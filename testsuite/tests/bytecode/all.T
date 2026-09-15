@@ -49,3 +49,21 @@ test('JoinPointsAsLabelsCount',
 test('JoinPointsAsLabelsCountOff',
      [extra_files(['JoinPointsAsLabels.hs']), req_interp, only_ways(['normal'])],
      run_command, [join_points_count_cmd.format(compiler='{compiler}', flags='-fno-bc-join-points-as-labels')])
+
+# Join points whose jumps are all in one case continuation BCO are compiled as
+# labels in that BCO (Note [Join points as labels]). -fno-float-in keeps the
+# join points outside the case alternatives that use them.
+join_conts_opts = join_points_opts + " -fno-float-in"
+test('JoinPointsInConts',
+     [extra_files(['JoinPointsInConts.hs']), req_interp, only_ways(['normal'])],
+     run_command,
+     ['{compiler} -e main ' + join_conts_opts + ' JoinPointsInConts.hs'])
+join_conts_count_cmd = ("{compiler} -fbyte-code -no-link -ddump-bcos -fforce-recomp "
+                        "-dno-typeable-binds -v0 " + join_conts_opts +
+                        " {flags} JoinPointsInConts.hs | grep -c '^ *ProtoBCO'")
+test('JoinPointsInContsCount',
+     [extra_files(['JoinPointsInConts.hs']), req_interp, only_ways(['normal'])],
+     run_command, [join_conts_count_cmd.format(compiler='{compiler}', flags='')])
+test('JoinPointsInContsCountOff',
+     [extra_files(['JoinPointsInConts.hs']), req_interp, only_ways(['normal'])],
+     run_command, [join_conts_count_cmd.format(compiler='{compiler}', flags='-fno-bc-join-points-as-labels')])

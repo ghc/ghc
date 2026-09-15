@@ -239,8 +239,31 @@ data JoinTarget = JoinTarget
   , jt_bco    :: !BcoId       -- ^ the BCO containing the label
   }
 
+-- | A join point compiled as a label in scope.
+data JoinBinding
+  = JoinLabel !JoinTarget
+  -- | The label goes into a continuation BCO whose code is not generated yet
+  -- ('PendingJoin'); there must be no jump to it before.
+  | JoinLabelPending
+
 -- | The join points compiled as labels in scope
-type JoinEnv = UniqMap Id JoinTarget
+type JoinEnv = UniqMap Id JoinBinding
+
+-- | A join point whose label and RHS go into the continuation BCO of a case
+-- nested in its let body. See Note [Join points as labels].
+data PendingJoin = PendingJoin
+  { pj_id     :: !Id
+  , pj_params :: ![Id]
+  , pj_rhs    :: !CgStgExpr
+  , pj_fvs    :: ![Id]          -- ^ the free variables of the RHS in 'pj_env'
+  , pj_env    :: !BCEnv         -- ^ the environment of the definition
+  , pj_base   :: !JoinBaseDepth -- ^ the stack depth of the definition
+  , pj_sequel :: !Sequel        -- ^ sequel of the let-no-escape
+  }
+
+-- | The pending join points in scope, by the binder of the case whose
+-- continuation BCO gets their labels.
+type PendingJoins = UniqMap Id [PendingJoin]
 
 {-
 ppBCEnv :: BCEnv -> SDoc
@@ -570,10 +593,12 @@ returnUnboxedTuple d s p es = do
 schemeE :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
 schemeE d s p (StgLit lit) = returnUnliftedAtom d s p (StgLitArg lit)
 schemeE d s p e@(StgApp f args) = do
-   m_target <- lookupJoinTarget f
-   case m_target of
+   m_join <- lookupJoinBinding f
+   case m_join of
      -- A jump to a join point compiled as a label
-     Just target -> schemeJump d s p f target args
+     Just (JoinLabel target) -> schemeJump d s p f target args
+     Just JoinLabelPending ->
+       pprPanic "schemeE: jump to a join point before its label is placed" (ppr f)
      Nothing
        | null args, isUnliftedType (idType f) -> returnUnliftedAtom d s p (StgVarArg f)
        -- Delegate tail-calls to schemeT.
@@ -581,12 +606,16 @@ schemeE d s p e@(StgApp f args) = do
 schemeE d s p e@(StgConApp {}) = schemeT d s p e
 schemeE d s p e@(StgOpApp {}) = schemeT d s p e
 schemeE d s p (StgLetNoEscape xlet bnd body) = do
-   as_label <- case bnd of
-     StgNonRec j StgRhsClosure{} -> isJoinLabel j
-     _ -> pure False
+   placement <- case bnd of
+     StgNonRec j StgRhsClosure{} -> joinPlacement j
+     _ -> pure Nothing
    case bnd of
-     StgNonRec j (StgRhsClosure _ _ _ params rhs _)
-       | as_label -> schemeJoinPoint d s p j params rhs body
+     StgNonRec j rhs_closure@(StgRhsClosure _ _ _ params rhs _)
+       | Just (ContPath []) <- placement
+       -> schemeJoinPoint d s p j params rhs body
+       -- the innermost continuation of the path gets the label
+       | Just (ContPath (k : _)) <- placement
+       -> schemeJoinPointInCont d s p j k (fvsToEnv p rhs_closure) params rhs body
      -- Other join points are compiled like ordinary lets, i.e. as heap
      -- closures. See also Note [Join points and bytecode preparation] in
      -- GHC.Stg.BcPrep.
@@ -717,6 +746,68 @@ schemeJoinPoint d s p j params rhs body = do
      (text "schemeJoinPoint: body falls through into" <+> ppr j)
    return (body_code `appOL` (LABEL label `consOL` rhs_code))
 
+-- | Compile @let-no-escape j = \params -> rhs in body@ with @j@ as a label in
+-- the continuation BCO of the case with binder @k@ in @body@: record the join
+-- point for 'doCase', and compile @body@. See Note [Join points as labels].
+schemeJoinPointInCont :: StackDepth -> Sequel -> BCEnv -> Id -> Id -> [Id] -> [Id]
+                      -> CgStgExpr -> CgStgExpr -> BcM BCInstrList
+schemeJoinPointInCont d s p j k fvs params rhs body = do
+   let pending = PendingJoin { pj_id = j
+                             , pj_params = params
+                             , pj_rhs = rhs
+                             , pj_fvs = fvs
+                             , pj_env = p
+                             , pj_base = JoinBaseDepth d
+                             , pj_sequel = s }
+   body_code <- withPendingJoin k pending $ schemeE d s p body
+   placed <- isJoinPlaced j
+   unless placed $
+     pprPanic "schemeJoinPointInCont: no continuation for the label of"
+       (ppr j <+> text "in the case of" <+> ppr k)
+   return body_code
+
+-- | Place the labels and RHSs of the pending join points of a continuation
+-- BCO: generate the code of the alternatives with the join points in scope,
+-- followed by the labels and RHSs. The stack of the continuation BCO below its
+-- frame is the stack of the enclosing BCO, which has the stack of the
+-- definition below. See Note [Join points as labels].
+placePendingJoins :: BCEnv -> [PendingJoin] -> BcM BCInstrList -> BcM BCInstrList
+placePendingJoins _ [] alts_code = alts_code
+placePendingJoins p pendings alts_code = do
+   platform <- profilePlatform <$> getProfile
+   bco <- getCurrentBco
+   labels <- mapM (const getLabelBc) pendings
+   let target pj label = JoinTarget { jt_label = label
+                                    , jt_base = pj_base pj
+                                    , jt_params = pj_params pj
+                                    , jt_sequel = pj_sequel pj
+                                    , jt_bco = bco }
+       with_targets act =
+         foldr (\(pj, label) -> withJoinPoint (pj_id pj) (target pj label)) act
+               (zip pendings labels)
+       place_rhs pj label = do
+         let JoinBaseDepth base = pj_base pj
+             p_def = pj_env pj
+             param_szsb = map (joinParamSize platform) (pj_params pj)
+             p_rhs = UniqMap.addListToUniqMap p_def
+                       (zip (pj_params pj) (mkStackOffsets base param_szsb))
+             d_rhs = base + sum param_szsb
+         -- The RHS reads its free variables where the definition had them.
+         massertPpr (and [ UniqMap.lookupUniqMap p v == UniqMap.lookupUniqMap p_def v
+                         | v <- pj_fvs pj ])
+           (text "placePendingJoins: free variables moved for" <+> ppr (pj_id pj))
+         markJoinPlaced (pj_id pj)
+         rhs_code <- schemeE d_rhs (pj_sequel pj) p_rhs (pj_rhs pj)
+         return (LABEL label `consOL` rhs_code)
+   with_targets $ do
+     code <- alts_code
+     -- The alternatives must not fall through into the labels.
+     massertPpr (endsInControlTransfer code)
+       (text "placePendingJoins: alternatives fall through into"
+         <+> ppr (map pj_id pendings))
+     rhs_codes <- zipWithM place_rhs pendings labels
+     return (code `appOL` concatOL rhs_codes)
+
 -- | Compile a jump @j args@ to a join point compiled as a label: push the
 -- arguments, slide them down to the join point's base depth, and jump.
 -- See Note [Join points as labels].
@@ -763,6 +854,7 @@ endsInControlTransfer code
       RETURN_TUPLE -> True
       JMP{} -> True
       CASEFAIL -> True
+      PRIMCALL -> True  -- returns to the scheduler
       _ -> False
 
 
@@ -1590,6 +1682,10 @@ doCase d s p scrut bndr alts
      case m_inline_scrut of
        -- See Note [Inlined case continuations]
        Just compute_scrut -> do
+          pendings <- takePendingJoins bndr
+          unless (null pendings) $
+            pprPanic "doCase: join point labels for the inlined case of"
+              (ppr bndr <+> ppr (map pj_id pendings))
           alt_final0 <- alts_code
           (scrut_code, szb) <- compute_scrut d p
           -- A mismatch means the alternatives would read the wrong stack
@@ -1604,7 +1700,8 @@ doCase d s p scrut bndr alts
        Nothing -> do
           -- The alternatives go into the continuation BCO (the scrutinee
           -- stays in the current one).
-          alt_final0 <- withNewBco alts_code
+          pendings <- takePendingJoins bndr
+          alt_final0 <- withNewBco $ placePendingJoins p pendings alts_code
           let
 
               -- drop the stg_ctoi_*_info header...
@@ -1674,22 +1771,25 @@ doCase d s p scrut bndr alts
 
 -- | Whether a join point binding can be compiled as a label, and if not, why.
 data JoinPointVerdict
-  = JoinAsLabel
+  = JoinAsLabel             -- ^ a label in the BCO of the definition
+  | JoinInCont !ContPath    -- ^ a label in a continuation BCO nested in it
   | JoinRejectBreakpoints   -- ^ breakpoints are enabled
   | JoinRejectDisabled      -- ^ -fno-bc-join-points-as-labels
   | JoinRejectConRhs        -- ^ the RHS is a constructor application
   | JoinRejectRecGroup      -- ^ a group of several (mutually) recursive join points
   | JoinRejectRecursive !OtherwiseEligible  -- ^ self-recursive
-  | JoinRejectCrossBco !CrossBco -- ^ some jump would be emitted into another BCO
+  | JoinRejectCrossBco !CrossBco -- ^ the jumps are not all in one BCO
   deriving Eq
 
--- | Where the occurrences of a join point that is rejected for jumps from other
--- BCOs are. Only for measurements (-ddump-bcos), see 'crossBcoClass'.
+-- | The case continuation BCOs enclosing some code, relative to an enclosing
+-- definition, named by the binders of their cases, innermost first. Empty for
+-- code in the BCO of the definition itself.
+newtype ContPath = ContPath [Id]
+  deriving Eq
+
+-- | Why the occurrences of a join point are not all jumps in one BCO.
 data CrossBco
-  = CrossOneContDepth1   -- ^ all jumps are in one continuation BCO nested
-                         --   directly in the definition's BCO
-  | CrossOneContDeeper   -- ^ all jumps are in one continuation BCO nested deeper
-  | CrossSpread          -- ^ jumps in more than one BCO, none in a closure
+  = CrossSpread          -- ^ jumps in more than one BCO, none in a closure
   | CrossClosure         -- ^ some occurrence is in a closure RHS
   | CrossOther           -- ^ some occurrence is not a jump in tail position
   deriving Eq
@@ -1702,6 +1802,13 @@ data OtherwiseEligible = OtherwiseEligible | NotOtherwiseEligible
 -- | The verdicts for all join point binders of a module. Every binder of a
 -- recursive group gets the group's verdict.
 type JoinPointVerdicts = UniqMap Id JoinPointVerdict
+
+-- | Where the label of a join point is, relative to its definition, if it is
+-- compiled as a label.
+verdictPlacement :: JoinPointVerdict -> Maybe ContPath
+verdictPlacement JoinAsLabel = Just (ContPath [])
+verdictPlacement (JoinInCont path) = Just path
+verdictPlacement _ = Nothing
 
 -- | Decide for every join point of the module whether it is compiled as a label.
 joinPointVerdicts :: Platform -> DynFlags -> [CgStgTopBinding] -> JoinPointVerdicts
@@ -1722,19 +1829,19 @@ joinPointVerdicts platform dflags = foldl' top UniqMap.emptyUniqMap
       StgCase scrut _ _ alts -> foldl' (\acc alt -> expr acc (alt_rhs alt)) (expr vs scrut) alts
       StgLet _ bind body -> expr (binds vs bind) body
       StgLetNoEscape _ bind body ->
-        -- The verdict depends on those of the join points nested in the
-        -- binding and the body, so decide them first.
+        -- The verdict depends on the placement of the join points nested in
+        -- the binding and the body, so decide them first.
         let !vs' = expr (binds vs bind) body
-            is_label j = UniqMap.lookupUniqMap vs' j == Just JoinAsLabel
-            verdict = joinPointVerdict platform dflags is_label bind body
+            placement j = verdictPlacement =<< UniqMap.lookupUniqMap vs' j
+            verdict = joinPointVerdict platform dflags placement bind body
         in UniqMap.addListToUniqMap vs' [ (j, verdict) | j <- bindBinders bind ]
       StgTick _ body -> expr vs body
 
 -- | The verdict for the join point binding of @let-no-escape bind in body@,
--- given which of the join points nested in it are compiled as labels.
-joinPointVerdict :: Platform -> DynFlags -> (Id -> Bool) -> CgStgBinding -> CgStgExpr
-                 -> JoinPointVerdict
-joinPointVerdict platform dflags is_label bind body
+-- given the placement of the labels of the join points nested in it.
+joinPointVerdict :: Platform -> DynFlags -> (Id -> Maybe ContPath) -> CgStgBinding
+                 -> CgStgExpr -> JoinPointVerdict
+joinPointVerdict platform dflags placement bind body
   | gopt Opt_InsertBreakpoints dflags = JoinRejectBreakpoints
   | not (gopt Opt_BcJoinPointsAsLabels dflags) = JoinRejectDisabled
   | otherwise = case bind of
@@ -1742,101 +1849,79 @@ joinPointVerdict platform dflags is_label bind body
       StgNonRec j (StgRhsClosure _ _ _ params rhs_body _)
         | exprMentions j rhs_body
         -> JoinRejectRecursive (recursive j params rhs_body)
-        | stays j params body
-        -> JoinAsLabel
         | otherwise
-        -> JoinRejectCrossBco (crossBcoClass platform dflags is_label j (length params) body)
+        -> case singleBco (sites j params body) of
+             Right (ContPath []) -> JoinAsLabel
+             Right path -> JoinInCont path
+             Left cross -> JoinRejectCrossBco cross
       -- a self-recursive join point is a singleton group
       StgRec [(j, StgRhsClosure _ _ _ params rhs_body _)]
         -> JoinRejectRecursive (recursive j params rhs_body)
       StgRec{} -> JoinRejectRecGroup
   where
-    stays j params = joinJumpsStayInBco platform dflags is_label j (length params)
+    sites j params = joinJumpSites platform dflags placement j (length params)
+    -- as for v1: all jumps in the body and the RHS in the defining BCO
     recursive j params rhs_body
-      | stays j params body && stays j params rhs_body = OtherwiseEligible
-      | otherwise = NotOtherwiseEligible
+      | all (== SiteIn (ContPath [])) (sites j params body ++ sites j params rhs_body)
+      = OtherwiseEligible
+      | otherwise
+      = NotOtherwiseEligible
 
--- | Is every occurrence of the join point @j@ in the expression a saturated
--- jump whose code is emitted into the same BCO as the expression's own code?
--- The predicate tells which join points nested in the expression are compiled
--- as labels.
-joinJumpsStayInBco :: Platform -> DynFlags -> (Id -> Bool) -> Id -> Int -> CgStgExpr
-                   -> Bool
-joinJumpsStayInBco platform dflags is_label j arity = go
+-- | The BCO that all the occurrences are jumps in, if there is one.
+singleBco :: [JumpSite] -> Either CrossBco ContPath
+singleBco sites
+  | SiteInClosure `elem` sites = Left CrossClosure
+  | SiteOther `elem` sites = Left CrossOther
+  | otherwise = case sites of
+      [] -> Right (ContPath [])  -- no jumps at all
+      SiteIn path : rest
+        | all (== SiteIn path) rest -> Right path
+      _ -> Left CrossSpread
+
+-- | An occurrence of a join point.
+data JumpSite
+  = SiteIn !ContPath  -- ^ a saturated jump, emitted into the BCO at this path
+  | SiteInClosure     -- ^ any occurrence in the RHS of a closure
+  | SiteOther         -- ^ any other occurrence
+  deriving Eq
+
+-- | The occurrences of the join point @j@ in an expression, and which BCOs
+-- their code is emitted into. The placement tells where the labels of the join
+-- points nested in the expression are, and 'inlinedCaseScrutinee' which cases
+-- have continuation BCOs, exactly as in code generation.
+joinJumpSites :: Platform -> DynFlags -> (Id -> Maybe ContPath) -> Id -> Int -> CgStgExpr
+              -> [JumpSite]
+joinJumpSites platform dflags placement j arity = go []
   where
-    no_mention = not . argMentions j
-    no_rhs_mention = not . bindMentions j
-
-    go e = case e of
-      StgApp f args
-        | f == j    -> length args == arity && all no_mention args
-        | otherwise -> all no_mention args
-      StgLit{} -> True
-      StgConApp _ _ args _ -> all no_mention args
-      StgOpApp _ args _ -> all no_mention args
-      -- no alternatives: the scrutinee is compiled in tail position
-      StgCase scrut _ _ [] -> go scrut
-      StgCase scrut bndr _ alts
-        | exprMentions j scrut -> False
-        | isJust (inlinedCaseScrutinee platform dflags scrut bndr)
-        -> all (go . alt_rhs) alts
-        | otherwise  -- the alternatives go into a continuation BCO
-        -> not (any (exprMentions j . alt_rhs) alts)
-      -- every let-bound RHS is a BCO of its own
-      StgLet _ bind body -> no_rhs_mention bind && go body
-      StgLetNoEscape _ bind body
-        | StgNonRec j' (StgRhsClosure _ _ _ _ rhs_body _) <- bind
-        , is_label j'
-        -- an inner label's body stays in this BCO
-        -> go rhs_body && go body
-        | otherwise
-        -> no_rhs_mention bind && go body
-      StgTick tick body -> not (tickMentions j tick) && go body
-
--- | Classify the occurrences of a join point that 'joinJumpsStayInBco' rejects.
--- Only for measurements; this does not affect code generation.
-crossBcoClass :: Platform -> DynFlags -> (Id -> Bool) -> Id -> Int -> CgStgExpr
-              -> CrossBco
-crossBcoClass platform dflags is_label j arity body
-  | SiteInClosure `elem` sites = CrossClosure
-  | SiteOther `elem` sites = CrossOther
-  | SiteIn path : rest <- sites
-  , all (== SiteIn path) rest
-  = case path of
-      [_] -> CrossOneContDepth1
-      _   -> CrossOneContDeeper  -- not [], or the join point would be eligible
-  | otherwise = CrossSpread
-  where
-    sites = go [] body
     mentions_in args = any (argMentions j) args
 
-    -- The path lists the binders of the cases whose continuation BCOs
-    -- enclose the occurrence, innermost first.
+    -- the path in reverse, innermost first
     go path e = case e of
       StgApp f args
-        | f == j, length args == arity, not (mentions_in args) -> [SiteIn path]
+        | f == j, length args == arity, not (mentions_in args) -> [SiteIn (ContPath path)]
         | f == j || mentions_in args -> [SiteOther]
         | otherwise -> []
       StgLit{} -> []
       StgConApp _ _ args _ -> [SiteOther | mentions_in args]
       StgOpApp _ args _ -> [SiteOther | mentions_in args]
+      -- no alternatives: the scrutinee is compiled in tail position
       StgCase scrut _ _ [] -> go path scrut
       StgCase scrut bndr _ alts ->
         [SiteOther | exprMentions j scrut] ++
         if isJust (inlinedCaseScrutinee platform dflags scrut bndr)
           then concatMap (go path . alt_rhs) alts
+          -- the alternatives go into a continuation BCO
           else concatMap (go (bndr : path) . alt_rhs) alts
-      StgLet _ bind body' -> [SiteInClosure | bindMentions j bind] ++ go path body'
-      StgLetNoEscape _ bind body'
+      -- every let-bound RHS is a BCO of its own
+      StgLet _ bind body -> [SiteInClosure | bindMentions j bind] ++ go path body
+      StgLetNoEscape _ bind body
         | StgNonRec j' (StgRhsClosure _ _ _ _ rhs_body _) <- bind
-        , is_label j'
-        -> go path rhs_body ++ go path body'
+        , Just (ContPath rhs_path) <- placement j'
+        -- the RHS of a label is emitted where the label is
+        -> go (rhs_path ++ path) rhs_body ++ go path body
         | otherwise
-        -> [SiteInClosure | bindMentions j bind] ++ go path body'
-      StgTick tick body' -> [SiteOther | tickMentions j tick] ++ go path body'
-
-data JumpSite = SiteIn [Id] | SiteInClosure | SiteOther
-  deriving Eq
+        -> [SiteInClosure | bindMentions j bind] ++ go path body
+      StgTick tick body -> [SiteOther | tickMentions j tick] ++ go path body
 
 -- | Does the variable occur anywhere in the expression, including in closures
 -- and breakpoint free variables?
@@ -1880,6 +1965,9 @@ joinPointStats :: JoinPointVerdicts -> SDoc
 joinPointStats verdict_map =
   text "join points:" <+> int (length verdicts) <+> text "total,"
     <+> number (== JoinAsLabel) <+> text "as labels,"
+    <+> number isInCont <+> text "as labels in continuations"
+    <+> parens (number (inContDepth (== 1)) <+> text "depth 1," <+>
+                number (inContDepth (> 1)) <+> text "deeper") <> comma
     <+> number isRecursive <+> text "rejected-recursive"
     <+> parens (number (== JoinRejectRecursive OtherwiseEligible)
                 <+> text "otherwise eligible") <> comma
@@ -1889,9 +1977,7 @@ joinPointStats verdict_map =
     <+> number (== JoinRejectDisabled) <+> text "rejected-disabled,"
     <+> number isCrossBco <+> text "rejected-cross-BCO"
     <+> parens (hsep (punctuate comma
-          [ number (== JoinRejectCrossBco CrossOneContDepth1) <+> text "one-cont-depth1"
-          , number (== JoinRejectCrossBco CrossOneContDeeper) <+> text "one-cont-deeper"
-          , number (== JoinRejectCrossBco CrossSpread) <+> text "spread"
+          [ number (== JoinRejectCrossBco CrossSpread) <+> text "spread"
           , number (== JoinRejectCrossBco CrossClosure) <+> text "in-closure"
           , number (== JoinRejectCrossBco CrossOther) <+> text "other" ]))
   where
@@ -1902,6 +1988,10 @@ joinPointStats verdict_map =
     isRecursive _ = False
     isCrossBco JoinRejectCrossBco{} = True
     isCrossBco _ = False
+    isInCont JoinInCont{} = True
+    isInCont _ = False
+    inContDepth p (JoinInCont (ContPath path)) = p (length path)
+    inContDepth _ _ = False
 
 {-
 Note [Join points as labels]
@@ -1933,15 +2023,14 @@ code follows the body. Void parameters take no stack space at either side
 
   * All jumps are forward, so these are no loops: we need no safepoint.
   * The body never falls through into L: every expression in tail position
-    ends in a control transfer (ENTER, RETURN, RETURN_TUPLE, a JMP to a join
-    point, or CASEFAIL in an incomplete inlined case). 'schemeJoinPoint'
-    asserts this.
+    ends in a control transfer (ENTER, RETURN, RETURN_TUPLE, PRIMCALL, a JMP
+    to a join point, or CASEFAIL in an incomplete inlined case).
+    'schemeJoinPoint' and 'placePendingJoins' assert this.
   * The stack check needs no changes: 'mkProtoBCO' sums the stack use of all
     instructions of the BCO, which includes the pushes of the RHS and of every
     jump.
   * A jump has the same sequel as the definition (asserted): it is in tail
-    position of the body, and emitted into the same BCO, and only a case
-    continuation that is not inlined changes the sequel.
+    position of the body, and only the scrutinee of a case changes the sequel.
 
 We give each BCO a 'BcoId' ('withNewBco') when we start generating its code:
 in 'schemeR_wrk' (functions, thunks, top-level bindings) and for the
@@ -1951,6 +2040,28 @@ A 'JoinTarget' records the BCO of its label. The 'JoinEnv' stays visible in
 the code of nested BCOs, so that a jump that the analysis wrongly let through
 panics in 'schemeJump' instead of silently compiling to a PUSH_G of a local
 variable.
+
+Labels in continuations. If all jumps are emitted into one continuation BCO
+K nested in the BCO of the definition, the label and the RHS go into K
+instead, after its alternatives. The path to K is the list of binders of the
+cases whose alternatives lead to it ('ContPath'). K is the innermost one, and
+'schemeJoinPointInCont' records a 'PendingJoin' for its binder: the
+definition's environment, depth d and sequel. When 'doCase' generates K's code
+it takes the pending join points of its binder ('placePendingJoins'), puts
+them into the 'JoinEnv' with fresh labels, compiles the alternatives, and
+appends the labels and RHSs compiled exactly as above, at depth d and with the
+definition's environment. This is sound because a continuation BCO sees the
+stack of the BCO that pushed its frame: when K is entered, it drops the frame
+headers, which leaves the stack as it was at the case (at depth d_case >= d),
+plus the case binder. So the stack up to d is that at the definition, and a
+jump can slide its arguments down to d as in the defining BCO. No instruction
+of K relies on K's frame after its entry: the stack checks happen at BCO entry
+and returns, and a CCALL pushes a frame of its own. The free variables of the
+RHS must be at the same offsets in the environment of the case (asserted);
+the pointer bitmap of K's frame covers them while the scrutinee runs. Until
+its label is placed, a join point is marked pending in the 'JoinEnv', so a jump
+from elsewhere panics; so does a pending join point for an inlined case, or
+one whose label was never placed or was placed twice.
 
 Eligibility. The verdicts ('joinPointVerdicts') are computed for the whole
 module before code generation, and counted in the "join points" section of
@@ -1967,16 +2078,16 @@ as a label if
   * the RHS is a closure, not a constructor application;
   * it is not recursive, neither a 'StgRec' group nor mentioning j in rhs: a
     backward jump would be a loop without a safepoint;
-  * every occurrence of j in body is a saturated tail call that is emitted
-    into the current BCO ('joinJumpsStayInBco'). Code goes into another BCO in
-    the RHS of a let, and in the alternatives of a case whose continuation is
-    not inlined. Whether a case is inlined must be decided by the same function
+  * every occurrence of j in body is a saturated tail call, and they are all
+    emitted into the same BCO: the current one, or one continuation BCO nested
+    in it ('joinJumpSites'). Code goes into another BCO in the RHS of a let,
+    and in the alternatives of a case whose continuation is not inlined. Whether a case is inlined must be decided by the same function
     as in 'doCase', 'inlinedCaseScrutinee', or the analysis and the code
     generator could disagree. Occurrences of j anywhere else, e.g. in a closure
     or in a breakpoint's free variables, make the binding ineligible, even
-    though STG's invariants should rule them out. A jump in a join point
-    nested in body stays in the BCO if the nested one is a label itself, so
-    the verdicts of nested join points are decided first.
+    though STG's invariants should rule them out. The RHS of a join point
+    nested in body goes where its label goes, so the verdicts of nested join
+    points are decided first.
 -}
 
 {-
@@ -3349,6 +3460,7 @@ data BcM_Env
         , last_bp_tick   :: !(Maybe StgTickish)
         , join_verdicts  :: !JoinPointVerdicts
         , join_env       :: !JoinEnv -- ^ join points compiled as labels in scope
+        , pending_joins  :: !PendingJoins -- ^ labels to place in continuation BCOs
         , current_bco    :: !BcoId   -- ^ the BCO whose code is being generated
         }
 
@@ -3361,6 +3473,7 @@ data BcM_State
           -- 'InternalBreakpointId'. See Note [Breakpoint identifiers] in
           -- GHC.ByteCode.Breakpoints.
         , nextBcoId      :: !Word   -- ^ For generating 'BcoId's
+        , placedJoins    :: !IdSet  -- ^ pending join points whose labels are placed
         }
 
 newtype BcM r = BcM (BcM_Env -> BcM_State -> IO (r, BcM_State))
@@ -3370,8 +3483,9 @@ newtype BcM r = BcM (BcM_Env -> BcM_State -> IO (r, BcM_State))
 runBc :: HscEnv -> Module -> Maybe ModBreaks -> JoinPointVerdicts -> BcM r
       -> IO (r, BcM_State)
 runBc hsc_env this_mod mbs verdicts (BcM m)
-   = m (BcM_Env hsc_env this_mod mbs Nothing verdicts UniqMap.emptyUniqMap (BcoId 0))
-       (BcM_State 0 0 IntMap.empty 1)
+   = m (BcM_Env hsc_env this_mod mbs Nothing verdicts UniqMap.emptyUniqMap
+                UniqMap.emptyUniqMap (BcoId 0))
+       (BcM_State 0 0 IntMap.empty 1 emptyVarSet)
 
 instance HasDynFlags BcM where
     getDynFlags = hsc_dflags <$> getHscEnv
@@ -3435,18 +3549,42 @@ withNewBco (BcM act) = BcM $ \env st ->
 getCurrentBco :: BcM BcoId
 getCurrentBco = BcM $ \env st -> pure (current_bco env, st)
 
--- | Is this let-no-escape binder compiled as a label?
-isJoinLabel :: Id -> BcM Bool
-isJoinLabel j = BcM $ \env st ->
-  pure (UniqMap.lookupUniqMap (join_verdicts env) j == Just JoinAsLabel, st)
+-- | Is this let-no-escape binder compiled as a label, and where?
+joinPlacement :: Id -> BcM (Maybe ContPath)
+joinPlacement j = BcM $ \env st ->
+  pure (verdictPlacement =<< UniqMap.lookupUniqMap (join_verdicts env) j, st)
 
 withJoinPoint :: Id -> JoinTarget -> BcM a -> BcM a
 withJoinPoint j target (BcM act) = BcM $ \env st ->
-  act env{join_env = UniqMap.addToUniqMap (join_env env) j target} st
+  act env{join_env = UniqMap.addToUniqMap (join_env env) j (JoinLabel target)} st
 
-lookupJoinTarget :: Id -> BcM (Maybe JoinTarget)
-lookupJoinTarget f = BcM $ \env st ->
+lookupJoinBinding :: Id -> BcM (Maybe JoinBinding)
+lookupJoinBinding f = BcM $ \env st ->
   pure (UniqMap.lookupUniqMap (join_env env) f, st)
+
+-- | Record a join point whose label goes into the continuation BCO of the case
+-- with the given binder.
+withPendingJoin :: Id -> PendingJoin -> BcM a -> BcM a
+withPendingJoin k pending (BcM act) = BcM $ \env st ->
+  act env{ join_env = UniqMap.addToUniqMap (join_env env) (pj_id pending) JoinLabelPending
+         , pending_joins = UniqMap.addToUniqMap_C (++) (pending_joins env) k [pending] } st
+
+-- | The pending join points for the case with the given binder. Panics if one
+-- of them is already placed.
+takePendingJoins :: Id -> BcM [PendingJoin]
+takePendingJoins k = BcM $ \env st -> do
+  let pendings = fromMaybe [] (UniqMap.lookupUniqMap (pending_joins env) k)
+      placed = [ pj_id pj | pj <- pendings, pj_id pj `elemVarSet` placedJoins st ]
+  unless (null placed) $
+    pprPanic "takePendingJoins: labels placed twice" (ppr k <+> ppr placed)
+  pure (pendings, st)
+
+markJoinPlaced :: Id -> BcM ()
+markJoinPlaced j = BcM $ \_ st ->
+  pure ((), st{placedJoins = extendVarSet (placedJoins st) j})
+
+isJoinPlaced :: Id -> BcM Bool
+isJoinPlaced j = BcM $ \_ st -> pure (j `elemVarSet` placedJoins st, st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
