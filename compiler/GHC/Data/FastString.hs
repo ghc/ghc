@@ -316,13 +316,8 @@ data FastStringTable = FastStringTable
   -- ^ The unique ID counter shared with all buckets
   --
   -- We unpack the 'FastMutInt' counter as it is always consumed strictly.
-  {-# NOUNPACK #-} !FastMutInt
+  {-# UNPACK #-} !FastMutInt
   -- ^ Number of computed z-encodings for all buckets.
-  --
-  -- We mark this as 'NOUNPACK' as this 'FastMutInt' is retained by a thunk
-  -- in 'internSB' and needs to be boxed any way.
-  -- If this is unpacked, then we box this single 'FastMutInt' once for each
-  -- allocated FastString.
   (Array# (IORef FastStringTableSegment)) -- ^  concurrent segments
 
 data FastStringTableSegment = FastStringTableSegment
