@@ -768,9 +768,9 @@ schemeJoinPointInCont d s p j k fvs params rhs body = do
 
 -- | Place the labels and RHSs of the pending join points of a continuation
 -- BCO: generate the code of the alternatives with the join points in scope,
--- followed by the labels and RHSs. The stack of the continuation BCO below its
--- frame is the stack of the enclosing BCO, which has the stack of the
--- definition below. See Note [Join points as labels].
+-- followed by the labels and RHSs, innermost join point first. The stack of
+-- the continuation BCO below its frame is the stack of the enclosing BCO,
+-- which has the stack of the definition below. See Note [Join points as labels].
 placePendingJoins :: BCEnv -> [PendingJoin] -> BcM BCInstrList -> BcM BCInstrList
 placePendingJoins _ [] alts_code = alts_code
 placePendingJoins p pendings alts_code = do
@@ -2021,7 +2021,11 @@ with the definition's environment, not the one of any jump, even though its
 code follows the body. Void parameters take no stack space at either side
 ('joinParamSize' and 'pushAtom' agree on this).
 
-  * All jumps are forward, so these are no loops: we need no safepoint.
+  * All jumps are forward, so these are no loops: we need no safepoint. This
+    holds for several join points sharing one continuation BCO because they
+    are placed innermost first: only the RHS of an inner join point can jump
+    to an outer one, and the outer label follows it. The RHS of an outer join
+    point cannot mention an inner one, which is not in scope there.
   * The body never falls through into L: every expression in tail position
     ends in a control transfer (ENTER, RETURN, RETURN_TUPLE, PRIMCALL, a JMP
     to a join point, or CASEFAIL in an incomplete inlined case).
@@ -2049,7 +2053,8 @@ cases whose alternatives lead to it ('ContPath'). K is the innermost one, and
 definition's environment, depth d and sequel. When 'doCase' generates K's code
 it takes the pending join points of its binder ('placePendingJoins'), puts
 them into the 'JoinEnv' with fresh labels, compiles the alternatives, and
-appends the labels and RHSs compiled exactly as above, at depth d and with the
+appends the labels and RHSs, innermost join point first, compiled exactly as
+above, at depth d and with the
 definition's environment. This is sound because a continuation BCO sees the
 stack of the BCO that pushed its frame: when K is entered, it drops the frame
 headers, which leaves the stack as it was at the case (at depth d_case >= d),
@@ -3566,11 +3571,17 @@ lookupJoinBinding f = BcM $ \env st ->
 -- with the given binder.
 withPendingJoin :: Id -> PendingJoin -> BcM a -> BcM a
 withPendingJoin k pending (BcM act) = BcM $ \env st ->
-  act env{ join_env = UniqMap.addToUniqMap (join_env env) (pj_id pending) JoinLabelPending
-         , pending_joins = UniqMap.addToUniqMap_C (++) (pending_joins env) k [pending] } st
+  -- Innermost first: the RHS of a join point can jump to one defined further
+  -- out, so the outer label must follow the inner RHS to keep jumps forward.
+  let others = fromMaybe [] (UniqMap.lookupUniqMap (pending_joins env) k)
+  in act env{ join_env = UniqMap.addToUniqMap (join_env env) (pj_id pending) JoinLabelPending
+            , pending_joins =
+                UniqMap.addToUniqMap (pending_joins env) k (pending : others) } st
 
--- | The pending join points for the case with the given binder. Panics if one
--- of them is already placed.
+-- | The pending join points for the case with the given binder, innermost
+-- first. Panics if one of them is already placed. The entry stays in the
+-- environment, which is harmless: 'doCase' visits every case binder once, and
+-- placing a label twice panics.
 takePendingJoins :: Id -> BcM [PendingJoin]
 takePendingJoins k = BcM $ \env st -> do
   let pendings = fromMaybe [] (UniqMap.lookupUniqMap (pending_joins env) k)

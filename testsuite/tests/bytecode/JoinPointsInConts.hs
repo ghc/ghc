@@ -48,6 +48,23 @@ cont2 n x =
                   z     -> j 3# z
 {-# NOINLINE cont2 #-}
 
+-- Two join points share one continuation, and the RHS of the inner one jumps
+-- to the outer one: the inner label and RHS must precede the outer label, so
+-- that the jump is forward.
+contShared :: Int -> Int -> Int
+contShared n x =
+  let outer :: Int# -> Int
+      outer a = I# (a +# 1#) + n
+      {-# NOINLINE outer #-}
+  in let inner :: Int# -> Int
+         inner b = if isTrue# (b ># 20#) then outer (b *# 2#) else outer (b +# 5#)
+         {-# NOINLINE inner #-}
+     in case opaque x of
+          I# 2# -> inner 30#
+          I# 5# -> outer 7#
+          I# y  -> inner y
+{-# NOINLINE contShared #-}
+
 -- Jumps from UNPACKed alternatives and from an inlined case inside the
 -- continuation.
 contUnpack :: Int -> Int -> Int
@@ -82,4 +99,5 @@ main :: IO ()
 main = do
   print (map (cont1 10) [1, 3], map (cont2 10) [1, 2, 4])
   print (map (contUnpack 10) [2, 17, 71, 80])
+  print (map (contShared 10) [1, 2, 3, 9])
   mapM (\k -> gcScrut [k .. k + 1000]) [1, 2] >>= print
