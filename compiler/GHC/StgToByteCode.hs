@@ -545,6 +545,9 @@ schemeE d s p (StgApp x [])
 schemeE d s p e@(StgApp {}) = schemeT d s p e
 schemeE d s p e@(StgConApp {}) = schemeT d s p e
 schemeE d s p e@(StgOpApp {}) = schemeT d s p e
+-- Join points are compiled like ordinary lets, i.e. as heap closures.
+-- They do reach this point: see Note [Join points and bytecode preparation]
+-- in GHC.Stg.BcPrep.
 schemeE d s p (StgLetNoEscape xlet bnd body)
    = schemeE d s p (StgLet xlet bnd body)
 schemeE d s p (StgLet _xlet

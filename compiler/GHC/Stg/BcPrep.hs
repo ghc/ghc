@@ -8,6 +8,9 @@
    - Protect Not-necessarily lifted join points, see
         Note [Not-necessarily-lifted join points]
 
+  Join points stay 'StgLetNoEscape', see
+  Note [Join points and bytecode preparation].
+
  -}
 
 module GHC.Stg.BcPrep ( bcPrep ) where
@@ -84,9 +87,10 @@ bcPrepExpr (StgTick tick rhs) =
 bcPrepExpr (StgLet xlet bnds expr) =
   StgLet xlet <$> bcPrepBind bnds
               <*> bcPrepExpr expr
+-- Keep the let-no-escape marker; see Note [Join points and bytecode preparation]
 bcPrepExpr (StgLetNoEscape xlne bnds expr) =
-  StgLet xlne <$> bcPrepBind bnds
-              <*> bcPrepExpr expr
+  StgLetNoEscape xlne <$> bcPrepBind bnds
+                      <*> bcPrepExpr expr
 bcPrepExpr (StgCase expr bndr alt_type alts) =
   StgCase <$> bcPrepExpr expr
           <*> pure bndr
@@ -154,6 +158,41 @@ newId ty = do
 
 prepFS :: FastString
 prepFS = fsLit "bcprep"
+
+{-
+Note [Join points and bytecode preparation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bcPrep keeps 'StgLetNoEscape' bindings as they are, so the bytecode generator
+can tell join points from ordinary lets.
+
+However, the breakpoint wrappers introduced above can break an invariant of
+Note [What is a non-escaping let] in GHC.CoreToStg. If a jump to a join point
+`j` sits inside a ticked expression that bcPrep wraps as
+
+  let bcprep = \[] -> tick<n> e in bcprep
+
+then `j` is a free variable of the closure `bcprep`, i.e. it is buried in a
+heap-allocated closure, violating invariant 2. (The wrapper is itself called in
+tail position, so the jump still returns to the code enclosing the definition
+of `j`; but it is made from the code of a different closure.)
+
+So after bcPrep, 'StgLetNoEscape' only records that the binder was a join point
+in Core. Consumers must not rely on invariant 2 without checking it:
+
+  * 'GHC.StgToByteCode' compiles 'StgLetNoEscape' like 'StgLet', which is correct
+    whether or not the invariant holds.
+  * 'GHC.Stg.EnforceEpt' handles 'StgLetNoEscape' exactly like 'StgLet'; its
+    special treatment of join points is keyed on 'isJoinId'
+    (Note [TagInfo of functions]), which bcPrep does not change.
+
+Without breakpoints (-fno-break-points) no wrappers are introduced and the
+invariant holds.
+
+We could instead turn such a binding back into a 'StgLet' here, but deciding
+that needs the same analysis (does any occurrence of the binder end up inside
+a closure?) that any consumer relying on the invariant must perform anyway,
+so we keep the marker and document its weaker meaning.
+-}
 
 {-
 

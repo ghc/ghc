@@ -154,6 +154,9 @@ All of this is provided x is:
 
 Under these circumstances we say that `x' is non-escaping.
 
+(On the bytecode path, breakpoint wrappers can break invariant 2 after the
+fact; see Note [Join points and bytecode preparation] in GHC.Stg.BcPrep.)
+
 An example of when (4) does not hold:
 
     let x = ...
