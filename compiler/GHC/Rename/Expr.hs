@@ -79,6 +79,7 @@ import Data.Ord
 import Data.Array
 import GHC.Driver.Env (HscEnv)
 import Data.Foldable (toList)
+import GHC.Unit.Module.Name
 
 {- Note [Handling overloaded and rebindable constructs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1490,7 +1491,7 @@ lookupQualifiedDoStmtNameN :: HasDebugCallStack => HsStmtContextRn
 lookupQualifiedDoStmtNameN ctxt std_occ
   -- Respect QualifiedDo; see Note [QualifiedDo]
   | Just mod_name <- qualifiedDoModuleName_maybe ctxt
-  = do { (nm, fvs) <- lookupNameWithQualifier mod_name std_occ
+  = do { (nm, fvs) <- lookupNameWithQualifier (mkModuleNameFS (mkFastStringShortText mod_name)) std_occ
        ; return (nm, fvs) }
 
   | otherwise  -- Respect -XRebindableSyntax

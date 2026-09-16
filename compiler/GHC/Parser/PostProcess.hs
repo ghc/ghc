@@ -1801,7 +1801,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
          -> PV (LocatedA b)
   -- | Disambiguate "do { ... }" (do notation)
   mkHsDoPV ::
-    SrcSpan -> DoAnn -> Maybe ModuleName -> LocatedA [LStmt GhcPs (LocatedA b)] ->
+    SrcSpan -> DoAnn -> Maybe HsModuleName -> LocatedA [LStmt GhcPs (LocatedA b)] ->
     PV (LocatedA b)
   -- | Disambiguate "( ... )" (parentheses)
   mkHsParPV :: SrcSpan -> EpToken "(" -> LocatedA b -> EpToken ")" -> PV (LocatedA b)

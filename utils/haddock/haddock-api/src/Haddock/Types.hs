@@ -416,6 +416,7 @@ type instance NoGhcTc DocNameI = DocNameI
 
 type instance IdP    DocNameI = DocName
 type instance IdOccP DocNameI = DocName
+type instance ModuleNameP DocNameI = ModuleName
 
 instance CollectPass DocNameI where
   collectXXPat _ ext = dataConCantHappen ext
