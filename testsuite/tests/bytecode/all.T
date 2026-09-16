@@ -223,3 +223,19 @@ test('JoinPointLoopN2',
       req_ghc_with_threaded_rts, req_ghc_smp,
       extra_hc_opts(loop_points_opts + ' +RTS -N2 -A1m -RTS')],
      compile_and_run, [''])
+
+# A rubbish literal (Note [Absent fillers] in GHC.Core.Opt.WorkWrap.Utils)
+# whose RuntimeRep is boxed stands in a field that the garbage collector
+# traces, so the bytecode generator must emit a real heap pointer for it and
+# not the zero word the assembler gives every other rubbish literal; see
+# Note [Rubbish literals of boxed type] in GHC.StgToByteCode. LitRubbishStatic
+# puts such a field in a top-level constructor, which is a static constructor
+# built at link time; LitRubbishPack puts one in a constructor built at run
+# time by PACK, alongside a live field and an absentError thunk. Both force
+# the value and then collect, since the failure is the collector following the
+# zero. They run in the normal way too, where they must pass either way.
+lit_rubbish_opts = "-O -fno-unoptimized-core-for-interpreter -fno-break-points"
+test('LitRubbishStatic', [extra_ways(ghci_ways), extra_hc_opts(lit_rubbish_opts)],
+     compile_and_run, [''])
+test('LitRubbishPack', [extra_ways(ghci_ways), extra_hc_opts(lit_rubbish_opts)],
+     compile_and_run, [''])

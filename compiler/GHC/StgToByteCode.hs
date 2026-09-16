@@ -48,6 +48,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Types.Var.Set
 import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Types ( unitDataConId )
 import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
 import GHC.Builtin.Uniques
@@ -371,7 +372,10 @@ schemeTopBind (id, rhs@(StgRhsCon _ dc _ _ args _))
   = do
     profile <- getProfile
     let
-      non_voids = addArgReps (assertNonVoidStgArgs args)
+      -- See Note [Rubbish literals of boxed type]. Substituting here, before
+      -- the layout below and the pointer/literal split further down, is what
+      -- keeps those two in agreement.
+      non_voids = addArgReps (assertNonVoidStgArgs (map subBoxedRubbish args))
       (tot_wds, --  #ptr_wds + #nonptr_wds
        ptr_wds, --  #ptr_wds
        nv_args_w_offsets) =
@@ -3690,7 +3694,62 @@ pushAtom d p (StgVarArg var)
             | otherwise -> do
               return (unitOL (PUSH_G (getName var)), szb)
 
+-- See Note [Rubbish literals of boxed type]
+pushAtom d p (StgLitArg lit)
+  | Just arg <- boxedRubbishArg lit = pushAtom d p arg
+
 pushAtom _ _ (StgLitArg lit) = pushLiteral True lit
+
+-- | A 'LitRubbish' of boxed representation, as the unit data constructor to
+-- put in its place. See Note [Rubbish literals of boxed type].
+boxedRubbishArg :: Literal -> Maybe StgArg
+boxedRubbishArg (LitRubbish _ rep)
+    -- Mirrors the 'LitRubbish' case of 'GHC.StgToCmm.Lit.cgLit', including its
+    -- use of 'expectOnly'; see Note [Post-unarisation invariants].
+  | BoxedRep _ <- expectOnly (runtimeRepPrimRep (text "boxedRubbishArg") rep)
+  = Just (StgVarArg unitDataConId)
+boxedRubbishArg _ = Nothing
+
+-- | 'boxedRubbishArg' on an argument, leaving every other argument alone.
+subBoxedRubbish :: StgArg -> StgArg
+subBoxedRubbish arg@(StgLitArg lit)
+  | Just arg' <- boxedRubbishArg lit = arg'
+  | otherwise                        = arg
+subBoxedRubbish arg = arg
+
+{-
+Note [Rubbish literals of boxed type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A 'LitRubbish' stands for a value that is known never to be used; see
+Note [Rubbish literals] in GHC.Types.Literal. The assembler lowers one to a
+zero word (the 'LitRubbish' case of 'literal' in GHC.ByteCode.Asm), on the
+grounds that NULL is the value most likely to crash loudly if absence analysis
+was wrong.
+
+That is fine for a field the garbage collector does not look at, but a
+'LitRubbish' whose RuntimeRep is boxed occupies a field that the collector
+*will* trace, and a zero there is not a heap pointer. Note that the two halves
+of 'schemeTopBind' would disagree about such a field: the heap layout comes
+from 'mkVirtHeapOffsetsWithPadding', which works from the arguments'
+representations and so counts a boxed rubbish literal in 'ptr_wds', while the
+pointer/literal split is made syntactically, on 'StgLitArg' vs 'StgVarArg', and
+so puts it among the literals. The static constructor is then linked with that
+word among its non-pointers, 'newConAppObj#' copies it into a pointer field,
+and the next major GC follows it.
+
+(This is not hypothetical: it was found as a top-level 'Hooks' constructor
+application with all fourteen of its boxed fields absent, linked with an empty
+pointer array and fourteen zero literal words, which killed the collector the
+first time GHC-in-GHCi ran a major GC.)
+
+So we substitute the unit data constructor for a boxed rubbish literal before
+anything looks at the argument, which keeps the two views in agreement --
+'unitDataConId' is lifted, so the field is still laid out as a pointer, exactly
+as the rubbish literal was. This is what the Cmm backend does too; see the
+'LitRubbish' case of 'cgLit' in GHC.StgToCmm.Lit. Rubbish of any other
+representation needs no such treatment: it is a plain word, and for AddrRep the
+zero the assembler emits is the null address that 'cgLit' produces there.
+-}
 
 pushLiteral :: Bool -> Literal -> BcM (BCInstrList, ByteOff)
 pushLiteral padded lit =
@@ -3757,6 +3816,10 @@ pushLiteral padded lit =
 -- packing constructor fields. See also @mkConAppCode@ and @pushPadding@.
 pushConstrAtom
     :: StackDepth -> BCEnv -> StgArg -> BcM (BCInstrList, ByteOff)
+-- See Note [Rubbish literals of boxed type]
+pushConstrAtom d p (StgLitArg lit)
+  | Just arg <- boxedRubbishArg lit = pushConstrAtom d p arg
+
 pushConstrAtom _ _ (StgLitArg lit) = pushLiteral False lit
 
 pushConstrAtom d p va@(StgVarArg v)
