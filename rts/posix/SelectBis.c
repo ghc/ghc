@@ -83,16 +83,13 @@ over the bit sets we would have to maintain a mapping from fd to requests.
 In principle we also have the choice to maintain the read and write fd bit sets
 incrementally, or create them afresh each time we call select(). There is no
 asymptotic bonus to maintaining them incrementally since the whole thing is
-O(n) anyway. There could plausibly be some constant factor benefit. To maintain
-the fd bit sets incrementally we would need to maintain a mapping between
-requests and fds. This would also be an extra cost that would have to be
-outweighed by any saving.
+O(n) anyway. There could be a constant factor benefit.
 
 In the end we take the simple approach to constructing the bitset inputs and to
 results processing. We create the bit sets afresh each time from the collection
 of requests. For processing results we iterate over the requests and look up
-each one to see if it is in the appropriate result bitset. Along with each
-operation, we store the fd and whether we were interested in reading or writing.
+each one to see if it is in the appropriate result bitset. Each StgAsyncIOOp
+operation stores the fd and whether we were interested in reading or writing.
 We iterate over the operations and use the fd and r/w information to construct
 the read and write bit sets.
 
@@ -105,13 +102,6 @@ through the fds to find which one was bad.
 The primary data structure for this I/O manager is a aiop_table which is a
 ClosureTable of AsyncIOOps. This table tracks the active I/O operations, with
 one entry per operation (corresponding to threads calling waitRead#/waitWrite#).
-We also track the fd for each operation and whether the operation is waiting on
-read or write readiness. This additional information is stored in the fd_table.
-The fd_table is maintained as an auxiliary table to the aiop_table, with table
-indexes matching the ClosureTable. So there is an entry in the aiop_table for
-each operation, and a corresponding entry in the fd_table at the same table
-index. The aiop_table and the fd_table are maintained incrementally, and with
-dense indexes.
 
 We also use a StgTimeoutQueue to track timeouts, and use the delay to the next
 timeout (if any) as the poll() timeout parameter.
