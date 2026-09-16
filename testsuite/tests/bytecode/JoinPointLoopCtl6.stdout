@@ -1,0 +1,5 @@
+2 total
+0 as loops
+0 rejected-recursive
+1 loop-rejected-in-continuation
+1 in-rec-join
