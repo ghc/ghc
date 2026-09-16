@@ -57,7 +57,6 @@ import Language.Haskell.Syntax.ImpExp
 import GHC.Types.UnresolvedImport
 
 import GHC.Data.FastString
-import GHC.Data.ShortText  ( ShortText )
 import GHC.Data.Maybe      ( expectJust )
 import qualified GHC.Data.Maybe as M
 import GHC.Data.OsPath     ( OsPath, unsafeEncodeUtf )
@@ -96,6 +95,7 @@ import GHC.Unit.Module.Graph
 import GHC.Unit.Module.Deps
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Module.Stage
+import GHC.Unit.External.Index (UnitAbiHash)
 
 import Data.Either ( partitionEithers, lefts )
 import Data.Map (Map)
@@ -979,7 +979,7 @@ checkHomeUnitsClosed unit_env
     collect :: [UnitState]
                -- ^ The 'UnitState's of the home units from which to traverse
                --   the dependency graph.
-            -> State (UniqMap UnitId (Set ShortText)) [(UnitId, UnitId)]
+            -> State (UniqMap UnitId (Set UnitAbiHash)) [(UnitId, UnitId)]
                -- ^ A stateful computation that collects offending dependencies
                --   that have not yet been found. It uses its state, which is an
                --   efficent representation of a set of 'GlobalUnitKey's, to
@@ -999,7 +999,7 @@ checkHomeUnitsClosed unit_env
         -> [UnitId]
            -- ^ The 'UnitId's of the units from which to traverse the dependency
            --   graph.
-        -> State (UniqMap UnitId (Set ShortText)) [(UnitId, UnitId)]
+        -> State (UniqMap UnitId (Set UnitAbiHash)) [(UnitId, UnitId)]
            -- ^ A stateful computation that collects offending dependencies that
            --   have not yet been found. It uses its state, which is an efficent
            --   representation of a set of 'GlobalUnitKey's, to keep track of
@@ -1022,7 +1022,7 @@ checkHomeUnitsClosed unit_env
             unit_not_found_msg = "Unit not found during closure property check"
 
           -- | The ABI hash of the current unit.
-          unit_abi_hash :: ShortText
+          unit_abi_hash :: UnitAbiHash
           unit_abi_hash = unitAbiHash unit_info
 
         has_been_processed <- gets $ maybe False (Set.member unit_abi_hash) .
