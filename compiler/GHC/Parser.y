@@ -3153,11 +3153,12 @@ aexp    :: { ECP }
                                         $2 >>= \ $2 ->
                                         mkHsDoPV (comb2 $1 $2)
                                                  (Right $ stmtlistAnns $2, glR $1)
-                                                 (fmap fastStringToShortText (getDO $1))
+                                                 (fmap mkModuleNameFS (getDO $1))
+                                                 (stmtlistStmts $2) }
         | MDO stmtlist             {% hintQualifiedDo $1 >> runPV $2 >>= \ $2 ->
                                        fmap ecpFromExp $
                                        amsA' (L (comb2 $1 $2)
-                                              (mkHsDoAnns (MDoExpr $ fmap fastStringToShortText (getMDO $1))
+                                              (mkHsDoAnns (MDoExpr $ fmap mkModuleNameFS (getMDO $1))
                                                           (stmtlistStmts $2)
                                                           (Right $ stmtlistAnns $2, glR $1))) }
         | 'proc' aexp '->' exp

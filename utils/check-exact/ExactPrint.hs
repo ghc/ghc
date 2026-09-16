@@ -3309,12 +3309,12 @@ exactDo (an,l) ListComp      stmts = markMaybeDodgyStmts (an,l) stmts
 exactDo (an,l) MonadComp     stmts = markMaybeDodgyStmts (an,l) stmts
 
 exactMdo :: (Monad m, Monoid w)
-  => EpaLocation -> Maybe HsModuleName -> String -> EP w m EpaLocation
+  => EpaLocation -> Maybe ModuleName -> String -> EP w m EpaLocation
 -- exactMdo an Nothing            kw = markLensFun an lal_rest (\l -> printStringAtAA l kw)
 exactMdo l Nothing            kw = printStringAtAA l kw
 exactMdo l (Just module_name) kw = printStringAtAA l n
     where
-      n = (unpackHText module_name) ++ "." ++ kw
+      n = (moduleNameString module_name) ++ "." ++ kw
 
 markMaybeDodgyStmts :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
   => DoAnn -> LocatedAn an a -> EP w m (DoAnn, LocatedAn an a)
