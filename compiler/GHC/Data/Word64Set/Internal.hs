@@ -2,6 +2,8 @@
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
+-- Speeds up otherwise unoptimized ghcs by 5-25% (#27814)
+{-# OPTIONS_GHC -O2 #-}
 
 -----------------------------------------------------------------------------
 -- |

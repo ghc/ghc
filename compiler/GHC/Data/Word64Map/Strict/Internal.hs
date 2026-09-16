@@ -1,5 +1,7 @@
 
 {-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
+-- Speeds up otherwise unoptimized ghcs by 5-25% (#27814)
+{-# OPTIONS_GHC -O2 #-}
 
 -----------------------------------------------------------------------------
 -- |
