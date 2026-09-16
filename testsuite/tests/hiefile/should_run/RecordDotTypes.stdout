@@ -1,9 +1,9 @@
 At (22,6), got type: MyRecord
 At (22,20), got type: MyRecord -> Integer
 At (22,25), got type: MyRecord
-At (22,28), got type: MyChild -> String
-At (22,29), got type: MyChild -> String
-At (22,6) - (22,8), got type: String
+At (22,28), got type: MyChild -> [Char]
+At (22,29), got type: MyChild -> [Char]
+At (22,6) - (22,8), got type: [Char]
 At (22,17) - (22,20), got type: Integer
 At (22,25) - (22,27), got type: MyChild
-At (22,25) - (22,29), got type: String
+At (22,25) - (22,29), got type: [Char]
