@@ -32,7 +32,8 @@ import GHC.Types.Basic
 import GHC.Types.UnresolvedImport ( isGeneratedImport )
 import GHC.Types.FieldLabel
 import GHC.Types.Avail            ( Avails )
-import GHC.Types.Id               ( isDataConId_maybe, isId )
+import GHC.Types.Id               ( isDataConId_maybe, isId, idDetails )
+import GHC.Types.Id.Info          ( IdDetails(..), recSelParentName )
 import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTyThing_maybe, getName )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
@@ -689,13 +690,19 @@ instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
     where
       go evbind = do
           let evDeps = hieEvIdsOfTerm $ eb_rhs evbind
-              depNames = EvBindDeps $ map varName evDeps
+              depNames = EvBindDeps $ map classifyEvBindDep evDeps
           concatM $
             [ toHie (C (EvidenceVarBind (EvLetBind depNames) (combineScopes sc (mkScope span)) sp)
                                         (L span $ eb_lhs evbind))
             , toHie $ map (C EvidenceVarUse . L span) $ evDeps
             ]
   toHie _ = pure []
+
+classifyEvBindDep :: EvId -> EvBindDep
+classifyEvBindDep evId =
+  case idDetails evId of
+    RecSelId{sel_tycon} -> RecordField (varName evId) (recSelParentName sel_tycon)
+    _ -> EvidenceVar (varName evId)
 
 instance ToHie (LocatedA HsWrapper) where
   toHie (L osp wrap)

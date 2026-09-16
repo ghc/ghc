@@ -4,7 +4,7 @@ At point (13,17), we found:
 ┌
 │ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            field1]
+│                                                            field1 of Record Thing]
 │           with scope: ModuleScope
 │           
 │     Defined at <no location info>
@@ -31,7 +31,7 @@ At point (16,27), we found:
 ┌
 │ $dHasField at HasFieldQueries.hs:16:1-32, of type: HasField "field1" Thing Char
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            field1]
+│                                                            field1 of Record Thing]
 │           with scope: LocalScope HasFieldQueries.hs:16:1-32
 │           bound at: HasFieldQueries.hs:16:1-32
 │     Defined at <no location info>
@@ -55,7 +55,7 @@ At point (23,17), we found:
 ┌
 │ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "nested1" NestedThing Thing
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            nested1]
+│                                                            nested1 of Record NestedThing]
 │           with scope: ModuleScope
 │           
 │     Defined at <no location info>
@@ -87,7 +87,7 @@ At point (23,25), we found:
 `- ┌
    │ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
    │     is an evidence variable bound by a let, depending on: [C:HasField,
-   │                                                            field1]
+   │                                                            field1 of Record Thing]
    │           with scope: ModuleScope
    │           
    │     Defined at <no location info>
@@ -176,7 +176,7 @@ At point (37,14), we found:
 `- ┌
    │ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
    │     is an evidence variable bound by a let, depending on: [C:HasField,
-   │                                                            field1]
+   │                                                            field1 of Record Thing]
    │           with scope: ModuleScope
    │           
    │     Defined at <no location info>
@@ -200,7 +200,7 @@ At point (41,21), we found:
 ┌
 │ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "nested1" NestedThing Thing
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            nested1]
+│                                                            nested1 of Record NestedThing]
 │           with scope: ModuleScope
 │           
 │     Defined at <no location info>
@@ -224,7 +224,7 @@ At point (41,30), we found:
 ┌
 │ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            field1]
+│                                                            field1 of Record Thing]
 │           with scope: ModuleScope
 │           
 │     Defined at <no location info>

@@ -598,17 +598,69 @@ instance Outputable EvVarSource where
   ppr (EvInstBind True cls) = text "bound due to a superclass of " <+> ppr cls
   ppr (EvLetBind deps) = text "bound by a let, depending on:" <+> ppr deps
 
+-- | Evidence binding dependency with additional details.
+data EvBindDep
+  = EvidenceVar Name
+    -- ^ Evidence variable such as a type class constructor.
+    --
+    -- For example, @C:HasField@, @$dShow@ (dictionaries) or @$fCList@.
+    --
+    -- This is the default representation of a 'EvBindDep'.
+  | RecordField
+    -- ^ Evidence variable of a record selector.
+    --
+    -- This is for example generated with @-XOverloadedRecordDot@, where
+    -- the evidence includes a reference to which record selector is used
+    -- to implement @getField@.
+      Name
+      -- ^ 'Name' of the record selector
+      Name
+      -- ^ 'Name' of the parent type.
+  deriving (Eq, Ord)
+
+instance Outputable EvBindDep where
+  ppr = \ case
+    EvidenceVar n -> ppr n
+    RecordField sel parent -> ppr sel <+> text "of Record" <+> ppr parent
+
+evBindDepName :: EvBindDep -> Name
+evBindDepName = \ case
+  EvidenceVar n -> n
+  RecordField selector _record -> selector
+
+evBindDepHieName :: EvBindDep -> HieName
+evBindDepHieName = toHieName . evBindDepName
+
+instance Binary EvBindDep where
+  put_ bh = \ case
+    EvidenceVar n -> do
+      putByte bh 0
+      put_ bh n
+    RecordField n sel -> do
+      putByte bh 1
+      put_ bh n
+      put_ bh sel
+
+  get bh =
+    getByte bh >>= \ case
+      0 -> EvidenceVar <$> get bh
+      1 -> RecordField <$> get bh <*> get bh
+      t -> fail $ "EvBindDep: Unknown tag: " ++ show t
+
 -- | Eq/Ord instances compare on the converted HieName,
 -- as non-exported names may have different uniques after
 -- a roundtrip
-newtype EvBindDeps = EvBindDeps { getEvBindDeps :: [Name] }
+newtype EvBindDeps = EvBindDeps { getEvBindDeps :: [EvBindDep] }
   deriving Outputable
 
+evBindDepsNames :: EvBindDeps -> [Name]
+evBindDepsNames = map evBindDepName . getEvBindDeps
+
 instance Eq EvBindDeps where
-  (==) = coerce ((==) `on` map toHieName)
+  (==) = coerce ((==) `on` map evBindDepHieName)
 
 instance Ord EvBindDeps where
-  compare = coerce (compare `on` map toHieName)
+  compare = coerce (compare `on` map evBindDepHieName)
 
 instance Binary EvBindDeps where
   put_ bh (EvBindDeps xs) = put_ bh xs

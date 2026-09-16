@@ -4,7 +4,7 @@ At point (23,16), we found:
 ┌
 │ $dHasField at NoFieldSelectorQueries.hs:1:1, of type: HasField "a" A Int
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            a]
+│                                                            a of Record A]
 │           with scope: ModuleScope
 │           
 │     Defined at <no location info>
@@ -47,7 +47,7 @@ At point (30,15), we found:
 ┌
 │ $dHasField at NoFieldSelectorQueries.hs:30:1-17, of type: HasField "n" B A
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            n]
+│                                                            n of Record B]
 │           with scope: LocalScope NoFieldSelectorQueries.hs:30:1-17
 │           bound at: NoFieldSelectorQueries.hs:30:1-17
 │     Defined at <no location info>
@@ -71,7 +71,7 @@ At point (30,17), we found:
 ┌
 │ $dHasField at NoFieldSelectorQueries.hs:30:1-17, of type: HasField "b" A Char
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            b]
+│                                                            b of Record A]
 │           with scope: LocalScope NoFieldSelectorQueries.hs:30:1-17
 │           bound at: NoFieldSelectorQueries.hs:30:1-17
 │     Defined at <no location info>
@@ -95,7 +95,7 @@ At point (33,16), we found:
 ┌
 │ $dHasField at NoFieldSelectorQueries.hs:33:1-16, of type: HasField "c" C Float
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            c]
+│                                                            c of Record C]
 │           with scope: LocalScope NoFieldSelectorQueries.hs:33:1-16
 │           bound at: NoFieldSelectorQueries.hs:33:1-16
 │     Defined at <no location info>
@@ -119,7 +119,7 @@ At point (36,16), we found:
 ┌
 │ $dHasField at NoFieldSelectorQueries.hs:36:1-16, of type: HasField "c" C Float
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            c]
+│                                                            c of Record C]
 │           with scope: LocalScope NoFieldSelectorQueries.hs:36:1-16
 │           bound at: NoFieldSelectorQueries.hs:36:1-16
 │     Defined at <no location info>
@@ -143,7 +143,7 @@ At point (40,23), we found:
 ┌
 │ $dHasField at NoFieldSelectorQueries.hs:1:1, of type: HasField "c" C Float
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            c]
+│                                                            c of Record C]
 │           with scope: ModuleScope
 │           
 │     Defined at <no location info>
@@ -167,7 +167,7 @@ At point (43,15), we found:
 ┌
 │ $dHasField at NoFieldSelectorQueries.hs:43:1-15, of type: HasField "e" C Int
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            e]
+│                                                            e of Record C]
 │           with scope: LocalScope NoFieldSelectorQueries.hs:43:1-15
 │           bound at: NoFieldSelectorQueries.hs:43:1-15
 │     Defined at <no location info>
@@ -191,7 +191,7 @@ At point (46,15), we found:
 ┌
 │ $dHasField at NoFieldSelectorQueries.hs:46:1-15, of type: HasField "e" C Int
 │     is an evidence variable bound by a let, depending on: [C:HasField,
-│                                                            e]
+│                                                            e of Record C]
 │           with scope: LocalScope NoFieldSelectorQueries.hs:46:1-15
 │           bound at: NoFieldSelectorQueries.hs:46:1-15
 │     Defined at <no location info>

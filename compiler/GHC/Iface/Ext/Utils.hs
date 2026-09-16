@@ -145,7 +145,7 @@ getEvidenceTree refmap var = go emptyNameSet var
                  det <- S.toList $ identInfo dets
                  case det of
                    EvidenceVarBind src@(EvLetBind (getEvBindDeps -> xs)) scp spn ->
-                     pure $ Just ((src,scp,spn),mapMaybe (go $ extendNameSet seen var) xs)
+                     pure $ Just ((src,scp,spn),mapMaybe (go (extendNameSet seen var) . evBindDepName) xs)
                    EvidenceVarBind src scp spn -> pure $ Just ((src,scp,spn),[])
                    _ -> pure Nothing
               pure $ Tree.Node (EvidenceInfo var sp typ (Just evdet)) children
@@ -390,7 +390,7 @@ definedInAsts asts n = case nameSrcSpan n of
 
 getEvidenceBindDeps :: ContextInfo -> [Name]
 getEvidenceBindDeps (EvidenceVarBind (EvLetBind xs) _ _) =
-  getEvBindDeps xs
+  evBindDepsNames xs
 getEvidenceBindDeps _ = []
 
 isEvidenceBind :: ContextInfo -> Bool
