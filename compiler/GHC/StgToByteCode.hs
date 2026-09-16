@@ -2467,8 +2467,64 @@ waiting for a test rather than consequences of the code shape:
     builds one per label, at that label's depth.
 
 Nothing in the machinery objects to either. Neither occurs in the corpus we
-measured or in any test we could write, which is why they are rejected and
-counted rather than emitted untested.
+measured, which is why they are rejected and counted rather than emitted
+untested.
+
+Possible lifts, not implemented
+-------------------------------
+Evidence: on the 277-module corpus (9407 join points) both counters were 0
+at every step of this series -- with the closure compilation, with the first
+loop implementation and with the RHS emitted once. The only instances are the
+controls JoinPointLoopCtl3 (placed join point in the RHS) and
+JoinPointLoopCtl6 (all jumps in one continuation) in testsuite/tests/bytecode.
+
+Placed join point in the RHS, including a loop nested in a loop
+('JoinRejectLoopPlacedJoin'):
+
+  * Verdict: drop the 'rhsPlacesJoin rhs_body' test in the 'StgRec' case of
+    'joinPointVerdict' (and 'rhsPlacesJoin', 'bindPlacesJoin', the
+    constructor and its counter field). Ctl3 then becomes a loop whose j is a
+    label; Ctl5 stays 'JoinRejectRecursive', which is asked first.
+  * Emission: nothing new. 'schemeJoinPointLoop' compiles the RHS with
+    'schemeE', which places an inner join point as it does in any body: as a
+    label, through 'PendingJoin' in a continuation, or as an inner loop. An
+    inner loop gets its own label, base and bitmap from 'yieldBitmap' at its
+    own depth; a jump from the inner RHS to the outer loop uses the outer
+    'JoinTarget', whose 'jt_yield' carries the outer bitmap, so it slides to
+    the outer base plus parameters, checks with the outer bitmap and jumps.
+    The assertion in 'placePendingJoins' (sequel equal, base between s and
+    d) holds for a case inside the RHS. 'joinJumpSites' already looks
+    through a loop's RHS, and verdicts are decided inner-first.
+  * Tests required: the Ctl3 shape as a run test (an allocating loop whose
+    RHS defines a join point jumped to from the RHS's own alternatives), a
+    nested-loop run test with the inner loop allocating so that both
+    safepoints fire and values live across both, each with a +RTS -c leg
+    and a +RTS -DS leg, and a counter test.
+
+Loop whose label belongs in a continuation ('JoinRejectLoopInCont'):
+
+  * Verdict: the 'path /= ContPath []' branch becomes a verdict that carries
+    the path, as 'JoinInCont' does; 'verdictPlacement' must return that path
+    so that 'joinJumpSites' looks through the RHS at rhs_path ++ path. The
+    condition on the RHS's own sites stays "all at 'ContPath []'" relative to
+    the RHS, since the RHS is emitted at the label.
+  * Emission: the 'StgRec' case of 'schemeE' dispatches on the verdict to
+    'schemeJoinPointInCont' with a 'PendingJoin' marked as a loop;
+    'placePendingJoins' then compiles that RHS with a 'JoinTarget' whose
+    'jt_yield' is 'Just (yieldBitmap platform d_rhs (pj_sequel pj) p_rhs)'
+    -- the label's stack in the continuation BCO: base plus parameters above
+    the continuation's sequel, which the assertion ties to s -- while the
+    alternatives keep 'jt_yield = Nothing' (forward jumps). The invariant
+    "as loops = loops emitted" then needs a sub-count for loops in
+    continuations.
+  * Untested runtime shape: the resume frame [stg_resume_interp, R, pc]
+    then sits above a case continuation frame rather than above the frame
+    of the BCO that defines the loop. No stack walker distinguishes the two,
+    but no test has walked it: the -DS leg of the run test is the one that
+    would.
+  * Tests required: the Ctl6 shape as a run test, allocating, with values
+    live across the safepoint inside the continuation BCO, with +RTS -c and
+    +RTS -DS legs, and a counter test.
 
 -}
 
