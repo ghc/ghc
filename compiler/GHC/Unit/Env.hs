@@ -443,8 +443,12 @@ The flow:
 Closure Property
 ----------------
 
-A unit environment must have the closure property, which means that a home unit
-must not directly or indirectly depend on an external unit that directly or
+A unit environment must have the closure property:
+
+    No used external unit depends on a home unit.
+
+More concretely, a unit environment has the closure property exactly if no home
+unit directly or indirectly depends on an external unit that directly or
 indirectly depends on a home unit. 'GHC.Driver.Downsweep.checkHomeUnitsClosed'
 checks whether a given unit environment indeed has this property.
 
