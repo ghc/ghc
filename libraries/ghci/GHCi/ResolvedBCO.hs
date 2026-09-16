@@ -152,34 +152,6 @@ instance Binary ResolvedBCO where
       1 -> ResolvedStaticCon <$> get <*> get <*> get <*> get <*> get <*> get
       _ -> error "Binary ResolvedBCO: invalid byte"
 
-#if !defined(WORDS_BIGENDIAN)
-
--- | Serialize a 'BCOByteArray', writing the payload verbatim instead of
---   serializing the individual elements. This must only be used when the host
---   platform uses little endian and the bitsize of the element type of the
---   array is the one that is used for the serialized form of elements.
-putBCOByteArrayDirectly :: Storable a => BCOByteArray a -> Put
-putBCOByteArrayDirectly @a (BCOByteArray byteArray#)
-  = putWord64le (fromIntegral size) <>
-    putBuilder (fromShortByteString (SBS byteArray#))
-  where
-
-  size :: Int
-  size = I# (sizeofByteArray# byteArray#) `div` sizeOf (undefined :: a)
-
--- | Deserialize a 'BCOByteArray', reading the payload verbatim instead of
---   deserializing the individual elements. This must only be used when the host
---   platform uses little endian and the bitsize of the element type of the
---   array is the one that is used for the serialized form of elements.
-getBCOByteArrayDirectly :: Storable a => Get (BCOByteArray a)
-getBCOByteArrayDirectly @a = do
-  size <- fromIntegral <$> getWord64le :: Get Int
-  SBS byteArray# <- toShort <$> getByteString (size * sizeOf (undefined :: a))
-    -- Beware that there is no overflow check for the byte count computation.
-  return (BCOByteArray byteArray#)
-
-#endif
-
 #if defined(WORDS_BIGENDIAN) || SIZEOF_HSWORD == 4
 
 -- | Serialize a 'BCOByteArray', not writing the payload verbatim but
@@ -212,6 +184,34 @@ getBCOByteArrayPortably getElement = do
   size <- fromIntegral <$> getWord64le :: Get Int
   elements <- replicateM size getElement
   return (mkBCOByteArray (listArray (0, pred size) elements))
+
+#endif
+
+#if !defined(WORDS_BIGENDIAN)
+
+-- | Serialize a 'BCOByteArray', writing the payload verbatim instead of
+--   serializing the individual elements. This must only be used when the host
+--   platform uses little endian and the bitsize of the element type of the
+--   array is the one that is used for the serialized form of elements.
+putBCOByteArrayDirectly :: Storable a => BCOByteArray a -> Put
+putBCOByteArrayDirectly @a (BCOByteArray byteArray#)
+  = putWord64le (fromIntegral size) <>
+    putBuilder (fromShortByteString (SBS byteArray#))
+  where
+
+  size :: Int
+  size = I# (sizeofByteArray# byteArray#) `div` sizeOf (undefined :: a)
+
+-- | Deserialize a 'BCOByteArray', reading the payload verbatim instead of
+--   deserializing the individual elements. This must only be used when the host
+--   platform uses little endian and the bitsize of the element type of the
+--   array is the one that is used for the serialized form of elements.
+getBCOByteArrayDirectly :: Storable a => Get (BCOByteArray a)
+getBCOByteArrayDirectly @a = do
+  size <- fromIntegral <$> getWord64le :: Get Int
+  SBS byteArray# <- toShort <$> getByteString (size * sizeOf (undefined :: a))
+    -- Beware that there is no overflow check for the byte count computation.
+  return (BCOByteArray byteArray#)
 
 #endif
 
