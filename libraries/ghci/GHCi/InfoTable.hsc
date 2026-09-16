@@ -29,6 +29,9 @@ import GHC.Platform.ArchOS
 -- NOTE: Must return a pointer acceptable for use in the header of a closure.
 -- If tables_next_to_code is enabled, then it must point the 'code' field.
 -- Otherwise, it should point to the start of the StgInfoTable.
+--
+-- The payload is padded to MIN_PAYLOAD_SIZE, see Note [Padding the payload of
+-- an interpreted constructor].
 mkConInfoTable
    :: Bool    -- TABLES_NEXT_TO_CODE
    -> Int     -- ptr words
@@ -46,18 +49,42 @@ mkConInfoTable tables_next_to_code ptr_words nonptr_words tag ptrtag con_desc = 
     then Just <$> mkJumpToAddr entry_addr
     else pure Nothing
   let
+     -- See Note [Padding the payload of an interpreted constructor]
+     nonptr_words'
+       | ptr_words + nonptr_words >= (#const MIN_PAYLOAD_SIZE) = nonptr_words
+       | otherwise = (#const MIN_PAYLOAD_SIZE) - ptr_words
+
      itbl  = StgInfoTable {
                  entry = if tables_next_to_code
                          then Nothing
                          else Just entry_addr,
                  ptrs  = fromIntegral ptr_words,
-                 nptrs = fromIntegral nonptr_words,
+                 nptrs = fromIntegral nonptr_words',
                  tipe  = CONSTR,
                  srtlen = fromIntegral tag,
                  code  = code'
               }
   castFunPtrToPtr <$> newExecConItbl tables_next_to_code itbl con_desc
 
+{-
+Note [Padding the payload of an interpreted constructor]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Every heap closure must have room for at least MIN_PAYLOAD_SIZE words of
+payload, because the copying collector overwrites an object it has evacuated
+with a forwarding pointer: the info pointer and one word naming the
+destination. A nullary constructor has no fields at all, so its info table
+must claim a payload word that does not correspond to any field.
+
+We therefore pad here, in the one place that builds an info table for an
+interpreted constructor, rather than in the callers. 'mkITbl' in
+GHC.ByteCode.InfoTable pads as well; that is now redundant but harmless, as
+padding an already padded payload is the identity.
+
+Whoever allocates the closure must use the *padded* size from the info table,
+not the constructor's arity: see stg_newConAppObjzh in rts/PrimOps.cmm and
+bci_PACK in rts/Interpreter.c, both of which read the layout back out of the
+info table.
+-}
 
 -- -----------------------------------------------------------------------------
 -- Building machine code fragments for a constructor's entry code

@@ -2169,9 +2169,21 @@ for:
 // Ptr InfoTable, [Literals] [Ptrs] ==> CONSTR heap closure
 stg_newConAppObjzh ( W_ datacon_info, P_ literals, P_ ptrs , W_ arity )
 {
-    W_ con_obj, bytes;
+    W_ con_obj, bytes, info, itbl_ptrs, itbl_nptrs;
 
-    bytes = SIZEOF_StgHeader + WDS(arity);
+    // Size the closure from the info table rather than from the arity: the
+    // payload of a nullary constructor is padded, so the info table claims a
+    // word that no field corresponds to. Allocating WDS(arity) instead would
+    // be a word short of what the collector copies. bci_PACK sizes the same
+    // way. See Note [Padding the payload of an interpreted constructor] in
+    // GHCi.InfoTable. The fields are filled in from the arrays below, so
+    // 'arity' is now only worth an assertion: it counts the fields, which
+    // must fit in the payload the info table declares.
+    info = %STD_INFO(datacon_info);
+    itbl_ptrs  = TO_W_(%INFO_PTRS(info));
+    itbl_nptrs = TO_W_(%INFO_NPTRS(info));
+    ASSERT(arity <= itbl_ptrs + itbl_nptrs);
+    bytes = SIZEOF_StgHeader + WDS(itbl_ptrs + itbl_nptrs);
 
     ALLOC_PRIM (bytes);
     con_obj = Hp - bytes + WDS(1);
