@@ -932,9 +932,15 @@ schemeJoinPointInCont d s p j k fvs params rhs body = do
 -- followed by the labels and RHSs, innermost join point first. The stack of
 -- the continuation BCO below its frame is the stack of the enclosing BCO,
 -- which has the stack of the definition below. See Note [Join points as labels].
-placePendingJoins :: BCEnv -> [PendingJoin] -> BcM BCInstrList -> BcM BCInstrList
-placePendingJoins _ [] alts_code = alts_code
-placePendingJoins p pendings alts_code = do
+--
+-- The case is at depth @d@ with sequel @s@ in the enclosing BCO. Its
+-- continuation's bitmap describes the stack above @s@ only, and the placed RHS
+-- reads its free variables below the continuation frame, so the definition
+-- must sit between the sequel and the case: that is asserted here.
+placePendingJoins :: StackDepth -> Sequel -> BCEnv -> [PendingJoin]
+                  -> BcM BCInstrList -> BcM BCInstrList
+placePendingJoins _ _ _ [] alts_code = alts_code
+placePendingJoins d s p pendings alts_code = do
    platform <- profilePlatform <$> getProfile
    bco <- getCurrentBco
    labels <- mapM (const getLabelBc) pendings
@@ -955,8 +961,18 @@ placePendingJoins p pendings alts_code = do
              p_rhs = UniqMap.addListToUniqMap p_def
                        (zip (pj_params pj) (mkStackOffsets base param_szsb))
              d_rhs = base + sum param_szsb
-         -- The RHS reads its free variables where the definition had them.
+         -- The definition is under this case, with the same sequel: the
+         -- continuation's frame covers the stack above s, and the enclosing
+         -- frames cover the rest, which the RHS reads and never writes.
+         massertPpr (pj_sequel pj == s && s <= base && base <= d)
+           (text "placePendingJoins:" <+> ppr (pj_id pj)
+              <+> text "is not defined under this case"
+            $$ text "sequel:" <+> ppr (pj_sequel pj) <+> text "case sequel:" <+> ppr s
+            $$ text "base:" <+> ppr base <+> text "case depth:" <+> ppr d)
+         -- The RHS reads its free variables where the definition had them,
+         -- and they are all below its base.
          massertPpr (and [ UniqMap.lookupUniqMap p v == UniqMap.lookupUniqMap p_def v
+                           && maybe False (<= base) (UniqMap.lookupUniqMap p_def v)
                          | v <- pj_fvs pj ])
            (text "placePendingJoins: free variables moved for" <+> ppr (pj_id pj))
          markJoinPlaced (pj_id pj)
@@ -1906,7 +1922,7 @@ doCase d s p scrut bndr alts
           -- The alternatives go into the continuation BCO (the scrutinee
           -- stays in the current one).
           pendings <- takePendingJoins bndr
-          alt_final0 <- withNewBco $ placePendingJoins p pendings alts_code
+          alt_final0 <- withNewBco $ placePendingJoins d s p pendings alts_code
           let
 
               -- drop the stg_ctoi_*_info header...
