@@ -1679,7 +1679,7 @@ run_BCO:
             &&lbl_bci_CCALL - &&lbl_bci_DEFAULT,
             &&lbl_bci_SWIZZLE - &&lbl_bci_DEFAULT,
             &&lbl_bci_ENTER - &&lbl_bci_DEFAULT,
-            &&lbl_bci_DEFAULT - &&lbl_bci_DEFAULT,
+            &&lbl_bci_YIELD_CHECK - &&lbl_bci_DEFAULT,
             &&lbl_bci_RETURN_P - &&lbl_bci_DEFAULT,
             &&lbl_bci_RETURN_N - &&lbl_bci_DEFAULT,
             &&lbl_bci_RETURN_F - &&lbl_bci_DEFAULT,
@@ -3350,6 +3350,24 @@ now:
             /* BCO_NEXT modifies bciPtr, so be conservative. */
             int nextpc = BCO_GET_LARGE_ARG;
             bciPtr     = nextpc;
+            NEXT_INSTRUCTION;
+        }
+
+        // The safepoint on the back edge of a join point compiled as a loop.
+        // A loop stays inside one BCO, so it passes neither the heap check
+        // nor the context-switch check that entering a BCO would have done;
+        // this instruction is those two checks, and nothing else. If either
+        // says we should stop, it branches to the loop's slow path, which
+        // tail-calls the join point's closure and so reaches the checks in
+        // run_BCO_fun proper. See Note [Join points as loops] in
+        // GHC.StgToByteCode.
+        INSTRUCTION(bci_YIELD_CHECK): {
+            /* Read the target first: BCO_GET_LARGE_ARG moves bciPtr, so the
+             * fall-through path must have consumed the argument too. */
+            int nextpc = BCO_GET_LARGE_ARG;
+            if (RELAXED_LOAD(&cap->r.rHpLim) == NULL || doYouWantToGC(cap)) {
+                bciPtr = nextpc;
+            }
             NEXT_INSTRUCTION;
         }
 

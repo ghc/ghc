@@ -237,6 +237,12 @@ data JoinTarget = JoinTarget
   , jt_params :: ![Id]
   , jt_sequel :: !Sequel      -- ^ sequel of the let-no-escape
   , jt_bco    :: !BcoId       -- ^ the BCO containing the label
+  , jt_slow   :: !(Maybe LocalLabel)
+      -- ^ The slow path of a loop, set exactly while the RHS of the join
+      -- point itself is compiled, where a jump to the label is a backward
+      -- one and so needs a safepoint. 'Nothing' for a forward jump, which
+      -- the code before it reached from the entry of the BCO, and for a join
+      -- point that is not a loop. See Note [Join points as loops].
   }
 
 -- | A join point compiled as a label in scope.
@@ -421,24 +427,35 @@ schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
                                 -- top-level things, which have no free vars.
         -> (Name, CgStgRhs)
         -> BcM ProtoBCO
-schemeR fvs (nm, rhs@(StgRhsClosure _ _ _ args body _))
-   = schemeR_wrk fvs nm rhs (args, body)
-schemeR fvs (nm, rhs@(StgRhsCon _cc dc cnum _ticks args _type))
+schemeR = schemeR_entry NoEntryLoop
+
+-- | 'schemeR' for a BCO that may be the fallback closure of a join point
+-- compiled as a loop. See Note [Join points as loops].
+schemeR_entry :: EntryLoop -> [Id] -> (Name, CgStgRhs) -> BcM ProtoBCO
+schemeR_entry entry_loop fvs (nm, rhs@(StgRhsClosure _ _ _ args body _))
+   = schemeR_wrk entry_loop fvs nm rhs (args, body)
+schemeR_entry entry_loop fvs (nm, rhs@(StgRhsCon _cc dc cnum _ticks args _type))
    -- unlike top-level StgRhsCon, which are static (see schemeTopBind),
    -- non-top-level StgRhsCon are compiled just like StgRhsClosure StgConApp
-   = schemeR_wrk fvs nm rhs ([], StgConApp dc cnum args [])
+   = schemeR_wrk entry_loop fvs nm rhs ([], StgConApp dc cnum args [])
 
 -- If an expression is a lambda, return the
 -- list of arguments to the lambda (in R-to-L order) and the
 -- underlying expression
 
+-- | Whether the BCO being generated is the fallback closure of a join point
+-- compiled as a loop, which binds that join point to a label at the entry of
+-- the BCO. See Note [Join points as loops].
+data EntryLoop = EntryLoop !Id | NoEntryLoop
+
 schemeR_wrk
-    :: [Id]
+    :: EntryLoop
+    -> [Id]
     -> Name
     -> CgStgRhs            -- expression e, for debugging only
     -> ([Var], CgStgExpr)  -- the args and body of an StgRhsClosure
     -> BcM ProtoBCO
-schemeR_wrk fvs nm original_body (args, body)
+schemeR_wrk entry_loop fvs nm original_body (args, body)
    = do
      add_bco_name <- shouldAddBcoName
      profile <- getProfile
@@ -462,7 +479,9 @@ schemeR_wrk fvs nm original_body (args, body)
          bits = argBits platform (reverse (map (idArgRep platform) all_args))
          bitmap_size = strictGenericLength bits
          bitmap = mkBitmap platform bits
-     body_code <- withNewBco $ schemeER_wrk sum_szsb_args p_init body
+     body_code <- withNewBco $ case entry_loop of
+       NoEntryLoop -> schemeER_wrk sum_szsb_args p_init body
+       EntryLoop j -> schemeEntryLoop j args fvs sum_szsb_args p_init body
 
      pure (mkProtoBCO platform add_bco_name nm body_code (Right original_body)
                  arity bitmap_size bitmap False{-not alts-})
@@ -496,6 +515,70 @@ schemeER_wrk d p (StgTick bp@(Breakpoint tick_ty tick_id fvs) rhs) = do
     Just ibi -> BRK_FUN ibi `consOL` code
 
 schemeER_wrk d p rhs = schemeE d 0 p rhs
+
+-- | The body of the fallback closure of a join point compiled as a loop: a
+-- prologue that rebuilds the entry frame, the label, the RHS with the join
+-- point bound to that label, and the slow path. The fallback is therefore a
+-- loop as well, and does not pay a call per iteration once a safepoint has
+-- sent the primary copy here. See Note [Join points as loops].
+--
+-- The frame has to be rebuilt because a jump slides its arguments down to the
+-- base of the label, and the entry frame is not somewhere they can be slid to:
+-- the entry stack is the arguments with the free variables on top, as the
+-- stored arguments of the PAP, and the free variables must stay -- one of them
+-- is the join point that the slow path calls. So the prologue pushes a copy of
+-- the free variables and then of the parameters, and one SLIDE drops the whole
+-- entry frame from under them, leaving the free variables below the label's
+-- base and the parameters above it. The back edge is then the same code as in
+-- the primary copy, and nothing of the entry frame is left to be retained.
+schemeEntryLoop :: Id -> [Id] -> [Id] -> StackDepth -> BCEnv -> CgStgExpr
+                -> BcM BCInstrList
+schemeEntryLoop j params fvs d p body = do
+   platform <- profilePlatform <$> getProfile
+   label <- getLabelBc
+   slow <- getLabelBc
+   bco <- getCurrentBco
+   let fv_szsb    = map (joinParamSize platform) fvs
+       param_szsb = map (joinParamSize platform) params
+       -- the frame the prologue leaves: the free variables, then the
+       -- parameters. The environment is built from scratch, not extended from
+       -- the entry one, whose offsets the SLIDE invalidates.
+       base   = sum fv_szsb
+       p_loop = UniqMap.listToUniqMap
+                  (zip (fvs ++ params) (mkStackOffsets 0 (fv_szsb ++ param_szsb)))
+       target = JoinTarget { jt_label = label
+                           , jt_base = JoinBaseDepth base
+                           , jt_params = params
+                           -- the sequel of the body of any BCO
+                           , jt_sequel = 0
+                           , jt_bco = bco
+                           , jt_slow = Just slow }
+       -- read from the entry environment: this is where the values still are
+       copy !dd [] = return (dd, nilOL)
+       copy !dd (x : rest) = do
+         (push, szb) <- pushAtom dd p (StgVarArg x)
+         massertPpr (szb == joinParamSize platform x)
+           (text "schemeEntryLoop: size mismatch for" <+> ppr j
+             $$ ppr x <+> ppr szb)
+         (dd', more) <- copy (dd + szb) rest
+         return (dd', push `appOL` more)
+   (d_copies, copy_code) <- copy d (fvs ++ params)
+   -- The copies are the entry frame again, so they are exactly as big as it
+   -- is, and the frame the SLIDE leaves is as deep as the entry frame was.
+   massertPpr (d_copies == d + d && base + sum param_szsb == d)
+     (text "schemeEntryLoop: prologue of" <+> ppr j <+> text "ends at"
+       <+> ppr d_copies <+> text "with base" <+> ppr base
+       <+> text "expected" <+> ppr (d + d) <+> text "and entry depth" <+> ppr d)
+   body_code <- withJoinPoint j target $ schemeER_wrk d p_loop body
+   -- The slow path is an ordinary call of the join point, which enters this
+   -- very closure again and so passes the checks of 'run_BCO_fun'. The join
+   -- point is a free variable of its own RHS, so it is in the environment.
+   slow_code <- doTailCall d 0 p_loop j (map StgVarArg params)
+   massertPpr (endsInControlTransfer body_code)
+     (text "schemeEntryLoop: RHS falls through into the slow path of" <+> ppr j)
+   return (copy_code `appOL` mkSlideB platform d d
+             `appOL` (LABEL label `consOL` body_code)
+             `appOL` (LABEL slow `consOL` slow_code))
 
 -- | Get the offset in words into this breakpoint's AP_STACK which contains the matching Id
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
@@ -732,7 +815,9 @@ schemeJoinPoint d s p j params rhs body = do
                            , jt_base = JoinBaseDepth d
                            , jt_params = params
                            , jt_sequel = s
-                           , jt_bco = bco }
+                           , jt_bco = bco
+                           -- not a loop: every jump to this label is forward
+                           , jt_slow = Nothing }
        -- A jump pushes the arguments in order, starting at depth d, and
        -- slides them down to d.
        param_szsb = map (joinParamSize platform) params
@@ -781,7 +866,9 @@ placePendingJoins p pendings alts_code = do
                                     , jt_base = pj_base pj
                                     , jt_params = pj_params pj
                                     , jt_sequel = pj_sequel pj
-                                    , jt_bco = bco }
+                                    , jt_bco = bco
+                                    -- not a loop: every jump here is forward
+                                    , jt_slow = Nothing }
        with_targets act =
          foldr (\(pj, label) -> withJoinPoint (pj_id pj) (target pj label)) act
                (zip pendings labels)
@@ -836,8 +923,22 @@ schemeJump d s p j target args = do
          (dd', more) <- push_args (dd + szb) rest
          return (dd', push `appOL` more)
    (d_args, push_code) <- push_args d (zipEqual params args)
+   -- The slow path of a loop continues from the stack the SLIDE leaves, so
+   -- that stack must be exactly the one the label itself expects: the base of
+   -- the join point with the parameters on top and nothing else.
+   massertPpr (d_args - d == sum (map (joinParamSize platform) params))
+     (text "schemeJump: argument block of" <+> ppr j <+> text "is"
+       <+> ppr (d_args - d) <+> text "bytes, expected"
+       <+> ppr (sum (map (joinParamSize platform) params)))
+   let -- The safepoint of a backward jump. A loop stays inside one BCO, so it
+       -- passes no heap or context-switch check on its own; without this it
+       -- would never yield. See Note [Join points as loops].
+       check = case jt_slow target of
+                 Nothing   -> nilOL
+                 Just slow -> unitOL (YIELD_CHECK slow)
    return (push_code `appOL`
-           mkSlideB platform (d_args - d) (d - base) `snocOL`
+           mkSlideB platform (d_args - d) (d - base) `appOL`
+           check `snocOL`
            JMP (jt_label target))
 
 -- | Which kind of closure the RHS of a join point rejected with this verdict is.
@@ -2264,9 +2365,11 @@ one RHS to another is not covered by the two predicates above.
 Beyond that, a loop needs a slow path for the back edge, because intra-BCO
 code has no safepoint: a BCO checks the heap, the stack and the
 context-switch flag when it is entered, so a loop that never leaves the BCO
-would never yield. The plan is a check on the back edge that falls back to an
-ordinary call of the join point, which is compiled a second time for that
-purpose. Compiling the RHS twice is what the remaining restriction is about:
+would never yield. 'YIELD_CHECK' is that check, emitted between the SLIDE and
+the JMP of a backward jump, and it branches to a slow path that calls the join
+point in the ordinary way, reaching the checks of 'run_BCO_fun'. The join
+point is compiled a second time for that purpose, as the closure it would have
+been. Compiling the RHS twice is what the remaining restriction is about:
 
   * a join point defined in the RHS that is itself placed (a label, or a
     nested loop) would be placed twice, once per copy, under one Id. Such a
@@ -2294,7 +2397,33 @@ the RHS of a placed join point only for a non-recursive binding; a loop is an
 'StgRec', so it falls to the 'otherwise' branch and its RHS is a closure.
 Whoever lets a loop's RHS be looked through must revisit this paragraph.
 
-It stops being empty as soon as the fallback stops being a closure -- if the
+The fallback is a loop as well ('schemeEntryLoop'), not the closure it would
+have been. If it were not, the first safepoint that fires would move the loop
+into the fallback for good -- the fallback's own recursive call re-enters the
+fallback -- and every iteration after the first collection would pay a closure
+entry again, which for a loop that allocates is nearly all of them. Its slow
+path needs nothing new: the join point is a free variable of its own RHS, as
+it has to be for the closure compilation to work at all, so an ordinary call
+of it re-enters this very closure.
+
+Its entry frame, however, cannot be the base of the label. A BCO is entered
+with its arguments on the stack and the free variables above them, being the
+stored arguments of the PAP, and a jump slides its arguments down to the base
+-- which would bury the free variables, one of which is the join point the
+slow path calls. So the prologue pushes a copy of the free variables and then
+of the parameters and slides the entry frame out from under them, leaving the
+free variables below the base and the parameters above it, at the cost of one
+push per word at entry and nothing per iteration.
+
+Leaving the entry frame in place under a copy would be cheaper still, but it
+retains the arguments the fallback was entered with: they stay live in the
+frame, and any callee of the loop body can collect, so everything they reach
+survives that collection -- for a loop consuming a lazy structure, up to a
+nursery's worth of cells it has already passed. Sliding them away costs
+nothing per iteration and avoids that, so it is what we do.
+
+The class of join points rejected because their jumps sit in a loop's RHS
+stops being empty as soon as the fallback stops being a closure -- if the
 RHS and the join points placed in it are duplicated into the fallback
 (v2a-2), or if the fallback becomes a bare BCO entered directly. Whoever makes
 that change must add the counter and the rejection then. Until then the price

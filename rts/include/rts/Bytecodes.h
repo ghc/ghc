@@ -85,6 +85,7 @@
 #define bci_CCALL                       56
 #define bci_SWIZZLE                     57
 #define bci_ENTER                       58
+#define bci_YIELD_CHECK                 59
 #define bci_RETURN_P                    60
 #define bci_RETURN_N                    61
 #define bci_RETURN_F                    62

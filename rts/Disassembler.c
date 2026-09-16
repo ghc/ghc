@@ -457,6 +457,9 @@ disInstr ( StgBCO *bco, int pc )
       case bci_JMP:
          debugBelch("JMP to    %d\n", instrs[pc]);
          pc += 1; break;
+      case bci_YIELD_CHECK:
+         debugBelch("YIELD_CHECK slow path at %d\n", instrs[pc]);
+         pc += 1; break;
 
       BELCH_INSTR_NAME(ENTER);
       BELCH_INSTR_NAME(RETURN_P);

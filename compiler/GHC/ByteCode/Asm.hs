@@ -817,6 +817,7 @@ assembleI platform i = case i of
   CASEFAIL                 -> emit_ bci_CASEFAIL []
   SWIZZLE   stkoff n       -> emit_ bci_SWIZZLE [wOp stkoff, IOp n]
   JMP       l              -> emit_ bci_JMP [LabelOp l]
+  YIELD_CHECK l            -> emit_ bci_YIELD_CHECK [LabelOp l]
   ENTER                    -> emit_ bci_ENTER []
   RETURN rep               -> emit_ (return_non_tuple rep) []
   RETURN_TUPLE             -> emit_ bci_RETURN_T []
