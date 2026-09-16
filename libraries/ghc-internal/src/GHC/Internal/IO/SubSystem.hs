@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE MagicHash          #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -31,13 +32,33 @@ module GHC.Internal.IO.SubSystem (
   IoSubSystem(..),
   conditional,
   (<!>),
-  isWindowsNativeIO
+  isWindowsNativeIO,
+
+  -- * I\/O manager features
+  -- | Different I\/O manager implementations support different features, and
+  -- some I\/O code within ghc-internal or base must be conditional on these
+  -- features. This API is used to dynamically test for features supported by
+  -- the I\/O manager currently in use.
+  --
+  -- The I\/O manager is selected on RTS startup and is not changed thereafter.
+  -- Thus these feature tests are stable, but must be made at runtime.
+  --
+  -- Historically such code was conditional on hard-coded assumptions about
+  -- which I\/O manager is available for particular platforms or RTS ways.
+  -- For example, historically a lot of code has been conditional on whether
+  -- the RTS way was threaded or non-threaded, as a proxy for whether the I\/O
+  -- manager is in the RTS or in Haskell, because historically each impled the
+  -- other. This can instead now be done conditionally on the I\/O manager
+  -- feature 'iomgrInRTS'.
+  iomgrInRTS,
  ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Show
 import GHC.Internal.Enum
 import GHC.Internal.Num
+import GHC.Internal.Prim (Word#, and#, indexWordOffAddr#, uncheckedShiftL#)
+import GHC.Internal.Ptr (Ptr(..))
+import GHC.Internal.Show
 
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.IO.Unsafe
@@ -130,3 +151,43 @@ whenIoSubSystem :: IoSubSystem -> IO () -> IO ()
 whenIoSubSystem m f = do let sub = ioSubSystem
                          when (sub == m) f
 
+
+-- | The available I\/O manager features we can dynamically test for.
+--
+-- This set is likely to be extended in future, as the I\/O functionality is
+-- extended.
+--
+data IOManagerFeature =
+       IOMgrInRTS
+
+ioManagerFeatureBitmask :: IOManagerFeature -> Word#
+ioManagerFeatureBitmask IOMgrInRTS       = 1## `uncheckedShiftL#` 0#
+
+-- | This means that the I\/O manager is implemented within the RTS. The
+-- inverse is that it is implemented in Haskell. Interaction with an in-RTS
+-- I\/O manager should be via the appropriate primops, while interaction
+-- with in-Haskell I\/O managers can be done by normal library calls.
+--
+-- In principle this is independent of the RTS threaded\/non-threaded way:
+-- neither implies the other. This is intended to allow for using in-RTS
+-- I\/O managers in the threaded or non-threaded RTS.
+--
+iomgrInRTS :: Bool
+iomgrInRTS = ioManagerFeature IOMgrInRTS
+
+-- | Test for availablity of a feature of the current I\/O manager.
+--
+-- The I\/O manager is selected on startup and not changed thereafter. Thus
+-- these feature tests are stable, but must be made at runtime.
+--
+ioManagerFeature :: IOManagerFeature -> Bool
+ioManagerFeature feature =
+  case ioManagerFeaturesPtr of
+    Ptr ioManagerFeaturesAddr# ->
+      case and# (ioManagerFeatureBitmask feature)
+                (indexWordOffAddr# ioManagerFeaturesAddr# 0#) of
+        0## -> False
+        _   -> True
+
+foreign import ccall unsafe "&rts_IOManagerFeatures"
+  ioManagerFeaturesPtr :: Ptr Word
