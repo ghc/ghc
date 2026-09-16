@@ -2606,13 +2606,13 @@ repLetE (MkC ds) (MkC e) = krep2 letEOcc [ds, e]
 repCaseE :: Core (M TH.Exp) -> Core [(M TH.Match)] -> MetaM (Core (M TH.Exp))
 repCaseE (MkC e) (MkC ms) = krep2 caseEOcc [e, ms]
 
-repDoE :: Maybe HsModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
+repDoE :: Maybe ModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
 repDoE = repDoBlock doEOcc
 
-repMDoE :: Maybe HsModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
+repMDoE :: Maybe ModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
 repMDoE = repDoBlock mdoEOcc
 
-repDoBlock :: KnownOcc -> Maybe HsModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
+repDoBlock :: KnownOcc -> Maybe ModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
 repDoBlock doName maybeModName (MkC ss) = do
     MkC coreModName <- coreModNameM
     krep2 doName [coreModName, ss]
@@ -2620,7 +2620,7 @@ repDoBlock doName maybeModName (MkC ss) = do
     coreModNameM :: MetaM (Core (Maybe TH.ModName))
     coreModNameM = case maybeModName of
       Just m -> do
-        MkC s <- lift $ coreStringLit (mkFastStringShortText m)
+        MkC s <- lift $ coreStringLit (moduleNameFS m)
         mName <- rep2_nw mkModNameOcc [s]
         coreJust modNameTyConOcc mName
       _ -> coreNothing modNameTyConOcc

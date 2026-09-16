@@ -219,7 +219,6 @@ module GHC (
 
         -- ** Modules
         Module, mkModule, pprModule, moduleName, moduleUnit,
-        ModuleName, mkModuleName, moduleNameString, moduleNameFS,
 
         -- ** Names
         Name,
