@@ -843,6 +843,18 @@ schemeJump d s p j target args = do
 -- | Which kind of closure the RHS of a join point rejected with this verdict is.
 joinClosureKind :: Maybe JoinPointVerdict -> ClosureKind
 joinClosureKind (Just JoinRejectRecursive{}) = ClosureRecJoin
+-- Also the RHS of a recursive join point that stays a closure, so it counts as
+-- one: this is not a further class of occurrence, and keeping it here is what
+-- makes the old 'in-rec-join' count the sum of the new 'in-rec-join' and
+-- 'in-loop-join'.
+joinClosureKind (Just JoinRejectLoopPlacedJoin) = ClosureRecJoin
+-- Still a closure, and stays one after loops are emitted: the RHS of a loop is
+-- compiled a second time into the fallback closure, so an enclosing join point
+-- with an occurrence there is rejected then as it is now. These are counted
+-- apart because they are what the *next* step would newly reach -- duplicating
+-- the RHS into the fallback, or a fallback that is not a closure. See
+-- Note [Join points as loops].
+joinClosureKind (Just JoinAsLoop{}) = ClosureLoopJoin
 joinClosureKind (Just JoinRejectCrossBco{}) = ClosureCrossJoin
 joinClosureKind (Just _) = ClosureOtherJoin
 joinClosureKind Nothing = ClosureLet
@@ -1780,11 +1792,13 @@ doCase d s p scrut bndr alts
 data JoinPointVerdict
   = JoinAsLabel             -- ^ a label in the BCO of the definition
   | JoinInCont !ContPath    -- ^ a label in a continuation BCO nested in it
+  | JoinAsLoop !ContPath    -- ^ self-recursive, a loop where the label would be
   | JoinRejectBreakpoints   -- ^ breakpoints are enabled
   | JoinRejectDisabled      -- ^ -fno-bc-join-points-as-labels
   | JoinRejectConRhs        -- ^ the RHS is a constructor application
   | JoinRejectRecGroup      -- ^ a group of several (mutually) recursive join points
-  | JoinRejectRecursive !OtherwiseEligible  -- ^ self-recursive
+  | JoinRejectRecursive !OtherwiseEligible  -- ^ self-recursive, not a loop
+  | JoinRejectLoopPlacedJoin -- ^ self-recursive, and a join point in its RHS is placed
   | JoinRejectCrossBco !CrossBco -- ^ the jumps are not all in one BCO
   deriving Eq
 
@@ -1812,6 +1826,7 @@ data SpreadShape
 -- the RHS of a join point that is compiled as a closure itself.
 data ClosureKind
   = ClosureRecJoin    -- ^ the RHS of a recursive join point
+  | ClosureLoopJoin   -- ^ the RHS of a join point that v2a would compile as a loop
   | ClosureCrossJoin  -- ^ the RHS of a join point rejected for cross-BCO jumps
   | ClosureOtherJoin  -- ^ the RHS of a join point rejected for another reason
   | ClosureLet        -- ^ an ordinary let, which STG should not allow
@@ -1827,11 +1842,24 @@ data OtherwiseEligible = OtherwiseEligible | NotOtherwiseEligible
 type JoinPointVerdicts = UniqMap Id JoinPointVerdict
 
 -- | Where the label of a join point is, relative to its definition, if it is
--- compiled as a label.
+-- compiled as a label /today/.
+--
+-- 'JoinAsLoop' deliberately has no placement: the verdict is analysis only,
+-- so a self-recursive join point is still compiled as a closure, and the RHS
+-- of one is still a BCO of its own for the purposes of 'joinJumpSites'. See
+-- Note [Join points as loops].
 verdictPlacement :: JoinPointVerdict -> Maybe ContPath
 verdictPlacement JoinAsLabel = Just (ContPath [])
 verdictPlacement (JoinInCont path) = Just path
 verdictPlacement _ = Nothing
+
+-- | Would the join point's RHS be emitted into a BCO that already exists,
+-- rather than into one of its own? Unlike 'verdictPlacement' this counts a
+-- loop, because what it decides is whether compiling an enclosing RHS twice
+-- would place this join point twice.
+verdictIsPlaced :: JoinPointVerdict -> Bool
+verdictIsPlaced JoinAsLoop{} = True
+verdictIsPlaced v = isJust (verdictPlacement v)
 
 -- | Decide for every join point of the module whether it is compiled as a label.
 joinPointVerdicts :: Platform -> DynFlags -> [CgStgTopBinding] -> JoinPointVerdicts
@@ -1871,24 +1899,76 @@ joinPointVerdict platform dflags verdict_of bind body
       StgNonRec _ StgRhsCon{} -> JoinRejectConRhs
       StgNonRec j (StgRhsClosure _ _ _ params rhs_body _)
         | exprMentions j rhs_body
-        -> JoinRejectRecursive (recursive j params rhs_body)
+        -> JoinRejectRecursive
+             (recursive (sites j params body) (sites j params rhs_body))
         | otherwise
-        -> case singleBco (sites j params body) of
-             Right (ContPath []) -> JoinAsLabel
-             Right path -> JoinInCont path
-             Left cross -> JoinRejectCrossBco cross
+        -> notRecursive j params
       -- a self-recursive join point is a singleton group
       StgRec [(j, StgRhsClosure _ _ _ params rhs_body _)]
-        -> JoinRejectRecursive (recursive j params rhs_body)
+        -- A singleton group whose RHS does not mention its binder is not
+        -- recursive: it has no back edge, so it is not a loop, and calling it
+        -- one would count (and later emit) a loop that never jumps to itself.
+        -- Classify it as the non-recursive join point it is.
+        | not (exprMentions j rhs_body)
+        -> notRecursive j params
+        | otherwise
+        -> let body_sites = sites j params body
+               rhs_sites  = sites j params rhs_body
+           in case singleBco body_sites of
+                Right path
+                  -- The two lists are not concatenated: a site in the body is
+                  -- a path from the definition to the label, a site in the RHS
+                  -- one from the label to itself.
+                  | all (== SiteIn (ContPath [])) rhs_sites
+                  -- The placement rule is asked last, so that this counter is
+                  -- exactly the join points that lifting it would win, and not
+                  -- also the ones rejected for their jumps anyway. Compiling
+                  -- the RHS twice would place a join point of its own twice,
+                  -- see Note [Join points as loops].
+                  -> if rhsPlacesJoin rhs_body
+                       then JoinRejectLoopPlacedJoin
+                       else JoinAsLoop path
+                _ -> JoinRejectRecursive (recursive body_sites rhs_sites)
       StgRec{} -> JoinRejectRecGroup
   where
     sites j params = joinJumpSites platform dflags verdict_of j (length params)
-    -- as for v1: all jumps in the body and the RHS in the defining BCO
-    recursive j params rhs_body
-      | all (== SiteIn (ContPath [])) (sites j params body ++ sites j params rhs_body)
+
+    -- The verdict of a join point whose RHS does not mention it: where its
+    -- jumps in the body are decides where the label goes.
+    notRecursive j params = case singleBco (sites j params body) of
+      Right (ContPath []) -> JoinAsLabel
+      Right path -> JoinInCont path
+      Left cross -> JoinRejectCrossBco cross
+
+    -- as for v1: all jumps in the body and the RHS in the defining BCO. For
+    -- legal STG this is now always 'NotOtherwiseEligible': the other answer
+    -- means the loop branch above fired, so this one was never reached. See
+    -- Note [Join points as loops].
+    recursive body_sites rhs_sites
+      | all (== SiteIn (ContPath [])) (body_sites ++ rhs_sites)
       = OtherwiseEligible
       | otherwise
       = NotOtherwiseEligible
+
+    -- Is some join point defined in this expression compiled into a BCO that
+    -- already exists, rather than into one of its own? Only join points
+    -- nested in the RHS are asked about, and their verdicts are decided
+    -- before this one, so they are all in 'verdict_of'.
+    rhsPlacesJoin e = case e of
+      StgApp{} -> False
+      StgLit{} -> False
+      StgConApp{} -> False
+      StgOpApp{} -> False
+      StgCase scrut _ _ alts -> rhsPlacesJoin scrut || any (rhsPlacesJoin . alt_rhs) alts
+      StgLet _ bnd e' -> bindPlacesJoin bnd || rhsPlacesJoin e'
+      StgLetNoEscape _ bnd e' ->
+        any (maybe False verdictIsPlaced . verdict_of) (bindBinders bnd)
+          || bindPlacesJoin bnd || rhsPlacesJoin e'
+      StgTick _ e' -> rhsPlacesJoin e'
+
+    bindPlacesJoin bnd = any rhs_places (bindRhss bnd)
+      where rhs_places (StgRhsClosure _ _ _ _ e' _) = rhsPlacesJoin e'
+            rhs_places StgRhsCon{} = False
 
 -- | The BCO that all the occurrences are jumps in, if there is one.
 singleBco :: [JumpSite] -> Either CrossBco ContPath
@@ -2001,9 +2081,13 @@ joinPointStats verdict_map =
     <+> number isInCont <+> text "as labels in continuations"
     <+> parens (number (inContDepth (== 1)) <+> text "depth 1," <+>
                 number (inContDepth (> 1)) <+> text "deeper") <> comma
+    <+> number isAsLoop <+> text "as loops"
+    <+> parens (number (== JoinAsLoop (ContPath [])) <+> text "in the defining BCO,"
+                <+> number isLoopInCont <+> text "in continuations") <> comma
     <+> number isRecursive <+> text "rejected-recursive"
     <+> parens (number (== JoinRejectRecursive OtherwiseEligible)
                 <+> text "otherwise eligible") <> comma
+    <+> number (== JoinRejectLoopPlacedJoin) <+> text "loop-rejected-placed-join,"
     <+> number (== JoinRejectRecGroup) <+> text "rejected-rec-group,"
     <+> number (== JoinRejectConRhs) <+> text "rejected-con-rhs,"
     <+> number (== JoinRejectBreakpoints) <+> text "rejected-breakpoint,"
@@ -2016,6 +2100,8 @@ joinPointStats verdict_map =
               <+> text "spread-siblings"
           , number (== JoinRejectCrossBco (CrossClosure ClosureRecJoin))
               <+> text "in-rec-join"
+          , number (== JoinRejectCrossBco (CrossClosure ClosureLoopJoin))
+              <+> text "in-loop-join"
           , number (== JoinRejectCrossBco (CrossClosure ClosureCrossJoin))
               <+> text "in-cross-join"
           , number (== JoinRejectCrossBco (CrossClosure ClosureOtherJoin))
@@ -2033,6 +2119,10 @@ joinPointStats verdict_map =
     isCrossBco _ = False
     isInCont JoinInCont{} = True
     isInCont _ = False
+    isAsLoop JoinAsLoop{} = True
+    isAsLoop _ = False
+    isLoopInCont (JoinAsLoop (ContPath path)) = not (null path)
+    isLoopInCont _ = False
     inContDepth p (JoinInCont (ContPath path)) = p (length path)
     inContDepth _ _ = False
 
@@ -2136,6 +2226,81 @@ as a label if
     though STG's invariants should rule them out. The RHS of a join point
     nested in body goes where its label goes, so the verdicts of nested join
     points are decided first.
+-}
+
+{-
+Note [Join points as loops]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A self-recursive join point is a singleton 'StgRec' group, and is compiled as
+a closure: every jump, including the recursive one, is a call. It could
+instead be a label like any other, with the recursive jump as a backward JMP
+-- a loop in the BCO that holds the label.
+
+This is currently *analysis only*: 'JoinAsLoop' says the binding qualifies,
+'verdictPlacement' still reports no placement for it, and the binding is
+compiled as a closure exactly as before. What the verdict buys today is the
+counters in 'joinPointStats', which say how much emitting loops would be
+worth and which of two further steps would be worth more.
+
+Eligibility is two predicates, not one, because 'joinJumpSites' reports paths
+relative to the expression it is given:
+
+  * the occurrences in the body must all be jumps in one BCO, which fixes
+    where the label goes ('singleBco'); and
+  * every occurrence in the RHS must be a jump in the BCO of the *label*,
+    i.e. at the empty path, since the RHS is emitted where the label is.
+
+Concatenating the two lists would be wrong whenever the label is not in the
+BCO of the definition. The concatenation is what the older rule asked, and it
+survives as the 'OtherwiseEligible' sub-count of 'rejected-recursive': for
+legal STG that sub-count is now 0 by construction, since a binding it would
+be true of takes the loop branch instead. The counter is kept, under its old
+name, as the assertion that this really is so.
+
+Only a singleton 'StgRec' is considered. A mutually recursive group stays
+'JoinRejectRecGroup': its members would need one label each, and a jump from
+one RHS to another is not covered by the two predicates above.
+
+Beyond that, a loop needs a slow path for the back edge, because intra-BCO
+code has no safepoint: a BCO checks the heap, the stack and the
+context-switch flag when it is entered, so a loop that never leaves the BCO
+would never yield. The plan is a check on the back edge that falls back to an
+ordinary call of the join point, which is compiled a second time for that
+purpose. Compiling the RHS twice is what the remaining restriction is about:
+
+  * a join point defined in the RHS that is itself placed (a label, or a
+    nested loop) would be placed twice, once per copy, under one Id. Such a
+    binding is rejected here ('JoinRejectLoopPlacedJoin'), and counted, so
+    that the cost of lifting the restriction can be compared against what it
+    would buy. A loop nested in a loop's RHS is rejected by this same rule,
+    so nested loops are a known coverage limit, priced by that counter.
+
+A jump from the RHS to a label defined outside the loop has the same problem:
+the second copy of the RHS is a different BCO, and a label-compiled join point
+exists only as a label, so the copy could not reach it. That conflict is
+resolved by construction, and the resolution is "joins lose to loops": as long
+as the join point's fallback is a closure, an enclosing join point with an
+occurrence inside a loop's RHS sees that RHS as a closure ('ClosureLoopJoin')
+and is rejected by the existing cross-BCO rule, so it never becomes a label
+and there is nothing for the copy to jump to. This holds for emission as well,
+not only for the analysis here, which is why there is no counter for the
+class: it is empty.
+
+That last sentence is an obligation on the emission step, not something the
+analysis enforces: it holds only as long as 'joinJumpSites' reports an
+occurrence in a loop's RHS as 'SiteInClosure'. The guard that decides this is
+the @StgNonRec j'@ pattern in its 'StgLetNoEscape' case, which looks through
+the RHS of a placed join point only for a non-recursive binding; a loop is an
+'StgRec', so it falls to the 'otherwise' branch and its RHS is a closure.
+Whoever lets a loop's RHS be looked through must revisit this paragraph.
+
+It stops being empty as soon as the fallback stops being a closure -- if the
+RHS and the join points placed in it are duplicated into the fallback
+(v2a-2), or if the fallback becomes a bare BCO entered directly. Whoever makes
+that change must add the counter and the rejection then. Until then the price
+of the resolution is measured from the other side by 'in-loop-join': the join
+points whose jumps sit in a loop's RHS, which emitting loops would newly
+reach.
 -}
 
 {-
