@@ -124,6 +124,12 @@ test('JoinPointLoopsCountOff',
 #                      is rejected-recursive, not loop-rejected-placed-join
 #   JoinPointLoopCtl6  all jumps in one continuation BCO:
 #                      loop-rejected-in-continuation
+#   JoinPointLoopCtl7  a join point jumped to from inside a loop's RHS:
+#                      in-loop-join, and in-loop-join-placeable because the
+#                      fallback copy is the only reason it is rejected
+#   JoinPointLoopCtl8  the same, but with two more jumps in sibling
+#                      continuation BCOs: in-loop-join and NOT placeable,
+#                      the negative control for that counter
 loopctl_fields = {
     'JoinPointLoopCtl1': 'total|as labels|as loops|rejected-recursive|'
                          'loop-rejected-in-continuation|loop-rejected-placed-join|'
@@ -136,6 +142,11 @@ loopctl_fields = {
                          'loop-rejected-placed-join|in-rec-join',
     'JoinPointLoopCtl6': 'total|as loops|rejected-recursive|'
                          'loop-rejected-in-continuation|in-rec-join',
+    'JoinPointLoopCtl7': 'total|as labels|as loops|rejected-recursive|'
+                         'loop-rejected-placed-join|in-rec-join|in-loop-join|'
+                         'in-loop-join-placeable',
+    'JoinPointLoopCtl8': 'total|as loops|spread-siblings|in-rec-join|'
+                         'in-loop-join|in-loop-join-placeable',
 }
 for _m, _fields in loopctl_fields.items():
     test(_m, [extra_files([_m + '.hs']), req_interp, only_ways(['normal'])],

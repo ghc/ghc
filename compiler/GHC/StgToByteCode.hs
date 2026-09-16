@@ -125,7 +125,8 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries hpc_info
             flattenBind (StgNonRec b e) = [(b,e)]
             flattenBind (StgRec bs)     = bs
             -- See Note [Join points as labels]
-            join_verdicts = joinPointVerdicts (profilePlatform profile) dflags binds
+            join_verdicts =
+              joinPointVerdicts (profilePlatform profile) dflags LoopHasFallback binds
 
         (proto_bcos, BcM_State{..}) <-
            runBc hsc_env this_mod mb_modBreaks join_verdicts $ do
@@ -139,7 +140,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries hpc_info
         -- See Note [Join points as labels]
         putDumpFileMaybe logger Opt_D_dump_BCOs
            "Join points" FormatText
-           (joinPointStats join_verdicts)
+           (joinPointStats (profilePlatform profile) dflags binds join_verdicts)
 
         let mod_breaks = case mb_modBreaks of
              Nothing -> Nothing
@@ -2023,6 +2024,13 @@ data ClosureKind
 data OtherwiseEligible = OtherwiseEligible | NotOtherwiseEligible
   deriving Eq
 
+-- | Does a loop's RHS exist a second time, as the fallback closure its
+-- safepoint enters? 'LoopHasFallback' is what 'schemeJoinPointLoop' emits, and
+-- the only mode whose verdicts decide code. 'LoopHasNoFallback' asks the same
+-- question of a loop that is only a label, which is what the
+-- @in-loop-join-placeable@ counter reports. See Note [Join points as loops].
+data LoopFallback = LoopHasFallback | LoopHasNoFallback
+
 -- | The verdicts for all join point binders of a module. Every binder of a
 -- recursive group gets the group's verdict.
 type JoinPointVerdicts = UniqMap Id JoinPointVerdict
@@ -2043,8 +2051,9 @@ verdictIsPlaced :: JoinPointVerdict -> Bool
 verdictIsPlaced v = isJust (verdictPlacement v)
 
 -- | Decide for every join point of the module whether it is compiled as a label.
-joinPointVerdicts :: Platform -> DynFlags -> [CgStgTopBinding] -> JoinPointVerdicts
-joinPointVerdicts platform dflags = foldl' top UniqMap.emptyUniqMap
+joinPointVerdicts :: Platform -> DynFlags -> LoopFallback -> [CgStgTopBinding]
+                  -> JoinPointVerdicts
+joinPointVerdicts platform dflags fallback = foldl' top UniqMap.emptyUniqMap
   where
     top vs StgTopStringLit{} = vs
     top vs (StgTopLifted bind) = binds vs bind
@@ -2065,15 +2074,16 @@ joinPointVerdicts platform dflags = foldl' top UniqMap.emptyUniqMap
         -- the binding and the body, so decide them first.
         let !vs' = expr (binds vs bind) body
             verdict_of j = UniqMap.lookupUniqMap vs' j
-            verdict = joinPointVerdict platform dflags verdict_of bind body
+            verdict = joinPointVerdict platform dflags fallback verdict_of bind body
         in UniqMap.addListToUniqMap vs' [ (j, verdict) | j <- bindBinders bind ]
       StgTick _ body -> expr vs body
 
 -- | The verdict for the join point binding of @let-no-escape bind in body@,
 -- given the verdicts of the join points nested in it.
-joinPointVerdict :: Platform -> DynFlags -> (Id -> Maybe JoinPointVerdict)
+joinPointVerdict :: Platform -> DynFlags -> LoopFallback
+                 -> (Id -> Maybe JoinPointVerdict)
                  -> CgStgBinding -> CgStgExpr -> JoinPointVerdict
-joinPointVerdict platform dflags verdict_of bind body
+joinPointVerdict platform dflags fallback verdict_of bind body
   | gopt Opt_InsertBreakpoints dflags = JoinRejectBreakpoints
   | not (gopt Opt_BcJoinPointsAsLabels dflags) = JoinRejectDisabled
   | otherwise = case bind of
@@ -2115,7 +2125,7 @@ joinPointVerdict platform dflags verdict_of bind body
                 _ -> JoinRejectRecursive (recursive body_sites rhs_sites)
       StgRec{} -> JoinRejectRecGroup
   where
-    sites j params = joinJumpSites platform dflags verdict_of j (length params)
+    sites j params = joinJumpSites platform dflags fallback verdict_of j (length params)
 
     -- The verdict of a join point whose RHS does not mention it: where its
     -- jumps in the body are decides where the label goes.
@@ -2184,9 +2194,10 @@ data JumpSite
 -- their code is emitted into. The verdicts tell where the labels of the join
 -- points nested in the expression are, and 'inlinedCaseScrutinee' which cases
 -- have continuation BCOs, exactly as in code generation.
-joinJumpSites :: Platform -> DynFlags -> (Id -> Maybe JoinPointVerdict) -> Id -> Int
+joinJumpSites :: Platform -> DynFlags -> LoopFallback
+              -> (Id -> Maybe JoinPointVerdict) -> Id -> Int
               -> CgStgExpr -> [JumpSite]
-joinJumpSites platform dflags verdict_of j arity = go []
+joinJumpSites platform dflags fallback verdict_of j arity = go []
   where
     mentions_in args = any (argMentions j) args
 
@@ -2210,7 +2221,7 @@ joinJumpSites platform dflags verdict_of j arity = go []
       -- every let-bound RHS is a BCO of its own
       StgLet _ bind body -> [SiteInClosure ClosureLet | bindMentions j bind] ++ go path body
       StgLetNoEscape _ bind body
-        | StgNonRec j' (StgRhsClosure _ _ _ _ rhs_body _) <- bind
+        | Just (j', StgRhsClosure _ _ _ _ rhs_body _) <- inlinedRhs bind
         , Just (ContPath rhs_path) <- verdictPlacement =<< verdict_of j'
         -- the RHS of a label is emitted where the label is
         -> go (rhs_path ++ path) rhs_body ++ go path body
@@ -2219,6 +2230,18 @@ joinJumpSites platform dflags verdict_of j arity = go []
            | bindMentions j bind, j'' <- take 1 (bindBinders bind) ]
            ++ go path body
       StgTick tick body -> [SiteOther | tickMentions j tick] ++ go path body
+
+    -- The binding whose RHS is emitted where its label is, rather than into a
+    -- BCO of its own, if this is one. A loop's RHS is emitted there too, but a
+    -- second copy of it goes into the fallback closure, so a jump into it is a
+    -- jump into a closure and the loop is looked through only when the
+    -- fallback is assumed away. See Note [Join points as loops].
+    inlinedRhs (StgNonRec j' rhs) = Just (j', rhs)
+    inlinedRhs (StgRec [(j', rhs)])
+      | LoopHasNoFallback <- fallback
+      , Just JoinAsLoop <- verdict_of j'
+      = Just (j', rhs)
+    inlinedRhs _ = Nothing
 
 -- | Does the variable occur anywhere in the expression, including in closures
 -- and breakpoint free variables?
@@ -2257,9 +2280,13 @@ bindBinders :: GenStgBinding pass -> [BinderP pass]
 bindBinders (StgNonRec b _) = [b]
 bindBinders (StgRec pairs) = map fst pairs
 
--- | Per-module counts of join point verdicts, for -ddump-bcos.
-joinPointStats :: JoinPointVerdicts -> SDoc
-joinPointStats verdict_map =
+-- | Per-module counts of join point verdicts, for -ddump-bcos. The binds are
+-- taken as well as their verdicts so that the counterfactual verdicts of
+-- Note [Join points as loops] can be computed here, where nothing but the dump
+-- can force them.
+joinPointStats :: Platform -> DynFlags -> [CgStgTopBinding] -> JoinPointVerdicts
+               -> SDoc
+joinPointStats platform dflags binds verdict_map =
   text "join points:" <+> int (length verdicts) <+> text "total,"
     <+> number (== JoinAsLabel) <+> text "as labels,"
     <+> number isInCont <+> text "as labels in continuations"
@@ -2291,10 +2318,19 @@ joinPointStats verdict_map =
               <+> text "in-other-join"
           , number (== JoinRejectCrossBco (CrossClosure ClosureLet))
               <+> text "in-let"
-          , number (== JoinRejectCrossBco CrossOther) <+> text "other" ]))
+          , number (== JoinRejectCrossBco CrossOther) <+> text "other" ])) <> comma
+    <+> int in_loop_placeable <+> text "in-loop-join-placeable"
   where
     -- counting does not depend on the order
     verdicts = UniqMap.nonDetEltsUniqMap verdict_map
+    -- What the analysis would say if a loop had no fallback copy of its RHS.
+    -- This is its only use: it decides nothing, and it is forced only when
+    -- -ddump-bcos forces this SDoc. See Note [Join points as loops].
+    no_fallback = joinPointVerdicts platform dflags LoopHasNoFallback binds
+    in_loop_placeable = count placeable (UniqMap.nonDetUniqMapToList verdict_map)
+    placeable (j, verdict) =
+      verdict == JoinRejectCrossBco (CrossClosure ClosureLoopJoin)
+        && maybe False verdictIsPlaced (UniqMap.lookupUniqMap no_fallback j)
     number p = int (count p verdicts)
     isRecursive JoinRejectRecursive{} = True
     isRecursive _ = False
@@ -2522,6 +2558,29 @@ that change must add the counter and the rejection then. Until then the price
 of the resolution is measured from the other side by 'in-loop-join': the join
 points whose jumps sit in a loop's RHS, which emitting loops would newly
 reach.
+
+'in-loop-join-placeable' is the part of that price a fallback-free loop would
+actually win: the join points whose verdict is 'in-loop-join' and which a
+counterfactual run of 'joinPointVerdicts' -- the same function with
+'LoopHasNoFallback', where 'joinJumpSites' looks through a loop's RHS exactly
+as it looks through the RHS of any other placed join point -- makes a placed
+one. That map is computed inside 'joinPointStats', so it exists only when
+-ddump-bcos forces the dump, and it goes nowhere else: it decides no code, in
+either flag state.
+
+Three caveats, since the number invites being read as more than it is:
+
+  * The counterfactual is self-consistent, not a question asked of one join
+    point at a time. With loops looked through, a join point that becomes a
+    label is itself looked through, so one loop can win several join points
+    and the effect can cascade to verdicts elsewhere. The number is "what the
+    analysis would say", not a re-partition of today's 'in-loop-join'.
+  * It assumes the loop stays a loop and only the duplicate RHS goes away.
+    That is the intent of v2b, not a statement about any implementation of it:
+    a change that removes the fallback by making the loop something else is
+    not what was measured.
+  * It says what removing the fallback would make eligible, and nothing about
+    what removing it would cost.
 -}
 
 {-
