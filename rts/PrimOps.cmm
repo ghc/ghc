@@ -2191,9 +2191,18 @@ stg_newConAppObjzh ( W_ datacon_info, P_ literals, P_ ptrs , W_ arity )
     // No memory barrier necessary as this is a new allocation.
     SET_HDR(con_obj, datacon_info, CCS_MAIN);
 
-    // Copy the ptrs followed by nonptrs into the constructor payload
-    W_ i, n_ptrs;
+    // Copy the ptrs followed by nonptrs into the constructor payload. The
+    // fields fill the payload declared by the info table, except that the
+    // padding word of a nullary constructor is left uninitialised: the info
+    // table counts it as a non-pointer (ptrs = 0, nptrs = 1), so the
+    // collector never traces it. bci_PACK asserts the same, in the equality
+    // form.
+    W_ i, n_ptrs, n_words;
     n_ptrs = StgMutArrPtrs_ptrs(ptrs);
+    n_words = n_ptrs + BYTE_ARR_WDS(literals);
+    ASSERT(n_ptrs == itbl_ptrs);
+    ASSERT(n_words == itbl_ptrs + itbl_nptrs ||
+           (itbl_ptrs == 0 && itbl_nptrs == 1 && n_words == 0));
     i = 0;
 loop1:
     if (i < n_ptrs) {

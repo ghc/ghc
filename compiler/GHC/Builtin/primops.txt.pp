@@ -3955,8 +3955,10 @@ primop  NewConAppObjOp "newConAppObj#" GenPrimOp
      application object on the heap from the info table pointer of the data
      constructor and the data arguments given in @ptrs@ and @lits@. The
      resulting object is a heap closure for the constructor application. It is
-     evaluated and properly tagged. The given @arity@ gives the total size of
-     pointers and literals in number of words. }
+     evaluated and properly tagged. The given @arity@ is the number of words
+     of pointers and literals given. It is not the size of the object, which
+     is taken from the info table: the payload of a nullary constructor is
+     padded, so it may be one word larger. }
    with
    effect = ReadWriteEffect
    out_of_line      = True
