@@ -111,7 +111,7 @@ module GHC.Utils.Outputable (
 
 import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
-import GHC.Unit.Module.Name ( ModuleName(..) )
+import GHC.Unit.Module.Name ( ModuleName(..), hsModuleName )
 
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
@@ -1109,6 +1109,9 @@ instance Outputable Serialized where
 
 instance Outputable Extension where
     ppr = text . show
+
+instance Outputable HsModuleName where
+  ppr = pprModuleName . hsModuleName
 
 instance Outputable ModuleName where
   ppr = pprModuleName

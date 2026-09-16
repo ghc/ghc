@@ -17,6 +17,7 @@ module GHC.Parser.String (
 
 import GHC.Prelude hiding (getChar)
 
+import Language.Haskell.Syntax.Text
 import Control.Arrow ((>>>))
 import Control.Monad (when)
 import Data.Char (chr, ord)
@@ -37,7 +38,6 @@ import GHC.Parser.CharClass (
  )
 import GHC.Parser.Errors.Types (LexErr (..))
 import GHC.Utils.Panic (panic)
-import GHC.Unit.Module.Name (ModuleName)
 
 type BufPos = Int
 data StringLexError = StringLexError LexErr BufPos
@@ -288,7 +288,7 @@ isSingleSmartQuote = \case
 
 data StringMeta = StringMeta
   { strMetaMultiline  :: Bool
-  , strMetaQualified  :: Maybe ModuleName
+  , strMetaQualified  :: Maybe HsModuleName
   }
   deriving (Show, Data)
 

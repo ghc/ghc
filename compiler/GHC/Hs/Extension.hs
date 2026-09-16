@@ -20,7 +20,6 @@ import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension.Pass
 import GHC.Types.Name
 import GHC.Types.Name.Reader
-import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Var
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Parser.Annotation
@@ -171,8 +170,6 @@ type family IdOccGhcP pass where
   IdOccGhcP 'Renamed     = WithUserRdr Name
   IdOccGhcP 'Typechecked = Id
 type LIdOccGhcP p = XRecGhc (IdOccGhcP p)
-
-type instance ModuleNameP (GhcPass _) = ModuleName
 
 -- | Marks that a field uses the GhcRn variant even when the pass
 -- parameter is GhcTc. Useful for storing HsTypes in GHC.Hs.Exprs, say, because

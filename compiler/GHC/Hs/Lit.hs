@@ -101,7 +101,6 @@ import GHC.Utils.Misc (split)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)
 import GHC.Hs.Extension
-import GHC.Unit.Module.Name (moduleNameString)
 
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
@@ -448,7 +447,8 @@ instance Ord (HsQualLit (GhcPass p)) where
   QualLit _ m1 v1 `compare` QualLit _ m2 v2 = (m1, v1) `compare` (m2, v2)
 
 instance OutputableBndrId p => Outputable (HsQualLit (GhcPass p)) where
-  ppr QualLit{..} = text (moduleNameString ql_mod) <> char '.' <> ppr ql_val
+  ppr QualLit{ql_mod = HsModuleName ql_mod, ..} =
+    text (unpackHText ql_mod) <> char '.' <> ppr ql_val
 
 -- -----------------------------------------------------------------------------
 -- QualLitVal

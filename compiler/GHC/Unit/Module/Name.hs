@@ -9,6 +9,7 @@ import qualified Text.ParserCombinators.ReadP as Parse
 import System.FilePath
 
 import GHC.Data.FastString
+import Language.Haskell.Syntax.Text
 
 -- | A ModuleName is essentially a simple string, e.g. @Data.List@.
 newtype ModuleName = ModuleName FastString deriving (Show, Eq)
@@ -59,4 +60,17 @@ moduleNameColons = dots_to_colons . moduleNameString
 parseModuleName :: Parse.ReadP ModuleName
 parseModuleName = fmap mkModuleName
                 $ Parse.munch1 (\c -> isAlphaNum c || c `elem` "_.'")
+
+--------------------------------------------------------------------------------
+-- * HsModuleName (AST) <-> ModuleName (GHC)
+--------------------------------------------------------------------------------
+
+hsModuleName :: HsModuleName -> ModuleName
+hsModuleName (HsModuleName mn) = ModuleName (mkFastStringShortText mn)
+
+-- | You should rarely if ever need this function. Once we're in GHC-land we
+-- have a `ModuleName` and we should essentially never go back to the AST
+-- representation of a module name (HsModuleName)
+toHsModuleName :: ModuleName -> HsModuleName
+toHsModuleName (ModuleName mn) = HsModuleName (fastStringToShortText mn)
 

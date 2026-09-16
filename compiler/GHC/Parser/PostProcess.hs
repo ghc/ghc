@@ -135,7 +135,6 @@ module GHC.Parser.PostProcess (
 
 import GHC.Prelude
 import GHC.Hs           -- Lots of it
-import GHC.Unit.Module.Name (ModuleName)
 import GHC.Core.TyCon          ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
 import GHC.Core.DataCon        ( DataCon, dataConTyCon, dataConName )
 import GHC.Core.ConLike        ( ConLike(..) )

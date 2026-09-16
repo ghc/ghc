@@ -172,9 +172,6 @@ type LIdP p = XRec p (IdP p)
 type family IdOccP p
 type LIdOccP p = XRec p (IdOccP p)
 
--- | Maps the "module name" type for a given pass
-type family ModuleNameP p
-
 {- Note [IdOcc]
 ~~~~~~~~~~~~~~~
 When possible, in error messages we would like to report identifiers with the

@@ -789,7 +789,7 @@ data Token
   | ITdata
   | ITdefault
   | ITderiving
-  | ITdo (Maybe FastString)
+  | ITdo (Maybe HText)
   | ITelse
   | IThiding
   | ITforeign
@@ -821,7 +821,7 @@ data Token
   | ITcapiconv
   | ITprimcallconv
   | ITjavascriptcallconv
-  | ITmdo (Maybe FastString)
+  | ITmdo (Maybe HText)
   | ITfamily
   | ITrole
   | ITgroup
@@ -1186,12 +1186,12 @@ layout_token t span _buf _len _buf2 = pushLexState layout >> return (L span t)
 idtoken :: (StringBuffer -> Int -> Token) -> Action
 idtoken f span buf len _buf2 = return (L span $! (f buf len))
 
-qdo_token :: (Maybe FastString -> Token) -> Action
+qdo_token :: (Maybe HText -> Token) -> Action
 qdo_token con span buf len _buf2 = do
     maybe_layout token
     return (L span $! token)
   where
-    !token = con $! Just $! fst $! splitQualName buf len False
+    !token = con $! Just $! fastStringToShortText $! fst $! splitQualName buf len False
 
 skip_one_varid :: (FastString -> Token) -> Action
 skip_one_varid f span buf len _buf2
@@ -2288,7 +2288,7 @@ tok_quoted_label span buf len _buf2 = do
 -- See Note [Implementation of QualifiedStrings]
 tok_qstrings :: Action -> Action
 tok_qstrings lex_str span0 buf0 len0 endBuf0 = do
-  let modName = ModuleName $ lexemeToFastString buf0 modNameLen
+  let modName = HsModuleName $ lexemeToText buf0 modNameLen
   (span1, src, meta, s) <- unITstring <$> lex_str strSpan strBuf strLen endBuf0
   let span2 = mkPsSpan (psSpanStart span0) (psSpanEnd span1)
   pure $ L span2 $ ITstring src meta{strMetaQualified = Just modName} s

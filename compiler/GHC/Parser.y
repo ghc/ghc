@@ -883,12 +883,12 @@ unitdecl :: { LHsUnitDecl PackageName }
                    NotBoot -> HsSrcFile
                    IsBoot  -> HsBootFile)
                  (reLoc $3)
-                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $7) $4 Nothing) (Just $3) (snd $5) (fst $ sndOf3 $7) (snd $ sndOf3 $7))) }
+                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $7) $4 Nothing) (Just $ fmap toHsModuleName $3) (snd $5) (fst $ sndOf3 $7) (snd $ sndOf3 $7))) }
         | 'signature' modid maybe_warning_pragma maybeexports 'where' body
              { sL1 $1 $ DeclD
                  HsigFile
                  (reLoc $2)
-                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $6) $3 Nothing) (Just $2) (snd $4) (fst $ sndOf3 $6) (snd $ sndOf3 $6))) }
+                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $6) $3 Nothing) (Just $ fmap toHsModuleName $2) (snd $4) (fst $ sndOf3 $6) (snd $ sndOf3 $6))) }
         | 'dependency' unitid mayberns
              { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $2
                                               , idModRenaming = $3
@@ -1042,7 +1042,7 @@ export  :: { LIE GhcPs }
                                                           ; return $ reLoc $ sL span $ impExp } }
         | maybe_warning_pragma 'module' modid            {% do { let { span = (maybe comb2 comb3 $1) $2 $>
                                                                      ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
-                                                          ; locImpExp <- return (sL span (IEModuleContents ($1, (epTok $2)) $3))
+                                                          ; locImpExp <- return (sL span (IEModuleContents ($1, (epTok $2)) (fmap toHsModuleName $3)))
                                                           ; return $ reLoc $ locImpExp } }
         | maybe_warning_pragma 'pattern' qcon            {% do { warnPatternNamespaceSpecifier (getLoc $2)
                                                                ; let span = (maybe comb2 comb3 $1) $2 $>
@@ -1158,7 +1158,7 @@ importdecl :: { LImportDecl GhcPs }
                   ; let loc = (comb6 $1 $7 $8 $9 (snd $10) $11);
                   ; amsA' $ L loc $
                       ImportDecl { ideclExt = XImportDeclPass anns (snd $ fst $2) UserWrittenImport
-                                  , ideclName = $7, ideclPkgQual = snd $6
+                                  , ideclName = fmap toHsModuleName $7, ideclPkgQual = snd $6
                                   , ideclSource = snd $2
                                   , ideclLevelSpec = snd $ levelSpec
                                   , ideclSafe = snd $4
@@ -1195,9 +1195,9 @@ optqualified :: { Maybe (EpToken "qualified") }
         : 'qualified'                           { Just (epTok $1) }
         | {- empty -}                           { Nothing }
 
-maybeas :: { (Maybe (EpToken "as"),Located (Maybe (LocatedA ModuleName))) }
+maybeas :: { (Maybe (EpToken "as"),Located (Maybe (LocatedA HsModuleName))) }
         : 'as' modid                           { (Just (epTok $1)
-                                                 ,sLL $1 $> (Just $2)) }
+                                                 ,sLL $1 $> (Just $ fmap toHsModuleName $2)) }
         | {- empty -}                          { (Nothing, noLoc Nothing) }
 
 maybeimpspec :: { Located (AnnListImportDecl, Maybe (ImportListInterpretation, [LIE GhcPs])) }
@@ -1234,7 +1234,7 @@ importlist1 :: { OrdList (LIE GhcPs) }
 
 import  :: { OrdList (LIE GhcPs) }
         : qcname_ext export_subspec {% fmap (unitOL . reLoc . (sLL $1 $>)) $ mkModuleImp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
-        | 'module' modid            {% fmap (unitOL . reLoc) $ return (sLL $1 $> (IEModuleContents (Nothing, (epTok $1)) $2)) }
+        | 'module' modid            {% fmap (unitOL . reLoc) $ return (sLL $1 $> (IEModuleContents (Nothing, (epTok $1)) (fmap toHsModuleName $2))) }
         | 'pattern' qcon            {% do { warnPatternNamespaceSpecifier (getLoc $1)
                                           ; return $ unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (epTok $1) $2)) Nothing } }
         | 'type' '..'               {% fmap (unitOL . reLoc) $ mkWholeTypeWcImpExp (comb2 $1 $>) Nothing (epTok $1) (epTok $2) }
@@ -3153,11 +3153,12 @@ aexp    :: { ECP }
                                         $2 >>= \ $2 ->
                                         mkHsDoPV (comb2 $1 $2)
                                                  (Right $ stmtlistAnns $2, glR $1)
-                                                 (fmap fastStringToShortText (getDO $1))
+                                                 (fmap HsModuleName $ getDO $1)
+                                                 (stmtlistStmts $2) }
         | MDO stmtlist             {% hintQualifiedDo $1 >> runPV $2 >>= \ $2 ->
                                        fmap ecpFromExp $
                                        amsA' (L (comb2 $1 $2)
-                                              (mkHsDoAnns (MDoExpr $ fmap fastStringToShortText (getMDO $1))
+                                              (mkHsDoAnns (MDoExpr $ fmap HsModuleName (getMDO $1))
                                                           (stmtlistStmts $2)
                                                           (Right $ stmtlistAnns $2, glR $1))) }
         | 'proc' aexp '->' exp
@@ -4561,8 +4562,8 @@ hintQualifiedDo tok = do
         maybeQDoDoc
   where
     maybeQDoDoc = case unLoc tok of
-      ITdo (Just m) -> Just $ ftext m <> text ".do"
-      ITmdo (Just m) -> Just $ ftext m <> text ".mdo"
+      ITdo (Just m) -> Just $ ppr m <> text ".do"
+      ITmdo (Just m) -> Just $ ppr m <> text ".mdo"
       t -> Nothing
 
 -- Hint about MultilineStrings

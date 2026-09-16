@@ -6,7 +6,6 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Hs
-import GHC.Unit.Module.Name (ModuleName)
 import GHC.Parser.Types
 import GHC.Parser.Errors.Basic
 import GHC.Types.Error

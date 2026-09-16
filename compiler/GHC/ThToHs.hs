@@ -2356,7 +2356,7 @@ mk_mod :: TH.ModName -> ModuleName
 mk_mod mod = mkModuleName (TH.modString mod)
 
 mk_modtext :: TH.ModName -> HsModuleName
-mk_modtext mod = packHText (TH.modString mod)
+mk_modtext mod = HsModuleName (packHText (TH.modString mod))
 
 mk_pkg :: TH.PkgName -> Unit
 mk_pkg pkg = stringToUnit (TH.pkgString pkg)

@@ -34,6 +34,7 @@ import Language.Haskell.Syntax.ImpExp
 import Language.Haskell.Syntax.Lit
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Pat
+import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Type
 
 import Data.Maybe (Maybe)
@@ -66,7 +67,7 @@ data HsModule p
     = HsModule {
       hsmodExt :: XCModule p,
         -- ^ HsModule extension point
-      hsmodName :: Maybe (XRec p (ModuleNameP p)),
+      hsmodName :: Maybe (XRec p HsModuleName),
         -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
         --     field is Nothing too)
       hsmodExports :: Maybe [LIE p],

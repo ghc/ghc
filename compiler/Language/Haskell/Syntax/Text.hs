@@ -25,13 +25,14 @@ module Language.Haskell.Syntax.Text
   , bytesHText
   , shortByteStringToHText
 
-  , HsModuleName
+  , HsModuleName(..)
 
     -- * Utils
   , lengthHText, nullHText
   ) where
 
 import Prelude
+import Data.Data
 
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as SBS
@@ -44,9 +45,6 @@ import qualified GHC.Data.ShortText as ST
 -- 'Data.Text.Text': the bytes are GHC's Modified UTF-8 so that arbitrary code
 -- points (including surrogates and NUL) round-trip.
 type HText = ShortText
-
--- | A module name in the AST is just 'HText'
-type HsModuleName = HText
 
 -- | Encode a 'String' into an 'HText'.
 packHText :: String -> HText
@@ -75,3 +73,11 @@ lengthHText = ST.codepointLength
 -- | Test whether an 'HText' is empty.
 nullHText :: HText -> Bool
 nullHText = ST.null
+
+--------------------------------------------------------------------------------
+-- TODO Move to different module
+
+-- | A module name in the AST is just 'HText'
+newtype HsModuleName = HsModuleName HText
+  deriving (Eq, Ord, Show, Data)
+
