@@ -462,6 +462,23 @@ INFO_TABLE_RET( stg_apply_interp, RET_BCO )
 }
 
 /*
+ * The header of the frame a join point compiled as a loop leaves behind when
+ * its safepoint fires: [stg_resume_interp, R, pc, locals]. R is a BCO whose
+ * bitmap describes the pc word and the locals, so every stack walker treats
+ * the frame as the ordinary RET_BCO frame it is; the interpreter recognises
+ * the header at its entry and resumes the loop at pc.
+ * See Note [Join points as loops] in GHC.StgToByteCode.
+ */
+INFO_TABLE_RET( stg_resume_interp, RET_BCO )
+    /* explicit stack */
+{
+    /* Entered when the frame is returned into rather than resumed -- e.g. the
+     * dummy return of an AP_STACK rebuilt by raiseAsync. Hand the stack back
+     * to the interpreter, which dispatches on this very header. */
+    jump stg_yield_to_interpreter [];
+}
+
+/*
  * Dummy info table pushed on the top of the stack when the stack's
  * owning thread has finished.
  */

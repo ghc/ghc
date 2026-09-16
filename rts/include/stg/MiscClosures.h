@@ -109,6 +109,7 @@ RTS_RET(stg_ctoi_t8);
 
 RTS_RET(stg_primcall);
 RTS_RET(stg_apply_interp);
+RTS_RET(stg_resume_interp);
 RTS_RET(stg_dead_thread);
 
 RTS_ENTRY(stg_IND);

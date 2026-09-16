@@ -238,12 +238,14 @@ data JoinTarget = JoinTarget
   , jt_params :: ![Id]
   , jt_sequel :: !Sequel      -- ^ sequel of the let-no-escape
   , jt_bco    :: !BcoId       -- ^ the BCO containing the label
-  , jt_slow   :: !(Maybe LocalLabel)
-      -- ^ The slow path of a loop, set exactly while the RHS of the join
-      -- point itself is compiled, where a jump to the label is a backward
-      -- one and so needs a safepoint. 'Nothing' for a forward jump, which
-      -- the code before it reached from the entry of the BCO, and for a join
-      -- point that is not a loop. See Note [Join points as loops].
+  , jt_yield  :: !(Maybe ResumeBitmap)
+      -- ^ The bitmap of the safepoint of a loop, set exactly while the RHS of
+      -- the join point itself is compiled, where a jump to the label is a
+      -- backward one and so needs a safepoint. 'Nothing' for a forward jump,
+      -- which the code before it reached from the entry of the BCO, and for a
+      -- join point that is not a loop. It describes the stack at the label,
+      -- which is where the safepoint sits, so it is computed once, with the
+      -- label. See Note [Join points as loops].
   }
 
 -- | A join point compiled as a label in scope.
@@ -553,7 +555,9 @@ schemeEntryLoop j params fvs d p body = do
                            -- the sequel of the body of any BCO
                            , jt_sequel = 0
                            , jt_bco = bco
-                           , jt_slow = Just slow }
+                           -- the stack at the label is the frame the prologue
+                           -- leaves, and the sequel of a BCO body is 0
+                           , jt_yield = Just (yieldBitmap platform d 0 p_loop) }
        -- read from the entry environment: this is where the values still are
        copy !dd [] = return (dd, nilOL)
        copy !dd (x : rest) = do
@@ -575,6 +579,9 @@ schemeEntryLoop j params fvs d p body = do
    -- very closure again and so passes the checks of 'run_BCO_fun'. The join
    -- point is a free variable of its own RHS, so it is in the environment.
    -- Reversed: see the calling convention noted at 'doTailCall'.
+   -- Unreachable since the safepoint yields in place, and emitted for now
+   -- only so that the fallback goes as one piece. See Note [Join points as
+   -- loops].
    slow_code <- doTailCall d 0 p_loop j (reverse (map StgVarArg params))
    massertPpr (endsInControlTransfer body_code)
      (text "schemeEntryLoop: RHS falls through into the slow path of" <+> ppr j)
@@ -826,7 +833,7 @@ schemeJoinPoint d s p j params rhs body = do
                            , jt_sequel = s
                            , jt_bco = bco
                            -- not a loop: every jump to this label is forward
-                           , jt_slow = Nothing }
+                           , jt_yield = Nothing }
        -- A jump pushes the arguments in order, starting at depth d, and
        -- slides them down to d.
        param_szsb = map (joinParamSize platform) params
@@ -866,12 +873,15 @@ schemeJoinPointLoop d s p j params rhs rhs_closure body = do
        p_rhs = UniqMap.addListToUniqMap p_clo
                  (zip params (mkStackOffsets d_clo param_szsb))
        d_rhs = d_clo + sum param_szsb
-       target slow_path = JoinTarget { jt_label = label
-                                     , jt_base = JoinBaseDepth d_clo
-                                     , jt_params = params
-                                     , jt_sequel = s
-                                     , jt_bco = bco
-                                     , jt_slow = slow_path }
+       -- The safepoint sits at the label's own stack: the loop's base with the
+       -- parameters on top, in the environment of the definition.
+       yield = yieldBitmap platform d_rhs s p_rhs
+       target on_back_edge = JoinTarget { jt_label = label
+                                        , jt_base = JoinBaseDepth d_clo
+                                        , jt_params = params
+                                        , jt_sequel = s
+                                        , jt_bco = bco
+                                        , jt_yield = on_back_edge }
        push_fvs !dd [] = return (dd, nilOL)
        push_fvs !dd (fv : rest) = do
          (push, szb) <- pushAtom dd p_clo (StgVarArg fv)
@@ -893,10 +903,13 @@ schemeJoinPointLoop d s p j params rhs rhs_closure body = do
    -- the entry of this BCO.
    body_code <- withJoinPoint j (target Nothing) $ schemeE d_clo s p_clo body
    -- Backward jumps from the RHS, which is where the safepoint goes.
-   rhs_code <- withJoinPoint j (target (Just slow)) $ schemeE d_rhs s p_rhs rhs
+   rhs_code <- withJoinPoint j (target (Just yield)) $ schemeE d_rhs s p_rhs rhs
    -- The slow path takes over the stack the back edge built, which is the
    -- loop's base with the parameters on top, and calls the fallback with them.
    -- Reversed: see the calling convention noted at 'doTailCall'.
+   -- Unreachable since the safepoint yields in place, and emitted for now
+   -- only so that the fallback goes as one piece. See Note [Join points as
+   -- loops].
    slow_code <- doTailCall d_rhs s p_rhs j (reverse (map StgVarArg params))
    massertPpr (endsInControlTransfer body_code)
      (text "schemeJoinPointLoop: body falls through into" <+> ppr j)
@@ -950,7 +963,7 @@ placePendingJoins d s p pendings alts_code = do
                                     , jt_sequel = pj_sequel pj
                                     , jt_bco = bco
                                     -- not a loop: every jump here is forward
-                                    , jt_slow = Nothing }
+                                    , jt_yield = Nothing }
        with_targets act =
          foldr (\(pj, label) -> withJoinPoint (pj_id pj) (target pj label)) act
                (zip pendings labels)
@@ -1024,14 +1037,58 @@ schemeJump d s p j target args = do
        <+> ppr (sum (map (joinParamSize platform) params)))
    let -- The safepoint of a backward jump. A loop stays inside one BCO, so it
        -- passes no heap or context-switch check on its own; without this it
-       -- would never yield. See Note [Join points as loops].
-       check = case jt_slow target of
-                 Nothing   -> nilOL
-                 Just slow -> unitOL (YIELD_CHECK slow)
+       -- would never yield. Its bitmap describes the stack the SLIDE above
+       -- leaves, which is the stack of the label.
+       -- See Note [Join points as loops].
+       check = case jt_yield target of
+                 Nothing -> nilOL
+                 Just bm -> unitOL (YIELD_CHECK bm)
    return (push_code `appOL`
            mkSlideB platform (d_args - d) (d - base) `appOL`
            check `snocOL`
            JMP (jt_label target))
+
+-- | The indices of the words of the stack at depth @d@ that hold a pointer,
+-- counted downwards from @d@: word 0 is the one last pushed. This is the scan
+-- a frame's bitmap is built from, whether the frame is a case continuation
+-- ('doCase') or the resume frame of a loop's safepoint ('yieldBitmap').
+--
+-- A variable of unboxed tuple or sum type is skipped: it does not live in one
+-- stack word of its own.
+envPointerSlots :: Platform -> StackDepth -> BCEnv -> [Int]
+envPointerSlots platform d p =
+    -- NB: unboxed tuple cases bind the scrut binder to the same offset as one
+    -- of the alt binders, so duplicates have to go; 'toAscList' sorts, which
+    -- is what 'intsToReverseBitmap' wants.
+    IntSet.toAscList $ UniqMap.nonDetFoldUniqMap go IntSet.empty p
+  where
+    go (var, offset) !acc
+      | isUnboxedTupleType (idType var) || isUnboxedSumType (idType var)
+      = acc
+      | isFollowableArg (idArgRep platform var)
+      = fromIntegral (bytesToWords platform (d - offset)) `IntSet.insert` acc
+      | otherwise = acc
+
+-- | The bitmap of the frame the safepoint of a loop leaves behind when it
+-- fires, at a label whose stack is depth @d@ with sequel @s@ in environment
+-- @p@: the saved pc, which is not a pointer, and under it the @d - s@ words
+-- the loop is using, described exactly as the bitmap of a case continuation
+-- describes them. A word of the region that holds no variable of @p@ is a
+-- non-pointer, so that nothing looks at whatever it holds.
+-- See Note [Join points as loops].
+yieldBitmap :: Platform -> StackDepth -> Sequel -> BCEnv -> ResumeBitmap
+yieldBitmap platform d s p =
+    ResumeBitmap { rb_size = fromIntegral size
+                 , rb_bits = intsToReverseBitmap platform size pointers }
+  where
+    -- the pc word, then the words above the sequel; the frames under the
+    -- sequel are described by whatever pushed them, as in 'doCase'.
+    locals = fromIntegral (bytesToWords platform (d - s)) :: Int
+    size = 1 + locals
+    -- The pc word is slot 0, so every slot of the environment moves up by one.
+    -- 'intsToReverseBitmap' is given the indices of the ZEROS, and the
+    -- collector follows a word whose bit is 0: the pointers.
+    pointers = map (+ 1) (filter (< locals) (envPointerSlots platform d p))
 
 -- | Which kind of closure the RHS of a join point rejected with this verdict is.
 joinClosureKind :: Maybe JoinPointVerdict -> ClosureKind
@@ -1885,16 +1942,7 @@ doCase d s p scrut bndr alts
           extra_pointers ++
           filter (< bitmap_size') (map (+extra_slots) rel_slots)
           where
-          -- NB: unboxed tuple cases bind the scrut binder to the same offset
-          -- as one of the alt binders, so we have to remove any duplicates here:
-          -- 'toAscList' takes care of sorting the result, which was previously done after the application of 'filter'.
-          rel_slots = IntSet.toAscList $ UniqMap.nonDetFoldUniqMap go IntSet.empty p
-          go (var, offset) !acc
-            | isUnboxedTupleType (idType var) || isUnboxedSumType (idType var)
-            = acc
-            | isFollowableArg (idArgRep platform var)
-            = fromIntegral (bytesToWords platform (d - offset)) `IntSet.insert` acc
-            | otherwise = acc
+          rel_slots = envPointerSlots platform d p
 
         bitmap = intsToReverseBitmap platform bitmap_size' pointers
 
@@ -2501,19 +2549,39 @@ could write, so emitting it would be untested code. It is rejected as
 of loops actually emitted. This is a coverage limit waiting for a test, not a
 design limit.
 
-A nullary loop is a program that diverges, and is left alone by none of this:
-its fallback is a thunk, so the first safepoint enters a closure under
-evaluation and the program gets <<loop>>, which is what the closure
-compilation gives today at the first jump instead.
+A nullary loop is a program that diverges, and none of this saves it: it spins,
+yielding at its safepoint and resuming there, until something interrupts it.
+The closure compilation gives <<loop>> at the first jump instead, since the
+thunk it enters is the one under evaluation.
 
-Beyond that, a loop needs a slow path for the back edge, because intra-BCO
-code has no safepoint: a BCO checks the heap, the stack and the
-context-switch flag when it is entered, so a loop that never leaves the BCO
-would never yield. 'YIELD_CHECK' is that check, emitted between the SLIDE and
-the JMP of a backward jump, and it branches to a slow path that calls the join
-point in the ordinary way, reaching the checks of 'run_BCO_fun'. The join
-point is compiled a second time for that purpose, as the closure it would have
-been. Compiling the RHS twice is what the remaining restriction is about:
+Beyond that, a loop needs a safepoint on its back edge, because intra-BCO code
+has none: a BCO checks the heap, the stack and the context-switch flag when it
+is entered, so a loop that never leaves the BCO would never yield.
+'YIELD_CHECK' is that check, emitted between the SLIDE and the JMP of a
+backward jump. When it fires the interpreter yields where it stands: it pushes
+[stg_resume_interp, R, pc] on top of the stack the SLIDE left and returns to
+the scheduler, which comes back to the dispatch at the entry of interpretBCO,
+pops the frame and continues the BCO at pc -- after interpretBCO has reset
+HpLim, which is what makes the resumed loop able to yield again.
+
+R is a BCO of its own, allocated by the interpreter, sharing the loop's three
+arrays; what it is there for is its bitmap, which describes the pc word and
+every word between the loop's sequel and its label. That is 'yieldBitmap':
+'envPointerSlots', the scan of the environment that also builds a case
+continuation's bitmap in 'doCase', with the pc word prepended as a
+non-pointer. So the frame is an ordinary RET_BCO frame with its bitmap one
+indirection away, and every stack walker, the compacting GC, stack squeezing
+and the AP_STACK capture of 'raiseAsync' handle it as they handle the entry
+frame of any BCO: none of them needed a change. The bitmap travels in the
+BCO's literals, as the size in bits followed by the bits, and 'YIELD_CHECK'
+carries the index of the first of those words.
+
+The fallback closure is still built, still sits under the loop, and still has
+the slow path emitted after the RHS -- which nothing branches to any more.
+Removing that copy, and lifting the restrictions the copy imposes, is the next
+step; until then the copy exists and everything the rest of this note says
+about it holds. Compiling the RHS twice is what the remaining restriction is
+about:
 
   * a join point defined in the RHS that is itself placed (a label, or a
     nested loop) would be placed twice, once per copy, under one Id. Such a
@@ -2548,7 +2616,9 @@ fallback -- and every iteration after the first collection would pay a closure
 entry again, which for a loop that allocates is nearly all of them. Its slow
 path needs nothing new: the join point is a free variable of its own RHS, as
 it has to be for the closure compilation to work at all, so an ordinary call
-of it re-enters this very closure.
+of it re-enters this very closure. Since the safepoint yields in place,
+nothing sends the loop here any more and the fallback is emitted but never
+entered; it is written as it was, to go as a whole in the next step.
 
 Its entry frame, however, cannot be the base of the label. A BCO is entered
 with its arguments on the stack and the free variables above them, being the

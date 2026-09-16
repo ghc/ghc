@@ -703,6 +703,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 debugBelch("stg_BCO_info" );
             } else if (c == (StgWord)&stg_apply_interp_info) {
                 debugBelch("stg_apply_interp_info" );
+            } else if (c == (StgWord)&stg_resume_interp_info) {
+                debugBelch("stg_resume_interp_info" );
             } else if (c == (StgWord)&stg_ret_t_info) {
                 debugBelch("stg_ret_t_info" );
             } else if (c == (StgWord)&stg_ctoi_t_info) {

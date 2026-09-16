@@ -688,6 +688,17 @@ class Monad m => MonadAssembler m where
 lit1 :: MonadAssembler m => BCONPtr -> m Word
 lit1 p = lit (OnlyOne p)
 
+-- | Add a run of literal words to the literal table and return the index of
+-- the first; the others follow it there, in order. Used where an instruction
+-- has an arbitrary number of words to point at, as 'YIELD_CHECK' has its
+-- bitmap.
+litWordRun :: MonadAssembler m => [Word] -> m Word
+litWordRun [] = panic "GHC.ByteCode.Asm.litWordRun: no words"
+litWordRun (w:ws) = do
+  n <- lit1 (BCONPtrWord w)
+  mapM_ (lit1 . BCONPtrWord) ws
+  return n
+
 {-# SPECIALISE assembleI :: Platform -> BCInstr -> InspectAsm () #-}
 {-# SPECIALISE assembleI :: Platform -> BCInstr -> RunAsm () #-}
 
@@ -817,7 +828,12 @@ assembleI platform i = case i of
   CASEFAIL                 -> emit_ bci_CASEFAIL []
   SWIZZLE   stkoff n       -> emit_ bci_SWIZZLE [wOp stkoff, IOp n]
   JMP       l              -> emit_ bci_JMP [LabelOp l]
-  YIELD_CHECK l            -> emit_ bci_YIELD_CHECK [LabelOp l]
+  -- the bitmap of the frame the safepoint pushes, as an StgLargeBitmap: the
+  -- size, then the bits. See Note [Join points as loops] in GHC.StgToByteCode.
+  YIELD_CHECK bm           -> do np <- litWordRun (fromIntegral (rb_size bm)
+                                        : map (fromInteger . fromStgWord)
+                                              (rb_bits bm))
+                                 emit_ bci_YIELD_CHECK [Op np]
   ENTER                    -> emit_ bci_ENTER []
   RETURN rep               -> emit_ (return_non_tuple rep) []
   RETURN_TUPLE             -> emit_ bci_RETURN_T []

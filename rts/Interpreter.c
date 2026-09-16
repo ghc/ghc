@@ -697,6 +697,10 @@ interpretBCO (Capability* cap)
     register void *SpLim;  // local state -- stack lim pointer
     register StgClosure *tagged_obj = 0, *obj = NULL;
     uint32_t n, m;
+    // The pc 'run_BCO' starts at. Only a resume frame sets it; every other
+    // path to run_BCO leaves it 0, and run_BCO resets it once it has read it.
+    // See Note [Join points as loops] in GHC.StgToByteCode.
+    int start_pc = 0;
 
     LOAD_THREAD_STATE();
 
@@ -839,6 +843,50 @@ interpretBCO (Capability* cap)
         obj = UNTAG_CLOSURE((StgClosure *)ReadSpW(1));
         Sp_addW(2);
         goto run_BCO_fun;
+    }
+
+    // ------------------------------------------------------------------------
+    // Case 2b:
+    //
+    //       We have a loop to resume where its safepoint left it. The stack is
+    //
+    //          |        ...        |
+    //          +-------------------+
+    //          |      locals       |  described by R's bitmap, pc word included
+    //          +-------------------+
+    //          |        pc         |
+    //          +-------------------+
+    //          |  (an StgBCO) R    |  the loop's BCO arrays and that bitmap
+    //          +-------------------+
+    //       Sp | stg_resume_interp |
+    //          +-------------------+
+    //
+    //       which is an ordinary RET_BCO frame, so every stack walker has
+    //       already handled it while we were away. Run the checks that
+    //       entering a BCO would have run, then continue at pc.
+    //       See Note [Join points as loops] in GHC.StgToByteCode.
+    //
+    else if (SpW(0) == (W_)&stg_resume_interp_info) {
+        obj = (StgClosure *)ReadSpW(1);
+        start_pc = (int)ReadSpW(2);
+
+        IF_DEBUG(sanity,
+                 checkStackChunk(Sp, cap->r.rCurrentTSO->stackobj->stack
+                                     + cap->r.rCurrentTSO->stackobj->stack_size);
+            );
+
+        // Heap check, then stack check, as run_BCO_fun does. The frame is
+        // still on the stack, so failing either needs no work: we return with
+        // it in place and are called again.
+        if (doYouWantToGC(cap)) {
+            RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
+        }
+        if (Sp_minusW(INTERP_STACK_CHECK_THRESH) < SpLim) {
+            RETURN_TO_SCHEDULER(ThreadInterpret, StackOverflow);
+        }
+
+        Sp_addW(3);
+        goto run_BCO;
     }
 
     // ------------------------------------------------------------------------
@@ -1584,7 +1632,7 @@ run_BCO_fun:
 run_BCO:
     INTERP_TICK(it_BCO_entries);
     {
-        register int       bciPtr = 0; /* instruction pointer */
+        register int       bciPtr = start_pc; /* instruction pointer */
         register StgWord16 bci;
         register StgBCO*   bco        = (StgBCO*)obj;
         register StgWord16* instrs    = (StgWord16*)(bco->instrs->payload);
@@ -1592,6 +1640,9 @@ run_BCO:
         register StgPtr*   ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
         int bcoSize = bco->instrs->bytes / sizeof(StgWord16);
         IF_DEBUG(interpreter,debugBelch("bcoSize = %d\n", bcoSize));
+        // A start pc is consumed by the entry it was set for; everything that
+        // comes here later starts at 0 again.
+        start_pc = 0;
 
 #if defined(INTERP_STATS)
         it_lastopc = 0; /* no opcode */
@@ -3368,18 +3419,58 @@ now:
         // A loop stays inside one BCO, so it passes neither the heap check
         // nor the context-switch check that entering a BCO would have done;
         // this instruction is those two checks, and nothing else. If either
-        // says we should stop, it branches to the loop's slow path, which
-        // tail-calls the join point's closure and so reaches the checks in
-        // run_BCO_fun proper. See Note [Join points as loops] in
-        // GHC.StgToByteCode.
+        // says we should stop, it yields where it stands: it pushes a resume
+        // frame describing the words this BCO is using and returns to the
+        // scheduler, which comes back to the dispatch at the entry of
+        // interpretBCO. See Note [Join points as loops] in GHC.StgToByteCode.
+        //
+        // The operand is the index of the frame's bitmap in this BCO's
+        // literals, laid out as an StgLargeBitmap: the size in bits, then the
+        // bits. It covers the saved pc and every word above the loop's sequel.
         INSTRUCTION(bci_YIELD_CHECK): {
-            /* Read the target first: BCO_GET_LARGE_ARG moves bciPtr, so the
+            /* Read the operand first: BCO_GET_LARGE_ARG moves bciPtr, so the
              * fall-through path must have consumed the argument too. */
-            int nextpc = BCO_GET_LARGE_ARG;
+            int bitmap_lit = BCO_GET_LARGE_ARG;
             INTERP_TICK(it_yield_checks);
             if (RELAXED_LOAD(&cap->r.rHpLim) == NULL || doYouWantToGC(cap)) {
                 INTERP_TICK(it_yield_checks_taken);
-                bciPtr = nextpc;
+
+                /* We resume at the instruction after this one, which is the
+                 * JMP of the back edge: bciPtr is already there. */
+                StgWord pc = (StgWord)bciPtr;
+
+                /* R: a BCO sharing this one's three arrays, whose bitmap is
+                 * the one the operand points at. That makes the frame below
+                 * an ordinary RET_BCO frame, walked by the bitmap inline in
+                 * R -- one indirection, as the compacting GC requires.
+                 * 'allocate' never collects, so allocating here is safe; it
+                 * is what ALLOC_AP does. */
+                StgWord *bitmap = &BCO_LIT(bitmap_lit);
+                StgWord words = 1 + ((bitmap[0] + BITS_IN(StgWord) - 1)
+                                       / BITS_IN(StgWord));
+                StgBCO *R = (StgBCO *)allocate(cap, sizeofW(StgBCO) + words);
+                // No write barrier is needed here as this is a new allocation
+                // visible only from our stack.
+                SET_HDR(R, (StgInfoTable *)&stg_BCO_info, CCS_MAIN);
+                R->instrs   = bco->instrs;
+                R->literals = bco->literals;
+                R->ptrs     = bco->ptrs;
+                R->arity    = 0;
+                R->size     = sizeofW(StgBCO) + words;
+                for (StgWord i = 0; i < words; i++) {
+                    R->bitmap[i] = bitmap[i];
+                }
+
+                Sp_subW(3);
+                SpW(2) = pc;
+                SpW(1) = (W_)R;
+                SpW(0) = (W_)&stg_resume_interp_info;
+
+                if (doYouWantToGC(cap)) {
+                    RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
+                } else {
+                    RETURN_TO_SCHEDULER(ThreadInterpret, ThreadYielding);
+                }
             }
             NEXT_INSTRUCTION;
         }

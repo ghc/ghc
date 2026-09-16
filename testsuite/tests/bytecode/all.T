@@ -168,3 +168,58 @@ test('JoinPointLoopSlowOff',
      [extra_files(['LoopSlow.hs']), only_ways(ghci_ways),
       extra_hc_opts(loop_slow_opts + ' -fno-bc-join-points-as-labels')],
      compile_and_run, [''])
+
+# When the safepoint fires the loop yields where it stands, leaving a resume
+# frame whose bitmap describes the words it was using
+# (Note [Join points as loops]); the tests below are the ways that frame is
+# looked at. LoopYield.hs has one unboxed and one boxed parameter live across
+# the safepoint, so both kinds of slot of that bitmap are exercised, and its
+# boxed accumulator is read after the loop has ended.
+loop_yield_opts = loop_points_opts + " +RTS -T -A1m -RTS"
+test('JoinPointLoopYield',
+     [extra_files(['LoopYield.hs']), only_ways(ghci_ways),
+      extra_hc_opts(loop_yield_opts)],
+     compile_and_run, [''])
+test('JoinPointLoopYieldOff',
+     [extra_files(['LoopYield.hs']), only_ways(ghci_ways),
+      extra_hc_opts(loop_yield_opts + ' -fno-bc-join-points-as-labels')],
+     compile_and_run, [''])
+
+# The same program as JoinPointLoopSlow under a compacting collector: Compact.c
+# walks the resume frame too, and compaction relocates every pointer it finds
+# there, so a slot described with the wrong polarity shows up without a debug
+# RTS. JoinPointLoopSlowCompactOff is the control with the flag off.
+loop_compact_opts = loop_points_opts + " +RTS -T -A1m -c -RTS"
+test('JoinPointLoopSlowCompact',
+     [extra_files(['LoopSlow.hs']), only_ways(ghci_ways),
+      extra_hc_opts(loop_compact_opts), extra_run_opts('check-gcs')],
+     compile_and_run, [''])
+test('JoinPointLoopSlowCompactOff',
+     [extra_files(['LoopSlow.hs']), only_ways(ghci_ways),
+      extra_hc_opts(loop_compact_opts + ' -fno-bc-join-points-as-labels')],
+     compile_and_run, [''])
+
+# An async exception delivered to a thread suspended at a resume frame:
+# 'raiseAsync' captures the frame into an AP_STACK, and forcing the thunk
+# again re-enters it through the frame's entry code.
+# JoinPointLoopResumeOff is the control with the flag off.
+loop_resume_opts = loop_points_opts + " +RTS -T -A1m -RTS"
+test('JoinPointLoopResume',
+     [extra_files(['LoopSlow.hs']), only_ways(ghci_ways),
+      extra_hc_opts(loop_resume_opts)],
+     compile_and_run, [''])
+test('JoinPointLoopResumeOff',
+     [extra_files(['LoopSlow.hs']), only_ways(ghci_ways),
+      extra_hc_opts(loop_resume_opts + ' -fno-bc-join-points-as-labels')],
+     compile_and_run, [''])
+
+# The threaded leg: with -N2 a collection on the sibling's capability clears
+# our HpLim, which is how a loop that allocates nothing reaches its safepoint.
+# No flag-off control: with the flag off there is no loop, and the program
+# says nothing else. The RTS options go to the interpreter's own RTS, so this
+# needs GHC itself to have a threaded, SMP-capable RTS.
+test('JoinPointLoopN2',
+     [extra_files(['LoopShapes.hs']), only_ways(ghci_ways),
+      req_ghc_with_threaded_rts, req_ghc_smp,
+      extra_hc_opts(loop_points_opts + ' +RTS -N2 -A1m -RTS')],
+     compile_and_run, [''])
