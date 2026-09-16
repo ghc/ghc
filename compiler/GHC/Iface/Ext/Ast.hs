@@ -23,7 +23,6 @@ import GHC.Core.DataCon           ( dataConWrapperType )
 import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
 import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.InstEnv
-import GHC.Core.Predicate         ( isEvId )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
@@ -33,7 +32,7 @@ import GHC.Types.Basic
 import GHC.Types.UnresolvedImport ( isGeneratedImport )
 import GHC.Types.FieldLabel
 import GHC.Types.Avail            ( Avails )
-import GHC.Types.Id               ( isDataConId_maybe )
+import GHC.Types.Id               ( isDataConId_maybe, isId )
 import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTyThing_maybe, getName )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
@@ -682,7 +681,7 @@ instance ToHie (Context (Located (WithUserRdr Name))) where
 
 hieEvIdsOfTerm :: EvTerm -> [EvId]
 -- Returns only EvIds satisfying relevantEvId
-hieEvIdsOfTerm = runFVSelectiveList isEvId . evTermFVs
+hieEvIdsOfTerm = runFVSelectiveList isId . evTermFVs
 
 instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))

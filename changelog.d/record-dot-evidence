@@ -1,0 +1,12 @@
+section: compiler
+synopsis: Record selector functions as evidence for `HasField` constraints during .hie file generation.
+description: {
+    We record the record selector `foo` of an expression such as `f.foo` as evidence for
+    solving the constraint `HasField "foo" record ty`.
+
+    This allows us to point to the definition source location of the record selector `foo`, allowing
+    users to jump to definition using the evidence variables.
+}
+
+issues: #25418
+mrs: !16694
