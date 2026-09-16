@@ -158,9 +158,14 @@ pattern MkFV :: (env -> acc) -> FV env acc
 {-# COMPLETE MkFV #-}
 pattern MkFV f <- MkFV' f
       where
-        MkFV f = MkFV' (oneShot f)
+        MkFV f = MkFV' (oneShot (\env -> env `seq` f env))
          -- oneShot: this is the core of the one-shot trick!
          -- Note [The one-shot state monad trick] in  GHC.Utils.Monad.
+         --
+         -- seq: this is /important/: it makes the function strict.
+         -- When the `env` is a pair (as it is in anyFreeVarsOfType), that means
+         -- we get good worker/wrapper splitting.  Without it we get extra boxed
+         -- pairs allocated by `anyFreeVarsOfType`.
 
 instance Semigroup a => Semigroup (FV env a) where
   (<>) = unionFV

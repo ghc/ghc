@@ -55,6 +55,7 @@ module GHC.Core.TyCo.FVs
   ) where
 
 import GHC.Prelude
+import GHC.Exts( inline )
 
 import {-# SOURCE #-} GHC.Core.Type( partitionInvisibleTypes, coreView, rewriterView )
 
@@ -278,14 +279,15 @@ deepUnitFV :: (Type -> TyCoFV) -> TyCoVar -> TyCoFV
 -- Deal with a single TyCoVar
 -- Takes a function to find free vars of the kind
 -- See Note [Computing deep free variables]
-deepUnitFV fvs_of_kind v
-  = MkFV (\bvs -> EndoOS (do_it bvs))
+{-# INLINE deepUnitFV #-}   -- INLINE to specialise on fvs_of_kind
+deepUnitFV fvs_of_kind
+  = \v -> MkFV (\bvs -> EndoOS (do_it bvs v))
   where
-    do_it :: BoundVars -> TyCoVarSet -> TyCoVarSet
-    do_it bvs acc | v `elemVarSet` bvs = acc
-                  | v `elemVarSet` acc = acc
-                  | otherwise          = runFVAcc (fvs_of_kind (varType v)) acc
-                                         `extendVarSet` v
+    do_it :: BoundVars -> TyCoVar -> TyCoVarSet -> TyCoVarSet
+    do_it bvs v acc | v `elemVarSet` bvs = acc
+                    | v `elemVarSet` acc = acc
+                    | otherwise          = runFVAcc (fvs_of_kind (varType v)) acc
+                                           `extendVarSet` v
                   -- Left-to-right: add the kind variables to the
                   --                accumulator before v itself
 
@@ -862,11 +864,11 @@ the pair.
 
 The same idiom is used in `exprFreeVarsDSet` and friends.
 
-However we are careful to inline `atvFolder` and `runAny` so that we get those
+However we are careful to INLINE `atvFolder` and `runAny` so that we get those
 nice tight loops.
 -}
 
-{-# INLINE afvFolder #-}   -- See Note [Inlining any-fvs]
+{-# INLINE afvFolder #-}   -- See Note [Any-free-var folder]
 afvFolder :: TyCoFolder (FV (BoundVars, TyCoVar -> Bool) DM.Any)
 -- 'afvFolder' is short for "any-free-var folder", good for checking
 --   if any shallow free var of a type satisfies a predicate `check_fv`
@@ -874,8 +876,9 @@ afvFolder :: TyCoFolder (FV (BoundVars, TyCoVar -> Bool) DM.Any)
 --    the bound variables (which are definitely not free), and
 --    an "interesting var" predicate which the client supplies
 afvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
-                       , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                       , tcf_hole = do_hole
+                       , tcf_tyvar = do_tcv
+                       , tcf_covar = do_tcv
+                       , tcf_hole  = do_hole
                        , tcf_tycobinder = addBndrSelectiveFV }
   where
     do_tcv tv    = MkFV $ \ (bvs,check_fv) ->
@@ -892,9 +895,11 @@ runAny :: (TyVar -> Bool) -> FV (BoundVars, TyCoVar -> Bool) DM.Any -> Bool
 runAny check_fv fvs = DM.getAny $ runFV fvs (emptyVarSet, check_fv)
 
 anyFreeVarsOfType :: (TyCoVar -> Bool) -> Type -> Bool
+{-# INLINE anyFreeVarsOfType #-}
 anyFreeVarsOfType check_fv ty = runAny check_fv (afv_type ty)
 
 anyFreeVarsOfTypes :: (TyCoVar -> Bool) -> [Type] -> Bool
+{-# INLINE anyFreeVarsOfTypes #-}
 anyFreeVarsOfTypes check_fv tys = runAny check_fv (afv_types tys)
 
 anyFreeVarsOfCo :: (TyCoVar -> Bool) -> Coercion -> Bool
