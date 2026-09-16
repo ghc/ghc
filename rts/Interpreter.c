@@ -494,6 +494,14 @@ unsigned long it_slides;
 unsigned long it_insns;
 unsigned long it_BCO_entries;
 
+/* How often the safepoint of a join point compiled as a loop was reached,
+ * and how often it branched to the slow path. A loop that never takes the
+ * branch has not exercised its fallback at all, which is what makes these
+ * two the useful assertion for a test of the slow path -- rather than a
+ * wall-clock measurement, which only says the loop was slow. */
+unsigned long it_yield_checks;
+unsigned long it_yield_checks_taken;
+
 unsigned long it_ofreq[N_CODES];
 unsigned long it_oofreq[N_CODES][N_CODES];
 unsigned long it_lastopc;
@@ -510,6 +518,7 @@ void interp_startup ( void )
    for (i = 0; i < N_CLOSURE_TYPES; i++)
       it_unknown_entries[i] = 0;
    it_slides = it_insns = it_BCO_entries = 0;
+   it_yield_checks = it_yield_checks_taken = 0;
    for (i = 0; i < N_CODES; i++) it_ofreq[i] = 0;
    for (i = 0; i < N_CODES; i++)
      for (j = 0; j < N_CODES; j++)
@@ -537,6 +546,8 @@ void interp_shutdown ( void )
    }
    debugBelch("%lu insns, %lu slides, %lu BCO_entries\n",
                    it_insns, it_slides, it_BCO_entries);
+   debugBelch("%lu YIELD_CHECKs, %lu of them taken\n",
+                   it_yield_checks, it_yield_checks_taken);
    for (i = 0; i < N_CODES; i++)
       debugBelch("opcode %2d got %lu\n", i, it_ofreq[i] );
 
@@ -3365,7 +3376,9 @@ now:
             /* Read the target first: BCO_GET_LARGE_ARG moves bciPtr, so the
              * fall-through path must have consumed the argument too. */
             int nextpc = BCO_GET_LARGE_ARG;
+            INTERP_TICK(it_yield_checks);
             if (RELAXED_LOAD(&cap->r.rHpLim) == NULL || doYouWantToGC(cap)) {
+                INTERP_TICK(it_yield_checks_taken);
                 bciPtr = nextpc;
             }
             NEXT_INSTRUCTION;

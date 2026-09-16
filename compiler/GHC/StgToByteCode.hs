@@ -573,7 +573,8 @@ schemeEntryLoop j params fvs d p body = do
    -- The slow path is an ordinary call of the join point, which enters this
    -- very closure again and so passes the checks of 'run_BCO_fun'. The join
    -- point is a free variable of its own RHS, so it is in the environment.
-   slow_code <- doTailCall d 0 p_loop j (map StgVarArg params)
+   -- Reversed: see the calling convention noted at 'doTailCall'.
+   slow_code <- doTailCall d 0 p_loop j (reverse (map StgVarArg params))
    massertPpr (endsInControlTransfer body_code)
      (text "schemeEntryLoop: RHS falls through into the slow path of" <+> ppr j)
    return (copy_code `appOL` mkSlideB platform d d
@@ -691,6 +692,7 @@ schemeE d s p e@(StgOpApp {}) = schemeT d s p e
 schemeE d s p (StgLetNoEscape xlet bnd body) = do
    placement <- case bnd of
      StgNonRec j StgRhsClosure{} -> joinPlacement j
+     StgRec [(j, StgRhsClosure{})] -> joinPlacement j
      _ -> pure Nothing
    case bnd of
      StgNonRec j rhs_closure@(StgRhsClosure _ _ _ params rhs _)
@@ -699,6 +701,12 @@ schemeE d s p (StgLetNoEscape xlet bnd body) = do
        -- the innermost continuation of the path gets the label
        | Just (ContPath (k : _)) <- placement
        -> schemeJoinPointInCont d s p j k (fvsToEnv p rhs_closure) params rhs body
+     -- A self-recursive join point compiled as a loop. Its label is always in
+     -- the BCO of the definition ('JoinRejectLoopInCont' is the rest), so
+     -- there is no continuation case here.
+     StgRec [(j, rhs_closure@(StgRhsClosure _ _ _ params rhs _))]
+       | Just (ContPath []) <- placement
+       -> schemeJoinPointLoop d s p j params rhs rhs_closure body
      -- Other join points are compiled like ordinary lets, i.e. as heap
      -- closures. See also Note [Join points and bytecode preparation] in
      -- GHC.Stg.BcPrep.
@@ -831,6 +839,73 @@ schemeJoinPoint d s p j params rhs body = do
      (text "schemeJoinPoint: body falls through into" <+> ppr j)
    return (body_code `appOL` (LABEL label `consOL` rhs_code))
 
+-- | Compile @let-no-escape rec j = \params -> rhs in body@ as a loop: the
+-- fallback closure, the code of @body@ with @j@ as a label in the current BCO,
+-- then the label, the code of @rhs@, and the slow path. The closure is built
+-- exactly as an ordinary recursive let would build it, and is what the slow
+-- path calls. See Note [Join points as loops].
+schemeJoinPointLoop :: StackDepth -> Sequel -> BCEnv -> Id -> [Id] -> CgStgExpr
+                    -> CgStgRhs -> CgStgExpr -> BcM BCInstrList
+schemeJoinPointLoop d s p j params rhs rhs_closure body = do
+   platform <- profilePlatform <$> getProfile
+   label <- getLabelBc
+   slow <- getLabelBc
+   bco <- getCurrentBco
+   let -- The fallback closure sits on the stack under everything the loop
+       -- uses, where an ordinary let would have put it; the loop's base is
+       -- above it, so a jump never slides it away.
+       !d_clo = d + wordSize platform
+       p_clo = UniqMap.addToUniqMap p j d_clo
+       -- computed in the environment that has j, so the closure captures
+       -- itself: that is what makes the slow path's call reach it
+       fvs = fvsToEnv p_clo rhs_closure
+       size_w = sum (map (idSizeW platform) fvs)
+       arity = strictGenericLength params
+       param_szsb = map (joinParamSize platform) params
+       p_rhs = UniqMap.addListToUniqMap p_clo
+                 (zip params (mkStackOffsets d_clo param_szsb))
+       d_rhs = d_clo + sum param_szsb
+       target slow_path = JoinTarget { jt_label = label
+                                     , jt_base = JoinBaseDepth d_clo
+                                     , jt_params = params
+                                     , jt_sequel = s
+                                     , jt_bco = bco
+                                     , jt_slow = slow_path }
+       push_fvs !dd [] = return (dd, nilOL)
+       push_fvs !dd (fv : rest) = do
+         (push, szb) <- pushAtom dd p_clo (StgVarArg fv)
+         (dd', more) <- push_fvs (dd + szb) rest
+         return (dd', push `appOL` more)
+   -- The fallback is the same RHS compiled as a closure, but with a label at
+   -- its entry, so that it is a loop too. See 'schemeEntryLoop'.
+   fallback <- schemeR_entry (EntryLoop j) fvs (getName j, rhs_closure)
+   (_, push_fv_code) <- push_fvs d_clo fvs
+   let alloc_code
+         | arity == 0 = unitOL (ALLOC_AP (fromIntegral size_w))
+         | otherwise  = unitOL (ALLOC_PAP arity (fromIntegral size_w))
+       mkap | arity == 0 = MKAP
+            | otherwise  = MKPAP
+       -- one binding, so the closure is one word under its payload
+       fill_code = push_fv_code `snocOL` PUSH_BCO fallback
+                     `snocOL` mkap (1 + size_w) (fromIntegral size_w)
+   -- Forward jumps from the body, so no safepoint: the body reached them from
+   -- the entry of this BCO.
+   body_code <- withJoinPoint j (target Nothing) $ schemeE d_clo s p_clo body
+   -- Backward jumps from the RHS, which is where the safepoint goes.
+   rhs_code <- withJoinPoint j (target (Just slow)) $ schemeE d_rhs s p_rhs rhs
+   -- The slow path takes over the stack the back edge built, which is the
+   -- loop's base with the parameters on top, and calls the fallback with them.
+   -- Reversed: see the calling convention noted at 'doTailCall'.
+   slow_code <- doTailCall d_rhs s p_rhs j (reverse (map StgVarArg params))
+   massertPpr (endsInControlTransfer body_code)
+     (text "schemeJoinPointLoop: body falls through into" <+> ppr j)
+   massertPpr (endsInControlTransfer rhs_code)
+     (text "schemeJoinPointLoop: RHS falls through into the slow path of"
+       <+> ppr j)
+   return (alloc_code `appOL` fill_code `appOL` body_code
+             `appOL` (LABEL label `consOL` rhs_code)
+             `appOL` (LABEL slow `consOL` slow_code))
+
 -- | Compile @let-no-escape j = \params -> rhs in body@ with @j@ as a label in
 -- the continuation BCO of the case with binder @k@ in @body@: record the join
 -- point for 'doCase', and compile @body@. See Note [Join points as labels].
@@ -949,6 +1024,9 @@ joinClosureKind (Just JoinRejectRecursive{}) = ClosureRecJoin
 -- makes the old 'in-rec-join' count the sum of the new 'in-rec-join' and
 -- 'in-loop-join'.
 joinClosureKind (Just JoinRejectLoopPlacedJoin) = ClosureRecJoin
+-- Likewise a loop that is not emitted because its label would go into a
+-- continuation BCO: it stays the closure a recursive join point is today.
+joinClosureKind (Just JoinRejectLoopInCont) = ClosureRecJoin
 -- Still a closure, and stays one after loops are emitted: the RHS of a loop is
 -- compiled a second time into the fallback closure, so an enclosing join point
 -- with an occurrence there is rejected then as it is now. These are counted
@@ -1162,6 +1240,12 @@ mkConAppCode orig_d _ p con args = app_code
 -- -----------------------------------------------------------------------------
 -- Generate code for a tail-call
 
+-- | Tail call @fn@ with @args@.
+--
+-- The arguments are pushed in list order, so the LAST element of @args@ ends
+-- up nearest the closure and is therefore the one applied FIRST. Callers that
+-- have the arguments in source order must pass @reverse args@; every call
+-- below does.
 doTailCall
     :: StackDepth
     -> Sequel
@@ -1893,12 +1977,13 @@ doCase d s p scrut bndr alts
 data JoinPointVerdict
   = JoinAsLabel             -- ^ a label in the BCO of the definition
   | JoinInCont !ContPath    -- ^ a label in a continuation BCO nested in it
-  | JoinAsLoop !ContPath    -- ^ self-recursive, a loop where the label would be
+  | JoinAsLoop              -- ^ self-recursive, a loop in the BCO of the definition
   | JoinRejectBreakpoints   -- ^ breakpoints are enabled
   | JoinRejectDisabled      -- ^ -fno-bc-join-points-as-labels
   | JoinRejectConRhs        -- ^ the RHS is a constructor application
   | JoinRejectRecGroup      -- ^ a group of several (mutually) recursive join points
   | JoinRejectRecursive !OtherwiseEligible  -- ^ self-recursive, not a loop
+  | JoinRejectLoopInCont    -- ^ a loop whose label would go in a continuation BCO
   | JoinRejectLoopPlacedJoin -- ^ self-recursive, and a join point in its RHS is placed
   | JoinRejectCrossBco !CrossBco -- ^ the jumps are not all in one BCO
   deriving Eq
@@ -1942,24 +2027,19 @@ data OtherwiseEligible = OtherwiseEligible | NotOtherwiseEligible
 -- recursive group gets the group's verdict.
 type JoinPointVerdicts = UniqMap Id JoinPointVerdict
 
--- | Where the label of a join point is, relative to its definition, if it is
--- compiled as a label /today/.
---
--- 'JoinAsLoop' deliberately has no placement: the verdict is analysis only,
--- so a self-recursive join point is still compiled as a closure, and the RHS
--- of one is still a BCO of its own for the purposes of 'joinJumpSites'. See
--- Note [Join points as loops].
+-- | Where the label of a join point is, relative to its definition. A loop's
+-- label is in the BCO of the definition, which is the only placement a loop
+-- has: see 'JoinRejectLoopInCont' and Note [Join points as loops].
 verdictPlacement :: JoinPointVerdict -> Maybe ContPath
 verdictPlacement JoinAsLabel = Just (ContPath [])
 verdictPlacement (JoinInCont path) = Just path
+verdictPlacement JoinAsLoop = Just (ContPath [])
 verdictPlacement _ = Nothing
 
 -- | Would the join point's RHS be emitted into a BCO that already exists,
--- rather than into one of its own? Unlike 'verdictPlacement' this counts a
--- loop, because what it decides is whether compiling an enclosing RHS twice
--- would place this join point twice.
+-- rather than into one of its own? What it decides is whether compiling an
+-- enclosing RHS twice would place this join point twice.
 verdictIsPlaced :: JoinPointVerdict -> Bool
-verdictIsPlaced JoinAsLoop{} = True
 verdictIsPlaced v = isJust (verdictPlacement v)
 
 -- | Decide for every join point of the module whether it is compiled as a label.
@@ -2021,14 +2101,17 @@ joinPointVerdict platform dflags verdict_of bind body
                   -- a path from the definition to the label, a site in the RHS
                   -- one from the label to itself.
                   | all (== SiteIn (ContPath [])) rhs_sites
-                  -- The placement rule is asked last, so that this counter is
-                  -- exactly the join points that lifting it would win, and not
-                  -- also the ones rejected for their jumps anyway. Compiling
-                  -- the RHS twice would place a join point of its own twice,
-                  -- see Note [Join points as loops].
-                  -> if rhsPlacesJoin rhs_body
-                       then JoinRejectLoopPlacedJoin
-                       else JoinAsLoop path
+                  -- The two restrictions are asked after the jump conditions,
+                  -- so that each counter is exactly the join points that
+                  -- lifting that one restriction would win, and not also the
+                  -- ones rejected for their jumps anyway. The coverage limit
+                  -- is asked before the placement one, being the coarser of
+                  -- the two. See Note [Join points as loops].
+                  -> if path /= ContPath []
+                       then JoinRejectLoopInCont
+                       else if rhsPlacesJoin rhs_body
+                              then JoinRejectLoopPlacedJoin
+                              else JoinAsLoop
                 _ -> JoinRejectRecursive (recursive body_sites rhs_sites)
       StgRec{} -> JoinRejectRecGroup
   where
@@ -2182,12 +2265,11 @@ joinPointStats verdict_map =
     <+> number isInCont <+> text "as labels in continuations"
     <+> parens (number (inContDepth (== 1)) <+> text "depth 1," <+>
                 number (inContDepth (> 1)) <+> text "deeper") <> comma
-    <+> number isAsLoop <+> text "as loops"
-    <+> parens (number (== JoinAsLoop (ContPath [])) <+> text "in the defining BCO,"
-                <+> number isLoopInCont <+> text "in continuations") <> comma
+    <+> number (== JoinAsLoop) <+> text "as loops,"
     <+> number isRecursive <+> text "rejected-recursive"
     <+> parens (number (== JoinRejectRecursive OtherwiseEligible)
                 <+> text "otherwise eligible") <> comma
+    <+> number (== JoinRejectLoopInCont) <+> text "loop-rejected-in-continuation,"
     <+> number (== JoinRejectLoopPlacedJoin) <+> text "loop-rejected-placed-join,"
     <+> number (== JoinRejectRecGroup) <+> text "rejected-rec-group,"
     <+> number (== JoinRejectConRhs) <+> text "rejected-con-rhs,"
@@ -2220,10 +2302,6 @@ joinPointStats verdict_map =
     isCrossBco _ = False
     isInCont JoinInCont{} = True
     isInCont _ = False
-    isAsLoop JoinAsLoop{} = True
-    isAsLoop _ = False
-    isLoopInCont (JoinAsLoop (ContPath path)) = not (null path)
-    isLoopInCont _ = False
     inContDepth p (JoinInCont (ContPath path)) = p (length path)
     inContDepth _ _ = False
 
@@ -2337,11 +2415,11 @@ a closure: every jump, including the recursive one, is a call. It could
 instead be a label like any other, with the recursive jump as a backward JMP
 -- a loop in the BCO that holds the label.
 
-This is currently *analysis only*: 'JoinAsLoop' says the binding qualifies,
-'verdictPlacement' still reports no placement for it, and the binding is
-compiled as a closure exactly as before. What the verdict buys today is the
-counters in 'joinPointStats', which say how much emitting loops would be
-worth and which of two further steps would be worth more.
+'schemeJoinPointLoop' emits one: the fallback closure, the body with the join
+point bound to a label, the label, the RHS, and the slow path. The closure is
+built as an ordinary recursive let builds it, so the static BCO count and the
+allocation are what they were; what a loop buys is the instructions on its back
+edges.
 
 Eligibility is two predicates, not one, because 'joinJumpSites' reports paths
 relative to the expression it is given:
@@ -2361,6 +2439,20 @@ name, as the assertion that this really is so.
 Only a singleton 'StgRec' is considered. A mutually recursive group stays
 'JoinRejectRecGroup': its members would need one label each, and a jump from
 one RHS to another is not covered by the two predicates above.
+
+Only a label in the BCO of the definition is emitted. A loop whose body jumps
+all sit in one *continuation* BCO would be a label there, like 'JoinInCont',
+and the machinery for that ('PendingJoin', 'placePendingJoins') would carry it
+-- but no such join point occurs in the corpus we measured or in any test we
+could write, so emitting it would be untested code. It is rejected as
+'JoinRejectLoopInCont' and counted, which keeps 'as loops' equal to the number
+of loops actually emitted. This is a coverage limit waiting for a test, not a
+design limit.
+
+A nullary loop is a program that diverges, and is left alone by none of this:
+its fallback is a thunk, so the first safepoint enters a closure under
+evaluation and the program gets <<loop>>, which is what the closure
+compilation gives today at the first jump instead.
 
 Beyond that, a loop needs a slow path for the back edge, because intra-BCO
 code has no safepoint: a BCO checks the heap, the stack and the
