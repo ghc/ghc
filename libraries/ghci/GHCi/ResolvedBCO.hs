@@ -31,8 +31,8 @@ import qualified GHC.Exts.Heap as Heap
 import Data.Word (Word16)
 import Data.ByteString.Short (ShortByteString (SBS), toShort)
 import Data.Array.Base (UArray (UArray))
-import Data.Binary.Builder (putWord64le, fromShortByteString)
-import Data.Binary.Put (Put, putWord8, putBuilder)
+import Data.Binary.Builder (fromShortByteString)
+import Data.Binary.Put (Put, putWord8, putWord64le, putBuilder)
 import Data.Binary.Get (Get, getWord8, getWord64le, getByteString)
 import Data.Binary (Binary (put, get))
 import Foreign.Storable (Storable, sizeOf)
@@ -40,13 +40,13 @@ import GHC.Data.SmallArray (SmallArray)
 import GHC.Generics (Generic)
 
 #if defined(WORDS_BIGENDIAN)
-import Data.Binary.Builder (putWord16le)
-import Data.Binary.Get (getWord16)
+import Data.Binary.Put (putWord16le)
+import Data.Binary.Get (getWord16le)
 #endif
 
 #if defined(WORDS_BIGENDIAN) || SIZEOF_HSWORD == 4
 import Control.Monad (replicateM)
-import Data.Array.Base (listArray, numElements, elems)
+import Data.Array.Base (IArray, listArray, numElements, elems)
 #endif
 
 isLittleEndian :: Bool
@@ -160,8 +160,8 @@ instance Binary ResolvedBCO where
 --   array is the one that is used for the serialized form of elements.
 putBCOByteArrayDirectly :: Storable a => BCOByteArray a -> Put
 putBCOByteArrayDirectly @a (BCOByteArray byteArray#)
-  = putBuilder $
-    putWord64le (fromIntegral size) <> fromShortByteString (SBS byteArray#)
+  = putWord64le (fromIntegral size) <>
+    putBuilder (fromShortByteString (SBS byteArray#))
   where
 
   size :: Int
@@ -185,13 +185,13 @@ getBCOByteArrayDirectly @a = do
 -- | Serialize a 'BCOByteArray', not writing the payload verbatim but
 --   serializing the individual elements. This can be used with any host
 --   platform and element type.
-putBCOByteArrayPortably :: (a -> Put)
+putBCOByteArrayPortably :: (Storable a, IArray UArray a)
+                        => (a -> Put)
                            -- ^ The serializer to use for each element
                         -> (BCOByteArray a -> Put)
                            -- ^ The 'BCOByteArray' serializer
-putBCOByteArrayPortably putElement bcoByteArray
-  = putBuilder $
-    putWord64le (fromIntegral size) <> foldMap putElement (elems array)
+putBCOByteArrayPortably @a putElement bcoByteArray
+  = putWord64le (fromIntegral size) <> foldMap putElement (elems array)
   where
 
   array :: UArray Int a
@@ -203,7 +203,8 @@ putBCOByteArrayPortably putElement bcoByteArray
 -- | Deserialize a 'BCOByteArray', not reading the payload verbatim but
 --   deserializing the individual elements. This can be used with any host
 --   platform and element type.
-getBCOByteArrayPortably :: Get a
+getBCOByteArrayPortably :: IArray UArray a
+                        => Get a
                            -- ^ The deserializer to use for each element
                         -> Get (BCOByteArray a)
                            -- ^ The 'BCOByteArray' deserializer
