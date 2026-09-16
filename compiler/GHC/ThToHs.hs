@@ -1129,8 +1129,8 @@ cvtl e = wrapLA (cvt e)
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM (cvtMatch CaseAlt) ms
                             ; th_origin <- getOrigin
                             ; wrapParLA (HsCase noAnn e' . mkMatchGroup th_origin noAnn) ms' }
-    cvt (DoE m ss)     = cvtHsDo (DoExpr (mk_mod <$> m)) ss
-    cvt (MDoE m ss)    = cvtHsDo (MDoExpr (mk_mod <$> m)) ss
+    cvt (DoE m ss)     = cvtHsDo (DoExpr (mk_modtext <$> m)) ss
+    cvt (MDoE m ss)    = cvtHsDo (MDoExpr (mk_modtext <$> m)) ss
     cvt (CompE ss)     = cvtHsDo ListComp ss
     cvt (ArithSeqE dd) = do { dd' <- cvtDD dd
                             ; return $ ArithSeq noAnn Nothing dd' }
@@ -2354,6 +2354,9 @@ mk_ghc_ns (TH.FldName con) = OccName.fieldName (fsLit con)
 
 mk_mod :: TH.ModName -> ModuleName
 mk_mod mod = mkModuleName (TH.modString mod)
+
+mk_modtext :: TH.ModName -> HsModuleName
+mk_modtext mod = packHText (TH.modString mod)
 
 mk_pkg :: TH.PkgName -> Unit
 mk_pkg pkg = stringToUnit (TH.pkgString pkg)

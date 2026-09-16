@@ -17,6 +17,7 @@ import Data.List.NonEmpty (NonEmpty)
 import GHC.Types.SrcLoc (PsLoc)
 
 import GHC.Generics ( Generic )
+import Language.Haskell.Syntax.Text (HsModuleName)
 
 -- The type aliases below are useful to make some type signatures a bit more
 -- descriptive, like 'handleWarningsThrowErrors' in 'GHC.Driver.Main'.
@@ -311,7 +312,7 @@ data PsMessage
    | PsErrUnallowedPragma !(HsPragE GhcPs)
 
    -- | Qualified do block in command
-   | PsErrQualifiedDoInCmd !ModuleName
+   | PsErrQualifiedDoInCmd !HsModuleName
 
    -- | Invalid infix hole, expected an infix operator
    | PsErrInvalidInfixHole
@@ -351,10 +352,10 @@ data PsMessage
    | PsErrDoCmdInFunAppCmd !(LHsCmd GhcPs)
 
    -- | Unexpected do block in function application
-   | PsErrDoInFunAppExpr !(Maybe ModuleName) !(LHsExpr GhcPs)
+   | PsErrDoInFunAppExpr !(Maybe HsModuleName) !(LHsExpr GhcPs)
 
    -- | Unexpected mdo block in function application
-   | PsErrMDoInFunAppExpr !(Maybe ModuleName) !(LHsExpr GhcPs)
+   | PsErrMDoInFunAppExpr !(Maybe HsModuleName) !(LHsExpr GhcPs)
 
    -- | Unexpected case expression in function application
    | PsErrCaseInFunAppExpr !(LHsExpr GhcPs)
