@@ -127,7 +127,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries hpc_info
             flattenBind (StgRec bs)     = bs
             -- See Note [Join points as labels]
             join_verdicts =
-              joinPointVerdicts (profilePlatform profile) dflags LoopHasFallback binds
+              joinPointVerdicts (profilePlatform profile) dflags binds
 
         (proto_bcos, BcM_State{..}) <-
            runBc hsc_env this_mod mb_modBreaks join_verdicts $ do
@@ -141,7 +141,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries hpc_info
         -- See Note [Join points as labels]
         putDumpFileMaybe logger Opt_D_dump_BCOs
            "Join points" FormatText
-           (joinPointStats (profilePlatform profile) dflags binds join_verdicts)
+           (joinPointStats join_verdicts)
 
         let mod_breaks = case mb_modBreaks of
              Nothing -> Nothing
@@ -434,35 +434,24 @@ schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
                                 -- top-level things, which have no free vars.
         -> (Name, CgStgRhs)
         -> BcM ProtoBCO
-schemeR = schemeR_entry NoEntryLoop
-
--- | 'schemeR' for a BCO that may be the fallback closure of a join point
--- compiled as a loop. See Note [Join points as loops].
-schemeR_entry :: EntryLoop -> [Id] -> (Name, CgStgRhs) -> BcM ProtoBCO
-schemeR_entry entry_loop fvs (nm, rhs@(StgRhsClosure _ _ _ args body _))
-   = schemeR_wrk entry_loop fvs nm rhs (args, body)
-schemeR_entry entry_loop fvs (nm, rhs@(StgRhsCon _cc dc cnum _ticks args _type))
+schemeR fvs (nm, rhs@(StgRhsClosure _ _ _ args body _))
+   = schemeR_wrk fvs nm rhs (args, body)
+schemeR fvs (nm, rhs@(StgRhsCon _cc dc cnum _ticks args _type))
    -- unlike top-level StgRhsCon, which are static (see schemeTopBind),
    -- non-top-level StgRhsCon are compiled just like StgRhsClosure StgConApp
-   = schemeR_wrk entry_loop fvs nm rhs ([], StgConApp dc cnum args [])
+   = schemeR_wrk fvs nm rhs ([], StgConApp dc cnum args [])
 
 -- If an expression is a lambda, return the
 -- list of arguments to the lambda (in R-to-L order) and the
 -- underlying expression
 
--- | Whether the BCO being generated is the fallback closure of a join point
--- compiled as a loop, which binds that join point to a label at the entry of
--- the BCO. See Note [Join points as loops].
-data EntryLoop = EntryLoop !Id | NoEntryLoop
-
 schemeR_wrk
-    :: EntryLoop
-    -> [Id]
+    :: [Id]
     -> Name
     -> CgStgRhs            -- expression e, for debugging only
     -> ([Var], CgStgExpr)  -- the args and body of an StgRhsClosure
     -> BcM ProtoBCO
-schemeR_wrk entry_loop fvs nm original_body (args, body)
+schemeR_wrk fvs nm original_body (args, body)
    = do
      add_bco_name <- shouldAddBcoName
      profile <- getProfile
@@ -486,9 +475,7 @@ schemeR_wrk entry_loop fvs nm original_body (args, body)
          bits = argBits platform (reverse (map (idArgRep platform) all_args))
          bitmap_size = strictGenericLength bits
          bitmap = mkBitmap platform bits
-     body_code <- withNewBco $ case entry_loop of
-       NoEntryLoop -> schemeER_wrk sum_szsb_args p_init body
-       EntryLoop j -> schemeEntryLoop j args fvs sum_szsb_args p_init body
+     body_code <- withNewBco $ schemeER_wrk sum_szsb_args p_init body
 
      pure (mkProtoBCO platform add_bco_name nm body_code (Right original_body)
                  arity bitmap_size bitmap False{-not alts-})
@@ -522,76 +509,6 @@ schemeER_wrk d p (StgTick bp@(Breakpoint tick_ty tick_id fvs) rhs) = do
     Just ibi -> BRK_FUN ibi `consOL` code
 
 schemeER_wrk d p rhs = schemeE d 0 p rhs
-
--- | The body of the fallback closure of a join point compiled as a loop: a
--- prologue that rebuilds the entry frame, the label, the RHS with the join
--- point bound to that label, and the slow path. The fallback is therefore a
--- loop as well, and does not pay a call per iteration once a safepoint has
--- sent the primary copy here. See Note [Join points as loops].
---
--- The frame has to be rebuilt because a jump slides its arguments down to the
--- base of the label, and the entry frame is not somewhere they can be slid to:
--- the entry stack is the arguments with the free variables on top, as the
--- stored arguments of the PAP, and the free variables must stay -- one of them
--- is the join point that the slow path calls. So the prologue pushes a copy of
--- the free variables and then of the parameters, and one SLIDE drops the whole
--- entry frame from under them, leaving the free variables below the label's
--- base and the parameters above it. The back edge is then the same code as in
--- the primary copy, and nothing of the entry frame is left to be retained.
-schemeEntryLoop :: Id -> [Id] -> [Id] -> StackDepth -> BCEnv -> CgStgExpr
-                -> BcM BCInstrList
-schemeEntryLoop j params fvs d p body = do
-   platform <- profilePlatform <$> getProfile
-   label <- getLabelBc
-   slow <- getLabelBc
-   bco <- getCurrentBco
-   let fv_szsb    = map (joinParamSize platform) fvs
-       param_szsb = map (joinParamSize platform) params
-       -- the frame the prologue leaves: the free variables, then the
-       -- parameters. The environment is built from scratch, not extended from
-       -- the entry one, whose offsets the SLIDE invalidates.
-       base   = sum fv_szsb
-       p_loop = UniqMap.listToUniqMap
-                  (zip (fvs ++ params) (mkStackOffsets 0 (fv_szsb ++ param_szsb)))
-       target = JoinTarget { jt_label = label
-                           , jt_base = JoinBaseDepth base
-                           , jt_params = params
-                           -- the sequel of the body of any BCO
-                           , jt_sequel = 0
-                           , jt_bco = bco
-                           -- the stack at the label is the frame the prologue
-                           -- leaves, and the sequel of a BCO body is 0
-                           , jt_yield = Just (yieldBitmap platform d 0 p_loop) }
-       -- read from the entry environment: this is where the values still are
-       copy !dd [] = return (dd, nilOL)
-       copy !dd (x : rest) = do
-         (push, szb) <- pushAtom dd p (StgVarArg x)
-         massertPpr (szb == joinParamSize platform x)
-           (text "schemeEntryLoop: size mismatch for" <+> ppr j
-             $$ ppr x <+> ppr szb)
-         (dd', more) <- copy (dd + szb) rest
-         return (dd', push `appOL` more)
-   (d_copies, copy_code) <- copy d (fvs ++ params)
-   -- The copies are the entry frame again, so they are exactly as big as it
-   -- is, and the frame the SLIDE leaves is as deep as the entry frame was.
-   massertPpr (d_copies == d + d && base + sum param_szsb == d)
-     (text "schemeEntryLoop: prologue of" <+> ppr j <+> text "ends at"
-       <+> ppr d_copies <+> text "with base" <+> ppr base
-       <+> text "expected" <+> ppr (d + d) <+> text "and entry depth" <+> ppr d)
-   body_code <- withJoinPoint j target $ schemeER_wrk d p_loop body
-   -- The slow path is an ordinary call of the join point, which enters this
-   -- very closure again and so passes the checks of 'run_BCO_fun'. The join
-   -- point is a free variable of its own RHS, so it is in the environment.
-   -- Reversed: see the calling convention noted at 'doTailCall'.
-   -- Unreachable since the safepoint yields in place, and emitted for now
-   -- only so that the fallback goes as one piece. See Note [Join points as
-   -- loops].
-   slow_code <- doTailCall d 0 p_loop j (reverse (map StgVarArg params))
-   massertPpr (endsInControlTransfer body_code)
-     (text "schemeEntryLoop: RHS falls through into the slow path of" <+> ppr j)
-   return (copy_code `appOL` mkSlideB platform d d
-             `appOL` (LABEL label `consOL` body_code)
-             `appOL` (LABEL slow `consOL` slow_code))
 
 -- | Get the offset in words into this breakpoint's AP_STACK which contains the matching Id
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
@@ -716,9 +633,9 @@ schemeE d s p (StgLetNoEscape xlet bnd body) = do
      -- A self-recursive join point compiled as a loop. Its label is always in
      -- the BCO of the definition ('JoinRejectLoopInCont' is the rest), so
      -- there is no continuation case here.
-     StgRec [(j, rhs_closure@(StgRhsClosure _ _ _ params rhs _))]
+     StgRec [(j, StgRhsClosure _ _ _ params rhs _)]
        | Just (ContPath []) <- placement
-       -> schemeJoinPointLoop d s p j params rhs rhs_closure body
+       -> schemeJoinPointLoop d s p j params rhs body
      -- Other join points are compiled like ordinary lets, i.e. as heap
      -- closures. See also Note [Join points and bytecode preparation] in
      -- GHC.Stg.BcPrep.
@@ -851,78 +768,46 @@ schemeJoinPoint d s p j params rhs body = do
      (text "schemeJoinPoint: body falls through into" <+> ppr j)
    return (body_code `appOL` (LABEL label `consOL` rhs_code))
 
--- | Compile @let-no-escape rec j = \params -> rhs in body@ as a loop: the
--- fallback closure, the code of @body@ with @j@ as a label in the current BCO,
--- then the label, the code of @rhs@, and the slow path. The closure is built
--- exactly as an ordinary recursive let would build it, and is what the slow
--- path calls. See Note [Join points as loops].
+-- | Compile @let-no-escape rec j = \params -> rhs in body@ as a loop: the code
+-- of @body@ with @j@ as a label in the current BCO, then the label and the
+-- code of @rhs@, whose jumps to @j@ are backward ones and so carry a
+-- safepoint. The RHS is emitted exactly once, where the label is, in the
+-- environment of the definition -- like the RHS of any other placed join
+-- point, the only difference being the safepoint. See
+-- Note [Join points as loops].
 schemeJoinPointLoop :: StackDepth -> Sequel -> BCEnv -> Id -> [Id] -> CgStgExpr
-                    -> CgStgRhs -> CgStgExpr -> BcM BCInstrList
-schemeJoinPointLoop d s p j params rhs rhs_closure body = do
+                    -> CgStgExpr -> BcM BCInstrList
+schemeJoinPointLoop d s p j params rhs body = do
    platform <- profilePlatform <$> getProfile
    label <- getLabelBc
-   slow <- getLabelBc
    bco <- getCurrentBco
-   let -- The fallback closure sits on the stack under everything the loop
-       -- uses, where an ordinary let would have put it; the loop's base is
-       -- above it, so a jump never slides it away.
-       !d_clo = d + wordSize platform
-       p_clo = UniqMap.addToUniqMap p j d_clo
-       -- computed in the environment that has j, so the closure captures
-       -- itself: that is what makes the slow path's call reach it
-       fvs = fvsToEnv p_clo rhs_closure
-       size_w = sum (map (idSizeW platform) fvs)
-       arity = strictGenericLength params
+   let -- A jump pushes the arguments in order, starting at depth d, and
+       -- slides them down to d, which is the loop's base.
        param_szsb = map (joinParamSize platform) params
-       p_rhs = UniqMap.addListToUniqMap p_clo
-                 (zip params (mkStackOffsets d_clo param_szsb))
-       d_rhs = d_clo + sum param_szsb
+       p_rhs = UniqMap.addListToUniqMap p (zip params (mkStackOffsets d param_szsb))
+       d_rhs = d + sum param_szsb
        -- The safepoint sits at the label's own stack: the loop's base with the
        -- parameters on top, in the environment of the definition.
        yield = yieldBitmap platform d_rhs s p_rhs
        target on_back_edge = JoinTarget { jt_label = label
-                                        , jt_base = JoinBaseDepth d_clo
+                                        , jt_base = JoinBaseDepth d
                                         , jt_params = params
                                         , jt_sequel = s
                                         , jt_bco = bco
                                         , jt_yield = on_back_edge }
-       push_fvs !dd [] = return (dd, nilOL)
-       push_fvs !dd (fv : rest) = do
-         (push, szb) <- pushAtom dd p_clo (StgVarArg fv)
-         (dd', more) <- push_fvs (dd + szb) rest
-         return (dd', push `appOL` more)
-   -- The fallback is the same RHS compiled as a closure, but with a label at
-   -- its entry, so that it is a loop too. See 'schemeEntryLoop'.
-   fallback <- schemeR_entry (EntryLoop j) fvs (getName j, rhs_closure)
-   (_, push_fv_code) <- push_fvs d_clo fvs
-   let alloc_code
-         | arity == 0 = unitOL (ALLOC_AP (fromIntegral size_w))
-         | otherwise  = unitOL (ALLOC_PAP arity (fromIntegral size_w))
-       mkap | arity == 0 = MKAP
-            | otherwise  = MKPAP
-       -- one binding, so the closure is one word under its payload
-       fill_code = push_fv_code `snocOL` PUSH_BCO fallback
-                     `snocOL` mkap (1 + size_w) (fromIntegral size_w)
    -- Forward jumps from the body, so no safepoint: the body reached them from
    -- the entry of this BCO.
-   body_code <- withJoinPoint j (target Nothing) $ schemeE d_clo s p_clo body
+   body_code <- withJoinPoint j (target Nothing) $ schemeE d s p body
    -- Backward jumps from the RHS, which is where the safepoint goes.
    rhs_code <- withJoinPoint j (target (Just yield)) $ schemeE d_rhs s p_rhs rhs
-   -- The slow path takes over the stack the back edge built, which is the
-   -- loop's base with the parameters on top, and calls the fallback with them.
-   -- Reversed: see the calling convention noted at 'doTailCall'.
-   -- Unreachable since the safepoint yields in place, and emitted for now
-   -- only so that the fallback goes as one piece. See Note [Join points as
-   -- loops].
-   slow_code <- doTailCall d_rhs s p_rhs j (reverse (map StgVarArg params))
    massertPpr (endsInControlTransfer body_code)
      (text "schemeJoinPointLoop: body falls through into" <+> ppr j)
+   -- The RHS is the last code of the loop, so falling off its end would run
+   -- whatever the enclosing expression emits next.
    massertPpr (endsInControlTransfer rhs_code)
-     (text "schemeJoinPointLoop: RHS falls through into the slow path of"
+     (text "schemeJoinPointLoop: RHS falls off the end of the loop of"
        <+> ppr j)
-   return (alloc_code `appOL` fill_code `appOL` body_code
-             `appOL` (LABEL label `consOL` rhs_code)
-             `appOL` (LABEL slow `consOL` slow_code))
+   return (body_code `appOL` (LABEL label `consOL` rhs_code))
 
 -- | Compile @let-no-escape j = \params -> rhs in body@ with @j@ as a label in
 -- the continuation BCO of the case with binder @k@ in @body@: record the join
@@ -1032,9 +917,10 @@ schemeJump d s p j target args = do
          (dd', more) <- push_args (dd + szb) rest
          return (dd', push `appOL` more)
    (d_args, push_code) <- push_args d (zipEqual params args)
-   -- The slow path of a loop continues from the stack the SLIDE leaves, so
-   -- that stack must be exactly the one the label itself expects: the base of
-   -- the join point with the parameters on top and nothing else.
+   -- The safepoint of a loop yields where it stands, describing the stack the
+   -- SLIDE leaves with the bitmap built at the label, so that stack must be
+   -- exactly the one the label itself expects: the base of the join point with
+   -- the parameters on top and nothing else.
    massertPpr (d_args - d == sum (map (joinParamSize platform) params))
      (text "schemeJump: argument block of" <+> ppr j <+> text "is"
        <+> ppr (d_args - d) <+> text "bytes, expected"
@@ -1105,11 +991,11 @@ joinClosureKind (Just JoinRejectLoopPlacedJoin) = ClosureRecJoin
 -- Likewise a loop that is not emitted because its label would go into a
 -- continuation BCO: it stays the closure a recursive join point is today.
 joinClosureKind (Just JoinRejectLoopInCont) = ClosureRecJoin
--- Still a closure, and stays one after loops are emitted: the RHS of a loop is
--- compiled a second time into the fallback closure, so an enclosing join point
--- with an occurrence there is rejected then as it is now. These are counted
--- apart because they are what the *next* step would newly reach -- duplicating
--- the RHS into the fallback, or a fallback that is not a closure. See
+-- Not reachable for legal STG: a loop's RHS is emitted where its label is, so
+-- 'joinJumpSites' looks through it instead of reporting a closure, and a join
+-- point whose jumps sit in a loop's RHS is placed by the ordinary rule. The
+-- equation, and the 'in-loop-join' count it feeds, are kept as the assertion
+-- that this is so, the way 'OtherwiseEligible' is. See
 -- Note [Join points as loops].
 joinClosureKind (Just JoinAsLoop{}) = ClosureLoopJoin
 joinClosureKind (Just JoinRejectCrossBco{}) = ClosureCrossJoin
@@ -2081,7 +1967,8 @@ data SpreadShape
 -- the RHS of a join point that is compiled as a closure itself.
 data ClosureKind
   = ClosureRecJoin    -- ^ the RHS of a recursive join point
-  | ClosureLoopJoin   -- ^ the RHS of a join point that v2a would compile as a loop
+  | ClosureLoopJoin   -- ^ the RHS of a join point compiled as a loop; 0 by
+                      -- construction, see 'joinClosureKind'
   | ClosureCrossJoin  -- ^ the RHS of a join point rejected for cross-BCO jumps
   | ClosureOtherJoin  -- ^ the RHS of a join point rejected for another reason
   | ClosureLet        -- ^ an ordinary let, which STG should not allow
@@ -2091,13 +1978,6 @@ data ClosureKind
 -- for?
 data OtherwiseEligible = OtherwiseEligible | NotOtherwiseEligible
   deriving Eq
-
--- | Does a loop's RHS exist a second time, as the fallback closure its
--- safepoint enters? 'LoopHasFallback' is what 'schemeJoinPointLoop' emits, and
--- the only mode whose verdicts decide code. 'LoopHasNoFallback' asks the same
--- question of a loop that is only a label, which is what the
--- @in-loop-join-placeable@ counter reports. See Note [Join points as loops].
-data LoopFallback = LoopHasFallback | LoopHasNoFallback
 
 -- | The verdicts for all join point binders of a module. Every binder of a
 -- recursive group gets the group's verdict.
@@ -2119,9 +1999,9 @@ verdictIsPlaced :: JoinPointVerdict -> Bool
 verdictIsPlaced v = isJust (verdictPlacement v)
 
 -- | Decide for every join point of the module whether it is compiled as a label.
-joinPointVerdicts :: Platform -> DynFlags -> LoopFallback -> [CgStgTopBinding]
+joinPointVerdicts :: Platform -> DynFlags -> [CgStgTopBinding]
                   -> JoinPointVerdicts
-joinPointVerdicts platform dflags fallback = foldl' top UniqMap.emptyUniqMap
+joinPointVerdicts platform dflags = foldl' top UniqMap.emptyUniqMap
   where
     top vs StgTopStringLit{} = vs
     top vs (StgTopLifted bind) = binds vs bind
@@ -2142,16 +2022,16 @@ joinPointVerdicts platform dflags fallback = foldl' top UniqMap.emptyUniqMap
         -- the binding and the body, so decide them first.
         let !vs' = expr (binds vs bind) body
             verdict_of j = UniqMap.lookupUniqMap vs' j
-            verdict = joinPointVerdict platform dflags fallback verdict_of bind body
+            verdict = joinPointVerdict platform dflags verdict_of bind body
         in UniqMap.addListToUniqMap vs' [ (j, verdict) | j <- bindBinders bind ]
       StgTick _ body -> expr vs body
 
 -- | The verdict for the join point binding of @let-no-escape bind in body@,
 -- given the verdicts of the join points nested in it.
-joinPointVerdict :: Platform -> DynFlags -> LoopFallback
+joinPointVerdict :: Platform -> DynFlags
                  -> (Id -> Maybe JoinPointVerdict)
                  -> CgStgBinding -> CgStgExpr -> JoinPointVerdict
-joinPointVerdict platform dflags fallback verdict_of bind body
+joinPointVerdict platform dflags verdict_of bind body
   | gopt Opt_InsertBreakpoints dflags = JoinRejectBreakpoints
   | not (gopt Opt_BcJoinPointsAsLabels dflags) = JoinRejectDisabled
   | otherwise = case bind of
@@ -2193,7 +2073,7 @@ joinPointVerdict platform dflags fallback verdict_of bind body
                 _ -> JoinRejectRecursive (recursive body_sites rhs_sites)
       StgRec{} -> JoinRejectRecGroup
   where
-    sites j params = joinJumpSites platform dflags fallback verdict_of j (length params)
+    sites j params = joinJumpSites platform dflags verdict_of j (length params)
 
     -- The verdict of a join point whose RHS does not mention it: where its
     -- jumps in the body are decides where the label goes.
@@ -2262,10 +2142,10 @@ data JumpSite
 -- their code is emitted into. The verdicts tell where the labels of the join
 -- points nested in the expression are, and 'inlinedCaseScrutinee' which cases
 -- have continuation BCOs, exactly as in code generation.
-joinJumpSites :: Platform -> DynFlags -> LoopFallback
+joinJumpSites :: Platform -> DynFlags
               -> (Id -> Maybe JoinPointVerdict) -> Id -> Int
               -> CgStgExpr -> [JumpSite]
-joinJumpSites platform dflags fallback verdict_of j arity = go []
+joinJumpSites platform dflags verdict_of j arity = go []
   where
     mentions_in args = any (argMentions j) args
 
@@ -2300,14 +2180,12 @@ joinJumpSites platform dflags fallback verdict_of j arity = go []
       StgTick tick body -> [SiteOther | tickMentions j tick] ++ go path body
 
     -- The binding whose RHS is emitted where its label is, rather than into a
-    -- BCO of its own, if this is one. A loop's RHS is emitted there too, but a
-    -- second copy of it goes into the fallback closure, so a jump into it is a
-    -- jump into a closure and the loop is looked through only when the
-    -- fallback is assumed away. See Note [Join points as loops].
+    -- BCO of its own, if this is one. A loop's RHS is emitted where its label
+    -- is and nowhere else, so it is looked through exactly like the RHS of any
+    -- other placed join point. See Note [Join points as loops].
     inlinedRhs (StgNonRec j' rhs) = Just (j', rhs)
     inlinedRhs (StgRec [(j', rhs)])
-      | LoopHasNoFallback <- fallback
-      , Just JoinAsLoop <- verdict_of j'
+      | Just JoinAsLoop <- verdict_of j'
       = Just (j', rhs)
     inlinedRhs _ = Nothing
 
@@ -2348,13 +2226,9 @@ bindBinders :: GenStgBinding pass -> [BinderP pass]
 bindBinders (StgNonRec b _) = [b]
 bindBinders (StgRec pairs) = map fst pairs
 
--- | Per-module counts of join point verdicts, for -ddump-bcos. The binds are
--- taken as well as their verdicts so that the counterfactual verdicts of
--- Note [Join points as loops] can be computed here, where nothing but the dump
--- can force them.
-joinPointStats :: Platform -> DynFlags -> [CgStgTopBinding] -> JoinPointVerdicts
-               -> SDoc
-joinPointStats platform dflags binds verdict_map =
+-- | Per-module counts of join point verdicts, for -ddump-bcos.
+joinPointStats :: JoinPointVerdicts -> SDoc
+joinPointStats verdict_map =
   text "join points:" <+> int (length verdicts) <+> text "total,"
     <+> number (== JoinAsLabel) <+> text "as labels,"
     <+> number isInCont <+> text "as labels in continuations"
@@ -2386,19 +2260,10 @@ joinPointStats platform dflags binds verdict_map =
               <+> text "in-other-join"
           , number (== JoinRejectCrossBco (CrossClosure ClosureLet))
               <+> text "in-let"
-          , number (== JoinRejectCrossBco CrossOther) <+> text "other" ])) <> comma
-    <+> int in_loop_placeable <+> text "in-loop-join-placeable"
+          , number (== JoinRejectCrossBco CrossOther) <+> text "other" ]))
   where
     -- counting does not depend on the order
     verdicts = UniqMap.nonDetEltsUniqMap verdict_map
-    -- What the analysis would say if a loop had no fallback copy of its RHS.
-    -- This is its only use: it decides nothing, and it is forced only when
-    -- -ddump-bcos forces this SDoc. See Note [Join points as loops].
-    no_fallback = joinPointVerdicts platform dflags LoopHasNoFallback binds
-    in_loop_placeable = count placeable (UniqMap.nonDetUniqMapToList verdict_map)
-    placeable (j, verdict) =
-      verdict == JoinRejectCrossBco (CrossClosure ClosureLoopJoin)
-        && maybe False verdictIsPlaced (UniqMap.lookupUniqMap no_fallback j)
     number p = int (count p verdicts)
     isRecursive JoinRejectRecursive{} = True
     isRecursive _ = False
@@ -2519,11 +2384,10 @@ a closure: every jump, including the recursive one, is a call. It could
 instead be a label like any other, with the recursive jump as a backward JMP
 -- a loop in the BCO that holds the label.
 
-'schemeJoinPointLoop' emits one: the fallback closure, the body with the join
-point bound to a label, the label, the RHS, and the slow path. The closure is
-built as an ordinary recursive let builds it, so the static BCO count and the
-allocation are what they were; what a loop buys is the instructions on its back
-edges.
+'schemeJoinPointLoop' emits one: the body with the join point bound to a
+label, the label, and the RHS. Nothing is allocated and no BCO of its own is
+built; what a loop buys over the closure is the closure entry on each of its
+back edges.
 
 Eligibility is two predicates, not one, because 'joinJumpSites' reports paths
 relative to the expression it is given:
@@ -2543,15 +2407,6 @@ name, as the assertion that this really is so.
 Only a singleton 'StgRec' is considered. A mutually recursive group stays
 'JoinRejectRecGroup': its members would need one label each, and a jump from
 one RHS to another is not covered by the two predicates above.
-
-Only a label in the BCO of the definition is emitted. A loop whose body jumps
-all sit in one *continuation* BCO would be a label there, like 'JoinInCont',
-and the machinery for that ('PendingJoin', 'placePendingJoins') would carry it
--- but no such join point occurs in the corpus we measured or in any test we
-could write, so emitting it would be untested code. It is rejected as
-'JoinRejectLoopInCont' and counted, which keeps 'as loops' equal to the number
-of loops actually emitted. This is a coverage limit waiting for a test, not a
-design limit.
 
 A nullary loop is a program that diverges, and none of this saves it: it spins,
 yielding at its safepoint and resuming there, until something interrupts it.
@@ -2580,97 +2435,41 @@ frame of any BCO: none of them needed a change. The bitmap travels in the
 BCO's literals, as the size in bits followed by the bits, and 'YIELD_CHECK'
 carries the index of the first of those words.
 
-The fallback closure is still built, still sits under the loop, and still has
-the slow path emitted after the RHS -- which nothing branches to any more.
-Removing that copy, and lifting the restrictions the copy imposes, is the next
-step; until then the copy exists and everything the rest of this note says
-about it holds. Compiling the RHS twice is what the remaining restriction is
-about:
+The RHS is emitted exactly once, at the label, in the environment of the
+definition. That is the whole of what makes the restrictions of the first
+implementation go away: there is no second copy of the RHS in a BCO of its
+own, so a join point placed anywhere in the BCO that holds the label is
+reachable from the RHS, and a jump from the RHS to it is an ordinary
+intra-BCO jump. 'joinJumpSites' therefore looks through a loop's RHS exactly
+as it looks through the RHS of any other placed join point -- the 'StgRec'
+singleton case of 'inlinedRhs' -- and an enclosing join point with an
+occurrence inside a loop is placed by the rule it already has.
 
-  * a join point defined in the RHS that is itself placed (a label, or a
-    nested loop) would be placed twice, once per copy, under one Id. Such a
-    binding is rejected here ('JoinRejectLoopPlacedJoin'), and counted, so
-    that the cost of lifting the restriction can be compared against what it
-    would buy. A loop nested in a loop's RHS is rejected by this same rule,
-    so nested loops are a known coverage limit, priced by that counter.
+So 'in-loop-join' -- 'ClosureLoopJoin', the occurrences in the RHS of a
+'JoinAsLoop' binding -- is 0 by construction: for legal STG the 'otherwise'
+branch of the 'StgLetNoEscape' case of 'joinJumpSites' is never reached with
+a 'JoinAsLoop' verdict, since 'inlinedRhs' matched first. The constructor and
+the counter are kept as that assertion, the way 'OtherwiseEligible' is kept
+under 'rejected-recursive'.
 
-A jump from the RHS to a label defined outside the loop has the same problem:
-the second copy of the RHS is a different BCO, and a label-compiled join point
-exists only as a label, so the copy could not reach it. That conflict is
-resolved by construction, and the resolution is "joins lose to loops": as long
-as the join point's fallback is a closure, an enclosing join point with an
-occurrence inside a loop's RHS sees that RHS as a closure ('ClosureLoopJoin')
-and is rejected by the existing cross-BCO rule, so it never becomes a label
-and there is nothing for the copy to jump to. This holds for emission as well,
-not only for the analysis here, which is why there is no counter for the
-class: it is empty.
+Two classes of join point are still rejected, and both are coverage limits
+waiting for a test rather than consequences of the code shape:
 
-That last sentence is an obligation on the emission step, not something the
-analysis enforces: it holds only as long as 'joinJumpSites' reports an
-occurrence in a loop's RHS as 'SiteInClosure'. The guard that decides this is
-the @StgNonRec j'@ pattern in its 'StgLetNoEscape' case, which looks through
-the RHS of a placed join point only for a non-recursive binding; a loop is an
-'StgRec', so it falls to the 'otherwise' branch and its RHS is a closure.
-Whoever lets a loop's RHS be looked through must revisit this paragraph.
+  * 'JoinRejectLoopInCont', a loop whose jumps all sit in one continuation
+    BCO. Its label would go there, like a 'JoinInCont' one, and 'PendingJoin'
+    and 'placePendingJoins' would carry it: the sequel is the continuation's
+    and the bitmap is built from the environment the same way. Rejecting it
+    keeps 'as loops' equal to the number of loops actually emitted.
+  * 'JoinRejectLoopPlacedJoin', a loop with a placed join point in its RHS,
+    which includes a loop nested in a loop. The RHS is emitted once now, so
+    a join point placed in it would be placed once like any other, and a
+    nested loop's safepoint would get a bitmap of its own -- 'yieldBitmap'
+    builds one per label, at that label's depth.
 
-The fallback is a loop as well ('schemeEntryLoop'), not the closure it would
-have been. If it were not, the first safepoint that fires would move the loop
-into the fallback for good -- the fallback's own recursive call re-enters the
-fallback -- and every iteration after the first collection would pay a closure
-entry again, which for a loop that allocates is nearly all of them. Its slow
-path needs nothing new: the join point is a free variable of its own RHS, as
-it has to be for the closure compilation to work at all, so an ordinary call
-of it re-enters this very closure. Since the safepoint yields in place,
-nothing sends the loop here any more and the fallback is emitted but never
-entered; it is written as it was, to go as a whole in the next step.
+Nothing in the machinery objects to either. Neither occurs in the corpus we
+measured or in any test we could write, which is why they are rejected and
+counted rather than emitted untested.
 
-Its entry frame, however, cannot be the base of the label. A BCO is entered
-with its arguments on the stack and the free variables above them, being the
-stored arguments of the PAP, and a jump slides its arguments down to the base
--- which would bury the free variables, one of which is the join point the
-slow path calls. So the prologue pushes a copy of the free variables and then
-of the parameters and slides the entry frame out from under them, leaving the
-free variables below the base and the parameters above it, at the cost of one
-push per word at entry and nothing per iteration.
-
-Leaving the entry frame in place under a copy would be cheaper still, but it
-retains the arguments the fallback was entered with: they stay live in the
-frame, and any callee of the loop body can collect, so everything they reach
-survives that collection -- for a loop consuming a lazy structure, up to a
-nursery's worth of cells it has already passed. Sliding them away costs
-nothing per iteration and avoids that, so it is what we do.
-
-The class of join points rejected because their jumps sit in a loop's RHS
-stops being empty as soon as the fallback stops being a closure -- if the
-RHS and the join points placed in it are duplicated into the fallback
-(v2a-2), or if the fallback becomes a bare BCO entered directly. Whoever makes
-that change must add the counter and the rejection then. Until then the price
-of the resolution is measured from the other side by 'in-loop-join': the join
-points whose jumps sit in a loop's RHS, which emitting loops would newly
-reach.
-
-'in-loop-join-placeable' is the part of that price a fallback-free loop would
-actually win: the join points whose verdict is 'in-loop-join' and which a
-counterfactual run of 'joinPointVerdicts' -- the same function with
-'LoopHasNoFallback', where 'joinJumpSites' looks through a loop's RHS exactly
-as it looks through the RHS of any other placed join point -- makes a placed
-one. That map is computed inside 'joinPointStats', so it exists only when
--ddump-bcos forces the dump, and it goes nowhere else: it decides no code, in
-either flag state.
-
-Three caveats, since the number invites being read as more than it is:
-
-  * The counterfactual is self-consistent, not a question asked of one join
-    point at a time. With loops looked through, a join point that becomes a
-    label is itself looked through, so one loop can win several join points
-    and the effect can cascade to verdicts elsewhere. The number is "what the
-    analysis would say", not a re-partition of today's 'in-loop-join'.
-  * It assumes the loop stays a loop and only the duplicate RHS goes away.
-    That is the intent of v2b, not a statement about any implementation of it:
-    a change that removes the fallback by making the loop something else is
-    not what was measured.
-  * It says what removing the fallback would make eligible, and nothing about
-    what removing it would cost.
 -}
 
 {-

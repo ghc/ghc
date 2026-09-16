@@ -1,13 +1,13 @@
--- The negative control for in-loop-join-placeable: an in-loop-join join point
--- that a fallback-free loop would NOT place.
+-- The negative control for JoinPointLoopCtl7: a join point jumped to from
+-- inside a loop's RHS that is NOT placed.
 --
--- 'j' is jumped to from inside the loop's RHS, as in JoinPointLoopCtl7, but its other two
--- jumps sit in two sibling continuation BCOs -- 'opaque' is NOINLINE, so each
--- alternative's case on it is a real continuation. 'singleBco' reports the
--- occurrence in the closure before it looks at the spread, so the verdict
--- today is in-loop-join like JoinPointLoopCtl7's; assuming the fallback away turns that
--- occurrence into a jump at the empty path and leaves the spread, so the
--- counterfactual verdict is a cross-BCO rejection and the counter stays 0.
+-- 'j' is jumped to from inside the loop's RHS, as in JoinPointLoopCtl7, but
+-- its other two jumps sit in two sibling continuation BCOs -- 'opaque' is
+-- NOINLINE, so each alternative's case on it is a real continuation. Looking
+-- through the loop's RHS turns the occurrence inside it into a jump at the
+-- empty path and leaves the spread, so 'j' is rejected as spread-siblings.
+-- This is what says that 'in-loop-join' reaching 0 is the occurrence being
+-- reclassified, not every such join point being won.
 {-# LANGUAGE BangPatterns #-}
 module JoinPointLoopCtl8 (f) where
 

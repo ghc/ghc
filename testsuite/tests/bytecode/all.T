@@ -92,7 +92,7 @@ test('JoinPointLoopsOff',
 # fields added or removed elsewhere on the line do not disturb the test.
 # NB: the command string is formatted once more by the driver (runCmd), so
 # it must not contain any literal brace; hence tr/sed/grep and no awk.
-join_points_loop_fields = ('as loops|rejected-recursive|'
+join_points_loop_fields = ('as labels|as loops|rejected-recursive|'
                            'loop-rejected-in-continuation|'
                            'loop-rejected-placed-join|in-rec-join|'
                            'in-loop-join|rejected-disabled')
@@ -124,17 +124,20 @@ test('JoinPointLoopsCountOff',
 #                      is rejected-recursive, not loop-rejected-placed-join
 #   JoinPointLoopCtl6  all jumps in one continuation BCO:
 #                      loop-rejected-in-continuation
-#   JoinPointLoopCtl7  a join point jumped to from inside a loop's RHS:
-#                      in-loop-join, and in-loop-join-placeable because the
-#                      fallback copy is the only reason it is rejected
+#   JoinPointLoopCtl7  a join point jumped to from inside a loop's RHS and
+#                      once in the BCO that defines it: a label, since the
+#                      loop's RHS is emitted where its label is
 #   JoinPointLoopCtl8  the same, but with two more jumps in sibling
-#                      continuation BCOs: in-loop-join and NOT placeable,
-#                      the negative control for that counter
+#                      continuation BCOs: looking through the loop's RHS
+#                      leaves the spread, so it stays rejected -- the
+#                      negative control, and the reason in-loop-join being 0
+#                      is not the same thing as every such join point winning
 loopctl_fields = {
     'JoinPointLoopCtl1': 'total|as labels|as loops|rejected-recursive|'
                          'loop-rejected-in-continuation|loop-rejected-placed-join|'
                          'in-rec-join|in-loop-join',
-    'JoinPointLoopCtl2': 'total|as loops|rejected-recursive|in-rec-join|in-loop-join',
+    'JoinPointLoopCtl2': 'total|as labels|as loops|rejected-recursive|'
+                         'in-rec-join|in-loop-join',
     'JoinPointLoopCtl3': 'total|as labels|as loops|rejected-recursive|'
                          'loop-rejected-placed-join|in-rec-join|in-loop-join',
     'JoinPointLoopCtl4': 'total|as loops|rejected-recursive|in-rec-join',
@@ -143,20 +146,19 @@ loopctl_fields = {
     'JoinPointLoopCtl6': 'total|as loops|rejected-recursive|'
                          'loop-rejected-in-continuation|in-rec-join',
     'JoinPointLoopCtl7': 'total|as labels|as loops|rejected-recursive|'
-                         'loop-rejected-placed-join|in-rec-join|in-loop-join|'
-                         'in-loop-join-placeable',
+                         'loop-rejected-placed-join|in-rec-join|in-loop-join',
     'JoinPointLoopCtl8': 'total|as loops|spread-siblings|in-rec-join|'
-                         'in-loop-join|in-loop-join-placeable',
+                         'in-loop-join',
 }
 for _m, _fields in loopctl_fields.items():
     test(_m, [extra_files([_m + '.hs']), req_interp, only_ways(['normal'])],
          run_command,
          [join_points_loop_cmd.format(compiler='{compiler}', flags='', module=_m, fields=_fields)])
 
-# The safepoint's slow path (YIELD_CHECK -> slow path -> closure entry ->
-# heap check) is only exercised by a loop that allocates on every iteration;
-# see LoopSlow.hs. A rise in the GC count during the loop is evidence the
-# slow path ran, sized on allocation rather than on wall time.
+# The safepoint (YIELD_CHECK, which yields in place) is only exercised by a
+# loop that allocates on every iteration; see LoopSlow.hs. A rise in the GC
+# count during the loop is evidence the safepoint fired, sized on allocation
+# rather than on wall time.
 # JoinPointLoopSlowOff is the control with the flag off: no loop is emitted,
 # so no GC-count assertion is made.
 loop_slow_opts = loop_points_opts + " +RTS -T -A1m -RTS"
@@ -223,6 +225,31 @@ test('JoinPointLoopN2',
       req_ghc_with_threaded_rts, req_ghc_smp,
       extra_hc_opts(loop_points_opts + ' +RTS -N2 -A1m -RTS')],
      compile_and_run, [''])
+
+# A loop's RHS is emitted once, where its label is, so a join point defined
+# outside the loop and jumped to from inside its RHS is an ordinary label in
+# the same BCO and the jump out of the loop is a JMP (Note [Join points as
+# loops]). LoopExit.hs is that shape: 'j' is jumped to once in the BCO that
+# defines it and once from the loop, which is what keeps it a join point, and
+# the jump carries an Int# and a list that 'j' reads after it. The loop
+# allocates, so collections happen while it runs and the exit jump is taken
+# on a stack the safepoint has been through. JoinPointLoopExitOff is the
+# control with the flag off, and JoinPointLoopExitCount pins the verdicts.
+loop_exit_opts = loop_points_opts + " +RTS -T -A1m -RTS"
+test('JoinPointLoopExit',
+     [extra_files(['LoopExit.hs']), only_ways(ghci_ways),
+      extra_hc_opts(loop_exit_opts)],
+     compile_and_run, [''])
+test('JoinPointLoopExitOff',
+     [extra_files(['LoopExit.hs']), only_ways(ghci_ways),
+      extra_hc_opts(loop_exit_opts + ' -fno-bc-join-points-as-labels')],
+     compile_and_run, [''])
+test('JoinPointLoopExitCount',
+     [extra_files(['LoopExit.hs']), req_interp, only_ways(['normal'])],
+     run_command,
+     [join_points_loop_cmd.format(compiler='{compiler}', flags='',
+                                  module='LoopExit',
+                                  fields='total|as labels|as loops|in-loop-join')])
 
 # A rubbish literal (Note [Absent fillers] in GHC.Core.Opt.WorkWrap.Utils)
 # whose RuntimeRep is boxed stands in a field that the garbage collector

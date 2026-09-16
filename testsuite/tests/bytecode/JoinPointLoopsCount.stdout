@@ -1,7 +1,8 @@
+2 as labels
 2 as loops
 2 rejected-recursive
 0 loop-rejected-in-continuation
 0 loop-rejected-placed-join
 0 rejected-disabled
 2 in-rec-join
-2 in-loop-join
+0 in-loop-join

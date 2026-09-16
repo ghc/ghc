@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 -- Join points compiled as loops: the shapes that exercise the parts of
--- 'schemeJoinPointLoop' and 'schemeEntryLoop' the counter controls cannot
--- reach, since those only read verdicts and never run anything.
+-- 'schemeJoinPointLoop' the counter controls cannot reach, since those only
+-- read verdicts and never run anything.
 --
 --   count   the plain loop, enough iterations that safepoints fire
 --   alloc   a loop that allocates; as written, though, its accumulator is a
@@ -10,10 +10,10 @@
 --           JoinPointLoopsCount.stdout: 2 loops, 2 rejected-recursive). It
 --           is kept as a control: the same program, flag on and off, must
 --           agree with native code. The allocating loop that does reach
---           the slow path is LoopSlow.hs.
---   wide    many free variables and many parameters, so the fallback's
---           prologue copies a large frame: this is what would overflow a
---           stack check that did not count the copies
+--           a safepoint is LoopSlow.hs.
+--   wide    many free variables and many parameters, so the loop's frame and
+--           its safepoint bitmap are large, and every jump slides a wide
+--           argument block down to the base
 --   mixed   parameters and free variables of several representations
 --           (boxed, Int#, Double#), so a wrong size anywhere in the frame
 --           rebuild shows up as a wrong number rather than a crash; like

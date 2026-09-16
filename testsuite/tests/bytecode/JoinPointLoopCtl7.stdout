@@ -1,8 +1,7 @@
 2 total
-0 as labels
+1 as labels
 1 as loops
 0 rejected-recursive
 0 loop-rejected-placed-join
 0 in-rec-join
-1 in-loop-join
-1 in-loop-join-placeable
+0 in-loop-join

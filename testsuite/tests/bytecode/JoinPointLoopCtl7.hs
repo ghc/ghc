@@ -1,12 +1,11 @@
--- A join point rejected for a jump inside a loop's RHS -- in-loop-join --
--- which would be a label if the loop had no fallback copy of its RHS: the
--- expected in-loop-join-placeable.
+-- A join point jumped to from inside a loop's RHS: a label, since a loop's
+-- RHS is emitted once, where its label is.
 --
 -- 'j' is jumped to from two places, one in the BCO that defines it and one in
--- the RHS of the loop 'go'. Today the second one is an occurrence in a closure
--- ('ClosureLoopJoin', since the loop's RHS is compiled a second time into the
--- fallback), so 'j' is rejected; assuming the fallback away, both jumps are in
--- the BCO of the definition and 'j' is a label.
+-- the RHS of the loop 'go'. Both are the same BCO, so 'j' is placed there by
+-- the ordinary rule and 'in-loop-join' is 0. (It used to be 1: the loop's RHS
+-- was compiled a second time into a fallback closure, which made the second
+-- jump an occurrence in a closure.)
 --
 -- The two call sites and the NOINLINE are what keep 'j' a join point rather
 -- than an inlining; 'go' must not define any placed join point of its own, or

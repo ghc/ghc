@@ -495,10 +495,10 @@ unsigned long it_insns;
 unsigned long it_BCO_entries;
 
 /* How often the safepoint of a join point compiled as a loop was reached,
- * and how often it branched to the slow path. A loop that never takes the
- * branch has not exercised its fallback at all, which is what makes these
- * two the useful assertion for a test of the slow path -- rather than a
- * wall-clock measurement, which only says the loop was slow. */
+ * and how often it fired, i.e. yielded in place with a resume frame. A loop
+ * that never fires it has not exercised the resume path at all, which is
+ * what makes these two the useful assertion for a test of that path --
+ * rather than a wall-clock measurement, which only says the loop was slow. */
 unsigned long it_yield_checks;
 unsigned long it_yield_checks_taken;
 

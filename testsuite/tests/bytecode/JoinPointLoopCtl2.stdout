@@ -1,5 +1,6 @@
 4 total
+1 as labels
 1 as loops
 1 rejected-recursive
 1 in-rec-join
-1 in-loop-join
+0 in-loop-join
