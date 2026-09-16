@@ -22,6 +22,7 @@
 #include "Stats.h"
 #include "GetTime.h"
 #include "FdWakeup.h"
+#include "Timeout.h"
 
 # if defined(HAVE_SYS_SELECT_H)
 #  include <sys/select.h>
@@ -345,47 +346,20 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
         }
       }
 
+      Time timeout;
       if (!wait) {
           // just poll
-          tv.tv_sec  = 0;
-          tv.tv_usec = 0;
-          ptv = &tv;
+          timeout = 0;
       } else if (iomgr->sleeping_queue != END_TSO_QUEUE) {
-          /* SUSv2 allows implementations to have an implementation defined
-           * maximum timeout for select(2). The standard requires
-           * implementations to silently truncate values exceeding this maximum
-           * to the maximum. Unfortunately, OSX and the BSD don't comply with
-           * SUSv2, instead opting to return EINVAL for values exceeding a
-           * timeout of 1e8.
-           *
-           * Select returning an error crashes the runtime in a bad way. To
-           * play it safe we truncate any timeout to 31 days, as SUSv2 requires
-           * any implementations maximum timeout to be larger than this.
-           *
-           * Truncating the timeout is not an issue, because if nothing
-           * interesting happens when the timeout expires, we'll see that the
-           * thread still wants to be blocked longer and simply block on a new
-           * iteration of select(2).
-           */
-          const time_t max_seconds = 2678400; // 31 * 24 * 60 * 60
-
-          Time min = LowResTimeToTime(
-                       iomgr->sleeping_queue->block_info.target - now
-                     );
-          tv.tv_sec  = TimeToSeconds(min);
-          if (tv.tv_sec < max_seconds) {
-              tv.tv_usec = TimeToUS(min) % 1000000;
-          } else {
-              tv.tv_sec = max_seconds;
-              tv.tv_usec = 0;
-          }
-          ptv = &tv;
+          timeout =
+              LowResTimeToTime(iomgr->sleeping_queue->block_info.target - now);
       } else {
-          ptv = NULL;
+          timeout = -1;
       }
 
       /* Check for any interesting events */
 
+      ptv = timeoutAsTimeval(timeout, &tv);
       while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, ptv)) < 0) {
           if (errno != EINTR) {
             if ( errno == EBADF ) {
