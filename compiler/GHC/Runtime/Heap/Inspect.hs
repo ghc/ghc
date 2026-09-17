@@ -1160,8 +1160,8 @@ findPtrTyss i tys = foldM step (i, []) tys
 -- improveType <base_type> <rtti_type>
 -- The types can contain skolem type variables, which need to be treated as normal vars.
 -- In particular, we want them to unify with things.
-improveRTTIType :: HscEnv -> RttiType -> RttiType -> Maybe Subst
-improveRTTIType _ base_ty new_ty = U.tcUnifyDebugger base_ty new_ty
+improveRTTIType :: RttiType -> RttiType -> Maybe Subst
+improveRTTIType base_ty new_ty = U.tcUnifyDebugger base_ty new_ty
 
 getDataConArgTys :: DataCon -> Type -> TR [Type]
 -- Given the result type ty of a constructor application (D a b c :: ty)

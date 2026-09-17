@@ -121,8 +121,7 @@ pprintClosureCommand bindThings force str = do
      --  Then, we extract a substitution,
      --  mapping the old tyvars to the reconstructed types.
        let reconstructed_type = termType term
-       hsc_env <- getSession
-       case (improveRTTIType hsc_env id_ty' reconstructed_type) of
+       case improveRTTIType id_ty' reconstructed_type of
          Nothing     -> return (subst, term')
          Just subst' -> do { logger <- getLogger
                            ; liftIO $
