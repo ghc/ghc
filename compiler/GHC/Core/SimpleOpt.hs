@@ -11,7 +11,7 @@ module GHC.Core.SimpleOpt (
         simpleOptPgm, simpleOptExpr, simpleOptExprNoInline, simpleOptExprWith,
 
         -- ** Join points
-        joinPointBinding_maybe, joinPointBindings_maybe,
+        joinPointBinding_maybe, joinPointBindings_maybe, joinPointBind_maybe,
 
         -- ** Predicates on expressions
         exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
@@ -1198,6 +1198,18 @@ joinPointBinding_maybe bndr rhs
 joinPointBindings_maybe :: [(InBndr, InExpr)] -> Maybe [(InBndr, InExpr)]
 joinPointBindings_maybe bndrs
   = mapM (uncurry joinPointBinding_maybe) bndrs
+
+joinPointBind_maybe :: InBind -> Maybe InBind
+joinPointBind_maybe (NonRec bndr rhs)
+  | Just (bndr', rhs') <- joinPointBinding_maybe bndr rhs
+  = Just (NonRec bndr' rhs')
+
+joinPointBind_maybe (Rec pairs)
+  | Just pairs' <- joinPointBindings_maybe pairs
+  = Just (Rec pairs')
+
+joinPointBind_maybe _other
+  = Nothing
 
 {- Note [JoinId vs TailCallInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

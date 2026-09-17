@@ -40,7 +40,7 @@ import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , pushCoTyArg, pushCoValArg, exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
-import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
+import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBind_maybe )
 import GHC.Core.FVs     ( mkRuleInfo {- exprsFreeIds -} )
 import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Core.Multiplicity
@@ -1283,12 +1283,6 @@ simplExprF1 env expr@(Lam {}) cont
         -- and likewise drop counts all binders (incl type lambdas)
 
 simplExprF1 env (Case scrut bndr _ alts) cont
-  | not (seCaseCase env)  -- See Note [Case-of-case and full laziness]
-  = do { let scrut_out_ty = substTy env (idType bndr)
-       ; scrut' <- simplExprC env scrut (mkBoringStop scrut_out_ty)
-       ; rebuildCase (SAF_In, env) scrut' bndr alts cont }
-
-  | otherwise
   = {-#SCC "simplExprF1-Case" #-}
     simplExprF env scrut (Select { sc_bndr = bndr, sc_alts = alts
                                  , sc_env = UnSimplified env, sc_cont = cont })
@@ -1310,34 +1304,31 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
          tick (PreInlineUnconditionally bndr)
        ; simplExprF env' body cont }
 
--- If -fno-case-of-case, push /nothing/ inside a 'let', lest we
--- lose a join point.  See Note [Case-of-case and full laziness]
+-- If -fno-case-of-case, push /only applications/ inside a 'let', lest we
+-- lose a join point.  See Note [Join points with -fno-case-of-case]
 simplExprF1 env let_expr@(Let {}) cont
-  | not (contIsStop cont)
-  , not (seCaseCase env)
-  = do { let_expr' <- simplExprC env let_expr (mkBoringStop (contHoleType cont))
-       ; rebuild env let_expr' cont }
+  | not (seCaseCase env)
+  , (inner, outer) <- splitContArgs cont
+  , not (contIsStop outer)
+  = do { let_expr' <- simplExprC env let_expr inner
+       ; rebuild env let_expr' outer }
+
+-- Now check for a join point.  It's better to do the preInlineUnconditionally
+-- test first, because joinPointBinding_maybe has to eta-expand, so a trivial
+-- binding like { j = j2 |> co } would first be eta-expanded and then inlined
+-- Better to test preInlineUnconditionally first.
+simplExprF1 env (Let bind body) cont
+  | Just bind' <- joinPointBind_maybe bind
+  = simplJoinPointBind env bind' body cont
 
 -- Non-recursive let
 simplExprF1 env (Let (NonRec bndr rhs) body) cont
-  -- Now check for a join point.  It's better to do the preInlineUnconditionally
-  -- test first, because joinPointBinding_maybe has to eta-expand, so a trivial
-  -- binding like { j = j2 |> co } would first be eta-expanded and then inlined
-  -- Better to test preInlineUnconditionally first.
-  | Just (bndr', rhs') <- joinPointBinding_maybe bndr rhs
-  = {-#SCC "simplNonRecJoinPoint" #-}
-    simplNonRecJoinPoint env bndr' rhs' body cont
-
-  | otherwise
   = {-#SCC "simplNonRecE" #-}
     simplNonRecE env FromLet bndr (rhs, env) body cont
 
 simplExprF1 env (Let (Rec pairs) body) cont
-  | Just pairs' <- joinPointBindings_maybe pairs
-  = {-#SCC "simplRecJoinPoin" #-} simplRecJoinPoint env pairs' body cont
-
-  | otherwise
-  = {-#SCC "simplRecE" #-} simplRecE env pairs body cont
+  = {-#SCC "simplRecE" #-}
+    simplRecE env pairs body cont
 
 
 {- Note [Avoiding space leaks in OutType]
@@ -2105,10 +2096,10 @@ is a join point, and what 'cont' is, in a value of type MaybeJoinCont
 of a SpecConstr-generated RULE for a join point.
 -}
 
-simplNonRecJoinPoint :: SimplEnv -> InId -> InExpr
+simplJoinPointBind :: SimplEnv -> InBind
                      -> InExpr -> SimplCont
                      -> SimplM (SimplFloats, OutExpr)
-simplNonRecJoinPoint env bndr rhs body cont
+simplJoinPointBind env (NonRec bndr rhs) body cont
    = assert (isJoinId bndr ) $
      wrapJoinCont env cont $ \ env cont ->
      do { -- We push join_cont into the join RHS and the body;
@@ -2121,12 +2112,7 @@ simplNonRecJoinPoint env bndr rhs body cont
         ; (floats2, body') <- simplExprF env3 body cont
         ; return (floats1 `addFloats` floats2, body') }
 
-
-------------------
-simplRecJoinPoint :: SimplEnv -> [(InId, InExpr)]
-                  -> InExpr -> SimplCont
-                  -> SimplM (SimplFloats, OutExpr)
-simplRecJoinPoint env pairs body cont
+simplJoinPointBind env (Rec pairs) body cont
   = wrapJoinCont env cont $ \ env cont ->
     do { let bndrs  = map fst pairs
              mult   = contHoleScaling cont
@@ -2150,7 +2136,10 @@ wrapJoinCont env cont thing_inside
 
   | otherwise
     -- Normal case; see Note [Join points and case-of-case]
-  = do { (floats1, cont')  <- mkDupableCont env cont
+    -- Case-of-case should be /on/ here, else we should not
+    -- be in wrapJoinCont in the first place
+  = assertPpr (seCaseCase env) (ppr cont) $
+    do { (floats1, cont')  <- mkDupableCont env cont
        ; (floats2, result) <- thing_inside (env `setInScopeFromF` floats1) cont'
        ; return (floats1 `addFloats` floats2, result) }
 
@@ -3323,6 +3312,14 @@ doCaseToLet scrut case_bndr
 --------------------------------------------------
 
 reallyRebuildCase (saf,env) scrut case_bndr alts cont
+  | not (seCaseCase env)    -- Only when case-of-case is on.
+                            -- See GHC.Driver.Config.Core.Opt.Simplify
+                            --    Note [Case-of-case and full laziness]
+  = do { case_expr <- simplAlts (saf,env) scrut case_bndr alts
+                                (mkBoringStop (contHoleType cont))
+       ; rebuild env case_expr cont }
+
+  | otherwise
   = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
        ; case_expr <- simplAlts (saf,env') scrut
                                 (scaleIdBy holeScaling case_bndr)

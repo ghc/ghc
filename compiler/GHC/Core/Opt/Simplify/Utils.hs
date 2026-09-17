@@ -28,7 +28,7 @@ module GHC.Core.Opt.Simplify.Utils (
         contIsTrivial, contArgs, contIsRhs, mkBottomCont,
         hasArgs, countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
-        interestingCallContext,
+        interestingCallContext, splitContArgs,
 
         -- ArgInfo
         ArgInfo(..), ArgSpec(..), RemainingArgDmds, mkArgInfo,
@@ -631,6 +631,18 @@ contOutArgs env cont
 
     -- No more arguments
     go _ = []
+
+splitContArgs :: SimplCont -> (SimplCont, SimplCont)
+-- Peel off an initial prefix of applications and casts
+splitContArgs cont@(ApplyToTy { sc_cont = cont1 })
+  | (inner, outer) <- splitContArgs cont1 = (cont { sc_cont = inner }, outer)
+splitContArgs cont@(ApplyToVal { sc_cont = cont1 })
+  | (inner, outer) <- splitContArgs cont1 = (cont { sc_cont = inner }, outer)
+splitContArgs cont@(CastIt { sc_cont = cont1 })
+  | (inner, outer) <- splitContArgs cont1 = (cont { sc_cont = inner }, outer)
+splitContArgs cont
+  | contIsStop cont  = (cont, cont)
+  | otherwise        = (mkBoringStop (contHoleType cont), cont)
 
 dropContArgs :: FullArgCount -> SimplCont -> SimplCont
 dropContArgs 0 cont = cont
