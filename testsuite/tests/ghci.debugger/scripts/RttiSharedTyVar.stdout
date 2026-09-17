@@ -1,0 +1,8 @@
+()
+Breakpoint 0 activated at RttiSharedTyVar.hs:4:9-26
+Stopped in RttiSharedTyVar.f, RttiSharedTyVar.hs:4:9-26
+_result :: () = _
+x :: Maybe Int = Just _
+y :: Maybe Int = Just 5
+x :: Maybe Int
+y :: Maybe Int
