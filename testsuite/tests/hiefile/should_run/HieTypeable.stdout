@@ -1,0 +1,30 @@
+==========================
+At point (11,21), we found:
+==========================
+┌
+│ $dTypeable at HieTypeable.hs:1:1, of type: Typeable Thing
+│     is an evidence variable bound by a let, depending on: [$dTypeable]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ $dTypeable at HieTypeable.hs:1:1, of type: Typeable Thing
+   │     is an evidence variable bound by a let, depending on: []
+   │           with scope: ModuleScope
+   │           
+   │     Defined at <no location info>
+   └
+
+==========================
+At point (15,10), we found:
+==========================
+┌
+│ $dTypeable at HieTypeable.hs:1:1, of type: Typeable Thing
+│     is an evidence variable bound by a let, depending on: []
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+

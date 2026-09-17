@@ -12,3 +12,4 @@ test('HieGadtConSigs', [extra_run_opts('"' + config.libdir + '"'), extra_files([
 test('T25709', [extra_run_opts('"' + config.libdir + '"'), extra_files(['TestUtils.hs'])], compile_and_run, ['-package ghc -fwrite-ide-info'])
 test('HasFieldQueries', [extra_run_opts('"' + config.libdir + '"'), extra_files(['TestUtils.hs'])], compile_and_run, ['-package ghc -fwrite-ide-info'])
 test('NoFieldSelectorQueries', [extra_run_opts('"' + config.libdir + '"'), extra_files(['TestUtils.hs'])], compile_and_run, ['-package ghc -fwrite-ide-info'])
+test('HieTypeable', [extra_run_opts('"' + config.libdir + '"'), extra_files(['TestUtils.hs'])], compile_and_run, ['-package ghc -fwrite-ide-info'])

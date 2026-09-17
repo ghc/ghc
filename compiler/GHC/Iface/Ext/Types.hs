@@ -616,17 +616,23 @@ data EvBindDep
       -- ^ 'Name' of the record selector
       Name
       -- ^ 'Name' of the parent type.
+  | TypeableEvidence
+    -- ^ Evidence of a @Typeable@ constraint.
+      Name
+      -- ^ Name of the type the evidence was generated for.
   deriving (Eq, Ord)
 
 instance Outputable EvBindDep where
   ppr = \ case
     EvidenceVar n -> ppr n
     RecordField sel parent -> ppr sel <+> text "of Record" <+> ppr parent
+    TypeableEvidence n -> ppr n <+> text "bound by Typeable"
 
 evBindDepName :: EvBindDep -> Name
 evBindDepName = \ case
   EvidenceVar n -> n
   RecordField selector _record -> selector
+  TypeableEvidence n -> n
 
 evBindDepHieName :: EvBindDep -> HieName
 evBindDepHieName = toHieName . evBindDepName
@@ -640,11 +646,15 @@ instance Binary EvBindDep where
       putByte bh 1
       put_ bh n
       put_ bh sel
+    TypeableEvidence n -> do
+      putByte bh 2
+      put_ bh n
 
   get bh =
     getByte bh >>= \ case
       0 -> EvidenceVar <$> get bh
       1 -> RecordField <$> get bh <*> get bh
+      2 -> TypeableEvidence <$> get bh
       t -> fail $ "EvBindDep: Unknown tag: " ++ show t
 
 -- | Eq/Ord instances compare on the converted HieName,
