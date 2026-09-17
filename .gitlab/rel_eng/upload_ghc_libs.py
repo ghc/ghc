@@ -101,6 +101,7 @@ def prep_ghc_boot_th():
                 lambda s: s.replace('../ghc-internal/src', '')
                            .replace('GHC.Internal.TH.Lib', '')
                            .replace('GHC.Internal.TH.Syntax', '')
+                           .replace('GHC.Internal.TH.Monad', '')
                            .replace('GHC.Internal.ForeignSrcLang', '')
                            .replace('GHC.Internal.LanguageExtensions', '')
                            .replace('GHC.Internal.Lexeme', '')
