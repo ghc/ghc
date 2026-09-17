@@ -12,7 +12,7 @@ def strip_prefix(s, prefix):
     else:
         return None
 
-do_not_distribute = set(["release-x86_64-linux-fedora33-release-hackage"])
+do_not_distribute = set(["release-x86_64-linux-fedora43-release-hackage"])
 
 def job_triple(job_name):
     bindists = {
@@ -31,6 +31,7 @@ def job_triple(job_name):
         'release-x86_64-linux-alpine3_23-release+no_split_sections': 'x86_64-alpine3_23-linux',
         'release-x86_64-linux-alpine3_12-int_native-release+fully_static': 'x86_64-alpine3_12-linux-static-int_native',
         'release-x86_64-darwin-release': 'x86_64-apple-darwin',
+        'release-x86_64-freebsd14-release+no_split_sections': 'x86_64-unknown-freebsd14',
         'release-i386-linux-deb13-release': 'i386-deb13-linux',
         'release-i386-linux-deb12-release': 'i386-deb12-linux',
         'release-i386-linux-deb11-release': 'i386-deb11-linux',
