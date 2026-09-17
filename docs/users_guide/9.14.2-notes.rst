@@ -104,6 +104,7 @@ Compiler
 - Bumped the maximum supported LLVM version to 23 (:ghc-ticket:`27764`)
 - Recognise ``considerAccessible`` under ticks (``-g``, ``-finfo-table-map``, ``-fhpc`` etc) (:ghc-ticket:`27360`)
 - Fix spurious ``-Wincomplete-uni-patterns`` warning under ``-finfo-table-map``. (:ghc-ticket:`27314`)
+- Fix a scoping bug in the type-class specialiser (:ghc-ticket:`27629`)
 
 GHCi
 ~~~~
@@ -148,6 +149,9 @@ Runtime System
 - Fix a possible use-after-free bug with TSOs (:ghc-ticket:`26716`, :ghc-ticket:`26717`)
 - Fix a parallel GC race on weakly-ordered architectures (AArch64) that could crash or silently corrupt the heap (:ghc-ticket:`27477`)
 - Fix stack corruption when returning large unboxed tuples in GHCi (:ghc-ticket:`27633`)
+- Fix "unknown/strange object 1" crash in compacting GC (:ghc-ticket:`27649`)
+- Fix a crash when capturing or resuming a delimited continuation that adjusts the async exception masking state (:ghc-ticket:`27651`)
+- Fix a segfault that could occur when querying the label of an unlabeled thread (:ghc-ticket:`27618`)
 
 Code Generation
 ~~~~~~~~~~~~~~~
