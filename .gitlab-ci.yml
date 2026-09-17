@@ -459,7 +459,7 @@ hadrian-ghc-in-ghci:
   variables:
     GHC_FLAGS: -Werror -Wwarn=unused-imports
   tags:
-    - x86_64-linux
+    - lint
   script:
     - git clean -xdf && git submodule foreach git clean -xdf
     - . .gitlab/ci.sh setup
