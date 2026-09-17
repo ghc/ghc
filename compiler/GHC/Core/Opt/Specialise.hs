@@ -1211,14 +1211,21 @@ specExpr env (Tick tickish body)
 ---------------- Applications might generate a call instance --------------------
 specExpr env expr@(App {})
   = do { let (fun_in, args_in) = collectArgs expr
+       ; (fun_out, uds_fun)   <- specExpr env fun_in
        ; (args_out, uds_args) <- mapAndCombineSM (specExpr env) args_in
-       ; let env_args = env `bringFloatedDictsIntoScope` ud_binds uds_args
-                -- Some dicts may have floated out of args_in;
-                -- they should be in scope for fireRewriteRules (#21689)
-             (fun_in', args_out') = fireRewriteRules env_args fun_in args_out
-       ; (fun_out', uds_fun) <- specExpr env fun_in'
+       ; let uds_app  = uds_fun `thenUDs` uds_args
+             env_args = zapSubst env `bringFloatedDictsIntoScope` ud_binds uds_app
+                -- zapSubst: we have now fully applied the substitution
+                -- bringFloatedDictsIntoScope: some dicts may have floated out of
+                -- args_in; they should be in scope for fireRewriteRules (#21689)
+
+       -- Try firing rewrite rules
+       -- See Note [Fire rules in the specialiser]
+       ; let (fun_out', args_out') = fireRewriteRules env_args fun_out args_out
+
+       -- Make a call record, and return
        ; let uds_call = mkCallUDs env fun_out' args_out'
-       ; return (fun_out' `mkApps` args_out', uds_fun `thenUDs` uds_call `thenUDs` uds_args) }
+       ; return (fun_out' `mkApps` args_out', uds_app `thenUDs` uds_call) }
 
 ---------------- Lambda/case require dumping of usage details --------------------
 specExpr env e@(Lam {})
@@ -1252,16 +1259,17 @@ specExpr env (Let bind body)
 -- See Note [Specialisation modulo dictionary selectors]
 --     Note [ClassOp/DFun selection]
 --     Note [Fire rules in the specialiser]
-fireRewriteRules :: SpecEnv -> InExpr -> [OutExpr] -> (InExpr, [OutExpr])
+fireRewriteRules :: SpecEnv   -- Substitution is already zapped
+                 -> OutExpr -> [OutExpr] -> (OutExpr, [OutExpr])
 fireRewriteRules env (Var f) args
   | Just (rule, expr) <- specLookupRule env f args InitialPhase (getRules (se_rules env) f)
   , let rest_args    = drop (ruleArity rule) args -- See Note [Extra args in the target]
-        zapped_subst = Core.zapSubst (se_subst env)
-        expr'        = simpleOptExprWith defaultSimpleOpts zapped_subst expr
+        zapped_subst = se_subst env   -- Just needed for the InScopeSet
+        expr'        = simpleOptExprWith defaultSimpleOpts zapped_subst (mkApps expr rest_args)
                        -- simplOptExpr needed because lookupRule returns
                        --   (\x y. rhs) arg1 arg2
-  , (fun, args) <- collectArgs expr'
-  = fireRewriteRules env fun (args++rest_args)
+  , (fun', args') <- collectArgs expr'
+  = fireRewriteRules env fun' args'
 fireRewriteRules _ fun args = (fun, args)
 
 --------------
@@ -1736,6 +1744,12 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
         do { -- Run the specialiser on the specialised RHS
              -- The "1" suffix is before we maybe add the void arg
            ; (rhs_body', rhs_uds) <- specExpr rhs_env2 rhs_body
+
+{-         ; pprTrace "spec_call2" (vcat
+                 [ text "fun:" <+> ppr fn
+                 , text "rhs_body':" <+> ppr rhs_body' ]) $
+             return ()
+-}
                 -- Add the { d1' = dx1; d2' = dx2 } usage stuff
                 -- to the rhs_uds; see Note [Specialising Calls]
            ; let rhs_uds_w_dx   = dx_binds `consDictBinds` rhs_uds
