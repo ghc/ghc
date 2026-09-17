@@ -82,15 +82,19 @@ resolveVisibility kind ty_args
 foldType :: (HieType a -> a) -> HieTypeFix -> a
 foldType f (Roll t) = f $ fmap (foldType f) t
 
-selectPoint :: HieFile -> (Int,Int) -> Maybe (HieAST Int)
-selectPoint hf (sl,sc) = getFirst $
+selectPoint :: HieFile -> (Int,Int) -> Maybe (HieAST TypeIndex)
+selectPoint hf p = selectRange hf p p
+
+selectRange :: HieFile -> (Int,Int) -> (Int,Int) -> Maybe (HieAST TypeIndex)
+selectRange hf (sl,sc) (el, ec) = getFirst $
   flip foldMap (M.toList (getAsts $ hie_asts hf)) $ \(HiePath fs,ast) -> First $
       case selectSmallestContaining (sp fs) ast of
         Nothing -> Nothing
         Just ast' -> Just ast'
  where
    sloc fs = mkRealSrcLoc fs sl sc
-   sp fs = mkRealSrcSpan (sloc fs) (sloc fs)
+   eloc fs = mkRealSrcLoc fs el ec
+   sp fs = mkRealSrcSpan (sloc fs) (eloc fs)
 
 findEvidenceUse :: NodeIdentifiers a -> [Name]
 findEvidenceUse ni = [n | (Right n, dets) <- xs, any isEvidenceUse (identInfo dets)]

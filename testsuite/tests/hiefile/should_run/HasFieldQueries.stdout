@@ -1,0 +1,55 @@
+==========================
+At point (13,17), we found:
+==========================
+==========================
+At point (16,25), we found:
+==========================
+==========================
+At point (16,27), we found:
+==========================
+==========================
+At point (23,17), we found:
+==========================
+==========================
+At point (23,25), we found:
+==========================
+==========================
+At point (27,20), we found:
+==========================
+==========================
+At point (27,28), we found:
+==========================
+==========================
+At point (33,22), we found:
+==========================
+==========================
+At point (37,14), we found:
+==========================
+┌
+│ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
+│     is an evidence variable bound by a let, depending on: [$dHasField]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
+`- ┌
+   │ $dHasField at HasFieldQueries.hs:1:1, of type: HasField "field1" Thing Char
+   │     is an evidence variable bound by a let, depending on: [C:HasField]
+   │           with scope: ModuleScope
+   │           
+   │     Defined at <no location info>
+   └
+   |
+   `- ┌
+      │ C:HasField at HasFieldQueries.hs:1:1, of type: forall {k} (x :: k) r a. (r -> a) -> HasField x r a
+      │     is a usage of an external evidence variable
+      │     Defined in `GHC.Internal.Records'
+      └
+
+==========================
+At point (41,21), we found:
+==========================
+==========================
+At point (41,30), we found:
+==========================
