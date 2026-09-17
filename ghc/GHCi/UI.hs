@@ -1229,8 +1229,8 @@ getInfoForPrompt = do
         rev_imports = reverse imports -- rightmost are the most recent
 
         myIdeclName :: ImportDecl GhcPs -> ModuleName
-        myIdeclName d | Just m <- ideclAs d = unLoc m
-                      | otherwise           = unLoc (ideclName d)
+        myIdeclName d | Just m <- ideclAs d = hsModuleName (unLoc m)
+                      | otherwise           = hsModuleName (unLoc (ideclName d))
 
         modules_names =
              ['*':(moduleNameString (moduleName m)) | IIModule m <- rev_imports] ++
@@ -2592,7 +2592,7 @@ keepPackageImports = filterM is_pkg_import
                 Left _  -> return False
                 Right m -> return $ not (HUG.memberHugUnit (moduleUnit m) hug)
         where
-          mod_name = unLoc (ideclName d)
+          mod_name = hsModuleName (unLoc (ideclName d))
 
 {- Note [GHCi and local Preludes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2976,8 +2976,9 @@ guessCurrentModule cmd = do
     [] -> throwGhcException $ CmdLineError (':' : cmd ++ ": no current module")
     IIModule m : _ -> pure m
     IIDecl d : _ -> do
-      pkgqual <- GHC.renameRawPkgQualM (unLoc $ ideclName d) (ideclPkgQual d)
-      GHC.findQualifiedModule pkgqual (unLoc (ideclName d))
+      let mod_name = hsModuleName (unLoc (ideclName d))
+      pkgqual <- GHC.renameRawPkgQualM mod_name (ideclPkgQual d)
+      GHC.findQualifiedModule pkgqual mod_name
 
 -- without bang, show items in context of their parents and omit children
 -- with bang, show class methods and data constructors separately, and
@@ -3177,7 +3178,7 @@ checkAdd ii = do
        | otherwise -> checkInterpretedModule mod >> return ()
 
     IIDecl d -> do
-       let modname = unLoc (ideclName d)
+       let modname = hsModuleName (unLoc (ideclName d))
        pkgqual <- GHC.renameRawPkgQualM modname (ideclPkgQual d)
        m <- lookupQualifiedModuleName pkgqual modname
        when safe $ do
@@ -3257,7 +3258,7 @@ isIIModule _ = False
 
 iiModuleName :: InteractiveImport -> ModuleName
 iiModuleName (IIModule m) = moduleName m
-iiModuleName (IIDecl d)   = unLoc (ideclName d)
+iiModuleName (IIDecl d)   = hsModuleName (unLoc (ideclName d))
 
 preludeModuleName :: ModuleName
 preludeModuleName = GHC.mkModuleName "Prelude"
