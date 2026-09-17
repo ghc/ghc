@@ -5480,10 +5480,11 @@ data SolverReportErrCtxt
           , cec_warn_redundant :: Bool    -- ^ True <=> -Wredundant-constraints
           , cec_expand_syns    :: Bool    -- ^ True <=> -fprint-expanded-synonyms
 
-          , cec_outer_err :: Bool   -- ^ True <=> More important errors have been reported
-                                    --            so create bindings if need be, but
-                                    --            don't issue any more errors/warnings
-                -- See Note [cec_outer_err: suppressing less-important error messages]
+          , cec_error_reported :: Bool
+                -- ^ True <=> A "serious" error has already been reported,
+                --            so create bindings if need be, but don't
+                --            issue any more less-important errors/warnings
+                -- See Note [cec_error_reported: suppressing less-serious errors]
       }
 
 ----------------------------------------------------------------------------

@@ -4085,7 +4085,7 @@ instance Outputable SolverReportErrCtxt where
            , cec_out_of_scope_holes = osh
            , cec_warn_redundant     = wr
            , cec_expand_syns        = es
-           , cec_outer_err          = sup })
+           , cec_error_reported     = sup })
     = text "CEC" <+> braces (vcat
          [ text "cec_binds"              <+> equals <+> ppr bvar
          , text "cec_defer_type_errors"  <+> equals <+> ppr dte
@@ -4094,7 +4094,7 @@ instance Outputable SolverReportErrCtxt where
          , text "cec_out_of_scope_holes" <+> equals <+> ppr osh
          , text "cec_warn_redundant"     <+> equals <+> ppr wr
          , text "cec_expand_syns"        <+> equals <+> ppr es
-         , text "cec_outer_err"          <+> equals <+> ppr sup ])
+         , text "cec_error_reported"     <+> equals <+> ppr sup ])
 
 {- *********************************************************************
 *                                                                      *

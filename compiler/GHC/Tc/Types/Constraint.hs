@@ -1206,25 +1206,11 @@ insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_errors = errors })
       is_insoluble (DE_Multiplicity {}) = False
 
 insolubleWantedCt :: Ct -> Bool
--- | Is this a definitely insoluble Wanted constraint? Namely:
---
---   - a Wanted,
---   - which is insoluble (as per 'insolubleCt'),
---   - that does not arise from a Given or a Wanted/Wanted fundep interaction.
---
--- See Note [Insoluble Wanteds]
+-- | Is this a definitely insoluble Wanted constraint?
 insolubleWantedCt ct
   | CtWanted (WantedCt {}) <- ctEvidence ct
       -- It's a Wanted
   , insolubleCt ct
-      -- It's insoluble
---  , isEmptyCoHoleSet rewriters
-      -- It has no rewriters – see (IW1) in Note [Insoluble Wanteds]
-
--- I don't understand IW2 so I'm going to get rid of it
---  , not (isGivenLoc loc)
---      -- isGivenLoc: see (IW2) in Note [Insoluble Wanteds]
-    -- See also historical (IW3) in Note [Insoluble Wanteds]
   = True
 
   | otherwise
@@ -1294,28 +1280,6 @@ in GHC.Tc.Errors), so we may fail to report anything at all!  Yikes.
 
 Bottom line: insolubleWC (called in GHC.Tc.Solver.setImplicationStatus)
              should ignore givens even if they are insoluble.
-
-Note [Insoluble Wanteds]
-~~~~~~~~~~~~~~~~~~~~~~~~
-insolubleWantedCt returns True of a Wanted constraint that definitely
-can't be solved.  But not quite all such constraints; see wrinkles.
-
-(IW1) We only treat it as insoluble if it has an empty rewriter set.  (See Note
-   [Wanteds rewrite Wanteds: rewriter-sets].)  Otherwise #25325 happens: a
-   Wanted constraint A that is /not/ insoluble rewrites some other Wanted
-   constraint B, so B has A in its rewriter set.  Now B looks insoluble.  The
-   danger is that we'll suppress reporting B because of its empty rewriter set;
-   and suppress reporting A because there is an insoluble B lying around.  (This
-   suppression happens in GHC.Tc.Errors.mkErrorItem.)  Solution: don't treat B
-   as insoluble.
-
-(IW2) If the Wanted arises from a Given (how can that happen?), don't
-   treat it as a Wanted insoluble (obviously).
-
-(IW3) Historical note: we used to have equalities arising from
-   Wanted/Wanted fundep interactions, which we did not want to treat
-   as insoluble.  But now such fundep constraints never escape.
-   See Note [Overview of functional dependencies in type inference]
 
 Note [Insoluble holes]
 ~~~~~~~~~~~~~~~~~~~~~~
