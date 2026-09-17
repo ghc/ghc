@@ -575,7 +575,7 @@ static void processBadFds(CapIOManager *iomgr)
 }
 
 
-void interruptIOManagerSelectBis(CapIOManager *iomgr)
+void interruptIOManagerSelectBis(CapIOManager *iomgr USED_IF_PREEMPTION)
 {
 #if defined(HAVE_PREEMPTION)
     sendFdWakeup(iomgr->interrupt_fd_w);
