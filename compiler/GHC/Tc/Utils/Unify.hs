@@ -3639,14 +3639,10 @@ simpleUnifyCheck :: UnifyCheckCaller -> TcLevel -> TcTyVar -> TcType -> SimpleUn
 --
 -- This function is pretty heavily used, so it's optimised not to allocate
 simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
-  | not $ touchabilityTest given_eq_lvl lhs_tv
-  = SUC_CannotUnify
-  | not $ checkTopShape lhs_info rhs
-  = SUC_CannotUnify
-  | rhs_is_ok rhs
-  = SUC_CanUnify
-  | otherwise
-  = SUC_NotSure
+  | not $ touchabilityTest given_eq_lvl lhs_tv = SUC_CannotUnify
+  | not $ checkTopShape lhs_info rhs           = SUC_CannotUnify
+  | not (rhs_is_bad rhs)                       = SUC_CanUnify
+  | otherwise                                  = SUC_NotSure
   where
     lhs_info           = metaTyVarInfo lhs_tv
     lhs_tv_lvl         = tcTyVarLevel lhs_tv
@@ -3667,35 +3663,42 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
                UC_QuickLook  -> True
                UC_OnTheFly   -> False
 
-    rhs_is_ok (TyVarTy tv)
+    rhs_tcv_is_bad tcv
        -- c.f. checkTyVar, the TEFTyVar case
-       | tcTyVarLevel tv `strictlyDeeperThan` lhs_tv_lvl = False
-       | lhs_tv_is_concrete, not (isConcreteTyVar tv)    = False
-       | simple_occurs_check lhs_tv_nm tv                = False
-       | otherwise                                       = True
+       | isCoVar tcv                                      = occ_check
+       | tcTyVarLevel tcv `strictlyDeeperThan` lhs_tv_lvl = True
+       | lhs_tv_is_concrete, not (isConcreteTyVar tcv)    = True
+       | lhs_tv_nm == getName tcv                         = True
+       | occ_check                                        = True
+       | otherwise                                        = False
+       where
+         occ_check = anyFreeVarsOfType rhs_tcv_is_bad (varType tcv)
 
-    rhs_is_ok (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
-      | not forall_ok, isInvisibleFunArg af = False
-      | otherwise                           = rhs_is_ok w && rhs_is_ok a && rhs_is_ok r
+    rhs_is_bad (TyVarTy tv) = rhs_tcv_is_bad tv
 
-    rhs_is_ok (TyConApp tc tys)
-      | lhs_tv_is_concrete, not (isConcreteTyCon tc) = False
-      | not forall_ok, not (isTauTyCon tc)           = False
-      | not fam_ok,    not (isFamFreeTyCon tc)       = False
-      | otherwise                                    = all rhs_is_ok tys
+    rhs_is_bad (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
+      | not forall_ok, isInvisibleFunArg af = True
+      | otherwise                           = rhs_is_bad w || rhs_is_bad a || rhs_is_bad r
 
-    rhs_is_ok (ForAllTy (Bndr tv _) ty)
-      | forall_ok = rhs_is_ok (tyVarKind tv) && (tv == lhs_tv || rhs_is_ok ty)
-      | otherwise = False
+    rhs_is_bad (TyConApp tc tys)
+      | lhs_tv_is_concrete, not (isConcreteTyCon tc) = True
+      | not forall_ok, not (isTauTyCon tc)           = True
+      | not fam_ok,    not (isFamFreeTyCon tc)       = True
+      | otherwise                                    = any rhs_is_bad tys
 
-    rhs_is_ok (AppTy t1 t2)    = rhs_is_ok t1 && rhs_is_ok t2
-    rhs_is_ok (CastTy ty co)   = co_is_ok co && rhs_is_ok ty
-    rhs_is_ok (CoercionTy co)  = co_is_ok co
-    rhs_is_ok (LitTy {})       = True
+    rhs_is_bad (ForAllTy (Bndr tv _) ty)
+      | not forall_ok               = True
+      | rhs_is_bad (tyVarKind tv)   = True
+      | tv /= lhs_tv, rhs_is_bad ty = True
+      | otherwise                   = False
 
-    -- For coercions we look only in the /type/ of the coercion
-    -- See (SUC1) in Note [simpleUnifyCheck]
-    co_is_ok co = rhs_is_ok (coercionType co)
+    rhs_is_bad (AppTy t1 t2)    = rhs_is_bad t1 || rhs_is_bad t2
+    rhs_is_bad (CastTy ty co)   = co_is_bad co || rhs_is_bad ty
+    rhs_is_bad (CoercionTy co)  = co_is_bad co
+    rhs_is_bad (LitTy {})       = False
+
+    -- Coercions: see (SUC1) in Note [simpleUnifyCheck]
+    co_is_bad co = anyFreeVarsOfCo rhs_tcv_is_bad co
 
 {- Note [simpleUnifyCheck]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4730,24 +4733,18 @@ promotionDone _      _               _ = return False
 ---------------------
 simpleOccursCheck :: OccursCheck -> TcTyVar -> TyVarCheckResult m
 -- ^ The "interpreter" for 'OccursCheck'
+-- Check for an occurrence of lhs_tv in occ_tv or its kind
 simpleOccursCheck OC_None _
   = TyVarCheck_Success
 simpleOccursCheck (OC_Check lhs_tv occ_prob) occ_tv
-  | simple_occurs_check lhs_tv occ_tv = TyVarCheck_Error (cteProblem occ_prob)
-  | otherwise                         = TyVarCheck_Success
-
-simple_occurs_check :: Name -> TcTyVar -> Bool  -- True <=> occurs check
--- Check for an occurrence of lhs_tv in occ_tv or its kind
--- This is a heavily-used bit of code, and experiments show that
--- it's worth inlining this function
-{-# INLINE simple_occurs_check #-}
-simple_occurs_check lhs_tv occ_tv
-  = go occ_tv
+  | is_bad occ_tv = TyVarCheck_Error (cteProblem occ_prob)
+  | otherwise     = TyVarCheck_Success
   where
     -- See (SUC2) in Note [simpleUnifyCheck]
-    go occ_tv | lhs_tv == tyVarName occ_tv                 = True
-              | anyFreeVarsOfType go $! (tyVarKind occ_tv) = True
-              | otherwise                                  = False
+    is_bad :: TyCoVar -> Bool
+    is_bad occ_tv | lhs_tv == tyVarName occ_tv                     = True
+                  | anyFreeVarsOfType is_bad $! (tyVarKind occ_tv) = True
+                  | otherwise                                      = False
 
 -------------------------
 tyVarLevelCheck :: LevelCheck m -> TcTyVar -> TyVarCheckResult m
