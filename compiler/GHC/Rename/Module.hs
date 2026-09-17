@@ -2523,8 +2523,8 @@ rnInjectivityAnn :: LHsQTyVars GhcRn           -- ^ Type variables declared in
 rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
                  (L srcSpan (InjectivityAnn x injFrom injTo))
  = do
-   { (injDecl'@(L _ (InjectivityAnn _ injFrom' injTo')), noRnErrors)
-          <- askNoErrs $
+   { (injDecl'@(L _ (InjectivityAnn _ injFrom' injTo')), rn_errors)
+          <- askErrsFound $
              bindLocalNames (maybeToList (hsLTyVarName resTv)) $
              -- The return type variable scopes over the injectivity annotation
              -- e.g.   type family F a = (r::*) | r -> a
@@ -2546,11 +2546,11 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
    -- if renaming of type variables ended with errors (eg. there were
    -- not-in-scope variables) don't check the validity of injectivity
    -- annotation. This gives better error messages.
-   ; when (noRnErrors && not lhsValid) $
+   ; unless (rn_errors || lhsValid) $
         addErrAt (getLocA injFrom) $
           TcRnIncorrectTyVarOnLhsOfInjCond resName injFrom
 
-   ; when (noRnErrors && not (Set.null rhsValid)) $
+   ; unless (rn_errors || Set.null rhsValid) $
       do { let errorVars = Set.toList rhsValid
          ; addErrAt (locA srcSpan) $
               TcRnUnknownTyVarsOnRhsOfInjCond errorVars } } }
@@ -2567,7 +2567,7 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
 -- this time we expect "result" to be reported not in scope by rnLTyVar.
 rnInjectivityAnn _ _ (L srcSpan (InjectivityAnn x injFrom injTo)) =
    setSrcSpanA srcSpan $ do
-   (injDecl', _) <- askNoErrs $ do
+   (injDecl', _) <- askErrsFound $ do
      injFrom' <- rnLTyVar injFrom
      injTo'   <- mapM rnLTyVar injTo
      return $ L srcSpan (InjectivityAnn x (fmap greName injFrom') (fmap (fmap greName) injTo'))

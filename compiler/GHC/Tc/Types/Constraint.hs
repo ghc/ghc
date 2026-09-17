@@ -1881,16 +1881,19 @@ approximateWCX include_non_quantifiable wc
 
     float_implic :: Bool -> TcTyCoVarSet -> Implication
                  -> ApproxWC -> ApproxWC
-    float_implic encl_eqs trapping_tvs imp
-      = float_wc new_encl_eqs new_trapping_tvs (ic_wanted imp)
+    float_implic encl_eqs trapping_tvs
+        (Implic { ic_wanted = wc, ic_given_eqs = given_eqs
+                , ic_skols = skols, ic_status = status }) acc
+      | isInsolubleStatus status = acc
+      | otherwise                = float_wc new_encl_eqs new_trapping_tvs wc acc
       where
-        new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
-        new_encl_eqs = encl_eqs || ic_given_eqs imp == MaybeGivenEqs
+        new_trapping_tvs = trapping_tvs `extendVarSetList` skols
+        new_encl_eqs = encl_eqs || given_eqs == MaybeGivenEqs
 
     float_ct :: Bool -> TcTyCoVarSet -> Ct
              -> ApproxWC -> ApproxWC
     float_ct encl_eqs skol_tvs ct acc@(quant, no_quant)
-       | isGivenCt ct                                = acc
+       | isGivenCt ct                         = acc
            -- There can be (insoluble) Given constraints in wc_simple,
            -- there so that we get error reports for unreachable code
            -- See `given_insols` in GHC.Tc.Solver.Solve.solveImplication

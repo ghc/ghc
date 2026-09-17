@@ -993,7 +993,8 @@ last example above.
 
 tryTypeClassDefaulting :: WantedConstraints -> TcS WantedConstraints
 tryTypeClassDefaulting wc
-  | isEmptyWC wc || insolubleWC wc -- See Note [Defaulting insolubles]
+  | isEmptyWC wc
+    -- || insolubleWC wc -- See Note [Defaulting insolubles]
   = return wc
   | otherwise  -- See Note [When to do type-class defaulting]
   = do { something_happened <- applyDefaultingRules wc
