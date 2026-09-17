@@ -54,6 +54,12 @@
 // however at the moment we cannot due to issue #27346.
 #endif
 
+#if defined(HAVE_PREEMPTION)
+#define USED_IF_PREEMPTION
+#else
+#define USED_IF_PREEMPTION STG_UNUSED
+#endif
+
 #if defined(HAVE_PTHREAD_H) && !defined(mingw32_HOST_OS)
 
 #if defined(CMINUSMINUS)

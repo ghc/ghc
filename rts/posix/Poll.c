@@ -565,7 +565,7 @@ static void reportPollError(int res, nfds_t nfds)
 }
 
 
-void interruptIOManagerPoll(CapIOManager *iomgr)
+void interruptIOManagerPoll(CapIOManager *iomgr USED_IF_PREEMPTION)
 {
 #if defined(HAVE_PREEMPTION)
     sendFdWakeup(iomgr->interrupt_fd_w);
