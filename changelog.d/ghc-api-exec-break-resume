@@ -1,0 +1,14 @@
+section: ghc-lib
+synopsis: An ``ExecBreak`` now stores its ``Resume`` and ``resumeExec`` receives it explicitly
+issues: #28058
+mrs: !16889
+
+description: {
+- ``ExecBreak`` has a new field ``breakResume :: Resume`` with the context needed
+  to resume the thread stopped at that breakpoint.
+- ``resumeExec`` takes a specific ``Resume`` to continue as an extra argument,
+  instead of resuming the most recent breakpoint in ``ic_resume``.
+- ``resumeExec`` no longer pops the ``Resume`` off ``ic_resume``. Callers that
+  rely on the ``ic_resume`` stack must now update it themselves, for instance
+  if if calling ``resumeExec`` on the first ``Resume`` in the context.
+}

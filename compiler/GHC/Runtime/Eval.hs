@@ -290,7 +290,8 @@ emptyHistory size = nilBL size
 -- breakpoint if we don't care about that breakpoint (e.g. if using :steplocal
 -- or :stepmodule, rather than :step, we only care about certain breakpoints).
 handleRunStatus :: GhcMonad m
-                => SingleStep -> String
+                => SingleStep
+                -> String
                 -> ResumeBindings
                 -> [Id]
                 -> EvalStatus_ [ForeignHValue] [HValueRef]
@@ -343,7 +344,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
         hsc_env2 = pushResume hsc_env1 resume
 
       setSession hsc_env2
-      return (ExecBreak break_ids Nothing)
+      return (ExecBreak break_ids Nothing resume)
 
     -- EvalBreak (Just ...) case: the interpreter stopped at a breakpoint
     --
@@ -389,7 +390,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
             }
           hsc_env2 = pushResume hsc_env1 resume
         setSession hsc_env2
-        return (ExecBreak break_ids (Just ibi))
+        return (ExecBreak break_ids (Just ibi) resume)
       else do
         -- resume with the same step type
         let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
@@ -404,65 +405,67 @@ handleRunStatus step expr bindings final_ids status history0 = do
   tracing | RunAndLogSteps <- step = True
           | otherwise              = False
 
-resumeExec :: GhcMonad m => SingleStep -> Maybe Int
+-- | Resume a paused thread given its 'Resume' context.
+--
+-- The interactive things in scope are restored to the things available at the
+-- time this paused thread hit the breakpoint.
+--
+-- This 'Resume' is not popped off the interactive `ic_resume` breakpoint
+-- stack, since there's no way to tell which of the breakpoints in the stack is
+-- the one we're resuming.
+resumeExec :: GhcMonad m
+           => SingleStep
+           -> Maybe Int
+           -> Resume
            -> m ExecResult
-resumeExec step mbCnt
- = do
-   hsc_env <- getSession
-   let ic = hsc_IC hsc_env
-       resume = ic_resume ic
+resumeExec step mbCnt r = do
+  hsc_env <- getSession
+  let ic = hsc_IC hsc_env
+  -- unbind the temporary locals by restoring the TypeEnv from
+  -- before the breakpoint
+  let (resume_tmp_te,resume_gre_cache) = resumeBindings r
+      ic' = ic { ic_tythings = resume_tmp_te,
+                 ic_gre_cache = resume_gre_cache }
+  setSession hsc_env{ hsc_IC = ic' }
 
-   case resume of
-     [] -> liftIO $
-           throwGhcExceptionIO (ProgramError "not stopped at a breakpoint")
-     (r:rs) -> do
-        -- unbind the temporary locals by restoring the TypeEnv from
-        -- before the breakpoint, and drop this Resume from the
-        -- InteractiveContext.
-        let (resume_tmp_te,resume_gre_cache) = resumeBindings r
-            ic' = ic { ic_tythings = resume_tmp_te,
-                       ic_gre_cache = resume_gre_cache,
-                       ic_resume   = rs }
-        setSession hsc_env{ hsc_IC = ic' }
+  -- remove any bindings created since the breakpoint from the
+  -- linker's environment
+  let old_names = map getName resume_tmp_te
+      new_names = [ n | thing <- ic_tythings ic
+                      , let n = getName thing
+                      , not (n `elem` old_names) ]
+      interp    = hscInterp hsc_env
+      dflags    = hsc_dflags hsc_env
+  liftIO $ Loader.deleteFromLoadedHomeEnv interp new_names
 
-        -- remove any bindings created since the breakpoint from the
-        -- linker's environment
-        let old_names = map getName resume_tmp_te
-            new_names = [ n | thing <- ic_tythings ic
-                            , let n = getName thing
-                            , not (n `elem` old_names) ]
-            interp    = hscInterp hsc_env
-            dflags    = hsc_dflags hsc_env
-        liftIO $ Loader.deleteFromLoadedHomeEnv interp new_names
+  case r of
+    Resume { resumeStmt = expr
+           , resumeContext = fhv
+           , resumeBindings = bindings
+           , resumeFinalIds = final_ids
+           , resumeApStack = apStack
+           , resumeBreakpointId = mb_brkpt
+           , resumeSpan = span
+           , resumeHistory = hist } ->
+         do
+          -- When the user specified a break ignore count, set it
+          -- in the interpreter
+          case (mb_brkpt, mbCnt) of
+            (Just brkpt, Just cnt) -> setupBreakpoint interp brkpt cnt
+            _ -> return ()
 
-        case r of
-          Resume { resumeStmt = expr
-                 , resumeContext = fhv
-                 , resumeBindings = bindings
-                 , resumeFinalIds = final_ids
-                 , resumeApStack = apStack
-                 , resumeBreakpointId = mb_brkpt
-                 , resumeSpan = span
-                 , resumeHistory = hist } ->
-               do
-                -- When the user specified a break ignore count, set it
-                -- in the interpreter
-                case (mb_brkpt, mbCnt) of
-                  (Just brkpt, Just cnt) -> setupBreakpoint interp brkpt cnt
-                  _ -> return ()
-
-                let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
-                status <- liftIO $ GHCi.resumeStmt interp eval_opts fhv
-                let prevHistoryLst = fromListBL 50 hist
-                    hug = hsc_HUG hsc_env
-                    hist' = case mb_brkpt of
-                       Nothing -> pure prevHistoryLst
-                       Just bi
-                         | breakHere False step span -> do
-                            hist1 <- liftIO (mkHistory hug apStack bi)
-                            return $ hist1 `consBL` fromListBL 50 hist
-                         | otherwise -> pure prevHistoryLst
-                handleRunStatus step expr bindings final_ids status =<< hist'
+          let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
+          status <- liftIO $ GHCi.resumeStmt interp eval_opts fhv
+          let prevHistoryLst = fromListBL 50 hist
+              hug = hsc_HUG hsc_env
+              hist' = case mb_brkpt of
+                 Nothing -> pure prevHistoryLst
+                 Just bi
+                   | breakHere False step span -> do
+                      hist1 <- liftIO (mkHistory hug apStack bi)
+                      return $ hist1 `consBL` fromListBL 50 hist
+                   | otherwise -> pure prevHistoryLst
+          handleRunStatus step expr bindings final_ids status =<< hist'
 
 setupBreakpoint :: GhcMonad m => Interp -> InternalBreakpointId -> Int -> m ()   -- #19157
 setupBreakpoint interp ibi cnt = do
