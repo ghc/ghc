@@ -107,43 +107,30 @@ import qualified GHC.Data.Word64Set as W
 -- results by this tag (see Note [Cost of deterministic iteration]). So you
 -- should only use `UniqDFM` if you need the deterministic property.
 --
--- `foldUDFM` also preserves determinism.
---
--- Normal @UniqFM@ when you turn it into a list will use
--- Data.IntMap.toList function that returns the elements in the order of
--- the keys. The keys in @UniqFM@ are always @Uniques@, so you end up with
--- with a list ordered by @Uniques@.
--- The order of @Uniques@ is known to be not stable across rebuilds.
--- See Note [Unique Determinism] in GHC.Types.Unique.
---
---
--- There's more than one way to implement this. The implementation here tags
--- every value with its insertion tag that can later be used to sort the
--- values when asked to convert to a list.
---
--- Updating an existing key keeps the old tag. This keeps the order stable for
--- maps whose entries are updated many times. The instance environments are
--- the main example: inserting an instance updates the entry of its class in a
--- DNameEnv, and when updates moved keys to the end the order of instances shown
--- by :info depended on the order in which interfaces happened to be loaded
--- (#27532). Now a class keeps its place once its first instance is added, so
--- loading further interfaces cannot change the order.
---
--- An alternative would be to have
---
---   data UniqDFM ele = UDFM (Word64Map ele) [ele]
---
--- where the list determines the order. This makes deletion tricky as we'd
--- only accumulate elements in that list, but makes merging easier as you
--- can just merge both structures independently.
--- Deletion can probably be done in amortized fashion when the size of the
--- list is twice the size of the set.
+-- CQ[udfm-update-keeps-position-why]
+-- Q: why must an update keep the entry's position, rather than move it to
+--    the end as it once did?
+-- A~ with move-to-end, the order of instances shown by :info depended on
+--    the order in which interfaces happened to be loaded, because adding an
+--    instance updates its class's entry in a DNameEnv (#27532).
 
--- | A type of values carrying an insertion tag
+-- CQ[insertion-tag]
+-- Q: what exactly is an "insertion tag", and how does it relate to
+--    "insertion time"/"insertion order"?
+-- A~ the map's ub field is a logical clock: every insert-like operation
+--    (addToUDFM*, alterUDFM*, upsertUDFM) ticks it, even when the key
+--    already exists. An entry's tag is the clock reading at the moment the
+--    key was inserted; updates keep it (a delete and re-add is a fresh
+--    insertion). So tags order entries by insertion, but are not
+--    contiguous. Exception:
+--    plusUDFM re-inserts the smaller map's entries into the larger one, so
+--    the merged tags reflect the merge, not the original insertions.
+-- D~ rename the ub field/accessor to make the clock reading explicit, e.g.
+--    `udfm_clock`; rename TaggedVal's Int field accordingly.
 data TaggedVal val =
   TaggedVal
     !val
-    {-# UNPACK #-} !Int -- ^ insertion tag
+    {-# UNPACK #-} !Int
   deriving stock (Data, Functor, Foldable, Traversable)
 
 taggedFst :: TaggedVal val -> val
@@ -164,10 +151,8 @@ instance Eq val => Eq (TaggedVal val) where
 -- very much discouraged.
 data UniqDFM key ele =
   UDFM
-    !(M.Word64Map (TaggedVal ele)) -- A map where keys are Unique's values and
-                                   -- values carry an insertion tag.
-    {-# UNPACK #-} !Int            -- Upper bound on the values' insertion
-                                   -- tags. See Note [Overflow on plusUDFM]
+    !(M.Word64Map (TaggedVal ele))
+    {-# UNPACK #-} !Int            -- CQ-REF[insertion-tag]
   -- See Note [UDFM invariants]
   deriving (Data, Functor)
 
@@ -212,10 +197,6 @@ addToUDFM_Directly (UDFM m i) u v
   = UDFM (MS.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
   where
     tf (TaggedVal new_v _) (TaggedVal _ old_i) = TaggedVal new_v old_i
-      -- Keep the old tag, but insert the new value
-      -- This means that udfmToList typically returns elements
-      -- in the order of insertion, rather than the reverse
-
       -- It is quite critical that the strict insertWith is used as otherwise
       -- the combination function 'tf' is not forced and both old values are retained
       -- in the map.
@@ -265,16 +246,12 @@ delFromUDFM (UDFM m i) k = UDFM (M.delete (getKey $ getUnique k) m) i
 
 plusUDFM_C :: (elt -> elt -> elt) -> UniqDFM key elt -> UniqDFM key elt -> UniqDFM key elt
 plusUDFM_C f udfml@(UDFM _ i) udfmr@(UDFM _ j)
-  -- we will use the upper bound on the tag as a proxy for the set size,
-  -- to insert the smaller one into the bigger one
   | i > j = insertUDFMIntoLeft_C f udfml udfmr
   | otherwise = insertUDFMIntoLeft_C f udfmr udfml
 
 -- | Like 'plusUDFM_C' but the combine function also receives the unique key
 plusUDFM_CK :: (Unique -> elt -> elt -> elt) -> UniqDFM key elt -> UniqDFM key elt -> UniqDFM key elt
 plusUDFM_CK f udfml@(UDFM _ i) udfmr@(UDFM _ j)
-  -- we will use the upper bound on the tag as a proxy for the set size,
-  -- to insert the smaller one into the bigger one
   | i > j = insertUDFMIntoLeft_CK f udfml udfmr
   | otherwise = insertUDFMIntoLeft_CK f udfmr udfml
 
@@ -304,13 +281,9 @@ plusUDFM_CK f udfml@(UDFM _ i) udfmr@(UDFM _ j)
 -- doubles again. After 64 merges you overflow.
 -- This solution would have the same time complexity as plusUFM, namely O(n+m).
 --
--- The solution I ended up with has time complexity of
--- O(m log m + m * min (n+m, W)) where m is the smaller set.
--- It simply inserts the elements of the smaller set into the larger
--- set in the order that they were inserted into the smaller set. That's
--- O(m log m) for extracting the elements from the smaller set in the
--- insertion order and O(m * min(n+m, W)) to insert them into the bigger
--- set.
+-- The solution I ended up with
+-- simply inserts the elements of the smaller set into the larger
+-- set in the order that they were inserted into the smaller set.
 
 plusUDFM :: UniqDFM key elt -> UniqDFM key elt -> UniqDFM key elt
 plusUDFM udfml@(UDFM _ i) udfmr@(UDFM _ j)
@@ -366,7 +339,6 @@ fold_udfm k z m ub
 -- See Note [Cost of deterministic iteration].
 foldWithKeyUDFM :: (Unique -> elt -> a -> a) -> a -> UniqDFM key elt -> a
 {-# INLINE foldWithKeyUDFM #-}
--- This INLINE was copied from foldUDFM
 foldWithKeyUDFM k z m = foldr (uncurry k) z (udfmToList m)
 
 -- | Performs a nondeterministic strict fold over the UniqDFM.
@@ -380,19 +352,17 @@ nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
 
 {- Note [Cost of deterministic iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Deterministic iteration -- foldUDFM, eltsUDFM, udfmToList, and everything
-built on them -- orders elements by insertion tag. The element with the
-smallest tag can sit anywhere in the map, so every tag must be inspected,
-and, given a @UDFM m ub@ on the pigeonhole-sort path, an array with ub slots
-must be filled, before the first element can be emitted (see
-Note [Sorting a UDFM]). So beyond maps of a single element, deterministic
-iteration cannot stream: demanding any of the result processes the whole
-map. #27459 shows that cost hitting a consumer that only needed to know
-whether the result was non-empty.
-
-So: to test for emptiness, use isNullUDFM rather than null on eltsUDFM;
-for order-oblivious queries, prefer short-circuiting anyUDFM/allUDFM; and
-if you don't need the deterministic order at all, use nonDetStrictFoldUDFM.
+CQ[det-iteration-cost]
+Q: what does deterministic iteration cost, and what should a caller use
+   when it doesn't need the order?
+A~ it cannot stream: the whole map is traversed (and, on the pigeonhole
+   path, an ub-slot array allocated) before the first element is produced.
+   #27459: a consumer that only needed to know whether the result was
+   non-empty paid for the full sort. Alternatives: isNullUDFM, the
+   short-circuiting anyUDFM/allUDFM, nonDetStrictFoldUDFM.
+D~ this may not need a Note: say "does not stream" in the Haddock of
+   foldUDFM/eltsUDFM/udfmToList and point at the alternatives there,
+   dropping the Note and its references.
 -}
 
 -- | Deterministic, in order of insertion.
@@ -418,31 +388,15 @@ sort_it m = sortBy (compare `on` taggedSnd) (M.elems m)
 
 {- Note [Sorting a UDFM]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Deterministic iteration must yield a map's elements in order of their
-insertion tags. The obvious way is to sort on the tags, but we can do better:
-in (UDFM m ub) the tags are distinct indices into [0, ub) (see
-Note [UDFM invariants]), so each element can simply be placed at its own
-tag in an ub-slot array, which is then read back in index order. This is
-pigeonhole sort, with one element per hole.
-
-Cost: writing the elements is O(n) for n = M.size m, while allocating the
-array and reading it back are O(ub). Since n <= ub the total is O(ub). No
-comparisons are made.
-
-So the method wins only while the array stays dense, and ub never shrinks
-(overwrites keep bumping it, delete/filter shrink n but not ub).
-usePigeonholeSort therefore takes this path only when ub <= 4 * n, which
-bounds its cost at O(n), and falls back to the O(n log n) comparison sort
-otherwise.
-
-Unfilled slots contain a TaggedVal with tag -1 and value
-@unsafeCoerce () :: r@. This is safe because the value is never used: only
-slots with non-negative tags are read.
-
-pigeonholeSort also avoids intermediate lists: it fills the array by
-traversing the map directly, and emits its readout with 'build', so the foldr
-in fold_udfm fuses with it. This contributes significantly to the allocation
-reductions in InstanceMatching1 in !16292.
+CQ[pigeonhole-sort]
+Q: why sort by placing elements into an ub-slot array, and why only when
+   ub <= 4 * n?
+A~ Note [UDFM invariants] makes the tags distinct indices into [0, ub), so
+   placing each element at its tag and reading the array back in index
+   order sorts in O(ub) with no comparisons. ub never shrinks (overwrites
+   bump it; delete/filter shrink n only), so a sparse map would pay O(ub)
+   >> O(n); the 4 * n bound keeps the cost O(n), else fall back to the
+   O(n log n) comparison sort.
 -}
 
 -- | @ub <= 4 * size m@, computed without a full 'M.size' traversal.
