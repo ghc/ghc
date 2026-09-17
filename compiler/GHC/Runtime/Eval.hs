@@ -347,7 +347,7 @@ handleRunStatus step isolateMode expr bindings final_ids status history0 = do
         hsc_env2 = pushResume hsc_env1 resume
 
       setSession hsc_env2
-      return (ExecBreak break_ids Nothing)
+      return (ExecBreak break_ids Nothing resume)
 
     -- EvalBreak (Just ...) case: the interpreter stopped at a breakpoint
     --
@@ -393,7 +393,7 @@ handleRunStatus step isolateMode expr bindings final_ids status history0 = do
             }
           hsc_env2 = pushResume hsc_env1 resume
         setSession hsc_env2
-        return (ExecBreak break_ids (Just ibi))
+        return (ExecBreak break_ids (Just ibi) resume)
       else do
         -- resume with the same step type
         let eval_opts = (initEvalOpts dflags (enableGhcStepMode step))
