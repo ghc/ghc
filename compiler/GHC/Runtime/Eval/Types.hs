@@ -162,6 +162,8 @@ data ExecResult
     | ExecBreak
        { breakNames   :: [Id]
        , breakPointId :: Maybe InternalBreakpointId
+       , breakResume  :: Resume
+         -- ^ to resume this thread blocked on this break
        }
 
 -- | Essentially a GlobalRdrEnv, but with additional cached values to allow
