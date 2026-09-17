@@ -1,0 +1,9 @@
+:l RttiSharedTyVar
+let a = Just undefined :: Maybe Int
+let b = Just 5 :: Maybe Int
+a `seq` b `seq` ()
+:break f
+-- should say x y have type Maybe Int, not Maybe a
+f a b
+:t x
+:t y
