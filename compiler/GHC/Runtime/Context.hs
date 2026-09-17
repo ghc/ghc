@@ -6,6 +6,8 @@ module GHC.Runtime.Context
    , extendInteractiveContextWithIds
    , setInteractivePrintName
    , substInteractiveContext
+   , substInteractiveTyThing
+   , substInteractiveId
    , replaceImportEnv
    , icReaderEnv
    , icExtendGblRdrEnv
@@ -496,15 +498,18 @@ icExtendGblRdrEnv drop_only_qualified env tythings
 substInteractiveContext :: InteractiveContext -> Subst -> InteractiveContext
 substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst
   | isEmptyTCvSubst subst = ictxt
-  | otherwise             = ictxt { ic_tythings = map subst_ty tts }
-  where
-    subst_ty (AnId id)
-      = AnId $ updateIdTypeAndMult (substTyAddInScope subst) id
-      -- Variables in the interactive context *can* mention free type variables
-      -- because of the runtime debugger. Otherwise you'd expect all
-      -- variables bound in the interactive context to be closed.
-    subst_ty tt
-      = tt
+  | otherwise             = ictxt { ic_tythings = map (substInteractiveTyThing subst) tts }
+
+substInteractiveTyThing :: Subst -> TyThing -> TyThing
+substInteractiveTyThing subst (AnId id) = AnId $ substInteractiveId subst id
+substInteractiveTyThing _ tt            = tt
+
+substInteractiveId :: Subst -> Id -> Id
+substInteractiveId subst id =
+  -- Variables in the interactive context *can* mention free type variables
+  -- because of the runtime debugger. Otherwise you'd expect all
+  -- variables bound in the interactive context to be closed.
+  updateIdTypeAndMult (substTyAddInScope subst) id
 
 instance Outputable InteractiveImport where
   ppr (IIModule m) = char '*' <> ppr m

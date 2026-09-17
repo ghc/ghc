@@ -155,3 +155,5 @@ test('T26042f2', [extra_hc_opts('-O -fno-unoptimized-core-for-interpreter'), ext
 test('T26042g', extra_files(['T26042g.hs']), ghci_script, ['T26042g.script'])
 
 test('T27633c', extra_files(['T27633c_obj.hs']), ghci_script, ['T27633c.script'])
+
+test('RttiSharedTyVar', extra_files(['RttiSharedTyVar.hs']), ghci_script, ['RttiSharedTyVar.script'])
