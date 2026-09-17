@@ -20,7 +20,6 @@ import GHCi.RemoteTypes
 import GHCi.Message (EvalExpr)
 import GHC.ByteCode.Types (InternalBreakpointId(..))
 import GHC.Types.Id
-import GHC.Types.Name
 import GHC.Types.TyThing
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
@@ -169,7 +168,7 @@ data ExecResult
   -- | Execution is complete with either an exception or the list of
   -- user-visible names that were brought into scope.
   = ExecComplete
-       { execResult :: Either SomeException [Name]
+       { execResult :: Either SomeException [Id]
        , execAllocation :: Word64
        }
 
@@ -180,7 +179,7 @@ data ExecResult
     -- subsequently deciding whether to really stop here.
     -- `ExecBreak` always means GHCi breaks.
     | ExecBreak
-       { breakNames   :: [Name]
+       { breakNames   :: [Id]
        , breakPointId :: Maybe InternalBreakpointId
        }
 
