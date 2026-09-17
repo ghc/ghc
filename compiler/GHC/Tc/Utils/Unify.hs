@@ -3702,7 +3702,7 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
 
 {- Note [simpleUnifyCheck]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-The function `simpleUnifyCheck` is asimple, /fast/ check for unifying (tv ~ rhs).
+The function `simpleUnifyCheck` is a simple, /fast/ check for unifying (tv ~ rhs).
 It can return a definite decision (SUC_CannotUnify of SUC_CanUnify), or uncertainty
 (SUC_NotSure).  In the latter case we will later use `checkTyEqRhs` to resolve.
 In particular, `simpleUnifyCheck`:

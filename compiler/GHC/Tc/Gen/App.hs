@@ -37,6 +37,7 @@ import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst ( substTyWithInScope )
 import GHC.Core.Type
@@ -2196,9 +2197,9 @@ qlUnify ty1 ty2
       -- with qualified types).
 
     go' (TyVarTy tv) ty2
-      | isMetaTyVar tv = go_kappa tv ty2
+      | isQLInstTyVar tv = go_kappa tv ty2
     go' ty1 (TyVarTy tv)
-      | isMetaTyVar tv = go_kappa tv ty1
+      | isQLInstTyVar tv = go_kappa tv ty1
 
     go' (CastTy ty1 _) ty2 = go ty1 ty2
     go' ty1 (CastTy ty2 _) = go ty1 ty2
@@ -2240,37 +2241,18 @@ qlUnify ty1 ty2
                                   ; go_flexi kappa ty2 } }
 
     ----------------
-    -- Swap (kappa1[conc] ~ kappa2[tau])
-    -- otherwise we'll fail to unify and emit a coercion.
-    -- Just an optimisation: emitting a coercion is fine
-    go_flexi kappa (TyVarTy tv2)
-      | lhsPriority tv2 > lhsPriority kappa
-      = go_flexi1 tv2 (TyVarTy kappa)
-    go_flexi kappa ty2
-      = go_flexi1 kappa ty2
-
-    go_flexi1 kappa ty2  -- ty2 is zonked
-      = do { cur_lvl <- getTcLevel
-              -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
-              -- Here we are in the TcM monad, which does not track enclosing
-              -- Given equalities; so for quick-look unification we conservatively
-              -- treat /any/ level outside this one as untouchable. Hence cur_lvl.
-           ; traceTc "go_flexi1" (ppr kappa $$ ppr ty2)
-           ; case simpleUnifyCheck UC_QuickLook cur_lvl kappa ty2 of
-              -- qlUnify depends, regrettably delicately, on the exact choices made
-              --  by `simpleUnifyCheck`.  See (SUC1) in
-              --  Note [simpleUnifyCheck] in GHC.Tc.Utils.Unify
-              SUC_CanUnify ->
-                do { co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
-                           -- unifyKind: see (UQL2) in Note [QuickLook unification]
-                           --            and (MIV2) in Note [Monomorphise instantiation variables]
-                   ; let ty2' = mkCastTy ty2 co
-                   ; traceTc "qlUnify:update" $
-                     ppr kappa <+> text ":=" <+> ppr ty2
-                   ; liftZonkM $ writeMetaTyVar kappa ty2' }
-              suc -> do { traceTc "go_flexi2" (ppr suc $$ ppr kappa $$ ppr ty2)
-                        ; return () } -- e.g. occurs-check or forall-bound variable
-           }
+    go_flexi kappa ty2  -- ty2 is zonked
+      | anyFreeVarsOfType (== kappa) ty2
+      = return ()  -- Occurs check
+      | otherwise
+      = do { co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
+                   -- unifyKind: see (UQL2) in Note [QuickLook unification]
+                   --            and (MIV2) in Note [Monomorphise instantiation variables]
+           ; let ty2' = mkCastTy ty2 co
+           ; traceTc "qlUnify:update" $
+             ppr kappa <+> text ":=" <+> ppr ty2
+           ; liftZonkM $ writeMetaTyVar kappa ty2'
+           ; return () }
       where
         kappa_kind = tyVarKind kappa
         ty2_kind   = typeKind ty2
