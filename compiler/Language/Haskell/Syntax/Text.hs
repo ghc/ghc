@@ -26,6 +26,7 @@ module Language.Haskell.Syntax.Text
   , shortByteStringToHText
 
   , HsModuleName(..)
+  , hsModuleNameString
 
     -- * Utils
   , lengthHText, nullHText
@@ -80,4 +81,7 @@ nullHText = ST.null
 -- | A module name in the AST is just 'HText'
 newtype HsModuleName = HsModuleName HText
   deriving (Eq, Ord, Show, Data)
+
+hsModuleNameString :: HsModuleName -> String
+hsModuleNameString (HsModuleName mn) = unpackHText mn
 

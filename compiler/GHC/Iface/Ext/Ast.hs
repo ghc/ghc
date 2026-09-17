@@ -81,6 +81,7 @@ import Control.Applicative        ( (<|>) )
 import GHC.Types.TypeEnv          ( TypeEnv )
 import Control.Arrow              ( second )
 import Data.Traversable           ( mapAccumR )
+import GHC.Unit.Module.Name (hsModuleName)
 
 {- Note [Updating HieAst for changes in the GHC AST]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2288,8 +2289,8 @@ instance ToHie (RScoped (LocatedAn NoEpAnns (RuleBndr GhcRn))) where
 instance ToHie (LocatedA (ImportDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
       ImportDecl { ideclName = name, ideclAs = as, ideclImportList = hidden } ->
-        [ toHie $ IEC Import name
-        , toHie $ fmap (IEC ImportAs) as
+        [ toHie $ IEC Import (fmap hsModuleName name)
+        , toHie $ fmap (IEC ImportAs) (fmap hsModuleName <$> as)
         , maybe (pure []) goIE hidden
         ]
     where
@@ -2321,7 +2322,7 @@ instance ToHie (IEContext (LocatedA (IE GhcRn))) where
         , toHie $ map (IEC c) ns
         ]
       IEModuleContents _ n ->
-        [ toHie $ IEC c n
+        [ toHie $ IEC c (fmap hsModuleName n)
         ]
       IEWholeNamespace _ _ -> []
       IEGroup _ _ d -> [toHie d]

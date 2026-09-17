@@ -2620,7 +2620,7 @@ repDoBlock doName maybeModName (MkC ss) = do
     coreModNameM :: MetaM (Core (Maybe TH.ModName))
     coreModNameM = case maybeModName of
       Just m -> do
-        MkC s <- lift $ coreStringLit (mkFastStringShortText m)
+        MkC s <- lift $ coreStringLit (moduleNameFS (hsModuleName m))
         mName <- rep2_nw mkModNameOcc [s]
         coreJust modNameTyConOcc mName
       _ -> coreNothing modNameTyConOcc
@@ -3173,7 +3173,7 @@ repOverLiteralVal lit = do
 
 repQualLit :: HsQualLit GhcRn -> MetaM (Core (M TH.Exp))
 repQualLit QualLit{ql_mod = modName, ql_val = lit} = do
-  modNameStr <- lift $ coreStringLit (moduleNameFS modName)
+  modNameStr <- lift $ coreStringLit (moduleNameFS (hsModuleName modName))
   funNameStr <- lift $ coreStringLit (occNameFS funOcc)
   funExp <- repVar =<< repNameQ modNameStr funNameStr
   litCore <- lift . dsLit =<< mkHsLit

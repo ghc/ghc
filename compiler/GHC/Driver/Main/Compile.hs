@@ -63,7 +63,6 @@ import GHC.ByteCode.Types
 
 import GHC.Linker.Types
 
-import GHC.Hs
 import GHC.HsToCore.Coverage qualified as Coverage
 
 import GHC.StgToByteCode    ( byteCodeGen )

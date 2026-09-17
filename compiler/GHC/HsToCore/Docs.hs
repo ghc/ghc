@@ -13,6 +13,7 @@ import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
 import GHC.Hs.Type
 import GHC.Hs.Utils
+import GHC.Unit.Module.Name
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
@@ -159,7 +160,7 @@ mkDocStructureFromExportList mdl import_avails export_list =
   where
     toDocStructure :: (IE GhcRn, Avails) -> DocStructureItem
     toDocStructure = \case
-      (IEModuleContents _ lmn, avails) -> moduleExport (unLoc lmn) avails
+      (IEModuleContents _ lmn, avails) -> moduleExport (hsModuleName (unLoc lmn)) avails
       (IEGroup _ level doc, _)         -> DsiSectionHeading level (unLoc doc)
       (IEDoc _ doc, _)                 -> DsiDocChunk (unLoc doc)
       (IEDocNamed _ name, _)           -> DsiNamedChunkRef name

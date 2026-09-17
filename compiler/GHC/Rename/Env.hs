@@ -57,6 +57,8 @@ module GHC.Rename.Env (
 
 import GHC.Prelude
 
+import Language.Haskell.Syntax.Text
+
 import GHC.Iface.Load
 import GHC.Iface.Env
 import GHC.Iface.Errors.Types( IfaceMessage(..) )
@@ -2469,9 +2471,9 @@ lookupSyntax std_occ
   = do { (expr, fvs) <- lookupSyntaxExpr std_occ
        ; return (SyntaxExprRn expr, fvs) }
 
-lookupNameWithQualifier :: ModuleName -> KnownOcc -> RnM (Name, FreeNames)
+lookupNameWithQualifier :: HsModuleName -> KnownOcc -> RnM (Name, FreeNames)
 lookupNameWithQualifier modName std_occ
-  = do { qname <- lookupOccRnNone (mkRdrQual modName std_occ)
+  = do { qname <- lookupOccRnNone (mkRdrQual (hsModuleName modName) std_occ)
        ; return (qname, unitFN qname) }
 
 

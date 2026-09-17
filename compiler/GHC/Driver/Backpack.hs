@@ -830,7 +830,7 @@ summariseRequirement pn mod_name = do
                             hsmodDeprecMessage = Nothing,
                             hsmodHaddockModHeader = Nothing
                                              },
-                        hsmodName = Just (L (noAnnSrcSpan loc) mod_name),
+                        hsmodName = Just (L (noAnnSrcSpan loc) (toHsModuleName mod_name)),
                         hsmodExports = Nothing,
                         hsmodImports = [],
                         hsmodDecls = []

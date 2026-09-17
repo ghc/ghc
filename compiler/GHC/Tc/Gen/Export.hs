@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE ViewPatterns       #-}
 
 module GHC.Tc.Gen.Export (rnExports, exports_from_avail, classifyGREs) where
 
@@ -379,7 +380,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                         expacc_wildcards  = wcs,
                         expacc_warn_spans = export_warn_spans,
                         expacc_dont_warn  = dont_warn_export
-                      } (L loc ie@(IEModuleContents (warn_txt_ps, _) lmod@(L _ mod)))
+                      } (L loc ie@(IEModuleContents (warn_txt_ps, _) lmod@(L _ (hsModuleName -> mod))))
       | Just exported_names <- lookupUniqMap earlier_mods mod  -- Duplicate export of M
       = do { addDiagnostic (TcRnDupeModuleExport mod)
            ; (export_warn_spans', dont_warn_export', _) <-

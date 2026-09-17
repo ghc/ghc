@@ -334,7 +334,7 @@ rnImportDecl this_mod
 
     -- If there's an error in loadInterface, (e.g. interface
     -- file not found) we get lots of spurious errors from 'filterImports'
-    let imp_mod_name = unLoc loc_imp_mod_name
+    let imp_mod_name = hsModuleName (unLoc loc_imp_mod_name)
         doc = ppr imp_mod_name <+> import_reason
 
     hsc_env <- getTopEnv
@@ -397,7 +397,7 @@ rnImportDecl this_mod
         addErr (TcRnSafeImportsDisabled imp_mod_name)
 
     let imp_mod = mi_module iface
-        qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
+        qual_mod_name = fmap (hsModuleName . unLoc) as_mod `orElse` imp_mod_name
         imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only,
                                   is_dloc = locA loc, is_as = qual_mod_name,
                                   is_pkg_qual = pkg_qual, is_isboot = want_boot,
@@ -2241,7 +2241,7 @@ lookupImportMap (L srcSpan ImportDecl{ideclName = L _ modName}) importMap =
     -- should match logic in insertImportMap
     case locA srcSpan of
       RealSrcSpan realSrcSpan _ -> realSrcSpan `Map.lookup` im_imports importMap
-      GeneratedSrcSpan{} -> modName `Map.lookup` im_generatedImports importMap
+      GeneratedSrcSpan{} -> hsModuleName modName `Map.lookup` im_generatedImports importMap
       _ -> Nothing
 
 warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
@@ -2256,13 +2256,13 @@ warnUnusedImport rdr_env (L loc decl, used, unused, unused_wcs)
   -- Note [Do not warn about Prelude hiding]
   | Just (EverythingBut, hides) <- ideclImportList decl
   , not (null hides)
-  , pRELUDE_NAME == unLoc (ideclName decl)
+  , pRELUDE_NAME == hsModuleName (unLoc (ideclName decl))
   = return ()
 
   -- Do not warn about import X as Rebindable
   -- See (UI2) in Note [Unused imports]
   | Just (L _ mod) <- ideclAs decl
-  , mod == rEBINDABLE_MOD_NAME
+  , hsModuleName mod == rEBINDABLE_MOD_NAME
   = return ()
 
   -- Nothing used; drop entire declaration
@@ -2320,7 +2320,7 @@ getMinimalImports ie_decls
                             , ideclPkgQual = pkg_qual
                             , ideclExt = XImportDeclPass { ideclOrigin = origin } } = decl
            ; iface <- loadSrcInterface doc (importDeclLookupScope origin)
-                        mod_name is_boot pkg_qual
+                        (hsModuleName mod_name) is_boot pkg_qual
            ; let used_avails = gresToAvailInfo used_gres
            ; lies <- map (L l) <$> concatMapM (to_ie rdr_env iface) used_avails
            ; return (L l (decl { ideclImportList = Just (Exactly, lies) })) }
@@ -2377,8 +2377,8 @@ getMinimalImports ie_decls
     getKey :: LImportDecl GhcRn -> (Bool, Maybe ModuleName, ModuleName)
     getKey decl =
       ( isImportDeclQualified . ideclQualified $ idecl -- is this qualified? (important that this be first)
-      , unLoc <$> ideclAs idecl -- what is the qualifier (inside Maybe monad)
-      , unLoc . ideclName $ idecl -- Module Name
+      , hsModuleName . unLoc <$> ideclAs idecl -- what is the qualifier (inside Maybe monad)
+      , hsModuleName . unLoc . ideclName $ idecl -- Module Name
       )
       where
         idecl :: ImportDecl GhcRn

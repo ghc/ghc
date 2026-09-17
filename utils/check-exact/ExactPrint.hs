@@ -1736,6 +1736,14 @@ instance ExactPrint HsModuleImpDecls where
 
 -- ---------------------------------------------------------------------
 
+instance ExactPrint HsModuleName where
+  getAnnotationEntry _ = NoEntryVal
+  setAnnotationAnchor n _anc _ cs = n
+     `debug` ("HsModuleName.setAnnotationAnchor:cs=" ++ showAst cs)
+  exact n = do
+    debugM $ "HsModuleName: " ++ showPprUnsafe n
+    withPpr n
+
 instance ExactPrint ModuleName where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor n _anc _ cs = n
@@ -3314,7 +3322,7 @@ exactMdo :: (Monad m, Monoid w)
 exactMdo l Nothing            kw = printStringAtAA l kw
 exactMdo l (Just module_name) kw = printStringAtAA l n
     where
-      n = (unpackHText module_name) ++ "." ++ kw
+      n = (hsModuleNameString module_name) ++ "." ++ kw
 
 markMaybeDodgyStmts :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
   => DoAnn -> LocatedAn an a -> EP w m (DoAnn, LocatedAn an a)
@@ -5016,7 +5024,7 @@ hsLit2String lit =
     HsInt        _ il@(IL{il_text = src }) -> toSourceTextWithSuffix src (il_value il) ""
 
 hsQualLit2String :: HsQualLit GhcPs -> String
-hsQualLit2String QualLit{..} = moduleNameString ql_mod ++ "." ++ fromVal ql_val
+hsQualLit2String QualLit{..} = hsModuleNameString ql_mod ++ "." ++ fromVal ql_val
   where
     fromVal = \case
       HsQualString src fs -> toSourceTextWithSuffix src fs ""

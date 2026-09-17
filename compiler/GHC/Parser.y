@@ -883,12 +883,12 @@ unitdecl :: { LHsUnitDecl PackageName }
                    NotBoot -> HsSrcFile
                    IsBoot  -> HsBootFile)
                  (reLoc $3)
-                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $7) $4 Nothing) (Just $ fmap toHsModuleName $3) (snd $5) (fst $ sndOf3 $7) (snd $ sndOf3 $7))) }
+                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $7) $4 Nothing) (Just (fmap toHsModuleName $3)) (snd $5) (fst $ sndOf3 $7) (snd $ sndOf3 $7))) }
         | 'signature' modid maybe_warning_pragma maybeexports 'where' body
              { sL1 $1 $ DeclD
                  HsigFile
                  (reLoc $2)
-                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $6) $3 Nothing) (Just $ fmap toHsModuleName $2) (snd $4) (fst $ sndOf3 $6) (snd $ sndOf3 $6))) }
+                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $6) $3 Nothing) (Just (fmap toHsModuleName $2)) (snd $4) (fst $ sndOf3 $6) (snd $ sndOf3 $6))) }
         | 'dependency' unitid mayberns
              { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $2
                                               , idModRenaming = $3
@@ -909,7 +909,7 @@ unitdecl :: { LHsUnitDecl PackageName }
 -- know what they are doing. :-)
 
 signature :: { Located (HsModule GhcPs) }
-       : 'signature' modid maybe_warning_pragma maybeexports 'where' body
+       : 'signature' hsmodid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acs loc (\loc cs-> (L loc (HsModule (XModulePs
                                                      (EpAnn (spanAsAnchor loc) (AnnsModule (epTok $1) noEpTok (epTok $5) (fst $4) (fstOf3 $6) [] Nothing) cs)
@@ -919,7 +919,7 @@ signature :: { Located (HsModule GhcPs) }
                     ) }
 
 module :: { Located (HsModule GhcPs) }
-       : 'module' modid maybe_warning_pragma maybeexports 'where' body
+       : 'module' hsmodid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acsFinal (\cs eof -> (L loc (HsModule (XModulePs
                                                        (EpAnn (spanAsAnchor loc) (AnnsModule noEpTok (epTok $1) (epTok $5) (fst $4) (fstOf3 $6) [] eof) cs)
@@ -967,14 +967,14 @@ top1    :: { ([LImportDecl GhcPs], [LHsDecl GhcPs]) }
 -- Module declaration & imports only
 
 header  :: { Located (HsModule GhcPs) }
-        : 'module' modid maybe_warning_pragma maybeexports 'where' header_body
+        : 'module' hsmodid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
                                                          (EpAnn (spanAsAnchor loc) (AnnsModule noEpTok (epTok  $1) (epTok $5) (fst $4) [] [] Nothing) cs)
                                                    EpNoLayout $3 Nothing)
                                                (Just $2) (snd $4) $6 []
                           ))) }
-        | 'signature' modid maybe_warning_pragma maybeexports 'where' header_body
+        | 'signature' hsmodid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs loc (\loc cs -> (L loc (HsModule (XModulePs
                                                          (EpAnn (spanAsAnchor loc) (AnnsModule noEpTok (epTok $1) (epTok $5) (fst $4) [] [] Nothing) cs)
@@ -1040,9 +1040,9 @@ export  :: { LIE GhcPs }
         : maybe_warning_pragma qcname_ext export_subspec {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
                                                           ; impExp <- mkModuleExp $1 (fst $ unLoc $3) $2 (snd $ unLoc $3)
                                                           ; return $ reLoc $ sL span $ impExp } }
-        | maybe_warning_pragma 'module' modid            {% do { let { span = (maybe comb2 comb3 $1) $2 $>
+        | maybe_warning_pragma 'module' hsmodid          {% do { let { span = (maybe comb2 comb3 $1) $2 $>
                                                                      ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
-                                                          ; locImpExp <- return (sL span (IEModuleContents ($1, (epTok $2)) (fmap toHsModuleName $3)))
+                                                          ; locImpExp <- return (sL span (IEModuleContents ($1, (epTok $2)) $3))
                                                           ; return $ reLoc $ locImpExp } }
         | maybe_warning_pragma 'pattern' qcon            {% do { warnPatternNamespaceSpecifier (getLoc $2)
                                                                ; let span = (maybe comb2 comb3 $1) $2 $>
@@ -1137,7 +1137,7 @@ importdecls_semi
         | {- empty -}           { [] }
 
 importdecl :: { LImportDecl GhcPs }
-        : 'import' maybe_src maybe_level maybe_safe optqualified maybe_pkg modid maybe_level optqualified maybeas maybeimpspec
+        : 'import' maybe_src maybe_level maybe_safe optqualified maybe_pkg hsmodid maybe_level optqualified maybeas maybeimpspec
                 {% do {
                   ; let { ; mPreQual = $5
                           ; mPostQual = $9
@@ -1158,7 +1158,7 @@ importdecl :: { LImportDecl GhcPs }
                   ; let loc = (comb6 $1 $7 $8 $9 (snd $10) $11);
                   ; amsA' $ L loc $
                       ImportDecl { ideclExt = XImportDeclPass anns (snd $ fst $2) UserWrittenImport
-                                  , ideclName = fmap toHsModuleName $7, ideclPkgQual = snd $6
+                                  , ideclName = $7, ideclPkgQual = snd $6
                                   , ideclSource = snd $2
                                   , ideclLevelSpec = snd $ levelSpec
                                   , ideclSafe = snd $4
@@ -1196,8 +1196,8 @@ optqualified :: { Maybe (EpToken "qualified") }
         | {- empty -}                           { Nothing }
 
 maybeas :: { (Maybe (EpToken "as"),Located (Maybe (LocatedA HsModuleName))) }
-        : 'as' modid                           { (Just (epTok $1)
-                                                 ,sLL $1 $> (Just $ fmap toHsModuleName $2)) }
+        : 'as' hsmodid                         { (Just (epTok $1)
+                                                 ,sLL $1 $> (Just $2)) }
         | {- empty -}                          { (Nothing, noLoc Nothing) }
 
 maybeimpspec :: { Located (AnnListImportDecl, Maybe (ImportListInterpretation, [LIE GhcPs])) }
@@ -1234,7 +1234,7 @@ importlist1 :: { OrdList (LIE GhcPs) }
 
 import  :: { OrdList (LIE GhcPs) }
         : qcname_ext export_subspec {% fmap (unitOL . reLoc . (sLL $1 $>)) $ mkModuleImp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
-        | 'module' modid            {% fmap (unitOL . reLoc) $ return (sLL $1 $> (IEModuleContents (Nothing, (epTok $1)) (fmap toHsModuleName $2))) }
+        | 'module' hsmodid          {% fmap (unitOL . reLoc) $ return (sLL $1 $> (IEModuleContents (Nothing, (epTok $1)) $2)) }
         | 'pattern' qcon            {% do { warnPatternNamespaceSpecifier (getLoc $1)
                                           ; return $ unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (epTok $1) $2)) Nothing } }
         | 'type' '..'               {% fmap (unitOL . reLoc) $ mkWholeTypeWcImpExp (comb2 $1 $>) Nothing (epTok $1) (epTok $2) }
@@ -4247,6 +4247,9 @@ close :: { () }
 
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)
+
+hsmodid :: { LocatedA HsModuleName }
+        : modid                 { fmap toHsModuleName $1 }
 
 modid   :: { LocatedA ModuleName }
         : CONID                 { sL1a $1 $ mkModuleNameFS (getCONID $1) }

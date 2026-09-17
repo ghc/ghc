@@ -2,6 +2,7 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -244,7 +245,7 @@ tcRnModule hsc_env mod_sum
 
     this_mod
       | Just (L _ mod) <- hsmodName this_module
-      = mkHomeModule home_unit mod
+      = mkHomeModule home_unit (hsModuleName mod)
 
       | otherwise   -- 'module M where' is omitted
       = mkHomeModule home_unit mAIN_NAME
@@ -263,7 +264,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                 (HsParsedModule {
                    hpm_module =
                       (L loc (HsModule (XModulePs _ _ mod_deprec maybe_doc_hdr)
-                                       maybe_mod export_ies import_decls local_decls)),
+                                       (fmap (fmap hsModuleName) -> maybe_mod) export_ies import_decls local_decls)),
                    hpm_src_files = src_files
                 })
                 this_mod
@@ -2159,8 +2160,8 @@ runTcInteractive tcm_plugin_handling hsc_env thing_inside
        ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
             case i of                   -- force above: see #15111
                 IIModule n -> getOrphansForModule n
-                IIDecl i   -> getOrphansForModuleName (unLoc (ideclName i))
-                                         (renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i))
+                IIDecl i   -> getOrphansForModuleName (hsModuleName (unLoc (ideclName i)))
+                                         (renameRawPkgQual (hsc_unit_env hsc_env) (hsModuleName $ unLoc $ ideclName i) (ideclPkgQual i))
 
 
        ; (home_insts, home_fam_insts) <- liftIO $ UnitEnv.hugAllInstances (hsc_unit_env hsc_env)
