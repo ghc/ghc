@@ -1,0 +1,46 @@
+==========================
+At point (13,21), we found:
+==========================
+┌
+│ $dTypeable at HieBuiltinInst.hs:1:1, of type: Typeable Thing
+│     is an evidence variable bound by a let, depending on: [Thing bound by Typeable]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+
+==========================
+At point (17,10), we found:
+==========================
+┌
+│ $dTypeable at HieBuiltinInst.hs:1:1, of type: Typeable Thing
+│     is an evidence variable bound by a let, depending on: []
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+
+==========================
+At point (23,20), we found:
+==========================
+┌
+│ $dDataToTag at HieBuiltinInst.hs:1:1, of type: DataToTag Foo
+│     is an evidence variable bound by a let, depending on: [C:DataToTag,
+│                                                            dataToTagSmall#]
+│           with scope: ModuleScope
+│           
+│     Defined at <no location info>
+└
+|
++- ┌
+|  │ C:DataToTag at HieBuiltinInst.hs:1:1, of type: forall a. (a -> Int#) -> DataToTag a
+|  │     is a usage of an external evidence variable
+|  │     Defined in `GHC.Internal.Magic'
+|  └
+|
+`- ┌
+   │ dataToTagSmall# at HieBuiltinInst.hs:1:1, of type: forall a. a -> Int#
+   │     is a usage of an external evidence variable
+   │     Defined in `GHC.Internal.Prim'
+   └
+

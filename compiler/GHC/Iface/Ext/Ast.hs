@@ -17,11 +17,14 @@ import GHC.Utils.Outputable(ppr)
 
 import GHC.Prelude hiding ( head, init, last, tail )
 
+import GHC.Builtin.KnownKeys      ( typeableClassKey, dataToTagClassKey )
+
 import GHC.Core.Class             ( className, classSCSelIds )
 import GHC.Core.ConLike           ( conLikeName )
 import GHC.Core.DataCon           ( dataConWrapperType )
-import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
-import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
+import GHC.Core.Type              ( Type, ForAllTyFlag(..), tcSplitTyConApp_maybe )
+import GHC.Core.TyCo.Rep          ( Type(..) )
+import GHC.Core.TyCon             ( TyCon (tyConUnique), tyConClass_maybe )
 import GHC.Core.InstEnv
 
 import GHC.Hs
@@ -38,7 +41,7 @@ import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTy
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
 import GHC.Types.SrcLoc
-import GHC.Types.Var              ( Id, Var, EvId, varName, varType, varUnique )
+import GHC.Types.Var              ( Id, Var, varName, varType, varUnique )
 import GHC.Types.Var.Env
 import GHC.Types.Var.FV
 
@@ -680,16 +683,16 @@ instance ToHie (Context (Located Name)) where
 instance ToHie (Context (Located (WithUserRdr Name))) where
   toHie (C c (L l (WithUserRdr _ n))) = toHie $ C c (L l n)
 
-hieEvIdsOfTerm :: EvTerm -> [EvId]
+hieEvIdsOfTerm :: EvTerm -> [Id]
 -- Returns only EvIds satisfying relevantEvId
-hieEvIdsOfTerm = runFVSelectiveList isId . evTermFVs
+hieEvIdsOfTerm = runFVSelectiveList (isId) . evTermFVs
 
 instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))
     = concatMapM go $ bagToList bs
     where
       go evbind = do
-          let evDeps = hieEvIdsOfTerm $ eb_rhs evbind
+          let evDeps = pprTraceIt "hieEvIdsOfTerm" $ hieEvIdsOfTerm $ pprTraceIt "eb_rhs" $ eb_rhs $ pprTraceIt "evbind" evbind
               depNames = EvBindDeps $ map classifyEvBindDep evDeps
           concatM $
             [ toHie (C (EvidenceVarBind (EvLetBind depNames) (combineScopes sc (mkScope span)) sp)
@@ -698,11 +701,29 @@ instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
             ]
   toHie _ = pure []
 
-classifyEvBindDep :: EvId -> EvBindDep
+classifyEvBindDep :: Id -> EvBindDep
 classifyEvBindDep evId =
-  case idDetails evId of
-    RecSelId{sel_tycon} -> RecordField (varName evId) (recSelParentName sel_tycon)
-    _ -> EvidenceVar (varName evId)
+  fromMaybe (EvidenceVar (varName evId)) $ do
+    case idDetails evId of
+      RecSelId{sel_tycon} -> Just $ RecordField (varName evId) (recSelParentName sel_tycon)
+      _ -> isBuiltinTyClass
+  where
+    isBuiltinTyClass =
+      case tcSplitTyConApp_maybe $ varType evId of
+        Just (ty, args)
+          | tyConUnique ty == typeableClassKey  -> typeableEv  args
+          | tyConUnique ty == dataToTagClassKey -> dataToTagEv args
+        _ -> Nothing
+
+    -- C:Typeable @(*) @Foo $tcFoo ([] @SomeTypeRep))
+    typeableEv = \ case
+      [_kindRep, TyConApp tyCon _] -> Just (TypeableEvidence $ getName tyCon)
+      _ -> Nothing
+
+    -- C:DataToTag @Lifted @Foo (dataToTagSmall# @Lifted @Foo)
+    dataToTagEv = \ case
+      [_kindRep, TyConApp tyCon _] -> Just (DataToTagEvidence $ getName tyCon)
+      _ -> Nothing
 
 instance ToHie (LocatedA HsWrapper) where
   toHie (L osp wrap)
