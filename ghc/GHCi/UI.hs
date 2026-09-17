@@ -1615,7 +1615,7 @@ runStmt input step = do
            m_result <- GhciMonad.runStmt stmt input step
            case m_result of
                Nothing     -> return Nothing
-               Just result -> Just <$> afterRunStmt step (RunStmtResult result)
+               Just result -> Just <$> afterRunStmt (RunStmtResult result)
 
     -- `x = y` (a declaration) should be treated as `let x = y` (a statement).
     -- The reason is because GHCi wasn't designed to support `x = y`, but then
@@ -1647,7 +1647,7 @@ runStmt input step = do
       _ <- liftIO $ tryIO $ hFlushAll stdin
       m_result <- GhciMonad.runDecls' decls
       forM m_result $ \result -> do
-        afterRunStmt step (RunDeclsResult result)
+        afterRunStmt (RunDeclsResult result)
 
     mk_stmt :: SrcSpan -> HsBind GhcPs -> GhciLStmt GhcPs
     mk_stmt loc bind =
@@ -1668,10 +1668,9 @@ data RunResult
   | RunDeclsResult [TyThing]
 
 -- | Clean up the GHCi environment after a statement has run
-afterRunStmt :: GhciMonad m => SingleStep {-^ Type of step we took just before -}
-             -> RunResult -> m RunResult
-afterRunStmt step run_result = do
-  resumes <- GHC.getResumeContext
+afterRunStmt :: GhciMonad m
+             => RunResult -> m RunResult
+afterRunStmt run_result = do
   case run_result of
     RunDeclsResult things -> do
       show_types <- isOptionSet ShowType
@@ -1682,20 +1681,15 @@ afterRunStmt step run_result = do
         Right ids -> do
           show_types <- isOptionSet ShowType
           when show_types $ printTypeOfIds ids
-    RunStmtResult (GHC.ExecBreak ids mb_info)
-        | first_resume : _ <- resumes
-        -> do mb_id_loc <- toBreakIdAndLocation mb_info
-              let bCmd = maybe "" ( \(_,l) -> onBreakCmd l ) mb_id_loc
-              if (null bCmd)
-                then printStoppedAtBreakInfo first_resume ids
-                else enqueueCommands [bCmd]
-              -- run the command set with ":set stop <cmd>"
-              st <- getGHCiState
-              enqueueCommands [stop st]
-              return ()
-
-        | otherwise -> resume step Nothing >>=
-                       afterRunStmt step . RunStmtResult >> return ()
+    RunStmtResult (GHC.ExecBreak ids mb_info resume) -> do
+      mb_id_loc <- toBreakIdAndLocation mb_info
+      let bCmd = maybe "" ( \(_,l) -> onBreakCmd l ) mb_id_loc
+      if (null bCmd)
+        then printStoppedAtBreakInfo resume ids
+        else enqueueCommands [bCmd]
+      -- run the command set with ":set stop <cmd>"
+      st <- getGHCiState
+      enqueueCommands [stop st]
 
   flushInterpBuffers
   withSignalHandlers $ do
@@ -4394,7 +4388,7 @@ doContinue step = doContinue' step Nothing
 doContinue' :: GhciMonad m => SingleStep -> Maybe Int -> m ()
 doContinue' step mbCnt= do
   runResult <- resume step mbCnt
-  _ <- afterRunStmt step (RunStmtResult runResult)
+  _ <- afterRunStmt (RunStmtResult runResult)
   return ()
 
 abandonCmd :: GhciMonad m => String -> m ()
