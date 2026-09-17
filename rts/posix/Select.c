@@ -74,14 +74,14 @@ void initCapabilityIOManagerSelect(CapIOManager *iomgr)
 #endif
 }
 
-void freeCapabilityIOManagerSelect(CapIOManager *iomgr)
+void freeCapabilityIOManagerSelect(CapIOManager *iomgr USED_IF_PREEMPTION)
 {
 #if defined(HAVE_PREEMPTION)
     closeFdWakeup(iomgr->interrupt_fd_r, iomgr->interrupt_fd_w);
 #endif
 }
 
-void interruptIOManagerSelect(CapIOManager *iomgr)
+void interruptIOManagerSelect(CapIOManager *iomgr USED_IF_PREEMPTION)
 {
 #if defined(HAVE_PREEMPTION)
     sendFdWakeup(iomgr->interrupt_fd_w);
