@@ -1,0 +1,15 @@
+section: ghc-lib
+synopsis: The GHCi evaluation API now returns ``Id``\s and ``TyThing``\s rather than ``Name``\s
+issues: #28052
+mrs: !16883
+
+description: {
+The results of interactive evaluation are now returned directly, rather than as
+``Name``\s that had to be looked up again in the interactive context:
+
+- ``ExecComplete``'s ``execResult`` and ``ExecBreak``'s ``breakNames`` now hold ``[Id]``.
+- ``runDecls``, ``runDeclsWithLocation`` and ``runParsedDecls`` now return ``[TyThing]`` rather than ``[Name]``.
+- ``rttiEnvironment`` now returns a Subst with the inferred types.
+
+The returned ``Id``\s carry the types refined by runtime type inference.
+}

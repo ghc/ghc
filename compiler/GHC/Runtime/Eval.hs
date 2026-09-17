@@ -131,7 +131,7 @@ import GHC.ByteCode.Breakpoints
 import Control.Monad
 import Data.Dynamic
 import Data.IntMap (IntMap)
-import Data.List (find,intercalate)
+import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty)
 import Unsafe.Coerce ( unsafeCoerce )
 import qualified GHC.Unit.Home.Graph as HUG
@@ -241,12 +241,12 @@ execStmt' stmt stmt_text ExecOptions{..} = do
         handleRunStatus execSingleStep stmt_text bindings ids
                         status (emptyHistory size)
 
-runDecls :: GhcMonad m => String -> m [Name]
+runDecls :: GhcMonad m => String -> m [TyThing]
 runDecls = runDeclsWithLocation "<interactive>" 1
 
 -- | Run some declarations and return any user-visible names that were brought
 -- into scope.
-runDeclsWithLocation :: GhcMonad m => String -> Int -> String -> m [Name]
+runDeclsWithLocation :: GhcMonad m => String -> Int -> String -> m [TyThing]
 runDeclsWithLocation source line_num input = do
     hsc_env <- getSession
     decls <- liftIO (hscParseDeclsWithLocation hsc_env source line_num input)
@@ -255,18 +255,18 @@ runDeclsWithLocation source line_num input = do
 -- | Like `runDeclsWithLocation`, but takes parsed declarations as argument.
 -- Useful when doing preprocessing on the AST before execution, e.g. in GHCi
 -- (see GHCi.UI.runStmt).
-runParsedDecls :: GhcMonad m => [LHsDecl GhcPs] -> m [Name]
+runParsedDecls :: GhcMonad m => [LHsDecl GhcPs] -> m [TyThing]
 runParsedDecls decls = do
-    hsc_env <- getSession
-    (tyThings, ic) <- liftIO (hscParsedDecls hsc_env decls)
-
+    hsc_env        <- getSession
+    (tyThings, ic) <- liftIO $ hscParsedDecls hsc_env decls
     setSession $ hsc_env { hsc_IC = ic }
     hsc_env <- getSession
-    hsc_env' <- liftIO $ rttiEnvironment hsc_env
+    (hsc_env', subst) <- liftIO $ rttiEnvironment hsc_env
     setSession hsc_env'
-    return $ filter (not . isDerivedOccName . nameOccName)
+    return $ map (substInteractiveTyThing subst)
+           $ filter (not . isDerivedOccName . nameOccName . getName)
              -- For this filter, see Note [What to show to users]
-           $ map getName tyThings
+           $ tyThings
 
 {- Note [What to show to users]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -310,9 +310,10 @@ handleRunStatus step expr bindings final_ids status history0 = do
         final_ic = extendInteractiveContextWithIds (hsc_IC hsc_env) final_ids
         final_names = map getName final_ids
       liftIO $ Loader.extendLoadedEnv interp modifyHomePackageBytecodeState (zip final_names hvals)
-      hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
+      (hsc_env', subst) <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
+      let improved_final_ids = map (substInteractiveId subst) final_ids
       setSession hsc_env'
-      return (ExecComplete (Right final_names) allocs)
+      return (ExecComplete (Right improved_final_ids) allocs)
 
     -- Completed with an exception
     EvalComplete alloc (EvalException e) ->
@@ -323,7 +324,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
       apStack_fhv     <- liftIO $ mkFinalizedHValue interp apStack_ref
       let span = mkGeneralSrcSpan (fsLit "<unknown>")
-      (hsc_env1, names) <- liftIO $
+      (hsc_env1, break_ids) <- liftIO $
         bindLocalsAtBreakpoint hsc_env apStack_fhv span Nothing
       let
         resume = Resume
@@ -342,7 +343,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
         hsc_env2 = pushResume hsc_env1 resume
 
       setSession hsc_env2
-      return (ExecBreak names Nothing)
+      return (ExecBreak break_ids Nothing)
 
     -- EvalBreak (Just ...) case: the interpreter stopped at a breakpoint
     --
@@ -370,7 +371,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
         -- This function only returns control to ghci with 'ExecBreak' when it is really meant to break.
         -- Specifically, for :steplocal or :stepmodule, don't return control
         -- and simply resume execution from here until we hit a breakpoint we do want to stop at.
-        (hsc_env1, names) <- liftIO $
+        (hsc_env1, break_ids) <- liftIO $
           bindLocalsAtBreakpoint hsc_env apStack_fhv span (Just ibi)
         let
           resume = Resume
@@ -388,7 +389,7 @@ handleRunStatus step expr bindings final_ids status history0 = do
             }
           hsc_env2 = pushResume hsc_env1 resume
         setSession hsc_env2
-        return (ExecBreak names (Just ibi))
+        return (ExecBreak break_ids (Just ibi))
       else do
         -- resume with the same step type
         let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
@@ -491,13 +492,13 @@ getBreakArray interp InternalBreakpointId{ibi_info_mod} imbs = do
           ( ld_st'
           , ba
           )
-back :: GhcMonad m => Int -> m ([Name], Int, SrcSpan)
+back :: GhcMonad m => Int -> m ([Id], Int, SrcSpan)
 back n = moveHist (+n)
 
-forward :: GhcMonad m => Int -> m ([Name], Int, SrcSpan)
+forward :: GhcMonad m => Int -> m ([Id], Int, SrcSpan)
 forward n = moveHist (subtract n)
 
-moveHist :: GhcMonad m => (Int -> Int) -> m ([Name], Int, SrcSpan)
+moveHist :: GhcMonad m => (Int -> Int) -> m ([Id], Int, SrcSpan)
 moveHist fn = do
   hsc_env <- getSession
   case ic_resume (hsc_IC hsc_env) of
@@ -521,7 +522,7 @@ moveHist fn = do
                         let hug = hsc_HUG hsc_env
                         brks <- readIModBreaks hug ibi
                         getBreakLoc (readIModModBreaks hug) ibi brks
-            (hsc_env1, names) <-
+            (hsc_env1, final_ids) <-
               liftIO $ bindLocalsAtBreakpoint hsc_env apStack span mb_info
             let ic = hsc_IC hsc_env1
                 r' = r { resumeHistoryIx = new_ix }
@@ -529,7 +530,7 @@ moveHist fn = do
 
             setSession hsc_env1{ hsc_IC = ic' }
 
-            return (names, new_ix, span)
+            return (final_ids, new_ix, span)
 
         -- careful: we want apStack to be the AP_STACK itself, not a thunk
         -- around it, hence the cases are carefully constructed below to
@@ -555,7 +556,7 @@ bindLocalsAtBreakpoint
         -> ForeignHValue
         -> SrcSpan
         -> Maybe InternalBreakpointId
-        -> IO (HscEnv, [Name])
+        -> IO (HscEnv, [Id])
 
 -- Nothing case: we stopped when an exception was raised, not at a
 -- breakpoint.  We have no location information or local variables to
@@ -575,7 +576,7 @@ bindLocalsAtBreakpoint hsc_env apStack span Nothing = do
        interp = hscInterp hsc_env
    --
    Loader.extendLoadedEnv interp modifyHomePackageBytecodeState [(exn_name, apStack)]
-   return (hsc_env{ hsc_IC = ictxt1 }, [exn_name])
+   return (hsc_env{ hsc_IC = ictxt1 }, [exn_id])
 
 -- Just case: we stopped at a breakpoint, we have information about the location
 -- of the breakpoint and the free variables of the expression.
@@ -635,8 +636,9 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv span (Just ibi) = do
    let fhvs = catMaybes mb_hValues
    Loader.extendLoadedEnv interp modifyHomePackageBytecodeState (zip names fhvs)
    when result_ok $ Loader.extendLoadedEnv interp modifyHomePackageBytecodeState [(result_name, apStack_fhv)]
-   hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
-   return (hsc_env1, if result_ok then result_name:names else names)
+   (hsc_env1, subst) <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
+   let improved_final_ids = map (substInteractiveId subst) final_ids
+   return (hsc_env1, improved_final_ids)
   where
         -- We need a fresh Unique for each Id we bind, because the linker
         -- state is single-threaded and otherwise we'd spam old bindings
@@ -676,34 +678,33 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv span (Just ibi) = do
        joinOccs = zipWithEqual joinOcc
        joinOcc mbV oc = (\(a,b) c -> (a,b,c)) <$> mbV <*> pure oc
 
-rttiEnvironment :: HscEnv -> IO HscEnv
+rttiEnvironment :: HscEnv -> IO (HscEnv, Subst)
 rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
    let tmp_ids = [id | AnId id <- ic_tythings ic]
        incompletelyTypedIds =
            [id | id <- tmp_ids
                , not $ noSkolems id
                , (occNameFS.nameOccName.idName) id /= result_fs]
-   foldM improveTypes hsc_env (map idName incompletelyTypedIds)
+   foldM improveTypes (hsc_env, emptySubst) incompletelyTypedIds
     where
      noSkolems = noFreeVarsOfType . idType
-     improveTypes hsc_env@HscEnv{hsc_IC=ic} name = do
-      let tmp_ids = [id | AnId id <- ic_tythings ic]
-          id = expectJust $ find (\i -> idName i == name) tmp_ids
+     improveTypes (hsc_env@HscEnv{hsc_IC=ic}, last_subst) id0 = do
+      let id = substInteractiveId last_subst id0
       if noSkolems id
-         then return hsc_env
+         then return (hsc_env, last_subst)
          else do
            mb_new_ty <- reconstructType hsc_env 10 id
            let old_ty = idType id
            case mb_new_ty of
-             Nothing -> return hsc_env
+             Nothing -> return (hsc_env, last_subst)
              Just new_ty -> do
-              case improveRTTIType hsc_env old_ty new_ty of
+              case improveRTTIType old_ty new_ty of
                Nothing -> warnPprTrace True (":print failed to calculate the "
                                              ++ "improvement for a type")
                               (vcat [ text "id" <+> ppr id
                                     , text "old_ty" <+> debugPprType old_ty
                                     , text "new_ty" <+> debugPprType new_ty ]) $
-                          return hsc_env
+                          return (hsc_env, last_subst)
                Just subst -> do
                  let logger = hsc_logger hsc_env
                  putDumpFileMaybe logger Opt_D_dump_rtti "RTTI"
@@ -712,7 +713,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                           ppr subst])
 
                  let ic' = substInteractiveContext ic subst
-                 return hsc_env{hsc_IC=ic'}
+                 return (hsc_env{hsc_IC=ic'}, subst `composeTCvSubst` last_subst)
 
 pushResume :: HscEnv -> Resume -> HscEnv
 pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
