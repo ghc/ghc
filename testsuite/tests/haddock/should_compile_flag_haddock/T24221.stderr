@@ -38,7 +38,7 @@
      []
      (EpaComments
       []))
-    {ModuleName: T24221}))
+    {HsModuleName: T24221}))
   (Nothing)
   []
   [(L

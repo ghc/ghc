@@ -2750,7 +2750,7 @@
        []
        (EpaComments
         []))
-      {ModuleName: Prelude})
+      {HsModuleName: Prelude})
      (NoPkgQual)
      (NotBoot)
      (NotLevelled)
@@ -2789,7 +2789,7 @@
        []
        (EpaComments
         []))
-      {ModuleName: GHC.Essentials})
+      {HsModuleName: GHC.Essentials})
      (NoPkgQual)
      (NotBoot)
      (NotLevelled)
@@ -2828,7 +2828,7 @@
        []
        (EpaComments
         []))
-      {ModuleName: Data.Kind})
+      {HsModuleName: Data.Kind})
      (NoPkgQual)
      (NotBoot)
      (NotLevelled)
@@ -2867,7 +2867,7 @@
        []
        (EpaComments
         []))
-      {ModuleName: Data.Kind})
+      {HsModuleName: Data.Kind})
      (NoPkgQual)
      (NotBoot)
      (NotLevelled)

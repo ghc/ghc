@@ -286,7 +286,7 @@
        []
        (EpaComments
         []))
-      {ModuleName: Prelude})
+      {HsModuleName: Prelude})
      (NoPkgQual)
      (NotBoot)
      (NotLevelled)
@@ -325,7 +325,7 @@
        []
        (EpaComments
         []))
-      {ModuleName: GHC.Essentials})
+      {HsModuleName: GHC.Essentials})
      (NoPkgQual)
      (NotBoot)
      (NotLevelled)

@@ -57,7 +57,7 @@
      []
      (EpaComments
       []))
-    {ModuleName: AnnotationNoListTuplePuns}))
+    {HsModuleName: AnnotationNoListTuplePuns}))
   (Nothing)
   []
   [(L
@@ -254,7 +254,7 @@
      []
      (EpaComments
       []))
-    {ModuleName: AnnotationNoListTuplePuns}))
+    {HsModuleName: AnnotationNoListTuplePuns}))
   (Nothing)
   []
   [(L

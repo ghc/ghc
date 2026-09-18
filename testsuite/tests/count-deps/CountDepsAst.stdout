@@ -1,16 +1,4 @@
 Found Language.Haskell.Syntax module dependencies
-GHC.Data.FastMutInt
-GHC.Data.FastString
-GHC.Data.List
-GHC.Data.List.NonEmpty
-GHC.Prelude.Basic
-GHC.Settings.Config
-GHC.Utils.Constants
-GHC.Utils.Exception
-GHC.Utils.Fingerprint
-GHC.Utils.IO.Unsafe
-GHC.Utils.Misc
-GHC.Utils.Panic.Plain
 Language.Haskell.Syntax
 Language.Haskell.Syntax.Basic
 Language.Haskell.Syntax.Binds
@@ -25,7 +13,6 @@ Language.Haskell.Syntax.Extension
 Language.Haskell.Syntax.ImpExp
 Language.Haskell.Syntax.ImpExp.IsBoot
 Language.Haskell.Syntax.Lit
-Language.Haskell.Syntax.Module.Name
 Language.Haskell.Syntax.Pat
 Language.Haskell.Syntax.Specificity
 Language.Haskell.Syntax.Text

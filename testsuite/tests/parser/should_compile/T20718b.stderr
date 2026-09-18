@@ -65,7 +65,7 @@
      []
      (EpaComments
       []))
-    {ModuleName: T20718b}))
+    {HsModuleName: T20718b}))
   (Nothing)
   []
   []))
