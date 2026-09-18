@@ -139,10 +139,6 @@ workflow:
   tags:
     - lint-anyarch
   image: debian:13
-  before_script:
-    # Allow Git to read from the runner-owned checkout. This is needed
-    # for example by the lint-author job.
-    - git config --global --add safe.directory "$CI_PROJECT_DIR"
   rules:
     - *drafts-can-fail-lint
     - when: always
@@ -153,6 +149,9 @@ workflow:
   before_script:
     - apt update
     - apt install -qy ghc cabal-install build-essential curl libffi-dev libffi8 libgmp-dev libgmp10 libncurses-dev libncurses6 libtinfo6 pkg-config python3 cmake git happy alex autoconf automake python3 libgmp-dev libnuma-dev libncurses-dev
+    # Allow Git to read from the runner-owned checkout. This is needed
+    # for example by the lint-author job.
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
 
 # linting but we need python
 .lint-python:
@@ -160,6 +159,9 @@ workflow:
   before_script:
     apt update
     apt install -qy python3 mypy shellcheck
+    # Allow Git to read from the runner-owned checkout. This is needed
+    # for example by the lint-author job.
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
 
 .nightly: &nightly
   variables:
