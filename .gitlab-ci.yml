@@ -162,7 +162,7 @@ workflow:
   extends: .lint
   before_script:
     - apt update
-    - apt install -qy python3 mypy shellcheck
+    - apt install -qy python3 mypy shellcheck git
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
 
 .nightly: &nightly
