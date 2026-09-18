@@ -143,12 +143,15 @@ workflow:
     - *drafts-can-fail-lint
     - when: always
 
+.install-deps: &install-ghc-toolchain
+  - apt update
+  - apt install -qy ghc cabal-install build-essential curl libffi-dev libffi8 libgmp-dev libgmp10 libncurses-dev libncurses6 libtinfo6 pkg-config python3 cmake git happy alex autoconf automake python3 libgmp-dev libnuma-dev libncurses-dev
+
 # linting but we need a boot toolchain
 .lint-ghc-toolchain:
   extends: .lint
   before_script:
-    - apt update
-    - apt install -qy ghc cabal-install build-essential curl libffi-dev libffi8 libgmp-dev libgmp10 libncurses-dev libncurses6 libtinfo6 pkg-config python3 cmake git happy alex autoconf automake python3 libgmp-dev libnuma-dev libncurses-dev
+    - *install-ghc-toolchain
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
 
 # linting but we need python
@@ -416,8 +419,9 @@ lint-submods-branch:
 
 .lint-params:
   needs: []
-  extends: .lint-ghc-toolchain
+  extends: .lint
   before_script:
+    - *install-ghc-toolchain
     - .gitlab/ci.sh setup
   after_script:
     - .gitlab/ci.sh save_cache
