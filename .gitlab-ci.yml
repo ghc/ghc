@@ -277,10 +277,6 @@ lint-changelog:
     CHANGELOG_EXPECT_MR: "$CI_MERGE_REQUEST_IID"
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
-  before_script:
-    - export PATH="/opt/toolchain/bin:$PATH"
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
     - .gitlab/ci.sh lint_changelog
   dependencies: []
@@ -296,9 +292,6 @@ lint-linters:
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
     - mypy testsuite/tests/linters/regex-linters/*.py
   dependencies: []
@@ -309,9 +302,6 @@ lint-testsuite:
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
     - make -Ctestsuite list_broken TEST_HC=$GHC
   dependencies: []
@@ -323,8 +313,6 @@ typecheck-testsuite:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
   before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
     - mypy testsuite/driver/runtests.py
   dependencies: []
@@ -353,9 +341,6 @@ lint-author:
   extends: .lint
   variables:
     GIT_SUBMODULE_STRATEGY: none
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
@@ -435,9 +420,6 @@ lint-submods-branch:
   needs: []
   extends: .lint-ghc-toolchain
   before_script:
-    - export PATH="/opt/toolchain/bin:$PATH"
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
     - .gitlab/ci.sh setup
   after_script:
     - .gitlab/ci.sh save_cache
@@ -460,9 +442,6 @@ hadrian-ghc-in-ghci:
     - job: lint-linters
     - job: lint-submods
       optional: true
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   variables:
     GHC_FLAGS: -Werror -Wwarn=unused-imports
   script:
@@ -498,9 +477,6 @@ hadrian-multi:
       optional: true
   dependencies: null
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   variables:
     GHC_FLAGS: "-Werror=-Wno-error=incomplete-record-selectors -Wwarn=deprecations -Wwarn=unused-imports"
        # -Wno-error=incomplete-record-selectors is present because -Wall now
@@ -1060,9 +1036,6 @@ perf:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   tags:
     - x86_64-linux-perf
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
     - root=$(pwd)/ghc
     - |
