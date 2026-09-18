@@ -270,7 +270,7 @@ ghc-linters:
 # Skipped if the MR has the ~"no-changelog" label.
 lint-changelog:
   stage: tool-lint
-  extends: .lint
+  extends: .lint-ghc-toolchain
   variables:
     CHANGELOG_EXPECT_MR: "$CI_MERGE_REQUEST_IID"
     GIT_DEPTH: 1
@@ -286,7 +286,7 @@ lint-changelog:
 
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
-  extends: .lint
+  extends: .lint-python
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
@@ -296,7 +296,7 @@ lint-linters:
 
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
-  extends: .lint
+  extends: .lint-ghc-toolchain
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
@@ -306,7 +306,7 @@ lint-testsuite:
 
 # Run mypy Python typechecker on testsuite driver
 typecheck-testsuite:
-  extends: .lint
+  extends: .lint-python
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
@@ -336,7 +336,7 @@ typecheck-testsuite:
 # Check that commits in an MR were not authored with the identity that CI uses
 # when it needs to create commits itself. This only needs Git history.
 lint-author:
-  extends: .lint
+  extends: .lint-ghc-toolchain
   variables:
     GIT_SUBMODULE_STRATEGY: none
   script:
