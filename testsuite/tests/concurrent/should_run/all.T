@@ -314,7 +314,6 @@ test('T21969e',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
        run_timeout_multiplier(0.3),
-       expect_broken(21969),
      ],
      compile_and_run, [''])
 

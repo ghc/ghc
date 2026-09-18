@@ -529,31 +529,64 @@ onFdEvent mgr fd evs
             savedEls = eventsOf saved
             allEls = eventsOf fdds
 
+            rearm =
+              case I.elLifetime allEls of
+                -- we previously armed the fd for multiple shots, no need to rearm
+                MultiShot | allEls == savedEls ->
+                  return ()
+
+                -- either we previously registered for one shot or the
+                -- events of interest have changed, we must re-arm
+                _ ->
+                  case I.elLifetime savedEls of
+                    OneShot | haveOneShot ->
+                      -- if there are no saved events and we registered with one-shot
+                      -- semantics then there is no need to re-arm
+                      unless (OneShot == I.elLifetime allEls
+                        && mempty == I.elEvent savedEls) $
+                          void $ I.modifyFdOnce (emBackend mgr) fd (I.elEvent savedEls)
+                    _ ->
+                      -- we need to re-arm with multi-shot semantics
+                      void $ I.modifyFd (emBackend mgr) fd
+                                        (I.elEvent allEls) (I.elEvent savedEls)
+
         -- Reinsert multishot registrations.
         -- We deleted the table entry for this fd above so we there isn't a preexisting entry
         _ <- IT.insertWith (\_ _ -> saved) (fromIntegral fd) saved tbl
 
-        case I.elLifetime allEls of
-          -- we previously armed the fd for multiple shots, no need to rearm
-          MultiShot | allEls == savedEls ->
-            return ()
+        rearmed <- (rearm >> return True) `catch` rearmFailed
+        if rearmed
+          then return triggered
+          else do
+            -- See Note [Backend errors while re-arming]
+            _ <- IT.delete (fromIntegral fd) tbl
+            return fdds
 
-          -- either we previously registered for one shot or the
-          -- events of interest have changed, we must re-arm
-          _ ->
-            case I.elLifetime savedEls of
-              OneShot | haveOneShot ->
-                -- if there are no saved events and we registered with one-shot
-                -- semantics then there is no need to re-arm
-                unless (OneShot == I.elLifetime allEls
-                  && mempty == I.elEvent savedEls) $
-                    void $ I.modifyFdOnce (emBackend mgr) fd (I.elEvent savedEls)
-              _ ->
-                -- we need to re-arm with multi-shot semantics
-                void $ I.modifyFd (emBackend mgr) fd
-                                  (I.elEvent allEls) (I.elEvent savedEls)
+    -- As in 'dropBackendRegistration', only what the backend reports, so
+    -- that an asynchronous exception aimed at the poll loop still gets
+    -- through.
+    rearmFailed :: IOException -> IO Bool
+    rearmFailed _ = return False
 
-        return triggered
+{- Note [Backend errors while re-arming]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+After dispatching an event, 'selectCallbacks' re-arms the fd for the
+registrations that were not triggered.  That call goes to the polling backend,
+which reports failures by throwing -- EBADF, for instance, once the fd has been
+closed without going through 'GHC.Internal.Event.Thread.closeFdWith'.
+
+The exception must not escape.  It would travel out of 'onFdEvent', out of the
+callback passed to 'I.poll', and out of 'step', where 'loop' turns it into
+'cleanup mgr': the 'EventManager' for that capability is shut down and every
+thread still waiting on it is left blocked forever.  One unusable fd would take
+the whole capability's IO with it.
+
+So a failure is handled the way 'registerFd_' handles one (see #21969): assume
+the registrations are not in the backend, take them back out of the callback
+table, and return them so that their callbacks run.  The waiting threads then
+wake up and find out for themselves -- typically from the very next read or
+write on the fd -- instead of hanging.
+-}
 
 nullToNothing :: [a] -> Maybe [a]
 nullToNothing []       = Nothing
