@@ -29,7 +29,9 @@ import GHC.Internal.Types ()
 -- TODO: Use new Windows I/O manager
 import qualified GHC.Internal.Stack.Types as Rebindable
 import GHC.Internal.Base
-import GHC.Internal.Control.Exception (finally)
+import GHC.Internal.Control.Exception (ErrorCall, IOException, SomeException,
+                                       catch, throwIO, try)
+import GHC.Internal.Data.Either (Either(..))
 import GHC.Internal.Data.Foldable (forM_, mapM_, sequence_)
 import GHC.Internal.Data.IORef (IORef, newIORef, readIORef, writeIORef, atomicWriteIORef)
 import GHC.Internal.Data.Maybe (fromMaybe)
@@ -38,7 +40,7 @@ import GHC.Internal.Err (error)
 import GHC.Internal.Foreign.C.Error (eBADF, errnoToIOError)
 import GHC.Internal.Foreign.C.Types (CInt(..), CUInt(..))
 import GHC.Internal.Foreign.Ptr (Ptr)
-import GHC.Internal.List (zipWith, zipWith3)
+import GHC.Internal.List (zipWith)
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.STM (TVar, atomically, newTVar, writeTVar, newTVarIO, readTVar, retry, throwSTM, STM)
 import GHC.Internal.Conc.Sync (ThreadId, ThreadStatus(..), forkIO,
@@ -131,9 +133,8 @@ threadWaitWrite = threadWait evtWrite
 closeFdWith :: (Fd -> IO ())        -- ^ Action that performs the close.
             -> Fd                   -- ^ File descriptor to close.
             -> IO ()
-closeFdWith close fd = close_loop
+closeFdWith close fd = mask_ close_loop
   where
-    finish mgr table cbApp = putMVar (M.callbackTableVar mgr fd) table >> cbApp
     zipWithM f xs ys = sequence (zipWith f xs ys)
       -- The array inside 'eventManager' can be swapped out at any time, see
       -- 'ioManagerCapabilitiesChanged'. See #21651. We detect this case by
@@ -146,29 +147,71 @@ closeFdWith close fd = close_loop
         Just (_,!mgr) <- readIOArray eventManagerArray i
         return mgr
 
-      -- 'takeMVar', and 'M.closeFd_' might block, although for a very short time.
-      -- To make 'closeFdWith' safe in presence of asynchronous exceptions we have
-      -- to use uninterruptible mask.
+      -- 'takeMVar', 'M.closeFd_' and 'close' might block, although for a very
+      -- short time.  They run under an uninterruptible mask so that the
+      -- callback tables cannot be left half updated.  The callbacks themselves
+      -- do not: see Note [closeFdWith and asynchronous exceptions].
       join $ uninterruptibleMask_ $ do
         tables <- flip mapM mgrs $ \mgr -> takeMVar $ M.callbackTableVar mgr fd
-        new_ema_bounds <- boundsIOArray `fmap` readIORef eventManager
-        -- Here we exploit Note [The eventManager Array]
-        if new_ema_bounds /= ema_bounds
-          then do
-            -- the array has been modified.
-            -- mgrs still holds the right EventManagers, by the Note.
-            -- new_ema_bounds must be larger than ema_bounds, by the note.
-            -- return the MVars we took and try again
-            sequence_ $ zipWith (\mgr table -> finish mgr table (pure ())) mgrs tables
-            pure close_loop
-          else do
-            -- We surely have taken all the appropriate MVars. Even if the array
-            -- has been swapped, our mgrs is still correct.
-            -- Remove the Fd from all callback tables, close the Fd, and run all
-            -- callbacks.
-            cbApps <- zipWithM (\mgr table -> M.closeFd_ mgr table fd) mgrs tables
-            close fd `finally` sequence_ (zipWith3 finish mgrs tables cbApps)
-            pure (pure ())
+        let putTablesBack = sequence_ $
+              zipWith (\mgr table -> putMVar (M.callbackTableVar mgr fd) table)
+                      mgrs tables
+        -- Whatever happens below, the callback tables have to go back.
+        -- See Note [closeFdWith and asynchronous exceptions].
+        next <- flip onException putTablesBack $ do
+          new_ema_bounds <- boundsIOArray `fmap` readIORef eventManager
+          -- Here we exploit Note [The eventManager Array]
+          if new_ema_bounds /= ema_bounds
+            then
+              -- the array has been modified.
+              -- mgrs still holds the right EventManagers, by the Note.
+              -- new_ema_bounds must be larger than ema_bounds, by the note.
+              -- return the MVars we took and try again
+              pure close_loop
+            else do
+              -- We surely have taken all the appropriate MVars. Even if the array
+              -- has been swapped, our mgrs is still correct.
+              -- Remove the Fd from all callback tables and close the Fd.  The
+              -- callbacks are handed to 'join' instead of being run here, so
+              -- that they run once the tables are back and asynchronous
+              -- exceptions are only interruptibly masked.
+              cbApps <- zipWithM (\mgr table -> M.closeFd_ mgr table fd) mgrs tables
+              res <- try (close fd)
+              pure (sequence_ cbApps >> rethrow res)
+        putTablesBack
+        pure next
+
+    -- 'close' may fail, but the callbacks still have to run: 'M.closeFd_' has
+    -- already dropped the registrations, so skipping them would strand every
+    -- thread waiting on the fd.
+    rethrow :: Either SomeException () -> IO ()
+    rethrow (Left e)   = throwIO e
+    rethrow (Right ()) = return ()
+
+{- Note [closeFdWith and asynchronous exceptions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'closeFdWith' has to take the 'callbackTableVar' of every 'EventManager' and
+hold them across the 'close', so that no thread can register the fd in a
+backend between us dropping the registrations and the fd actually going away.
+Two things must not go wrong while it does so.
+
+Firstly, the tables must always be put back.  'M.closeFd_' calls into the
+polling backend, which reports errors such as EBADF and ENOENT by throwing
+('epollControl' in GHC.Internal.Event.EPoll, 'kqueueControl' in
+GHC.Internal.Event.KQueue), and 'close' is arbitrary user code.  An escaping
+exception used to leave those MVars empty for good, which wedges every fd in
+the same bucket of 'emFds' -- one bucket per 32 fds -- for the rest of the
+program.  Worse, a later 'closeFdWith' on such an fd then blocks on 'takeMVar'
+*inside* 'uninterruptibleMask_', so that thread can no longer be killed at all.
+
+Secondly, the callbacks are arbitrary user code registered through
+'GHC.Internal.Event.Manager.registerFd' and may block.  Running them under
+'uninterruptibleMask_' therefore has the same effect: the thread calling
+'closeFdWith' becomes unkillable.  They are returned to the 'join' instead, so
+they run under the ordinary 'mask_' around 'close_loop'.  That still prevents
+them from being skipped at a non-blocking point, while leaving a callback that
+does block interruptible.
+-}
 
 -- | Wait for an event on a file descriptor.
 --
@@ -179,10 +222,34 @@ threadWait evt fd = mask_ $ do
   m <- newEmptyMVar
   mgr <- getSystemEventManager_
   reg <- registerFd mgr (\_ e -> putMVar m e) fd evt M.OneShot
-  evt' <- takeMVar m `onException` unregisterFd_ mgr reg
+  evt' <- takeMVar m `onException` quietUnregisterFd mgr reg
   if evt' `eventIs` evtClose
     then ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
     else return ()
+
+-- | Drop a registration, ignoring failures reported by the polling backend.
+--
+-- This is the cleanup of 'threadWait', so it runs inside the handler for the
+-- asynchronous exception that interrupted 'takeMVar'.  'unregisterFd_' calls
+-- into the backend, which throws on errors such as EBADF and ENOENT, and that
+-- exception would take the place of the one being delivered: 'killThread'
+-- would return while 'ThreadKilled' never reached the thread, and 'timeout'
+-- would no longer recognise its own exception.  There is nothing useful to do
+-- with the failure either -- the registration is being abandoned.
+--
+-- Only the exceptions the backend reports are ignored: 'throwErrno' raises an
+-- 'IOException' and 'failOnInvalidFile' an 'ErrorCall'.  Catching
+-- 'SomeException' would also swallow an asynchronous exception aimed at this
+-- thread, which is the very thing this is meant to protect.
+quietUnregisterFd :: EventManager -> M.FdKey -> IO ()
+quietUnregisterFd mgr reg =
+    (unregisterFd_ mgr reg >> return ()) `catch` ioException `catch` errorCall
+  where
+    ioException :: IOException -> IO ()
+    ioException _ = return ()
+
+    errorCall :: ErrorCall -> IO ()
+    errorCall _ = return ()
 
 threadWaitSTM :: Event -> Fd -> IO (STM (), IO ())
 threadWaitSTM evt fd = mask_ $ do

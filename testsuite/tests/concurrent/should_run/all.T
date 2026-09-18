@@ -289,14 +289,12 @@ test('T21969',
 test('T21969a',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
-       expect_broken(21969),
      ],
      compile_and_run, [''])
 
 test('T21969b',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
-       expect_broken(21969),
      ],
      compile_and_run, [''])
 
@@ -310,7 +308,6 @@ test('T21969c',
 test('T21969d',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
-       expect_broken(21969),
      ],
      compile_and_run, [''])
 

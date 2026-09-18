@@ -1,0 +1,16 @@
+section: ghc-internal
+synopsis:
+  Fix a lock-up in the MIO I/O manager when the polling backend reports an error
+description:
+  An error reported by the MIO backends ``epoll`` or ``kqueue`` -- for instance ``EBADF`` after a
+  file descriptor was closed concurrently -- could leave the IO manager in a
+  state from which it never recovered: file descriptors could no longer be
+  closed, and the threads doing so stopped responding to ``killThread`` and
+  ``timeout``.  ``closeFdWith`` now restores its callback tables on every path
+  and runs the fd's callbacks without an uninterruptible mask, ``closeFd_`` no
+  longer abandons the close when the backend complains, ``selectCallbacks`` no
+  longer takes the capability's ``EventManager`` down with it, and the cleanup
+  of ``threadWait`` no longer replaces the asynchronous exception being
+  delivered.
+mrs: !16703
+issues: #21969
