@@ -316,7 +316,6 @@ typecheck-testsuite:
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
-  before_script:
   script:
     - mypy testsuite/driver/runtests.py
   dependencies: []
