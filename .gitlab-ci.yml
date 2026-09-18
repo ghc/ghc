@@ -137,14 +137,36 @@ workflow:
 .lint:
   stage: tool-lint
   tags:
-    - lint
-  before_script:
-    # Allow Git to read from the runner-owned checkout. This is needed
-    # for example by the lint-author job.
-    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - lint-anyarch
+  image: debian:13
   rules:
     - *drafts-can-fail-lint
     - when: always
+
+.install-ghc-toolchain: &install-ghc-toolchain
+  - apt update
+  - apt install -qy build-essential curl libffi-dev libffi8 libgmp-dev libgmp10 libncurses-dev libncurses6 libtinfo6 pkg-config python3 cmake git happy alex autoconf automake python3 libgmp-dev libnuma-dev libncurses-dev
+  - curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 BOOTSTRAP_HASKELL_MINIMAL=1 sh
+  - source /root/.ghcup/env
+  - ghcup --no-verbose install ghc --set --install-targets 'install_bin install_lib update_package_db' '9.10'
+  - ghcup --no-verbose install cabal --set
+  - ghc --info
+  - cabal --version
+
+# linting but we need a boot toolchain
+.lint-ghc-toolchain:
+  extends: .lint
+  before_script:
+    - *install-ghc-toolchain
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+
+# linting but we need python
+.lint-python:
+  extends: .lint
+  before_script:
+    - apt update
+    - apt install -qy python3 mypy shellcheck git
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
 
 .nightly: &nightly
   variables:
@@ -217,11 +239,11 @@ not-interruptible:
   stage: not-interruptible
   script: "true"
   interruptible: false
-  image: "debian:13"
+  image: debian:13
   variables:
     GIT_STRATEGY: none
   tags:
-    - lint
+    - lint-anyarch
   rules:
 #   - if: '$CI_COMMIT_BRANCH == "master"'
 #      when: always
@@ -242,7 +264,6 @@ include: '.gitlab/jobs.yaml'
 
 ghc-linters:
   stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   extends: .lint-params
   variables:
     BUILD_FLAVOUR: default
@@ -258,16 +279,11 @@ ghc-linters:
 # Skipped if the MR has the ~"no-changelog" label.
 lint-changelog:
   stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
-  extends: .lint
+  extends: .lint-ghc-toolchain
   variables:
     CHANGELOG_EXPECT_MR: "$CI_MERGE_REQUEST_IID"
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
-  before_script:
-    - export PATH="/opt/toolchain/bin:$PATH"
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
     - .gitlab/ci.sh lint_changelog
   dependencies: []
@@ -279,42 +295,30 @@ lint-changelog:
 
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
-  extends: .lint
+  extends: .lint-python
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
     - mypy testsuite/tests/linters/regex-linters/*.py
   dependencies: []
 
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
-  extends: .lint
+  extends: .lint-ghc-toolchain
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
-    - make -Ctestsuite list_broken TEST_HC=$GHC
+    - make -Ctestsuite list_broken TEST_HC=$(which ghc)
   dependencies: []
 
 # Run mypy Python typechecker on testsuite driver
 typecheck-testsuite:
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
-  extends: .lint
+  extends: .lint-python
   variables:
     GIT_DEPTH: 1
     GIT_SUBMODULE_STRATEGY: none
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
     - mypy testsuite/driver/runtests.py
   dependencies: []
@@ -323,7 +327,6 @@ typecheck-testsuite:
 # accommodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
 .lint-submods:
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   extends: .lint-params
   variables:
     BUILD_FLAVOUR: default
@@ -341,13 +344,9 @@ typecheck-testsuite:
 # Check that commits in an MR were not authored with the identity that CI uses
 # when it needs to create commits itself. This only needs Git history.
 lint-author:
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
-  extends: .lint
+  extends: .lint-python
   variables:
     GIT_SUBMODULE_STRATEGY: none
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
@@ -425,12 +424,9 @@ lint-submods-branch:
 
 .lint-params:
   needs: []
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   extends: .lint
   before_script:
-    - export PATH="/opt/toolchain/bin:$PATH"
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
+    - *install-ghc-toolchain
     - .gitlab/ci.sh setup
   after_script:
     - .gitlab/ci.sh save_cache
@@ -448,18 +444,13 @@ lint-submods-branch:
 
 hadrian-ghc-in-ghci:
   stage: quick-build
+  extends: .lint-ghc-toolchain
   needs:
     - job: lint-linters
     - job: lint-submods
       optional: true
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   variables:
     GHC_FLAGS: -Werror -Wwarn=unused-imports
-  tags:
-    - lint
   script:
     - git clean -xdf && git submodule foreach git clean -xdf
     - . .gitlab/ci.sh setup
@@ -493,9 +484,6 @@ hadrian-multi:
       optional: true
   dependencies: null
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   variables:
     GHC_FLAGS: "-Werror=-Wno-error=incomplete-record-selectors -Wwarn=deprecations -Wwarn=unused-imports"
        # -Wno-error=incomplete-record-selectors is present because -Wall now
@@ -1055,9 +1043,6 @@ perf:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   tags:
     - x86_64-linux-perf
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
   script:
     - root=$(pwd)/ghc
     - |
