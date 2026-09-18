@@ -61,7 +61,7 @@ module GHC.Internal.Event.Manager
 import GHC.Internal.Base
 import GHC.Internal.Control.Concurrent.MVar (MVar, newMVar, putMVar,
                                 tryPutMVar, takeMVar, withMVar)
-import GHC.Internal.Control.Exception (onException)
+import GHC.Internal.Control.Exception (IOException, catch, onException)
 import GHC.Internal.Data.Bits ((.&.))
 import GHC.Internal.Data.Foldable (forM_)
 import GHC.Internal.Data.Functor (void)
@@ -440,10 +440,7 @@ closeFd mgr close fd = do
     case prev of
       Nothing  -> close fd >> return []
       Just fds -> do
-        let oldEls = eventsOf fds
-        when (I.elEvent oldEls /= mempty) $ do
-          _ <- I.modifyFd (emBackend mgr) fd (I.elEvent oldEls) mempty
-          wakeManager mgr
+        dropBackendRegistration mgr fd (eventsOf fds)
         close fd
         return fds
   forM_ fds $ \(FdData reg el cb) -> cb reg (I.elEvent el `mappend` evtClose)
@@ -461,13 +458,40 @@ closeFd_ mgr tbl fd = do
   case prev of
     Nothing  -> return (return ())
     Just fds -> do
-      let oldEls = eventsOf fds
-      when (oldEls /= mempty) $ do
-        _ <- I.modifyFd (emBackend mgr) fd (I.elEvent oldEls) mempty
-        wakeManager mgr
+      dropBackendRegistration mgr fd (eventsOf fds)
       return $
         forM_ fds $ \(FdData reg el cb) ->
           cb reg (I.elEvent el `mappend` evtClose)
+
+-- | Tell the backend to forget about an fd that is being closed.
+--
+-- Errors reported by the backend are deliberately ignored here.  We are
+-- tearing the registration down, and "the backend does not know this fd" --
+-- which is how ENOENT and EBADF reach us once the fd is already gone -- is
+-- exactly the state we are trying to reach.  Letting the exception through
+-- would abandon the close itself and strand every thread waiting on the fd,
+-- because 'IT.delete' has already taken their registrations out of the
+-- callback table and their callbacks would then never run.
+--
+-- This is the counterpart of 'registerFd_', which does report backend failures
+-- (see #21969): there the caller still has to learn that the registration did
+-- not happen, whereas here there is nothing left to decide.
+dropBackendRegistration :: EventManager -> Fd -> EventLifetime -> IO ()
+dropBackendRegistration mgr fd oldEls =
+  when (I.elEvent oldEls /= mempty) $ do
+    modify `catch` ignore
+    wakeManager mgr
+  where
+    modify = do
+      _ <- I.modifyFd (emBackend mgr) fd (I.elEvent oldEls) mempty
+      return ()
+
+    -- Only the 'IOException' that 'throwErrno' raises.  Catching
+    -- 'SomeException' would also swallow an asynchronous exception aimed at
+    -- the thread doing the close, and 'closeFd' runs this outside any
+    -- uninterruptible mask.
+    ignore :: IOException -> IO ()
+    ignore _ = return ()
 
 ------------------------------------------------------------------------
 -- Utilities

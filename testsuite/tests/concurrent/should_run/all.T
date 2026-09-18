@@ -301,7 +301,6 @@ test('T21969b',
 test('T21969c',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
-       expect_broken(21969),
      ],
      compile_and_run, [''])
 
