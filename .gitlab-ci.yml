@@ -143,9 +143,12 @@ workflow:
     - *drafts-can-fail-lint
     - when: always
 
-.install-deps: &install-ghc-toolchain
+.install-ghc-toolchain: &install-ghc-toolchain
   - apt update
-  - apt install -qy ghc cabal-install build-essential curl libffi-dev libffi8 libgmp-dev libgmp10 libncurses-dev libncurses6 libtinfo6 pkg-config python3 cmake git happy alex autoconf automake python3 libgmp-dev libnuma-dev libncurses-dev
+  - apt install -qy build-essential curl libffi-dev libffi8 libgmp-dev libgmp10 libncurses-dev libncurses6 libtinfo6 pkg-config python3 cmake git happy alex autoconf automake python3 libgmp-dev libnuma-dev libncurses-dev
+  - curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 BOOTSTRAP_HASKELL_GHC_VERSION="9.10" BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1 sh
+  - ghc --info
+  - cabal-install version
 
 # linting but we need a boot toolchain
 .lint-ghc-toolchain:
