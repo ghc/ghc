@@ -276,6 +276,52 @@ test('T21969',
      ],
      compile_and_run, [''])
 
+# The IO manager has to stay consistent when the polling backend reports an
+# error, and must not make threads uninterruptible while it does.  See #21969
+# and the header of each test for what it covers.
+#
+#   T21969a  an exception out of closeFdWith must not wedge the callback tables
+#   T21969b  closeFdWith must not run fd callbacks uninterruptibly masked
+#   T21969c  a backend error must not abandon the close of an fd
+#   T21969d  threadWait's cleanup must not replace the async exception
+#   T21969e  a backend error must not take down the capability's IO manager
+
+test('T21969a',
+     [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
+       when(opsys('mingw32'),skip), # POSIX only
+       expect_broken(21969),
+     ],
+     compile_and_run, [''])
+
+test('T21969b',
+     [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
+       when(opsys('mingw32'),skip), # POSIX only
+       expect_broken(21969),
+     ],
+     compile_and_run, [''])
+
+test('T21969c',
+     [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
+       when(opsys('mingw32'),skip), # POSIX only
+       expect_broken(21969),
+     ],
+     compile_and_run, [''])
+
+test('T21969d',
+     [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
+       when(opsys('mingw32'),skip), # POSIX only
+       expect_broken(21969),
+     ],
+     compile_and_run, [''])
+
+test('T21969e',
+     [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
+       when(opsys('mingw32'),skip), # POSIX only
+       run_timeout_multiplier(0.3),
+       expect_broken(21969),
+     ],
+     compile_and_run, [''])
+
 test('hs_try_putmvar001',
      [
      when(opsys('mingw32'),skip), # uses pthread APIs in the C code
