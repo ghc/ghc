@@ -147,6 +147,7 @@ workflow:
   - apt update
   - apt install -qy build-essential curl libffi-dev libffi8 libgmp-dev libgmp10 libncurses-dev libncurses6 libtinfo6 pkg-config python3 cmake git happy alex autoconf automake python3 libgmp-dev libnuma-dev libncurses-dev
   - curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 BOOTSTRAP_HASKELL_GHC_VERSION="9.10" BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1 sh
+  - source /root/.ghcup/env
   - ghc --info
   - cabal-install version
 
@@ -341,7 +342,7 @@ typecheck-testsuite:
 # Check that commits in an MR were not authored with the identity that CI uses
 # when it needs to create commits itself. This only needs Git history.
 lint-author:
-  extends: .lint-ghc-toolchain
+  extends: .lint-python
   variables:
     GIT_SUBMODULE_STRATEGY: none
   script:
