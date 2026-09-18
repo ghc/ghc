@@ -315,6 +315,67 @@ def get_compiler_info():
         config.ghc_th_way       = "normal"
         config.ghc_th_hi_ext    = "hi"
 
+    # I/O manager discovery.
+    #
+    # Which I/O managers (GHC's `--io-manager` RTS flag) a given RTS build
+    # supports depends on the target platform and on whether the RTS is the
+    # threaded or non-threaded flavour (see rts/IOManager.h's
+    # IOMGR_ENABLED_* macros). Rather than duplicate that platform/way
+    # dependent logic here, we ask the RTS itself: giving it a bogus
+    # '--io-manager=' choice makes it print, on stderr, the list of I/O
+    # managers it was actually built to support (see IOManager.h's
+    # IOMGRS_ENABLED_STR, used when reporting the error in RtsFlags.c),
+    # which we then parse out.
+    def discover_io_managers(extra_flags):
+        import tempfile
+
+        test_src = 'module Main where\nmain :: IO ()\nmain = return ()\n'
+
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / 'IOMgrProbe.hs'
+            src.write_text(test_src)
+            exe = Path(d) / ('ioMgrProbe' + config.exeext)
+
+            # -rtsopts is needed so that the resulting binary will even
+            # consider an --io-manager= flag (rather than immediately
+            # rejecting all "unsafe" RTS options).
+            cmd = '{} -v0 -rtsopts -o {} {} {}'.format(
+                                    config.compiler,
+                                    exe,
+                                    src,
+                                    ' '.join(extra_flags))
+            cp = subprocess.run(
+                cmd,
+                shell=True,
+                cwd=d,
+                stdout=subprocess.DEVNULL,
+                stderr=None if config.verbose >= 3 else subprocess.DEVNULL)
+            if cp.returncode != 0 or not exe.exists():
+                raise Exception("Error in testsuite/config/ghc.discover_io_managers: failed to compile with: {}".format(cmd))
+
+            # An unrecognised '--io-manager=' choice makes the RTS print
+            # the ones it does support, then exit; we don't care that
+            # the program itself never gets to run main.
+            rp = subprocess.run(
+                [str(exe), '+RTS', '--io-manager=not-a-real-io-manager', '-RTS'],
+                cwd=d,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE)
+            stderr = rp.stderr.decode('utf-8', errors='replace')
+
+        m = re.search(r'choices are:\s*(.*)', stderr)
+        if not m:
+            raise Exception("Expected stderr output of form 'choices are: ...' but got: {}".format(stderr));
+        # 'auto' is a meta-choice (let the RTS pick a default for us), not
+        # an I/O manager implementation in its own right.
+        return list(set(m.group(1).split()) - {'auto'})
+
+    config.io_managers_nonthreaded = discover_io_managers([])
+    config.io_managers_threaded = (
+        discover_io_managers(['-threaded']) if config.ghc_with_threaded_rts
+        else [])
+    config.io_managers_all = list(set(config.io_managers_nonthreaded).union(set(config.io_managers_threaded)))
+
     config.cmm_cpp_is_gcc = test_compile(
         ['-c'],
         test_filename='test.cmm',
