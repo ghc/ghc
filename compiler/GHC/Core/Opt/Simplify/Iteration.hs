@@ -1283,6 +1283,12 @@ simplExprF1 env expr@(Lam {}) cont
         -- and likewise drop counts all binders (incl type lambdas)
 
 simplExprF1 env (Case scrut bndr _ alts) cont
+  | not (seCaseCase env)  -- See (COC-INV) in Note [sm_case_case: switching off case continuations]
+  = do { let scrut_out_ty = substTy env (idType bndr)
+       ; scrut' <- simplExprC env scrut (mkBoringStop scrut_out_ty)
+       ; rebuildCase (SAF_In, env) scrut' bndr alts cont }
+
+  | otherwise
   = {-#SCC "simplExprF1-Case" #-}
     simplExprF env scrut (Select { sc_bndr = bndr, sc_alts = alts
                                  , sc_env = UnSimplified env, sc_cont = cont })
@@ -1303,15 +1309,6 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
   = do { simplTrace "SimplBindr:inline-uncond2" (ppr bndr) $
          tick (PreInlineUnconditionally bndr)
        ; simplExprF env' body cont }
-
--- If -fno-case-of-case, push /only applications/ inside a 'let', lest we
--- lose a join point.  See Note [Join points with -fno-case-of-case]
-simplExprF1 env let_expr@(Let {}) cont
-  | not (seCaseCase env)
-  , (inner, outer) <- splitContArgs cont
-  , not (contIsStop outer)
-  = do { let_expr' <- simplExprC env let_expr inner
-       ; rebuild env let_expr' outer }
 
 -- Now check for a join point.  It's better to do the preInlineUnconditionally
 -- test first, because joinPointBinding_maybe has to eta-expand, so a trivial
@@ -2026,8 +2023,9 @@ simplNonRecE env from_what bndr (rhs, rhs_se) body cont
        -- If not, the invariant holds already, and it's optional.
 
        -- (FromBeta Lifted) or FromLet: look at the demand info
+       -- seCaseCase: see (COC-INV)
+       -- in Note [sm_case_case: switching off case continuations]
        _ -> seCaseCase env && isStrUsedDmd (idDemandInfo bndr)
-
 
 ------------------
 simplRecE :: SimplEnv
@@ -2131,15 +2129,14 @@ wrapJoinCont :: SimplEnv -> SimplCont
 -- Deal with making the continuation duplicable if necessary,
 -- and with the no-case-of-case situation.
 wrapJoinCont env cont thing_inside
-  | contIsStop cont        -- Common case; no need for fancy footwork
+  | contIsStop cont        -- Fast path: no need for fancy footwork
   = thing_inside env cont
 
   | otherwise
     -- Normal case; see Note [Join points and case-of-case]
     -- Case-of-case should be /on/ here, else we should not
     -- be in wrapJoinCont in the first place
-  = assertPpr (seCaseCase env) (ppr cont) $
-    do { (floats1, cont')  <- mkDupableCont env cont
+  = do { (floats1, cont')  <- mkDupableCont env cont
        ; (floats2, result) <- thing_inside (env `setInScopeFromF` floats1) cont'
        ; return (floats1 `addFloats` floats2, result) }
 
@@ -2168,8 +2165,84 @@ trimJoinCont var (JoinPoint arity) cont
       = pprPanic "completeCall" $ ppr var $$ ppr cont
 
 
-{- Note [Join points and case-of-case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [sm_case_case: switching off case continuations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Normally when we come across a `case` expression, we just push a `Select`
+continuation onto the continuation, roughly like this.
+   simplExprF (Case scrut alts) cont
+     = simplExprF scrut (Select alts cont)
+
+There are two reasons that we might NOT want to do this
+
+1. Loss of full laziness.  The case-of-case transformation can hide
+   opportunities for let-floating (aka full laziness). For example
+       rec { f = \y. case (expensive x) of (a,b) -> blah }
+   We might hope to float the (expensive x) out of the \y-loop.
+   But if we inline `expensive` we might get
+      \y. case (case x of I# x' -> body) of (a,b) -> blah
+   Now if we do case-of-case we get
+       \y. case x if I# x2 ->
+           case body of (a,b) -> blah
+
+   Sadly, at this point `body` mentions `x2`, so we can't float it out of the \y-loop.
+
+2. Pushing a `case` inside a `let` can prevent a join point from being
+   discovered (#27737).  For example
+      case (letrec j x y = ... in id (j p q)) of blah
+   Here `j` is not /yet/ a join point, because it is not tail called, but it
+   well become one after we inline `id`.  But if we push that `case` inwards
+   at the same time as inlinine `id` we'll get
+      letrec j x y = ... in case (j p q) of blah
+   and now `j` /still/ isn't a join point, and will never become one.  This
+   matters in practice: #27737
+
+Solution in both cases: in the "gentle" simplification phase that precedes the
+first float-out transformation, never push a `Select` continuation.  So we
+do not push the `case` inwards.  This behaiour is controlled by the `sm_case_case`
+field of `SimplMode`, interrogated via `seCaseCase`.
+
+Some specifics, for when `sm_case_case` is False:
+
+(COC-INV) When `sm_case_case` is False we obey the following invariant:
+             The SimplCont never contains
+                - Select
+                - StrictBind
+                - StrictArg
+    This is achieved by testing `seCaseCase` just before pushing any of
+    those three constructors. Why StrictBind and StrictArg?  Because
+    they mess with evaluation order in the same way that Select does.
+
+(COC1) The (COC-INV) also solves #25055, where we pushed a `case` inside `runRW`:
+           case (runRW# (\s. body)) of (a,b) -> blah
+         --->
+           runRW# (\s. case body of (a,b) -> blah)
+  Again, we don't want to this when `sm_case_case` is False, but that falls
+  out as a simple consequence of (COC-INV)
+
+(COC2) Supose `sm_case_case` is False, and we are simplifying
+
+    case (join j x = <j-rhs> in
+          case y of
+             A -> j 1
+             B -> j 2
+             C -> e) of <outer-alts>
+
+  Usually, we'd push the outer continuation (case . of <outer-alts>) into
+  both the RHS and the body of the join point j.  But since we aren't doing
+  case-of-case we could end up with this totally bogus result
+
+      join x = case <j-rhs> of <outer-alts> in
+      case (case y of
+               A -> j 1
+               B -> j 2
+               C -> e) of <outer-alts>
+
+   Again, (COC-INV) neatly avoid this bogosity: we never push a Select
+   onto the continuation.  This is much nicer than switching off case-of-case
+   specifically (which we used to do).
+
+Note [Join points and case-of-case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we perform the case-of-case transform (or otherwise push continuations
 inward), we want to treat join points specially. Since they're always
 tail-called and we want to maintain this invariant, we can do this (for any
@@ -2317,7 +2390,7 @@ simplOutId :: SimplEnvIS -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplOutId env fun cont
   | fun `hasKey` runRWKey
   , ApplyToTy  { sc_cont = cont1 } <- cont
-  , ApplyToTy  { sc_cont = cont2, sc_arg_ty = hole_ty } <- cont1
+  , ApplyToTy  { sc_cont = cont2 } <- cont1
   , ApplyToVal { sc_cont = cont3, sc_arg = arg, sc_cast = arg_mco
                , sc_env = arg_se, sc_hole_ty = fun_ty } <- cont2
   -- Do this even if (contIsStop cont), or if seCaseCase is off.
@@ -2326,11 +2399,6 @@ simplOutId env fun cont
 
              overall_res_ty = contResultType cont3
              -- hole_ty is the type of the current runRW# application
-             (outer_cont, new_runrw_res_ty, inner_cont)
-                | seCaseCase env = (mkBoringStop overall_res_ty, overall_res_ty, cont3)
-                | otherwise      = (cont3, hole_ty, mkBoringStop hole_ty)
-                -- Only when case-of-case is on. See GHC.Driver.Config.Core.Opt.Simplify
-                -- See (COC1) in Note [Case-of-case and full laziness]
 
        -- If the argument is a literal lambda already, take a short cut
        -- This isn't just efficiency:
@@ -2339,27 +2407,27 @@ simplOutId env fun cont
        --    * Even more important: see Note [No eta-expansion in runRW#]
        ; arg' <- case arg of
            Lam s body -> do { (env', s') <- simplBinder arg_env s
-                            ; body' <- simplExprC env' body inner_cont
+                            ; body' <- simplExprC env' body cont3
                             ; return (Lam s' body') }
                             -- Important: do not try to eta-expand this lambda
                             -- See Note [No eta-expansion in runRW#]
 
            _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
                    ; let (m,_,_) = splitFunTy fun_ty
-                         env'  = arg_env `addNewInScopeIds` [s']
-                         hole_ty = mkVisFunTy m realWorldStatePrimTy new_runrw_res_ty
+                         env'    = arg_env `addNewInScopeIds` [s']
+                         hole_ty = mkVisFunTy m realWorldStatePrimTy overall_res_ty
                    ; cont' <- pushCastMCo env' arg_mco $
-                              ApplyToVal { sc_arg = Var s', sc_cast = MRefl
-                                         , sc_env = Simplified OkDup
-                                         , sc_cont = inner_cont
+                              ApplyToVal { sc_arg     = Var s', sc_cast = MRefl
+                                         , sc_env     = Simplified OkDup
+                                         , sc_cont    = cont3
                                          , sc_hole_ty = hole_ty }
                                 -- cont' applies to s', then K
                    ; body' <- simplExprC env' arg cont'
                    ; return (Lam s' body') }
 
-       ; let rr'   = getRuntimeRep new_runrw_res_ty
-             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
-       ; rebuild_go env call' outer_cont }
+       ; let rr'   = getRuntimeRep overall_res_ty
+             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg overall_res_ty, arg']
+       ; return (emptyFloats env, call') }
 
 -- Normal case for (f e1 .. en)
 simplOutId env fun cont
@@ -2424,8 +2492,8 @@ rebuildCall env fun_info
                         , sc_hole_ty = fun_ty, sc_cont = cont })
   | UnSimplified arg_env <- arg_se
   , isStrictArgInfo fun_info  -- Strict arguments
-  , seCaseCase env            -- But only when case-of-case is on.
-                              -- See Note [Case-of-case and full laziness]
+  , seCaseCase env            -- But only when case-of-case is on; see (COC-INV)
+                              -- in Note [sm_case_case: switching off case continuations]
   = simplExprF (arg_env `setInScopeFromE` env) arg $
     addCastMCo arg_mco $
     StrictArg { sc_fun = fun_info, sc_fun_ty = fun_ty
@@ -3312,14 +3380,6 @@ doCaseToLet scrut case_bndr
 --------------------------------------------------
 
 reallyRebuildCase (saf,env) scrut case_bndr alts cont
-  | not (seCaseCase env)    -- Only when case-of-case is on.
-                            -- See GHC.Driver.Config.Core.Opt.Simplify
-                            --    Note [Case-of-case and full laziness]
-  = do { case_expr <- simplAlts (saf,env) scrut case_bndr alts
-                                (mkBoringStop (contHoleType cont))
-       ; rebuild env case_expr cont }
-
-  | otherwise
   = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
        ; case_expr <- simplAlts (saf,env') scrut
                                 (scaleIdBy holeScaling case_bndr)

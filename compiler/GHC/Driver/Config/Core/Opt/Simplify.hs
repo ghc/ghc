@@ -80,7 +80,7 @@ initGentleSimplMode :: DynFlags -> SimplMode
 initGentleSimplMode dflags = (initSimplMode dflags InitialPhase "Gentle")
   { -- Don't do case-of-case transformations.
     -- This makes full laziness work better
-    -- See Note [Case-of-case and full laziness]
+    -- See Note [sm_case_case: switching off case continuations]
     sm_case_case = False
   }
 
@@ -90,80 +90,3 @@ floatEnable dflags =
     (True, True) -> FloatEnabled
     (True, False)-> FloatNestedOnly
     (False, _)   -> FloatDisabled
-
-
-{- Note [Case-of-case and full laziness]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Case-of-case can hide opportunities for let-floating (full laziness).
-For example
-   rec { f = \y. case (expensive x) of (a,b) -> blah }
-We might hope to float the (expensive x) out of the \y-loop.
-But if we inline `expensive` we might get
-   \y. case (case x of I# x' -> body) of (a,b) -> blah
-Now if we do case-of-case we get
-   \y. case x if I# x2 ->
-       case body of (a,b) -> blah
-
-Sadly, at this point `body` mentions `x2`, so we can't float it out of the
-\y-loop.
-
-Solution: don't do case-of-case in the "gentle" simplification phase that
-precedes the first float-out transformation.  Implementation:
-
-  * `sm_case_case` field in SimplMode
-
-  * If `sm_case_case` is False (tested via `seCaseCase`), then:
-    (COC1) When simplifying (case scrut of alts), do not make a Select continuation.
-           This happens in the `Case` case of `simplExprF`.
-    (COC2) When simplifying (f arg), where `f` is strict, do not make a StrictArg
-           continuation.  See the `ApplyToVal` case of `rebuildArg`.
-
-    ...more to come...
-           in GHC.Core.Opt.Simplify.Iteration.rebuildCall.
-
-    (COC3) This applies equally to the case-of-runRW# transformation:
-           case (runRW# (\s. body)) of (a,b) -> blah
-           --->
-           runRW# (\s. case body of (a,b) -> blah)
-           Again, don't do this when `sm_case_case` is off.
-           See #25055 for a motivating example.
-
-Note [Join points with -fno-case-of-case]   FIX ME
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Supose case-of-case is switched off, and we are simplifying
-
-    case (join j x = <j-rhs> in
-          case y of
-             A -> j 1
-             B -> j 2
-             C -> e) of <outer-alts>
-
-Usually, we'd push the outer continuation (case . of <outer-alts>) into
-both the RHS and the body of the join point j.  But since we aren't doing
-case-of-case we may then end up with this totally bogus result
-
-    join x = case <j-rhs> of <outer-alts> in
-    case (case y of
-             A -> j 1
-             B -> j 2
-             C -> e) of <outer-alts>
-
-This would be OK in the language of the paper, but not in GHC: j is no longer
-a join point.  We can only do the "push continuation into the RHS of the
-join point j" if we also push the continuation right down to the /jumps/ to
-j, so that it can evaporate there (trimJoinCont). Then, if we are doing
-case-of-case, we'll get to:
-
-    join x = case <j-rhs> of <outer-alts> in
-    case y of
-      A -> j 1
-      B -> j 2
-      C -> case e of <outer-alts>
-
-which is great.
-
-Bottom line: if case-of-case is off, we must stop pushing the continuation
-inwards altogether at any join point.  Instead simplify the (join ... in ...)
-with a Stop continuation, and wrap the original continuation around the
-outside.  Surprisingly tricky!
--}
