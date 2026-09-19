@@ -323,6 +323,14 @@ test('T21969f',
      ],
      compile_and_run, [''])
 
+# 'registerFd_' must not trust the callback table alone.  See registerFd001.hs.
+test('registerFd001',
+     [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
+       when(opsys('mingw32'),skip), # POSIX only
+       when(opsys('darwin'), expect_broken(27821)),
+     ],
+     compile_and_run, [''])
+
 test('hs_try_putmvar001',
      [
      when(opsys('mingw32'),skip), # uses pthread APIs in the C code
