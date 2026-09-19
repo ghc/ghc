@@ -327,7 +327,6 @@ test('T21969f',
 test('registerFd001',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
-       when(opsys('darwin'), expect_broken(27821)),
      ],
      compile_and_run, [''])
 

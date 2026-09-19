@@ -1,0 +1,16 @@
+section: base
+synopsis: Fix a bug in `threadWaitRead`/`threadWaitWrite` in the MIO I/O
+  manager on macOS. The symptom was that if a file descriptor (fd) was closed,
+  without using `closeFdWith`, while a thread was still waiting on that fd
+  using `threadWaitRead`/`threadWaitWrite`, then subsequent uses of
+  `threadWaitRead`/`threadWaitWrite` on unrelated files (that happened to get
+  allocated the same fd number) would block forever.
+description:
+  ``registerFd_`` concluded from the callback table alone that an fd was
+  already armed in the polling backend, and so called the backend only when
+  the events it wanted differed from the ones the table recorded.  That holds
+  only while the two agree, which they stop doing once an fd is closed without
+  ``closeFdWith``: the kernel drops the registration, the table keeps it, and
+  the number is handed straight back out.  It now always calls the backend.
+mrs: !16705
+issues: #27821

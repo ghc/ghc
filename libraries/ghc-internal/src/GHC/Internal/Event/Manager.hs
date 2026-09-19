@@ -352,21 +352,45 @@ registerFd_ mgr@(EventManager{..}) cb fd evs lt = do
 
       -- We don't want or don't support one-shot semantics
       _ -> do
-        let modify = prevEvs /= el'
-        ok <- if modify
-              then let newEvs = I.elEvent el'
-                       oldEvs = I.elEvent prevEvs
-                   in I.modifyFd emBackend fd oldEvs newEvs
-                        `onException` undoRegistration
-              else return True
+        -- The backend is told even when 'prevEvs' already covers the events we
+        -- are registering.  See Note [Do not trust the callback table].
+        let newEvs = I.elEvent el'
+            oldEvs = I.elEvent prevEvs
+        ok <- I.modifyFd emBackend fd oldEvs newEvs
+                `onException` undoRegistration
         if ok
-          then return (modify, True)
+          then return (prevEvs /= el', True)
           else undoRegistration >> return (False, False)
   -- this simulates behavior of old IO manager:
   -- i.e. just call the callback if the registration fails.
   when (not ok) (cb reg evs)
   return (reg,modify)
 {-# INLINE registerFd_ #-}
+
+{- Note [Do not trust the callback table]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Where the backend has one-shot registrations, 'registerFd_' calls it for every
+registration.  Where it does not -- 'haveOneShot' is 'False' on Darwin, see
+#7651 -- it used to call the backend only when the events being registered
+differed from the ones the callback table already records for that fd, on the
+grounds that the backend must be watching for them already.
+
+That holds only while the table and the backend agree, and they stop agreeing
+as soon as an fd is closed without going through
+'GHC.Internal.Event.Thread.closeFdWith': the kernel drops the backend's
+registration and the table keeps it.  fd numbers are handed straight back out
+again, so the next 'threadWaitRead' on that number finds matching events in the
+table, never tells the backend, and waits for an event that nothing will ever
+deliver -- silently, on a descriptor that is perfectly good and already
+readable.  Backends with one-shot registrations recover by themselves, which is
+why only Darwin was affected.
+
+This does not make closing a registered fd behind the IO manager's back work;
+that remains a documented hazard.  The backend has forgotten the fd, so the
+call now always made here fails and the caller is told.  What it does buy is
+that the caller finds out at all, rather than blocking for ever, and that the
+platforms behave the same way.
+-}
 
 -- | @registerFd mgr cb fd evs lt@ registers interest in the events @evs@
 -- on the file descriptor @fd@ for lifetime @lt@. @cb@ is called for
