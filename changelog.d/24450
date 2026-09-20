@@ -1,0 +1,14 @@
+section: rts
+synopsis:
+  Fix a hang when a program is started with a standard file descriptor closed
+description:
+  A process started with stdout or stderr closed -- ``prog >&-`` from a shell
+  does exactly that -- left that descriptor number free for the runtime to
+  take for its own use.  The ``Handle`` for the stream, built later when the
+  program first wrote to it, then took over a descriptor belonging to the
+  runtime: the program wrote its output into the runtime's own plumbing and
+  hung, with no error reported anywhere.  The runtime now opens ``/dev/null``
+  onto whichever of the descriptors 0, 1 and 2 are closed when it starts, so
+  such a stream is connected to ``/dev/null`` instead.
+mrs: !16710
+issues: #24450

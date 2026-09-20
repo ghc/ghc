@@ -69,6 +69,10 @@
 #if defined(HAVE_LOCALE_H)
 #include <locale.h>
 #endif
+#if !defined(mingw32_HOST_OS)
+#include <errno.h>
+#include <fcntl.h>
+#endif
 
 // Count of how many outstanding hs_init()s there have been.
 static StgWord hs_init_count = 0;
@@ -80,6 +84,10 @@ static int64_t __codePage = -1;
 #endif
 
 static void flushStdHandles(void);
+
+#if !defined(mingw32_HOST_OS)
+static void sanitiseStandardFds(void);
+#endif
 
 /* -----------------------------------------------------------------------------
    Initialise floating point unit on x86 (currently disabled; See Note
@@ -238,6 +246,82 @@ hs_init_with_rtsopts(int *argc, char **argv[])
 
 void init_ghc_hs_iface(void);
 
+#if !defined(mingw32_HOST_OS)
+/* See Note [Standard file descriptors must be open]. */
+static void sanitiseStandardFds(void)
+{
+    // The access mode each descriptor would have had, had the process been
+    // started with it open.
+    static const int access_mode[3] = { O_RDONLY, O_WRONLY, O_WRONLY };
+
+    for (int fd = 0; fd <= 2; fd++) {
+        if (fcntl(fd, F_GETFD) != -1 || errno != EBADF) {
+            continue;           // already open
+        }
+
+        int nullfd;
+        do {
+            nullfd = open("/dev/null", access_mode[fd]);
+        } while (nullfd == -1 && errno == EINTR);
+
+        if (nullfd == -1) {
+            // No /dev/null to be had.  There is nothing better to do than
+            // carry on; the hazard the Note describes is then still there,
+            // but refusing to start would be worse.
+            return;
+        }
+        if (nullfd != fd) {
+            // open() hands out the lowest free descriptor, so this cannot
+            // happen unless something in this process is opening descriptors
+            // concurrently.  Do not shuffle its descriptor around.
+            close(nullfd);
+            return;
+        }
+    }
+}
+
+/*
+ * Note [Standard file descriptors must be open]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A process may be started with any of file descriptors 0, 1 and 2 closed --
+ * from a shell, `prog >&-` does exactly that.  Nothing then reserves those
+ * numbers, and open(), pipe() and socket() hand out the lowest free
+ * descriptor, so the next descriptor the runtime creates for itself takes one
+ * of them: the ticker's pipe, or a capability's IO manager control pipe.
+ *
+ * Nothing warns anybody.  'GHC.Internal.IO.StdHandles.stdout' is a CAF, so it
+ * is built the first time the program writes to stdout, which is long after
+ * that has happened, and it builds a 'Handle' over descriptor 1 -- which now
+ * belongs to the runtime.  The program then writes its output into the
+ * runtime's own plumbing, and at exit closes it.
+ *
+ * What this looks like from the outside is a hang, because the descriptor the
+ * Handle has taken over is the read end of a pipe.  It is a perfectly good
+ * descriptor, so nothing reports an error: poll() for POLLOUT on it simply
+ * never says yes, epoll_ctl() accepts a registration for it, and the thread
+ * waiting to write blocks for ever.  See #24450, where this is `prog >&-`
+ * hanging after main has finished.
+ *
+ * Closing those descriptors is legal, so the runtime cannot refuse them; and
+ * moving only the descriptors the runtime opens would not help, since the
+ * first file the program itself opens would land on the free number instead.
+ * The fix is to leave no free number: open /dev/null onto whichever of 0, 1
+ * and 2 are closed, before the runtime creates any descriptor of its own.
+ * Other runtimes do the same, and for the same reason.
+ *
+ * A program run this way therefore finds stdout connected to /dev/null rather
+ * than failing with EBADF on the first write.  That is the price of the fix,
+ * and it is the behaviour such a program would get from most other language
+ * runtimes.
+ *
+ * Each substitute is opened for the access the descriptor would normally have:
+ * read-only for 0, write-only for 1 and 2.  Opening all three for both would
+ * make the substitute something a real stdin or stdout is not, and writing to
+ * 'stdin' or reading from 'stdout' would then quietly succeed instead of
+ * failing with EBADF.
+ */
+#endif
+
 void
 hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 {
@@ -251,6 +335,12 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
         errorBelch("hs_init_ghc: reinitializing the RTS after shutdown is not currently supported");
         stg_exit(1);
     }
+
+#if !defined(mingw32_HOST_OS)
+    /* Before anything here opens a file descriptor of its own.
+       See Note [Standard file descriptors must be open]. */
+    sanitiseStandardFds();
+#endif
 
 #if defined(wasm32_HOST_ARCH)
     char *pwd = getenv("PWD");
