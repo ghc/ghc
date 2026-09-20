@@ -229,13 +229,24 @@ threadWait evt fd = mask_ $ do
 
 -- | Drop a registration, ignoring failures reported by the polling backend.
 --
--- This is the cleanup of 'threadWait', so it runs inside the handler for the
--- asynchronous exception that interrupted 'takeMVar'.  'unregisterFd_' calls
--- into the backend, which throws on errors such as EBADF and ENOENT, and that
--- exception would take the place of the one being delivered: 'killThread'
--- would return while 'ThreadKilled' never reached the thread, and 'timeout'
--- would no longer recognise its own exception.  There is nothing useful to do
--- with the failure either -- the registration is being abandoned.
+-- 'unregisterFd_' calls into the backend, which throws on errors such as EBADF
+-- and ENOENT.  Both callers here are teardown: the registration is being
+-- abandoned, and "the backend does not know this fd" is the state they are
+-- trying to reach, so there is nothing useful to do with the failure.
+--
+-- Cancelling is racy by its nature, which is the other half of the same
+-- point.  A caller that cancels is racing the I\/O it is cancelling, and
+-- cancelling after the I\/O completed has to be as safe as cancelling before:
+-- losing that race is the ordinary case, not an error, and it arrives here as
+-- the backend saying it has no such registration.
+--
+-- For the cleanup of 'threadWait' the exception would also do harm.  It runs
+-- inside the handler for the asynchronous exception that interrupted
+-- 'takeMVar', so it would take the place of the one being delivered:
+-- 'killThread' would return while 'ThreadKilled' never reached the thread, and
+-- 'timeout' would no longer recognise its own exception.  The deregistration
+-- action of 'threadWaitSTM' has the same hazard, since it is meant to be used
+-- from the cleanup of a 'bracket'.
 --
 -- Only the exceptions the backend reports are ignored: 'throwErrno' raises an
 -- 'IOException' and 'failOnInvalidFile' an 'ErrorCall'.  Catching
@@ -264,7 +275,7 @@ threadWaitSTM evt fd = mask_ $ do
                if evt' `eventIs` evtClose
                then throwSTM $ errnoToIOError "threadWaitSTM" eBADF Nothing Nothing
                else return ()
-  return (waitAction, unregisterFd_ mgr reg >> return ())
+  return (waitAction, quietUnregisterFd mgr reg)
 
 -- | Allows a thread to use an STM action to wait for a file descriptor to be readable.
 -- The STM action will retry until the file descriptor has data ready.

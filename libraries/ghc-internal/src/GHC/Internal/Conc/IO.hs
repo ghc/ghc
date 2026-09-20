@@ -151,6 +151,11 @@ threadWaitWrite fd
 -- to read from a file descriptor. The second returned value
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
+--
+-- The deregistration is safe to race against the read completing: a caller
+-- that deregisters is racing the I\/O it is cancelling, and deregistering
+-- after the read completed does nothing.  It is idempotent for the same
+-- reason, so it may be run more than once and from more than one thread.
 threadWaitReadSTM :: Fd -> IO (STM.STM (), IO ())
 threadWaitReadSTM fd
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
@@ -170,6 +175,11 @@ threadWaitReadSTM fd
 -- can be written to a file descriptor. The second returned value
 -- is an IO action that can be used to deregister interest
 -- in the file descriptor.
+--
+-- The deregistration is safe to race against the write becoming possible: a caller
+-- that deregisters is racing the I\/O it is cancelling, and deregistering
+-- after that happened does nothing.  It is idempotent for the same
+-- reason, so it may be run more than once and from more than one thread.
 threadWaitWriteSTM :: Fd -> IO (STM.STM (), IO ())
 threadWaitWriteSTM fd
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)

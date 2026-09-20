@@ -285,6 +285,7 @@ test('T21969',
 #   T21969c  a backend error must not abandon the close of an fd
 #   T21969d  threadWait's cleanup must not replace the async exception
 #   T21969e  a backend error must not take down the capability's IO manager
+#   T21969f  the deregistration of threadWaitSTM must not throw either
 
 test('T21969a',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
@@ -314,6 +315,12 @@ test('T21969e',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        when(opsys('mingw32'),skip), # POSIX only
        run_timeout_multiplier(0.3),
+     ],
+     compile_and_run, [''])
+
+test('T21969f',
+     [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
+       when(opsys('mingw32'),skip), # POSIX only
      ],
      compile_and_run, [''])
 
