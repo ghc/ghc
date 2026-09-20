@@ -1,9 +1,8 @@
 -- Stress test for #26341: repeatedly interrupt async-blocked threads and
 -- re-enter their AP_STACKs. Before the fix, re-entering a thunk whose
 -- unsafePerformIO was blocked on an async I/O call (Windows non-threaded
--- RTS) would read uninitialized memory or free a dangling pointer,
--- because stg_block_async reserved a stack slot for a heap-allocated
--- StgAsyncIOResult that became invalid after an async exception.
+-- RTS) would treat an uninitialized stack slot as a StgAsyncIOResult
+-- pointer, potentially crashing or freeing an invalid pointer.
 --
 -- This test spawns many concurrent workers, each of which:
 --   1. Creates a pipe.
@@ -12,9 +11,12 @@
 --   4. Re-evaluates the thunk (AP_STACK re-entry).
 --   5. Repeats many times.
 --
--- On threaded RTS / Unix the re-entered read succeeds (we write a byte
--- first). On Windows non-threaded RTS the re-entered async call returns
--- EINTR. Both paths exercise the fixed stack-frame layout.
+-- On the non-threaded Unix RTS the re-entered read succeeds (we write a byte
+-- first). On the Windows non-threaded RTS the re-entered async call returns
+-- EINTR; this is the path that exercises the fixed stack-frame layout. On
+-- threaded Unix, threadWaitRead uses onException for cleanup, which rethrows
+-- the asynchronous exception synchronously and prevents the computation from
+-- resuming (#25300).
 {-# OPTIONS_GHC -O -fno-full-laziness #-}
 
 import Control.Concurrent
@@ -60,7 +62,7 @@ worker wid done = do
                   (\(_ :: SomeException) -> return ())
 
             -- Write a byte so the re-entered read can complete on
-            -- threaded RTS / Unix.
+            -- non-threaded Unix RTS.
             poke buf 0
             _ <- writeRawBufferPtr "unblock" (FD writeFd 0) buf 0 1
 
@@ -75,7 +77,7 @@ worker wid done = do
                     -> throwIO (userError $
                          "worker " ++ show wid ++ " iteration " ++ show n ++
                          ": unexpected exception: " ++ show e)
-                Right () -> return ()  -- expected on threaded / Unix
+                Right () -> return ()  -- expected on non-threaded Unix
 
             -- Close the pipe fds.
             _ <- c_close readFd

@@ -1,11 +1,13 @@
 -- Test that re-evaluating an AP_STACK from an interrupted async I/O call
 -- does not crash. On Windows non-threaded RTS, re-entry returns EINTR
 -- which readRawBufferPtr converts to IOException Interrupted. On the
--- threaded RTS (any platform), the blocking read is re-attempted and
--- succeeds because we write a byte to the pipe between evaluations.
+-- non-threaded Unix RTS, the blocking read is re-attempted and succeeds
+-- because we write a byte to the pipe between evaluations. On threaded Unix,
+-- threadWaitRead uses onException for cleanup, which rethrows the asynchronous
+-- exception synchronously and prevents the computation from resuming (#25300).
 --
--- Before the fix for #26341, re-evaluation on Windows would crash or read
--- uninitialized memory from a freed StgAsyncIOResult.
+-- Before the fix for #26341, re-evaluation on Windows would treat an
+-- uninitialized stack slot as a StgAsyncIOResult pointer and could crash.
 {-# OPTIONS_GHC -O -fno-full-laziness #-}
 
 import Control.Concurrent (threadDelay, myThreadId, forkIO, killThread, rtsSupportsBoundThreads)
@@ -22,7 +24,7 @@ import System.Process (createPipeFd)
 
 -- Store the write fd so main can feed data into the pipe between
 -- evaluations.  On Unix this unblocks the re-entered read; on Windows
--- stg_block_async returns EINTR regardless.
+-- non-threaded, stg_block_async returns EINTR instead.
 {-# NOINLINE writeFdRef #-}
 writeFdRef :: IORef CInt
 writeFdRef = unsafePerformIO $ newIORef (-1)
@@ -58,7 +60,7 @@ main = do
 
     -- Second evaluation: AP_STACK re-enters.
     -- Non-threaded Windows: asyncRead returns (-1, EINTR) → IOException
-    -- Threaded / Unix:      read succeeds → returns normally
+    -- Non-threaded Unix:    read succeeds → returns normally
     let expectEINTR = os == "mingw32" && not rtsSupportsBoundThreads
     result <- try (evaluate blockedRead)
     case result of

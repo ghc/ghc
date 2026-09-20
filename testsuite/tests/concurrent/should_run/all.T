@@ -312,20 +312,27 @@ test('T13330', normal, compile_and_run, ['-O'])
 
 test('T16761', normal, compile_and_run, [''])
 
-test('T26341', normal, compile_and_run, [''])
+# Threaded threadDelay uses onException to unregister its timeout. The cleanup
+# rethrows the asynchronous exception synchronously, preventing the interrupted
+# thunk from being resumed (#25300).
+test('T26341', omit_ways(threaded_ways), compile_and_run, [''])
 
 # Test EINTR for async I/O interrupted by an exception (#26341)
 test('T26341a'
-    # test uses pipe operations which are not supported by the JS/wasm backends
-    , when(arch('wasm32') or arch('javascript'), skip)
+    , [ omit_ways(threaded_ways)
+      # test uses pipe operations which are not supported by the JS/wasm backends
+      , when(arch('wasm32') or arch('javascript'), skip)
+      ]
     , compile_and_run, ['-package process'])
 
 # Stress test: many threads repeatedly interrupt and re-enter async-blocked
 # thunks (#26341). Before the fix, this would crash due to dangling
 # StgAsyncIOResult pointers on the stack.
 test('T26341b'
-    # test uses pipe operations which are not supported by the JS/wasm backends
-    , when(arch('wasm32') or arch('javascript'), skip)
+    , [ omit_ways(threaded_ways)
+      # test uses pipe operations which are not supported by the JS/wasm backends
+      , when(arch('wasm32') or arch('javascript'), skip)
+      ]
     , compile_and_run, ['-package process'])
 
 # Scheduler fairness
