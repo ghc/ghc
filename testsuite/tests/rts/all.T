@@ -408,6 +408,18 @@ test('T10590', [ ignore_stderr
                , req_process
                ], compile_and_run, [''])
 
+# Run with stdin and stdout closed -- that is what leaves those descriptors
+# free for the runtime to take, which is the whole of #24450.  What the test
+# has to say therefore goes to stderr and is checked against T24450.stderr.
+test('T24450',
+     [ when(opsys('mingw32'), skip) # POSIX only
+     , js_skip # JS backend has its own runtime
+     # The wrapper below would close the stdout of the wasm runtime rather
+     # than that of the program running under it, which tests nothing.
+     , when(arch('wasm32'), skip)
+     , cmd_wrapper(lambda c: c + ' <&- >&-')
+     ], compile_and_run, [''])
+
 # 20000 was easily enough to trigger the bug with 7.10
 test('T10904', [ extra_run_opts('20000'), req_c ],
                compile_and_run, ['T10904lib.c'])
