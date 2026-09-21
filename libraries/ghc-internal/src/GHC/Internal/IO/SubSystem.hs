@@ -51,6 +51,7 @@ module GHC.Internal.IO.SubSystem (
   -- other. This can instead now be done conditionally on the I\/O manager
   -- feature 'iomgrInRTS'.
   iomgrInRTS,
+  iomgrInLib,
   iomgrUsesHANDLEs,
  ) where
 
@@ -149,6 +150,11 @@ ioManagerFeatureBitmask IOMgrUsesHANDLEs = 1## `uncheckedShiftL#` 1#
 --
 iomgrInRTS :: Bool
 iomgrInRTS = ioManagerFeature IOMgrInRTS
+
+-- | The inverse of 'iomgrInRTS'. In some cases the logic may read more clearly
+-- this way round.
+iomgrInLib :: Bool
+iomgrInLib = not iomgrInRTS
 
 -- | This means that the I\/O manager uses the Win32 API's HANDLE type to
 -- refer to open files. The inverse is that it uses Posix style fds.
