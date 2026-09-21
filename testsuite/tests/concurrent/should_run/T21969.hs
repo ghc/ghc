@@ -12,8 +12,6 @@ import           Control.Monad           (forM_, unless)
 import           GHC.Conc.IO             (threadWaitRead, threadWaitWrite)
 
 import qualified Data.ByteString         as BS
-import           GHC.IO.FD               (FD (..))
-import           GHC.IO.Handle.FD        (handleToFd)
 import           System.Environment      (getArgs)
 import           System.IO               (BufferMode (NoBuffering), Handle,
                                           hClose, hSetBuffering)
@@ -36,26 +34,32 @@ main = do
         reader readH `catch` handler
 
 
--- | Return a @(read, write)@ handle pair for an anonymous pipe.
-setupPipes :: IO (Handle, Handle)
+-- | Return a @(read, write)@ pair for an anonymous pipe, each as the handle
+-- and the descriptor it was made from.
+--
+-- The descriptor is carried along rather than recovered later with
+-- 'GHC.IO.Handle.FD.handleToFd', which rejects a 'DuplexHandle' -- and on
+-- FreeBSD, whose pipes are bidirectional, that is what 'fdToHandle' makes of
+-- these.  See #25512 for the symptom and #27889 for the cause.  It is the
+-- same descriptor either way.
+setupPipes :: IO ((Handle, Fd), (Handle, Fd))
 setupPipes = do
   (readFd, writeFd) <- createPipe
-  (,)
-    <$> fdToHandle readFd -- fdToHandle' readFd Nothing True ("read fd " <> show readFd) ReadMode True
-    <*> fdToHandle writeFd -- fdToHandle' writeFd Nothing True ("write fd " <> show writeFd) WriteMode True
+  readH  <- fdToHandle readFd
+  writeH <- fdToHandle writeFd
+  return ((readH, readFd), (writeH, writeFd))
 
 -- | Close the handles returned by 'setupPipes'.
-closePipes :: (Handle, Handle) -> IO ()
-closePipes (readH, writeH) = do
+closePipes :: ((Handle, Fd), (Handle, Fd)) -> IO ()
+closePipes ((readH, _), (writeH, _)) = do
   dropResourceVanishedError $ hClose readH
   dropResourceVanishedError $ hClose writeH
 
-reader :: Handle -> IO ()
-reader readHandle = do
+reader :: (Handle, Fd) -> IO ()
+reader (readHandle, readFd) = do
   let
     drain = do
-      fd <- handleToFd readHandle
-      threadWaitRead (Fd (fdFD fd))
+      threadWaitRead readFd
       msg <- BS.hGetSome readHandle 1024
       unless (BS.null msg) drain
 
@@ -77,13 +81,12 @@ withThread bgAction mainAction = do
     mainAction
 
 -- | Something to keep the reader busy reading.
-writer :: Handle -> IO ()
-writer writeHandle = do
+writer :: (Handle, Fd) -> IO ()
+writer (writeHandle, writeFd) = do
   hSetBuffering writeHandle NoBuffering
   let
     loop = do
-      fd <- handleToFd writeHandle
-      threadWaitWrite (Fd (fdFD fd))
+      threadWaitWrite writeFd
       BS.hPut writeHandle $ BS.replicate 1024 65
       -- We need a short delay so that the reader actually needs to wait for data to be present.
       -- Only then can we trigger the epoll registration race condition.
