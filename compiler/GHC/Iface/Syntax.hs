@@ -338,7 +338,12 @@ data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars    :: [IfaceTvBndr]
                                    , ifaxbRoles     :: [Role]
                                    , ifaxbRHS       :: IfaceType
                                    , ifaxbIncomps   :: [BranchIndex] }
-                                     -- See Note [Storing compatibility] in GHC.Core.Coercion.Axiom
+    -- We store the incompatibilities in IfaceAxBranch
+    --   just for (perhaps unnecessary) display purposes:
+    --   see Note [Displaying axiom incompatibilities]
+    -- When we construct a real CoAxBranch we compute cab_incomps directly
+    --   from the equations, ignoring the ifaxbIncomps.
+    -- We could consider getting rid of ifaxbIncomps altogether.
 
 data IfaceConDecls
   = IfAbstractTyCon -- c.f TyCon.AbstractTyCon
@@ -779,14 +784,13 @@ that is what is seen by importing module with --make
 
 Note [Displaying axiom incompatibilities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-With -fprint-axiom-incomps we display which closed type family equations
-are incompatible with which. This information is sometimes necessary
-because GHC doesn't try equations in order: any equation can be used when
-all preceding equations that are incompatible with it do not apply.
+With -fprint-axiom-incomps we display which closed type family equations are
+incompatible with which (see #15546). This information is sometimes necessary
+because GHC doesn't try equations in order: any equation can be used when all
+preceding equations that are incompatible with it do not apply.
 
-For example, the last "a && a = a" equation in Data.Type.Bool.&& is
-actually compatible with all previous equations, and can reduce at any
-time.
+For example, the last "a && a = a" equation in Data.Type.Bool.&& is actually
+compatible with all previous equations, and can reduce at any time.
 
 This is displayed as:
 Prelude> :i Data.Type.Equality.==
