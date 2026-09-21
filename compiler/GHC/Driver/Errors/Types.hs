@@ -369,7 +369,7 @@ data DriverMessage where
 
   DriverRedirectedNoMain :: !ModuleName -> DriverMessage
 
-  DriverHomePackagesNotClosed :: ![UnitId] -> DriverMessage
+  DriverHomePackagesNotClosed :: ![(UnitId, UnitId)] -> DriverMessage
 
   DriverInterfaceError :: !IfaceMessage -> DriverMessage
 
