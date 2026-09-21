@@ -443,13 +443,14 @@ The flow:
 Closure Property
 ----------------
 
-You must perform a clean cut of the dependency graph.
+A unit environment must have the closure property:
 
-> Any dependency which is not a home unit must not (transitively) depend on a home unit.
+    No used external unit depends on a home unit.
 
-For example, if you have three packages p, q and r, then if p depends on q which
-depends on r then it is illegal to load both p and r as home units but not q,
-because q is a dependency of the home unit p which depends on another home unit r.
+More concretely, a unit environment has the closure property exactly if no home
+unit directly or indirectly depends on an external unit that directly or
+indirectly depends on a home unit. 'GHC.Driver.Downsweep.checkHomeUnitsClosed'
+checks whether a given unit environment indeed has this property.
 
 Offsetting Paths
 ----------------
