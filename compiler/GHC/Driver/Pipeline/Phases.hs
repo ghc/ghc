@@ -13,6 +13,7 @@ import GHC.Driver.Errors.Types
 import GHC.Fingerprint.Type
 import GHC.Unit.Module.Location ( ModLocation )
 import GHC.Unit.Module.ModIface
+import GHC.Utils.Logger
 import GHC.Driver.Phases
 
 import Language.Haskell.Syntax.Module.Name ( ModuleName )
@@ -25,7 +26,7 @@ import GHC.Unit.Home.ModInfo
 -- phase if the inputs have been modified.
 data TPhase res where
   T_Unlit :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
-  T_FileArgs :: HscEnv -> FilePath -> TPhase (DynFlags, Messages PsMessage, Messages DriverMessage)
+  T_FileArgs :: Logger -> DynFlags -> FilePath -> TPhase ((DynFlags, [String], Messages PsMessage, Messages DriverMessage))
   T_Cpp   :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_HsPp  :: PipeEnv -> HscEnv -> FilePath -> FilePath -> TPhase FilePath
   T_HscRecomp :: PipeEnv -> HscEnv -> FilePath -> HscSource -> TPhase (HscEnv, ModSummary, HscRecompStatus)
