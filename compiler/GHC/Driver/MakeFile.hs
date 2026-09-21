@@ -20,7 +20,7 @@ import GHC qualified
 
 import GHC.Data.Bag (listToBag)
 import GHC.Data.Graph.Directed (SCC (..))
-import GHC.Data.OsPath (unsafeDecodeUtf, unsafeEncodeUtf)
+import GHC.Data.OsPath
 
 import GHC.Driver.DynFlags
 import GHC.Driver.Env
@@ -66,9 +66,13 @@ import Data.List (partition)
 import Data.Maybe (isJust, isNothing)
 import Data.Set qualified as Set
 import System.Directory
-import System.FilePath
+import qualified System.Directory as Directory
+import System.OsPath as OsPath
 import System.IO
 import System.IO.Error (isEOFError)
+import qualified System.OsString as OsString
+import qualified Data.Monoid as Monoid
+import qualified System.FilePath as FilePath
 
 -----------------------------------------------------------------
 --
@@ -110,27 +114,43 @@ doMkDependHS srcs = do
 
 doMkDependModuleGraph :: GhcMonad m =>  DynFlags -> ModuleGraph -> m ()
 doMkDependModuleGraph dflags module_graph = do
+    hsc_env <- getSession
     logger <- getLogger
-    tmpfs <- hsc_tmpfs <$> getSession
-    let excl_mods = depExcludeMods dflags
+    let
+      tmpfs = hsc_tmpfs hsc_env
+      excl_mods = depExcludeMods dflags
 
-    files <- liftIO $ beginMkDependHS logger tmpfs dflags
+    root_ <- liftIO getCurrentDirectory
+    root <- encodeUtf root_
+
+    let
+      backends = concat
+        [ [ initFileDepWriter logger root tmpfs dflags
+          ]
+        ]
+
     let sorted = GHC.topSortModuleGraph False module_graph Nothing
-
     -- Print out the dependencies if wanted
     liftIO $ debugTraceMsg logger 2 (text "Module dependencies" $$ ppr sorted)
 
-    -- Process them one by one, dumping results into makefile
-    -- and complaining about cycles
-    hsc_env <- getSession
-    root <- liftIO getCurrentDirectory
-    mapM_ (liftIO . processDeps dflags hsc_env (UniqSet.mkUniqSet excl_mods) root (mkd_tmp_hdl files)) sorted
+    liftIO $ do
 
-    -- If -ddump-mod-cycles, show cycles in the module graph
-    liftIO $ dumpModCycles logger module_graph
+      -- Setup the writers
+      writers <- sequenceA backends
+      sinks <- traverse dw_beginWriter writers
 
-    -- Tidy up
-    liftIO $ endMkDependHS logger files
+      -- Do the actual work
+      do
+        -- Process them one by one, dumping results and complaining about cycles
+        mapM_ (processDeps dflags hsc_env (UniqSet.mkUniqSet excl_mods) sinks) sorted
+
+        -- If -ddump-mod-cycles, show cycles in the module graph
+        liftIO $ dumpModCycles logger module_graph
+
+      -- Tidy up
+      do
+        traverse_ dw_endWriter writers
+
 
     -- Unconditional exiting is a bad idea.  If an error occurs we'll get an
     --exception; if that is not caught it's fine, but at least we have a
@@ -138,6 +158,200 @@ doMkDependModuleGraph dflags module_graph = do
     --line if you disagree.
 
     --`GHC.ghcCatch` \_ -> io $ exitWith (ExitFailure 1)
+
+--------------------------------------------------------------------------------
+-- Types abstracting over the output
+--------------------------------------------------------------------------------
+
+data DepNode =
+  DepNode
+    { dn_mod :: Module
+    , dn_src :: OsPath
+    , dn_obj :: OsPath
+    , dn_hi :: OsPath
+    , dn_boot :: IsBootInterface
+    , dn_preprocessing :: PreprocessingNode
+    }
+
+data PreprocessingNode = PreprocessingNode
+  { pn_preprocessor :: Maybe String
+  , pn_options :: [String]
+  }
+
+data Dep
+  = DepHi
+    { dep_mod :: Module
+    , dep_path :: OsPath
+    , dep_unit :: Maybe UnitInfo
+    , dep_local :: Bool
+    , dep_boot :: IsBootInterface
+    }
+  | DepCpp
+    { dep_path :: OsPath
+    }
+
+data DependencyWriter = DependencyWriter
+  { dw_beginWriter :: IO DepSink
+  , dw_endWriter :: IO ()
+  }
+
+data DepSink = DepSink
+  { ds_writeDependency :: DepNode -> [Dep] -> IO ()
+  }
+
+-----------------------------------------------------------------
+--
+--              processDeps
+--
+-----------------------------------------------------------------
+
+processDeps :: DynFlags
+            -> HscEnv
+            -> UniqSet ModuleName -- ^ Excludes
+            -> [DepSink]
+            -> SCC ModuleGraphNode
+            -> IO ()
+-- Write suitable dependencies to handle
+-- Always:
+--                      this.o : this.hs
+--
+-- If the dependency is on something other than a .hi file:
+--                      this.o this.p_o ... : dep
+-- otherwise
+--                      this.o ...   : dep.hi
+--                      this.p_o ... : dep.p_hi
+--                      ...
+-- (where .o is $osuf, and the other suffixes come from
+-- the cmdline -s options).
+--
+-- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
+
+processDeps _ hsc_env _ _ (CyclicSCC nodes)
+  =     -- There shouldn't be any cycles; report them
+    throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $ cyclicModuleErr nodes
+
+processDeps _ hsc_env _ _ (AcyclicSCC (InstantiationNode _uid node))
+  =     -- There shouldn't be any backpack instantiations; report them as well
+    throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $
+      mkPlainErrorMsgEnvelope noSrcSpan $
+      GhcDriverMessage $ DriverInstantiationNodeInDependencyGeneration node
+
+processDeps _dflags _ _ _ (AcyclicSCC (LinkNode {})) = return ()
+processDeps _dflags _ _ _ (AcyclicSCC (UnitNode {})) = return ()
+processDeps _ _ _ _ (AcyclicSCC (ModuleNode _ (ModuleNodeFixed {})))
+  -- No dependencies needed for fixed modules (already compiled)
+  = return ()
+
+processDeps dflags hsc_env excl_mods sinks (AcyclicSCC (ModuleNode _ (ModuleNodeCompile node))) = do
+  pp <- preprocessor
+  let
+    dep_node = mkDepNode pp
+    find_deps imps = do
+      cpp_deps <- find_cpp_deps
+      import_deps <- find_import_deps imps
+      pure $ map Right cpp_deps ++ import_deps
+  (missing_dep_errs, deps) <- partitionEithers <$> find_deps (ms_imps node)
+
+  if null missing_dep_errs
+    then do
+      traverse_ (\ sink -> ds_writeDependency sink dep_node deps) sinks
+    else do
+      let sec = initSourceErrorContext (hsc_dflags hsc_env)
+      throwErrors sec (mkMessages (listToBag missing_dep_errs))
+  where
+    src_file = msHsFileOsPath node
+    mkDepNode preproc =
+      DepNode
+        { dn_mod = ms_mod node
+        , dn_src = src_file
+        , dn_obj = msObjFileOsPath node
+        , dn_hi = msHiFileOsPath node
+        , dn_boot = isBootSummary node
+        , dn_preprocessing = preproc
+        }
+
+    preprocessor :: IO PreprocessingNode
+    preprocessor
+      | Just src <- ml_hs_file (ms_location node)
+      = runPipeline (hsc_hooks hsc_env) $ do
+        let
+          (_, suffix) = FilePath.splitExtension src
+          lit | Unlit _ <- startPhase suffix = True
+              | otherwise = False
+          pipe_env = mkPipeEnv StopPreprocess src Nothing NoOutputFile
+        unlit_fn <- if lit then use (T_Unlit pipe_env hsc_env src) else pure src
+        (dflags1, opts, _, _) <- use (T_FileArgs (hsc_logger hsc_env) (ms_hspp_opts node) unlit_fn)
+        let pp = pgm_F dflags1
+        pure PreprocessingNode
+          { pn_preprocessor = if null pp then global_preprocessor else Just pp
+          , pn_options = opts
+          }
+      | otherwise
+      = pure PreprocessingNode
+          { pn_preprocessor = global_preprocessor
+          , pn_options = []
+          }
+
+    global_preprocessor :: Maybe String
+    global_preprocessor
+      | let pp = pgm_F dflags
+      , not (null pp)
+      = Just pp
+      | otherwise
+      = Nothing
+
+    -- Emit a dependency for each CPP import
+    -- CPP deps are discovered in the module parsing phase by parsing
+    -- comment lines left by the preprocessor.
+    -- Note that GHC.parseModule may throw an exception if the module
+    -- fails to parse, which may not be desirable (see #16616).
+    find_cpp_deps :: IO [Dep]
+    find_cpp_deps =
+      if depIncludeCppDeps dflags
+        then do
+          session <- Session <$> newIORef hsc_env
+          parsedMod <- reflectGhc (GHC.parseModule node) session
+          pure (DepCpp . unsafeEncodeUtf <$> GHC.pm_extra_src_files parsedMod)
+        else
+          pure []
+
+    -- Emit a dependency for each import
+    find_import_deps :: [UnresolvedImport PkgQual] -> IO [Either (MsgEnvelope GhcMessage) Dep]
+    find_import_deps idecls =
+      sequence
+        [ findDependency hsc_env decl
+        | decl <- idecls
+        , let L _loc mod = ui_mod_name decl
+        , not $ mod `UniqSet.elementOfUniqSet` excl_mods
+        ]
+
+findDependency  :: HscEnv
+                -> UnresolvedImport PkgQual   -- The import to find
+                -> IO (Either (MsgEnvelope GhcMessage) Dep)  -- Interface file
+findDependency hsc_env imp = do
+  -- Find the module; this will be fast because
+  -- we've done it once during downsweep.
+  r <- resolveImport hsc_env imp
+  case r of
+    Found loc dep_mod ->
+      pure $ Right
+        DepHi
+          { dep_mod = dep_mod
+          , dep_path = ml_hi_file_ospath loc
+          , dep_unit = lookupUnitId (hsc_units hsc_env) (moduleUnitId dep_mod)
+          , dep_local = isJust (ml_hs_file loc)
+          , dep_boot = is_boot
+          }
+
+    fail ->
+      return $
+        Left $
+          mkPlainErrorMsgEnvelope srcloc $
+          GhcDriverMessage $ DriverInterfaceError $
+             (Can'tFindInterface (cannotFindModule hsc_env mod_name fail) (LookingForModule mod_name is_boot))
+  where
+    L srcloc mod_name = ui_mod_name imp
+    is_boot           = ui_boot imp
 
 -----------------------------------------------------------------
 --
@@ -147,6 +361,18 @@ doMkDependModuleGraph dflags module_graph = do
 --      slurp through it, etc
 --
 -----------------------------------------------------------------
+
+initFileDepWriter :: Logger -> OsPath -> TmpFs -> DynFlags -> IO DependencyWriter
+initFileDepWriter logger root tmpfs dflags = do
+  files <- beginMkDependHS logger tmpfs dflags
+  pure DependencyWriter
+    { dw_beginWriter = do
+        pure $ DepSink $ \ node deps -> do
+          writeDependencies (depIncludePkgDeps dflags) root (mkd_tmp_hdl files) suffixes node deps
+    , dw_endWriter = endMkDependHS logger files
+    }
+  where
+    suffixes = map unsafeEncodeUtf (depSuffixes dflags)
 
 data MkDepFiles
   = MkDep { mkd_make_file :: FilePath,          -- Name of the makefile
@@ -163,7 +389,7 @@ beginMkDependHS logger tmpfs dflags = do
 
         -- open the makefile
   let makefile = depMakefile dflags
-  exists <- doesFileExist makefile
+  exists <- Directory.doesFileExist makefile
   mb_make_hdl <-
         if not exists
         then return Nothing
@@ -200,196 +426,12 @@ beginMkDependHS logger tmpfs dflags = do
   return (MkDep { mkd_make_file = makefile, mkd_make_hdl = mb_make_hdl,
                   mkd_tmp_file  = tmp_file, mkd_tmp_hdl  = tmp_hdl})
 
---------------------------------------------------------------------------------
--- Types abstracting over the output
---------------------------------------------------------------------------------
-
-data DepNode =
-  DepNode
-    { dn_mod :: Module
-    , dn_src :: FilePath
-    , dn_obj :: FilePath
-    , dn_hi :: FilePath
-    , dn_boot :: IsBootInterface
-    , dn_preprocessing :: PreprocessingNode
-    }
-
-data PreprocessingNode = PreprocessingNode
-  { pn_preprocessor :: Maybe String
-  , pn_options :: [String]
-  }
-
-data Dep
-  = DepHi
-    { dep_mod :: Module
-    , dep_path :: FilePath
-    , dep_unit :: Maybe UnitInfo
-    , dep_local :: Bool
-    , dep_boot :: IsBootInterface
-    }
-  | DepCpp
-    { dep_path :: FilePath
-    }
-
-
------------------------------------------------------------------
---
---              processDeps
---
------------------------------------------------------------------
-
-processDeps :: DynFlags
-            -> HscEnv
-            -> UniqSet ModuleName -- ^ Excludes
-            -> FilePath
-            -> Handle           -- Write dependencies to here
-            -> SCC ModuleGraphNode
-            -> IO ()
--- Write suitable dependencies to handle
--- Always:
---                      this.o : this.hs
---
--- If the dependency is on something other than a .hi file:
---                      this.o this.p_o ... : dep
--- otherwise
---                      this.o ...   : dep.hi
---                      this.p_o ... : dep.p_hi
---                      ...
--- (where .o is $osuf, and the other suffixes come from
--- the cmdline -s options).
---
--- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
-
-processDeps _ hsc_env _ _ _ (CyclicSCC nodes)
-  =     -- There shouldn't be any cycles; report them
-    throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $ cyclicModuleErr nodes
-
-processDeps _ hsc_env _ _ _ (AcyclicSCC (InstantiationNode _uid node))
-  =     -- There shouldn't be any backpack instantiations; report them as well
-    throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $
-      mkPlainErrorMsgEnvelope noSrcSpan $
-      GhcDriverMessage $ DriverInstantiationNodeInDependencyGeneration node
-
-processDeps _dflags _ _ _ _ (AcyclicSCC (LinkNode {})) = return ()
-processDeps _dflags _ _ _ _ (AcyclicSCC (UnitNode {})) = return ()
-processDeps _ _ _ _ _ (AcyclicSCC (ModuleNode _ (ModuleNodeFixed {})))
-  -- No dependencies needed for fixed modules (already compiled)
-  = return ()
-
-processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ (ModuleNodeCompile node))) = do
-  pp <- preprocessor
-  let
-    dep_node = mkDepNode pp
-    find_deps imps = do
-      cpp_deps <- find_cpp_deps
-      import_deps <- find_import_deps imps
-      pure $ map Right cpp_deps ++ import_deps
-  (missing_dep_errs, deps) <- partitionEithers <$> find_deps (ms_imps node)
-
-  if null missing_dep_errs
-    then do
-      writeDependencies include_pkg_deps root hdl extra_suffixes dep_node deps
-    else do
-      let sec = initSourceErrorContext (hsc_dflags hsc_env)
-      throwErrors sec (mkMessages (listToBag missing_dep_errs))
-  where
-    extra_suffixes = depSuffixes dflags
-    include_pkg_deps = depIncludePkgDeps dflags
-    src_file = msHsFilePath node
-    mkDepNode opts =
-      DepNode {
-        dn_mod = ms_mod node,
-        dn_src = src_file,
-        dn_obj = msObjFilePath node,
-        dn_hi = msHiFilePath node,
-        dn_boot = isBootSummary node,
-        dn_preprocessing = opts
-      }
-
-    preprocessor :: IO PreprocessingNode
-    preprocessor
-      | Just src <- ml_hs_file (ms_location node)
-      = runPipeline (hsc_hooks hsc_env) $ do
-        let (_, suffix) = splitExtension src
-            lit | Unlit _ <- startPhase suffix = True
-                | otherwise = False
-            pipe_env = mkPipeEnv StopPreprocess src Nothing NoOutputFile
-        unlit_fn <- if lit then use (T_Unlit pipe_env hsc_env src) else pure src
-        (dflags1, opts, _, _) <- use (T_FileArgs (hsc_logger hsc_env) (hsc_dflags hsc_env) unlit_fn)
-        let pp = pgm_F dflags1
-        pure PreprocessingNode
-          { pn_preprocessor = if null pp then global_preprocessor else Just pp
-          , pn_options = opts
-          }
-      | otherwise
-      = pure PreprocessingNode
-          { pn_preprocessor = global_preprocessor
-          , pn_options = []
-          }
-
-    global_preprocessor :: Maybe String
-    global_preprocessor
-      | let pp = pgm_F dflags
-      , not (null pp)
-      = Just pp
-      | otherwise
-      = Nothing
-
-    -- Emit a dependency for each CPP import
-    -- CPP deps are discovered in the module parsing phase by parsing
-    -- comment lines left by the preprocessor.
-    -- Note that GHC.parseModule may throw an exception if the module
-    -- fails to parse, which may not be desirable (see #16616).
-    find_cpp_deps :: IO [Dep]
-    find_cpp_deps = do
-      session <- Session <$> newIORef hsc_env
-      parsedMod <- reflectGhc (GHC.parseModule node) session
-      pure (DepCpp <$> GHC.pm_extra_src_files parsedMod)
-
-    -- Emit a dependency for each import
-    find_import_deps :: [UnresolvedImport PkgQual] -> IO [Either (MsgEnvelope GhcMessage) Dep]
-    find_import_deps idecls =
-      sequence
-        [ findDependency hsc_env decl
-        | decl <- idecls
-        , let L _loc mod = ui_mod_name decl
-        , not $ mod `UniqSet.elementOfUniqSet` excl_mods
-        ]
-
-
-findDependency  :: HscEnv
-                -> UnresolvedImport PkgQual   -- The import to find
-                -> IO (Either (MsgEnvelope GhcMessage) Dep)  -- Interface file
-findDependency hsc_env imp = do
-  -- Find the module; this will be fast because
-  -- we've done it once during downsweep.
-  r <- resolveImport hsc_env imp
-  case r of
-    Found loc dep_mod ->
-      pure $ Right
-        DepHi
-          { dep_mod = dep_mod
-          , dep_path = ml_hi_file loc
-          , dep_unit = lookupUnitId (hsc_units hsc_env) (moduleUnitId dep_mod)
-          , dep_local = isJust (ml_hs_file loc)
-          , dep_boot = is_boot
-          }
-
-    fail ->
-      return $
-        Left $
-          mkPlainErrorMsgEnvelope srcloc $
-          GhcDriverMessage $ DriverInterfaceError $
-             (Can'tFindInterface (cannotFindModule hsc_env mod_name fail) (LookingForModule mod_name is_boot))
-  where
-    L srcloc mod_name = ui_mod_name imp
-    is_boot           = ui_boot imp
-
 writeDependencies ::
   Bool ->
-  FilePath ->
+  OsPath ->
   Handle ->
-  [FilePath] ->
+  [OsString] ->
+  -- ^ Suffixes
   DepNode ->
   [Dep] ->
   IO ()
@@ -406,7 +448,7 @@ writeDependencies include_pkgs root hdl suffixes node deps =
     -- files if the module has a corresponding .hs-boot file (#14482)
     boot_dep
       | IsBoot <- dn_boot
-      = [([obj], hi) | (obj, hi) <- zip (suffixed (viaOsPath removeBootSuffix dn_obj)) (suffixed dn_hi)]
+      = [([obj], hi) | (obj, hi) <- zip (suffixed (removeBootSuffix dn_obj)) (suffixed dn_hi)]
       | otherwise
       = []
 
@@ -431,10 +473,8 @@ writeDependencies include_pkgs root hdl suffixes node deps =
 
     DepNode {dn_src, dn_obj, dn_hi, dn_boot} = node
 
-    viaOsPath f a = unsafeDecodeUtf (f (unsafeEncodeUtf a))
-
 -----------------------------
-writeDependency :: FilePath -> Handle -> [FilePath] -> FilePath -> IO ()
+writeDependency :: OsPath -> Handle -> [OsPath] -> OsPath -> IO ()
 -- (writeDependency r h [t1,t2] dep) writes to handle h the dependency
 --      t1 t2 : dep
 writeDependency root hdl targets dep
@@ -442,25 +482,25 @@ writeDependency root hdl targets dep
            --     c:/foo/...
            -- on Windows as make gets confused by the :
            -- Making relative deps avoids some instances of this.
-           dep' = makeRelative root dep
-           forOutput = escapeSpaces . reslash Forwards . normalise
+           dep' = OsPath.makeRelative root dep
+           forOutput = escapeSpaces . reslash Forwards . unsafeDecodeUtf . OsPath.normalise
            output = unwords (map forOutput targets) ++ " : " ++ forOutput dep'
        hPutStrLn hdl output
 
 -----------------------------
 insertSuffixes
-        :: FilePath     -- Original filename;   e.g. "foo.o"
-        -> [String]     -- Suffix prefixes      e.g. ["x_", "y_"]
-        -> [FilePath]   -- Zapped filenames     e.g. ["foo.x_o", "foo.y_o"]
+        :: OsPath     -- Original filename;   e.g. "foo.o"
+        -> [OsString]     -- Suffix prefixes      e.g. ["x_", "y_"]
+        -> [OsPath]   -- Zapped filenames     e.g. ["foo.x_o", "foo.y_o"]
         -- Note that the extra bit gets inserted *before* the old suffix
         -- We assume the old suffix contains no dots, so we know where to
         -- split it
 insertSuffixes file_name extras
-  = [ basename <.> (extra ++ suffix) | extra <- extras ]
+  = [ basename <.> (extra Monoid.<> suffix) | extra <- extras ]
   where
-    (basename, suffix) = case splitExtension file_name of
+    (basename, suffix) = case OsPath.splitExtension file_name of
                          -- Drop the "." from the extension
-                         (b, s) -> (b, drop 1 s)
+                         (b, s) -> (b, OsString.drop 1 s)
 
 
 -----------------------------------------------------------------
