@@ -72,9 +72,12 @@ import GHC.Internal.Prim (Int#, State#, RealWorld,
 import GHC.Internal.Real ( fromIntegral )
 import GHC.Internal.System.Posix.Types
 
+#if !defined(javascript_HOST_ARCH)
+import GHC.Internal.IO.SubSystem
+#endif
+
 #if defined(mingw32_HOST_OS)
 import qualified GHC.Internal.Conc.Windows as Windows
-import GHC.Internal.IO.SubSystem
 import GHC.Internal.Conc.Windows (asyncRead, asyncWrite, asyncDoProc, asyncReadBA,
                          asyncWriteBA, ConsoleEvent(..), win32ConsoleHandler,
                          toWin32ConsoleEvent)
@@ -124,9 +127,9 @@ ioManagerCapabilitiesChanged = return ()
 threadWaitRead :: Fd -> IO ()
 threadWaitRead fd
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-  | threaded  = Event.threadWaitRead fd
+  | iomgrInLib = Event.threadWaitRead fd
 #endif
-  | otherwise = IO $ \s ->
+  | otherwise  = IO $ \s ->
         case fromIntegral fd of { I# fd# ->
         case waitRead# fd# s of { s' -> (# s', () #)
         }}
@@ -140,9 +143,9 @@ threadWaitRead fd
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-  | threaded  = Event.threadWaitWrite fd
+  | iomgrInLib = Event.threadWaitWrite fd
 #endif
-  | otherwise = IO $ \s ->
+  | otherwise  = IO $ \s ->
         case fromIntegral fd of { I# fd# ->
         case waitWrite# fd# s of { s' -> (# s', () #)
         }}
@@ -154,9 +157,9 @@ threadWaitWrite fd
 threadWaitReadSTM :: Fd -> IO (STM.STM (), IO ())
 threadWaitReadSTM fd
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-  | threaded  = Event.threadWaitReadSTM fd
+  | iomgrInLib = Event.threadWaitReadSTM fd
 #endif
-  | otherwise = do
+  | otherwise  = do
       m <- STM.newTVarIO False
       t <- Sync.forkIO $ do
         threadWaitRead fd
@@ -173,9 +176,9 @@ threadWaitReadSTM fd
 threadWaitWriteSTM :: Fd -> IO (STM.STM (), IO ())
 threadWaitWriteSTM fd
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-  | threaded  = Event.threadWaitWriteSTM fd
+  | iomgrInLib = Event.threadWaitWriteSTM fd
 #endif
-  | otherwise = do
+  | otherwise  = do
       m <- STM.newTVarIO False
       t <- Sync.forkIO $ do
         threadWaitWrite fd
@@ -206,9 +209,9 @@ closeFdWith :: (Fd -> IO ()) -- ^ Low-level action that performs the real close.
             -> IO ()
 closeFdWith close fd
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-  | threaded  = Event.closeFdWith close fd
+  | iomgrInLib = Event.closeFdWith close fd
 #endif
-  | otherwise = close fd
+  | otherwise  = close fd
 
 -- | Suspends the current thread for a given number of microseconds
 -- (GHC only).
@@ -223,12 +226,11 @@ closeFdWith close fd
 threadDelay :: Int -> IO ()
 threadDelay time
 #if defined(mingw32_HOST_OS)
-  | isWindowsNativeIO = Windows.threadDelay time
-  | threaded          = Windows.threadDelay time
+  | iomgrInLib        = Windows.threadDelay time
 #elif defined(wasm32_HOST_ARCH)
   | Wasm.isJSFFIUsed  = Wasm.threadDelay time
 #elif !defined(javascript_HOST_ARCH)
-  | threaded  = Event.threadDelay time
+  | iomgrInLib        = Event.threadDelay time
 #endif
   | otherwise         = IO $ \s ->
         case time of { I# time# ->
@@ -245,16 +247,11 @@ threadDelay time
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay _usecs
 #if defined(mingw32_HOST_OS)
-  | isWindowsNativeIO = Windows.registerDelay _usecs
-  | threaded          = Windows.registerDelay _usecs
+  | iomgrInLib        = Windows.registerDelay _usecs
 #elif !defined(javascript_HOST_ARCH)
-  | threaded          = Event.registerDelay _usecs
+  | iomgrInLib        = Event.registerDelay _usecs
 #endif
   | otherwise         = errorWithoutStackTrace "registerDelay: requires -threaded"
-
-#if !defined(javascript_HOST_ARCH)
-foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
-#endif
 
 
 -- ---------------------------------------------------------------------------
