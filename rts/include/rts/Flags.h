@@ -45,7 +45,7 @@ typedef struct _GC_FLAGS {
     uint32_t     maxHeapSize;        /* in *blocks* */
     uint32_t     minAllocAreaSize;   /* in *blocks* */
     uint32_t     largeAllocLim;      /* in *blocks* */
-    uint32_t     nurseryChunkSize;   /* in *blocks* */
+    int32_t      nurseryChunkSize;   /* in *blocks*, int to distinguish default off, vs explicit off */
     uint32_t     minOldGenSize;      /* in *blocks* */
     uint32_t     heapSizeSuggestion; /* in *blocks* */
     bool heapSizeSuggestionAuto;
@@ -80,7 +80,7 @@ typedef struct _GC_FLAGS {
                                  * to handle the exception before we
                                  * raise it again.
                                  */
-    StgWord heapLimitGrace;     /* units: *blocks*
+    StgWord heapLimitGrace;     /* units: *bytes*
                                  * After a HeapOverflow exception has
                                  * been raised, how much extra space is
                                  * given to the thread to handle the

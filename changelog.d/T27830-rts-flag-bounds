@@ -1,0 +1,17 @@
+section: rts
+synopsis: Update RTS flag handling: It now respects user set -n values, allows resetting of more settings to defaults and gives more accurate bounds in errors.
+description:
+  Using 0 as argument to any of these flags now resets the flags setting to default:
+
+    - ``-n0`` disables nursery chunking.
+    - ``-K0`` (or a bare ``-K``) removes the stack size limit.
+    - ``-M0`` removes the heap size limit.
+    - ``-H0`` resets the suggested heap size, including the nursery scaling set by ``-H``.
+    - ``-AL0`` makes the large object allocation limit follow ``-A`` again.
+
+  A nursery chunk size (``-n``) larger than the allocation area (``-A``) now prints a
+  warning and disables nursery chunking. Previously every nursery was enlarged to the chunk size.
+
+  The number of generations (``-G``) is now limited to 64.
+issues: #27830 #27829
+mrs: !16713

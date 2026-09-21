@@ -52,6 +52,8 @@
 // ie. StgWord.  Note that we have had some tricky int overflows in a
 // couple of cases caused by using ints rather than longs (e.g. #5086)
 
+#define GC_MAX_GENERATIONS 64
+
 typedef StgWord memcount;
 
 typedef struct nursery_ {

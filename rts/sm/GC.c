@@ -154,7 +154,7 @@ static Condition gc_exit_leave_now_cv;
 
 #else // THREADED_RTS
 // Must match the alignment of gen_workspace.
-StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(gen_workspace)]
+StgWord8 the_gc_thread[sizeof(gc_thread) + GC_MAX_GENERATIONS * sizeof(gen_workspace)]
     ATTRIBUTE_ALIGNED(GEN_WORKSPACE_ALIGNMENT);
 #endif // THREADED_RTS
 

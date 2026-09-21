@@ -493,7 +493,7 @@ performance.
     Sets the limit on the total size of "large objects" (objects
     larger than about 3KB) that can be allocated before a GC is
     triggered. By default this limit is the same as the :rts-flag:`-A <-A
-    ⟨size⟩>` value.
+    ⟨size⟩>` value. ``-AL0`` restores the default.
 
     Large objects are not allocated from the normal allocation area
     set by the ``-A`` flag, which is why there is a separate limit for
@@ -635,10 +635,11 @@ performance.
 
     Set the number of generations used by the garbage
     collector. The default of 2 seems to be good, but the garbage
-    collector can support any number of generations. Anything larger
+    collector can in theory support any number of generations. Anything larger
     than about 4 is probably not a good idea unless your program runs
     for a *long* time, because the oldest generation will hardly ever
-    get collected.
+    get collected. Currently the RTS hardcodes a limit of 64 generations which
+    seems plenty.
 
     Specifying 1 generation with ``+RTS -G1`` gives you a simple 2-space
     collector, as you would expect. In a 2-space collector, the :rts-flag:`-A
@@ -730,6 +731,9 @@ performance.
     overall memory requirements of the program. It can be useful when
     the default small ``-A`` value is suboptimal, as it can be in
     programs that create large amounts of long-lived data.
+
+    ``-H0`` resets both the size suggestion, and dynamic scaling enablied by a
+    bare ``-H``.
 
 .. rts-flag:: -I ⟨seconds⟩
 
@@ -886,7 +890,7 @@ performance.
     of the program. The only reason for having this option is to stop
     the heap growing without bound and filling up all the available swap
     space, which at the least will result in the program being summarily
-    killed by the operating system.
+    killed by the operating system. ``-M0`` resets any limit set by ``-M<size>``.
 
     The maximum heap size also affects other garbage collection
     parameters: when the amount of live data in the heap exceeds a
