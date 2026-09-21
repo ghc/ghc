@@ -1,1 +1,1 @@
-rtsflags001: error in RTS option -H0m: size outside allowed range (4096 - 4294967295)
+rtsflags001: error in RTS option -H1k: size outside allowed range (0 or 4096 - 17592186040320)

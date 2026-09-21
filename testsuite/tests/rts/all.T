@@ -171,7 +171,7 @@ test('T3424',
 # Test for out-of-range heap size
 test('rtsflags001', [ only_ways(['normal']),
                       exit_code(1),
-                      extra_run_opts('+RTS -H0m -RTS'),
+                      extra_run_opts('+RTS -H1k -RTS'),
                       js_skip # JS backend uses its own rts.
                     ],
                      compile_and_run, [''])

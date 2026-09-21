@@ -273,7 +273,7 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
     if (RtsFlags.GcFlags.nurseryChunkSize == 0) {
         new_n_nurseries = to;
     } else {
-        memcount total_alloc = to * RtsFlags.GcFlags.minAllocAreaSize;
+        memcount total_alloc = to * (size_t) RtsFlags.GcFlags.minAllocAreaSize;
         new_n_nurseries =
             stg_max(to, total_alloc / RtsFlags.GcFlags.nurseryChunkSize);
     }

@@ -101,7 +101,8 @@ static int  openStatsFile (
     char *filename, const char *FILENAME_FMT, FILE **file_ret);
 
 static StgWord64 decodeSize (
-    const char *flag, uint32_t offset, StgWord64 min, StgWord64 max);
+    const char *flag, uint32_t offset, StgWord64 min, StgWord64 max,
+    bool allow_zero);
 
 static double parseDouble (
     const char *arg, bool *error);
@@ -141,8 +142,8 @@ void initRtsFlagsDefaults(void)
     if (maxStkSize == 0)
         maxStkSize = 8 * 1024 * 1024;
     // GcFlags.maxStkSiz is 32-bit, so we need to cap to prevent overflow (#17019)
-    else if (maxStkSize > UINT32_MAX * sizeof(W_))
-        maxStkSize = UINT32_MAX * sizeof(W_);
+    else if (maxStkSize > (StgWord64) UINT32_MAX * sizeof(W_))
+        maxStkSize = (StgWord64) UINT32_MAX * sizeof(W_);
 
     RtsFlags.GcFlags.statsFile          = NULL;
     RtsFlags.GcFlags.giveStats          = NO_GC_STATS;
@@ -155,7 +156,7 @@ void initRtsFlagsDefaults(void)
     /* -A default. See #16499 for a discussion about the tradeoffs */
     RtsFlags.GcFlags.minAllocAreaSize   = (4 * 1024 * 1024)       / BLOCK_SIZE;
     RtsFlags.GcFlags.largeAllocLim      = 0; /* defaults to minAllocAreasize */
-    RtsFlags.GcFlags.nurseryChunkSize   = 0;
+    RtsFlags.GcFlags.nurseryChunkSize   = -1; /* -1: Nothing set by user, normalized to off by default, 0: off explicitly, <n>: explicit size*/
     RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE; /* -O default */
     RtsFlags.GcFlags.maxHeapSize        = 0;    /* off by default */
     RtsFlags.GcFlags.heapLimitGrace     = (1024 * 1024);
@@ -331,7 +332,7 @@ usage_text[] = {
 "  --copying-gc",
 "            Selects the copying garbage collector to manage all generations.",
 "",
-"  -K<size>  Sets the maximum stack size (default: 80% of the heap)",
+"  -K<size>  Sets the maximum stack size (0 = unlimited, default: 80% of the heap)",
 "            e.g.: -K32k -K512k -K8M",
 "  -ki<size> Sets the initial thread stack size (default 1k)  e.g.: -ki4k -ki2m",
 "  -kc<size> Sets the stack chunk size (default 32k)",
@@ -349,9 +350,9 @@ usage_text[] = {
 "            memory controlled by this factor (higher is slower). Setting the factor",
 "            to 0 means memory is not returned.",
 "            (default 4.0)",
-"  -n<size>  Allocation area chunk size (0 = disabled, default: 0)",
+"  -n<size>  Allocation area chunk size (0 = disabled, default: 0, 4m for -A >= 16m)",
 "  -O<size>  Sets the minimum size of the old generation (default 1M)",
-"  -M<size>  Sets the maximum heap size (default unlimited)  e.g.: -M256k -M1G",
+"  -M<size>  Sets the maximum heap size (0 = unlimited, default unlimited)  e.g.: -M256k -M1G",
 "  -H<size>  Sets the minimum heap size (default 0M)   e.g.: -H24m  -H1G",
 "  -xb<addr> Sets the address from which a suitable start for the heap memory",
 "            will be searched from. This is useful if the default address",
@@ -1239,19 +1240,19 @@ error = true;
                   if (rts_argv[arg][2] == 'L') {
                       RtsFlags.GcFlags.largeAllocLim
                           = decodeSize(rts_argv[arg], 3, 2*BLOCK_SIZE,
-                                       HS_INT_MAX) / BLOCK_SIZE;
+                                       (StgWord64) HS_WORD32_MAX * BLOCK_SIZE, true) / BLOCK_SIZE;
                   } else {
                       // minimum two blocks in the nursery, so that we have one
                       // to grab for allocate().
                       RtsFlags.GcFlags.minAllocAreaSize
                           = decodeSize(rts_argv[arg], 2, 2*BLOCK_SIZE,
-                                       HS_INT_MAX) / BLOCK_SIZE;
+                                       (StgWord64) HS_WORD32_MAX * BLOCK_SIZE, false) / BLOCK_SIZE;
                   }
                   break;
               case 'n':
                   OPTION_UNSAFE;
                   RtsFlags.GcFlags.nurseryChunkSize
-                      = decodeSize(rts_argv[arg], 2, 2*BLOCK_SIZE, HS_INT_MAX)
+                      = decodeSize(rts_argv[arg], 2, 2*BLOCK_SIZE, ((StgWord64) HS_INT32_MAX) * BLOCK_SIZE, true)
                            / BLOCK_SIZE;
                   break;
 
@@ -1301,9 +1302,14 @@ error = true;
 
               case 'K':
                   OPTION_UNSAFE;
-                  RtsFlags.GcFlags.maxStkSize =
-                      decodeSize(rts_argv[arg], 2, 0, UINT32_MAX)
-                      / sizeof(W_);
+                  // -K and -K0 mean unlimited.
+                  if (rts_argv[arg][2] == '\0') {
+                      RtsFlags.GcFlags.maxStkSize = 0;
+                  } else {
+                      RtsFlags.GcFlags.maxStkSize =
+                          decodeSize(rts_argv[arg], 2, sizeof(W_), (StgWord64) UINT32_MAX * sizeof(W_), true)
+                          / sizeof(W_);
+                  }
                   break;
 
               case 'k':
@@ -1311,22 +1317,22 @@ error = true;
                 switch(rts_argv[arg][2]) {
                 case 'c':
                   RtsFlags.GcFlags.stkChunkSize =
-                      decodeSize(rts_argv[arg], 3, sizeof(W_), HS_WORD_MAX)
+                      decodeSize(rts_argv[arg], 3, sizeof(W_), (StgWord64)HS_WORD32_MAX * sizeof(W_), false)
                       / sizeof(W_);
                   break;
                 case 'b':
                   RtsFlags.GcFlags.stkChunkBufferSize =
-                      decodeSize(rts_argv[arg], 3, sizeof(W_), HS_WORD_MAX)
+                      decodeSize(rts_argv[arg], 3, sizeof(W_), (StgWord64)HS_WORD32_MAX * sizeof(W_), false)
                       / sizeof(W_);
                   break;
                 case 'i':
                   RtsFlags.GcFlags.initialStkSize =
-                      decodeSize(rts_argv[arg], 3, sizeof(W_), HS_WORD_MAX)
+                      decodeSize(rts_argv[arg], 3, sizeof(W_), (StgWord64)HS_WORD32_MAX * sizeof(W_), false)
                       / sizeof(W_);
                   break;
                 default:
                   RtsFlags.GcFlags.initialStkSize =
-                      decodeSize(rts_argv[arg], 2, sizeof(W_), HS_WORD_MAX)
+                      decodeSize(rts_argv[arg], 2, sizeof(W_), (StgWord64)HS_WORD32_MAX * sizeof(W_), false)
                       / sizeof(W_);
                   break;
                 }
@@ -1336,10 +1342,10 @@ error = true;
                   OPTION_UNSAFE;
                   if (0 == strncmp("grace=", rts_argv[arg] + 2, 6)) {
                       RtsFlags.GcFlags.heapLimitGrace =
-                          decodeSize(rts_argv[arg], 8, BLOCK_SIZE, HS_WORD_MAX);
+                          decodeSize(rts_argv[arg], 8, BLOCK_SIZE, HS_WORD_MAX, false);
                   } else {
                       RtsFlags.GcFlags.maxHeapSize =
-                          decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX)
+                          decodeSize(rts_argv[arg], 2, BLOCK_SIZE, (StgWord64) HS_WORD32_MAX * BLOCK_SIZE, true)
                           / BLOCK_SIZE;
                       // user give size in *bytes* but "maxHeapSize" is in
                       // *blocks*
@@ -1388,8 +1394,9 @@ error = true;
 #endif
               case 'G':
                   OPTION_UNSAFE;
-                  RtsFlags.GcFlags.generations =
-                      decodeSize(rts_argv[arg], 2, 1, HS_INT_MAX);
+                  // Capped at 64 by hardcoded array size in non-threaded RTS.
+                  RtsFlags.GcFlags.generations = (uint32_t)
+                      decodeSize(rts_argv[arg], 2, 1, GC_MAX_GENERATIONS, false);
                   break;
 
               case 'H':
@@ -1398,8 +1405,12 @@ error = true;
                       RtsFlags.GcFlags.heapSizeSuggestionAuto = true;
                   } else {
                       RtsFlags.GcFlags.heapSizeSuggestion = (uint32_t)
-                          (decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX)
+                          (decodeSize(rts_argv[arg], 2, BLOCK_SIZE, (StgWord64) HS_WORD32_MAX * BLOCK_SIZE, true)
                           / BLOCK_SIZE);
+                      // -H0 resets to the default of no suggestion.
+                      if (RtsFlags.GcFlags.heapSizeSuggestion == 0) {
+                          RtsFlags.GcFlags.heapSizeSuggestionAuto = false;
+                      }
                   }
                   break;
 
@@ -1407,7 +1418,7 @@ error = true;
                   OPTION_UNSAFE;
                   RtsFlags.GcFlags.minOldGenSize =
                       (uint32_t)(decodeSize(rts_argv[arg], 2, BLOCK_SIZE,
-                                       HS_WORD_MAX)
+                                       (StgWord64) HS_WORD32_MAX * BLOCK_SIZE, false)
                             / BLOCK_SIZE);
                   break;
 
@@ -1852,14 +1863,14 @@ error = true;
                 case 'q':
                   OPTION_UNSAFE;
                   RtsFlags.GcFlags.allocLimitGrace
-                      = decodeSize(rts_argv[arg], 3, BLOCK_SIZE, HS_INT_MAX)
+                      = decodeSize(rts_argv[arg], 3, BLOCK_SIZE, HS_INT_MAX, false)
                           / BLOCK_SIZE;
                   break;
 
                 case 'r':
                     OPTION_UNSAFE;
                     RtsFlags.GcFlags.addressSpaceSize
-                      = decodeSize(rts_argv[arg], 3, MBLOCK_SIZE, HS_WORD64_MAX);
+                      = decodeSize(rts_argv[arg], 3, MBLOCK_SIZE, HS_WORD64_MAX, false);
                     break;
 
                   default:
@@ -1994,9 +2005,25 @@ static void normaliseRtsOpts (void)
         RtsFlags.GcFlags.minAllocAreaSize = RtsFlags.GcFlags.maxHeapSize;
     }
 
-    // If we have -A16m or larger, use -n4m.
-    if (RtsFlags.GcFlags.minAllocAreaSize >= (16*1024*1024) / BLOCK_SIZE) {
-        RtsFlags.GcFlags.nurseryChunkSize = (4*1024*1024) / BLOCK_SIZE;
+    // If no explicit size was given, and we have -A16m or larger, use -n4m.
+    if (RtsFlags.GcFlags.nurseryChunkSize == -1) {
+        if (RtsFlags.GcFlags.minAllocAreaSize >= (16*1024*1024) / BLOCK_SIZE) {
+            RtsFlags.GcFlags.nurseryChunkSize = (4*1024*1024) / BLOCK_SIZE;
+        } else {
+            RtsFlags.GcFlags.nurseryChunkSize = 0;
+        }
+    }
+    else if ( RtsFlags.GcFlags.nurseryChunkSize > 0 && RtsFlags.GcFlags.nurseryChunkSize < 2) {
+        errorBelch("nursery chunk size (-n) must be at least %" FMT_Word " large.", (W_)(2 * BLOCK_SIZE));
+        errorBelch("Disabling nursery chunking");
+        RtsFlags.GcFlags.nurseryChunkSize = 0;
+    }
+    // If the user gave a chunk size respect it, unless it's larger than
+    // minimum allocation area.
+    else if ( (StgWord64) RtsFlags.GcFlags.nurseryChunkSize > (StgWord64) RtsFlags.GcFlags.minAllocAreaSize) {
+        errorBelch("warning: nursery chunk size (-n) is bigger than minimum alloc area size (-A), "
+                   "disabling nursery chunking");
+        RtsFlags.GcFlags.nurseryChunkSize = 0;
     }
 
     if (RtsFlags.ParFlags.parGcLoadBalancingGen == ~0u) {
@@ -2144,10 +2171,14 @@ static void initStatsFile (FILE *f)
 
 /* -----------------------------------------------------------------------------
  * decodeSize: parse a string containing a size, like 300K or 1.2M
+ *
+ * The result must lie within [min, max]. If allow_zero is set an explicitly
+ * given zero (e.g. "-M0") is accepted as well.
 -------------------------------------------------------------------------- */
 
 static StgWord64
-decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
+decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max,
+           bool allow_zero)
 {
     const char *s;
     StgDouble m;
@@ -2206,10 +2237,14 @@ decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
 
     val = (StgWord64)m;
 
-    if (m < 0 || val < min || val > max) {
-        // printf doesn't like 64-bit format specs on Windows
-        // apparently, so fall back to unsigned long.
-        errorBelch("error in RTS option %s: size outside allowed range (%" FMT_Word " - %" FMT_Word ")", flag, (W_)min, (W_)max);
+    // Only a explicit zero-digit is accepted for allow_zero.
+    bool explicit_zero = allow_zero && *s != '\0' && m == 0;
+    if (m < 0 || (val < min && !explicit_zero) || val > max) {
+        if (allow_zero && min > 0) {
+            errorBelch("error in RTS option %s: size outside allowed range (0 or %" FMT_Word64 " - %" FMT_Word64 ")", flag, (StgWord64)min, (StgWord64)max);
+        } else {
+            errorBelch("error in RTS option %s: size outside allowed range (%" FMT_Word64 " - %" FMT_Word64 ")", flag, (StgWord64)min, (StgWord64)max);
+        }
         stg_exit(EXIT_FAILURE);
     }
 
