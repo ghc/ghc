@@ -1,0 +1,8 @@
+section: compiler
+synopsis: Fix a "No skolem info" compiler crash
+issues: #27828
+mrs: !16714
+
+description: {
+    There was a bug in the implementation of functional dependencies for type families.
+}

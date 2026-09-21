@@ -136,10 +136,10 @@ data FunDepEqns  -- Plural becuase fd_eqs has multiple equations
                                  --   to fresh unification vars,
                                  -- See (IMP2) in Note [Improving against instances]
 
-           , fd_eqs   :: [TypeEqn]  -- Make these pairs of types equal
-                                   -- Invariant: In each (Pair ty1 ty2), the fd_qtvs may be
-                                   -- free in ty1 but not in ty2.  See Wrinkle (1) of
-                                   -- Note [Improving against instances]
+           , fd_eqs  :: [TypeEqn]  -- Make these pairs of types equal
+                        -- Invariant: In each (Pair ty1 ty2), the fd_qtvs may be
+                        -- free in ty1 but not in ty2.  See Wrinkle (1) of
+                        -- Note [Improving against instances]
            }
 
 instance Outputable FunDepEqns where

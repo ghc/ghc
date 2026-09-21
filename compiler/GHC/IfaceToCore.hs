@@ -91,7 +91,6 @@ import GHC.Utils.Logger
 import GHC.Data.Bag
 import GHC.Data.Maybe
 import GHC.Data.FastString
-import GHC.Data.List.SetOps
 
 import GHC.Types.Annotations
 import GHC.Types.SourceFile
@@ -903,12 +902,7 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
        -- See #13803
        ; tc_branches <- forkM (text "Axiom branches" <+> ppr tc_name)
                       $ tc_ax_branches branches
-       ; let axiom = CoAxiom { co_ax_unique   = nameUnique tc_name
-                             , co_ax_name     = tc_name
-                             , co_ax_tc       = tc_tycon
-                             , co_ax_role     = role
-                             , co_ax_branches = manyBranches tc_branches
-                             , co_ax_implicit = False }
+       ; let axiom = mkBranchedCoAxiom role tc_name tc_tycon tc_branches
        ; return (ACoAxiom axiom) }
 
 tc_iface_decl _ _ (IfacePatSyn{ ifName = name
@@ -1116,15 +1110,14 @@ tc_fd (tvs1, tvs2) = do { tvs1' <- mapM tcIfaceTyVar tvs1
                         ; return (tvs1', tvs2') }
 
 tc_ax_branches :: [IfaceAxBranch] -> IfL [CoAxBranch]
-tc_ax_branches if_branches = foldlM tc_ax_branch [] if_branches
+tc_ax_branches if_branches = mapM tc_ax_branch if_branches
 
-tc_ax_branch :: [CoAxBranch] -> IfaceAxBranch -> IfL [CoAxBranch]
-tc_ax_branch prev_branches
-             (IfaceAxBranch { ifaxbTyVars = tv_bndrs
+tc_ax_branch :: IfaceAxBranch -> IfL CoAxBranch
+tc_ax_branch (IfaceAxBranch { ifaxbTyVars = tv_bndrs
                             , ifaxbEtaTyVars = eta_tv_bndrs
                             , ifaxbCoVars = cv_bndrs
                             , ifaxbLHS = lhs, ifaxbRHS = rhs
-                            , ifaxbRoles = roles, ifaxbIncomps = incomps })
+                            , ifaxbRoles = roles })
   = bindIfaceTyConBinders_AT
       (map (\b -> Bndr (IfaceTvBndr b) (NamedTCB Inferred)) tv_bndrs) $ \ tvs ->
          -- The _AT variant is needed here; see Note [CoAxBranch type variables] in GHC.Core.Coercion.Axiom
@@ -1135,15 +1128,15 @@ tc_ax_branch prev_branches
     ; this_mod <- getIfModule
     ; let loc = mkGeneralSrcSpan (fsLit "module " `appendFS`
                                   moduleNameFS (moduleName this_mod))
-          br = CoAxBranch { cab_loc     = loc
-                          , cab_tvs     = binderVars tvs
-                          , cab_eta_tvs = eta_tvs
-                          , cab_cvs     = cvs
-                          , cab_lhs     = tc_lhs
-                          , cab_roles   = roles
-                          , cab_rhs     = tc_rhs
-                          , cab_incomps = map (prev_branches `getNth`) incomps }
-    ; return (prev_branches ++ [br]) }
+    ; return (CoAxBranch { cab_loc      = loc
+                         , cab_tvs      = binderVars tvs
+                         , cab_eta_tvs  = eta_tvs
+                         , cab_cvs      = cvs
+                         , cab_lhs      = tc_lhs
+                         , cab_roles    = roles
+                         , cab_rhs      = tc_rhs
+                         , cab_overlaps = placeHolderOverlaps
+                         , cab_incomps  = placeHolderIncomps }) }
 
 tcIfaceDataCons :: Name -> TyCon -> IfaceConDecls -> IfL AlgTyConRhs
 tcIfaceDataCons tycon_name tycon if_cons

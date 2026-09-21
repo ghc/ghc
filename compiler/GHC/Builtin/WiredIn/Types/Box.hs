@@ -329,7 +329,8 @@ mkWiredInNewTyCon tc_name dc_name nt_co_uniq bndrs roles nt_fld_ty =
                         , cab_roles   = roles
                         , cab_lhs     = mkTyVarTys tvs
                         , cab_rhs     = nt_fld_ty
-                        , cab_incomps = [] }
+                        , cab_overlaps = []
+                        , cab_incomps  = [] }
 
 -- | The wired-in @Box@ newtype:
 --

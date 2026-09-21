@@ -3462,7 +3462,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
 
        ; let mb_co_ax
               | null eqns = Nothing   -- mkBranchedCoAxiom fails on empty list
-              | otherwise = Just (mkBranchedCoAxiom co_ax_name fam_tc branches)
+              | otherwise = Just (mkBranchedCoAxiom Nominal co_ax_name fam_tc branches)
 
              fam_tc = mkFamilyTyCon tc_name kind tc_bndrs 0 res_kind (resultVariableName sig)
                       (ClosedTypeFamilyTyCon $ CTF mb_co_ax) parent inj'
