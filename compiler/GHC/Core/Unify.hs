@@ -9,6 +9,7 @@ module GHC.Core.Unify (
         tcMatchTyX_BM, ruleMatchTyKiX,
 
         -- Side-effect free unification
+        AmIUnifying(..),
         tcUnifyTy, tcUnifyTys, tcUnifyFunDeps, tcUnifyDebugger,
         tcUnifyTysFG, tcUnifyTysForInjectivity,
         BindTvFun, BindFamFun, BindFlag(..),
@@ -597,14 +598,14 @@ tcMatchTyX_BM :: HasDebugCallStack
               => BindTvFun -> Subst
               -> Type -> Type -> Maybe Subst
 tcMatchTyX_BM bind_tv subst ty1 ty2
-  = tc_match_tys_x bind_tv False subst [ty1] [ty2]
+  = tc_match_tys_x bind_tv IgnoreOuterKinds subst [ty1] [ty2]
 
 -- | Like 'tcMatchTy', but allows the kinds of the types to differ,
 -- and thus matches them as well.
 -- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTyKi :: HasDebugCallStack => Type -> Type -> Maybe Subst
 tcMatchTyKi ty1 ty2
-  = tc_match_tys alwaysBindTv True [ty1] [ty2]
+  = tc_match_tys alwaysBindTv CheckOuterKinds [ty1] [ty2]
 
 -- | This is similar to 'tcMatchTy', but extends a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -614,7 +615,7 @@ tcMatchTyX :: HasDebugCallStack
            -> Type                -- ^ Target
            -> Maybe Subst
 tcMatchTyX subst ty1 ty2
-  = tc_match_tys_x alwaysBindTv False subst [ty1] [ty2]
+  = tc_match_tys_x alwaysBindTv IgnoreOuterKinds subst [ty1] [ty2]
 
 -- | Like 'tcMatchTy' but over a list of types.
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -625,7 +626,7 @@ tcMatchTys :: HasDebugCallStack
                              -- variables could be free in the target
                              -- See (CU6) in Note [The Core unifier]
 tcMatchTys tys1 tys2
-  = tc_match_tys alwaysBindTv False tys1 tys2
+  = tc_match_tys alwaysBindTv IgnoreOuterKinds tys1 tys2
 
 -- | Like 'tcMatchTyKi' but over a list of types.
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -635,7 +636,7 @@ tcMatchTyKis :: HasDebugCallStack
              -> Maybe Subst    -- ^ One-shot substitution
                                -- See (CU6) in Note [The Core unifier]
 tcMatchTyKis tys1 tys2
-  = tc_match_tys alwaysBindTv True tys1 tys2
+  = tc_match_tys alwaysBindTv CheckOuterKinds tys1 tys2
 
 -- | Like 'tcMatchTys', but extending a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -645,7 +646,7 @@ tcMatchTysX :: HasDebugCallStack
             -> [Type]         -- ^ Target
             -> Maybe Subst    -- ^ One-shot substitution
 tcMatchTysX subst tys1 tys2
-  = tc_match_tys_x alwaysBindTv False subst tys1 tys2
+  = tc_match_tys_x alwaysBindTv IgnoreOuterKinds subst tys1 tys2
 
 -- | Like 'tcMatchTyKis', but extending a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -655,12 +656,12 @@ tcMatchTyKisX :: HasDebugCallStack
               -> [Type]       -- ^ Target
               -> Maybe Subst  -- ^ One-shot substitution
 tcMatchTyKisX subst tys1 tys2
-  = tc_match_tys_x alwaysBindTv True subst tys1 tys2
+  = tc_match_tys_x alwaysBindTv CheckOuterKinds subst tys1 tys2
 
 -- | Same as tc_match_tys_x, but starts with an empty substitution
 tc_match_tys :: HasDebugCallStack
              => BindTvFun
-             -> Bool          -- ^ match kinds?
+             -> OuterKindsFlag   -- ^ Match kinds?
              -> [Type]
              -> [Type]
              -> Maybe Subst
@@ -672,7 +673,7 @@ tc_match_tys bind_me match_kis tys1 tys2
 -- | Worker for 'tcMatchTysX' and 'tcMatchTyKisX'
 tc_match_tys_x :: HasDebugCallStack
                => BindTvFun
-               -> Bool          -- ^ match kinds?
+               -> OuterKindsFlag   -- ^ Match kinds?
                -> Subst
                -> [Type]
                -> [Type]
@@ -680,8 +681,8 @@ tc_match_tys_x :: HasDebugCallStack
 tc_match_tys_x bind_tv match_kis (Subst in_scope id_env tv_env cv_env) tys1 tys2
   = case tc_unify_tys neverBindFam  -- (ATF7) in Note [Apartness and type families]
                       bind_tv
-                      False  -- Matching, not unifying
-                      False  -- Not an injectivity check
+                      Matching  -- Matching, not unifying
+                      False     -- Not an injectivity check
                       match_kis
                       RespectMultiplicities
                       (mkRnEnv2 in_scope) tv_env cv_env tys1 tys2 of
@@ -706,9 +707,9 @@ ruleMatchTyKiX tmpl_tvs rn_env tenv tmpl target
       -- But even if it did, (ATF8) in Note [Apartness and type families]
       -- says it doesn't matter becuase here we only care about Unifiable.
       -- So neverBindFam is efficient, and sufficient.
-                      False    -- Matching, not unifying
+                      Matching -- Matching, not unifying
                       False    -- No doing an injectivity check
-                      True     -- Match the kinds
+                      CheckOuterKinds  -- Match the kinds
                       IgnoreMultiplicities
                         -- See Note [Rewrite rules ignore multiplicities in FunTy]
                       rn_env tenv emptyCvSubstEnv [tmpl] [target] of
@@ -784,7 +785,7 @@ tcUnifyTy t1 t2 = tcUnifyTys alwaysBindTv [t1] [t2]
 tcUnifyDebugger :: Type -> Type -> Maybe Subst
 tcUnifyDebugger t1 t2
   = case tc_unify_tys_fg
-             True            -- Unify kinds
+             CheckOuterKinds -- Unify kinds
              neverBindFam    -- Does not affect Unifiable, so pick max efficient
                              -- See (ATF8) in Note [Apartness and type families]
              alwaysBindTv
@@ -798,7 +799,7 @@ tcUnifyFunDeps :: TyCoVarSet
                -> Maybe Subst
 tcUnifyFunDeps qtvs tys1 tys2
   = case tc_unify_tys_fg
-             True               -- Unify kinds
+             CheckOuterKinds    -- Unify kinds
              dontCareBindFam    -- Class-instance heads never mention type families
              (matchBindTv qtvs)
              tys1 tys2 of
@@ -821,7 +822,7 @@ tcUnifyTysForInjectivity unif tys1 tys2
   = case tc_unify_tys alwaysBindFam alwaysBindTv
                        unif   -- Am I unifying?
                        True   -- Do injectivity checks
-                       False  -- Don't check outermost kinds
+                       IgnoreOuterKinds  -- Don't check outermost kinds
                        RespectMultiplicities
                        rn_env emptyTvSubstEnv emptyCvSubstEnv
                        tys1 tys2 of
@@ -838,8 +839,9 @@ tcUnifyTysForInjectivity unif tys1 tys2
                -- should never actually be done
 
     maybe_fix tv_subst
-      | unif      = niFixSubst in_scope tv_subst
-      | otherwise = mkTvSubst  in_scope tv_subst
+      = case unif of
+          Unifying -> niFixSubst in_scope tv_subst
+          Matching -> mkTvSubst  in_scope tv_subst
       -- When matching, don't confuse domain with range; no fixpoint!
 
 -----------------
@@ -866,15 +868,15 @@ tcUnifyTysFG :: BindFamFun -> BindTvFun
              -> [Type] -> [Type]
              -> UnifyResult
 tcUnifyTysFG bind_fam bind_tv tys1 tys2
-  = tc_unify_tys_fg False bind_fam bind_tv tys1 tys2
+  = tc_unify_tys_fg IgnoreOuterKinds bind_fam bind_tv tys1 tys2
 
-tc_unify_tys_fg :: Bool
+tc_unify_tys_fg :: OuterKindsFlag
                 -> BindFamFun -> BindTvFun
                 -> [Type] -> [Type]
                 -> UnifyResult
 tc_unify_tys_fg match_kis bind_fam bind_tv tys1 tys2
   = do { (tv_env, _) <- tc_unify_tys bind_fam bind_tv
-                                  True       -- Unifying
+                                  Unifying
                                   False      -- Not doing an injectivity check
                                   match_kis  -- Match outer kinds
                                   RespectMultiplicities rn_env
@@ -888,10 +890,10 @@ tc_unify_tys_fg match_kis bind_fam bind_tv tys1 tys2
 -- | This function is actually the one to call the unifier -- a little
 -- too general for outside clients, though.
 tc_unify_tys :: BindFamFun -> BindTvFun
-             -> AmIUnifying -- ^ True <=> unify; False <=> match
-             -> Bool        -- ^ True <=> doing an injectivity check
-             -> Bool        -- ^ True <=> treat the kinds as well
-             -> MultiplicityFlag -- ^ see Note [Rewrite rules ignore multiplicities in FunTy] in GHC.Core.Unify
+             -> AmIUnifying    -- ^ Unifying or matching
+             -> Bool           -- ^ True <=> doing an injectivity check
+             -> OuterKindsFlag -- ^ Check outer kinds or not
+             -> MultiplicityFlag  -- ^ see Note [Rewrite rules ignore multiplicities in FunTy] in GHC.Core.Unify
              -> RnEnv2
              -> TvSubstEnv  -- ^ substitution to extend
              -> CvSubstEnv
@@ -910,8 +912,9 @@ tc_unify_tys :: BindFamFun -> BindTvFun
 -- See also Note [tcMatchTy vs tcMatchTyKi].
 tc_unify_tys bind_fam bind_tv unif inj_check match_kis match_mults rn_env tv_env cv_env tys1 tys2
   = initUM tv_env cv_env $
-    do { when match_kis $
-         unify_tys env kis1 kis2
+    do { case match_kis of
+            CheckOuterKinds  -> unify_tys env kis1 kis2
+            IgnoreOuterKinds -> return ()
        ; unify_tys env tys1 tys2 }
   where
     env = UMEnv { um_bind_tv_fun  = bind_tv
@@ -925,6 +928,11 @@ tc_unify_tys bind_fam bind_tv unif inj_check match_kis match_mults rn_env tv_env
     kis1 = map typeKind tys1
     kis2 = map typeKind tys2
 
+
+data OuterKindsFlag
+  = CheckOuterKinds    -- Unify or match the /kind/ of the two types
+  | IgnoreOuterKinds   -- Just unify of match the types, ignoring kinds
+                       --  (typically, we already know they are equal)
 
 {- *********************************************************************
 *                                                                      *
@@ -1583,8 +1591,7 @@ c.f. Note [Comparing type synonyms] in GHC.Core.TyCo.Compare
 
 -------------- unify_ty: the main workhorse -----------
 
-type AmIUnifying = Bool   -- True  <=> Unifying
-                          -- False <=> Matching
+data AmIUnifying = Matching | Unifying
 
 type InType      = Type       -- Before applying the RnEnv2
 type OutCoercion = Coercion   -- After applying the RnEnv2
@@ -1618,7 +1625,7 @@ unify_ty env (CastTy ty1 co1) ty2 kco
     -- See (KCU1) in Note [Kind coercions in Unify]
   = maybeApart MARCast  -- See (KCU2)
 
-  | um_unif env
+  | Unifying <- um_unif env
   = unify_ty env ty1 ty2 (co1 `mkTransCo` kco)
 
   | otherwise -- We are matching, not unifying
@@ -1661,7 +1668,7 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
   = do { c_subst <- getCvSubstEnv
        ; case co1 of
            CoVarCo cv
-             | not (um_unif env)
+             | Matching <- um_unif env
              , not (cv `elemVarEnv` c_subst)   -- Not forall-bound
              , let (_mult_co, co_l, co_r) = decomposeFunCo kco
                      -- Because the coercion is used in a type, it should be safe to
@@ -1682,7 +1689,7 @@ unify_ty env (TyVarTy tv1) ty2 kco
   = uVarOrFam env (TyVarLHS tv1) ty2 kco
 
 unify_ty env ty1 (TyVarTy tv2) kco
-  | um_unif env  -- If unifying, can swap args; but not when matching
+  | Unifying <- um_unif env  -- If unifying, can swap args; but not when matching
   = uVarOrFam (umSwapRn env) (TyVarLHS tv2) ty1 (mkSymCo kco)
 
 -- Deal with TyConApps
@@ -1692,7 +1699,7 @@ unify_ty env ty1 ty2 kco
   | Just (tc,tys) <- mb_sat_fam_app1
   = uVarOrFam env (TyFamLHS tc tys) ty2 kco
 
-  | um_unif env
+  | Unifying <- um_unif env
   , Just (tc,tys) <- mb_sat_fam_app2
   = uVarOrFam (umSwapRn env) (TyFamLHS tc tys) ty1 (mkSymCo kco)
 
@@ -1820,7 +1827,7 @@ uVarOrFam env ty1 ty2 kco
     go swapped substs lhs@(TyVarLHS tv1) ty2 kco
       | Just ty1' <- lookupVarEnv (um_tv_env substs) tv1'
       = -- We already have a substitution for tv1
-        if | um_unif env                          -> unify_ty env ty1' ty2 kco
+        if | Unifying <- um_unif env              -> unify_ty env ty1' ty2 kco
            | (ty1' `mkCastTy` kco) `tcEqType` ty2 -> return ()
            | otherwise                            -> surelyApart
            -- Unifying: recurse into unify_ty
@@ -1842,9 +1849,9 @@ uVarOrFam env ty1 ty2 kco
       | TyVarTy tv2 <- ty2
       , let tv2' = umRnOccR env tv2
       , tv1' == tv2'
-      = if | um_unif env     -> return ()
-           | tv1_is_bindable -> extendTvEnv tv1' ty2
-           | otherwise       -> return ()
+      = if | Unifying <- um_unif env -> return ()
+           | tv1_is_bindable         -> extendTvEnv tv1' ty2
+           | otherwise               -> return ()
 
       | tv1_is_bindable
       , not (mentionsForAllBoundTyVarsR env ty2_fvs)
@@ -1858,9 +1865,9 @@ uVarOrFam env ty1 ty2 kco
       -- e.g.   a    ~ F p q       with `a` not bindable: we might succeed with go_fam
       -- e.g.   a    ~ beta        with `a` not bindable: we might be able to bind `beta`
       -- e.g.   beta ~ F beta Int  occurs check; but MaybeApart after swapping
-      | um_unif env
+      | Unifying   <- um_unif env
       , NotSwapped <- swapped  -- If we have swapped already, don't do so again
-      , Just lhs2 <- canEqLHS_maybe ty2
+      , Just lhs2  <- canEqLHS_maybe ty2
       = go IsSwapped substs lhs2 (mkTyVarTy tv1) (mkSymCo kco)
 
       | occurs_check = maybeApart MARInfinite   -- Occurs check
@@ -1879,7 +1886,9 @@ uVarOrFam env ty1 ty2 kco
                         | otherwise
                         = False
 
-        occurs_check = um_unif env && uOccursCheck substs foralld_tvs lhs rhs
+        occurs_check = case um_unif env of
+                         Unifying -> uOccursCheck substs foralld_tvs lhs rhs
+                         Matching -> False
           -- Occurs check, only when unifying
           -- see Note [Infinitary substitutions]
           -- Make sure you include `kco` in rhs #14846
@@ -1893,7 +1902,7 @@ uVarOrFam env ty1 ty2 kco
       -- Hence the RnEnv2 is empty
       | not under_forall
       , Just ty1' <- lookupFamEnv (um_fam_env substs) tc1 tys1
-      = if | um_unif env                          -> unify_ty env ty1' ty2 kco
+      = if | Unifying <- um_unif env              -> unify_ty env ty1' ty2 kco
            -- Below here we are matching
            -- The return () case deals with:
            --    Template:   (F a)..(F a)
@@ -1930,9 +1939,9 @@ uVarOrFam env ty1 ty2 kco
       -- NB: a type family can appear on the template when matching
       --     see (ATF6) in Note [Apartness and type families]
       -- (Only worth doing this if we are not under a forall.)
-      | um_unif env
+      | Unifying   <- um_unif env
       , NotSwapped <- swapped
-      , Just lhs2 <- canEqLHS_maybe ty2
+      , Just lhs2  <- canEqLHS_maybe ty2
       = go IsSwapped substs lhs2 (mkTyConApp tc1 tys1) (mkSymCo kco)
 
       | otherwise   -- See (ATF5) in Note [Apartness and type families]
@@ -1962,9 +1971,9 @@ uVarOrFam env ty1 ty2 kco
        (inj_tys2, noninj_tys2) = partitionByList inj tys2
 
        bind_fam_if_poss
-         | not (um_unif env)  -- Not when matching (ATF11-1)
+         | Matching <- um_unif env  -- Not when matching (ATF11-1)
          = return ()
-         | under_forall       -- Not under a forall (ATF3)
+         | under_forall             -- Not under a forall (ATF3)
          = return ()
          | BindMe <- um_bind_fam_fun env tc tys1 rhs1
          = unless (uOccursCheck substs emptyVarSet (TyFamLHS tc tys1) rhs1) $

@@ -19,7 +19,7 @@ module GHC.Core.FamInstEnv (
         FamInstMatch(..),
         lookupFamInstEnv, lookupFamInstEnvConflicts, lookupFamInstEnvByTyCon,
 
-        isDominatedBy, apartnessCheck, compatibleBranches,
+        isDominatedBy, apartnessCheck, noEarlierMatchCheck, compatibleBranches,
 
         -- Injectivity
         InjectivityCheckResult(..),
@@ -487,20 +487,45 @@ in GHC.Core.Unify.)
 
 Note [Compatibility]
 ~~~~~~~~~~~~~~~~~~~~
-Two patterns are /compatible/ if either of the following conditions hold:
-1) The patterns are apart.
-2) The patterns unify with a substitution S, and their right hand sides
-equal under that substitution.
+Consider a closed type family with two equations (X1) and (X2)
+   type family F a where
+      F lhs1 = rhs1   -- (X1)
+      ...
+      F lhs2 = rhs2   -- (X2)
+      ...
+Then equations (X1) and (X2) are /compatible/ if any target (F ty) that
+matches both equations yields the very same right hand side.  Example:
+      And True True = True
+      And a    True = a
+The target (And True True) matches both equations but they then both
+produce the same reduct True.
+
+More precisely (X1) and (X2) are /compatible/ iff
+   If LHSs unify with a substitution S, then S(rhs1) = S(rhs2)
+
+Conversely, (X1) and (X2) are /incompatible/ if
+   Their LHSs unify with S, and S(rhs1) /= S(rhs2)
 
 For open type families, only compatible instances are allowed. For closed
-type families, the story is slightly more complicated. Consider the following:
+families, we use the Closed Family Matching Rule (see function `findBranch`):
 
-type family F a where
-  F Int = Bool
-  F a   = Int
+    When looking up a target (F ty) in a closed type family F,
+    find an equation (branch) such that:
+      * the LHS matches the target
+      * the target is apart from every previous /incompatible/ equation for F
 
-g :: Show a => a -> F a
-g x = length (show x)
+We don't need to check the earlier equations that are compatible with the
+matching equation, because they are either irrelevant (clause 1 of compatible)
+or benign (clause 2 of compatible).
+
+Some examples:
+
+  type family F a where
+    F Int = Bool
+    F a   = Int
+
+  g :: Show a => a -> F a
+  g x = length (show x)
 
 Should that type-check? No. We need to allow for the possibility that 'a'
 might be Int and therefore 'F a' should be Bool. We can simplify 'F a' to Int
@@ -516,12 +541,12 @@ potentially-overlapping group is closed.
 
 As another example, consider this:
 
-type family G x where
-  G Int = Bool
-  G a   = Double
+  type family G x where
+    G Int = Bool
+    G a   = Double
 
-type family H y
--- no instances
+  type family H y
+  -- no instances
 
 Now, we want to simplify (G (H Char)). We can't, because (H Char) might later
 simplify to be Int. So, (G (H Char)) is stuck, for now.
@@ -529,18 +554,13 @@ simplify to be Int. So, (G (H Char)) is stuck, for now.
 While everything above is quite sound, it isn't as expressive as we'd like.
 Consider this:
 
-type family J a where
-  J Int = Int
-  J a   = a
+  type family J a where
+    J Int = Int
+    J a   = a
 
 Can we simplify (J b) to b? Sure we can. Yes, the first equation matches if
 b is instantiated with Int, but the RHSs coincide there, so it's all OK.
-
-So, the rule is this: when looking up a branch in a closed type family, we
-find a branch that matches the target, but then we make sure that the target
-is apart from every previous *incompatible* branch. We don't check the
-branches that are compatible with the matching branch, because they are either
-irrelevant (clause 1 of compatible) or benign (clause 2 of compatible).
+Hence the Closed Family Matching Rule.
 
 Note [Compatibility of eta-reduced axioms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -572,15 +592,32 @@ fails anyway.
 
 -- See Note [Compatibility]
 compatibleBranches :: CoAxBranch -> CoAxBranch -> Bool
-compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
-                   (CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
+compatibleBranches b1 b2
+  = case compareBranches b1 b2 of
+       BC_Apart    -> True
+       BC_Compat   -> True
+       BC_Incompat -> False
+
+data BranchCompatibility
+  = BC_Apart     -- LHSs are apart
+  | BC_Compat    -- LHSs unify with S, and S(rhs1)=S(rhs2)
+  | BC_Incompat  -- LHSs unify with S, and S(rhs1)/=S(rhs2)
+
+compareBranches :: CoAxBranch -> CoAxBranch -> BranchCompatibility
+compareBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
+                (CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
   = case tcUnifyTysFG alwaysBindFam alwaysBindTv commonlhs1 commonlhs2 of
       -- Here we need the cab_tvs of the two branches to be disinct.
       -- See Note [CoAxBranch type variables] in GHC.Core.Coercion.Axiom.
-      SurelyApart     -> True
-      MaybeApart {}   -> False
-      Unifiable subst -> Type.substTyAddInScope subst rhs1 `eqType`
+      SurelyApart     -> BC_Apart
+      Unifiable subst |  Type.substTyAddInScope subst rhs1 `eqType`
                          Type.substTyAddInScope subst rhs2
+                      -> BC_Compat
+                      | otherwise
+                      -> BC_Incompat
+      MaybeApart {}   -> BC_Incompat
+        -- An occurs check yields MaybeApart;
+        -- see Note [Infinitary substitutions] in GHC.Core.Unify
   where
      (commonlhs1, commonlhs2) = zipAndUnzip lhs1 lhs2
      -- See Note [Compatibility of eta-reduced axioms]
@@ -603,8 +640,7 @@ injectiveBranches injectivity
                   ax1@(CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                   ax2@(CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
   -- See Note [Verifying injectivity annotation], case 1.
-  = case tcUnifyTysForInjectivity True [rhs1] [rhs2] of
-             -- True = two-way pre-unification
+  = case tcUnifyTysForInjectivity Unifying [rhs1] [rhs2] of
        Nothing -> InjectivityAccepted
          -- RHS are different, so equations are injective.
          -- This is case 1A from Note [Verifying injectivity annotation]
@@ -629,10 +665,11 @@ injectiveBranches injectivity
           lhs1Subst = Type.substTys subst (getInjArgs lhs1)
           lhs2Subst = Type.substTys subst (getInjArgs lhs2)
 
--- takes a CoAxiom with unknown branch incompatibilities and computes
--- the compatibilities
--- See Note [Storing compatibility] in GHC.Core.Coercion.Axiom
 computeAxiomIncomps :: [CoAxBranch] -> [CoAxBranch]
+-- Takes a CoAxiom for a closed type family that has place-holder
+-- `cab_incomps` and `cab_overlaps` fields, and computes those fields
+-- properly from the list of branches.
+-- See Note [Storing compatibility] in GHC.Core.Coercion.Axiom
 computeAxiomIncomps branches
   = snd (mapAccumL go [] branches)
   where
@@ -640,11 +677,23 @@ computeAxiomIncomps branches
     go prev_brs cur_br
        = (new_br : prev_brs, new_br)
        where
-         new_br = cur_br { cab_incomps = mk_incomps prev_brs cur_br }
+         (overlaps,incomps) = get_cab [] [] prev_brs
+         new_br = cur_br { cab_overlaps = overlaps, cab_incomps  = incomps }
 
-    mk_incomps :: [CoAxBranch] -> CoAxBranch -> [CoAxBranch]
-    mk_incomps prev_brs cur_br
-       = filter (not . compatibleBranches cur_br) prev_brs
+         get_cab :: [CoAxBranch] -> [CoAxBranch]   -- Accumulators
+                 -> [CoAxBranch]
+                 -> ([CoAxBranch], [CoAxBranch])
+         get_cab overlaps incomps [] = (overlaps,incomps)
+         get_cab overlaps incomps (br:brs)
+            = case compareBranches cur_br br of
+                BC_Apart    -> get_cab overlaps      incomps      brs
+                BC_Compat   -> get_cab (br:overlaps) incomps      brs
+                BC_Incompat -> get_cab (br:overlaps) (br:incomps) brs
+
+noAxiomIncomps :: CoAxBranch -> CoAxBranch
+-- Overwrite the placeholders for `cab_incomps` and `cab_overlaps`
+-- with [], because unbranched axioms have no "preceding" equations
+noAxiomIncomps branch = branch { cab_incomps = [], cab_overlaps = [] }
 
 {-
 ************************************************************************
@@ -715,14 +764,17 @@ mkCoAxBranch :: [TyVar] -- original, possibly stale, tyvars
              -> SrcSpan
              -> CoAxBranch
 mkCoAxBranch tvs eta_tvs cvs lhs rhs roles loc
-  = CoAxBranch { cab_tvs     = tvs'
-               , cab_eta_tvs = eta_tvs'
-               , cab_cvs     = cvs'
-               , cab_lhs     = tidyTypes env lhs
-               , cab_roles   = roles
-               , cab_rhs     = tidyType env rhs
-               , cab_loc     = loc
-               , cab_incomps = placeHolderIncomps }
+  = CoAxBranch { cab_tvs      = tvs'
+               , cab_eta_tvs  = eta_tvs'
+               , cab_cvs      = cvs'
+               , cab_lhs      = tidyTypes env lhs
+               , cab_roles    = roles
+               , cab_rhs      = tidyType env rhs
+               , cab_loc      = loc
+
+               -- See (SC1) in Note [Storing compatibility]
+               , cab_overlaps = placeHolderOverlaps
+               , cab_incomps  = placeHolderIncomps }
   where
     (env1, tvs')     = tidyVarBndrs init_tidy_env tvs
     (env2, eta_tvs') = tidyVarBndrs env1          eta_tvs
@@ -736,14 +788,16 @@ mkCoAxBranch tvs eta_tvs cvs lhs rhs roles loc
 
 -- all of the following code is here to avoid mutual dependencies with
 -- Coercion
-mkBranchedCoAxiom :: Name -> TyCon -> [CoAxBranch] -> CoAxiom Branched
-mkBranchedCoAxiom ax_name fam_tc branches
+mkBranchedCoAxiom :: Role -> Name -> TyCon -> [CoAxBranch] -> CoAxiom Branched
+mkBranchedCoAxiom role ax_name fam_tc branches
   = CoAxiom { co_ax_unique   = nameUnique ax_name
             , co_ax_name     = ax_name
             , co_ax_tc       = fam_tc
-            , co_ax_role     = Nominal
+            , co_ax_role     = role
             , co_ax_implicit = False
             , co_ax_branches = manyBranches (computeAxiomIncomps branches) }
+                               -- computeAxiomIncomps: see (SC1) in
+                               --      Note [Storing compatibility]
 
 mkUnbranchedCoAxiom :: Name -> TyCon -> CoAxBranch -> CoAxiom Unbranched
 mkUnbranchedCoAxiom ax_name fam_tc branch
@@ -752,7 +806,9 @@ mkUnbranchedCoAxiom ax_name fam_tc branch
             , co_ax_tc       = fam_tc
             , co_ax_role     = Nominal
             , co_ax_implicit = False
-            , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
+            , co_ax_branches = unbranched (noAxiomIncomps branch) }
+                               -- noAxiomIncomps: see (SC1) in
+                               --      Note [Storing compatibility]
 
 mkSingleCoAxiom :: Role -> Name
                 -> [TyVar] -> [TyVar] -> [CoVar]
@@ -767,7 +823,9 @@ mkSingleCoAxiom role ax_name tvs eta_tvs cvs fam_tc lhs_tys rhs_ty
             , co_ax_tc       = fam_tc
             , co_ax_role     = role
             , co_ax_implicit = False
-            , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
+            , co_ax_branches = unbranched (noAxiomIncomps branch) }
+                               -- noAxiomIncomps: see (SC1) in
+                               --      Note [Storing compatibility]
   where
     branch = mkCoAxBranch tvs eta_tvs cvs lhs_tys rhs_ty
                           (map (const Nominal) tvs)
@@ -785,7 +843,9 @@ mkNewTypeCoAxiom name tycon tvs roles rhs_ty
             , co_ax_implicit = True  -- See Note [Implicit axioms] in GHC.Core.TyCon
             , co_ax_role     = Representational
             , co_ax_tc       = tycon
-            , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
+            , co_ax_branches = unbranched (noAxiomIncomps branch) }
+                               -- noAxiomIncomps: see (SC1) in
+                               --      Note [Storing compatibility]
   where
     branch = mkCoAxBranch tvs [] [] (mkTyVarTys tvs) rhs_ty
                           roles (getSrcSpan name)
@@ -1223,7 +1283,9 @@ findBranch :: Array BranchIndex CoAxBranch
            -> Maybe (BranchIndex, [Type], [Coercion])
     -- coercions relate requested types to returned axiom LHS at role N
 findBranch branches target_tys
-  = foldr go Nothing (assocs branches)
+  = -- Implements the Closed Family Matching Rule
+    -- in Note [Compatibility]
+    foldr go Nothing (assocs branches)
   where
     go :: (BranchIndex, CoAxBranch)
        -> Maybe (BranchIndex, [Type], [Coercion])
@@ -1257,6 +1319,20 @@ apartnessCheck target (CoAxBranch { cab_incomps = incomps })
   where
     isSurelyApart SurelyApart = True
     isSurelyApart _           = False
+
+-- | Check whether an earlier branch matches these target types
+noEarlierMatchCheck
+  :: [Type]
+  -> CoAxBranch -- ^ The candidate equation we wish to use
+  -> Bool       -- ^ True <=> equation can fire
+noEarlierMatchCheck target (CoAxBranch { cab_overlaps = overlaps })
+    -- NB: this is the /only/ use of the `cab_overlaps` field
+    -- See Note [Storing compatibility] and
+    -- (RW4) in Note [Relevance]
+  = not (any matches overlaps)
+  where
+    matches earlier_branch
+      = isJust (tcMatchTys (coAxBranchLHS earlier_branch) target)
 
 {-
 ************************************************************************

@@ -18,7 +18,7 @@ module GHC.Core.Coercion.Axiom (
        coAxiomSingleBranch, coAxBranchTyVars, coAxBranchCoVars,
        coAxBranchRoles,
        coAxBranchLHS, coAxBranchRHS, coAxBranchSpan, coAxBranchIncomps,
-       placeHolderIncomps,
+       placeHolderIncomps, placeHolderOverlaps,
 
        Role(..),
 
@@ -195,23 +195,44 @@ mapAccumBranches f (MkBranches arr)
 
 Note [Storing compatibility]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-During axiom application, we need to be aware of which branches are compatible
-with which others. The full explanation is in Note [Compatibility] in
-GHc.Core.FamInstEnv. (The code is placed there to avoid a dependency from
-GHC.Core.Coercion.Axiom on the unification algorithm.) Although we could
-theoretically compute compatibility on the fly, this is silly, so we store it
-in a CoAxiom.
+A `CoAxBranch` caches some useful information in `cab_incomps` and `cab_overlaps`:
 
-Specifically, each branch refers to all other branches with which it is
-incompatible. This list might well be empty, and it will always be for the
-first branch of any axiom.
+* `cab_overlaps`: when computing "relevance", in the function
+  `GHC.Tc.Solver.FunDeps.getRelevantBranches`, we need to know which ealier branches
+  can match this one -- see `noEarlierMatch`.
 
-CoAxBranches that do not (yet) belong to a CoAxiom should have a panic thunk
-stored in cab_incomps. The incompatibilities are properly a property of the
-axiom as a whole, and they are computed only when the final axiom is built.
+  Again we could look at all earlier branches, but instead we cache in `cab_overlaps`
+  a list of all earlier branches that could overlap with this one.
 
-During serialization, the list is converted into a list of the indices
-of the branches.
+* `cab_incomps`: during axiom application, we need to be aware of which branches are
+  /compatible/ with which others. The full explanation is in Note [Compatibility] in
+  GHC.Core.FamInstEnv. (The code is placed there to avoid a dependency from
+  GHC.Core.Coercion.Axiom on the unification algorithm.)
+
+  Although we could readily compute compatibility on the fly, this is silly, so we
+  cache in `cab_incomps` a list of earlier branches that are /incompatible/ with
+  this one.  (See Note [Compatibility] for a definition.)
+
+  Always a sub-list of `cab_overlaps`.
+
+Both lists can be empty, and always be for the first branch of any axiom.
+
+Some extra points:
+
+(SC1) A `CoAxBranch` that does not (yet) belong to a CoAxiom is initialised with panic
+  thunks, `placeHolderOverlaps` or `placeHolderIncomps`, for the two fields; see `mkCoAxBranch`.
+
+  Then, when a bunch of branches is grouped together in an axiom, we analyse the
+  branches as a whole and initialise the fields properly, using `computeAxiomIncomps`.
+  (For open type families, whose axioms have only one branch, we null out both lists
+  with `noAxiomIncomps`.
+
+(SC2) We don't need to serialise `cab_overlaps` and `cab_incomps` into an interface
+  file, because we recompute them in `computeAxiomIncomps`.  However, annoyingly,
+  the pretty printer converts to IfaceSyn before printing, and we do want to show
+  `cab_incomps` (see Note [Displaying axiom incompatibilities]).  So, tiresomely,
+  `IfaceAxBranch` has a `ifaxbIncomps` field, used only for printing.  For historical
+  reasons this is actually serialised.  Yuk.
 
 Note [CoAxioms are homogeneous]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -230,7 +251,9 @@ This is checked in FamInstEnv.mkCoAxBranch.
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
 data CoAxiom br
-  = CoAxiom                   -- Type equality axiom.
+  = -- `br` is Unbranched for each of the many axioms of an open type family
+    --         Branched   for the single multi-branch axiom of a closed type family
+    CoAxiom                   -- Type equality axiom.
     { co_ax_unique   :: Unique        -- Unique identifier
     , co_ax_name     :: Name          -- Name for pretty-printing
     , co_ax_role     :: Role          -- Role of the axiom's equality
@@ -268,8 +291,15 @@ data CoAxBranch
     , cab_rhs      :: Type
        -- ^ Right-hand side of the equality
        -- See Note [CoAxioms are homogeneous]
+
+    , cab_overlaps :: [CoAxBranch]
+       -- ^ The preceding branches whose LHSs are /unify with/ this one
+       -- Order is unimportant
+       -- See Note [Storing compatibility]
+
     , cab_incomps  :: [CoAxBranch]
-       -- ^ The previous incompatible branches
+       -- ^ The preceding branches that are /incompatible/ with this one
+       -- Order is unimportant
        -- See Note [Storing compatibility]
     }
   deriving Data.Data
@@ -342,8 +372,9 @@ coAxBranchIncomps :: CoAxBranch -> [CoAxBranch]
 coAxBranchIncomps = cab_incomps
 
 -- See Note [Compatibility] in GHC.Core.FamInstEnv
-placeHolderIncomps :: [CoAxBranch]
-placeHolderIncomps = panic "placeHolderIncomps"
+placeHolderIncomps, placeHolderOverlaps :: [CoAxBranch]
+placeHolderIncomps  = panic "placeHolderIncomps"
+placeHolderOverlaps = panic "placeHolderOverlaps"
 
 {-
 Note [CoAxBranch type variables]

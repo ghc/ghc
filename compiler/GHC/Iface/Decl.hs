@@ -112,7 +112,7 @@ coAxBranchToIfaceBranch tc lhs_s
                   , ifaxbRoles   = roles
                   , ifaxbRHS     = toIfaceType rhs
                   , ifaxbIncomps = iface_incomps }
-  where
+ where
     iface_incomps = map (expectJust
                         . flip findIndex lhs_s
                         . eqTypes

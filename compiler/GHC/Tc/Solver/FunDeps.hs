@@ -26,20 +26,23 @@ import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep( Type(..) )
 import GHC.Core.Predicate( EqRel(..) )
 import GHC.Core.TyCon
-import GHC.Core.Unify( tcUnifyTysForInjectivity, typeListsAreApart )
+import GHC.Core.Unify( AmIUnifying(..)
+                     , tcUnifyTysForInjectivity, typeListsAreApart )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Subst( elemSubst )
 
 import GHC.Builtin.WiredIn.TypeLits( tryInteractTopFam, tryInteractInertFam )
 
+import GHC.Types.Var( TyVar, tyVarKind, setTyVarKind )
 import GHC.Types.Var.Set
+import GHC.Types.Var.Env( mkInScopeSet )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Control.Monad( unless )
 import GHC.Data.Pair
-import Data.Maybe( isNothing, isJust, mapMaybe )
+import Data.Maybe( isJust, mapMaybe )
 
 
 {- Note [Overview of functional dependencies in type inference]
@@ -108,7 +111,6 @@ Wrinkles
 (FD2) We discard all evidence in Step 2.  We could go further and offer evidence
   from fundeps, but that would require new evidence forms, and an extension to
   FC, so we don't do that right now (Dec 14).
-
 
 Note [FunDep and implicit parameter reactions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -573,6 +575,7 @@ tryEqFunDeps work_item@(EqCt { eq_lhs = work_lhs
 
 
 tryFamEqFunDeps :: TcSMode -> [EqCt] -> TyCon -> [TcType] -> EqCt -> SolverStage ()
+-- See Note [Type inference for type families with injectivity]
 tryFamEqFunDeps mode eqs_for_me fam_tc work_args
                 work_item@(EqCt { eq_ev = ev, eq_rhs = work_rhs })
   | Just ops <- builtInClosedTyFamTyCon_maybe fam_tc
@@ -583,6 +586,7 @@ tryFamEqFunDeps mode eqs_for_me fam_tc work_args
             ; tryFDEqns False fam_tc work_args work_item eqns
 
             ; unless (hasRelevantGiven eqs_for_me work_args work_item) $
+              -- hasRelevantGiven: See (CF1) in Note [Exploiting closed type families]
               do { eqns <- mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
                  ; tryFDEqns True fam_tc work_args work_item eqns } }
 
@@ -599,8 +603,11 @@ tryFamEqFunDeps mode eqs_for_me fam_tc work_args
            NotInjective  -> nopStage ()
            Injective inj -> do { eqns <- mkLocalFamEqFDs eqs_for_me fam_tc inj work_args work_rhs
                                ; tryFDEqns False fam_tc work_args work_item eqns }
+         -- NB: tryFDEqns bales out on an insoluble fundep
+         -- See (CF4) in Note [Exploiting closed type families]
 
        ; unless (hasRelevantGiven eqs_for_me work_args work_item) $
+         -- hasRelevantGiven: See (CF1) in Note [Exploiting closed type families]
          do { eqns <- mkTopFamEqFDs fam_tc work_args work_item
             ; tryFDEqns True fam_tc work_args work_item eqns } }
 
@@ -638,10 +645,11 @@ tryFDEqns is_top fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) f
 --  User-defined type families
 -----------------------------------------
 mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> EqCt -> SolverStage [FunDepEqns]
--- Look at the top-level axioms; we effectively infer injectivity,
--- so we don't need tyConInjectivtyInfo.  This works fine for closed
--- type families without injectivity info
+-- Implements (INJFAM:Wanted/top-closed)
 -- See Note [Exploiting closed type families]
+-- Look at the top-level axioms; we effectively infer injectivity,
+-- so we don't need tyConInjectivityInfo.  This works fine for closed
+-- type families without injectivity info
 mkTopClosedFamEqFDs ax work_args (EqCt { eq_ev = ev, eq_rhs = work_rhs })
   | isGenerativeType work_rhs -- See (CF5) in Note [Exploiting closed type families]
   = Stage $
@@ -679,39 +687,46 @@ hasRelevantGiven eqs_for_me work_args (EqCt { eq_rhs = work_rhs })
     relevant (EqCt { eq_ev = ev, eq_lhs = lhs, eq_rhs = rhs_ty })
        | isGiven ev
        , TyFamLHS _ lhs_tys <- lhs
-       = isJust (tcUnifyTysForInjectivity True work_tys (rhs_ty:lhs_tys))
+       = isJust (tcUnifyTysForInjectivity Unifying work_tys (rhs_ty:lhs_tys))
        | otherwise
        = False
 
 getRelevantBranches :: CoAxiom Branched -> [TcType] -> Xi -> [FunDepEqns]
 -- Return the FunDepEqns that arise from each relevant branch
+-- Implements Note [Relevance]
 getRelevantBranches ax work_args work_rhs
-  = go [] (fromBranches (coAxiomBranches ax))
+  = go (fromBranches (coAxiomBranches ax))
   where
     work_tys = work_rhs : work_args
 
-    go _ [] = []
-    go preceding (branch:branches)
+    go [] = []
+    go (branch:branches)
       = case is_relevant branch of
-          Just eqn -> eqn : go (branch:preceding) branches
-          Nothing  ->       go (branch:preceding) branches
+          Just eqn -> eqn : go branches
+          Nothing  ->       go branches
       where
-         is_relevant (CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys, cab_rhs = rhs_ty })
-            | Just subst <- tcUnifyTysForInjectivity True (rhs_ty:lhs_tys) work_tys
-            , let (subst', qtvs') = trim_qtvs subst qtvs
-                  lhs_tys' = substTys subst' lhs_tys
-                  rhs_ty'  = substTy  subst' rhs_ty
-            , all (no_match lhs_tys') preceding
+         is_relevant branch@(CoAxBranch { cab_tvs = qtvs
+                                        , cab_lhs = lhs_tys
+                                        , cab_rhs = rhs_ty })
+            | Just subst <- tcUnifyTysForInjectivity Unifying (rhs_ty:lhs_tys) work_tys
+              -- See (RW1)-(RW3) in Note [Relevance]
+              -- This is a pre-/unification/ check (not matching)
+              -- so `subst` can bind both `qtvs` and fvs(work_tys)
+            , let (subst',qtvs') = trim_qtvs subst qtvs
+                  lhs_tys'       = substTys subst' lhs_tys
+                  rhs_ty'        = substTy  subst' rhs_ty
+                  branch_tys'    = rhs_ty' : lhs_tys'
+            , noEarlierMatchCheck lhs_tys' branch  -- See (RW4) in Note [Relevance]
             = Just (FDEqns { fd_qtvs = qtvs'
-                           , fd_eqs = zipWith Pair (rhs_ty':lhs_tys') work_tys })
+                           , fd_eqs  = zipWith Pair branch_tys' work_tys })
+                              -- Do not apply the substition to `work_tys`;
+                              -- See (CF7) in Note [Exploiting closed type families]
             | otherwise
             = Nothing
 
-         no_match lhs_tys (CoAxBranch { cab_lhs = lhs_tys1 })
-            = isNothing (tcUnifyTysForInjectivity False lhs_tys1 lhs_tys)
-
 mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> EqCt -> TcS [FunDepEqns]
--- Implements (INJFAM:Wanted/top)
+-- Implements (INJFAM:Wanted/top-open)
+-- See Note [Exploiting open type families]
 mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
   = do { fam_envs <- getFamInstEnvs
        ; let branches :: [CoAxBranch]
@@ -720,15 +735,15 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
        ; return (mapMaybe do_one branches) }
   where
     do_one :: CoAxBranch -> Maybe FunDepEqns
-    do_one branch@(CoAxBranch { cab_tvs = branch_tvs
-                              , cab_lhs = branch_lhs_tys
-                              , cab_rhs = branch_rhs })
-      | Just subst <- tcUnifyTysForInjectivity False [branch_rhs] [work_rhs]
-                      -- False: matching, not unifying
-      , let (subst', qtvs) = trim_qtvs subst branch_tvs
+    do_one (CoAxBranch { cab_tvs = branch_qtvs
+                       , cab_lhs = branch_lhs_tys
+                       , cab_rhs = branch_rhs })
+      | Just subst <- tcUnifyTysForInjectivity Matching [branch_rhs] [work_rhs]
+      , let (subst', qtvs') = trim_qtvs subst branch_qtvs
             branch_lhs_tys' = substTys subst' branch_lhs_tys
-      , apartnessCheck branch_lhs_tys' branch  -- See (TIF3)
-      = Just (mkInjectivityFDEqn inj_flags qtvs branch_lhs_tys' work_args)
+        -- No need for an apartness check here; for open type families
+        -- there are no "preceding" equations
+      = Just (mkInjectivityFDEqn inj_flags qtvs' branch_lhs_tys' work_args)
 
       | otherwise
       = Nothing
@@ -736,7 +751,7 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
 mkLocalFamEqFDs :: [EqCt] -> TyCon -> [Bool] -> [TcType] -> Xi -> SolverStage [FunDepEqns]
 -- Wanted constraints only
 -- Both open and closed type families, but only ones with declared injectivity
--- See Note [Type inference for type families with injectivity] esp (TIF2)
+-- See Note [Exploiting local type-family injectivity]
 mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
   = do { let -- eqns_from_inerts: see (INJFAM:Wanted/other)
              eqns_from_inerts = mapMaybe do_one eqs_for_me
@@ -755,15 +770,23 @@ mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
 
     mk_eqn iargs = mkInjectivityFDEqn inj_flags [] work_args iargs
 
-trim_qtvs :: Subst -> [TcTyVar] -> (Subst,[TcTyVar])
--- Tricky stuff: see (TIF1) in
--- Note [Type inference for type families with injectivity]
-trim_qtvs subst []       = (subst, [])
-trim_qtvs subst (tv:tvs)
-  | tv `elemSubst` subst = trim_qtvs subst tvs
-  | otherwise            = let !(subst1, tv')  = substTyVarBndr subst tv
-                               !(subst', tvs') = trim_qtvs subst1 tvs
-                           in (subst', tv':tvs')
+trim_qtvs :: Subst -> [TyVar] -> (Subst, [TyVar])
+-- Tricky stuff: see (OF1) in Note [Exploiting open type families]
+-- The returned substitution is identical to the incoming one, except that
+-- its in-scope set is extended with the returned [TyVar]
+trim_qtvs unif_subst qtvs
+  = go unif_subst qtvs
+  where
+    go :: Subst -> [TyVar] -> (Subst, [TyVar])
+    go subst [] = (subst, [])
+    go subst (tv:tvs)
+      | tv `elemSubst` unif_subst = go subst tvs
+      | otherwise                 = (subst'', tv':tvs')
+      where
+        tv' = tv `setTyVarKind` substTy subst (tyVarKind tv)
+        subst' = subst `extendSubstInScope` tv'
+        !(subst'', tvs') = go subst' tvs
+
 
 -----------------------------------------
 --  Built-in type families
@@ -924,15 +947,20 @@ we attempt to exploit injectivity, via `mkLocalFamEqFDs`:
 * (INJFAM:Wanted/other) see `mkLocalFamEqFDs`
     work item: [W]   F s1 s2 ~ rhs   -- Wanted
     inert:     [G/W] F t2 t2 ~ rhs   -- Same `rhs`, Given or Wanted
-  We can generate FunDepEqns: (s2 ~ t2)
+  See Note [Exploiting local type-family injectivity]
 
-* (INJFAM:Wanted/top) see `mkTopUserFamEqFDs`
-    work item: [W] F s1 s2 ~ rhs
-    type instance forall a b c. F t1 t2 ~ top_rhs
-  and we can /match/ the LHS, so that
-     S(top_rhs) = rhs
-  then we can generate the FunDepEqns:  forall a c. s2 ~ S(t2)
-  But see wrinkle (TIF1), (TIF3)
+* (INJFAM:Wanted/top-open) for open type families: `mkTopOpenFamEqFDs`
+    type family F a b = r | r -> b
+    type instance F Int (Maybe a) = [G Int]   -- G is a type family
+    [W] F alpha beta = [ty]
+  We can generate (Maybe gamma ~ beta)
+  See Note [Exploiting open type families]
+
+* (INJFAM:Wanted/top-closed) for closed type families: `mkTopClosedFamEqFDs`
+    type family F a b where { ...eqns... }
+    [W] F alpha ~ Int
+  We may be able to generate some extra equalities to constraint `alpha`
+  See very clever Note [Exploiting closed type families]
 
 For /built-in/ type families, it's pretty similar, except that
 
@@ -945,45 +973,36 @@ For /built-in/ type families, it's pretty similar, except that
    * mkLocalBuiltinFamEqFDs
    * mkTopBuiltinFamEqFDs
 
-(TIF1) Generating fundeps from a top-level type instance is covered in
-  Section 5.2 in the Injective Type Families paper. It's a bit tricky.
-  Consider
-     type family F @k (a::k) (b::k) = r | r -> k b
-     type instance forall k (a::k) (b::k). F @k (Proxy @k a) (Proxy @k b) = Proxy @k a
-     [W] F @kappa alpha beta ~ Maybe (Proxy @kappa (delta::kappa))
+Note [Exploiting local type-family injectivity] see `mkLocalFamEqFDs`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have a type family with declared injectivity:
+    type family F a b = r | r -> b
+and we have
+    work item: [W] F s1 s2 ~ F t1 t2
+or
+    work item: [W]   F s1 s2 ~ rhs   -- Wanted
+    inert:     [G/W] F t2 t2 ~ rhs   -- Same `rhs`, Given or Wanted
 
-  we match (Proxy @kappa delta) against the template (Proxy k a), succeeding
-  with substitution [k:->kappa, a:->delta].  We want to generate this FunDepEqns
-    FDEqn { fd_qtvs = [b:kappa], fd_eqs = [ beta ~ Proxy @kappa b ] }
-  Notice that
-    * we must quantify the FunDepEqns over `b`, which is not matched; for this
-      we will generate a fresh unification variable in `instantiateFunDepEqn`.
-    * we must substitute `k:->kappa` in the kind of `b`.
-  This fancy footwork for `fd_qtvs` is done by `trim_qtvs` in
-  `mkInjWantedFamEqTopEqns`.
+Then we can generate FunDepEqns: (s2 ~ t2)
 
-(TIF2) All this applies equally to /closed/ type families; it is /not/
-  subsumed by Note [Exploiting closed type families].  Consider:
+This applies equally to /closed/ type families; it is /not/ subsumed
+by Note [Exploiting closed type families].  Consider:
+
       type family F a | r -> a where { .... }
 
       [W] F t1 ~ a
       [W] F t2 ~ a
 
-  Then since F is declared injective, we can generate t1~t2.
+Then since F is declared injective, we can generate t1~t2.
 
-  As for open type families, we insist on /user-declared/ injectivity only; we
-  don't try to /infer/ injectivity even for a closed family.  See Section 3.4
-  of the "Injective type families" paper.  (Arguably, we could /infer/
-  injectivity for closed type families, and that would be more in the spirit of
-  Note [Exploiting closed type families].)
+As for open type families, we insist on /user-declared/ injectivity only; we
+don't try to /infer/ injectivity even for a closed family.  See Section 3.4
+of the "Injective type families" paper.  (Arguably, we could /infer/
+injectivity for closed type families, and that would be more in the spirit of
+Note [Exploiting closed type families].)
 
-(TIF3) Further to (TIF1), if we are considering a /closed/ type family, we
-  must ensure (see Section 5.2 of the paper) that after matching that
-  equation would indeed be the one to fire.  So we call `apartnessCheck`
-  on the branch to ensure this, in `mkTopUserFamEqFDs`.
-
-Definition [Relevance]
-~~~~~~~~~~~~~~~~~~~~~~
+Note [Relevance]
+~~~~~~~~~~~~~~~~
 We say that a closed-type-family equation `F lhs = rhs` is
    /relevant/ for a Wanted [W] F wlhs ~ wrhs
 iff
@@ -991,6 +1010,10 @@ iff
        See (RW1),(RW2), (RW3)
 
   (R2) There is no earlier equation that matches S(lhs).  See (RW4) below.
+
+The relevance check is implemented by `getRelevantBranches`, which acutally
+returns the [FunDepEqns] described in the Closed Family Fundep Algorithm in
+Note [Exploiting closed type families].
 
 (RW1) Pre-unification treats type-family applications as binding to anything,
     rather like type variables.  If two types don't even pre-unify, we say that they
@@ -1014,24 +1037,99 @@ iff
     Clearly the RHS is apart from the first equation and we want to fire injectivity
     on the second equation.
 
-(RW4) Why "no earlier equation matches" in conditoin (R2)?  Consider the family
+(RW4) Why "no earlier equation matches" in condition (R2)?  Consider the family
 
           type family Bak a = r where
              Bak Int  = Char   -- B1
              Bak Char = Int    -- B2
              Bak a    = a      -- B3
 
-    and [W] Bak alpha ~ Char. In fact, only (B2) is relevant for this Wanted.
+    and [W] Bak alpha ~ Char. In fact, only (B1) is relevant for this Wanted.
     You might think that (B3) could be instantiated to Bak Char ~ Char; but
     actually that instantiation will never fire because (B2) Bak Char ~ Int would
-    fire first.  So the only way to return a Char is if the argment is Int; so we
-    can emit [W] alpha ~ Int.  Hence (B3) is not relevant; only (B2) is relevant.
+    fire first.  So the only way to return a Char is via (B1); so we
+    can emit [W] alpha ~ Int.  Hence (B3) is not relevant; only (B1) is relevant.
 
     That is the reason for condition (R2) in the definition of Relevance above.
     A watertight proof that this is the Right Thing is not very easy.  See more
-    discussion in #23162.
+    discussion in #23162, and Section 5.2 of the paper.
 
-Note [Exploiting closed type families]
+    How, precisely, do we implement (R2)? We check that there is no earlier equation
+    that fires on S(lhs), in this case (on Bak Char).  Notice that this is different
+    from the `apartnessCheck`, which checks that all preceding equations are apart
+    from S(lhs).  Apartness checking uses /unification/; here we want /matching/.
+    Hence using `noEarlierMatchCheck`, not `apartnessCheck`.
+
+    Here's a good example from T27171_aux. T
+       type family TMessage m where
+         {- T1 -} TMessage @f @t   (CustomMethod s :: Method f t) = ()
+         {- T2 -} TMessage @f @Req (m :: Method f Req)            = TRequestMessage m
+         {- T3 -} TMessage @f @Not (m :: Method f Not)            = TNotificationMessage m
+
+       [W] TMessage @SC @Req alpha  ~# TRequestMessage alpha
+
+    There is only one relevant equation, namely (T2).  If we apply its
+    pre-unification substitution [f :-> SC, m :-> alpha] to its LHS we get
+         TMessage @SC @Req alpha
+    and equation (T1) does not match that. (It does unify, but we don't care.)
+
+(RW5) `noEarlierMatchCheck`: in (RW4) We really do need to check that /no/
+    earlier equation matches, not just no earlier /incompatible/ equation
+    matches.  Consider T27282a:
+        type family F a where
+          F Int  = Int  -- B1
+          F Char = Bool -- B2
+          F a    = a    -- B3
+
+        [W] F alpha ~ Int
+
+    (B1) is relevant, and (B2) is not. What about (B3)?  It pre-unifies with
+    the Wanted via [alpha :-> Int, a :-> Int].  But under that substitution
+    (B1) would fire, so (B3) is not relevant.
+
+    And yet, (B1) is /compatible/ with (B3), so it's no good just looking at
+    the `cab_incomps` of (B3).  Instead we look at `cab_overlaps`.
+
+Note [Exploiting open type families] see `mkTopOpenFamEqFDs`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generating fundeps from a top-level type instance is covered in Section 5.2 in
+the Injective Type Families paper. For open type families, suppose we have
+
+   type family F a b = r | r -> b
+   type instance F Int (Maybe a) = [G Int]   -- G is a type family
+
+   [W] F alpha beta = [ty]
+
+Then, since F has been checked as injective, and the RHS [G Int]
+pre-unifies with [ty], we can add a derived FunDepEqns
+   FDEqns{ fd_qtvs = a, fd_eqs = [ Maybe a ~ beta ] }
+and thereby emit
+   [W] Maybe gamma ~ beta    -- Fresh gamma
+
+Wrinkles
+
+(OF1) Consider
+     type family F @k (a::k) (b::k) = r | r -> k b
+     type instance forall k (a::k) (b::k).
+                   F @k (Proxy @k a) (Proxy @k b) = Maybe (Proxy @k a)
+
+     [W] F @kappa alpha beta ~ Maybe (Proxy @kappa (delta::kappa))
+
+  We match   the target   (Maybe (Proxy @kappa delta))
+   against   the template (Maybe (Proxy @k     a))
+  succeeding with substitution [k:->kappa, a:->delta].  We want to generate this:
+    FDEqn { fd_qtvs = [b::kappa], fd_eqs = [ Proxy @kappa b ] ~ beta }
+  Notice that
+    * we must quantify the FunDepEqns over `b`, which is not matched; for this
+      we will generate a fresh unification variable in `instantiateFunDepEqn`.
+    * we must substitute `k:->kappa` in the kind of `b`.
+
+  This fancy footwork for `fd_qtvs` is done by `trim_qtvs`.  It
+    * Drops a quantified tyvar that /is/ matched
+    * Substitutes in the kind of a quantified tyvar that is /not/ matched
+    * Adds the not-matched tyvar to the in-scope set of the substitution
+
+Note [Exploiting closed type families] see `mkTopClosedFamEqFDs`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
     type family F a b where
@@ -1042,17 +1140,18 @@ Suppose we have
     [W]  F Int alpha ~ Char
 
 The /only/ way to solve this Wanted is using (F2), so we can safely unify
-alpha:=Char without risking losing any solutions.  That is what
-`mkTopClosedFamEqFDs` does.  Ticket #23162 has lots of background detail
+alpha:=Char without risking losing any solutions.  We don't even need any
+injectivity annotations. Ticket #23162 has lots of background detail.
 
-More precisely, here is the Closed Family Fundep Algorithm (CFFA)
+More precisely, here is the very clever Closed Family Fundep Algorithm (CFFA)
 
     IF * F a is a closed type family.
        * We are trying to solve [W] F wlhs ~ wrhs.
-       * There are no "relevant" Givens [G] F lhs ~ rhs.  See (CF1) below.
-       * F  has exactly one equation, F lhs = rhs that is "relevant" for that Wanted
+       * There are no "relevant Givens" [G] F lhs ~ rhs.  See (CF1) below.
+       * F  has exactly one equation, F lhs = rhs that is "relevant" for
+         that Wanted (see Note [Relevance])
     THEN
-      we can emit and solve the fundep equalities:
+      we can emit and solve the fundeps :: [FunDepEqns]:
           [W] wlhs1 ~ lhs1
           ...
           [W] wlhsn ~ lhsn
@@ -1060,7 +1159,10 @@ More precisely, here is the Closed Family Fundep Algorithm (CFFA)
     with fresh unification vars in lhs and rhs for the quantified variables of the
     equation.
 
-See Definition [Relevance] for what "relevant" means.
+    Actually we take advantage of the substitution generated by the relevance
+    check, see (CF7) below.
+
+See Note [Relevance] for what "relevant" means.
 We need to take care about non-termination; see (CF3).
 
 Key point: equations that are not relevant do not need to be considered for fundeps at all.
@@ -1166,6 +1268,8 @@ Key point: equations that are not relevant do not need to be considered for fund
   I was looking at non-termination for closed type families, but it's a small
   improvement in general.
 
+  This bale-out is implementedn in `tryFDEqns`.
+
 (CF5) Consider (see "Yikes5" in #23162):
       type family F a where
          F (Just x) = Int
@@ -1196,7 +1300,7 @@ Key point: equations that are not relevant do not need to be considered for fund
       type family I t = res | res -> t where
         I TInt = Int |> g    -- where g :: Type ~# IK k
   and [W] I alpha ~ Int |> g2
-  Here we definiteily want to take advantage of injectivity.
+  Here we definitely want to take advantage of injectivity.
 
 (CF6) This machinery can also have a significant positive effect on the size of
   proof terms. For example (simplification of T26426):
@@ -1204,7 +1308,8 @@ Key point: equations that are not relevant do not need to be considered for fund
       type family (++) a b where { '[] ++ ys = ys; (x:xs) ++ ys = x : (xs ++ ys) }
       type family MapId a where { MapId '[] = '[]; MapId (x:xs) = x : MapId xs }
 
-      app :: (MapId xs ++ MapId ys ~ MapId (xs ++ ys)) => Proxy xs -> Proxy ys -> Proxy (xs ++ ys)
+      app :: (MapId xs ++ MapId ys ~ MapId (xs ++ ys))
+          => Proxy xs -> Proxy ys -> Proxy (xs ++ ys)
 
       test :: Proxy [ty_1, ..., ty_n]
       test =   Proxy @'[ty_1]
@@ -1247,6 +1352,30 @@ Key point: equations that are not relevant do not need to be considered for fund
   The takeaway is that (CFFA) allows us to push in the (flat) result type,
   instead of relying on recursively built sub-proof terms, which brings down
   coercion sizes (in certain situations) from O(n^3) to O(n^2).
+
+(CF7) Relevance.  When computing relevance in the Closed Family Fundep Algorithm,
+  for [W] F wlhs1 wlhs2 ~ wrhs, against an equation   F lhs1 lhs2 ~ rhs
+  we get back a pre-unifying substitution S that makes the two as equal as poss.
+  Then we use `trim_qtvs` in exactly the same way as in
+       (OF1) of Note [Exploiting closed type families], to generate qtvs' and S'
+  Then we generate
+      FDEqns { fd_qtvs = qtvs', fd_eqs [ S'(lhs1) ~ wlhs1
+                                       , S'(lhs2) ~ wlhs2
+                                       , S'(rhs)  ~ wrhs ] }
+  Notice that we do /not/ apply S' to wlhs/wrhs.  These type contain unification
+  variables that we must actually unify! Example
+     type familiy F a b where
+       F [a] (Maybe b) = (a,  G b)
+     [W] F alpha beta ~ (Int, [gamma])
+  Pre-unification gives [alpha :-> [a], beta :-> Maybe b, a :-> Int]
+  This substitution eliminates the quantified variable `a` but not `b`, so we
+  want this:
+     FDEqns { fd_qtvs = [b], fd_eqs [ [Int] ~ alpha
+                                    , Maybe b ~ beta
+                                    , (Int,G b) ~ (Int, [gamma]) ] }
+
+  Notice also that by applying the substitution to the template but not to the
+  Wanted, we uphold the `fd_eqs` invariant in `FDEqns` (see its data type decl)
 
 Note [Cache-caused loops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1340,28 +1469,34 @@ solveFunDeps work_ev fd_eqns
                          ; uPairsTcM uenv eqs }
 
 instantiateFunDepEqns :: FunDepEqns -> TcM [TypeEqn]
-instantiateFunDepEqns (FDEqns { fd_qtvs = tvs, fd_eqs = eqs })
-  | null tvs
+-- See GHC.Tc.Instance.Fundeps Note [Improving against instances]
+--     Wrinkle (IMP1)
+instantiateFunDepEqns (FDEqns { fd_qtvs = qtvs, fd_eqs = eqs })
+  | null qtvs
   = return rev_eqs
   | otherwise
-  = do { TcM.traceTc "instantiateFunDepEqns" (ppr tvs $$ ppr eqs)
-       ; (_, subst) <- instFlexiXTcM emptySubst tvs  -- Takes account of kind substitution
+  = do { TcM.traceTc "instantiateFunDepEqns" (ppr qtvs $$ ppr eqs)
+       ; (_, subst) <- instFlexiXTcM empty_subst qtvs  -- Takes account of kind substitution
        ; return (map (subst_pair subst) rev_eqs) }
   where
     rev_eqs = reverse eqs
        -- (reverse eqs): See Note [Reverse order of fundep equations]
 
+    -- The kinds of `qtvs` can have free variables, because of `trim_qtvs`
+    -- Example: T27828b
+    empty_subst = mkEmptySubst $ mkInScopeSet $
+                  tyCoVarsOfTypes (map tyVarKind qtvs)
+
     subst_pair subst (Pair ty1 ty2)
-       = Pair (substTyUnchecked subst' ty1) ty2
-              -- ty2 does not mention fd_qtvs, so no need to subst it.
-              -- See GHC.Tc.Instance.Fundeps Note [Improving against instances]
-              --     Wrinkle (1)
+       = Pair (substTy subst' ty1) ty2
+         -- NB: ty2 does not mention fd_qtvs, so no need to subst it.
+         --     See invariant on `fv_eqs` in `data FunDepEqns`.
        where
          subst' = extendSubstInScopeSet subst (tyCoVarsOfType ty1)
                   -- The free vars of ty1 aren't just fd_qtvs: ty1 is the result
                   -- of matching with the [W] constraint. So we add its free
                   -- vars to InScopeSet, to satisfy substTy's invariants, even
-                  -- though ty1 will never (currently) be a poytype, so this
+                  -- though ty1 will never (currently) be a polytype, so this
                   -- InScopeSet will never be looked at.
 
 
