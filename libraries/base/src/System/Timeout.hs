@@ -23,6 +23,7 @@ import Prelude
 import GHC.Internal.Control.Monad
 import GHC.Internal.Event           (getSystemTimerManager,
                             registerTimeout, unregisterTimeout)
+import GHC.Internal.IO.SubSystem    (iomgrInLib)
 #endif
 
 import Control.Concurrent
@@ -105,8 +106,8 @@ timeout n f
     | n <  0    = fmap Just f
     | n == 0    = return Nothing
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-    | rtsSupportsBoundThreads = do
-        -- In the threaded RTS, we use the Timer Manager to delay the
+    | iomgrInLib = do
+        -- If the Timer Manager is available then use it to delay the
         -- (fairly expensive) 'forkIO' call until the timeout has expired.
         --
         -- An additional thread is required for the actual delivery of

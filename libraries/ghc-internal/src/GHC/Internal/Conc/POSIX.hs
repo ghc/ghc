@@ -55,6 +55,7 @@ import GHC.Internal.Data.Maybe (Maybe(..))
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Event.Windows.ConsoleEvent
 import GHC.Internal.IO (unsafePerformIO)
+import GHC.Internal.IO.SubSystem (iomgrInLib)
 import GHC.Internal.IORef
 import GHC.Internal.MVar
 import GHC.Internal.Num (Num(..))
@@ -120,7 +121,7 @@ asyncWriteBA fd isSock len off bufB =
 --
 threadDelay :: Int -> IO ()
 threadDelay time
-  | threaded  = waitForDelayEvent time
+  | iomgrInLib = waitForDelayEvent time
   | otherwise = IO $ \s ->
         case time of { I# time# ->
         case delay# time# s of { s' -> (# s', () #)
@@ -134,10 +135,8 @@ threadDelay time
 --
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs
-  | threaded = waitForDelayEventSTM usecs
+  | iomgrInLib = waitForDelayEventSTM usecs
   | otherwise = errorWithoutStackTrace "registerDelay: requires -threaded"
-
-foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 
 waitForDelayEvent :: Int -> IO ()
 waitForDelayEvent usecs = do
@@ -185,7 +184,7 @@ foreign import ccall unsafe "getOrSetGHCConcWindowsIOManagerThreadStore"
 
 ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning
-  | threaded  = startIOManagerThread
+  | iomgrInLib = startIOManagerThread
   | otherwise = return ()
 
 interruptIOManager :: IO ()
