@@ -49,6 +49,7 @@ import GHC.Internal.IO (mask_, uninterruptibleMask_, onException)
 import GHC.Internal.IO.Exception (ioError)
 import GHC.Internal.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
                     boundsIOArray)
+import GHC.Internal.IO.SubSystem (iomgrInRTS)
 import GHC.Internal.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import GHC.Internal.Event.Control (controlWriteFd)
 import GHC.Internal.Event.Internal (eventIs, evtClose)
@@ -325,7 +326,7 @@ timerManagerThreadVar = unsafePerformIO $ do
 
 ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning
-  | not threaded = return ()
+  | iomgrInRTS = return ()
   | otherwise = do
       startIOManagerThreads
       startTimerManagerThread
@@ -408,8 +409,6 @@ startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
                                TM.cleanup em
           create
         _other         -> return st
-
-foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 
 ioManagerCapabilitiesChanged :: IO ()
 ioManagerCapabilitiesChanged =
