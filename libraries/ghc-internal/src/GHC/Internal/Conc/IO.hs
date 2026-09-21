@@ -91,13 +91,14 @@ import qualified GHC.Internal.Wasm.Prim.Flag as Wasm
 #endif
 
 ensureIOManagerIsRunning :: IO ()
-#if defined(javascript_HOST_ARCH)
-ensureIOManagerIsRunning = pure ()
-#elif !defined(mingw32_HOST_OS)
-ensureIOManagerIsRunning = Event.ensureIOManagerIsRunning
-#else
-ensureIOManagerIsRunning = Windows.ensureIOManagerIsRunning
+#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
+ensureIOManagerIsRunning
+  | iomgrInLib = Event.ensureIOManagerIsRunning
+#elif !defined(javascript_HOST_ARCH)
+ensureIOManagerIsRunning
+  | iomgrInLib = Windows.ensureIOManagerIsRunning
 #endif
+  | otherwise  = return ()
 
 -- | Interrupts the current wait of the I/O manager if it is currently blocked.
 -- This instructs it to re-read how much it should wait and to process any
@@ -105,18 +106,18 @@ ensureIOManagerIsRunning = Windows.ensureIOManagerIsRunning
 --
 -- @since base-4.15
 interruptIOManager :: IO ()
-#if !defined(mingw32_HOST_OS)
-interruptIOManager = return ()
-#else
-interruptIOManager = Windows.interruptIOManager
+interruptIOManager
+#if defined(mingw32_HOST_OS)
+  | iomgrInLib = Windows.interruptIOManager
 #endif
+  | otherwise  = return ()
 
 ioManagerCapabilitiesChanged :: IO ()
+ioManagerCapabilitiesChanged
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-ioManagerCapabilitiesChanged = Event.ioManagerCapabilitiesChanged
-#else
-ioManagerCapabilitiesChanged = return ()
+  | iomgrInLib = Event.ioManagerCapabilitiesChanged
 #endif
+  | otherwise  = return ()
 
 -- | Block the current thread until data is available to read on the
 -- given file descriptor (GHC only).
