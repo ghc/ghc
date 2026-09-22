@@ -242,23 +242,30 @@ data GlobalDbgStatus = GlobalDbgStatus
 --------------------------------------------------------------------------------
 
 getThreadResumeContext :: ThreadId -> IO ResumeContext
-getThreadResumeContext tid = modifyMVar globalBreakActionMap $ \gbm0 -> do
-  case Map.lookup tid gbm0 of
+getThreadResumeContext tid = do
+  ctxs0 <- readTVarIO threadContextsVar
+  case Map.lookup tid ctxs0 of
+    Just ctx -> pure ctx -- common case: hence read without transaction
     Nothing  -> do
-      r <- ResumeContext <$> newEmptyMVar
-      let !gbm1 = Map.insert tid r gbm0
-      pure (gbm1, r)
-    Just ctx -> do
-      pure (gbm0, ctx)
+      new_ctx <- ResumeContext <$> newEmptyMVar
+      atomically $ do -- write new thread context atomically
+        ctxs1 <- readTVar threadContextsVar
+        case Map.lookup tid ctxs1 of
+          Just ctx -> pure ctx -- already exists
+          Nothing  -> do
+            let !ctxs2 = Map.insert tid new_ctx ctxs1
+            writeTVar threadContextsVar ctxs2
+            pure new_ctx
 
--- | A global mapping from thread ids to the MVars on which they block when stopped.
-globalBreakActionMap :: MVar (Map.Map ThreadId ResumeContext)
-globalBreakActionMap = unsafePerformIO $ newMVar Map.empty
-{-# NOINLINE globalBreakActionMap #-}
+-- | A global mapping from threads to their 'ResumeContext' (that contain
+-- the MVars on which they block when stopped)
+threadContextsVar :: TVar (Map.Map ThreadId ResumeContext)
+threadContextsVar = unsafePerformIO $ newTVarIO Map.empty
+{-# NOINLINE threadContextsVar #-}
 
 newtype ResumeContext = ResumeContext
   { resumeBreakMVar :: MVar ()
   -- ^ A thread that hits a breakpoint blocks reading its corresponding MVar
-  -- (gotten from the 'globalBreakActionMap').
+  -- (gotten from the 'threadContextsVar').
   -- The debugger can unblock that thread by signaling its MVar.
   }
