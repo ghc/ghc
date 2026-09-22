@@ -1,0 +1,136 @@
+
+==================== CodeGenAnal STG: ====================
+(EnforceEpt005.$WS, <TagFun[TagEPT]>) =
+    {} \r [(conrep, <TagVal[TagDunno]>)]
+        case conrep of (conrep1, <TagVal[TagEPT]>) {
+        __DEFAULT -> EnforceEpt005.S [conrep1];
+        };
+
+(lvl, <TagVal[TagEPT]>) = GHC.Types.I#! [0#];
+
+(EnforceEpt005.S, <TagFun[TagDunno]>) =
+    {} \r [(eta, <TagVal[TagDunno]>)] EnforceEpt005.S [eta];
+
+(EnforceEpt005.A, <TagFun[TagEPT]>) =
+    {} \r [(eta, <TagVal[TagDunno]>)
+           (eta, <TagVal[TagDunno]>)
+           (eta, <TagVal[TagDunno]>)
+           (eta, <TagVal[TagDunno]>)
+           (eta, <TagVal[TagDunno]>)
+           (eta, <TagVal[TagDunno]>)]
+        EnforceEpt005.A [eta eta eta eta eta eta];
+
+(EnforceEpt005.B, <TagVal[TagEPT]>) = EnforceEpt005.B! [];
+
+(EnforceEpt005.f, <TagFun[TagTuple[TagEPT, TagEPT]]>) =
+    {} \r [(x, <TagVal[TagDunno]>) (y, <TagVal[TagDunno]>)]
+        case x of (wild, <TagVal[TagEPT]>) {
+        GHC.Types.I# (ds, <TagVal[TagEPT]>) ->
+        case ds of (ds1, <TagVal[TagEPT]>) {
+          __DEFAULT -> (#,#) [EnforceEpt005.B EnforceEpt005.B];
+          0# ->
+              let {
+                (sat, <TagVal[TagDunno]>) =
+                    {y} \u []
+                        case y of (wild1, <TagVal[TagEPT]>) {
+                        GHC.Types.I# (x1, <TagVal[TagEPT]>) -> lvl;
+                        }; } in
+              let {
+                (sat, <TagVal[TagDunno]>) =
+                    {y} \u []
+                        case y of (wild1, <TagVal[TagEPT]>) {
+                        GHC.Types.I# (x1, <TagVal[TagEPT]>) ->
+                        case *# [x1 x1] of (sat, <TagVal[TagEPT]>) {
+                        __DEFAULT -> GHC.Types.I# [sat];
+                        };
+                        }; } in
+              let {
+                (sat, <TagVal[TagDunno]>) =
+                    {y} \u []
+                        case y of (wild1, <TagVal[TagEPT]>) {
+                        GHC.Types.I# (x1, <TagVal[TagEPT]>) ->
+                        case -# [x1 3#] of (sat, <TagVal[TagEPT]>) {
+                        __DEFAULT -> GHC.Types.I# [sat];
+                        };
+                        }; } in
+              let {
+                (sat, <TagVal[TagDunno]>) =
+                    {y} \u []
+                        case y of (wild1, <TagVal[TagEPT]>) {
+                        GHC.Types.I# (x1, <TagVal[TagEPT]>) ->
+                        case *# [x1 2#] of (sat, <TagVal[TagEPT]>) {
+                        __DEFAULT -> GHC.Types.I# [sat];
+                        };
+                        }; } in
+              let {
+                (sat, <TagVal[TagDunno]>) =
+                    {y} \u []
+                        case y of (wild1, <TagVal[TagEPT]>) {
+                        GHC.Types.I# (x1, <TagVal[TagEPT]>) ->
+                        case +# [x1 1#] of (sat, <TagVal[TagEPT]>) {
+                        __DEFAULT -> GHC.Types.I# [sat];
+                        };
+                        }; } in
+              let {
+                (sat, <TagVal[TagEPT]>) = EnforceEpt005.A! [sat sat sat sat y sat];
+              } in  (#,#) [sat EnforceEpt005.B];
+          1# ->
+              let {
+                (sat, <TagVal[TagDunno]>) =
+                    {y} \u []
+                        case y of (wild1, <TagVal[TagEPT]>) {
+                        GHC.Types.I# (x1, <TagVal[TagEPT]>) ->
+                        case +# [x1 1#] of (sat, <TagVal[TagEPT]>) {
+                        __DEFAULT -> GHC.Types.I# [sat];
+                        };
+                        }; } in
+              let {
+                (sat, <TagVal[TagDunno]>) =
+                    {y} \u []
+                        case y of (wild1, <TagVal[TagEPT]>) {
+                        GHC.Types.I# (x1, <TagVal[TagEPT]>) ->
+                        case *# [x1 x1] of (sat, <TagVal[TagEPT]>) {
+                        __DEFAULT -> GHC.Types.I# [sat];
+                        };
+                        }; } in
+              let {
+                (sat, <TagVal[TagDunno]>) =
+                    {y} \u []
+                        case y of (wild1, <TagVal[TagEPT]>) {
+                        GHC.Types.I# (x1, <TagVal[TagEPT]>) ->
+                        case -# [x1 3#] of (sat, <TagVal[TagEPT]>) {
+                        __DEFAULT -> GHC.Types.I# [sat];
+                        };
+                        }; } in
+              let {
+                (sat, <TagVal[TagDunno]>) =
+                    {y} \u []
+                        case y of (wild1, <TagVal[TagEPT]>) {
+                        GHC.Types.I# (x1, <TagVal[TagEPT]>) ->
+                        case *# [x1 2#] of (sat, <TagVal[TagEPT]>) {
+                        __DEFAULT -> GHC.Types.I# [sat];
+                        };
+                        }; } in
+              let {
+                (sat, <TagVal[TagDunno]>) =
+                    {y} \u []
+                        case y of (wild1, <TagVal[TagEPT]>) {
+                        GHC.Types.I# (x1, <TagVal[TagEPT]>) ->
+                        case +# [x1 1#] of (sat, <TagVal[TagEPT]>) {
+                        __DEFAULT -> GHC.Types.I# [sat];
+                        };
+                        }; } in
+              let {
+                (sat, <TagVal[TagEPT]>) = EnforceEpt005.A! [sat sat sat sat sat y];
+              } in  (#,#) [sat EnforceEpt005.B];
+        };
+        };
+
+(EnforceEpt005.g, <TagFun[TagEPT]>) =
+    {} \r [(x, <TagVal[TagDunno]>) (y, <TagVal[TagDunno]>)]
+        case EnforceEpt005.f x y of (ds, <TagVal[TagEPT]>) {
+        (#,#) (ipv, <TagVal[TagEPT]>) (ipv1, <TagVal[TagEPT]>) ->
+        EnforceEpt005.$WS ipv;
+        };
+
+
