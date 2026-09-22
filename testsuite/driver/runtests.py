@@ -28,7 +28,7 @@ import subprocess
 
 import asyncio
 
-from testutil import getStdout, str_warn, str_info, print_table, shorten_metric_name, str_removeprefix
+from testutil import discover_io_managers, getStdout, str_warn, str_info, print_table, shorten_metric_name, str_removeprefix
 from testglobals import getConfig, ghc_env, TestConfig, t, \
                         TestOptions, brokens, PerfMetric
 from my_typing import TestName

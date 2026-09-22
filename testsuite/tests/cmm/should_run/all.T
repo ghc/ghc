@@ -56,7 +56,7 @@ test('T25601',
 test('T27447',
      [ req_cmm
      , extra_ways(['optasm'])
-     , when(have_llvm(), extra_ways(['optasm', 'optllvm']))
+     , when(have_llvm(), extra_ways(['optllvm']))
      ],
      multi_compile_and_run,
      ['T27447', [('T27447_cmm.cmm', '')], ''])
