@@ -3,6 +3,7 @@
 
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE UnboxedTuples              #-}
 
 module GHC.Stg.EnforceEpt.Rewrite (rewriteTopBinds, rewriteOpApp)
 where
@@ -13,7 +14,7 @@ import GHC.Builtin.PrimOps ( PrimOp(..) )
 import GHC.Types.Basic     ( CbvMark (..), isMarkedCbv
                            , TopLevelFlag(..), isTopLevel )
 import GHC.Types.Id
-import GHC.Types.Name
+import GHC.Types.Name ( nameIsLocalOrFrom )
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
 import GHC.Types.RepType
@@ -22,10 +23,7 @@ import GHC.Unit.Types
 
 import GHC.Core.DataCon
 import GHC.Core            ( AltCon(..) )
-import GHC.Core.Type
-
-import GHC.StgToCmm.Types
-import GHC.StgToCmm.Closure (importedIdLFInfo)
+import GHC.Core.Type       ( definitelyLiftedType )
 
 import GHC.Stg.Utils
 import GHC.Stg.Syntax as StgSyn
@@ -34,15 +32,54 @@ import GHC.Data.Maybe
 import GHC.Utils.Panic
 
 import GHC.Utils.Outputable
-import GHC.Utils.Monad.StrictState
 import GHC.Utils.Misc
 
 import GHC.Stg.EnforceEpt.Types
 
 import Control.Monad
+import GHC.Exts (oneShot)
+import Data.Traversable (mapAccumM)
 
-newtype RM a = RM { unRM :: (State (UniqFM Id TagSig, UniqSupply, Module, IdSet) a) }
-    deriving (Functor, Monad, Applicative)
+-- | Constant for whole module
+data RmModInfo = RmModInfo { rm_mod :: !Module, rm_for_interpreter :: !Bool }
+
+type SigEnv = UniqFM Id TagSig
+data RmEnv = RmEnv { rm_fvs :: IdSet, rm_sig_env :: !(SigEnv) }
+
+newtype RM a = RM { unRM :: RmModInfo -> RmEnv -> UniqSupply -> (# UniqSupply, a #) }
+
+instance Functor RM where
+    fmap f (RM x) = RM $ oneShot $ \info -> oneShot $ \env -> oneShot $ \us ->
+        case x info env us of
+            (# !us1, !x' #) ->
+                let !r = f x'
+                in (# us1, r #)
+
+instance Applicative RM where
+    (RM f) <*> (RM x) = RM $ oneShot $ \info -> oneShot $ \env -> oneShot $ \us ->
+        case f info env us of
+            (# !us1, !f' #) ->
+                case x info env us1 of
+                    (# !us2, !x' #) ->
+                        let !r = f' x'
+                        in (# us2, r #)
+    pure !x = RM $ \_ !_env !us -> (# us, x #)
+
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+instance Monad RM where
+    RM x >>= f = RM $ oneShot $ \info -> oneShot $ \env -> oneShot $ \us ->
+        case x info env us of
+            (# !us1, !x' #) -> case (f x') of RM r -> r info env us1
+
+-- | runRM this_mod for_bytecode us
+runRM :: Module -> Bool -> UniqSupply -> RM a -> a
+runRM mod for_bytecode us act  =
+    case (unRM act)
+            (RmModInfo { rm_mod = mod, rm_for_interpreter = for_bytecode })
+            (RmEnv { rm_fvs = emptyVarSet, rm_sig_env = emptyUFM })
+            us
+        of
+    (# _, r #) -> r
 
 ------------------------------------------------------------
 -- Add cases around strict fields where required.
@@ -107,30 +144,31 @@ when building the free variable list.
 --------------------------------
 
 instance MonadUnique RM where
-    getUniqueSupplyM = RM $ do
-        (m, us, mod,lcls) <- get
-        let (us1, us2) = splitUniqSupply us
-        (put) (m,us2,mod,lcls)
-        return us1
+    getUniqueSupplyM = RM $ \_ _env us ->
+        case splitUniqSupply us of
+            (us1, us2) -> (# us2, us1 #)
 
-getMap :: RM (UniqFM Id TagSig)
-getMap = RM $ ((\(fst,_,_,_) -> fst) <$> get)
+getSigEnv :: RM SigEnv
+getSigEnv = RM $ \_ env us -> (# us, rm_sig_env env #)
 
-setMap :: (UniqFM Id TagSig) -> RM ()
-setMap !m = RM $ do
-    (_,us,mod,lcls) <- get
-    put (m, us,mod,lcls)
-
-getMod :: RM Module
-getMod = RM $ ( (\(_,_,thrd,_) -> thrd) <$> get)
+{-# INLINE withSigEnv #-}
+withSigEnv :: SigEnv-> RM a -> RM a
+withSigEnv !m (RM f)= RM $ \mi env us -> f mi env { rm_sig_env = m} us
 
 getFVs :: RM IdSet
-getFVs = RM $ ((\(_,_,_,lcls) -> lcls) <$> get)
+getFVs = RM $ \_ env us -> (# us, rm_fvs env #)
 
-setFVs :: IdSet -> RM ()
-setFVs !fvs = RM $ do
-    (tag_map,us,mod,_lcls) <- get
-    put (tag_map, us,mod,fvs)
+{-# INLINE withFVs #-}
+withFVs :: IdSet -> RM a -> RM a
+withFVs !fvs (RM f)= RM $ \mi env us -> f mi env { rm_fvs = fvs } us
+
+getMod :: RM Module
+getMod = RM $ \info _env us -> (# us, rm_mod info #)
+
+-- | When generating bytecode certain bindings might be untagged. So we have to
+-- have a way to check for that.
+getForBytecode :: RM Bool
+getForBytecode = RM $ \info _env us -> (# us, rm_for_interpreter info #)
 
 -- Rewrite the RHS(s) while making the id and it's sig available
 -- to determine if things are tagged/need to be captured as FV.
@@ -140,66 +178,50 @@ withBind top_flag (StgRec binds) cont = do
     let (bnds,_rhss) = unzip binds :: ([(Id, TagSig)], [GenStgRhs 'InferTaggedBinders])
     withBinders top_flag bnds cont
 
-addTopBind :: GenStgBinding 'InferTaggedBinders -> RM ()
+addTopBind :: GenStgBinding 'InferTaggedBinders -> RM SigEnv
 addTopBind (StgNonRec (id, tag) _) = do
-    s <- getMap
+    s <- getSigEnv
     -- pprTraceM "AddBind" (ppr id)
-    setMap $ addToUFM s id tag
-    return ()
+    pure $! addToUFM s id tag
 addTopBind (StgRec binds) = do
     let (bnds,_rhss) = unzip binds
-    !s <- getMap
+    !s <- getSigEnv
     -- pprTraceM "AddBinds" (ppr $ map fst bnds)
-    setMap $! addListToUFM s bnds
+    pure $! addListToUFM s bnds
 
 withBinder :: TopLevelFlag ->  (Id, TagSig) -> RM a -> RM a
 withBinder top_flag (id,sig) cont = do
-    oldMap <- getMap
-    setMap $ addToUFM oldMap id sig
-    a <- if isTopLevel top_flag
+    sig_env <- getSigEnv
+    withSigEnv (addToUFM sig_env id sig) $ do
+        if isTopLevel top_flag
             then cont
             else withLcl id cont
-    setMap oldMap
-    return a
 
 withBinders :: TopLevelFlag -> [(Id, TagSig)] -> RM a -> RM a
 withBinders TopLevel sigs cont = do
-    oldMap <- getMap
-    setMap $ addListToUFM oldMap sigs
-    a <- cont
-    setMap oldMap
-    return a
+    sig_env <- getSigEnv
+    withSigEnv (addListToUFM sig_env sigs) cont
 withBinders NotTopLevel sigs cont = do
-    oldMap <- getMap
-    oldFvs <- getFVs
-    setMap $ addListToUFM oldMap sigs
-    setFVs $ extendVarSetList oldFvs (map fst sigs)
-    a <- cont
-    setMap oldMap
-    setFVs oldFvs
-    return a
+    sig_env <- getSigEnv
+    fvs <- getFVs
+    withSigEnv (addListToUFM sig_env sigs) $
+        withFVs (extendVarSetList fvs (map fst sigs)) cont
 
 -- | Compute the argument with the given set of ids treated as requiring capture
 -- as free variables.
 withClosureLcls :: DIdSet -> RM a -> RM a
 withClosureLcls fvs act = do
     old_fvs <- getFVs
-    let !fvs' = nonDetStrictFoldDVarSet (flip extendVarSet) old_fvs fvs
-    setFVs fvs'
-    !r <- act
-    setFVs old_fvs
-    return r
+    withFVs
+        (nonDetStrictFoldDVarSet (flip extendVarSet) old_fvs fvs)
+        act
 
 -- | Compute the argument with the given id treated as requiring capture
 -- as free variables in closures.
 withLcl :: Id -> RM a -> RM a
 withLcl fv act = do
     old_fvs <- getFVs
-    let !fvs' = extendVarSet old_fvs fv
-    setFVs fvs'
-    !r <- act
-    setFVs old_fvs
-    return r
+    withFVs (extendVarSet old_fvs fv) act
 
 {- Note [Tag inference for interactive contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -238,51 +260,26 @@ indicates a bug in the tag inference implementation.
 For this reason we assert that we are running in interactive mode if a lookup fails.
 -}
 isTagged :: Id -> RM Bool
-isTagged v
-    -- See Note [Bottom functions are TagBottoming]
-    | isDeadEndId v = pure False
-    | otherwise = do
+isTagged v = do
+    for_bytecode <- getForBytecode
     this_mod <- getMod
-    -- See Note [Tag inference for interactive contexts]
-    let lookupDefault v = assertPpr (isInteractiveModule this_mod)
-                                    (text "unknown Id:" <> ppr this_mod <+> ppr v)
-                                    (TagVal TagDunno)
-    case nameIsLocalOrFrom this_mod (idName v) of
-        True
-            | definitelyUnliftedType (idType v)
-              -- NB: v might be the Id of a representation-polymorphic join point,
-              -- so we shouldn't use isUnliftedType here. See T22212.
-            -> return True
-            | otherwise -> do -- Local binding
-                !s <- getMap
-                let !sig = lookupWithDefaultUFM s (lookupDefault v) v
-                return $ case sig of
-                    TagFun _             -> True  -- function closure is tagged
-                    TagVal TagDunno      -> False
-                    TagVal TagEPT        -> True
-                    TagVal TagBottoming  -> True
-                    TagVal (TagTuple _)  -> True  -- Consider unboxed tuples tagged.
-        -- Imported
-        False -> return $!
-                -- Determine whether it is tagged from the LFInfo of the imported id.
-                -- See Note [The LFInfo of Imported Ids]
-                case importedIdLFInfo v of
-                    -- Function, applied not entered.
-                    LFReEntrant {}
-                        -> True
-                    -- Thunks need to be entered.
-                    LFThunk {}
-                        -> False
-                    -- LFCon means we already know the tag, and it's tagged.
-                    LFCon {}
-                        -> True
-                    LFUnknown {}
-                        -> False
-                    LFUnlifted {}  -- Unboxed, tagging irrelevant
-                        -> True
-                    LFLetNoEscape {}
-                    -- Shouldn't be possible. I don't think we can export letNoEscapes
-                        -> True
+    s <- getSigEnv
+    let get_env_sig = lookupUFM s
+    massertPpr
+        -- Assert the env is complete for local lifted binders, which means either
+        -- - The binder is present in the env
+        -- - The binder is not a local lifted binder *or* comes from a ghci context
+        (isJust (get_env_sig v)
+            -- See Note [Tag inference for interactive contexts]
+            || isInteractiveModule this_mod
+            || not (nameIsLocalOrFrom this_mod (idName v))
+            || not (definitelyLiftedType (idType v)))
+               (text "unknown Id:" <> ppr this_mod <+> ppr v)
+    -- TODO: We could refactor the whole pass such that we also set id_tagSig
+    -- for every imported id. But this likely comes with a heavy allocation
+    -- overhead so for now we just ensure to use the same logic across analysis
+    -- and rewriter.
+    pure $! isTaggedInfo $ argTagInfo for_bytecode (get_env_sig v) (StgVarArg v)
 
 
 isArgTagged :: StgArg -> RM Bool
@@ -299,18 +296,22 @@ mkLocalArgId id = do
 ---------------------------
 
 
-rewriteTopBinds :: Module -> UniqSupply -> [GenStgTopBinding 'InferTaggedBinders] -> [TgStgTopBinding]
-rewriteTopBinds mod us binds =
-    let doBinds = mapM rewriteTop binds
+rewriteTopBinds :: Bool -- ^ Generating bytecode?
+                -> Module -> UniqSupply -> [GenStgTopBinding 'InferTaggedBinders] -> [TgStgTopBinding]
+rewriteTopBinds for_bytecode mod us binds =
+    runRM mod for_bytecode us $ do
+        snd <$> (mapAccumM rewriteTop mempty binds)
 
-    in evalState (unRM doBinds) (mempty, us, mod, mempty)
-
-rewriteTop :: InferStgTopBinding -> RM TgStgTopBinding
-rewriteTop (StgTopStringLit v s) = return $! (StgTopStringLit v s)
-rewriteTop (StgTopLifted bind)   = do
+rewriteTop :: SigEnv -> InferStgTopBinding -> RM (SigEnv, TgStgTopBinding)
+rewriteTop sig_env (StgTopStringLit v s) = return $! (sig_env, StgTopStringLit v s)
+rewriteTop sig_env (StgTopLifted bind)   = do
     -- Top level bindings can, and must remain in scope
-    addTopBind bind
-    (StgTopLifted) <$!> (rewriteBinds TopLevel bind)
+    -- We use withSigEnv inside rewriteTop per binding to avoid
+    -- allocating one withEnv continuation per top binder.
+    withSigEnv sig_env $ do
+        sig_env <- addTopBind bind
+        !binds <- withSigEnv sig_env (rewriteBinds TopLevel bind)
+        pure (sig_env, StgTopLifted binds)
 
 -- For top level binds, the wrapper is guaranteed to be `id`
 rewriteBinds :: TopLevelFlag -> InferStgBinding -> RM (TgStgBinding)

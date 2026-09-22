@@ -25,5 +25,17 @@ test('inferTags003', [ only_ways(['optasm']),
                      ], compile, ['-ddump-cmm -dno-typeable-binds -O'])
 test('inferTags004', normal, compile, ['-O -ddump-stg-tags -dno-typeable-binds -dsuppress-uniques'])
 test('T27005b', normal, compile, ['-O -ddump-stg-tags -dno-typeable-binds -dsuppress-uniques'])
+# Both f and the join point j should have a signature TagTuple[TagEPT, TagEPT]
+test('inferTags005',
+     grep_errmsg(r'(TagTuple\[TagEPT, TagEPT\])', [1]),
+     compile,
+     ['-O -fno-worker-wrapper -fno-cpr-anal -ddump-stg-tags '
+      '-dno-typeable-binds -dsuppress-uniques'])
+# The function needs to have a signature TagTuple[TagEPT, TagEPT]
+test('inferTags006',
+     grep_errmsg(r'(TagTuple\[TagEPT, TagEPT\])', [1]),
+     compile,
+     ['-O -fno-worker-wrapper -fno-cpr-anal -fno-full-laziness -ddump-stg-tags '
+      '-dno-typeable-binds -dsuppress-uniques'])
 
 test('T24806', grep_errmsg('^\\(T24806\\.\\$wgo'), compile, ['-O -ddump-stg-tags -dno-typeable-binds -dsuppress-uniques'])
