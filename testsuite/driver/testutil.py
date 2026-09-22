@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import shutil
 import tempfile
@@ -179,3 +180,19 @@ def shorten_metric_name(name: str) -> str:
         "binary_size/if_compression(3)": "size/3",
     }
     return dic.get(name, name)
+
+# I/O manager discovery for a haskell binary. Returns the set of IO Manager
+# strings supported by the binary
+def discover_io_managers(hs_exe: Union[str, Path], cwd: Union[str, Path]) -> Set[str]:
+    rp = subprocess.run(
+        [str(hs_exe), '+RTS', '--info', '-RTS'],
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL)
+    stdout = rp.stdout.decode('utf-8', errors='replace')
+
+    m = re.search(r'\("I/O managers", "(.*)"\)', stdout)
+    if not m:
+        raise Exception('Expected stdout output of form \'... ("I/O managers", "select selectbis poll") ...\' but got:\n{}'.format(stdout))
+
+    return set(m.group(1).split())
