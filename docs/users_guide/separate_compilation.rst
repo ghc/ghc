@@ -1503,6 +1503,23 @@ generation are:
     ``.depend`` and then ``include`` the file ``.depend`` into
     ``Makefile``.
 
+.. ghc-flag:: -dep-json ⟨file⟩
+    :shortdesc: Also emit ⟨file⟩ as a JSON file containing dependencies
+    :type: dynamic
+    :reverse: -no-dep-json
+    :category: redirect-output
+
+    In addition to the makefile, also emit ⟨file⟩ as a JSON file
+    containing the same dependencies info, so it can be parsed by
+    external build systems. The JSON file contains a single object,
+    mapping each target to a list of dependencies.
+    In addition to the makefile, each module's payload will contain the
+    values of ``OPTIONS`` and ``LANGUAGE`` pragmas of the source
+    file, so it can be parsed by external build systems. Each ``LANGUAGE``
+    pragma is represented as an option as well, e.g.
+    ``{-# LANGUAGE TemplateHaskell #-}`` is represented as
+    ``"-XTemplateHaskell"``.
+
 .. ghc-flag:: -dep-suffix ⟨suffix⟩
     :shortdesc: Make dependencies that declare that files with suffix
         ``.⟨suf⟩⟨osuf⟩`` depend on interface files with suffix ``.⟨suf⟩hi``

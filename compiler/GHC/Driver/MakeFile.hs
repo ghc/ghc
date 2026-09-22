@@ -7,6 +7,8 @@
 -- (c) The University of Glasgow 2005
 --
 -----------------------------------------------------------------------------
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module GHC.Driver.MakeFile
    ( doMkDependHS
@@ -19,6 +21,7 @@ import GHC.Prelude
 import GHC qualified
 
 import GHC.Data.Bag (listToBag)
+import GHC.Data.FastString (lexicalCompareFS, unpackFS)
 import GHC.Data.Graph.Directed (SCC (..))
 import GHC.Data.OsPath
 
@@ -52,6 +55,7 @@ import GHC.Unit.State (lookupUnitId)
 
 import GHC.Utils.Error
 import GHC.Utils.Exception
+import GHC.Utils.Json
 import GHC.Utils.Logger
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -63,8 +67,11 @@ import Data.Either
 import Data.Foldable (traverse_)
 import Data.IORef
 import Data.List (partition)
+import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust, isNothing)
+import Data.Semigroup qualified as Semigroup
 import Data.Set qualified as Set
+import GHC.Generics (Generic, Generically (..))
 import System.Directory
 import qualified System.Directory as Directory
 import System.OsPath as OsPath
@@ -127,7 +134,11 @@ doMkDependModuleGraph dflags module_graph = do
       backends = concat
         [ [ initFileDepWriter logger root tmpfs dflags
           ]
+        , [ initJsonDepWriter json_output dflags
+          | Just json_output <- [depJson dflags]
+          ]
         ]
+
 
     let sorted = GHC.topSortModuleGraph False module_graph Nothing
     -- Print out the dependencies if wanted
@@ -504,11 +515,8 @@ insertSuffixes file_name extras
 
 
 -----------------------------------------------------------------
---
---              endMkDependHs
---      Complete the makefile, close the tmp file etc
---
------------------------------------------------------------------
+-- endMkDependHs
+-- Complete the makefile, close the tmp file etc
 
 endMkDependHS :: Logger -> MkDepFiles -> IO ()
 
@@ -536,6 +544,186 @@ endMkDependHS logger
         -- Copy the new makefile in place
   showPass logger "Installing new makefile"
   SysTools.copyFile tmp_file makefile
+
+-----------------------------------------------------------------
+--
+--              JSON MkDepends output
+--
+-----------------------------------------------------------------
+
+initJsonDepWriter :: FilePath -> DynFlags -> IO DependencyWriter
+initJsonDepWriter output dflags = do
+  json_var <- mkJsonOutput output initDepJson
+  pure DependencyWriter
+    { dw_beginWriter =
+        pure $ DepSink $ \ node deps ->
+          updateJson json_var (updateDepJson (depIncludePkgDeps dflags) node deps)
+    , dw_endWriter =
+        writeJsonOutput json_var
+    }
+
+--------------------------------------------------------------------------------
+-- Output interface for json dumps
+
+-- | Resources for a json dump option, used in "GHC.Driver.MakeFile".
+-- The flag @-dep-json@ add an additional output target for dependency
+-- diagnostics.
+data JsonOutput a =
+  JsonOutput {
+    -- | This ref is updated in @processDeps@ incrementally, using a
+    -- flag-specific type.
+    json_ref :: IORef a,
+
+    -- | The output file path specified as argument to the flag.
+    json_path :: FilePath
+  }
+
+-- | TODO: @fendor
+mkJsonOutput ::
+  FilePath ->
+  IO (IORef a) ->
+  IO (JsonOutput a)
+mkJsonOutput json_path mk_ref = do
+  json_ref <- mk_ref
+  pure JsonOutput {json_ref, json_path}
+
+-- | Update the dump data in 'json_ref' if the output target is present.
+updateJson :: JsonOutput a -> (a -> a) -> IO ()
+updateJson JsonOutput {json_ref} f = modifyIORef' json_ref f
+
+-- | Write a json object to the flag-dependent file if the output target is
+-- present.
+writeJsonOutput ::
+  ToJson a =>
+  JsonOutput a ->
+  IO ()
+writeJsonOutput JsonOutput {json_ref, json_path} = do
+  payload <- readIORef json_ref
+  writeJsonFile payload json_path
+
+--------------------------------------------------------------------------------
+-- Output helpers
+
+writeJsonFile :: ToJson a => a -> FilePath -> IO ()
+writeJsonFile doc p = do
+  withAtomicRename p
+    $ \tmp -> writeFile tmp $ showSDocUnsafe $ renderJSON $ json doc
+
+--------------------------------------------------------------------------------
+-- Payload for -dep-json
+
+newtype PackageDeps
+  = PackageDeps (Map.Map (String, UnitId, DPackageId) (Set.Set ModuleName))
+  deriving newtype (Monoid)
+
+newtype DPackageId = DPackageId PackageId
+  deriving newtype (Eq)
+
+instance Ord DPackageId where
+  DPackageId (PackageId d1) `compare` DPackageId (PackageId d2) = d1 `lexicalCompareFS` d2
+
+instance Semigroup PackageDeps where
+  PackageDeps l <> PackageDeps r = PackageDeps (Map.unionWith (Semigroup.<>) l r)
+
+data Deps
+  = Deps
+  { sources :: Set.Set OsPath
+  , modules :: (Set.Set ModuleName, Set.Set ModuleName)
+  , packages :: PackageDeps
+  , cpp :: Set.Set OsPath
+  , options :: [String]
+  , preprocessor :: Maybe FilePath
+  }
+  deriving stock (Generic)
+  deriving (Semigroup, Monoid) via (Generically Deps)
+
+newtype DepJson = DepJson (Map.Map ModuleName Deps)
+
+instance ToJson DepJson where
+  json (DepJson m) =
+    JSObject [
+      (moduleNameString target, JSObject [
+        ("sources", array sources (showOsPath . normalise)),
+        ("modules", array (fst modules) moduleNameString),
+        ("modules-boot", array (snd modules) moduleNameString),
+        ("packages",
+          JSArray
+            [ package name unit_id package_id mods
+            | ((name, unit_id, dpkd_id), mods) <- Map.toList packages
+            , let DPackageId package_id = dpkd_id
+            ]
+        ),
+        ("cpp", array cpp showOsPath),
+        ("options", JSArray $ map JSString options),
+        ("preprocessor", maybe JSNull JSString preprocessor)
+      ])
+      | (target, Deps {packages = PackageDeps packages, ..}) <- Map.toList m
+    ]
+    where
+      package name unit_id (PackageId package_id) mods =
+        JSObject [
+          ("id", JSString (unitIdString unit_id)),
+          ("name", JSString name),
+          ("package-id", JSString (unpackFS package_id)),
+          ("modules", array mods moduleNameString)
+        ]
+
+      array values render = JSArray (fmap (JSString . render) (Set.toList values))
+
+      showOsPath = unsafeDecodeUtf
+
+initDepJson :: IO (IORef DepJson)
+initDepJson = newIORef $ DepJson Map.empty
+
+insertDepJson :: [ModuleName] -> Deps -> DepJson -> DepJson
+insertDepJson targets dep (DepJson m0) =
+  DepJson
+    $ foldl'
+      ( \acc target ->
+          Map.insertWith
+            (Semigroup.<>)
+            target
+            dep
+            acc
+      )
+      m0
+      targets
+
+updateDepJson :: Bool -> DepNode -> [Dep] -> DepJson -> DepJson
+updateDepJson include_pkgs DepNode {..} deps =
+  insertDepJson [moduleName dn_mod] payload
+  where
+    payload = node_data Semigroup.<> foldMap dep deps
+
+    node_data =
+      mempty {
+        sources = Set.singleton dn_src,
+        preprocessor = pn_preprocessor dn_preprocessing,
+        options = pn_options dn_preprocessing
+      }
+
+    dep = \case
+      DepHi {dep_mod, dep_local, dep_unit, dep_boot}
+        | dep_local
+        , let set = Set.singleton $ moduleName dep_mod
+              value | IsBoot <- dep_boot = (Set.empty, set)
+                    | otherwise = (set, Set.empty)
+        -> mempty {modules = value}
+
+        | include_pkgs
+        , Just unit <- dep_unit
+        , let PackageName nameFS = unitPackageName unit
+              name = unpackFS nameFS
+              withLibName (PackageName c) = name ++ ":" ++ unpackFS c
+              lname = maybe name withLibName (unitComponentName unit)
+              key = (lname, unitId unit, DPackageId $ unitPackageId unit)
+        -> mempty {packages = PackageDeps (Map.singleton key (Set.singleton $ moduleName dep_mod))}
+
+        | otherwise
+        -> mempty
+
+      DepCpp {dep_path} ->
+        mempty {cpp = Set.singleton dep_path}
 
 
 -----------------------------------------------------------------

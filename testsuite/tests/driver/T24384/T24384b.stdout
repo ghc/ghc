@@ -1,0 +1,157 @@
+{
+  "A": {
+    "cpp": [],
+    "modules": [],
+    "modules-boot": [
+      "C"
+    ],
+    "options": [
+      "-XStrict",
+      "-fexpose-all-unfoldings"
+    ],
+    "packages": [
+      {
+        "id": "base-4.23.0.0-inplace",
+        "modules": [
+          "GHC.Essentials",
+          "Prelude"
+        ],
+        "name": "base",
+        "package-id": "base-4.23.0.0"
+      }
+    ],
+    "preprocessor": null,
+    "sources": [
+      "A.hs"
+    ]
+  },
+  "B": {
+    "cpp": [],
+    "modules": [
+      "A"
+    ],
+    "modules-boot": [],
+    "options": [
+      "-F",
+      "-pgmF",
+      "./preproc.sh"
+    ],
+    "packages": [
+      {
+        "id": "base-4.23.0.0-inplace",
+        "modules": [
+          "GHC.Essentials",
+          "Prelude"
+        ],
+        "name": "base",
+        "package-id": "base-4.23.0.0"
+      }
+    ],
+    "preprocessor": "./preproc.sh",
+    "sources": [
+      "lib/B.hs"
+    ]
+  },
+  "C": {
+    "cpp": [],
+    "modules": [
+      "A",
+      "E"
+    ],
+    "modules-boot": [],
+    "options": [],
+    "packages": [
+      {
+        "id": "base-4.23.0.0-inplace",
+        "modules": [
+          "GHC.Essentials",
+          "Prelude"
+        ],
+        "name": "base",
+        "package-id": "base-4.23.0.0"
+      },
+      {
+        "id": "containers-0.8-inplace",
+        "modules": [
+          "Data.Set"
+        ],
+        "name": "containers",
+        "package-id": "containers-0.8"
+      }
+    ],
+    "preprocessor": null,
+    "sources": [
+      "C.hs",
+      "C.hs-boot"
+    ]
+  },
+  "D": {
+    "cpp": [],
+    "modules": [
+      "B",
+      "C"
+    ],
+    "modules-boot": [],
+    "options": [],
+    "packages": [
+      {
+        "id": "base-4.23.0.0-inplace",
+        "modules": [
+          "GHC.Essentials",
+          "Prelude"
+        ],
+        "name": "base",
+        "package-id": "base-4.23.0.0"
+      }
+    ],
+    "preprocessor": null,
+    "sources": [
+      "D.hs"
+    ]
+  },
+  "E": {
+    "cpp": [],
+    "modules": [],
+    "modules-boot": [],
+    "options": [],
+    "packages": [
+      {
+        "id": "base-4.23.0.0-inplace",
+        "modules": [
+          "GHC.Essentials",
+          "Prelude"
+        ],
+        "name": "base",
+        "package-id": "base-4.23.0.0"
+      },
+      {
+        "id": "dep-1-XXX",
+        "modules": [
+          "Dep"
+        ],
+        "name": "dep",
+        "package-id": "dep-1"
+      },
+      {
+        "id": "dep-public-1-XXX",
+        "modules": [
+          "DepPublic"
+        ],
+        "name": "dep-public",
+        "package-id": "dep-public-1"
+      },
+      {
+        "id": "template-haskell-2.25.0.0-inplace",
+        "modules": [
+          "Language.Haskell.TH.Syntax"
+        ],
+        "name": "template-haskell",
+        "package-id": "template-haskell-2.25.0.0"
+      }
+    ],
+    "preprocessor": null,
+    "sources": [
+      "E.hs"
+    ]
+  }
+}

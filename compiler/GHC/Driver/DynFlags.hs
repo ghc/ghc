@@ -351,6 +351,7 @@ data DynFlags = DynFlags {
 
   --  For ghc -M
   depMakefile           :: FilePath,
+  depJson               :: Maybe FilePath,
   depIncludePkgDeps     :: Bool,
   depIncludeCppDeps     :: Bool,
   depExcludeMods        :: [ModuleName],
@@ -694,6 +695,7 @@ defaultDynFlags mySettings =
 
         -- ghc -M values
         depMakefile       = "Makefile",
+        depJson           = Nothing,
         depIncludePkgDeps = False,
         depIncludeCppDeps = False,
         depExcludeMods    = [],
