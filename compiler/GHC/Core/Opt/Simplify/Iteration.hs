@@ -1282,11 +1282,12 @@ simplExprF1 env expr@(Lam {}) cont
         -- NB: countArgs counts all the args (incl type args)
         -- and likewise drop counts all binders (incl type lambdas)
 
-simplExprF1 env (Case scrut bndr _ alts) cont
+simplExprF1 env expr@(Case scrut bndr _ alts) cont
   | not (seCaseCase env)  -- See (COC-INV) in Note [sm_case_case: switching off case continuations]
-  = do { let scrut_out_ty = substTy env (idType bndr)
-       ; scrut' <- simplExprC env scrut (mkBoringStop scrut_out_ty)
-       ; rebuildCase (SAF_In, env) scrut' bndr alts cont }
+  , (inner, outer) <- splitContArgs cont
+  , not (contIsStop outer)
+  = do { expr' <- simplExprC env expr inner
+       ; rebuild env expr' outer }
 
   | otherwise
   = {-#SCC "simplExprF1-Case" #-}
@@ -1318,11 +1319,19 @@ simplExprF1 env (Let bind body) cont
   | Just bind' <- joinPointBind_maybe bind
   = simplJoinPointBind env bind' body cont
 
+simplExprF1 env expr@(Let {}) cont
+  | not (seCaseCase env)
+  , (inner, outer) <- splitContArgs cont
+  , not (contIsStop outer)
+  = do { expr' <- simplExprC env expr inner
+       ; rebuild env expr' outer }
+
 -- Non-recursive let
 simplExprF1 env (Let (NonRec bndr rhs) body) cont
   = {-#SCC "simplNonRecE" #-}
     simplNonRecE env FromLet bndr (rhs, env) body cont
 
+-- Recursive let
 simplExprF1 env (Let (Rec pairs) body) cont
   = {-#SCC "simplRecE" #-}
     simplRecE env pairs body cont
