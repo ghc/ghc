@@ -397,6 +397,7 @@ void printRtsInfo(const RtsConfig rts_config) {
         rts_config.rts_opts != NULL ? rts_config.rts_opts : "");
     selectIOManager(); /* resolve the io-manager, accounting for flags  */
     mkRtsInfoPair("I/O manager default",     showIOManager());
+    mkRtsInfoPair("I/O managers",            &IOMGRS_ENABLED_STR[1]); // skips the initial ' ' character in IOMGRS_ENABLED_STR
     printf(" ]\n");
 }
 
