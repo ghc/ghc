@@ -190,7 +190,7 @@ def no_lint( name, opts ):
 
 def stage1(name, opts):
     # See Note [Why is there no stage1 setup function?]
-    framework_fail(name, 'stage1 setup function does not exist',
+    framework_fail(name, None,
                    'add your test to testsuite/tests/stage1 instead')
 
 # Note [Why is there no stage1 setup function?]
@@ -341,7 +341,7 @@ def req_th( name, opts ):
     req_interp(name, opts);
 
     if ghc_dynamic():
-        return _omit_ways(name, opts, ['profasm', 'profthreaded'])
+        return _omit_ways(name, opts, [WayName('profasm'), WayName('profthreaded')])
 
 def req_plugins( name, opts ):
     """
@@ -355,7 +355,7 @@ def req_plugins( name, opts ):
     req_interp(name, opts)
 
     # Plugins aren't supported with the external interpreter (#14335)
-    expect_broken_for(14335,['ext-interp'])(name,opts)
+    expect_broken_for(IssueNumber(14335),[WayName('ext-interp')])(name,opts)
 
     if config.cross:
         opts.skip = True
@@ -661,18 +661,15 @@ def collect_size ( deviation, path ):
 def collect_size_func ( deviation, path_func ):
     return collect_generic_stat ( 'size', deviation, lambda way: os.path.getsize(in_testdir(path_func())) )
 
-def get_dir_size(path):
+def get_dir_size(path) -> int:
     total = 0
-    try:
-        with os.scandir(path) as it:
-            for entry in it:
-                if entry.is_file():
-                    total += entry.stat().st_size
-                elif entry.is_dir():
-                    total += get_dir_size(entry.path)
-        return total
-    except FileNotFoundError:
-        print("Exception: Could not find: " + path)
+    with os.scandir(path) as it:
+        for entry in it:
+            if entry.is_file():
+                total += entry.stat().st_size
+            elif entry.is_dir():
+                total += get_dir_size(entry.path)
+    return total
 
 def collect_size_dir ( deviation, path ):
     return collect_size_dir_func ( deviation, lambda: path )
@@ -790,7 +787,7 @@ def find_non_inplace_so(lib):
     return _find_so(lib,path_from_ghcPkg(lib, "dynamic-library-dirs"),False)
 
 
-def collect_generic_stat ( metric, deviation: Optional[int], get_stat: Callable[[WayName], str]):
+def collect_generic_stat ( metric, deviation: Optional[int], get_stat: Callable[[WayName], Any]):
     """
     Define a generic stat test, which computes the statistic by calling the function
     given as the third argument.
@@ -1135,7 +1132,7 @@ def _collect_compiler_perf_counters(counters: Set[str], deviation: Optional[int]
         # Slightly hacky, we need the requested perf_counters in 'simple_run'.
         # Thus, we have to globally register these counters
         opts.compiler_perf_counters += list(counters)
-        _collect_stats(name, opts, counters, deviation, False, True, True)
+        _collect_stats(name, opts, counters, deviation, None, True, True)
     return f
 
 
@@ -1334,21 +1331,22 @@ def check_errmsg(needle):
 # grep_errmsg(regex,[groups])
 # If groups are given, return only the matched groups
 # that matches the regex.
-def grep_errmsg_norm(needle:str, groups = None):
+def grep_errmsg_norm(needle:str, groups_may = None):
 
-    def get_match(str:str):
-        m = re.search(needle,str)
-        if m:
-            return "".join([m.group(g) for g in groups if m.group(g) is not None])
-        else:
-            return None
-
-    def norm(str) -> str:
-        if groups == None:
+    def norm(string) -> str:
+        if groups_may == None:
             return "".join( filter(lambda l: re.search(needle,l),
-                                   str.splitlines(True)))
+                                   string.splitlines(True)))
         else:
-            matches = [get_match(x) for x in str.splitlines(True)]
+            groups = groups_may
+            def get_match(string: str):
+                m = re.search(needle, string)
+                if m:
+                    return "".join([m.group(g) for g in groups if m.group(g) is not None])
+                else:
+                    return None
+
+            matches = [get_match(x) for x in string.splitlines(True)]
             res = "\n".join([x for x in matches if x])
             return res
     return norm
@@ -1909,7 +1907,7 @@ def framework_warn(name: TestName, way: WayName, reason: str) -> None:
 # run_command.
 
 async def run_command( name, way, cmd ):
-    return await simple_run( name, '', override_options(cmd), '' )
+    return await simple_run( name, WayName(''), override_options(cmd), '' )
 
 async def makefile_test( name, way, target=None ):
     if target is None:
@@ -1995,7 +1993,7 @@ async def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
     return await do_compile( name, way, True, top_mod, extra_mods, [], extra_hc_opts)
 
 async def make_depend( name, way, mods, extra_hc_opts ):
-    return await do_compile( name, way, False,  ' '.join(mods), [], [], extra_hc_opts, mode = '-M')
+    return await do_compile( name, way, False, Path(' '.join(mods)), [], [], extra_hc_opts, mode = '-M')
 
 async def do_compile(name: TestName,
                way: WayName,
@@ -2126,7 +2124,7 @@ async def compile_grep_core(name: TestName,
 
 async def compile_and_run__(name: TestName,
                       way: WayName,
-                      top_mod: Path,
+                      top_mod: Path | None,
                       extra_mods: List[str],
                       extra_hc_opts: str,
                       backpack: bool=False,
@@ -2495,7 +2493,7 @@ def rts_flags(way: WayName) -> str:
 async def interpreter_run(name: TestName,
                     way: WayName,
                     extra_hc_opts: str,
-                    top_mod: Path
+                    top_mod: Path | None
                     ) -> PassFail:
     opts = getTestOpts()
 
@@ -2866,11 +2864,11 @@ async def compare_outputs(
             if config.accept_platform:
                 if_verbose(1, 'Accepting new output for platform "'
                               + config.platform + '".')
-                expected_path += '-' + config.platform
+                expected_path = Path(str(expected_path) + '-' + config.platform)
             elif config.accept_os:
                 if_verbose(1, 'Accepting new output for os "'
                               + config.os + '".')
-                expected_path += '-' + config.os
+                expected_path = Path(str(expected_path) + '-' + config.os)
             else:
                 if_verbose(1, 'Accepting new output.')
 
@@ -3500,7 +3498,7 @@ def find_expected_file(name: TestName, suff: str, way: WayName) -> Path:
 
     for f in files:
         if in_srcdir(f).exists():
-            return f
+            return Path(f)
 
     return basename
 

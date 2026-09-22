@@ -227,7 +227,7 @@ class TestConfig:
         self.allowed_perf_changes = {}
 
         # The test environment.
-        self.test_env = 'local'
+        self.test_env = TestEnv('local')
 
         # terminal supports colors
         self.supports_colors = False
