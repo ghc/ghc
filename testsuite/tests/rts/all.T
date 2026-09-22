@@ -662,8 +662,9 @@ test('T23142', [unless(debug_rts(), skip), req_interp], makefile_test, ['T23142'
 test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
 
 test('IOManager', [js_skip, when(arch('wasm32'), skip), when(opsys('mingw32'), skip),
-                   pre_cmd('$MAKE -s --no-print-directory IOManager.hs')],
-                  compile_and_run, [''])
+                   pre_cmd('$MAKE -s --no-print-directory IOManager.hs'),
+                   extra_ways(['threaded2']), all_available_io_managers_except('winio')],
+                   compile_and_run, [''])
 
 test('T24142', [req_target_smp], compile_and_run, ['-threaded -with-rtsopts "-N2"'])
 

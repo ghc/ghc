@@ -126,6 +126,15 @@ class TestConfig:
         self.way_flags = {}  # type: Dict[WayName, List[str]]
         self.way_rts_flags = {}  # type: Dict[WayName, List[str]]
 
+        # I/O managers (GHC's `--io-manager` RTS flag) supported by the threaded runtime.
+        self.io_managers_threaded = []  # type: List[str]
+
+        # I/O managers (GHC's `--io-manager` RTS flag) supported by the non-threaded runtime.
+        self.io_managers_nonthreaded = []  # type: List[str]
+
+        # All I/O managers (GHC's `--io-manager` RTS flag)
+        self.io_managers_all = []  # type: List[str]
+
         # Do we have a functional LLVM toolchain?
         self.have_llvm = False
 
@@ -365,6 +374,11 @@ class TestOptions:
 
        # add these ways to the default set
        self.extra_ways = [] # type: List[WayName]
+
+       # IO Managers to test (passed as the --io-manager RTS option)
+       # * [None] - only default IO Manager
+       # * [...] - list of io managers e.g. "mio" or "poll"
+       self.io_managers = [None] # type: List[Optional[str]]
 
        # the result we normally expect for this test
        self.expect = 'pass'

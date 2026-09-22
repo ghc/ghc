@@ -257,7 +257,9 @@ def get_compiler_info():
                     )
 
             except Exception as err:
-                print("Exception thrown in testsuite/config/ghc.get_compiler_info: %s", err)
+                # We don't throw so that we can still discover tests before we've built
+                # GHC (i.e. config.compiler doesn't yet exist).
+                print("Exception thrown in testsuite/config/ghc.get_compiler_info: ", err)
 
             else:
                 res = p.returncode == 0
@@ -314,6 +316,61 @@ def get_compiler_info():
         config.plugin_way_flags = "-static"
         config.ghc_th_way       = "normal"
         config.ghc_th_hi_ext    = "hi"
+
+    # I/O manager discovery.
+    #
+    # Which I/O managers (GHC's `--io-manager` RTS flag) a given RTS build
+    # supports depends on the target platform and on whether the RTS is the
+    # threaded or non-threaded flavour (see rts/IOManager.h's
+    # IOMGR_ENABLED_* macros). Rather than duplicate that platform/way
+    # dependent logic here, we ask the RTS itself: giving it a bogus
+    # '--io-manager=' choice makes it print, on stderr, the list of I/O
+    # managers it was actually built to support (see IOManager.h's
+    # IOMGRS_ENABLED_STR, used when reporting the error in RtsFlags.c),
+    # which we then parse out.
+    def discover_io_managers_generic(extra_flags):
+        import tempfile
+
+        test_src = 'main :: IO ()\nmain = return ()\n'
+
+        res = [None]
+
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / 'IOMgrProbe.hs'
+            src.write_text(test_src)
+            exe = Path(d) / ('IoMgrProbe' + config.exeext)
+
+            # -rtsopts is needed so that the resulting binary will even
+            # consider an --io-manager= flag (rather than immediately
+            # rejecting all "unsafe" RTS options).
+            cmd = '{} -v0 -rtsopts -o {} {} {}'.format(
+                                    config.compiler,
+                                    exe,
+                                    src,
+                                    ' '.join(extra_flags))
+            try:
+                cp = subprocess.run(
+                    cmd,
+                    shell=True,
+                    cwd=d,
+                    stdout=subprocess.DEVNULL,
+                    stderr=None if config.verbose >= 3 else subprocess.DEVNULL)
+                if cp.returncode != 0 or not exe.exists():
+                    raise Exception("Error in testsuite/config/ghc.discover_io_managers: failed to compile with: {}".format(cmd))
+                res = list(discover_io_managers(exe, d))
+
+            except Exception as err:
+                # We don't throw so that we can still discover tests before we've built
+                # GHC (i.e. config.compiler doesn't yet exist).
+                print("Exception thrown in testsuite/config/ghc.discover_io_managers_generic: ", err)
+
+        return res
+
+    config.io_managers_nonthreaded = discover_io_managers_generic([])
+    config.io_managers_threaded = (
+        discover_io_managers_generic(['-threaded']) if config.ghc_with_threaded_rts
+        else [])
+    config.io_managers_all = list(set(config.io_managers_nonthreaded).union(set(config.io_managers_threaded)))
 
     config.cmm_cpp_is_gcc = test_compile(
         ['-c'],

@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import shutil
 import tempfile
@@ -179,3 +180,21 @@ def shorten_metric_name(name: str) -> str:
         "binary_size/if_compression(3)": "size/3",
     }
     return dic.get(name, name)
+
+# I/O manager discovery for a haskell binary. Returns the set of IO Manager
+# strings supported by the binary
+def discover_io_managers(hs_exe: Union[str, Path], cwd: Union[str, Path]) -> Set[str]:
+    rp = subprocess.run(
+        [str(hs_exe), '+RTS', '--io-manager=not-a-real-io-manager', '-RTS'],
+        cwd=cwd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE)
+    stderr = rp.stderr.decode('utf-8', errors='replace')
+
+    m = re.search(r'choices are:\s*(.*)', stderr)
+    if not m:
+        raise Exception("Expected stderr output of form 'choices are: ...' but got: {}".format(stderr))
+
+    # 'auto' is a meta-choice (let the RTS pick a default for us), not
+    # an I/O manager implementation in its own right.
+    return set(m.group(1).split()) - {'auto'}

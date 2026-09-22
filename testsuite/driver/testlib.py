@@ -23,7 +23,7 @@ import subprocess
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, \
                         TestRun, TestResult, TestOptions, PerfMetric
-from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
+from testutil import discover_io_managers, strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, residency_testing_metrics, \
                      stable_perf_counters, \
                      PassFail, badResult, str_warn, str_removeprefix
@@ -569,6 +569,34 @@ def extra_ways( ways: List[WayName] ):
 
     return helper
 
+# -----
+
+def _io_managers( name: TestName, opts, io_mgrs: List[str] ) -> None:
+    opts.io_managers = io_mgrs
+
+def io_managers( io_mgrs: List[str] ):
+    """
+    Further split test cases into the given IO Managers if available.
+    Available IO Managers are determined by the test case's way (threaded/non-threads) and OS.
+    You'll likely want to use `extra_ways(['threaded2'])` if you want to test threaded IO Managers (e.g. mio).
+    """
+    return lambda name, opts: _io_managers(name, opts, io_mgrs)
+
+def all_available_io_managers( name: TestName, opts ):
+    """
+    Further split test cases into all available IO Managers.
+    Available IO Managers are determined by the test case's way (threaded/non-threads) and OS.
+    You'll likely want to use `extra_ways(['threaded2'])` to ensure threaded IO Managers are tested (e.g. mio).
+    """
+    _io_managers(name, opts, config.io_managers_all)
+
+def all_available_io_managers_except(exclude: List[str]):
+    """
+    Further split test cases into all available (except the given excluded) IO Managers.
+    Available IO Managers are determined by the test case's way (threaded/non-threads) and OS.
+    You'll likely want to use `extra_ways(['threaded2'])` to ensure threaded IO Managers are tested (e.g. mio).
+    """
+    return lambda name, opts: _io_managers(name, opts, list(set(config.io_managers_all) - set(exclude)))
 
 # -----
 
@@ -1571,6 +1599,15 @@ do_not_copy = ('.hi', '.o', '.dyn_hi'
               , '.dyn_o', '.out'
               ,'.hi-boot', '.o-boot') # 12112
 
+def way_supports_io_manager(way: WayName, io_manager: Optional[str]) -> bool:
+    # All ways support a default IO Manager
+    if io_manager is None:
+        return True
+
+    way_is_threaded = '-threaded' in config.way_flags[way]
+    available_io_managers = config.io_managers_threaded if way_is_threaded else config.io_managers_nonthreaded
+    return io_manager in available_io_managers
+
 async def test_common_work(name: TestName, opts,
                      func, args) -> None:
     try:
@@ -1619,7 +1656,22 @@ async def test_common_work(name: TestName, opts,
         # A test itself can request extra ways by setting opts.extra_ways
         all_ways = list(OrderedDict.fromkeys(all_ways + [way for way in opts.extra_ways if way not in all_ways]))
 
-        t.total_test_cases += len(all_ways)
+        # We split each way over available io managers
+        if len(opts.io_managers) == 0:
+            framework_fail(name, None, 'opts.io_managers is empty')
+        all_ways_and_io_managers = dict(
+            (
+                way,
+                [io_manager
+                    for io_manager in opts.io_managers
+                    if way_supports_io_manager(way, io_manager)
+                ]
+            )
+            for way in all_ways
+        )
+
+        for io_managers in all_ways_and_io_managers.values():
+            t.total_test_cases += len(io_managers)
 
         only_ways = getTestOpts().only_ways
         ok_way = lambda way: \
@@ -1702,17 +1754,26 @@ async def test_common_work(name: TestName, opts,
 
         # Run the required tests...
         for way in do_ways:
-            if stopping():
-                break
-            try:
-                await do_test(name, way, func, args, files)
-            except KeyboardInterrupt:
-                stopNow()
-            except Exception as e:
-                traceback.print_exc()
-                framework_fail(name, way, traceback.format_exc())
+            for io_manager in all_ways_and_io_managers[way]:
+                if stopping():
+                    break
+                try:
+                    await do_test(
+                        name,
+                        way,
+                        io_manager,
+                        func,
+                        args,
+                        files)
+                except KeyboardInterrupt:
+                    stopNow()
+                except Exception as e:
+                    traceback.print_exc()
+                    framework_fail(name, way, traceback.format_exc())
 
-        t.n_tests_skipped += len(set(all_ways) - set(do_ways))
+        for skipped_way in set(all_ways) - set(do_ways):
+            t.n_tests_skipped += len(all_ways_and_io_managers[skipped_way])
+
         if getTestOpts().expect == 'missing-lib': t.n_missing_libs += 1
 
         if config.cleanup and do_ways:
@@ -1731,6 +1792,7 @@ async def test_common_work(name: TestName, opts,
 
 async def do_test(name: TestName,
             way: WayName,
+            io_manager: Optional[str],
             func: Callable[..., Awaitable[PassFail]],
             args,
             files: Set[str]
@@ -1738,6 +1800,8 @@ async def do_test(name: TestName,
     opts = getTestOpts()
 
     full_name = name + '(' + way + ')'
+    if io_manager is not None:
+        full_name += ' (IO Manager: {})'.format(io_manager)
     test_n = len(allTestNames)
     progress_args = [ full_name, t.total_tests, test_n,
         [len(t.unexpected_passes),
@@ -1818,7 +1882,20 @@ async def do_test(name: TestName,
             # Don't continue and try to run the test if the pre_cmd fails.
             return
 
-    result = await func(*[name,way] + args)
+
+    func_has_io_manager_param = func in [
+        backpack_run,
+        compile_and_run,
+        ghci_multiunit_script,
+        ghci_script,
+        multi_compile_and_run,
+        multimod_compile_and_run,
+        warn_and_run
+    ]
+
+    io_manager_arg = [io_manager] if func_has_io_manager_param else []
+
+    result = await func(*[name,way] + io_manager_arg + args)
 
     if opts.expect not in ['pass', 'fail', 'missing-lib']:
         framework_fail(name, way, 'bad expected ' + opts.expect)
@@ -1907,7 +1984,7 @@ def framework_warn(name: TestName, way: WayName, reason: str) -> None:
 # run_command.
 
 async def run_command( name, way, cmd ):
-    return await simple_run( name, WayName(''), override_options(cmd), '' )
+    return await simple_run( name, WayName(''), None, override_options(cmd), '' )
 
 async def makefile_test( name, way, target=None ):
     if target is None:
@@ -1919,7 +1996,7 @@ async def makefile_test( name, way, target=None ):
 # -----------------------------------------------------------------------------
 # GHCi tests
 
-async def ghci_script( name, way, script):
+async def ghci_script( name, way, io_manager, script):
     flags = ' '.join(get_compiler_flags())
     way_flags = ' '.join(config.way_flags[way])
 
@@ -1930,9 +2007,9 @@ async def ghci_script( name, way, script):
       # NB: put way_flags before flags so that flags in all.T can override others
 
     getTestOpts().stdin = script
-    return await simple_run( name, way, cmd, getTestOpts().extra_run_opts )
+    return await simple_run( name, way, io_manager, cmd, getTestOpts().extra_run_opts )
 
-async def ghci_multiunit_script( name, way, units, script):
+async def ghci_multiunit_script( name, way, io_manager, units, script):
     flags = ' '.join(get_compiler_flags())
     way_flags = ' '.join(config.way_flags[way])
     unit_flags = ' '.join(['-unit @%s' % unit for unit in units])
@@ -1944,7 +2021,7 @@ async def ghci_multiunit_script( name, way, units, script):
       # NB: put way_flags before flags so that flags in all.T can override others
 
     getTestOpts().stdin = script
-    return await simple_run( name, way, cmd, getTestOpts().extra_run_opts )
+    return await simple_run( name, way, io_manager, cmd, getTestOpts().extra_run_opts )
 
 # -----------------------------------------------------------------------------
 # Compile-only tests
@@ -2124,7 +2201,8 @@ async def compile_grep_core(name: TestName,
 
 async def compile_and_run__(name: TestName,
                       way: WayName,
-                      top_mod: Path | None,
+                      io_manager: Optional[str],
+                      top_mod: Optional[Path],
                       extra_mods: List[str],
                       extra_hc_opts: str,
                       backpack: bool=False,
@@ -2166,22 +2244,22 @@ async def compile_and_run__(name: TestName,
         cmd = './' + name + extension
 
         # we don't check the compiler's stderr for a compile-and-run test
-        return await simple_run( name, way, cmd, getTestOpts().extra_run_opts )
+        return await simple_run( name, way, io_manager, cmd, getTestOpts().extra_run_opts )
 
-async def compile_and_run( name, way, extra_hc_opts ):
-    return await compile_and_run__( name, way, None, [], extra_hc_opts)
+async def compile_and_run( name, way, io_manager, extra_hc_opts ):
+    return await compile_and_run__( name, way, io_manager, None, [], extra_hc_opts)
 
-async def backpack_run( name, way, extra_hc_opts ):
-    return await compile_and_run__( name, way, None, [], extra_hc_opts, backpack=True )
+async def backpack_run( name, way, io_manager, extra_hc_opts ):
+    return await compile_and_run__( name, way, io_manager, None, [], extra_hc_opts, backpack=True )
 
-async def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
-    return await compile_and_run__( name, way, top_mod, [], extra_hc_opts)
+async def multimod_compile_and_run( name, way, io_manager, top_mod, extra_hc_opts ):
+    return await compile_and_run__( name, way, io_manager, top_mod, [], extra_hc_opts)
 
-async def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
-    return await compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts)
+async def multi_compile_and_run( name, way, io_manager, top_mod, extra_mods, extra_hc_opts ):
+    return await compile_and_run__( name, way, io_manager, top_mod, extra_mods, extra_hc_opts)
 
-async def warn_and_run( name, way, extra_hc_opts ):
-    return await compile_and_run__( name, way, None, [], extra_hc_opts, compile_stderr = True)
+async def warn_and_run( name, way, io_manager, extra_hc_opts ):
+    return await compile_and_run__( name, way, io_manager, None, [], extra_hc_opts, compile_stderr = True)
 
 async def static_stats( name, way ):
     opts = getTestOpts()
@@ -2388,7 +2466,7 @@ async def simple_build(name: Union[TestName, str],
 # from /dev/null.  Route output to testname.run.stdout and
 # testname.run.stderr.  Returns the exit code of the run.
 
-async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> Any:
+async def simple_run(name: TestName, way: WayName, io_manager: Optional[str], prog: str, extra_run_opts: str) -> Any:
     opts = getTestOpts()
 
     # figure out what to use for stdin
@@ -2406,6 +2484,9 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
         stderr_arg = in_testdir(name, 'run.stderr')
 
     my_rts_flags = rts_flags(way)
+
+    if io_manager is not None:
+        my_rts_flags += ' +RTS --io-manager={0} -RTS '.format(io_manager)
 
     # Collect runtime stats if necessary:
     # isStatsTest and not isCompilerStatsTest():
@@ -2431,6 +2512,12 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
         cmd = opts.cmd_wrapper(cmd)
 
     output_file = perfStatsFile(False, name)
+
+    # Check that IO Manager is available
+    if io_manager is not None:
+        available_io_managers = discover_io_managers(prog, opts.testdir)
+        if io_manager not in available_io_managers:
+            framework_fail(name, way, 'IO Manager {} unexpectedly unavailable (available IO Managers: {}). `-non-threaded`/`-threaded` is only supported through way RTS flags (not manually added via test modifiers/args) when testing over IO Managers.'.format(io_manager, available_io_managers))
 
     # run the command
     exit_code = await runCmdPerf(opts.compiler_perf_counters, cmd, output_file,
@@ -2493,7 +2580,7 @@ def rts_flags(way: WayName) -> str:
 async def interpreter_run(name: TestName,
                     way: WayName,
                     extra_hc_opts: str,
-                    top_mod: Path | None
+                    top_mod: Optional[Path]
                     ) -> PassFail:
     opts = getTestOpts()
 
