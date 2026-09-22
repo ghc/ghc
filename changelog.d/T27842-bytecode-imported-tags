@@ -1,0 +1,6 @@
+section: bytecode
+issues: #27842
+mrs: !16719
+synopsis:
+  Fix a segfault caused by reusing interface files generated with
+  ``-fbyte-code-and-object-code`` for interpreter sessions using ``-fprefer-byte-code``.

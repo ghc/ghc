@@ -12,7 +12,7 @@ where
 import GHC.Prelude
 
 import GHC.Core.DataCon
-import GHC.Core.Type (isUnliftedType)
+import GHC.Core.Type (isUnliftedType, definitelyUnliftedType)
 import GHC.Types.Id
 import GHC.Stg.Syntax
 import GHC.Stg.EnforceEpt.TagSig as TagSig
@@ -22,6 +22,7 @@ import GHC.Utils.Misc( zipWithEqual )
 import GHC.Utils.Panic
 
 import GHC.StgToCmm.Types
+import GHC.StgToCmm.Closure (importedIdLFInfo)
 
 {- *********************************************************************
 *                                                                      *
@@ -97,31 +98,39 @@ lookupReturnInfo env fun = case lookupVarEnv (te_env env) fun of
   Just (TagVal _)        -> Nothing
   Nothing                -> Nothing
 
--- | Look up a value-level tag for an argument: either from the env (where
--- a function-typed argument flattens to TagEPT — its closure is tagged)
--- or derived from information on the variable itself.
-lookupInfo :: TagEnv p -> StgArg -> TagInfo
-lookupInfo env (StgVarArg var)
+-- | Look up a value-level tag.
+--
+-- If the tag info is completely determined by Id info we use that tag.
+-- If the tag info is dependent on the analysis/call site use the passed TagSig.
+-- If the passed TagSig is Nothing we fall back to safe tag info based on id properties.
+argTagInfo :: Bool -> (Maybe TagSig) -> StgArg -> TagInfo
+{-# INLINE argTagInfo #-} -- Specialize for the call site.
+argTagInfo _for_bytecode _env_sig (StgLitArg{}) = TagEPT
+argTagInfo for_bytecode env_sig (StgVarArg var)
   -- Nullary data constructors like True, False
   | Just dc <- isDataConWorkId_maybe var
   , isNullaryRepDataCon dc
   , not for_bytecode
   = TagEPT
 
-  | isUnliftedType (idType var)
+  -- NB: v might be the Id of a representation-polymorphic join point,
+  -- so we shouldn't use isUnliftedType here. See T22212.
+  | definitelyUnliftedType (idType var)
   = TagEPT
 
   -- Variables in the environment. A function binding flattens to TagEPT
   -- since a function closure pointer is properly tagged; its return info
   -- is not relevant when the function is used as a value.
-  | Just sig <- lookupVarEnv (te_env env) var
+  | Just sig <- env_sig
   = case sig of
       TagVal info -> info
       TagFun _    -> TagEPT
 
-  | Just lf_info <- idLFInfo_maybe var
-  , not for_bytecode
-  =   case lf_info of
+-- Always save defaults.
+  | lf_info <- importedIdLFInfo var -- will make up LFInfo if not present.
+  = if for_bytecode then TagDunno
+    else
+        case lf_info of
           -- Function, tagged (with arity)
           LFReEntrant {}
               -> TagEPT
@@ -138,13 +147,12 @@ lookupInfo env (StgVarArg var)
           -- Shouldn't be possible. I don't think we can export letNoEscapes
           LFLetNoEscape {} -> panic "LFLetNoEscape exported"
 
-  | otherwise
-  = TagDunno
-  where
-    for_bytecode = te_bytecode env
-
-lookupInfo _ (StgLitArg {})
-  = TagEPT
+-- | Get tag info using the environment.
+lookupInfo :: TagEnv p -> StgArg -> TagInfo
+lookupInfo env arg@(StgVarArg var) =
+    let env_sig = (lookupVarEnv (te_env env) var)
+    in  argTagInfo (te_bytecode env) env_sig arg
+lookupInfo _env (StgLitArg{}) = TagEPT
 
 isDunnoSig :: TagSig -> Bool
 isDunnoSig (TagVal TagDunno) = True
