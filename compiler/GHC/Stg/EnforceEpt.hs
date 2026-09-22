@@ -334,9 +334,15 @@ a) Tags for let-bindings:
 b) When referencing ids from other modules the Cmm backend will try to put a
    proper tag on these references through various means. When doing analysis we
    usually predict these cases to improve precision of the analysis.
-   But to my knowledge the bytecode generator makes no such attempts so we must
-   not infer imported bindings as tagged.
-   This is handled in GHC.Stg.EnforceEpt.Types.lookupInfo
+   The bytecode generator gives fewer guarantees about what it tags.
+   So we simply assume it fails to tag binders, even in the cases where it does.
+
+   This is handled in GHC.Stg.EnforceEpt.Types.argTagInfo
+
+ Eventually we will want to update the Analysis and bco code gen to uphold and
+ take advantage of tag inference at least to some degree. But for now it's
+ not a perf benefit for interpreted code, and essentially only run to uphold
+ the "strict field invariant"/EPT Invariant described in EPT enforcement.
 
 
 -}
@@ -359,7 +365,7 @@ enforceEpt ppr_opts !for_bytecode logger this_mod stg_binds = do
 
     -- Rewrite STG to uphold the strict field invariant
     us_t <- mkSplitUniqSupply StgTag
-    let rewritten_binds = {-# SCC "StgEptRewrite" #-} rewriteTopBinds this_mod us_t stg_binds_w_tags :: [TgStgTopBinding]
+    let rewritten_binds = {-# SCC "StgEptRewrite" #-} rewriteTopBinds for_bytecode this_mod us_t stg_binds_w_tags :: [TgStgTopBinding]
 
     return (rewritten_binds,export_tag_info)
 
@@ -414,12 +420,14 @@ inferTagExpr env (StgApp fun args)
          | isDeadEndAppSig (idDmdSig fun) (length args)
          = TagBottoming
 
-         | fun_arity == 0 -- Unknown arity => Thunk or unknown call
+         | not (isJoinId fun) -- zero arity join ids behave like functions NOT thunks.
+         , fun_arity == 0 -- Unknown arity => Thunk or unknown call
          = TagDunno
 
          -- Imported function with known return tag
          | Just (TagFun res_info) <- tagSigInfo (idInfo fun)
          , fun_arity == length args  -- Saturated
+         , not (te_bytecode env) -- #27842
          = res_info
 
          -- Local function with known return tag
@@ -593,7 +601,7 @@ initSig (bndr, StgRhsClosure _ _ _ bndrs _ _)
 
 {- Note [Bottom functions are TagBottoming]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have a function with two branches with one
+If we have a function with two branches with one branch
 being bottom, and the other returning a tagged
 unboxed tuple what is the result? We give it TagBottoming!
 To answer why consider this function:
@@ -603,21 +611,40 @@ foo x = case x of
     True -> (# True,True #)
     False -> undefined
 
-The true branch is obviously tagged. The other branch isn't.
-We want to treat the *result* of foo as tagged as well so that
-the combination of the branches also is tagged if all non-bottom
-branches are tagged.
-This is safe because the function is still always called/entered as long
-as it's applied to arguments. Since the function will never return we can give
-it safely any tag sig we like.
-So we give it TagBottoming, as it allows the combined tag sig of the case expression
-to be the combination of all non-bottoming branches.
+The true branch obviously returns tagged components. The other branch is bottom.
+We want to treat the components in the *result* returned by foo as tagged.
+Because at a call site like:
 
-NB: After the analysis is done we go back to treating bottoming functions as
-untagged to ensure they are evaluated as expected in code like:
+    case foo e of
+        (# x, y #) ->
+            case x of
+                ...
 
-  case bottom_id of { ...}
+Either `foo` will have evaluated undefined or blown up. Or we will bind x and y
+to tagged pointers. A fact we take advantage of to optimize `case x of`.
 
+The rule is then simple. A combination of the alternatives of the same case has
+tagged components if all non-bottom branches have tagged components.
+
+To represent the bottoming alternatives we use TagBottoming. Which says all it's
+components are tagged. Now the same is true if we have:
+
+foo :: Bool -> (# Bool, Bool #)
+foo x = case x of
+    True -> (# True,True #)
+    False -> willCrash x
+
+Where we want to check:
+
+* Is `willCrash x` bottom?
+* If it is not are the returned components tagged?
+
+For the first question we have to be careful about the notion of bottom we use.
+I've got this wrong in the past, because a underapplied bottoming function will
+return a *function* as result. Rather than being bottom.
+
+If the function *is* bottom then we treat it the same we do undefined above. And
+use TagBottoming as the tagInfo of the expression. Hence the title of the Note.
 -}
 
 -----------------------------

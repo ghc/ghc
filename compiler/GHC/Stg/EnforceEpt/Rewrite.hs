@@ -3,6 +3,7 @@
 
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE UnboxedTuples              #-}
 
 module GHC.Stg.EnforceEpt.Rewrite (rewriteTopBinds, rewriteOpApp)
 where
@@ -13,7 +14,7 @@ import GHC.Builtin.PrimOps ( PrimOp(..) )
 import GHC.Types.Basic     ( CbvMark (..), isMarkedCbv
                            , TopLevelFlag(..), isTopLevel )
 import GHC.Types.Id
-import GHC.Types.Name
+import GHC.Types.Name ( nameIsLocalOrFrom )
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
 import GHC.Types.RepType
@@ -22,10 +23,7 @@ import GHC.Unit.Types
 
 import GHC.Core.DataCon
 import GHC.Core            ( AltCon(..) )
-import GHC.Core.Type
-
-import GHC.StgToCmm.Types
-import GHC.StgToCmm.Closure (importedIdLFInfo)
+import GHC.Core.Type       ( definitelyLiftedType )
 
 import GHC.Stg.Utils
 import GHC.Stg.Syntax as StgSyn
@@ -34,15 +32,48 @@ import GHC.Data.Maybe
 import GHC.Utils.Panic
 
 import GHC.Utils.Outputable
-import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Misc
 
 import GHC.Stg.EnforceEpt.Types
 
 import Control.Monad
+import GHC.Exts (oneShot)
 
-newtype RM a = RM { unRM :: (State (UniqFM Id TagSig, UniqSupply, Module, IdSet) a) }
-    deriving (Functor, Monad, Applicative)
+data RmContext = RmContext { rm_mod :: !Module, rm_interpreter :: !Bool }
+
+data RmState = RmState { rm_us :: !UniqSupply, rm_fvs :: IdSet, rm_sig_env :: !(UniqFM Id TagSig)}
+newtype RM a = RM { unRM :: RmContext -> RmState -> (# RmState, a #) }
+
+instance Functor RM where
+    fmap f (RM x) = RM $ oneShot $ \env -> oneShot $ \state ->
+        case x env state of
+            (# !s1, !x' #) ->
+                let !r = f x'
+                in (# s1, r #)
+
+instance Applicative RM where
+    (RM f) <*> (RM x) = RM $ oneShot $ \env -> oneShot $ \state ->
+        case f env state of
+            (# !s1,!f' #) -> case x env s1 of
+                (# !s2, !x' #) ->
+                    let !r = f' x'
+                    in (# s2, r #)
+    pure !x = RM $ \_ !s -> (# s, x #)
+
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+instance Monad RM where
+    RM x >>= f = RM $ oneShot $ \env -> oneShot $ \state ->
+        case x env state of
+            (# !s1, !x' #) -> case (f x') of RM r -> r env s1
+
+-- | runRM this_mod for_bytecode us
+runRM :: Module -> Bool -> UniqSupply -> RM a -> a
+runRM mod for_bytecode us act  =
+    case (unRM act)
+            (RmContext { rm_mod = mod, rm_interpreter = for_bytecode })
+            (RmState { rm_us = us, rm_fvs = emptyVarSet, rm_sig_env = emptyUFM })
+        of
+    (# _, r #) -> r
 
 ------------------------------------------------------------
 -- Add cases around strict fields where required.
@@ -107,30 +138,29 @@ when building the free variable list.
 --------------------------------
 
 instance MonadUnique RM where
-    getUniqueSupplyM = RM $ do
-        (m, us, mod,lcls) <- get
-        let (us1, us2) = splitUniqSupply us
-        (put) (m,us2,mod,lcls)
-        return us1
+    getUniqueSupplyM = RM $ \_ s ->
+        case splitUniqSupply (rm_us s) of
+            (us1, us2) -> (# s { rm_us = us2 }, us1 #)
 
 getMap :: RM (UniqFM Id TagSig)
-getMap = RM $ ((\(fst,_,_,_) -> fst) <$> get)
+getMap = RM $ \_ s -> (# s, rm_sig_env s #)
 
 setMap :: (UniqFM Id TagSig) -> RM ()
-setMap !m = RM $ do
-    (_,us,mod,lcls) <- get
-    put (m, us,mod,lcls)
-
-getMod :: RM Module
-getMod = RM $ ( (\(_,_,thrd,_) -> thrd) <$> get)
+setMap !m = RM $ \_ s -> (# s { rm_sig_env = m }, () #)
 
 getFVs :: RM IdSet
-getFVs = RM $ ((\(_,_,_,lcls) -> lcls) <$> get)
+getFVs = RM $ \_ s -> (# s, rm_fvs s #)
 
 setFVs :: IdSet -> RM ()
-setFVs !fvs = RM $ do
-    (tag_map,us,mod,_lcls) <- get
-    put (tag_map, us,mod,fvs)
+setFVs !fvs = RM $ \_ s -> (# s { rm_fvs = fvs }, () #)
+
+getMod :: RM Module
+getMod = RM $ \env s -> (# s, rm_mod env #)
+
+-- | When generating bytecode certain bindings might be untagged. So we have to
+-- have a way to check for that.
+getForBytecode :: RM Bool
+getForBytecode = RM $ \env s -> (# s, rm_interpreter env #)
 
 -- Rewrite the RHS(s) while making the id and it's sig available
 -- to determine if things are tagged/need to be captured as FV.
@@ -238,51 +268,26 @@ indicates a bug in the tag inference implementation.
 For this reason we assert that we are running in interactive mode if a lookup fails.
 -}
 isTagged :: Id -> RM Bool
-isTagged v
-    -- See Note [Bottom functions are TagBottoming]
-    | isDeadEndId v = pure False
-    | otherwise = do
+isTagged v = do
+    for_bytecode <- getForBytecode
     this_mod <- getMod
-    -- See Note [Tag inference for interactive contexts]
-    let lookupDefault v = assertPpr (isInteractiveModule this_mod)
-                                    (text "unknown Id:" <> ppr this_mod <+> ppr v)
-                                    (TagVal TagDunno)
-    case nameIsLocalOrFrom this_mod (idName v) of
-        True
-            | definitelyUnliftedType (idType v)
-              -- NB: v might be the Id of a representation-polymorphic join point,
-              -- so we shouldn't use isUnliftedType here. See T22212.
-            -> return True
-            | otherwise -> do -- Local binding
-                !s <- getMap
-                let !sig = lookupWithDefaultUFM s (lookupDefault v) v
-                return $ case sig of
-                    TagFun _             -> True  -- function closure is tagged
-                    TagVal TagDunno      -> False
-                    TagVal TagEPT        -> True
-                    TagVal TagBottoming  -> True
-                    TagVal (TagTuple _)  -> True  -- Consider unboxed tuples tagged.
-        -- Imported
-        False -> return $!
-                -- Determine whether it is tagged from the LFInfo of the imported id.
-                -- See Note [The LFInfo of Imported Ids]
-                case importedIdLFInfo v of
-                    -- Function, applied not entered.
-                    LFReEntrant {}
-                        -> True
-                    -- Thunks need to be entered.
-                    LFThunk {}
-                        -> False
-                    -- LFCon means we already know the tag, and it's tagged.
-                    LFCon {}
-                        -> True
-                    LFUnknown {}
-                        -> False
-                    LFUnlifted {}  -- Unboxed, tagging irrelevant
-                        -> True
-                    LFLetNoEscape {}
-                    -- Shouldn't be possible. I don't think we can export letNoEscapes
-                        -> True
+    s <- getMap
+    let get_env_sig = lookupUFM s
+    massertPpr
+        -- Assert the env is complete for local lifted binders, which means either
+        -- - The binder is present in the env
+        -- - The binder is not a local lifted binder *or* comes from a ghci context
+        (isJust (get_env_sig v)
+            -- See Note [Tag inference for interactive contexts]
+            || isInteractiveModule this_mod
+            || not (nameIsLocalOrFrom this_mod (idName v))
+            || not (definitelyLiftedType (idType v)))
+               (text "unknown Id:" <> ppr this_mod <+> ppr v)
+    -- TODO: We could refactor the whole pass such that we also set id_tagSig
+    -- for every imported id. But this likely comes with a heavy allocation
+    -- overhead so for now we just ensure to use the same logic across analysis
+    -- and rewriter.
+    pure $! isTaggedInfo $ argTagInfo for_bytecode (get_env_sig v) (StgVarArg v)
 
 
 isArgTagged :: StgArg -> RM Bool
@@ -299,11 +304,10 @@ mkLocalArgId id = do
 ---------------------------
 
 
-rewriteTopBinds :: Module -> UniqSupply -> [GenStgTopBinding 'InferTaggedBinders] -> [TgStgTopBinding]
-rewriteTopBinds mod us binds =
-    let doBinds = mapM rewriteTop binds
-
-    in evalState (unRM doBinds) (mempty, us, mod, mempty)
+rewriteTopBinds :: Bool -- ^ Generating bytecode?
+                -> Module -> UniqSupply -> [GenStgTopBinding 'InferTaggedBinders] -> [TgStgTopBinding]
+rewriteTopBinds for_bytecode mod us binds =
+    runRM mod for_bytecode us (mapM rewriteTop binds)
 
 rewriteTop :: InferStgTopBinding -> RM TgStgTopBinding
 rewriteTop (StgTopStringLit v s) = return $! (StgTopStringLit v s)

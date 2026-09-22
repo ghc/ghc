@@ -117,7 +117,7 @@ isTaggedSig (TagVal ti) = isTaggedInfo ti
 
 -- | Is the given value-level tag known to be properly tagged?
 -- NB: unboxed tuples are *not* treated as tagged here; they are handled
--- specially by the rewriter (which considers them already evaluated).
+-- specially by the rewriter. See Note [Constructor TagSigs]
 isTaggedInfo :: TagInfo -> Bool
 isTaggedInfo TagEPT       = True
 isTaggedInfo TagBottoming = True
