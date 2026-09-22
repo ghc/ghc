@@ -405,8 +405,9 @@ sandboxIO opts io
 -- rather than just "main" being observed. This should be used for the main
 -- debuggee execution of a debugger.
 withBreakAction :: EvalOpts -> ThreadId -> (IO (EvalStatus [HValueRef]) -> IO a) -> IO a
-withBreakAction opts tid@(ThreadId tid#) act
-  = bracket setBreakAction resetBreakAction (\_ -> act waitForResult)
+withBreakAction opts tid@(ThreadId tid#) act = do
+  ctx <- getThreadResumeContext tid
+  bracket setBreakAction resetBreakAction (\_ -> act (waitForResult ctx))
   where
     setBreakAction = do
       poke breakPointIOAction globalBreakStablePtr
@@ -438,16 +439,16 @@ withBreakAction opts tid@(ThreadId tid#) act
     runIf  pred what = when (pred opts) (what tid)
     runIf# pred what = when (pred opts) (what tid#)
 
-    waitForResult
+    waitForResult ctx
       | isolateThreadBreaks opts
       = atomically $
-          readThreadEvalStatus tid
+          readCtxEvalStatus ctx
 
       | otherwise
       = atomically $
           (EvalPaused <$> readAnyThreadEvalBreak)
           `orElse`
-          readThreadEvalStatus tid
+          readCtxEvalStatus ctx
 
 -- While we're waiting for the sandbox thread to return a result, if
 -- the current thread receives an asynchronous exception we re-throw
