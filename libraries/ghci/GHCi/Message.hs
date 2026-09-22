@@ -395,7 +395,7 @@ data EvalOpts
   , stepOut :: Bool
   , breakOnException :: Bool
   , breakOnError :: Bool
-  , isolateThreadBreaks :: Bool
+  , isolateThreadBreaks :: !Bool
   -- ^ If @isolateThreadBreaks == True@, any breakpoint hit by the thread
   -- forked~[1] to execute this expression is only seen by a caller observing
   -- this thread's result explicitly. That is, this thread's 'EvalStatus' can
