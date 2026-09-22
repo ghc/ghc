@@ -12,3 +12,12 @@ test('T26640', extra_files(["T26640.hs"]), ghci_script, ['T26640.script'])
 test('T27001', [extra_files(['T27001.hs']), req_interp],
      run_command,
      ['{compiler} -e main -O -fno-unoptimized-core-for-interpreter T27001.hs'])
+
+# Bytecode must not trust tag information from imported interfaces, which
+# comes from native code (#27842): neither the TagSig of an imported function
+# nor the LFInfo of an imported value (with and without constructor fields).
+test('T27842', [extra_files(['T27842A.hs', 'T27842N.hs']), req_interp],
+     run_command,
+     ['{compiler} -e main -O -fno-unoptimized-core-for-interpreter '
+      '-fobject-code -fbyte-code-and-object-code -fprefer-byte-code '
+      'T27842.hs'])

@@ -1,0 +1,8 @@
+section: compiler
+issues: #27831
+mrs: !16719
+synopsis:
+  Fix a segfault that could occur when a bottoming function was stored in a strict field.
+description:
+  This was happening when a function that always diverges (e.g. ``\_ -> error "..."``) was stored in a strict field, and the constructor was pattern matched on
+  in "nearby" code where the structure of the constructor application was still visible to GHC.
