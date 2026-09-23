@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include "Schedule.h"
 #include "Capability.h"
+#include "IdleGC.h"
 #include "IOManagerInternals.h"
 #include "win32/MIOManager.h"
 
@@ -230,6 +231,12 @@ bool
 awaitRequests(bool wait)
 {
     CapIOManager *iomgr = MainCapability.iomgr;
+
+    if (RTS_UNLIKELY(issued_reqs == 0)) {
+        /* See Note [Deadlock detection without idle GC]
+         * Note that the issued_reqs covers both I/O and timers. */
+        if (notifyIdleGcDeadlock()) return false;
+    }
 
 start:
 #if 0

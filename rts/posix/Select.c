@@ -357,6 +357,13 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
           timeout = -1;
       }
 
+      if (RTS_UNLIKELY(timeout == -1 &&
+                       iomgr->blocked_queue_hd == END_TSO_QUEUE)) {
+          /* See Note [Deadlock detection without idle GC] */
+          interrupt = notifyIdleGcDeadlock();
+          if (interrupt) break;
+      }
+
       /* Check for any interesting events */
 
       ptv = timeoutAsTimeval(timeout, &tv);
