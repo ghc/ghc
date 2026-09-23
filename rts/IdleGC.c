@@ -65,13 +65,13 @@
  * ACTIVITY_MAYBE_NO, waits for RtsFlags.GcFlags.idleGCDelayTime,
  * and then:
  *   - if idle GC is on, set ACTIVITY_INACTIVE and wakeUpRts()
- *   - if idle GC is off, set ACTIVITY_DONE_GC and stopTimer()
+ *   - if idle GC is off, set ACTIVITY_DONE_GC and pauseTimer()
  *
  * If the scheduler finds ACTIVITY_INACTIVE, then it sets
- * ACTIVITY_DONE_GC, performs the GC and calls stopTimer().
+ * ACTIVITY_DONE_GC, performs the GC and calls pauseTimer().
  *
  * If the scheduler finds ACTIVITY_DONE_GC and it has a thread to run,
- * it enables the timer again with startTimer().
+ * it enables the timer again with unpauseTimer().
  */
 enum RecentActivity {
     // the RTS is active
