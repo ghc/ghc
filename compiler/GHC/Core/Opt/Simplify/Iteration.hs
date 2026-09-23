@@ -1311,20 +1311,23 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
          tick (PreInlineUnconditionally bndr)
        ; simplExprF env' body cont }
 
--- Now check for a join point.  It's better to do the preInlineUnconditionally
--- test first, because joinPointBinding_maybe has to eta-expand, so a trivial
--- binding like { j = j2 |> co } would first be eta-expanded and then inlined
--- Better to test preInlineUnconditionally first.
-simplExprF1 env (Let bind body) cont
-  | Just bind' <- joinPointBind_maybe bind
-  = simplJoinPointBind env bind' body cont
-
 simplExprF1 env expr@(Let {}) cont
   | not (seCaseCase env)
   , (inner, outer) <- splitContArgs cont
   , not (contIsStop outer)
   = do { expr' <- simplExprC env expr inner
        ; rebuild env expr' outer }
+
+-- Now check for a join point.  It's better to do the preInlineUnconditionally
+-- test first, because joinPointBinding_maybe has to eta-expand, so a trivial
+-- binding like { j = j2 |> co } would first be eta-expanded and then inlined
+-- Better to test preInlineUnconditionally first.
+--
+-- Must be after the seCaseCase stuff:  todo: explain why
+--   Example GHC.Internal.Debug
+simplExprF1 env (Let bind body) cont
+  | Just bind' <- joinPointBind_maybe bind
+  = simplJoinPointBind env bind' body cont
 
 -- Non-recursive let
 simplExprF1 env (Let (NonRec bndr rhs) body) cont
