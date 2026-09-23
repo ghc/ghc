@@ -140,7 +140,6 @@ import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer.Interface
 import qualified GHC.Parser.Lexer.String as Lexer.String
 import GHC.Parser.String
-import GHC.Unit.Module.Name (ModuleName(..))
 }
 
 -- -----------------------------------------------------------------------------
