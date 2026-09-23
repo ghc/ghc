@@ -1,35 +1,42 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 127, types: 130, coercions: 48, joins: 0/0}
+  = {terms: 127, types: 130, coercions: 24, joins: 0/0}
 
 $dmop
-  = (\ @a _ $dOrd xs ys ->
-       case $fOrdList_$ccompare $dOrd xs ys of {
-         __DEFAULT ->
-           reverse1 (reverse1 (reverse1 (reverse1 (++ xs ys) []) []) []) [];
-         GT -> reverse1 (reverse1 (reverse1 (reverse xs) []) []) []
-       })
-    `cast` <Co:20> :: ...
+  = \ @a $dC $dOrd xs ys ->
+      case $fOrdList_$ccompare $dOrd xs ys of {
+        __DEFAULT ->
+          (reverse1 (reverse1 (reverse1 (reverse1 (++ xs ys) []) []) []) [])
+          `cast` <Co:3>;
+        GT ->
+          (reverse1 (reverse1 (reverse1 (reverse xs) []) []) [])
+          `cast` <Co:3>
+      }
 
 $fCInt_$cop
-  = (\ xs ys ->
-       case $fOrdList_$s$ccompare xs ys of {
-         __DEFAULT ->
-           reverse1 (reverse1 (reverse1 (reverse1 (++ xs ys) []) []) []) [];
-         GT -> reverse1 (reverse1 (reverse1 (reverse xs) []) []) []
-       })
-    `cast` <Co:11> :: ...
+  = \ xs ys ->
+      case $fOrdList_$s$ccompare xs ys of {
+        __DEFAULT ->
+          (reverse1 (reverse1 (reverse1 (reverse1 (++ xs ys) []) []) []) [])
+          `cast` <Co:3>;
+        GT ->
+          (reverse1 (reverse1 (reverse1 (reverse xs) []) []) [])
+          `cast` <Co:3>
+      }
 
 $fCInt1
   = \ xs ys ->
       case $fOrdList_$s$ccompare xs ys of {
         __DEFAULT ->
-          reverse1 (reverse1 (reverse1 (reverse1 (++ xs ys) []) []) []) [];
-        GT -> reverse1 (reverse1 (reverse1 (reverse xs) []) []) []
+          (reverse1 (reverse1 (reverse1 (reverse1 (++ xs ys) []) []) []) [])
+          `cast` <Co:3>;
+        GT ->
+          (reverse1 (reverse1 (reverse1 (reverse xs) []) []) [])
+          `cast` <Co:3>
       }
 
-$fCInt = C:C ($fCInt1 `cast` <Co:11> :: ...)
+$fCInt = C:C $fCInt1
 
 test4 = reverse1 [] []
 
@@ -44,8 +51,8 @@ test
       case $fOrdList_$s$ccompare [] xs of {
         __DEFAULT ->
           (reverse1 (reverse1 (reverse1 (reverse1 (++ [] xs) []) []) []) [])
-          `cast` <Co:3> :: ...;
-        GT -> test1 `cast` <Co:3> :: ...
+          `cast` <Co:3>;
+        GT -> test1 `cast` <Co:3>
       }
 
 

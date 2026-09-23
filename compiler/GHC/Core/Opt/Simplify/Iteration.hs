@@ -1339,15 +1339,11 @@ simplExprF1 env (Let (Rec pairs) body) cont
 
 splitContForNoCaseCase :: SimplEnv -> SimplCont
                        -> Maybe (SimplCont, SimplCont)
--- Splits `cont` into (inner, outer), where `inner` has only
--- applications, and `outer` is non-trivial
+-- When seCaseCase is off, this function splits `cont` into (inner, outer),
+-- where `inner` has only applications, and `outer` is non-trivial
 splitContForNoCaseCase env cont
-  | not (seCaseCase env)
-  , (inner, outer) <- splitContArgs cont
-  , not (contIsStop outer)
-  = Just (inner, outer)
-  | otherwise
-  = Nothing
+  | seCaseCase env = Nothing
+  | otherwise      = splitContArgs cont
 
 {- Note [Avoiding space leaks in OutType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
