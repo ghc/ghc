@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include "Schedule.h"
 #include "Capability.h"
+#include "IdleGC.h"
 #include "IOManagerInternals.h"
 #include "win32/MIOManager.h"
 
@@ -249,6 +250,16 @@ start:
         OS_RELEASE_LOCK(&queue_lock);
         return true;
     }
+
+    if (RTS_UNLIKELY(wait && completed_hw == 0 && issued_reqs == 0)) {
+        /* See Note [Deadlock detection without idle GC]
+         * Note that the issued_reqs covers both I/O and timers. */
+        if (notifyIdleGcDeadlock()) {
+            OS_RELEASE_LOCK(&queue_lock);
+            return false;
+        }
+    }
+
     if (completed_hw == 0) {
         // empty table, drop lock and wait
         OS_RELEASE_LOCK(&queue_lock);

@@ -185,6 +185,44 @@ capability, while in the non-threaded we will ask the I/O manager to
 block and wait for I/O, timers or signals.
 
 See also Note [Deadlock detection under the nonmoving collector].
+
+
+Note [Deadlock detection without idle GC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In Note [Deadlock detection] above we noted that:
+
+> the historical design looks for situations in which there *must* be
+  a system deadlock.
+
+We can still take advantage of these situations, but instead of basing the
+whole design around it, we use it opportunistically, and in a way that involves
+minimal changes to the general design.
+
+Specifically, in the case of a single capability (so we have a global view), if
+the I/O manager would be about to block indefinitely, with no I/O pending, then
+we have a strong suspicion that there is a system deadlock.
+
+In this case, I/O manager informs the idle GC system via notifyIdleGcDeadlock.
+Typically it will then behave as if the I/O manager had been interrupted and
+return to the scheduler. We can do this promptly, and we can do so even if idle
+GC in general is disabled (e.g. via -I0). This fits into the existing design
+because it can behave just as if there had been an idle GC timeout.
+
+One subulty with idle GC being disabled is that we progress through different
+states: from ACTIVITY_MAYBE_NO we procede to ACTIVITY_PAUSED instead of
+ACTIVITY_INACTIVE. Then if notifyIdleGcDeadlock is called in this state we move
+to ACTIVITY_INACTIVE which schedules the GC. See test T26408d.
+
+There is another very subtle case to note: we can have situations where there's
+no deadlock detected but yet there are no runnable threads, no timers and no
+pending I/O. There can also be signals with signal handlers that could wake up
+and unblock things (e.g. if a handler closure has access to a TVar/MVar that
+other threads are blocked on). To make this case work, the I/O manager has to
+ask notifyIdleGcDeadlock if it should should return to the scheduler, or
+continue and block. And notifyIdleGcDeadlock will tell it to continue if an
+idle GC has already been completed (with no intervening activity) since this is
+the situation where there is no deadlock. See test T26408c.
 */
 
 
@@ -195,7 +233,7 @@ See also Note [Deadlock detection under the nonmoving collector].
  * ACTIVITY_MAYBE_NO, waits for RtsFlags.GcFlags.idleGCDelayTime,
  * and then:
  *   - if idle GC is on, set ACTIVITY_INACTIVE and wakeUpRts()
- *   - if idle GC is off, set ACTIVITY_DONE_GC and pauseTimer()
+ *   - if idle GC is off, set ACTIVITY_PAUSED and pauseTimer()
  *
  * If the scheduler finds ACTIVITY_INACTIVE, then it sets
  * ACTIVITY_DONE_GC, performs the GC and calls pauseTimer().
@@ -209,10 +247,14 @@ enum RecentActivity {
     // no activity since the last timer signal
     ACTIVITY_MAYBE_NO = 1,
     // RtsFlags.GcFlags.idleGCDelayTime has passed with no activity
+    // idle GC is pending, the timer is running
     ACTIVITY_INACTIVE = 2,
-    // like ACTIVITY_INACTIVE, but we've done a GC too (if idle GC is
-    // enabled) and the interval timer is now turned off.
-    ACTIVITY_DONE_GC  = 3,
+    // RtsFlags.GcFlags.idleGCDelayTime has passed with no activity
+    // idle GC is disabled, the timer is paused
+    ACTIVITY_PAUSED   = 3,
+    // like ACTIVITY_INACTIVE, but we've done a GC too and the interval
+    // timer is now turned off.
+    ACTIVITY_DONE_GC  = 4,
 };
 
 /* Recent activity flag.
@@ -276,7 +318,7 @@ void handleIdleGcTick(void)
               // The scheduler will call pauseTimer() when it has done
               // the GC.
           } else {
-              setRecentActivity(ACTIVITY_DONE_GC);
+              setRecentActivity(ACTIVITY_PAUSED);
               // disable timer signals (see #1623, #5991, #9105)
               // but only if we're not profiling (e.g. passed -h or -p RTS
               // flags). If we are profiling we need to keep the timer active
@@ -300,16 +342,45 @@ void handleIdleGcTick(void)
   }
 }
 
+/* If the I/O manager can see that there is very likely a deadlock (no I/O and
+ * no timers) then it lets us know. If we have not already done an idle GC then
+ * we schedule one idle GC. If we did already do an idle GC and thus did not
+ * find a deadlock then we'll arrange to continue and block (waiting for signals
+ * only).
+ */
+bool notifyIdleGcDeadlock(void)
+{
+    /* We do this even if RtsFlags.GcFlags.doIdleGC is turned off.
+     *
+     * But if we've already done a GC and didn't detect anything,
+     * i.e. ACTIVITY_DONE_GC, then continue and block. This will
+     * wait for signals that could unwedge things.
+     *
+     * Caution: if we get this wrong we can loop doing deadlock detecting GCs
+     * that find nothing! See test T26408c that checks we get this right.
+     */
+    if (getRecentActivity() < ACTIVITY_DONE_GC) {
+        setRecentActivity(ACTIVITY_INACTIVE);
+        /* Instruct to interrupt, return to scheduler and do idle GC. */
+        return true;
+    } else {
+        /* Instruct not to interrupt, to continue and block on signals. */
+        return false;
+    }
+}
+
 void notifyIdleGcActive(void)
 {
     switch (getRecentActivity())
     {
-    case ACTIVITY_DONE_GC: {
+    case ACTIVITY_PAUSED:
+    case ACTIVITY_DONE_GC:
+    {
         // ACTIVITY_DONE_GC means we turned off the timer signal to
         // conserve power (see #1623).  Re-enable it here.
         uint32_t prev;
         prev = setRecentActivity(ACTIVITY_YES);
-        if (prev == ACTIVITY_DONE_GC) {
+        if (prev == ACTIVITY_DONE_GC || prev == ACTIVITY_PAUSED) {
 #if !defined(PROFILING)
             unpauseTimer();
 #endif
@@ -356,6 +427,7 @@ void notifyIdleGcDone(bool force_major)
         // recent_activity flag and re-enable the timer.
         break;
     case ACTIVITY_YES:
+    case ACTIVITY_PAUSED:
         break;
     }
 }
