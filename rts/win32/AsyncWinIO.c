@@ -393,23 +393,40 @@ OVERLAPPED_ENTRY* getOverlappedEntries (uint32_t *num)
    returns you will have at least one action to service, though this may be a
    wake-up action.  */
 
-void awaitAsyncRequests (bool wait)
+static bool interrupt_await = false;
+
+bool awaitAsyncRequests (bool wait)
 {
   if(queueIOThread()) {
-    return;
+    return false;
   }
+  bool interrupted;
   AcquireSRWLockExclusive (&wio_runner_lock);
   /* We don't deal with spurious requests here, that's left up to AwaitEvent.c
      because in principle we need to check if the capability work queue is now
      not empty but we can't do that here.  Also these locks don't guarantee
      fairness, as such a request may have completed without us seeing a
      timeslice in between.  */
-  if (wait && outstanding_service_requests)
+  if (wait && outstanding_service_requests) {
     SleepConditionVariableSRW (&threadIOWait, &wio_runner_lock, INFINITE, 0);
+  }
+  interrupted = interrupt_await;
+  interrupt_await = false;
 
   ReleaseSRWLockExclusive (&wio_runner_lock);
+  return interrupted;
 }
 
+/* Wake up a Task that's blocked in awaitAsyncRequests above waiting for new IO
+ * requests to complete.
+ */
+void abandonAsyncRequestWait(void)
+{
+    AcquireSRWLockExclusive (&wio_runner_lock);
+    interrupt_await = true;
+    WakeConditionVariable(&threadIOWait);
+    ReleaseSRWLockExclusive (&wio_runner_lock);
+}
 
 
 /* Sets `canQueueIOThread` to indicate to the scheduler that it should
