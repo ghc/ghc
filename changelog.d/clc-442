@@ -1,0 +1,9 @@
+section: base
+issues: #27849
+mrs: !16718
+synopsis:
+  Expose `data Unit` and `data TupleN` from `Data.Tuple` in `base`
+description:
+  The data types `data Unit` and `data TupleN` (for N from 2 to 64) are now exported from
+  `Data.Tuple` in the `base` library instead of `Data.Tuple.Experimental` in `ghc-experimental`.
+  See `CLC proposal 442 <https://github.com/haskell/core-libraries-committee/issues/442>`_.
