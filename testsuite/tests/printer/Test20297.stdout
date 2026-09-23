@@ -1152,8 +1152,7 @@
         (AnnList
          (EpNoLayout)
          []))
-       (EpVirtualBraces
-        (EpaDelta { <no location info> } (SameLine 0) [])))
+       (EpNoLayout))
       []
       (Nothing)
       (L
