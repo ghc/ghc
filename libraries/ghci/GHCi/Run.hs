@@ -407,9 +407,9 @@ sandboxIO opts io
 withBreakAction :: EvalOpts -> ThreadId -> (IO (EvalStatus [HValueRef]) -> IO a) -> IO a
 withBreakAction opts tid@(ThreadId tid#) act = do
   ctx <- getThreadResumeContext tid
-  bracket setBreakAction resetBreakAction (\_ -> act (waitForResult ctx))
+  bracket (setBreakAction ctx) (resetBreakAction ctx) (\_ -> act (waitForResult ctx))
   where
-    setBreakAction = do
+    setBreakAction ctx = do
       poke breakPointIOAction globalBreakStablePtr
          -- TODO: This is poke thread unsafe, as one thread might be accessing this
          -- global variable while this thread tries to overwrite it. We should
@@ -423,21 +423,23 @@ withBreakAction opts tid@(ThreadId tid#) act = do
 
       runIf# singleStep rts_enableStopNextBreakpoint
       runIf# stepOut    rts_enableStopAfterReturn
-      runIf  isolateThreadBreaks setIsolatedThread
 
-    resetBreakAction () = do
+      runIfCtx ctx isolateThreadBreaks setIsolatedCtx
+
+    resetBreakAction ctx () = do
       poke exceptionFlag 0
       rts_disableStopAfterReturn    tid#
       rts_disableStopNextBreakpoint tid#
-      runIf isolateThreadBreaks unsetIsolatedThread
+      runIfCtx ctx isolateThreadBreaks unsetIsolatedCtx
 
       -- freeStablePtr stablePtr TODO: we never free the global stablePtr for
       -- global action. Maybe we should have a de-init for clean up.
       -- TODO: don't set it in `setBreakAction` either. Should be on
       -- interpreter initialization.
 
-    runIf  pred what = when (pred opts) (what tid)
-    runIf# pred what = when (pred opts) (what tid#)
+    runIf    pred what     = when (pred opts) (what tid)
+    runIf#   pred what     = when (pred opts) (what tid#)
+    runIfCtx ctx pred what = when (pred opts) (what ctx)
 
     waitForResult ctx
       | isolateThreadBreaks opts

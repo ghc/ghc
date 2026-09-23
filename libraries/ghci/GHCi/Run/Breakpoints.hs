@@ -13,6 +13,7 @@ module GHCi.Run.Breakpoints
   -- ** Isolating thread breakpoints
   , withIsolatedThread
   , setIsolatedThread, unsetIsolatedThread
+  , setIsolatedCtx, unsetIsolatedCtx
 
   -- ** Querying the global thread breakpoint map
   , listOtherPausedThreads
@@ -30,18 +31,15 @@ import GHCi.Message
 import GHCi.RemoteTypes
 
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Control.Concurrent
 import Control.Exception
 import qualified Data.ByteString.Short.Internal as BS
-#if defined(PROFILING)
-import GHC.Data.ShortByteString
-#endif
 import GHC.Exts
 import GHC.Stack
 import Foreign hiding (void)
 import GHC.Conc.Sync
 import GHC.IO hiding ( bracket )
+import Control.Monad
 
 --------------------------------------------------------------------------------
 -- * Global break action
@@ -135,16 +133,14 @@ readCtxEvalStatus ResumeContext{resumeEvalStatus} =
 readAnyThreadEvalBreak :: STM EvalBreak
 readAnyThreadEvalBreak = do
   ctxs <- readTVar threadContextsVar
-  isolated <- readTVar isolatedThreadsVar
   -- try reading any thread's 'EvalBreak' and retry if none have yielded one yet
-  foldr (\x next -> readBreak isolated x `orElse` next) retry (Map.toList ctxs)
+  foldr (\ctx next -> readBreak ctx `orElse` next) retry (Map.elems ctxs)
   where
-    readBreak isolated (tid, _) -- don't look at isolated threads
-      | Set.member tid isolated
-      = retry
-
-    readBreak _ (_, ResumeContext{resumeEvalStatus})
-      = readTVar resumeEvalStatus >>= \case
+    readBreak ResumeContext{resumeEvalStatus, resumeIsolated} = do
+      isolated <- readTVar resumeIsolated
+      if isolated
+        then retry -- don't look at isolated threads
+        else readTVar resumeEvalStatus >>= \case
           Just (EvalPaused b) -> do
             writeTVar resumeEvalStatus Nothing
             pure b
@@ -184,15 +180,15 @@ withIsolatedThread tid = bracket_ (setIsolatedThread tid) (unsetIsolatedThread t
 -- expression to run should not be seen at all by the debugger (e.g. when
 -- evaluating an expr to :force a variable)
 setIsolatedThread :: ThreadId -> IO ()
-setIsolatedThread tid = atomically $ do
-  isolated <- readTVar isolatedThreadsVar
-  writeTVar isolatedThreadsVar $! Set.insert tid isolated
+setIsolatedThread = getThreadResumeContext >=> setIsolatedCtx
 
 -- | Undoes 'setIsolatedThread'
 unsetIsolatedThread :: ThreadId -> IO ()
-unsetIsolatedThread tid = atomically $ do
-  isolated <- readTVar isolatedThreadsVar
-  writeTVar isolatedThreadsVar $! Set.delete tid isolated
+unsetIsolatedThread = getThreadResumeContext >=> unsetIsolatedCtx
+
+setIsolatedCtx, unsetIsolatedCtx :: ResumeContext -> IO ()
+setIsolatedCtx   ctx = atomically $ writeTVar (resumeIsolated ctx) True
+unsetIsolatedCtx ctx = atomically $ writeTVar (resumeIsolated ctx) False
 
 -- ** Querying the global thread breakpoint map --------------------------------
 
@@ -215,15 +211,6 @@ listOtherPausedThreads = atomically $ do
                    Just EvalComplete{} -> False
                    Nothing             -> False)
 
--- ** Global thread isolate map ------------------------------------------------
-
--- | Threads in this set are meant to be ignored by 'readAnyThreadEvalBreak'.
--- That is, even if one of the threads in this set hits a breakpoint, we
--- can only read its 'EvalBreak' with @'readThreadEvalStatus' tid@ directly.
-isolatedThreadsVar :: TVar (Set.Set ThreadId)
-isolatedThreadsVar = unsafePerformIO $ newTVarIO Set.empty
-{-# NOINLINE isolatedThreadsVar #-}
-
 --------------------------------------------------------------------------------
 -- * Per-thread resume-ing
 --------------------------------------------------------------------------------
@@ -234,7 +221,9 @@ getThreadResumeContext tid = do
   case Map.lookup tid ctxs0 of
     Just ctx -> pure ctx -- common case: hence read without transaction
     Nothing  -> do
-      new_ctx <- ResumeContext <$> newEmptyMVar <*> newTVarIO Nothing
+      new_ctx <- ResumeContext <$> newEmptyMVar
+                               <*> newTVarIO Nothing
+                               <*> newTVarIO False
       atomically $ do -- write new thread context atomically
         ctxs1 <- readTVar threadContextsVar
         case Map.lookup tid ctxs1 of
@@ -244,12 +233,22 @@ getThreadResumeContext tid = do
             writeTVar threadContextsVar ctxs2
             pure new_ctx
 
--- | A global mapping from threads to their 'ResumeContext' (that contain
--- the MVars on which they block when stopped)
+-- | A global mapping from threads to their per-thread state 'ResumeContext'
+-- (that e.g. contain the MVars on which they block when stopped)
 threadContextsVar :: TVar (Map.Map ThreadId ResumeContext)
 threadContextsVar = unsafePerformIO $ newTVarIO Map.empty
 {-# NOINLINE threadContextsVar #-}
 
+-- | Global context for a thread, which is created and inserted in the global
+-- 'threadContextsVar' when a thread hits a breakpoint (and, thus, the
+-- 'globalBreakAction') is run, or when 'withBreakAction' sets the thread
+-- isolation (e.g. in 'sandboxIO'), or in other calls to
+-- 'getThreadResumeContext', the function which gets or creates a thread
+-- 'ResumeContext'.
+--
+-- TODO: Rename ResumeContext to something like ThreadContext or
+-- ThreadDbgContext or (Thread)BreakContext, and fields to something like
+-- dbgEvalStatus, threadIsolated, ...
 data ResumeContext = ResumeContext
   { resumeBreakMVar :: !(MVar ())
   -- ^ A thread that hits a breakpoint blocks reading its corresponding MVar
@@ -265,4 +264,9 @@ data ResumeContext = ResumeContext
   --
   -- The variable should be emptied (i.e. set to 'Nothing') by whoever
   -- reads the status.
+  , resumeIsolated :: !(TVar Bool)
+  -- ^ When set, this thread is meant to be ignored by 'readAnyThreadEvalBreak'.
+  -- That is, if a thread with resumeIsolated=True hits a breakpoint, its
+  -- 'EvalBreak' can only be read with @'readThreadEvalStatus' tid@ for this
+  -- thread's @tid@ directly.
   }
