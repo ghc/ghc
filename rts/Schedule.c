@@ -1787,7 +1787,7 @@ delete_threads_and_gc:
 
     traceSparkCounters(cap);
 
-    notifyIdleGcDone(force_major);
+    notifyIdleGcDone(deadlock_detect);
 
 #if defined(THREADED_RTS)
     // Stable point where we can do a global check on our spark counters
