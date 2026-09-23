@@ -428,6 +428,13 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
          */
         Time timeout = timeoutWaitTime(iomgr, wait, now);
 
+        if (RTS_UNLIKELY(timeout == -1 &&
+                         isEmptyClosureTable(&iomgr->aiop_table))) {
+            /* See Note [Deadlock detection without idle GC] */
+            interrupt = notifyIdleGcDeadlock();
+            if (interrupt) break;
+        }
+
 #if defined(RTS_USER_SIGNALS)
         /* Final check for pending signals before calling poll. There is
          * Still a window between here and calling poll when signals could

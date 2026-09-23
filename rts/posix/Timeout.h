@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include "IdleGC.h" // To get definition of THREADED_IDLEGC
+
 #include "BeginPrivate.h"
 
 bool syncDelayTimeout(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay);
