@@ -1795,7 +1795,7 @@ cvars1 :: { [RecordPatSynField GhcPs] }
                                             ; return ((RecordPatSynField (mkFieldOcc h) h) : $3 )}}
 
 where_decls :: { Located (Located (OrdList (LHsDecl GhcPs)), EpToken "where", AnnList) }
-        : 'where' '{' decls '}'       { sLL $1 $> (sLL $2 $> (thdOf3 $ unLoc $3),
+        : 'where' '{' decls '}'       { sLL $1 $> (sL1 $3 (thdOf3 $ unLoc $3),
                                                   epTok $1,
                                                   AnnList (EpExplicitBraces (epTok $2) (epTok $4)) (sndOf3 $ unLoc $3)) }
         | 'where' vocurly decls close { sLL $1 $3 (sLL $2 $3 (thdOf3 $ unLoc $3),
@@ -1853,11 +1853,12 @@ decllist_cls
         :: { Located ( AnnList
                      , OrdList (LHsDecl GhcPs)
                      , EpLayout) }      -- Reversed
-        : '{'         decls_cls '}'     { sLL $1 $> (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) (fst $ unLoc $2)
-                                             ,snd $ unLoc $2, epExplicitBraces $1 $3) }
+        : '{'         decls_cls '}'     { let { L l (anns, decls) = $2
+                                              ; epe = epExplicitBraces $1 $3 }
+                                           in sLL $1 $> (AnnList epe anns, decls, epe) }
         |     vocurly decls_cls close   { let { L l (anns, decls) = $2
                                               ; epv = (epVirtualBraces (glR $1) $2) }
-                                           in sLL $1 $2 (AnnList epv anns, decls, epv) }
+                                           in sL1 $2 (AnnList epv anns, decls, epv) }
 
 -- Class body
 --
@@ -1867,8 +1868,8 @@ where_cls :: { Located ( (EpToken "where", AnnList)
                                 -- No implicit parameters
                                 -- May have type declarations
         : 'where' decllist_cls          { sLL $1 $> ((epTok $1,fstOf3 $ unLoc $2)
-                                             , sL1 $2 (sndOf3 $ unLoc $2)
-                                             , thdOf3 $ unLoc $2) }
+                                                    , sL1 $2 (sndOf3 $ unLoc $2)
+                                                    , thdOf3 $ unLoc $2) }
         | {- empty -}                   { noLoc ((noAnn, noAnn),noLoc nilOL,EpNoLayout) }
 
 -- Declarations in instance bodies
@@ -1908,8 +1909,8 @@ where_inst :: { Located ((EpToken "where", AnnList)
                         , Located (OrdList (LHsDecl GhcPs))) }   -- Reversed
                                 -- No implicit parameters
                                 -- May have type declarations
-        : 'where' decllist_inst         { sLL $1 $> ((epTok $1,(fst $ unLoc $2))
-                                             , sL1 $2 (snd $ unLoc $2)) }
+        : 'where' decllist_inst         { sLL $1 $> ( (epTok $1,(fst $ unLoc $2))
+                                                    , sL1 $2 (snd $ unLoc $2)) }
         | {- empty -}                   { noLoc (noAnn,noLoc nilOL) }
 
 -- Declarations in binding groups other than classes and instances
@@ -3549,7 +3550,7 @@ altslist(PATS) :: { forall b. DisambECP b => PV (LocatedA ([LMatch GhcPs (Locate
                                            (L (getLoc $2) (reverse (snd $ unLoc $2),
                                            (AnnList (epVirtualBraces (glR $1) $2) (fst $ unLoc $2)))) }
         | '{'              '}'   { amsA' (sLL $1 $> ([], (AnnList (EpExplicitBraces (epTok $1) (epTok $2)) []))) }
-        | vocurly          close { return $ noLocA ([], AnnList (EpVirtualBraces noSpanAnchor) []) }
+        | vocurly          close { return $ noLocA ([], AnnList EpNoLayout []) }
 
 alts(PATS) :: { forall b. DisambECP b => PV (Located ([EpToken ";"],[LMatch GhcPs (LocatedA b)])) }
         : alts1(PATS)              { $1 >>= \ $1 -> return $
@@ -4756,7 +4757,7 @@ stmtlistAnns (L _ (an,_)) = an
 
 epVirtualBraces :: EpaLocation -> Located a -> EpLayout
 epVirtualBraces oc (L (RealSrcSpan _ _) _) = EpVirtualBraces oc
-epVirtualBraces oc _                       = EpVirtualBraces noSpanAnchor
+epVirtualBraces oc _                       = EpNoLayout
 
 -- -------------------------------------
 
