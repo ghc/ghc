@@ -632,17 +632,24 @@ contOutArgs env cont
     -- No more arguments
     go _ = []
 
-splitContArgs :: SimplCont -> (SimplCont, SimplCont)
--- Peel off an initial prefix of applications and casts
+splitContArgs :: SimplCont -> Maybe (SimplCont, SimplCont)
+-- Splits `cont` into (inner, outer), where `inner` has only
+-- applications and casts, and `outer` is non-trivial
 splitContArgs cont@(ApplyToTy { sc_cont = cont1 })
-  | (inner, outer) <- splitContArgs cont1 = (cont { sc_cont = inner }, outer)
+  = do { (inner, outer) <- splitContArgs cont1
+       ; return (cont { sc_cont = inner }, outer) }
 splitContArgs cont@(ApplyToVal { sc_cont = cont1 })
-  | (inner, outer) <- splitContArgs cont1 = (cont { sc_cont = inner }, outer)
+  = do { (inner, outer) <- splitContArgs cont1
+       ; return (cont { sc_cont = inner }, outer) }
 splitContArgs cont@(CastIt { sc_cont = cont1 })
-  | (inner, outer) <- splitContArgs cont1 = (cont { sc_cont = inner }, outer)
-splitContArgs cont
-  | contIsStop cont  = (cont, cont)
-  | otherwise        = (mkBoringStop (contHoleType cont), cont)
+  = do { (inner, outer) <- splitContArgs cont1
+       ; return (cont { sc_cont = inner }, outer) }
+splitContArgs outer
+  | contIsStop outer = Nothing
+  | otherwise        = pprTrace "splitContHoleType" (ppr hole_ty) $
+                       return (mkBoringStop hole_ty, outer)
+  where
+    hole_ty = contHoleType outer
 
 dropContArgs :: FullArgCount -> SimplCont -> SimplCont
 dropContArgs 0 cont = cont
