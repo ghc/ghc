@@ -400,6 +400,7 @@ bool awaitAsyncRequests (bool wait)
   if(queueIOThread()) {
     return false;
   }
+  //TODO: add support here for prompt deadlock detection. See issue #28057.
   bool interrupted;
   AcquireSRWLockExclusive (&wio_runner_lock);
   /* We don't deal with spurious requests here, that's left up to AwaitEvent.c
