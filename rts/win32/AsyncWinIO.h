@@ -23,7 +23,8 @@ extern void completeSynchronousRequest (void);
 
 extern bool startupAsyncWinIO(void);
 extern void shutdownAsyncWinIO(bool wait_threads);
-extern void awaitAsyncRequests(bool wait);
+extern bool awaitAsyncRequests(bool wait);
+extern void abandonAsyncRequestWait(void);
 extern bool queueIOThread(void);
 
 #include "EndPrivate.h"

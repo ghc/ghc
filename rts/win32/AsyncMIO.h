@@ -14,6 +14,7 @@
 
 #include "BeginPrivate.h"
 
+#if !defined(THREADED_RTS)
 extern unsigned int
 addIORequest(int   fd,
              bool  forWriting,
@@ -28,7 +29,8 @@ extern void shutdownAsyncIO(bool wait_threads);
 extern bool awaitRequests(bool wait);
 
 extern void abandonRequestWait(void);
-extern void resetAbandonRequestWait(void);
+#endif
+
 extern HsInt rts_EINTR(void);
 
 #include "EndPrivate.h"
