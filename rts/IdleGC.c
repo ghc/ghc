@@ -185,6 +185,39 @@ capability, while in the non-threaded we will ask the I/O manager to
 block and wait for I/O, timers or signals.
 
 See also Note [Deadlock detection under the nonmoving collector].
+
+
+Note [Deadlock detection without idle GC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In Note [Deadlock detection] above we noted that:
+
+> the historical design looks for situations in which there *must* be
+  a system deadlock.
+
+We can still take advantage of these situations, but instead of basing the
+whole design around it, we use it opportunistically, and in a way that involves
+minimal changes to the general design.
+
+Specifically, in the case of a single capability (so we have a global view), if
+the I/O manager would be about to block indefinitely, with no I/O pending, then
+we have a strong suspicion that there is a system deadlock.
+
+In this case, I/O manager informs the idle GC system via notifyIdleGcDeadlock.
+Typically it will then behave as if the I/O manager had been interrupted and
+return to the scheduler. We can do this promptly, and we can do so even if idle
+GC in general is disabled (e.g. via -I0). This fits into the existing design
+because it can behave just as if there had been an idle GC timeout.
+
+There is one very subtle case to note: we can have situations where there's no
+deadlock detected but yet there are no runnable threads, no timers and no
+pending I/O. There can also be signals with signal handlers that could wake up
+and unblock things (e.g. if a handler closure has access to a TVar/MVar that
+other threads are blocked on). To make this case work, the I/O manager has to
+ask notifyIdleGcDeadlock if it should should return to the scheduler, or
+continue and block. And notifyIdleGcDeadlock will tell it to continue if an
+idle GC has already been completed (with no intervening activity) since this is
+the situation where there is no deadlock. See test T26408c.
 */
 
 
@@ -298,6 +331,33 @@ void handleIdleGcTick(void)
   default:
       break;
   }
+}
+
+/* If the I/O manager can see that there is very likely a deadlock (no I/O and
+ * no timers) then it lets us know. If we have not already done an idle GC then
+ * we schedule one idle GC. If we did already do an idle GC and thus did not
+ * find a deadlock then we'll arrange to continue and block (waiting for signals
+ * only).
+ */
+bool notifyIdleGcDeadlock(void)
+{
+    /* We do this even if RtsFlags.GcFlags.doIdleGC is turned off.
+     *
+     * But if we've already done a GC and didn't detect anything,
+     * i.e. ACTIVITY_DONE_GC, then continue and block. This will
+     * wait for signals that could unwedge things.
+     *
+     * Caution: if we get this wrong we can loop doing deadlock detecting GCs
+     * that find nothing! See test T26408c that checks we get this right.
+     */
+    if (getRecentActivity() < ACTIVITY_INACTIVE) {
+        setRecentActivity(ACTIVITY_INACTIVE);
+        /* Instruct to interrupt, return to scheduler and do idle GC. */
+        return true;
+    } else {
+        /* Instruct not to interrupt, to continue and block on signals. */
+        return false;
+    }
 }
 
 void notifyIdleGcActive(void)

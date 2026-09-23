@@ -23,6 +23,11 @@ void notifyIdleGcActive(void);
 /* Called from schedule(), specifically scheduleDoGC() */
 void notifyIdleGcDone(bool force_major);
 
+/* Called from I/O managers before waiting if there is almost certainly
+ * a deadlock.
+ */
+bool notifyIdleGcDeadlock(void);
+
 /* Called from handle_tick() */
 void handleIdleGcTick(void);
 

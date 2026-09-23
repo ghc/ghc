@@ -369,13 +369,14 @@ void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
 
     if (!isEmptyClosureTable(&iomgr->aiop_table)) {
 
+        int n_aiops = sizeClosureTable(&iomgr->aiop_table);
 #if defined(HAVE_PREEMPTION)
         /* the full_poll_table includes interrupt_fd_r */
-        nfds_t nfds = sizeClosureTable(&iomgr->aiop_table) + 1;
+        nfds_t nfds = n_aiops + 1;
         struct pollfd *poll_table = iomgr->full_poll_table;
 #else
         /* the aiop_poll_table does not include interrupt_fd_r */
-        nfds_t nfds = sizeClosureTable(&iomgr->aiop_table) + 0;
+        nfds_t nfds = n_aiops + 0;
         struct pollfd *poll_table = iomgr->aiop_poll_table;
 #endif
 
@@ -448,13 +449,14 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
          */
         bool wait = emptyRunQueue(iomgr->cap);
 
+        int n_aiops = sizeClosureTable(&iomgr->aiop_table);
 #if defined(HAVE_PREEMPTION)
         /* the full_poll_table includes interrupt_fd_r */
-        nfds_t nfds = sizeClosureTable(&iomgr->aiop_table) + 1;
+        nfds_t nfds = n_aiops + 1;
         struct pollfd *poll_table = iomgr->full_poll_table;
 #else
         /* the aiop_poll_table does not include interrupt_fd_r */
-        nfds_t nfds = sizeClosureTable(&iomgr->aiop_table) + 0;
+        nfds_t nfds = n_aiops + 0;
         struct pollfd *poll_table = iomgr->aiop_poll_table;
 #endif
 
@@ -462,6 +464,12 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
          * poll only, wait indefinitely, or wait until a timeout.
          */
         Time timeout = timeoutWaitTime(iomgr, wait, now);
+
+        if (RTS_UNLIKELY(timeout == -1 && n_aiops == 0)) {
+            /* See Note [Deadlock detection without idle GC] */
+            interrupt = notifyIdleGcDeadlock();
+            if (interrupt) break;
+        }
 
         /* Check for I/O readiness, possibly waiting. */
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1

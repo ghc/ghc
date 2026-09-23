@@ -231,6 +231,12 @@ awaitRequests(bool wait)
 {
     CapIOManager *iomgr = MainCapability.iomgr;
 
+    if (RTS_UNLIKELY(issued_reqs == 0)) {
+        /* See Note [Deadlock detection without idle GC]
+         * Note that the issued_reqs covers both I/O and timers. */
+        if (notifyIdleGcDeadlock()) return false;
+    }
+
 start:
 #if 0
     fprintf(stderr, "awaitRequests(): %d %d %d\n",

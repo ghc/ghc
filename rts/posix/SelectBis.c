@@ -428,6 +428,13 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
          */
         Time timeout = timeoutWaitTime(iomgr, wait, now);
 
+        if (RTS_UNLIKELY(timeout == -1 &&
+                         isEmptyClosureTable(&iomgr->aiop_table))) {
+            /* See Note [Deadlock detection without idle GC] */
+            interrupt = notifyIdleGcDeadlock();
+            if (interrupt) break;
+        }
+
         /* Check for I/O readiness, possibly waiting. */
         struct timeval tv, *timeout_us = timeoutAsTimeval(timeout, &tv);
         int res = select(maxfd+1, iomgr->rfds, iomgr->wfds, NULL, timeout_us);
