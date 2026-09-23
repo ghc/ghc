@@ -1283,9 +1283,8 @@ simplExprF1 env expr@(Lam {}) cont
         -- and likewise drop counts all binders (incl type lambdas)
 
 simplExprF1 env expr@(Case scrut bndr _ alts) cont
-  | not (seCaseCase env)  -- See (COC-INV) in Note [sm_case_case: switching off case continuations]
-  , (inner, outer) <- splitContArgs cont
-  , not (contIsStop outer)
+  | Just (inner, outer) <- splitContForNoCaseCase env cont
+       -- See (COC-INV) in Note [sm_case_case: switching off case continuations]
   = do { expr' <- simplExprC env expr inner
        ; rebuild env expr' outer }
 
@@ -1312,9 +1311,7 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
        ; simplExprF env' body cont }
 
 simplExprF1 env expr@(Let {}) cont
-  | not (seCaseCase env)
-  , (inner, outer) <- splitContArgs cont
-  , not (contIsStop outer)
+  | Just (inner, outer) <- splitContForNoCaseCase env cont
   = do { expr' <- simplExprC env expr inner
        ; rebuild env expr' outer }
 
@@ -1339,6 +1336,18 @@ simplExprF1 env (Let (Rec pairs) body) cont
   = {-#SCC "simplRecE" #-}
     simplRecE env pairs body cont
 
+
+splitContForNoCaseCase :: SimplEnv -> SimplCont
+                       -> Maybe (SimplCont, SimplCont)
+-- Splits `cont` into (inner, outer), where `inner` has only
+-- applications, and `outer` is non-trivial
+splitContForNoCaseCase env cont
+  | not (seCaseCase env)
+  , (inner, outer) <- splitContArgs cont
+  , not (contIsStop outer)
+  = Just (inner, outer)
+  | otherwise
+  = Nothing
 
 {- Note [Avoiding space leaks in OutType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2403,43 +2412,13 @@ simplOutId env fun cont
   | fun `hasKey` runRWKey
   , ApplyToTy  { sc_cont = cont1 } <- cont
   , ApplyToTy  { sc_cont = cont2 } <- cont1
-  , ApplyToVal { sc_cont = cont3, sc_arg = arg, sc_cast = arg_mco
-               , sc_env = arg_se, sc_hole_ty = fun_ty } <- cont2
-  -- Do this even if (contIsStop cont), or if seCaseCase is off.
-  -- See Note [No eta-expansion in runRW#]
-  = do { let (_saf,arg_env) = mkAltEnv env arg_se
-
-             overall_res_ty = contResultType cont3
-             -- hole_ty is the type of the current runRW# application
-
-       -- If the argument is a literal lambda already, take a short cut
-       -- This isn't just efficiency:
-       --    * If we don't do this we get a beta-redex every time, so the
-       --      simplifier keeps doing more iterations.
-       --    * Even more important: see Note [No eta-expansion in runRW#]
-       ; arg' <- case arg of
-           Lam s body -> do { (env', s') <- simplBinder arg_env s
-                            ; body' <- simplExprC env' body cont3
-                            ; return (Lam s' body') }
-                            -- Important: do not try to eta-expand this lambda
-                            -- See Note [No eta-expansion in runRW#]
-
-           _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
-                   ; let (m,_,_) = splitFunTy fun_ty
-                         env'    = arg_env `addNewInScopeIds` [s']
-                         hole_ty = mkVisFunTy m realWorldStatePrimTy overall_res_ty
-                   ; cont' <- pushCastMCo env' arg_mco $
-                              ApplyToVal { sc_arg     = Var s', sc_cast = MRefl
-                                         , sc_env     = Simplified OkDup
-                                         , sc_cont    = cont3
-                                         , sc_hole_ty = hole_ty }
-                                -- cont' applies to s', then K
-                   ; body' <- simplExprC env' arg cont'
-                   ; return (Lam s' body') }
-
-       ; let rr'   = getRuntimeRep overall_res_ty
-             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg overall_res_ty, arg']
-       ; return (emptyFloats env, call') }
+  , ApplyToVal { sc_cont = cont3, sc_arg = arg, sc_env = arg_se
+               , sc_cast = arg_mco, sc_hole_ty = fun_ty } <- cont2
+  = case splitContForNoCaseCase env cont3 of
+      Nothing -> do { e' <- simplRunRW env fun arg arg_se arg_mco fun_ty cont3
+                    ; return (emptyFloats env, e') }
+      Just (ink,outk) -> do { e' <- simplRunRW env fun arg arg_se arg_mco fun_ty ink
+                            ; rebuild env e' outk }
 
 -- Normal case for (f e1 .. en)
 simplOutId env fun cont
@@ -2473,6 +2452,51 @@ simplOutId env fun cont
     do { let arg_info = mkArgInfo env fun rules_for_me cont
        ; rebuildCall env arg_info cont
     } } } } }
+
+simplRunRW :: SimplEnv
+           -> OutId        -- runRW#
+           -> CoreExpr     -- Main value argument `e` of runRW#
+           -> StaticEnv    -- ...and its static envt
+           -> MOutCoercion -- ...and its MCoercion
+           -> OutType      -- Type of (runRW# @k @ty), always t1->t2
+           -> SimplCont    -- Continuation to push into body of `e`
+           -> SimplM OutExpr
+simplRunRW env fun arg arg_se arg_mco fun_ty cont
+  -- Do this even if (contIsStop cont), or if seCaseCase is off.
+  -- See Note [No eta-expansion in runRW#]
+  = do { let (_saf,arg_env) = mkAltEnv env arg_se
+
+             overall_res_ty = contResultType cont
+             -- hole_ty is the type of the current runRW# application
+
+       -- If the argument is a literal lambda already, take a short cut
+       -- This isn't just efficiency:
+       --    * If we don't do this we get a beta-redex every time, so the
+       --      simplifier keeps doing more iterations.
+       --    * Even more important: see Note [No eta-expansion in runRW#]
+       ; arg' <- case arg of
+           Lam s body -> do { (env', s') <- simplBinder arg_env s
+                            ; body' <- simplExprC env' body cont
+                            ; return (Lam s' body') }
+                            -- Important: do not try to eta-expand this lambda
+                            -- See Note [No eta-expansion in runRW#]
+
+           _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
+                   ; let (m,_,_) = splitFunTy fun_ty
+                         env'    = arg_env `addNewInScopeIds` [s']
+                         hole_ty = mkVisFunTy m realWorldStatePrimTy overall_res_ty
+                   ; cont' <- pushCastMCo env' arg_mco $
+                              ApplyToVal { sc_arg     = Var s', sc_cast = MRefl
+                                         , sc_env     = Simplified OkDup
+                                         , sc_cont    = cont
+                                         , sc_hole_ty = hole_ty }
+                                -- cont' applies to s', then K
+                   ; body' <- simplExprC env' arg cont'
+                   ; return (Lam s' body') }
+
+       ; let rr'   = getRuntimeRep overall_res_ty
+             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg overall_res_ty, arg']
+       ; return call' }
 
 ---------------------------------------------------------
 --      Dealing with a call site

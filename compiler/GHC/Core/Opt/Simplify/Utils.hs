@@ -176,7 +176,7 @@ data SimplCont
       , sc_cont :: SimplCont }
 
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
-      { sc_hole_ty :: OutType    -- Type of the function, presumably (forall a. blah)
+      { sc_hole_ty :: OutType    -- Type of the function, presumably (ty1 -> ty2)
                                  -- See Note [The hole type in ApplyToTy]
       , sc_env  :: StaticEnv     -- See Note [StaticEnv]
       , sc_arg  :: CoreExpr      -- The argument
