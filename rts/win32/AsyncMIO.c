@@ -229,9 +229,6 @@ shutdownAsyncIO(bool wait_threads)
 bool
 awaitRequests(bool wait)
 {
-#if !defined(THREADED_RTS)
-  // none of this is actually used in the threaded RTS
-
     CapIOManager *iomgr = MainCapability.iomgr;
 
 start:
@@ -358,7 +355,6 @@ start:
         OS_RELEASE_LOCK(&queue_lock);
         return true;
     }
-#endif /* !THREADED_RTS */
 }
 
 /*
@@ -384,7 +380,6 @@ abandonRequestWait( void )
      * properly serviced (see resetAbandon() below).  --SDM 18/12/2003
      */
     SetEvent(abandon_req_wait);
-    interruptIOManagerEvent ();
 }
 
 #endif /* !defined(THREADED_RTS) */
