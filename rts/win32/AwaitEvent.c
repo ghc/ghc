@@ -37,13 +37,11 @@ awaitCompletedTimeoutsOrIOWin32(Capability *cap, bool wait)
     /* Try to de-queue completed IO requests
      */
     workerWaitingForRequests = true;
-    if (is_io_mng_native_p())
-      awaitAsyncRequests(wait);
-      /* FIXME: no support yet for interrupting in WinIO I/O manager
-       * See issue #27403
-       */
-    else
-      interrupt = !awaitRequests(wait);
+    if (is_io_mng_native_p()) {
+        interrupt = awaitAsyncRequests(wait);
+    } else {
+        interrupt = !awaitRequests(wait);
+    }
     workerWaitingForRequests = false;
 
     // If a signal was raised, we need to service it. This will typically

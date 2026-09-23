@@ -752,9 +752,7 @@ void interruptIOManager(CapIOManager *iomgr)
 
 #if defined(IOMGR_ENABLED_WINIO)
         case IO_MANAGER_WINIO:
-            /* FIXME: no support yet for interrupting in WinIO I/O manager
-             * See issue #27403
-             */
+            abandonAsyncRequestWait();
             break;
 #endif
 
