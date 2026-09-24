@@ -524,7 +524,7 @@ isInsolubleReason (InsolubleFunDepReason {}) = True
 ------------------------------------------------------------------------------
 
 -- | A /set/ of problems in checking the validity of a type equality.
--- See 'checkTypeEq'.
+-- See 'GHC.Tc.Utils.Unify.checkTyEqRhs'.
 newtype CheckTyEqResult = CTER Word8
 
 -- | No problems in checking the validity of a type equality.
@@ -2623,18 +2623,23 @@ The rewriter-set plan
    thereby dropping the reference to `co`.  I'm not certain whether this actually
    happens or not.
 
-(WRW7) In error reporting, we simply suppress any errors that have been rewritten
-  by /unsolved/ wanteds. This suppression happens in GHC.Tc.Errors.mkErrorItem,
+(WRW7) When we fill a coercion hole `h` we kick out any inert Wanted that has `h`
+   in its rewriter set.  See `kickOutAfterFilling CoercionHole`.
+   See Note [Kick out after filling a coercion hole] in GHC.Tc.Solver.Monad.
+
+   Furthermore, when we select a work item, in `selectNextWorkItem` we zonk the
+   rewriter set so that it accurately reflects the unsolved coercion holes. That
+   sets it up ready for the no-rewriter check in (WR5), when we process the equality.
+
+   In `selectNextWorkItem`, we also prioritise equalities with no rewiters.
+   See Note [Prioritise Wanteds with empty CoHoleSet] in GHC.Tc.Types.Constraint
+   wrinkle (PER1).
+
+(WRW8) In error reporting, we suppress any errors that have been rewritten
+  by /unsolved/ wanteds. This suppression happens in `GHC.Tc.Errors.mkErrorItem`,
   which uses `GHC.Tc.Zonk.Type.zonkCoHoleSet` to look through any filled
   coercion holes. The idea is that we wish to report the "root cause" -- the
   error that rewrote all the others.
-
-(WRW8) In `selectNextWorkItem`, priorities equalities with no rewiters.  See
-  Note [Prioritise Wanteds with empty CoHoleSet] in GHC.Tc.Types.Constraint
-  wrinkle (PER1).
-
-(WRW9) In error reporting, we prioritise Wanteds that have an empty CoHoleSet:
-  see Note [Prioritise Wanteds with empty CoHoleSet].
 
 Let's continue our first example above:
 
@@ -2661,8 +2666,10 @@ Wrinkles:
 
 (WRW11) When zonking a constraint (with `zonkCt` and `zonkCtEvidence`) we take
    the opportunity to zonk its `CoHoleSet`, which eliminates solved ones.
-   This doesn't guarantee that rewriter sets are always up to date -- c.f.
-   (WRW10) -- but it helps, and it de-clutters debug output.
+   This doesn't guarantee that rewriter sets are always up to date (c.f. (WRW10))
+   but it helps, and it de-clutters debug output.
+
+   See also (WRW7) which does the crucial just-in-time zonking of the rewriters.
 
 Note [Prioritise Wanteds with empty CoHoleSet]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2705,9 +2712,8 @@ in our simplify_loop iteration, we happened to start with co_aym. All would have
 been well if we'd started with the (not-rewritten) co_ayb and gotten it into the
 inert set.
 
-With that in mind, we /prioritise/ the work-list to put
-constraints with no rewriters first.  This prioritisation
-is done in `GHC.Tc.Solver.Monad.selectNextWorkItem`.
+With that in mind, we /prioritise/ the work-list to put constraints with no rewriters
+first.  This prioritisation is done in `GHC.Tc.Solver.Monad.selectNextWorkItem`.
 
 Wrinkles
 
@@ -2720,8 +2726,8 @@ Wrinkles
   order to report /some/ error in this case, we simply report all the
   Wanteds. The user will get a perhaps-confusing error message, but they've
   written a confusing program!  (T22707 and T22793 were close, but they do
-  not exhibit this behaviour.)  So belt and braces: see the `suppress`
-  stuff in GHC.Tc.Errors.mkErrorItem.
+  not exhibit this behaviour.)  So belt and braces:
+  see `GHC.Tc.Errors.reportWanteds`.
 
 Note [Avoiding rewriting cycles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

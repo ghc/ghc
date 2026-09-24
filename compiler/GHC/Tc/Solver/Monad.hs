@@ -117,10 +117,7 @@ module GHC.Tc.Solver.Monad (
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
     matchFam, matchFamTcM,
     checkWellLevelledDFun,
-    pprEq,
-
-    -- Enforcing invariants for type equalities
-    checkTypeEq
+    pprEq
 ) where
 
 import GHC.Prelude
@@ -438,10 +435,12 @@ why solving `kco` might unlock `co`, especially (URW2).
 
 Hence `kickOutAfterFillingCoercionHole`.  It looks at inert constraints that are
   * Wanted
-  * Of the form  alpha ~ rhs, where alpha is a unification variable
-and kicks out any that will have an empty rewriter set after filling the hole.
+  * Of the form  (alpha ~ rhs), or (F tys ~ alpha)
+    where alpha is a unification variable
+and kicks out any that have an empty rewriter set after filling the hole.
 
 Wrinkles:
+
 (KOC1) If co's rewriter-set is {kco, xco}, there is no point in kicking it out,
        because it still can't be unified.  So we only kick out if the co's
        rewriter-set becomes empty.
@@ -455,13 +454,17 @@ Wrinkles:
        on `kco2` instead of `kco`.  Hence the `new_holes` passed to
        `kickOutAfterFillingCoercionHole`
 
-(KOC3) It's possible that this could just go ahead and unify, but could there
-       be occurs-check problems? Seems simpler just to kick out.
+(KOC3) It's possible that this could just go ahead and unify on the spot, but could
+       there be occurs-check problems? Seems simpler just to kick out.
 
 (KOC4) Kick-out is undesirable, so it'd be better to solve `kco` before `co`.  So
        the solver prioritises equalities with an empty rewriter set, to try to
        avoid unnecessary kick-out.  See GHC.Tc.Types.Constraint
        Note [Prioritise Wanteds with empty CoHoleSet] esp (PER1)
+
+(KOC5) We kick out from both `inert_eqs` and `inert_funeqs`.  The latter is needed
+       in case we have (F tys ~ alpha), which might (if it now has an empty rewriter
+       set) allou unifying alpha.
 -}
 
 kickOutRewritable  :: KickOutSpec -> CtFlavourRole -> TcS ()
@@ -526,23 +529,32 @@ kickOutAfterFillingCoercionHole hole (CPH { cph_holes = new_holes })
        ; setInertCans ics' }
   where
     kick_out :: InertCans -> ([EqCt], InertCans)
-    kick_out ics@(IC { inert_eqs = eqs })
-      = (eqs_to_kick, ics { inert_eqs = eqs_to_keep })
+    kick_out ics@(IC { inert_eqs = eqs, inert_funeqs = funeqs })
+      = ( kick_funeqs ++ kick_eqs
+        , ics { inert_eqs = keep_eqs, inert_funeqs = keep_funeqs })
       where
-        (eqs_to_kick, eqs_to_keep) = transformAndPartitionTyVarEqs kick_out_eq eqs
+        (kick_eqs,       keep_eqs) = transformAndPartitionTyVarEqs kick_out_eq eqs
+        (kick_funeqs, keep_funeqs) = transformAndPartitionFunEqs   kick_out_eq funeqs
+        -- Kick out from funeqs as well as eqs.
+        -- See (KOC5) in Note [Kick out after filling a coercion hole]
+
+    is_meta_tv_equality (EqCt { eq_lhs = lhs, eq_rhs = rhs })
+       | TyVarLHS tv <- lhs            = isMetaTyVar tv
+       | Just tv <- getTyVar_maybe rhs = isMetaTyVar tv
+       | otherwise                     = False
 
     kick_out_eq :: EqCt -> Either EqCt EqCt
-    kick_out_eq eq_ct@(EqCt { eq_ev = ev, eq_lhs = lhs })
+    kick_out_eq eq_ct@(EqCt { eq_ev = ev })
       | CtWanted (wev@(WantedCt { ctev_rewriters = rewriters })) <- ev
-      , TyVarLHS tv <- lhs
-      , isMetaTyVar tv
       , hole `elemCoHoleSet` rewriters
-      , let holes' = (rewriters `delCoHoleSet` hole) `mappend` new_holes
-                     -- Adding new_holes and deleting hole: see (KOC2)
-            eq_ct' = eq_ct { eq_ev = CtWanted (wev { ctev_rewriters = holes' }) }
-      = if isEmptyCoHoleSet holes'
+      , is_meta_tv_equality eq_ct
+      , let rewriters' = (rewriters `delCoHoleSet` hole) `mappend` new_holes
+                         -- Adding new_holes and deleting hole: see (KOC2)
+            eq_ct' = eq_ct { eq_ev = CtWanted (wev { ctev_rewriters = rewriters' }) }
+      = if isEmptyCoHoleSet rewriters'
         then Left eq_ct'    -- Kick out, if new rewriter set is empty (KOC1)
         else Right eq_ct'   -- Keep, but with trimmed holes see (KOC2)
+
       | otherwise
       = Right eq_ct
 
@@ -2302,52 +2314,6 @@ wrapUnifier rws loc role do_unifications
 ************************************************************************
 -}
 
-checkTypeEq :: CtEvidence -> EqRel -> CanEqLHS -> TcType
-            -> TcS (PuResult Ct Reduction)
--- Used for general CanEqLHSs, ones that do
--- not have a touchable type variable on the LHS (i.e. not unifying)
-checkTypeEq ev eq_rel lhs rhs =
-  case ev of
-    CtGiven {} ->
-      do { traceTcS "checkTypeEq {" (vcat [ text "lhs:" <+> ppr lhs
-                                          , text "rhs:" <+> ppr rhs ])
-         ; check_result <- wrapTcS (checkTyEqRhs given_flags rhs)
-         ; traceTcS "checkTypeEq }" (ppr check_result)
-         ; case check_result of
-              PuFail reason -> return (PuFail reason)
-              PuOK prs redn -> do { new_givens <- mapBagM mk_new_given prs
-                                  ; emitWork new_givens
-                                  ; updInertSet (addCycleBreakerBindings prs)
-                                  ; return (pure redn) } }
-    CtWanted {} -> wrapTcS (checkTyEqRhs wanted_flags rhs)
-  where
-    wanted_flags :: TyEqFlags TcM Ct
-    wanted_flags = notUnifying_TEFTask occ_prob lhs
-                   -- checkTypeEq deals only with the non-unifying case
-
-    given_flags :: TyEqFlags TcM (TcTyVar, TcType)
-    given_flags = wanted_flags { tef_fam_app = mkTEFA_Break ev eq_rel BreakGiven }
-        -- TEFA_Break used for: [G] a ~ Maybe (F a)
-        --                   or [W] F a ~ Maybe (F a)
-
-    -- occ_prob: see Note [Occurs check and representational equality]
-    occ_prob = case eq_rel of
-                 NomEq  -> cteInsolubleOccurs
-                 ReprEq -> cteSolubleOccurs
-
-    ---------------------------
-    mk_new_given :: (TcTyVar, TcType) -> TcS Ct
-    mk_new_given (new_tv, fam_app)
-      = mkNonCanonical . CtGiven <$> newGivenEv cb_loc (given_pred, given_term)
-      where
-        new_ty     = mkTyVarTy new_tv
-        given_pred = mkNomEqPred fam_app new_ty
-        given_term = evCoercion $ mkNomReflCo new_ty  -- See Detail (4) of Note
-
-    -- See Detail (7) of the Note
-    cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
-
--------------------------
 -- | Fill in CycleBreakerTvs with the variables they stand for.
 -- See Note [Type equality cycles] in GHC.Tc.Solver.Equality
 restoreTyVarCycles :: InertSet -> TcM ()
@@ -2363,43 +2329,4 @@ restoreTyVarCycles is
 (a ~R# b a) is soluble if b later turns out to be Identity
 So we treat this as a "soluble occurs check".
 
-Note [Don't cycle-break Wanteds when not unifying]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consdier
-  [W] a[2] ~ Maybe (F a[2])
-
-Should we cycle-break this Wanted, thus?
-
-  [W] a[2] ~ Maybe delta[2]
-  [W] delta[2] ~ F a[2]
-
-For a start, this is dodgy because we might just unify delta, thus undoing
-what we have done, and getting an infinite loop in the solver.  Even if we
-somehow prevented ourselves from doing so, is there any merit in the split?
-Maybe: perhaps we can use that equality on `a` to unlock other constraints?
-Consider
-  type instance F (Maybe _) = Bool
-
-  [G] g1: a ~ Maybe Bool
-  [W] w1: a ~ Maybe (F a)
-
-If we loop-break w1 to get
-  [W] w1': a ~ Maybe gamma
-  [W] w3:  gamma ~ F a
-Now rewrite w3 with w1'
-  [W] w3':  gamma ~ F (Maybe gamma)
-Now use the type instance to get
-  gamma := Bool
-Now we are left with
-  [W] w1': a ~ Maybe Bool
-which we can solve from the Given.
-
-BUT in this situation we could have rewritten the
-/original/ Wanted from the Given, like this:
-  [W] w1': Maybe Bool ~ Maybe (F (Maybe Bool))
-and that is readily soluble.
-
-In short: loop-breaking Wanteds, when we aren't unifying,
-seems of no merit.  Hence TEFA_Recurse, rather than TEFA_Break,
-in `wanted_flags` in `checkTypeEq`.
 -}

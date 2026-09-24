@@ -3617,15 +3617,20 @@ instance Outputable SimpleUnifyResult where
 simpleUnifyCheck :: UnifyCheckCaller -> TcLevel -> TcTyVar -> TcType -> SimpleUnifyResult
 -- ^ A fast check for unification. May return "not sure", in which case
 -- unification might still be OK, but it'll take more work to do
--- (use the full 'checkTypeEq').
+-- (use the full 'checkTyEqRhs').
 --
--- * Rejects if lhs_tv occurs in rhs_ty (occurs check)
--- * Rejects foralls unless
---      lhs_tv is RuntimeUnk (used by GHCi debugger)
---          or is a QL instantiation variable
--- * Rejects a non-concrete type if lhs_tv is concrete
--- * Rejects type families unless fam_ok=True
--- * Does a level-check for type variables, to avoid skolem escape
+-- It returns SUC_CannotUnify for
+--   * Touchability failure
+--   * Top level-shape failure
+--
+-- It returns SUC_NotSure for
+--   * Occurs check: lhs_tv occurs in rhs_ty
+--   * Type families unless fam_ok=True
+--   * Foralls unless
+--        lhs_tv is RuntimeUnk (used by GHCi debugger)
+--            or is a QL instantiation variable
+--   * Concreteness: lhs_tv is concrete and rhs is a non-concrete type
+--   * Skolem-escape: a level-check for type variables, to avoid skolem escape
 --
 -- This function is pretty heavily used, so it's optimised not to allocate
 simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
@@ -4198,7 +4203,7 @@ famAppArgFlags flags = case flags of
 The key function `checkTyEqRhs ty_eq_flags rhs` is called on the
 RHS of a type equality
        lhs ~ rhs
-and checks to see if `rhs` satisfies, or can be made to satisfy,
+and checks to see if `rhs` satisfies, /or can be made to satisfy/,
 invariants described by `ty_eq_flags`.  It can succeded or fail; in
 the latter case it returns a `CheckTyEqResult` that describes why it
 failed.
@@ -4218,6 +4223,15 @@ Notably, it can check for things like:
       e.g  alpha[1] ~ (b[sk:2], Int)
   * Concreteness error
       e.g. alpha[conc] ~ r[sk]
+
+Note "or can be made to satisfy the preconditions"!  `checkTyEqRhs` may transform
+the RHS by
+
+  * Turning a type-family application into a type variable, perhaps to avoid
+    an occurs check.  See Note Note [Family applications in canonical constraints]
+
+  * Promoting any nested unification variables, in order to satisfy the
+    level invariant. See Note [Promotion and level-checking]
 
 Its specific behaviour is governed by the `TyEqFlags` that are passed
 to it; see Note [TyEqFlags].
@@ -4275,7 +4289,7 @@ NB: We never see a TyVarLHS here, such as
     [G] a ~ F tys here
 because we'd have swapped it to
    [G] F tys ~ a
-in canEqCanLHS2, before getting to checkTypeEq.
+in canEqCanLHS2, before getting to checkTyEqRhs.
 -}
 
 check_ty_eq_rhs :: forall m a
@@ -4799,7 +4813,6 @@ promote_meta_tyvar info dest_lvl occ_tv
 touchabilityTest :: TcLevel -> TcTyVar -> Bool
 -- ^ This is the key test for untouchability:
 -- See Note [Unification preconditions] in GHC.Tc.Utils.Unify
--- and Note [Solve by unification] in GHC.Tc.Solver.Equality
 --
 -- @True@ <=> the variable is touchable
 touchabilityTest given_eq_lvl tv
