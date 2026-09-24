@@ -1079,8 +1079,12 @@ runGHCi paths maybe_exprs = do
                             -- current progname in the exception text:
                             -- <progname>: <exception>
                             liftIO $ withProgName (progname st)
-                                   $ topHandler e
                                    -- this used to be topHandlerFastExit, see #2228
+                                   $ topHandler
+                                   -- The program's own context is already part of the
+                                   -- message (see toSerializableException). The rest
+                                   -- comes from GHC itself (#27847).
+                                   $ dropExceptionContext e
             runInputTWithPrefs defaultPrefs defaultSettings $ do
                 -- make `ghc -e` exit nonzero on failure, see #7962, #9916, #17560, #18441
                 _ <- runCommands' hdle

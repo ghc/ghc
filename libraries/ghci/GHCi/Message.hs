@@ -466,8 +466,7 @@ data LoadedDLL
 -- * UserInterrupt has a special meaning
 -- * In ghc -e, exitWith should exit with the appropriate exit code
 --
--- So all we need to do is distinguish UserInterrupt and ExitCode, and
--- all other exceptions can be represented by their 'show' string.
+-- So all we need to do is distinguish UserInterrupt and ExitCode.
 --
 data SerializableException
   = EUserInterrupt
