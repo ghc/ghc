@@ -1345,22 +1345,19 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,)
-       (AnnClassDecl
-        (EpTok
-         (EpaSpan { DumpSemis.hs:28:1-5 }))
-        []
-        []
-        (EpTok
-         (EpaSpan { <no location info> }))
-        (EpTok
-         (EpaSpan { DumpSemis.hs:28:40-44 }))
-        (AnnList
-         (EpVirtualBraces
-          (EpaSpan { DumpSemis.hs:29:3 }))
-         []))
-       (EpVirtualBraces
-        (EpaSpan { DumpSemis.hs:29:3 })))
+      (AnnClassDecl
+       (EpTok
+        (EpaSpan { DumpSemis.hs:28:1-5 }))
+       []
+       []
+       (EpTok
+        (EpaSpan { <no location info> }))
+       (EpTok
+        (EpaSpan { DumpSemis.hs:28:40-44 }))
+       (AnnList
+        (EpVirtualBraces
+         (EpaSpan { DumpSemis.hs:29:3 }))
+        []))
       []
       (Nothing)
       (L
