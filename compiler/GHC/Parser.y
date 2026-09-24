@@ -1322,8 +1322,8 @@ topdecl :: { LHsDecl GhcPs }
 --
 cl_decl :: { LTyClDecl GhcPs }
         : 'class' tycl_hdr fds where_cls
-                {% do { let {(wtok, al) = fstOf3 $ unLoc $4}
-                      ; mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4)
+                {% do { let {(wtok, al) = fst $ unLoc $4}
+                      ; mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (snd $ unLoc $4)
                         (AnnClassDecl (epTok $1) [] [] (fst $ unLoc $3) wtok al) }}
 
 -- Default declarations (toplevel)
@@ -1851,26 +1851,23 @@ decls_cls :: { Located ([EpToken ";"],OrdList (LHsDecl GhcPs)) }  -- Reversed
 
 decllist_cls
         :: { Located ( AnnList
-                     , OrdList (LHsDecl GhcPs)
-                     , EpLayout) }      -- Reversed
+                     , OrdList (LHsDecl GhcPs)) }      -- Reversed
         : '{'         decls_cls '}'     { let { L l (anns, decls) = $2
                                               ; epe = epExplicitBraces $1 $3 }
-                                           in sLL $1 $> (AnnList epe anns, decls, epe) }
+                                           in sLL $1 $> (AnnList epe anns, decls) }
         |     vocurly decls_cls close   { let { L l (anns, decls) = $2
                                               ; epv = (epVirtualBraces (glR $1) $2) }
-                                           in sL1 $2 (AnnList epv anns, decls, epv) }
+                                           in sL1 $2 (AnnList epv anns, decls) }
 
 -- Class body
 --
 where_cls :: { Located ( (EpToken "where", AnnList)
-                       , Located (OrdList (LHsDecl GhcPs))    -- Reversed
-                       , EpLayout) }
+                       , Located (OrdList (LHsDecl GhcPs)) ) } -- Reversed
                                 -- No implicit parameters
                                 -- May have type declarations
-        : 'where' decllist_cls          { sLL $1 $> ((epTok $1,fstOf3 $ unLoc $2)
-                                                    , sL1 $2 (sndOf3 $ unLoc $2)
-                                                    , thdOf3 $ unLoc $2) }
-        | {- empty -}                   { noLoc ((noAnn, noAnn),noLoc nilOL,EpNoLayout) }
+        : 'where' decllist_cls          { sLL $1 $> ((epTok $1,fst $ unLoc $2)
+                                                    , sL1 $2 (snd $ unLoc $2)) }
+        | {- empty -}                   { noLoc ((noAnn, noAnn),noLoc nilOL) }
 
 -- Declarations in instance bodies
 --
