@@ -2225,6 +2225,7 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
                       PuFail reason
                         | Just can_rhs <- canTyFamEqLHS_maybe rhs
                         -> swap_and_finish lhs_tv can_rhs -- See Note [Orienting TyVarLHS/TyFamLHS]
+{-
                         | reason `cterHasOnlyProblems` do_not_prevent_rewriting
                         ->
                           -- ContinueWith, to allow using this constraint for
@@ -2234,6 +2235,7 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
                                  EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
                                       , eq_lhs = lhs , eq_rhs = rhs }
                              }
+-}
                         | otherwise
                         -> try_irred reason
                   }
@@ -2321,13 +2323,15 @@ canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
 --              -> swapAndFinish ev eq_rel swapped lhs_ty can_rhs
 --              | otherwise
 
+{-
               | reason `cterHasOnlyProblems` do_not_prevent_rewriting
               -> do { new_ev <- rewriteEqEvidenceSwapOnly ev eq_rel swapped lhs rhs
                     ; continueWith $ Right $
                         EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
                              , eq_lhs = lhs , eq_rhs = rhs }
                     }
-
+-}
+       
               | otherwise
               -> tryIrredInstead reason ev eq_rel swapped lhs rhs
 
@@ -2354,9 +2358,11 @@ canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
 --
 -- Concrete-ness:  alpha[conc] ~ b[sk]
 --    We can use it to rewrite; we still have to solve the original
+{-
 do_not_prevent_rewriting :: CheckTyEqResult
 do_not_prevent_rewriting = cteProblem cteSkolemEscape S.<>
                            cteProblem cteConcrete
+-}
 
 ----------------------
 swapAndFinish :: CtEvidence -> EqRel -> SwapFlag
