@@ -1,5 +1,10 @@
 module System.Mem.Experimental
-  ( setGlobalAllocationLimitHandler
+  (
+  -- *  Garbage collection
+    performDeadlockDetection
+
+  -- *  Allocation counter and limits
+  , setGlobalAllocationLimitHandler
   , AllocationLimitKillBehaviour(..)
   , getAllocationCounterFor
   , setAllocationCounterFor
@@ -8,3 +13,4 @@ module System.Mem.Experimental
   )
   where
 import GHC.Internal.AllocationLimitHandler
+import GHC.Internal.System.Mem
