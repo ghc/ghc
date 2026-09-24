@@ -288,10 +288,10 @@ ghc_env = os.environ.copy()
 class TestResult:
     """
     A result from the execution of a test. These live in the expected_passes,
-    framework_failures, framework_warnings, unexpected_passes,
+    expected_failures, framework_failures, framework_warnings, unexpected_passes,
     unexpected_failures, unexpected_stat_failures lists of TestRun.
     """
-    __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr', 'diff'
+    __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr', 'diff', 'runtime'
     def __init__(self,
                  directory: str,
                  testname: TestName,
@@ -299,7 +299,8 @@ class TestResult:
                  way: WayName,
                  stdout: Optional[str]=None,
                  stderr: Optional[str]=None,
-                 diff: Optional[str]=None) -> None:
+                 diff: Optional[str]=None,
+                 runtime: Optional[float]=None) -> None:
         self.directory = directory
         self.testname = testname
         self.reason = reason
@@ -307,6 +308,7 @@ class TestResult:
         self.stdout = stdout
         self.stderr = stderr
         self.diff = diff
+        self.runtime = runtime # Walltime
 
 # A performance metric measured in this test run.
 PerfMetric = NamedTuple('PerfMetric',
@@ -322,13 +324,12 @@ class TestRun:
 
        self.n_tests_skipped = 0
        self.n_missing_libs = 0
-       self.n_expected_passes = 0
-       self.n_expected_failures = 0
 
        self.framework_failures = [] # type: List[TestResult]
        self.framework_warnings = [] # type: List[TestResult]
 
        self.expected_passes = [] # type: List[TestResult]
+       self.expected_failures = [] # type: List[TestResult]
        self.unexpected_passes = [] # type: List[TestResult]
        self.unexpected_failures = [] # type: List[TestResult]
        self.unexpected_stat_failures = [] # type: List[TestResult]

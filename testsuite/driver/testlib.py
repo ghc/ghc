@@ -1706,13 +1706,15 @@ async def test_common_work(name: TestName, opts,
         for way in do_ways:
             if stopping():
                 break
+            start = time.monotonic()
             try:
                 await do_test(name, way, func, args, files)
             except KeyboardInterrupt:
                 stopNow()
             except Exception as e:
                 traceback.print_exc()
-                framework_fail(name, way, traceback.format_exc())
+                framework_fail(name, way, traceback.format_exc(),
+                               runtime=time.monotonic() - start)
 
         t.n_tests_skipped += len(set(all_ways) - set(do_ways))
         if getTestOpts().expect == 'missing-lib': t.n_missing_libs += 1
@@ -1738,6 +1740,7 @@ async def do_test(name: TestName,
             files: Set[str]
             ) -> None:
     opts = getTestOpts()
+    start = time.monotonic()
 
     full_name = name + '(' + way + ')'
     test_n = len(allTestNames)
@@ -1787,7 +1790,8 @@ async def do_test(name: TestName,
                 pass
             else:
                 framework_fail(name, way,
-                    'extra_file does not exist: ' + extra_file)
+                    'extra_file does not exist: ' + extra_file,
+                    runtime=time.monotonic() - start)
 
     if func.__name__ == 'run_command' or func.__name__ == 'makefile_test' or opts.pre_cmd:
         # When running 'MAKE' make sure 'TOP' still points to the
@@ -1811,7 +1815,8 @@ async def do_test(name: TestName,
 
         # If user used expect_broken then don't record failures of pre_cmd
         if exit_code != 0 and opts.expect not in ['fail']:
-            framework_fail(name, way, 'pre_cmd failed: {0}'.format(exit_code))
+            framework_fail(name, way, 'pre_cmd failed: {0}'.format(exit_code),
+                           runtime=time.monotonic() - start)
             if_verbose(1, '** pre_cmd was "{0}".'.format(override_options(opts.pre_cmd)))
             stderr_contents = stderr_path.read_text(encoding='UTF-8', errors='replace')
             stdout_contents = stdout_path.read_text(encoding='UTF-8', errors='replace')
@@ -1821,45 +1826,54 @@ async def do_test(name: TestName,
             return
 
     result = await func(*[name,way] + args)
+    runtime = time.monotonic() - start
 
     if opts.expect not in ['pass', 'fail', 'missing-lib']:
-        framework_fail(name, way, 'bad expected ' + opts.expect)
+        framework_fail(name, way, 'bad expected ' + opts.expect, runtime=runtime)
 
     directory = _result_directory(opts)
 
     if way in opts.fragile_ways:
         if_verbose(1, '*** fragile test %s resulted in %s' % (full_name, 'pass' if result.passed else 'fail'))
         if result.passed:
-            t.fragile_passes.append(TestResult(directory, name, 'fragile', way))
+            t.fragile_passes.append(TestResult(directory, name, 'fragile', way,
+                                               runtime=runtime))
         else:
             reason = '%s (fragile)' % result.reason if result.reason else 'fragile'
             t.fragile_failures.append(TestResult(directory, name, reason, way,
                                                  stdout=result.stdout,
                                                  stderr=result.stderr,
-                                                 diff=result.diff))
+                                                 diff=result.diff,
+                                                 runtime=runtime))
     elif result.passed:
         if _expect_pass(way):
-            t.expected_passes.append(TestResult(directory, name, "", way))
-            t.n_expected_passes += 1
+            t.expected_passes.append(TestResult(directory, name, "", way,
+                                                runtime=runtime))
         else:
             if_verbose(1, '*** unexpected pass for %s' % full_name)
-            t.unexpected_passes.append(TestResult(directory, name, 'unexpected', way))
+            t.unexpected_passes.append(TestResult(directory, name, 'unexpected', way,
+                                                  runtime=runtime))
     else:
         if _expect_pass(way):
             reason = result.reason
             tag = result.tag
             if tag == 'stat':
                 if_verbose(1, '*** unexpected stat test failure for %s' % full_name)
-                t.unexpected_stat_failures.append(TestResult(directory, name, reason, way))
+                t.unexpected_stat_failures.append(TestResult(directory, name, reason, way,
+                                                             runtime=runtime))
             else:
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
                 tr = TestResult(directory, name, reason, way,
                                 stdout=result.stdout,
                                 stderr=result.stderr,
-                                diff=result.diff)
+                                diff=result.diff,
+                                runtime=runtime)
                 t.unexpected_failures.append(tr)
         else:
-            t.n_expected_failures += 1
+            # Only keep the reason: nothing reports the output of expected
+            # failures.
+            t.expected_failures.append(TestResult(directory, name, result.reason, way,
+                                                  runtime=runtime))
 
 # Make is often invoked with -s, which means if it fails, we get
 # no feedback at all. This is annoying. So let's remove the option
@@ -1873,7 +1887,8 @@ def override_options(pre_cmd):
 
     return pre_cmd
 
-def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str) -> None:
+def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str,
+                   runtime: Optional[float]=None) -> None:
     opts = getTestOpts()
     # framework_fail can be called before testdir is initialised,
     # so we need to take care not to blow up with the wrong way
@@ -1888,7 +1903,8 @@ def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str
     way2 = way if way is not None else WayName('none')
     if way not in opts.fragile_ways:
         # If the test is fragile then we rather report this as a fragile test failure
-        t.framework_failures.append(TestResult(directory, name2, reason, way2))
+        t.framework_failures.append(TestResult(directory, name2, reason, way2,
+                                               runtime=runtime))
 
 def framework_warn(name: TestName, way: WayName, reason: str) -> None:
     opts = getTestOpts()
@@ -3649,9 +3665,9 @@ def summary(t: TestRun, file: TextIO, color=False, junit_path: Optional[Path]=No
                + repr(t.n_missing_libs).rjust(8)
                + ' had missing libraries\n'
                + '\n'
-               + repr(t.n_expected_passes).rjust(8)
+               + repr(len(t.expected_passes)).rjust(8)
                + ' expected passes\n'
-               + repr(t.n_expected_failures).rjust(8)
+               + repr(len(t.expected_failures)).rjust(8)
                + ' expected failures\n'
                + '\n'
                + repr(len(t.framework_failures)).rjust(8)
