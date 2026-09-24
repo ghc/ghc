@@ -1367,13 +1367,8 @@ It's surprisingly subtle.
   application; see test `T27627f`.
 
 TL;DR: we play safe: we never make an absent filler for any /constraint-kinded/ type,
-using `isPredTy` to decide.
-
-  * `mkAbsentFiller` returns `Nothing` for any constraint type, so worker/wrapper
-    keeps the real argument.
-
-  * `Specialise.specHeader` calls `mkAbsentFiller` too, so it likewise keeps the
-    dead dictionary argument rather than dropping it for a filler.
+using `isPredTy` to decide: `mkAbsentFiller` returns `Nothing` for any constraint
+type, so worker/wrapper keeps the real argument.
 
 Prior failed approaches
 
