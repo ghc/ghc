@@ -696,6 +696,7 @@ extern char **environ;
       SymI_HasProto(performGC)                                          \
       SymI_HasProto(performMajorGC)                                     \
       SymI_HasProto(performBlockingMajorGC)                             \
+      SymI_HasProto(performDeadlockDetection)                           \
       SymI_HasProto(prog_argc)                                          \
       SymI_HasProto(prog_argv)                                          \
       SymI_HasDataProto(stg_putMVarzh)                                      \

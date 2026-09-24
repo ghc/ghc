@@ -290,6 +290,7 @@ void setAllocLimitKill(bool, bool);
 void performGC(void);
 void performMajorGC(void);
 void performBlockingMajorGC(void);
+void performDeadlockDetection(void); // Implemented as a mode of major GC
 
 /* -----------------------------------------------------------------------------
    The CAF table - used to let us revert CAFs in GHCi
