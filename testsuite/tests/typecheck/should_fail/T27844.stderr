@@ -1,0 +1,12 @@
+T27844.hs:14:22: error: [GHC-25897]
+    • Couldn't match expected type ‘(b, F c)’ with actual type ‘c’
+      ‘c’ is a rigid type variable bound by
+        the inferred type of g :: Show c => c -> ()
+        at T27844.hs:14:1-34
+    • In the first argument of ‘const’, namely ‘x’
+      In the expression: const x (show x)
+      In the first argument of ‘f’, namely ‘(\ _ -> const x (show x))’
+    • Relevant bindings include
+        x :: c (bound at T27844.hs:14:3)
+        g :: c -> () (bound at T27844.hs:14:1)
+

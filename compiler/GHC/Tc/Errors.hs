@@ -581,7 +581,6 @@ mkErrorItem ct
                            CtGiven {}                               -> Nothing
                            CtWanted (WantedCt { ctev_dest = dest }) -> Just dest
 
-
              m_reason = case ct of
                 CIrredCan (IrredCt { ir_reason = reason }) -> Just reason
                 _                                          -> Nothing

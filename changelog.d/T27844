@@ -1,0 +1,9 @@
+section: compiler
+issues: #27844
+mrs: !16723
+synopsis:
+  Reinstate a missing occurs check in the constraint solver
+description:
+  Simplifies code in GHC's type-constraint solver, thereby fixing an outright
+  compiler loop (via a missing occurs check).
+
