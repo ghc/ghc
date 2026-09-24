@@ -22,7 +22,7 @@ module GHC.Tc.Solver.InertSet (
     InertEqs,
     foldTyEqs, delEq, findEq,
     partitionInertEqs, partitionFunEqs, transformAndPartitionTyVarEqs,
-    filterInertEqs, filterFunEqs,
+    filterInertEqs, filterFunEqs, transformAndPartitionFunEqs,
     foldFunEqs, addEqToCans,
 
     -- * Inert Dicts
@@ -128,7 +128,7 @@ Further refinements:
 
 * Among the equalities we prioritise ones with an empty rewriter set;
   see Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint,
-  wrinkle (WRW8).
+  wrinkle (WRW7).
 
 * Among equalities with an empty rewriter set, we prioritise nominal equalities.
    * They have more rewriting power, so doing them first is better.
@@ -983,7 +983,7 @@ How do we establish these conditions?
     with S(fw,_).
 
   * (T3) is guaranteed by an occurs-check on the work item.
-    This is done during canonicalisation, in checkTypeEq; invariant
+    This is done during canonicalisation, in checkTyEqRhs; invariant
     (TyEq:OC) of CEqCan. See also Note [EqCt occurs check] in GHC.Tc.Types.Constraint.
 
   * (T4) is established by GHC.Tc.Solver.Monad.kickOutRewritable.  If the inert
@@ -1421,6 +1421,19 @@ addCanFunEq old_eqs fun_tc fun_args ct
 
 foldFunEqs :: (EqCt -> b -> b) -> FunEqMap EqualCtList -> b -> b
 foldFunEqs k fun_eqs z = foldTcAppMap (\eqs z -> foldr k z eqs) fun_eqs z
+
+transformAndPartitionFunEqs
+  :: (EqCt -> Either EqCt EqCt)         -- Left => chuck out, Right => keep
+  -> InertFunEqs
+  -> ([EqCt], InertFunEqs)               -- (chuck-out, keep)
+transformAndPartitionFunEqs pred orig_inerts
+  = foldFunEqs folder orig_inerts ([], emptyFunEqs)
+  where
+    folder :: EqCt -> ([EqCt], InertFunEqs) -> ([EqCt], InertFunEqs)
+    folder eq_ct (acc_true, acc_false)
+      = case pred eq_ct of
+           Left eq_ct'  -> (eq_ct' : acc_true, acc_false)
+           Right eq_ct' -> (acc_true, addFunEqs eq_ct' acc_false)
 
 partitionFunEqs :: (EqCt -> Bool)    -- EqCt will have a TyFamLHS
                 -> InertFunEqs
