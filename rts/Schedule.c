@@ -2700,7 +2700,7 @@ freeScheduler( void )
    -------------------------------------------------------------------------- */
 
 static void
-performGC_(bool force_major, bool nonconcurrent)
+performGC_(bool force_major, bool deadlock_detect, bool nonconcurrent)
 {
     Task *task;
     Capability *cap = NULL;
@@ -2713,7 +2713,7 @@ performGC_(bool force_major, bool nonconcurrent)
     // TODO: do we need to traceTask*() here?
 
     waitForCapability(&cap,task);
-    scheduleDoGC(&cap,task,force_major,false,false,nonconcurrent);
+    scheduleDoGC(&cap,task,force_major,false,deadlock_detect,nonconcurrent);
     releaseCapability(cap);
     exitMyTask();
 }
@@ -2721,19 +2721,33 @@ performGC_(bool force_major, bool nonconcurrent)
 void
 performGC(void)
 {
-    performGC_(false, false);
+    performGC_(false  /*force_major*/,
+               false  /*deadlock_detect*/,
+               false  /*nonconcurrent*/);
 }
 
 void
 performMajorGC(void)
 {
-    performGC_(true, false);
+    performGC_(true  /*force_major*/,
+               false /*deadlock_detect*/,
+               false /*nonconcurrent*/);
 }
 
 void
 performBlockingMajorGC(void)
 {
-    performGC_(true, true);
+    performGC_(true  /*force_major*/,
+               false /*deadlock_detect*/,
+               true  /*nonconcurrent*/);
+}
+
+void
+performDeadlockDetection(void)
+{
+    performGC_(true  /*force_major*/,
+               true  /*deadlock_detect*/,
+               false /*nonconcurrent*/);
 }
 
 /* ---------------------------------------------------------------------------
