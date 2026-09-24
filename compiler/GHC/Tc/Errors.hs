@@ -478,6 +478,7 @@ mkErrorItem ct
 
              -- For this `suppress` stuff see
              -- Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
+             -- especially (WRW8)
              (suppress, m_evdest) = case ctEvidence ct of
                      CtGiven {} -> (False, Nothing)
                      CtWanted (WantedCt { ctev_rewriters = rws, ctev_dest = dest })

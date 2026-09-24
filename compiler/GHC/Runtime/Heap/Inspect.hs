@@ -630,7 +630,7 @@ be sigmas and not taus.
 ~~~~~~~~~~~~~~~~~~~~~~
 In the GHCi debugger we use unification variables whose MetaInfo is
 RuntimeUnkTv.  The special property of a RuntimeUnkTv is that it can
-unify with a polytype (see GHC.Tc.Utils.Unify.checkTypeEq).
+unify with a polytype (see GHC.Tc.Solver.Equality.checkTypeEqNoUnification).
 If we don't do this `:print <term>` will fail if the type of <term>
 has nested `forall`s or `=>`s.
 
