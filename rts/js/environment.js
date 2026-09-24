@@ -397,6 +397,10 @@ function h$performBlockingMajorGC() {
     h$performMajorGC();
 }
 
+function h$performDeadlockDetection() {
+    h$performMajorGC();
+}
+
 function h$ghczminternalZCSystemziCPUTimeZCgetrusage() {
   return 0;
 }
