@@ -646,7 +646,7 @@ splitContArgs cont@(CastIt { sc_cont = cont1 })
        ; return (cont { sc_cont = inner }, outer) }
 splitContArgs outer
   | contIsStop outer = Nothing
-  | otherwise        = pprTrace "splitContHoleType" (ppr hole_ty) $
+  | otherwise        = -- pprTrace "splitContHoleType" (ppr hole_ty) $
                        return (mkBoringStop hole_ty, outer)
   where
     hole_ty = contHoleType outer
