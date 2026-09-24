@@ -1,0 +1,11 @@
+name: dep-public
+version: 1
+id: dep-public-1-XXX
+key: dep-public-1-XXX
+visibility:           public
+abi: inplace
+exposed-modules:      DepPublic
+depends:
+import-dirs: ${pkgroot}/dep-public/outdir
+library-dirs: ${pkgroot}/dep-public/outdir
+include-dirs:
