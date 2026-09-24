@@ -3729,7 +3729,7 @@ instance ExactPrint (TyClDecl GhcPs) where
 
   -- -----------------------------------
 
-  exact (ClassDecl {tcdCExt = (AnnClassDecl c ops cps vb w al, lo),
+  exact (ClassDecl {tcdCExt = AnnClassDecl c ops cps vb w al,
                     tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
@@ -3741,7 +3741,7 @@ instance ExactPrint (TyClDecl GhcPs) where
       = do
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
           (al',_) <- markAnnListA al $ return ()
-          return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' al', lo),
+          return (ClassDecl {tcdCExt = AnnClassDecl c' [] [] vb' w' al',
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
@@ -3752,7 +3752,7 @@ instance ExactPrint (TyClDecl GhcPs) where
       = do
           (mods', c', w', vb', fds', lclas', tyvars',context') <- top_matter
           (L ld' (List al' decls')) <- markAnnotated (L ld (List al (filter notDocDecl decls)))
-          return (ClassDecl {tcdCExt = (AnnClassDecl c' [] [] vb' w' al', lo),
+          return (ClassDecl {tcdCExt = AnnClassDecl c' [] [] vb' w' al',
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',

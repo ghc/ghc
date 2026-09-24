@@ -372,7 +372,7 @@ data DataDeclRn = DataDeclRn
              , tcdFVs      :: NameSet }
   deriving Data
 
-type instance XClassDecl    GhcPs = (AnnClassDecl, EpLayout) -- See Note [Class EpLayout]
+type instance XClassDecl    GhcPs = AnnClassDecl -- See Note [Class EpLayout]
 type instance XClassDecl    GhcRn = (HsNestedGroup GhcRn, NameSet) -- decls, FVs
 type instance XClassDecl    GhcTc = (HsNestedGroup GhcTc, NameSet) -- decls, FVs
 

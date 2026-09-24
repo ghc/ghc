@@ -314,20 +314,18 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,)
-       (AnnClassDecl
-        (EpTok
-         (EpaSpan { Test24533.hs:11:1-5 }))
-        []
-        []
-        (EpTok
-         (EpaSpan { <no location info> }))
-        (EpTok
-         (EpaSpan { <no location info> }))
-        (AnnList
-         (EpNoLayout)
-         []))
-       (EpNoLayout))
+      (AnnClassDecl
+       (EpTok
+        (EpaSpan { Test24533.hs:11:1-5 }))
+       []
+       []
+       (EpTok
+        (EpaSpan { <no location info> }))
+       (EpTok
+        (EpaSpan { <no location info> }))
+       (AnnList
+        (EpNoLayout)
+        []))
       []
       (Nothing)
       (L
@@ -972,20 +970,18 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,)
-       (AnnClassDecl
-        (EpTok
-         (EpaSpan { Test24533.ppr.hs:4:1-5 }))
-        []
-        []
-        (EpTok
-         (EpaSpan { <no location info> }))
-        (EpTok
-         (EpaSpan { <no location info> }))
-        (AnnList
-         (EpNoLayout)
-         []))
-       (EpNoLayout))
+      (AnnClassDecl
+       (EpTok
+        (EpaSpan { Test24533.ppr.hs:4:1-5 }))
+       []
+       []
+       (EpTok
+        (EpaSpan { <no location info> }))
+       (EpTok
+        (EpaSpan { <no location info> }))
+       (AnnList
+        (EpNoLayout)
+        []))
       []
       (Nothing)
       (L
