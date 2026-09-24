@@ -13642,6 +13642,7 @@ module System.Mem.Experimental where
   disableAllocationLimitFor :: GHC.Internal.Conc.Sync.ThreadId -> GHC.Internal.Types.IO ()
   enableAllocationLimitFor :: GHC.Internal.Conc.Sync.ThreadId -> GHC.Internal.Types.IO ()
   getAllocationCounterFor :: GHC.Internal.Conc.Sync.ThreadId -> GHC.Internal.Types.IO GHC.Internal.Int.Int64
+  performDeadlockDetection :: GHC.Internal.Types.IO ()
   setAllocationCounterFor :: GHC.Internal.Int.Int64 -> GHC.Internal.Conc.Sync.ThreadId -> GHC.Internal.Types.IO ()
   setGlobalAllocationLimitHandler :: AllocationLimitKillBehaviour -> GHC.Internal.Maybe.Maybe (GHC.Internal.Conc.Sync.ThreadId -> GHC.Internal.Types.IO ()) -> GHC.Internal.Types.IO ()
 
