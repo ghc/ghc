@@ -1,0 +1,31 @@
+# DO NOT DELETE: Beginning of Haskell dependencies
+E.o : E.hs
+E.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/Prelude.hi
+E.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/GHC/Essentials.hi
+E.o : dep-public/outdir/DepPublic.hi
+E.o : dep/outdir/Dep.hi
+E.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/template-haskell-2.25.0.0-inplace/Language/Haskell/TH/Syntax.hi
+C.o-boot : C.hs-boot
+C.o : C.hi-boot
+C.o-boot : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/Prelude.hi
+C.o-boot : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/GHC/Essentials.hi
+C.o-boot : E.hi
+A.o : A.hs
+A.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/Prelude.hi
+A.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/GHC/Essentials.hi
+A.o : C.hi-boot
+C.o : C.hs
+C.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/Prelude.hi
+C.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/GHC/Essentials.hi
+C.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/containers-0.8-inplace/Data/Set.hi
+C.o : A.hi
+lib/B.o : lib/B.hs
+lib/B.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/Prelude.hi
+lib/B.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/GHC/Essentials.hi
+lib/B.o : A.hi
+D.o : D.hs
+D.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/Prelude.hi
+D.o : /home/hugin/Documents/haskell/ghc-homes/ghc-dep-json/_build/stage1/lib/../lib/x86_64-linux-ghc-10.1.20260917-inplace/base-4.23.0.0-inplace/GHC/Essentials.hi
+D.o : C.hi
+D.o : lib/B.hi
+# DO NOT DELETE: End of Haskell dependencies
