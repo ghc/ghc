@@ -363,15 +363,20 @@ test('T13379',
 # (though the size of the fluctuations does perhaps suggest that it
 # would be valuable to solve the pathology in a more general way).
 
+# Note [MultiLayerModules* test timeout]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# These tests are relatively sensitive to system load and cane
+# take a while to run. This caused a fair number of CI failures
+# in the past. So we give them some headroom.
+# We need to ensure to use the right timeout for those test. In the past
+# we used the compile timeout for the GHCi versions by accident.
+
 test('MultiLayerModules',
      [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('./genMultiLayerModules'),
        extra_files(['genMultiLayerModules']),
+       # See Note [MultiLayerModules* test timeout]
        compile_timeout_multiplier(5)
-       # this is _a lot_
-       # but this test has been failing every now and then,
-       # especially on i386. Let's just give it some room
-       # to complete successfully reliably everywhere.
      ],
      multimod_compile,
      # see Note [Increased initial stack size for MultiLayerModules]
@@ -382,11 +387,8 @@ test('MultiLayerModulesRecomp',
      [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('$MAKE -s --no-print-directory MultiModulesRecomp'),
        extra_files(['genMultiLayerModules']),
+       # See Note [MultiLayerModules* test timeout]
        compile_timeout_multiplier(5)
-       # this is _a lot_
-       # but this test has been failing every now and then,
-       # especially on i386. Let's just give it some room
-       # to complete successfully reliably everywhere.
      ],
      multimod_compile,
      # see Note [Increased initial stack size for MultiLayerModules]
@@ -398,6 +400,7 @@ test('MultiLayerModulesTH_Make',
      [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('$MAKE -s --no-print-directory MultiLayerModulesTH_Make_Prep'),
        extra_files(['genMultiLayerModulesTH']),
+       # See Note [MultiLayerModules* test timeout]
        compile_timeout_multiplier(5),
        when(arch('wasm32'), fragile(25336)),
        # We skip the test on darwin due to recent regression due to toolchain
@@ -413,6 +416,7 @@ test('MultiLayerModulesTH_OneShot',
      [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('$MAKE -s --no-print-directory MultiLayerModulesTH_OneShot_Prep'),
        extra_files(['genMultiLayerModulesTH']),
+       # See Note [MultiLayerModules* test timeout]
        compile_timeout_multiplier(5),
        when(arch('wasm32'), fragile(25336)),
        # We skip the test on darwin due to recent regression due to toolchain
@@ -427,11 +431,8 @@ test('MultiLayerModulesDefsGhci',
      [ collect_compiler_residency(15),
        pre_cmd('./genMultiLayerModulesDefs'),
        extra_files(['genMultiLayerModulesDefs']),
-       compile_timeout_multiplier(5)
-       # this is _a lot_
-       # but this test has been failing every now and then,
-       # especially on i386. Let's just give it some room
-       # to complete successfully reliably everywhere.
+       # See Note [MultiLayerModules* test timeout]
+       run_timeout_multiplier(5)
      ],
      ghci_script,
      ['MultiLayerModulesDefsGhci.script'])
@@ -440,11 +441,9 @@ test('MultiLayerModulesDefsGhciWithCore',
      [ collect_compiler_residency(15),
        pre_cmd('$MAKE -s --no-print-directory MultiModulesRecompDefsWithCore'),
        extra_files(['genMultiLayerModulesCore', 'MultiLayerModulesDefsGhciWithCore.script']),
-       compile_timeout_multiplier(5),
-       # this is _a lot_
-       # but this test has been failing every now and then,
-       # especially on i386. Let's just give it some room
-       # to complete successfully reliably everywhere.
+       # See Note [MultiLayerModules* test timeout]
+       pre_cmd_timeout_multiplier(5),
+       run_timeout_multiplier(5),
        extra_run_opts('-fwrite-if-simplified-core MultiLayerModules')
      ],
      ghci_script,
@@ -454,11 +453,9 @@ test('MultiLayerModulesDefsGhciWithBytecodeFiles',
      [ collect_compiler_residency(15),
        pre_cmd('$MAKE -s --no-print-directory MultiModulesRecompDefsWithBytecodeFiles'),
        extra_files(['genMultiLayerModulesCore', 'MultiLayerModulesDefsGhciWithBytecodeFiles.script']),
-       compile_timeout_multiplier(5),
-       # this is _a lot_
-       # but this test has been failing every now and then,
-       # especially on i386. Let's just give it some room
-       # to complete successfully reliably everywhere.
+       # See Note [MultiLayerModules* test timeout]
+       pre_cmd_timeout_multiplier(5),
+       run_timeout_multiplier(5),
        extra_run_opts('-fwrite-byte-code MultiLayerModules')
      ],
      ghci_script,
@@ -468,11 +465,8 @@ test('MultiLayerModulesDefsGhcWithCore',
      [ collect_compiler_residency(15),
        pre_cmd('$MAKE -s --no-print-directory MultiModulesDefsWithCore'),
        extra_files(['genMultiLayerModulesCore']),
+       # See Note [MultiLayerModules* test timeout]
        compile_timeout_multiplier(5)
-       # this is _a lot_
-       # but this test has been failing every now and then,
-       # especially on i386. Let's just give it some room
-       # to complete successfully reliably everywhere.
      ],
      multimod_compile,
      ['MultiLayerModules', '-v0 -fwrite-if-simplified-core'])
@@ -481,11 +475,8 @@ test('MultiLayerModulesDefsGhciReload',
      [ collect_compiler_residency(15),
        pre_cmd('./genMultiLayerModulesDefs'),
        extra_files(['genMultiLayerModulesDefs']),
-       compile_timeout_multiplier(10)
-       # this is _a lot_
-       # but this test has been failing every now and then,
-       # especially on i386. Let's just give it some room
-       # to complete successfully reliably everywhere.
+       # See Note [MultiLayerModules* test timeout]
+       run_timeout_multiplier(5)
      ],
      ghci_script,
      ['MultiLayerModulesDefsGhciReload.script'])
@@ -504,11 +495,8 @@ test('InstanceMatching1',
      [ collect_compiler_stats('bytes allocated',3),
        pre_cmd('./genMatchingTest 1'),
        extra_files(['genMatchingTest']),
+       # See Note [MultiLayerModules* test timeout]
        compile_timeout_multiplier(5)
-       # this is _a lot_
-       # but this test has been failing every now and then,
-       # especially on i386. Let's just give it some room
-       # to complete successfully reliably everywhere.
      ],
      multimod_compile,
      ['Defs', '-fno-code -fwrite-interface -v0'])
@@ -518,11 +506,8 @@ test('MultiLayerModulesNoCode',
      [ collect_compiler_residency(15),
        pre_cmd('./genMultiLayerModulesNoCode'),
        extra_files(['genMultiLayerModulesNoCode']),
-       compile_timeout_multiplier(5)
-       # this is _a lot_
-       # but this test has been failing every now and then,
-       # especially on i386. Let's just give it some room
-       # to complete successfully reliably everywhere.
+       # See Note [MultiLayerModules* test timeout]
+       run_timeout_multiplier(5)
      ],
      ghci_script,
      ['MultiLayerModulesNoCode.script'])
