@@ -414,22 +414,19 @@
     (TyClD
      (NoExtField)
      (ClassDecl
-      ((,)
-       (AnnClassDecl
-        (EpTok
-         (EpaSpan { T17544_kw.hs:19:1-5 }))
-        []
-        []
-        (EpTok
-         (EpaSpan { <no location info> }))
-        (EpTok
-         (EpaSpan { T17544_kw.hs:21:3-7 }))
-        (AnnList
-         (EpVirtualBraces
-          (EpaSpan { T17544_kw.hs:22:5 }))
-         []))
-       (EpVirtualBraces
-        (EpaSpan { T17544_kw.hs:22:5 })))
+      (AnnClassDecl
+       (EpTok
+        (EpaSpan { T17544_kw.hs:19:1-5 }))
+       []
+       []
+       (EpTok
+        (EpaSpan { <no location info> }))
+       (EpTok
+        (EpaSpan { T17544_kw.hs:21:3-7 }))
+       (AnnList
+        (EpVirtualBraces
+         (EpaSpan { T17544_kw.hs:22:5 }))
+        []))
       []
       (Nothing)
       (L
