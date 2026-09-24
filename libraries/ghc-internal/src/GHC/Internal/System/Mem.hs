@@ -19,9 +19,10 @@ module GHC.Internal.System.Mem
        (
        -- * Garbage collection
          performGC
+       , performMinorGC
        , performMajorGC
        , performBlockingMajorGC
-       , performMinorGC
+       , performDeadlockDetection
 
         -- * Allocation counter and limits
         , setAllocationCounter
@@ -52,3 +53,16 @@ foreign import ccall "performBlockingMajorGC" performBlockingMajorGC :: IO ()
 --
 -- @since base-4.7.0.0
 foreign import ccall "performGC" performMinorGC :: IO ()
+
+-- | Triggers an immediate major garbage collection in deadlock detection mode.
+-- This will detect any threads that are deadlocked and throw asynchronous
+-- exceptions to them.
+--
+-- Normally, deadlock detection is done automatically and it is rarely useful
+-- to invoke manually. However, since deadlock detection in GHC is performed
+-- by idle GC, which some applications disable, then it may be useful to
+-- invoke deadlock detection manually for the purpose of debugging or
+-- resilliance.
+--
+-- @since ghc-internal-10.100.0
+foreign import ccall "performDeadlockDetection" performDeadlockDetection :: IO ()
