@@ -2294,23 +2294,18 @@ canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
               -- If we had F a ~ G (F a), which gives an occurs check,
               -- then swap it to G (F a) ~ F a, which does not
               -- See Note [Orienting TyVarLHS/TyFamLHS]
-              -- ToDo: fix me
+              -- ToDo: fix me  ... also needed for a ~ G (F a)
               -- However `swap_for_size` above will orient it with (G (F a)) on
               -- the left anwyway.  `swap_for_rewriting` "wins", but that doesn't
               -- matter: in the occurs check case swap_for_rewriting will be moot.
               -- TL;DR: the next four lines of code are redundant
               -- I'm leaving them here in case they become relevant again
-              | TyFamLHS {} <- lhs
-              , Just can_rhs <- canTyFamEqLHS_maybe rhs
+              | Just can_rhs <- canTyFamEqLHS_maybe rhs
               , reason `cterHasOnlyProblem` cteSolubleOccurs
-              -> swapAndFinish ev eq_rel swapped lhs_ty can_rhs
+              -> finishWith ev eq_rel (flipSwap swapped) can_rhs lhs_ty
 
               | reason `cterHasOnlyProblems` do_not_prevent_rewriting
-              -> do { new_ev <- rewriteEqEvidenceSwapOnly ev eq_rel swapped lhs rhs
-                    ; continueWith $ Right $
-                        EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
-                             , eq_lhs = lhs , eq_rhs = rhs }
-                    }
+              -> finishWith ev eq_rel swapped lhs rhs
 
               | otherwise
               -> tryIrredInstead reason ev eq_rel swapped lhs rhs
@@ -2343,6 +2338,16 @@ do_not_prevent_rewriting = cteProblem cteSkolemEscape S.<>
                            cteProblem cteConcrete
 
 ----------------------
+finishWith :: CtEvidence -> EqRel -> SwapFlag
+           -> CanEqLHS -> TcType
+           -> TcS (StopOrContinue (Either unused EqCt))
+finishWith ev eq_rel swapped can_lhs rhs_ty
+  = do { new_ev <- rewriteEqEvidenceSwapOnly ev eq_rel swapped can_lhs rhs_ty
+       ; continueWith $ Right $
+         EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
+              , eq_lhs = can_lhs , eq_rhs = rhs_ty } }
+
+{-
 swapAndFinish :: CtEvidence -> EqRel -> SwapFlag
               -> TcType -> CanEqLHS      -- ty ~ F tys
               -> TcS (StopOrContinue (Either unused EqCt))
@@ -2354,6 +2359,7 @@ swapAndFinish ev eq_rel swapped lhs_ty can_rhs
        ; continueWith $ Right $
          EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
               , eq_lhs = can_rhs, eq_rhs = lhs_ty } }
+-}
 
 ----------------------
 tryIrredInstead :: CheckTyEqResult -> CtEvidence
