@@ -791,6 +791,12 @@ addOptCmmP f = alterToolSettings $ \s -> s
 setDepMakefile :: FilePath -> DynFlags -> DynFlags
 setDepMakefile f d = d { depMakefile = f }
 
+setDepJson :: FilePath -> DynFlags -> DynFlags
+setDepJson f d = d { depJson = Just f }
+
+unsetDepJson :: DynFlags -> DynFlags
+unsetDepJson d = d { depJson = Nothing }
+
 setDepIncludeCppDeps :: Bool -> DynFlags -> DynFlags
 setDepIncludeCppDeps b d = d { depIncludeCppDeps = b }
 
@@ -1261,6 +1267,8 @@ dynamic_flags_deps = [
         -------- ghc -M -----------------------------------------------------
   , make_ord_flag defGhcFlag "dep-suffix"              (hasArg addDepSuffix)
   , make_ord_flag defGhcFlag "dep-makefile"            (hasArg setDepMakefile)
+  , make_ord_flag defGhcFlag "dep-json"                (hasArg setDepJson)
+  , make_ord_flag defGhcFlag "no-dep-json"             (noArg unsetDepJson)
   , make_ord_flag defGhcFlag "include-cpp-deps"
         (noArg (setDepIncludeCppDeps True))
   , make_ord_flag defGhcFlag "include-pkg-deps"
