@@ -3619,13 +3619,18 @@ simpleUnifyCheck :: UnifyCheckCaller -> TcLevel -> TcTyVar -> TcType -> SimpleUn
 -- unification might still be OK, but it'll take more work to do
 -- (use the full 'checkTypeEq').
 --
--- * Rejects if lhs_tv occurs in rhs_ty (occurs check)
--- * Rejects foralls unless
---      lhs_tv is RuntimeUnk (used by GHCi debugger)
---          or is a QL instantiation variable
--- * Rejects a non-concrete type if lhs_tv is concrete
--- * Rejects type families unless fam_ok=True
--- * Does a level-check for type variables, to avoid skolem escape
+-- It returns SUC_CannotUnify for
+--   * Touchability failure
+--   * Top level-shape failure
+--
+-- It returns SUC_NotSure for
+--   * Occurs check: lhs_tv occurs in rhs_ty
+--   * Type families unless fam_ok=True
+--   * Foralls unless
+--        lhs_tv is RuntimeUnk (used by GHCi debugger)
+--            or is a QL instantiation variable
+--   * Concreteness: lhs_tv is concrete and rhs is a non-concrete type
+--   * Skolem-escape: a level-check for type variables, to avoid skolem escape
 --
 -- This function is pretty heavily used, so it's optimised not to allocate
 simpleUnifyCheck caller given_eq_lvl lhs_tv rhs

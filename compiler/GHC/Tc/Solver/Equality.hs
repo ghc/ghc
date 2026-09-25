@@ -406,11 +406,13 @@ canonicaliseEquality
 --   hold.
 
 canonicaliseEquality ev eq_rel ty1 ty2
-  = Stage $ do { traceTcS "canonicaliseEquality" $
+  = Stage $ do { traceTcS "canonicaliseEquality {" $
                  vcat [ ppr ev, ppr eq_rel, ppr ty1, ppr ty2 ]
                ; rdr_env   <- getGlobalRdrEnvTcS
                ; fam_insts <- getFamInstEnvs
-               ; can_eq_nc initCanEqState rdr_env fam_insts ev eq_rel ty1 ty1 ty2 ty2 }
+               ; res <- can_eq_nc initCanEqState rdr_env fam_insts ev eq_rel ty1 ty1 ty2 ty2
+               ; traceTcS "canonicaliseEquality }" (ppr res)
+               ; return res }
 
 -- | Main worker function for 'canonicaliseEquality'.
 --
@@ -2205,65 +2207,44 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
   , TyVarLHS lhs_tv <- lhs
   = do  { given_eq_lvl <- getInnermostGivenEqLevel
         ; case simpleUnifyCheck UC_Solver given_eq_lvl lhs_tv rhs of
-            SUC_CanUnify ->
-              unify lhs_tv (mkReflRedn Nominal rhs)
-            SUC_CannotUnify
-              | Just can_rhs <- canTyFamEqLHS_maybe rhs
-              -> swap_and_finish lhs_tv can_rhs -- See Note [Orienting TyVarLHS/TyFamLHS]
-              | otherwise
-              -> finish_no_unify
-            SUC_NotSure ->
+            SUC_CannotUnify -> finish_no_unify
+            SUC_CanUnify    -> do_unification lhs_tv (mkReflRedn Nominal rhs)
+            SUC_NotSure     ->
               -- We have a touchable unification variable on the left,
               -- and the top-shape check succeeded. These are both guaranteed
               -- by the fact that simpleUnifyCheck did not return SUC_CannotUnify.
               do  { let flags = unifyingLHSMetaTyVar_TEFTask ev lhs_tv
                   ; check_result <- wrapTcS (checkTyEqRhs flags rhs)
+                  ; traceTcS "canEqCanLHSFinish_try_unification" $
+                    vcat [ text "lhs" <+> ppr lhs
+                         , text "rhs" <+> ppr rhs
+                         , text "check_result" <+> ppr check_result ]
                   ; case check_result of
-                      PuOK cts rhs_redn ->
-                        do { emitWork cts
-                           ; unify lhs_tv rhs_redn }
-                      PuFail reason
-                        | Just can_rhs <- canTyFamEqLHS_maybe rhs
-                        -> swap_and_finish lhs_tv can_rhs -- See Note [Orienting TyVarLHS/TyFamLHS]
-{-
-                        | reason `cterHasOnlyProblems` do_not_prevent_rewriting
-                        ->
-                          -- ContinueWith, to allow using this constraint for
-                          -- rewriting (e.g. alpha[2] ~ beta[3]).
-                          do { new_ev <- rewriteEqEvidenceSwapOnly ev eq_rel swapped lhs rhs
-                             ; continueWith $ Right $
-                                 EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
-                                      , eq_lhs = lhs , eq_rhs = rhs }
-                             }
--}
-                        | otherwise
-                        -> try_irred reason
-                  }
+                      PuFail {}         -> finish_no_unify
+                      PuOK cts rhs_redn -> do { emitWork cts
+                                              ; do_unification lhs_tv rhs_redn }
          }
   -- Otherwise unification is off the table
   | otherwise
   = finish_no_unify
 
   where
-    -- We can't unify, but this equality can go in the inert set
+    -- We can't unify, but we can see if this equality can go in the inert set
     -- and be used to rewrite other constraints.
-    finish_no_unify =
-      canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
+    finish_no_unify = canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
 
     -- We can't unify, and this equality should not be used to rewrite
     -- other constraints (e.g. because it has an occurs check).
     -- So add it to the inert Irreds.
-    try_irred reason =
-      tryIrredInstead reason ev eq_rel swapped lhs rhs
+    try_irred reason = tryIrredInstead reason ev eq_rel swapped lhs rhs
 
     -- We can't unify as-is, and want to flip the equality around.
     -- Example: alpha ~ F tys, flip it around to become the canonical
     -- equality f tys ~ alpha.
-    swap_and_finish tv can_rhs =
-      swapAndFinish ev eq_rel swapped (mkTyVarTy tv) can_rhs
+    swap_and_finish tv can_rhs = swapAndFinish ev eq_rel swapped (mkTyVarTy tv) can_rhs
 
     -- Phew! Finally!  We can unify; go ahead and do so.
-    unify tv rhs_redn =
+    do_unification tv rhs_redn =
       do { -- In the common case where rhs_redn is Refl, we don't need to rewrite
            -- the evidence, even if swapped=IsSwapped.   Suppose the original was
            --     [W] co : Int ~ alpha
@@ -2312,26 +2293,25 @@ canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
 
               -- If we had F a ~ G (F a), which gives an occurs check,
               -- then swap it to G (F a) ~ F a, which does not
+              -- See Note [Orienting TyVarLHS/TyFamLHS]
+              -- ToDo: fix me
               -- However `swap_for_size` above will orient it with (G (F a)) on
               -- the left anwyway.  `swap_for_rewriting` "wins", but that doesn't
               -- matter: in the occurs check case swap_for_rewriting will be moot.
               -- TL;DR: the next four lines of code are redundant
               -- I'm leaving them here in case they become relevant again
---              | TyFamLHS {} <- lhs
---              , Just can_rhs <- canTyFamEqLHS_maybe rhs
---              , reason `cterHasOnlyProblem` cteSolubleOccurs
---              -> swapAndFinish ev eq_rel swapped lhs_ty can_rhs
---              | otherwise
+              | TyFamLHS {} <- lhs
+              , Just can_rhs <- canTyFamEqLHS_maybe rhs
+              , reason `cterHasOnlyProblem` cteSolubleOccurs
+              -> swapAndFinish ev eq_rel swapped lhs_ty can_rhs
 
-{-
               | reason `cterHasOnlyProblems` do_not_prevent_rewriting
               -> do { new_ev <- rewriteEqEvidenceSwapOnly ev eq_rel swapped lhs rhs
                     ; continueWith $ Right $
                         EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
                              , eq_lhs = lhs , eq_rhs = rhs }
                     }
--}
-       
+
               | otherwise
               -> tryIrredInstead reason ev eq_rel swapped lhs rhs
 
@@ -2358,11 +2338,9 @@ canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
 --
 -- Concrete-ness:  alpha[conc] ~ b[sk]
 --    We can use it to rewrite; we still have to solve the original
-{-
 do_not_prevent_rewriting :: CheckTyEqResult
 do_not_prevent_rewriting = cteProblem cteSkolemEscape S.<>
                            cteProblem cteConcrete
--}
 
 ----------------------
 swapAndFinish :: CtEvidence -> EqRel -> SwapFlag

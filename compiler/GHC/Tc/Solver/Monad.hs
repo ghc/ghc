@@ -2309,8 +2309,8 @@ checkTypeEq :: CtEvidence -> EqRel -> CanEqLHS -> TcType
 checkTypeEq ev eq_rel lhs rhs =
   case ev of
     CtGiven {} ->
-      do { traceTcS "checkTypeEq {" (vcat [ text "lhs:" <+> ppr lhs
-                                          , text "rhs:" <+> ppr rhs ])
+      do { traceTcS "checkTypeEq (given) {" (vcat [ text "lhs:" <+> ppr lhs
+                                                  , text "rhs:" <+> ppr rhs ])
          ; check_result <- wrapTcS (checkTyEqRhs given_flags rhs)
          ; traceTcS "checkTypeEq }" (ppr check_result)
          ; case check_result of
@@ -2319,7 +2319,12 @@ checkTypeEq ev eq_rel lhs rhs =
                                   ; emitWork new_givens
                                   ; updInertSet (addCycleBreakerBindings prs)
                                   ; return (pure redn) } }
-    CtWanted {} -> wrapTcS (checkTyEqRhs wanted_flags rhs)
+    CtWanted {} -> do { traceTcS "checkTypeEq (wanted) {" $
+                        vcat [ text "lhs:" <+> ppr lhs
+                             , text "rhs:" <+> ppr rhs ]
+                      ; check_result <- wrapTcS (checkTyEqRhs wanted_flags rhs)
+                      ; traceTcS "checkTypeEq }" (ppr check_result)
+                      ; return check_result }
   where
     wanted_flags :: TyEqFlags TcM Ct
     wanted_flags = notUnifying_TEFTask occ_prob lhs
