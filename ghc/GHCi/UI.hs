@@ -178,6 +178,7 @@ import qualified System.Win32
 import GHC.IO.Exception ( IOErrorType(InvalidArgument) )
 import GHC.IO.Handle ( hFlushAll )
 import GHC.TopHandler ( topHandler )
+import GHC.Conc ( setUncaughtExceptionHandler )
 
 import qualified GHC.Unit.Module.Graph as GHC
 
@@ -1078,8 +1079,20 @@ runGHCi paths maybe_exprs = do
                             -- Jump through some hoops to get the
                             -- current progname in the exception text:
                             -- <progname>: <exception>
-                            liftIO $ withProgName (progname st)
-                                   $ topHandler e
+                            liftIO $ withProgName (progname st) $ do
+                                   -- CQ[ghc-e-uncaught-handler]
+                                   -- Q: Why swap the global uncaught-exception handler right
+                                   --    before topHandler instead of printing here and exiting?
+                                   -- A~ topHandler owns the exit policy: exit codes, ^C via
+                                   --    SIGINT, stack/heap overflow, EPIPE on stdout, and
+                                   --    failures while rendering the message. Only the
+                                   --    rendering changes: like interactive GHCi, ghc -e shows
+                                   --    the exception without its type header and without the
+                                   --    exception context, which since 2ab02c579a9 carried
+                                   --    GHC's own rethrow frames (#27847). topHandler never
+                                   --    returns, so the handler doesn't outlive this call.
+                                   setUncaughtExceptionHandler reportUncaughtException
+                                   topHandler e
                                    -- this used to be topHandlerFastExit, see #2228
             runInputTWithPrefs defaultPrefs defaultSettings $ do
                 -- make `ghc -e` exit nonzero on failure, see #7962, #9916, #17560, #18441
@@ -4932,6 +4945,12 @@ handler exception = do
   flushInterpBuffers
   withSignalHandlers $
      ghciHandle handler (showException exception >> return False)
+
+-- CQ-REF[ghc-e-uncaught-handler]
+reportUncaughtException :: SomeException -> IO ()
+reportUncaughtException se = do
+  prog <- getProgName
+  hPutStrLn stderr (prog ++ ": " ++ displayException se)
 
 showException :: MonadIO m => SomeException -> m ()
 showException se =
