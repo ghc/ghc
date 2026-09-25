@@ -12,7 +12,7 @@ description:
   semaphores); its reported protocol version remains v1.
 
   When GHC receives a ``-jsem`` name whose protocol version it does not
-  support, it now emits a ``-Wsemaphore-version-mismatch`` warning and
+  support, it now emits a :ghc-flag:`-Wsemaphore-open-failure` warning and
   falls back to ``-j1`` rather than crashing. ``ghc --info`` exposes the
   supported version in a new ``"Semaphore version"`` entry so
   cabal-install can detect a mismatch before invoking GHC.
