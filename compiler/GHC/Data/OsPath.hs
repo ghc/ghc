@@ -13,6 +13,7 @@ module GHC.Data.OsPath
   , (<.>)
   , splitSearchPath
   , isRelative
+  , normalise
   , dropTrailingPathSeparator
   , takeDirectory
   , isSuffixOf

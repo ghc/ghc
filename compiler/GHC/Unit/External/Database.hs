@@ -53,9 +53,15 @@ import System.FilePath as FilePath
 -- ExternalUnitDatabases
 -- ----------------------------------------------------------------------------
 
+-- | A normalised 'OsPath' that we use as the key to cache 'UnitDatabase's.
+--
+newtype NormalisedUnitDbLoc = NormalisedUnitDbLoc OsPath
+  deriving (Eq, Ord)
+
 -- | Caches unit databases in-memory.
 data ExternalUnitDatabases unit = ExternalUnitDatabases
-  { eud_cachedDatabases :: !(Map OsPath (UnitDatabase unit))
+  { eud_cachedDatabases :: !(Map NormalisedUnitDbLoc (UnitDatabase unit))
+  -- ^ The 'Map' is keyed by a normalised 'OsPath', ensuring
   }
 
 emptyExternalUnitDatabases :: ExternalUnitDatabases unit
@@ -67,18 +73,20 @@ emptyExternalUnitDatabases =
 insertExternalUnitDatabases :: UnitDatabase unit -> ExternalUnitDatabases unit -> ExternalUnitDatabases unit
 insertExternalUnitDatabases unit_db eud =
   ExternalUnitDatabases
-    { eud_cachedDatabases = Map.insert (unitDatabasePath unit_db) unit_db (eud_cachedDatabases eud)
+    { eud_cachedDatabases =
+        Map.insert (normalisedUnitDatabaseKey unit_db) unit_db (eud_cachedDatabases eud)
     }
 
 deleteExternalUnitDatabases :: OsPath -> ExternalUnitDatabases unit -> ExternalUnitDatabases unit
 deleteExternalUnitDatabases unit_db_path eud =
   ExternalUnitDatabases
-    { eud_cachedDatabases = Map.delete unit_db_path (eud_cachedDatabases eud)
+    { eud_cachedDatabases =
+        Map.delete (normalisedUnitDatabaseKeyOsPath unit_db_path) (eud_cachedDatabases eud)
     }
 
 lookupExternalUnitDatabases :: OsPath -> ExternalUnitDatabases unit -> Maybe (UnitDatabase unit)
 lookupExternalUnitDatabases key eud =
-  Map.lookup key (eud_cachedDatabases eud)
+  Map.lookup (normalisedUnitDatabaseKeyOsPath key) (eud_cachedDatabases eud)
 
 -- ----------------------------------------------------------------------------
 -- UnitDatabase
@@ -87,11 +95,37 @@ lookupExternalUnitDatabases key eud =
 -- | Unit database entry.
 data UnitDatabase unit = UnitDatabase
   { unitDatabasePath :: OsPath
+  -- ^ On-disk location of the unit database.
+  --
   , unitDatabaseUnits :: [GenUnitInfo unit]
+  -- ^ Units read from the database located at 'unitDatabasePath'.
+  --
+  -- These units have the @$pkgroot@ variable already resolved.
   }
 
 instance (Outputable u) => Outputable (UnitDatabase u) where
   ppr (UnitDatabase fp _u) = text "DB:" <+> ppr fp
+
+normalisedUnitDatabaseKey :: UnitDatabase unit -> NormalisedUnitDbLoc
+normalisedUnitDatabaseKey unit_db = normalisedUnitDatabaseKeyOsPath $ unitDatabasePath unit_db
+
+-- | Normalise the unit database location and drop trailing path separators.
+--
+-- This ensures that two databases that point to the same location can be cached.
+--
+-- We need to remove trailing slash from the 'OsPath' before calculating @$pkgroot@ (Fix #16360)
+normalisedUnitDatabaseKeyOsPath :: OsPath -> NormalisedUnitDbLoc
+normalisedUnitDatabaseKeyOsPath db_path =
+    NormalisedUnitDbLoc $ OsPath.normalise $ OsPath.dropTrailingPathSeparator db_path
+
+-- | Get the root location of a unit database.
+-- Used to replace @$pkgroot@ variables in the 'GenericUnitInfo'.
+unitDatabaseRoot :: OsPath -> OsPath
+unitDatabaseRoot p =
+  let
+    NormalisedUnitDbLoc np = normalisedUnitDatabaseKeyOsPath p
+  in
+    OsPath.takeDirectory np
 
 -- ----------------------------------------------------------------------------
 --
@@ -258,14 +292,12 @@ readUnitDatabase logger cfg conf_file = do
                       "can't find a package database at " ++ show conf_file
 
   let
-      -- Fix #16360: remove trailing slash from conf_file before calculating pkgroot
-      conf_file' = OsPath.dropTrailingPathSeparator conf_file
       top_dir = OsPath.unsafeEncodeUtf (unitDbConfigGHCDir cfg)
-      pkgroot = OsPath.takeDirectory conf_file'
+      pkgroot = unitDatabaseRoot conf_file
       pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . mapUnitInfo (\(UnitKey x) -> UnitId x) . mkUnitKeyInfo)
                          proto_pkg_configs
   --
-  return $ UnitDatabase conf_file' pkg_configs1
+  return $ UnitDatabase conf_file pkg_configs1
   where
     readDirStyleUnitInfo :: OsPath -> IO [DbUnitInfo]
     readDirStyleUnitInfo conf_dir = do
