@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GHC dependencies",
+  "description": "The dependency graph of a Haskell program.",
+  "oneOf": [
+    { "$ref": "#/definitions/external-unit" },
+    { "$ref": "#/definitions/module" }
+  ],
+  "definitions": {
+    "external-unit": {
+      "type": "object",
+      "properties": {
+        "unit-id": { "$ref": "#/definitions/package-name" },
+        "package-name": { "$ref": "#/definitions/package-name" },
+        "package-id": { "$ref": "#/definitions/package-id" }
+      },
+      "required": ["unit-id", "package-name", "package-id"],
+      "unevaluatedProperties": false
+    },
+    "unit-id": {
+      "type": "string"
+    },
+    "package-name": {
+      "type": "string"
+    },
+    "package-id": {
+      "type": "string"
+    },
+    "module": {
+      "type": "object",
+      "properties": {
+        "unit-id": { "$ref": "#/definitions/package-name" },
+        "source": { "$ref": "#/definitions/module-source" },
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/module-option" }
+        },
+        "includes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/module-include" }
+        },
+        "imports": {
+          "type": "object",
+          "patternProperties": { "": { "$ref": "#/definitions/import" } }
+        },
+        "preprocessor": { "$ref": "#/definitions/module-preprocessor" }
+      },
+      "required": ["unit-id", "source"],
+      "unevaluatedProperties": false
+    },
+    "module-name": {
+      "type": "string"
+    },
+    "module-source": {
+      "type": "string"
+    },
+    "module-option": {
+      "type": "string"
+    },
+    "module-include": {
+      "type": "string"
+    },
+    "module-preprocessor": {
+      "oneOf": [{ "type": "null" }, { "type": "string" }]
+    },
+    "import": {
+      "oneOf": [
+        { "$ref": "#/definitions/module-name" },
+        {
+          "type": "object",
+          "properties": {
+            "module": { "$ref": "#/definitions/module-name" },
+            "level": { "$ref": "#/definitions/import-level" }
+          },
+          "required": ["module"],
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "import-level": {
+      "type": "string",
+      "enum": ["normal", "quote", "splice"],
+      "default": "normal"
+    }
+  }
+}

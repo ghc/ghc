@@ -20,6 +20,7 @@ from pathlib import Path, PurePath
 import collections
 import collections.abc
 import subprocess
+import json
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, \
                         TestRun, TestResult, TestOptions, PerfMetric
@@ -3264,6 +3265,58 @@ def normalise_asm( s: str ) -> str:
         else:
           out.append(ins[0])
     return '\n'.join(out)
+
+def normalise_dep_json(s: str) -> str:
+    """
+    Normalise the json output of `ghc -M -dep-json output.json`
+    """
+
+    def normalise_includes(j):
+        # Only normalise proper json objects.
+        # Strings might be parsed as json strings, but we that's not what we are looking for
+        if not isinstance(j, dict):
+            return j
+        for unit in j.values():
+            for module in unit.get("modules", {}).values():
+                rewritten = [
+                    __replace_absolute_path(p)
+                    for p in module["includes"]
+                ]
+                # we sort to make sure this never
+                module["includes"] = sorted(rewritten)
+        return j
+
+    output = ""
+    try:
+        normalised_dep_json = normalise_includes(json.loads(s))
+        output = json.dumps(normalised_dep_json, indent=2, sort_keys=True, ensure_ascii=False)
+    except json.JSONDecodeError:
+        output = s
+    return output
+
+def normalise_dep_makefile(s: str) -> str:
+    """
+    Normalise the Makefile output of `ghc -M`
+    """
+
+    output = []
+    rules = []
+    for line in s.split("\n"):
+        target, sep, dep = line.partition(" : ")
+        if sep:
+            rules.append(target + sep + __replace_absolute_path(dep))
+        else:
+            # sort each block of rules so the order doesn't depend on the original absolute paths
+            output.extend(sorted(rules))
+            rules = []
+            output.append(line)
+    output.extend(sorted(rules))
+    return "\n".join(output)
+
+def __replace_absolute_path(s: str) -> str:
+    if s.startswith("/"):
+        return "<absolute-path>/" + s.rsplit("/", 1)[-1]
+    return s
 
 def safe_print(s: str) -> None:
     s2 = s.encode(sys.stdout.encoding, errors='replace').decode(sys.stdout.encoding)

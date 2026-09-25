@@ -1,0 +1,7 @@
+section: compiler
+synopsis: Add `-dep-json` output option to `ghc -M`
+issues: #24384
+mrs: !16717
+description: {
+
+}
