@@ -2222,7 +2222,7 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
                   ; case check_result of
                       PuFail {}         -> finish_no_unify
                       PuOK cts rhs_redn -> do { emitWork cts
-                                              ; do_unification lhs_tv rhs_redn }
+                                              ; do_unification lhs_tv rhs_redn } }
          }
   -- Otherwise unification is off the table
   | otherwise
@@ -2236,12 +2236,12 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
     -- We can't unify, and this equality should not be used to rewrite
     -- other constraints (e.g. because it has an occurs check).
     -- So add it to the inert Irreds.
-    try_irred reason = tryIrredInstead reason ev eq_rel swapped lhs rhs
+--    try_irred reason = tryIrredInstead reason ev eq_rel swapped lhs rhs
 
     -- We can't unify as-is, and want to flip the equality around.
     -- Example: alpha ~ F tys, flip it around to become the canonical
     -- equality f tys ~ alpha.
-    swap_and_finish tv can_rhs = swapAndFinish ev eq_rel swapped (mkTyVarTy tv) can_rhs
+--    swap_and_finish tv can_rhs = swapAndFinish ev eq_rel swapped (mkTyVarTy tv) can_rhs
 
     -- Phew! Finally!  We can unify; go ahead and do so.
     do_unification tv rhs_redn =
