@@ -1,0 +1,12 @@
+section: compiler
+synopsis: Add `-dep-json` output option to `ghc -M`
+issues: #24384
+mrs: !16717
+description: {
+    Adds the option to output the dependency information of `ghc -M` in
+    JSON Lines format via the new flag `-dep-json <FILE>`.
+
+    The output is richer than the `Makefile`, since it can encode additional information
+    such as `quote` and `splice` imports (see `-XExplicitLevelImports`).
+    By using JSON Lines, the output of `-dep-json` can be streamed efficiently.
+}
