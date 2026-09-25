@@ -820,13 +820,13 @@ preprocessPipeline pipe_env hsc_env input_fn = do
       use (T_Unlit pipe_env hsc_env input_fn)
 
 
-  (dflags1, p_warns1, warns1) <- use (T_FileArgs hsc_env unlit_fn)
+  (dflags1, _, p_warns1, warns1) <- use (fileArgsPhase hsc_env unlit_fn)
   let hsc_env1 = hscSetFlags dflags1 hsc_env
 
   (cpp_fn, hsc_env2)
     <- runAfterFlag hsc_env1 (Cpp HsSrcFile) (xopt LangExt.Cpp) (unlit_fn, hsc_env1) $ do
           cpp_fn <- use (T_Cpp pipe_env hsc_env1 unlit_fn)
-          (dflags2, _, _) <- use (T_FileArgs hsc_env1 cpp_fn)
+          (dflags2, _, _, _) <- use (fileArgsPhase hsc_env1 cpp_fn)
           let hsc_env2 = hscSetFlags dflags2 hsc_env1
           return (cpp_fn, hsc_env2)
 
@@ -841,7 +841,8 @@ preprocessPipeline pipe_env hsc_env input_fn = do
           then return (dflags1, p_warns1, warns1)
           else do
             -- Reparse with original hsc_env so that we don't get duplicated options
-            use (T_FileArgs hsc_env pp_fn)
+            (dflagsPP, _, p_warns3, warns3) <- use (fileArgsPhase hsc_env pp_fn)
+            pure (dflagsPP, p_warns3, warns3)
 
   let print_config = initPrintConfig dflags3
   liftIO (printOrThrowDiagnostics (hsc_logger hsc_env) print_config (initDiagOpts dflags3) (GhcPsMessage <$> p_warns3))
@@ -864,6 +865,9 @@ preprocessPipeline pipe_env hsc_env input_fn = do
         runAfterFlag hsc_env phase flag def action =
           runAfter phase def
            $ phaseIfFlag hsc_env flag def action
+
+        fileArgsPhase env fn =
+          T_FileArgs (hsc_logger env) (hsc_dflags env) fn
 
 -- | The complete compilation pipeline, from start to finish
 fullPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> HscSource -> m (ModIface, RecompLinkables)
