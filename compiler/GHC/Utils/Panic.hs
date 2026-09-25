@@ -210,8 +210,8 @@ tryMost action = do r <- try action
                         Left se ->
                             case fromException se of
                                 -- Some GhcException's we rethrow,
-                                Just (Signal _)  -> throwIO se
-                                Just (Panic _)   -> throwIO se
+                                Just (Signal _)  -> rethrowSomeException se
+                                Just (Panic _)   -> rethrowSomeException se
                                 -- others we return
                                 Just _           -> return (Left se)
                                 Nothing ->
@@ -220,7 +220,7 @@ tryMost action = do r <- try action
                                         Just (_ :: IOException) ->
                                             return (Left se)
                                         -- Anything else is rethrown
-                                        Nothing -> throwIO se
+                                        Nothing -> rethrowSomeException se
                         Right v -> return (Right v)
 
 -- | We use reference counting for signal handlers

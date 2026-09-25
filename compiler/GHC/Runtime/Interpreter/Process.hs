@@ -129,4 +129,4 @@ handleInterpProcessFailure i e = do
     _ -> do
       terminateProcess hdl
       _ <- waitForProcess hdl
-      throw e
+      rethrowSomeException e -- CQ-REF[rethrow-in-handler]

@@ -62,7 +62,7 @@ import GHC.Data.OsPath     ( OsPath, unsafeEncodeUtf )
 import GHC.Data.StringBuffer
 import GHC.Data.Graph.Directed.Reachability
 
-import GHC.Utils.Exception ( throwIO, SomeAsyncException )
+import GHC.Utils.Exception ( rethrowSomeException, SomeAsyncException )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -903,7 +903,7 @@ rootSummariesParallel n_jobs hsc_env diag_wrapper msg get_summary = do
   runPipelines n_jobs hsc_env diag_wrapper msg actions
   (sequence . catMaybes <$> sequence get_results) >>= \case
     Right results -> pure (partitionEithers (concat results))
-    Left exc -> throwIO exc
+    Left exc -> rethrowSomeException exc
   where
     bundles = mk_bundles targets
 
@@ -926,7 +926,7 @@ rootSummariesParallel n_jobs hsc_env diag_wrapper msg get_summary = do
         withLoggerHsc log_queue_id env \ lcl_hsc_env ->
           MC.try (mapM (get_summary lcl_hsc_env) target_bundle) >>= \case
             Left e | Just (_ :: SomeAsyncException) <- fromException e ->
-              throwIO e
+              rethrowSomeException e
             a -> pure a
 
 --------------------------------------------------------------------------------

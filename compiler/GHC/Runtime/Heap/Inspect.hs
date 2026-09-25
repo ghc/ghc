@@ -75,7 +75,7 @@ import GHC.Utils.Panic
 import GHC.Char
 import GHC.Exts.Heap
 import GHC.Runtime.Heap.Layout (ByteOff)
-import GHC.IO (throwIO)
+import GHC.Utils.Exception (rethrowSomeException)
 
 import Control.Monad
 import Data.Maybe
@@ -819,7 +819,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
            EvalException ex -> do
               -- Report the exception to the UI
               traceTR $ text "Exception occurred:" <+> text (show ex)
-              liftIO $ throwIO $ fromSerializableException ex
+              liftIO $ rethrowSomeException $ fromSerializableException ex -- CQ-REF[rethrow-serialised]
 -- Blackholes are indirections iff the payload is not TSO or BLOCKING_QUEUE. If
 -- the indirection is a TSO or BLOCKING_QUEUE, we return the BLACKHOLE itself as
 -- the suspension so that entering it in GHCi will enter the BLACKHOLE instead

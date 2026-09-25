@@ -78,7 +78,7 @@ readCreateProcessWithExitCode' proc = do
     result <- takeMVar outMVar
     hClose outh
     output <- case result of
-      Left exc -> throwIO exc
+      Left exc -> rethrowSomeException exc
       Right output -> return output
 
     -- wait on the process

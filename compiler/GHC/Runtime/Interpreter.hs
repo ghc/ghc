@@ -769,5 +769,12 @@ readIModModBreaks hug mod = imodBreaks_modBreaks . expectJust <$> readIModBreaks
 -- Misc utils
 
 fromEvalResult :: EvalResult a -> IO a
-fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
+-- CQ[rethrow-serialised]
+-- Q: The exception was rebuilt by fromSerializableException with an empty
+--    context, so what does NoBacktrace buy here?
+-- A~ throwIO would add this site's frame; the user's own context is already
+--    part of the message text (toSerializableException), so the frame would
+--    be the only one printed by ghc -e, and GHC API clients of compileExpr
+--    see it too (#27847).
+fromEvalResult (EvalException e) = rethrowSomeException (fromSerializableException e)
 fromEvalResult (EvalSuccess a) = return a

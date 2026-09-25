@@ -1377,7 +1377,8 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
                                    do liftIO (print (ghce :: GhcException))
                                       return Nothing
                                  _other ->
-                                   liftIO (Exception.throwIO e))
+                                   -- CQ-REF[rethrow-in-handler]
+                                   liftIO (Exception.rethrowSomeException e))
             (unmask $ runOneCommand eh gCmd)
     case b of
       Nothing -> return ()
@@ -1530,7 +1531,14 @@ checkInputForLayout stmt getStmt = do
                                  Just ghce ->
                                    do liftIO (print (ghce :: GhcException))
                                       return Nothing
-                                 _other -> liftIO (Exception.throwIO ex))
+                                 -- CQ[rethrow-in-handler]
+                                 -- Q: This rethrows inside a catch handler, so
+                                 --    base still adds a WhileHandling of the
+                                 --    exception itself. Does anything print it?
+                                 -- A~ No printer of context is reached from
+                                 --    here (audit in #27847); the helper only
+                                 --    removes the frame.
+                                 _other -> liftIO (Exception.rethrowSomeException ex))
                      getStmt
        modifyGHCiState (\st' -> st' { prompt = p })
        -- the recursive call does not recycle parser state
@@ -1673,7 +1681,7 @@ afterRunStmt step run_result = do
   case run_result of
      GHC.ExecComplete{..} ->
        case execResult of
-          Left ex -> liftIO $ Exception.throwIO ex
+          Left ex -> liftIO $ Exception.rethrowSomeException ex
           Right names -> do
             show_types <- isOptionSet ShowType
             when show_types $ printTypeOfNames names
@@ -2320,7 +2328,7 @@ wrapDeferTypeErrors load =
 loadModule :: GhciMonad m => LoadTargets -> [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
 loadModule loadTargets fs = do
   (_, result) <- runAndPrintStats (const Nothing) (loadModule' loadTargets fs)
-  either (liftIO . Exception.throwIO) return result
+  either (liftIO . Exception.rethrowSomeException) return result
 
 -- | @:load@ command
 loadModule_ :: GhciMonad m => [FilePath] -> m ()

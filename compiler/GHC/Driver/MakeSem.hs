@@ -34,6 +34,7 @@ import GHC.Data.OrdList
 import GHC.IO.Exception
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Exception ( rethrowSomeException )
 import GHC.Utils.Json
 
 import System.Semaphore
@@ -544,7 +545,7 @@ runJSemAbstractSem sem_ident action = MC.mask \ unmask -> do
   case r of
     Left (e1 :: MC.SomeException) -> do
       (_ :: Either MC.SomeException ()) <- MC.try cleanup
-      MC.throwM e1
+      rethrowSomeException e1
     Right x -> cleanup $> x
 
 {- Note [Architecture of the Job Server]

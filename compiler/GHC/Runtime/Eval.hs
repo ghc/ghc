@@ -1276,7 +1276,7 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   case status of
     EvalComplete _ (EvalSuccess [hval]) -> return hval
     EvalComplete _ (EvalException e) ->
-      liftIO $ throwIO (fromSerializableException e)
+      liftIO $ rethrowSomeException (fromSerializableException e) -- CQ-REF[rethrow-serialised]
     _ -> panic "compileParsedExpr"
 
 compileParsedExpr :: GhcMonad m => LHsExpr GhcPs -> m HValue
