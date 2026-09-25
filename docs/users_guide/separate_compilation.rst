@@ -1495,6 +1495,7 @@ generation are:
 .. ghc-flag:: -dep-makefile ⟨file⟩
     :shortdesc: Use ⟨file⟩ as the makefile
     :type: dynamic
+    :reverse: -no-dep-makefile
     :category: redirect-output
 
     Use ⟨file⟩ as the makefile, rather than ``makefile`` or
@@ -1502,6 +1503,25 @@ generation are:
     often use ``-dep-makefile .depend`` to put the dependencies in
     ``.depend`` and then ``include`` the file ``.depend`` into
     ``Makefile``.
+
+    ``-no-dep-makefile`` disables the generation of a Makefile altogether.
+    This flag was introduced the same time as :ghc-flag:`-dep-json ⟨file⟩`
+
+.. ghc-flag:: -dep-json ⟨file⟩
+    :shortdesc: Emit ⟨file⟩ as a JSON file containing dependencies
+    :type: dynamic
+    :reverse: -no-dep-json
+    :category: redirect-output
+
+    :since: 10.1
+
+    Emit ⟨file⟩ as a JSON file containing the similar dependency info as the Makefile,
+    so it can be parsed by external build systems. The JSON file contains a single object,
+    mapping each target to a list of dependencies.
+
+    The schema can be downloaded :download:`here <make-depends-json-schema-1_0.json>`.
+
+    ``-no-dep-json`` disables the generation of the JSON file.
 
 .. ghc-flag:: -dep-suffix ⟨suffix⟩
     :shortdesc: Make dependencies that declare that files with suffix
