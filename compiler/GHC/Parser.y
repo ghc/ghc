@@ -1881,7 +1881,7 @@ decl_inst  : at_decl_inst               { sL1 $1 (unitOL (sL1a $1 (InstD noExtFi
 
 decls_inst :: { Located ([EpToken ";"],OrdList (LHsDecl GhcPs)) }   -- Reversed
            : decls_inst ';' decl_inst   {% if isNilOL (snd $ unLoc $1)
-                                             then return (sLL $1 $> ((fst $ unLoc $1) ++ [mzEpTok $2]
+                                             then return (sL (comb3 $1 $2 $3) ((fst $ unLoc $1) ++ [mzEpTok $2]
                                                                     , unLoc $3))
                                              else case (snd $ unLoc $1) of
                                                SnocOL hs t -> do

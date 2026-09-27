@@ -31,6 +31,9 @@ ipb = ?y
 instance C Int where -- comment4
   meth = x
 
+instance C Int where --comment4a
+ ; vary = varyIntegral
+
 -- ClassDecl
 class C a where -- comment5
 
