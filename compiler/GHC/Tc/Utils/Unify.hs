@@ -3596,7 +3596,6 @@ matchExpectedFunKind hs_ty n k = go n k
 
 data UnifyCheckCaller
   = UC_OnTheFly   -- Called from the on-the-fly unifier
-  | UC_QuickLook  -- Called from Quick Look
   | UC_Solver     -- Called from constraint solver
 
 -- | The result type of 'simpleUnifyCheck'.
@@ -3649,9 +3648,7 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     lhs_tv_is_concrete = isConcreteTyVar lhs_tv
     lhs_tv_nm          = tyVarName lhs_tv
 
-    forall_ok = case caller of
-                   UC_QuickLook -> isQLInstTyVar lhs_tv
-                   _            -> isRuntimeUnkTyVar lhs_tv
+    forall_ok = isRuntimeUnkTyVar lhs_tv
 
     -- This fam_ok thing relates to a very specific perf problem
     -- See Note [Prevent unification with type families]
@@ -3660,7 +3657,6 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     --   see if it bites us)
     fam_ok = case caller of
                UC_Solver     -> True
-               UC_QuickLook  -> True
                UC_OnTheFly   -> False
 
     rhs_tcv_is_bad tcv

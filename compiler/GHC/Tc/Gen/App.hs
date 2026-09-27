@@ -2196,10 +2196,9 @@ qlUnify ty1 ty2
       -- the main point of QuickLook (allowing meta-variables to be unified
       -- with qualified types).
 
-    go' (TyVarTy tv) ty2
-      | isQLInstTyVar tv = go_kappa tv ty2
-    go' ty1 (TyVarTy tv)
-      | isQLInstTyVar tv = go_kappa tv ty1
+    -- Type variables; see (UQL6) in Note [QuickLook unification]
+    go' (TyVarTy tv) ty2 | isQLInstTyVar tv = go_kappa tv ty2
+    go' ty1 (TyVarTy tv) | isQLInstTyVar tv = go_kappa tv ty1
 
     go' (CastTy ty1 _) ty2 = go ty1 ty2
     go' ty1 (CastTy ty2 _) = go ty1 ty2
@@ -2242,6 +2241,8 @@ qlUnify ty1 ty2
 
     ----------------
     go_flexi kappa ty2  -- ty2 is zonked
+      | isConcreteTyVar kappa  -- See (UQL7) in Note [QuickLook unification]
+      = return ()
       | anyFreeVarsOfType (== kappa) ty2
       = return ()  -- Occurs check
       | otherwise
@@ -2339,6 +2340,22 @@ That is the entire point of qlUnify!   Wrinkles:
   The general principle is: treat linear arrows %1 -> similar to foralls and
   constraint arrows =>, so that (UQL4) applies to them as well.
   See Note [Multiplicity in deep subsumption].
+
+(UQL6) What if `qlUnify` sees a regular (monotyped) unification variable, `alpha`, rather
+  than an instantiation variable `kappa`?  Thus (alpha ~ ty).   It's tempting to just
+  unify it, but the regular, on-the-fly unifier has lots of careful checks (levels,
+  concreteness etc).  In regular unification it doesn't matter whether we unify on-the-fly
+  or later -- it's just an efficiency issue -- but here it matters because `qlUnify` has
+  /user-visible/ consequences.   This led to #26543.
+
+  The simplest thing is to say that `qlUnify` unifies /only/ instantiation variables
+  (see calls to `isQLInstTyVar`).  We could be more ambitious, perhaps, in future.
+
+(UQL7) If `qlUnify` sees a concrete `kaapa`, thus
+            kappa[conc] ~ some-type
+  we just give up. It's tiresome to do all the checks for concreteness; and concrete
+  type variables are never unified with polytypes, so it's fine to leave it for the
+  regular unifier.
 
 Sadly discarded design alternative
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

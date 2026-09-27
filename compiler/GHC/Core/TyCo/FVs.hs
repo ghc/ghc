@@ -55,7 +55,6 @@ module GHC.Core.TyCo.FVs
   ) where
 
 import GHC.Prelude
-import GHC.Exts( inline )
 
 import {-# SOURCE #-} GHC.Core.Type( partitionInvisibleTypes, coreView, rewriterView )
 
@@ -852,8 +851,11 @@ invisibleVarsOfTypes = foldr (unionVarSet . invisibleVarsOfType) emptyVarSet
 {- Note [Any-free-var folder]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The "any-free-var" folders take a `check_fv` predicate (TyCoVar -> Bool) and
-check if any free variable of the type/coercion satisfies it.  Our main folders
-look like:
+check if any /deep/ free variable of the type/coercion satisfies it. So
+
+   anyFreeVarsOfType p ty = anyVarSet p (tyCoVarsOfType ty)
+
+Our main folders look like:
 
    afv_type :: Type -> FV (BoundVars, TyVar -> Bool) Any
 
@@ -871,7 +873,7 @@ nice tight loops.
 {-# INLINE afvFolder #-}   -- See Note [Any-free-var folder]
 afvFolder :: TyCoFolder (FV (BoundVars, TyCoVar -> Bool) DM.Any)
 -- 'afvFolder' is short for "any-free-var folder", good for checking
---   if any shallow free var of a type satisfies a predicate `check_fv`
+--   if any /deep/ free var of a type satisfies a predicate `check_fv`
 -- The "env" of the (FV env Any) is a pair (bvs,pred) of
 --    the bound variables (which are definitely not free), and
 --    an "interesting var" predicate which the client supplies
@@ -881,8 +883,11 @@ afvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                        , tcf_hole  = do_hole
                        , tcf_tycobinder = addBndrSelectiveFV }
   where
-    do_tcv tv    = MkFV $ \ (bvs,check_fv) ->
-                   Any (not (tv `elemVarSet` bvs) && check_fv tv)
+    -- Check the variable itself with check_fv,
+    -- and check its kind (this is a deep folder)
+    do_tcv tcv = MkFV $ \ (bvs,check_fv) ->
+                 Any (not (tcv `elemVarSet` bvs) &&
+                      (check_fv tcv || runAny check_fv (afv_type (varType tcv))))
     do_hole hole = do_tcv (coHoleCoVar hole)
 
 afv_type  :: Type     -> FV (BoundVars, TyVar -> Bool) DM.Any
@@ -892,7 +897,7 @@ afv_co    :: Coercion -> FV (BoundVars, TyVar -> Bool) DM.Any
 
 runAny :: (TyVar -> Bool) -> FV (BoundVars, TyCoVar -> Bool) DM.Any -> Bool
 {-# INLINE runAny #-}
-runAny check_fv fvs = DM.getAny $ runFV fvs (emptyVarSet, check_fv)
+runAny check_fv fvs = DM.getAny (runFV fvs (emptyVarSet, check_fv))
 
 anyFreeVarsOfType :: (TyCoVar -> Bool) -> Type -> Bool
 {-# INLINE anyFreeVarsOfType #-}
