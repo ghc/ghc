@@ -4496,7 +4496,7 @@ fromInnerBindings :: InnerBindings -> ([LHsGadtTelescope GhcPs], (Maybe (LHsCont
 fromInnerBindings = go []
   where
     go acc (InnerMore b n) = go (b:acc) n
-    go acc (InnerDone x) = (acc,x)
+    go acc (InnerDone x) = (reverse acc,x)
 
 instance ExactPrint InnerBindings where
   getAnnotationEntry (InnerMore (L li _) _) = fromAnn li
