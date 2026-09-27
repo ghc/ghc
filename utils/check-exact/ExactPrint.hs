@@ -3314,7 +3314,6 @@ markMaybeDodgyStmts (an,l) s@(L ls stmts) =
           return (Left (o',c'), r)
         Right an' -> do
          L ls' (List an'' stmts'') <- markAnnotated (L ls (List an' stmts))
-         -- (an'',r') <- markAnnListA an' $ markAnnotated stmts
          return (Right an'', L ls' stmts'')
       return ((an0, l), L ls' stmts')
     else return ((an, l), L ls stmts)
