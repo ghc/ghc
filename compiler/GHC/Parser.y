@@ -3679,8 +3679,8 @@ stmts :: { forall b. DisambECP b => PV (Located (OrdList (EpToken ";"),[LStmt Gh
         : stmts ';' stmt  { $1 >>= \ $1 ->
                             $3 >>= \ ($3 :: LStmt GhcPs (LocatedA b)) ->
                             case (snd $ unLoc $1) of
-                              [] -> return (sLL $1 $> ( (fst $ unLoc $1) `snocOL` (epTok $2)
-                                                      , $3 : (snd $ unLoc $1)))
+                              [] -> return (sL (comb3 $1 $2 $3) ( (fst $ unLoc $1) `snocOL` (epTok $2)
+                                                                , $3 : (snd $ unLoc $1)))
                               (h:t) -> do
                                { h' <- addTrailingSemiA h (epTok $2)
                                ; return $ sLL $1 $> (fst $ unLoc $1,$3 :(h':t)) }}

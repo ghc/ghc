@@ -64,6 +64,8 @@ dodo = do -- comment15
           stmt1
           stmt2
 
+main = do
+
 dodo2 = do
     -- comment16
     stmt1
