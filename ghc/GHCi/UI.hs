@@ -182,6 +182,7 @@ import GHC.IO.Handle ( hFlushAll )
 import GHC.TopHandler ( topHandler )
 
 import qualified GHC.Unit.Module.Graph as GHC
+import GHC.Unit.Home.Graph (memberHugUnit)
 
 -----------------------------------------------------------------------------
 
@@ -2376,7 +2377,9 @@ addModule files = do
       result <- liftIO $
         Finder.findImportedModule hsc_env m NoPkgQual
       case result of
-        Found _ _ -> return True
+        -- We could find a module from a dependency, such as `Data.List`, but we can't
+        -- actualy load that unless the module is located in a home unit.
+        Found _ m | moduleUnit m `memberHugUnit` hsc_HUG hsc_env -> return True
         _ -> do reportError (GhciModuleError $ GhciModuleNotFound (moduleNameString m))
                 return False
 
