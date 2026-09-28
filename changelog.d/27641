@@ -1,0 +1,4 @@
+section: ghci
+synopsis: Don't accept modules in `:add` that the loader will reject
+issues: #27641
+mrs: !16734

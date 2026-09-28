@@ -1,6 +1,2 @@
-<no location info>: error: [GHC-82272]
-    module ‘Data.List’ cannot be found locally
-
-<no location info>: error: [GHC-82272]
-    module ‘Data.List’ cannot be found locally
+<interactive>: error: [GHCi-23305] Module Data.List not found
 
