@@ -402,3 +402,4 @@ test('GhciPackageRename',
      ghci_script,
      ['GhciPackageRename.script'])
 test('T26233', normal, ghci_script, ['T26233.script'])
+test('T27641', normal, ghci_script, ['T27641.script'])
