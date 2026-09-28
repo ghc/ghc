@@ -1,0 +1,3 @@
+:add Data.List
+:reload
+putStrLn ":add Data.List should fail and a subsequent :reload should succeed"
