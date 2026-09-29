@@ -41,5 +41,13 @@ dnl ghc-toolchain.
 # See Note [How we configure the bundled windows toolchain]
 AC_DEFUN([SUBST_TOOLDIR],
 [
-    sed -i.bkp $1 's%'"$mingw_prefix"'%'"$mingw_install_prefix"'%g'
+    if ! grep -qF "$mingw_prefix" $1; then
+        AC_MSG_ERROR([SUBST_TOOLDIR: $1 does not refer to the bundled mingw toolchain at $mingw_prefix])
+    fi
+    if ! sed -i.bkp 's%'"$mingw_prefix"'%'"$mingw_install_prefix"'%g' $1; then
+        AC_MSG_ERROR([SUBST_TOOLDIR: failed to substitute $mingw_prefix in $1])
+    fi
+    if grep -qF "$mingw_prefix" $1; then
+        AC_MSG_ERROR([SUBST_TOOLDIR: $1 still refers to $mingw_prefix after substitution])
+    fi
 ])
