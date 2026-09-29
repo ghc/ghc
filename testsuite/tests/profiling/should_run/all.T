@@ -208,8 +208,13 @@ test('ignore_scc', [grep_prof("ignore_scc.hs"), test_opts_dot_prof], compile_and
 
 test('T21446', [], makefile_test, ['T21446'])
 
-test('T27225', [only_ways(['prof'])], compile_and_run, ['-O'])
-test('T27225b', [only_ways(['prof'])], compile_and_run, ['-O'])
+# Only check the user-written cost centres: which library frames (runMainIO1,
+# collectBacktraces', ...) show up depends on inlining and on whether the
+# libraries were built with -fprof-late.
+test('T27225', [only_ways(['prof']), filter_stdout_lines(r'.*Main\.Main\..*')],
+     compile_and_run, ['-O'])
+test('T27225b', [only_ways(['prof']), filter_stdout_lines(r'.*Main\.Main\..*')],
+     compile_and_run, ['-O'])
 
 test('scc-prof-overloaded001',
      [grep_prof("scc-prof-overloaded001.hs"), test_opts_dot_prof],
