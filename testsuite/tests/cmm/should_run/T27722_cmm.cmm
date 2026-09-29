@@ -1,0 +1,22 @@
+#include "Cmm.h"
+
+// The then-blocks of E1 and E2 are duplicates of the entry block: they
+// carry the same number of source notes (block and statement) as the
+// entry block (proc and statement), which matters for the block hash.
+// They get merged with each other in the first round of common block
+// elimination, E1 and E2 in the second, and only then does the entry
+// block have a duplicate.
+INFO_TABLE_RET (zork, RET_SMALL)
+    return ()
+{
+  bits64 x;
+  x = 1 :: bits64;
+  goto E1;
+E1:
+  if (x > 0 :: bits64) { x = 1 :: bits64; goto E2; } else { goto D; }
+E2:
+  if (x > 0 :: bits64) { x = 1 :: bits64; goto E2; } else { goto D; }
+D:
+  if (x > 1 :: bits64) goto E1;
+  goto E2;
+}

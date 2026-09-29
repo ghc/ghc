@@ -60,3 +60,6 @@ test('T27447',
      ],
      multi_compile_and_run,
      ['T27447', [('T27447_cmm.cmm', '')], ''])
+
+test('T27722', [req_cmm], multi_compile_and_run,
+     ['T27722', [('T27722_cmm.cmm', ''), ('T27722_c.c', '')], '-O'])
