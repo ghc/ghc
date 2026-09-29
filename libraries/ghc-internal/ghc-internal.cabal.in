@@ -94,6 +94,7 @@ Library
         OverloadedStrings
         ParallelListComp
         PolyKinds
+        QualifiedDo
         RankNTypes
         RecordWildCards
         RoleAnnotations
@@ -328,6 +329,7 @@ Library
         GHC.Internal.Text.Show
         GHC.Internal.Type.Reflection
         GHC.Internal.Type.Reflection.Unsafe
+        GHC.Internal.Unboxed.Do
         GHC.Internal.Unsafe.Coerce
 
         GHC.Internal.CString

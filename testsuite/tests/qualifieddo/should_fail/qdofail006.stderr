@@ -1,0 +1,14 @@
+qdofail006.hs:17:3: error: [GHC-55287]
+    • The binder of the lambda expression
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE r
+    • In a stmt of a qualified 'do' block: x <- m
+      In the expression:
+        Ubx.do x <- m
+               Ubx.pure x
+      In an equation for ‘bad’:
+          bad m
+            = Ubx.do x <- m
+                     Ubx.pure x
+

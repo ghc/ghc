@@ -1,0 +1,18 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 30, types: 44, coercions: 0, joins: 0/0}
+
+sumTwo
+  = \ @s mba s1 ->
+      case readWordArray# mba 0# s1 of { (# ipv, ipv1 #) ->
+      case readWordArray# mba 1# ipv of { (# ipv2, ipv3 #) ->
+      case writeWordArray# mba 2# (plusWord# ipv1 ipv3) ipv2 of s2
+      { __DEFAULT ->
+      (# s2, plusWord# ipv1 ipv3 #)
+      }
+      }
+      }
+
+
+

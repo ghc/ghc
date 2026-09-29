@@ -4,6 +4,7 @@
 
 * Introduce `dataToCodeQ` and `liftDataTyped`, typed variants of `dataToExpQ` and `liftData` respectively.
 * Add new `gc_sync_elapsed_ns` counter to GHC.Internal.Stats
+* Add `GHC.Internal.Unboxed.Do`: `QualifiedDo` operations for `State#`-passing code that binds unboxed values.
 
 ## 9.1001.0 -- 2024-05-01
 

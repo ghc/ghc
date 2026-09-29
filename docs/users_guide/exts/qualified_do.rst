@@ -118,6 +118,17 @@ If no qualifier is specified with ``-XQualifiedDo`` enabled, it defaults to the 
 Note that the operations to be qualified must be in scope for QualifiedDo to work. I.e. ``import MAC (label)`` in the
 example above would result in an error, since ``MAC.>>=`` and ``MAC.>>`` would not be in scope.
 
+.. _qualified-do-rep-poly:
+
+Representation-polymorphic operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The operations can be representation-polymorphic, so that the variables bound
+by ``pat <- u`` can have unboxed types such as ``Word#``. The representation of
+each bound variable must be fixed by the type of ``u``
+(see :ref:`representation-polymorphism-restrictions`). This does not work with
+:extension:`ApplicativeDo`.
+
 Examples
 ~~~~~~~~
 

@@ -1,0 +1,11 @@
+section: ghc-internal
+issues: #27944
+mrs: !16808
+synopsis:
+  Add ``GHC.Internal.Unboxed.Do`` for do-notation over unboxed values
+description:
+  The new module ``GHC.Internal.Unboxed.Do`` provides ``QualifiedDo``
+  operations for ``State#``-passing code. Bound variables can have any
+  representation (``Word#``, ``MutableByteArray# s``, ``(# Word#, Word# #)``,
+  ...) and unit actions of type ``State# s -> State# s`` can be used as
+  statements.
