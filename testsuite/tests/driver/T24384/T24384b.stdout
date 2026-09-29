@@ -5,10 +5,18 @@
       "/usr/include/stdc-predef.h",
       "foo.h"
     ],
-    "modules": [],
-    "modules-boot": [
-      "C"
-    ],
+    "modules": {
+      "normal": [],
+      "quote": [],
+      "splice": []
+    },
+    "modules-boot": {
+      "normal": [
+        "C"
+      ],
+      "quote": [],
+      "splice": []
+    },
     "options": [
       "-XStrict",
       "-XCPP",
@@ -17,10 +25,14 @@
     "packages": [
       {
         "id": "base-4.23.0.0-inplace",
-        "modules": [
-          "GHC.Essentials",
-          "Prelude"
-        ],
+        "modules": {
+          "normal": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "quote": [],
+          "splice": []
+        },
         "name": "base",
         "package-id": "base-4.23.0.0"
       }
@@ -32,10 +44,18 @@
   },
   "B": {
     "cpp": [],
-    "modules": [
-      "A"
-    ],
-    "modules-boot": [],
+    "modules": {
+      "normal": [
+        "A"
+      ],
+      "quote": [],
+      "splice": []
+    },
+    "modules-boot": {
+      "normal": [],
+      "quote": [],
+      "splice": []
+    },
     "options": [
       "-F",
       "-pgmF",
@@ -44,10 +64,14 @@
     "packages": [
       {
         "id": "base-4.23.0.0-inplace",
-        "modules": [
-          "GHC.Essentials",
-          "Prelude"
-        ],
+        "modules": {
+          "normal": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "quote": [],
+          "splice": []
+        },
         "name": "base",
         "package-id": "base-4.23.0.0"
       }
@@ -57,54 +81,154 @@
       "lib/B.hs"
     ]
   },
+  "B[boot]": {
+    "cpp": [],
+    "modules": {
+      "normal": [
+        "A"
+      ],
+      "quote": [],
+      "splice": []
+    },
+    "modules-boot": {
+      "normal": [],
+      "quote": [],
+      "splice": []
+    },
+    "options": [
+      "-F",
+      "-pgmF",
+      "./preproc.sh"
+    ],
+    "packages": [
+      {
+        "id": "base-4.23.0.0-inplace",
+        "modules": {
+          "normal": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "quote": [],
+          "splice": []
+        },
+        "name": "base",
+        "package-id": "base-4.23.0.0"
+      }
+    ],
+    "preprocessor": "./preproc.sh",
+    "sources": [
+      "lib/B.hs-boot"
+    ]
+  },
   "C": {
     "cpp": [],
-    "modules": [
-      "A",
-      "E"
-    ],
-    "modules-boot": [],
+    "modules": {
+      "normal": [
+        "A"
+      ],
+      "quote": [],
+      "splice": []
+    },
+    "modules-boot": {
+      "normal": [],
+      "quote": [],
+      "splice": []
+    },
     "options": [],
     "packages": [
       {
         "id": "base-4.23.0.0-inplace",
-        "modules": [
-          "GHC.Essentials",
-          "Prelude"
-        ],
+        "modules": {
+          "normal": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "quote": [],
+          "splice": []
+        },
         "name": "base",
         "package-id": "base-4.23.0.0"
       },
       {
         "id": "containers-0.8-inplace",
-        "modules": [
-          "Data.Set"
-        ],
+        "modules": {
+          "normal": [
+            "Data.Set"
+          ],
+          "quote": [],
+          "splice": []
+        },
         "name": "containers",
         "package-id": "containers-0.8"
       }
     ],
     "preprocessor": null,
     "sources": [
-      "C.hs",
+      "C.hs"
+    ]
+  },
+  "C[boot]": {
+    "cpp": [],
+    "modules": {
+      "normal": [
+        "E"
+      ],
+      "quote": [],
+      "splice": []
+    },
+    "modules-boot": {
+      "normal": [],
+      "quote": [],
+      "splice": []
+    },
+    "options": [],
+    "packages": [
+      {
+        "id": "base-4.23.0.0-inplace",
+        "modules": {
+          "normal": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "quote": [],
+          "splice": []
+        },
+        "name": "base",
+        "package-id": "base-4.23.0.0"
+      }
+    ],
+    "preprocessor": null,
+    "sources": [
       "C.hs-boot"
     ]
   },
   "D": {
     "cpp": [],
-    "modules": [
-      "B",
-      "C"
-    ],
-    "modules-boot": [],
+    "modules": {
+      "normal": [
+        "B",
+        "C"
+      ],
+      "quote": [],
+      "splice": []
+    },
+    "modules-boot": {
+      "normal": [],
+      "quote": [],
+      "splice": []
+    },
     "options": [],
     "packages": [
       {
         "id": "base-4.23.0.0-inplace",
-        "modules": [
-          "GHC.Essentials",
-          "Prelude"
-        ],
+        "modules": {
+          "normal": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "quote": [],
+          "splice": []
+        },
         "name": "base",
         "package-id": "base-4.23.0.0"
       }
@@ -116,40 +240,64 @@
   },
   "E": {
     "cpp": [],
-    "modules": [],
-    "modules-boot": [],
+    "modules": {
+      "normal": [],
+      "quote": [],
+      "splice": []
+    },
+    "modules-boot": {
+      "normal": [],
+      "quote": [],
+      "splice": []
+    },
     "options": [],
     "packages": [
       {
         "id": "base-4.23.0.0-inplace",
-        "modules": [
-          "GHC.Essentials",
-          "Prelude"
-        ],
+        "modules": {
+          "normal": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "quote": [],
+          "splice": []
+        },
         "name": "base",
         "package-id": "base-4.23.0.0"
       },
       {
         "id": "dep-1-XXX",
-        "modules": [
-          "Dep"
-        ],
+        "modules": {
+          "normal": [
+            "Dep"
+          ],
+          "quote": [],
+          "splice": []
+        },
         "name": "dep",
         "package-id": "dep-1"
       },
       {
         "id": "dep-public-1-XXX",
-        "modules": [
-          "DepPublic"
-        ],
+        "modules": {
+          "normal": [
+            "DepPublic"
+          ],
+          "quote": [],
+          "splice": []
+        },
         "name": "dep-public",
         "package-id": "dep-public-1"
       },
       {
         "id": "template-haskell-2.25.0.0-inplace",
-        "modules": [
-          "Language.Haskell.TH.Syntax"
-        ],
+        "modules": {
+          "normal": [
+            "Language.Haskell.TH.Syntax"
+          ],
+          "quote": [],
+          "splice": []
+        },
         "name": "template-haskell",
         "package-id": "template-haskell-2.25.0.0"
       }

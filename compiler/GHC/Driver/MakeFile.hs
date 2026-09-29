@@ -176,11 +176,10 @@ doMkDependModuleGraph dflags module_graph = do
 
 data DepNode =
   DepNode
-    { dn_mod :: Module
+    { dn_mod :: ModuleWithIsBoot
     , dn_src :: OsPath
     , dn_obj :: OsPath
     , dn_hi :: OsPath
-    , dn_boot :: IsBootInterface
     , dn_preprocessing :: PreprocessingNode
     }
 
@@ -195,6 +194,7 @@ data Dep
     , dep_path :: OsPath
     , dep_unit :: Maybe UnitInfo
     , dep_local :: Bool
+    , dep_level :: ImportLevel
     , dep_boot :: IsBootInterface
     }
   | DepCpp
@@ -273,11 +273,10 @@ processDeps dflags hsc_env excl_mods sinks (AcyclicSCC (ModuleNode _ (ModuleNode
     src_file = msHsFileOsPath node
     mkDepNode preproc =
       DepNode
-        { dn_mod = ms_mod node
+        { dn_mod = GWIB (ms_mod node) (isBootSummary node)
         , dn_src = src_file
         , dn_obj = msObjFileOsPath node
         , dn_hi = msHiFileOsPath node
-        , dn_boot = isBootSummary node
         , dn_preprocessing = preproc
         }
 
@@ -352,6 +351,7 @@ findDependency hsc_env imp = do
           , dep_unit = lookupUnitId (hsc_units hsc_env) (moduleUnitId dep_mod)
           , dep_local = isJust (ml_hs_file loc)
           , dep_boot = is_boot
+          , dep_level = ui_level imp
           }
 
     fail ->
@@ -457,11 +457,9 @@ writeDependencies include_pkgs root hdl suffixes node deps =
 
     -- add dependency between objects and their corresponding .hi-boot
     -- files if the module has a corresponding .hs-boot file (#14482)
-    boot_dep
-      | IsBoot <- dn_boot
-      = [([obj], hi) | (obj, hi) <- zip (suffixed (removeBootSuffix dn_obj)) (suffixed dn_hi)]
-      | otherwise
-      = []
+    boot_dep = case gwib_isBoot dn_mod of
+      IsBoot -> [([obj], hi) | (obj, hi) <- zip (suffixed (removeBootSuffix dn_obj)) (suffixed dn_hi)]
+      NotBoot -> []
 
     -- Add one dependency for each suffix;
     -- e.g.         A.o   : B.hi
@@ -482,7 +480,7 @@ writeDependencies include_pkgs root hdl suffixes node deps =
 
     suffixed f = insertSuffixes f suffixes
 
-    DepNode {dn_src, dn_obj, dn_hi, dn_boot} = node
+    DepNode {dn_src, dn_obj, dn_hi, dn_mod} = node
 
 -----------------------------
 writeDependency :: OsPath -> Handle -> [OsPath] -> OsPath -> IO ()
@@ -613,7 +611,7 @@ writeJsonFile doc p = do
 -- Payload for -dep-json
 
 newtype PackageDeps
-  = PackageDeps (Map.Map (String, UnitId, DPackageId) (Set.Set ModuleName))
+  = PackageDeps (Map.Map (String, UnitId, DPackageId) DepsImports)
   deriving newtype (Monoid)
 
 newtype DPackageId = DPackageId PackageId
@@ -625,10 +623,10 @@ instance Ord DPackageId where
 instance Semigroup PackageDeps where
   PackageDeps l <> PackageDeps r = PackageDeps (Map.unionWith (Semigroup.<>) l r)
 
-data Deps
-  = Deps
+data Deps = Deps
   { sources :: Set.Set OsPath
-  , modules :: (Set.Set ModuleName, Set.Set ModuleName)
+  , moduleImports :: DepsImports
+  , sourceImports :: DepsImports
   , packages :: PackageDeps
   , cpp :: Set.Set OsPath
   , options :: [String]
@@ -637,51 +635,76 @@ data Deps
   deriving stock (Generic)
   deriving (Semigroup, Monoid) via (Generically Deps)
 
-newtype DepJson = DepJson (Map.Map ModuleName Deps)
+data DepsImports
+  = DepsImports
+  { normalImport :: Set.Set Module
+  , spliceImport :: Set.Set Module
+  , quoteImport :: Set.Set Module
+  }
+  deriving stock (Generic)
+  deriving (Semigroup, Monoid) via (Generically DepsImports)
+
+newtype DepJson = DepJson (Map.Map ModuleWithIsBoot Deps)
 
 instance ToJson DepJson where
   json (DepJson m) =
-    JSObject [
-      (moduleNameString target, JSObject [
-        ("sources", array sources (showOsPath . normalise)),
-        ("modules", array (fst modules) moduleNameString),
-        ("modules-boot", array (snd modules) moduleNameString),
-        ("packages",
-          JSArray
-            [ package name unit_id package_id mods
-            | ((name, unit_id, dpkd_id), mods) <- Map.toList packages
-            , let DPackageId package_id = dpkd_id
-            ]
-        ),
-        ("cpp", array cpp showOsPath),
-        ("options", JSArray $ map JSString options),
-        ("preprocessor", maybe JSNull JSString preprocessor)
-      ])
-      | (target, Deps {packages = PackageDeps packages, ..}) <- Map.toList m
-    ]
+    JSObject
+      [ (homeUnitModuleKey target, homeUnitModule deps)
+      | (target, deps) <- Map.toList m
+      ]
     where
+      homeUnitModuleKey :: ModuleWithIsBoot -> String
+      homeUnitModuleKey t = moduleNameString (moduleName (gwib_mod t)) ++ case gwib_isBoot t of
+        IsBoot -> "[boot]"
+        NotBoot -> ""
+
+      homeUnitModule :: Deps -> JsonDoc
+      homeUnitModule Deps {packages = PackageDeps packages, ..} =
+        JSObject
+          [ ("sources", array sources (showOsPath . normalise))
+          , ("modules", JSObject $ importsObj moduleImports)
+          , ("modules-boot", JSObject $ importsObj sourceImports)
+          , ("packages", JSArray
+              [ package name unit_id package_id mods
+              | ((name, unit_id, dpkd_id), mods) <- Map.toList packages
+              , let DPackageId package_id = dpkd_id
+              ]
+            )
+          , ("cpp", array cpp showOsPath)
+          , ("options", JSArray $ map JSString options)
+          , ("preprocessor", maybe JSNull JSString preprocessor)
+          ]
+
+      package :: String -> UnitId -> PackageId -> DepsImports -> JsonDoc
       package name unit_id (PackageId package_id) mods =
-        JSObject [
-          ("id", JSString (unitIdString unit_id)),
-          ("name", JSString name),
-          ("package-id", JSString (unpackFS package_id)),
-          ("modules", array mods moduleNameString)
-        ]
+        JSObject
+          [ ("id", JSString (unitIdString unit_id))
+          , ("name", JSString name)
+          , ("package-id", JSString (unpackFS package_id))
+          , ("modules", JSObject $ importsObj mods)
+          ]
 
       array values render = JSArray (fmap (JSString . render) (Set.toList values))
 
       showOsPath = unsafeDecodeUtf
 
+      importsObj  :: DepsImports -> [(String, JsonDoc)]
+      importsObj DepsImports{..} =
+        [ ("normal", array normalImport (moduleNameString . moduleName))
+        , ("quote" , array quoteImport  (moduleNameString . moduleName))
+        , ("splice", array spliceImport (moduleNameString . moduleName))
+        ]
+
 initDepJson :: IO (IORef DepJson)
 initDepJson = newIORef $ DepJson Map.empty
 
-insertDepJson :: [ModuleName] -> Deps -> DepJson -> DepJson
+insertDepJson :: [ModuleWithIsBoot] -> Deps -> DepJson -> DepJson
 insertDepJson targets dep (DepJson m0) =
   DepJson
     $ foldl'
       ( \acc target ->
-          Map.insertWith
-            (Semigroup.<>)
+          Map.insertWithKey
+            (\ k _l _r -> pprPanic "insertDepJson" (text "Conflicting entries for: " <+> ppr k))
             target
             dep
             acc
@@ -691,24 +714,23 @@ insertDepJson targets dep (DepJson m0) =
 
 updateDepJson :: Bool -> DepNode -> [Dep] -> DepJson -> DepJson
 updateDepJson include_pkgs DepNode {..} deps =
-  insertDepJson [moduleName dn_mod] payload
+  insertDepJson [dn_mod] payload
   where
-    payload = node_data Semigroup.<> foldMap dep deps
+    payload = node_data Semigroup.<> foldMap mkDep deps
 
     node_data =
-      mempty {
-        sources = Set.singleton dn_src,
-        preprocessor = pn_preprocessor dn_preprocessing,
-        options = pn_options dn_preprocessing
-      }
+      mempty
+        { sources = Set.singleton dn_src
+        , preprocessor = pn_preprocessor dn_preprocessing
+        , options = pn_options dn_preprocessing
+        }
 
-    dep = \case
-      DepHi {dep_mod, dep_local, dep_unit, dep_boot}
+    mkDep = \case
+      DepHi {dep_mod, dep_local, dep_unit, dep_boot, dep_level}
         | dep_local
-        , let set = Set.singleton $ moduleName dep_mod
-              value | IsBoot <- dep_boot = (Set.empty, set)
-                    | otherwise = (set, Set.empty)
-        -> mempty {modules = value}
+        -> case dep_boot of
+          IsBoot -> mempty {sourceImports = depsImportForImport dep_mod dep_level}
+          NotBoot -> mempty {moduleImports = depsImportForImport dep_mod dep_level }
 
         | include_pkgs
         , Just unit <- dep_unit
@@ -717,7 +739,7 @@ updateDepJson include_pkgs DepNode {..} deps =
               withLibName (PackageName c) = name ++ ":" ++ unpackFS c
               lname = maybe name withLibName (unitComponentName unit)
               key = (lname, unitId unit, DPackageId $ unitPackageId unit)
-        -> mempty {packages = PackageDeps (Map.singleton key (Set.singleton $ moduleName dep_mod))}
+        -> mempty {packages = PackageDeps (Map.singleton key (depsImportForImport dep_mod dep_level))}
 
         | otherwise
         -> mempty
@@ -725,6 +747,10 @@ updateDepJson include_pkgs DepNode {..} deps =
       DepCpp {dep_path} ->
         mempty {cpp = Set.singleton dep_path}
 
+    depsImportForImport mod_name = \ case
+      NormalLevel -> mempty { normalImport = Set.singleton mod_name }
+      SpliceLevel -> mempty { spliceImport = Set.singleton mod_name }
+      QuoteLevel ->  mempty { quoteImport  = Set.singleton mod_name }
 
 -----------------------------------------------------------------
 --              Module cycles
