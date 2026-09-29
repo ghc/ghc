@@ -8,4 +8,4 @@ description:
   operations for ``State#``-passing code. Bound variables can have any
   representation (``Word#``, ``MutableByteArray# s``, ``(# Word#, Word# #)``,
   ...) and unit actions of type ``State# s -> State# s`` can be used as
-  statements.
+  statements. The ``GHC.Internal.Bignum`` modules now use it.

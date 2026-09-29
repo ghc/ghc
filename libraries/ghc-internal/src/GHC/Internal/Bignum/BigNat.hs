@@ -9,6 +9,11 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE QualifiedDo #-}
+{-# LANGUAGE MonoLocalBinds #-}
+   -- Local State#-passing loops (e.g. in bigNatFromAddrLE#) must stay
+   -- monomorphic in the state type, otherwise GHC does not turn them into
+   -- join points (see #14620).
 
 {-# OPTIONS_GHC -fdefines-known-key-names #-}
     -- Defines lots of functions that have BuiltinRules
@@ -28,6 +33,7 @@ import GHC.Internal.Magic
 import GHC.Internal.Bignum.Primitives
 import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Backend
+import qualified GHC.Internal.Unboxed.Do as Ubx
 
 -- | A BigNat
 --
@@ -198,10 +204,10 @@ bigNatFromWordListUnsafe xs =
       length i []     = i
       length i (_:ys) = length (i +# 1#) ys
       !lxs = length 0# xs
-      writeWordList _mwa _i []        s = s
-      writeWordList mwa   i (W# w:ws) s =
-         case mwaWrite# mwa i w s of
-            s1 -> writeWordList mwa (i -# 1#) ws s1
+      writeWordList _mwa _i []        = Ubx.nop
+      writeWordList mwa   i (W# w:ws) = Ubx.do
+         mwaWrite# mwa i w
+         writeWordList mwa (i -# 1#) ws
    in withNewWordArray# lxs \mwa ->
             writeWordList mwa (lxs -# 1#) xs
 
@@ -503,17 +509,18 @@ bigNatSubWordUnsafe# x y
    where
       !sz = wordArraySize# x
 
-      go mwa carry i s
+      go mwa carry i
          | isTrue# (i >=# sz)
-         = s
+         = Ubx.nop
 
          | 0## <- carry
-         = mwaArrayCopy# mwa i x i (sz -# i) s
+         = mwaArrayCopy# mwa i x i (sz -# i)
 
          | True
-         = case subWordC# (indexWordArray# x i) carry of
-            (# l, c #) -> case mwaWrite# mwa i l s of
-                              s1 -> go mwa (int2Word# c) (i +# 1#) s1
+         = Ubx.do
+            let !(# l, c #) = subWordC# (indexWordArray# x i) carry
+            mwaWrite# mwa i l
+            go mwa (int2Word# c) (i +# 1#)
 
 -- | Subtract a Word# from a BigNat
 --
@@ -537,13 +544,14 @@ bigNatSubUnsafe a b
    | bigNatIsZero b = a
    | True =
       let szA = wordArraySize# a
-      in withNewWordArrayTrimmed# szA \mwa s->
-            case inline bignat_sub mwa a b s of
-               (# s', 1# #) -> s'
-               (# s', _  #) -> case raiseUnderflow of
-                                 !_ -> s'
-                                 -- see Note [ghc-bignum exceptions] in
-                                 -- GHC.Internal.Bignum.Primitives
+      in withNewWordArrayTrimmed# szA \mwa -> Ubx.do
+            ok <- inline bignat_sub mwa a b
+            case ok of
+               1# -> Ubx.nop
+               _  -> case raiseUnderflow of
+                        !_ -> Ubx.nop
+                        -- see Note [ghc-bignum exceptions] in
+                        -- GHC.Internal.Bignum.Primitives
 
 -- | Subtract two BigNat
 bigNatSub :: BigNat# -> BigNat# -> (# (# #) | BigNat# #)
@@ -620,13 +628,12 @@ bigNatQuotRemWord# a b
    | True =
    let
       sz = wordArraySize# a
-      io s =
-         case newWordArray# sz s of { (# s1, mwq #) ->
-         case inline bignat_quotrem_word mwq a b s1 of { (# s2, r #)  ->
-         case mwaTrimZeroes# mwq s2 of { s3 ->
-         case unsafeFreezeByteArray# mwq s3 of { (# s4, wq #) ->
-         (# s4, (# wq, r #) #)
-         }}}}
+      io = Ubx.do
+         mwq <- newWordArray# sz
+         r <- inline bignat_quotrem_word mwq a b
+         mwaTrimZeroes# mwq
+         wq <- unsafeFreezeByteArray# mwq
+         Ubx.pure (# wq, r #)
    in case runRW# io of
          (# _, (# wq,r #) #) -> (# wq, r #)
 
@@ -815,9 +822,9 @@ bigNatOrWord# a b
    | 0## <- b       = a
    | True           =
       let sz = wordArraySize# a
-      in withNewWordArray# sz \mwa s ->
-            case mwaArrayCopy# mwa 1# a 1# (sz -# 1#) s of
-               s' -> mwaWrite# mwa 0# (indexWordArray# a 0# `or#` b) s'
+      in withNewWordArray# sz \mwa -> Ubx.do
+            mwaArrayCopy# mwa 1# a 1# (sz -# 1#)
+            mwaWrite# mwa 0# (indexWordArray# a 0# `or#` b)
 
 -- | Bitwise AND
 bigNatAnd :: BigNat# -> BigNat# -> BigNat#
@@ -852,11 +859,10 @@ bigNatAndNotWord# :: BigNat# -> Word# -> BigNat#
 bigNatAndNotWord# a b
    | bigNatIsZero a     = a
    | szA <- bigNatSize# a
-   = withNewWordArray# szA \mwa s ->
+   = withNewWordArray# szA \mwa -> Ubx.do
       -- duplicate higher limbs
-      case mwaArrayCopy# mwa 1# a 1# (szA -# 1#) s of
-         s' -> writeWordArray# mwa 0#
-               (indexWordArray# a 0# `and#` not# b) s'
+      mwaArrayCopy# mwa 1# a 1# (szA -# 1#)
+      writeWordArray# mwa 0# (indexWordArray# a 0# `and#` not# b)
 
 -- | Bitwise AND with Int#
 bigNatAndInt# :: BigNat# -> Int# -> BigNat#
@@ -864,11 +870,10 @@ bigNatAndInt# a b
    | bigNatIsZero a     = a
    | isTrue# (b >=# 0#) = bigNatAndWord# a (int2Word# b)
    | szA <- bigNatSize# a
-   = withNewWordArray# szA \mwa s ->
+   = withNewWordArray# szA \mwa -> Ubx.do
       -- duplicate higher limbs (because of sign-extension of b)
-      case mwaArrayCopy# mwa 1# a 1# (szA -# 1#) s of
-         s' -> writeWordArray# mwa 0#
-               (indexWordArray# a 0# `and#` int2Word# b) s'
+      mwaArrayCopy# mwa 1# a 1# (szA -# 1#)
+      writeWordArray# mwa 0# (indexWordArray# a 0# `and#` int2Word# b)
 
 
 -- | Bitwise XOR
@@ -891,9 +896,9 @@ bigNatXorWord# a b
    | True           =
       let
          sz = wordArraySize# a
-      in withNewWordArray# sz \mwa s ->
-            case mwaArrayCopy# mwa 1# a 1# (sz -# 1#) s of
-               s' -> mwaWrite# mwa 0# (indexWordArray# a 0# `xor#` b) s'
+      in withNewWordArray# sz \mwa -> Ubx.do
+            mwaArrayCopy# mwa 1# a 1# (sz -# 1#)
+            mwaWrite# mwa 0# (indexWordArray# a 0# `xor#` b)
 
 -- | PopCount for BigNat
 bigNatPopCount :: BigNat# -> Word
@@ -1005,11 +1010,11 @@ bigNatBit# i
       !nb = word2Int# (i `and#` WORD_SIZE_BITS_MASK##)
       !sz = nw +# 1#
       !v  = 1## `uncheckedShiftL#` nb
-   in withNewWordArray# sz \mwa s ->
+   in withNewWordArray# sz \mwa -> Ubx.do
          -- clear the array
-         case mwaFill# mwa 0## 0## (int2Word# sz) s of
-            -- set the bit in the most-significant word
-            s2 -> mwaWrite# mwa (sz -# 1#) v s2
+         mwaFill# mwa 0## 0## (int2Word# sz)
+         -- set the bit in the most-significant word
+         mwaWrite# mwa (sz -# 1#) v
 
 -- | Return a BigNat whose bit `i` is the only one set.
 --
@@ -1042,9 +1047,9 @@ bigNatClearBit# a n
                      mwaArrayCopy# mwa 0# a 0# nsz s
 
       | True ->
-         withNewWordArray# sz \mwa s ->
-            case mwaArrayCopy# mwa 0# a 0# sz s of
-               s' -> writeWordArray# mwa nw nv s'
+         withNewWordArray# sz \mwa -> Ubx.do
+            mwaArrayCopy# mwa 0# a 0# sz
+            writeWordArray# mwa nw nv
 
 -- | BigNat set bit
 bigNatSetBit# :: BigNat# -> Word# -> BigNat#
@@ -1061,15 +1066,15 @@ bigNatSetBit# a n
    in if
       -- result BigNat will have more limbs
       | isTrue# (d ># 0#)
-      -> withNewWordArray# (nw +# 1#) \mwa s ->
-            case mwaArrayCopy# mwa 0# a 0# sz s of
-               s' -> case mwaFill# mwa 0## (int2Word# sz) (int2Word# (d -# 1#)) s' of
-                  s'' -> writeWordArray# mwa nw (bitW# nb) s''
+      -> withNewWordArray# (nw +# 1#) \mwa -> Ubx.do
+            mwaArrayCopy# mwa 0# a 0# sz
+            mwaFill# mwa 0## (int2Word# sz) (int2Word# (d -# 1#))
+            writeWordArray# mwa nw (bitW# nb)
 
       | nv <- bigNatIndex# a nw `or#` bitW# nb
-      -> withNewWordArray# sz \mwa s ->
-            case mwaArrayCopy# mwa 0# a 0# sz s of
-               s' -> writeWordArray# mwa nw nv s'
+      -> withNewWordArray# sz \mwa -> Ubx.do
+            mwaArrayCopy# mwa 0# a 0# sz
+            writeWordArray# mwa nw nv
 
 -- | Reverse the given bit
 bigNatComplementBit# :: BigNat# -> Word# -> BigNat#
@@ -1082,15 +1087,15 @@ bigNatComplementBit# a n =
    in if
       -- result BigNat will have more limbs
       | isTrue# (d ># 0#)
-      -> withNewWordArray# (nw +# 1#) \mwa s ->
-            case mwaArrayCopy# mwa 0# a 0# sz s of
-               s' -> case mwaFill# mwa 0## (int2Word# sz) (int2Word# (d -# 1#)) s' of
-                  s'' -> writeWordArray# mwa nw (bitW# nb) s''
+      -> withNewWordArray# (nw +# 1#) \mwa -> Ubx.do
+            mwaArrayCopy# mwa 0# a 0# sz
+            mwaFill# mwa 0## (int2Word# sz) (int2Word# (d -# 1#))
+            writeWordArray# mwa nw (bitW# nb)
 
       | nv <- bigNatIndex# a nw `xor#` bitW# nb
-      -> withNewWordArrayTrimmed# sz \mwa s ->
-            case mwaArrayCopy# mwa 0# a 0# sz s of
-               s' -> writeWordArray# mwa nw nv s'
+      -> withNewWordArrayTrimmed# sz \mwa -> Ubx.do
+            mwaArrayCopy# mwa 0# a 0# sz
+            writeWordArray# mwa nw nv
 
 -------------------------------------------------
 -- Log operations
@@ -1259,11 +1264,12 @@ bigNatCtzWord a = W# (bigNatCtzWord# a)
 -- zero bytes written.
 bigNatToAddrLE# :: BigNat# -> Addr# -> State# s -> (# State# s, Word# #)
 {-# NOINLINE bigNatToAddrLE# #-}
-bigNatToAddrLE# a addr s0
-   | isTrue# (sz ==# 0#) = (# s0, 0## #)
-   | True = case writeMSB s0 of
-      (# s1, k #) -> case go 0# s1 of
-         s2 -> (# s2, k `plusWord#` (int2Word# li `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#) #)
+bigNatToAddrLE# a addr
+   | isTrue# (sz ==# 0#) = Ubx.pure 0##
+   | True = Ubx.do
+      k <- writeMSB
+      go 0#
+      Ubx.pure (k `plusWord#` (int2Word# li `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#))
    where
      !sz = wordArraySize# a
      !li = sz -# 1#
@@ -1271,15 +1277,16 @@ bigNatToAddrLE# a addr s0
      writeMSB = wordToAddrLE# (indexWordArray# a li)
                   (addr `plusAddr#` (li `uncheckedIShiftL#` WORD_SIZE_BYTES_SHIFT#))
 
-     go i s
+     go i
       | isTrue# (i <# li)
       , off <- i `uncheckedIShiftL#` WORD_SIZE_BYTES_SHIFT#
       , w <- indexWordArray# a i
-      = case wordWriteAddrLE# w (addr `plusAddr#` off) s of
-         s -> go (i +# 1#) s
+      = Ubx.do
+         wordWriteAddrLE# w (addr `plusAddr#` off)
+         go (i +# 1#)
 
       | True
-      = s
+      = Ubx.nop
 
 -- | Write a BigNat in base-256 big-endian representation and return the
 -- number of bytes written.
@@ -1289,23 +1296,24 @@ bigNatToAddrLE# a addr s0
 -- zero bytes written.
 bigNatToAddrBE# :: BigNat# -> Addr# -> State# s -> (# State# s, Word# #)
 {-# NOINLINE bigNatToAddrBE# #-}
-bigNatToAddrBE# a addr s0
-   | isTrue# (sz ==# 0#) = (# s0, 0## #)
+bigNatToAddrBE# a addr
+   | isTrue# (sz ==# 0#) = Ubx.pure 0##
    | msw <- indexWordArray# a (sz -# 1#)
-   = case wordToAddrBE# msw addr s0 of
-      (# s1, k #) -> case go (sz -# 1#) (addr `plusAddr#` word2Int# k) s1 of
-         s2 -> (# s2, k `plusWord#` (int2Word# (sz -# 1#) `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#) #)
+   = Ubx.do
+      k <- wordToAddrBE# msw addr
+      go (sz -# 1#) (addr `plusAddr#` word2Int# k)
+      Ubx.pure (k `plusWord#` (int2Word# (sz -# 1#) `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#))
    where
      sz   = wordArraySize# a
 
-     go i adr s
+     go i adr
       | 0# <- i
-      = s
+      = Ubx.nop
 
       | w <- indexWordArray# a (i -# 1#)
-      = case wordWriteAddrBE# w adr s of
-         s' -> go (i -# 1#)
-                  (adr `plusAddr#` WORD_SIZE_IN_BYTES# ) s'
+      = Ubx.do
+         wordWriteAddrBE# w adr
+         go (i -# 1#) (adr `plusAddr#` WORD_SIZE_IN_BYTES# )
 
 
 -- | Write a BigNat in base-256 representation and return the
@@ -1333,8 +1341,9 @@ bigNatToAddr# a addr _  s = bigNatToAddrBE# a addr s
 -- written in advance. In case of @/i/ == 0@, the function will write and report
 -- zero bytes written.
 bigNatToAddr :: BigNat# -> Addr# -> Bool# -> IO Word
-bigNatToAddr a addr e = IO \s -> case bigNatToAddr# a addr e s of
-   (# s', w #) -> (# s', W# w #)
+bigNatToAddr a addr e = IO Ubx.do
+   w <- bigNatToAddr# a addr e
+   Ubx.pure (W# w)
 
 
 
@@ -1349,34 +1358,37 @@ bigNatToAddr a addr e = IO \s -> case bigNatToAddr# a addr e s of
 -- Higher limbs equal to 0 are automatically trimmed.
 bigNatFromAddrLE# :: Word# -> Addr# -> State# s -> (# State# s, BigNat# #)
 {-# NOINLINE bigNatFromAddrLE# #-}
-bigNatFromAddrLE# 0## _    s = (# s, bigNatZero# (# #) #)
-bigNatFromAddrLE# sz  addr s =
+bigNatFromAddrLE# 0## _    = Ubx.pure (bigNatZero# (# #))
+bigNatFromAddrLE# sz  addr =
    let
       !nw = sz `uncheckedShiftRL#` WORD_SIZE_BYTES_SHIFT#
       !nb = sz `and#` WORD_SIZE_BYTES_MASK##
 
-      readMSB mwa s
+      readMSB mwa
          | 0## <- nb
-         = s
+         = Ubx.nop
 
          | off <- word2Int# (nw `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#)
-         = case wordFromAddrLE# nb (addr `plusAddr#` off) s of
-            (# s, w #) -> mwaWrite# mwa (word2Int# nw) w s
+         = Ubx.do
+            w <- wordFromAddrLE# nb (addr `plusAddr#` off)
+            mwaWrite# mwa (word2Int# nw) w
 
-      go mwa i s
+      go mwa i
          | isTrue# (i ==# word2Int# nw)
-         = s
+         = Ubx.nop
 
          | off <- i `uncheckedIShiftL#` WORD_SIZE_BYTES_SHIFT#
-         = case wordFromAddrLE# WORD_SIZE_IN_BYTES## (addr `plusAddr#` off) s of
-            (# s, w #) -> case mwaWrite# mwa i w s of
-               s -> go mwa (i +# 1#) s
+         = Ubx.do
+            w <- wordFromAddrLE# WORD_SIZE_IN_BYTES## (addr `plusAddr#` off)
+            mwaWrite# mwa i w
+            go mwa (i +# 1#)
 
-   in case newWordArray# (word2Int# nw +# (word2Int# nb /=# 0#)) s of
-         (# s, mwa #) -> case readMSB mwa s of
-            s -> case go mwa 0# s of
-               s -> case mwaTrimZeroes# mwa s of
-                  s -> unsafeFreezeByteArray# mwa s
+   in Ubx.do
+      mwa <- newWordArray# (word2Int# nw +# (word2Int# nb /=# 0#))
+      readMSB mwa
+      go mwa 0#
+      mwaTrimZeroes# mwa
+      unsafeFreezeByteArray# mwa
 
 -- | Read a BigNat in base-256 big-endian representation from an Addr#.
 --
@@ -1385,35 +1397,38 @@ bigNatFromAddrLE# sz  addr s =
 -- Null higher limbs are automatically trimmed.
 bigNatFromAddrBE# :: Word# -> Addr# -> State# s -> (# State# s, BigNat# #)
 {-# NOINLINE bigNatFromAddrBE# #-}
-bigNatFromAddrBE# 0## _    s = (# s, bigNatZero# (# #) #)
-bigNatFromAddrBE# sz  addr s =
+bigNatFromAddrBE# 0## _    = Ubx.pure (bigNatZero# (# #))
+bigNatFromAddrBE# sz  addr =
    let
       !nw = word2Int# (sz `uncheckedShiftRL#` WORD_SIZE_BYTES_SHIFT#)
       !nb = sz `and#` WORD_SIZE_BYTES_MASK##
 
-      goMSB mwa s
+      goMSB mwa
          | 0## <- nb
-         = s
+         = Ubx.nop
 
          | True
-         = case wordFromAddrBE# nb addr s of
-            (# s, w #) -> mwaWrite# mwa nw w s
+         = Ubx.do
+            w <- wordFromAddrBE# nb addr
+            mwaWrite# mwa nw w
 
-      go mwa i s
+      go mwa i
          | isTrue# (i ==# nw)
-         = s
+         = Ubx.nop
 
          | k <- nw -# 1# -# i
          , off <- (k `uncheckedIShiftL#` WORD_SIZE_BYTES_SHIFT#) +# word2Int# nb
-         = case wordFromAddrBE# WORD_SIZE_IN_BYTES## (addr `plusAddr#` off) s of
-            (# s, w #) -> case mwaWrite# mwa i w s of
-               s -> go mwa (i +# 1#) s
+         = Ubx.do
+            w <- wordFromAddrBE# WORD_SIZE_IN_BYTES## (addr `plusAddr#` off)
+            mwaWrite# mwa i w
+            go mwa (i +# 1#)
 
-   in case newWordArray# (nw +# (word2Int# nb /=# 0#)) s of
-         (# s, mwa #) -> case goMSB mwa s of
-            s -> case go mwa 0# s of
-               s -> case mwaTrimZeroes# mwa s of
-                  s -> unsafeFreezeByteArray# mwa s
+   in Ubx.do
+      mwa <- newWordArray# (nw +# (word2Int# nb /=# 0#))
+      goMSB mwa
+      go mwa 0#
+      mwaTrimZeroes# mwa
+      unsafeFreezeByteArray# mwa
 
 -- | Read a BigNat in base-256 representation from an Addr#.
 --
@@ -1440,11 +1455,12 @@ bigNatFromAddr# sz addr _  s = bigNatFromAddrBE# sz addr s
 -- zero bytes written.
 bigNatToMutableByteArrayLE# :: BigNat# -> MutableByteArray# s -> Word# -> State# s -> (# State# s, Word# #)
 {-# NOINLINE bigNatToMutableByteArrayLE# #-}
-bigNatToMutableByteArrayLE# a mba moff s0
-   | isTrue# (sz ==# 0#) = (# s0, 0## #)
-   | True = case writeMSB s0 of
-      (# s1, k #) -> case go 0# s1 of
-         s2 -> (# s2, k `plusWord#` (int2Word# li `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#) #)
+bigNatToMutableByteArrayLE# a mba moff
+   | isTrue# (sz ==# 0#) = Ubx.pure 0##
+   | True = Ubx.do
+      k <- writeMSB
+      go 0#
+      Ubx.pure (k `plusWord#` (int2Word# li `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#))
    where
      !sz = wordArraySize# a
      !li = sz -# 1#
@@ -1452,15 +1468,16 @@ bigNatToMutableByteArrayLE# a mba moff s0
      writeMSB = wordToMutableByteArrayLE# (indexWordArray# a li)
                   mba (moff `plusWord#` int2Word# (li `uncheckedIShiftL#` WORD_SIZE_BYTES_SHIFT#))
 
-     go i s
+     go i
       | isTrue# (i <# li)
       , off <- int2Word# i `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#
       , w <- indexWordArray# a i
-      = case wordWriteMutableByteArrayLE# w mba (moff `plusWord#` off) s of
-         s -> go (i +# 1#) s
+      = Ubx.do
+         wordWriteMutableByteArrayLE# w mba (moff `plusWord#` off)
+         go (i +# 1#)
 
       | True
-      = s
+      = Ubx.nop
 
 -- | Write a BigNat in base-256 big-endian representation and return the
 -- number of bytes written.
@@ -1470,23 +1487,24 @@ bigNatToMutableByteArrayLE# a mba moff s0
 -- zero bytes written.
 bigNatToMutableByteArrayBE# :: BigNat# -> MutableByteArray# s -> Word# -> State# s -> (# State# s, Word# #)
 {-# NOINLINE bigNatToMutableByteArrayBE# #-}
-bigNatToMutableByteArrayBE# a mba moff s0
-   | isTrue# (sz ==# 0#) = (# s0, 0## #)
+bigNatToMutableByteArrayBE# a mba moff
+   | isTrue# (sz ==# 0#) = Ubx.pure 0##
    | msw <- indexWordArray# a (sz -# 1#)
-   = case wordToMutableByteArrayBE# msw mba moff s0 of
-      (# s1, k #) -> case go (sz -# 1#) k s1 of
-         s2 -> (# s2, k `plusWord#` (int2Word# (sz -# 1#) `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#) #)
+   = Ubx.do
+      k <- wordToMutableByteArrayBE# msw mba moff
+      go (sz -# 1#) k
+      Ubx.pure (k `plusWord#` (int2Word# (sz -# 1#) `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#))
    where
      sz   = wordArraySize# a
 
-     go i c s
+     go i c
       | 0# <- i
-      = s
+      = Ubx.nop
 
       | w <- indexWordArray# a (i -# 1#)
-      = case wordWriteMutableByteArrayBE# w mba (moff `plusWord#` c) s of
-         s' -> go (i -# 1#)
-                  (c `plusWord#` WORD_SIZE_IN_BYTES## ) s'
+      = Ubx.do
+         wordWriteMutableByteArrayBE# w mba (moff `plusWord#` c)
+         go (i -# 1#) (c `plusWord#` WORD_SIZE_IN_BYTES## )
 
 
 -- | Write a BigNat in base-256 representation and return the
@@ -1514,34 +1532,36 @@ bigNatToMutableByteArray# a mba off _  s = bigNatToMutableByteArrayBE# a mba off
 -- Null higher limbs are automatically trimmed.
 bigNatFromByteArrayLE# :: Word# -> ByteArray# -> Word# -> State# s -> (# State# s, BigNat# #)
 {-# NOINLINE bigNatFromByteArrayLE# #-}
-bigNatFromByteArrayLE# 0## _  _    s = (# s, bigNatZero# (# #) #)
-bigNatFromByteArrayLE# sz  ba moff s =
+bigNatFromByteArrayLE# 0## _  _    = Ubx.pure (bigNatZero# (# #))
+bigNatFromByteArrayLE# sz  ba moff =
    let
       !nw = sz `uncheckedShiftRL#` WORD_SIZE_BYTES_SHIFT#
       !nb = sz `and#` WORD_SIZE_BYTES_MASK##
 
-      readMSB mwa s
+      readMSB mwa
          | 0## <- nb
-         = s
+         = Ubx.nop
 
          | off <- nw `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#
          = case wordFromByteArrayLE# nb ba (moff `plusWord#` off) of
-               w -> mwaWrite# mwa (word2Int# nw) w s
+               w -> mwaWrite# mwa (word2Int# nw) w
 
-      go mwa i s
+      go mwa i
          | isTrue# (i `eqWord#` nw)
-         = s
+         = Ubx.nop
 
          | off <- i `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#
          = case wordFromByteArrayLE# WORD_SIZE_IN_BYTES## ba (moff `plusWord#` off) of
-               w -> case mwaWrite# mwa (word2Int# i) w s of
-                  s -> go mwa (i `plusWord#` 1##) s
+               w -> Ubx.do
+                  mwaWrite# mwa (word2Int# i) w
+                  go mwa (i `plusWord#` 1##)
 
-   in case newWordArray# (word2Int# nw +# (word2Int# nb /=# 0#)) s of
-         (# s, mwa #) -> case readMSB mwa s of
-            s -> case go mwa 0## s of
-               s -> case mwaTrimZeroes# mwa s of
-                  s -> unsafeFreezeByteArray# mwa s
+   in Ubx.do
+      mwa <- newWordArray# (word2Int# nw +# (word2Int# nb /=# 0#))
+      readMSB mwa
+      go mwa 0##
+      mwaTrimZeroes# mwa
+      unsafeFreezeByteArray# mwa
 
 -- | Read a BigNat in base-256 big-endian representation from a ByteArray#.
 --
@@ -1550,35 +1570,37 @@ bigNatFromByteArrayLE# sz  ba moff s =
 -- Null higher limbs are automatically trimmed.
 bigNatFromByteArrayBE# :: Word# -> ByteArray# -> Word# -> State# s -> (# State# s, BigNat# #)
 {-# NOINLINE bigNatFromByteArrayBE# #-}
-bigNatFromByteArrayBE# 0## _  _    s = (# s, bigNatZero# (# #) #)
-bigNatFromByteArrayBE# sz  ba moff s =
+bigNatFromByteArrayBE# 0## _  _    = Ubx.pure (bigNatZero# (# #))
+bigNatFromByteArrayBE# sz  ba moff =
    let
       !nw = sz `uncheckedShiftRL#` WORD_SIZE_BYTES_SHIFT#
       !nb = sz `and#` WORD_SIZE_BYTES_MASK##
 
-      goMSB mwa s
+      goMSB mwa
          | 0## <- nb
-         = s
+         = Ubx.nop
 
          | True
          = case wordFromByteArrayBE# nb ba moff of
-            w -> mwaWrite# mwa (word2Int# nw) w s
+            w -> mwaWrite# mwa (word2Int# nw) w
 
-      go mwa i s
+      go mwa i
          | isTrue# (i `eqWord#` nw)
-         = s
+         = Ubx.nop
 
          | k <- nw `minusWord#` 1## `minusWord#` i
          , off <- (k `uncheckedShiftL#` WORD_SIZE_BYTES_SHIFT#) `plusWord#` nb
          = case wordFromByteArrayBE# WORD_SIZE_IN_BYTES## ba (moff `plusWord#` off) of
-            w -> case mwaWrite# mwa (word2Int# i) w s of
-               s -> go mwa (i `plusWord#` 1##) s
+            w -> Ubx.do
+               mwaWrite# mwa (word2Int# i) w
+               go mwa (i `plusWord#` 1##)
 
-   in case newWordArray# (word2Int# nw +# (word2Int# nb /=# 0#)) s of
-         (# s, mwa #) -> case goMSB mwa s of
-            s -> case go mwa 0## s of
-               s -> case mwaTrimZeroes# mwa s of
-                  s -> unsafeFreezeByteArray# mwa s
+   in Ubx.do
+      mwa <- newWordArray# (word2Int# nw +# (word2Int# nb /=# 0#))
+      goMSB mwa
+      go mwa 0##
+      mwaTrimZeroes# mwa
+      unsafeFreezeByteArray# mwa
 
 -- | Read a BigNat in base-256 representation from a ByteArray#.
 --

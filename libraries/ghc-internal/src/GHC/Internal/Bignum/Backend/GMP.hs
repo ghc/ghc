@@ -9,6 +9,7 @@
 {-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE QualifiedDo #-}
 
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
@@ -26,6 +27,7 @@ import GHC.Internal.Bignum.Primitives
 import GHC.Internal.Prim
 import GHC.Internal.Types
 import GHC.Internal.Magic (runRW#)
+import qualified GHC.Internal.Unboxed.Do as Ubx
 import {-# SOURCE #-} GHC.Internal.Bignum.Integer
 import {-# SOURCE #-} GHC.Internal.Bignum.BigNat
 import {-# SOURCE #-} GHC.Internal.Bignum.Natural
@@ -75,15 +77,17 @@ bignat_add
    -> State# RealWorld
    -> State# RealWorld
 {-# INLINE bignat_add #-}
-bignat_add mwa wa wb s
+bignat_add mwa wa wb
    -- weird GMP requirement: the biggest comes first
    | isTrue# (wordArraySize# wb ># wordArraySize# wa)
-   = case ioWord# (c_mpn_add mwa wb (wordArraySize# wb) wa (wordArraySize# wa)) s of
-      (# s', c #) -> mwaWriteMostSignificant mwa c s'
+   = Ubx.do
+      c <- ioWord# (c_mpn_add mwa wb (wordArraySize# wb) wa (wordArraySize# wa))
+      mwaWriteMostSignificant mwa c
 
    | True
-   = case ioWord# (c_mpn_add mwa wa (wordArraySize# wa) wb (wordArraySize# wb)) s of
-      (# s', c #) -> mwaWriteMostSignificant mwa c s'
+   = Ubx.do
+      c <- ioWord# (c_mpn_add mwa wa (wordArraySize# wa) wb (wordArraySize# wb))
+      mwaWriteMostSignificant mwa c
 
 bignat_add_word
    :: MutableWordArray# RealWorld
@@ -92,9 +96,9 @@ bignat_add_word
    -> State# RealWorld
    -> State# RealWorld
 {-# INLINE bignat_add_word #-}
-bignat_add_word mwa wa b s = do
-   case ioWord# (c_mpn_add_1 mwa wa (wordArraySize# wa) b) s of
-      (# s', c #) -> mwaWriteMostSignificant mwa c s'
+bignat_add_word mwa wa b = Ubx.do
+   c <- ioWord# (c_mpn_add_1 mwa wa (wordArraySize# wa) b)
+   mwaWriteMostSignificant mwa c
 
 bignat_sub
    :: MutableWordArray# RealWorld
@@ -103,10 +107,11 @@ bignat_sub
    -> State# RealWorld
    -> (# State# RealWorld, Bool# #)
 {-# INLINE bignat_sub #-}
-bignat_sub mwa wa wb s =
-   case ioWord# (c_mpn_sub mwa wa (wordArraySize# wa) wb (wordArraySize# wb)) s of
-      (# s', 1## #) -> (# s', 0# #) -- underflow
-      (# s', _   #) -> (# s', 1# #) -- no underflow
+bignat_sub mwa wa wb = Ubx.do
+   c <- ioWord# (c_mpn_sub mwa wa (wordArraySize# wa) wb (wordArraySize# wb))
+   case c of
+      1## -> Ubx.pure 0# -- underflow
+      _   -> Ubx.pure 1# -- no underflow
 
 bignat_sub_word
    :: MutableWordArray# RealWorld
@@ -115,10 +120,11 @@ bignat_sub_word
    -> State# RealWorld
    -> (# State# RealWorld, Bool# #)
 {-# INLINE bignat_sub_word #-}
-bignat_sub_word mwa wa b s =
-   case ioWord# (c_mpn_sub_1 mwa wa (wordArraySize# wa) b) s of
-      (# s', 1## #) -> (# s', 0# #) -- underflow
-      (# s', _   #) -> (# s', 1# #) -- no underflow
+bignat_sub_word mwa wa b = Ubx.do
+   c <- ioWord# (c_mpn_sub_1 mwa wa (wordArraySize# wa) b)
+   case c of
+      1## -> Ubx.pure 0# -- underflow
+      _   -> Ubx.pure 1# -- no underflow
 
 bignat_mul
    :: MutableWordArray# RealWorld
@@ -127,11 +133,12 @@ bignat_mul
    -> State# RealWorld
    -> State# RealWorld
 {-# INLINE bignat_mul #-}
-bignat_mul mwa wa wb s = do
-   case ioWord# (c_mpn_mul mwa wa (wordArraySize# wa) wb (wordArraySize# wb)) s of
-      (# s', _msl #) -> s' -- we don't care about the most-significant
-                           -- limb. The caller shrink the mwa if
-                           -- necessary anyway.
+bignat_mul mwa wa wb = Ubx.do
+   _msl <- ioWord# (c_mpn_mul mwa wa (wordArraySize# wa) wb (wordArraySize# wb))
+   -- _msl is the most-significant limb of the result. It tells if the result
+   -- has a leading zero limb. We ignore it: the caller removes leading zero
+   -- limbs anyway (see withNewWordArrayTrimmed#).
+   Ubx.nop
 
 bignat_mul_word
    :: MutableWordArray# RealWorld -- ^ Result
@@ -140,9 +147,9 @@ bignat_mul_word
    -> State# RealWorld
    -> State# RealWorld
 {-# INLINE bignat_mul_word #-}
-bignat_mul_word mwa wa b s =
-   case ioWord# (c_mpn_mul_1 mwa wa (wordArraySize# wa) b) s of
-      (# s', c #) -> mwaWriteMostSignificant mwa c s'
+bignat_mul_word mwa wa b = Ubx.do
+   c <- ioWord# (c_mpn_mul_1 mwa wa (wordArraySize# wa) b)
+   mwaWriteMostSignificant mwa c
 
 bignat_popcount :: WordArray# -> Word#
 {-# INLINE bignat_popcount #-}
@@ -156,11 +163,12 @@ bignat_shiftl
    -> State# RealWorld
    -> State# RealWorld
 {-# INLINE bignat_shiftl #-}
-bignat_shiftl mwa wa n s =
-   case ioWord# (c_mpn_lshift mwa wa (wordArraySize# wa) n) s of
-      (# s', _msl #) -> s' -- we don't care about the most-significant
-                           -- limb. The caller shrink the mwa if
-                           -- necessary anyway.
+bignat_shiftl mwa wa n = Ubx.do
+   _msl <- ioWord# (c_mpn_lshift mwa wa (wordArraySize# wa) n)
+   -- _msl is the most-significant limb of the result. It tells if the result
+   -- has a leading zero limb. We ignore it: the caller removes leading zero
+   -- limbs anyway (see withNewWordArrayTrimmed#).
+   Ubx.nop
 
 bignat_shiftr
    :: MutableWordArray# RealWorld
@@ -169,11 +177,12 @@ bignat_shiftr
    -> State# RealWorld
    -> State# RealWorld
 {-# INLINE bignat_shiftr #-}
-bignat_shiftr mwa wa n s =
-   case ioWord# (c_mpn_rshift mwa wa (wordArraySize# wa) n) s of
-      (# s', _msl #) -> s' -- we don't care about the most-significant
-                           -- limb. The caller shrink the mwa if
-                           -- necessary anyway.
+bignat_shiftr mwa wa n = Ubx.do
+   _msl <- ioWord# (c_mpn_rshift mwa wa (wordArraySize# wa) n)
+   -- _msl is the most-significant limb of the result. It tells if the result
+   -- has a leading zero limb. We ignore it: the caller removes leading zero
+   -- limbs anyway (see withNewWordArrayTrimmed#).
+   Ubx.nop
 
 bignat_or
    :: MutableWordArray# RealWorld
@@ -182,15 +191,16 @@ bignat_or
    -> State# RealWorld
    -> State# RealWorld
 {-# INLINE bignat_or #-}
-bignat_or mwa wa wb s1
-   | isTrue# (szA >=# szB) = go wa szA wb szB s1
-   | True                  = go wb szB wa szA s1
+bignat_or mwa wa wb
+   | isTrue# (szA >=# szB) = go wa szA wb szB
+   | True                  = go wb szB wa szA
    where
       !szA = wordArraySize# wa
       !szB = wordArraySize# wb
       -- nx >= ny
-      go wx nx wy ny s = case ioVoid (c_mpn_ior_n mwa wx wy ny) s of
-         s' -> mwaArrayCopy# mwa ny wx ny (nx -# ny) s'
+      go wx nx wy ny = Ubx.do
+         ioVoid (c_mpn_ior_n mwa wx wy ny)
+         mwaArrayCopy# mwa ny wx ny (nx -# ny)
 
 bignat_xor
    :: MutableWordArray# RealWorld
@@ -199,15 +209,16 @@ bignat_xor
    -> State# RealWorld
    -> State# RealWorld
 {-# INLINE bignat_xor #-}
-bignat_xor mwa wa wb s1
-   | isTrue# (szA >=# szB) = go wa szA wb szB s1
-   | True                  = go wb szB wa szA s1
+bignat_xor mwa wa wb
+   | isTrue# (szA >=# szB) = go wa szA wb szB
+   | True                  = go wb szB wa szA
    where
       !szA = wordArraySize# wa
       !szB = wordArraySize# wb
       -- nx >= ny
-      go wx nx wy ny s = case ioVoid (c_mpn_xor_n mwa wx wy ny) s of
-         s' -> mwaArrayCopy# mwa ny wx ny (nx -# ny) s'
+      go wx nx wy ny = Ubx.do
+         ioVoid (c_mpn_xor_n mwa wx wy ny)
+         mwaArrayCopy# mwa ny wx ny (nx -# ny)
 
 bignat_and
    :: MutableWordArray# RealWorld -- ^ Result
@@ -229,9 +240,9 @@ bignat_and_not
    -> State# RealWorld
    -> State# RealWorld
 {-# INLINE bignat_and_not #-}
-bignat_and_not mwa wa wb s =
-   case ioVoid (c_mpn_andn_n mwa wa wb n) s of
-      s' -> mwaArrayCopy# mwa szB wa szB (szA -# szB) s'
+bignat_and_not mwa wa wb = Ubx.do
+   ioVoid (c_mpn_andn_n mwa wa wb n)
+   mwaArrayCopy# mwa szB wa szB (szA -# szB)
    where
       !szA = wordArraySize# wa
       !szB = wordArraySize# wb
@@ -291,9 +302,7 @@ bignat_quot_word
    -> Word#
    -> State# RealWorld
    -> State# RealWorld
-bignat_quot_word mwq wa b s =
-   case bignat_quotrem_word mwq wa b s of
-      (# s', _ #) -> s'
+bignat_quot_word mwq wa b = Ubx.void (bignat_quotrem_word mwq wa b)
 
 bignat_rem_word
    :: WordArray#
@@ -309,10 +318,10 @@ bignat_gcd
    -> WordArray#
    -> State# RealWorld
    -> State# RealWorld
-bignat_gcd mwr wa wb s =
+bignat_gcd mwr wa wb = Ubx.do
    -- wa > wb
-   case ioInt# (c_mpn_gcd# mwr wa (wordArraySize# wa) wb (wordArraySize# wb)) s of
-      (# s', sz #) -> mwaSetSize# mwr (narrowGmpSize# sz) s'
+   sz <- ioInt# (c_mpn_gcd# mwr wa (wordArraySize# wa) wb (wordArraySize# wb))
+   mwaSetSize# mwr (narrowGmpSize# sz)
 
 bignat_gcd_word
    :: WordArray#
@@ -379,7 +388,7 @@ integer_powmod b e m = naturalFromBigNat# (withNewWordArray# szm io)
                0# -> szb
                _  -> negateInt# szb
 
-      io r s = sbignat_powmod r ssb bb be bm s
+      io r = sbignat_powmod r ssb bb be bm
 
 
 sbignat_powmod
@@ -390,9 +399,9 @@ sbignat_powmod
    -> WordArray#
    -> State# RealWorld
    -> State# RealWorld
-sbignat_powmod r b_signed_size b e m s =
-   case ioInt# (integer_gmp_powm# r b b_signed_size e (wordArraySize# e) m (wordArraySize# m)) s of
-      (# s', n #) -> mwaSetSize# r (narrowGmpSize# n) s'
+sbignat_powmod r b_signed_size b e m = Ubx.do
+   n <- ioInt# (integer_gmp_powm# r b b_signed_size e (wordArraySize# e) m (wordArraySize# m))
+   mwaSetSize# r (narrowGmpSize# n)
 
 integer_gcde
    :: Integer
@@ -422,40 +431,39 @@ integer_gcde a b = case runRW# io of (# _, a #) -> a
       !x_init_sz = szb
       !y_init_sz = sza
 
-      io s =
+      io = Ubx.do
          -- allocate output arrays
-         case newWordArray# g_init_sz s     of { (# s, mbg #) ->
-         case newWordArray# x_init_sz s     of { (# s, mbx #) ->
-         case newWordArray# y_init_sz s     of { (# s, mby #) ->
+         mbg <- newWordArray# g_init_sz
+         mbx <- newWordArray# x_init_sz
+         mby <- newWordArray# y_init_sz
          -- allocate space to return sizes (3x4 = 12)
-         case newPinnedByteArray# 12# s     of { (# s, mszs #) ->
-         case unsafeFreezeByteArray# mszs s of { (# s, szs #) ->
-         let !ssx_ptr = byteArrayContents# szs in
-         let !ssy_ptr = ssx_ptr `plusAddr#` 4# in
-         let !sg_ptr  = ssy_ptr `plusAddr#` 4# in
+         mszs <- newPinnedByteArray# 12#
+         szs <- unsafeFreezeByteArray# mszs
+         let !ssx_ptr = byteArrayContents# szs
+             !ssy_ptr = ssx_ptr `plusAddr#` 4#
+             !sg_ptr  = ssy_ptr `plusAddr#` 4#
          -- call GMP
-         case ioVoid (integer_gmp_gcdext# mbx ssx_ptr mby ssy_ptr mbg sg_ptr ba ssa bb ssb) s of { s ->
+         ioVoid (integer_gmp_gcdext# mbx ssx_ptr mby ssy_ptr mbg sg_ptr ba ssa bb ssb)
          -- read sizes
-         case readInt32OffAddr# ssx_ptr 0# s of { (# s, ssx #) ->
-         case readInt32OffAddr# ssy_ptr 0# s of { (# s, ssy #) ->
-         case readInt32OffAddr# sg_ptr  0# s of { (# s, sg #) ->
-         case touch# szs s of { s ->
+         ssx <- readInt32OffAddr# ssx_ptr 0#
+         ssy <- readInt32OffAddr# ssy_ptr 0#
+         sg  <- readInt32OffAddr# sg_ptr  0#
+         touch# szs
          -- shrink x, y and g to their actual sizes and freeze them
-         let !sx = absI# (int32ToInt# ssx) in
-         let !sy = absI# (int32ToInt# ssy) in
-         case mwaSetSize# mbx sx s of { s ->
-         case mwaSetSize# mby sy s of { s ->
-         case mwaSetSize# mbg (int32ToInt# sg) s of { s ->
+         let !sx = absI# (int32ToInt# ssx)
+             !sy = absI# (int32ToInt# ssy)
+         mwaSetSize# mbx sx
+         mwaSetSize# mby sy
+         mwaSetSize# mbg (int32ToInt# sg)
 
          -- return x, y and g as Integer
-         case unsafeFreezeByteArray# mbx s of { (# s, bx #) ->
-         case unsafeFreezeByteArray# mby s of { (# s, by #) ->
-         case unsafeFreezeByteArray# mbg s of { (# s, bg #) ->
+         bx <- unsafeFreezeByteArray# mbx
+         by <- unsafeFreezeByteArray# mby
+         bg <- unsafeFreezeByteArray# mbg
 
-         (# s, (# integerFromBigNat# bg
-               ,  integerFromBigNatSign# (int32ToInt# ssx <# 0#) bx
-               ,  integerFromBigNatSign# (int32ToInt# ssy <# 0#) by #) #)
-         }}}}}}}}}}}}}}}}
+         Ubx.pure (# integerFromBigNat# bg
+                  ,  integerFromBigNatSign# (int32ToInt# ssx <# 0#) bx
+                  ,  integerFromBigNatSign# (int32ToInt# ssy <# 0#) by #)
 
 
 
@@ -477,8 +485,9 @@ integer_recip_mod x m =
 sbignat_recip_mod :: Int# -> BigNat# -> BigNat# -> BigNat#
 sbignat_recip_mod sign_x x m = withNewWordArray# szm io
   where
-    io r s = case ioInt# (integer_gmp_invert# r x ssx m szm) s of
-               (# s, rn #) -> mwaSetSize# r (narrowGmpSize# rn) s
+    io r = Ubx.do
+       rn <- ioInt# (integer_gmp_invert# r x ssx m szm)
+       mwaSetSize# r (narrowGmpSize# rn)
     !szx  = bigNatSize# x
     !szm  = bigNatSize# m
     !ssx = case sign_x of -- signed size of x

@@ -7,6 +7,7 @@
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE QualifiedDo #-}
 
 {-# OPTIONS_GHC -fdefines-known-key-names #-}
     -- Defines lots of functions that have BuiltinRules
@@ -166,6 +167,7 @@ import GHC.Internal.Bignum.Primitives
 import GHC.Internal.Bignum.BigNat
 import GHC.Internal.Bignum.Natural
 import qualified GHC.Internal.Bignum.Backend as Backend
+import qualified GHC.Internal.Unboxed.Do as Ubx
 
 -- | Arbitrary precision integers. In contrast with fixed-size integral types
 -- such as 'Int', the 'Integer' type represents the entire infinite range of
@@ -1334,8 +1336,9 @@ integerToAddr# (IN n) = bigNatToAddr# n
 -- byte first (big-endian) if @1#@ or least significant byte first
 -- (little-endian) if @0#@.
 integerToAddr :: Integer -> Addr# -> Bool# -> IO Word
-integerToAddr a addr e = IO \s -> case integerToAddr# a addr e s of
-   (# s', w #) -> (# s', W# w #)
+integerToAddr a addr e = IO Ubx.do
+   w <- integerToAddr# a addr e
+   Ubx.pure (W# w)
 
 -- | Read an 'Integer' (without sign) in base-256 representation from an Addr#.
 --
@@ -1347,9 +1350,9 @@ integerToAddr a addr e = IO \s -> case integerToAddr# a addr e s of
 --
 -- Null higher limbs are automatically trimed.
 integerFromAddr# :: Word# -> Addr# -> Bool# -> State# s -> (# State# s, Integer #)
-integerFromAddr# sz addr e s =
-   case bigNatFromAddr# sz addr e s of
-      (# s', n #) -> (# s', integerFromBigNat# n #)
+integerFromAddr# sz addr e = Ubx.do
+   n <- bigNatFromAddr# sz addr e
+   Ubx.pure (integerFromBigNat# n)
 
 -- | Read an 'Integer' (without sign) in base-256 representation from an Addr#.
 --
@@ -1383,8 +1386,9 @@ integerToMutableByteArray# (IN a) = bigNatToMutableByteArray# a
 -- byte first (big-endian) if @1#@ or least significant byte first
 -- (little-endian) if @0#@.
 integerToMutableByteArray :: Integer -> MutableByteArray# RealWorld -> Word# -> Bool# -> IO Word
-integerToMutableByteArray i mba w e = IO \s -> case integerToMutableByteArray# i mba w e s of
-   (# s', r #) -> (# s', W# r #)
+integerToMutableByteArray i mba w e = IO Ubx.do
+   r <- integerToMutableByteArray# i mba w e
+   Ubx.pure (W# r)
 
 -- | Read an 'Integer' (without sign) in base-256 representation from a ByteArray#.
 --
@@ -1396,8 +1400,9 @@ integerToMutableByteArray i mba w e = IO \s -> case integerToMutableByteArray# i
 --
 -- Null higher limbs are automatically trimed.
 integerFromByteArray# :: Word# -> ByteArray# -> Word# -> Bool# -> State# s -> (# State# s, Integer #)
-integerFromByteArray# sz ba off e s = case bigNatFromByteArray# sz ba off e s of
-   (# s', a #) -> (# s', integerFromBigNat# a #)
+integerFromByteArray# sz ba off e = Ubx.do
+   a <- bigNatFromByteArray# sz ba off e
+   Ubx.pure (integerFromBigNat# a)
 
 -- | Read an 'Integer' (without sign) in base-256 representation from a ByteArray#.
 --

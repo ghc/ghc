@@ -4,6 +4,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE QualifiedDo #-}
 
 {-# OPTIONS_GHC -fdefines-known-key-names #-}
     -- Defines lots of functions that have BuiltinRules
@@ -121,6 +122,7 @@ import GHC.Internal.Classes
 
 import GHC.Internal.Bignum.BigNat
 import GHC.Internal.Bignum.Primitives
+import qualified GHC.Internal.Unboxed.Do as Ubx
 
 -- | Natural number
 --
@@ -656,8 +658,9 @@ naturalToAddr# (NB n) = bigNatToAddr# n
 -- byte first (big-endian) if @1#@ or least significant byte first
 -- (little-endian) if @0#@.
 naturalToAddr :: Natural -> Addr# -> Bool# -> IO Word
-naturalToAddr a addr e = IO \s -> case naturalToAddr# a addr e s of
-   (# s', w #) -> (# s', W# w #)
+naturalToAddr a addr e = IO Ubx.do
+   w <- naturalToAddr# a addr e
+   Ubx.pure (W# w)
 
 
 -- | Read a Natural in base-256 representation from an Addr#.
@@ -670,9 +673,9 @@ naturalToAddr a addr e = IO \s -> case naturalToAddr# a addr e s of
 --
 -- Null higher limbs are automatically trimed.
 naturalFromAddr# :: Word# -> Addr# -> Bool# -> State# s -> (# State# s, Natural #)
-naturalFromAddr# sz addr e s =
-   case bigNatFromAddr# sz addr e s of
-      (# s', n #) -> (# s', naturalFromBigNat# n #)
+naturalFromAddr# sz addr e = Ubx.do
+   n <- bigNatFromAddr# sz addr e
+   Ubx.pure (naturalFromBigNat# n)
 
 -- | Read a Natural in base-256 representation from an Addr#.
 --
@@ -707,8 +710,9 @@ naturalToMutableByteArray# (NB a) = bigNatToMutableByteArray# a
 --
 -- Null higher limbs are automatically trimed.
 naturalFromByteArray# :: Word# -> ByteArray# -> Word# -> Bool# -> State# s -> (# State# s, Natural #)
-naturalFromByteArray# sz ba off e s = case bigNatFromByteArray# sz ba off e s of
-   (# s', a #) -> (# s', naturalFromBigNat# a #)
+naturalFromByteArray# sz ba off e = Ubx.do
+   a <- bigNatFromByteArray# sz ba off e
+   Ubx.pure (naturalFromBigNat# a)
 
 
 

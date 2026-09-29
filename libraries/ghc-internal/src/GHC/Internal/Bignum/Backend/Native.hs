@@ -7,6 +7,7 @@
 {-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE QualifiedDo #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module GHC.Internal.Bignum.Backend.Native where
@@ -27,6 +28,7 @@ import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Primitives
 import GHC.Internal.Prim
 import GHC.Internal.Types
+import qualified GHC.Internal.Unboxed.Do as Ubx
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 -- (This module uses the empty tuple () and string literals.)
@@ -96,39 +98,41 @@ bignat_add mwa wa wb = addABc 0# 0##
       -- 4) We only have a potential carry
       --    => write the carry or shrink the array
 
-      addABc i carry s
-         | isTrue# (i <# szMin) =
+      addABc i carry
+         | isTrue# (i <# szMin) = Ubx.do
             let
                !(# carry', r #) = plusWord3#
                                     (indexWordArray# wa i)
                                     (indexWordArray# wb i)
                                     carry
-            in case mwaWrite# mwa i r s of
-               s' -> addABc (i +# 1#) carry' s'
+            mwaWrite# mwa i r
+            addABc (i +# 1#) carry'
 
          | isTrue# ((i ==# szA) &&# (i ==# szB))
-         = mwaWriteOrShrink mwa carry i s
+         = mwaWriteOrShrink mwa carry i
 
          | isTrue# (i ==# szA)
-         = addAoBc wb i carry s
+         = addAoBc wb i carry
 
          | True
-         = addAoBc wa i carry s
+         = addAoBc wa i carry
 
-      addAoBc wab i carry s
+      addAoBc wab i carry
          | isTrue# (i ==# wordArraySize# wab)
-         = mwaWriteOrShrink mwa carry i s
+         = mwaWriteOrShrink mwa carry i
 
          | 0## <- carry
-         = -- copy the remaining words and remove the word allocated for the
-           -- potential carry
-           case mwaArrayCopy# mwa i wab i (wordArraySize# wab -# i) s of
-            s' -> mwaShrink# mwa 1# s'
+         = Ubx.do
+            -- copy the remaining words and remove the word allocated for the
+            -- potential carry
+            mwaArrayCopy# mwa i wab i (wordArraySize# wab -# i)
+            mwaShrink# mwa 1#
 
          | True
-         = let !(# carry', r #) = plusWord2# (indexWordArray# wab i) carry
-           in case mwaWrite# mwa i r s of
-               s' -> addAoBc wab (i +# 1#) carry' s'
+         = Ubx.do
+            let !(# carry', r #) = plusWord2# (indexWordArray# wab i) carry
+            mwaWrite# mwa i r
+            addAoBc wab (i +# 1#) carry'
 
 -- | Add a non-zero BigNat and a non-zero Word#
 --
@@ -163,22 +167,25 @@ bignat_sub_word
 bignat_sub_word mwa wa b = go b 0#
    where
       !sz = wordArraySize# wa
-      go carry i s
+      go carry i
          | isTrue# (i >=# sz)
-         = (# s, carry `eqWord#` 0## #)
+         = Ubx.pure (carry `eqWord#` 0##)
 
          | 0## <- carry
-         = case mwaArrayCopy# mwa i wa i (sz -# i) s of
-            s' -> (# s', 1# #) -- no underflow
+         = Ubx.do
+            mwaArrayCopy# mwa i wa i (sz -# i)
+            Ubx.pure 1# -- no underflow
 
          | True
          = case subWordC# (indexWordArray# wa i) carry of
             (# 0##, 0# #)
-               | isTrue# (i ==# sz) -> case mwaShrink# mwa 1# s of
-                                          s' -> (# s', 1# #) -- no underflow
+               | isTrue# (i ==# sz) -> Ubx.do
+                  mwaShrink# mwa 1#
+                  Ubx.pure 1# -- no underflow
 
-            (# l  , c  #) -> case mwaWrite# mwa i l s of
-                              s1 -> go (int2Word# c) (i +# 1#) s1
+            (# l  , c  #) -> Ubx.do
+               mwaWrite# mwa i l
+               go (int2Word# c) (i +# 1#)
 
 -- | Multiply a non-zero BigNat and a non-zero Word#
 --
@@ -196,14 +203,14 @@ bignat_mul_word
 bignat_mul_word mwa wa b = go 0# 0##
    where
       !szA = wordArraySize# wa
-      go i carry s
-         | isTrue# (i ==# szA) = mwaWriteOrShrink mwa carry i s
-         | True =
+      go i carry
+         | isTrue# (i ==# szA) = mwaWriteOrShrink mwa carry i
+         | True = Ubx.do
             let
                ai               = indexWordArray# wa i
                !(# carry', r #) = plusWord12# carry (timesWord2# ai b)
-            in case mwaWrite# mwa i r s of
-                  s' -> go (i +# 1#) carry' s'
+            mwaWrite# mwa i r
+            go (i +# 1#) carry'
 
 
 -- | Multiply two non-zero BigNat
@@ -219,10 +226,10 @@ bignat_mul
    -> WordArray#
    -> State# RealWorld
    -> State# RealWorld
-bignat_mul mwa wa wb s1 =
+bignat_mul mwa wa wb = Ubx.do
    -- initialize the resulting WordArray
-   case mwaFill# mwa 0## 0## (int2Word# sz) s1 of
-      s' -> mulEachB ctzB s' -- loop on b Words
+   mwaFill# mwa 0## 0## (int2Word# sz)
+   mulEachB ctzB -- loop on b Words
    where
       !szA = wordArraySize# wa
       !szB = wordArraySize# wb
@@ -232,27 +239,29 @@ bignat_mul mwa wa wb s1 =
       !ctzB = word2Int# (bigNatCtzWord# wb)
 
       -- multiply a single bj Word# to the whole wa WordArray
-      mul mwa wa bj j i carry s
+      mul mwa wa bj j i carry
          | isTrue# (i ==# wordArraySize# wa)
          -- write the carry
-         = mwaAddInplaceWord# mwa (i +# j) carry s
+         = mwaAddInplaceWord# mwa (i +# j) carry
 
-         | True = let
-                     ai           = indexWordArray# wa i
-                     !(# c',r' #) = timesWord2# ai bj
-                     !(# c'',r #) = plusWord2# r' carry
-                     carry'       = plusWord# c' c''
-                  in case mwaAddInplaceWord# mwa (i +# j) r s of
-                        s' -> mul mwa wa bj j (i +# 1#) carry' s'
+         | True = Ubx.do
+            let
+               ai           = indexWordArray# wa i
+               !(# c',r' #) = timesWord2# ai bj
+               !(# c'',r #) = plusWord2# r' carry
+               carry'       = plusWord# c' c''
+            mwaAddInplaceWord# mwa (i +# j) r
+            mul mwa wa bj j (i +# 1#) carry'
 
       -- for each bj in wb, call `mul bj wa`
-      mulEachB i s
-         | isTrue# (i ==# szB) = s
+      mulEachB i
+         | isTrue# (i ==# szB) = Ubx.nop
          | True = case indexWordArray# wb i of
             -- detect bj == 0## and skip the loop
-            0## -> mulEachB (i +# 1#) s
-            bi  -> case mul mwa wa bi i ctzA 0## s of
-                     s' -> mulEachB (i +# 1#) s'
+            0## -> mulEachB (i +# 1#)
+            bi  -> Ubx.do
+               mul mwa wa bi i ctzA 0##
+               mulEachB (i +# 1#)
 
 -- | Sub two non-zero BigNat
 --
@@ -269,12 +278,12 @@ bignat_sub
    -> WordArray#
    -> State# RealWorld
    -> (# State# RealWorld, Bool# #)
-bignat_sub mwa wa wb s =
+bignat_sub mwa wa wb = Ubx.do
    -- initialize the resulting WordArray
    -- Note: we could avoid the copy by subtracting the first non-zero
    -- less-significant word of b...
-   case mwaArrayCopy# mwa 0# wa 0# (wordArraySize# wa) s of
-      s' -> mwaSubInplaceArray mwa 0# wb s'
+   mwaArrayCopy# mwa 0# wa 0# (wordArraySize# wa)
+   mwaSubInplaceArray mwa 0# wb
 
 -- | PopCount of a non-zero BigNat
 bignat_popcount :: WordArray# -> Word#
@@ -298,30 +307,29 @@ bignat_shiftl
    -> Word#
    -> State# s
    -> State# s
-bignat_shiftl mwa wa n s1 =
+bignat_shiftl mwa wa n = Ubx.do
    -- set the lower words to 0
-   case mwaFill# mwa 0## 0## (int2Word# nw) s1 of
-      s2 -> if
-            | 0# <- nb -> mwaArrayCopy# mwa nw wa 0# szA s2
-            | True     -> mwaBitShift 0# 0## s2
+   mwaFill# mwa 0## 0## (int2Word# nw)
+   if | 0# <- nb -> mwaArrayCopy# mwa nw wa 0# szA
+      | True     -> mwaBitShift 0# 0##
    where
       !szA          = wordArraySize# wa
       !(# nw, nb #) = count_words_bits_int n
       !sh           = WORD_SIZE_IN_BITS# -# nb
 
       -- Bit granularity (c is the carry from the previous shift)
-      mwaBitShift i c s
+      mwaBitShift i c
          -- write the carry
          | isTrue# (i ==# szA)
-         = mwaWriteOrShrink mwa c (i +# nw) s
+         = mwaWriteOrShrink mwa c (i +# nw)
 
-         | True =
+         | True = Ubx.do
             let
                !ai = indexWordArray# wa i
                !v  = c `or#` (ai `uncheckedShiftL#` nb)
                !c' = ai `uncheckedShiftRL#` sh
-            in case mwaWrite# mwa (i +# nw) v s of
-                  s' -> mwaBitShift (i +# 1#) c' s'
+            mwaWrite# mwa (i +# nw) v
+            mwaBitShift (i +# 1#) c'
 
 
 -- | Right-shift a non-zero BigNat by a non-zero amount of bits
@@ -337,9 +345,9 @@ bignat_shiftr
    -> Word#
    -> State# s
    -> State# s
-bignat_shiftr mwa wa n s1
-   | isTrue# (nb ==# 0#) = mwaArrayCopy# mwa 0# wa nw sz s1
-   | True                = mwaBitShift (sz -# 1#) 0## s1
+bignat_shiftr mwa wa n
+   | isTrue# (nb ==# 0#) = mwaArrayCopy# mwa 0# wa nw sz
+   | True                = mwaBitShift (sz -# 1#) 0##
    where
       !szA          = wordArraySize# wa
       !(# nw, nb #) = count_words_bits_int n
@@ -347,15 +355,15 @@ bignat_shiftr mwa wa n s1
       !sh           = WORD_SIZE_IN_BITS# -# nb
 
       -- Bit granularity (c is the carry from the previous shift)
-      mwaBitShift i c s
-         | isTrue# (i <# 0#) = s
-         | True =
+      mwaBitShift i c
+         | isTrue# (i <# 0#) = Ubx.nop
+         | True = Ubx.do
             let
                !ai = indexWordArray# wa (i +# nw)
                !v  = c `or#` (ai `uncheckedShiftRL#` nb)
                !c' = ai `uncheckedShiftL#` sh
-            in case mwaWrite# mwa i v s of
-                  s' -> mwaBitShift (i -# 1#) c' s'
+            mwaWrite# mwa i v
+            mwaBitShift (i -# 1#) c'
 
 -- | Right-shift a non-zero BigNat by a non-zero amount of bits by first
 -- converting it into its two's complement representation and then again after
@@ -372,15 +380,15 @@ bignat_shiftr_neg
    -> Word#
    -> State# s
    -> State# s
-bignat_shiftr_neg mwa wa n s1
+bignat_shiftr_neg mwa wa n = Ubx.do
    -- initialize higher limb of mwa
-   = case mwaSize# mwa s1 of
-      (# s2, sz_mwa #) -> case mwaWrite# mwa (sz_mwa -# 1#) 0## s2 of
-        s3 -> case bignat_shiftr mwa wa n s3 of
-           s4 -> if nz_shifted_out
-                    -- round if non-zero bits were shifted out
-                    then mwaAddInplaceWord# mwa 0# 1## s4
-                    else s4
+   sz_mwa <- mwaSize# mwa
+   mwaWrite# mwa (sz_mwa -# 1#) 0##
+   bignat_shiftr mwa wa n
+   if nz_shifted_out
+      -- round if non-zero bits were shifted out
+      then mwaAddInplaceWord# mwa 0# 1##
+      else Ubx.nop
    where
       !(# nw, nb #) = count_words_bits_int n
 
@@ -412,16 +420,16 @@ bignat_or
    -> WordArray#
    -> State# RealWorld
    -> State# RealWorld
-bignat_or mwa wa wb s1
-   | isTrue# (szA >=# szB) = go wa szA wb szB s1
-   | True                  = go wb szB wa szA s1
+bignat_or mwa wa wb
+   | isTrue# (szA >=# szB) = go wa szA wb szB
+   | True                  = go wb szB wa szA
    where
       !szA = wordArraySize# wa
       !szB = wordArraySize# wb
       -- nx >= ny
-      go wx nx wy ny s =
-         case mwaInitArrayBinOp mwa wx wy or# s of
-            s' -> mwaArrayCopy# mwa ny wx ny (nx -# ny) s'
+      go wx nx wy ny = Ubx.do
+         mwaInitArrayBinOp mwa wx wy or#
+         mwaArrayCopy# mwa ny wx ny (nx -# ny)
 
 -- | XOR two non-zero BigNat
 --
@@ -436,16 +444,16 @@ bignat_xor
    -> WordArray#
    -> State# RealWorld
    -> State# RealWorld
-bignat_xor mwa wa wb s1
-   | isTrue# (szA >=# szB) = go wa szA wb szB s1
-   | True                  = go wb szB wa szA s1
+bignat_xor mwa wa wb
+   | isTrue# (szA >=# szB) = go wa szA wb szB
+   | True                  = go wb szB wa szA
    where
       !szA = wordArraySize# wa
       !szB = wordArraySize# wb
       -- nx >= ny
-      go wx nx wy ny s =
-         case mwaInitArrayBinOp mwa wx wy xor# s of
-            s' -> mwaArrayCopy# mwa ny wx ny (nx -# ny) s'
+      go wx nx wy ny = Ubx.do
+         mwaInitArrayBinOp mwa wx wy xor#
+         mwaArrayCopy# mwa ny wx ny (nx -# ny)
 
 -- | AND two non-zero BigNat
 --
@@ -475,9 +483,9 @@ bignat_and_not
    -> WordArray#
    -> State# RealWorld
    -> State# RealWorld
-bignat_and_not mwa wa wb s =
-   case mwaInitArrayBinOp mwa wa wb (\x y -> x `and#` not# y) s of
-      s' -> mwaArrayCopy# mwa szB wa szB (szA -# szB) s'
+bignat_and_not mwa wa wb = Ubx.do
+   mwaInitArrayBinOp mwa wa wb (\x y -> x `and#` not# y)
+   mwaArrayCopy# mwa szB wa szB (szA -# szB)
    where
       !szA = wordArraySize# wa
       !szB = wordArraySize# wb
@@ -497,7 +505,7 @@ bignat_quotrem
    -> WordArray#
    -> State# s
    -> State# s
-bignat_quotrem mwq mwr uwa uwb s0 =
+bignat_quotrem mwq mwr uwa uwb = Ubx.do
    -- Normalization consists in left-shifting bits in B and A so that the
    -- most-significant bit of the most-significant word of B is 1. It makes
    -- quotient prediction much more efficient as we only use the two most
@@ -513,30 +521,27 @@ bignat_quotrem mwq mwr uwa uwb s0 =
    --
    -- We allocate it here with an additionnal Word compared to A because
    -- normalizing can left shift at most (N-1) bits (on N-bit arch).
-   in case newWordArray# (wordArraySize# uwa +# 1#) s0 of { (# s1, mnwa #) ->
+   mnwa <- newWordArray# (wordArraySize# uwa +# 1#)
 
    -- normalized A in mnwa
-   let normalizeA s = case mwaWrite# mnwa (wordArraySize# uwa) 0## s of -- init potential carry
-                         s -> case bignat_shiftl mnwa uwa clzb s of     -- left shift
-                            s -> mwaTrimZeroes# mnwa s                  -- remove null carry if any
-   in case normalizeA s1 of { s2 ->
+   mwaWrite# mnwa (wordArraySize# uwa) 0## -- init potential carry
+   bignat_shiftl mnwa uwa clzb              -- left shift
+   mwaTrimZeroes# mnwa                      -- remove null carry if any
 
    -- normalize B. We don't do it in a MutableWordArray because it will remain
    -- constant during the whole computation.
-   let !nwb = bigNatShiftL# uwb clzb in
+   let !nwb = bigNatShiftL# uwb clzb
 
    -- perform quotrem on normalized inputs
-   case bignat_quotrem_normalized mwq mnwa nwb s2 of { s3 ->
+   bignat_quotrem_normalized mwq mnwa nwb
 
    -- denormalize the remainder now stored in mnwa. We just have to right shift
    -- of "clzb" bits. We copy the result into "mwr" array.
-   let denormalizeR s = case mwaTrimZeroes# mnwa s of
-                         s -> case unsafeFreezeByteArray# mnwa s of
-                            (# s, wr #) -> case mwaSetSize# mwr (wordArraySize# wr) s of
-                               s -> case bignat_shiftr mwr wr clzb s of
-                                 s -> mwaTrimZeroes# mwr s
-   in denormalizeR s3
-   }}}
+   mwaTrimZeroes# mnwa
+   wr <- unsafeFreezeByteArray# mnwa
+   mwaSetSize# mwr (wordArraySize# wr)
+   bignat_shiftr mwr wr clzb
+   mwaTrimZeroes# mwr
 
 
 
@@ -553,10 +558,10 @@ bignat_quot
    -> WordArray#
    -> State# RealWorld
    -> State# RealWorld
-bignat_quot mwq wa wb s =
+bignat_quot mwq wa wb = Ubx.do
    -- allocate a temporary array for the remainder and call quotrem
-   case newWordArray# (wordArraySize# wb) s of
-      (# s, mwr #) -> bignat_quotrem mwq mwr wa wb s
+   mwr <- newWordArray# (wordArraySize# wb)
+   bignat_quotrem mwq mwr wa wb
 
 -- | Remainder of two non-zero BigNat
 --
@@ -571,12 +576,12 @@ bignat_rem
    -> WordArray#
    -> State# RealWorld
    -> State# RealWorld
-bignat_rem mwr wa wb s =
+bignat_rem mwr wa wb = Ubx.do
    -- allocate a temporary array for the quotient and call quotrem
    -- (we could avoid allocating it as it is not used to compute the result but
    -- it would require non trivial modification of bignat_quotrem)
-   case newWordArray# szQ s of
-      (# s, mwq #) -> bignat_quotrem mwq mwr wa wb s
+   mwq <- newWordArray# szQ
+   bignat_quotrem mwq mwr wa wb
    where
    szA = wordArraySize# wa
    szB = wordArraySize# wb
@@ -593,14 +598,14 @@ bignat_quotrem_normalized
    -> WordArray#
    -> State# s
    -> State# s
-bignat_quotrem_normalized mwq mwa b s0 =
+bignat_quotrem_normalized mwq mwa b = Ubx.do
 
    -- n is the size of B
    let !n = wordArraySize# b
 
    -- m+n is the size of A (m >= 0)
-   in case mwaSize# mwa s0 of { (# s1, szA #) ->
-   let !m = szA -# n in
+   szA <- mwaSize# mwa
+   let !m = szA -# n
 
    -- Definitions:
    --    MSW(x) is the most-significant word of x
@@ -624,18 +629,22 @@ bignat_quotrem_normalized mwq mwa b s0 =
    --         A := A - (B << m words)
    --    else Qm = 0
    --         A unchanged
-   let computeQm s = case mwaTrimCompare m mwa b s of
-         (# s, LT #) -> (# s, 0## #)
-         (# s, _  #) -> (# s, 1## #)
+   let computeQm = Ubx.do
+         c <- mwaTrimCompare m mwa b
+         case c of
+            LT -> Ubx.pure 0##
+            _  -> Ubx.pure 1##
 
-       updateQj j qj qjb s = case mwaWrite# mwq j qj s of -- write Qj
-               s | 0## <- qj -> s
-                 | True      -> case mwaSubInplaceArray mwa j qjb s of -- subtract (qjB << j words)
-                                 (# s, _ #) -> s
+       updateQj j qj qjb = Ubx.do
+         mwaWrite# mwq j qj -- write Qj
+         case qj of
+            0## -> Ubx.nop
+            _   -> Ubx.void (mwaSubInplaceArray mwa j qjb) -- subtract (qjB << j words)
 
        -- update the highest word of Q
-       updateQm s = case computeQm s of
-         (# s, qm #) -> updateQj m qm b s
+       updateQm = Ubx.do
+         qm <- computeQm
+         updateQj m qm b
 
        -- the size of Q is szA+szB+1 BEFORE normalization. Normalization may add
        -- an additional higher word to A.
@@ -649,11 +658,13 @@ bignat_quotrem_normalized mwq mwa b s0 =
        --        accordingly
        --
        -- We detect if A has an additional limb by comparing the size of Q with m
-       updateQmMaybe s = case mwaSize# mwq s of
-         (# s, szQ #) | isTrue# (m <# szQ) -> updateQm s
-                      | True               -> s
+       updateQmMaybe = Ubx.do
+         szQ <- mwaSize# mwq
+         if isTrue# (m <# szQ)
+            then updateQm
+            else Ubx.nop
 
-   in case updateQmMaybe s1 of { s2 ->
+   updateQmMaybe
 
 
    -- main loop: for j from (m-1) downto 0
@@ -669,33 +680,37 @@ bignat_quotrem_normalized mwq mwa b s0 =
 
    let bmsw = wordArrayLast# b -- most significant word of B
 
-       estimateQj j s =
-         case mwaRead# mwa (n +# j) s of
-           (# s, a1 #) -> case mwaRead# mwa (n +# j -# 1#) s of
-             (# s, a0 #) -> case quotRemWord3# (# a1, a0 #) bmsw of
-               (# (# 0##, qj #), _ #) -> (# s,              qj #)
-               (# (#   _,  _ #), _ #) -> (# s, WORD_MAXBOUND## #)
+       estimateQj j = Ubx.do
+         a1 <- mwaRead# mwa (n +# j)
+         a0 <- mwaRead# mwa (n +# j -# 1#)
+         case quotRemWord3# (# a1, a0 #) bmsw of
+            (# (# 0##, qj #), _ #) -> Ubx.pure qj
+            (# (#   _,  _ #), _ #) -> Ubx.pure WORD_MAXBOUND##
 
        -- we perform the qj*B multiplication once and then we subtract B from
        -- qj*B as much as needed until (qj'*B << j words) <= A
-       findRealQj j qj s = findRealQj' j qj (bigNatMulWord# b qj) s
+       findRealQj j qj = findRealQj' j qj (bigNatMulWord# b qj)
 
-       findRealQj' j qj qjB s = case mwaTrimCompare j mwa qjB s of
-         (# s, LT #) -> findRealQj' j (qj `minusWord#` 1##) (bigNatSubUnsafe qjB b) s
+       findRealQj' j qj qjB = Ubx.do
+         c <- mwaTrimCompare j mwa qjB
+         case c of
+            LT -> findRealQj' j (qj `minusWord#` 1##) (bigNatSubUnsafe qjB b)
                                                             -- TODO: we could do the sub inplace to
                                                             -- reduce allocations
-         (# s, _  #) -> (# s, qj, qjB #)
+            _  -> Ubx.pure (# qj, qjB #)
 
-       loop j s = case estimateQj j s of
-         (# s, qj #) -> case findRealQj j qj s of
-            (# s, qj, qjB #) -> case updateQj j qj qjB s of
-               s | 0# <- j -> s
-                 | True    -> loop (j -# 1#) s
+       loop j = Ubx.do
+         qj <- estimateQj j
+         (# qj', qjB #) <- findRealQj j qj
+         updateQj j qj' qjB
+         case j of
+            0# -> Ubx.nop
+            _  -> loop (j -# 1#)
 
 
-   in if | 0# <- m -> s2
-         | True    -> loop (m -# 1#) s2
-   }}
+   case m of
+      0# -> Ubx.nop
+      _  -> loop (m -# 1#)
 
 -- | QuotRem of a non-zero BigNat and a non-zero Word
 --
@@ -712,17 +727,17 @@ bignat_quotrem_word
    -> Word#
    -> State# s
    -> (# State# s, Word# #)
-bignat_quotrem_word mwq wa b s = go (sz -# 1#) 0## s
+bignat_quotrem_word mwq wa b = go (sz -# 1#) 0##
    where
       sz = wordArraySize# wa
-      go i r s
-         | isTrue# (i <# 0#) = (# s, r #)
-         | True =
+      go i r
+         | isTrue# (i <# 0#) = Ubx.pure r
+         | True = Ubx.do
             let
                ai          = indexWordArray# wa i
                !(# q,r' #) = quotRemWord2# r ai b
-            in case mwaWrite# mwq i q s of
-                  s' -> go (i -# 1#) r' s'
+            mwaWrite# mwq i q
+            go (i -# 1#) r'
 
 -- | Quot of a non-zero BigNat and a non-zero Word
 --
@@ -737,17 +752,17 @@ bignat_quot_word
    -> Word#
    -> State# s
    -> State# s
-bignat_quot_word mwq wa b s = go (sz -# 1#) 0## s
+bignat_quot_word mwq wa b = go (sz -# 1#) 0##
    where
       sz = wordArraySize# wa
-      go i r s
-         | isTrue# (i <# 0#) = s
-         | True =
+      go i r
+         | isTrue# (i <# 0#) = Ubx.nop
+         | True = Ubx.do
             let
                ai          = indexWordArray# wa i
                !(# q,r' #) = quotRemWord2# r ai b
-            in case mwaWrite# mwq i q s of
-                  s' -> go (i -# 1#) r' s'
+            mwaWrite# mwq i q
+            go (i -# 1#) r'
 
 -- | Remainder of a non-zero BigNat and a non-zero Word
 --
@@ -784,15 +799,15 @@ bignat_gcd
    -> State# s
 bignat_gcd mwr = go
    where
-      go wmax wmin s
+      go wmax wmin
          | isTrue# (wordArraySize# wmin ==# 0#)
-         = mwaInitCopyShrink# mwr wmax s
+         = mwaInitCopyShrink# mwr wmax
 
          | True
          = let
              wmax' = wmin
              !wmin' = bigNatRem wmax wmin
-           in go wmax' wmin' s
+           in go wmax' wmin'
 
 -- | Greatest common divisor (GCD) of a non-zero/non-one BigNat and a
 -- non-zero/non-one Word#

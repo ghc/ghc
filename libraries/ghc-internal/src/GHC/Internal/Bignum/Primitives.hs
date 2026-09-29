@@ -11,6 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE QualifiedDo #-}
 {-# OPTIONS_GHC -fexpose-all-unfoldings #-}
 
 module GHC.Internal.Bignum.Primitives
@@ -93,6 +94,7 @@ import GHC.Internal.Prim.Exception
 
 import GHC.Internal.Prim
 import GHC.Internal.Types
+import qualified GHC.Internal.Unboxed.Do as Ubx
 
 ----------------------------------
 -- Bool#
@@ -322,13 +324,14 @@ wordReverseBits32# x0 = wordReverseBits# x0
 wordToAddrLE# :: Word# -> Addr# -> State# s -> (# State# s, Word# #)
 wordToAddrLE# x addr = go x 0#
    where
-      go w c s
+      go w c
          | 0## <- w
-         = (# s, int2Word# c #)
+         = Ubx.pure (int2Word# c)
 
          | True
-         = case writeWord8OffAddr# addr c (wordToWord8# w) s of
-            s' -> go (w `uncheckedShiftRL#` 8#) (c +# 1#) s'
+         = Ubx.do
+            writeWord8OffAddr# addr c (wordToWord8# w)
+            go (w `uncheckedShiftRL#` 8#) (c +# 1#)
 
 -- | Write a Word to @/addr/@ in base-256 big-endian representation and
 -- return the number of bytes written.
@@ -337,14 +340,15 @@ wordToAddrBE# w addr = go 0# (WORD_SIZE_IN_BITS# -# clz)
    where
      !clz = word2Int# (clz# w `and#` (not# 0b0111##)) -- keep complete bytes
 
-     go c sh s
+     go c sh
       | 0# <- sh
-      = (# s, int2Word# c #)
+      = Ubx.pure (int2Word# c)
 
       | True
       , w' <- wordToWord8# (w `uncheckedShiftRL#` (sh -# 8#))
-      = case writeWord8OffAddr# addr c w' s of
-         s' -> go (c +# 1#) (sh -# 8#) s'
+      = Ubx.do
+         writeWord8OffAddr# addr c w'
+         go (c +# 1#) (sh -# 8#)
 
 -- | Write a Word to @/addr/@ in base-256 representation and
 -- return the number of bytes written.
@@ -361,53 +365,55 @@ wordToAddr# a addr _  s = wordToAddrBE# a addr s
 --
 -- @'n' is the number of bytes to read.
 wordFromAddrLE# :: Word# -> Addr# -> State# s -> (# State# s, Word# #)
-wordFromAddrLE# n addr s
+wordFromAddrLE# n addr
    -- Optimize when we read a full word
    | WORD_SIZE_IN_BYTES## <- n
-   = case readWordOffAddr# addr 0# s of
+   = Ubx.do
+      w <- readWordOffAddr# addr 0#
 #if defined(WORDS_BIGENDIAN)
-      (# s', w #) -> (# s', wordReverseBytes# w #)
+      Ubx.pure (wordReverseBytes# w)
 #else
-      (# s', w #) -> (# s', w #)
+      Ubx.pure w
 #endif
 
-wordFromAddrLE# n addr s0 = go 0## 0# s0
+wordFromAddrLE# n addr = go 0## 0#
    where
-      go w c s
+      go w c
          | isTrue# (c ==# word2Int# n)
-         = (# s, w #)
+         = Ubx.pure w
 
          | True
-         = case readWord8OffAddr# addr c s of
-            (# s', b #) -> go (w `or#` (word8ToWord# b `uncheckedShiftL#` (c `uncheckedIShiftL#` 3#)))
-                              (c +# 1#)
-                              s'
+         = Ubx.do
+            b <- readWord8OffAddr# addr c
+            go (w `or#` (word8ToWord# b `uncheckedShiftL#` (c `uncheckedIShiftL#` 3#)))
+               (c +# 1#)
 
 -- | Read a Word from @/addr/@ in base-256 big-endian representation.
 --
 -- @'n' is the number of bytes to read.
 wordFromAddrBE# :: Word# -> Addr# -> State# s -> (# State# s, Word# #)
-wordFromAddrBE# n addr s
+wordFromAddrBE# n addr
    -- Optimize when we read a full word
    | WORD_SIZE_IN_BYTES## <- n
-   = case readWordOffAddr# addr 0# s of
+   = Ubx.do
+      w <- readWordOffAddr# addr 0#
 #if defined(WORDS_BIGENDIAN)
-      (# s', w #) -> (# s', w #)
+      Ubx.pure w
 #else
-      (# s', w #) -> (# s', wordReverseBytes# w #)
+      Ubx.pure (wordReverseBytes# w)
 #endif
 
-wordFromAddrBE# n addr s0 = go 0## 0# s0
+wordFromAddrBE# n addr = go 0## 0#
    where
-      go w c s
+      go w c
          | isTrue# (c ==# word2Int# n)
-         = (# s, w #)
+         = Ubx.pure w
 
          | True
-         = case readWord8OffAddr# addr c s of
-            (# s', b #) -> go ((w `uncheckedShiftL#` 8#) `or#` word8ToWord# b)
-                              (c +# 1#)
-                              s'
+         = Ubx.do
+            b <- readWord8OffAddr# addr c
+            go ((w `uncheckedShiftL#` 8#) `or#` word8ToWord# b)
+               (c +# 1#)
 
 -- | Read a Word from @/addr/@ in base-256 representation.
 --
@@ -447,13 +453,14 @@ wordWriteAddrBE# w addr = writeWordOffAddr# addr 0#
 wordToMutableByteArrayLE# :: Word# -> MutableByteArray# s -> Word# -> State# s -> (# State# s, Word# #)
 wordToMutableByteArrayLE# x mba off = go x 0#
    where
-      go w c s
+      go w c
          | 0## <- w
-         = (# s, int2Word# c #)
+         = Ubx.pure (int2Word# c)
 
          | True
-         = case writeWord8Array# mba (word2Int# off +# c) (wordToWord8# w) s of
-            s' -> go (w `uncheckedShiftRL#` 8#) (c +# 1#) s'
+         = Ubx.do
+            writeWord8Array# mba (word2Int# off +# c) (wordToWord8# w)
+            go (w `uncheckedShiftRL#` 8#) (c +# 1#)
 
 -- | Write a Word to @/MutableByteArray/@ in base-256 big-endian representation and
 -- return the number of bytes written.
@@ -464,14 +471,15 @@ wordToMutableByteArrayBE# w mba off = go 0# (WORD_SIZE_IN_BITS# -# clz)
    where
      !clz = word2Int# (clz# w `and#` (not# 0b0111##)) -- keep complete bytes
 
-     go c sh s
+     go c sh
       | 0# <- sh
-      = (# s, int2Word# c #)
+      = Ubx.pure (int2Word# c)
 
       | True
       , w' <- wordToWord8# (w `uncheckedShiftRL#` (sh -# 8#))
-      = case writeWord8Array# mba (word2Int# off +# c) w' s of
-         s' -> go (c +# 1#) (sh -# 8#) s'
+      = Ubx.do
+         writeWord8Array# mba (word2Int# off +# c) w'
+         go (c +# 1#) (sh -# 8#)
 
 -- | Write a Word to @/MutableByteArray/@ in base-256 representation and
 -- return the number of bytes written.
@@ -568,21 +576,24 @@ wordFromByteArray# a ba off _  = wordFromByteArrayBE# a ba off
 ----------------------------------
 
 ioVoid :: IO a -> State# RealWorld -> State# RealWorld
-ioVoid (IO io) s = case io s of
-                  (# s', _ #) -> s'
+ioVoid (IO io) = Ubx.void io
 
 ioWord# :: IO Word -> State# RealWorld -> (# State# RealWorld, Word# #)
-ioWord# (IO io) s = case io s of
-   (# s', W# w #) -> (# s', w #)
+ioWord# (IO io) = Ubx.do
+   W# w <- io
+   Ubx.pure w
 
 ioInt# :: IO Int -> State# RealWorld -> (# State# RealWorld, Int# #)
-ioInt# (IO io) s = case io s of
-   (# s', I# i #) -> (# s', i #)
+ioInt# (IO io) = Ubx.do
+   I# i <- io
+   Ubx.pure i
 
 ioBool :: IO Bool -> State# RealWorld -> (# State# RealWorld, Bool# #)
-ioBool (IO io) s = case io s of
-   (# s', False #) -> (# s', 0# #)
-   (# s', True #) -> (# s', 1# #)
+ioBool (IO io) = Ubx.do
+   b <- io
+   case b of
+      False -> Ubx.pure 0#
+      True  -> Ubx.pure 1#
 
 
 ----------------------------------
