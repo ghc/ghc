@@ -294,21 +294,44 @@ Primitive imports
 
     :status: InternalUseOnly
 
-With :extension:`GHCForeignImportPrim`, GHC extends the FFI with an additional
-calling convention ``prim``, e.g.: ::
-
-       foreign import prim "foo" foo :: ByteArray# -> (# Int#, Int# #)
-
-This is used to import functions written in Cmm code that follow an
-internal GHC calling convention. The arguments and results must be
-unboxed types, except that an argument may be of type ``Any :: Type``
-or ``Any :: UnliftedType`` (which can be arranged by way of
-``unsafeCoerce#``) and the result type is allowed to be an unboxed tuple
-or the types ``Any :: Type`` or ``Any :: UnliftedType``.
-
 This feature is not intended for use outside of the core libraries that
 come with GHC. For more details see the
 :ghc-wiki:`GHC developer wiki <commentary/prim-ops>`.
+
+With :extension:`GHCForeignImportPrim`, GHC extends the FFI with an additional
+calling convention ``prim``, e.g.: ::
+
+       foreign import prim "pkgname foo" foo :: ByteArray# -> (# Int#, Int# #)
+
+This is used to import functions written in Cmm code that follow an internal
+GHC calling convention. This is typically used to import functions in "hand
+written" Cmm code in ``.cmm`` files that are compiled and linked into the local
+package. It is also used within the core libraries to import primops from the
+rts.
+
+The arguments and results must be unboxed types, except that an argument may be
+of type ``Any :: Type`` or ``Any :: UnliftedType`` (which can be arranged by
+way of ``unsafeCoerce#``) and the result type is allowed to be an unboxed tuple
+or the types ``Any :: Type`` or ``Any :: UnliftedType``.
+
+In general, GHC precisely tracks whether Cmm calls are to destinations in the
+local package, or are to destinations in a different external package. To
+enable this, prim imports must specify the Haskell package where the cmm code
+lives. To specify that the cmm code lives in the current/local package, provide
+the cmm function name only, without any package name, for example: ::
+
+       foreign import prim "addOne" addOne :: Int# -> Int#
+
+Whereas if the cmm code lives in a different package, then the package name
+must be specified before the symbol name, separated by a space. For example, to
+import ``addOne`` from ``somePackage``: ::
+
+       foreign import prim "somePackage addOne" addOne :: Int# -> Int#
+
+The package name must resolve to one of the direct dependencies of the current
+package. An incorrect source package will result in linker errors when dynamic
+linking on some platforms (in particular on windows) and lost optimisation
+opportunities when dynamic linking on other platforms.
 
 .. _ffi-interruptible:
 
