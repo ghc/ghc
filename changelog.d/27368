@@ -1,0 +1,5 @@
+section: compiler
+synopsis: Fix a ``setInfoTableStackMap`` panic caused by common block elimination
+  leaving references to eliminated blocks.
+issues: #27368
+mrs: !16543

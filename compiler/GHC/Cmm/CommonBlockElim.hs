@@ -90,6 +90,8 @@ elimCommonBlocks g =
 -- (so avoid comparing them again)
 type DistinctBlocks = [CmmBlock]
 type Key = [Label]
+-- Invariant: no value is a key, so a single lookup resolves any label.
+-- See extendSubst.
 type Subst = LabelMap BlockId
 
 -- The outer list groups by hash. We retain this grouping throughout.
@@ -108,8 +110,18 @@ iterate subst blocks
           where
             (new_subst2, db) = mergeBlockList subst dbs
 
-    subst' = subst `mapUnion` new_substs
+    subst' = extendSubst subst new_substs
     updated_blocks = map (map (first (map (lookupBid subst')))) merged_blocks
+
+-- | Add the substitutions of one round of 'iterate'. A block that won a
+-- merge in an earlier round may have lost one in this round, so the older
+-- substitutions are rewritten through the new ones to keep the result
+-- chain-free.
+extendSubst :: Subst -> Subst -> Subst
+extendSubst subst new = assert (chainFree subst') subst'
+  where
+    subst' = mapMap (lookupBid new) subst `mapUnion` new
+    chainFree s = not (any (`mapMember` s) (mapElems s))
 
 -- Combine two lists of blocks.
 -- While they are internally distinct they can still share common blocks.
@@ -218,9 +230,7 @@ dont_care _other         = False
 eqBid :: LabelMap BlockId -> BlockId -> BlockId -> Bool
 eqBid subst bid bid' = lookupBid subst bid == lookupBid subst bid'
 lookupBid :: LabelMap BlockId -> BlockId -> BlockId
-lookupBid subst bid = case mapLookup bid subst of
-                        Just bid  -> lookupBid subst bid
-                        Nothing -> bid
+lookupBid subst bid = mapFindWithDefault bid bid subst
 
 -- Middle nodes and expressions can contain BlockIds, in particular in
 -- CmmStackSlot and CmmBlock, so we have to use a special equality for
