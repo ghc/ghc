@@ -26,6 +26,7 @@ import qualified GHC.Data.TrieMap as TM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import GHC.Utils.Word64 (truncateWord64ToWord32)
+import GHC.Utils.Panic.Plain (assert)
 import Control.Arrow (first, second)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
@@ -74,6 +75,10 @@ elimCommonBlocks g = replaceLabels env $ copyTicks env g
 -- (so avoid comparing them again)
 type DistinctBlocks = [CmmBlock]
 type Key = [Label]
+
+-- | A substitution maps each eliminated block to its replacement.
+--
+-- Invariant: the substitution is idempotent, i.e. no value is a key.
 type Subst = LabelMap BlockId
 
 -- The outer list groups by hash. We retain this grouping throughout.
@@ -92,8 +97,23 @@ iterate subst blocks
           where
             (new_subst2, db) = mergeBlockList subst dbs
 
-    subst' = subst `mapUnion` new_substs
+    subst' = extendSubst subst new_substs
     updated_blocks = map (map (first (map (lookupBid subst')))) merged_blocks
+
+-- | Extend the substitution with the merges of one more round.
+--
+-- A block that won a merge in an earlier round may have lost one in this
+-- round, so the existing mapping is updated to keep the result idempotent:
+--
+-- > old:    A -> B
+-- > new:    B -> C
+-- > result: A -> C, B -> C
+--
+extendSubst :: Subst -> Subst -> Subst
+extendSubst old new = assert (idempotent result) result
+  where
+    result = mapMap (lookupBid new) old `mapUnion` new
+    idempotent s = not (any (`mapMember` s) s)
 
 -- Combine two lists of blocks.
 -- While they are internally distinct they can still share common blocks.
@@ -200,9 +220,7 @@ dont_care _other         = False
 eqBid :: LabelMap BlockId -> BlockId -> BlockId -> Bool
 eqBid subst bid bid' = lookupBid subst bid == lookupBid subst bid'
 lookupBid :: LabelMap BlockId -> BlockId -> BlockId
-lookupBid subst bid = case mapLookup bid subst of
-                        Just bid  -> lookupBid subst bid
-                        Nothing -> bid
+lookupBid subst bid = mapFindWithDefault bid bid subst
 
 -- Middle nodes and expressions can contain BlockIds, in particular in
 -- CmmStackSlot and CmmBlock, so we have to use a special equality for
