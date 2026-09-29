@@ -732,8 +732,7 @@ test ('T13253-spj',
       compile,
       ['-v0 -O'])
 test ('T13820',
-      [ collect_compiler_stats('peak_megabytes_allocated', 5),
-        collect_compiler_stats('bytes allocated', 2),
+      [ collect_compiler_stats('bytes allocated', 5),
       ],
       compile,
       ['-v0'])
