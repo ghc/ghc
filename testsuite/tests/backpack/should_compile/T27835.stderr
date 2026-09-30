@@ -1,0 +1,7 @@
+[1 of 2] Processing p
+  Instantiating p
+  [1 of 1] Compiling P                ( p/P.hs, T27835.out/p/P.o )
+[2 of 2] Processing q
+  Instantiating q
+  [1 of 1] Including p
+  [1 of 1] Compiling Q                ( q/Q.hs, T27835.out/q/Q.o )
