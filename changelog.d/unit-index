@@ -1,7 +1,7 @@
 section: compiler
 synopsis: Use global ``UnitIndex`` to deduplicate ``UnitInfo``s over multiple home units
-issues: #27500 #26423 #27748 #27834
-mrs: !16115 !16598 !16743
+issues: #27500 #26423 #27748 #27834 #27835
+mrs: !16115 !16598 !16743 !16748
 
 description: {
     The ``UnitState`` used to be duplicated for all ``HomeUnitEnv``, not sharing any of the ``UnitInfo``s.

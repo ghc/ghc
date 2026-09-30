@@ -1,0 +1,11 @@
+unit p where
+  module P where
+    p :: Int
+    p = 42
+
+unit q where
+  dependency p
+  module Q where
+    import P
+    q :: Int
+    q = p + 1
