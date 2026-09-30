@@ -2,4 +2,5 @@ test('T25052', normal, compile_and_run, [''])
 test('T27851', exit_code(1), compile_and_run, [''])
 test('T27851b', exit_code(1), compile_and_run, [''])
 test('T27851c', normal, compile_and_run, [''])
+test('T27851d', unless(opsys('linux'), skip), compile_and_run, [''])
 

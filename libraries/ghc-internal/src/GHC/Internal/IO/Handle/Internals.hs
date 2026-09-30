@@ -192,7 +192,7 @@ do_operation fun h act m = do
             throwTo t e
             do_operation fun h act m
         _otherwise ->
-            throwIO e
+            rethrowIO (ExceptionWithContext c e)
 
 -- Note [async]
 -- ~~~~~~~~~~~~
@@ -450,7 +450,7 @@ handleFinalizer fp m = do
   (handle_', mb_exc) <- hClose_help handle_
   putMVar m handle_'
   case mb_exc of
-    Just exc -> throwIO exc
+    Just exc -> throwIO (NoBacktrace exc)
     Nothing -> return ()
 
 {-
@@ -884,8 +884,9 @@ hClose_maybethrow (Just e) h = hClose_rethrow e h
 hClose_rethrow :: SomeException -> Handle -> IO ()
 hClose_rethrow e h =
   case fromException e of
-    Just ioe -> ioError (augmentIOError ioe "hClose" h)
-    Nothing  -> throwIO e
+    Just ioe -> rethrowIO $ ExceptionWithContext (someExceptionContext e) $
+                  augmentIOError ioe "hClose" h
+    Nothing  -> throwIO (NoBacktrace e)
 
 hClose' :: Handle -> MVar Handle__ -> IO (Maybe SomeException)
 hClose' h m = withHandle' "hClose" h m $ hClose_help
