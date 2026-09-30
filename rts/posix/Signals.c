@@ -55,8 +55,6 @@ HsInt nocldstop = 0;
 StgInt *signal_handlers = NULL; /* Dynamically grown array of signal handlers */
 static StgInt nHandlers = 0;    /* Size of handlers array */
 
-static uint32_t n_haskell_handlers = 0;
-
 static sigset_t userSignals;
 static sigset_t savedSignals;
 
@@ -83,7 +81,6 @@ freeSignalHandlers(void) {
         stgFree(signal_handlers);
         signal_handlers = NULL;
         nHandlers = 0;
-        n_haskell_handlers = 0;
     }
 #if defined(THREADED_RTS)
     closeMutex(&sig_mutex);
@@ -288,16 +285,10 @@ stg_sig_install(int sig, int spi, void *mask)
     case STG_SIG_RST:
     case STG_SIG_HAN:
         sigaddset(&userSignals, sig);
-        if (previous_spi != STG_SIG_HAN && previous_spi != STG_SIG_RST) {
-            n_haskell_handlers++;
-        }
         break;
 
     default:
         sigdelset(&userSignals, sig);
-        if (previous_spi == STG_SIG_HAN || previous_spi == STG_SIG_RST) {
-            n_haskell_handlers--;
-        }
         break;
     }
 
