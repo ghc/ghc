@@ -420,13 +420,24 @@ addTickLHsExpr e@(L pos e0) = do
     TickForBreakPoints | isGoodBreakExpr e0 -> tick_it
     TickForCoverage    | XExpr (ExpandedThingTc (HSE StmtErrCtxt{} _)) <- e0 -- expansion ticks are handled separately
                        -> dont_tick_it
-                       | otherwise -> tick_it
+                       | otherwise -> ifCoverageSuppressed e0 dont_tick_it tick_it
     TickCallSites      | isCallSite e0      -> tick_it
     _other             -> dont_tick_it
  where
    tick_it      = allocTickBox (ExpBox False) False False (locA pos)
                   $ addTickHsExpr e0
    dont_tick_it = addTickLHsExprNever e
+
+ifCoverageSuppressed :: HsExpr GhcTc -> TM a -> TM a -> TM a
+ifCoverageSuppressed e noCover cover
+    | isNoCoverExpr e = do
+        hpc <- (== HpcTicks) . tickishType <$> getEnv
+        if hpc then noCover else cover
+    | otherwise = cover
+  where
+    isNoCoverExpr (HsPragE _ (HsPragNoCover{}) _) = True
+    isNoCoverExpr (HsPar _ e) = isNoCoverExpr (unLoc e)
+    isNoCoverExpr _ = False
 
 -- Add a tick to an expression which is the RHS of an equation or a binding.
 -- We always consider these to be breakpoints, unless the expression is a 'let'
@@ -438,7 +449,7 @@ addTickLHsExprRHS e@(L pos e0) = do
   case d of
      TickForBreakPoints | HsLet{} <- e0 -> dont_tick_it
                         | otherwise     -> tick_it
-     TickForCoverage -> tick_it
+     TickForCoverage -> ifCoverageSuppressed e0 dont_tick_it tick_it
      TickCallSites   | isCallSite e0 -> tick_it
      _other          -> dont_tick_it
  where
@@ -503,14 +514,17 @@ isCallSite _           = False
 addTickLHsExprOptAlt :: Bool -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
 addTickLHsExprOptAlt oneOfMany e@(L pos e0)
   = ifDensity TickForCoverage
-        (allocTickBox (ExpBox oneOfMany) False False (locA pos)
-                           $ addTickHsExpr e0)
+        (ifCoverageSuppressed e0
+          (addTickLHsExprNever e)
+          (allocTickBox (ExpBox oneOfMany) False False (locA pos) $ addTickHsExpr e0))
         (addTickLHsExpr e)
 
 addBinTickLHsExpr :: (Bool -> BoxLabel) -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
 addBinTickLHsExpr boxLabel e@(L pos e0)
   = ifDensity TickForCoverage
-        (allocBinTickBox boxLabel (locA pos) $ addTickHsExpr e0)
+        (ifCoverageSuppressed e0
+          (addTickLHsExpr e)
+          (allocBinTickBox boxLabel (locA pos) $ addTickHsExpr e0))
         (addTickLHsExpr e)
 
 
@@ -625,8 +639,8 @@ addTickHsExpr (ArithSeq ty wit arith_seq) =
                    addTickWit (Just fl) = do fl' <- addTickSyntaxExpr hpcSrcSpan fl
                                              return (Just fl')
 
-addTickHsExpr (HsPragE x p e) =
-        liftM (HsPragE x p) (addTickLHsExpr e)
+addTickHsExpr e@(HsPragE x p e') =
+  ifCoverageSuppressed e (pure e) (HsPragE x p <$> addTickLHsExpr e')
 addTickHsExpr e@(HsTypedBracket {})  = return e
 addTickHsExpr e@(HsUntypedBracket{}) = return e
 addTickHsExpr e@(HsTypedSplice{})    = return e
