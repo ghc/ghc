@@ -50,7 +50,6 @@ import qualified GHC.Internal.IO.Device as RawIO
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.Storable
 
-import qualified GHC.Internal.Control.Exception as Exception
 import GHC.Internal.System.IO.Error
 import GHC.Internal.Data.Either (Either(..))
 import GHC.Internal.Data.Maybe
@@ -270,13 +269,14 @@ hGetLineBufferedLoop handle_@Handle__{..}
 
 maybeFillReadBuffer :: Handle__ -> CharBuffer -> IO (Maybe CharBuffer)
 maybeFillReadBuffer handle_ buf
-  = catchException
+  = catchNoPropagate
      (do buf' <- getSomeCharacters handle_ buf
          return (Just buf')
      )
-     (\e -> do if isEOFError e
+     (\ec@(ExceptionWithContext _ e) ->
+               if isEOFError e
                   then return Nothing
-                  else ioError e)
+                  else rethrowIO ec)
 
 -- See GHC.Internal.IO.Buffer
 #define CHARBUF_UTF32
@@ -424,7 +424,7 @@ lazyRead handle =
 lazyReadBuffered :: Handle -> Handle__ -> IO (Handle__, [Char])
 lazyReadBuffered h handle_@Handle__{..} = do
    buf <- readIORef haCharBuffer
-   Exception.catch
+   catchNoPropagate
         (do
             buf'@Buffer{..} <- getSomeCharacters handle_ buf
             lazy_rest <- lazyRead h
@@ -435,7 +435,8 @@ lazyReadBuffered h handle_@Handle__{..} = do
             writeIORef haCharBuffer (bufferAdjustL r buf')
             return (handle_, s)
         )
-        (\e -> do (handle_', _) <- hClose_help handle_
+        (\(ExceptionWithContext ctx e) -> do
+                  (handle_', _) <- hClose_help handle_
                   debugIO ("hGetContents caught: " ++ show e)
                   -- We might have a \r cached in CRLF mode.  So we
                   -- need to check for that and return it:
@@ -444,7 +445,8 @@ lazyReadBuffered h handle_@Handle__{..} = do
                                      then "\r"
                                      else ""
                              else
-                                  throw (augmentIOError e "hGetContents" h)
+                                  throw $ NoBacktrace $ ExceptionWithContext ctx $
+                                    augmentIOError e "hGetContents" h
 
                   return (handle_', r)
         )
@@ -499,7 +501,8 @@ hGetContents' handle = do
       Right s -> return s
       Left e ->
           case fromException e of
-            Just ioe -> throwIO (augmentIOError ioe "hGetContents'" handle)
+            Just ioe -> rethrowIO $ ExceptionWithContext (someExceptionContext e) $
+                          augmentIOError ioe "hGetContents'" handle
             Nothing -> throwIO (NoBacktrace e)
 
 strictRead :: Handle -> Handle__ -> IO (Handle__, Either SomeException String)
@@ -515,12 +518,13 @@ strictRead h handle_@Handle__{..} = do
 
 strictReadLoop :: Handle__ -> [CharBuffer] -> CharBuffer -> IO [CharBuffer]
 strictReadLoop handle_ cbufs cbuf0 = do
-    mcbuf <- Exception.catch
+    mcbuf <- catchNoPropagate
         (do r <- readTextDevice handle_ cbuf0
             return (Just r))
-        (\e -> if isEOFError e
+        (\ec@(ExceptionWithContext _ e) ->
+               if isEOFError e
                   then return Nothing
-                  else throw e)
+                  else rethrowIO ec)
     case mcbuf of
       Nothing -> return (cbuf0 : cbufs)
       Just cbuf1 -> strictReadLoop' handle_ cbufs cbuf1
