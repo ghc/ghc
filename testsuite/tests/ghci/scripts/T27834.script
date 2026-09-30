@@ -1,0 +1,2 @@
+:load T27834
+putStrLn "Can import trusted module from ghc-internal"

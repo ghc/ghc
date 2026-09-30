@@ -5,6 +5,7 @@ module GHC.Unit.External.Wired (
   isWireMapEmpty,
   lookupWireMap,
   listWireMap,
+  nonDetFoldWireMap,
   -- * 'UnwireMap'
   UnwireMap,
   emptyUnwireMap,
@@ -47,6 +48,9 @@ lookupWireMap uid (WireMap wmap) = lookupUniqMap wmap uid
 
 listWireMap :: WireMap -> [(UnitId, UnitId)]
 listWireMap (WireMap wmap) = nonDetUniqMapToList wmap
+
+nonDetFoldWireMap :: ((UnitId, UnitId) -> b -> b) -> b -> WireMap -> b
+nonDetFoldWireMap go z (WireMap uniq) = nonDetFoldUniqMap go z uniq
 
 -- | The reverse of 'WireMap'.
 -- Records the mapping from the wired-in 'UnitId' to the on-disk 'UnitId'.
