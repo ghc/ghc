@@ -1,0 +1,7 @@
+T27851b: Uncaught exception main:Main.Wrapped:
+
+Wrapped "boom"
+
+HasCallStack backtrace:
+  error, called at T27851b.hs:7:59 in main:Main
+
