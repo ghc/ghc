@@ -1,0 +1,7 @@
+ghc-internal:GHC.Internal.IO.Exception.IOException:
+
+/dev/full: hClose: resource exhausted (No space left on device)
+
+HasCallStack backtrace:
+  ioError, called at libraries/ghc-internal/src/GHC/Internal/Foreign/C/Error.hs:293:5 in ghc-internal:GHC.Internal.Foreign.C.Error
+
