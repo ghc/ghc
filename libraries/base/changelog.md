@@ -32,6 +32,7 @@
   * Remove `GHC.Desugar`, which was deprecated and should have been removed in GHC 9.14. ([CLC proposal #216](https://github.com/haskell/core-libraries-committee/issues/216))
   * Add `@since` annotation to `System.Info.fullCompilerVersion`. ([GHC #26973](https://gitlab.haskell.org/ghc/ghc/-/issues/26973))
   * Fix `retry` and async exception delivery inside a `catchSTM` handler ([GHC #27657](https://gitlab.haskell.org/ghc/ghc/-/issues/27657))
+  * Preserve exception context when rethrowing exceptions in `modifyIOError` and `mapException`. ([CLC proposal #446](https://github.com/haskell/core-libraries-committee/issues/446))
 
 ## 4.22.0.0 *December 2025*
   * Shipped with GHC 9.14.1
