@@ -441,9 +441,11 @@ addInMemoryDatabase dflags u = do
           }
     let uic = hscUIC hsc_env
     liftIO $ cacheExternalUnitDatabase uic newdb
-    -- added at the end because ordering matters
+    -- Ordering matters here! We prepend the new unit database, because 'packageDBFlags'
+    -- works like a stack, where what's on top takes precedence over what's below (same as right-to-left when given at the CLI).
+    -- The new db needs highest precedence to overwrite any other in-memory units that potentially occur in the dbs below it.
     pure dflags
-          { packageDBFlags = packageDBFlags dflags ++ [PackageDB (PkgDbPath (unitDatabasePath newdb))]
+          { packageDBFlags = PackageDB (PkgDbPath (unitDatabasePath newdb)) : packageDBFlags dflags
           }
 
 -- | Register a new virtual unit database containing a single unit
