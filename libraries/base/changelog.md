@@ -12,6 +12,7 @@
   * Add new `Data.RealFloat` module re-exporting `RealFloat` from `GHC.Float` ([CLC proposal #394](https://github.com/haskell/core-libraries-committee/issues/394))
   * Add `Infinity`, `NegInfinity`, and `NaN` pattern synonyms to `Data.RealFloat` ([CLC proposal #394](https://github.com/haskell/core-libraries-committee/issues/394))
   * Preserve exception context when rethrowing exceptions in `modifyIOError` and `mapException`. ([CLC proposal #446](https://github.com/haskell/core-libraries-committee/issues/446))
+  * Preserve exception context when rethrowing exceptions in `hGetLine`, `hGetContents`, `hGetContents'`, `hClose`, `executablePath`, and on Windows in `openFile`, `openFileBlocking` and `openBinaryFile`. ([CLC proposal #447](https://github.com/haskell/core-libraries-committee/issues/447))
 
 ## 4.23.0.0 *TBA*
   * Add `System.IO.hGetNewlineMode`. ([CLC proposal #370](https://github.com/haskell/core-libraries-committee/issues/370))

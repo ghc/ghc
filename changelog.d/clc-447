@@ -1,0 +1,8 @@
+section: base
+synopsis: Preserve exception context when rethrowing exceptions in ``hGetLine``,
+  ``hGetContents``, ``hGetContents'``, ``hClose``, ``executablePath``, and on
+  Windows in ``openFile``, ``openFileBlocking`` and ``openBinaryFile``.
+issues: #27875
+mrs: !16747
+description:
+  See `CLC proposal 447 <https://github.com/haskell/core-libraries-committee/issues/447>`_.
