@@ -1,0 +1,7 @@
+section: base
+synopsis: Preserve exception context when rethrowing exceptions in
+  ``modifyIOError`` and ``mapException``.
+issues: #27851
+mrs: !16747
+description:
+  See `CLC proposal 446 <https://github.com/haskell/core-libraries-committee/issues/446>`_.
