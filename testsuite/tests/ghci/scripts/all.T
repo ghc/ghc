@@ -403,3 +403,4 @@ test('GhciPackageRename',
      ['GhciPackageRename.script'])
 test('T26233', normal, ghci_script, ['T26233.script'])
 test('T27641', normal, ghci_script, ['T27641.script'])
+test('T27834', [extra_hc_opts("-fpackage-trust -trust base -trust ghc-internal -package ghc-internal")], ghci_script, ['T27834.script'])

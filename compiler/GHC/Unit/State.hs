@@ -286,6 +286,21 @@ trustUnits elements (TrustOverlay to) = TrustOverlay $ foldl' (\ acc uid -> addT
 emptyTrustOverlay :: TrustOverlay
 emptyTrustOverlay = TrustOverlay emptyUniqMap
 
+-- | For all values in the 'WireMap', copy the recorded trust/distrust
+-- for the wired-in unit id.
+--
+extendForWireMap :: TrustOverlay -> WireMap -> TrustOverlay
+extendForWireMap to wmap =
+  nonDetFoldWireMap go to wmap
+  where
+    go (onDiskUid, wiredInUid) overlay =
+      case lookupTrustOverlay overlay onDiskUid of
+        Nothing -> overlay
+        Just Trusted ->
+          trustUnits [wiredInUid] overlay
+        Just Distrusted ->
+          distrustUnits [wiredInUid] overlay
+
 {-
 Note [Sharing 'UnitInfo's across the 'UnitEnv']
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -957,7 +972,7 @@ mkUnitState logger unit_index cfg = do
          , explicitUnits                = explicit_pkgs
          , homeUnitDepends              = home_unit_deps
          , unitInfoMap                  = pkg_db
-         , trustedUnits                 = trustUnitsOverlay
+         , trustedUnits                 = trustUnitsOverlay `extendForWireMap` wired_map
          , moduleNameProvidersMap       = mod_map
          , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger (unitConfigAllowVirtual cfg) pkg_db plugin_vis_map
          , packageNameMap               = pkgname_map
