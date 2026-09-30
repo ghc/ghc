@@ -211,7 +211,7 @@ data CommandResult
    deriving Show
 
 cmdSuccess :: MonadThrow m => CommandResult -> m (Maybe Bool)
-cmdSuccess CommandComplete{ cmdResult = Left e } =
+cmdSuccess CommandComplete{ cmdResult = Left (SomeException e) } =
   {- Don't add a backtrace from ghci/ghc to the exception from the user program! -}
 #if MIN_VERSION_base(4,21,0)
   throwM (NoBacktrace e)
