@@ -46,6 +46,13 @@ type instance RuleResult (ArgsHash c b) = Int
 argsHashOracle :: (ShakeValue c, ShakeValue b) => TrackArgument c b -> Args c b -> Rules ()
 argsHashOracle trackArgument args = void $
     addOracle $ \(ArgsHash target) -> do
-        argList <- interpret target args
+        -- PERFORMANCE:
+        -- The oracle isn't cashed, but rerun every time. So rather than "remembering"
+        -- it's dependencies, it's enough to check during the run if the required
+        -- dependencies need to be built via "need".
+        -- Why bother? If we let shake store the dependencies it will verify them before
+        -- the Oracle runs. Which is a bit pointless, since we unconditionally run it.
+        -- This speeds a no-op build up by ~10%.
+        argList <- orderOnlyAction (interpret target args)
         let trackedArgList = filter (trackArgument target) argList
         return $ hash trackedArgList
