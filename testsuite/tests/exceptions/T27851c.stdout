@@ -1,0 +1,24 @@
+-- hGetLine
+ghc-internal:GHC.Internal.IO.Exception.IOException:
+
+T27851c.txt: hGetLine: invalid argument (cannot decode byte sequence starting from 255)
+
+HasCallStack backtrace:
+  ioException, called at libraries/ghc-internal/src/GHC/Internal/IO/Encoding/Failure.hs:214:23 in ghc-internal:GHC.Internal.IO.Encoding.Failure
+
+-- hGetContents'
+ghc-internal:GHC.Internal.IO.Exception.IOException:
+
+T27851c.txt: hGetContents': invalid argument (cannot decode byte sequence starting from 255)
+
+HasCallStack backtrace:
+  ioException, called at libraries/ghc-internal/src/GHC/Internal/IO/Encoding/Failure.hs:214:23 in ghc-internal:GHC.Internal.IO.Encoding.Failure
+
+-- hGetContents
+ghc-internal:GHC.Internal.IO.Exception.IOException:
+
+T27851c.txt: hGetContents: invalid argument (cannot decode byte sequence starting from 255)
+
+HasCallStack backtrace:
+  ioException, called at libraries/ghc-internal/src/GHC/Internal/IO/Encoding/Failure.hs:214:23 in ghc-internal:GHC.Internal.IO.Encoding.Failure
+
