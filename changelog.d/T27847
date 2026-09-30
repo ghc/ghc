@@ -1,0 +1,5 @@
+section: ghci
+synopsis: Drop GHCi's own exception context when rethrowing exceptions in
+  ``ghc -e`` and ``runghc``.
+issues: #27847
+mrs: !16747
