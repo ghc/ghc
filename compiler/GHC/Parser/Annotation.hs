@@ -43,7 +43,7 @@ module GHC.Parser.Annotation (
 
   AnnList(..), AnnListBrackets(..), AnnListLayout(..),
   AnnParen(..),
-  AnnCType(..),AnnWarningTxt(..),AnnOverlap(..),AnnAnnDecl(..),AnnPragSCC(..),
+  AnnCType(..),AnnWarningTxt(..),AnnOverlap(..),AnnAnnDecl(..),AnnPragSCC(..),AnnPragNoCover(..),
 
   -- ** Utilities for converting between different 'GenLocated' when
   -- ** we do not care about the annotations.
@@ -653,6 +653,13 @@ data AnnPragSCC
       aps_loc1      :: EpaLocation
       } deriving (Data,Eq)
 
+data AnnPragNoCover
+  = AnnPragNoCover {
+      apnc_open      :: EpaLocation,
+      apnc_close     :: EpToken "#-}",
+      apnc_loc1      :: EpaLocation
+      } deriving (Data,Eq)
+
 -- ---------------------------------------------------------------------
 
 -- | Helper function used in the parser to add a 'TrailingAnn' items
@@ -1030,6 +1037,9 @@ instance NoAnn AnnAnnDecl where
 instance NoAnn AnnPragSCC where
   noAnn = AnnPragSCC noAnn noAnn noAnn
 
+instance NoAnn AnnPragNoCover where
+  noAnn = AnnPragNoCover noAnn noAnn noAnn
+
 instance NoAnn AnnParen where
   noAnn = AnnParens noAnn noAnn
 
@@ -1136,3 +1146,7 @@ instance Outputable AnnAnnDecl where
 instance Outputable AnnPragSCC where
   ppr (AnnPragSCC o c l)
     = text "AnnPragSCC" <+> ppr o <+> ppr c <+> ppr l
+
+instance Outputable AnnPragNoCover where
+  ppr (AnnPragNoCover o c l)
+    = text "AnnPragNoCover" <+> ppr o <+> ppr c <+> ppr l

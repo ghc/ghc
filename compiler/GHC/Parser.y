@@ -655,6 +655,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '{-# SOURCE'             { L _ (ITsource_prag _) }
  '{-# RULES'              { L _ (ITrules_prag _) }
  '{-# SCC'                { L _ (ITscc_prag _)}
+ '{-# NOCOVER'            { L _ (ITnocover_prag _)}
  '{-# DEPRECATED'         { L _ (ITdeprecated_prag _) }
  '{-# WARNING'            { L _ (ITwarning_prag _) }
  '{-# UNPACK'             { L _ (ITunpack_prag _) }
@@ -3062,6 +3063,11 @@ prag_e :: { Located (HsPragE GhcPs) }
                                                (AnnPragSCC (glR $1) (epTok $3) (glR $2),
                                                (getSCC_PRAGs $1))
                                                (StringLiteral NoSourceText (fastStringToShortText $ getVARID $2))) }
+      | '{-# NOCOVER' STRING '#-}'  { sLL $1 $>
+                                             (HsPragNoCover
+                                               (AnnPragNoCover (glR $1) (epTok $3) (glR $2),
+                                               (getNOCOVER_PRAGs $1))
+                                               (StringLiteral (getSTRINGs $2) (getSTRING $2))) }
 
 fexp    :: { ECP }
         : fexp aexp                  { ECP $
@@ -4335,6 +4341,7 @@ getRULES_PRAGs        (L _ (ITrules_prag        src)) = src
 getWARNING_PRAGs      (L _ (ITwarning_prag      src)) = src
 getDEPRECATED_PRAGs   (L _ (ITdeprecated_prag   src)) = src
 getSCC_PRAGs          (L _ (ITscc_prag          src)) = src
+getNOCOVER_PRAGs      (L _ (ITnocover_prag          src)) = src
 getUNPACK_PRAGs       (L _ (ITunpack_prag       src)) = src
 getNOUNPACK_PRAGs     (L _ (ITnounpack_prag     src)) = src
 getANN_PRAGs          (L _ (ITann_prag          src)) = src

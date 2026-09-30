@@ -852,6 +852,7 @@ data Token
   | ITline_prag         SourceText  -- not usually produced, see 'UsePosPragsBit'
   | ITcolumn_prag       SourceText  -- not usually produced, see 'UsePosPragsBit'
   | ITscc_prag          SourceText
+  | ITnocover_prag      SourceText
   | ITunpack_prag       SourceText
   | ITnounpack_prag     SourceText
   | ITann_prag          SourceText
@@ -3535,6 +3536,7 @@ oneWordPrags = Map.fromList [
      ("warning", fstrtoken (\s -> ITwarning_prag (SourceText s))),
      ("deprecated", fstrtoken (\s -> ITdeprecated_prag (SourceText s))),
      ("scc", fstrtoken (\s -> ITscc_prag (SourceText s))),
+     ("nocover", fstrtoken (\s -> ITnocover_prag (SourceText s))),
      ("unpack", fstrtoken (\s -> ITunpack_prag (SourceText s))),
      ("nounpack", fstrtoken (\s -> ITnounpack_prag (SourceText s))),
      ("ann", fstrtoken (\s -> ITann_prag (SourceText s))),

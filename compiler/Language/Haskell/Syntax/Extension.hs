@@ -544,6 +544,7 @@ type family XXDotFieldOcc  x
 -- -------------------------------------
 -- HsPragE type families
 type family XSCC            x
+type family XNoCover        x
 type family XXPragE         x
 
 -- -------------------------------------

@@ -422,6 +422,8 @@ dsExpr (HsPragE _ (HsPragSCC _ cc) expr)
                  <$> dsLExpr expr
          else dsLExpr expr }
 
+dsExpr (HsPragE _ (HsPragNoCover _ _) expr) = dsLExpr expr
+
 dsExpr (HsCase ctxt discrim matches)
   = do { core_discrim <- dsLExpr discrim
        ; ([discrim_var], matching_code) <- matchWrapper ctxt (Just [core_discrim]) matches

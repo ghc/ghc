@@ -618,6 +618,7 @@ instance NoAnn AnnFunRhs where
 -- ---------------------------------------------------------------------
 
 type instance XSCC           (GhcPass _) = (AnnPragSCC, SourceText)
+type instance XNoCover       (GhcPass _) = (AnnPragNoCover, SourceText)
 type instance XXPragE        (GhcPass _) = DataConCantHappen
 
 type instance XCDotFieldOcc (GhcPass _) = AnnFieldLabel
@@ -1257,6 +1258,9 @@ instance Outputable (HsPragE (GhcPass p)) where
     pprWithSourceText st (text "{-# SCC")
      -- no doublequotes if stl empty, for the case where the SCC was written
      -- without quotes.
+    <+> pprWithSourceText (stringLitSourceText sl) (ppr lbl) <+> text "#-}"
+  ppr (HsPragNoCover (_, st) sl@(StringLiteral _ lbl)) =
+    pprWithSourceText st (text "{-# NOCOVER")
     <+> pprWithSourceText (stringLitSourceText sl) (ppr lbl) <+> text "#-}"
 
 

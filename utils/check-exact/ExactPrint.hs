@@ -3346,11 +3346,17 @@ notDodgyE anc =
 
 -- ---------------------------------------------------------------------
 instance ExactPrint (HsPragE GhcPs) where
-  getAnnotationEntry HsPragSCC{}  = NoEntryVal
+  getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
   exact (HsPragSCC (AnnPragSCC o c l1,st) sl) = do
     o' <- markAnnOpen'' o st  "{-# SCC"
+    l1' <- printStringAtAA l1 (sourceTextToString (stringLitSourceText sl) (unpackHText $ sl_fs sl))
+    c' <- markEpToken c
+    return (HsPragSCC (AnnPragSCC o' c' l1',st) sl)
+
+  exact (HsPragNoCover (AnnPragNoCover o c l1,st) sl) = do
+    o' <- markAnnOpen'' o st  "{-# NOCOVER"
     l1' <- printStringAtAA l1 (sourceTextToString (stringLitSourceText sl) (unpackHText $ sl_fs sl))
     c' <- markEpToken c
     return (HsPragSCC (AnnPragSCC o' c' l1',st) sl)

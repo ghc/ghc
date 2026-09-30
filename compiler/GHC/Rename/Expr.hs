@@ -469,6 +469,7 @@ rnExpr (HsPragE x prag expr)
   where
     rn_prag :: HsPragE GhcPs -> HsPragE GhcRn
     rn_prag (HsPragSCC x ann) = HsPragSCC x $ rnStringLit ann
+    rn_prag (HsPragNoCover x ann) = HsPragNoCover x $ rnStringLit ann
 
 rnExpr (HsLam x lam_variant matches)
   = do { (matches', fvs_ms) <- rnMatchGroup (LamAlt lam_variant) rnLExpr matches

@@ -558,7 +558,7 @@ data DotFieldOcc p
 data HsPragE p
   = HsPragSCC   (XSCC p)
                 (StringLiteral p) -- "set cost centre" SCC pragma
-
+  | HsPragNoCover (XNoCover p) (StringLiteral p)
   | XHsPragE !(XXPragE p)
 
 -- | Located Haskell Tuple Argument

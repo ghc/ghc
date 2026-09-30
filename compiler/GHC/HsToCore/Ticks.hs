@@ -5,7 +5,7 @@
 {-
 (c) Galois, 2006
 (c) University of Glasgow, 2007
-(c) Florian Ragwitz, 2025
+(c) Florian Ragwitz, 2025-2026
 -}
 
 module GHC.HsToCore.Ticks
