@@ -924,6 +924,8 @@ maxCard (Card a) (Card b) = Card ((a .&. b .&. 0b001) .|. ((a .|. b) .&. 0b110))
 maxDmd :: Demand -> Demand -> Demand
 maxDmd BotDmd      dmd2        = dmd2
 maxDmd dmd1        BotDmd      = dmd1
+maxDmd AbsDmd      dmd2        = dmd2
+maxDmd dmd1        AbsDmd      = dmd1
 maxDmd (n1 :* sd1) (n2 :* sd2) =
   maxCard n1 n2 :* maxSubDmd sd1 sd2
 

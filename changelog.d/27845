@@ -1,0 +1,5 @@
+section: compiler
+synopsis: Fix a bug where an argument used lazily only by a function's stable
+  unfolding could be treated as strict in its fields.
+mrs: !16746
+issues: #27845
