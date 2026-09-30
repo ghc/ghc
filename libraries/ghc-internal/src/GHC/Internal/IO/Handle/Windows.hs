@@ -28,6 +28,7 @@ import GHC.Internal.Base (String, fmap, otherwise, return, ($))
 import qualified GHC.Internal.Base as Rebindable
 import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
 import GHC.Internal.MVar
+import GHC.Internal.Exception.Type (ExceptionWithContext(..))
 import GHC.Internal.IO
 import GHC.Internal.IO.BufferedIO hiding (flushWriteBuffer)
 import GHC.Internal.IO.Encoding
@@ -114,6 +115,11 @@ addFilePathToIOError :: String -> FilePath -> IOException -> IOException
 addFilePathToIOError fun fp ioe
   = ioe{ ioe_location = fun, ioe_filename = Just fp }
 
+catchAndAnnotate :: FilePath -> String -> IO a -> IO a
+catchAndAnnotate fp s a =
+  catchExceptionNoPropagate a $ \(ExceptionWithContext c e) ->
+    rethrowIO (ExceptionWithContext c (addFilePathToIOError s fp e))
+
 -- | Computation 'openFile' @file mode@ allocates and returns a new, open
 -- handle to manage the file @file@.  It manages input if @mode@
 -- is 'ReadMode', output if @mode@ is 'WriteMode' or 'AppendMode',
@@ -142,9 +148,8 @@ addFilePathToIOError fun fp ioe
 -- be using 'openBinaryFile'.
 openFile :: FilePath -> IOMode -> IO Handle
 openFile fp im =
-  catchException
-    (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True)
-    (\e -> ioError (addFilePathToIOError "openFile" fp e))
+  catchAndAnnotate fp "openFile" $
+    openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True
 
 -- | Like 'openFile', but opens the file in ordinary blocking mode.
 -- This can be useful for opening a FIFO for writing: if we open in
@@ -154,9 +159,8 @@ openFile fp im =
 -- @since base-4.4.0.0
 openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking fp im =
-  catchException
-    (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False)
-    (\e -> ioError (addFilePathToIOError "openFileBlocking" fp e))
+  catchAndAnnotate fp "openFileBlocking" $
+    openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False
 
 -- | Like 'openFile', but open the file in binary mode.
 -- On Windows, reading a file in text mode (which is the default)
@@ -169,9 +173,8 @@ openFileBlocking fp im =
 
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m =
-  catchException
-    (openFile' fp m True True)
-    (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
+  catchAndAnnotate fp "openBinaryFile" $
+    openFile' fp m True True
 
 openFile' :: String -> IOMode -> Bool -> Bool -> IO Handle
 openFile' filepath iomode binary non_blocking = do
