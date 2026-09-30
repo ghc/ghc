@@ -44,7 +44,7 @@ executablePath = Nothing
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.IO (FilePath)
 #if defined(darwin_HOST_OS)
-import GHC.Internal.Control.Exception (catch, throw)
+import GHC.Internal.Control.Exception (catchJust)
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Real
 import GHC.Internal.Word
@@ -66,7 +66,7 @@ import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.Real
 import GHC.Internal.System.Posix.Internals
 #elif defined(solaris2_HOST_OS)
-import GHC.Internal.Control.Exception (catch, throw)
+import GHC.Internal.Control.Exception (catchJust)
 import GHC.Internal.Data.Functor
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.Error
@@ -75,7 +75,7 @@ import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.System.IO.Error (isDoesNotExistError)
 import GHC.Internal.System.Posix.Internals
 #elif defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
-import GHC.Internal.Control.Exception (catch, throw)
+import GHC.Internal.Control.Exception (catchJust)
 import GHC.Internal.Data.Functor
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.Error
@@ -203,10 +203,10 @@ realpath path =
 getExecutablePath = _NSGetExecutablePath >>= realpath
 
 -- realpath(3) fails with ENOENT file does not exist (e.g. was deleted)
-executablePath = Just (fmap Just getExecutablePath `catch` f)
+executablePath = Just (catchJust f (fmap Just getExecutablePath) (\_ -> pure Nothing))
   where
-  f e | isDoesNotExistError e = pure Nothing
-      | otherwise             = throw e
+  f e | isDoesNotExistError e = Just ()
+      | otherwise             = Nothing
 
 --------------------------------------------------------------------------------
 -- Linux / Solaris / Hurd
@@ -242,12 +242,12 @@ executablePath = Just (check <$> getExecutablePath) where
 #  elif defined(solaris2_HOST_OS)
 getExecutablePath = readSymbolicLink "/proc/self/path/a.out"
 
-executablePath = Just ((Just <$> getExecutablePath) `catch` f)
+executablePath = Just (catchJust f (Just <$> getExecutablePath) (\_ -> pure Nothing))
   where
     -- readlink(2) fails with ENOENT when the executable has been deleted,
     -- even though the symlink itself still exists according to readdir(3).
-    f e | isDoesNotExistError e = pure Nothing
-        | otherwise             = throw e
+    f e | isDoesNotExistError e = Just ()
+        | otherwise             = Nothing
 
 #endif
 
@@ -297,15 +297,15 @@ getExecutablePath = do
       ]
 #  endif
 
-executablePath = Just (fmap Just getExecutablePath `catch` f)
+executablePath = Just (catchJust f (fmap Just getExecutablePath) (\_ -> pure Nothing))
   where
   -- The sysctl fails with errno ENOENT when executable has been deleted;
   -- see https://gitlab.haskell.org/ghc/ghc/-/issues/12377#note_321346.
-  f e | isDoesNotExistError e = pure Nothing
+  f e | isDoesNotExistError e = Just ()
 
   -- As far as I know, ENOENT is the only kind of failure that should be
   -- expected and handled.  Re-throw other errors.
-      | otherwise             = throw e
+      | otherwise             = Nothing
 
 
 --------------------------------------------------------------------------------
