@@ -1,0 +1,7 @@
+T27851: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
+
+file: outer: does not exist
+
+HasCallStack backtrace:
+  ioError, called at T27851.hs:7:3 in main:Main
+

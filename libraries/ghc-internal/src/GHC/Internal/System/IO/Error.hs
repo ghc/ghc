@@ -319,9 +319,10 @@ ioeSetHandle      ioe hdl      = ioe{ ioe_handle = Just hdl }
 ioeSetFileName    ioe filename = ioe{ ioe_filename = Just filename }
 
 -- | Catch any 'IOError' that occurs in the computation and throw a
--- modified version.
+-- modified version, preserving the original 'ExceptionContext'.
 modifyIOError :: (IOError -> IOError) -> IO a -> IO a
-modifyIOError f io = catch io (\e -> throwIO (NoBacktrace $ f e))
+modifyIOError f io = catchNoPropagate io $ \(ExceptionWithContext ctx e) ->
+  rethrowIO (ExceptionWithContext ctx (f e))
 
 -- -----------------------------------------------------------------------------
 -- annotating an IOError
