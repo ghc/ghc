@@ -10,6 +10,7 @@
   * The implementation of `toException` in `SomeException`'s `Exception` instance no longer drops exception context, in keeping with the behavior originally proposed in [CLC Proposal #200](https://github.com/haskell/core-libraries-committee/issues/200).
   * Fix `retry` and async exception delivery inside a `catchSTM` handler ([#27657](https://gitlab.haskell.org/ghc/ghc/-/issues/27657))
   * Show `ExceptionContext` in `displayExceptionAnnotation` implementation of `WhileHandling` ([GHC #27456](https://gitlab.haskell.org/ghc/ghc/-/issues/27456))
+  * Preserve exception context when rethrowing exceptions in `modifyIOError` and `mapException`. ([CLC proposal #446](https://github.com/haskell/core-libraries-committee/issues/446))
 
 ## 4.22.0.0 *December 2025*
   * Shipped with GHC 9.14.1
