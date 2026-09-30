@@ -478,7 +478,7 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
          * (see handleIdleGcTimeout below).
          */
         bool any_pending_io = nfds > 0;
-        int timeout_idlegc_delay;
+        bool timeout_idlegc_delay;
         adjustTimeoutForIdleGc(any_pending_io, &timeout, &timeout_idlegc_delay);
 #endif
 
