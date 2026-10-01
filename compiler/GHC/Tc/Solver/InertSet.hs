@@ -304,7 +304,7 @@ instance Outputable WorkList where
 ********************************************************************* -}
 
 type CycleBreakerVarStack = NE.NonEmpty (Bag (TcTyVar, TcType))
-   -- ^ a stack of (CycleBreakerTv, original family applications) lists
+   -- ^ A stack of (GivenCycleBreakerTv, original family applications) lists
    -- first element in the stack corresponds to current implication;
    --   later elements correspond to outer implications
    -- used to undo the cycle-breaking needed to handle
@@ -324,6 +324,8 @@ data InertSet
               -- See `resetInertCans`
 
        , inert_cycle_breakers :: CycleBreakerVarStack
+              -- The equalities for /given/ cycle breakers, GivenCycleBreakerTvs
+              -- See Note [
 
        , inert_famapp_cache :: FunEqMap Reduction
               -- Just a hash-cons cache for use when reducing family applications
@@ -1942,7 +1944,8 @@ prohibitedSuperClassSolve given_loc wanted_loc
 
 {- *********************************************************************
 *                                                                      *
-    Cycle breakers
+                 Given Cycle breakers
+  See Note [Type equality cycles: Givens] in GHC.Tc.Solver.Equality
 *                                                                      *
 ********************************************************************* -}
 

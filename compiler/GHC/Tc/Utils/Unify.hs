@@ -3235,11 +3235,11 @@ lhsPriority tv
         -> 5  -- Eliminate instantiation variables first
         | otherwise
         -> case info of
-             CycleBreakerTv -> 0
-             TyVarTv        -> 1
-             ConcreteTv {}  -> 2
-             TauTv          -> 3
-             RuntimeUnkTv   -> 4
+             GivenCycleBreakerTv -> 0
+             TyVarTv             -> 1
+             ConcreteTv {}       -> 2
+             TauTv               -> 3
+             RuntimeUnkTv        -> 4
 
 {- Note [Unification preconditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3285,7 +3285,7 @@ There are five reasons not to unify:
      structured type.  So if 'ty' is a structured type, such as (Maybe x),
      don't unify.
 
-   * CycleBreakerTv: never unified, except by restoreTyVarCycles.
+   * GivenCycleBreakerTv: never unified, except by restoreGivenCycles.
 
 4. (CONCRETE) A ConcreteTv can only unify with a concrete type,
     by definition.
@@ -3390,7 +3390,7 @@ So we look for a positive reason to swap, using a three-step test:
   touchable and can be unified.
 
   Tie-breaking rules for MetaTvs:
-  - CycleBreakerTv: This is essentially a stand-in for another type;
+  - GivenCycleBreakerTv: This is essentially a stand-in for another type;
        it's untouchable and should have the same priority as a skolem: 0.
 
   - TyVarTv: These can unify only with another tyvar, but we can't unify
@@ -4112,13 +4112,14 @@ wantConcreteCheck = \case
 -- where @cbv@ is a fresh loop-breaker tyvar (for Given), or
 -- just a fresh 'TauTv' (for Wanted)
 famAppBreaker :: FamAppBreaker a -> TcType -> TcM (PuResult a Reduction)
-famAppBreaker BreakGiven fam_app
+famAppBreaker BreakGiven fam_app    -- Givens
    = do { new_tv <- TcM.newCycleBreakerTyVar (typeKind fam_app)
         ; return (PuOK (unitBag (new_tv, fam_app))
                        (mkReflRedn Nominal (mkTyVarTy new_tv))) }
                  -- Why reflexive? See Detail (4) of Note [Type equality cycles]
                  -- in GHC.Tc.Solver.Equality
-famAppBreaker (BreakWanted ev lhs_tv) fam_app
+
+famAppBreaker (BreakWanted ev lhs_tv) fam_app   -- Wanteds
   -- Occurs check or skolem escape; so flatten
   = do { reason <- checkPromoteFreeVars cteInsolubleOccurs
                      (tyVarName lhs_tv) lhs_tv_lvl
@@ -4861,7 +4862,7 @@ checkTopShape info xi
                         RuntimeUnk  -> True
                         MetaTv { mtv_info = TyVarTv } -> True
                         _                             -> False
-      CycleBreakerTv -> False  -- We never unify these
+      GivenCycleBreakerTv -> False  -- We never unify these
       _ -> True
 
 --------------------------------------------------------------------------------
@@ -5174,14 +5175,14 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
 
     -- True for TauTv and TyVarTv (and RuntimeUnkTv) meta-tyvars
     -- (as they can be unified)
-    -- and also for CycleBreakerTvs that mentions meta-tyvars
+    -- and also for GivenCycleBreakerTvs that mentions meta-tyvars
     mentions_meta_ty_var :: TyVar -> Bool
     mentions_meta_ty_var tv
       | isMetaTyVar tv
       = case metaTyVarInfo tv of
           -- See Examples 8 and 9 in the Note
-          CycleBreakerTv -> anyFreeVarsOfType mentions_meta_ty_var
-                              (lookupCycleBreakerVar tv inert_set)
+          GivenCycleBreakerTv -> anyFreeVarsOfType mentions_meta_ty_var
+                                    (lookupCycleBreakerVar tv inert_set)
           _ -> True
       | otherwise
       = False
@@ -5224,7 +5225,7 @@ We want to solve w1 using g1 and g2. The presence of g3 is irrelevant, because
 we cannot unify 'f[tau:1] v[tau:1]' and 'g[sk:1] x[sk:3]' due to skolem escape.
 -}
 
--- | Return the type family application a CycleBreakerTv maps to.
+-- | Return the type family application a GivenCycleBreakerTv maps to.
 lookupCycleBreakerVar :: TcTyVar    -- ^ cbv, must be a CycleBreakerTv
                       -> InertSet
                       -> TcType     -- ^ type family application the cbv maps to
