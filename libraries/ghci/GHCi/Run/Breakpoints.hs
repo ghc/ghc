@@ -134,7 +134,7 @@ readAnyThreadEvalBreak :: STM EvalBreak
 readAnyThreadEvalBreak = do
   ctxs <- readTVar threadContextsVar
   -- try reading any thread's 'EvalBreak' and retry if none have yielded one yet
-  foldr (\ctx next -> readBreak ctx `orElse` next) retry (Map.elems ctxs)
+  foldl' (\next ctx -> next `orElse` readBreak ctx) retry (Map.elems ctxs)
   where
     readBreak ResumeContext{resumeEvalStatus, resumeIsolated} = do
       isolated <- readTVar resumeIsolated
