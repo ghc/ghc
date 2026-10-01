@@ -11,7 +11,8 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module GHC.Driver.MakeFile
-   ( doMkDependHS
+   ( doMkDepend
+   , doMkDependHS
    , doMkDependModuleGraph
    )
 where
@@ -80,6 +81,8 @@ import System.IO.Error (isEOFError)
 import qualified System.OsString as OsString
 import qualified Data.Monoid as Monoid
 import qualified System.FilePath as FilePath
+import GHC.Unit.Home.Graph (HomeUnitEnv(homeUnitEnv_dflags))
+import GHC (setProgramHUG)
 
 -----------------------------------------------------------------
 --
@@ -117,7 +120,39 @@ doMkDependHS srcs = do
     module_graph <- GHC.depanal excl_mods True {- Allow dup roots -}
     doMkDependModuleGraph dflags module_graph
 
+doMkDepend :: GhcMonad m => m ()
+doMkDepend = do
+    hug_ <- hsc_HUG <$> getSession
 
+    let hug =
+          fmap (\ hue ->
+            let
+              -- We kludge things a bit for dependency generation. Rather than
+              -- generating dependencies for each way separately, we generate
+              -- them once and then duplicate them for each way's osuf/hisuf.
+              -- We therefore do the initial dependency generation with an empty
+              -- way and .o/.hi extensions, regardless of any flags that might
+              -- be specified.
+              dflags1 = (homeUnitEnv_dflags hue)
+                { targetWays_ = Set.empty
+                , hiSuf_      = "hi"
+                , objectSuf_  = "o"
+                }
+            in
+              hue {homeUnitEnv_dflags = dflags1}
+              ) hug_
+
+    _ <- setProgramHUG hug
+
+    dflagsGlobal <- GHC.getSessionDynFlags
+    -- If no suffix is provided, use the default -- the empty one
+    let dflags = if null (depSuffixes dflagsGlobal)
+                 then dflagsGlobal { depSuffixes = [""] }
+                 else dflagsGlobal
+
+    let excl_mods = depExcludeMods dflags
+    module_graph <- GHC.depanal excl_mods True {- Allow dup roots -}
+    doMkDependModuleGraph dflags module_graph
 
 doMkDependModuleGraph :: GhcMonad m =>  DynFlags -> ModuleGraph -> m ()
 doMkDependModuleGraph dflags module_graph = do
