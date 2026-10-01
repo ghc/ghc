@@ -534,7 +534,7 @@ warnIfDeclDeprecated gre@(GRE { gre_imp = iss })
     definedMod = moduleName $ assertPpr (isExternalName name) (ppr name) (nameModule name)
     doc = text "The name" <+> quotes (ppr occ) <+> text "is mentioned explicitly"
 
-lookupImpDeclDeprec :: ModIface -> GlobalRdrElt -> Maybe (WarningTxt GhcRn)
+lookupImpDeclDeprec :: RetainedModIface -> GlobalRdrElt -> Maybe (WarningTxt GhcRn)
 lookupImpDeclDeprec iface gre
   -- Bleat if the thing, or its parent, is warn'd
   = mi_decl_warn_fn iface (greOccName gre) `mplus`
