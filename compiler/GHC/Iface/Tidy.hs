@@ -172,7 +172,8 @@ mkBootModDetailsTc logger
                   tcg_fam_insts        = fam_insts,
                   tcg_complete_matches = complete_matches,
                   tcg_mod              = this_mod,
-                  tcg_default_exports  = default_exports
+                  tcg_default_exports  = default_exports,
+                  tcg_anns             = anns
                 }
   = -- This timing isn't terribly useful since the result isn't forced, but
     -- the message is useful to locating oneself in the compilation process.
@@ -184,7 +185,7 @@ mkBootModDetailsTc logger
                        , md_insts            = insts'
                        , md_fam_insts        = fam_insts
                        , md_rules            = []
-                       , md_anns             = []
+                       , md_anns             = anns
                        , md_exports          = exports
                        , md_complete_matches = complete_matches
                        })
