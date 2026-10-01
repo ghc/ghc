@@ -130,6 +130,12 @@ readCtxEvalStatus ResumeContext{resumeEvalStatus} =
 -- The debugger will be waiting for threads to break using `readAnyThreadEvalBreak`.
 --
 -- Succeeds when any thread hits a breakpoint.
+--
+-- TODO: Instead of reading all elems of the map, we could have the global
+-- break action write breakpoints hit into a global `TChan ThreadId`, and then
+-- `readAnyThreadEvalBreak` would read off of this channel breakpoints that
+-- were hit, and do the lookup on the map by ThreadId, retrying if it has
+-- already been handled (i.e. set to Nothing)
 readAnyThreadEvalBreak :: STM EvalBreak
 readAnyThreadEvalBreak = do
   ctxs <- readTVar threadContextsVar
