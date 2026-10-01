@@ -1,0 +1,5 @@
+section: compiler
+synopsis: Propagate annotations when producing simple interfaces.
+description: Plugins that require annotations can now succeed even when run by Haddock.
+mrs: !16754
+issues: #26761
