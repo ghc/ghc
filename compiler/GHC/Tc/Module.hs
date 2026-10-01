@@ -2964,7 +2964,7 @@ externaliseAndTidyId this_mod id
 -- a package module with an interface on disk.  If neither of these is
 -- true, then the result will be an error indicating the interface
 -- could not be found.
-getModuleInterface :: HscEnv -> Module -> IO (Messages TcRnMessage, Maybe ModIface)
+getModuleInterface :: HscEnv -> Module -> IO (Messages TcRnMessage, Maybe RetainedModIface)
 getModuleInterface hsc_env mod
   = runTcInteractive NoTcMPlugins hsc_env $
     loadModuleInterface (text "getModuleInterface") mod

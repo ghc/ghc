@@ -224,7 +224,7 @@ data PluginWithArgs = PluginWithArgs
 data LoadedPlugin = LoadedPlugin
   { lpPlugin :: PluginWithArgs
   -- ^ the actual plugin together with its commandline arguments
-  , lpModule :: ModIface
+  , lpModule :: RetainedModIface
   -- ^ the module containing the plugin
   }
 

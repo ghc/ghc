@@ -215,7 +215,7 @@ import GHC.Types.DefaultEnv (ClassDefaults)
 
 import GHC.Unit.Types (Module)
 import GHC.Unit.State (UnitState)
-import GHC.Unit.Module.ModIface (ModIface)
+import GHC.Unit.Module.ModIface (RetainedModIface)
 
 import GHC.Utils.Outputable
 
@@ -6635,7 +6635,7 @@ data ImportLookupReason where
       T9006, T11071, T9905fail2, T5385, T10668
   -}
   ImportLookupBad :: BadImportKind
-                  -> ModIface
+                  -> RetainedModIface
                   -> ImpDeclSpec
                   -> IE GhcPs
                   -> ImportLookupExtensions

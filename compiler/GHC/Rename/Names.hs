@@ -517,7 +517,7 @@ renamePkgQual unit_env mn mb_pkg = case mb_pkg of
 -- interface, but without 'imp_mods'.
 calculateAvails :: HomeUnit
                 -> S.Set UnitId
-                -> ModIface
+                -> RetainedModIface
                 -> IsSafeImport
                 -> IsBootInterface
                 -> ImportedBy
@@ -525,8 +525,8 @@ calculateAvails :: HomeUnit
 calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
-      orph_iface = mi_orphan iface
-      has_finsts = mi_finsts iface
+      orph_iface = mi_abi_orphan (mi_abi_hashes iface)
+      has_finsts = mi_abi_finsts (mi_abi_hashes iface)
       deps       = mi_deps iface
       trust      = getSafeMode $ mi_trust iface
       trust_pkg  = mi_trust_pkg iface
@@ -1209,7 +1209,7 @@ gresFromAvail hsc_env prov avail =
 gresFromAvails :: HscEnv -> Maybe ImportSpec -> [AvailInfo] -> [GlobalRdrElt]
 gresFromAvails hsc_env prov = concatMap (gresFromAvail hsc_env prov)
 
-importsFromIface :: HscEnv -> ModIface -> ImpDeclSpec -> Maybe NameSet -> GlobalRdrEnv
+importsFromIface :: HscEnv -> RetainedModIface -> ImpDeclSpec -> Maybe NameSet -> GlobalRdrEnv
 importsFromIface hsc_env iface decl_spec hidden = mkGlobalRdrEnv $ case hidden of
     Nothing -> all_gres
     Just hidden_names -> filter (not . (`elemNameSet` hidden_names) . greName) all_gres
@@ -1225,7 +1225,7 @@ rnNamespaceSpecifier (DataNamespaceSpecifier x) = DataNamespaceSpecifier x
 filterImports
     :: HasDebugCallStack
     => HscEnv
-    -> ModIface
+    -> RetainedModIface
     -> ImpDeclSpec
          -- ^ Import spec
     -> Maybe (ImportListInterpretation, [LIE GhcPs])
@@ -2327,7 +2327,7 @@ getMinimalImports ie_decls
       where
         doc = text "Compute minimal imports for" <+> ppr decl
 
-    to_ie :: GlobalRdrEnv -> ModIface -> AvailInfo -> RnM [IE GhcRn]
+    to_ie :: GlobalRdrEnv -> RetainedModIface -> AvailInfo -> RnM [IE GhcRn]
     -- The main trick here is that if we're importing all the constructors
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
@@ -2529,7 +2529,7 @@ DRFPatSynExport for a test of this.
 -}
 
 badImportItemErr
-  :: ModIface -> ImpDeclSpec -> IE GhcPs
+  :: RetainedModIface -> ImpDeclSpec -> IE GhcPs
   -> IsSubordinateError
   -> [AvailInfo]
   -> TcRn (NonEmpty ImportLookupReason)

@@ -190,7 +190,7 @@ checkExternalInterpreter hsc_env = case interpInstance <$> hsc_interp hsc_env of
     -> throwIO (InstallationError "Plugins require -fno-external-interpreter")
   _ -> pure ()
 
-loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface, [LinkableUsage], PkgsLoaded)
+loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, RetainedModIface, [LinkableUsage], PkgsLoaded)
 loadPlugin' occ_name plugin_name hsc_env mod_name
   = do { let plugin_rdr_name = mkRdrQual mod_name occ_name
              dflags = hsc_dflags hsc_env
@@ -341,7 +341,7 @@ lessUnsafeCoerce logger context what = do
 -- Need the module as well to record information in the interface file
 lookupRdrNameInModuleForPlugins :: HasDebugCallStack
                                 => HscEnv -> ModuleName -> RdrName
-                                -> IO (Maybe (Name, ModIface))
+                                -> IO (Maybe (Name, RetainedModIface))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     let dflags     = hsc_dflags hsc_env
     -- First find the unit the module resides in by searching exposed units and home modules
