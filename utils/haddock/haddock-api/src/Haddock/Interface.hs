@@ -57,21 +57,25 @@ import GHC.Driver.Monad
 import GHC.Driver.Make
 import GHC.Driver.Main
 import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
 import qualified GHC.Driver.DynFlags as DynFlags
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session hiding (verbosity)
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline (compileFile)
 import GHC.HsToCore.Docs (getMainDeclBinder)
-import GHC.Iface.Load (loadSysInterface)
-import GHC.IfaceToCore (tcIfaceInst, tcIfaceFamInst)
-import GHC.Tc.Utils.Monad (initIfaceLoad, initIfaceLcl)
+import GHC.Iface.Load (findAndReadIface)
+import GHC.IfaceToCore (tcIfaceDecls, tcIfaceInst, tcIfaceFamInst)
+import GHC.Tc.Utils.Monad (goptM, updateEps_, initIfaceLoad, initIfaceLcl)
 import GHC.Tc.Utils.Env (lookupGlobal_maybe)
 import GHC.Types.Error (mkUnknownDiagnostic)
 import GHC.Types.Name.Occurrence (emptyOccEnv)
+import GHC.Types.Name.Env (extendNameEnvList)
 import GHC.Unit.Finder (findImportedModule, runFinderM, ModuleLookupScope(..), FindResult(Found))
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
+import GHC.Unit.External (eps_PTE, eps_inst_env, eps_fam_inst_env)
+import GHC.Unit.Module (getModuleInstantiation)
 import GHC.Unit.Module.Graph (ModuleGraphNode (..), ModuleNodeInfo(..))
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface (mi_semantic_module, mi_boot)
@@ -254,19 +258,29 @@ dropErr :: MaybeErr e a -> Maybe a
 dropErr (Succeeded a) = Just a
 dropErr (Failed _) = Nothing
 
-loadHiFile :: HscEnv -> Outputable.SDoc -> Module -> IO (ModIface, ([ClsInst], [FamInst]))
-loadHiFile hsc_env doc theModule = initIfaceLoad hsc_env $ do
-
-  mod_iface <- loadSysInterface doc theModule
-
-  insts <- initIfaceLcl (mi_semantic_module mod_iface) doc (mi_boot mod_iface) $ do
-
-    new_eps_insts     <- mapM tcIfaceInst (mi_insts mod_iface)
-    new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts mod_iface)
-
-    pure (new_eps_insts, new_eps_fam_insts)
-
-  pure (mod_iface, insts)
+loadHiFile :: Verbosity -> HscEnv -> Outputable.SDoc -> Module -> IO (ModIface, ([ClsInst], [FamInst]))
+loadHiFile verbosity hsc_env doc requested = initIfaceLoad hsc_env $ do
+  let installed = fst (getModuleInstantiation requested)
+  iface_fetch_result <- liftIO $ findAndReadIface hsc_env doc installed requested NotBoot
+  case iface_fetch_result of
+    Failed _ -> do
+      out verbosity normal $ "Loading interface for "                ++
+                             moduleNameString (moduleName requested) ++
+                             " failed"
+      liftIO exitFailure
+    Succeeded (mod_iface, _) -> do
+      all_insts <- initIfaceLcl (mi_semantic_module mod_iface) doc (mi_boot mod_iface) $ do
+        ignore_iface_pragmas <- goptM Opt_IgnoreInterfacePragmas
+        decls                <- tcIfaceDecls ignore_iface_pragmas (mi_decls mod_iface)
+        insts                <- mapM tcIfaceInst (mi_insts mod_iface)
+        fam_insts            <- mapM tcIfaceFamInst (mi_fam_insts mod_iface)
+        updateEps_ $ \ eps -> eps {
+          eps_PTE              = extendNameEnvList (eps_PTE eps) decls,
+          eps_inst_env         = extendInstEnvList (eps_inst_env eps) insts,
+          eps_fam_inst_env     = extendFamInstEnvList (eps_fam_inst_env eps) fam_insts
+        }
+        pure (insts, fam_insts)
+      pure (mod_iface, all_insts)
 
 processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> WarningMap -> Ghc (Maybe Interface)
 processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
@@ -279,7 +293,7 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
       unit_state = hsc_units hsc_env
 
   (mod_iface, insts) <- if Flag_NoCompilation `elem` flags
-    then liftIO $ loadHiFile hsc_env doc $ ms_mod modSummary
+    then liftIO $ loadHiFile verbosity hsc_env doc $ ms_mod modSummary
     else do
       hmi <- liftIO $ lookupHpt (hsc_HPT hsc_env) (moduleName $ ms_mod modSummary) >>= \case
           Nothing -> error "processModule: All modules should be loaded into the HPT by this point"
@@ -374,7 +388,7 @@ createOneShotIface verbosity flags instIfaceMap moduleNameStr = do
   modifySession $ hscSetFlags dflags
   hsc_env <- getSession
 
-  (iface, insts) <- liftIO $ loadHiFile hsc_env doc $ mkMainModule_ moduleNm
+  (iface, insts) <- liftIO $ loadHiFile verbosity hsc_env doc $ mkMainModule_ moduleNm
 
   -- Update the DynFlags with the extensions from the source file (as stored in the interface file)
   -- This is instead of ms_hspp_opts from ModSummary, which is not available in one-shot mode.
