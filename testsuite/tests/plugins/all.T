@@ -154,6 +154,9 @@ test('T14335',
      ['-package-db simple-plugin/pkg.plugins01/local.package.conf -fplugin Simple.Plugin \
        -fexternal-interpreter -package simple-plugin ' + config.plugin_way_flags])
 
+test('T26761', [extra_files(['T26761Plugin.hs', 'T26761a.hs'])],
+     multimod_compile, ['T26761', '-package ghc ' + config.plugin_way_flags ])
+
 test('plugin-recomp-pure',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
 

@@ -1,0 +1,4 @@
+[1 of 3] Compiling T26761Plugin     ( T26761Plugin.hs, T26761Plugin.o )
+[2 of 3] Compiling T26761a          ( T26761a.hs, nothing )
+[3 of 3] Compiling T26761           ( T26761.hs, T26761.o )
+Found 1 annotations for direct import: T26761a
