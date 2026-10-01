@@ -87,7 +87,7 @@ data ModuleInfo = ModuleInfo {
         minf_type_env  :: TypeEnv,
         minf_exports   :: [AvailInfo],
         minf_instances :: [ClsInst],
-        minf_iface     :: Maybe ModIface,
+        minf_iface     :: Maybe RetainedModIface,
         minf_safe      :: SafeHaskellMode,
         minf_modBreaks :: Maybe InternalModBreaks
   }
@@ -140,7 +140,7 @@ getHomeModuleInfo hsc_env mdl =
     Nothing  -> return Nothing
     Just hmi -> do
       let details  = hm_details hmi
-          iface    = hm_iface hmi
+          iface    = shrinkModIface (hm_iface hmi)
       return (Just (ModuleInfo {
                         minf_type_env  = md_types details,
                         minf_exports   = md_exports details,
@@ -187,7 +187,7 @@ modInfoLookupName minf name = withSession $ \hsc_env -> do
      Just tyThing -> return (Just tyThing)
      Nothing      -> liftIO (lookupType hsc_env name)
 
-modInfoIface :: ModuleInfo -> Maybe ModIface
+modInfoIface :: ModuleInfo -> Maybe RetainedModIface
 modInfoIface = minf_iface
 
 -- | Retrieve module safe haskell mode
