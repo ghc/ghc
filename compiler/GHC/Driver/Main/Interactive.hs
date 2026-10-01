@@ -148,7 +148,7 @@ hscIsGHCiMonad :: HscEnv -> String -> IO Name
 hscIsGHCiMonad hsc_env name
   = runHsc hsc_env $ ioMsgMaybe $ hoistTcRnMessage $ isGHCiMonad hsc_env name
 
-hscGetModuleInterface :: HscEnv -> Module -> IO ModIface
+hscGetModuleInterface :: HscEnv -> Module -> IO RetainedModIface
 hscGetModuleInterface hsc_env0 mod = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
   ioMsgMaybe $ hoistTcRnMessage $ getModuleInterface hsc_env mod
@@ -270,7 +270,7 @@ hscCheckSafe' m l = do
             _ | isHomeModule home_unit mod      -> True
             _ -> isUnitTrusted unit_state (moduleUnit m)
 
-    lookup' :: Module -> Hsc (Maybe ModIface)
+    lookup' :: Module -> Hsc (Maybe RetainedModIface)
     lookup' m = do
         hsc_env <- getHscEnv
         iface <- liftIO $ lookupIfaceByModuleHsc hsc_env m

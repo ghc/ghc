@@ -372,10 +372,10 @@ lookupIfaceByModule
         :: HomeUnitGraph
         -> PackageIfaceTable
         -> Module
-        -> IO (Maybe ModIface)
+        -> IO (Maybe RetainedModIface)
 lookupIfaceByModule hug pit mod
   = HUG.lookupHugByModule mod hug >>= pure . \case
-       Just hm -> Just (hm_iface hm)
+       Just hm -> Just (shrinkModIface (hm_iface hm))
        Nothing -> lookupModuleEnv pit mod
    -- If the module does come from the home package, why do we look in the PIT as well?
    -- (a) In OneShot mode, even home-package modules accumulate in the PIT
@@ -384,7 +384,7 @@ lookupIfaceByModule hug pit mod
    -- We could eliminate (b) if we wanted, by making GHC.Prim belong to a package
    -- of its own, but it doesn't seem worth the bother.
 
-lookupIfaceByModuleHsc :: HscEnv -> Module -> IO (Maybe ModIface)
+lookupIfaceByModuleHsc :: HscEnv -> Module -> IO (Maybe RetainedModIface)
 lookupIfaceByModuleHsc hsc_env mod = do
   eps <- hscEPS hsc_env
   lookupIfaceByModule (hsc_HUG hsc_env) (eps_PIT eps) mod

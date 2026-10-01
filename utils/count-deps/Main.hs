@@ -79,5 +79,5 @@ calcDeps modName libdir =
     mkModule :: String -> ModuleName -> Module
     mkModule ghcUnitId = Module (stringToUnit ghcUnitId)
 
-    modDeps :: ModIface -> [ModuleName]
+    modDeps :: ModIface_ phase -> [ModuleName]
     modDeps mi = map (gwib_mod . (\(_, _, mn) -> mn)) $ Set.toList $ dep_direct_mods (mi_deps mi)

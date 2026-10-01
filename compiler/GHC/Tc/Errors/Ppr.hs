@@ -6386,7 +6386,7 @@ pprImportLookup :: ImportLookupReason -> SDoc
 pprImportLookup = \case
   ImportLookupBad k iface decl_spec ie _exts ->
     let
-      pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
+      pprImpDeclSpec :: RetainedModIface -> ImpDeclSpec -> SDoc
       pprImpDeclSpec iface decl_spec =
         quotes (ppr (moduleName $ is_mod decl_spec)) <+> case mi_boot iface of
             IsBoot  -> text "(hi-boot interface)"
