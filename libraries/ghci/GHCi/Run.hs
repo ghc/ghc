@@ -322,6 +322,17 @@ sandboxIO opts io
     = do
         wait <- newEmptyMVar
 
+        -- If we are evaluating expressions (sandboxIO), then make sure the
+        -- global breakpoint action is set.
+        --
+        -- TODO: Is this thread unsafe? Already running threads may access this
+        -- pointer as we write it when evaluating a new expression.
+        --
+        -- A solution would be to have an "initialize interpreter" command
+        -- which sets this at the start. A different solution is to have a
+        -- global lock and only write this once here, then lock.
+        poke breakPointIOAction globalBreakStablePtr
+
         tid <- forkIO $ do
 
           takeMVar wait -- don't run anything in this thread before
@@ -410,12 +421,6 @@ withBreakAction opts tid@(ThreadId tid#) act = do
   bracket (setBreakAction ctx) (resetBreakAction ctx) (\_ -> act (waitForResult ctx))
   where
     setBreakAction ctx = do
-      poke breakPointIOAction globalBreakStablePtr
-         -- TODO: This is poke thread unsafe, as one thread might be accessing this
-         -- global variable while this thread tries to overwrite it. We should
-         -- rather do it when the interpreter process/internal is initialized
-         -- somehow.
-
       runIf breakOnException $ \_ -> poke exceptionFlag 1
         -- Breaking on exceptions is not enabled by default, since it
         -- might be a bit surprising. The exception flag is turned off
