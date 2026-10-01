@@ -45,4 +45,12 @@ T24384b: T24384_prep
 		-package-db ./$(PKGCONF_LOCAL) -package-id dep-1-XXX -package-id dep-public-1-XXX \
 		A.hs lib/B.hs C.hs D.hs E.hs
 
-	cat dep.json | jq --sort-keys
+	cat dep.json
+
+T24384c: T24384_prep
+	'$(TEST_HC)' -M -dep-json dep.json \
+		-hide-all-packages -package base -package containers -package template-haskell \
+		-package-db ./$(PKGCONF_LOCAL) -package-id dep-1-XXX -package-id dep-public-1-XXX \
+		A.hs lib/B.hs C.hs D.hs E.hs
+
+	cat dep.json

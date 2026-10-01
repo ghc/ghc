@@ -610,127 +610,188 @@ writeJsonFile doc p = do
 --------------------------------------------------------------------------------
 -- Payload for -dep-json
 
-newtype PackageDeps
-  = PackageDeps (Map.Map (String, UnitId, DPackageId) DepsImports)
-  deriving newtype (Monoid)
-
 newtype DPackageId = DPackageId PackageId
   deriving newtype (Eq)
 
 instance Ord DPackageId where
   DPackageId (PackageId d1) `compare` DPackageId (PackageId d2) = d1 `lexicalCompareFS` d2
 
-instance Semigroup PackageDeps where
-  PackageDeps l <> PackageDeps r = PackageDeps (Map.unionWith (Semigroup.<>) l r)
-
-data Deps = Deps
-  { sources :: Set.Set OsPath
-  , moduleImports :: DepsImports
-  , sourceImports :: DepsImports
-  , packages :: PackageDeps
+data ModuleNodeDeps = ModuleNodeDeps
+  { source :: OsPath
+  , imports :: ImportDeps
   , cpp :: Set.Set OsPath
   , options :: [String]
   , preprocessor :: Maybe FilePath
   }
   deriving stock (Generic)
-  deriving (Semigroup, Monoid) via (Generically Deps)
+  deriving (Semigroup, Monoid) via (Generically ModuleNodeDeps)
 
-data DepsImports
-  = DepsImports
-  { normalImport :: Set.Set Module
-  , spliceImport :: Set.Set Module
-  , quoteImport :: Set.Set Module
+addImport :: ImportDep -> ModuleNodeDeps -> ModuleNodeDeps
+addImport import_dep mod_node_deps =
+  mod_node_deps
+    { imports = ImportDeps $ Map.insertWith Set.union uid (Set.singleton import_dep) (getImports $ imports mod_node_deps)
+    }
+  where
+    uid = toUnitId $ moduleUnit $ imp_mod import_dep
+
+addCpp :: OsPath -> ModuleNodeDeps -> ModuleNodeDeps
+addCpp p mod_node_deps =
+  mod_node_deps
+    { cpp = Set.insert p (cpp mod_node_deps)
+    }
+
+newtype ImportDeps = ImportDeps { getImports :: Map.Map UnitId (Set.Set ImportDep) }
+  deriving stock (Generic)
+  deriving (Semigroup, Monoid) via (Generically ImportDeps)
+
+data ImportDep = ImportDep
+  { imp_mod :: Module
+  , imp_level :: ImportLevel
+  , imp_isBoot :: IsBootInterface
+  } deriving (Eq, Ord)
+
+mkImportDep :: Module -> ImportLevel -> IsBootInterface -> ImportDep
+mkImportDep modl level isBoot = ImportDep
+  { imp_mod = modl
+  , imp_level = level
+  , imp_isBoot = isBoot
+  }
+
+data HomeUnitDeps = HomeUnitDeps
+  { homeModules :: Map.Map ModuleWithIsBoot ModuleNodeDeps
   }
   deriving stock (Generic)
-  deriving (Semigroup, Monoid) via (Generically DepsImports)
+  deriving (Semigroup, Monoid) via (Generically HomeUnitDeps)
 
-newtype DepJson = DepJson (Map.Map ModuleWithIsBoot Deps)
+data ExtUnitDep = ExtUnitDep
+  { extUnitId :: UnitId
+  -- ^ The 'UnitId' of a unit. This is assumed to be globally unique.
+  , extUnitName :: String
+  , extUnitPackageId :: DPackageId
+  } deriving (Eq, Ord)
+
+data DepJson = DepJson
+  { homeUnitDeps :: Map.Map UnitId HomeUnitDeps
+  , externalDeps :: Set.Set ExtUnitDep
+  }
 
 instance ToJson DepJson where
-  json (DepJson m) =
-    JSObject
-      [ (homeUnitModuleKey target, homeUnitModule deps)
-      | (target, deps) <- Map.toList m
+  json (DepJson homeUnits extDeps) =
+    JSObject $
+      [ homeUnit huid hud
+      | (huid, hud) <- Map.toList homeUnits
+      ] ++
+      [ mkExtDepObj dep
+      | dep <- Set.toList extDeps
       ]
     where
+      homeUnit uid hud =
+        ( unitIdString uid
+        , JSObject
+            [
+              ( "modules"
+              , JSObject
+                  [ (homeUnitModuleKey modl, homeUnitModule deps)
+                  | (modl, deps) <- Map.toList $ homeModules hud
+                  ]
+              )
+            ]
+        )
+
       homeUnitModuleKey :: ModuleWithIsBoot -> String
-      homeUnitModuleKey t = moduleNameString (moduleName (gwib_mod t)) ++ case gwib_isBoot t of
+      homeUnitModuleKey t = moduleKey (gwib_mod t) (gwib_isBoot t)
+
+      moduleKey :: Module -> IsBootInterface -> String
+      moduleKey t b = moduleNameString (moduleName t) ++ case b of
         IsBoot -> "[boot]"
         NotBoot -> ""
 
-      homeUnitModule :: Deps -> JsonDoc
-      homeUnitModule Deps {packages = PackageDeps packages, ..} =
+      homeUnitModule :: ModuleNodeDeps -> JsonDoc
+      homeUnitModule ModuleNodeDeps {source, imports, cpp, options, preprocessor} =
         JSObject
-          [ ("sources", array sources (showOsPath . normalise))
-          , ("modules", JSObject $ importsObj moduleImports)
-          , ("modules-boot", JSObject $ importsObj sourceImports)
-          , ("packages", JSArray
-              [ package name unit_id package_id mods
-              | ((name, unit_id, dpkd_id), mods) <- Map.toList packages
-              , let DPackageId package_id = dpkd_id
-              ]
-            )
-          , ("cpp", array cpp showOsPath)
+          [ ("source", JSString . showOsPath $ normalise source)
+          , ("imports", importsObj imports)
+          , ("includes", strArray cpp showOsPath)
           , ("options", JSArray $ map JSString options)
           , ("preprocessor", maybe JSNull JSString preprocessor)
           ]
 
-      package :: String -> UnitId -> PackageId -> DepsImports -> JsonDoc
-      package name unit_id (PackageId package_id) mods =
+      importsObj :: ImportDeps -> JsonDoc
+      importsObj importDeps = JSArray $ map importObj (Map.toList $ getImports importDeps)
+
+      importObj :: (UnitId, Set.Set ImportDep) -> JsonDoc
+      importObj (uid, importSet) =
         JSObject
-          [ ("id", JSString (unitIdString unit_id))
-          , ("name", JSString name)
-          , ("package-id", JSString (unpackFS package_id))
-          , ("modules", JSObject $ importsObj mods)
+          [ (unitIdString uid, array importSet importDepObj )
           ]
 
-      array values render = JSArray (fmap (JSString . render) (Set.toList values))
+      importDepObj :: ImportDep -> JsonDoc
+      importDepObj ImportDep {imp_mod, imp_level, imp_isBoot}
+        | NormalLevel <- imp_level = JSString (moduleKey imp_mod imp_isBoot)
+        | otherwise = JSObject
+          [ ("module", JSString (moduleKey imp_mod imp_isBoot))
+          , ("level" , importLevel imp_level)
+          ]
+
+      importLevel :: ImportLevel -> JsonDoc
+      importLevel lvl =
+        JSString $ case lvl of
+          NormalLevel -> "normal"
+          SpliceLevel -> "splice"
+          QuoteLevel -> "quote"
+
+      mkExtDepObj :: ExtUnitDep -> (String, JsonDoc)
+      mkExtDepObj ExtUnitDep{..} =
+        ( unitIdString extUnitId
+        , JSObject
+            [ ("package-name", JSString extUnitName)
+            , ("package-id", JSString $ showPackageId extUnitPackageId)
+            ]
+        )
+
+      array values render = JSArray (fmap render (Set.toList values))
+      strArray values render = JSArray (fmap (JSString . render) (Set.toList values))
 
       showOsPath = unsafeDecodeUtf
-
-      importsObj  :: DepsImports -> [(String, JsonDoc)]
-      importsObj DepsImports{..} =
-        [ ("normal", array normalImport (moduleNameString . moduleName))
-        , ("quote" , array quoteImport  (moduleNameString . moduleName))
-        , ("splice", array spliceImport (moduleNameString . moduleName))
-        ]
+      showPackageId (DPackageId (PackageId pid)) = unpackFS pid
 
 initDepJson :: IO (IORef DepJson)
-initDepJson = newIORef $ DepJson Map.empty
+initDepJson = newIORef $ DepJson Map.empty Set.empty
 
-insertDepJson :: [ModuleWithIsBoot] -> Deps -> DepJson -> DepJson
-insertDepJson targets dep (DepJson m0) =
+insertDepJson :: ModuleWithIsBoot -> ModuleNodeDeps -> Set.Set ExtUnitDep -> DepJson -> DepJson
+insertDepJson target modNode extUnits (DepJson m0 e0) =
   DepJson
-    $ foldl'
-      ( \acc target ->
-          Map.insertWithKey
-            (\ k _l _r -> pprPanic "insertDepJson" (text "Conflicting entries for: " <+> ppr k))
-            target
-            dep
-            acc
-      )
-      m0
-      targets
+    { homeUnitDeps =
+        Map.insertWith
+          (Semigroup.<>)
+          modUnitId
+          (HomeUnitDeps $ Map.singleton target modNode)
+          m0
+    , externalDeps =
+        Set.union e0 extUnits
+    }
+  where
+    modUnitId = toUnitId $ moduleUnit $ gwib_mod target
 
 updateDepJson :: Bool -> DepNode -> [Dep] -> DepJson -> DepJson
 updateDepJson include_pkgs DepNode {..} deps =
-  insertDepJson [dn_mod] payload
+  insertDepJson dn_mod payload externalDeps
   where
-    payload = node_data Semigroup.<> foldMap mkDep deps
+    (externalDeps, payload) = foldl' go (Set.empty, initial_node_data) deps
 
-    node_data =
-      mempty
-        { sources = Set.singleton dn_src
+    initial_node_data =
+      ModuleNodeDeps
+        { source = dn_src
         , preprocessor = pn_preprocessor dn_preprocessing
         , options = pn_options dn_preprocessing
+        , cpp = Set.empty
+        , imports = ImportDeps Map.empty
         }
 
-    mkDep = \case
+    go (extDeps, node_data) = \ case
       DepHi {dep_mod, dep_local, dep_unit, dep_boot, dep_level}
         | dep_local
-        -> case dep_boot of
-          IsBoot -> mempty {sourceImports = depsImportForImport dep_mod dep_level}
-          NotBoot -> mempty {moduleImports = depsImportForImport dep_mod dep_level }
+        -> (extDeps, addImport (mkImportDep dep_mod dep_level dep_boot) node_data)
 
         | include_pkgs
         , Just unit <- dep_unit
@@ -738,19 +799,21 @@ updateDepJson include_pkgs DepNode {..} deps =
               name = unpackFS nameFS
               withLibName (PackageName c) = name ++ ":" ++ unpackFS c
               lname = maybe name withLibName (unitComponentName unit)
-              key = (lname, unitId unit, DPackageId $ unitPackageId unit)
-        -> mempty {packages = PackageDeps (Map.singleton key (depsImportForImport dep_mod dep_level))}
+              newExtDep = ExtUnitDep
+                { extUnitId = unitId unit
+                , extUnitName = lname
+                , extUnitPackageId = DPackageId $ unitPackageId unit
+                }
+        ->
+          ( Set.insert newExtDep extDeps
+          , addImport (mkImportDep dep_mod dep_level dep_boot) node_data
+          )
 
         | otherwise
-        -> mempty
+        -> (extDeps, node_data)
 
       DepCpp {dep_path} ->
-        mempty {cpp = Set.singleton dep_path}
-
-    depsImportForImport mod_name = \ case
-      NormalLevel -> mempty { normalImport = Set.singleton mod_name }
-      SpliceLevel -> mempty { spliceImport = Set.singleton mod_name }
-      QuoteLevel ->  mempty { quoteImport  = Set.singleton mod_name }
+        (extDeps, addCpp dep_path node_data)
 
 -----------------------------------------------------------------
 --              Module cycles
