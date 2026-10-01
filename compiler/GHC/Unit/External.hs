@@ -49,7 +49,7 @@ type PackageAnnEnv           = AnnEnv
 type PackageCompleteMatches  = CompleteMatches
 
 -- | Helps us find information about modules in the imported packages
-type PackageIfaceTable = ModuleEnv ModIface
+type PackageIfaceTable = ModuleEnv RetainedModIface
         -- Domain = modules in the imported packages
 
 -- | Constructs an empty PackageIfaceTable

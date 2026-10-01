@@ -1335,7 +1335,7 @@ hscCheckSafe' m l = do
             _ | isHomeModule home_unit mod      -> True
             _ -> isUnitTrusted unit_state (moduleUnit m)
 
-    lookup' :: Module -> Hsc (Maybe ModIface)
+    lookup' :: Module -> Hsc (Maybe RetainedModIface)
     lookup' m = do
         hsc_env <- getHscEnv
         iface <- liftIO $ lookupIfaceByModuleHsc hsc_env m
