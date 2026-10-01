@@ -1693,7 +1693,7 @@ lookupArgDoc i nm = do
         _ -> pure Nothing
 
 -- | Returns the module a Name belongs to, if it is isn't local.
-getExternalModIface :: Name -> TcM (Maybe ModIface)
+getExternalModIface :: Name -> TcM (Maybe RetainedModIface)
 getExternalModIface nm = do
   isLocal <- nameIsLocalOrFrom <$> getModule <*> pure nm
   if isLocal
