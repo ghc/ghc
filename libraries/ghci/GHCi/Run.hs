@@ -421,6 +421,7 @@ withBreakAction opts tid@(ThreadId tid#) act = do
   bracket (setBreakAction ctx) (resetBreakAction ctx) (\_ -> act (waitForResult ctx))
   where
     setBreakAction ctx = do
+      -- TODO: TERRIBLY NOT MULTI-THREAD FRIENDLY. Each thread needs its own RTS flag exceptionFlag, like we have for step-in or step-out.
       runIf breakOnException $ \_ -> poke exceptionFlag 1
         -- Breaking on exceptions is not enabled by default, since it
         -- might be a bit surprising. The exception flag is turned off
