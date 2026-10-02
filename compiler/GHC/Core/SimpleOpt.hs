@@ -1554,7 +1554,8 @@ exprIsConApp_maybe :: HasDebugCallStack
                    => InScopeEnv -> CoreExpr
                    -> Maybe (InScopeSet, FloatBinds, DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
-  = go (Left in_scope) emptyFloatBinds expr (CC [] MRefl)
+  = -- pprTrace "exprIsConApp" (ppr expr) $
+    go (Left in_scope) emptyFloatBinds expr (CC [] MRefl)
   where
     go :: Either InScopeSet Subst
              -- Left in-scope  means "empty substitution"
@@ -1667,7 +1668,8 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         | idArity fun == 0
         , Just rhs <- expandUnfolding_maybe unfolding
         , let in_scope' = extend_in_scope (exprFreeVars rhs)
-        = go (Left in_scope') floats rhs cont
+        = -- pprTrace "exprIsConApp:unf" (ppr fun <+> ppr rhs) $
+          go (Left in_scope') floats rhs cont
 
         -- See Note [exprIsConApp_maybe on literal strings]
         | (fun `hasKey` unpackCStringIdKey) ||
@@ -1707,17 +1709,21 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     subst_co (Right s) co = GHC.Core.Subst.substCo s co
 
     subst_expr (Left {}) e = e
-    subst_expr (Right s) e = substExpr s e
-
-    subst_bndr msubst bndr
-      = (Right subst', bndr')
-      where
-        (subst', bndr') = substBndr subst bndr
-        subst = case msubst of
-                  Left in_scope -> mkEmptySubst in_scope
-                  Right subst   -> subst
+    subst_expr (Right s) e = -- pprTrace "subst_expr" (text "subst" <+> ppr s $$ text "expr" <+> ppr e) $
+                             substExpr s e
 
     subst_bndrs subst bs = mapAccumL subst_bndr subst bs
+
+    subst_bndr (Left in_scope) bndr
+      | bndr `elemInScopeSet` in_scope = subst_bndr1 (mkEmptySubst in_scope) bndr
+      | otherwise                      = (Left in_scope, bndr)
+    subst_bndr (Right subst) bndr = subst_bndr1 subst bndr
+
+    subst_bndr1 subst bndr
+      = -- pprTrace "subst_bndr1" (ppr bndr <+> ppr bndr' $$ ppr subst) $
+        (Right subst', bndr')
+      where
+        (subst', bndr') = substBndr subst bndr
 
     extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
     extend (Right s)       v e = Right (extendSubst s v e)
