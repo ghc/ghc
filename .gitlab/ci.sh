@@ -64,7 +64,8 @@ Environment variables affecting the build:
   CROSS_TARGET      Triple of cross-compilation target.
   FINAL_CROSS_STAGE The final stage of the cross-compiler to build either
                       * 2: Build a cross-compiler bindist
-                      * 3: Build a target executable bindist (implies the cross-compiler bindist of 2)
+                      * 3: Also build the target executable bindist
+                          (builds stages 2 and 3; implies the bindist of 2)
   VERBOSE           Set to non-empty for verbose build output
   RUNTEST_ARGS      Arguments passed to runtest.py
   TEST_WAYS         Testsuite ways to run
@@ -575,9 +576,8 @@ function build_hadrian() {
 
   case "${FINAL_CROSS_STAGE:-2}" in
     2) BINDIST_TARGET="binary-dist";;
-    # Stage2 cross-compiler bindists are (almost) a byproduct of Stage3
-    # cross-compiled bindists. So, we bundle both of them when the Stage3
-    # bindist is built.
+    # Stage2 bindists are (almost) a byproduct of Stage3 bindists. So, we
+    # bundle both of them when the Stage3 bindist is built.
     3)
       BINDIST_TARGET="binary-dist binary-dist-stage3"
       if [[ -z "${BIN_DIST_NAME_STAGE3:-}" ]]; then
