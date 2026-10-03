@@ -110,26 +110,51 @@ data Opsys
   = Linux LinuxDistro
   | Darwin
   | FreeBSD14
-  | Windows deriving (Eq)
+  | Windows deriving (Eq, Show)
 
 data LinuxDistro
   = Debian13
   | Debian12
-  | Debian12Wine
-  | Debian13Riscv
   | Debian11
-  | Debian11Js
   | Fedora43
-  | Ubuntu2404LoongArch64
   | Ubuntu2404
   | Ubuntu2204
   | Alpine312
   | Alpine323
-  | AlpineWasm
   | Rocky8
-  deriving (Eq)
+  deriving (Eq, Show)
 
-data Arch = Amd64 | AArch64 | I386
+-- | The architecture of a platform: either the build host architecture or
+-- the architecture component of a target triple.
+data Arch = Amd64 | AArch64 | I386 | RiscV64 | LoongArch | Wasm32 | JavaScript
+  deriving (Show)
+
+-- | Describes what the docker image is for: the development flavour of the
+-- build environment, orthogonal to the image's own architecture ('Arch').
+-- E.g. @FlavorRiscV@ denotes the image that carries the RISC-V cross
+-- toolchain.
+data ImageFlavor
+  = FlavorVanilla
+  | FlavorRiscV
+  | FlavorLoongArch
+  | FlavorWine
+  | FlavorEmscripten
+  | FlavorWasm
+  deriving (Eq, Show)
+
+-- | OS element of a configure target triple: this is the OS of the *target*
+-- platform, not the build environment (that is 'Opsys'/'LinuxDistro').
+data TargetOs
+  = TargetOsLinuxGnu
+  | TargetOsGhcjs
+  | TargetOsMingw32
+  | TargetOsWasi
+  deriving (Eq, Show)
+
+data TargetPlatform = TargetPlatform
+  { tpArch :: Arch     -- ^ target architecture, e.g. 'RiscV64'
+  , tpOs   :: TargetOs -- ^ target OS, e.g. 'TargetOsLinuxGnu'
+  }
 
 data BignumBackend = Native | Gmp deriving Eq
 
@@ -158,7 +183,7 @@ data BuildConfig
                 , withAssertions :: Bool
                 , withNuma       :: Bool
                 , withZstd       :: Bool
-                , crossTarget    :: Maybe String
+                , crossTarget    :: Maybe TargetPlatform
                 , finalCrossStage :: Maybe FinalCrossStage
                 , crossEmulator  :: CrossEmulator
                 , configureWrapper :: Maybe String
@@ -180,7 +205,7 @@ configureArgsStr bc = unwords $
      ["--enable-unregisterised"| unregisterised bc ]
   ++ ["--disable-tables-next-to-code" | not (tablesNextToCode bc) ]
   ++ ["--with-intree-gmp" | Just _ <- [crossTarget bc] ]
-  ++ ["--with-system-libffi" | crossTarget bc == Just "wasm32-wasi" ]
+  ++ ["--with-system-libffi" | (tpOs <$> crossTarget bc) == Just TargetOsWasi ]
   ++ ["--enable-ipe-data-compression" | withZstd bc ]
   ++ ["--enable-strict-ghc-toolchain-check"]
 
@@ -287,17 +312,48 @@ crossStageToInt :: FinalCrossStage -> Int
 crossStageToInt Stage2 = 2
 crossStageToInt Stage3 = 3
 
-crossConfig :: String       -- ^ target triple
+crossConfig :: TargetPlatform -- ^ target platform
             -> CrossEmulator -- ^ emulator for testing
             -> Maybe String -- ^ Configure wrapper
             -> FinalCrossStage -- ^ final stage to build
             -> BuildConfig
-crossConfig triple emulator configure_wrapper crossStage =
-    vanilla { crossTarget = Just triple
+crossConfig targetPlatform emulator configure_wrapper crossStage =
+    vanilla { crossTarget = Just targetPlatform
             , finalCrossStage  = Just crossStage
             , crossEmulator = emulator
             , configureWrapper = configure_wrapper
             }
+
+-- | The docker image flavour of a build, derived from its cross target
+-- (the image must carry the target's toolchain) or 'FlavorVanilla' for
+-- plain builds.
+buildFlavor :: BuildConfig -> ImageFlavor
+buildFlavor bc = maybe FlavorVanilla flavorOf (crossTarget bc)
+
+-- | The docker image flavour needed to build for a target platform. The
+-- flavour is a property of the build environment, not of the target's OS,
+-- so it lives in its own type. Rejecting pairings that have no image makes
+-- it impossible to silently emit an implausible docker image name.
+flavorOf :: TargetPlatform -> ImageFlavor
+flavorOf TargetPlatform{ tpArch = arch, tpOs = os } = case (arch, os) of
+  (AArch64,    TargetOsLinuxGnu) -> FlavorVanilla
+  (AArch64,    TargetOsMingw32)  -> FlavorWine
+  (RiscV64,    TargetOsLinuxGnu) -> FlavorRiscV
+  (LoongArch,  TargetOsLinuxGnu) -> FlavorLoongArch
+  (Wasm32,     TargetOsWasi)     -> FlavorWasm
+  (JavaScript, TargetOsGhcjs)    -> FlavorEmscripten
+  _                              -> error $
+    "flavorOf: no image flavour for target " ++ show arch ++ "/" ++ show os
+
+-- | The configure target triple the build system consumes, e.g.
+-- @"riscv64-linux-gnu"@. 'renderTriple' is the only place where a target
+-- triple is rendered from the structured 'TargetPlatform'.
+renderTriple :: TargetPlatform -> String
+renderTriple TargetPlatform{ tpArch = arch, tpOs = os } = case os of
+  TargetOsLinuxGnu -> archName arch ++ "-linux-gnu"
+  TargetOsGhcjs    -> archName arch ++ "-unknown-ghcjs"
+  TargetOsMingw32  -> archName arch ++ "-unknown-mingw32"
+  TargetOsWasi     -> archName arch ++ "-wasi"
 
 llvm :: BuildConfig
 llvm = vanilla { llvmBootstrap = True, testsuiteWays = ["llvm", "optllvm"] }
@@ -320,16 +376,16 @@ usePerfProfilingTestsuite bc = bc { testsuiteUsePerf = True }
 
 -- | These tags have to match what we call the runners on gitlab
 runnerTag :: Arch -> Opsys -> String
-runnerTag arch (Linux _) =
-  case arch of
-    Amd64                -> "x86_64-linux"
-    AArch64              -> "aarch64-linux"
-    I386                 -> "x86_64-linux"
-runnerTag AArch64 Darwin  = "aarch64-darwin"
-runnerTag Amd64 Darwin    = "x86_64-darwin-m1"
-runnerTag Amd64 Windows   = "new-x86_64-windows"
-runnerTag Amd64 FreeBSD14 = "x86_64-freebsd14"
-runnerTag _ _             = error "Invalid arch/opsys"
+runnerTag arch opsys = case (arch, opsys) of
+  (Amd64,   Linux{})    -> "x86_64-linux"
+  (AArch64, Linux{})    -> "aarch64-linux"
+  (I386,    Linux{})    -> "x86_64-linux"
+  (AArch64, Darwin)     -> "aarch64-darwin"
+  (Amd64,   Darwin)     -> "x86_64-darwin-m1"
+  (Amd64,   Windows)    -> "new-x86_64-windows"
+  (Amd64,   FreeBSD14)  -> "x86_64-freebsd14"
+  _                     -> error $ "runnerTag: no runner for "
+                                      ++ show arch ++ "/" ++ show opsys
 
 tags :: Arch -> Opsys -> BuildConfig -> [String]
 tags arch opsys _bc = [runnerTag arch opsys] -- Tag for which runners we can use
@@ -337,23 +393,32 @@ tags arch opsys _bc = [runnerTag arch opsys] -- Tag for which runners we can use
 runnerPerfTag :: Arch -> Opsys -> String
 runnerPerfTag arch sys = runnerTag arch sys ++ "-perf"
 
--- These names are used to find the docker image so they have to match what is
--- in the docker registry.
+-- | These names are used to find the docker image so they have to match what
+-- is in the docker registry.
 distroName :: LinuxDistro -> String
 distroName Debian13      = "deb13"
 distroName Debian12      = "deb12"
 distroName Debian11      = "deb11"
-distroName Debian11Js    = "deb11-emsdk-closure"
-distroName Debian13Riscv = "deb13-riscv"
-distroName Debian12Wine  = "deb12-wine"
 distroName Fedora43      = "fedora43"
-distroName Ubuntu2404LoongArch64 = "ubuntu24_04-loongarch"
 distroName Ubuntu2204    = "ubuntu22_04"
 distroName Ubuntu2404    = "ubuntu24_04"
 distroName Alpine312     = "alpine3_12"
 distroName Alpine323     = "alpine3_23"
-distroName AlpineWasm    = "alpine3_23-wasm"
 distroName Rocky8        = "rocky8"
+
+-- | The distro tag used in docker image names, extended with the toolchain
+-- suffix of the image flavour (e.g. 'Debian13'' + 'FlavorRiscV' ->
+-- @"deb13-riscv"@).
+distroImageTag :: LinuxDistro -> ImageFlavor -> String
+distroImageTag distro flavor = distroName distro ++ flavorSuffix flavor
+
+flavorSuffix :: ImageFlavor -> String
+flavorSuffix FlavorVanilla    = ""
+flavorSuffix FlavorRiscV      = "-riscv"
+flavorSuffix FlavorLoongArch  = "-loongarch"
+flavorSuffix FlavorWine       = "-wine"
+flavorSuffix FlavorEmscripten = "-emsdk-closure"
+flavorSuffix FlavorWasm       = "-wasm"
 
 opsysName :: Opsys -> String
 opsysName (Linux distro) = "linux-" ++ distroName distro
@@ -361,22 +426,20 @@ opsysName Darwin         = "darwin"
 opsysName FreeBSD14      = "freebsd14"
 opsysName Windows        = "windows"
 
--- | Remove cross-specific prefix for Stage3 bindist names.
--- We need to pretend to have built the bindist on the target.
-toStage3TargetOpsys :: Opsys -> Opsys
-toStage3TargetOpsys (Linux Debian13Riscv) = Linux Debian13
-toStage3TargetOpsys (Linux Ubuntu2404LoongArch64) = Linux Ubuntu2404
-toStage3TargetOpsys opsys = opsys
+-- | OS name as it appears for job identity and docker image tags, qualified
+-- by the working image flavour if any (e.g. @"linux-deb13-riscv"@).
+opsysNameWithFlavor :: Opsys -> ImageFlavor -> String
+opsysNameWithFlavor (Linux distro) flavor = "linux-" ++ distroImageTag distro flavor
+opsysNameWithFlavor opsys         _       = opsysName opsys
 
 archName :: Arch -> String
-archName Amd64   = "x86_64"
-archName AArch64 = "aarch64"
-archName I386    = "i386"
-
--- | First component of a cross target triple, used to name stage3
--- (target-platform) bindists as if they had been built natively on the target.
-targetArchName :: String -> String
-targetArchName = takeWhile (/= '-')
+archName Amd64       = "x86_64"
+archName AArch64     = "aarch64"
+archName I386        = "i386"
+archName RiscV64     = "riscv64"
+archName LoongArch   = "loongarch64"
+archName Wasm32      = "wasm32"
+archName JavaScript  = "javascript"
 
 binDistName :: Arch -> Opsys -> BuildConfig -> String
 binDistName arch = binDistNameWith (archName arch)
@@ -384,12 +447,15 @@ binDistName arch = binDistNameWith (archName arch)
 binDistNameWith :: String -> Opsys -> BuildConfig -> String
 binDistNameWith archN opsys bc = "ghc-" ++ testEnvWith archN opsys bc
 
+-- | Name of the stage3 (target-platform) bindist, produced by a stage3
+-- cross build (final cross stage 'Stage3'). It is named as if built
+-- natively on the target: target architecture, the OS of the job, and no
+-- cross marker.
 stage3BinDistName :: Opsys -> BuildConfig -> Maybe String
 stage3BinDistName opsys bc
   | Just Stage3 <- finalCrossStage bc
-  , Just triple <- crossTarget bc
-  = Just $ binDistNameWith (targetArchName triple) (toStage3TargetOpsys opsys)
-                          (bc { crossTarget = Nothing })
+  , Just TargetPlatform{ tpArch = arch } <- crossTarget bc
+  = Just $ binDistNameWith (archName arch) opsys (bc { crossTarget = Nothing })
   | otherwise
   = Nothing
 
@@ -403,13 +469,13 @@ testEnvWith :: String -> Opsys -> BuildConfig -> String
 testEnvWith archN opsys bc =
   intercalate "-" $ concat
     [ [ archN
-      , opsysName opsys ]
+      , opsysNameWithFlavor opsys (buildFlavor bc) ]
     , ["int_" ++ bignumString (bignumBackend bc) | bignumBackend bc /= Gmp]
     , ["unreg" | unregisterised bc ]
     , ["numa"  | withNuma bc ]
     , ["zstd"  | withZstd bc ]
     , ["no_tntc"  | not (tablesNextToCode bc) ]
-    , ["cross_"++triple  | Just triple <- pure $ crossTarget bc ]
+    , ["cross_"++renderTriple ct | Just ct <- pure $ crossTarget bc ]
     , [flavourString (mkJobFlavour bc)]
     ]
 
@@ -432,18 +498,18 @@ flavourString (Flavour base trans) = base_string base ++ concatMap (("+" ++) . f
     flavour_string TextWithSIMDUTF = "text_simdutf"
 
 -- The path to the docker image (just for linux builders)
-dockerImage :: Arch -> Opsys -> Maybe String
-dockerImage arch (Linux distro) =
+dockerImage :: Arch -> Opsys -> BuildConfig -> Maybe String
+dockerImage arch (Linux distro) bc =
     Just image
   where
     image = mconcat
       [ "registry.gitlab.haskell.org/ghc/ci-images/"
       , archName arch
       , "-linux-"
-      , distroName distro
+      , distroImageTag distro (buildFlavor bc)
       , ":$DOCKER_REV"
       ]
-dockerImage _ _ = Nothing
+dockerImage _ _ _ = Nothing
 
 -----------------------------------------------------------------------------
 -- Platform-specific variables
@@ -484,8 +550,8 @@ brokenTest :: TestName -- ^ test name
            -> Variables
 brokenTest test _why = "BROKEN_TESTS" =: test
 
-opsysVariables :: Arch -> Opsys -> Variables
-opsysVariables _ FreeBSD14 = mconcat
+opsysVariables :: Arch -> Opsys -> ImageFlavor -> Variables
+opsysVariables _ FreeBSD14 _ = mconcat
   [ -- N.B. we use iconv from ports as I see linker errors when we attempt
     -- to use the "native" iconv embedded in libc as suggested by the
     -- porting guide [1].
@@ -499,8 +565,8 @@ opsysVariables _ FreeBSD14 = mconcat
   , "FETCH_GHC_VERSION" =: "9.10.3"
   , "CABAL_INSTALL_VERSION" =: "3.14.2.0"
   ]
-opsysVariables arch (Linux distro) = distroVariables arch distro
-opsysVariables AArch64 (Darwin {}) = mconcat
+opsysVariables arch (Linux distro) flavor = distroVariables arch distro flavor
+opsysVariables AArch64 (Darwin {}) _ = mconcat
   [ "NIX_SYSTEM" =: "aarch64-darwin"
   , "MACOSX_DEPLOYMENT_TARGET" =: "11.0"
   , "LANG" =: "en_US.UTF-8"
@@ -508,7 +574,7 @@ opsysVariables AArch64 (Darwin {}) = mconcat
     -- Fonts can't be installed on darwin
   , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
   ]
-opsysVariables Amd64 (Darwin {}) = mconcat
+opsysVariables Amd64 (Darwin {}) _ = mconcat
   [ "NIX_SYSTEM" =: "x86_64-darwin"
   , "MACOSX_DEPLOYMENT_TARGET" =: "11.0"
     -- Only Sierra and onwards supports clock_gettime. See #12858
@@ -521,16 +587,15 @@ opsysVariables Amd64 (Darwin {}) = mconcat
   , "CONFIGURE_ARGS" =: "--with-intree-gmp --with-system-libffi"
     -- Fonts can't be installed on darwin
   , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
-
   ]
-opsysVariables _ (Windows {}) = mconcat
+opsysVariables _ (Windows {}) _ = mconcat
   [ "MSYSTEM" =: "CLANG64"
   , "LANG" =: "en_US.UTF-8"
   , "CABAL_INSTALL_VERSION" =: "3.14.2.0"
   , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
   , "FETCH_GHC_VERSION" =: "9.10.3"
   ]
-opsysVariables _ _ = mempty
+opsysVariables _ _ _ = mempty
 
 alpineVariables :: Arch -> Variables
 alpineVariables arch = mconcat $
@@ -549,10 +614,13 @@ alpineVariables arch = mconcat $
   ]
 
 
-distroVariables :: Arch -> LinuxDistro -> Variables
-distroVariables arch Alpine312 = alpineVariables arch
-distroVariables arch Alpine323 = alpineVariables arch
-distroVariables _ _ = mempty
+distroVariables :: Arch -> LinuxDistro -> ImageFlavor -> Variables
+distroVariables arch Alpine312 _ = alpineVariables arch
+-- The wasm image runs its own (libc-free) toolchain, so the alpine broken
+-- tests do not apply to it.
+distroVariables _ Alpine323 FlavorWasm = mempty
+distroVariables arch Alpine323 _ = alpineVariables arch
+distroVariables _ _ _ = mempty
 
 -----------------------------------------------------------------------------
 -- Cache settings, what to cache and when can we share the cache
@@ -564,8 +632,8 @@ data Cache
           }
 
 -- The cache doesn't depend on the BuildConfig because we only cache the cabal store.
-mkCacheKey :: Arch -> Opsys -> String
-mkCacheKey arch opsys = archName arch <> "-" <> opsysName opsys <> "-$CACHE_REV"
+mkCacheKey :: Arch -> Opsys -> ImageFlavor -> String
+mkCacheKey arch opsys flavor = archName arch <> "-" <> opsysNameWithFlavor opsys flavor <> "-$CACHE_REV"
 
 instance ToJSON Cache where
   toJSON Cache {..} = object
@@ -847,7 +915,7 @@ data Job
         , jobArtifacts :: Artifacts
         , jobCache :: Cache
         , jobRules :: OnOffRules
-        , jobPlatform  :: (Arch, Opsys)
+        , jobPlatform  :: (Arch, Opsys, ImageFlavor)
         }
 
 instance Show Job where
@@ -877,7 +945,7 @@ instance ToJSON Job where
 job :: Arch -> Opsys -> BuildConfig -> NamedJob Job
 job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
   where
-    jobPlatform = (arch, opsys)
+    jobPlatform = (arch, opsys, buildFlavor buildConfig)
 
     jobRules = emptyRules jobName
 
@@ -885,7 +953,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
 
     jobTags = tags arch opsys buildConfig
 
-    jobDockerImage = dockerImage arch opsys
+    jobDockerImage = dockerImage arch opsys buildConfig
 
     jobScript
       | Windows <- opsys
@@ -920,7 +988,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
 
     jobDependencies = []
     jobVariables = mconcat
-      [ opsysVariables arch opsys
+      [ opsysVariables arch opsys (buildFlavor buildConfig)
       , "TEST_ENV" =: testEnv arch opsys buildConfig
       , "BIN_DIST_NAME" =: binDistName arch opsys buildConfig
       , maybe mempty ("BIN_DIST_NAME_STAGE3" =:) (stage3BinDistName opsys buildConfig)
@@ -929,7 +997,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       , "CONFIGURE_ARGS" =: configureArgsStr buildConfig
       , "INSTALL_CONFIGURE_ARGS" =: "--enable-strict-ghc-toolchain-check"
       , maybe mempty ("CONFIGURE_WRAPPER" =:) (configureWrapper buildConfig)
-      , maybe mempty ("CROSS_TARGET" =:) (crossTarget buildConfig)
+      , maybe mempty ("CROSS_TARGET" =:) (fmap renderTriple (crossTarget buildConfig))
       , maybe mempty (("FINAL_CROSS_STAGE" =:) . show . crossStageToInt) (finalCrossStage buildConfig)
       , case crossEmulator buildConfig of
           NoEmulator
@@ -984,7 +1052,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
           Cache { cachePaths = [], cacheKey = "no-caching" }
       | otherwise = Cache
           { cachePaths = [ "cabal-cache", "toolchain" ]
-          , cacheKey = mkCacheKey arch opsys
+          , cacheKey = mkCacheKey arch opsys (buildFlavor buildConfig)
 
           }
 
@@ -1332,17 +1400,17 @@ alpine_aarch64 = [
 cross_jobs :: [JobGroup Job]
 cross_jobs = [
     -- x86 -> aarch64
-    validateBuilds Amd64 (Linux Debian13) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing Stage2)
+    validateBuilds Amd64 (Linux Debian13) (crossConfig (TargetPlatform AArch64 TargetOsLinuxGnu) (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing Stage2)
 
     -- Stage2: x86_64 (build/host) -> riscv64 (target)
     -- Stage3: x86_64 (build) -> riscv64 (host/target)
-  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing Stage3))
+  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13) (crossConfig (TargetPlatform RiscV64 TargetOsLinuxGnu) (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing Stage3))
 
     -- x86_64 -> loongarch64
-  , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404LoongArch64) (crossConfig "loongarch64-linux-gnu" (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing Stage2))
+  , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404) (crossConfig (TargetPlatform LoongArch TargetOsLinuxGnu) (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing Stage2))
 
     -- Javascript
-  , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11Js) javascriptConfig)
+  , addValidateRule JSBackend (validateBuilds Amd64 (Linux Debian11) javascriptConfig)
 
     -- Wasm
   , make_wasm_jobs wasm_build_config
@@ -1354,13 +1422,13 @@ cross_jobs = [
     -- Linux Aarch64 (Wine + FEX + MSYS64) => Windows Aarch64
   , makeWinArmJobs
       $ addValidateRule WinArm64
-        (validateBuilds AArch64 (Linux Debian12Wine) winAarch64Config)
+        (validateBuilds AArch64 (Linux Debian12) winAarch64Config)
   , makeWinArmJobs
       $ addValidateRule WinArm64LLVM
-        (validateBuilds AArch64 (Linux Debian12Wine) (winAarch64Config {llvmBootstrap = True}))
+        (validateBuilds AArch64 (Linux Debian12) (winAarch64Config {llvmBootstrap = True}))
   ]
   where
-    javascriptConfig = (crossConfig "javascript-unknown-ghcjs" (NoEmulatorNeeded TimeoutIncrease) (Just "emconfigure") Stage2)
+    javascriptConfig = (crossConfig (TargetPlatform JavaScript TargetOsGhcjs) (NoEmulatorNeeded TimeoutIncrease) (Just "emconfigure") Stage2)
                          { bignumBackend = Native }
 
     makeWinArmJobs = modifyJobs
@@ -1399,7 +1467,7 @@ cross_jobs = [
             llvm_prefix = "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-"
             cflags = "-fuse-ld=" ++ llvm_prefix ++ "ld --rtlib=compiler-rt"
 
-    winAarch64Config = (crossConfig "aarch64-unknown-mingw32" (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine") Nothing Stage2)
+    winAarch64Config = (crossConfig (TargetPlatform AArch64 TargetOsMingw32) (Emulator "/opt/wine-arm64ec-msys2-deb12/bin/wine") Nothing Stage2)
                          { bignumBackend = Native }
 
     make_wasm_jobs cfg =
@@ -1409,10 +1477,10 @@ cross_jobs = [
             . setVariable "HADRIAN_ARGS" "--docs=no-sphinx-pdfs --docs=no-sphinx-man"
             . delVariable "INSTALL_CONFIGURE_ARGS"
         )
-        $ addValidateRule WasmBackend $ validateBuilds Amd64 (Linux AlpineWasm) cfg
+        $ addValidateRule WasmBackend $ validateBuilds Amd64 (Linux Alpine323) cfg
 
     wasm_build_config =
-      (crossConfig "wasm32-wasi" (NoEmulatorNeeded NoTimeoutIncrease) Nothing Stage2)
+      (crossConfig (TargetPlatform Wasm32 TargetOsWasi) (NoEmulatorNeeded NoTimeoutIncrease) Nothing Stage2)
         { hostFullyStatic = True
         , buildFlavour    = Release -- TODO: This needs to be validate but wasm backend doesn't pass yet
         , textWithSIMDUTF = True
@@ -1437,8 +1505,8 @@ job_groups =
 -- Platform mapping for GHCup metadata
 ---------------------------------------------------------------------
 
-mkPlatform :: Arch -> Opsys -> String
-mkPlatform arch opsys = archName arch <> "-" <> opsysName opsys
+mkPlatform :: (Arch, Opsys, ImageFlavor) -> String
+mkPlatform (arch, opsys, flavor) = archName arch <> "-" <> opsysNameWithFlavor opsys flavor
 
 -- | This map tells us for a specific arch/opsys combo what the job name for
 -- nightly/release pipelines is. This is used by the ghcup metadata generation so that
@@ -1483,7 +1551,7 @@ platform_mapping = Map.map go combined_result
 
     process sel =
       Map.fromListWith combine
-      [ (uncurry mkPlatform (jobPlatform (jobInfo j)), j)
+      [ (mkPlatform (jobPlatform (jobInfo j)), j)
       | (sel -> Just j) <- job_groups
       ]
 
