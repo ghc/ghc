@@ -124,8 +124,6 @@ data LinuxDistro
   | Rocky8
   deriving (Eq, Show)
 
--- | The architecture of a platform: either the build host architecture or
--- the architecture component of a target triple.
 data Arch = Amd64 | AArch64 | I386 | RiscV64 | LoongArch | Wasm32 | JavaScript
   deriving (Show)
 
@@ -184,7 +182,7 @@ data BuildConfig
                 , withNuma       :: Bool
                 , withZstd       :: Bool
                 , crossTarget    :: Maybe TargetPlatform
-                , finalCrossStage :: Maybe FinalCrossStage
+                , crossStages    :: Maybe CrossStages
                 , crossEmulator  :: CrossEmulator
                 , configureWrapper :: Maybe String
                 , fullyStatic    :: Bool
@@ -254,7 +252,7 @@ vanilla = BuildConfig
   , withNuma = False
   , withZstd = False
   , crossTarget = Nothing
-  , finalCrossStage  = Nothing
+  , crossStages = Nothing
   , crossEmulator = NoEmulator
   , configureWrapper = Nothing
   , fullyStatic = False
@@ -300,26 +298,29 @@ static = vanilla { fullyStatic = True }
 staticNativeInt :: BuildConfig
 staticNativeInt = static { bignumBackend = Native }
 
--- | The final stage for which binary distributions should be built
---
--- `Stage2` builds a cross-compiler (build == host, host /= target). `Stage3`
--- implies `Stage2` and additionally builds a cross-compiled compiler (build /=
--- host, host == target).
-data FinalCrossStage = Stage2 | Stage3
-  deriving (Eq, Ord)
+-- | The cross stages a build produces binary distributions for
+data CrossStages
+  = -- | Builds a cross-compiler (build == host, host /= target):
+    -- its bindist runs on the build host.
+    Stage2
+  | -- | Implies `Stage2` and additionally builds a cross-compiled compiler
+    -- (build /= host, host == target).
+    Stage2And3
+  deriving stock (Eq, Ord)
 
-crossStageToInt :: FinalCrossStage -> Int
-crossStageToInt Stage2 = 2
-crossStageToInt Stage3 = 3
+-- | The value of the @FINAL_CROSS_STAGE@ environment variable; @"2"@ or @"3"@.
+finalCrossStageEnvVal :: CrossStages -> String
+finalCrossStageEnvVal Stage2     = "2"
+finalCrossStageEnvVal Stage2And3 = "3"
 
 crossConfig :: TargetPlatform -- ^ target platform
             -> CrossEmulator -- ^ emulator for testing
             -> Maybe String -- ^ Configure wrapper
-            -> FinalCrossStage -- ^ final stage to build
+            -> CrossStages -- ^ final cross stages to build bindists for
             -> BuildConfig
 crossConfig targetPlatform emulator configure_wrapper crossStage =
     vanilla { crossTarget = Just targetPlatform
-            , finalCrossStage  = Just crossStage
+            , crossStages  = Just crossStage
             , crossEmulator = emulator
             , configureWrapper = configure_wrapper
             }
@@ -329,25 +330,20 @@ crossConfig targetPlatform emulator configure_wrapper crossStage =
 -- plain builds.
 buildFlavor :: BuildConfig -> ImageFlavor
 buildFlavor bc = maybe FlavorVanilla flavorOf (crossTarget bc)
-
--- | The docker image flavour needed to build for a target platform. The
--- flavour is a property of the build environment, not of the target's OS,
--- so it lives in its own type. Rejecting pairings that have no image makes
--- it impossible to silently emit an implausible docker image name.
-flavorOf :: TargetPlatform -> ImageFlavor
-flavorOf TargetPlatform{ tpArch = arch, tpOs = os } = case (arch, os) of
-  (AArch64,    TargetOsLinuxGnu) -> FlavorVanilla
-  (AArch64,    TargetOsMingw32)  -> FlavorWine
-  (RiscV64,    TargetOsLinuxGnu) -> FlavorRiscV
-  (LoongArch,  TargetOsLinuxGnu) -> FlavorLoongArch
-  (Wasm32,     TargetOsWasi)     -> FlavorWasm
-  (JavaScript, TargetOsGhcjs)    -> FlavorEmscripten
-  _                              -> error $
-    "flavorOf: no image flavour for target " ++ show arch ++ "/" ++ show os
+  where
+    flavorOf :: TargetPlatform -> ImageFlavor
+    flavorOf TargetPlatform{ tpArch = arch, tpOs = os } = case (arch, os) of
+      (AArch64,    TargetOsLinuxGnu) -> FlavorVanilla
+      (AArch64,    TargetOsMingw32)  -> FlavorWine
+      (RiscV64,    TargetOsLinuxGnu) -> FlavorRiscV
+      (LoongArch,  TargetOsLinuxGnu) -> FlavorLoongArch
+      (Wasm32,     TargetOsWasi)     -> FlavorWasm
+      (JavaScript, TargetOsGhcjs)    -> FlavorEmscripten
+      _                              -> error $
+        "flavorOf: no image flavour for target " ++ show arch ++ "/" ++ show os
 
 -- | The configure target triple the build system consumes, e.g.
--- @"riscv64-linux-gnu"@. 'renderTriple' is the only place where a target
--- triple is rendered from the structured 'TargetPlatform'.
+-- @"riscv64-linux-gnu"@.
 renderTriple :: TargetPlatform -> String
 renderTriple TargetPlatform{ tpArch = arch, tpOs = os } = case os of
   TargetOsLinuxGnu -> archName arch ++ "-linux-gnu"
@@ -411,26 +407,26 @@ distroName Rocky8        = "rocky8"
 -- @"deb13-riscv"@).
 distroImageTag :: LinuxDistro -> ImageFlavor -> String
 distroImageTag distro flavor = distroName distro ++ flavorSuffix flavor
-
-flavorSuffix :: ImageFlavor -> String
-flavorSuffix FlavorVanilla    = ""
-flavorSuffix FlavorRiscV      = "-riscv"
-flavorSuffix FlavorLoongArch  = "-loongarch"
-flavorSuffix FlavorWine       = "-wine"
-flavorSuffix FlavorEmscripten = "-emsdk-closure"
-flavorSuffix FlavorWasm       = "-wasm"
-
-opsysName :: Opsys -> String
-opsysName (Linux distro) = "linux-" ++ distroName distro
-opsysName Darwin         = "darwin"
-opsysName FreeBSD14      = "freebsd14"
-opsysName Windows        = "windows"
+  where
+    flavorSuffix :: ImageFlavor -> String
+    flavorSuffix FlavorVanilla    = ""
+    flavorSuffix FlavorRiscV      = "-riscv"
+    flavorSuffix FlavorLoongArch  = "-loongarch"
+    flavorSuffix FlavorWine       = "-wine"
+    flavorSuffix FlavorEmscripten = "-emsdk-closure"
+    flavorSuffix FlavorWasm       = "-wasm"
 
 -- | OS name as it appears for job identity and docker image tags, qualified
 -- by the working image flavour if any (e.g. @"linux-deb13-riscv"@).
 opsysNameWithFlavor :: Opsys -> ImageFlavor -> String
 opsysNameWithFlavor (Linux distro) flavor = "linux-" ++ distroImageTag distro flavor
 opsysNameWithFlavor opsys         _       = opsysName opsys
+  where
+    opsysName :: Opsys -> String
+    opsysName (Linux distro) = "linux-" ++ distroName distro
+    opsysName Darwin         = "darwin"
+    opsysName FreeBSD14      = "freebsd14"
+    opsysName Windows        = "windows"
 
 archName :: Arch -> String
 archName Amd64       = "x86_64"
@@ -442,22 +438,25 @@ archName Wasm32      = "wasm32"
 archName JavaScript  = "javascript"
 
 binDistName :: Arch -> Opsys -> BuildConfig -> String
-binDistName arch = binDistNameWith (archName arch)
+binDistName arch  opsys bc = "ghc-" ++ testEnvWith (archName arch) opsys bc
 
-binDistNameWith :: String -> Opsys -> BuildConfig -> String
-binDistNameWith archN opsys bc = "ghc-" ++ testEnvWith archN opsys bc
-
--- | Name of the stage3 (target-platform) bindist, produced by a stage3
--- cross build (final cross stage 'Stage3'). It is named as if built
--- natively on the target: target architecture, the OS of the job, and no
--- cross marker.
+-- | Name of the stage3 (target-platform) bindist.
+--
+-- Because that bindist lives on its target, it is named as if built natively
+-- on the target: target architecture, the OS of the job, and no
+-- cross/toolchain flavour markers.
 stage3BinDistName :: Opsys -> BuildConfig -> Maybe String
 stage3BinDistName opsys bc
-  | Just Stage3 <- finalCrossStage bc
+  | buildsTargetBindist
   , Just TargetPlatform{ tpArch = arch } <- crossTarget bc
-  = Just $ binDistNameWith (archName arch) opsys (bc { crossTarget = Nothing })
+  = Just $ binDistName arch opsys (bc { crossTarget = Nothing })
   | otherwise
   = Nothing
+  where
+    -- Whether any bindist produced by this build configuration runs on its
+    -- target platform rather than on the build host.
+    buildsTargetBindist :: Bool
+    buildsTargetBindist = crossStages bc == Just Stage2And3
 
 -- | Test env should create a string which changes whenever the 'BuildConfig' changes.
 -- Either the change is reflected by modifying the flavourString or directly (as is
@@ -997,8 +996,8 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       , "CONFIGURE_ARGS" =: configureArgsStr buildConfig
       , "INSTALL_CONFIGURE_ARGS" =: "--enable-strict-ghc-toolchain-check"
       , maybe mempty ("CONFIGURE_WRAPPER" =:) (configureWrapper buildConfig)
-      , maybe mempty ("CROSS_TARGET" =:) (fmap renderTriple (crossTarget buildConfig))
-      , maybe mempty (("FINAL_CROSS_STAGE" =:) . show . crossStageToInt) (finalCrossStage buildConfig)
+      , maybe mempty (("CROSS_TARGET" =:) . renderTriple) (crossTarget buildConfig)
+      , maybe mempty (("FINAL_CROSS_STAGE" =:) . finalCrossStageEnvVal) (crossStages buildConfig)
       , case crossEmulator buildConfig of
           NoEmulator
             -- we need an emulator but it isn't set. Won't run the testsuite
@@ -1404,7 +1403,7 @@ cross_jobs = [
 
     -- Stage2: x86_64 (build/host) -> riscv64 (target)
     -- Stage3: x86_64 (build) -> riscv64 (host/target)
-  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13) (crossConfig (TargetPlatform RiscV64 TargetOsLinuxGnu) (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing Stage3))
+  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13) (crossConfig (TargetPlatform RiscV64 TargetOsLinuxGnu) (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing Stage2And3))
 
     -- x86_64 -> loongarch64
   , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404) (crossConfig (TargetPlatform LoongArch TargetOsLinuxGnu) (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing Stage2))
