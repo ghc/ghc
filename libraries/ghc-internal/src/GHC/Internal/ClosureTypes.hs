@@ -9,7 +9,6 @@ module GHC.Internal.ClosureTypes
 import GHC.Internal.Base
 import GHC.Internal.Enum
 import GHC.Internal.Num
-import GHC.Internal.Generics
 import GHC.Internal.Show
 
 -- |  Enum representing closure types
@@ -85,4 +84,4 @@ data ClosureType
     | CONTINUATION
     | ANN_FRAME
     | N_CLOSURE_TYPES
-    deriving (Enum, Eq, Ord, Show, Generic)
+    deriving (Enum, Eq, Ord, Show)

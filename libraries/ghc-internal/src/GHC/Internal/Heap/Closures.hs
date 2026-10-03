@@ -4,7 +4,6 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE UnliftedFFITypes #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 -- Late cost centres introduce a thunk in the asBox function, which leads to
 -- an additional wrapper being added to any value placed inside a box.
@@ -79,7 +78,6 @@ import GHC.Internal.Num
 import GHC.Internal.Prim (Int#, Word#, closureSize#)
 import GHC.Internal.Real
 import GHC.Internal.Word
-import GHC.Internal.Generics
 import GHC.Internal.Numeric
 import GHC.Internal.Ptr
 import GHC.Internal.Unsafe.Coerce
@@ -389,7 +387,7 @@ data GenClosure b
     -- or an Int#).
   |  UnknownTypeWordSizedPrimitive
         { wordVal :: !Word }
-  deriving (Show, Generic, Functor, Foldable, Traversable)
+  deriving (Show, Functor, Foldable, Traversable)
 
 -- | Get the info table for a heap closure, or Nothing for a prim value
 --
@@ -506,7 +504,7 @@ data GenStgStackClosure b = GenStgStackClosure
       , ssc_stack_size      :: !Word32 -- ^ stack size in *words*
       , ssc_stack           :: ![GenStackFrame b]
       }
-  deriving (Foldable, Functor, Generic, Show, Traversable)
+  deriving (Foldable, Functor, Show, Traversable)
 
 type StackField = GenStackField Box
 
@@ -516,7 +514,7 @@ data GenStackField b
     = StackWord !Word
     -- | A pointer field
     | StackBox  !b
-  deriving (Foldable, Functor, Generic, Show, Traversable)
+  deriving (Foldable, Functor, Show, Traversable)
 
 type StackFrame = GenStackFrame Box
 
@@ -585,7 +583,7 @@ data GenStackFrame b =
       { info_tbl            :: !StgInfoTable
       , annotation          :: !b
       }
-  deriving (Foldable, Functor, Generic, Show, Traversable)
+  deriving (Foldable, Functor, Show, Traversable)
 
 data PrimType
   = PInt
@@ -595,7 +593,7 @@ data PrimType
   | PAddr
   | PFloat
   | PDouble
-  deriving (Eq, Show, Generic, Ord)
+  deriving (Eq, Show, Ord)
 
 data WhatNext
   = ThreadRunGHC
@@ -603,7 +601,7 @@ data WhatNext
   | ThreadKilled
   | ThreadComplete
   | WhatNextUnknownValue Word16 -- ^ Please report this as a bug
-  deriving (Eq, Show, Generic, Ord)
+  deriving (Eq, Show, Ord)
 
 data WhyBlocked
   = NotBlocked
@@ -620,7 +618,7 @@ data WhyBlocked
   | BlockedOnMsgThrowTo
   | ThreadMigrating
   | WhyBlockedUnknownValue Word16 -- ^ Please report this as a bug
-  deriving (Eq, Show, Generic, Ord)
+  deriving (Eq, Show, Ord)
 
 data TsoFlags
   = TsoLocked
@@ -633,7 +631,7 @@ data TsoFlags
   | TsoStopNextBreakpoint
   | TsoStopAfterReturn
   | TsoFlagsUnknownValue Word32 -- ^ Please report this as a bug
-  deriving (Eq, Show, Generic, Ord)
+  deriving (Eq, Show, Ord)
 
 -- | For generic code, this function returns all referenced closures.
 allClosures :: GenClosure b -> [b]

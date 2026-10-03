@@ -144,9 +144,6 @@ import GHC.Internal.ForeignPtr        -- So we can give Data instance for Foreig
 import GHC.Internal.Foreign.Ptr (IntPtr(..), WordPtr(..))
                              -- So we can give Data instance for IntPtr and WordPtr
 import GHC.Internal.Arr               -- So we can give Data instance for Array
-import qualified GHC.Internal.Generics as Generics (Fixity(..))
-import GHC.Internal.Generics hiding (Fixity(..))
-                             -- So we can give Data instance for U1, V1, ...
 import qualified GHC.Internal.TH.Syntax as TH
 import GHC.Internal.Functor.ZipList (ZipList(..))
 import GHC.Internal.Exts (SpecConstrAnnotation(..))
@@ -1281,56 +1278,6 @@ deriving instance (Data (f a), Data a, Typeable f) => Data (Alt f a)
 
 -- | @since base-4.12.0.0
 deriving instance (Data (f a), Data a, Typeable f) => Data (Ap f a)
-
-----------------------------------------------------------------------------
--- Data instances for GHC.Generics representations
-
--- | @since base-4.9.0.0
-deriving instance Data p => Data (U1 p)
-
--- | @since base-4.9.0.0
-deriving instance Data p => Data (Par1 p)
-
--- | @since base-4.9.0.0
-deriving instance (Data (f p), Typeable f, Data p) => Data (Rec1 f p)
-
--- | @since base-4.9.0.0
-deriving instance (Typeable i, Data p, Data c) => Data (K1 i c p)
-
--- | @since base-4.9.0.0
-deriving instance (Data p, Data (f p), Typeable c, Typeable i, Typeable f)
-    => Data (M1 i c f p)
-
--- | @since base-4.9.0.0
-deriving instance (Typeable f, Typeable g, Data p, Data (f p), Data (g p))
-    => Data ((f :+: g) p)
-
--- | @since base-4.9.0.0
-deriving instance (Typeable (f :: Type -> Type), Typeable (g :: Type -> Type),
-          Data p, Data (f (g p)))
-    => Data ((f :.: g) p)
-
--- | @since base-4.9.0.0
-deriving instance Data p => Data (V1 p)
-
--- | @since base-4.9.0.0
-deriving instance (Typeable f, Typeable g, Data p, Data (f p), Data (g p))
-    => Data ((f :*: g) p)
-
--- | @since base-4.9.0.0
-deriving instance Data Generics.Fixity
-
--- | @since base-4.9.0.0
-deriving instance Data Associativity
-
--- | @since base-4.9.0.0
-deriving instance Data SourceUnpackedness
-
--- | @since base-4.9.0.0
-deriving instance Data SourceStrictness
-
--- | @since base-4.9.0.0
-deriving instance Data DecidedStrictness
 
 ----------------------------------------------------------------------------
 -- Data instances for GHC.Internal.Data.Ord

@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -38,7 +37,6 @@ import GHC.Internal.Control.Monad
 import GHC.Internal.Int
 import GHC.Internal.Maybe ( Maybe(..) )
 import GHC.Internal.Word
-import GHC.Internal.Generics (Generic)
 import GHC.Internal.Read
 import GHC.Internal.Show
 import GHC.Internal.IO.Exception
@@ -46,7 +44,6 @@ import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
-import qualified GHC.Internal.Generics as Rebindable hiding( prec )
 
 #include "Rts.h"
 
@@ -142,7 +139,6 @@ data RTSStats = RTSStats {
   , gc :: GCDetails
   } deriving ( Read -- ^ @since base-4.10.0.0
              , Show -- ^ @since base-4.10.0.0
-             , Generic -- ^ @since base-4.15.0.0
              )
 
 --
@@ -197,7 +193,6 @@ data GCDetails = GCDetails {
   , gcdetails_nonmoving_gc_sync_elapsed_ns :: RtsTime
   } deriving ( Read -- ^ @since base-4.10.0.0
              , Show -- ^ @since base-4.10.0.0
-             , Generic -- ^ @since base-4.15.0.0
              )
 
 -- | Time values from the RTS, using a fixed resolution of nanoseconds.

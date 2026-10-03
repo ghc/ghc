@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module GHC.Internal.ForeignSrcLang
   ( ForeignSrcLang(..)
   ) where
@@ -10,7 +11,6 @@ import GHC.Generics (Generic)
 #else
 import GHC.Internal.Base
 import GHC.Internal.Show
-import GHC.Internal.Generics
 #endif
 
 -- | Foreign formats supported by GHC via TH
@@ -22,4 +22,8 @@ data ForeignSrcLang
   | LangAsm    -- ^ Assembly language (.s)
   | LangJs     -- ^ JavaScript
   | RawObject  -- ^ Object (.o)
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
+
+#ifdef BOOTSTRAP_TH
+deriving instance Generic ForeignSrcLang
+#endif

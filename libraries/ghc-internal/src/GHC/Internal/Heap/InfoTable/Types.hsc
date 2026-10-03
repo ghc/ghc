@@ -12,7 +12,6 @@ module GHC.Internal.Heap.InfoTable.Types
 #include "Rts.h"
 
 import GHC.Internal.Base
-import GHC.Internal.Generics
 import GHC.Internal.ClosureTypes
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable
@@ -51,4 +50,4 @@ data StgInfoTable = StgInfoTable {
    tipe   :: ClosureType,
    srtlen :: HalfWord,
    code   :: Maybe ItblCodes -- Just <=> TABLES_NEXT_TO_CODE
-  } deriving (Eq, Show, Generic)
+  } deriving (Eq, Show)

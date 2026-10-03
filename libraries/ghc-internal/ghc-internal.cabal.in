@@ -222,7 +222,6 @@ Library
         GHC.Internal.Functor.ZipList
         GHC.Internal.GHCi
         GHC.Internal.GHCi.Helpers
-        GHC.Internal.Generics
         GHC.Internal.Heap.Closures
         GHC.Internal.Heap.Constants
         GHC.Internal.Heap.InfoTable

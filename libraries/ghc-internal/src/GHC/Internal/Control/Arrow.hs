@@ -52,8 +52,6 @@ import GHC.Internal.Base hiding( id, (.) )
 import GHC.Internal.Data.Tuple ( uncurry )
 import GHC.Internal.Data.Either
 import GHC.Internal.Control.Category
-import GHC.Internal.Generics (Generic, Generic1)
-import qualified GHC.Internal.Generics as Rebindable
 
 infixr 5 <+>
 infixr 3 ***
@@ -180,12 +178,6 @@ instance Arrow (->) where
 
 -- | Kleisli arrows of a monad.
 newtype Kleisli m a b = Kleisli { runKleisli :: a -> m b }
-
--- | @since base-4.14.0.0
-deriving instance Generic (Kleisli m a b)
-
--- | @since base-4.14.0.0
-deriving instance Generic1 (Kleisli m a)
 
 -- | @since base-4.14.0.0
 deriving instance Functor m => Functor (Kleisli m a)
@@ -417,4 +409,3 @@ instance (ArrowApply a, ArrowPlus a) => MonadPlus (ArrowMonad a)
 leftApp :: ArrowApply a => a b c -> a (Either b d) (Either c d)
 leftApp f = arr ((\b -> (arr (\() -> b) >>> f >>> arr Left, ())) |||
              (\d -> (arr (\() -> d) >>> arr Right, ()))) >>> app
-

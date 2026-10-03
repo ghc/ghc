@@ -8,7 +8,7 @@
 --
 -- A data type defining the language extensions supported by GHC.
 --
-{-# LANGUAGE DeriveGeneric, CPP, Trustworthy #-}
+{-# LANGUAGE DeriveGeneric, CPP, StandaloneDeriving, Trustworthy #-}
 module GHC.Internal.LanguageExtensions ( Extension(..) ) where
 
 #ifdef BOOTSTRAP_TH
@@ -17,7 +17,6 @@ import GHC.Generics (Generic)
 #else
 import GHC.Internal.Base
 import GHC.Internal.Show
-import GHC.Internal.Generics
 import GHC.Internal.Enum  -- For deriving
 import GHC.Internal.Num   -- For deriving
 #endif
@@ -171,8 +170,12 @@ data Extension
    | ImplicitStagePersistence
    | QualifiedStrings
    | LazyFieldAnnotations
-   deriving (Eq, Enum, Show, Generic, Bounded)
+   deriving (Eq, Enum, Show, Bounded)
 -- 'Ord' and 'Bounded' are provided for GHC API users (see discussions
 -- in https://gitlab.haskell.org/ghc/ghc/merge_requests/2707 and
 -- https://gitlab.haskell.org/ghc/ghc/merge_requests/826).
 instance Ord Extension where compare a b = compare (fromEnum a) (fromEnum b)
+
+#ifdef BOOTSTRAP_TH
+deriving instance Generic Extension
+#endif

@@ -335,7 +335,7 @@ import GHC.Internal.StaticPtr.Internal( makeStatic )
 import GHC.Internal.Stable( StablePtr, newStablePtr )
 import GHC.Internal.Data.Typeable( gcast1, gcast2 )
 import GHC.Internal.Data.Typeable.Internal as TR
-import GHC.Internal.Generics hiding( Fixity(..), prec )
+import GHC.Generics hiding( Fixity(..), prec )
 import GHC.Internal.Bignum.BigNat
 
 import GHC.Internal.TH.Syntax as TH
