@@ -24,11 +24,10 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Internal.Desugar ((>>>), AnnotationWrapper(..), toAnnotationWrapper) where
+module GHC.Internal.Desugar ((>>>)) where
 
 import GHC.Internal.Control.Arrow    (Arrow(..))
 import GHC.Internal.Control.Category ((.))
-import GHC.Internal.Data.Data        (Data)
 import GHC.Internal.Types as Rebindable
 
 -- A version of Control.Category.>>> overloaded on Arrow
@@ -39,9 +38,3 @@ import GHC.Internal.Types as Rebindable
 --     arrows stuff needs reworking anyway!
 f >>> g = g . f
 {-# INLINE (>>>) #-} -- see Note [INLINE on >>>] in GHC.Internal.Control.Category
-
--- A wrapper data type that lets the typechecker get at the appropriate dictionaries for an annotation
-data AnnotationWrapper = forall a. (Data a) => AnnotationWrapper a
-
-toAnnotationWrapper :: (Data a) => a -> AnnotationWrapper
-toAnnotationWrapper what = AnnotationWrapper what

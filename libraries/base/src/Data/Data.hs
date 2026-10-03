@@ -1,6 +1,24 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE CPP #-}
-
 {-# LANGUAGE Safe #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+{-# OPTIONS_GHC -fexclude-known-key-define=IntRep  #-}
+{-# OPTIONS_GHC -fexclude-known-key-define=FloatRep  #-}
+    -- Defines Data
+    -- Careful!  Don't confuse this IntRep, FloatRep with the ones from RuntimeRep,
+    --           which are the /real/ known-key entity.
 
 -- |
 -- Module      :  Data.Data
@@ -99,8 +117,43 @@ module Data.Data (
 
   ) where
 
-import GHC.Internal.Data.Data
+import GHC.Internal.Base hiding( RuntimeRep(..), Any )
+import GHC.Internal.Data.Functor.Const
+import GHC.Internal.Data.Either
+import GHC.Internal.Data.Maybe
+import GHC.Internal.Data.Monoid
+import GHC.Internal.Data.Ord
+import GHC.Internal.Data.List (findIndex)
+import GHC.Internal.Data.Typeable
+import GHC.Internal.Data.Version( Version(..) )
+import GHC.Internal.Err (errorWithoutStackTrace)
+import GHC.Internal.List
+import GHC.Internal.Num
+import GHC.Internal.Show
+import GHC.Internal.Tuple (Solo (..))
 import Data.Typeable
+
+-- Imports for the instances
+import GHC.Internal.Data.Functor.Identity -- So we can give Data instance for Identity
+import GHC.Internal.Int              -- So we can give Data instance for Int8, ...
+import GHC.Internal.Data.Type.Coercion
+import GHC.Internal.Word             -- So we can give Data instance for Word8, ...
+import GHC.Internal.Real              -- So we can give Data instance for Ratio
+import GHC.Internal.Ptr               -- So we can give Data instance for Ptr
+import GHC.Internal.Foreign.C.ConstPtr    -- So we can give Data instance for ConstPtr
+import GHC.Internal.ForeignPtr        -- So we can give Data instance for ForeignPtr
+import GHC.Internal.Foreign.Ptr (IntPtr(..), WordPtr(..))
+                             -- So we can give Data instance for IntPtr and WordPtr
+import GHC.Internal.Arr               -- So we can give Data instance for Array
+import qualified GHC.Internal.Generics as Generics (Fixity(..))
+import GHC.Internal.Generics hiding (Fixity(..))
+                             -- So we can give Data instance for U1, V1, ...
+import qualified GHC.Internal.TH.Syntax as TH
+import GHC.Internal.Functor.ZipList (ZipList(..))
+import GHC.Internal.Exts (SpecConstrAnnotation(..))
+
+import GHC.Internal.Data.Typeable.Internal as Rebindable
+import qualified GHC.Internal.Stack.Types  as Rebindable
 
 #if __GLASGOW_HASKELL__ >= 1001
 
@@ -141,3 +194,1253 @@ readConstr dt str =
     ffloat =  mkPrimCon dt str . FloatConstr . toRational
 
 #endif
+
+------------------------------------------------------------------------------
+--
+--      The Data class
+--
+------------------------------------------------------------------------------
+
+{- |
+The 'Data' class comprehends a fundamental primitive 'gfoldl' for
+folding over constructor applications, say terms. This primitive can
+be instantiated in several ways to map over the immediate subterms
+of a term; see the @gmap@ combinators later in this class.  Indeed, a
+generic programmer does not necessarily need to use the ingenious gfoldl
+primitive but rather the intuitive @gmap@ combinators.  The 'gfoldl'
+primitive is completed by means to query top-level constructors, to
+turn constructor representations into proper terms, and to list all
+possible datatype constructors.  This completion allows us to serve
+generic programming scenarios like read, show, equality, term generation.
+
+The combinators 'gmapT', 'gmapQ', 'gmapM', etc are all provided with
+default definitions in terms of 'gfoldl', leaving open the opportunity
+to provide datatype-specific definitions.
+(The inclusion of the @gmap@ combinators as members of class 'Data'
+allows the programmer or the compiler to derive specialised, and maybe
+more efficient code per datatype.  /Note/: 'gfoldl' is more higher-order
+than the @gmap@ combinators.  This is subject to ongoing benchmarking
+experiments.  It might turn out that the @gmap@ combinators will be
+moved out of the class 'Data'.)
+
+Conceptually, the definition of the @gmap@ combinators in terms of the
+primitive 'gfoldl' requires the identification of the 'gfoldl' function
+arguments.  Technically, we also need to identify the type constructor
+@c@ for the construction of the result type from the folded term type.
+
+In the definition of @gmapQ@/x/ combinators, we use phantom type
+constructors for the @c@ in the type of 'gfoldl' because the result type
+of a query does not involve the (polymorphic) type of the term argument.
+In the definition of 'gmapQl' we simply use the plain constant type
+constructor because 'gfoldl' is left-associative anyway and so it is
+readily suited to fold a left-associative binary operation over the
+immediate subterms.  In the definition of gmapQr, extra effort is
+needed. We use a higher-order accumulation trick to mediate between
+left-associative constructor application vs. right-associative binary
+operation (e.g., @(:)@).  When the query is meant to compute a value
+of type @r@, then the result type within generic folding is @r -> r@.
+So the result of folding is a function to which we finally pass the
+right unit.
+
+With the @-XDeriveDataTypeable@ option, GHC can generate instances of the
+'Data' class automatically.  For example, given the declaration
+
+> data T a b = C1 a b | C2 deriving (Typeable, Data)
+
+GHC will generate an instance that is equivalent to
+
+> instance (Data a, Data b) => Data (T a b) where
+>     gfoldl k z (C1 a b) = z C1 `k` a `k` b
+>     gfoldl k z C2       = z C2
+>
+>     gunfold k z c = case constrIndex c of
+>                         1 -> k (k (z C1))
+>                         2 -> z C2
+>
+>     toConstr (C1 _ _) = con_C1
+>     toConstr C2       = con_C2
+>
+>     dataTypeOf _ = ty_T
+>
+> con_C1 = mkConstr ty_T "C1" [] Prefix
+> con_C2 = mkConstr ty_T "C2" [] Prefix
+> ty_T   = mkDataType "Module.T" [con_C1, con_C2]
+
+This is suitable for datatypes that are exported transparently.
+
+-}
+
+class Typeable a => Data a where
+
+  -- | Left-associative fold operation for constructor applications.
+  --
+  -- The type of 'gfoldl' is a headache, but operationally it is a simple
+  -- generalisation of a list fold.
+  --
+  -- The default definition for 'gfoldl' is @'const' 'id'@, which is
+  -- suitable for abstract datatypes with no substructures.
+  gfoldl  :: (forall d b. Data d => c (d -> b) -> d -> c b)
+                -- ^ defines how nonempty constructor applications are
+                -- folded.  It takes the folded tail of the constructor
+                -- application and its head, i.e., an immediate subterm,
+                -- and combines them in some way.
+          -> (forall g. g -> c g)
+                -- ^ defines how the empty constructor application is
+                -- folded, like the neutral \/ start element for list
+                -- folding.
+          -> a
+                -- ^ structure to be folded.
+          -> c a
+                -- ^ result, with a type defined in terms of @a@, but
+                -- variability is achieved by means of type constructor
+                -- @c@ for the construction of the actual result type.
+
+  -- See the 'Data' instances in this file for an illustration of 'gfoldl'.
+
+  gfoldl _ z = z
+
+  -- | Unfolding constructor applications
+  gunfold :: (forall b r. Data b => c (b -> r) -> c r)
+          -> (forall r. r -> c r)
+          -> Constr
+          -> c a
+
+  -- | Obtaining the constructor from a given datum.
+  -- For proper terms, this is meant to be the top-level constructor.
+  -- Primitive datatypes are here viewed as potentially infinite sets of
+  -- values (i.e., constructors).
+  toConstr   :: a -> Constr
+
+
+  -- | The outer type constructor of the type
+  dataTypeOf  :: a -> DataType
+
+
+
+------------------------------------------------------------------------------
+--
+-- Mediate types and type constructors
+--
+------------------------------------------------------------------------------
+
+  -- | Mediate types and unary type constructors.
+  --
+  -- In 'Data' instances of the form
+  --
+  -- @
+  --     instance (Data a, ...) => Data (T a)
+  -- @
+  --
+  -- 'dataCast1' should be defined as 'gcast1'.
+  --
+  -- The default definition is @'const' 'Nothing'@, which is appropriate
+  -- for instances of other forms.
+  dataCast1 :: Typeable t
+            => (forall d. Data d => c (t d))
+            -> Maybe (c a)
+  dataCast1 _ = Nothing
+
+  -- | Mediate types and binary type constructors.
+  --
+  -- In 'Data' instances of the form
+  --
+  -- @
+  --     instance (Data a, Data b, ...) => Data (T a b)
+  -- @
+  --
+  -- 'dataCast2' should be defined as 'gcast2'.
+  --
+  -- The default definition is @'const' 'Nothing'@, which is appropriate
+  -- for instances of other forms.
+  dataCast2 :: Typeable t
+            => (forall d e. (Data d, Data e) => c (t d e))
+            -> Maybe (c a)
+  dataCast2 _ = Nothing
+
+
+
+------------------------------------------------------------------------------
+--
+--      Typical generic maps defined in terms of gfoldl
+--
+------------------------------------------------------------------------------
+
+
+  -- | A generic transformation that maps over the immediate subterms
+  --
+  -- The default definition instantiates the type constructor @c@ in the
+  -- type of 'gfoldl' to an identity datatype constructor, using the
+  -- isomorphism pair as injection and projection.
+  gmapT :: (forall b. Data b => b -> b) -> a -> a
+
+  -- Use the Identity datatype constructor
+  -- to instantiate the type constructor c in the type of gfoldl,
+  -- and perform injections Identity and projections runIdentity accordingly.
+  --
+  gmapT f x0 = runIdentity (gfoldl k Identity x0)
+    where
+      k :: Data d => Identity (d->b) -> d -> Identity b
+      k (Identity c) x = Identity (c (f x))
+
+
+  -- | A generic query with a left-associative binary operator
+  gmapQl :: forall r r'. (r -> r' -> r) -> r -> (forall d. Data d => d -> r') -> a -> r
+  gmapQl o r f = getConst . gfoldl k z
+    where
+      k :: Data d => Const r (d->b) -> d -> Const r b
+      k c x = Const $ (getConst c) `o` f x
+      z :: g -> Const r g
+      z _   = Const r
+
+  -- | A generic query with a right-associative binary operator
+  gmapQr :: forall r r'. (r' -> r -> r) -> r -> (forall d. Data d => d -> r') -> a -> r
+  gmapQr o r0 f x0 = unQr (gfoldl k (const (Qr id)) x0) r0
+    where
+      k :: Data d => Qr r (d->b) -> d -> Qr r b
+      k (Qr c) x = Qr (\r -> c (f x `o` r))
+
+
+  -- | A generic query that processes the immediate subterms and returns a list
+  -- of results.  The list is given in the same order as originally specified
+  -- in the declaration of the data constructors.
+  gmapQ :: (forall d. Data d => d -> u) -> a -> [u]
+  gmapQ f = gmapQr (:) [] f
+
+
+  -- | A generic query that processes one child by index (zero-based)
+  gmapQi :: forall u. Int -> (forall d. Data d => d -> u) -> a -> u
+  gmapQi i f x = case gfoldl k z x of { Qi _ q -> fromJust q }
+    where
+      k :: Data d => Qi u (d -> b) -> d -> Qi u b
+      k (Qi i' q) a = Qi (i'+1) (if i==i' then Just (f a) else q)
+      z :: g -> Qi q g
+      z _           = Qi 0 Nothing
+
+
+  -- | A generic monadic transformation that maps over the immediate subterms
+  --
+  -- The default definition instantiates the type constructor @c@ in
+  -- the type of 'gfoldl' to the monad datatype constructor, defining
+  -- injection and projection using 'return' and '>>='.
+  gmapM :: forall m. Monad m => (forall d. Data d => d -> m d) -> a -> m a
+
+  -- Use immediately the monad datatype constructor
+  -- to instantiate the type constructor c in the type of gfoldl,
+  -- so injection and projection is done by return and >>=.
+  --
+  gmapM f = gfoldl k return
+    where
+      k :: Data d => m (d -> b) -> d -> m b
+      k c x = do c' <- c
+                 x' <- f x
+                 return (c' x')
+
+
+  -- | Transformation of at least one immediate subterm does not fail
+  gmapMp :: forall m. MonadPlus m => (forall d. Data d => d -> m d) -> a -> m a
+
+{-
+
+The type constructor that we use here simply keeps track of the fact
+if we already succeeded for an immediate subterm; see Mp below. To
+this end, we couple the monadic computation with a Boolean.
+
+-}
+
+  gmapMp f x = unMp (gfoldl k z x) >>= \(x',b) ->
+                if b then return x' else mzero
+    where
+      z :: g -> Mp m g
+      z g = Mp (return (g,False))
+      k :: Data d => Mp m (d -> b) -> d -> Mp m b
+      k (Mp c) y
+        = Mp ( c >>= \(h, b) ->
+                 (f y >>= \y' -> return (h y', True))
+                 `mplus` return (h y, b)
+             )
+
+  -- | Transformation of one immediate subterm with success
+  gmapMo :: forall m. MonadPlus m => (forall d. Data d => d -> m d) -> a -> m a
+
+{-
+
+We use the same pairing trick as for gmapMp,
+i.e., we use an extra Bool component to keep track of the
+fact whether an immediate subterm was processed successfully.
+However, we cut of mapping over subterms once a first subterm
+was transformed successfully.
+
+-}
+
+  gmapMo f x = unMp (gfoldl k z x) >>= \(x',b) ->
+                if b then return x' else mzero
+    where
+      z :: g -> Mp m g
+      z g = Mp (return (g,False))
+      k :: Data d => Mp m (d -> b) -> d -> Mp m b
+      k (Mp c) y
+        = Mp ( c >>= \(h,b) -> if b
+                        then return (h y, b)
+                        else (f y >>= \y' -> return (h y',True))
+                             `mplus` return (h y, b)
+             )
+
+
+-- | Type constructor for adding counters to queries
+data Qi q a = Qi Int (Maybe q)
+
+
+-- | The type constructor used in definition of gmapQr
+newtype Qr r a = Qr { unQr  :: r -> r }
+
+
+-- | The type constructor used in definition of gmapMp
+newtype Mp m x = Mp { unMp :: m (x, Bool) }
+
+
+
+------------------------------------------------------------------------------
+--
+--      Generic unfolding
+--
+------------------------------------------------------------------------------
+
+
+-- | Build a term skeleton
+fromConstr :: Data a => Constr -> a
+fromConstr = fromConstrB (errorWithoutStackTrace "GHC.Internal.Data.Data.fromConstr")
+
+
+-- | Build a term and use a generic function for subterms
+fromConstrB :: Data a
+            => (forall d. Data d => d)
+            -> Constr
+            -> a
+fromConstrB f = runIdentity . gunfold k z
+ where
+  k :: forall b r. Data b => Identity (b -> r) -> Identity r
+  k c = Identity (runIdentity c f)
+
+  z :: forall r. r -> Identity r
+  z = Identity
+
+
+-- | Monadic variation on 'fromConstrB'
+fromConstrM :: forall m a. (Monad m, Data a)
+            => (forall d. Data d => m d)
+            -> Constr
+            -> m a
+fromConstrM f = gunfold k z
+ where
+  k :: forall b r. Data b => m (b -> r) -> m r
+  k c = do { c' <- c; b <- f; return (c' b) }
+
+  z :: forall r. r -> m r
+  z = return
+
+
+
+------------------------------------------------------------------------------
+--
+--      Datatype and constructor representations
+--
+------------------------------------------------------------------------------
+
+
+--
+-- | Representation of datatypes.
+-- A package of constructor representations with names of type and module.
+--
+data DataType = DataType
+                        { tycon   :: String
+                        , datarep :: DataRep
+                        }
+
+              deriving Show -- ^ @since base-4.0.0.0
+
+-- | Representation of constructors. Note that equality on constructors
+-- with different types may not work -- i.e. the constructors for 'False' and
+-- 'Nothing' may compare equal.
+data Constr = Constr
+                        { conrep    :: ConstrRep
+                        , constring :: String
+                        , confields :: [String] -- for AlgRep only
+                        , confixity :: Fixity   -- for AlgRep only
+                        , datatype  :: DataType
+                        }
+
+-- | @since base-4.0.0.0
+instance Show Constr where
+ show = constring
+
+
+-- | Equality of constructors
+--
+-- @since base-4.0.0.0
+instance Eq Constr where
+  c == c' = constrRep c == constrRep c'
+
+
+-- | Public representation of datatypes
+data DataRep = AlgRep [Constr]
+             | IntRep
+             | FloatRep
+             | CharRep
+             | NoRep
+
+            deriving ( Eq   -- ^ @since base-4.0.0.0
+                     , Show -- ^ @since base-4.0.0.0
+                     )
+-- The list of constructors could be an array, a balanced tree, or others.
+
+
+-- | Public representation of constructors
+data ConstrRep = AlgConstr    ConIndex
+               | IntConstr    Integer
+               | FloatConstr  Rational
+               | CharConstr   Char
+
+               deriving ( Eq   -- ^ @since base-4.0.0.0
+                        , Show -- ^ @since base-4.0.0.0
+                        )
+
+
+-- | Unique index for datatype constructors,
+-- counting from 1 in the order they are given in the program text.
+type ConIndex = Int
+
+
+-- | Fixity of constructors
+data Fixity = Prefix
+            | Infix     -- Later: add associativity and precedence
+
+            deriving ( Eq   -- ^ @since base-4.0.0.0
+                     , Show -- ^ @since base-4.0.0.0
+                     )
+
+
+------------------------------------------------------------------------------
+--
+--      Observers for datatype representations
+--
+------------------------------------------------------------------------------
+
+
+-- | Gets the type constructor including the module
+dataTypeName :: DataType -> String
+dataTypeName = tycon
+
+
+
+-- | Gets the public presentation of a datatype
+dataTypeRep :: DataType -> DataRep
+dataTypeRep = datarep
+
+
+-- | Gets the datatype of a constructor
+constrType :: Constr -> DataType
+constrType = datatype
+
+
+-- | Gets the public presentation of constructors
+constrRep :: Constr -> ConstrRep
+constrRep = conrep
+
+
+-- | Look up a constructor by its representation
+repConstr :: DataType -> ConstrRep -> Constr
+repConstr dt cr =
+      case (dataTypeRep dt, cr) of
+        (AlgRep cs, AlgConstr i)      -> cs !! (i-1)
+        (IntRep,    IntConstr i)      -> mkIntegralConstr dt i
+        (FloatRep,  FloatConstr f)    -> mkRealConstr dt f
+        (CharRep,   CharConstr c)     -> mkCharConstr dt c
+        _ -> errorWithoutStackTrace "GHC.Internal.Data.Data.repConstr: The given ConstrRep does not fit to the given DataType."
+
+
+
+------------------------------------------------------------------------------
+--
+--      Representations of algebraic data types
+--
+------------------------------------------------------------------------------
+
+
+-- | Constructs an algebraic datatype
+mkDataType :: String -> [Constr] -> DataType
+mkDataType str cs = DataType
+                        { tycon   = str
+                        , datarep = AlgRep cs
+                        }
+
+-- | Constructs a constructor
+--
+-- @since base-4.16.0.0
+mkConstrTag :: DataType -> String -> Int -> [String] -> Fixity -> Constr
+mkConstrTag dt str idx fields fix =
+        Constr
+                { conrep    = AlgConstr idx
+                , constring = str
+                , confields = fields
+                , confixity = fix
+                , datatype  = dt
+                }
+
+-- | Constructs a constructor
+mkConstr :: DataType -> String -> [String] -> Fixity -> Constr
+mkConstr dt str fields fix = mkConstrTag dt str idx fields fix
+  where
+    idx = case findIndex (\c -> showConstr c == str) (dataTypeConstrs dt) of
+            Just i  -> i+1 -- ConTag starts at 1
+            Nothing -> errorWithoutStackTrace $
+                        "GHC.Internal.Data.Data.mkConstr: couldn't find constructor " ++ str
+
+
+-- | Gets the constructors of an algebraic datatype
+dataTypeConstrs :: DataType -> [Constr]
+dataTypeConstrs dt = case datarep dt of
+                        (AlgRep cons) -> cons
+                        _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.dataTypeConstrs is not supported for "
+                                    ++ dataTypeName dt ++
+                                    ", as it is not an algebraic data type."
+
+
+-- | Gets the field labels of a constructor.  The list of labels
+-- is returned in the same order as they were given in the original
+-- constructor declaration.
+constrFields :: Constr -> [String]
+constrFields = confields
+
+
+-- | Gets the fixity of a constructor
+constrFixity :: Constr -> Fixity
+constrFixity = confixity
+
+
+
+------------------------------------------------------------------------------
+--
+--      From strings to constr's and vice versa: all data types
+--
+------------------------------------------------------------------------------
+
+
+-- | Gets the string for a constructor
+showConstr :: Constr -> String
+showConstr = constring
+
+
+------------------------------------------------------------------------------
+--
+--      Convenience functions: algebraic data types
+--
+------------------------------------------------------------------------------
+
+
+-- | Test for an algebraic type
+isAlgType :: DataType -> Bool
+isAlgType dt = case datarep dt of
+                 (AlgRep _) -> True
+                 _ -> False
+
+
+-- | Gets the constructor for an index (algebraic datatypes only)
+indexConstr :: DataType -> ConIndex -> Constr
+indexConstr dt idx = case datarep dt of
+                        (AlgRep cs) -> cs !! (idx-1)
+                        _           -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.indexConstr is not supported for "
+                                               ++ dataTypeName dt ++
+                                               ", as it is not an algebraic data type."
+
+
+-- | Gets the index of a constructor (algebraic datatypes only)
+constrIndex :: Constr -> ConIndex
+constrIndex con = case constrRep con of
+                    (AlgConstr idx) -> idx
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.constrIndex is not supported for "
+                                 ++ dataTypeName (constrType con) ++
+                                 ", as it is not an algebraic data type."
+
+
+-- | Gets the maximum constructor index of an algebraic datatype
+maxConstrIndex :: DataType -> ConIndex
+maxConstrIndex dt = case dataTypeRep dt of
+                        AlgRep cs -> length cs
+                        _            -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.maxConstrIndex is not supported for "
+                                                 ++ dataTypeName dt ++
+                                                 ", as it is not an algebraic data type."
+
+
+
+------------------------------------------------------------------------------
+--
+--      Representation of primitive types
+--
+------------------------------------------------------------------------------
+
+
+-- | Constructs the 'Int' type
+mkIntType :: String -> DataType
+mkIntType = mkPrimType IntRep
+
+
+-- | Constructs the 'Float' type
+mkFloatType :: String -> DataType
+mkFloatType = mkPrimType FloatRep
+
+
+-- | Constructs the 'Char' type
+mkCharType :: String -> DataType
+mkCharType = mkPrimType CharRep
+
+
+-- | Helper for 'mkIntType', 'mkFloatType'
+mkPrimType :: DataRep -> String -> DataType
+mkPrimType dr str = DataType
+                        { tycon   = str
+                        , datarep = dr
+                        }
+
+
+-- Makes a constructor for primitive types
+mkPrimCon :: DataType -> String -> ConstrRep -> Constr
+mkPrimCon dt str cr = Constr
+                        { datatype  = dt
+                        , conrep    = cr
+                        , constring = str
+                        , confields = errorWithoutStackTrace "GHC.Internal.Data.Data.confields"
+                        , confixity = errorWithoutStackTrace "GHC.Internal.Data.Data.confixity"
+                        }
+
+mkIntegralConstr :: (Integral a, Show a) => DataType -> a -> Constr
+mkIntegralConstr dt i = case datarep dt of
+                  IntRep -> mkPrimCon dt (show i) (IntConstr (toInteger  i))
+                  _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.mkIntegralConstr is not supported for "
+                               ++ dataTypeName dt ++
+                               ", as it is not an Integral data type."
+
+mkRealConstr :: (Real a, Show a) => DataType -> a -> Constr
+mkRealConstr dt f = case datarep dt of
+                    FloatRep -> mkPrimCon dt (show f) (FloatConstr (toRational f))
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.mkRealConstr is not supported for "
+                                 ++ dataTypeName dt ++
+                                 ", as it is not a Real data type."
+
+-- | Makes a constructor for 'Char'.
+mkCharConstr :: DataType -> Char -> Constr
+mkCharConstr dt c = case datarep dt of
+                   CharRep -> mkPrimCon dt (show c) (CharConstr c)
+                   _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.mkCharConstr is not supported for "
+                                ++ dataTypeName dt ++
+                                ", as it is not an Char data type."
+
+
+------------------------------------------------------------------------------
+--
+--      Non-representations for non-representable types
+--
+------------------------------------------------------------------------------
+
+
+-- | Constructs a non-representation for a non-representable type
+mkNoRepType :: String -> DataType
+mkNoRepType str = DataType
+                        { tycon   = str
+                        , datarep = NoRep
+                        }
+
+-- | Test for a non-representable type
+isNorepType :: DataType -> Bool
+isNorepType dt = case datarep dt of
+                   NoRep -> True
+                   _ -> False
+
+
+
+------------------------------------------------------------------------------
+--
+--      Convenience for qualified type constructors
+--
+------------------------------------------------------------------------------
+
+
+-- | Gets the unqualified type constructor:
+-- drop *.*.*... before name
+--
+tyconUQname :: String -> String
+tyconUQname x = case dropWhile (not . (==) '.') x of
+                  [] -> x
+                  _ : tl -> tyconUQname tl
+
+
+-- | Gets the module of a type constructor:
+-- take *.*.*... before name
+tyconModule :: String -> String
+tyconModule x = case break ((==) '.') x of
+                  (_, "") -> ""
+                  (a, _ : tl) -> a ++ tyconModule' tl
+  where
+    tyconModule' y = let y' = tyconModule y
+                      in if y' == "" then "" else ('.':y')
+
+
+
+
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+--
+--      Instances of the Data class for Prelude-like types.
+--      We define top-level definitions for representations.
+--
+------------------------------------------------------------------------------
+
+-- | @since base-4.0.0.0
+deriving instance Data Bool
+
+------------------------------------------------------------------------------
+
+charType :: DataType
+charType = mkCharType "Prelude.Char"
+
+-- | @since base-4.0.0.0
+instance Data Char where
+  toConstr x = mkCharConstr charType x
+  gunfold _ z c = case constrRep c of
+                    (CharConstr x) -> z x
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Char."
+  dataTypeOf _ = charType
+
+
+------------------------------------------------------------------------------
+
+floatType :: DataType
+floatType = mkFloatType "Prelude.Float"
+
+-- | @since base-4.0.0.0
+instance Data Float where
+  toConstr = mkRealConstr floatType
+  gunfold _ z c = case constrRep c of
+                    (FloatConstr x) -> z (realToFrac x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Float."
+  dataTypeOf _ = floatType
+
+
+------------------------------------------------------------------------------
+
+doubleType :: DataType
+doubleType = mkFloatType "Prelude.Double"
+
+-- | @since base-4.0.0.0
+instance Data Double where
+  toConstr = mkRealConstr doubleType
+  gunfold _ z c = case constrRep c of
+                    (FloatConstr x) -> z (realToFrac x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Double."
+  dataTypeOf _ = doubleType
+
+
+------------------------------------------------------------------------------
+
+intType :: DataType
+intType = mkIntType "Prelude.Int"
+
+-- | @since base-4.0.0.0
+instance Data Int where
+  toConstr x = mkIntegralConstr intType x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Int."
+  dataTypeOf _ = intType
+
+
+------------------------------------------------------------------------------
+
+integerType :: DataType
+integerType = mkIntType "Prelude.Integer"
+
+-- | @since base-4.0.0.0
+instance Data Integer where
+  toConstr = mkIntegralConstr integerType
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z x
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Integer."
+  dataTypeOf _ = integerType
+
+
+------------------------------------------------------------------------------
+
+-- This follows the same style as the other integral 'Data' instances
+-- defined in "Data.Data"
+naturalType :: DataType
+naturalType = mkIntType "Numeric.Natural.Natural"
+
+-- | @since base-4.8.0.0
+instance Data Natural where
+  toConstr x = mkIntegralConstr naturalType x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Natural"
+  dataTypeOf _ = naturalType
+
+
+------------------------------------------------------------------------------
+
+int8Type :: DataType
+int8Type = mkIntType "Data.Int.Int8"
+
+-- | @since base-4.0.0.0
+instance Data Int8 where
+  toConstr x = mkIntegralConstr int8Type x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Int8."
+  dataTypeOf _ = int8Type
+
+
+------------------------------------------------------------------------------
+
+int16Type :: DataType
+int16Type = mkIntType "Data.Int.Int16"
+
+-- | @since base-4.0.0.0
+instance Data Int16 where
+  toConstr x = mkIntegralConstr int16Type x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Int16."
+  dataTypeOf _ = int16Type
+
+
+------------------------------------------------------------------------------
+
+int32Type :: DataType
+int32Type = mkIntType "Data.Int.Int32"
+
+-- | @since base-4.0.0.0
+instance Data Int32 where
+  toConstr x = mkIntegralConstr int32Type x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Int32."
+  dataTypeOf _ = int32Type
+
+
+------------------------------------------------------------------------------
+
+int64Type :: DataType
+int64Type = mkIntType "Data.Int.Int64"
+
+-- | @since base-4.0.0.0
+instance Data Int64 where
+  toConstr x = mkIntegralConstr int64Type x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Int64."
+  dataTypeOf _ = int64Type
+
+
+------------------------------------------------------------------------------
+
+wordType :: DataType
+wordType = mkIntType "Data.Word.Word"
+
+-- | @since base-4.0.0.0
+instance Data Word where
+  toConstr x = mkIntegralConstr wordType x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Word"
+  dataTypeOf _ = wordType
+
+
+------------------------------------------------------------------------------
+
+word8Type :: DataType
+word8Type = mkIntType "Data.Word.Word8"
+
+-- | @since base-4.0.0.0
+instance Data Word8 where
+  toConstr x = mkIntegralConstr word8Type x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Word8."
+  dataTypeOf _ = word8Type
+
+
+------------------------------------------------------------------------------
+
+word16Type :: DataType
+word16Type = mkIntType "Data.Word.Word16"
+
+-- | @since base-4.0.0.0
+instance Data Word16 where
+  toConstr x = mkIntegralConstr word16Type x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Word16."
+  dataTypeOf _ = word16Type
+
+
+------------------------------------------------------------------------------
+
+word32Type :: DataType
+word32Type = mkIntType "Data.Word.Word32"
+
+-- | @since base-4.0.0.0
+instance Data Word32 where
+  toConstr x = mkIntegralConstr word32Type x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Word32."
+  dataTypeOf _ = word32Type
+
+
+------------------------------------------------------------------------------
+
+word64Type :: DataType
+word64Type = mkIntType "Data.Word.Word64"
+
+-- | @since base-4.0.0.0
+instance Data Word64 where
+  toConstr x = mkIntegralConstr word64Type x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "GHC.Internal.Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Word64."
+  dataTypeOf _ = word64Type
+
+
+------------------------------------------------------------------------------
+
+ratioConstr :: Constr
+ratioConstr = mkConstr ratioDataType ":%" [] Infix
+
+ratioDataType :: DataType
+ratioDataType = mkDataType "GHC.Real.Ratio" [ratioConstr]
+
+-- NB: This Data instance intentionally uses the (%) smart constructor instead
+-- of the internal (:%) constructor to preserve the invariant that a Ratio
+-- value is reduced to normal form. See #10011.
+
+-- | @since base-4.0.0.0
+instance (Data a, Integral a) => Data (Ratio a) where
+  gfoldl k z (a :% b) = z (%) `k` a `k` b
+  toConstr _ = ratioConstr
+  gunfold k z c | constrIndex c == 1 = k (k (z (%)))
+  gunfold _ _ _ = errorWithoutStackTrace "GHC.Internal.Data.Data.gunfold(Ratio)"
+  dataTypeOf _  = ratioDataType
+
+
+------------------------------------------------------------------------------
+
+nilConstr :: Constr
+nilConstr    = mkConstr listDataType "[]" [] Prefix
+consConstr :: Constr
+consConstr   = mkConstr listDataType "(:)" [] Infix
+
+listDataType :: DataType
+listDataType = mkDataType "Prelude.[]" [nilConstr,consConstr]
+
+-- | For historical reasons, the constructor name used for @(:)@ is
+-- @"(:)"@. In a derived instance, it would be @":"@.
+--
+-- @since base-4.0.0.0
+instance Data a => Data [a] where
+  gfoldl _ z []     = z []
+  gfoldl f z (x:xs) = z (:) `f` x `f` xs
+  toConstr []    = nilConstr
+  toConstr (_:_) = consConstr
+  gunfold k z c = case constrIndex c of
+                    1 -> z []
+                    2 -> k (k (z (:)))
+                    _ -> errorWithoutStackTrace "GHC.Internal.Data.Data.gunfold(List)"
+  dataTypeOf _ = listDataType
+  dataCast1 f  = gcast1 f
+
+--
+-- The gmaps are given as an illustration.
+-- This shows that the gmaps for lists are different from list maps.
+--
+  gmapT  _   []     = []
+  gmapT  f   (x:xs) = (f x:f xs)
+  gmapQ  _   []     = []
+  gmapQ  f   (x:xs) = [f x,f xs]
+  gmapM  _   []     = return []
+  gmapM  f   (x:xs) = f x >>= \x' -> f xs >>= \xs' -> return (x':xs')
+
+
+------------------------------------------------------------------------------
+
+-- | @since base-4.9.0.0
+deriving instance Data a => Data (NonEmpty a)
+
+-- | @since base-4.0.0.0
+deriving instance Data a => Data (Maybe a)
+
+-- | @since base-4.0.0.0
+deriving instance Data Ordering
+
+-- | @since base-4.0.0.0
+deriving instance (Data a, Data b) => Data (Either a b)
+
+-- | @since base-4.8.0.0
+deriving instance Data Void
+
+-- | @since base-4.0.0.0
+deriving instance Data ()
+
+-- | @since base-4.15
+deriving instance Data a => Data (Solo a)
+
+-- | @since base-4.0.0.0
+deriving instance (Data a, Data b) => Data (a,b)
+
+-- | @since base-4.0.0.0
+deriving instance (Data a, Data b, Data c) => Data (a,b,c)
+
+-- | @since base-4.0.0.0
+deriving instance (Data a, Data b, Data c, Data d)
+         => Data (a,b,c,d)
+
+-- | @since base-4.0.0.0
+deriving instance (Data a, Data b, Data c, Data d, Data e)
+         => Data (a,b,c,d,e)
+
+-- | @since base-4.0.0.0
+deriving instance (Data a, Data b, Data c, Data d, Data e, Data f)
+         => Data (a,b,c,d,e,f)
+
+-- | @since base-4.0.0.0
+deriving instance (Data a, Data b, Data c, Data d, Data e, Data f, Data g)
+         => Data (a,b,c,d,e,f,g)
+
+------------------------------------------------------------------------------
+
+-- | @since base-4.8.0.0
+instance Data a => Data (Ptr a) where
+  toConstr _   = errorWithoutStackTrace "GHC.Internal.Data.Data.toConstr(Ptr)"
+  gunfold _ _  = errorWithoutStackTrace "GHC.Internal.Data.Data.gunfold(Ptr)"
+  dataTypeOf _ = mkNoRepType "GHC.Ptr.Ptr"
+  dataCast1 x  = gcast1 x
+
+-- | @since base-4.18.0.0
+deriving instance Data a => Data (ConstPtr a)
+
+------------------------------------------------------------------------------
+
+-- | @since base-4.8.0.0
+instance Data a => Data (ForeignPtr a) where
+  toConstr _   = errorWithoutStackTrace "GHC.Internal.Data.Data.toConstr(ForeignPtr)"
+  gunfold _ _  = errorWithoutStackTrace "GHC.Internal.Data.Data.gunfold(ForeignPtr)"
+  dataTypeOf _ = mkNoRepType "GHC.ForeignPtr.ForeignPtr"
+  dataCast1 x  = gcast1 x
+
+-- | @since base-4.11.0.0
+deriving instance Data IntPtr
+
+-- | @since base-4.11.0.0
+deriving instance Data WordPtr
+
+------------------------------------------------------------------------------
+-- The Data instance for Array preserves data abstraction at the cost of
+-- inefficiency. We omit reflection services for the sake of data abstraction.
+-- | @since base-4.8.0.0
+instance (Data a, Data b, Ix a) => Data (Array a b)
+ where
+  gfoldl f z a = z (listArray (bounds a)) `f` (elems a)
+  toConstr _   = errorWithoutStackTrace "GHC.Internal.Data.Data.toConstr(Array)"
+  gunfold _ _  = errorWithoutStackTrace "GHC.Internal.Data.Data.gunfold(Array)"
+  dataTypeOf _ = mkNoRepType "Data.Array.Array"
+  dataCast2 x  = gcast2 x
+
+----------------------------------------------------------------------------
+-- Data instance for Proxy
+
+-- | @since base-4.7.0.0
+deriving instance (Data t) => Data (Proxy t)
+
+-- | @since base-4.7.0.0
+deriving instance (a ~ b, Data a) => Data (a :~: b)
+
+-- | @since base-4.10.0.0
+deriving instance (Typeable i, Typeable j, Typeable a, Typeable b,
+                    (a :: i) ~~ (b :: j))
+    => Data (a :~~: b)
+
+-- | @since base-4.7.0.0
+deriving instance (Coercible a b, Data a, Data b) => Data (Coercion a b)
+
+-- | @since base-4.9.0.0
+deriving instance Data a => Data (Identity a)
+
+-- | @since base-4.10.0.0
+deriving instance (Typeable k, Data a, Typeable (b :: k)) => Data (Const a b)
+
+-- | @since base-4.7.0.0
+deriving instance Data Version
+
+----------------------------------------------------------------------------
+-- Data instances for GHC.Internal.Data.Monoid wrappers
+
+-- | @since base-4.8.0.0
+deriving instance Data a => Data (Dual a)
+
+-- | @since base-4.8.0.0
+deriving instance Data All
+
+-- | @since base-4.8.0.0
+deriving instance Data Any
+
+-- | @since base-4.8.0.0
+deriving instance Data a => Data (Sum a)
+
+-- | @since base-4.8.0.0
+deriving instance Data a => Data (Product a)
+
+-- | @since base-4.8.0.0
+deriving instance Data a => Data (First a)
+
+-- | @since base-4.8.0.0
+deriving instance Data a => Data (Last a)
+
+-- | @since base-4.8.0.0
+deriving instance (Data (f a), Data a, Typeable f) => Data (Alt f a)
+
+-- | @since base-4.12.0.0
+deriving instance (Data (f a), Data a, Typeable f) => Data (Ap f a)
+
+----------------------------------------------------------------------------
+-- Data instances for GHC.Generics representations
+
+-- | @since base-4.9.0.0
+deriving instance Data p => Data (U1 p)
+
+-- | @since base-4.9.0.0
+deriving instance Data p => Data (Par1 p)
+
+-- | @since base-4.9.0.0
+deriving instance (Data (f p), Typeable f, Data p) => Data (Rec1 f p)
+
+-- | @since base-4.9.0.0
+deriving instance (Typeable i, Data p, Data c) => Data (K1 i c p)
+
+-- | @since base-4.9.0.0
+deriving instance (Data p, Data (f p), Typeable c, Typeable i, Typeable f)
+    => Data (M1 i c f p)
+
+-- | @since base-4.9.0.0
+deriving instance (Typeable f, Typeable g, Data p, Data (f p), Data (g p))
+    => Data ((f :+: g) p)
+
+-- | @since base-4.9.0.0
+deriving instance (Typeable (f :: Type -> Type), Typeable (g :: Type -> Type),
+          Data p, Data (f (g p)))
+    => Data ((f :.: g) p)
+
+-- | @since base-4.9.0.0
+deriving instance Data p => Data (V1 p)
+
+-- | @since base-4.9.0.0
+deriving instance (Typeable f, Typeable g, Data p, Data (f p), Data (g p))
+    => Data ((f :*: g) p)
+
+-- | @since base-4.9.0.0
+deriving instance Data Generics.Fixity
+
+-- | @since base-4.9.0.0
+deriving instance Data Associativity
+
+-- | @since base-4.9.0.0
+deriving instance Data SourceUnpackedness
+
+-- | @since base-4.9.0.0
+deriving instance Data SourceStrictness
+
+-- | @since base-4.9.0.0
+deriving instance Data DecidedStrictness
+
+----------------------------------------------------------------------------
+-- Data instances for GHC.Internal.Data.Ord
+
+-- | @since base-4.12.0.0
+deriving instance Data a => Data (Down a)
+
+----------------------------------------------------------------------------
+-- Data instances for GHC.Internal.TH.Syntax
+
+deriving instance Data TH.AnnLookup
+deriving instance Data TH.AnnTarget
+deriving instance Data TH.Bang
+deriving instance Data TH.BndrVis
+deriving instance Data TH.Body
+deriving instance Data TH.Bytes
+deriving instance Data TH.Callconv
+deriving instance Data TH.Clause
+deriving instance Data TH.Con
+deriving instance Data TH.Dec
+deriving instance Data TH.DecidedStrictness
+deriving instance Data TH.DerivClause
+deriving instance Data TH.DerivStrategy
+deriving instance Data TH.DocLoc
+deriving instance Data TH.Exp
+deriving instance Data TH.FamilyResultSig
+deriving instance Data TH.Fixity
+deriving instance Data TH.FixityDirection
+deriving instance Data TH.Foreign
+deriving instance Data TH.FunDep
+deriving instance Data TH.Guard
+deriving instance Data TH.Info
+deriving instance Data TH.InjectivityAnn
+deriving instance Data TH.Inline
+deriving instance Data TH.Lit
+deriving instance Data TH.Loc
+deriving instance Data TH.Match
+deriving instance Data TH.ModName
+deriving instance Data TH.Module
+deriving instance Data TH.ModuleInfo
+deriving instance Data TH.Name
+deriving instance Data TH.NameFlavour
+deriving instance Data TH.NameSpace
+deriving instance Data TH.NamespaceSpecifier
+deriving instance Data TH.OccName
+deriving instance Data TH.Overlap
+deriving instance Data TH.Pat
+deriving instance Data TH.PatSynArgs
+deriving instance Data TH.PatSynDir
+deriving instance Data TH.Phases
+deriving instance Data TH.PkgName
+deriving instance Data TH.Pragma
+deriving instance Data TH.Range
+deriving instance Data TH.Role
+deriving instance Data TH.RuleBndr
+deriving instance Data TH.RuleMatch
+deriving instance Data TH.Safety
+deriving instance Data TH.SourceStrictness
+deriving instance Data TH.SourceUnpackedness
+deriving instance Data TH.Specificity
+deriving instance Data TH.Stmt
+deriving instance Data TH.TyLit
+deriving instance Data TH.TySynEqn
+deriving instance Data TH.Type
+deriving instance Data TH.TypeFamilyHead
+deriving instance Data flag => Data (TH.TyVarBndr flag)
+
+-- | @since base-4.14.0.0
+deriving instance Data a => Data (ZipList a)
+
+-- | @since base-4.3.0.0
+deriving instance Data SpecConstrAnnotation

@@ -301,7 +301,7 @@ import GHC.Internal.TypeNats( KnownNat )
 import GHC.Internal.TypeLits( KnownSymbol, KnownChar )
 import GHC.Internal.Enum
 import GHC.Internal.Data.Dynamic( toDyn )
-import GHC.Internal.Data.Data
+import GHC.Data.Data
 import GHC.Internal.Data.String( fromString )
 import GHC.Internal.Data.Either( Either(..) )
 import GHC.Internal.Data.Foldable( Foldable(..), null, all )
@@ -346,7 +346,6 @@ import GHC.Internal.TH.Lift
 import GHC.Internal.TH.Monad as TH
 import GHC.Internal.TopHandler
 import GHC.Internal.GHCi
-import GHC.Internal.Desugar (toAnnotationWrapper)
 import GHC.Internal.Stack.Types
 import GHC.Internal.Exception.Context
 import GHC.Internal.Ptr
@@ -383,3 +382,9 @@ won't be used unless compiling to JS, or WASM) and toggle
 unsafeUnpackJSStringUtf8## :: a
 unsafeUnpackJSStringUtf8## = error "unsafeUnpackJSStringUtf8## known-key was used when the compilation target wasn't javascript_HOST_ARCH"
 #endif
+
+-- A wrapper data type that lets the typechecker get at the appropriate dictionaries for an annotation
+data AnnotationWrapper = forall a. (Data a) => AnnotationWrapper a
+
+toAnnotationWrapper :: (Data a) => a -> AnnotationWrapper
+toAnnotationWrapper what = AnnotationWrapper what

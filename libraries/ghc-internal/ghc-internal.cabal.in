@@ -131,7 +131,6 @@ Library
         GHC.Internal.Control.Monad.ST.Lazy.Imp
         GHC.Internal.Data.Bits
         GHC.Internal.Data.Coerce
-        GHC.Internal.Data.Data
         GHC.Internal.Data.Dynamic
         GHC.Internal.Data.Either
         GHC.Internal.Data.Foldable
