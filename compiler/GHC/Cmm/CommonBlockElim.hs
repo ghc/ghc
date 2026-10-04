@@ -66,25 +66,23 @@ elimCommonBlocks g =
   where
      g' = replaceLabels env $ copyTicks env g
      env = iterate mapEmpty blocks_with_key
-     -- The order of blocks doesn't matter here. While we could use
-     -- revPostorder which drops unreachable blocks this is done in
-     -- ContFlowOpt already which runs before this pass. So we use
-     -- toBlockList since it is faster.
-     -- One exception: The entry block most come first or we risk eliminating it
-     -- in favour of another block. See Note [Retain entry block during common block elimination.]
-     groups = groupByInt hash_block (toBlockListEntryFirst g) :: [[CmmBlock]]
      blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]
+     groups = groupByInt hash_block candidates :: [[CmmBlock]]
+     -- See Note [Retain entry block during common block elimination]
+     candidates = filter ((/= g_entry g) . entryLabel) (toBlockList g)
 
--- Note [Retain entry block during common block elimination.]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- At the stage we run common block elimination (CBE) we only have one info
--- table for the entry label. Which means we can get away without applying the
--- block label substitution to the info table *as long as we keep the first block*.
--- When combining blocks the first block in the list of blocks is kept, and the later
--- one eliminated, so we can achieve this by simply using toBlockListEntryFirst.
+-- Note [Retain entry block during common block elimination]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- When CBE runs, only the entry label has an info table, so we can get away
+-- without applying the block label substitution to info tables, as long as we
+-- preserve the entry block (#27722). We achieve this by simply keeping it out
+-- of the list of candidates for elimination.
 --
--- If we don't we end up with #27722 where the entry block was eliminated in favour
--- of another block.
+-- The downside is that any duplicates of the entry block stay unmerged. This
+-- should be very rare though, and only affects hand-written Cmm: the entry
+-- block of any proc generated from STG contains the stack check (see
+-- entryHeapCheck in GHC.StgToCmm.Heap) and is therefore distinct from any
+-- other block in the same proc.
 
 -- Invariant: The blocks in the list are pairwise distinct
 -- (so avoid comparing them again)
