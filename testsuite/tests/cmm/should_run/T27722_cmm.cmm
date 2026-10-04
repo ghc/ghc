@@ -1,0 +1,29 @@
+#include "Cmm.h"
+
+// Regression test for #27722: common block elimination (CBE) must not
+// eliminate the entry block, because the proc's info table refers to it.
+// With the bug, zork_info is never emitted and T27722.hs fails to link.
+//
+// The entry block only becomes a duplicate in the third round of CBE:
+// round 1 merges the two then-blocks (both duplicates of the entry
+// block), round 2 merges E1 and E2, and only then does the entry block
+// match the surviving then-block.
+//
+// The then-blocks are braced if-bodies so that, like the entry block,
+// they carry two source notes (braces and statement): CBE's block hash
+// counts tick nodes (#27877), and blocks with different hashes are never
+// compared.
+INFO_TABLE_RET (zork, RET_SMALL)
+    return ()
+{
+  bits64 x;
+  x = 1 :: bits64;
+  goto E1;
+E1:
+  if (x > 0 :: bits64) { x = 1 :: bits64; goto E2; } else { goto D; }
+E2:
+  if (x > 0 :: bits64) { x = 1 :: bits64; goto E2; } else { goto D; }
+D:
+  if (x > 1 :: bits64) goto E1;
+  goto E2;
+}
