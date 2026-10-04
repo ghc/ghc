@@ -13,6 +13,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiWayIf #-}
 
 import Data.Aeson as A
 import qualified Data.Map as Map
@@ -947,15 +948,20 @@ job :: Arch -> Opsys -> BuildConfig -> BuildAndTestJob Job
 job arch opsys buildConfig =
   MkBuildAndTestJob
     { buildJob = NamedJob { name = jobName, jobInfo = Job { jobScript = jobBuildScript, jobStage = "full-build", jobNeeds =  [("hadrian-ghc-in-ghci", False)], jobArtifacts = buildJobArtifacts, ..} }
-    , testJobs =
-      NamedJob { name = jobName <> "-test", jobInfo = testJobInfo } :
-      [ NamedJob
-        { name = jobName <> "-testperf"
-        , jobInfo = testJobInfo
-          { jobVariables = testJobInfo.jobVariables <> "RUNTEST_ARGS" =: "--config perf_path=perf"
-          , jobTags = [runnerPerfTag arch opsys]
-          } }
-        | testsuiteUsePerf buildConfig  ] }
+    , testJobs = if
+       -- if we need an emulator to run the testsuite, we skip for now
+       -- in future we should run the testsuite using an appropriate target
+       -- platform runner
+       | Emulator {} <- crossEmulator buildConfig -> []
+       | otherwise ->
+            NamedJob { name = jobName <> "-test", jobInfo = testJobInfo } :
+            [ NamedJob
+              { name = jobName <> "-testperf"
+              , jobInfo = testJobInfo
+                { jobVariables = testJobInfo.jobVariables <> "RUNTEST_ARGS" =: "--config perf_path=perf"
+                , jobTags = [runnerPerfTag arch opsys]
+                } }
+              | testsuiteUsePerf buildConfig  ] }
   where
     testJobInfo = Job {jobScript = jobTestScript, jobNeeds = [(jobName, True)], jobStage = "testing", jobArtifacts = testJobArtifacts, ..}
     jobPlatform = (arch, opsys, buildFlavor buildConfig)
@@ -985,7 +991,7 @@ job arch opsys buildConfig =
       = [ "bash .gitlab/ci.sh setup"
         , "bash .gitlab/ci.sh configure"
         , "bash .gitlab/ci.sh build_hadrian"
-        , "bash .gitlab/ci.sh test_hadrian_stage1"
+        , "bash " ++ testStep
         ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
@@ -994,8 +1000,15 @@ job arch opsys buildConfig =
         [ ".gitlab/ci.sh setup"
         , ".gitlab/ci.sh configure"
         , ".gitlab/ci.sh build_hadrian"
-        , ".gitlab/ci.sh test_hadrian_stage1"
+        , testStep
         ]
+
+    -- Cross jobs with a working emulator smoke-test the bindist under the
+    -- emulator as a separate step after the build; everything else runs the
+    -- testsuite.
+    testStep
+      | Emulator _ <- crossEmulator buildConfig = ".gitlab/ci.sh smoke_test"
+      | otherwise                               = ".gitlab/ci.sh test_hadrian_stage1"
 
     jobAfterScript
       | Windows <- opsys =
@@ -1069,6 +1082,7 @@ job arch opsys buildConfig =
                         , "junit.xml"
                         , "unexpected-test-output.tar.gz"
                         , "_build/stage1/haddock-timing-files"]
+                        ++ stage3Artifacts
       , artifactsWhen = ArtifactsAlways
       }
 
@@ -1078,7 +1092,6 @@ job arch opsys buildConfig =
       , expireIn = "2 weeks"
       , artifactPaths = ["junit.xml"
                         ,"unexpected-test-output.tar.gz"]
-                        ++ stage3Artifacts
       , artifactsWhen = ArtifactsAlways
       }
 
@@ -1320,7 +1333,6 @@ debian_x86 =
   , disableValidate (standardBuilds Amd64 (Linux Debian11))
   , disableValidate (standardBuilds Amd64 (Linux Debian12))
   , disableValidate (standardBuilds Amd64 (Linux Debian13))
-
 
     -- Validate only builds
   , fastCI (validateBuilds Amd64 (Linux validate_debian) debug)
