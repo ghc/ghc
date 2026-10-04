@@ -255,11 +255,14 @@ generateRules = do
             prefix = root -/- stageString compilerStage -/- "lib"
             go gen file = generate file (semiEmptyTarget compilerStage) gen
         (prefix -/- "settings") %> \out -> do
-            -- Stage0 has no library or package DB of its own (the
-            -- bootstrapping compiler uses Stage1's); for any other stage the
-            -- package DB lives where the LibDir redirect points (this stage's
-            -- own lib dir, or the successor's when @compilerStage@ is a cross
-            -- stage).
+            -- @compilerStage@ is the stage that builds the compiler, i.e. the
+            -- binary whose settings these are; @libraryStage@ is the stage
+            -- whose libraries and package DB that compiler uses. The two
+            -- differ in two cases: Stage0 has no library or package DB of its
+            -- own (the bootstrapping compiler uses Stage1's), and cross
+            -- stages use the successor stage's libraries (a cross compiler
+            -- requires libs from the successor stage, otherwise they are
+            -- compiled for the host and not the target).
             isCross <- crossStage compilerStage
             let libraryStage = case compilerStage of
                     Stage0 {} -> Stage1
@@ -421,8 +424,9 @@ bindistRules = do
 
     , interpolateVar "HostOS_CPP" $ fmap cppify $ interp $ queryHost queryOS
 
-    -- Stage2 always targets the final architecture. Thus, we can use a
-    -- constant stage here.
+    -- Stage2 always targets the target (as in build, host, target)
+    -- architecture. Thus, we can use it constant stage here to find
+    -- information about the target architecture.
     , interpolateVar "TargetPlatform" $ getTarget Stage2 targetPlatformTriple
     , interpolateVar "TargetPlatform_CPP" $ cppify <$> getTarget Stage2 targetPlatformTriple
     , interpolateVar "TargetArch_CPP" $ cppify <$> getTarget Stage2 queryArch
