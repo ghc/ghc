@@ -959,7 +959,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       = [ "bash .gitlab/ci.sh setup"
         , "bash .gitlab/ci.sh configure"
         , "bash .gitlab/ci.sh build_hadrian"
-        , "bash .gitlab/ci.sh test_hadrian"
+        , "bash " ++ testStep
         ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
@@ -967,8 +967,15 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
         [ ".gitlab/ci.sh setup"
         , ".gitlab/ci.sh configure"
         , ".gitlab/ci.sh build_hadrian"
-        , ".gitlab/ci.sh test_hadrian"
+        , testStep
         ]
+
+    -- Cross jobs with a working emulator smoke-test the bindist under the
+    -- emulator as a separate step after the build; everything else runs the
+    -- testsuite.
+    testStep
+      | Emulator _ <- crossEmulator buildConfig = ".gitlab/ci.sh smoke_test"
+      | otherwise                               = ".gitlab/ci.sh test_hadrian"
 
     jobAfterScript
       | Windows <- opsys =
@@ -1273,7 +1280,6 @@ debian_x86 =
   , disableValidate (standardBuilds Amd64 (Linux Debian11))
   , disableValidate (standardBuilds Amd64 (Linux Debian12))
   , disableValidate (standardBuilds Amd64 (Linux Debian13))
-
 
     -- Validate only builds
   , fastCI (validateBuilds Amd64 (Linux validate_debian) debug)

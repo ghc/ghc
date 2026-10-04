@@ -659,6 +659,62 @@ function install_bindist() {
   end_section install-bindist
 }
 
+# Smoke-test the cross-compiled Stage2 and Stage2 bindists using the emulator.
+# For cross jobs with a working emulator this runs instead of `test_hadrian`
+# as a separate validation step after the build.
+function smoke_test() {
+  check_msys2_deps _build/stage1/bin/ghc --version
+  check_release_build
+
+  if [[ "${CROSS_EMULATOR:-}" == "NOT_SET" ]]; then
+    info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
+    return
+  fi
+
+  local instdir="$TOP/_build/install"
+  local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
+  install_bindist _build/bindist/ghc-*/ "$instdir"
+  echo 'main = putStrLn "hello world"' > expected
+  run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
+
+  if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
+    ${CROSS_EMULATOR:-} ./hello.exe > actual
+  else
+    ${CROSS_EMULATOR:-} ./hello > actual
+  fi
+
+  # We have to use `-w` to make the test more stable across supported
+  # platforms, i.e. Windows:
+  # $ cmp expected actual
+  # differ: byte 30, line 1
+  # $ diff expected actual
+  # 1c1
+  # < main = putStrLn "hello world"
+  # ---
+  # > main = putStrLn "hello world"
+  run diff -w expected actual
+
+  if [[ "${FINAL_CROSS_STAGE:-2}" == "3" ]]; then
+    local stage3_dir
+    stage3_dir="$(echo _build/bindist-stage3/ghc-*/)"
+    local stage3_ghc="$stage3_dir/bin/ghc$exe"
+
+    info "Smoke-testing stage3 compiler..."
+    file "$stage3_ghc"
+    run ${CROSS_EMULATOR} "$stage3_ghc" --info
+
+    run ${CROSS_EMULATOR} "$stage3_ghc" -package ghc "$TOP/.gitlab/hello.hs" -o hello-stage3
+
+    if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
+      ${CROSS_EMULATOR:-} ./hello-stage3.exe > actual-stage3
+    else
+      ${CROSS_EMULATOR:-} ./hello-stage3 > actual-stage3
+    fi
+
+    run diff -w expected actual-stage3
+  fi
+}
+
 function test_hadrian() {
   check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
@@ -683,55 +739,7 @@ function test_hadrian() {
     fi
   fi
 
-
-  if [[ "${CROSS_EMULATOR:-}" == "NOT_SET" ]]; then
-    info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
-    return
-  # If we have set CROSS_EMULATOR, then can't test using normal testsuite.
-  elif [ -n "${CROSS_EMULATOR:-}" ] && [[ "${CROSS_TARGET:-}" != *"wasm"* ]]; then
-    local instdir="$TOP/_build/install"
-    local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
-    install_bindist _build/bindist/ghc-*/ "$instdir"
-    echo 'main = putStrLn "hello world"' > expected
-    run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
-
-    if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
-      ${CROSS_EMULATOR:-} ./hello.exe > actual
-    else
-      ${CROSS_EMULATOR:-} ./hello > actual
-    fi
-
-    # We have to use `-w` to make the test more stable across supported
-    # platforms, i.e. Windows:
-    # $ cmp expected actual
-    # differ: byte 30, line 1
-    # $ diff expected actual
-    # 1c1
-    # < main = putStrLn "hello world"
-    # ---
-    # > main = putStrLn "hello world"
-    run diff -w expected actual
-
-    if [[ "${FINAL_CROSS_STAGE:-2}" == "3" ]]; then
-      local stage3_dir
-      stage3_dir="$(echo _build/bindist-stage3/ghc-*/)"
-      local stage3_ghc="$stage3_dir/bin/ghc$exe"
-
-      info "Smoke-testing stage3 compiler..."
-      file "$stage3_ghc"
-      run ${CROSS_EMULATOR} "$stage3_ghc" --info
-
-      run ${CROSS_EMULATOR} "$stage3_ghc" -package ghc "$TOP/.gitlab/hello.hs" -o hello-stage3
-
-      if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
-        ${CROSS_EMULATOR:-} ./hello-stage3.exe > actual-stage3
-      else
-        ${CROSS_EMULATOR:-} ./hello-stage3 > actual-stage3
-      fi
-
-      run diff -w expected actual-stage3
-    fi
-  elif [[ -n "${REINSTALL_GHC:-}" ]]; then
+  if [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian \
       test \
       --test-root-dirs=testsuite/tests/stage1 \
@@ -1162,6 +1170,7 @@ case ${1:-help} in
     time_it "test" test_hadrian || res=$?
     push_perf_notes
     exit $res ;;
+  smoke_test) time_it "smoke-test" smoke_test ;;
   run_hadrian) shift; run_hadrian "$@" ;;
   perf_test) run_perf_test ;;
   abi_test) abi_test ;;
