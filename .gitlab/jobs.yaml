@@ -547,7 +547,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian_stage1"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -631,7 +631,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian_stage1"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -664,168 +664,6 @@
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
       "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
-      "TEST_WAYS": "",
-      "USER_CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres"
-    }
-  },
-  "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm-test": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "2 weeks",
-      "paths": [
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": true,
-        "job": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm"
-      }
-    ],
-    "rules": [
-      {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate\\+llvm(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || (($CI_MERGE_REQUEST_LABELS =~ /.*aarch64.*/) && ($CI_MERGE_REQUEST_LABELS =~ /.*Windows.*/) && ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "testing",
-    "tags": [
-      "aarch64-linux"
-    ],
-    "variables": {
-      "AR": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar",
-      "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
-      "BUILD_FLAVOUR": "validate+llvm",
-      "CC": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
-      "CFLAGS": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "CROSS_EMULATOR": "/opt/wine-arm64ec-msys2-deb12/bin/wine",
-      "CROSS_TARGET": "aarch64-unknown-mingw32",
-      "CXX": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++",
-      "FINAL_CROSS_STAGE": "2",
-      "HADRIAN_ARGS": "--docs=none",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LD": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld",
-      "LLVMAS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
-      "MergeObjsCmd": "",
-      "NM": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm",
-      "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
-      "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
-      "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
-      "RUNTEST_ARGS": "-e config.timeout=900",
-      "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
-      "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
-      "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
-      "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
-      "TEST_WAYS": "",
-      "USER_CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres"
-    }
-  },
-  "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate-test": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "2 weeks",
-      "paths": [
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": true,
-        "job": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate"
-      }
-    ],
-    "rules": [
-      {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || (($CI_MERGE_REQUEST_LABELS =~ /.*aarch64.*/) && ($CI_MERGE_REQUEST_LABELS =~ /.*Windows.*/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "testing",
-    "tags": [
-      "aarch64-linux"
-    ],
-    "variables": {
-      "AR": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar",
-      "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate",
-      "BUILD_FLAVOUR": "validate",
-      "CC": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
-      "CFLAGS": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "CROSS_EMULATOR": "/opt/wine-arm64ec-msys2-deb12/bin/wine",
-      "CROSS_TARGET": "aarch64-unknown-mingw32",
-      "CXX": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++",
-      "FINAL_CROSS_STAGE": "2",
-      "HADRIAN_ARGS": "--docs=none",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LD": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld",
-      "LLVMAS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
-      "MergeObjsCmd": "",
-      "NM": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm",
-      "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
-      "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
-      "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
-      "RUNTEST_ARGS": "-e config.timeout=900",
-      "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
-      "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
-      "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
-      "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate",
       "TEST_WAYS": "",
       "USER_CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
       "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres"
@@ -2126,7 +1964,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian_stage1"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -2211,7 +2049,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian_stage1"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -2244,170 +2082,6 @@
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
       "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
-      "TEST_WAYS": "",
-      "USER_CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres",
-      "XZ_OPT": "-9"
-    }
-  },
-  "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm-test": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "8 weeks",
-      "paths": [
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": true,
-        "job": "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm"
-      }
-    ],
-    "rules": [
-      {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "testing",
-    "tags": [
-      "aarch64-linux"
-    ],
-    "variables": {
-      "AR": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar",
-      "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
-      "BUILD_FLAVOUR": "validate+llvm",
-      "CC": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
-      "CFLAGS": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "CROSS_EMULATOR": "/opt/wine-arm64ec-msys2-deb12/bin/wine",
-      "CROSS_TARGET": "aarch64-unknown-mingw32",
-      "CXX": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++",
-      "FINAL_CROSS_STAGE": "2",
-      "HADRIAN_ARGS": "--docs=none",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LD": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld",
-      "LLVMAS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
-      "MergeObjsCmd": "",
-      "NM": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm",
-      "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
-      "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
-      "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
-      "RUNTEST_ARGS": "-e config.timeout=900",
-      "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
-      "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
-      "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
-      "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
-      "TEST_WAYS": "",
-      "USER_CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres",
-      "XZ_OPT": "-9"
-    }
-  },
-  "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate-test": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "8 weeks",
-      "paths": [
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": true,
-        "job": "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate"
-      }
-    ],
-    "rules": [
-      {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "testing",
-    "tags": [
-      "aarch64-linux"
-    ],
-    "variables": {
-      "AR": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar",
-      "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate",
-      "BUILD_FLAVOUR": "validate",
-      "CC": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
-      "CFLAGS": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
-      "CROSS_EMULATOR": "/opt/wine-arm64ec-msys2-deb12/bin/wine",
-      "CROSS_TARGET": "aarch64-unknown-mingw32",
-      "CXX": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang++",
-      "FINAL_CROSS_STAGE": "2",
-      "HADRIAN_ARGS": "--docs=none",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "LD": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld",
-      "LLVMAS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
-      "MergeObjsCmd": "",
-      "NM": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-nm",
-      "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
-      "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
-      "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
-      "RUNTEST_ARGS": "-e config.timeout=900",
-      "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
-      "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
-      "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
-      "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate",
       "TEST_WAYS": "",
       "USER_CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
       "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres",
@@ -4761,73 +4435,9 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian_stage1"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-cross_aarch64-linux-gnu-validate",
-      "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
-      "CROSS_TARGET": "aarch64-linux-gnu",
-      "FINAL_CROSS_STAGE": "2",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900",
-      "TEST_ENV": "x86_64-linux-deb13-cross_aarch64-linux-gnu-validate",
-      "TEST_WAYS": "",
-      "XZ_OPT": "-9"
-    }
-  },
-  "nightly-x86_64-linux-deb13-cross_aarch64-linux-gnu-validate-test": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "8 weeks",
-      "paths": [
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": true,
-        "job": "nightly-x86_64-linux-deb13-cross_aarch64-linux-gnu-validate"
-      }
-    ],
-    "rules": [
-      {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "testing",
     "tags": [
       "x86_64-linux"
     ],
@@ -5423,7 +5033,8 @@
         "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz",
-        "_build/stage1/haddock-timing-files"
+        "_build/stage1/haddock-timing-files",
+        "ghc-riscv64-linux-deb13-validate.tar.xz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -5455,75 +5066,9 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian_stage1"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate",
-      "BIN_DIST_NAME_STAGE3": "ghc-riscv64-linux-deb13-validate",
-      "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
-      "CROSS_TARGET": "riscv64-linux-gnu",
-      "FINAL_CROSS_STAGE": "3",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900",
-      "TEST_ENV": "x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate",
-      "TEST_WAYS": "",
-      "XZ_OPT": "-9"
-    }
-  },
-  "nightly-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate-test": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "8 weeks",
-      "paths": [
-        "junit.xml",
-        "unexpected-test-output.tar.gz",
-        "ghc-riscv64-linux-deb13-validate.tar.xz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-deb13-riscv-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13-riscv:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": true,
-        "job": "nightly-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate"
-      }
-    ],
-    "rules": [
-      {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "testing",
     "tags": [
       "x86_64-linux"
     ],
@@ -7224,73 +6769,9 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian_stage1"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate",
-      "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CROSS_EMULATOR": "qemu-loongarch64 -L /usr/loongarch64-linux-gnu",
-      "CROSS_TARGET": "loongarch64-linux-gnu",
-      "FINAL_CROSS_STAGE": "2",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900",
-      "TEST_ENV": "x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate",
-      "TEST_WAYS": "",
-      "XZ_OPT": "-9"
-    }
-  },
-  "nightly-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate-test": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "8 weeks",
-      "paths": [
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-ubuntu24_04-loongarch-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu24_04-loongarch:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": true,
-        "job": "nightly-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate"
-      }
-    ],
-    "rules": [
-      {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "testing",
     "tags": [
       "x86_64-linux"
     ],
@@ -12599,72 +12080,9 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian_stage1"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-cross_aarch64-linux-gnu-validate",
-      "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
-      "CROSS_TARGET": "aarch64-linux-gnu",
-      "FINAL_CROSS_STAGE": "2",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900",
-      "TEST_ENV": "x86_64-linux-deb13-cross_aarch64-linux-gnu-validate",
-      "TEST_WAYS": ""
-    }
-  },
-  "x86_64-linux-deb13-cross_aarch64-linux-gnu-validate-test": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "2 weeks",
-      "paths": [
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": true,
-        "job": "x86_64-linux-deb13-cross_aarch64-linux-gnu-validate"
-      }
-    ],
-    "rules": [
-      {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb13-cross_aarch64-linux-gnu-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "testing",
     "tags": [
       "x86_64-linux"
     ],
@@ -13252,7 +12670,8 @@
         "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz",
-        "_build/stage1/haddock-timing-files"
+        "_build/stage1/haddock-timing-files",
+        "ghc-riscv64-linux-deb13-validate.tar.xz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -13284,74 +12703,9 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian_stage1"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate",
-      "BIN_DIST_NAME_STAGE3": "ghc-riscv64-linux-deb13-validate",
-      "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
-      "CROSS_TARGET": "riscv64-linux-gnu",
-      "FINAL_CROSS_STAGE": "3",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900",
-      "TEST_ENV": "x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate",
-      "TEST_WAYS": ""
-    }
-  },
-  "x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate-test": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "2 weeks",
-      "paths": [
-        "junit.xml",
-        "unexpected-test-output.tar.gz",
-        "ghc-riscv64-linux-deb13-validate.tar.xz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-deb13-riscv-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13-riscv:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": true,
-        "job": "x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate"
-      }
-    ],
-    "rules": [
-      {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*RISC-V.*/)))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "testing",
     "tags": [
       "x86_64-linux"
     ],
@@ -15027,72 +14381,9 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian_stage1"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate",
-      "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
-      "CROSS_EMULATOR": "qemu-loongarch64 -L /usr/loongarch64-linux-gnu",
-      "CROSS_TARGET": "loongarch64-linux-gnu",
-      "FINAL_CROSS_STAGE": "2",
-      "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900",
-      "TEST_ENV": "x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate",
-      "TEST_WAYS": ""
-    }
-  },
-  "x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate-test": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh save_test_output",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings.txt"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "2 weeks",
-      "paths": [
-        "junit.xml",
-        "unexpected-test-output.tar.gz"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-ubuntu24_04-loongarch-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu24_04-loongarch:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": true,
-        "job": "x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate"
-      }
-    ],
-    "rules": [
-      {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*loongarch.*/)))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "testing",
     "tags": [
       "x86_64-linux"
     ],
