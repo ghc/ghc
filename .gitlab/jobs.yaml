@@ -303,7 +303,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -387,7 +387,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -1111,7 +1111,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -1196,7 +1196,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -2459,7 +2459,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -2784,7 +2784,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -3689,7 +3689,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -6441,7 +6441,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -6762,7 +6762,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
@@ -7654,7 +7654,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
+      ".gitlab/ci.sh smoke_test"
     ],
     "stage": "full-build",
     "tags": [
