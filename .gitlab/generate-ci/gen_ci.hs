@@ -308,11 +308,6 @@ data CrossStages
     Stage2And3
   deriving stock (Eq, Ord)
 
--- | The value of the @FINAL_CROSS_STAGE@ environment variable; @"2"@ or @"3"@.
-finalCrossStageEnvVal :: CrossStages -> String
-finalCrossStageEnvVal Stage2     = "2"
-finalCrossStageEnvVal Stage2And3 = "3"
-
 crossConfig :: TargetPlatform -- ^ target platform
             -> CrossEmulator -- ^ emulator for testing
             -> Maybe String -- ^ Configure wrapper
@@ -1004,7 +999,10 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       , "INSTALL_CONFIGURE_ARGS" =: "--enable-strict-ghc-toolchain-check"
       , maybe mempty ("CONFIGURE_WRAPPER" =:) (configureWrapper buildConfig)
       , maybe mempty (("CROSS_TARGET" =:) . renderTriple) (crossTarget buildConfig)
-      , maybe mempty (("FINAL_CROSS_STAGE" =:) . finalCrossStageEnvVal) (crossStages buildConfig)
+      , case crossStages buildConfig of
+          Nothing          -> mempty
+          Just Stage2      -> "FINAL_CROSS_STAGE" =: "2"
+          Just Stage2And3  -> "FINAL_CROSS_STAGE" =: "3"
       , case crossEmulator buildConfig of
           NoEmulator
             -- we need an emulator but it isn't set. Won't run the testsuite
