@@ -1716,7 +1716,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
 
     subst_bndr (Left in_scope) bndr
       | bndr `elemInScopeSet` in_scope = subst_bndr1 (mkEmptySubst in_scope) bndr
-      | otherwise                      = (Left in_scope, bndr)
+      | otherwise                      = (Left (in_scope `extendInScopeSet` bndr), bndr)
     subst_bndr (Right subst) bndr = subst_bndr1 subst bndr
 
     subst_bndr1 subst bndr
