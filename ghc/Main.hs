@@ -27,7 +27,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Pipeline  ( oneShot )
-import GHC.Driver.MakeFile  ( doMkDependHS )
+import qualified GHC.Driver.MakeFile as MakeFile
 import GHC.Driver.Backpack  ( doBackpack )
 import GHC.Driver.Plugins
 import GHC.Driver.Config.Logger (initLogFlags)
@@ -271,7 +271,7 @@ main' postLoadMode units dflags0 args flagWarnings = do
                                                     f
        ShowByteCode f         -> liftIO $ showByteCode logger hsc_env f
        DoMake                 -> doMake units srcs
-       DoMkDependHS           -> doMkDependHS (map fst srcs)
+       DoMkDependHS           -> doMkDepend units srcs
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
        DoInteractive          -> ghciUI units srcs Nothing
        DoEval exprs           -> ghciUI units srcs $ Just $ reverse exprs
@@ -331,6 +331,15 @@ doMake units targets = do
       GHC.setTargets targets'
       ok_flag <- GHC.load LoadAllTargets
       when (failed ok_flag) (liftIO $ exitWith (ExitFailure 1))
+
+-- ----------------------------------------------------------------------------
+-- Run -M mode
+
+doMkDepend :: [String] -> [(String, Maybe Phase)] -> Ghc ()
+doMkDepend units targets = do
+  ts <- initMkDepend units targets (checkOptions DoMkDependHS)
+  GHC.setTargets ts
+  MakeFile.doMkDepend
 
 -- ---------------------------------------------------------------------------
 -- Various banners and verbosity output.
