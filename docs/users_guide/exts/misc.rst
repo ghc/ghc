@@ -10,3 +10,4 @@ Miscellaneous
     assert
     callstack
     whitespace
+    meaningful_main_return

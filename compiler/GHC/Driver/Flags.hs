@@ -284,6 +284,7 @@ extensionName = \case
   LangExt.ImplicitStagePersistence -> "ImplicitStagePersistence"
   LangExt.QualifiedStrings -> "QualifiedStrings"
   LangExt.LazyFieldAnnotations -> "LazyFieldAnnotations"
+  LangExt.MeaningfulMainReturn -> "MeaningfulMainReturn"
 
 -- | Is this extension known by any other names? For example
 -- -XGeneralizedNewtypeDeriving is accepted
@@ -1143,6 +1144,7 @@ data WarningFlag =
    | Opt_WarnSemaphoreOpenFailure                   -- Since 10.0.1
    | Opt_WarnDefaultedCallStack                      -- ^ @since 10.2
    | Opt_WarnImplicitFieldStrictness                 -- ^ @since 10.2
+   | Opt_WarnAmbiguousMainReturn                     -- ^ @since 10.2
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1268,6 +1270,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnUnrecognisedModifiers                   -> "unrecognised-modifiers" :| []
   Opt_WarnSemaphoreOpenFailure                   -> "semaphore-open-failure" :| []
   Opt_WarnDefaultedCallStack                      -> "defaulted-callstack" :| []
+  Opt_WarnAmbiguousMainReturn                     -> "ambiguous-main-return" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -1415,7 +1418,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnRuleLhsEqualities,
         Opt_WarnUnusableUnpackPragmas,
         Opt_WarnUnrecognisedModifiers,
-        Opt_WarnSemaphoreOpenFailure
+        Opt_WarnSemaphoreOpenFailure,
+        Opt_WarnAmbiguousMainReturn
       ]
 
 -- | Things you get with @-W@.

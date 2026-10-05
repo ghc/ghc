@@ -1,0 +1,4 @@
+MeaningfulMainReturn.hs:62:1: error: [GHC-42176]
+    The main IO action ‘mainFamilyUnconstrained’ returns a value of type ‘FamilyResult
+                                                                            a0’, but with ‘-XMeaningfulMainReturn’ its result type must unify with ‘()’, ‘Void’, or ‘ExitCode’.
+

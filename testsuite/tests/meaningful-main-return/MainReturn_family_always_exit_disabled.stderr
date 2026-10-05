@@ -1,0 +1,3 @@
+MeaningfulMainReturn.hs:68:1: warning: [GHC-31337] [-Wambiguous-main-return (in -Wdefault)]
+    The main IO action ‘mainFamilyAlwaysExit’ returns a value of type ‘ExitCode’, which is ignored.
+

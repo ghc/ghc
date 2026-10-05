@@ -7852,6 +7852,7 @@ module GHC.IO.Exception where
   cannotCompactFunction :: GHC.Internal.Exception.Type.SomeException
   cannotCompactMutable :: GHC.Internal.Exception.Type.SomeException
   cannotCompactPinned :: GHC.Internal.Exception.Type.SomeException
+  exitWith :: forall a. ExitCode -> GHC.Internal.Types.IO a
   heapOverflow :: GHC.Internal.Exception.Type.SomeException
   ioError :: forall a. GHC.Internal.Stack.Types.HasCallStack => IOError -> GHC.Internal.Types.IO a
   ioException :: forall a. GHC.Internal.Stack.Types.HasCallStack => IOException -> GHC.Internal.Types.IO a

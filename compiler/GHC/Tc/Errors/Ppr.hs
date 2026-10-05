@@ -1978,6 +1978,20 @@ instance Diagnostic TcRnMessage where
         defOrExp :: SDoc
         defOrExp | explicit_export_list = text "exported by"
                  | otherwise            = text "defined in"
+    TcRnAmbiguousMainReturn main_name result_ty
+      -> mkSimpleDecorated $
+         text "The" <+> ppMainFn (nameOccName main_name)
+        <+> text "returns a value of type" <+> quotes (ppr result_ty) <> comma
+        <+> text "which is ignored."
+    TcRnInvalidMainReturn main_name result_ty
+      -> mkSimpleDecorated $
+         text "The" <+> ppMainFn (nameOccName main_name)
+        <+> text "returns a value of type" <+> quotes (ppr result_ty) <> comma
+        <+> text "but with" <+> quotes (text "-XMeaningfulMainReturn")
+        <+> text "its result type must unify with" <+>
+            quotes (text "()") <> comma <+>
+            quotes (text "Void") <> comma <+>
+            text "or" <+> quotes (text "ExitCode") <> dot
     TcRnGhciUnliftedBind id
       -> mkSimpleDecorated $
          sep [ text "GHCi can't bind a variable of unlifted type:"
@@ -2701,6 +2715,10 @@ instance Diagnostic TcRnMessage where
     TcRnImplicitImportOfPrelude {}
       -> WarningWithFlag Opt_WarnImplicitPrelude
     TcRnMissingMain {}
+      -> ErrorWithoutFlag
+    TcRnAmbiguousMainReturn {}
+      -> WarningWithFlag Opt_WarnAmbiguousMainReturn
+    TcRnInvalidMainReturn {}
       -> ErrorWithoutFlag
     TcRnGhciUnliftedBind {}
       -> ErrorWithoutFlag
@@ -3438,6 +3456,10 @@ instance Diagnostic TcRnMessage where
     TcRnImplicitImportOfPrelude {}
       -> noHints
     TcRnMissingMain {}
+      -> noHints
+    TcRnAmbiguousMainReturn {}
+      -> noHints
+    TcRnInvalidMainReturn {}
       -> noHints
     TcRnGhciUnliftedBind {}
       -> noHints

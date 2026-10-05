@@ -2481,6 +2481,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnSemaphoreOpenFailure -> warnSpec x
   Opt_WarnDefaultedCallStack -> warnSpec x
   Opt_WarnImplicitFieldStrictness -> warnSpec x
+  Opt_WarnAmbiguousMainReturn -> warnSpec x
 
 warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]
 warningGroupsDeps = map mk warningGroups

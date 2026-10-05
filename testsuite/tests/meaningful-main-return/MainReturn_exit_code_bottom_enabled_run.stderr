@@ -1,0 +1,7 @@
+MainReturn_exit_code_bottom_enabled_run: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+mainExitCodeBottom result evaluated
+
+HasCallStack backtrace:
+  error, called at MeaningfulMainReturn.hs:31:28 in main:MeaningfulMainReturn
+

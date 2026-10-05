@@ -728,3 +728,7 @@ d_Pat = nlVarPat d_RDR
 f_Pat = nlVarPat f_RDR
 k_Pat = nlVarPat k_RDR
 z_Pat = nlVarPat z_RDR
+
+exitCodeTyConOcc, exitWithIdOcc :: KnownOcc
+exitCodeTyConOcc = mkTcOcc "ExitCode"
+exitWithIdOcc = mkVarOcc "exitWith"
