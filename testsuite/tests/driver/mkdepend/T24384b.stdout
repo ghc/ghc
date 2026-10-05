@@ -1,0 +1,142 @@
+{
+  "package-id": "base-<VERSION>-<HASH>",
+  "package-name": "base",
+  "unit-id": "base-<VERSION>-<HASH>"
+}
+{
+  "package-id": "dep-1",
+  "package-name": "dep",
+  "unit-id": "dep-1-XXX"
+}
+{
+  "package-id": "dep-public-1",
+  "package-name": "dep-public",
+  "unit-id": "dep-public-1-XXX"
+}
+{
+  "package-id": "template-haskell-<VERSION>-<HASH>",
+  "package-name": "template-haskell",
+  "unit-id": "template-haskell-<VERSION>-<HASH>"
+}
+{
+  "imports": {
+    "base-<VERSION>-<HASH>": [
+      "GHC.Essentials",
+      "Prelude"
+    ],
+    "dep-1-XXX": [
+      "Dep"
+    ],
+    "dep-public-1-XXX": [
+      "DepPublic"
+    ],
+    "template-haskell-<VERSION>-<HASH>": [
+      "Language.Haskell.TH.Syntax"
+    ]
+  },
+  "includes": [],
+  "module": "E",
+  "source": "E.hs",
+  "unit-id": "main"
+}
+{
+  "imports": {
+    "base-<VERSION>-<HASH>": [
+      "GHC.Essentials",
+      "Prelude"
+    ],
+    "main": [
+      "E"
+    ]
+  },
+  "includes": [],
+  "module": "C[boot]",
+  "source": "C.hs-boot",
+  "unit-id": "main"
+}
+{
+  "imports": {
+    "base-<VERSION>-<HASH>": [
+      "GHC.Essentials",
+      "Prelude"
+    ],
+    "main": [
+      "C[boot]"
+    ]
+  },
+  "includes": [
+    "foo.h"
+  ],
+  "module": "A",
+  "source": "A.hs",
+  "unit-id": "main"
+}
+{
+  "package-id": "containers-<VERSION>-<HASH>",
+  "package-name": "containers",
+  "unit-id": "containers-<VERSION>-<HASH>"
+}
+{
+  "imports": {
+    "base-<VERSION>-<HASH>": [
+      "GHC.Essentials",
+      "Prelude"
+    ],
+    "containers-<VERSION>-<HASH>": [
+      "Data.Set"
+    ],
+    "main": [
+      "A"
+    ]
+  },
+  "includes": [],
+  "module": "C",
+  "source": "C.hs",
+  "unit-id": "main"
+}
+{
+  "imports": {
+    "base-<VERSION>-<HASH>": [
+      "GHC.Essentials",
+      "Prelude"
+    ],
+    "main": [
+      "A"
+    ]
+  },
+  "includes": [],
+  "module": "B[boot]",
+  "source": "lib/B.hs-boot",
+  "unit-id": "main"
+}
+{
+  "imports": {
+    "base-<VERSION>-<HASH>": [
+      "GHC.Essentials",
+      "Prelude"
+    ],
+    "main": [
+      "A"
+    ]
+  },
+  "includes": [],
+  "module": "B",
+  "source": "lib/B.hs",
+  "unit-id": "main"
+}
+{
+  "imports": {
+    "base-<VERSION>-<HASH>": [
+      "GHC.Essentials",
+      "Prelude"
+    ],
+    "main": [
+      "B",
+      "C"
+    ]
+  },
+  "includes": [],
+  "module": "D",
+  "source": "D.hs",
+  "unit-id": "main"
+}

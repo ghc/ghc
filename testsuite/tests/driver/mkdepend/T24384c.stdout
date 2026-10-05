@@ -1,0 +1,74 @@
+{
+  "imports": {},
+  "includes": [],
+  "module": "E",
+  "source": "E.hs",
+  "unit-id": "main"
+}
+{
+  "imports": {
+    "main": [
+      "E"
+    ]
+  },
+  "includes": [],
+  "module": "C[boot]",
+  "source": "C.hs-boot",
+  "unit-id": "main"
+}
+{
+  "imports": {
+    "main": [
+      "C[boot]"
+    ]
+  },
+  "includes": [],
+  "module": "A",
+  "source": "A.hs",
+  "unit-id": "main"
+}
+{
+  "imports": {
+    "main": [
+      "A"
+    ]
+  },
+  "includes": [],
+  "module": "C",
+  "source": "C.hs",
+  "unit-id": "main"
+}
+{
+  "imports": {
+    "main": [
+      "A"
+    ]
+  },
+  "includes": [],
+  "module": "B[boot]",
+  "source": "lib/B.hs-boot",
+  "unit-id": "main"
+}
+{
+  "imports": {
+    "main": [
+      "A"
+    ]
+  },
+  "includes": [],
+  "module": "B",
+  "source": "lib/B.hs",
+  "unit-id": "main"
+}
+{
+  "imports": {
+    "main": [
+      "B",
+      "C"
+    ]
+  },
+  "includes": [],
+  "module": "D",
+  "source": "D.hs",
+  "unit-id": "main"
+}

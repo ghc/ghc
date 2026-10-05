@@ -1,0 +1,23 @@
+# DO NOT DELETE: Beginning of Haskell dependencies
+mhu01/a/A/Base.o : mhu01/a/A/Base.hi-boot
+mhu01/a/A/Base.o : mhu01/a/A/Base.hs
+mhu01/a/A/Base.o : mhu01/a/Util.hi
+mhu01/a/A/Base.o-boot : mhu01/a/A/Base.hs-boot
+mhu01/a/A/TH.o : mhu01/a/A/Base.hi
+mhu01/a/A/TH.o : mhu01/a/A/TH.hs
+mhu01/a/Util.o : mhu01/a/A/Base.hi-boot
+mhu01/a/Util.o : mhu01/a/Util.hs
+mhu01/b/B/Normal.o : mhu01/a/A/Base.hi
+mhu01/b/B/Normal.o : mhu01/b/B/Normal.hs
+mhu01/b/B/Normal.o : mhu01/b/B/Splice.hi
+mhu01/b/B/Splice.o : mhu01/a/A/Base.hi
+mhu01/b/B/Splice.o : mhu01/a/A/TH.hi
+mhu01/b/B/Splice.o : mhu01/b/B/Splice.hs
+mhu01/b/B/Splice.o : mhu01/b/Util.hi
+mhu01/b/Util.o : mhu01/b/Util.hs
+mhu01/c/C.o : mhu01/a/Util.hi
+mhu01/c/C.o : mhu01/b/B/Normal.hi
+mhu01/c/C.o : mhu01/b/B/Splice.hi
+mhu01/c/C.o : mhu01/b/Util.hi
+mhu01/c/C.o : mhu01/c/C.hs
+# DO NOT DELETE: End of Haskell dependencies

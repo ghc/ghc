@@ -1,0 +1,7 @@
+{
+  "imports": {},
+  "includes": [],
+  "module": "A",
+  "source": "mkdepend01/A.hs",
+  "unit-id": "main"
+}
