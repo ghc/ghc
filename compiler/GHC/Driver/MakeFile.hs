@@ -31,6 +31,9 @@ import GHC.Driver.Env
 import GHC.Driver.Errors.Types
 import GHC.Driver.Make
 import GHC.Driver.Monad
+import GHC.Driver.Phases
+import GHC.Driver.Pipeline
+import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Session
 
 import GHC.Iface.Errors.Types
@@ -61,6 +64,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.TmpFs
 
+import Control.Applicative ((<|>))
 import Control.Monad (guard, when)
 import Data.Either
 import Data.Foldable (traverse_)
@@ -74,6 +78,7 @@ import Data.Set qualified as Set
 import GHC.Generics (Generic, Generically (..))
 import System.Directory
 import System.Directory qualified as Directory
+import System.FilePath qualified as FilePath
 import System.IO
 import System.IO.Error (isEOFError)
 import System.OsPath as OsPath
@@ -193,6 +198,7 @@ data DepNode =
 
 data PreprocessingNode = PreprocessingNode
   { pn_preprocessor :: Maybe String
+  , pn_options :: [String]
   }
 
 data Dep
@@ -294,10 +300,26 @@ processDeps hsc_env0 excl_mods sinks (AcyclicSCC (ModuleNode _ (ModuleNodeCompil
         }
 
     preprocessor :: IO PreprocessingNode
-    preprocessor = do
-      pure PreprocessingNode
-        { pn_preprocessor = find_preprocessor dflags
-        }
+    preprocessor
+      | Just src <- ml_hs_file (ms_location node)
+      = runPipeline (hsc_hooks local_hsc_env) $ do
+        let
+          (_, suffix) = FilePath.splitExtension src
+          lit | Unlit _ <- startPhase suffix = True
+              | otherwise = False
+          pipe_env = mkPipeEnv StopPreprocess src Nothing NoOutputFile
+        unlit_fn <- if lit then use (T_Unlit pipe_env local_hsc_env src) else pure src
+        (dflags1, opts, _, _) <- use (T_FileArgs (hsc_logger local_hsc_env) (ms_hspp_opts node) unlit_fn)
+        let pp = find_preprocessor dflags1
+        pure PreprocessingNode
+          { pn_preprocessor = pp <|> find_preprocessor dflags
+          , pn_options = opts
+          }
+      | otherwise
+      = pure PreprocessingNode
+          { pn_preprocessor = find_preprocessor dflags
+          , pn_options = []
+          }
 
     -- Emit a dependency for each CPP import
     -- CPP deps are discovered in the module parsing phase by parsing
@@ -615,6 +637,7 @@ data ModuleNodeDeps = ModuleNodeDeps
   { source :: OsPath
   , imports :: ImportDeps
   , cpp :: Set.Set OsPath
+  , options :: [String]
   , preprocessor :: Maybe FilePath
   }
   deriving stock (Generic)
@@ -717,11 +740,12 @@ instance ToJson DepJson where
         NotBoot -> ""
 
       homeUnitModule :: ModuleNodeDeps -> JsonDoc
-      homeUnitModule ModuleNodeDeps {source, imports, cpp, preprocessor} =
+      homeUnitModule ModuleNodeDeps {source, imports, cpp, options, preprocessor} =
         JSObject
           [ ("source", JSString . showOsPath $ normalise source)
           , ("imports", importsObj imports)
           , ("includes", strArray cpp showOsPath)
+          , ("options", JSArray $ map JSString options)
           , ("preprocessor", maybe JSNull JSString preprocessor)
           ]
 
@@ -790,6 +814,7 @@ updateDepJson include_pkgs DepNode {..} deps =
       ModuleNodeDeps
         { source = dn_src
         , preprocessor = pn_preprocessor dn_preprocessing
+        , options = pn_options dn_preprocessing
         , cpp = Set.empty
         , imports = ImportDeps Map.empty
         }
