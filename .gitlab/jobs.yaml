@@ -77,7 +77,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-aarch64-darwin-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -204,7 +203,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-aarch64-linux-alpine3_23-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -328,7 +326,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb11-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -451,7 +448,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb12-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -678,7 +674,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -760,7 +755,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -966,7 +960,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb13-validate+llvm.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1027,7 +1020,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb13-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1151,7 +1143,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-i386-linux-alpine3_23-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1275,7 +1266,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-i386-linux-deb11-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1398,7 +1388,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-i386-linux-deb12-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1521,7 +1510,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-i386-linux-deb13-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1649,7 +1637,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-aarch64-darwin-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1778,7 +1765,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-aarch64-linux-alpine3_23-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -1904,7 +1890,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb11-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2029,7 +2014,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb12-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2259,7 +2243,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2342,7 +2325,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2551,7 +2533,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb13-validate+llvm.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2613,7 +2594,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-aarch64-linux-deb13-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2739,7 +2719,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-i386-linux-alpine3_23-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2865,7 +2844,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-i386-linux-deb11-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2990,7 +2968,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-i386-linux-deb12-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -3115,7 +3092,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-i386-linux-deb13-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -3247,7 +3223,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-darwin-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -3381,7 +3356,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-freebsd14-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -3510,7 +3484,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -3637,7 +3610,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_12-validate+fully_static.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -3764,7 +3736,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_23-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -3893,7 +3864,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4024,7 +3994,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_23-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4155,7 +4124,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_23-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4286,7 +4254,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4477,7 +4444,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-validate+debug_info.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4539,7 +4505,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4664,7 +4629,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb12-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4792,7 +4756,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-cross_aarch64-linux-gnu-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -4920,7 +4883,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-int_native-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -5045,7 +5007,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-no_tntc-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -5171,7 +5132,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-numa-slow-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -5297,7 +5257,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -5359,7 +5318,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -5487,7 +5445,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -5615,7 +5572,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-unreg-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -5803,7 +5759,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-validate+boot_nonmoving_gc.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -5928,7 +5883,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-validate+llvm.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -6055,7 +6009,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-validate+thread_sanitizer_cmm.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -6119,7 +6072,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -6244,7 +6196,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-zstd-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -6433,7 +6384,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -6496,7 +6446,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -6749,7 +6698,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -6813,7 +6761,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-validate+debug_info.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -6875,7 +6822,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7000,7 +6946,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-rocky8-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7125,7 +7070,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-ubuntu22_04-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7253,7 +7197,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7381,7 +7324,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-ubuntu24_04-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7505,7 +7447,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-windows-int_native-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7630,7 +7571,6 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-windows-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7761,7 +7701,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-aarch64-darwin-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7892,7 +7831,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-aarch64-linux-alpine3_23-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -8020,7 +7958,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-aarch64-linux-deb11-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -8147,7 +8084,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-aarch64-linux-deb12-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -8274,7 +8210,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-aarch64-linux-deb13-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -8402,7 +8337,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-i386-linux-alpine3_23-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -8530,7 +8464,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-i386-linux-deb11-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -8657,7 +8590,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-i386-linux-deb12-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -8784,7 +8716,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-i386-linux-deb13-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -8918,7 +8849,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-darwin-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -9054,7 +8984,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-freebsd14-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -9185,7 +9114,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-alpine3_12-int_native-release+fully_static.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -9314,7 +9242,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-alpine3_12-release+fully_static+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -9443,7 +9370,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-alpine3_23-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -9635,7 +9561,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-deb11-release+debug_info.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -9698,7 +9623,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-deb11-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -9825,7 +9749,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-deb12-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -9952,7 +9875,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-deb13-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -10143,7 +10065,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-fedora43-release+debug_info.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -10271,7 +10192,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-fedora43-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -10335,7 +10255,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-fedora43-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -10462,7 +10381,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-rocky8-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -10589,7 +10507,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-ubuntu22_04-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -10716,7 +10633,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-linux-ubuntu24_04-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -10842,7 +10758,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-windows-int_native-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -10969,7 +10884,6 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-windows-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -11102,7 +11016,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-darwin-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -11234,7 +11147,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-freebsd14-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -11361,7 +11273,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -11486,7 +11397,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_12-validate+fully_static.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -11611,7 +11521,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_23-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -11738,7 +11647,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -11868,7 +11776,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_23-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -11999,7 +11906,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-alpine3_23-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -12129,7 +12035,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -12317,7 +12222,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-validate+debug_info.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -12378,7 +12282,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -12501,7 +12404,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb12-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -12627,7 +12529,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-cross_aarch64-linux-gnu-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -12753,7 +12654,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-int_native-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -12877,7 +12777,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-no_tntc-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -13002,7 +12901,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-numa-slow-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -13126,7 +13024,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -13187,7 +13084,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -13313,7 +13209,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -13439,7 +13334,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-unreg-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -13624,7 +13518,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-validate+boot_nonmoving_gc.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -13747,7 +13640,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-validate+llvm.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -13873,7 +13765,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-validate+thread_sanitizer_cmm.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -13937,7 +13828,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -14060,7 +13950,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb13-zstd-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -14246,7 +14135,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -14308,7 +14196,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-release.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -14557,7 +14444,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -14620,7 +14506,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-validate+debug_info.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -14681,7 +14566,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -14804,7 +14688,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-rocky8-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -14927,7 +14810,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-ubuntu22_04-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -15053,7 +14935,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -15179,7 +15060,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-ubuntu24_04-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -15301,7 +15181,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-windows-int_native-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -15424,7 +15303,6 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-windows-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],

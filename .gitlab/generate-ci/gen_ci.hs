@@ -844,7 +844,7 @@ instance ToJSON Job where
 job :: Arch -> Opsys -> BuildConfig -> BuildAndTestJob Job
 job arch opsys buildConfig =
   MkBuildAndTestJob
-    { buildJob = NamedJob { name = jobName, jobInfo = Job { jobScript = jobBuildScript, jobStage = "full-build", jobNeeds =  [("hadrian-ghc-in-ghci", False)], ..} }
+    { buildJob = NamedJob { name = jobName, jobInfo = Job { jobScript = jobBuildScript, jobStage = "full-build", jobNeeds =  [("hadrian-ghc-in-ghci", False)], jobArtifacts = buildJobArtifacts, ..} }
     , testJobs =
       NamedJob { name = jobName <> "-test", jobInfo = testJobInfo } :
       [ NamedJob
@@ -855,7 +855,7 @@ job arch opsys buildConfig =
           } }
         | testsuiteUsePerf buildConfig  ] }
   where
-    testJobInfo = Job {jobScript = jobTestScript, jobNeeds = [(jobName, True)], jobStage = "testing", ..}
+    testJobInfo = Job {jobScript = jobTestScript, jobNeeds = [(jobName, True)], jobStage = "testing", jobArtifacts = testJobArtifacts, ..}
     jobPlatform = (arch, opsys)
 
     jobRules = emptyRules jobName
@@ -952,11 +952,20 @@ job arch opsys buildConfig =
 
     -- Keep in sync with the exclude list in `function clean()` in
     -- `.gitlab/ci.sh`!
-    jobArtifacts = Artifacts
+    buildJobArtifacts = Artifacts
       { junitReport = "junit.xml"
       , expireIn = "2 weeks"
       , artifactPaths = [binDistName arch opsys buildConfig ++ ".tar.xz"
                         ,"junit.xml"
+                        ,"unexpected-test-output.tar.gz"]
+      , artifactsWhen = ArtifactsAlways
+      }
+
+    -- don't reupload the bindist from the testsuite run
+    testJobArtifacts = Artifacts
+      { junitReport = "junit.xml"
+      , expireIn = "2 weeks"
+      , artifactPaths = ["junit.xml"
                         ,"unexpected-test-output.tar.gz"]
       , artifactsWhen = ArtifactsAlways
       }
