@@ -1,0 +1,1 @@
+-working-dir=mhu03/pkg -this-unit-id a -F -pgmF ./mhu03/pkg/pp.sh A.hs
