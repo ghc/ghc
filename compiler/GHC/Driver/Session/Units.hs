@@ -1,10 +1,10 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-module GHC.Driver.Session.Units (initMake, initMulti) where
+module GHC.Driver.Session.Units (initMake, initMkDepend, initMulti) where
 
 -- The official GHC API
 import qualified GHC
-import GHC              (parseTargetFiles, Ghc, GhcMonad(..))
+import GHC              (parseTargetFiles, Ghc, GhcMonad(..), Target)
 
 import GHC.Driver.Env
 import GHC.Driver.Errors
@@ -73,6 +73,22 @@ initMake srcs  = do
                                       ++ ldInputs dflags }
     _ <- GHC.setSessionDynFlags dflags'
     return hs_srcs
+
+initMkDepend ::
+  [String] ->
+  [(String, Maybe Phase)] ->
+  (DynFlags -> [(String,Maybe Phase)] -> [String] -> [String] -> IO ()) ->
+  -- ^ Function to lint initMulti DynFlags and sources.
+  -- In GHC, this is instanced to @checkOptions@.
+  Ghc [Target]
+initMkDepend units targets lintDynFlagsAndSrcs = do
+  hs_srcs <- case NE.nonEmpty units of
+    Just ne_units -> do
+      initMulti ne_units lintDynFlagsAndSrcs
+    Nothing -> do
+      return $ map (uncurry (,Nothing,)) targets
+
+  mapM (\(src, uid, phase) -> GHC.guessTarget src uid phase) hs_srcs
 
 initMulti :: NE.NonEmpty String
           -> (DynFlags -> [(String,Maybe Phase)] -> [String] -> [String] -> IO ())

@@ -1473,6 +1473,11 @@ generator to locate any imported modules that come from packages. The
 package modules won't be included in the dependencies generated, though
 (but see the ``-include-pkg-deps`` option below).
 
+Since GHC 10.1, ``ghc -M`` supports dependency generation for multiple
+home units via :ghc-flag:`-unit @⟨filename⟩`.
+See :ref:`multi-home-units` for details and examples how to use
+``ghc -M`` with multiple home units.
+
 The dependency generation phase of GHC can take some additional options,
 which you may find useful. The options which affect dependency
 generation are:
