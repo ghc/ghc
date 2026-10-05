@@ -1,0 +1,8 @@
+Using binary package database: local-unit-db/my-test.conf/package.cache
+
+
+All -package-db variations:
+- local-unit-db/my-test.conf
+- ./local-unit-db/my-test.conf
+- ./local-unit-db/my-test.conf/
+Must be parsed only once.
