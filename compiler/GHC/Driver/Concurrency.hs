@@ -58,14 +58,18 @@ import GHC.Conc
 #else
 import Control.Concurrent
   ( myThreadId, newQSem, signalQSem, waitQSem )
+import Control.Exception
+  ( bracket, bracket_ )
 import GHC.Conc
   ( getNumCapabilities, getNumProcessors, labelThread, setNumCapabilities )
+import System.Semaphore
+  ( destroyClientSemaphore, openSemaphore )
 #endif
 import Control.Concurrent.STM
   ( STM, atomically )
 import Control.Exception
   ( SomeAsyncException, SomeException
-  , bracket, finally, fromException, mask, throwIO, try )
+  , finally, fromException, mask, throwIO, try )
 import Control.Monad
   ( unless, when )
 import Data.Foldable
@@ -97,32 +101,39 @@ isWorkerLimitSequential :: WorkerLimit -> Bool
 isWorkerLimitSequential (NumProcessorsLimit x) = x <= 1
 isWorkerLimitSequential (JSemLimit {})         = False
 
--- | Open the semaphore for the given worker limit, returning it together with
--- its release action (which also restores the RTS capability count).
-acquireWorkerLimit
+-- | Run an action with the semaphore that enforces the given worker limit.
+withWorkerLimit
   :: (SemaphoreError -> IO ())
      -- ^ report failure when opening the @-jsem@ semaphore
      -- (after which we fall back to running with a single job)
-  -> WorkerLimit -> IO (AbstractSem, IO ())
+  -> WorkerLimit
+  -> ( AbstractSem -> IO a )
+  -> IO a
 #if defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH)
-acquireWorkerLimit _report_semaphore_failure _ = do
+withWorkerLimit _report_semaphore_failure _ action = do
   lock <- newMVar ()
-  pure (AbstractSem (takeMVar lock) (putMVar lock ()), pure ())
+  action $ AbstractSem (takeMVar lock) (putMVar lock ())
 #else
-acquireWorkerLimit report_semaphore_failure worker_limit = case worker_limit of
+withWorkerLimit report_semaphore_failure worker_limit action =
+  case worker_limit of
     NumProcessorsLimit n_jobs ->
-      acquireNjobsAbstractSem n_jobs
+      withNjobsAbstractSem n_jobs action
     JSemLimit sem_ident ->
-      acquireJSemAbstractSem sem_ident >>= \case
-        Right acquired -> pure acquired
-        Left err -> do
-          report_semaphore_failure err
-          acquireNjobsAbstractSem 1
+      bracket
+        ( openSemaphore sem_ident )
+        ( \ opened -> for_ opened destroyClientSemaphore )
+        \case
+          Right semaphore -> withJobserver semaphore action
+          Left err -> do
+            report_semaphore_failure err
+            withNjobsAbstractSem 1 action
 #endif
 
 #if !(defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH))
-acquireNjobsAbstractSem :: Int -> IO (AbstractSem, IO ())
-acquireNjobsAbstractSem n_jobs = do
+-- | Run an action with a semaphore of the given size, setting the RTS
+-- capability count accordingly for the duration of the action.
+withNjobsAbstractSem :: Int -> ( AbstractSem -> IO a ) -> IO a
+withNjobsAbstractSem n_jobs action = do
   compile_sem <- newQSem n_jobs
   n_capabilities <- getNumCapabilities
   n_cpus <- getNumProcessors
@@ -131,8 +142,8 @@ acquireNjobsAbstractSem n_jobs = do
     set_num_caps n = unless (n_capabilities /= 1) $ setNumCapabilities n
   -- Setting number of capabilities more than CPU count usually leads to high
   -- userspace lock contention. #9221
-  set_num_caps $ min n_jobs n_cpus
-  pure ( asem, set_num_caps n_capabilities )
+  bracket_ ( set_num_caps $ min n_jobs n_cpus ) ( set_num_caps n_capabilities ) $
+    action asem
 #endif
 
 --------------------------------------------------------------------------------
@@ -379,8 +390,7 @@ withWorkerPool
         pure result
 
   | otherwise
-  = bracket ( acquireWorkerLimit report_semaphore_failure limit ) snd
-      \ ( sem, _close_sem ) -> do
+  = withWorkerLimit report_semaphore_failure limit \ sem -> do
       safe_logger <- makeThreadSafe logger
       let
         parent_work_env :: ConcurrentWorkerEnv

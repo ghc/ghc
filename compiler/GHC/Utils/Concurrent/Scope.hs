@@ -13,6 +13,7 @@ module GHC.Utils.Concurrent.Scope
   , fork
   , forkIn
   , activeCount
+  , interruptAll
   )
   where
 
@@ -166,8 +167,18 @@ forkIn ( Scope state ) acquire release action = mask_ do
                     else Nothing
           -- Deliver the failure to the scope's owner, tearing the scope down.
           for_ mb_owner \ owner ->
-            -- Give up if interrupted: see Note [Scope teardown].
-            void $ try @ScopeInterrupt ( throwTo owner e )
+            let
+              notify_owner :: IO ()
+              notify_owner =
+                try @ScopeInterrupt ( throwTo owner e ) >>= \case
+                  Right () -> pure ()
+                  Left ScopeInterrupt -> do
+                    -- Give up if the scope is being torn down, as per
+                    -- Note [Scope teardown]. Otherwise, the interruption came
+                    -- from 'interruptAll': the owner has yet to be notified.
+                    still_open <- scope_starting <$> readTVarIO state
+                    when still_open notify_owner
+            in notify_owner
 
     finished :: ThreadId -> IO ()
     finished me =
@@ -217,7 +228,8 @@ down, as each would be waiting for the other. We avoid this deadlock as follows:
   - A thread that fails once the scope is closed does not notify the owner.
 
   - A thread that is blocked on notifying the owner when teardown begins gets
-    interrupted by it ('throwTo' is an interruptible operation), and gives up.
+    interrupted by it ('throwTo' is an interruptible operation); it then sees
+    that the scope is closed and gives up.
 
 Nothing is lost when a thread does not notify the owner: the owner is already
 ending the scope with an exception.
