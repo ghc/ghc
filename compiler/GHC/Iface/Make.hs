@@ -77,6 +77,7 @@ import GHC.Iface.Binary
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
+import qualified GHC.Data.Strict as Strict
 
 import GHC.HsToCore.Docs
 import GHC.HsToCore.Usage
@@ -394,7 +395,7 @@ mkIface_ hsc_env
           & set_mi_docs             docs
           & set_mi_abi_hashes       ()
           & set_mi_ext_fields       emptyExtensibleFields
-          & set_mi_hi_bytes         PartialIfaceBinHandle
+          & set_mi_hi_bytes         Strict.Nothing
 
   where
      cmp_rule     = lexicalCompareFS `on` ifRuleName

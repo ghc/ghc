@@ -197,7 +197,7 @@ getIfaceWithExtFields name_cache bh = do
   modIfaceBinData <- freezeBinHandle bh start
   pure $ mod_iface
     & set_mi_ext_fields extFields
-    & set_mi_hi_bytes (FullIfaceBinHandle $ Strict.Just modIfaceBinData)
+    & set_mi_hi_bytes (Strict.Just modIfaceBinData)
 
 -- | This performs a get action after reading the dictionary and symbol
 -- table. It is necessary to run this before trying to deserialise any
@@ -276,10 +276,10 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
 putIfaceWithExtFields :: TraceBinIFace -> CompressionIFace -> WriteBinHandle -> ModIface -> IO ()
 putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface =
   case mi_hi_bytes mod_iface of
-    FullIfaceBinHandle Strict.Nothing -> do
+    Strict.Nothing -> do
       forwardPutRel_ bh (\_ -> put_ bh (mi_ext_fields mod_iface)) $ do
         putWithUserData traceBinIface compressionLevel bh mod_iface
-    FullIfaceBinHandle (Strict.Just binData) -> putFullBinData bh binData
+    Strict.Just binData -> putFullBinData bh binData
 
 -- | Put a piece of data with an initialised `UserData` field. This
 -- is necessary if you want to serialise Names or FastStrings.
