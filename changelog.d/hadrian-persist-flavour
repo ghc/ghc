@@ -1,0 +1,7 @@
+section: packaging
+synopsis: Hadrian now persists the flavour name in the build root. When
+  rebuilding, the previously used flavour is automatically restored, removing
+  the need to re-specify it on every invocation and avoiding accidental build
+  root invalidation.
+issues: #20650
+mrs: !7017

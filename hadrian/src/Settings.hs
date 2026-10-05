@@ -1,10 +1,14 @@
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies  #-}
+
 module Settings (
     getExtraArgs, getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, unsafeFindPackageByName, unsafeFindPackageByPath,
     isLibrary, stagePackages, getBignumBackend, completeSetting,
     queryBuildTarget, queryHostTarget,
     queryBuild, queryHost,
-    queryArch, queryOS, queryVendor
+    queryArch, queryOS, queryVendor,
+    flavourFileRules
     ) where
 
 import CommandLine
@@ -58,6 +62,56 @@ hadrianFlavours =
     , ghcInGhciFlavour, validateFlavour, slowValidateFlavour
     ]
 
+{-
+Note [Persisting the flavour]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Passing the flavour on the command-line means the user must consistently pass
+the same --flavour flag to all Hadrian invocations on a particular build root.
+Forgetting even once can result in a full rebuild of the tree.
+
+To avoid this we persist the flavour name in the build root itself
+(specifically, in `<build root>/flavour`). We refer to this file when looking
+up the active flavour, defaulting to it if the user does not specify a flavour
+name explicitly.
+-}
+
+-- | Oracle query type for the active flavour name.
+-- See Note [Persisting the flavour].
+newtype FlavourName = FlavourName ()
+    deriving (Binary, Eq, Hashable, NFData, Show)
+type instance RuleResult FlavourName = String
+
+flavourFileRules :: Rules ()
+flavourFileRules = do
+    root <- buildRootRules
+
+    -- Cache the flavour name lookup for the whole Shake run.
+    -- alwaysRerun ensures the oracle re-executes on every new invocation so
+    -- that a changed --flavour flag is never ignored due to a stale cross-run
+    -- cache entry (CLI args are not tracked as Shake dependencies).
+    -- See Note [Persisting the flavour].
+    void $ addOracleCache $ \(FlavourName _) -> do
+        alwaysRerun
+        let flavourFile = root -/- "flavour"
+        cmdFlavour >>= \case
+          Just nm -> do
+            putBuild $ "Flavour: " ++ nm
+            liftIO $ writeFile flavourFile nm
+            return nm
+          Nothing -> do
+            exists <- doesFileExist flavourFile
+            if exists
+              then do nm <- liftIO $ readFile flavourFile
+                      putBuild $ "Flavour: " ++ nm ++ " (cached from last build, override by passing --flavour=... explicitly)"
+                      return nm
+              else return userDefaultFlavour
+
+-- | Lookup the requested flavour name, referring to the persistent flavour
+-- file saved from the previous Hadrian execution if not specified.
+-- The result is cached for the whole Shake run via the 'FlavourName' oracle.
+getFlavourName :: Action String
+getFlavourName = askOracle (FlavourName ())
+
 -- | This action looks up a flavour with the name given on the
 --   command line with @--flavour@, defaulting to 'userDefaultFlavour'
 --   when no explicit @--flavour@ is passed. It then applies any
@@ -66,7 +120,7 @@ hadrianFlavours =
 --   syntax. See Note [Hadrian settings] at the bottom of this file.
 flavour :: Action Flavour
 flavour = do
-    flavourName <- fromMaybe userDefaultFlavour <$> cmdFlavour
+    flavourName <- getFlavourName
     when ("quickest" `isPrefixOf` flavourName) $
       fail $ "The `quickest` flavour has been deprecated. Use `quick` instead.\n"
           ++ "Skip building dynamic libraries with `quick+no_dynamic_libs`\n"
