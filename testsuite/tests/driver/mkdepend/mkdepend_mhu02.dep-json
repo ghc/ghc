@@ -1,0 +1,2 @@
+{"module":"A","unit-id":"a-1.0.0-XXX","imports":{},"package-name":"a","source":"mhu02/A.hs"}
+{"module":"B","unit-id":"b-0.1.0-XXX","imports":{},"package-name":"b","source":"mhu02/B.hs","preprocessor":"./mhu02/pp.sh"}

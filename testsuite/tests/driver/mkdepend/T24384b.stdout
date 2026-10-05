@@ -1,0 +1,12 @@
+{"unit-id":"base-<VERSION>-<HASH>","package-name":"base","package-id":"base-<VERSION>-<HASH>"}
+{"unit-id":"dep-1-XXX","package-name":"dep","package-id":"dep-1"}
+{"unit-id":"dep-public-1-XXX","package-name":"dep-public","package-id":"dep-public-1"}
+{"unit-id":"template-haskell-<VERSION>-<HASH>","package-name":"template-haskell","package-id":"template-haskell-<VERSION>-<HASH>"}
+{"module":"E","unit-id":"main","imports":{"base-<VERSION>-<HASH>":["GHC.Essentials","Prelude"],"dep-1-XXX":["Dep"],"dep-public-1-XXX":["DepPublic"],"template-haskell-<VERSION>-<HASH>":["Language.Haskell.TH.Syntax"]},"source":"E.hs"}
+{"module":"C","unit-id":"main","boot":true,"imports":{"base-<VERSION>-<HASH>":["GHC.Essentials","Prelude"],"main":["E"]},"source":"C.hs-boot"}
+{"module":"A","unit-id":"main","imports":{"base-<VERSION>-<HASH>":["GHC.Essentials","Prelude"],"main":[{"module":"C","boot":true}]},"source":"A.hs","includes":["foo.h"]}
+{"unit-id":"containers-<VERSION>-<HASH>","package-name":"containers","package-id":"containers-<VERSION>-<HASH>"}
+{"module":"C","unit-id":"main","imports":{"base-<VERSION>-<HASH>":["GHC.Essentials","Prelude"],"containers-<VERSION>-<HASH>":["Data.Set"],"main":["A"]},"source":"C.hs"}
+{"module":"B","unit-id":"main","boot":true,"imports":{"base-<VERSION>-<HASH>":["GHC.Essentials","Prelude"],"main":["A"]},"source":"lib/B.hs-boot"}
+{"module":"B","unit-id":"main","imports":{"base-<VERSION>-<HASH>":["GHC.Essentials","Prelude"],"main":["A"]},"source":"lib/B.hs"}
+{"module":"D","unit-id":"main","imports":{"base-<VERSION>-<HASH>":["GHC.Essentials","Prelude"],"main":["B","C"]},"source":"D.hs"}
