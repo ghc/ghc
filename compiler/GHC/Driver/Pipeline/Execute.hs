@@ -104,7 +104,7 @@ runPhase :: TPhase out -> IO out
 runPhase (T_Unlit pipe_env hsc_env inp_path) = do
   out_path <- phaseOutputFilenameNew (Cpp HsSrcFile) pipe_env hsc_env Nothing
   runUnlitPhase hsc_env inp_path out_path
-runPhase (T_FileArgs hsc_env inp_path) = getFileArgs hsc_env inp_path
+runPhase (T_FileArgs logger dflags inp_path) = getFileArgsNoHsc logger dflags inp_path
 runPhase (T_Cpp pipe_env hsc_env inp_path) = do
   out_path <- phaseOutputFilenameNew (HsPp HsSrcFile) pipe_env hsc_env Nothing
   runCppPhase hsc_env inp_path out_path
@@ -620,17 +620,21 @@ runUnlitPhase hsc_env input_fn output_fn = do
 
     return output_fn
 
-getFileArgs :: HscEnv -> FilePath -> IO ((DynFlags, Messages PsMessage, Messages DriverMessage))
+getFileArgs :: HscEnv -> FilePath -> IO ((DynFlags, [String], Messages PsMessage, Messages DriverMessage))
 getFileArgs hsc_env input_fn = do
   let dflags0 = hsc_dflags hsc_env
       logger  = hsc_logger hsc_env
-      parser_opts = initParserOpts dflags0
+  getFileArgsNoHsc logger dflags0 input_fn
+
+getFileArgsNoHsc :: Logger -> DynFlags -> FilePath -> IO ((DynFlags, [String], Messages PsMessage, Messages DriverMessage))
+getFileArgsNoHsc logger dflags0 input_fn = do
+  let parser_opts = initParserOpts dflags0
       sec = initSourceErrorContext dflags0
   (warns0, src_opts) <- getOptionsFromFile parser_opts sec (supportedLanguagePragmas dflags0) input_fn
   (dflags1, unhandled_flags, warns)
     <- parseDynamicFilePragma logger dflags0 src_opts
   checkProcessArgsResult dflags0 unhandled_flags
-  return (dflags1, warns0, warns)
+  return (dflags1, map unLoc src_opts, warns0, warns)
 
 runCppPhase :: HscEnv -> FilePath -> FilePath -> IO FilePath
 runCppPhase hsc_env input_fn output_fn = do
