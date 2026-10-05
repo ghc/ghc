@@ -82,11 +82,20 @@ servWithCustom verbose hook pipe restore customHandler = do
         CustomMessage tag payload -> handleCustom tag payload %>>= writeReply wr
         Shutdown                  -> writeIORef doneRef True >>
                                      reply ()                 %>>= writeReply wr
+        -- Run splices concurrently without blocking the main thread
         RunTH ii st q ty loc      -> spawnFinally mngr         (runWriteReply wr)
                                      (wrapRunTH ii (runTH pipe ii st q ty loc))
                                      (setCancel . void . forkIO . killThread)
         RunModFinalizers ii st qs -> spawnFinally mngr         (runWriteReply wr)
                                      (wrapRunTH ii (runModFinalizerRefs pipe ii st qs))
+                                     (setCancel . void . forkIO . killThread)
+        -- Wait off of the main thread
+        WaitThreadResult{}        -> spawnFinally mngr (runWriteReply wr) (run msg)
+                                     (setCancel . void . forkIO . killThread)
+        WaitAnyThreadBreak        -> spawnFinally mngr (runWriteReply wr) (run msg)
+                                     (setCancel . void . forkIO . killThread)
+        WaitThreadResultOrAnyThreadBreak{}
+                                  -> spawnFinally mngr (runWriteReply wr) (run msg)
                                      (setCancel . void . forkIO . killThread)
         _other                    -> run msg >>= reply        %>>= writeReply wr
 

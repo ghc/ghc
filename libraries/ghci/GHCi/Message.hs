@@ -137,13 +137,13 @@ data Message a where
   EvalStmt
     :: EvalOpts
     -> EvalExpr HValueRef {- IO [a] -}
-    -> Message (EvalStatus [HValueRef]) {- [a] -}
+    -> Message (RemoteRef ThreadId) {- 'WaitThreadResult' of this thread yields [a] -}
 
   -- | Resume evaluation of a statement after a breakpoint
   ResumeStmt
    :: EvalOpts
    -> RemoteRef ThreadId
-   -> Message (EvalStatus [HValueRef])
+   -> Message ()
 
   -- | Abandon evaluation of a statement after a breakpoint
   AbandonStmt
@@ -247,12 +247,23 @@ data Message a where
   -- | Evaluate something. This is used to support :force in GHCi.
   Seq
     :: HValueRef
-    -> Message (EvalStatus ())
+    -> Message (RemoteRef ThreadId)
 
   -- | Resume forcing a free variable in a breakpoint (#2950)
   ResumeSeq
     :: RemoteRef ThreadId
-    -> Message (EvalStatus ())
+    -> Message ()
+
+  WaitThreadResult
+    :: RemoteRef ThreadId
+    -> Message (EvalStatus [HValueRef])
+
+  WaitAnyThreadBreak
+    :: Message EvalBreak
+
+  WaitThreadResultOrAnyThreadBreak
+    :: RemoteRef ThreadId
+    -> Message (EvalStatus [HValueRef])
 
   -- | User-defined request encoded as a tag/payload pair.  This is left
   -- uninterpreted by GHC and is meant for GHC API applications to be able to supply
@@ -609,6 +620,9 @@ getMessage = do
       40 -> Msg <$> (WhereFrom <$> get)
       41 -> Msg <$> (AddHpcModule <$> get <*> get <*> get <*> get)
       42 -> Msg <$> (CustomMessage <$> get <*> get)
+      43 -> Msg <$> (WaitThreadResult <$> get)
+      44 -> Msg <$> return WaitAnyThreadBreak
+      45 -> Msg <$> (WaitThreadResultOrAnyThreadBreak <$> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -657,6 +671,10 @@ putMessage m = case m of
   WhereFrom a                 -> putWord8 40 >> put a
   AddHpcModule m n h ticks    -> putWord8 41 >> put m >> put n >> put h >> put ticks
   CustomMessage tag payload   -> putWord8 42 >> put tag >> put payload
+  WaitThreadResult tid        -> putWord8 43 >> put tid
+  WaitAnyThreadBreak          -> putWord8 44
+  WaitThreadResultOrAnyThreadBreak tid
+                              -> putWord8 45 >> put tid
 
 {-
 Note [Parallelize CreateBCOs serialization]
