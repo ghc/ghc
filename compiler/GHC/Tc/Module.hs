@@ -100,7 +100,7 @@ import GHC.Iface.Decl    ( coAxiomToIfaceDecl )
 import GHC.Iface.Env     ( externaliseName )
 import GHC.Iface.Load
 
-import GHC.Builtin.WiredIn.Types ( mkListTy, anyTypeOfKind )
+import GHC.Builtin.WiredIn.Types ( mkListTy, anyTypeOfKind, unitTy )
 import GHC.Builtin.Modules( mAIN_NAME, gHC_PRIM, rOOT_MAIN, isWiredInOnlyModule )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
@@ -124,6 +124,7 @@ import GHC.Core.TyCo.Tidy( tidyTopType )
 import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons, orphNamesOfFamInst
    , famInstEnvElts, extendFamInstEnvList, normaliseType )
+import GHC.Core.Unify ( tcUnifyTy )
 
 import GHC.Parser.Header       ( mkImplicitImports, mkUnresolvedImport )
 
@@ -1972,12 +1973,16 @@ generateMainBinding tcg_env main_name = do
     ; (io_ty, res_ty) <- getIOType
     ; let loc = getSrcSpan main_name
           main_expr_rn = L (noAnnSrcSpan loc) (mkHsVar (L (noAnnSrcSpan loc) main_name))
-    ; (ev_binds, main_expr) <- setMainCtxt main_name io_ty $
-                               tcCheckMonoExpr main_expr_rn io_ty
+    -- Solve the constraints arising from checking `main` before deciding how
+    -- to handle its result.
+    ; ((ev_binds, main_expr), main_wanteds) <- captureTopConstraints $
+        setMainCtxt main_name io_ty $ tcCheckMonoExpr main_expr_rn io_ty
+    ; main_ev_binds <- simplifyTop main_wanteds
+    ; main_action <- handleMainReturn main_name res_ty ev_binds main_expr
 
             -- See Note [Root-main Id]
             -- Construct the binding
-            --      :Main.main :: IO res_ty = runMainIO res_ty main
+            --      :Main.main :: IO res_ty = runMainIO res_ty main_action
     ; run_main_id <- tcLookupKnownOccId runMainIOOcc
     ; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN
                                (mkVarOccFS (fsLit "main"))
@@ -1988,18 +1993,79 @@ generateMainBinding tcg_env main_name = do
           -- type errors when type of `main` is not `IO a`. The `ev_binds`
           -- must be put inside `runMainIO` to ensure the deferred type
           -- error can be emitted correctly. See #13838.
-          ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) $
-                    mkHsDictLet ev_binds main_expr
+          ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) main_action
           ; main_bind = mkVarBind root_main_id rhs }
 
     ; return (tcg_env { tcg_main  = Just main_name
                       , tcg_binds = tcg_binds tcg_env
                                     ++ [main_bind]
                       , tcg_dus   = tcg_dus tcg_env
-                                    `plusDU` usesOnly (unitFN main_name) })
+                                    `plusDU` usesOnly (unitFN main_name) }
                     -- Record the use of 'main', so that we don't
                     -- complain about it being defined but not used
+              `addEvBinds` main_ev_binds)
     }
+
+-- Implement GHC proposal #631
+-- (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0631-main-return-types.rst).
+--
+-- Without `MeaningfulMainReturn` we discard the result of `main`, but warn
+-- (under `-Wambiguous-main-return`, the default) if its result type does not
+-- unify with `()` or `Void`, since such result types are likely to have been
+-- returned unintentionally.
+--
+-- With `MeaningfulMainReturn`, we require `main`'s result type to unify with
+-- `()`, `Void`, or `ExitCode`. For `()` and `Void`, the semantics are the same
+-- as with `MeaningfulMainReturn` disabled. For `ExitCode`, we effectively turn
+-- `main` into `main >>= exitWith`, so that the returned value determines the
+-- program's exit code.
+--
+-- We diverge slightly from the proposal as currently written in the case of
+-- underconstrained result types. For example:
+--
+--   {-# LANGUAGE MeaningfulMainReturn #-}
+--   main :: IO a
+--   main = putStrLn "foo" $> error "never executed"
+--
+-- The above `main` can be instantiated to `IO ()`, `IO Void`, or `IO
+-- ExitCode`. The proposal as written would require us to add the implicit
+-- `>>= exitWith`. However, doing so would cause the `error` to be evaluated,
+-- even though nothing in the source code indicates that the result should be
+-- interpreted as an `ExitCode` rather than one of the other equally valid
+-- result types.
+--
+-- To avoid this potentially confusing behaviour, we instead ignore the result
+-- whenever `()` or `Void` is a valid interpretation. We only add the implicit
+-- `>>= exitWith` when `ExitCode` is the only valid interpretation.
+--
+-- An amendment to the original proposal to this effect has been submitted at
+-- https://github.com/ghc-proposals/ghc-proposals/pull/771.
+handleMainReturn :: Name -> TcType -> TcEvBinds -> LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
+handleMainReturn main_name res_ty ev_binds main_expr = do
+  main_res_ty <- liftZonkM $ zonkTcType res_ty
+  ignore_result <- anyM id
+    [ pure $ unifies main_res_ty unitTy
+    , unifies main_res_ty . mkTyConTy <$> tcLookupKnownOccTyCon voidTyConOcc
+    , xoptM LangExt.MeaningfulMainReturn >>= \enabled ->
+        not enabled <$ unless enabled (warn_ignored main_res_ty) ]
+  if ignore_result
+  then pure main_action
+  else wrap_exit_with main_res_ty
+  where
+    main_action = mkHsDictLet ev_binds main_expr
+    unifies = (isJust .) . tcUnifyTy
+    warn_ignored main_res_ty =
+      setSrcSpan (getSrcSpan main_name) $
+        addDiagnosticTc (TcRnAmbiguousMainReturn main_name main_res_ty)
+    wrap_exit_with main_res_ty = do
+      exit_code_ty <- mkTyConTy <$> tcLookupKnownOccTyCon exitCodeTyConOcc
+      setSrcSpan (getSrcSpan main_name) $
+        checkTc (unifies main_res_ty exit_code_ty)
+                (TcRnInvalidMainReturn main_name main_res_ty)
+      bind_io_id <- tcLookupKnownOccId bindIOIdOcc
+      exit_with_id <- tcLookupKnownOccId exitWithIdOcc
+      pure $ nlHsTyApps bind_io_id [exit_code_ty, exit_code_ty]
+               [ main_action, nlHsTyApp exit_with_id [exit_code_ty] ]
 
 getIOType :: TcM (TcType, TcType)
 -- Return (IO alpha, alpha) for fresh alpha

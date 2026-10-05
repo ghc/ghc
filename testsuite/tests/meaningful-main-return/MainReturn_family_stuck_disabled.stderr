@@ -1,0 +1,4 @@
+MeaningfulMainReturn.hs:62:1: warning: [GHC-31337] [-Wambiguous-main-return (in -Wdefault)]
+    The main IO action ‘mainFamilyUnconstrained’ returns a value of type ‘FamilyResult
+                                                                            a0’, which is ignored.
+

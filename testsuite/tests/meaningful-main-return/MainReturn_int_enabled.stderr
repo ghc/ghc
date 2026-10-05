@@ -1,0 +1,3 @@
+MeaningfulMainReturn.hs:21:1: error: [GHC-42176]
+    The main IO action ‘mainInt’ returns a value of type ‘Int’, but with ‘-XMeaningfulMainReturn’ its result type must unify with ‘()’, ‘Void’, or ‘ExitCode’.
+

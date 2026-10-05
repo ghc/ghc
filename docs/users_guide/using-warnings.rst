@@ -84,6 +84,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wnoncanonical-monad-instances`
         * :ghc-flag:`-Wimplicit-rhs-quantification`
         * :ghc-flag:`-Wunusable-unpack-pragmas`
+        * :ghc-flag:`-Wambiguous-main-return`
 
 .. ghc-flag:: -W
     :shortdesc: enable normal warnings
@@ -2788,6 +2789,24 @@ of ``-W(no-)*``.
     A common cause is ``cabal-install`` and GHC being built against
     different versions of the ``semaphore-compat`` library; upgrading
     both to versions that use the same protocol resolves the mismatch.
+
+.. ghc-flag:: -Wambiguous-main-return
+    :shortdesc: warn when the result of ``main`` is ignored
+    :type: dynamic
+    :reverse: -Wno-ambiguous-main-return
+    :category:
+
+    :since: 10.2
+    :default: on
+
+    Warn when the result type of ``main`` doesn't unify with either ``()`` or
+    ``Void``. For example: ::
+
+      main :: IO Int
+      main = pure 42
+
+    This warning is only emitted when :extension:`MeaningfulMainReturn` is
+    disabled.
 
 ----
 

@@ -4203,6 +4203,44 @@ data TcRnMessage where
     -> !OccName -- ^ the expected name of the main function
     -> TcRnMessage
 
+   {-| TcRnAmbiguousMainReturn is a warning, controlled by @-Wambiguous-main-return@,
+       that occurs when the result of the main IO action is discarded.
+
+       Example:
+
+         main :: IO Int
+         main = pure 1
+
+       Test cases:
+         MainReturn_constrained_disabled, MainReturn_exit_code_alias_disabled,
+         MainReturn_exit_code_bottom_disabled, MainReturn_exit_code_disabled,
+         MainReturn_family_always_exit_disabled,
+         MainReturn_family_invalid_disabled, MainReturn_family_stuck_disabled,
+         MainReturn_int_disabled, MainReturn_newtype_disabled
+  -}
+  TcRnAmbiguousMainReturn
+    :: !Name
+    -> !Type
+    -> TcRnMessage
+
+  {-| TcRnInvalidMainReturn is an error, controlled by the @MeaningfulMainReturn@
+      extension, that occurs when the result of the main IO action doesn't unify
+      with any of @()@, @Void@, and @ExitCode@.
+
+      Example:
+
+        main :: IO Int
+        main = pure 1
+
+      Test cases:
+        MainReturn_family_invalid_enabled, MainReturn_family_stuck_enabled,
+        MainReturn_int_enabled, MainReturn_newtype_enabled
+  -}
+  TcRnInvalidMainReturn
+    :: !Name
+    -> !Type
+    -> TcRnMessage
+
   {-| TcRnGhciUnliftedBind is an error that occurs when a user attempts to
       bind an unlifted value in GHCi.
 

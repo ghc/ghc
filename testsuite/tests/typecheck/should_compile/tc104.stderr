@@ -1,0 +1,4 @@
+tc104.hs:4:1: warning: [GHC-31337] [-Wambiguous-main-return (in -Wdefault)]
+    The IO action ‘main’ returns a value of type ‘a0
+                                                  -> a0’, which is ignored.
+

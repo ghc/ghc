@@ -1,0 +1,3 @@
+MeaningfulMainReturn.hs:40:1: warning: [GHC-31337] [-Wambiguous-main-return (in -Wdefault)]
+    The main IO action ‘mainExitCodeAlias’ returns a value of type ‘ExitCodeAlias’, which is ignored.
+

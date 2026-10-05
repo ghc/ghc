@@ -1,0 +1,41 @@
+section: language
+issues: #24848
+mrs: !16783
+synopsis: Introduce the :extension:`MeaningfulMainReturn` extension and :ghc-flag:`-Wambiguous-main-return`
+description:
+  The new warning flag :ghc-flag:`-Wambiguous-main-return`, which is enabled by
+  default, will warn if the ``main`` function's result type doesn't unify with
+  either ``()`` or ``Void``. For example: ::
+
+    main :: IO Int
+    main = pure 42
+
+  This warning will only be emitted if the new :extension:`MeaningfulMainReturn`
+  extension is disabled.
+
+  If :extension:`MeaningfulMainReturn` is enabled, programs with a ``main``
+  function whose result type doesn't unify with either ``()``, ``Void``, or
+  ``ExitCode`` will be rejected.
+
+  Additionally, if it can be determined that ``main`` returns an ``ExitCode``,
+  the value returned will be the program's exit code: ::
+
+    {-# LANGUAGE MeaningfulMainReturn #-}
+    import System.Exit
+
+    main :: IO ExitCode
+    main = pure (ExitFailure 42)
+
+  The above behaves as if the user had written: ::
+
+    {-# LANGUAGE NoMeaningfulMainReturn #-}
+    import System.Exit
+
+    main :: IO ()
+    main = pure (ExitFailure 42) >>= exitWith
+
+  :extension:`MeaningfulMainReturn` is intended to become the default in the
+  next GHC language edition.
+
+  This implements `GHC Proposal #631
+  <https://ghc-proposals.readthedocs.io/en/latest/proposals/0631-main-return-types.html>`_.
