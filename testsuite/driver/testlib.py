@@ -2095,11 +2095,15 @@ async def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
     return await do_compile( name, way, True, top_mod, extra_mods, [], extra_hc_opts)
 
 async def make_depend( name, way, mods, extra_hc_opts ):
-    return await do_make_depend( name, way, mods, extra_hc_opts )
+    return await do_make_depend( name, way, mods, [], extra_hc_opts )
+
+async def make_depend_multiunit( name, way, units, extra_hc_opts ):
+    return await do_make_depend( name, way, [], units, extra_hc_opts )
 
 async def do_make_depend(name: TestName,
                    way: WayName,
                    srcs: List[str],
+                   units: List[str],
                    extra_hc_opts: str
                    ) -> PassFail:
     """
@@ -2126,7 +2130,7 @@ async def do_make_depend(name: TestName,
         outputs.append(('dep-json', normalise_dep_json))
         output_flags.append('-dep-json %s' % actual_file('dep-json'))
 
-    result = await do_compile( name, way, False, None, [], [],
+    result = await do_compile( name, way, False, None, [], units,
                                ' '.join(output_flags + [extra_hc_opts]),
                                mode = '-M', srcs = srcs )
     if badResult(result) or opts.ignore_dep_outputs:
@@ -2471,10 +2475,11 @@ async def simple_build(name: Union[TestName, str],
         to_do = '-o ' + name
     elif len(units) > 0:
         to_do = '--make'
-        for u in units:
-            to_do = to_do + ' -unit @%s' % u
     else:
         to_do = '-c' # just compile
+
+    for u in units:
+        to_do = to_do + ' -unit @%s' % u
 
     if isCompilerStatsTest():
         stats_file = statsFile(True, name)

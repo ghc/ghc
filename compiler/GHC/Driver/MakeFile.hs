@@ -11,7 +11,8 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module GHC.Driver.MakeFile
-   ( doMkDependHS
+   ( doMkDepend
+   , doMkDependHS
    , doMkDependModuleGraph
    )
 where
@@ -44,6 +45,7 @@ import GHC.Types.Unique.Set qualified as UniqSet
 import GHC.Types.UnresolvedImport
 
 import GHC.Unit.Finder
+import GHC.Unit.Home.Graph (HomeUnitEnv (homeUnitEnv_dflags))
 import GHC.Unit.Info
 import GHC.Unit.Info qualified as UnitInfo
 import GHC.Unit.Module
@@ -85,34 +87,47 @@ import System.OsString qualified as OsString
 doMkDependHS :: GhcMonad m => [FilePath] -> m ()
 doMkDependHS srcs = do
     -- Initialisation
-    dflags0 <- GHC.getSessionDynFlags
-
-    -- We kludge things a bit for dependency generation. Rather than
-    -- generating dependencies for each way separately, we generate
-    -- them once and then duplicate them for each way's osuf/hisuf.
-    -- We therefore do the initial dependency generation with an empty
-    -- way and .o/.hi extensions, regardless of any flags that might
-    -- be specified.
-    let dflags1 = dflags0
-            { targetWays_ = Set.empty
-            , hiSuf_      = "hi"
-            , objectSuf_  = "o"
-            }
-    GHC.setSessionDynFlags dflags1
-
-    -- If no suffix is provided, use the default -- the empty one
-    let dflags = if null (depSuffixes dflags1)
-                 then dflags1 { depSuffixes = [""] }
-                 else dflags1
-
-    -- Do the downsweep to find all the modules
     targets <- mapM (\s -> GHC.guessTarget s Nothing Nothing) srcs
     GHC.setTargets targets
+    doMkDepend
+
+-- | Generate the dependency information for the current GHC session.
+--
+-- Uses 'GHC.Target's set by 'GHC.setTargets' to compute the module graph
+-- and outputs the dependency information topologically sorted.
+doMkDepend :: GhcMonad m => m ()
+doMkDepend = do
+    hug_ <- hsc_HUG <$> getSession
+
+    let hug =
+          fmap (\ hue ->
+            let
+              -- We kludge things a bit for dependency generation. Rather than
+              -- generating dependencies for each way separately, we generate
+              -- them once and then duplicate them for each way's osuf/hisuf.
+              -- We therefore do the initial dependency generation with an empty
+              -- way and .o/.hi extensions, regardless of any flags that might
+              -- be specified.
+              dflags1 = (homeUnitEnv_dflags hue)
+                { targetWays_ = Set.empty
+                , hiSuf_      = "hi"
+                , objectSuf_  = "o"
+                }
+            in
+              hue {homeUnitEnv_dflags = dflags1}
+              ) hug_
+
+    _ <- GHC.setProgramHUG hug
+
+    dflagsGlobal <- GHC.getSessionDynFlags
+    -- If no suffix is provided, use the default -- the empty one
+    let dflags = if null (depSuffixes dflagsGlobal)
+                 then dflagsGlobal { depSuffixes = [""] }
+                 else dflagsGlobal
+
     let excl_mods = depExcludeMods dflags
     module_graph <- GHC.depanal excl_mods True {- Allow dup roots -}
     doMkDependModuleGraph dflags module_graph
-
-
 
 doMkDependModuleGraph :: GhcMonad m =>  DynFlags -> ModuleGraph -> m ()
 doMkDependModuleGraph dflags module_graph = do
@@ -577,7 +592,7 @@ initJsonDepWriter logger tmpfs dflags output = do
   pure DependencyWriter
     { dw_writeDependency = \ case
         ModuleDepNode node deps ->
-          writeHomeUnitDeps json_var (depIncludePkgDeps dflags) node deps
+          writeHomeUnitDeps json_var node deps
     , dw_endWriter = do
         writeJsonOutput logger json_var
     }
@@ -838,8 +853,8 @@ cacheExternalDepsJson extUnits (DepJson e0) =
         Set.union e0 extUnits
     }
 
-writeHomeUnitDeps :: JsonOutput -> Bool -> HomeModuleNode -> [Dep] -> IO ()
-writeHomeUnitDeps deps_json include_pkgs HomeModuleNode {..} deps = do
+writeHomeUnitDeps :: JsonOutput -> HomeModuleNode -> [Dep] -> IO ()
+writeHomeUnitDeps deps_json HomeModuleNode {..} deps = do
   extUnits <- readJson deps_json
   let newExtUnits = Set.difference extUnitsDeps (externalDeps extUnits)
   -- Write new external unit deps before the module that uses them
@@ -867,7 +882,7 @@ writeHomeUnitDeps deps_json include_pkgs HomeModuleNode {..} deps = do
         | dep_local
         -> (extDeps, addImport (mkImportDep dep_mod dep_level dep_boot) node_data)
 
-        | include_pkgs
+        | hmn_includePkgDeps
         , Just unit <- dep_unit
         , let PackageName nameFS = unitPackageName unit
               name = unpackFS nameFS

@@ -1,0 +1,1 @@
+-i -i. -working-dir=mhu01/a -this-unit-id a -this-package-name a -package template-haskell A.Base A.TH Util
