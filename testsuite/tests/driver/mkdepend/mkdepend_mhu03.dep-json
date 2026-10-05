@@ -1,0 +1,9 @@
+{
+  "imports": {},
+  "includes": [],
+  "module": "A",
+  "options": [],
+  "preprocessor": "./mhu03/pkg/pp.sh",
+  "source": "mhu03/pkg/A.hs",
+  "unit-id": "a"
+}

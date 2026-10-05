@@ -1,0 +1,19 @@
+{
+  "imports": {},
+  "includes": [],
+  "module": "A",
+  "options": [],
+  "package-name": "a",
+  "source": "mhu02/A.hs",
+  "unit-id": "a-1.0.0-XXX"
+}
+{
+  "imports": {},
+  "includes": [],
+  "module": "B",
+  "options": [],
+  "package-name": "b",
+  "preprocessor": "./mhu02/pp.sh",
+  "source": "mhu02/B.hs",
+  "unit-id": "b-0.1.0-XXX"
+}

@@ -1,0 +1,132 @@
+{
+  "imports": {},
+  "includes": [],
+  "module": "A.Base[boot]",
+  "options": [],
+  "package-name": "a",
+  "source": "mhu01/a/A/Base.hs-boot",
+  "unit-id": "a"
+}
+{
+  "imports": {
+    "a": [
+      "A.Base[boot]"
+    ]
+  },
+  "includes": [],
+  "module": "Util",
+  "options": [],
+  "package-name": "a",
+  "source": "mhu01/a/Util.hs",
+  "unit-id": "a"
+}
+{
+  "imports": {
+    "a": [
+      "Util"
+    ]
+  },
+  "includes": [],
+  "module": "A.Base",
+  "options": [],
+  "package-name": "a",
+  "source": "mhu01/a/A/Base.hs",
+  "unit-id": "a"
+}
+{
+  "imports": {
+    "a": [
+      "A.Base"
+    ]
+  },
+  "includes": [],
+  "module": "A.TH",
+  "options": [
+    "-XTemplateHaskell"
+  ],
+  "package-name": "a",
+  "source": "mhu01/a/A/TH.hs",
+  "unit-id": "a"
+}
+{
+  "imports": {},
+  "includes": [],
+  "module": "Util",
+  "options": [],
+  "package-name": "b",
+  "source": "mhu01/b/Util.hs",
+  "unit-id": "b"
+}
+{
+  "imports": {
+    "a": [
+      {
+        "level": "quote",
+        "module": "A.Base"
+      },
+      {
+        "level": "splice",
+        "module": "A.TH"
+      }
+    ],
+    "b": [
+      "Util"
+    ]
+  },
+  "includes": [],
+  "module": "B.Splice",
+  "options": [
+    "-XExplicitLevelImports",
+    "-XTemplateHaskell"
+  ],
+  "package-name": "b",
+  "source": "mhu01/b/B/Splice.hs",
+  "unit-id": "b"
+}
+{
+  "imports": {
+    "a": [
+      "A.Base"
+    ],
+    "b": [
+      "B.Splice"
+    ]
+  },
+  "includes": [],
+  "module": "B.Normal",
+  "options": [],
+  "package-name": "b",
+  "source": "mhu01/b/B/Normal.hs",
+  "unit-id": "b"
+}
+{
+  "imports": {
+    "a": [
+      {
+        "level": "splice",
+        "module": "Util"
+      }
+    ],
+    "b": [
+      "B.Normal",
+      {
+        "level": "splice",
+        "module": "B.Splice"
+      },
+      {
+        "level": "quote",
+        "module": "Util"
+      }
+    ]
+  },
+  "includes": [],
+  "module": "C",
+  "options": [
+    "-XExplicitLevelImports",
+    "-XPackageImports",
+    "-XTemplateHaskell"
+  ],
+  "package-name": "c",
+  "source": "mhu01/c/C.hs",
+  "unit-id": "c"
+}

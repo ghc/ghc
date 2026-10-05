@@ -2,6 +2,12 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+# Tests for 'ghc -M' that need more setup than the 'make_depend_multiunit'
+# test mode provides. The sources of each test group live in their own
+# sub-directory, and the commands are run from within that directory.
+
+# --------------------------------------------------------------------------
+# T24384: -dep-json output, with external package and CPP dependencies
 
 PKGCONF_LOCAL=./db.package.conf
 GHC_PKG_LOCAL='$(GHC_PKG)' --no-user-package-db -f $(PKGCONF_LOCAL)
@@ -38,3 +44,19 @@ T24384a: T24384_prep
 		A.hs lib/B.hs C.hs D.hs E.hs
 
 	cat T24384a.Makefile
+
+T24384b: T24384_prep
+	'$(TEST_HC)' -M -dep-json dep.json -include-pkg-deps -include-cpp-deps \
+		-hide-all-packages -package base -package containers -package template-haskell \
+		-package-db ./$(PKGCONF_LOCAL) -package-id dep-1-XXX -package-id dep-public-1-XXX \
+		A.hs lib/B.hs C.hs D.hs E.hs
+
+	cat dep.json
+
+T24384c: T24384_prep
+	'$(TEST_HC)' -M -dep-json dep.json \
+		-hide-all-packages -package base -package containers -package template-haskell \
+		-package-db ./$(PKGCONF_LOCAL) -package-id dep-1-XXX -package-id dep-public-1-XXX \
+		A.hs lib/B.hs C.hs D.hs E.hs
+
+	cat dep.json

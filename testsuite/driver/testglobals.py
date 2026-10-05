@@ -388,6 +388,11 @@ class TestOptions:
        # don't use the executable extension
        self.ignore_extension = False
 
+       # make_depend tests: which outputs to write and check
+       self.dep_makefile = False
+       self.dep_json = False
+       self.ignore_dep_outputs = False
+
        # Backpack test
        self.compile_backpack = False
 
