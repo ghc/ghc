@@ -23,57 +23,15 @@ module System.Exit
      die
      ) where
 
-import GHC.IO.Exception
-       (
-           IOErrorType (InvalidArgument),
-           IOException (IOError),
-           ExitCode (ExitSuccess, ExitFailure)
-       )
+import GHC.IO.Exception (ExitCode (ExitSuccess, ExitFailure), exitWith)
 import Control.Monad ((>>))
-import Control.Exception (throwIO, ioError)
-import Data.Bool (otherwise)
-import Data.Maybe (Maybe (Nothing))
 import Data.String (String)
-import Data.Eq ((/=))
 import System.IO (IO, hPutStrLn, stderr)
 #if __GLASGOW_HASKELL__ >= 1001
 import GHC.Internal.Num as Rebindable( Num, fromInteger ) -- For known-key names
 import qualified GHC.Internal.Stack.Types as Rebindable (SrcLoc(..), pushCallStack, emptyCallStack)
 import qualified GHC.Internal.Types as Rebindable (unpackCString#, unpackCStringUtf8#)
 #endif
-
--- ---------------------------------------------------------------------------
--- exitWith
-
--- | Computation 'exitWith' @code@ throws 'ExitCode' @code@.
--- Normally this terminates the program, returning @code@ to the
--- program's caller.
---
--- On program termination, the standard 'Handle's 'stdout' and
--- 'stderr' are flushed automatically; any other buffered 'Handle's
--- need to be flushed manually, otherwise the buffered data will be
--- discarded.
---
--- A program that fails in any other way is treated as if it had
--- called 'exitFailure'.
--- A program that terminates successfully without calling 'exitWith'
--- explicitly is treated as if it had called 'exitWith' 'ExitSuccess'.
---
--- As an 'ExitCode' is an 'Control.Exception.Exception', it can be
--- caught using the functions of "Control.Exception".  This means that
--- cleanup computations added with 'GHC.Internal.Control.Exception.bracket' (from
--- "Control.Exception") are also executed properly on 'exitWith'.
---
--- Note: in GHC, 'exitWith' should be called from the main program
--- thread in order to exit the process.  When called from another
--- thread, 'exitWith' will throw an 'ExitCode' as normal, but the
--- exception will not cause the process itself to exit.
---
-exitWith :: ExitCode -> IO a
-exitWith ExitSuccess = throwIO ExitSuccess
-exitWith code@(ExitFailure n)
-  | n /= 0 = throwIO code
-  | otherwise = ioError (IOError Nothing InvalidArgument "exitWith" "ExitFailure 0" Nothing Nothing)
 
 -- | The computation 'exitFailure' is equivalent to
 -- 'exitWith' @(@'ExitFailure' /exitfail/@)@,

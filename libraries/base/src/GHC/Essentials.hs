@@ -323,7 +323,7 @@ import GHC.Internal.TypeError( TypeError, ErrorMessage(..), Unsatisfiable, unsat
 import GHC.Internal.System.IO( print )
 import qualified GHC.Internal.IsList as IL
 import GHC.Internal.Err( error )
-import GHC.Internal.IO.Exception( assertError )
+import GHC.IO.Exception( assertError, ExitCode, exitWith )
 import GHC.Internal.Int( Int8(I8#), Int16(I16#), Int32(I32#), Int64(I64#) )
 import GHC.Internal.Word( Word8(W8#), Word16(W16#), Word32(W32#), Word64(W64#) )
 
