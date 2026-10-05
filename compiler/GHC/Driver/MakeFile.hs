@@ -11,7 +11,8 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module GHC.Driver.MakeFile
-   ( doMkDependHS
+   ( doMkDepend
+   , doMkDependHS
    , doMkDependModuleGraph
    )
 where
@@ -44,6 +45,7 @@ import GHC.Types.Unique.Set qualified as UniqSet
 import GHC.Types.UnresolvedImport
 
 import GHC.Unit.Finder
+import GHC.Unit.Home.Graph (HomeUnitEnv (homeUnitEnv_dflags))
 import GHC.Unit.Info
 import GHC.Unit.Info qualified as UnitInfo
 import GHC.Unit.Module
@@ -60,7 +62,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.TmpFs
 
-import Control.Monad (when)
+import Control.Monad (guard, when)
 import Data.Either
 import Data.Foldable (for_, traverse_)
 import Data.IORef
@@ -85,34 +87,47 @@ import System.OsString qualified as OsString
 doMkDependHS :: GhcMonad m => [FilePath] -> m ()
 doMkDependHS srcs = do
     -- Initialisation
-    dflags0 <- GHC.getSessionDynFlags
-
-    -- We kludge things a bit for dependency generation. Rather than
-    -- generating dependencies for each way separately, we generate
-    -- them once and then duplicate them for each way's osuf/hisuf.
-    -- We therefore do the initial dependency generation with an empty
-    -- way and .o/.hi extensions, regardless of any flags that might
-    -- be specified.
-    let dflags1 = dflags0
-            { targetWays_ = Set.empty
-            , hiSuf_      = "hi"
-            , objectSuf_  = "o"
-            }
-    GHC.setSessionDynFlags dflags1
-
-    -- If no suffix is provided, use the default -- the empty one
-    let dflags = if null (depSuffixes dflags1)
-                 then dflags1 { depSuffixes = [""] }
-                 else dflags1
-
-    -- Do the downsweep to find all the modules
     targets <- mapM (\s -> GHC.guessTarget s Nothing Nothing) srcs
     GHC.setTargets targets
+    doMkDepend
+
+-- | Generate the dependency information for the current GHC session.
+--
+-- Uses 'GHC.Target's set by 'GHC.setTargets' to compute the module graph
+-- and outputs the dependency information topologically sorted.
+doMkDepend :: GhcMonad m => m ()
+doMkDepend = do
+    hug_ <- hsc_HUG <$> getSession
+
+    let hug =
+          fmap (\ hue ->
+            let
+              -- We kludge things a bit for dependency generation. Rather than
+              -- generating dependencies for each way separately, we generate
+              -- them once and then duplicate them for each way's osuf/hisuf.
+              -- We therefore do the initial dependency generation with an empty
+              -- way and .o/.hi extensions, regardless of any flags that might
+              -- be specified.
+              dflags1 = (homeUnitEnv_dflags hue)
+                { targetWays_ = Set.empty
+                , hiSuf_      = "hi"
+                , objectSuf_  = "o"
+                }
+            in
+              hue {homeUnitEnv_dflags = dflags1}
+              ) hug_
+
+    _ <- GHC.setProgramHUG hug
+
+    dflagsGlobal <- GHC.getSessionDynFlags
+    -- If no suffix is provided, use the default -- the empty one
+    let dflags = if null (depSuffixes dflagsGlobal)
+                 then dflagsGlobal { depSuffixes = [""] }
+                 else dflagsGlobal
+
     let excl_mods = depExcludeMods dflags
     module_graph <- GHC.depanal excl_mods True {- Allow dup roots -}
     doMkDependModuleGraph dflags module_graph
-
-
 
 doMkDependModuleGraph :: GhcMonad m =>  DynFlags -> ModuleGraph -> m ()
 doMkDependModuleGraph dflags module_graph = do
@@ -148,7 +163,7 @@ doMkDependModuleGraph dflags module_graph = do
       -- Do the actual work
       do
         -- Process them one by one, dumping results and complaining about cycles
-        mapM_ (processDeps dflags hsc_env (UniqSet.mkUniqSet excl_mods) sinks) sorted
+        mapM_ (processDeps hsc_env (UniqSet.mkUniqSet excl_mods) sinks) sorted
 
         -- If -ddump-mod-cycles, show cycles in the module graph
         liftIO $ dumpModCycles logger module_graph
@@ -178,6 +193,7 @@ data DepNode =
     , dn_obj :: OsPath
     , dn_hi :: OsPath
     , dn_preprocessing :: PreprocessingNode
+    , dn_includePkgDeps :: Bool
     }
 
 data PreprocessingNode = PreprocessingNode
@@ -212,8 +228,7 @@ data DepSink = DepSink
 --
 -----------------------------------------------------------------
 
-processDeps :: DynFlags
-            -> HscEnv
+processDeps :: HscEnv
             -> UniqSet ModuleName -- ^ Excludes
             -> [DepSink]
             -> SCC ModuleGraphNode
@@ -233,23 +248,23 @@ processDeps :: DynFlags
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps _ hsc_env _ _ (CyclicSCC nodes)
+processDeps hsc_env _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
     throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $ cyclicModuleErr nodes
 
-processDeps _ hsc_env _ _ (AcyclicSCC (InstantiationNode _uid node))
+processDeps hsc_env _ _ (AcyclicSCC (InstantiationNode _uid node))
   =     -- There shouldn't be any backpack instantiations; report them as well
     throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $
       mkPlainErrorMsgEnvelope noSrcSpan $
       GhcDriverMessage $ DriverInstantiationNodeInDependencyGeneration node
 
-processDeps _dflags _ _ _ (AcyclicSCC (LinkNode {})) = return ()
-processDeps _dflags _ _ _ (AcyclicSCC (UnitNode {})) = return ()
-processDeps _ _ _ _ (AcyclicSCC (ModuleNode _ (ModuleNodeFixed {})))
+processDeps _ _ _ (AcyclicSCC (LinkNode {})) = return ()
+processDeps _ _ _ (AcyclicSCC (UnitNode {})) = return ()
+processDeps _ _ _ (AcyclicSCC (ModuleNode _ (ModuleNodeFixed {})))
   -- No dependencies needed for fixed modules (already compiled)
   = return ()
 
-processDeps dflags hsc_env excl_mods sinks (AcyclicSCC (ModuleNode _ (ModuleNodeCompile node))) = do
+processDeps hsc_env0 excl_mods sinks (AcyclicSCC (ModuleNode _ (ModuleNodeCompile node))) = do
   pp <- preprocessor
   let
     dep_node = mkDepNode pp
@@ -263,9 +278,16 @@ processDeps dflags hsc_env excl_mods sinks (AcyclicSCC (ModuleNode _ (ModuleNode
     then do
       traverse_ (\ sink -> ds_writeDependency sink dep_node deps) sinks
     else do
-      let sec = initSourceErrorContext (hsc_dflags hsc_env)
+      let sec = initSourceErrorContext (hsc_dflags local_hsc_env)
       throwErrors sec (mkMessages (listToBag missing_dep_errs))
   where
+    -- Operations such import resolution depend on the currently active home unit id.
+    -- With multiple home units, each module may be from a different home unit with
+    -- separate dependencies and options.
+    -- Thus, we need to set the active unit id to the one of the module we are processing.
+    local_hsc_env = hscSetActiveUnitId (ms_unitid node) hsc_env0
+    unit_dflags = hsc_dflags local_hsc_env
+    dflags = ms_hspp_opts node
     src_file = msHsFileOsPath node
     mkDepNode preproc =
       DepNode
@@ -276,22 +298,14 @@ processDeps dflags hsc_env excl_mods sinks (AcyclicSCC (ModuleNode _ (ModuleNode
         , dn_obj = msObjFileOsPath node
         , dn_hi = msHiFileOsPath node
         , dn_preprocessing = preproc
+        , dn_includePkgDeps = depIncludePkgDeps unit_dflags
         }
 
     preprocessor :: IO PreprocessingNode
     preprocessor = do
-      let pp = pgm_F (ms_hspp_opts node)
       pure PreprocessingNode
-        { pn_preprocessor = if null pp then global_preprocessor else Just pp
+        { pn_preprocessor = find_preprocessor dflags
         }
-
-    global_preprocessor :: Maybe String
-    global_preprocessor
-      | let pp = pgm_F dflags
-      , not (null pp)
-      = Just pp
-      | otherwise
-      = Nothing
 
     -- Emit a dependency for each CPP import
     -- CPP deps are discovered in the module parsing phase by parsing
@@ -300,9 +314,9 @@ processDeps dflags hsc_env excl_mods sinks (AcyclicSCC (ModuleNode _ (ModuleNode
     -- fails to parse, which may not be desirable (see #16616).
     find_cpp_deps :: IO [Dep]
     find_cpp_deps =
-      if depIncludeCppDeps dflags
+      if depIncludeCppDeps unit_dflags
         then do
-          session <- Session <$> newIORef hsc_env
+          session <- Session <$> newIORef local_hsc_env
           parsedMod <- reflectGhc (GHC.parseModule node) session
           pure (DepCpp . unsafeEncodeUtf <$> GHC.pm_extra_src_files parsedMod)
         else
@@ -312,7 +326,7 @@ processDeps dflags hsc_env excl_mods sinks (AcyclicSCC (ModuleNode _ (ModuleNode
     find_import_deps :: [UnresolvedImport PkgQual] -> IO [Either (MsgEnvelope GhcMessage) Dep]
     find_import_deps idecls =
       sequence
-        [ findDependency hsc_env decl
+        [ findDependency local_hsc_env decl
         | decl <- idecls
         , let L _loc mod = ui_mod_name decl
         , not $ mod `UniqSet.elementOfUniqSet` excl_mods
@@ -347,6 +361,13 @@ findDependency hsc_env imp = do
     L srcloc mod_name = ui_mod_name imp
     is_boot           = ui_boot imp
 
+find_preprocessor :: DynFlags -> Maybe String
+find_preprocessor d = do
+  guard (gopt Opt_Pp d)
+  let pp = pgm_F d
+  guard (not $ null pp)
+  Just pp
+
 -----------------------------------------------------------------
 --
 --              beginMkDependHs
@@ -362,7 +383,7 @@ initFileDepWriter logger root tmpfs dflags makefile = do
   pure DependencyWriter
     { dw_beginWriter = do
         pure $ DepSink $ \ node deps -> do
-          writeDependencies (depIncludePkgDeps dflags) root (mkd_tmp_hdl files) suffixes node deps
+          writeDependencies root (mkd_tmp_hdl files) suffixes node deps
     , dw_endWriter = endMkDependHS logger files
     }
   where
@@ -420,7 +441,6 @@ beginMkDependHS logger tmpfs dflags makefile = do
                   mkd_tmp_file  = tmp_file, mkd_tmp_hdl  = tmp_hdl})
 
 writeDependencies ::
-  Bool ->
   OsPath ->
   Handle ->
   [OsString] ->
@@ -428,7 +448,7 @@ writeDependencies ::
   DepNode ->
   [Dep] ->
   IO ()
-writeDependencies include_pkgs root hdl suffixes node deps =
+writeDependencies root hdl suffixes node deps =
   traverse_ write tasks
   where
     tasks = source_dep : boot_dep ++ concatMap import_dep deps
@@ -448,7 +468,7 @@ writeDependencies include_pkgs root hdl suffixes node deps =
     --              A.x_o : B.x_hi
     import_dep = \case
       DepHi {dep_path, dep_local}
-        | dep_local || include_pkgs
+        | dep_local || dn_includePkgDeps node
         -> [([obj], hi) | (obj, hi) <- zip obj_files (suffixed dep_path)]
 
         | otherwise
@@ -537,7 +557,7 @@ initJsonDepWriter logger tmpfs dflags output = do
   pure DependencyWriter
     { dw_beginWriter =
         pure $ DepSink $ \ node deps ->
-          writeHomeUnitDeps json_var (depIncludePkgDeps dflags) node deps
+          writeHomeUnitDeps json_var node deps
     , dw_endWriter = do
         writeJsonOutput logger json_var
     }
@@ -761,8 +781,8 @@ cacheExternalDepsJson extUnits (DepJson e0) =
         Set.union e0 extUnits
     }
 
-writeHomeUnitDeps :: JsonOutput -> Bool -> DepNode -> [Dep] -> IO ()
-writeHomeUnitDeps deps_json include_pkgs DepNode {..} deps = do
+writeHomeUnitDeps :: JsonOutput -> DepNode -> [Dep] -> IO ()
+writeHomeUnitDeps deps_json DepNode {..} deps = do
   extUnits <- readJson deps_json
   let newExtUnits = Set.difference extUnitsDeps (externalDeps extUnits)
   -- Write new external unit deps before the module that uses them
@@ -790,7 +810,7 @@ writeHomeUnitDeps deps_json include_pkgs DepNode {..} deps = do
         | dep_local
         -> (extDeps, addImport (mkImportDep dep_mod dep_level dep_boot) node_data)
 
-        | include_pkgs
+        | dn_includePkgDeps
         , Just unit <- dep_unit
         , let PackageName nameFS = unitPackageName unit
               name = unpackFS nameFS
