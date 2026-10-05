@@ -13,6 +13,7 @@ module GHC.Utils.Concurrent.Scope
   , fork
   , forkIn
   , activeCount
+  , interruptAll
   )
   where
 
