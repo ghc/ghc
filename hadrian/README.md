@@ -367,20 +367,36 @@ instructions can be found in the corresponding
 
 #### Integrating Hadrian into other tooling
 
-The `tool-args` target is designed to allow hadrian to be integrated into other
-tooling which uses the GHC API.
-`tool-args` prints out a list of flags which hadrian will use to compile
-a module in the `compiler` directory. Using these flags you can then set up
-a GHC API session with the correct environment to load a module into your own
-GHC session. This is how `haskell-ide-engine` is able to support hadrian.
+The `tool:<file>` target is designed to allow hadrian to be integrated into
+other tooling which uses the GHC API. `tool:path/to/Module.hs` prints out the
+list of flags which hadrian will use to compile that module, one per line,
+after building whatever the module needs first (generated sources, dependency
+packages). Using these flags you can then set up a GHC API session with the
+correct environment to load the module into your own GHC session. This is how
+`hie-bios`, and hence HLS, supports hadrian: see `hie.yaml` and
+`hadrian/hie-bios.bat` at the repository root.
 
 ```
-> ./hadrian/build tool-args
--hide-all-packages -no-user-package-db -package-db _build/stage0/lib/packag...
+> ./hadrian/build -q tool:compiler/GHC.hs
+-hide-all-packages
+-no-user-package-db
+-package-env -
+-package-db _build/stage0/lib/package.conf.d
+-this-unit-id ghc-10.1-inplace
+-this-package-name ghc
+...
 ```
 
+Pass `-q` so that hadrian's progress output does not get mixed into the flags,
+or set the `TOOL_OUTPUT` environment variable to a file path to have the flags
+written there instead of to stdout.
 
-The `./hadrian/ghci` script is implemented using this target.
+For a multi-component session, `multi:<pkg>` prints the `-unit @<response
+file>` arguments needed to load `<pkg>` and all of its in-tree dependencies,
+and plain `multi` does so for everything the stage0 compiler can build.
+
+The `./hadrian/ghci` and `./hadrian/ghci-multi` scripts are implemented using
+these targets.
 
 Troubleshooting
 ---------------
