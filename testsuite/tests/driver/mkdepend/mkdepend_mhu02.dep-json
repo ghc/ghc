@@ -1,0 +1,24 @@
+{
+  "a": {
+    "modules": {
+      "A": {
+        "imports": {},
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "mhu02/A.hs"
+      }
+    }
+  },
+  "b": {
+    "modules": {
+      "B": {
+        "imports": {},
+        "includes": [],
+        "options": [],
+        "preprocessor": "./mhu02/pp.sh",
+        "source": "mhu02/B.hs"
+      }
+    }
+  }
+}

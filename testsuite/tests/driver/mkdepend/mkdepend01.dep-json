@@ -1,0 +1,13 @@
+{
+  "main": {
+    "modules": {
+      "A": {
+        "imports": {},
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "mkdepend01/A.hs"
+      }
+    }
+  }
+}

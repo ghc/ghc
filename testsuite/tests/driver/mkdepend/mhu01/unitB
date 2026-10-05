@@ -1,0 +1,1 @@
+-i -i. -working-dir=mhu01/b -this-unit-id b -this-package-name b -package template-haskell -package-id a B.Splice B.Normal Util

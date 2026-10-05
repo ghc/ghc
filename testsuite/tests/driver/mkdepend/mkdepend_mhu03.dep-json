@@ -1,0 +1,13 @@
+{
+  "a": {
+    "modules": {
+      "A": {
+        "imports": {},
+        "includes": [],
+        "options": [],
+        "preprocessor": "./mhu03/pkg/pp.sh",
+        "source": "mhu03/pkg/A.hs"
+      }
+    }
+  }
+}

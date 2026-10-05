@@ -1,0 +1,1 @@
+-i -i. -working-dir=mhu01/c -this-unit-id c -this-package-name c -package template-haskell -package containers -package-id a -package-id b C

@@ -1,0 +1,130 @@
+{
+  "a": {
+    "modules": {
+      "A.Base": {
+        "imports": {
+          "a": [
+            "Util"
+          ]
+        },
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "mhu01/a/A/Base.hs"
+      },
+      "A.Base[boot]": {
+        "imports": {},
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "mhu01/a/A/Base.hs-boot"
+      },
+      "A.TH": {
+        "imports": {
+          "a": [
+            "A.Base"
+          ]
+        },
+        "includes": [],
+        "options": [
+          "-XTemplateHaskell"
+        ],
+        "preprocessor": null,
+        "source": "mhu01/a/A/TH.hs"
+      },
+      "Util": {
+        "imports": {
+          "a": [
+            "A.Base[boot]"
+          ]
+        },
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "mhu01/a/Util.hs"
+      }
+    }
+  },
+  "b": {
+    "modules": {
+      "B.Normal": {
+        "imports": {
+          "a": [
+            "A.Base"
+          ],
+          "b": [
+            "B.Splice"
+          ]
+        },
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "mhu01/b/B/Normal.hs"
+      },
+      "B.Splice": {
+        "imports": {
+          "a": [
+            {
+              "level": "quote",
+              "module": "A.Base"
+            },
+            {
+              "level": "splice",
+              "module": "A.TH"
+            }
+          ],
+          "b": [
+            "Util"
+          ]
+        },
+        "includes": [],
+        "options": [
+          "-XExplicitLevelImports",
+          "-XTemplateHaskell"
+        ],
+        "preprocessor": null,
+        "source": "mhu01/b/B/Splice.hs"
+      },
+      "Util": {
+        "imports": {},
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "mhu01/b/Util.hs"
+      }
+    }
+  },
+  "c": {
+    "modules": {
+      "C": {
+        "imports": {
+          "a": [
+            {
+              "level": "splice",
+              "module": "Util"
+            }
+          ],
+          "b": [
+            "B.Normal",
+            {
+              "level": "splice",
+              "module": "B.Splice"
+            },
+            {
+              "level": "quote",
+              "module": "Util"
+            }
+          ]
+        },
+        "includes": [],
+        "options": [
+          "-XExplicitLevelImports",
+          "-XPackageImports",
+          "-XTemplateHaskell"
+        ],
+        "preprocessor": null,
+        "source": "mhu01/c/C.hs"
+      }
+    }
+  }
+}

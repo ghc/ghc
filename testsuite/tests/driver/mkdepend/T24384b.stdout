@@ -1,0 +1,155 @@
+{
+  "base-<VERSION>-<HASH>": {
+    "package-id": "base-<VERSION>-<HASH>",
+    "package-name": "base"
+  },
+  "containers-<VERSION>-<HASH>": {
+    "package-id": "containers-<VERSION>-<HASH>",
+    "package-name": "containers"
+  },
+  "dep-1-XXX": {
+    "package-id": "dep-1",
+    "package-name": "dep"
+  },
+  "dep-public-1-XXX": {
+    "package-id": "dep-public-1",
+    "package-name": "dep-public"
+  },
+  "main": {
+    "modules": {
+      "A": {
+        "imports": {
+          "base-<VERSION>-<HASH>": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "main": [
+            "C[boot]"
+          ]
+        },
+        "includes": [
+          "foo.h"
+        ],
+        "options": [
+          "-XStrict",
+          "-XCPP",
+          "-fexpose-all-unfoldings"
+        ],
+        "preprocessor": null,
+        "source": "A.hs"
+      },
+      "B": {
+        "imports": {
+          "base-<VERSION>-<HASH>": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "main": [
+            "A"
+          ]
+        },
+        "includes": [],
+        "options": [
+          "-F",
+          "-pgmF",
+          "./preproc.sh"
+        ],
+        "preprocessor": "./preproc.sh",
+        "source": "lib/B.hs"
+      },
+      "B[boot]": {
+        "imports": {
+          "base-<VERSION>-<HASH>": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "main": [
+            "A"
+          ]
+        },
+        "includes": [],
+        "options": [
+          "-F",
+          "-pgmF",
+          "./preproc.sh"
+        ],
+        "preprocessor": "./preproc.sh",
+        "source": "lib/B.hs-boot"
+      },
+      "C": {
+        "imports": {
+          "base-<VERSION>-<HASH>": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "containers-<VERSION>-<HASH>": [
+            "Data.Set"
+          ],
+          "main": [
+            "A"
+          ]
+        },
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "C.hs"
+      },
+      "C[boot]": {
+        "imports": {
+          "base-<VERSION>-<HASH>": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "main": [
+            "E"
+          ]
+        },
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "C.hs-boot"
+      },
+      "D": {
+        "imports": {
+          "base-<VERSION>-<HASH>": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "main": [
+            "B",
+            "C"
+          ]
+        },
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "D.hs"
+      },
+      "E": {
+        "imports": {
+          "base-<VERSION>-<HASH>": [
+            "GHC.Essentials",
+            "Prelude"
+          ],
+          "dep-1-XXX": [
+            "Dep"
+          ],
+          "dep-public-1-XXX": [
+            "DepPublic"
+          ],
+          "template-haskell-<VERSION>-<HASH>": [
+            "Language.Haskell.TH.Syntax"
+          ]
+        },
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "E.hs"
+      }
+    }
+  },
+  "template-haskell-<VERSION>-<HASH>": {
+    "package-id": "template-haskell-<VERSION>-<HASH>",
+    "package-name": "template-haskell"
+  }
+}

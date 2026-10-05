@@ -1,0 +1,92 @@
+{
+  "main": {
+    "modules": {
+      "A": {
+        "imports": {
+          "main": [
+            "C[boot]"
+          ]
+        },
+        "includes": [],
+        "options": [
+          "-XStrict",
+          "-XCPP",
+          "-fexpose-all-unfoldings"
+        ],
+        "preprocessor": null,
+        "source": "A.hs"
+      },
+      "B": {
+        "imports": {
+          "main": [
+            "A"
+          ]
+        },
+        "includes": [],
+        "options": [
+          "-F",
+          "-pgmF",
+          "./preproc.sh"
+        ],
+        "preprocessor": "./preproc.sh",
+        "source": "lib/B.hs"
+      },
+      "B[boot]": {
+        "imports": {
+          "main": [
+            "A"
+          ]
+        },
+        "includes": [],
+        "options": [
+          "-F",
+          "-pgmF",
+          "./preproc.sh"
+        ],
+        "preprocessor": "./preproc.sh",
+        "source": "lib/B.hs-boot"
+      },
+      "C": {
+        "imports": {
+          "main": [
+            "A"
+          ]
+        },
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "C.hs"
+      },
+      "C[boot]": {
+        "imports": {
+          "main": [
+            "E"
+          ]
+        },
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "C.hs-boot"
+      },
+      "D": {
+        "imports": {
+          "main": [
+            "B",
+            "C"
+          ]
+        },
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "D.hs"
+      },
+      "E": {
+        "imports": {},
+        "includes": [],
+        "options": [],
+        "preprocessor": null,
+        "source": "E.hs"
+      }
+    }
+  }
+}

@@ -1,0 +1,3 @@
+# DO NOT DELETE: Beginning of Haskell dependencies
+mkdepend01/A.o : mkdepend01/A.hs
+# DO NOT DELETE: End of Haskell dependencies
