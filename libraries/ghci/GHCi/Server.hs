@@ -70,6 +70,14 @@ servWithCustom verbose hook pipe restore customHandler = loop
 
     when verbose $ trace ("msg: " ++ (show msg))
     case msg of
+      -- The expressions which block waiting for a result musn't block the
+      -- server thread, so send them off and notify over the wire when done.
+      --
+      -- The other end (see 'remoteCall') will be processing notifications, and
+      -- it will use the returned pointer as the index for the matching notification.
+      WaitThreadResult                 {} -> forkIO (run msg >>= (notification =<< myThreadId)) >>= reply . mkRemoteRef
+      WaitAnyThreadBreak               {} -> forkIO (run msg >>= (notification =<< myThreadId)) >>= reply . mkRemoteRef
+      WaitThreadResultOrAnyThreadBreak {} -> forkIO (run msg >>= (notification =<< myThreadId)) >>= reply . mkRemoteRef
       CustomMessage tag payload -> handleCustom tag payload
       Shutdown -> return ()
       RunTH st q ty loc -> wrapRunTH $ runTH pipe st q ty loc

@@ -128,6 +128,15 @@ run m = case m of
   Seq ref -> doSeq ref
   ResumeSeq ref -> resumeSeq ref
 
+  WaitThreadResult tid -> localRef tid >>= atomically . readThreadEvalStatus
+  WaitAnyThreadBreak   -> atomically $ readAnyThreadEvalBreak
+  WaitThreadResultOrAnyThreadBreak t -> do
+    tid <- localRef t
+    atomically $
+      readThreadEvalStatus tid
+        `orElse`
+      (EvalPaused <$> readAnyThreadEvalBreak)
+
   Shutdown            -> unexpectedMessage m
   RunTH {}            -> unexpectedMessage m
   RunModFinalizers {} -> unexpectedMessage m
@@ -206,7 +215,7 @@ tryEval io = do
 
 --------------------------------------------------------------------------------
 
-evalStmt :: EvalOpts -> EvalExpr HValueRef -> IO (EvalStatus [HValueRef])
+evalStmt :: EvalOpts -> EvalExpr HValueRef -> IO (RemoteRef ThreadId)
 evalStmt opts expr = do
   io <- mkIO expr
   sandboxIO opts $ do
@@ -248,16 +257,16 @@ evalStringToString r str = do
 -- The UI process has more and therefore also can show more
 -- information about the breakpoint than the current iserv
 -- process.
-doSeq :: RemoteRef a -> IO (EvalStatus ())
-doSeq ref = clearEvalStatus <$> do
+doSeq :: RemoteRef a -> IO (RemoteRef ThreadId)
+doSeq ref = do
     sandboxIO evalOptsSeq $ do
       _ <- (void $ evaluate =<< localRef ref)
       return []
 
 -- | Process a ResumeSeq message. Continue the :force processing     #2950
 -- after a breakpoint.
-resumeSeq :: RemoteRef ThreadId -> IO (EvalStatus ())
-resumeSeq hvref = clearEvalStatus <$> resumeStmt evalOptsSeq hvref
+resumeSeq :: RemoteRef ThreadId -> IO ()
+resumeSeq hvref = resumeStmt evalOptsSeq hvref
 
 evalOptsSeq :: EvalOpts
 evalOptsSeq = EvalOpts
@@ -296,15 +305,16 @@ abandonStmt hvref = do
 
 --------------------------------------------------------------------------------
 
-resumeStmt :: EvalOpts -> RemoteRef ThreadId -> IO (EvalStatus [HValueRef])
+resumeStmt :: EvalOpts -> RemoteRef ThreadId -> IO ()
 resumeStmt opts rtid = do
   resumeThreadId <- localRef rtid
   ResumeContext{..} <- getThreadResumeContext resumeThreadId
-  withBreakAction opts resumeThreadId $ \waitForResult ->
-    mask_ $ do
-      putMVar resumeBreakMVar () -- this awakens the stopped thread...
-      redirectInterrupts resumeThreadId $
-        waitForResult
+  setBreakAction opts resumeThreadId -- See Note [TODO: all break options must be set every time]
+  -- withBreakAction opts resumeThreadId $ \waitForResult ->
+    -- mask_ $ do
+  putMVar resumeBreakMVar () -- this awakens the stopped thread...
+      -- redirectInterrupts resumeThreadId $
+      --   waitForResult
 
 -- When running a computation, we redirect ^C exceptions to the running
 -- thread.  ToDo: we might want a way to continue even if the target
@@ -316,7 +326,7 @@ resumeStmt opts rtid = do
 -- only while we execute the user's code.  We can't afford to lose the final
 -- putMVar, otherwise deadlock ensues. (#1583, #1922, #1946)
 
-sandboxIO :: EvalOpts -> IO [HValueRef] -> IO (EvalStatus [HValueRef])
+sandboxIO :: EvalOpts -> IO [HValueRef] -> IO (RemoteRef ThreadId)
 sandboxIO opts io
     | useSandboxThread opts
     = do
@@ -336,17 +346,31 @@ sandboxIO opts io
         tid <- forkIO $ do
 
           takeMVar wait -- don't run anything in this thread before
-                        -- `withBreakAction` has a chance to set up.
+                        -- `setBreakAction` has a chance to set up.
 
           tid <- myThreadId
           labelThread tid "GHCi sandbox"
-          unsafeUnmask runIt >>= writeThreadEvalStatus tid
 
-        -- We are running in uninterruptibleMask
-        withBreakAction opts tid $ \waitForResult -> do
-          putMVar wait ()
-          redirectInterrupts tid $ unsafeUnmask $
-            waitForResult
+            -- WHEN THE THREAD IS FINISHED, write the value itself.
+            --
+            -- we only write the TID status map in two places:
+            --
+            -- When the "main" thread finishes (here)
+            -- When any thread hits a breakpoint (global break action)
+          unsafeUnmask runIt >>= writeThreadEvalStatus tid
+            -- TODO: This unsafe-unmask is very dubious. Consult with Andrea. I
+            -- don't think we should be uninterruptable masking interp commands
+            -- somewhere else. This should just be runIt?
+
+        -- We are running in uninterruptibleMask -- TODO WHY??
+        setBreakAction opts tid
+        putMVar wait ()
+
+        mkRemoteRef tid
+        -- withBreakAction opts tid $ \waitForResult -> do
+        --   putMVar wait ()
+        --   redirectInterrupts tid $ unsafeUnmask $
+        --     waitForResult
 
     | otherwise
     = do
@@ -360,7 +384,17 @@ sandboxIO opts io
       -- tracing, etc.) need the expression to be running in a
       -- separate thread, so debugging is only enabled when
       -- using the sandbox.
-      runIt
+      tid <- forkIO (pure ())
+      runIt >>= writeThreadEvalStatus tid
+      mkRemoteRef tid
+        -- We `runIt` on the main thread, but fork a new thread to store to the
+        -- result with `writeThreadEvalStatus` to fit the asynchronous API. We
+        -- can't use myThreadId because if the user happens to runIt twice
+        -- before awaiting, the second result will clobber the first.
+
+        -- TODO We have to be careful evacuating this map bc there may be
+        -- uncollected results from finished threads. So the thread map can't
+        -- be weak refs ? Or maybe because of the RemoteRef it's fine. Ah, prob.
   where
     runIt = measureAlloc $ tryEval $ rethrow opts $ clearCCS io
 
@@ -415,12 +449,16 @@ sandboxIO opts io
 -- whenever "main" or one of the threads spawned by "main" hit a breakpoint,
 -- rather than just "main" being observed. This should be used for the main
 -- debuggee execution of a debugger.
-withBreakAction :: EvalOpts -> ThreadId -> (IO (EvalStatus [HValueRef]) -> IO a) -> IO a
-withBreakAction opts tid@(ThreadId tid#) act = do
+-- withBreakAction :: EvalOpts -> ThreadId -> (IO (EvalStatus [HValueRef]) -> IO a) -> IO a
+-- withBreakAction opts tid@(ThreadId tid#) act = do
+
+setBreakAction :: EvalOpts -> ThreadId -> IO ()
+setBreakAction opts tid@(ThreadId tid#) = do
   ctx <- getThreadResumeContext tid
-  bracket (setBreakAction ctx) (resetBreakAction ctx) (\_ -> act (waitForResult ctx))
+  setBreakAction' ctx
+    -- bracket _ (resetBreakAction ctx) (\_ -> act (waitForResult ctx))
   where
-    setBreakAction ctx = do
+    setBreakAction' ctx = do
       -- TODO: TERRIBLY NOT MULTI-THREAD FRIENDLY. Each thread needs its own RTS flag exceptionFlag, like we have for step-in or step-out.
       runIf breakOnException $ \_ -> poke exceptionFlag 1
         -- Breaking on exceptions is not enabled by default, since it
@@ -433,7 +471,7 @@ withBreakAction opts tid@(ThreadId tid#) act = do
       runIfCtx ctx isolateThreadBreaks setIsolatedCtx
 
     resetBreakAction ctx () = do
-      poke exceptionFlag 0
+      poke exceptionFlag 0 -- just wrong, expection flag should be per-thread
       rts_disableStopAfterReturn    tid#
       rts_disableStopNextBreakpoint tid#
       runIfCtx ctx isolateThreadBreaks unsetIsolatedCtx
@@ -484,10 +522,4 @@ redirectInterrupts target wait = do
      case m of
        Nothing -> wait
        Just target -> do throwTo target (e :: SomeException); wait
-
-clearEvalStatus :: EvalStatus a -> EvalStatus ()
-clearEvalStatus = \case
-  EvalComplete w (EvalException se) -> EvalComplete w (EvalException se)
-  EvalComplete w (EvalSuccess _)    -> EvalComplete w (EvalSuccess ())
-  EvalBreak ap mb rt rccs           -> EvalBreak ap mb rt rccs
 

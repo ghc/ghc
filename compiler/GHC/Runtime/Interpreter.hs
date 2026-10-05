@@ -11,6 +11,7 @@ module GHC.Runtime.Interpreter
   , evalStmt, EvalStatus_(..), EvalStatus, EvalResult(..), EvalExpr(..)
   , resumeStmt
   , abandonStmt
+  , waitThreadResult
   , evalIO
   , evalString
   , evalStringToIOString
@@ -286,11 +287,11 @@ evalStmt
   :: Interp
   -> EvalOpts
   -> EvalExpr ForeignHValue
-  -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
+  -> IO (ForeignRef ThreadId)
 evalStmt interp opts foreign_expr = do
-  status <- withExpr foreign_expr $ \expr ->
+  r <- withExpr foreign_expr $ \expr ->
     interpCmd interp (EvalStmt opts expr)
-  handleEvalStatus interp status
+  mkFinalizedHValue interp r
  where
   withExpr :: EvalExpr ForeignHValue -> (EvalExpr HValueRef -> IO a) -> IO a
   withExpr (EvalThis fhv) cont =
@@ -304,16 +305,24 @@ resumeStmt
   :: Interp
   -> EvalOpts
   -> ForeignRef ThreadId
-  -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
+  -> IO ()
 resumeStmt interp opts resume_tid = do
-  status <- withForeignRef resume_tid $ \rhv ->
+  withForeignRef resume_tid $ \rhv ->
     interpCmd interp (ResumeStmt opts rhv)
-  handleEvalStatus interp status
 
 abandonStmt :: Interp -> ForeignRef ThreadId -> IO ()
 abandonStmt interp resume_tid =
   withForeignRef resume_tid $ \rhv ->
     interpCmd interp (AbandonStmt rhv)
+
+waitThreadResult
+  :: Interp
+  -> ForeignRef ThreadId
+  -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
+waitThreadResult interp tid = do
+  status <- withForeignRef tid $ \rhv -> do
+    interpCmd interp (WaitThreadResult rhv)
+  handleEvalStatus interp status
 
 handleEvalStatus
   :: Interp
@@ -417,8 +426,9 @@ whereFrom interp ref =
 seqHValue :: Interp -> UnitEnv -> Logger -> ForeignHValue -> IO (EvalResult ())
 seqHValue interp unit_env logger ref =
   withForeignRef ref $ \hval -> do
-    status <- interpCmd interp (Seq hval)
-    handleSeqHValueStatus interp unit_env logger status
+    rtid   <- interpCmd interp (Seq hval)
+    status <- interpCmd interp (WaitThreadResult rtid)
+    handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
 
 evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
 evalBreakpointToId eval_break =
@@ -460,9 +470,10 @@ handleSeqHValueStatus interp unit_env logger eval_status =
             Just modbreaks -> put =<< getBreakLoc (readIModModBreaks hug) ibi modbreaks
 
       -- resume the seq (:force) processing in the iserv process
-      withForeignRef resume_ctxt_fhv $ \hval -> do
-        status <- interpCmd interp (ResumeSeq hval)
-        handleSeqHValueStatus interp unit_env logger status
+      withForeignRef resume_ctxt_fhv $ \rtid -> do
+        interpCmd interp (ResumeSeq rtid)
+        status <- interpCmd interp (WaitThreadResult rtid)
+        handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
     (EvalComplete _ r) -> return r
 
 
@@ -769,3 +780,9 @@ readIModModBreaks hug mod = imodBreaks_modBreaks . expectJust <$> readIModBreaks
 fromEvalResult :: EvalResult a -> IO a
 fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
 fromEvalResult (EvalSuccess a) = return a
+
+clearEvalStatus :: EvalStatus a -> EvalStatus ()
+clearEvalStatus = \case
+  EvalComplete w (EvalException se) -> EvalComplete w (EvalException se)
+  EvalComplete w (EvalSuccess _)    -> EvalComplete w (EvalSuccess ())
+  EvalBreak ap mb rt rccs           -> EvalBreak ap mb rt rccs
