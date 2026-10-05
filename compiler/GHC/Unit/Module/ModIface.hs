@@ -70,7 +70,7 @@ module GHC.Unit.Module.ModIface
    , set_mi_hash_fn
    , completePartialModIface
    , shrinkModIface
-   , IfaceBinHandle(..)
+   , IfaceBinHandle
    , PartialModIface
    , RetainedModIface
    , IfaceAbiHashes (..)
@@ -160,6 +160,7 @@ import GHC.Utils.Binary
 
 import Control.DeepSeq
 import Control.Exception
+import Data.Void (Void)
 
 
 {- Note [Interface file stages]
@@ -236,15 +237,10 @@ data ModIfacePhase
 -- | In-memory byte array representation of a 'ModIface'.
 --
 -- See Note [Sharing of ModIface] for why we need this.
-data IfaceBinHandle (phase :: ModIfacePhase) where
-  -- | A partial 'ModIface' cannot be serialised to disk.
-  PartialIfaceBinHandle :: IfaceBinHandle 'ModIfaceCore
-  -- | Optional 'FullBinData' that can be serialised to disk directly.
-  --
-  -- See Note [Private fields in ModIface] for when this fields needs to be cleared
-  -- (e.g., set to 'Nothing').
-  FullIfaceBinHandle :: !(Strict.Maybe FullBinData) -> IfaceBinHandle 'ModIfaceFinal
-  RetainedIfaceBinHandle :: IfaceBinHandle 'ModIfaceRetained
+type family IfaceBinHandle (phase :: ModIfacePhase) where
+  IfaceBinHandle 'ModIfaceCore     = Void
+  IfaceBinHandle 'ModIfaceFinal    = FullBinData
+  IfaceBinHandle 'ModIfaceRetained = Void
 
 type family IfaceSelfRecompData (phase :: ModIfacePhase) where
   IfaceSelfRecompData 'ModIfaceCore     = Maybe IfaceSelfRecomp
@@ -322,11 +318,12 @@ withSelfRecomp iface nk jk =
 -- fields.
 data ModIface_ (phase :: ModIfacePhase)
   = PrivateModIface {
-        mi_hi_bytes_ :: !(IfaceBinHandle phase),
+        mi_hi_bytes_ :: !(Strict.Maybe (IfaceBinHandle phase)),
                 -- ^ A serialised in-memory buffer of this 'ModIface'.
                 -- If this handle is given, we can avoid serialising the 'ModIface'
                 -- when writing this 'ModIface' to disk, and write this buffer to disk instead.
-                -- See Note [Sharing of ModIface].
+                -- See Note [Sharing of ModIface] and
+                -- Note [Private fields in ModIface].
         mi_iface_hash_  :: Fingerprint, -- A hash of the whole interface
 
         mi_mod_info_     :: IfaceModInfo,
@@ -718,7 +715,7 @@ instance Binary ModIface where
                  -- We can't populate this field here, as we are
                  -- missing the 'mi_ext_fields_' field, which is
                  -- handled in 'getIfaceWithExtFields'.
-                 mi_hi_bytes_    = FullIfaceBinHandle Strict.Nothing
+                 mi_hi_bytes_    = Strict.Nothing
                  })
 
 instance Binary IfaceModInfo where
@@ -833,7 +830,7 @@ emptyPartialModIface mod
   = PrivateModIface
       { mi_mod_info_    = emptyIfaceModInfo mod,
         mi_iface_hash_  = fingerprint0,
-        mi_hi_bytes_    = PartialIfaceBinHandle,
+        mi_hi_bytes_    = Strict.Nothing,
         mi_deps_        = noDependencies,
         mi_public_      = emptyPublicModIface [] [] [] [] [] [] [] (),
         mi_simplified_core_ = Nothing,
@@ -907,7 +904,7 @@ emptyFullModIface :: Module -> ModIface
 emptyFullModIface mod =
     (emptyPartialModIface mod)
       { mi_public_ = emptyPublicModIface [] [] [] [] [] [] [] emptyIfaceBackend
-      , mi_hi_bytes_ = FullIfaceBinHandle Strict.Nothing
+      , mi_hi_bytes_ = Strict.Nothing
       }
 
 
@@ -940,7 +937,7 @@ instance ( NFData (IfaceSelfRecompData phase)
          , NFData (IfaceAbiHashesData phase)
          ) => NFData (ModIface_ phase) where
   rnf (PrivateModIface a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
-    = (a1 :: IfaceBinHandle phase)
+    = a1
     `seq` rnf a2
     `seq` rnf a3
     `seq` rnf a4
@@ -1051,7 +1048,7 @@ completePartialModIface :: PartialModIface
 completePartialModIface partial iface_hash decls extra_decls final_exts cache = partial
   { mi_public_ = completePublicModIface decls final_exts cache (mi_public_ partial)
   , mi_simplified_core_ = extra_decls
-  , mi_hi_bytes_ = FullIfaceBinHandle Strict.Nothing
+  , mi_hi_bytes_ = Strict.Nothing
   , mi_iface_hash_ = iface_hash
   }
 
@@ -1072,7 +1069,7 @@ shrinkModIface :: ModIface -> RetainedModIface
 shrinkModIface PrivateModIface {..}
   = PrivateModIface
     {
-      mi_hi_bytes_        = RetainedIfaceBinHandle,
+      mi_hi_bytes_        = Strict.Nothing,
       mi_public_          = shrinkIfacePublic mi_public_,
       mi_self_recomp_     = (),
       mi_simplified_core_ = (),
@@ -1100,7 +1097,7 @@ set_mi_mod_info val iface = clear_mi_hi_bytes $ iface { mi_mod_info_ = val }
 set_mi_self_recomp :: IfaceSelfRecompData phase -> ModIface_ phase -> ModIface_ phase
 set_mi_self_recomp val iface = clear_mi_hi_bytes $ iface { mi_self_recomp_ = val }
 
-set_mi_hi_bytes :: IfaceBinHandle phase -> ModIface_ phase -> ModIface_ phase
+set_mi_hi_bytes :: Strict.Maybe (IfaceBinHandle phase) -> ModIface_ phase -> ModIface_ phase
 set_mi_hi_bytes val iface = iface { mi_hi_bytes_ = val }
 
 set_mi_deps :: Dependencies -> ModIface_ phase -> ModIface_ phase
@@ -1203,12 +1200,7 @@ set_mi_mod_info_field f iface = clear_mi_hi_bytes $ iface { mi_mod_info_ = f (mi
 
 -- | Invalidate any byte array buffer we might have.
 clear_mi_hi_bytes :: ModIface_ phase -> ModIface_ phase
-clear_mi_hi_bytes iface = iface
-  { mi_hi_bytes_ = case mi_hi_bytes iface of
-      PartialIfaceBinHandle  -> PartialIfaceBinHandle
-      FullIfaceBinHandle _   -> FullIfaceBinHandle Strict.Nothing
-      RetainedIfaceBinHandle -> RetainedIfaceBinHandle
-  }
+clear_mi_hi_bytes iface = iface { mi_hi_bytes_ = Strict.Nothing }
 
 -- ----------------------------------------------------------------------------
 -- 'ModIface' pattern synonyms to keep breakage low.
@@ -1319,7 +1311,7 @@ pattern ModIface ::
   -> Maybe Docs
   -> IfaceAbiHashesData phase
   -> ExtensibleFieldsData phase
-  -> IfaceBinHandle phase
+  -> Strict.Maybe (IfaceBinHandle phase)
   -> IfaceSelfRecompData phase
   -> (OccName -> Maybe Fixity)
   -> (OccName -> Maybe (OccName, Fingerprint))
