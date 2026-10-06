@@ -447,8 +447,12 @@ cannedGCReturnsTo checkYield cont_on_stack gc regs lret off code
       -- to the canned heap-check routines, because we are in a case
       -- alternative and hence the [LocalReg] was passed to us in the
       -- NativeReturn convention.
+    -- With two-word frames the continuation's frame header is stored on the
+    -- call path only (emitEnter), so after a tagged scrutinee it is not on
+    -- the stack yet: store it here, on the GC path.
+    -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
     gc_call profile label sp
-      | cont_on_stack
+      | cont_on_stack, not (twoWordFrames (profilePlatform profile))
       = mkJumpReturnsTo profile label NativeReturn reg_exprs lret off sp
       | otherwise
       = mkCallReturnsTo profile label NativeReturn reg_exprs lret off sp []
