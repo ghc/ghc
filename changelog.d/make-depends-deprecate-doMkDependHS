@@ -1,0 +1,11 @@
+section: ghc-lib
+synopsis: Deprecate `doMkDependHS` in favour of `doMkDepend`
+issues: #27938
+mrs: !16717
+description: {
+    Deprecate `doMkDependHS` in favour of the more expressive `doMkDepend`
+    in order to better support multiple home units.
+
+    For migration, initialise the session using `initMkDepend`, set the obtained targets
+    via `setTargets` and then use the new API `doMkDepend`.
+}
