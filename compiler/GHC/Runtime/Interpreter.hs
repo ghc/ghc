@@ -626,11 +626,9 @@ spawnIServ conf = do
                                           []
                                           (iservConfOpts    conf)
   interpPipe <- mkPipeFromHandles rh wh
-  lock <- newMVar ()
   let process = InterpProcess
                   { interpHandle = ph
                   , interpPipe
-                  , interpLock   = lock
                   }
 
   pending_frees <- newMVar []

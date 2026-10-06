@@ -1,0 +1,17 @@
+section: ghci
+synopsis: Make external interpreter communication use an explicit Async RPC
+issues: #27960
+mrs: !16802
+
+description: {
+    iserv already implements RPC today, although in a fairly ad-hoc and
+    convoluted manner. The template haskell consumer already requires
+    bidirectional communication and async requests, and got implemented in a
+    way that precludes other consumers with async needs.
+    This change streamlines all this by using an explicit Async RPC protocol.
+
+    It additionally clears the path to fix #18852 since the main thread is no
+    longer blocked per request, enables evaluating splices concurrently in the
+    external interpreter, and unblocks multi-threaded interactive debugging.
+}
+
