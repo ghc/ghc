@@ -91,6 +91,9 @@ import System.OsString qualified as OsString
 -----------------------------------------------------------------
 
 doMkDependHS :: GhcMonad m => [FilePath] -> m ()
+{-# DEPRECATED doMkDependHS "Supports only a single home unit.\n \
+    \Use 'initMkDepend', 'setTargets' and 'doMkDepend' to run with multiple home unit support."
+#-}
 doMkDependHS srcs = do
     -- Initialisation
     targets <- mapM (\s -> GHC.guessTarget s Nothing Nothing) srcs
