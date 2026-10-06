@@ -5,6 +5,7 @@ import qualified Data.Map.Strict as Map
 import Data.Semigroup ((<>))
 import GHC.Cmm
 import GHC.Cmm.CLabel (CLabel, mkAsmTempLabel)
+import GHC.Cmm.Config (CmmConfig (..))
 import GHC.Cmm.Dataflow (O)
 import GHC.Cmm.Dataflow.Block (blockSplit, blockToList)
 import GHC.Cmm.Dataflow.Label
@@ -62,12 +63,21 @@ second pass walks over the Cmm decls and creates an entry in the IPE map for eve
 looking up source locations for stack info tables in the map generated during the first pass.
 
 The rest of this note will document exactly how the first pass generates the map from labels to
-estimated source positions. The algorithms are different depending on whether tables-next-to-code
-is on or off. Both algorithms have in common that we are looking for a `GHC.Cmm.Node.CmmTick`
-(containing a `SourceNote`) that is near what we estimate to be the label of a return stack frame.
+estimated source positions. The algorithms are different depending on whether the proc points of
+the Cmm were split into separate procs (`cmmSplitProcPoints`, see GHC.Driver.Config.Cmm). They are
+not split with tables-next-to-code in the native code generator, and, since
+Note [Proc points without tables-next-to-code] in GHC.Cmm.Info, not without tables-next-to-code in
+the native code generator either (except for Wasm32 and PPC_64). They are split with the LLVM and C
+backends, and without tables-next-to-code on Wasm32 and PPC_64. The algorithm for unsplit proc
+points is the one titled "With tables-next-to-code" below (`labelsToSourcesWithTNTC`), the one for
+split proc points the one titled "Without tables-next-to-code" (`labelsToSourcesSansTNTC`); the
+titles and names date from when the two conditions coincided. With tables-next-to-code, the former
+is used even when the proc points are split (LLVM). Both algorithms have in common that we are
+looking for a `GHC.Cmm.Node.CmmTick` (containing a `SourceNote`) that is near what we estimate to
+be the label of a return stack frame.
 
-With tables-next-to-code
-~~~~~~~~~~~~~~~~~~~~~~~~
+With tables-next-to-code (proc points not split)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Let's consider this example:
 ```
@@ -126,11 +136,13 @@ So, given a `CmmGraph`:
 
 See `labelsToSourcesWithTNTC` for the implementation of this algorithm.
 
-Without tables-next-to-code
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Without tables-next-to-code (proc points split)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When tables-next-to-code is off, there is no return frame / continuation label in calls. The continuation (i.e. return
-frame) is set in an explicit Cmm assignment. Thus the tick lookup algorithm has to be slightly different.
+When the proc points are split, there is no return frame / continuation label in calls (splitting
+removes `cml_cont`, see `replaceBranches` in GHC.Cmm.ProcPoint). The continuation (i.e. return
+frame) is set in an explicit Cmm assignment of its info table label (`replacePPIds` in
+GHC.Cmm.ProcPoint). Thus the tick lookup algorithm has to be slightly different.
 
 ```
  sat_s16G_entry() { //  [R1]
@@ -278,6 +290,18 @@ lookupEstimatedTicks hsc_env this_file ipes stats cmm_group_srts =
     dflags = hsc_dflags hsc_env
     platform = targetPlatform dflags
 
+    -- Do we find return frames by the continuations of calls
+    -- (labelsToSourcesWithTNTC), or by the stores of their info table labels
+    -- (labelsToSourcesSansTNTC)? Calls keep their continuations only when the
+    -- proc points are not split; the info table labels are stored only when
+    -- they are. Without tables-next-to-code, the native code generator no
+    -- longer splits them (see Note [Proc points without tables-next-to-code]
+    -- in GHC.Cmm.Info). With tables-next-to-code, the continuations are used
+    -- whether or not the proc points are split, as before.
+    useConts :: Bool
+    useConts = platformTablesNextToCode platform
+            || not (cmmSplitProcPoints (initCmmConfig dflags))
+
     -- Pass 1: Map every label meeting the conditions described in Note
     -- [Stacktraces from Info Table Provenance Entries (IPE based stack
     -- unwinding)] to the estimated source location (also as described in the
@@ -287,7 +311,7 @@ lookupEstimatedTicks hsc_env this_file ipes stats cmm_group_srts =
     -- map if -fno-info-table-with-stack is given
     labelsToSources :: Map CLabel IpeSourceLocation
     labelsToSources =
-      if platformTablesNextToCode platform then
+      if useConts then
         foldl' (labelsToSourcesWithTNTC this_file) Map.empty cmm_group_srts
       else
         foldl' (labelsToSourcesSansTNTC this_file) Map.empty cmm_group_srts
@@ -306,13 +330,14 @@ lookupEstimatedTicks hsc_env this_file ipes stats cmm_group_srts =
         go (!acc, !stats) lbl' tbl =
           let
             lbl =
-              if platformTablesNextToCode platform then
-                -- TNTC case, the mapped CLabel will be the result of
-                -- mkAsmTempLabel on the info table label
+              if useConts then
+                -- Continuations case (TNTC, or unsplit NTNTC), the mapped
+                -- CLabel will be the result of mkAsmTempLabel on the info
+                -- table's block label
                 mkAsmTempLabel lbl'
               else
-                -- Non-TNTC case, the mapped CLabel will be the CLabel of the
-                -- info table itself
+                -- Split NTNTC case, the mapped CLabel will be the CLabel of
+                -- the info table itself
                 cit_lbl tbl
           in
             if (isStackRep . cit_rep) tbl then
