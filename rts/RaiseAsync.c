@@ -817,8 +817,8 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
     // The stack freezing code assumes there's a closure pointer on
     // the top of the stack, so we have to arrange that this is the case...
     //
-    if (sp[0] == (W_)&stg_enter_info) {
-        sp++;
+    if (FRAME_INFO_PTR(sp) == &stg_enter_info) {
+        sp += FRAME_HDR_W;      // step over the stg_enter frame's header
     } else {
         sp--;
         sp[0] = (W_)&stg_dummy_ret_closure;
@@ -873,7 +873,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
             }
 
             SET_HDR(ap,&stg_AP_STACK_info,
-                    ((StgClosure *)frame)->header.prof.ccs /* ToDo */);
+                    ((StgUpdateFrame *)frame)->header.prof.ccs /* ToDo */);
             // N.B. This will be made visible by updateThunk below, which
             // implies a release memory barrier.
             TICK_ALLOC_UP_THK(AP_STACK_sizeW(words),0);
@@ -961,8 +961,8 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 
             // Unmask async exceptions after running the handler, if necessary.
             if ((tso->flags & TSO_BLOCKEX) == 0) {
-              sp--;
-              sp[0] = (W_)&stg_unmaskAsyncExceptionszh_ret_info;
+              sp -= FRAME_HDR_W;
+              SET_FRAME_HDR(sp, &stg_unmaskAsyncExceptionszh_ret_info);
             }
 
             // Ensure that async exceptions are masked while running the handler;
@@ -971,12 +971,14 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
               tso->flags |= TSO_BLOCKEX | TSO_INTERRUPTIBLE;
             }
 
-            // Set up the top of the stack to apply the handler.
-            sp -= 4;
-            sp[0] = (W_)&stg_enter_info;
-            sp[1] = (W_)handler;
-            sp[2] = (W_)&stg_ap_pv_info;
-            sp[3] = (W_)exception;
+            // Set up the top of the stack to apply the handler:
+            // an stg_enter frame and an stg_ap_pv frame, each of
+            // FRAME_HDR_W + 1 words.
+            sp -= 2 * (FRAME_HDR_W + 1);
+            SET_FRAME_HDR(sp, &stg_enter_info);
+            sp[FRAME_HDR_W] = (W_)handler;
+            SET_FRAME_HDR(sp + FRAME_HDR_W + 1, &stg_ap_pv_info);
+            sp[2 * FRAME_HDR_W + 1] = (W_)exception;
 
             stack->sp = sp;
             RELAXED_STORE(&tso->what_next, ThreadRunGHC);
@@ -987,7 +989,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
             if (stop_at_atomically) {
                 ASSERT(tso->trec->enclosing_trec == NO_TREC);
                 stmCondemnTransaction(cap, tso -> trec);
-                stack->sp = frame - 2;
+                stack->sp = frame - (FRAME_HDR_W + 1);
                 // The ATOMICALLY_FRAME expects to be returned a
                 // result from the transaction, which it stores in the
                 // stack frame.  Hence we arrange to return a dummy
@@ -996,8 +998,8 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
                 // ATOMICALLY_FRAME instance for condemned
                 // transactions, but I don't fully understand the
                 // interaction with STM invariants.
-                stack->sp[1] = (W_)&stg_NO_TREC_closure;
-                stack->sp[0] = (W_)&stg_ret_p_info;
+                stack->sp[FRAME_HDR_W] = (W_)&stg_NO_TREC_closure;
+                SET_FRAME_HDR(stack->sp, &stg_ret_p_info);
                 tso->what_next = ThreadRunGHC;
                 goto done;
             }
@@ -1086,17 +1088,17 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 
         default:
             // see Note [Update async masking state on unwind] in Schedule.c
-            if (*frame == (W_)&stg_unmaskAsyncExceptionszh_ret_info) {
+            if ((W_)FRAME_INFO_PTR(frame) == (W_)&stg_unmaskAsyncExceptionszh_ret_info) {
                 tso->flags &= ~(TSO_BLOCKEX | TSO_INTERRUPTIBLE);
-            } else if (*frame == (W_)&stg_maskAsyncExceptionszh_ret_info) {
+            } else if ((W_)FRAME_INFO_PTR(frame) == (W_)&stg_maskAsyncExceptionszh_ret_info) {
                 tso->flags |= TSO_BLOCKEX | TSO_INTERRUPTIBLE;
-            } else if (*frame == (W_)&stg_maskUninterruptiblezh_ret_info) {
+            } else if ((W_)FRAME_INFO_PTR(frame) == (W_)&stg_maskUninterruptiblezh_ret_info) {
                 tso->flags |= TSO_BLOCKEX;
                 tso->flags &= ~TSO_INTERRUPTIBLE;
             }
             // see Note [GHCi unboxed tuples stack spills] in
             // StgMiscClosures.cmm
-            if (*frame == (W_)&stg_ctoi_t_info) {
+            if ((W_)FRAME_INFO_PTR(frame) == (W_)&stg_ctoi_t_info) {
                 tso->ctoi_tuple_spill_words = frame[CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET];
             }
             break;

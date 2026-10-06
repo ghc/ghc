@@ -393,13 +393,20 @@ INLINE_HEADER void pushClosure   (StgTSO *tso, StgWord c) {
   tso->stackobj->sp[0] = (W_) c;
 }
 
+// Push the header of a frame with info table `info`: FRAME_HDR_W words
+// (the code word and the info word under two-word frames).
+INLINE_HEADER void pushFrameHeader (StgTSO *tso, const StgInfoTable *info) {
+  tso->stackobj->sp -= FRAME_HDR_W;
+  SET_FRAME_HDR(tso->stackobj->sp, info);
+}
+
 StgTSO *
 createGenThread (Capability *cap, W_ stack_size,  StgClosure *closure)
 {
   StgTSO *t;
   t = createThread (cap, stack_size);
   pushClosure(t, (W_)closure);
-  pushClosure(t, (W_)&stg_enter_info);
+  pushFrameHeader(t, &stg_enter_info);
   return t;
 }
 
@@ -408,9 +415,9 @@ createIOThread (Capability *cap, W_ stack_size,  StgClosure *closure)
 {
   StgTSO *t;
   t = createThread (cap, stack_size);
-  pushClosure(t, (W_)&stg_ap_v_info);
+  pushFrameHeader(t, &stg_ap_v_info);
   pushClosure(t, (W_)closure);
-  pushClosure(t, (W_)&stg_enter_info);
+  pushFrameHeader(t, &stg_enter_info);
   return t;
 }
 
@@ -424,10 +431,10 @@ createStrictIOThread(Capability *cap, W_ stack_size,  StgClosure *closure)
 {
   StgTSO *t;
   t = createThread(cap, stack_size);
-  pushClosure(t, (W_)&stg_forceIO_info);
-  pushClosure(t, (W_)&stg_ap_v_info);
+  pushFrameHeader(t, &stg_forceIO_info);
+  pushFrameHeader(t, &stg_ap_v_info);
   pushClosure(t, (W_)closure);
-  pushClosure(t, (W_)&stg_enter_info);
+  pushFrameHeader(t, &stg_enter_info);
   return t;
 }
 

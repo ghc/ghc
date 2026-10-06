@@ -406,7 +406,7 @@ StgClosure *captureContinuationAndAbort(Capability *cap, StgTSO *tso, StgPromptT
     IF_DEBUG(continuation,
       printStackChunk(frame, frame + stack_frame_sizeW((StgClosure *)frame)));
 
-    const StgInfoTable *info_ptr = ((StgClosure *)frame)->header.info;
+    const StgInfoTable *info_ptr = FRAME_INFO_PTR(frame);
     const StgRetInfoTable *info = get_ret_itbl((StgClosure *)frame);
     StgWord chunk_words = frame - stack->sp;
 
@@ -514,7 +514,7 @@ StgClosure *captureContinuationAndAbort(Capability *cap, StgTSO *tso, StgPromptT
   }
 
   ASSERT(cont->stack + total_words == cont_stack);
-  ASSERT(((StgClosure *)stack->sp)->header.info == &stg_prompt_frame_info);
+  ASSERT(FRAME_INFO_PTR(stack->sp) == &stg_prompt_frame_info);
   stack->sp += stack_frame_sizeW((StgClosure *)frame);
   IF_DEBUG(sanity,
     checkClosure((StgClosure *)cont);

@@ -112,6 +112,28 @@ checkStackFrame( StgPtr c )
     uint32_t size;
     const StgRetInfoTable* info;
 
+#if defined(TWO_WORD_FRAMES)
+    // Two-word frames: c[0] is the return-code address, c[1] the info
+    // pointer.  Check the header shape and invariant I2 (the two words
+    // agree), before trusting the info word.  This holds for statically
+    // linked code; code words reached through linker jump islands or
+    // dynamic-linking stubs would differ (see the T128 design notes).
+    {
+        const StgInfoTable *frame_info = FRAME_INFO_PTR(c);
+        if (RTS_UNLIKELY(!LOOKS_LIKE_INFO_PTR((StgWord)frame_info))) {
+            barf("checkStackFrame: frame %p: info word %p does not look like "
+                 "an info pointer (code word %p)",
+                 c, (const void *)frame_info, (void *)c[0]);
+        }
+        if (RTS_UNLIKELY(c[0] != (StgWord)frame_info->entry)) {
+            barf("checkStackFrame: frame %p: code word %p disagrees with "
+                 "info word %p (whose entry is %p, closure type %d)",
+                 c, (void *)c[0], (const void *)frame_info, (void *)(StgWord)frame_info->entry,
+                 (int)frame_info->type);
+        }
+    }
+#endif
+
     info = get_ret_itbl((StgClosure *)c);
 
     /* All activation records have 'bitmap' style layout info. */
@@ -130,23 +152,23 @@ checkStackFrame( StgPtr c )
     case RET_SMALL:
     case ANN_FRAME:
         size = BITMAP_SIZE(info->i.layout.bitmap);
-        checkSmallBitmap((StgPtr)c + 1,
+        checkSmallBitmap((StgPtr)c + FRAME_HDR_W,
                          BITMAP_BITS(info->i.layout.bitmap), size);
-        return 1 + size;
+        return FRAME_HDR_W + size;
 
     case RET_BCO: {
         StgBCO *bco;
         uint32_t size;
-        bco = (StgBCO *)*(c+1);
+        bco = (StgBCO *)*(c+FRAME_HDR_W);
         size = BCO_BITMAP_SIZE(bco);
-        checkLargeBitmap((StgPtr)c + 2, BCO_BITMAP(bco), size);
-        return 2 + size;
+        checkLargeBitmap((StgPtr)c + FRAME_HDR_W + 1, BCO_BITMAP(bco), size);
+        return FRAME_HDR_W + 1 + size;
     }
 
     case RET_BIG: // large bitmap (> 32 entries)
         size = GET_LARGE_BITMAP(&info->i)->size;
-        checkLargeBitmap((StgPtr)c + 1, GET_LARGE_BITMAP(&info->i), size);
-        return 1 + size;
+        checkLargeBitmap((StgPtr)c + FRAME_HDR_W, GET_LARGE_BITMAP(&info->i), size);
+        return FRAME_HDR_W + size;
 
     case RET_FUN:
     {
@@ -573,7 +595,9 @@ checkClosure( const StgClosure* p )
           ASSERT(cont->apply_mask_frame == &stg_unmaskAsyncExceptionszh_ret_info
               || cont->apply_mask_frame == &stg_maskAsyncExceptionszh_ret_info
               || cont->apply_mask_frame == &stg_maskUninterruptiblezh_ret_info);
-          ASSERT(LOOKS_LIKE_CLOSURE_PTR(cont->stack + cont->mask_frame_offset));
+          // the mask frame's info word (FRAME_AS_CLOSURE skips the code
+          // word under two-word frames)
+          ASSERT(LOOKS_LIKE_CLOSURE_PTR(FRAME_AS_CLOSURE(cont->stack + cont->mask_frame_offset)));
         }
         checkStackChunk(cont->stack, cont->stack + cont->stack_size);
         return continuation_sizeW(cont);

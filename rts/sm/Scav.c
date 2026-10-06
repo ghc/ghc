@@ -1981,9 +1981,11 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
     case ANN_FRAME:
         bitmap = BITMAP_BITS(info->i.layout.bitmap);
         size   = BITMAP_SIZE(info->i.layout.bitmap);
-        // NOTE: the payload starts immediately after the info-ptr, we
-        // don't have an StgHeader in the same sense as a heap closure.
-        p++;
+        // NOTE: the payload starts immediately after the frame header
+        // (FRAME_HDR_W words: the info-ptr, preceded by the return-code
+        // address under two-word frames); we don't have an StgHeader in
+        // the same sense as a heap closure.
+        p += FRAME_HDR_W;
         p = scavenge_small_bitmap(p, size, bitmap);
 
     follow_srt:
@@ -1997,7 +1999,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         StgBCO *bco;
         StgWord size;
 
-        p++;
+        p += FRAME_HDR_W;
         evacuate((StgClosure **)p);
         bco = (StgBCO *)*p;
         p++;
@@ -2013,7 +2015,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         StgWord size;
 
         size = GET_LARGE_BITMAP(&info->i)->size;
-        p++;
+        p += FRAME_HDR_W;
         scavenge_large_bitmap(p, GET_LARGE_BITMAP(&info->i), size);
         p += size;
         // and don't forget to follow the SRT

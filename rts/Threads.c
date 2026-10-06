@@ -38,13 +38,15 @@ static StgThreadID next_thread_id = 1;
  *    RESERVED_STACK_WORDS    (so we can get back from the stack overflow)
  *  + sizeofW(StgStopFrame)   (the stg_stop_thread_info frame)
  *  + 1                       (the closure to enter)
- *  + 1                       (stg_ap_v_ret)
- *  + 1                       (spare slot req'd by stg_ap_v_ret)
+ *  + FRAME_HDR_W             (stg_ap_v_ret)
+ *  + FRAME_HDR_W             (spare slot(s) req'd by stg_ap_v_ret)
+ *
+ * (FRAME_HDR_W is 1 with tables-next-to-code, 2 with two-word frames.)
  *
  * A thread with this stack will bomb immediately with a stack
  * overflow, which will increase its stack size.
  */
-#define MIN_STACK_WORDS (RESERVED_STACK_WORDS + sizeofW(StgStopFrame) + 3)
+#define MIN_STACK_WORDS (RESERVED_STACK_WORDS + sizeofW(StgStopFrame) + 1 + 2*FRAME_HDR_W)
 
 /* ---------------------------------------------------------------------------
    Create a new thread.
@@ -125,7 +127,7 @@ createThread(Capability *cap, W_ size)
 
     // put a stop frame on the stack
     stack->sp -= sizeofW(StgStopFrame);
-    SET_HDR((StgClosure*)stack->sp,
+    SET_FRAME_HDR_CCS(stack->sp,
             (StgInfoTable *)&stg_stop_thread_info,CCS_SYSTEM);
 
     /* Link the new thread on the global thread list.
@@ -317,8 +319,8 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         }
 
         // remove the block frame from the stack
-        ASSERT(tso->stackobj->sp[0] == (StgWord)&stg_block_throwto_info);
-        tso->stackobj->sp += 3;
+        ASSERT(FRAME_INFO_PTR(tso->stackobj->sp) == (StgInfoTable *)&stg_block_throwto_info);
+        tso->stackobj->sp += FRAME_HDR_W + 2;
         goto unblock;
     }
 
@@ -737,20 +739,23 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
             frame = (StgUnderflowFrame*)new_stack->sp;
 
             // See Note [realArgRegsCover] in GHC.Cmm.CallConv.
+            const StgInfoTable *uf_info;
             switch (vectorSupportGlobalVar) {
               case 3:
-                frame->info = &stg_stack_underflow_frame_v64_info;
+                uf_info = &stg_stack_underflow_frame_v64_info;
                 break;
               case 2:
-                frame->info = &stg_stack_underflow_frame_v32_info;
+                uf_info = &stg_stack_underflow_frame_v32_info;
                 break;
               case 1:
-                frame->info = &stg_stack_underflow_frame_v16_info;
+                uf_info = &stg_stack_underflow_frame_v16_info;
                 break;
               default:
-                frame->info = &stg_stack_underflow_frame_d_info;
+                uf_info = &stg_stack_underflow_frame_d_info;
                 break;
             }
+            // both header words under two-word frames
+            SET_FRAME_HDR(frame, uf_info);
             frame->next_chunk  = old_stack;
         }
 
@@ -894,10 +899,12 @@ loop:
     ASSERT(why_blocked == BlockedOnMVarRead || why_blocked == BlockedOnMVar);
     ASSERT(tso->block_info.mvar == mvar);
 
-    // actually perform the takeMVar
+    // actually perform the takeMVar: turn the blocked thread's
+    // stg_block_takemvar/readmvar frame into an stg_ret_p frame, writing
+    // both header words under two-word frames (Cmm twin in PrimOps.cmm)
     StgStack* stack = tso->stackobj;
-    RELAXED_STORE(&stack->sp[1], (W_)value);
-    RELAXED_STORE(&stack->sp[0], (W_)&stg_ret_p_info);
+    RELAXED_STORE(&stack->sp[FRAME_HDR_W], (W_)value);
+    SET_FRAME_HDR_RELAXED(stack->sp, &stg_ret_p_info);
 
     // indicate that the MVar operation has now completed.
     RELEASE_STORE(&tso->_link, (StgTSO*)&stg_END_TSO_QUEUE_closure);
@@ -1120,7 +1127,7 @@ restoreStackInvariants(StgTSO *tso, StgPtr sp, StgWord words)
      */
      StgPtr first_ctoi_frame = NULL, last_ctoi_frame = NULL;
      while (frame < end) {
-        if (*(StgWord*)frame == (StgWord)&stg_ctoi_t_info) {
+        if (FRAME_INFO_PTR(frame) == (StgInfoTable *)&stg_ctoi_t_info) {
             if(first_ctoi_frame == NULL) first_ctoi_frame = frame;
             last_ctoi_frame = frame;
         }

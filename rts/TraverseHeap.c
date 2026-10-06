@@ -970,7 +970,7 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackElement *sep,
         case ANN_FRAME:
             bitmap = BITMAP_BITS(info->i.layout.bitmap);
             size   = BITMAP_SIZE(info->i.layout.bitmap);
-            p++;
+            p += FRAME_HDR_W;     // skip the frame header
             p = traverseSmallBitmap(ts, p, size, bitmap, cp, sep, data);
 
         follow_srt:
@@ -982,7 +982,7 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackElement *sep,
         case RET_BCO: {
             StgBCO *bco;
 
-            p++;
+            p += FRAME_HDR_W;
             traversePushClosure(ts, (StgClosure*)*p, cp, sep, data);
             bco = (StgBCO *)*p;
             p++;
@@ -995,7 +995,7 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackElement *sep,
             // large bitmap (> 32 entries, or > 64 on a 64-bit machine)
         case RET_BIG:
             size = GET_LARGE_BITMAP(&info->i)->size;
-            p++;
+            p += FRAME_HDR_W;
             traverseLargeBitmap(ts, p, GET_LARGE_BITMAP(&info->i),
                                 size, cp, sep, data);
             p += size;

@@ -314,7 +314,7 @@
 
 #define ENTER_R1() P_ _r1; _r1 = R1; ENTER_(RET_R1, _r1)
 
-#define RET_R1(x) jump %ENTRY_CODE(Sp(0)) [R1]
+#define RET_R1(x) jump FRAME_CODE(Sp) [R1]
 
 #define ENTER_(ret,x)                                   \
  again:                                                 \
@@ -380,6 +380,51 @@
 
 
 #define MyCapability()  (BaseReg - OFFSET_Capability_r)
+
+/* -------------------------------------------------------------------------
+   Stack frame headers
+
+   A stack frame starts with FRAME_HDR_W header words (rts/Constants.h),
+   then the optional profiling header, then the payload.  With
+   tables-next-to-code the header is the single info pointer, which is
+   also the return address.  Under TWO_WORD_FRAMES (no
+   tables-next-to-code) the frame at p is
+
+       W_[p]           the address of the frame's return code
+       W_[p + WDS(1)]  the info table pointer (the frame's identity)
+
+   and the two always agree: %ENTRY_CODE(info) == code.
+
+   FRAME_INFO(p)               the info word of the frame at p
+   FRAME_CODE(p)               the return-code address of the frame at p:
+                                 jump FRAME_CODE(Sp) [..]
+   SET_FRAME_HDR_LBL(p,f)      write the header of a frame f declared
+                                 with INFO_TABLE_RET(f, ..)
+   SET_FRAME_HDR_INFO(p,info)  write the header from an info pointer
+                                 held in a variable (costs a load of the
+                                 info table's entry field under
+                                 TWO_WORD_FRAMES)
+
+   High-level Cmm (return, call, push, jump f (frame) (..), the
+   INFO_TABLE_RET formals) gets the code word from the Cmm parser; only
+   code that names Sp by hand uses these macros.
+   ------------------------------------------------------------------------- */
+
+#if defined(TWO_WORD_FRAMES)
+#define FRAME_INFO(p) W_[(p) + WDS(FRAME_HDR_W-1)]
+#define FRAME_CODE(p) W_[p]
+#define SET_FRAME_HDR_LBL(p,f)                  \
+    W_[p] = RET_LBL(f);                         \
+    W_[(p) + WDS(1)] = f##_info
+#define SET_FRAME_HDR_INFO(p,info)              \
+    W_[p] = %ENTRY_CODE(info);                  \
+    W_[(p) + WDS(1)] = info
+#else
+#define FRAME_INFO(p) W_[p]
+#define FRAME_CODE(p) %ENTRY_CODE(W_[p])
+#define SET_FRAME_HDR_LBL(p,f) W_[p] = f##_info
+#define SET_FRAME_HDR_INFO(p,info) W_[p] = info
+#endif
 
 /* -------------------------------------------------------------------------
    Info tables
@@ -567,8 +612,10 @@
 
 // A funky heap check used by AutoApply.cmm
 
+// f is the info pointer of the (possibly unwritten) frame at Sp; the
+// failure path writes its header before the GC sees the stack.
 #define HP_CHK_NP_ASSIGN_SP0(size,f)                    \
-    HEAP_CHECK(size, Sp(0) = f; jump __stg_gc_enter_1 [R1];)
+    HEAP_CHECK(size, SET_FRAME_HDR_INFO(Sp,f); jump __stg_gc_enter_1 [R1];)
 
 /* -----------------------------------------------------------------------------
    Closure headers
@@ -625,6 +672,15 @@
 #define LOOKS_LIKE_CLOSURE_PTR(p)                               \
    ( LOOKS_LIKE_PTR(p) &&                                       \
      LOOKS_LIKE_INFO_PTR(GET_INFO(UNTAG(p))))
+
+/* The same for a stack frame at p, whose info pointer is FRAME_INFO(p) */
+#if defined(TWO_WORD_FRAMES)
+#define LOOKS_LIKE_FRAME_PTR(p)                                 \
+   ( LOOKS_LIKE_PTR(p) &&                                       \
+     LOOKS_LIKE_INFO_PTR(FRAME_INFO(p)))
+#else
+#define LOOKS_LIKE_FRAME_PTR(p) LOOKS_LIKE_CLOSURE_PTR(p)
+#endif
 
 /*
  * The layout of the StgFunInfoExtra part of an info table changes

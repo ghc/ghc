@@ -44,8 +44,10 @@ StgBool isThreadBound (StgTSO* tso);
 void threadStackOverflow  (Capability *cap, StgTSO *tso);
 W_   threadStackUnderflow (Capability *cap, StgTSO *tso);
 
-#define CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET 4
-#define CTOI_TUPLE_INFO_OFFSET 2
+// Word offsets from the start of an stg_ctoi_t frame; they count the
+// frame header, which has FRAME_HDR_W words (two under two-word frames).
+#define CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET (3 + FRAME_HDR_W)
+#define CTOI_TUPLE_INFO_OFFSET (1 + FRAME_HDR_W)
 void restoreStackInvariants(StgTSO *tso, StgPtr sp, StgWord words);
 
 #if defined(DEBUG)

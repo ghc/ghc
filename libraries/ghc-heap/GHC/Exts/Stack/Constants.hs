@@ -27,6 +27,8 @@ module GHC.Exts.Stack.Constants (
   offsetStgBCOFrameSize,
   offsetStgClosurePayload,
   sizeStgClosure,
+  offsetStgFramePayload,
+  sizeStgFrameHeader,
   byteOffsetToWordOffset,
   bytesToWords,
   bytesInWord,

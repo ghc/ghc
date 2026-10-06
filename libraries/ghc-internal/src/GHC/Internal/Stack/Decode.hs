@@ -372,9 +372,9 @@ unpackStackFrameTo (StackSnapshot stackSnapshot#, index) unpackUnderflowFrame fi
     unpackStackFrame' info mkUnderflowResult mkStackFrameResult =
       case tipe info of
         RET_BCO -> do
-          let bco' = getClosureBox stackSnapshot# (index + offsetStgClosurePayload)
-          -- The arguments begin directly after the payload's one element
-          bcoArgs' <- decodeLargeBitmap getBCOLargeBitmap# stackSnapshot# index (offsetStgClosurePayload + 1)
+          let bco' = getClosureBox stackSnapshot# (index + offsetStgFramePayload)
+          -- The arguments begin directly after the payload's one element (the BCO)
+          bcoArgs' <- decodeLargeBitmap getBCOLargeBitmap# stackSnapshot# index (offsetStgFramePayload + 1)
           mkStackFrameResult
             RetBCO
               { info_tbl = info,
@@ -382,7 +382,7 @@ unpackStackFrameTo (StackSnapshot stackSnapshot#, index) unpackUnderflowFrame fi
                 bcoArgs = bcoArgs'
               }
         RET_SMALL ->
-          let payload' = decodeSmallBitmap getSmallBitmap# stackSnapshot# index offsetStgClosurePayload
+          let payload' = decodeSmallBitmap getSmallBitmap# stackSnapshot# index offsetStgFramePayload
           in
             mkStackFrameResult $
               RetSmall
@@ -390,7 +390,7 @@ unpackStackFrameTo (StackSnapshot stackSnapshot#, index) unpackUnderflowFrame fi
                   stack_payload = payload'
                 }
         RET_BIG -> do
-          payload' <- decodeLargeBitmap getLargeBitmap# stackSnapshot# index offsetStgClosurePayload
+          payload' <- decodeLargeBitmap getLargeBitmap# stackSnapshot# index offsetStgFramePayload
           mkStackFrameResult $
             RetBig
               { info_tbl = info,

@@ -296,6 +296,37 @@ extern char **environ;
      SymE_NeedsDataProto(ffi_type_uint8)                    \
      SymE_NeedsDataProto(ffi_type_pointer)
 
+/* Under two-word frames (T128) compiled code pushes the return-code
+   address of RTS frames next to their info pointer, so it names the
+   frames' `_ret` symbols as well as their `_info` symbols. */
+#if defined(TWO_WORD_FRAMES) && defined(PROFILING)
+#define RTS_TWO_WORD_FRAME_PROF_RET_SYMBOLS             \
+      SymI_HasProto(stg_restore_cccs_d_ret)             \
+      SymI_HasProto(stg_restore_cccs_v16_ret)           \
+      SymI_HasProto(stg_restore_cccs_v32_ret)           \
+      SymI_HasProto(stg_restore_cccs_v64_ret)
+#else
+#define RTS_TWO_WORD_FRAME_PROF_RET_SYMBOLS /* nothing */
+#endif
+
+#if defined(TWO_WORD_FRAMES)
+#define RTS_TWO_WORD_FRAME_RET_SYMBOLS                  \
+      SymI_HasProto(stg_upd_frame_ret)                  \
+      SymI_HasProto(stg_bh_upd_frame_ret)               \
+      SymI_HasProto(stg_marked_upd_frame_ret)           \
+      SymI_HasProto(stg_orig_thunk_info_frame_ret)      \
+      SymI_HasProto(stg_ret_v_ret)                      \
+      SymI_HasProto(stg_ret_p_ret)                      \
+      SymI_HasProto(stg_ret_n_ret)                      \
+      SymI_HasProto(stg_ret_f_ret)                      \
+      SymI_HasProto(stg_ret_d_ret)                      \
+      SymI_HasProto(stg_ret_l_ret)                      \
+      SymI_HasProto(stg_ret_t_ret)                      \
+      RTS_TWO_WORD_FRAME_PROF_RET_SYMBOLS
+#else
+#define RTS_TWO_WORD_FRAME_RET_SYMBOLS /* nothing */
+#endif
+
 #if defined(TABLES_NEXT_TO_CODE)
 #define RTS_RET_SYMBOLS /* nothing */
 #else
@@ -318,7 +349,8 @@ extern char **environ;
       SymI_HasProto(stg_ap_pppv_ret)                    \
       SymI_HasProto(stg_ap_pppp_ret)                    \
       SymI_HasProto(stg_ap_ppppp_ret)                   \
-      SymI_HasProto(stg_ap_pppppp_ret)
+      SymI_HasProto(stg_ap_pppppp_ret)                  \
+      RTS_TWO_WORD_FRAME_RET_SYMBOLS
 #endif
 
 /* Modules compiled with -ticky may mention ticky counters */

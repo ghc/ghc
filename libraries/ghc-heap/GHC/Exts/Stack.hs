@@ -16,20 +16,22 @@ import Prelude
 
 -- | Get the size of the `StackFrame` in words.
 --
--- Includes header and payload. Does not follow pointers.
+-- Includes header and payload. Does not follow pointers. The header of a
+-- generic frame is 'sizeStgFrameHeader' words (two without
+-- tables-next-to-code: the return-code address and the info pointer).
 stackFrameSize :: StackFrame -> Int
 stackFrameSize (UpdateFrame {}) = sizeStgUpdateFrame
 stackFrameSize (CatchFrame {}) = sizeStgCatchFrame
 stackFrameSize (CatchStmFrame {}) = sizeStgCatchSTMFrame
 stackFrameSize (CatchRetryFrame {}) = sizeStgCatchRetryFrame
 stackFrameSize (AtomicallyFrame {}) = sizeStgAtomicallyFrame
-stackFrameSize (RetSmall {..}) = sizeStgClosure + length stack_payload
-stackFrameSize (RetBig {..}) = sizeStgClosure + length stack_payload
+stackFrameSize (RetSmall {..}) = sizeStgFrameHeader + length stack_payload
+stackFrameSize (RetBig {..}) = sizeStgFrameHeader + length stack_payload
 stackFrameSize (RetFun {..}) = sizeStgRetFunFrame + length retFunPayload
 -- The one additional word is a pointer to the StgBCO in the closure's payload
-stackFrameSize (RetBCO {..}) = sizeStgClosure + 1 + length bcoArgs
+stackFrameSize (RetBCO {..}) = sizeStgFrameHeader + 1 + length bcoArgs
 -- The one additional word is a pointer to the next stack chunk
-stackFrameSize (UnderflowFrame {}) = sizeStgClosure + 1
+stackFrameSize (UnderflowFrame {}) = sizeStgFrameHeader + 1
 stackFrameSize (AnnFrame {}) = sizeStgAnnFrame
 stackFrameSize _ = error "Unexpected stack frame type"
 

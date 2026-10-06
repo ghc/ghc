@@ -964,7 +964,7 @@ fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
 
     for (; is_caf && depth < MAX_DEPTH; depth++)
     {
-        switch (get_itbl((StgClosure*)frame)->type)
+        switch (get_ret_itbl((StgClosure*)frame)->i.type)  // frame: info word
         {
         case UPDATE_FRAME:
             ccs = ((StgUpdateFrame*)frame)->header.prof.ccs;

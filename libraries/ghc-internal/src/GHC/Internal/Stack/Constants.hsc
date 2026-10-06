@@ -25,62 +25,64 @@ newtype WordOffset = WordOffset { offsetInWords :: Int }
 
 offsetStgCatchFrameHandler :: WordOffset
 offsetStgCatchFrameHandler = byteOffsetToWordOffset $
-  (#const OFFSET_StgCatchFrame_handler) + (#size StgHeader)
+  (#const OFFSET_StgCatchFrame_handler) + (#size StgFrameHeader)
 
 sizeStgCatchFrame :: Int
 sizeStgCatchFrame = bytesToWords $
-  (#const SIZEOF_StgCatchFrame_NoHdr) + (#size StgHeader)
+  (#const SIZEOF_StgCatchFrame_NoHdr) + (#size StgFrameHeader)
 
 offsetStgCatchSTMFrameCode :: WordOffset
 offsetStgCatchSTMFrameCode = byteOffsetToWordOffset $
-  (#const OFFSET_StgCatchSTMFrame_code) + (#size StgHeader)
+  (#const OFFSET_StgCatchSTMFrame_code) + (#size StgFrameHeader)
 
 offsetStgCatchSTMFrameHandler :: WordOffset
 offsetStgCatchSTMFrameHandler = byteOffsetToWordOffset $
-  (#const OFFSET_StgCatchSTMFrame_handler) + (#size StgHeader)
+  (#const OFFSET_StgCatchSTMFrame_handler) + (#size StgFrameHeader)
 
 sizeStgCatchSTMFrame :: Int
 sizeStgCatchSTMFrame = bytesToWords $
-  (#const SIZEOF_StgCatchSTMFrame_NoHdr) + (#size StgHeader)
+  (#const SIZEOF_StgCatchSTMFrame_NoHdr) + (#size StgFrameHeader)
 
 offsetStgUpdateFrameUpdatee :: WordOffset
 offsetStgUpdateFrameUpdatee = byteOffsetToWordOffset $
-  (#const OFFSET_StgUpdateFrame_updatee) + (#size StgHeader)
+  (#const OFFSET_StgUpdateFrame_updatee) + (#size StgFrameHeader)
 
 sizeStgUpdateFrame :: Int
 sizeStgUpdateFrame = bytesToWords $
-  (#const SIZEOF_StgUpdateFrame_NoHdr) + (#size StgHeader)
+  (#const SIZEOF_StgUpdateFrame_NoHdr) + (#size StgFrameHeader)
 
 offsetStgAtomicallyFrameCode :: WordOffset
 offsetStgAtomicallyFrameCode = byteOffsetToWordOffset $
-  (#const OFFSET_StgAtomicallyFrame_code) + (#size StgHeader)
+  (#const OFFSET_StgAtomicallyFrame_code) + (#size StgFrameHeader)
 
 offsetStgAtomicallyFrameResult :: WordOffset
 offsetStgAtomicallyFrameResult = byteOffsetToWordOffset $
-  (#const OFFSET_StgAtomicallyFrame_result) + (#size StgHeader)
+  (#const OFFSET_StgAtomicallyFrame_result) + (#size StgFrameHeader)
 
 sizeStgAtomicallyFrame :: Int
 sizeStgAtomicallyFrame = bytesToWords $
-  (#const SIZEOF_StgAtomicallyFrame_NoHdr) + (#size StgHeader)
+  (#const SIZEOF_StgAtomicallyFrame_NoHdr) + (#size StgFrameHeader)
 
 offsetStgCatchRetryFrameRunningAltCode :: WordOffset
 offsetStgCatchRetryFrameRunningAltCode = byteOffsetToWordOffset $
-  (#const OFFSET_StgCatchRetryFrame_running_alt_code) + (#size StgHeader)
+  (#const OFFSET_StgCatchRetryFrame_running_alt_code) + (#size StgFrameHeader)
 
 offsetStgCatchRetryFrameRunningFirstCode :: WordOffset
 offsetStgCatchRetryFrameRunningFirstCode = byteOffsetToWordOffset $
-  (#const OFFSET_StgCatchRetryFrame_first_code) + (#size StgHeader)
+  (#const OFFSET_StgCatchRetryFrame_first_code) + (#size StgFrameHeader)
 
 offsetStgCatchRetryFrameAltCode :: WordOffset
 offsetStgCatchRetryFrameAltCode = byteOffsetToWordOffset $
-  (#const OFFSET_StgCatchRetryFrame_alt_code) + (#size StgHeader)
+  (#const OFFSET_StgCatchRetryFrame_alt_code) + (#size StgFrameHeader)
 
 sizeStgCatchRetryFrame :: Int
 sizeStgCatchRetryFrame = bytesToWords $
-  (#const SIZEOF_StgCatchRetryFrame_NoHdr) + (#size StgHeader)
+  (#const SIZEOF_StgCatchRetryFrame_NoHdr) + (#size StgFrameHeader)
 
 offsetStgRetFunFrameSize :: WordOffset
--- StgRetFun has no header, but only a pointer to the info table at the beginning.
+-- StgRetFun has no header, but only a pointer to the info table at the beginning
+-- (preceded by the return-code address without tables-next-to-code); these
+-- offsets are from the start of the struct.
 offsetStgRetFunFrameSize = byteOffsetToWordOffset (#const OFFSET_StgRetFun_size)
 
 offsetStgRetFunFrameFun :: WordOffset
@@ -94,11 +96,11 @@ sizeStgRetFunFrame = bytesToWords (#const SIZEOF_StgRetFun)
 
 sizeStgAnnFrame :: Int
 sizeStgAnnFrame = bytesToWords $
-  (#const SIZEOF_StgAnnFrame_NoHdr) + (#size StgHeader)
+  (#const SIZEOF_StgAnnFrame_NoHdr) + (#size StgFrameHeader)
 
 offsetStgAnnFrameAnn :: WordOffset
 offsetStgAnnFrameAnn = byteOffsetToWordOffset $
-  (#const OFFSET_StgAnnFrame_ann) + (#size StgHeader)
+  (#const OFFSET_StgAnnFrame_ann) + (#size StgFrameHeader)
 
 offsetStgBCOFrameInstrs :: ByteOffset
 offsetStgBCOFrameInstrs = (#const OFFSET_StgBCO_instrs) + (#size StgHeader)
@@ -114,6 +116,18 @@ offsetStgBCOFrameArity = (#const OFFSET_StgBCO_arity) + (#size StgHeader)
 
 offsetStgBCOFrameSize :: ByteOffset
 offsetStgBCOFrameSize = (#const OFFSET_StgBCO_size) + (#size StgHeader)
+
+-- | Words from the start of a stack frame to its payload: the frame header
+-- (two words, code and info pointer, without tables-next-to-code; see
+-- StgFrameHeader in rts/include/rts/storage/Closures.h) plus the profiling
+-- header if any. Use this, not 'offsetStgClosurePayload', for frames.
+offsetStgFramePayload :: WordOffset
+offsetStgFramePayload = byteOffsetToWordOffset $
+  (#const OFFSET_StgClosure_payload) + (#size StgFrameHeader)
+
+-- | Words in a stack frame header ('StgFrameHeader').
+sizeStgFrameHeader :: Int
+sizeStgFrameHeader = bytesToWords (#size StgFrameHeader)
 
 offsetStgClosurePayload :: WordOffset
 offsetStgClosurePayload = byteOffsetToWordOffset $

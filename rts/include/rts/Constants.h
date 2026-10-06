@@ -152,7 +152,36 @@
    18 words for the saved registers, see StgMacros.h).
    -------------------------------------------------------------------------- */
 
+/* -----------------------------------------------------------------------------
+   Two-word stack frames (T128)
+
+   Without tables-next-to-code, every stack frame starts with two words:
+   Sp[0] holds the address of the frame's return code and Sp[1] the info
+   table pointer.  A return is then a single load-and-jump, as under TNTC.
+   A frame's identity is always the info word; bitmaps describe the payload
+   only, starting at Sp + FRAME_HDR_W (after the optional profiling header,
+   which counts as payload).  With TNTC, the one header word does both
+   jobs and FRAME_HDR_W is 1.
+
+   FRAME_HDR_W: words before a frame's payload, excluding the profiling
+   header.
+   -------------------------------------------------------------------------- */
+
+#if !defined(TABLES_NEXT_TO_CODE)
+#define TWO_WORD_FRAMES 1
+#define FRAME_HDR_W 2
+#else
+#define FRAME_HDR_W 1
+#endif
+
+/* Two-word frames enlarge every frame pushed below SpLim without a stack
+   check by one word; the reserve is raised with a margin rather than
+   re-derived (T128 design decision D6). */
+#if defined(TWO_WORD_FRAMES)
+#define RESERVED_STACK_WORDS 32
+#else
 #define RESERVED_STACK_WORDS 21
+#endif
 
 /* -----------------------------------------------------------------------------
    The limit on the size of the stack check performed when we enter an

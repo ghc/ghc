@@ -334,9 +334,10 @@ thread_stack(P_ p, P_ stack_end)
 
     while (p < stack_end) {
 
-        // *p must be the info pointer of an activation
-        // record.  All activation records have 'bitmap' style layout
-        // info.
+        // p must point to an activation record, whose info pointer is
+        // the last of its FRAME_HDR_W header words.  All activation
+        // records have 'bitmap' style layout info.  Neither header word is
+        // ever threaded.
         //
         const StgRetInfoTable *info  = get_ret_itbl((StgClosure *)p);
 
@@ -355,15 +356,15 @@ thread_stack(P_ p, P_ stack_end)
         {
             W_ bitmap = BITMAP_BITS(info->i.layout.bitmap);
             W_ size   = BITMAP_SIZE(info->i.layout.bitmap);
-            p++;
-            // NOTE: the payload starts immediately after the info-ptr, we
-            // don't have an StgHeader in the same sense as a heap closure.
+            p += FRAME_HDR_W;
+            // NOTE: the payload starts immediately after the frame header,
+            // we don't have an StgHeader in the same sense as a heap closure.
             p = thread_small_bitmap(p, size, bitmap);
             continue;
         }
 
         case RET_BCO: {
-            p++;
+            p += FRAME_HDR_W;
             StgBCO *bco = (StgBCO *)*p;
             thread((StgClosure **)p);
             p++;
@@ -375,7 +376,7 @@ thread_stack(P_ p, P_ stack_end)
 
             // large bitmap (> 32 entries, or 64 on a 64-bit machine)
         case RET_BIG:
-            p++;
+            p += FRAME_HDR_W;
             W_ size = GET_LARGE_BITMAP(&info->i)->size;
             thread_large_bitmap(p, GET_LARGE_BITMAP(&info->i), size);
             p += size;

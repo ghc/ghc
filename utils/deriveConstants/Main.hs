@@ -173,12 +173,14 @@ newtype CExpr = CExpr String
 newtype CPPExpr = CPPExpr String
 data What f = GetFieldType   Name (f CExpr   Integer)
             | GetClosureSize Name (f CExpr   Integer)
+            | GetFrameSize   Name (f CExpr   Integer)
             | GetWord        Name (f CExpr   Integer)
             | GetInt         Name (f CExpr   Integer)
             | GetNatural     Name (f CExpr   Integer)
             | GetBool        Name (f CPPExpr Bool)
             | StructFieldMacro    Name
             | ClosureFieldMacro   Name
+            | FrameFieldMacro     Name
             | ClosurePayloadMacro Name
             | FieldTypeGcptrMacro Name
 
@@ -280,6 +282,32 @@ closureSize :: Where -> String -> Wanteds
 closureSize w theType = defSize        w (theType ++ "_NoHdr") (CExpr expr)
                      ++ defClosureSize C theType               (CExpr expr)
     where expr = "TYPE_SIZE(" ++ theType ++ ") - TYPE_SIZE(StgHeader)"
+
+-- Stack frames: the size of a frame type minus its header, named
+-- SIZEOF_<type>_NoHdr, and the byte offset of a frame field minus the
+-- header, named OFFSET_<type>_<field>.  The header subtracted is
+-- StgFrameHeader, not StgHeader, so these mean "relative to the end of the
+-- frame header" in every configuration; the compiler adds the frame header
+-- size (frameHdrSize) back.  The generated C-- macros (SIZEOF_<type>,
+-- <type>_<field>(p)) use SIZEOF_StgFrameHeader, which the Cmm parser
+-- provides.
+--
+-- Without tables-next-to-code a frame header is two words, the return-code
+-- address and then the info pointer (TWO_WORD_FRAMES in rts/Constants.h,
+-- Note [Two-word frames] in GHC.Runtime.Heap.Layout).  With
+-- tables-next-to-code StgFrameHeader is laid out exactly like StgHeader,
+-- so frameSize/frameField give the same numbers as closureSize/closureField.
+frameSize :: Where -> String -> Wanteds
+frameSize w theType = defSize w (theType ++ "_NoHdr") (CExpr expr)
+                   ++ [(C, GetFrameSize ("SIZEOF_" ++ theType) (Fst (CExpr expr)))]
+    where expr = "TYPE_SIZE(" ++ theType ++ ") - TYPE_SIZE(StgFrameHeader)"
+
+frameField :: Where -> String -> String -> Wanteds
+frameField w theType theField
+    = defOffset w nameBase (CExpr ("offsetof(" ++ theType ++ ", " ++ theField ++ ") - TYPE_SIZE(StgFrameHeader)"))
+   ++ fieldType_' C nameBase theType theField
+   ++ [(C, FrameFieldMacro nameBase)]
+    where nameBase = theType ++ "_" ++ theField
 
 -- Byte offset and MachRep for a closure field, minus the header
 closureFieldGcptr :: Where -> String -> String -> Wanteds
@@ -443,14 +471,14 @@ wanteds os = concat
           ,structField  Both "StgEntCounter" "link"
           ,structField  Both "StgEntCounter" "entry_count"
 
-          ,closureSize  Both "StgUpdateFrame"
-          ,closureSize  Both "StgOrigThunkInfoFrame"
-          ,closureSize  C    "StgCatchFrame"
-          ,closureSize  C    "StgStopFrame"
-          ,closureSize  C    "StgDeadThreadFrame"
-          ,closureField C    "StgDeadThreadFrame" "result"
-          ,closureSize  Both "StgAnnFrame"
-          ,closureField C    "StgAnnFrame" "ann"
+          ,frameSize  Both "StgUpdateFrame"
+          ,frameSize  Both "StgOrigThunkInfoFrame"
+          ,frameSize  C    "StgCatchFrame"
+          ,frameSize  C    "StgStopFrame"
+          ,frameSize  C    "StgDeadThreadFrame"
+          ,frameField C    "StgDeadThreadFrame" "result"
+          ,frameSize  Both "StgAnnFrame"
+          ,frameField C    "StgAnnFrame" "ann"
 
           ,closureSize    Both "StgMutArrPtrs"
           ,closureField   Both "StgMutArrPtrs" "ptrs"
@@ -486,10 +514,10 @@ wanteds os = concat
           ,closureField       C    "StgStack" "dirty"
           ,closureField       C    "StgStack" "marking"
 
-          ,closureField Both "StgUpdateFrame" "updatee"
-          ,closureField Both "StgOrigThunkInfoFrame" "info_ptr"
+          ,frameField Both "StgUpdateFrame" "updatee"
+          ,frameField Both "StgOrigThunkInfoFrame" "info_ptr"
 
-          ,closureField C "StgCatchFrame" "handler"
+          ,frameField C "StgCatchFrame" "handler"
 
           ,structSize  C "StgRetFun"
           ,fieldOffset C "StgRetFun" "size"
@@ -521,20 +549,20 @@ wanteds os = concat
           ,closureSize  C "StgMutVar"
           ,closureField C "StgMutVar" "var"
 
-          ,closureSize  C "StgAtomicallyFrame"
-          ,closureField C "StgAtomicallyFrame" "code"
-          ,closureField C "StgAtomicallyFrame" "result"
+          ,frameSize  C "StgAtomicallyFrame"
+          ,frameField C "StgAtomicallyFrame" "code"
+          ,frameField C "StgAtomicallyFrame" "result"
 
           ,closureField C "StgTRecHeader" "enclosing_trec"
 
-          ,closureSize  C "StgCatchSTMFrame"
-          ,closureField C "StgCatchSTMFrame" "handler"
-          ,closureField C "StgCatchSTMFrame" "code"
+          ,frameSize  C "StgCatchSTMFrame"
+          ,frameField C "StgCatchSTMFrame" "handler"
+          ,frameField C "StgCatchSTMFrame" "code"
 
-          ,closureSize  C "StgCatchRetryFrame"
-          ,closureField C "StgCatchRetryFrame" "running_alt_code"
-          ,closureField C "StgCatchRetryFrame" "first_code"
-          ,closureField C "StgCatchRetryFrame" "alt_code"
+          ,frameSize  C "StgCatchRetryFrame"
+          ,frameField C "StgCatchRetryFrame" "running_alt_code"
+          ,frameField C "StgCatchRetryFrame" "first_code"
+          ,frameField C "StgCatchRetryFrame" "alt_code"
 
           ,closureSize  C "StgTVar"
           ,closureField C "StgTVar" "current_value"
@@ -792,6 +820,8 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
               = ["char " ++ mkFullName name ++ "[1 + " ++ cExpr ++ "];"]
           doWanted (GetClosureSize name (Fst (CExpr cExpr)))
               = ["char " ++ mkFullName name ++ "[1 + " ++ cExpr ++ "];"]
+          doWanted (GetFrameSize name (Fst (CExpr cExpr)))
+              = ["char " ++ mkFullName name ++ "[1 + " ++ cExpr ++ "];"]
           doWanted (GetWord name (Fst (CExpr cExpr)))
               = ["char " ++ mkFullName name ++ "[1 + " ++ cExpr ++ "];"]
           doWanted (GetInt name (Fst (CExpr cExpr)))
@@ -813,6 +843,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                  "#endif"]
           doWanted (StructFieldMacro {}) = []
           doWanted (ClosureFieldMacro {}) = []
+          doWanted (FrameFieldMacro {}) = []
           doWanted (ClosurePayloadMacro {}) = []
           doWanted (FieldTypeGcptrMacro {}) = []
 
@@ -919,10 +950,15 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
           lookupResult m (w, GetClosureSize name _)
               = do v <- lookupSmall m name
                    return (w, GetClosureSize name (Snd (v - 1)))
+          lookupResult m (w, GetFrameSize name _)
+              = do v <- lookupSmall m name
+                   return (w, GetFrameSize name (Snd (v - 1)))
           lookupResult _ (w, StructFieldMacro name)
               = return (w, StructFieldMacro name)
           lookupResult _ (w, ClosureFieldMacro name)
               = return (w, ClosureFieldMacro name)
+          lookupResult _ (w, FrameFieldMacro name)
+              = return (w, FrameFieldMacro name)
           lookupResult _ (w, ClosurePayloadMacro name)
               = return (w, ClosurePayloadMacro name)
           lookupResult _ (w, FieldTypeGcptrMacro name)
@@ -953,8 +989,10 @@ getWantedJS = mapM lookupResult (wanteds (Just JS))
       GetBool             name _ -> (w, GetBool             name (Snd False))
       GetFieldType        name _ -> (w, GetFieldType        name (Snd 1))
       GetClosureSize      name _ -> (w, GetClosureSize      name (Snd 1))
+      GetFrameSize        name _ -> (w, GetFrameSize        name (Snd 1))
       StructFieldMacro    name   -> (w, StructFieldMacro    name)
       ClosureFieldMacro   name   -> (w, ClosureFieldMacro   name)
+      FrameFieldMacro     name   -> (w, FrameFieldMacro     name)
       ClosurePayloadMacro name   -> (w, ClosurePayloadMacro name)
       FieldTypeGcptrMacro name   -> (w, FieldTypeGcptrMacro name)
 
@@ -969,6 +1007,7 @@ writeHaskellType fn ws = atomicWriteFile fn xs
           body = intercalate ",\n" (concatMap doWhat ws)
 
           doWhat (GetClosureSize name _) = ["      pc_" ++ name ++ " :: {-# UNPACK #-} !Int"]
+          doWhat (GetFrameSize   name _) = ["      pc_" ++ name ++ " :: {-# UNPACK #-} !Int"]
           doWhat (GetFieldType   name _) = ["      pc_" ++ name ++ " :: {-# UNPACK #-} !Int"]
           doWhat (GetWord        name _) = ["      pc_" ++ name ++ " :: {-# UNPACK #-} !Int"]
           doWhat (GetInt         name _) = ["      pc_" ++ name ++ " :: {-# UNPACK #-} !Int"]
@@ -976,6 +1015,7 @@ writeHaskellType fn ws = atomicWriteFile fn xs
           doWhat (GetBool        name _) = ["      pc_" ++ name ++ " :: !Bool"]
           doWhat (StructFieldMacro {}) = []
           doWhat (ClosureFieldMacro {}) = []
+          doWhat (FrameFieldMacro {}) = []
           doWhat (ClosurePayloadMacro {}) = []
           doWhat (FieldTypeGcptrMacro {}) = []
 
@@ -1013,6 +1053,7 @@ writeHaskellType fn ws = atomicWriteFile fn xs
 
 
           doParse (GetClosureSize name _)   i = ["pc_" ++ name ++ " = fromIntegral v" ++ show i]
+          doParse (GetFrameSize   name _)   i = ["pc_" ++ name ++ " = fromIntegral v" ++ show i]
           doParse (GetFieldType   name _)   i = ["pc_" ++ name ++ " = fromIntegral v" ++ show i]
           doParse (GetWord        name _)   i = ["pc_" ++ name ++ " = fromIntegral v" ++ show i]
           doParse (GetInt         name _)   i = ["pc_" ++ name ++ " = fromIntegral v" ++ show i]
@@ -1020,6 +1061,7 @@ writeHaskellType fn ws = atomicWriteFile fn xs
           doParse (GetBool        name _)   i = ["pc_" ++ name ++ " = 0 < v" ++ show i]
           doParse (StructFieldMacro {})    _i = []
           doParse (ClosureFieldMacro {})   _i = []
+          doParse (FrameFieldMacro {})     _i = []
           doParse (ClosurePayloadMacro {}) _i = []
           doParse (FieldTypeGcptrMacro {}) _i = []
 
@@ -1031,6 +1073,7 @@ writeHaskellValue fn rs = atomicWriteFile fn xs
           footer = "  }"
           body = intercalate ",\n" (concatMap doWhat rs)
           doWhat (GetClosureSize name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
+          doWhat (GetFrameSize   name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
           doWhat (GetFieldType   name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
           doWhat (GetWord        name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
           doWhat (GetInt         name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
@@ -1038,6 +1081,7 @@ writeHaskellValue fn rs = atomicWriteFile fn xs
           doWhat (GetBool        name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
           doWhat (StructFieldMacro {}) = []
           doWhat (ClosureFieldMacro {}) = []
+          doWhat (FrameFieldMacro {}) = []
           doWhat (ClosurePayloadMacro {}) = []
           doWhat (FieldTypeGcptrMacro {}) = []
 
@@ -1063,12 +1107,14 @@ writeHeader fn rs = atomicWriteFile fn xs
           doHs x = case x of
             GetFieldType   _name (Snd v) -> Just (show v)
             GetClosureSize _name (Snd v) -> Just (show v)
+            GetFrameSize   _name (Snd v) -> Just (show v)
             GetWord        _name (Snd v) -> Just (show v)
             GetInt         _name (Snd v) -> Just (show v)
             GetNatural     _name (Snd v) -> Just (show v)
             GetBool        _name (Snd v) -> Just (if v then "1" else "0")
             StructFieldMacro {}          -> Nothing
             ClosureFieldMacro {}         -> Nothing
+            FrameFieldMacro {}           -> Nothing
             ClosurePayloadMacro {}       -> Nothing
             FieldTypeGcptrMacro {}       -> Nothing
 
@@ -1076,12 +1122,15 @@ writeHeader fn rs = atomicWriteFile fn xs
           doC x = case x of
             GetFieldType   name (Snd v)  -> "#define " ++ name ++ " b" ++ show (v * 8)
             GetClosureSize name (Snd v)  -> "#define " ++ name ++ " (SIZEOF_StgHeader+" ++ show v ++ ")"
+            -- SIZEOF_StgFrameHeader is provided by the Cmm parser
+            GetFrameSize   name (Snd v)  -> "#define " ++ name ++ " (SIZEOF_StgFrameHeader+" ++ show v ++ ")"
             GetWord        name (Snd v)  -> "#define " ++ name ++ " " ++ show v
             GetInt         name (Snd v)  -> "#define " ++ name ++ " " ++ show v
             GetNatural     name (Snd v)  -> "#define " ++ name ++ " " ++ show v
             GetBool        name (Snd v)  -> "#define " ++ name ++ " " ++ show (fromEnum v)
             StructFieldMacro nameBase    -> "#define " ++ nameBase ++ "(__ptr__) REP_" ++ nameBase ++ "[__ptr__+OFFSET_" ++ nameBase ++ "]"
             ClosureFieldMacro nameBase   -> "#define " ++ nameBase ++ "(__ptr__) REP_" ++ nameBase ++ "[__ptr__+SIZEOF_StgHeader+OFFSET_" ++ nameBase ++ "]"
+            FrameFieldMacro nameBase     -> "#define " ++ nameBase ++ "(__ptr__) REP_" ++ nameBase ++ "[__ptr__+SIZEOF_StgFrameHeader+OFFSET_" ++ nameBase ++ "]"
             ClosurePayloadMacro nameBase -> "#define " ++ nameBase ++ "(__ptr__,__ix__) W_[__ptr__+SIZEOF_StgHeader+OFFSET_" ++ nameBase ++ " + WDS(__ix__)]"
             FieldTypeGcptrMacro nameBase -> "#define REP_" ++ nameBase ++ " gcptr"
 

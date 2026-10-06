@@ -110,10 +110,69 @@ EXTERN_INLINE const StgInfoTable *get_itbl_acquire(const StgClosure *c)
     return INFO_PTR_TO_STRUCT(ACQUIRE_LOAD(&c->header.info));
 }
 
+/* -----------------------------------------------------------------------------
+   Stack frame headers
+
+   A stack frame starts with FRAME_HDR_W header words (rts/Constants.h):
+   with TABLES_NEXT_TO_CODE just the info pointer; under TWO_WORD_FRAMES the
+   return-code address (Sp[0]) and then the info pointer (Sp[1]).  The
+   profiling header, if any, follows the info word and counts as payload.
+
+   FRAME_INFO_PTR(p)        the info word of the frame at p (the frame's
+                            identity; never compare the code word)
+   SET_FRAME_HDR(p,info)    write both header words from an info pointer;
+                            the code word is info->entry
+   SET_FRAME_HDR_RELAXED    the same with relaxed atomic stores
+   SET_FRAME_HDR_CCS(p,info,ccs)
+                            header plus profiling header (like SET_HDR)
+   FRAME_AS_CLOSURE(p)      the frame seen as a closure whose header starts
+                            at the info word; only for code that reads the
+                            info word and the profiling header through
+                            StgClosure (e.g. printers).
+   -------------------------------------------------------------------------- */
+
+#define FRAME_INFO_PTR(p) \
+    ((const StgInfoTable *)RELAXED_LOAD(&((const StgWord *)(p))[FRAME_HDR_W-1]))
+
+#define FRAME_AS_CLOSURE(p) ((StgClosure *)((StgPtr)(p) + (FRAME_HDR_W-1)))
+
+#if defined(TWO_WORD_FRAMES)
+#define SET_FRAME_HDR(p,info_)                                          \
+   {                                                                    \
+        StgPtr frame_hdr_p__ = (StgPtr)(p);                             \
+        const StgInfoTable *frame_hdr_i__ = (const StgInfoTable*)(info_); \
+        frame_hdr_p__[0] = (StgWord)frame_hdr_i__->entry;               \
+        frame_hdr_p__[1] = (StgWord)frame_hdr_i__;                      \
+   }
+#define SET_FRAME_HDR_RELAXED(p,info_)                                  \
+   {                                                                    \
+        StgPtr frame_hdr_p__ = (StgPtr)(p);                             \
+        const StgInfoTable *frame_hdr_i__ = (const StgInfoTable*)(info_); \
+        RELAXED_STORE(&frame_hdr_p__[0], (StgWord)frame_hdr_i__->entry); \
+        RELAXED_STORE(&frame_hdr_p__[1], (StgWord)frame_hdr_i__);       \
+   }
+#else
+#define SET_FRAME_HDR(p,info_) \
+   { ((StgPtr)(p))[0] = (StgWord)(info_); }
+#define SET_FRAME_HDR_RELAXED(p,info_) \
+   { RELAXED_STORE(&((StgPtr)(p))[0], (StgWord)(info_)); }
+#endif
+
+#define SET_FRAME_HDR_CCS(p,info_,ccs_)                 \
+   {                                                    \
+        SET_PROF_HDR(FRAME_AS_CLOSURE(p),ccs_);         \
+        SET_FRAME_HDR_RELAXED(p,info_);                 \
+   }
+
 EXTERN_INLINE const StgRetInfoTable *get_ret_itbl(const StgClosure *c);
 EXTERN_INLINE const StgRetInfoTable *get_ret_itbl(const StgClosure *c)
 {
+    // c is a stack frame: read its info word (see FRAME_INFO_PTR)
+#if defined(TWO_WORD_FRAMES)
+    return RET_INFO_PTR_TO_STRUCT(FRAME_INFO_PTR(c));
+#else
     return RET_INFO_PTR_TO_STRUCT(RELAXED_LOAD(&c->header.info));
+#endif
 }
 
 EXTERN_INLINE const StgFunInfoTable *get_fun_itbl(const StgClosure *c);
@@ -485,13 +544,13 @@ EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame )
         return sizeofW(StgRetFun) + ((StgRetFun *)frame)->size;
 
     case RET_BIG:
-        return 1 + GET_LARGE_BITMAP(&info->i)->size;
+        return FRAME_HDR_W + GET_LARGE_BITMAP(&info->i)->size;
 
     case RET_BCO:
-        return 2 + BCO_BITMAP_SIZE((StgBCO *)((P_)frame)[1]);
+        return FRAME_HDR_W + 1 + BCO_BITMAP_SIZE((StgBCO *)((P_)frame)[FRAME_HDR_W]);
 
     default:
-        return 1 + BITMAP_SIZE(info->i.layout.bitmap);
+        return FRAME_HDR_W + BITMAP_SIZE(info->i.layout.bitmap);
     }
 }
 

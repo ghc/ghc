@@ -1180,9 +1180,10 @@ trace_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
         {
             StgWord bitmap = BITMAP_BITS(info->i.layout.bitmap);
             StgWord size   = BITMAP_SIZE(info->i.layout.bitmap);
-            // NOTE: the payload starts immediately after the info-ptr, we
-            // don't have an StgHeader in the same sense as a heap closure.
-            sp++;
+            // NOTE: the payload starts immediately after the frame header
+            // (FRAME_HDR_W words), we don't have an StgHeader in the same
+            // sense as a heap closure.
+            sp += FRAME_HDR_W;
             trace_small_bitmap(queue, (StgClosure **) sp, size, bitmap);
             sp += size;
         }
@@ -1193,7 +1194,7 @@ trace_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
             continue;
 
         case RET_BCO: {
-            sp++;
+            sp += FRAME_HDR_W;
             markQueuePushClosure_(queue, *(StgClosure**)sp);
             StgBCO *bco = (StgBCO *)*sp;
             sp++;
@@ -1209,7 +1210,7 @@ trace_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
             StgWord size;
 
             size = GET_LARGE_BITMAP(&info->i)->size;
-            sp++;
+            sp += FRAME_HDR_W;
             trace_large_bitmap(queue, (StgClosure **) sp, GET_LARGE_BITMAP(&info->i), size);
             sp += size;
             // and don't forget to follow the SRT

@@ -109,11 +109,12 @@ INLINE_HEADER void setTsoIOOpOutcome (StgTSO *tso,
                                       enum IOOpOutcome outcome,
                                       uint32_t result)
 {
-    ASSERT((StgPtr *)tso->stackobj->sp[0] == (StgPtr *)&stg_block_io_unit_info
-        || (StgPtr *)tso->stackobj->sp[0] == (StgPtr *)&stg_block_io_int_info);
+    // the frame's info word; the payload follows the FRAME_HDR_W header words
+    ASSERT((StgPtr *)FRAME_INFO_PTR(tso->stackobj->sp) == (StgPtr *)&stg_block_io_unit_info
+        || (StgPtr *)FRAME_INFO_PTR(tso->stackobj->sp) == (StgPtr *)&stg_block_io_int_info);
 
-    tso->stackobj->sp[1] = (W_)outcome;
-    tso->stackobj->sp[2] = (W_)result;
+    tso->stackobj->sp[FRAME_HDR_W]     = (W_)outcome;
+    tso->stackobj->sp[FRAME_HDR_W + 1] = (W_)result;
 }
 
 #include "EndPrivate.h"

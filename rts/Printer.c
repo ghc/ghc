@@ -109,6 +109,12 @@ printThunkObject( StgThunk *obj, char* tag )
     printThunkPayload( obj );
 }
 
+/* A stack frame is passed to printClosure as FRAME_AS_CLOSURE(frame), so
+   that get_itbl reads its info word (under two-word frames the first word
+   of a frame is the return-code address); CLOSURE_AS_FRAME undoes that in
+   the frame cases.  Both are the identity with tables-next-to-code. */
+#define CLOSURE_AS_FRAME(obj) ((StgPtr)(obj) - (FRAME_HDR_W-1))
+
 void
 printClosure( const StgClosure *obj )
 {
@@ -272,9 +278,9 @@ printClosure( const StgClosure *obj )
 
     case ANN_FRAME:
         {
-            StgAnnFrame* frame = (StgAnnFrame*)obj;
+            StgAnnFrame* frame = (StgAnnFrame*)CLOSURE_AS_FRAME(obj);
             debugBelch("ANN_FRAME(");
-            printPtr((StgPtr)GET_INFO((StgClosure *)frame));
+            printPtr((StgPtr)FRAME_INFO_PTR(frame));
             debugBelch(",");
             printPtr((StgPtr)frame->ann);
             debugBelch(")\n");
@@ -283,9 +289,9 @@ printClosure( const StgClosure *obj )
 
     case UPDATE_FRAME:
         {
-            StgUpdateFrame* frame = (StgUpdateFrame*)obj;
+            StgUpdateFrame* frame = (StgUpdateFrame*)CLOSURE_AS_FRAME(obj);
             debugBelch("%s(", info_update_frame(obj));
-            printPtr((StgPtr)GET_INFO((StgClosure *)frame));
+            printPtr((StgPtr)FRAME_INFO_PTR(frame));
             debugBelch(",");
             printPtr((StgPtr)frame->updatee);
             debugBelch(")\n");
@@ -294,9 +300,9 @@ printClosure( const StgClosure *obj )
 
     case CATCH_FRAME:
         {
-            StgCatchFrame* frame = (StgCatchFrame*)obj;
+            StgCatchFrame* frame = (StgCatchFrame*)CLOSURE_AS_FRAME(obj);
             debugBelch("CATCH_FRAME(");
-            printPtr((StgPtr)GET_INFO((StgClosure *)frame));
+            printPtr((StgPtr)FRAME_INFO_PTR(frame));
             debugBelch(",");
             printPtr((StgPtr)frame->handler);
             debugBelch(")\n");
@@ -305,7 +311,7 @@ printClosure( const StgClosure *obj )
 
     case UNDERFLOW_FRAME:
         {
-            StgUnderflowFrame* frame = (StgUnderflowFrame*)obj;
+            StgUnderflowFrame* frame = (StgUnderflowFrame*)CLOSURE_AS_FRAME(obj);
             debugBelch("UNDERFLOW_FRAME(");
             printPtr((StgPtr)frame->next_chunk);
             debugBelch(")\n");
@@ -314,18 +320,18 @@ printClosure( const StgClosure *obj )
 
     case STOP_FRAME:
         {
-            StgStopFrame* frame = (StgStopFrame*)obj;
+            StgStopFrame* frame = (StgStopFrame*)CLOSURE_AS_FRAME(obj);
             debugBelch("STOP_FRAME(");
-            printPtr((StgPtr)GET_INFO((StgClosure *)frame));
+            printPtr((StgPtr)FRAME_INFO_PTR(frame));
             debugBelch(")\n");
             break;
         }
 
     case ATOMICALLY_FRAME:
         {
-            StgAtomicallyFrame* frame = (StgAtomicallyFrame*)obj;
+            StgAtomicallyFrame* frame = (StgAtomicallyFrame*)CLOSURE_AS_FRAME(obj);
             debugBelch("ATOMICALLY_FRAME(");
-            printPtr((StgPtr)GET_INFO((StgClosure *)frame));
+            printPtr((StgPtr)FRAME_INFO_PTR(frame));
             debugBelch(",");
             printPtr((StgPtr)frame->code);
             debugBelch(",");
@@ -336,9 +342,9 @@ printClosure( const StgClosure *obj )
 
     case CATCH_RETRY_FRAME:
         {
-            StgCatchRetryFrame* frame = (StgCatchRetryFrame*)obj;
+            StgCatchRetryFrame* frame = (StgCatchRetryFrame*)CLOSURE_AS_FRAME(obj);
             debugBelch("CATCH_RETRY_FRAME(");
-            printPtr((StgPtr)GET_INFO((StgClosure *)frame));
+            printPtr((StgPtr)FRAME_INFO_PTR(frame));
             debugBelch(",");
             printPtr((StgPtr)frame->first_code);
             debugBelch(",");
@@ -349,9 +355,9 @@ printClosure( const StgClosure *obj )
 
     case CATCH_STM_FRAME:
         {
-            StgCatchSTMFrame* frame = (StgCatchSTMFrame*)obj;
+            StgCatchSTMFrame* frame = (StgCatchSTMFrame*)CLOSURE_AS_FRAME(obj);
             debugBelch("CATCH_STM_FRAME(");
-            printPtr((StgPtr)GET_INFO((StgClosure *)frame));
+            printPtr((StgPtr)FRAME_INFO_PTR(frame));
             debugBelch(",");
             printPtr((StgPtr)frame->code);
             debugBelch(",");
@@ -597,7 +603,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
     ASSERT(sp <= spBottom);
     for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
 
-        info = get_itbl((StgClosure *)sp);
+        // the frame's info word
+        info = get_itbl(FRAME_AS_CLOSURE(sp));
 
         switch (info->type) {
 
@@ -608,11 +615,11 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
         case ATOMICALLY_FRAME:
         case CATCH_RETRY_FRAME:
         case CATCH_STM_FRAME:
-            printClosure((StgClosure*)sp);
+            printClosure(FRAME_AS_CLOSURE(sp));
             continue;
 
         case RET_SMALL: {
-            StgWord c = *sp;
+            StgWord c = (StgWord)FRAME_INFO_PTR(sp);
             if (c == (StgWord)&stg_ap_v_info) {
                 debugBelch("stg_ap_v_info\n" );
             } else if (c == (StgWord)&stg_ap_f_info) {
@@ -652,27 +659,27 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 #if defined(PROFILING)
             } else if (c == (StgWord)&stg_restore_cccs_d_info) {
                 debugBelch("stg_restore_cccs_d_info\n" );
-                fprintCCS(stderr, (CostCentreStack*)sp[1]);
+                fprintCCS(stderr, (CostCentreStack*)sp[FRAME_HDR_W]);
                 debugBelch("\n" );
                 continue;
             } else if (c == (StgWord)&stg_restore_cccs_v16_info) {
                 debugBelch("stg_restore_cccs_v16_info\n" );
-                fprintCCS(stderr, (CostCentreStack*)sp[1]);
+                fprintCCS(stderr, (CostCentreStack*)sp[FRAME_HDR_W]);
                 debugBelch("\n" );
                 continue;
             } else if (c == (StgWord)&stg_restore_cccs_v32_info) {
                 debugBelch("stg_restore_cccs_v32_info\n" );
-                fprintCCS(stderr, (CostCentreStack*)sp[1]);
+                fprintCCS(stderr, (CostCentreStack*)sp[FRAME_HDR_W]);
                 debugBelch("\n" );
                 continue;
             } else if (c == (StgWord)&stg_restore_cccs_v64_info) {
                 debugBelch("stg_restore_cccs_v64_info\n" );
-                fprintCCS(stderr, (CostCentreStack*)sp[1]);
+                fprintCCS(stderr, (CostCentreStack*)sp[FRAME_HDR_W]);
                 debugBelch("\n" );
                 continue;
             } else if (c == (StgWord)&stg_restore_cccs_eval_info) {
                 debugBelch("stg_restore_cccs_eval_info\n" );
-                fprintCCS(stderr, (CostCentreStack*)sp[1]);
+                fprintCCS(stderr, (CostCentreStack*)sp[FRAME_HDR_W]);
                 debugBelch("\n" );
                 continue;
 #endif
@@ -680,14 +687,14 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 debugBelch("RET_SMALL (%p)\n", info);
             }
             StgWord bitmap = info->layout.bitmap;
-            printSmallBitmap(spBottom, sp+1,
+            printSmallBitmap(spBottom, sp+FRAME_HDR_W,
                              BITMAP_BITS(bitmap), BITMAP_SIZE(bitmap));
             continue;
         }
 
         case RET_BCO: {
-            StgWord c = *sp;
-            StgBCO *bco = ((StgBCO *)sp[1]);
+            StgWord c = (StgWord)FRAME_INFO_PTR(sp);
+            StgBCO *bco = ((StgBCO *)sp[FRAME_HDR_W]);
 
             if (c == (StgWord)&stg_ctoi_R1p_info) {
                 debugBelch("stg_ctoi_R1p_info" );
@@ -729,7 +736,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 debugBelch("RET_BCO");
             }
             debugBelch(" (%p)\n", sp);
-            printLargeBitmap(spBottom, sp+2,
+            printLargeBitmap(spBottom, sp+FRAME_HDR_W+1,
                              BCO_BITMAP(bco), BCO_BITMAP_SIZE(bco));
             continue;
         }
@@ -738,7 +745,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
             debugBelch("RET_BIG (%p)\n", sp);
             StgLargeBitmap* bitmap = GET_LARGE_BITMAP(info);
             printLargeBitmap(spBottom,
-                            (StgPtr)((StgClosure *) sp)->payload,
+                            (StgPtr)FRAME_AS_CLOSURE(sp)->payload,
                             bitmap,
                             bitmap->size);
             continue;

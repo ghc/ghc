@@ -255,7 +255,8 @@ threadPaused(Capability *cap, StgTSO *tso)
         case UPDATE_FRAME:
 
             // If we've already marked this frame, then stop here.
-            frame_info = ACQUIRE_LOAD(&frame->header.info);
+            // the frame's info word (not the code word under two-word frames)
+            frame_info = ACQUIRE_LOAD(&((StgUpdateFrame *)frame)->header.info);
             if (frame_info == (StgInfoTable *)&stg_marked_upd_frame_info) {
                 if (prev_was_update_frame) {
                     words_to_squeeze += sizeofW(StgUpdateFrame);
@@ -265,7 +266,10 @@ threadPaused(Capability *cap, StgTSO *tso)
                 goto end;
             }
 
-            SET_INFO(frame, (StgInfoTable *)&stg_marked_upd_frame_info);
+            // Rewrites both header words under two-word frames: the
+            // marked frame must also *return* through
+            // stg_marked_upd_frame's code.
+            SET_FRAME_HDR(frame, (StgInfoTable *)&stg_marked_upd_frame_info);
 
             bh = ((StgUpdateFrame *)frame)->updatee;
             bh_info = ACQUIRE_LOAD(&bh->header.info);
@@ -326,14 +330,15 @@ threadPaused(Capability *cap, StgTSO *tso)
 
                 // Now drop the update frame, and arrange to return
                 // the value to the frame underneath:
-                tso->stackobj->sp = (StgPtr)frame + sizeofW(StgUpdateFrame) - 2;
-                tso->stackobj->sp[1] = (StgWord)bh;
+                // (an stg_enter frame is FRAME_HDR_W + 1 words)
+                tso->stackobj->sp = (StgPtr)frame + sizeofW(StgUpdateFrame) - (FRAME_HDR_W + 1);
+                tso->stackobj->sp[FRAME_HDR_W] = (StgWord)bh;
                 ASSERT(RELAXED_LOAD(&bh->header.info) != &stg_TSO_info);
-                tso->stackobj->sp[0] = (W_)&stg_enter_info;
+                SET_FRAME_HDR(tso->stackobj->sp, &stg_enter_info);
 
                 // And continue with threadPaused; there might be
                 // yet more computation to suspend.
-                frame = (StgClosure *)(tso->stackobj->sp + 2);
+                frame = (StgClosure *)(tso->stackobj->sp + FRAME_HDR_W + 1);
                 prev_was_update_frame = false;
                 continue;
             }

@@ -74,6 +74,26 @@ typedef struct {
 #endif
 } StgHeader;
 
+/* -----------------------------------------------------------------------------
+   The header of a stack frame
+
+   Under TWO_WORD_FRAMES (no tables-next-to-code, see rts/Constants.h) a
+   frame starts with the address of its return code, then the info pointer.
+   Otherwise it is laid out exactly like StgHeader.  The member names
+   `info` and `prof` match StgHeader's, so `frame->header.info` reads the
+   info word in both modes.  A frame's identity is always `info`.
+   -------------------------------------------------------------------------- */
+
+typedef struct {
+#if defined(TWO_WORD_FRAMES)
+    StgFunPtr ret;                 /* code word, Sp[0] */
+#endif
+    const StgInfoTable* info;      /* info word */
+#if defined(PROFILING)
+    StgProfHeader prof;
+#endif
+} StgFrameHeader;
+
 typedef struct {
     const StgInfoTable* info;
 #if defined(PROFILING)
@@ -258,7 +278,7 @@ typedef struct {
 //
 // Closure types: UPDATE_FRAME
 typedef struct _StgUpdateFrame {
-    StgHeader  header;
+    StgFrameHeader  header;
     StgClosure *updatee;
 } StgUpdateFrame;
 
@@ -266,13 +286,13 @@ typedef struct _StgUpdateFrame {
 //
 // Closure types: RET_SMALL
 typedef struct _StgOrigThunkInfoFrame {
-    StgHeader  header;
+    StgFrameHeader  header;
     StgInfoTable *info_ptr;
 } StgOrigThunkInfoFrame;
 
 // Closure types: RET_SMALL
 typedef struct {
-    StgHeader  header;
+    StgFrameHeader  header;
     StgClosure *c;
 } StgKeepAliveFrame;
 
@@ -281,7 +301,7 @@ typedef struct {
 //
 // Closure types: CATCH_FRAME
 typedef struct {
-    StgHeader  header;
+    StgFrameHeader  header;
     StgClosure *handler;
 } StgCatchFrame;
 
@@ -291,6 +311,9 @@ typedef struct {
 //
 // Closure types: UNDERFLOW_FRAME
 typedef struct {
+#if defined(TWO_WORD_FRAMES)
+    StgFunPtr ret;
+#endif
     const StgInfoTable* info;
     struct StgStack_ *next_chunk;
 } StgUnderflowFrame;
@@ -301,14 +324,14 @@ typedef struct {
 //
 // Closure types: STOP_FRAME
 typedef struct {
-    StgHeader  header;
+    StgFrameHeader  header;
 } StgStopFrame;
 
 // Stack frame indicating that the stack's owning thread has finished.
 //
 // Closure types: RET_SMALL
 typedef struct {
-    StgHeader  header;
+    StgFrameHeader  header;
     StgClosure *result;
 } StgDeadThreadFrame;
 
@@ -317,7 +340,7 @@ typedef struct {
 //
 // Closure types: ANN_FRAME
 typedef struct {
-    StgHeader header;
+    StgFrameHeader header;
     StgClosure *ann;
 } StgAnnFrame;
 
@@ -333,6 +356,9 @@ typedef struct {
 //
 // Closure types: RET_FUN
 typedef struct {
+#if defined(TWO_WORD_FRAMES)
+    StgFunPtr      ret;
+#endif
     const StgInfoTable* info;
     StgWord        size;
     StgClosure *   fun;
@@ -561,21 +587,21 @@ struct StgTRecHeader_ {
 
 /* A stack frame delimiting an STM transaction */
 typedef struct {
-  StgHeader   header;
+  StgFrameHeader header;
   StgClosure *code;
   StgClosure *result;
 } StgAtomicallyFrame;
 
 /* A catch# handler introduced within an STM transaction */
 typedef struct {
-  StgHeader   header;
+  StgFrameHeader header;
   StgClosure *code;
   StgClosure *handler;
 } StgCatchSTMFrame;
 
 /* A catchRetry# handler */
 typedef struct {
-  StgHeader      header;
+  StgFrameHeader header;
   StgWord        running_alt_code;
   StgClosure    *first_code;
   StgClosure    *alt_code;
@@ -695,7 +721,7 @@ typedef struct StgCompactNFData_ {
 typedef StgClosure *StgPromptTag;
 
 typedef struct {
-    StgHeader header;
+    StgFrameHeader header;
     StgPromptTag tag;
 } StgPromptFrame;
 
