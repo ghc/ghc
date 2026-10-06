@@ -191,10 +191,10 @@ cpsTop logger platform cfg dus proc =
                     return g
                else return g
 
-        -- we don't need to split proc points for the NCG, unless
-        -- tablesNextToCode is off.  The latter is because we have no
-        -- label to put on info tables for basic blocks that are not
-        -- the entry point.
+        -- The NCG does not need proc points split, except without
+        -- tables-next-to-code on Wasm32 and PPC_64; the LLVM and C backends
+        -- always do. See cmmSplitProcPoints in GHC.Driver.Config.Cmm and
+        -- Note [Proc points without tables-next-to-code] in GHC.Cmm.Info.
         splitting_proc_points = cmmSplitProcPoints cfg
 
 -- Note [Sinking after stack layout]
