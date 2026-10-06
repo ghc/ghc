@@ -14,6 +14,7 @@ module GHC.Cmm.Graph
   , mkReturn, mkComment, mkCallEntry, mkBranch
   , mkUnwind
   , copyInOflow, copyOutOflow
+  , mkFrameHeaderStores
   , noExtraStack
   , toCall, Transfer(..)
   )
@@ -253,6 +254,20 @@ mkCallReturnsTo profile f callConv actuals ret_lbl ret_off updfr_off extra_stack
   lastWithArgsAndExtraStack profile Call (Young ret_lbl) callConv actuals
     updfr_off extra_stack $
       toCall f (Just ret_lbl) updfr_off ret_off
+
+-- | The header stores of a two-word return frame for a call that returns to
+-- the given block: the same stores copyOutOflow's 'Call' case makes (info
+-- word, then the code word below it). Used where a frame is laid out before
+-- a tag test but only needs a header on the call path (emitEnter).
+-- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+mkFrameHeaderStores :: Profile -> BlockId -> CmmAGraph
+mkFrameHeaderStores profile id =
+  mkStore (CmmStackSlot (Young id) (hdr - w)) (CmmLit (CmmBlock id)) <*>
+  mkStore (CmmStackSlot (Young id) hdr) (CmmLit (CmmBlockCode id))
+  where
+    platform = profilePlatform profile
+    hdr = frameHdrBytes platform
+    w = widthInBytes (wordWidth platform)
 
 -- Like mkCallReturnsTo, but does not push the return address (it is assumed to be
 -- already on the stack).

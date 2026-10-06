@@ -58,6 +58,7 @@ import Control.Arrow ( first )
 import Data.List     ( partition )
 import GHC.Stg.EnforceEpt.TagSig (isTaggedSig)
 import GHC.Platform.Profile (profileIsProfiling)
+import GHC.Runtime.Heap.Layout (twoWordFrames)
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -1241,7 +1242,14 @@ emitEnter fun = do
        ; align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
        ; let (off, _, copyin) = copyInOflow profile NativeReturn (Young lret) res_regs []
        ; let area = Young lret
-       ; let (outArgs, regs, copyout) = copyOutOflow profile NativeNodeCall Call area
+         -- With two-word frames the frame header is stored on the call path
+         -- only: a tagged scrutinee jumps straight to lret, which never reads
+         -- it. The payload stays before the branch, as lret reads it.
+         -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+             (transfer, hdr_stores)
+               | twoWordFrames platform = (JumpRet, mkFrameHeaderStores profile lret)
+               | otherwise              = (Call, mkNop)
+       ; let (outArgs, regs, copyout) = copyOutOflow profile NativeNodeCall transfer area
                                           [fun] updfr_off []
          -- refer to fun via nodeReg after the copyout, to avoid having
          -- both live simultaneously; this sometimes enables fun to be
@@ -1254,7 +1262,7 @@ emitEnter fun = do
            copyout <*>
            mkCbranch (cmmIsTagged platform node)
                      lret lcall Nothing <*>
-           outOfLine lcall (the_call,tscope) <*>
+           outOfLine lcall (hdr_stores <*> the_call,tscope) <*>
            mkLabel lret tscope <*>
            copyin
        ; return (ReturnedTo lret off)
