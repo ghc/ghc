@@ -721,9 +721,10 @@ serializeBCOs rbcos = parMap doChunk (chunkList 100 rbcos)
 
 -- | An opaque pipe for bidirectional binary data transmission.
 data Pipe = Pipe
-  { getSome :: !(IO ByteString)
-  , putAll :: !(B.Builder -> IO ())
-  , pipeLeftovers :: !(IORef (Maybe ByteString))
+  { getSome         :: !(IO ByteString)
+  , putAll          :: !(B.Builder -> IO ())
+  , pipeLeftovers   :: !(IORef (Maybe ByteString))
+  , pipeLock        :: !(MVar ()) -- ^ Lock to prevent concurrent access to the stream
   }
 
 -- | Make a 'Pipe' from a 'Handle' to read and a 'Handle' to write.
@@ -733,14 +734,16 @@ mkPipeFromHandles pipeRead pipeWrite = do
       putAll b = do
         B.hPutBuilder pipeWrite b
         hFlush pipeWrite
-  pipeLeftovers <- newIORef Nothing
-  pure $ Pipe { getSome, putAll, pipeLeftovers }
+  pipeLeftovers   <- newIORef Nothing
+  pipeLock        <- newMVar ()
+  pure $ Pipe { .. }
 
 -- | Make a 'Pipe' from a reader function and a writer function.
 mkPipeFromContinuations :: IO ByteString -> (B.Builder -> IO ()) -> IO Pipe
 mkPipeFromContinuations getSome putAll = do
-  pipeLeftovers <- newIORef Nothing
-  pure $ Pipe { getSome, putAll, pipeLeftovers }
+  pipeLeftovers   <- newIORef Nothing
+  pipeLock        <- newMVar ()
+  pure $ Pipe { .. }
 
 remoteCall :: Binary a => Pipe -> Message a -> IO a
 remoteCall pipe msg = do
