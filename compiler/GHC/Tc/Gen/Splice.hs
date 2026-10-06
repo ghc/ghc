@@ -170,6 +170,7 @@ import Data.IORef
 import GHC.Parser.HaddockLex (lexHsDoc)
 import GHC.Parser (parseIdentifier)
 import GHC.Rename.Doc (rnHsDoc)
+import Data.Function
 
 {-
 Note [Template Haskell state diagram]
@@ -1165,11 +1166,12 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
       case th_state of
         Nothing -> return () -- TH was not started, nothing to do
         Just fhv -> do
-          r <- liftIO $ withForeignRef fhv $ \st ->
-            withForeignRefs finRefs $ \qrefs ->
-              sendMessageDelayedResponse inst (RunModFinalizers st qrefs)
-          () <- runRemoteTH inst []
-          qr <- liftIO $ receiveDelayedResponse inst r
+          qr <- withRunInIO $ \runInIO -> do
+            recovers <- newIORef []
+            withForeignRef fhv $ \st ->
+              withForeignRefs finRefs $ \qrefs ->
+                sendTHComputation inst (RunModFinalizers st qrefs) $ \msg ->
+                  runInIO (runRemoteTH recovers msg)
           checkQResult qr
 
 runQResult
@@ -1824,48 +1826,47 @@ runTH ty fhv = do
       rstate <- getTHState inst
       loc <- location
       -- run a remote TH request
-      r <- liftIO $
+      qr <- withRunInIO $ \runInIO -> do
+        recovers <- newIORef []
         withForeignRef rstate $ \state_hv ->
-        withForeignRef fhv $ \q_hv ->
-          sendMessageDelayedResponse inst (RunTH state_hv q_hv ty (Just loc))
-      -- respond to requests from the interpreter
-      runRemoteTH inst []
-      -- get the final result
-      qr <- liftIO $ receiveDelayedResponse inst r
+          withForeignRef fhv $ \q_hv ->
+            sendTHComputation inst (RunTH state_hv q_hv ty (Just loc)) $ \msg ->
+              runInIO (runRemoteTH recovers msg)
       bs <- checkQResult qr
       return $! runGet get (LB.fromStrict bs)
 
 
--- | communicate with a remotely-running TH computation until it finishes.
+-- | Communicate with a remotely-running TH computation until it finishes.
 -- See Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
 runRemoteTH
-  :: ExtInterpInstance d
-  -> [Messages TcRnMessage]   --  saved from nested calls to qRecover
-  -> TcM ()
-runRemoteTH inst recovers = do
-  THMsg msg <- liftIO $ receiveTHMessage inst
+  :: Binary a
+  => IORef [Messages TcRnMessage] -- ^ saved from nested calls to qRecover
+  -> THMessage a
+  -> TcM (Bool, a)
+runRemoteTH recovers msg = do
   case msg of
-    RunTHDone -> return ()
+    RunTHDone -> return (True, ())
     StartRecover -> do -- Note [TH recover with -fexternal-interpreter]
       v <- getErrsVar
       msgs <- readTcRef v
       writeTcRef v emptyMessages
-      runRemoteTH inst (msgs : recovers)
+      modifyIORef recovers (msgs:) & liftIO
+      return (False, ())
     EndRecover caught_error -> do
-      let (prev_msgs, rest) = case recovers of
-             [] -> panic "EndRecover"
-             a : b -> (a,b)
+      (prev_msgs, rest) <- liftIO $
+        readIORef recovers >>= \case
+          [] -> panic "EndRecover"
+          a : b -> pure (a,b)
       v <- getErrsVar
       warn_msgs <- getWarningMessages <$> readTcRef v
       -- keep the warnings only if there were no errors
       writeTcRef v $ if caught_error
         then prev_msgs
         else mkMessages warn_msgs `unionMessages` prev_msgs
-      runRemoteTH inst rest
+      writeIORef recovers rest & liftIO
+      return (False, ())
     _other -> do
-      r <- handleTHMessage msg
-      liftIO $ sendAnyValue inst r
-      runRemoteTH inst recovers
+      (False,) <$> handleTHMessage msg
 
 -- | Check a QResult
 checkQResult :: QResult a -> TcM a
