@@ -1,6 +1,7 @@
 module GHC.CmmToAsm.Utils
    ( topInfoTable
    , entryBlocks
+   , inlineInfoTables
    )
 where
 
@@ -9,6 +10,7 @@ import GHC.Prelude
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm hiding (topInfoTable)
+import GHC.Platform
 
 -- | Returns the info table associated with the CmmDecl's entry point,
 -- if any.
@@ -30,3 +32,13 @@ entryBlocks (CmmProc info _ _ (ListGraph code)) = entries
                        | entry `elem` infos -> infos
                        | otherwise          -> entry : infos
 entryBlocks _ = []
+
+-- | The info tables that are printed in front of their blocks: all of them
+-- with tables-next-to-code, none without. Without tables-next-to-code the
+-- tables are emitted out of line as read-only data, and the map's entries are
+-- only markers for entry points; see Note [Proc points without
+-- tables-next-to-code] in "GHC.Cmm.Info".
+inlineInfoTables :: Platform -> LabelMap a -> LabelMap a
+inlineInfoTables platform infos
+  | platformTablesNextToCode platform = infos
+  | otherwise                         = mapEmpty

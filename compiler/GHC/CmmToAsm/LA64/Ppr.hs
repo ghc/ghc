@@ -41,7 +41,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
               -- do not
               -- pprProcAlignment config $$
               pprLabel platform lbl
-              $$ vcat (map (pprBasicBlock config top_info) blocks) -- blocks guaranteed not null, so label needed
+              $$ vcat (map (pprBasicBlock config (inlineInfoTables platform top_info)) blocks) -- blocks guaranteed not null, so label needed
               $$ ppWhen
                 (ncgDwarfEnabled config)
                 (line (pprBlockEndLabel platform lbl) $$ line (pprProcEndLabel platform lbl))
@@ -54,7 +54,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
                   then line (pprAsmLabel platform (mkDeadStripPreventer info_lbl) <> char ':')
                   else empty
               )
-              $$ vcat (map (pprBasicBlock config top_info) blocks)
+              $$ vcat (map (pprBasicBlock config (inlineInfoTables platform top_info)) blocks)
               $$ ppWhen (ncgDwarfEnabled config) (line (pprProcEndLabel platform info_lbl))
               $$
               -- above: Even the first block gets a label, because with branch-chain

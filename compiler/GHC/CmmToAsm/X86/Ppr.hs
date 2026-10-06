@@ -121,7 +121,7 @@ pprNatCmmDecl config proc@(CmmProc top_info entry_lbl _ (ListGraph blocks)) =
         Just _  -> empty
 
       -- Proc's basic blocks
-    , vcat (map (pprBasicBlock config top_info) blocks)
+    , vcat (map (pprBasicBlock config (inlineInfoTables platform top_info)) blocks)
       -- Note that even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
 

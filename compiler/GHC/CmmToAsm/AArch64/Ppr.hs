@@ -45,7 +45,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         (if lbl /= blockLbl (blockId (head blocks)) -- blocks can have clashed names
           then pprLabel platform lbl -- blocks guaranteed not null, so label needed
           else empty) $$
-        vcat (map (pprBasicBlock platform with_dwarf top_info) blocks) $$
+        vcat (map (pprBasicBlock platform with_dwarf (inlineInfoTables platform top_info)) blocks) $$
         (if ncgDwarfEnabled config
          then line (pprAsmLabel platform (mkAsmTempEndLabel lbl) <> char ':') else empty) $$
         pprSizeDecl platform lbl
@@ -56,7 +56,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       (if platformHasSubsectionsViaSymbols platform
           then line (pprAsmLabel platform (mkDeadStripPreventer info_lbl) <> char ':')
           else empty) $$
-      vcat (map (pprBasicBlock platform with_dwarf top_info) blocks) $$
+      vcat (map (pprBasicBlock platform with_dwarf (inlineInfoTables platform top_info)) blocks) $$
       -- above: Even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
       (if platformHasSubsectionsViaSymbols platform
