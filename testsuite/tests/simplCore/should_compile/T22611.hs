@@ -1,4 +1,4 @@
--- The method `alterF` inside containers is marked as INLINEABLE
+-- The method `alterF` in T22611a is marked as INLINEABLE
 -- and hence should be specialized to the `CheckRes` Functor.
 
 -- This only started to work with 9.6, this test checks that we don't
@@ -8,11 +8,11 @@
 
 module T22611 where
 
-import Data.Map.Strict as Map
-import qualified Data.Map.Strict as Map
+import Data.Map.Strict (Map)
+import T22611a (alterF)
 
 foo :: Either Int Char -> Map (Either Int Char) v -> Maybe (v, (Map (Either Int Char) v))
-foo x subst = case Map.alterF alt x subst of
+foo x subst = case alterF alt x subst of
   NotFound -> foo (fmap (toEnum . (+1) . fromEnum) x) subst
   Found p q -> Just (p, q)
   where
