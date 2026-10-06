@@ -34,6 +34,7 @@ module GHC.Cmm.Info (
 import GHC.Prelude
 
 import GHC.Cmm
+import GHC.Cmm.BlockId (blockLbl)
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.StgToCmm.CgUtils (CgStream)
@@ -114,31 +115,30 @@ cmmToRawCmm logger profile cmms
 mkInfoTable :: Profile -> CmmDeclSRTs -> UniqDSM [RawCmmDecl]
 mkInfoTable _ (CmmData sec dat) = return [CmmData sec dat]
 
-mkInfoTable profile proc@(CmmProc infos entry_lbl live blocks)
+mkInfoTable profile (CmmProc infos entry_lbl live blocks)
   --
-  -- in the non-tables-next-to-code case, procs can have at most a
-  -- single info table associated with the entry label of the proc.
+  -- Without tables-next-to-code, every info table of the proc is emitted
+  -- separately as read-only data whose first word is the address of its
+  -- code: the proc's entry label for the entry block's table, the block's
+  -- local label for a continuation's table. The proc's info map keeps one
+  -- empty marker per continuation table, so that the native code generator
+  -- still knows these blocks as entry points.
+  -- See Note [Proc points without tables-next-to-code].
   --
   | not (platformTablesNextToCode platform)
-  = case topInfoTable proc of   --  must be at most one
-      -- no info table
-      Nothing ->
-         return [CmmProc mapEmpty entry_lbl live blocks]
-
-      Just info@CmmInfoTable { cit_lbl = info_lbl } -> do
-        (top_decls, (std_info, extra_bits)) <-
-             mkInfoTableContents profile info Nothing
-        let
-          rel_std_info   = map (makeRelativeRefTo platform info_lbl) std_info
-          rel_extra_bits = map (makeRelativeRefTo platform info_lbl) extra_bits
-        --
-        -- Separately emit info table (with the function entry
-        -- point as first entry) and the entry code
-        --
-        return (top_decls ++
-                [CmmProc mapEmpty entry_lbl live blocks,
-                 mkRODataLits info_lbl
-                    (CmmLabel entry_lbl : rel_std_info ++ rel_extra_bits)])
+  = assertPpr (null stale_tables)
+      (text "mkInfoTable: info tables of blocks not in the graph of"
+         <+> pdoc platform entry_lbl <> colon <+> ppr stale_tables) $
+    do
+    (top_declss, tables) <-
+       unzip `fmap` mapM do_one_ntntc (mapToList (info_tbls infos))
+    --
+    -- When the proc points are split, each proc has at most the entry
+    -- block's table, and the output is (top_decls ++ [proc, table]) as
+    -- it always was.
+    --
+    return (concat top_declss ++
+            CmmProc entry_points entry_lbl live blocks : tables)
 
   --
   -- With tables-next-to-code, we can have many info tables,
@@ -155,6 +155,36 @@ mkInfoTable profile proc@(CmmProc infos entry_lbl live blocks)
 
   where
    platform = profilePlatform profile
+   entry_bid = g_entry blocks
+
+   -- Without tables-next-to-code, an out-of-line table refers to its
+   -- block's label, so a table whose block is not in the graph would refer
+   -- to an undefined label and fail only at link time. The Cmm pipeline
+   -- must not produce one (attachContInfoTables in GHC.Cmm.ProcPoint).
+   stale_tables = filter (not . (`mapMember` toBlockMap blocks))
+                         (mapKeys (info_tbls infos))
+
+   -- Without tables-next-to-code: markers for the blocks with an info
+   -- table other than the entry block. The marker carries the table's
+   -- label but no data; the table itself is emitted by do_one_ntntc.
+   entry_points = mapFromList [ (bid, CmmStaticsRaw (cit_lbl itbl) [])
+                              | (bid, itbl) <- mapToList (info_tbls infos)
+                              , bid /= entry_bid ]
+
+   -- Without tables-next-to-code: the info table as read-only data, with
+   -- the address of its code as its first word.
+   do_one_ntntc (bid, itbl) = do
+     (top_decls, (std_info, extra_bits)) <-
+         mkInfoTableContents profile itbl Nothing
+     let
+        info_lbl = cit_lbl itbl
+        code_lbl | bid == entry_bid = entry_lbl
+                 | otherwise        = blockLbl bid
+        rel_std_info   = map (makeRelativeRefTo platform info_lbl) std_info
+        rel_extra_bits = map (makeRelativeRefTo platform info_lbl) extra_bits
+     return (top_decls, mkRODataLits info_lbl
+                          (CmmLabel code_lbl : rel_std_info ++ rel_extra_bits))
+
    do_one_info (lbl,itbl) = do
      (top_decls, (std_info, extra_bits)) <-
          mkInfoTableContents profile itbl Nothing
@@ -165,6 +195,51 @@ mkInfoTable profile proc@(CmmProc infos entry_lbl live blocks)
      --
      return (top_decls, (lbl, CmmStaticsRaw info_lbl $ map CmmStaticLit $
                               reverse rel_extra_bits ++ rel_std_info))
+
+{- Note [Proc points without tables-next-to-code]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With tables-next-to-code (TNTC), an info table sits directly in front of its
+code, and the info pointer is the code address. A proc can therefore have any
+number of info tables, one per block that is entered from outside the proc
+(the entry block and the return continuations of calls): the native code
+generator prints each table inline, in front of its block.
+
+Without tables-next-to-code (NTNTC), the first word of an info table holds the
+address of its code (see the layout comment above mkInfoTable), so the table
+can live anywhere. mkInfoTable emits every info table of a proc separately as
+read-only data:
+
+  * the entry block's table has the proc's entry label as its first word;
+  * a continuation's table, labelled `infoTblLbl bid`, has the block's local
+    label `blockLbl bid` as its first word; the native code generator prints
+    that label in front of the block.
+
+The resulting CmmProc keeps, for every block with a table other than the entry
+block, a marker `CmmStaticsRaw info_lbl []` in its info map: the block is an
+entry point of the proc, and its table is out of line. The native code
+generator uses the keys of the map as the proc's entry points (entryBlocks in
+GHC.CmmToAsm.Utils, the PIC base setup, the stack-allocation code), and it
+must not remove or rename these blocks (shortcutting in GHC.CmmToAsm skips
+blocks in the map), since the table refers to their label. It prints the
+tables inline only with TNTC (inlineInfoTables in GHC.CmmToAsm.Utils). A
+reference to a continuation, `CmmBlock bid`, becomes `infoTblLbl bid` in both
+cases (cmmExprNative), i.e. the label of the out-of-line table.
+
+Hence NTNTC no longer forces the Cmm pipeline to split the proc points of a
+proc into separate procs (see cmmSplitProcPoints in GHC.Driver.Config.Cmm):
+the native code generator keeps proc points unsplit as it does with TNTC. Two
+exceptions keep splitting (ncgUnsplitWithoutTNTC in GHC.Driver.Config.Cmm):
+
+  * Wasm32, where each proc point must be a function of its own;
+  * PPC_64, where the TOC pointer is set up only at a proc's entry.
+
+The LLVM and C backends cannot take the address of a block and always split.
+A split proc has at most the entry block's table, so its info map is empty and
+its output is the same as with the old one-table-per-proc scheme.
+
+Under NTNTC, GHC.Driver.GenerateCgIPEStub must also choose its algorithm by
+whether the proc points were split, not by TNTC.
+-}
 
 -----------------------------------------------------
 type InfoTableContents = ( [CmmLit]          -- The standard part
