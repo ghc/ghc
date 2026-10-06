@@ -147,6 +147,32 @@ See also Note [realArgRegsCover] in GHC.Cmm.CallConv, which deals with similar
 concerns.
 -}
 
+{- Note [genapply and two-word frames]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Without tables-next-to-code the RTS uses two-word stack frame headers
+(TWO_WORD_FRAMES in rts/include/rts/Constants.h): Sp[0] holds the frame's
+return code address and Sp[1] its info pointer, and the payload starts at
+Sp[2]. FRAME_HDR_W is the number of header words, 1 or 2.
+
+genapply cannot see the mode: it is not in DerivedConstants.h, and see
+Note [How genapply gets target info] for why it must not use CPP itself.
+So the frame-layout dependent code (the stg_ap_* frames, stg_ap_*_fast,
+stg_ap_stk_* and stg_stk_save_*) is generated once per header size, with
+frameHdrW set accordingly, and the output selects one with
+
+    #if FRAME_HDR_W == 1 ... #elif FRAME_HDR_W == 2 ... #endif
+
+which CPP resolves when AutoApply.cmm is compiled. The frameHdrW == 1
+variant is exactly the code genapply generated before two-word frames
+existed. Generating the variants (rather than printing FRAME_HDR_W into
+offsets) keeps the stack usage numbers plain integers: they are maxima
+over the cases, and max does not distribute over a symbolic offset.
+
+Every place that knows "one word of frame header" uses frameHdrW, and a
+header is written with setFrameHdrSp0/setFrameHdrAt, which write both
+words (SET_FRAME_HDR_LBL from Cmm.h) when frameHdrW is 2.
+-}
+
 data TargetInfo = TargetInfo
   { maxRealVanillaReg,
     maxRealFloatReg,
@@ -156,7 +182,11 @@ data TargetInfo = TargetInfo
     wordSize,
     tagBits,
     tagBitsMax,
-    bitmapBitsShift :: !Int
+    bitmapBitsShift :: !Int,
+    frameHdrW :: !Int
+      -- ^ words in a stack frame's header (excluding the profiling header):
+      -- 1, or 2 with two-word frames (FRAME_HDR_W in rts/Constants.h).
+      -- See Note [genapply and two-word frames].
   }
 
 parseTargetInfo :: FilePath -> IO TargetInfo
@@ -177,7 +207,8 @@ parseTargetInfo path = do
     wordSize = tups_get "WORD_SIZE",
     tagBits = tag_bits,
     tagBitsMax = 1 `shiftL` tag_bits,
-    bitmapBitsShift = tups_get "BITMAP_BITS_SHIFT"
+    bitmapBitsShift = tups_get "BITMAP_BITS_SHIFT",
+    frameHdrW = 1 -- set per variant by main
   }
 
 -- -----------------------------------------------------------------------------
@@ -383,6 +414,21 @@ regRep _ = "W_"
 loadSpWordOff :: String -> Int -> Doc
 loadSpWordOff rep off = text rep <> text "[Sp+WDS(" <> int off <> text ")]"
 
+-- | Write the header of the RTS frame @name@ (declared with
+-- @INFO_TABLE_RET(name, ..)@) at @Sp(0)@.
+-- See Note [genapply and two-word frames].
+setFrameHdrSp0 :: TargetInfo -> Doc -> Doc
+setFrameHdrSp0 TargetInfo {..} name
+  | frameHdrW == 1 = text "Sp(0) = " <> name <> text "_info;"
+  | otherwise      = text "SET_FRAME_HDR_LBL(Sp, " <> name <> text ");"
+
+-- | Write the header of the RTS frame @name@ at @Sp+WDS(off)@.
+setFrameHdrAt :: TargetInfo -> Int -> Doc -> Doc
+setFrameHdrAt TargetInfo {..} off name
+  | frameHdrW == 1 = loadSpWordOff "W_" off <> text " = " <> name <> text "_info;"
+  | otherwise      = text "SET_FRAME_HDR_LBL(Sp+WDS(" <> int off <> text "), "
+                       <> name <> text ");"
+
 -- Make a jump
 mkJump :: TargetInfo
        -> Doc       -- Jump target
@@ -407,15 +453,19 @@ mkJumpSaveCCCS targetInfo jump live args =
     restoreCCCS_info = text (stgRestoreCCCSInfo args)
 
 stgRestoreCCCSInfo :: [ArgRep] -> String
-stgRestoreCCCSInfo args
+stgRestoreCCCSInfo args = stgRestoreCCCSName args ++ "_info"
+
+-- | The frame name (for INFO_TABLE_RET) of the stg_restore_cccs frame
+stgRestoreCCCSName :: [ArgRep] -> String
+stgRestoreCCCSName args
   | null args
-  = "stg_restore_cccs_d_info"
+  = "stg_restore_cccs_d"
   | otherwise
   = case maximum args of
-      V64 -> "stg_restore_cccs_v64_info"
-      V32 -> "stg_restore_cccs_v32_info"
-      V16 -> "stg_restore_cccs_v16_info"
-      _   -> "stg_restore_cccs_d_info"
+      V64 -> "stg_restore_cccs_v64"
+      V32 -> "stg_restore_cccs_v32"
+      V16 -> "stg_restore_cccs_v16"
+      _   -> "stg_restore_cccs_d"
 
 -- Calculate live registers for a jump
 mkJumpLiveRegs :: TargetInfo
@@ -444,7 +494,8 @@ mkBitmap targetInfo args = foldr f 0 args
 -- The entry convention to an stg_ap_ function is as follows: all the
 -- arguments are on the stack (we might revisit this at some point,
 -- but it doesn't make any difference on x86), and THERE IS AN EXTRA
--- EMPTY STACK SLOT at the top of the stack.
+-- EMPTY STACK SLOT at the top of the stack (frameHdrW slots: the frame's
+-- header, see Note [genapply and two-word frames]).
 --
 -- Why?  Because in several cases, stg_ap_* will need an extra stack
 -- slot, eg. to push a return address in the THUNK case, and this is a
@@ -486,12 +537,13 @@ stackCheck
    :: TargetInfo
    -> [ArgRep]
    -> Bool       -- args in regs?
-   -> Doc        -- fun_info_label
+   -> Doc        -- frame name (stg_ap_<args>)
    -> StackUsage
    -> Doc
-stackCheck targetInfo args args_in_regs fun_info_label (prof_sp, norm_sp) =
+stackCheck targetInfo args args_in_regs frame_name (prof_sp, norm_sp) =
   let
-     (reg_locs, _leftovers, sp_offset) = assignRegs targetInfo 1 args
+     (reg_locs, _leftovers, sp_offset) =
+        assignRegs targetInfo (frameHdrW targetInfo) args
 
      cmp_sp n
        | n > 0 =
@@ -503,7 +555,7 @@ stackCheck targetInfo args args_in_regs fun_info_label (prof_sp, norm_sp) =
                  saveRegOffs reg_locs
                else
                  empty,
-            text "Sp(0) = " <> fun_info_label <> char ';',
+            setFrameHdrSp0 targetInfo frame_name,
             mkJump targetInfo (text "__stg_gc_enter_1") ["R1"] []
             ]) $$
           char '}'
@@ -544,8 +596,9 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
 
     n_args = length args
 
-        -- offset of arguments on the stack at slow apply calls.
-    stk_args_slow_offset = 1
+        -- offset of arguments on the stack at slow apply calls: the
+        -- frame header
+    stk_args_slow_offset = frameHdrW
 
     stk_args_offset
         | args_in_regs = 0
@@ -630,7 +683,7 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
           where
              -- we have extra arguments in registers to save
               extra_reg_locs = drop (length reg_locs') (reverse reg_locs)
-              adj_reg_locs = [ (reg, off - adj + 1) |
+              adj_reg_locs = [ (reg, off - adj + frameHdrW) |
                                (reg,off) <- extra_reg_locs ]
               adj = case extra_reg_locs of
                       (_reg, fst_off):_ -> fst_off
@@ -640,8 +693,7 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
               save_extra_doc =
                 text "Sp_adj(" <> int (-size) <> text ");" $$
                 saveRegOffs adj_reg_locs $$
-                loadSpWordOff "W_" 0 <> text " = " <>
-                             mkApplyInfoName rest_args <> semi
+                setFrameHdrAt targetInfo 0 (mkApplyName rest_args)
 
         shuffle_extra_args = (shuffle_extra_doc, (shuffle_prof_stack, shuffle_norm_stack))
           where
@@ -659,23 +711,28 @@ genMkPAP targetInfo@TargetInfo {..} macro jump live _ticker disamb
            -- Sadly here we have to insert an stg_restore_cccs frame
            -- just underneath the stg_ap_*_info frame if we're
            -- profiling; see Note [jump_SAVE_CCCS]
+           --
+           -- The arguments of this call move down by the size of the
+           -- new stg_ap_<rest> frame's header (plus, when profiling, the
+           -- stg_restore_cccs frame: header and CCCS), and that header
+           -- is written just under the remaining arguments.
            shuffle prof = (shuffle_doc, -sp_adj)
              where
-             sp_adj = sp_stk_args - 1 - offset
-             offset = if prof then 2 else 0
+             sp_adj = sp_stk_args - frameHdrW - offset
+             offset = if prof then frameHdrW + 1 else 0
+             stk_args_end = sp_stk_args + stack_args_size
              shuffle_doc =
-               vcat (map (shuffle_down (offset + 1))
-                      [sp_stk_args .. sp_stk_args + stack_args_size - 1]) $$
+               vcat (map (shuffle_down (offset + frameHdrW))
+                      [sp_stk_args .. stk_args_end - 1]) $$
                (if prof
                  then
-                   loadSpWordOff "W_" (sp_stk_args + stack_args_size - 3)
-                     <> text " = " <> text (stgRestoreCCCSInfo args) <> semi $$
-                   loadSpWordOff "W_" (sp_stk_args + stack_args_size - 2)
+                   setFrameHdrAt targetInfo (stk_args_end - 2*frameHdrW - 1)
+                     (text (stgRestoreCCCSName args)) $$
+                   loadSpWordOff "W_" (stk_args_end - frameHdrW - 1)
                      <> text " = CCCS;"
                  else empty) $$
-               loadSpWordOff "W_" (sp_stk_args + stack_args_size-1)
-                     <> text " = "
-                     <> mkApplyInfoName rest_args <> semi $$
+               setFrameHdrAt targetInfo (stk_args_end - frameHdrW)
+                     (mkApplyName rest_args) $$
                text "Sp_adj(" <> int sp_adj <> text ");"
 
         shuffle_down j i =
@@ -802,8 +859,9 @@ enterFastPathHelper targetInfo tag no_load_regs args_in_regs args =
   -- exact_arity_case
   -- TODO: refactor
     where
-        -- offset of arguments on the stack at slow apply calls.
-    stk_args_slow_offset = 1
+        -- offset of arguments on the stack at slow apply calls: the
+        -- frame header
+    stk_args_slow_offset = frameHdrW targetInfo
 
     stk_args_offset
         | args_in_regs = 0
@@ -862,6 +920,7 @@ genApply targetInfo args =
     fun_ret_label  = mkApplyRetName args
     fun_info_label = mkApplyInfoName args
     all_args_size  = sum (map (argSize targetInfo) args)
+    hdr_w          = frameHdrW targetInfo
 
     (bco_doc, bco_stack) =
        genMkPAP targetInfo "BUILD_PAP" "ENTRY_LBL(stg_BCO)" ["R1"] "FUN" "BCO"
@@ -880,7 +939,7 @@ genApply targetInfo args =
 
     stack_usage = maxStack [bco_stack, fun_stack, pap_stack]
     applyName = mkApplyName args
-    (regsOffs,_,_) =assignRegs targetInfo 1 args
+    (regsOffs,_,_) =assignRegs targetInfo hdr_w args
     regs = map fst regsOffs
    in
     vcat [
@@ -891,7 +950,7 @@ genApply targetInfo args =
        text "W_ _unused;",
        text "W_ info;",
        text "W_ arity;",
-       text "unwind Sp = Sp + WDS(" <> int (1 + all_args_size) <> text ");",
+       text "unwind Sp = Sp + WDS(" <> int (hdr_w + all_args_size) <> text ");",
 
 --    if fast == 1:
 --        print "static void *lbls[] ="
@@ -920,7 +979,7 @@ genApply targetInfo args =
        text "IF_DEBUG(apply,foreign \"C\" debugBelch(\"" <> fun_ret_label <>
           text "... \", NULL); foreign \"C\" printClosure(R1 \"ptr\"));",
 
-       text "IF_DEBUG(sanity,(_unused) = foreign \"C\" checkStackFrame(Sp+WDS(" <> int (1 + all_args_size)
+       text "IF_DEBUG(sanity,(_unused) = foreign \"C\" checkStackFrame(Sp+WDS(" <> int (hdr_w + all_args_size)
         <> text ")\"ptr\"));",
 
 --       text "IF_DEBUG(sanity,checkStackChunk(Sp+" <> int (1 + all_args_size) <>
@@ -936,7 +995,7 @@ genApply targetInfo args =
                                  <> int offset <> text ")));"
                       rest = do_assert as (offset + argSize targetInfo a)
        in
-       vcat (do_assert args 1),
+       vcat (do_assert args hdr_w),
 
        text  "again:",
 
@@ -944,7 +1003,7 @@ genApply targetInfo args =
        enterFastPath targetInfo False False args,
 
        stackCheck targetInfo args False{-args on stack-}
-                  fun_info_label stack_usage,
+                  applyName stack_usage,
 
        -- Functions can be tagged, so we untag them!
        text  "R1 = UNTAG(R1);",
@@ -1016,7 +1075,7 @@ genApply targetInfo args =
         text "     THUNK_SELECTOR: {",
         nest 4 (vcat [
 --          text "TICK_SLOW_CALL_UNEVALD(" <> int (length args) <> text ");",
-          text "Sp(0) = " <> fun_info_label <> semi,
+          setFrameHdrSp0 targetInfo applyName,
           -- CAREFUL! in SMP mode, the info table may already have been
           -- overwritten by an indirection, so we must enter the original
           -- info pointer we read, don't read it again, because it might
@@ -1076,7 +1135,8 @@ genApplyFast targetInfo args =
             False{-reg apply-} True{-args in regs-} False{-not a PAP-}
             args all_args_size fun_info_label {- tag stmt -}True
 
-    (reg_locs, _leftovers, sp_offset) = assignRegs targetInfo 1 args
+    (reg_locs, _leftovers, sp_offset) =
+        assignRegs targetInfo (frameHdrW targetInfo) args
 
     stack_usage = maxStack [fun_stack, (sp_offset,sp_offset)]
 
@@ -1094,7 +1154,7 @@ genApplyFast targetInfo args =
         enterFastPath targetInfo False True args,
 
         stackCheck targetInfo args True{-args in regs-}
-                   fun_info_label stack_usage,
+                   (mkApplyName args) stack_usage,
 
         -- Functions can be tagged, so we untag them!
         text  "R1 = UNTAG(R1);",
@@ -1188,13 +1248,15 @@ genStackSave targetInfo args =
      vecsCpp fn_entry_label (map fst reg_locs)
        [ text "Sp_adj" <> parens (int (-sp_offset)) <> semi
        , saveRegOffs reg_locs
-       , text "Sp(2) = R1;"
-       , text "Sp(1) =" <+> int stk_args <> semi
-       , text "Sp(0) = stg_gc_fun_info;"
+       , text "Sp(" <> int (hdr_w + 1) <> text ") = R1;"
+       , text "Sp(" <> int hdr_w <> text ") =" <+> int stk_args <> semi
+       , setFrameHdrSp0 targetInfo (text "stg_gc_fun")
        , text "jump stg_gc_noregs [];"
        ]
 
-   std_frame_size = 3 -- the std bits of the frame. See StgRetFun in Closures.h,
+   hdr_w = frameHdrW targetInfo
+   std_frame_size = hdr_w + 2
+                      -- the std bits of the frame. See StgRetFun in Closures.h,
                       -- and the comment on stg_fun_gc_gen
                       -- in HeapStackCheck.cmm.
    (reg_locs, leftovers, sp_offset) = assignRegs targetInfo std_frame_size args
@@ -1236,7 +1298,21 @@ main = do
             | otherwise
             -> False
   targetInfo <- parseTargetInfo path
-  let the_code = vcat [
+  let frameCode ti = vcat [
+                vcat $ intersperse (text "") $
+                   [ genApply ti argReps
+                   | argReps <- applyTypes
+                   , wantArgs argReps ],
+                vcat $ intersperse (text "") $
+                   [ genStackFns ti argReps
+                   | argReps <- stackApplyTypes
+                   , wantArgs argReps ],
+                vcat $ intersperse (text "") $
+                   [ genApplyFast ti argReps
+                   | argReps <- applyTypes
+                   , wantArgs argReps ]
+                ]
+      the_code = vcat [
                 text "// DO NOT EDIT!",
                 text "// Automatically generated by utils/genapply/Main.hs",
                 text "",
@@ -1269,18 +1345,14 @@ main = do
                        , mkStackSaveEntryLabel argReps ]
               ],
 
-                vcat $ intersperse (text "") $
-                   [ genApply targetInfo argReps
-                   | argReps <- applyTypes
-                   , wantArgs argReps ],
-                vcat $ intersperse (text "") $
-                   [ genStackFns targetInfo argReps
-                   | argReps <- stackApplyTypes
-                   , wantArgs argReps ],
-                vcat $ intersperse (text "") $
-                   [ genApplyFast targetInfo argReps
-                   | argReps <- applyTypes
-                   , wantArgs argReps ],
+                -- See Note [genapply and two-word frames]
+                text "#if FRAME_HDR_W == 1",
+                frameCode (targetInfo { frameHdrW = 1 }),
+                text "#elif FRAME_HDR_W == 2",
+                frameCode (targetInfo { frameHdrW = 2 }),
+                text "#else",
+                text "#error \"AutoApply: unsupported FRAME_HDR_W\"",
+                text "#endif",
 
                 if isNothing mbVec
                 then

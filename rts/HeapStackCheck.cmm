@@ -143,7 +143,7 @@ stg_gc_noregs
                 ret = ThreadYielding;
                 goto sched;
             } else {
-                jump %ENTRY_CODE(Sp(0)) [];
+                jump FRAME_CODE(Sp) [];
             }
         } else {
             ret = HeapOverflow;
@@ -240,9 +240,9 @@ INFO_TABLE_RET(stg_gc_prim_p_ll, RET_SMALL, W_ info, P_ arg, W_ fun)
 {
     W_ fun;
     P_ arg;
-    fun = Sp(2);
-    arg = Sp(1);
-    Sp_adj(3);
+    fun = Sp(FRAME_HDR_W+1);
+    arg = Sp(FRAME_HDR_W);
+    Sp_adj(FRAME_HDR_W+2);
     R1 = arg;
     jump fun [R1];
 }
@@ -253,10 +253,10 @@ stg_gc_prim_p_ll
     P_ arg;
     fun = R2;
     arg = R1;
-    Sp_adj(-3);
-    Sp(2) = fun;
-    Sp(1) = arg;
-    Sp(0) = stg_gc_prim_p_ll_info;
+    Sp_adj(-2-FRAME_HDR_W);
+    Sp(FRAME_HDR_W+1) = fun;
+    Sp(FRAME_HDR_W) = arg;
+    SET_FRAME_HDR_LBL(Sp, stg_gc_prim_p_ll);
     jump stg_gc_noregs [];
 }
 
@@ -265,10 +265,10 @@ INFO_TABLE_RET(stg_gc_prim_pp_ll, RET_SMALL, W_ info, P_ arg1, P_ arg2, W_ fun)
 {
     W_ fun;
     P_ arg1, arg2;
-    fun = Sp(3);
-    arg2 = Sp(2);
-    arg1 = Sp(1);
-    Sp_adj(4);
+    fun = Sp(FRAME_HDR_W+2);
+    arg2 = Sp(FRAME_HDR_W+1);
+    arg1 = Sp(FRAME_HDR_W);
+    Sp_adj(FRAME_HDR_W+3);
     R1 = arg1;
     R2 = arg2;
     jump fun [R1, R2];
@@ -281,11 +281,11 @@ stg_gc_prim_pp_ll
     fun = R3;
     arg1 = R1;
     arg2 = R2;
-    Sp_adj(-4);
-    Sp(3) = fun;
-    Sp(2) = arg2;
-    Sp(1) = arg1;
-    Sp(0) = stg_gc_prim_pp_ll_info;
+    Sp_adj(-3-FRAME_HDR_W);
+    Sp(FRAME_HDR_W+2) = fun;
+    Sp(FRAME_HDR_W+1) = arg2;
+    Sp(FRAME_HDR_W) = arg1;
+    SET_FRAME_HDR_LBL(Sp, stg_gc_prim_pp_ll);
     jump stg_gc_noregs [];
 }
 
@@ -447,6 +447,8 @@ stg_gc_bpp return (I8 arg1, P_ arg2, P_ arg3)
          +---------------------+
          |   stg_gc_fun_info   |
          +---------------------+
+         |   stg_gc_fun_ret    |  (only under TWO_WORD_FRAMES)
+         +---------------------+
 
    The size is the number of words of arguments on the stack, and is cached
    in the frame in order to simplify stack walking: otherwise the size of
@@ -501,10 +503,10 @@ __stg_gc_fun /* explicit stack */
 
 #if defined(NO_ARG_REGS)
     // we don't have to save any registers away
-    Sp_adj(-3);
-    Sp(2) = R1;
-    Sp(1) = size;
-    Sp(0) = stg_gc_fun_info;
+    Sp_adj(-2-FRAME_HDR_W);
+    Sp(FRAME_HDR_W+1) = R1;
+    Sp(FRAME_HDR_W) = size;
+    SET_FRAME_HDR_LBL(Sp, stg_gc_fun);
     jump stg_gc_noregs [];
 #else
     W_ type;
@@ -512,10 +514,10 @@ __stg_gc_fun /* explicit stack */
     // cache the size
     if (type == ARG_GEN || type == ARG_GEN_BIG) {
         // regs already saved by the heap check code
-        Sp_adj(-3);
-        Sp(2) = R1;
-        Sp(1) = size;
-        Sp(0) = stg_gc_fun_info;
+        Sp_adj(-2-FRAME_HDR_W);
+        Sp(FRAME_HDR_W+1) = R1;
+        Sp(FRAME_HDR_W) = size;
+        SET_FRAME_HDR_LBL(Sp, stg_gc_fun);
         // DEBUG_ONLY(foreign "C" debugBelch("stg_fun_gc_gen(ARG_GEN)"););
         jump stg_gc_noregs [];
     } else {
@@ -540,8 +542,8 @@ __stg_gc_fun /* explicit stack */
 INFO_TABLE_RET ( stg_gc_fun, RET_FUN )
     /* explicit stack */
 {
-    R1 = Sp(2);
-    Sp_adj(3);
+    R1 = Sp(FRAME_HDR_W+1);
+    Sp_adj(FRAME_HDR_W+2);
 #if defined(NO_ARG_REGS)
     // Minor optimisation: there are no argument registers to load up,
     // so we can just jump straight to the function's entry point.
@@ -557,9 +559,9 @@ INFO_TABLE_RET ( stg_gc_fun, RET_FUN )
     } else {
         if (type == ARG_BCO) {
             // cover this case just to be on the safe side
-            Sp_adj(-2);
-            Sp(1) = R1;
-            Sp(0) = stg_apply_interp_info;
+            Sp_adj(-1-FRAME_HDR_W);
+            Sp(FRAME_HDR_W) = R1;
+            SET_FRAME_HDR_LBL(Sp, stg_apply_interp);
             jump stg_yield_to_interpreter [];
         } else {
             jump W_[stg_ap_stack_entries + WDS(type)] [R1];
@@ -603,6 +605,7 @@ stg_block_noregs
  *       ret. addr
  *       ptr to MVar   (R1)
  *       stg_block_takemvar_info (or stg_block_readmvar_info)
+ *       [stg_block_takemvar_ret (..), only under TWO_WORD_FRAMES]
  *
  * Stack layout for a thread blocked in putMVar:
  *
@@ -610,6 +613,7 @@ stg_block_noregs
  *       ptr to Value  (R2)
  *       ptr to MVar   (R1)
  *       stg_block_putmvar_info
+ *       [stg_block_putmvar_ret, only under TWO_WORD_FRAMES]
  *
  * See PrimOps.cmm for a description of the workings of take/putMVar.
  *
@@ -636,9 +640,9 @@ stg_block_takemvar_finally
 // Stack usage covered by RESERVED_STACK_WORDS
 stg_block_takemvar /* mvar passed in R1 */
 {
-    Sp_adj(-2);
-    Sp(1) = R1;
-    Sp(0) = stg_block_takemvar_info;
+    Sp_adj(-1-FRAME_HDR_W);
+    Sp(FRAME_HDR_W) = R1;
+    SET_FRAME_HDR_LBL(Sp, stg_block_takemvar);
     R3 = R1; // mvar communicated to stg_block_takemvar_finally in R3
     BLOCK_BUT_FIRST(stg_block_takemvar_finally);
 }
@@ -663,9 +667,9 @@ stg_block_readmvar_finally
 
 stg_block_readmvar /* mvar passed in R1 */
 {
-    Sp_adj(-2);
-    Sp(1) = R1;
-    Sp(0) = stg_block_readmvar_info;
+    Sp_adj(-1-FRAME_HDR_W);
+    Sp(FRAME_HDR_W) = R1;
+    SET_FRAME_HDR_LBL(Sp, stg_block_readmvar);
     R3 = R1; // mvar communicated to stg_block_readmvar_finally in R3
     BLOCK_BUT_FIRST(stg_block_readmvar_finally);
 }
@@ -730,9 +734,9 @@ stg_block_stmwait
 
 stg_block_blackhole (P_ node)
 {
-    Sp_adj(-2);
-    Sp(1) = node;
-    Sp(0) = stg_enter_info;
+    Sp_adj(-1-FRAME_HDR_W);
+    Sp(FRAME_HDR_W) = node;
+    SET_FRAME_HDR_LBL(Sp, stg_enter);
     BLOCK_GENERIC;
 }
 
@@ -786,10 +790,10 @@ stg_block_async
     // Fill the stack frame with values that indicate that the operation
     // has been interrupted. The IO manager will overwrite these with the
     // actual results if the async operation completes.
-    Sp_adj(-3);
-    Sp(0) = stg_block_async_info;
-    Sp(1) = -1;                    // len:     -1 indicates error
-    Sp(2) = eintr;                 // errCode: interrupted
+    Sp_adj(-2-FRAME_HDR_W);
+    SET_FRAME_HDR_LBL(Sp, stg_block_async);
+    Sp(FRAME_HDR_W) = -1;          // len:     -1 indicates error
+    Sp(FRAME_HDR_W+1) = eintr;     // errCode: interrupted
     BLOCK_GENERIC;
 }
 #endif
@@ -874,6 +878,8 @@ The stack frame layout used is:
  Sp[0]   stg_block_io_unit_info or stg_block_io_int_info
  Sp[1]   outcome
  Sp[2]   result or error
+(Under TWO_WORD_FRAMES the frame header is two words, the return code then
+the info pointer, and outcome and result move to Sp[2] and Sp[3].)
 
 C code should use setTsoIOOpOutcome to set this. But update this if the layout
 changes!
@@ -921,10 +927,10 @@ stg_block_io_unit
      * overwrite these with the actual results when the I/O operation
      * completes, fails, or is cancelled.
      */
-    Sp_adj(-3);
-    Sp(0) = stg_block_io_unit_info;
-    Sp(1) = 0;                    // outcome: 0 indicates IOOpOutcomeInFlight
-    Sp(2) = 0;                    // result/errno
+    Sp_adj(-2-FRAME_HDR_W);
+    SET_FRAME_HDR_LBL(Sp, stg_block_io_unit);
+    Sp(FRAME_HDR_W) = 0;          // outcome: 0 indicates IOOpOutcomeInFlight
+    Sp(FRAME_HDR_W+1) = 0;        // result/errno
     BLOCK_GENERIC;
 }
 
@@ -954,9 +960,9 @@ stg_block_io_int
      * overwrite these with the actual results when the I/O operation
      * completes, fails, or is cancelled.
      */
-    Sp_adj(-3);
-    Sp(0) = stg_block_io_int_info;
-    Sp(1) = 0;                    // outcome: 0 indicates IOOpOutcomeInFlight
-    Sp(2) = 0;                    // result/errno
+    Sp_adj(-2-FRAME_HDR_W);
+    SET_FRAME_HDR_LBL(Sp, stg_block_io_int);
+    Sp(FRAME_HDR_W) = 0;          // outcome: 0 indicates IOOpOutcomeInFlight
+    Sp(FRAME_HDR_W+1) = 0;        // result/errno
     BLOCK_GENERIC;
 }

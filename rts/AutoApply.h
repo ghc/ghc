@@ -9,7 +9,8 @@
 #pragma once
 
 // Build a new PAP: function is in R1
-// ret addr and m arguments taking up n words are on the stack.
+// ret addr (a frame header of FRAME_HDR_W words) and m arguments taking up
+// n words are on the stack.
 // NB. x is a dummy argument attached to the 'for' label so that
 // BUILD_PAP can be used multiple times in the same function.
 // m: number of arguments provided
@@ -31,13 +32,13 @@
     i = 0;                                              \
   for##x:                                               \
     if (i < n) {                                        \
-        StgPAP_payload(pap,i) = Sp(1+i);                \
+        StgPAP_payload(pap,i) = Sp(FRAME_HDR_W+i);      \
         i = i + 1;                                      \
         goto for##x;                                    \
     }                                                   \
     R1 = pap;                                           \
-    Sp_adj(1 + n);                                      \
-    jump %ENTRY_CODE(Sp(0)) [R1];
+    Sp_adj(FRAME_HDR_W + n);                            \
+    jump FRAME_CODE(Sp) [R1];
 
 // Just like when we enter a PAP, if we're building a new PAP by applying more
 // arguments to an existing PAP, we must construct the CCS for the new PAP as if
@@ -51,7 +52,8 @@
 #endif
 
 // Copy the old PAP, build a new one with the extra arg(s)
-// ret addr and m arguments taking up n words are on the stack.
+// ret addr (a frame header of FRAME_HDR_W words) and m arguments taking up
+// n words are on the stack.
 // NB. x is a dummy argument attached to the 'for' label so that
 // BUILD_PAP can be used multiple times in the same function.
 #define NEW_PAP(m,n,f,x)                                        \
@@ -82,20 +84,21 @@
      i = 0;                                                     \
    for2##x:                                                     \
      if (i < n) {                                               \
-         StgPAP_payload(new_pap,n_args+i) = Sp(1+i);            \
+         StgPAP_payload(new_pap,n_args+i) = Sp(FRAME_HDR_W+i);  \
          i = i + 1;                                             \
          goto for2##x;                                          \
      }                                                          \
      R1 = new_pap;                                              \
-     Sp_adj(n+1);                                               \
-     jump %ENTRY_CODE(Sp(0)) [R1];
+     Sp_adj(n+FRAME_HDR_W);                                     \
+     jump FRAME_CODE(Sp) [R1];
 
 // Jump to target, saving CCCS and restoring it on return
+// restore_fun is the info pointer of a stg_restore_cccs_* frame.
 #if defined(PROFILING)
-#define jump_SAVE_CCCS(restore_fun, target,...) \
-    Sp(-1) = CCCS;                              \
-    Sp(-2) = (restore_fun);                     \
-    Sp_adj(-2);                                 \
+#define jump_SAVE_CCCS(restore_fun, target,...)                 \
+    Sp(-1) = CCCS;                                              \
+    SET_FRAME_HDR_INFO(Sp - WDS(1+FRAME_HDR_W), (restore_fun)); \
+    Sp_adj(-1-FRAME_HDR_W);                                     \
     jump (target) [__VA_ARGS__]
 #else
 #define jump_SAVE_CCCS(restore_fun, target,...) jump (target) [__VA_ARGS__]

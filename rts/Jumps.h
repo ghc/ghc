@@ -56,7 +56,7 @@ INFO_TABLE_RET (MK_FUN_NM(stg_stack_underflow_frame), UNDERFLOW_FRAME,
     /* no args => explicit stack */
 {
 #if REGS_ALLOWED
-    unwind Sp = W_[Sp + WDS(2)];
+    unwind Sp = W_[Sp + WDS(FRAME_HDR_W+1)];
 
     W_ new_tso;
     W_ ret_off;
@@ -68,7 +68,7 @@ INFO_TABLE_RET (MK_FUN_NM(stg_stack_underflow_frame), UNDERFLOW_FRAME,
     LOAD_THREAD_STATE();
     RESTORE_ARG_REGS;
 
-    jump %ENTRY_CODE(Sp(ret_off)) ALL_ARG_REGS;
+    jump FRAME_CODE(Sp + WDS(ret_off)) ALL_ARG_REGS;
 #else
     ccall sbarf("stg_stack_underflow_frame: unsupported register") never returns;
 #endif
@@ -83,18 +83,18 @@ INFO_TABLE_RET (MK_FUN_NM(stg_restore_cccs), RET_SMALL, W_ info_ptr, W_ cccs)
 #if REGS_ALLOWED
     W_ _unused;
 
-    unwind Sp = Sp + WDS(2);
+    unwind Sp = Sp + WDS(FRAME_HDR_W+1);
 #if defined(PROFILING)
-    CCCS = Sp(1);
+    CCCS = Sp(FRAME_HDR_W);
 #endif
-    Sp_adj(2);
+    Sp_adj(FRAME_HDR_W+1);
 
     IF_DEBUG(sanity,
       SAVE_ARG_REGS;
       (_unused) = ccall checkStackFrame(Sp "ptr");
       RESTORE_ARG_REGS);
 
-    jump %ENTRY_CODE(Sp(0)) ALL_ARG_REGS;
+    jump FRAME_CODE(Sp) ALL_ARG_REGS;
 #else
     ccall sbarf("stg_restore_cccs: unsupported register") never returns;
 #endif

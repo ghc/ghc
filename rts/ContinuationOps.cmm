@@ -120,8 +120,8 @@ stg_control0zh_ll // explicit stack
   // don’t have any adjustments to undo, either. Therefore, we can just apply
   // the function directly.
   if (apply_mask_frame == NULL) {
-    Sp_adj(-2);
-    Sp(1) = cont;
+    Sp_adj(-1-FRAME_HDR_W); // stg_ap_pv's header is left unwritten
+    Sp(FRAME_HDR_W) = cont;
     R1 = f;
     jump RET_LBL(stg_ap_pv) [R1];
   }
@@ -141,16 +141,17 @@ stg_control0zh_ll // explicit stack
   untagged_cont = UNTAG(cont);
   cont_stack = untagged_cont + SIZEOF_StgHeader + OFFSET_StgContinuation_stack;
   mask_frame_offset = StgContinuation_mask_frame_offset(untagged_cont);
-  mask_frame = W_[cont_stack + WDS(mask_frame_offset)];
+  mask_frame = FRAME_INFO(cont_stack + WDS(mask_frame_offset));
 
   // Now we have the relevant info table to return to in `mask_frame`, so we
   // just set up the stack to apply the function when the unmask frame returns
   // and jump to the frame’s entry code.
-  Sp_adj(-3); // Note -3, not -2, because `mask_frame` will
+  Sp_adj(-1-2*FRAME_HDR_W); // Note -3, not -2, because `mask_frame` will
               // try to pop itself off the stack when it returns!
-  Sp(0) = mask_frame; // Can't be omitted, see #27651
-  Sp(1) = stg_ap_pv_info;
-  Sp(2) = cont;
+              // (each header is FRAME_HDR_W words)
+  SET_FRAME_HDR_INFO(Sp, mask_frame); // Can't be omitted, see #27651
+  SET_FRAME_HDR_LBL(Sp + WDS(FRAME_HDR_W), stg_ap_pv);
+  Sp(2*FRAME_HDR_W) = cont;
   R1 = f;
   jump %ENTRY_CODE(mask_frame) [R1];
 }
@@ -218,21 +219,26 @@ stg_CONTINUATION_apply // explicit stack
   // stack so that it returns the masking state to whatever it was before the
   // continuation was applied (see also Note [Continuations and async exception
   // masking] in Continuation.c).
+  // (an in-place rewrite of the frame's header: both words under
+  // TWO_WORD_FRAMES)
   if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
-    Sp(mask_frame_offset) = stg_unmaskAsyncExceptionszh_ret_info;
+    SET_FRAME_HDR_LBL(Sp + WDS(mask_frame_offset),
+                      stg_unmaskAsyncExceptionszh_ret);
   } else {
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) == 0) {
-      Sp(mask_frame_offset) = stg_maskUninterruptiblezh_ret_info;
+      SET_FRAME_HDR_LBL(Sp + WDS(mask_frame_offset),
+                        stg_maskUninterruptiblezh_ret);
     } else {
-      Sp(mask_frame_offset) = stg_maskAsyncExceptionszh_ret_info;
+      SET_FRAME_HDR_LBL(Sp + WDS(mask_frame_offset),
+                        stg_maskAsyncExceptionszh_ret);
     }
   }
 
   // Now we just set up the stack so that `apply_mask_frame` will apply `io`
   // when it returns and jump to it.
-  Sp_adj(-2);
-  Sp(0) = apply_mask_frame; // Can't be omitted, see #27651
-  Sp(1) = stg_ap_v_info;
+  Sp_adj(-2*FRAME_HDR_W);
+  SET_FRAME_HDR_INFO(Sp, apply_mask_frame); // Can't be omitted, see #27651
+  SET_FRAME_HDR_LBL(Sp + WDS(FRAME_HDR_W), stg_ap_v);
   R1 = io;
   jump %ENTRY_CODE(apply_mask_frame) [R1];
 }

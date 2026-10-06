@@ -82,7 +82,7 @@ import CLOSURE ghc_hs_iface;
 INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
     /* explicit stack */
 {
-    unwind Sp = Sp + WDS(1);
+    unwind Sp = Sp + WDS(FRAME_HDR_W);
     CInt r;
 
     P_ ret;
@@ -94,15 +94,18 @@ INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
     /* Eagerly raise a masked exception, if there is one */
     if (StgTSO_blocked_exceptions(CurrentTSO) != END_TSO_QUEUE) {
 
-        STK_CHK_P_LL (WDS(2), stg_unmaskAsyncExceptionszh_ret_info, R1);
+        // The resume address is jumped to (stg_gc_prim_p_ll: jump fun), so
+        // it must be the return code, not the info table: RET_LBL.
+        STK_CHK_P_LL (WDS(1+FRAME_HDR_W),
+                      RET_LBL(stg_unmaskAsyncExceptionszh_ret), R1);
         /*
          * We have to be very careful here, as in killThread#, since
          * we are about to raise an async exception in the current
          * thread, which might result in the thread being killed.
          */
-        Sp_adj(-2);
-        Sp(1) = ret;
-        Sp(0) = stg_ret_p_info;
+        Sp_adj(-1-FRAME_HDR_W);
+        Sp(FRAME_HDR_W) = ret;
+        SET_FRAME_HDR_LBL(Sp, stg_ret_p);
         SAVE_THREAD_STATE();
         (r) = ccall maybePerformBlockedException (MyCapability() "ptr",
                                                       CurrentTSO "ptr");
@@ -113,7 +116,7 @@ INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
                 LOAD_THREAD_STATE();
                 ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
                 R1 = ret;
-                jump %ENTRY_CODE(Sp(0)) [R1];
+                jump FRAME_CODE(Sp) [R1];
             }
         }
         else {
@@ -122,19 +125,19 @@ INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
                blocked_exception list by someone else in the meantime.
                Just restore the stack pointer and continue.
             */
-            Sp_adj(2);
+            Sp_adj(1+FRAME_HDR_W);
         }
     }
 
-    Sp_adj(1);
+    Sp_adj(FRAME_HDR_W);
     R1 = ret;
-    jump %ENTRY_CODE(Sp(0)) [R1];
+    jump FRAME_CODE(Sp) [R1];
 }
 
 INFO_TABLE_RET(stg_maskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
     return (P_ ret)
 {
-    unwind Sp = Sp + WDS(1);
+    unwind Sp = Sp + WDS(FRAME_HDR_W);
     StgTSO_flags(CurrentTSO) =
        %lobits32(
          TO_W_(StgTSO_flags(CurrentTSO))
@@ -147,7 +150,7 @@ INFO_TABLE_RET(stg_maskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
 INFO_TABLE_RET(stg_maskUninterruptiblezh_ret, RET_SMALL, W_ info_ptr)
     return (P_ ret)
 {
-    unwind Sp = Sp + WDS(1);
+    unwind Sp = Sp + WDS(FRAME_HDR_W);
     StgTSO_flags(CurrentTSO) =
        %lobits32(
         (TO_W_(StgTSO_flags(CurrentTSO))
@@ -161,22 +164,22 @@ INFO_TABLE_RET(stg_maskUninterruptiblezh_ret, RET_SMALL, W_ info_ptr)
 stg_maskAsyncExceptionszh /* explicit stack */
 {
     /* Args: R1 :: IO a */
-    STK_CHK_P_LL (WDS(1)/* worst case */, stg_maskAsyncExceptionszh, R1);
+    STK_CHK_P_LL (WDS(FRAME_HDR_W)/* worst case */, stg_maskAsyncExceptionszh, R1);
 
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
         /* avoid growing the stack unnecessarily */
-        if (Sp(0) == stg_maskAsyncExceptionszh_ret_info) {
-            Sp_adj(1);
+        if (FRAME_INFO(Sp) == stg_maskAsyncExceptionszh_ret_info) {
+            Sp_adj(FRAME_HDR_W);
         } else {
-            Sp_adj(-1);
-            Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
+            Sp_adj(-FRAME_HDR_W);
+            SET_FRAME_HDR_LBL(Sp, stg_unmaskAsyncExceptionszh_ret);
         }
     } else {
-        Sp_adj(-1);
+        Sp_adj(-FRAME_HDR_W);
         if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) == 0) {
-            Sp(0) = stg_maskUninterruptiblezh_ret_info;
+            SET_FRAME_HDR_LBL(Sp, stg_maskUninterruptiblezh_ret);
         } else {
-            Sp(0) = stg_maskAsyncExceptionszh_ret_info;
+            SET_FRAME_HDR_LBL(Sp, stg_maskAsyncExceptionszh_ret);
         }
     }
 
@@ -191,22 +194,22 @@ stg_maskAsyncExceptionszh /* explicit stack */
 stg_maskUninterruptiblezh /* explicit stack */
 {
     /* Args: R1 :: IO a */
-    STK_CHK_P_LL (WDS(1)/* worst case */, stg_maskUninterruptiblezh, R1);
+    STK_CHK_P_LL (WDS(FRAME_HDR_W)/* worst case */, stg_maskUninterruptiblezh, R1);
 
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
         /* avoid growing the stack unnecessarily */
-        if (Sp(0) == stg_maskUninterruptiblezh_ret_info) {
-            Sp_adj(1);
+        if (FRAME_INFO(Sp) == stg_maskUninterruptiblezh_ret_info) {
+            Sp_adj(FRAME_HDR_W);
         } else {
-            Sp_adj(-1);
-            Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
+            Sp_adj(-FRAME_HDR_W);
+            SET_FRAME_HDR_LBL(Sp, stg_unmaskAsyncExceptionszh_ret);
         }
     } else {
-      Sp_adj(-1);
+      Sp_adj(-FRAME_HDR_W);
       if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) == 0) {
-          Sp(0) = stg_maskUninterruptiblezh_ret_info;
+          SET_FRAME_HDR_LBL(Sp, stg_maskUninterruptiblezh_ret);
       } else {
-          Sp(0) = stg_maskAsyncExceptionszh_ret_info;
+          SET_FRAME_HDR_LBL(Sp, stg_maskAsyncExceptionszh_ret);
       }
     }
 
@@ -227,26 +230,27 @@ stg_unmaskAsyncExceptionszh /* explicit stack */
     P_ io;
     io = R1;
 
-    STK_CHK_P_LL (WDS(4), stg_unmaskAsyncExceptionszh, io);
+    STK_CHK_P_LL (WDS(3*FRAME_HDR_W+1), stg_unmaskAsyncExceptionszh, io);
     /* 4 words: one for the mask frame, 3 for setting up the
      * stack to call maybePerformBlockedException() below.
+     * (Each frame header is FRAME_HDR_W words: 7 under TWO_WORD_FRAMES.)
      */
 
     /* If exceptions are already unmasked, no need to check for a masked exception */
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
-        Sp_adj(-1);
-        Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
+        Sp_adj(-FRAME_HDR_W);
+        SET_FRAME_HDR_LBL(Sp, stg_unmaskAsyncExceptionszh_ret);
     } else {
 
         /* avoid growing the stack unnecessarily */
-        if (Sp(0) == stg_unmaskAsyncExceptionszh_ret_info) {
-            Sp_adj(1);
+        if (FRAME_INFO(Sp) == stg_unmaskAsyncExceptionszh_ret_info) {
+            Sp_adj(FRAME_HDR_W);
         } else {
-            Sp_adj(-1);
+            Sp_adj(-FRAME_HDR_W);
             if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) != 0) {
-                Sp(0) = stg_maskAsyncExceptionszh_ret_info;
+                SET_FRAME_HDR_LBL(Sp, stg_maskAsyncExceptionszh_ret);
             } else {
-                Sp(0) = stg_maskUninterruptiblezh_ret_info;
+                SET_FRAME_HDR_LBL(Sp, stg_maskUninterruptiblezh_ret);
             }
         }
 
@@ -266,10 +270,11 @@ stg_unmaskAsyncExceptionszh /* explicit stack */
              * make sense, because it is about to be snapshotted into
              * an AP_STACK.
              */
-            Sp_adj(-3);
-            Sp(2) = stg_ap_v_info;
-            Sp(1) = io;
-            Sp(0) = stg_enter_info;
+            // two frames: stg_ap_v (header only) under stg_enter (io)
+            Sp_adj(-1-2*FRAME_HDR_W);
+            SET_FRAME_HDR_LBL(Sp + WDS(1+FRAME_HDR_W), stg_ap_v);
+            Sp(FRAME_HDR_W) = io;
+            SET_FRAME_HDR_LBL(Sp, stg_enter);
 
             SAVE_THREAD_STATE();
             (r) = ccall maybePerformBlockedException (MyCapability() "ptr",
@@ -282,11 +287,11 @@ stg_unmaskAsyncExceptionszh /* explicit stack */
                     LOAD_THREAD_STATE();
                     ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
                     R1 = io;
-                    jump %ENTRY_CODE(Sp(0)) [R1];
+                    jump FRAME_CODE(Sp) [R1];
                 }
             } else {
                 /* we'll just call R1 directly, below */
-                Sp_adj(3);
+                Sp_adj(1+2*FRAME_HDR_W);
             }
         }
 
@@ -314,8 +319,10 @@ stg_killThreadzh (P_ target, P_ exception)
 {
     W_ why_blocked;
 
-    /* Needs 3 words because throwToSingleThreaded uses some stack */
-    STK_CHK_PP (WDS(3), stg_killThreadzh, target, exception);
+    /* Needs 3 words because throwToSingleThreaded uses some stack
+       (raiseAsync replaces a catch frame by an unmask frame, an stg_enter
+       frame and an stg_ap_pv frame: 2*FRAME_HDR_W+1 words more) */
+    STK_CHK_PP (WDS(2*FRAME_HDR_W+1), stg_killThreadzh, target, exception);
     /* We call allocate in throwTo(), so better check for GC */
     MAYBE_GC_PP (stg_killThreadzh, target, exception);
 
@@ -377,7 +384,7 @@ stg_killMyself
     } else {
         LOAD_THREAD_STATE();
         ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
-        jump %ENTRY_CODE(Sp(0)) [];
+        jump FRAME_CODE(Sp) [];
     }
 }
 
@@ -440,7 +447,7 @@ section "data" {
 INFO_TABLE_RET(stg_raise_ret, RET_SMALL, W_ info_ptr, P_ exception)
     return (P_ ret)
 {
-    unwind Sp = Sp + WDS(2);
+    unwind Sp = Sp + WDS(FRAME_HDR_W+1);
     W_[no_break_on_exception] = 1;
     jump stg_raisezh (exception);
 }
@@ -532,17 +539,20 @@ retry_pop_stack:
             // be per-thread.
             CInt[rts_stop_on_exception] = 0;
             ("ptr" ioAction) = ccall deRefStablePtr (W_[rts_breakpoint_io_action] "ptr");
-            Sp = Sp - WDS(11);
-            Sp(10) = exception;
-            Sp(9) = stg_raise_ret_info;
-            Sp(8) = exception;
-            Sp(7) = HsIface_True_closure(W_[ghc_hs_iface]); // True <=> an exception
-            Sp(6) = stg_ap_ppv_info;
-            Sp(5) = 0;
-            Sp(4) = stg_ap_n_info;
-            Sp(3) = 0;
-            Sp(2) = stg_ap_n_info;
-            Sp(1) = 0;
+            // From the top: stg_ap_n (header reserved, entered directly
+            // below), stg_ap_n, stg_ap_n, stg_ap_ppv, stg_raise_ret; each
+            // header is FRAME_HDR_W words (11 words in all when it is 1).
+            Sp = Sp - WDS(5*FRAME_HDR_W+6);
+            Sp(5*FRAME_HDR_W+5) = exception;
+            SET_FRAME_HDR_LBL(Sp + WDS(4*FRAME_HDR_W+5), stg_raise_ret);
+            Sp(4*FRAME_HDR_W+4) = exception;
+            Sp(4*FRAME_HDR_W+3) = HsIface_True_closure(W_[ghc_hs_iface]); // True <=> an exception
+            SET_FRAME_HDR_LBL(Sp + WDS(3*FRAME_HDR_W+3), stg_ap_ppv);
+            Sp(3*FRAME_HDR_W+2) = 0;
+            SET_FRAME_HDR_LBL(Sp + WDS(2*FRAME_HDR_W+2), stg_ap_n);
+            Sp(2*FRAME_HDR_W+1) = 0;
+            SET_FRAME_HDR_LBL(Sp + WDS(FRAME_HDR_W+1), stg_ap_n);
+            Sp(FRAME_HDR_W) = 0;
             R1 = ioAction;
             jump RET_LBL(stg_ap_n) [R1];
         }
@@ -557,9 +567,9 @@ retry_pop_stack:
         W_ stack;
         stack = StgTSO_stackobj(CurrentTSO);
         Sp = stack + OFFSET_StgStack_stack
-                + WDS(TO_W_(StgStack_stack_size(stack))) - WDS(2);
-        Sp(1) = exception;      /* save the exception */
-        Sp(0) = stg_enter_info; /* so that GC can traverse this stack */
+                + WDS(TO_W_(StgStack_stack_size(stack))) - WDS(FRAME_HDR_W+1);
+        Sp(FRAME_HDR_W) = exception;      /* save the exception */
+        SET_FRAME_HDR_LBL(Sp, stg_enter); /* so that GC can traverse this stack */
         StgTSO_what_next(CurrentTSO) = ThreadKilled::I16;
         SAVE_THREAD_STATE();    /* inline! */
 
@@ -599,8 +609,8 @@ retry_pop_stack:
       W_ flags;
       flags = TO_W_(StgTSO_flags(CurrentTSO));
       if ((flags & TSO_BLOCKEX) == 0) {
-          Sp_adj(-1);
-          Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
+          Sp_adj(-FRAME_HDR_W);
+          SET_FRAME_HDR_LBL(Sp, stg_unmaskAsyncExceptionszh_ret);
       }
 
       /* Ensure that async exceptions are masked when running the handler.
@@ -633,7 +643,7 @@ retry_pop_stack:
     Sp_adj(-1);
     Sp(0) = exception;
     R1 = handler;
-    Sp_adj(-1);
+    Sp_adj(-FRAME_HDR_W);  // the stg_ap_pv frame's header, left unwritten
     TICK_UNKNOWN_CALL();
     TICK_SLOW_CALL_fast_pv();
     jump RET_LBL(stg_ap_pv) [R1];

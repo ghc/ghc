@@ -59,7 +59,7 @@ advanceStackFrameLocationzh (P_ stack, W_ offsetWords) {
 getSmallBitmapzh(P_ stack, W_ offsetWords) {
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+  ASSERT(LOOKS_LIKE_FRAME_PTR(c));
 
   W_ bitmap, size;
   (bitmap) = ccall getBitmapWord(c);
@@ -73,7 +73,7 @@ getSmallBitmapzh(P_ stack, W_ offsetWords) {
 getRetFunSmallBitmapzh(P_ stack, W_ offsetWords) {
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+  ASSERT(LOOKS_LIKE_FRAME_PTR(c));
 
   W_ bitmap, size, specialType;
   (bitmap) = ccall getRetFunBitmapWord(c);
@@ -87,7 +87,7 @@ getLargeBitmapzh(P_ stack, W_ offsetWords) {
   P_ c, words;
   W_ size;
   c = StgStack_sp(stack) + WDS(offsetWords);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+  ASSERT(LOOKS_LIKE_FRAME_PTR(c));
 
   (words) = ccall getLargeBitmap(MyCapability(), c);
   (size) = ccall getLargeBitmapSize(c);
@@ -100,7 +100,7 @@ getBCOLargeBitmapzh(P_ stack, W_ offsetWords) {
   P_ c, words;
   W_ size;
   c = StgStack_sp(stack) + WDS(offsetWords);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+  ASSERT(LOOKS_LIKE_FRAME_PTR(c));
 
   (words) = ccall getBCOLargeBitmap(MyCapability(), c);
   (size) = ccall getBCOLargeBitmapSize(c);
@@ -113,7 +113,7 @@ getRetFunLargeBitmapzh(P_ stack, W_ offsetWords) {
   P_ c, words;
   W_ size;
   c = StgStack_sp(stack) + WDS(offsetWords);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+  ASSERT(LOOKS_LIKE_FRAME_PTR(c));
 
   (words) = ccall getRetFunLargeBitmap(MyCapability(), c);
   (size) = ccall getRetFunSize(c);
@@ -132,7 +132,7 @@ getWordzh(P_ stack, W_ offsetWords) {
 getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords) {
   P_ closurePtr;
   closurePtr = (StgStack_sp(stack) + WDS(offsetWords));
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
+  ASSERT(LOOKS_LIKE_FRAME_PTR(closurePtr));
 
   P_ next_chunk;
   (next_chunk) = ccall getUnderflowFrameNextChunk(closurePtr);
@@ -144,7 +144,7 @@ getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords) {
 isArgGenBigRetFunTypezh(P_ stack, W_ offsetWords) {
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+  ASSERT(LOOKS_LIKE_FRAME_PTR(c));
 
   W_ type;
   (type) = ccall isArgGenBigRetFunType(c);
@@ -155,9 +155,10 @@ isArgGenBigRetFunTypezh(P_ stack, W_ offsetWords) {
 getInfoTableAddrszh(P_ stack, W_ offsetWords) {
   P_ p, info_struct, info_ptr_ipe_key;
   p = StgStack_sp(stack) + WDS(offsetWords);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
-  info_struct = %GET_STD_INFO(UNTAG(p));
-  info_ptr_ipe_key = %INFO_PTR(UNTAG(p));
+  ASSERT(LOOKS_LIKE_FRAME_PTR(p));
+  // p is a stack frame: its info pointer is the frame's info word
+  info_ptr_ipe_key = FRAME_INFO(p);
+  info_struct = %STD_INFO(info_ptr_ipe_key);
   return (info_struct, info_ptr_ipe_key);
 }
 

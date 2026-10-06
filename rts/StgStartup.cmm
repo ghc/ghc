@@ -57,8 +57,8 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
        We leave the stack looking like this:
 
                 +----------------------+
-        Sp ---> | stg_dead_thread_info |
-                +----------------------+
+        Sp ---> | stg_dead_thread_info |  (under TWO_WORD_FRAMES:
+                +----------------------+   stg_dead_thread_ret first)
                 |      -----------------------> return value
                 +----------------------+
 
@@ -76,7 +76,17 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
 #endif
 
     Sp = Sp + SIZEOF_StgStopFrame - SIZEOF_StgDeadThreadFrame;
+#if defined(TWO_WORD_FRAMES)
+    // SET_HDR writes a heap-closure header; a frame header has two words
+    // here, and the profiling header follows them.
+    SET_FRAME_HDR_LBL(Sp, stg_dead_thread);
+#if defined(PROFILING)
+    W_[Sp + WDS(FRAME_HDR_W)] = CCS_SYSTEM;  // prof.ccs
+    W_[Sp + WDS(FRAME_HDR_W+1)] = 0;         // prof.hp
+#endif
+#else
     SET_HDR(Sp, stg_dead_thread_info, CCS_SYSTEM);
+#endif
     %release StgDeadThreadFrame_result(Sp) = R1;
 
     %relaxed StgTSO_what_next(CurrentTSO) = ThreadComplete::I16;
@@ -103,7 +113,7 @@ stg_returnToStackTop /* no args: explicit stack layout */
 {
   LOAD_THREAD_STATE();
   CHECK_SENSIBLE_REGS();
-  jump %ENTRY_CODE(Sp(0)) [];
+  jump FRAME_CODE(Sp) [];
 }
 
 stg_returnToSched /* no args: explicit stack layout */

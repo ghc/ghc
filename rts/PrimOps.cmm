@@ -1549,7 +1549,9 @@ retry_pop_stack:
     (r) = ccall stmWait(MyCapability() "ptr", CurrentTSO "ptr", trec "ptr");
     if (r != 0) {
         // Transaction was valid: stmWait put us on the TVars' queues, we now block
-        StgHeader_info(frame) = stg_atomically_waiting_frame_info;
+        // rewrite the frame's header in place (both words under
+        // TWO_WORD_FRAMES)
+        SET_FRAME_HDR_LBL(frame, stg_atomically_waiting_frame);
         Sp = frame;
         R3 = trec; // passing to stmWaitUnblock()
         jump stg_block_stmwait [R3];
@@ -1702,16 +1704,19 @@ stg_newMVarzh ()
 
 // See Note [Nonmoving write barrier in Perform{Put,Take}].
 // Precondition: the stack must be dirtied.
+// It rewrites the stg_block_takemvar/readmvar frame on top of the blocked
+// thread's stack into a stg_ret_p frame returning the value.
 #define PerformTake(stack, value)               \
     W_ sp;                                      \
     sp = StgStack_sp(stack);                    \
-    W_[sp + WDS(1)] = value;                    \
-    W_[sp + WDS(0)] = stg_ret_p_info;
+    W_[sp + WDS(FRAME_HDR_W)] = value;          \
+    SET_FRAME_HDR_LBL(sp, stg_ret_p);
 
 // See Note [Nonmoving write barrier in Perform{Put,Take}].
+// It pops the stg_block_putmvar frame (header, mvar, value).
 #define PerformPut(stack,lval)                  \
     W_ sp;                                      \
-    sp = StgStack_sp(stack) + WDS(3);           \
+    sp = StgStack_sp(stack) + WDS(FRAME_HDR_W+2); \
     IF_NONMOVING_WRITE_BARRIER_ENABLED {        \
       ccall updateRemembSetPushClosure_(BaseReg "ptr", W_[sp - WDS(1)] "ptr"); \
       ccall updateRemembSetPushClosure_(BaseReg "ptr", W_[sp - WDS(2)] "ptr"); \
@@ -2496,15 +2501,15 @@ stg_noDuplicatezh /* no arg list: explicit stack layout */
     CInt n_caps;
     n_caps = %relaxed CInt[n_capabilities];
     if (n_caps == 1 :: CInt) {
-        jump %ENTRY_CODE(Sp(0)) [];
+        jump FRAME_CODE(Sp) [];
     }
 
-    STK_CHK_LL (WDS(1), stg_noDuplicatezh);
+    STK_CHK_LL (WDS(FRAME_HDR_W), stg_noDuplicatezh);
 
     // leave noDuplicate frame in case the current
     // computation is suspended and restarted (see above).
-    Sp_adj(-1);
-    Sp(0) = stg_noDuplicate_info;
+    Sp_adj(-FRAME_HDR_W);
+    SET_FRAME_HDR_LBL(Sp, stg_noDuplicate);
 
     SAVE_THREAD_STATE();
     ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
@@ -2516,10 +2521,10 @@ stg_noDuplicatezh /* no arg list: explicit stack layout */
         LOAD_THREAD_STATE();
         ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
         // remove the stg_noDuplicate frame if it is still there.
-        if (Sp(0) == stg_noDuplicate_info) {
-            Sp_adj(1);
+        if (FRAME_INFO(Sp) == stg_noDuplicate_info) {
+            Sp_adj(FRAME_HDR_W);
         }
-        jump %ENTRY_CODE(Sp(0)) [];
+        jump FRAME_CODE(Sp) [];
     }
 }
 
@@ -2584,7 +2589,7 @@ INFO_TABLE_RET (stg_ann_frame, ANN_FRAME,
     */
     unwind Sp = W_[Sp + SIZEOF_StgAnnFrame];
     Sp = Sp + SIZEOF_StgAnnFrame;
-    jump %ENTRY_CODE(Sp(0)) GP_ARG_REGS; // NB. all GP arg regs live!
+    jump FRAME_CODE(Sp) GP_ARG_REGS; // NB. all GP arg regs live!
 }
 
 stg_annotateStackzh (P_ ann, P_ cont)
