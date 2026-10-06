@@ -409,10 +409,21 @@ attachContInfoTables :: ProcPointSet -> CmmDecl -> CmmDecl
 attachContInfoTables call_proc_points (CmmProc top_info top_l live g)
  = CmmProc top_info{info_tbls = info_tbls'} top_l live g
  where
+   -- The call proc points were computed before stack layout, which may
+   -- have removed some of them: e.g. the continuation of a call that is
+   -- unreachable (a call under `if (0)` in hand-written Cmm), or of a
+   -- stack check that layout found unnecessary. Attach tables only to
+   -- blocks that are still in the graph, as splitAtProcPoints does. With
+   -- tables-next-to-code a table without its block is never printed, but
+   -- the native code generator (entryBlocks) and the IPE map would still
+   -- see it; without tables-next-to-code the table is emitted out of line
+   -- and refers to the block's label, which would be undefined (Note [Proc
+   -- points without tables-next-to-code] in GHC.Cmm.Info).
    info_tbls' = mapUnion (info_tbls top_info) $
                 mapFromList [ (l, mkEmptyContInfoTable (infoTblLbl l))
                             | l <- setElems call_proc_points
-                            , l /= g_entry g ]
+                            , l /= g_entry g
+                            , l `mapMember` toBlockMap g ]
 attachContInfoTables _ other_decl
  = other_decl
 
