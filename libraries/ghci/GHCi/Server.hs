@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase, CPP, RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables #-}
 module GHCi.Server
   ( MessageHook
   , CustomMessageHandler
@@ -15,6 +15,7 @@ import GHCi.Signals
 import GHCi.TH
 import GHCi.Message
 import Data.ByteString (ByteString)
+import Data.IORef
 #if defined(wasm32_HOST_ARCH)
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Internal as B
@@ -60,27 +61,26 @@ servWithCustom
   -> (forall a .IO a -> IO a)
   -> CustomMessageHandler
   -> IO ()
-servWithCustom verbose hook pipe restore customHandler = loop
+servWithCustom verbose hook pipe restore customHandler = newIORef False >>= loop
  where
-  loop = do
+  loop doneRef = do
     when verbose $ trace "reading pipe..."
-    Msg msg <- readPipe pipe getMessage >>= hook
+    handleRemoteCall pipe hook $ \(msg :: Message a) -> do
 
-    discardCtrlC
+      discardCtrlC
 
-    when verbose $ trace ("msg: " ++ (show msg))
-    case msg of
-      CustomMessage tag payload -> handleCustom tag payload
-      Shutdown -> return ()
-      RunTH st q ty loc -> wrapRunTH $ runTH pipe st q ty loc
-      RunModFinalizers st qrefs -> wrapRunTH $ runModFinalizerRefs pipe st qrefs
-      _other -> run msg >>= reply
+      when verbose $ trace ("msg: " ++ (show msg))
+      case msg of
+        CustomMessage tag payload -> handleCustom tag payload
+        Shutdown -> writeIORef doneRef True >> reply ()
+        -- TODO: These two should probably be done off the main thread
+        RunTH st q ty loc -> wrapRunTH $ runTH pipe st q ty loc
+        RunModFinalizers st qrefs -> wrapRunTH $ runModFinalizerRefs pipe st qrefs
+        _other -> run msg >>= reply
 
-  reply :: forall a. (Binary a, Show a) => a -> IO ()
-  reply r = do
-    when verbose $ trace ("writing pipe: " ++ show r)
-    writePipe pipe (put r)
-    loop
+    isDone <- readIORef doneRef
+    if isDone then closePipe pipe
+              else loop doneRef
 
   handleCustom tag payload = do
     mresp <- customHandler tag payload
@@ -89,17 +89,22 @@ servWithCustom verbose hook pipe restore customHandler = loop
       Nothing ->
         error $ "GHCi.Server: unhandled CustomMessage with tag " ++ show tag
 
+  reply :: forall a. Show a => a -> IO a
+  reply r = do
+    when verbose $ trace ("writing pipe: " ++ show r)
+    return r -- the result of the handler gets sent
+
   -- Run some TH code, which may interact with GHC by sending
   -- THMessage requests, and then finally send RunTHDone followed by a
   -- QResult.  For an overview of how TH works with Remote GHCi, see
   -- Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
-  wrapRunTH :: forall a. (Binary a, Show a) => IO a -> IO ()
+  wrapRunTH :: forall a. (Binary a, Show a) => IO a -> IO (QResult a)
   wrapRunTH io = do
     when verbose $ trace "wrapRunTH..."
     r <- try io
     when verbose $ trace "wrapRunTH done."
     when verbose $ trace "writing RunTHDone."
-    writePipe pipe (putTHMessage RunTHDone)
+    remoteTHCall pipe RunTHDone
     case r of
       Left e
         | Just (GHCiQException _ err) <- fromException e  -> do
