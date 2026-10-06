@@ -2281,6 +2281,9 @@ genLit opt (CmmLabelDiffOff l1 l2 off w) = do
 genLit opt (CmmBlock b)
   = genLit opt (CmmLabel $ infoTblLbl b)
 
+genLit _ (CmmBlockCode _)
+  = panic "genLit: CmmBlockCode unsupported (two-word frames are not supported by the LLVM backend)"
+
 genLit _ CmmHighStackMark
   = panic "genStaticLit - CmmHighStackMark unsupported!"
 

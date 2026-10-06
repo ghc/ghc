@@ -242,9 +242,18 @@ emitForeignCall safety results target args
     let (off, _, copyout) = copyInOflow profile NativeReturn (Young k) results []
        -- see Note [safe foreign call convention]
     tscope <- getTickScope
+    let word = widthInBytes (wordWidth platform)
+        -- The return address: the info pointer, and with two-word frames
+        -- the return code below it.  Must agree with copyOutOflow.
+        -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+        push_ret_addr
+          | twoWordFrames platform
+          =     mkStore (CmmStackSlot (Young k) word) (CmmLit (CmmBlock k))
+            <*> mkStore (CmmStackSlot (Young k) (2 * word)) (CmmLit (CmmBlockCode k))
+          | otherwise
+          = mkStore (CmmStackSlot (Young k) word) (CmmLit (CmmBlock k))
     emit $
-           (    mkStore (CmmStackSlot (Young k) (widthInBytes (wordWidth platform)))
-                        (CmmLit (CmmBlock k))
+           (    push_ret_addr
             <*> mkLast (CmmForeignCall { tgt  = target'
                                        , res  = results
                                        , args = args'

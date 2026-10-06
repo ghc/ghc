@@ -92,8 +92,13 @@ emitReturn results
        ; case sequel of
            Return ->
              do { adjustHpBackwards
+                  -- The word at updfr_off is the return address: the info
+                  -- pointer with TNTC (where 'entryCode' is the identity),
+                  -- the code word with two-word frames.  Either way we jump
+                  -- to it directly.
+                  -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
                 ; let e = cmmLoadGCWord platform (CmmStackSlot Old updfr_off)
-                ; emit (mkReturn profile (entryCode platform e) results updfr_off)
+                ; emit (mkReturn profile e results updfr_off)
                 }
            AssignTo regs adjust ->
              do { when adjust adjustHpBackwards
@@ -372,6 +377,9 @@ Sp[old+24] = d
 Sp[old+32] = stg_ap_pp_info
 call f(a,b) -- usual calling convention
 
+(With two-word frames there is also Sp[old+40] = stg_ap_pp_ret; see
+Note [Two-word frames] in GHC.Runtime.Heap.Layout.)
+
 For the purposes of the CmmCall node, we count this extra stack as
 just more arguments that we are passing on the stack (cml_args).
 -}
@@ -391,9 +399,18 @@ slowArgs platform args sccProfilingEnabled  -- careful: reps contains voids (V),
         (call_args, rest_args)  = splitAt n args
 
         stg_ap_pat = mkCmmRetInfoLabel rtsUnitId arg_pat
-        this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
-        save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just $ cccsExpr platform)]
+        this_pat   = frame_hdr stg_ap_pat ++ call_args
+        save_cccs  = frame_hdr save_cccs_lbl ++ [(N, Just $ cccsExpr platform)]
         save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId (fsLit $ "stg_restore_cccs_" ++ arg_reps)
+        -- The header of an RTS frame: its info table, preceded by its return
+        -- code (the f_ret label of INFO_TABLE_RET(f, ...)) with two-word
+        -- frames.  See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+        frame_hdr info_lbl
+          | twoWordFrames platform
+          = [ (N, Just (mkLblExpr (toEntryLbl platform info_lbl)))
+            , (N, Just (mkLblExpr info_lbl)) ]
+          | otherwise
+          = [ (N, Just (mkLblExpr info_lbl)) ]
         arg_reps = case maximum (fmap fst args1) of
             V64 -> "v64"
             V32 -> "v32"

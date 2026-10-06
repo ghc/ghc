@@ -104,7 +104,11 @@ initUpdFrameProf :: CmmExpr -> FCode ()
 initUpdFrameProf frame
   = ifProfiling $        -- frame->header.prof.ccs = CCCS
     do platform <- getPlatform
-       emitStore (cmmOffset platform frame (pc_OFFSET_StgHeader_ccs (platformConstants platform))) (cccsExpr platform)
+       -- The profiling header follows the frame header's info word, which
+       -- is the second word with two-word frames.
+       -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+       let extra_hdr = wordsToBytes platform (frameHdrSizeW platform - 1)
+       emitStore (cmmOffset platform frame (extra_hdr + pc_OFFSET_StgHeader_ccs (platformConstants platform))) (cccsExpr platform)
         -- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0)
         -- is unnecessary because it is not used anyhow.
 

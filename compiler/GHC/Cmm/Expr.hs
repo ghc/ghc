@@ -218,6 +218,15 @@ data CmmLit
   | CmmBlock {-# UNPACK #-} !BlockId     -- Code label
         -- Invariant: must be a continuation BlockId
         -- See Note [Continuation BlockIds] in GHC.Cmm.Node.
+        -- Without tables-next-to-code this stands for the continuation's
+        -- info table (the info word of its frame).
+
+  | CmmBlockCode {-# UNPACK #-} !BlockId -- Return-code address of a continuation
+        -- The code word of a two-word frame; resolved to 'blockLbl' by
+        -- proc-point splitting.  Only used with two-word frames.
+        -- Invariant: must be a continuation BlockId
+        -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout and
+        -- Note [Continuation BlockIds] in GHC.Cmm.Node.
 
   | CmmHighStackMark -- A late-bound constant that stands for the max
                      -- #bytes of stack space used during a procedure.
@@ -238,6 +247,7 @@ instance Outputable CmmLit where
   ppr (CmmLabelOff _ _) = text "CmmLabelOff"
   ppr (CmmLabelDiffOff _ _ _ _) = text "CmmLabelDiffOff"
   ppr (CmmBlock blk) = text "CmmBlock" <+> ppr blk
+  ppr (CmmBlockCode blk) = text "CmmBlockCode" <+> ppr blk
   ppr CmmHighStackMark = text "CmmHighStackMark"
 
 mkCmmFloatLit :: Rational -> Width -> CmmLit
@@ -272,6 +282,7 @@ cmmLitType platform = \case
    (CmmLabelOff lbl _)  -> cmmLabelType platform lbl
    (CmmLabelDiffOff _ _ _ width) -> cmmBits width
    (CmmBlock _)         -> bWord platform
+   (CmmBlockCode _)     -> bWord platform
    (CmmHighStackMark)   -> bWord platform
 
 cmmLabelType :: Platform -> CLabel -> CmmType
@@ -581,6 +592,7 @@ pprLit platform lit = case lit of
     CmmLabelDiffOff clbl1 clbl2 i _ -> pdoc platform clbl1 <> char '-'
                                        <> pdoc platform clbl2 <> ppr_offset i
     CmmBlock id        -> ppr id
+    CmmBlockCode id    -> text "code" <> parens (ppr id)
     CmmHighStackMark -> text "<highSp>"
 
 pprLit1 :: Platform -> CmmLit -> SDoc

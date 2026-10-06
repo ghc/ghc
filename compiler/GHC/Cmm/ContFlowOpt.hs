@@ -405,6 +405,7 @@ replaceLabels env g
 
      exp :: CmmExpr -> CmmExpr
      exp (CmmLit (CmmBlock bid))                = CmmLit (CmmBlock (lookup bid))
+     exp (CmmLit (CmmBlockCode bid))            = CmmLit (CmmBlockCode (lookup bid))
      exp (CmmStackSlot (Young id) i) = CmmStackSlot (Young (lookup id)) i
      exp e                                      = e
 

@@ -113,8 +113,8 @@ data CmmNode e x where
           -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
           -- These BlockIds are called
           -- Continuation BlockIds, and are the only BlockIds that can
-          -- occur in CmmExprs, namely as (CmmLit (CmmBlock b)) or
-          -- (CmmStackSlot (Young b) _).
+          -- occur in CmmExprs, namely as (CmmLit (CmmBlock b)),
+          -- (CmmLit (CmmBlockCode b)) or (CmmStackSlot (Young b) _).
 
       cml_args_regs :: [GlobalRegUse],
           -- The argument GlobalRegs (Rx, Fx, Dx, Lx) that are passed

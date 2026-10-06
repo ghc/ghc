@@ -182,6 +182,12 @@ cmmExprNative referenceKind expr = do
           -- might have to do the PIC transformation.  Hence we must
           -- not modify BlockIds beyond this point.
 
+        CmmLit (CmmBlockCode id)
+          -> cmmExprNative referenceKind (CmmLit (CmmLabel (blockLbl id)))
+          -- The return code of a two-word frame; normally resolved by
+          -- proc-point splitting already.
+          -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+
         CmmLit (CmmLabel lbl)
           -> cmmMakeDynamicReference config referenceKind lbl
         CmmLit (CmmLabelOff lbl off)

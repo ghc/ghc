@@ -174,6 +174,7 @@ detRenameCmmGroup dufm group = swap (runState (mapM detRenameCmmDecl group) dufm
       CmmLabelDiffOff lbl1 lbl2 i w ->
         CmmLabelDiffOff <$> detRenameCLabel lbl1 <*> detRenameCLabel lbl2 <*> pure i <*> pure w
       CmmBlock bid -> CmmBlock <$> detRenameLabel bid
+      CmmBlockCode bid -> CmmBlockCode <$> detRenameLabel bid
       CmmHighStackMark -> pure CmmHighStackMark
 
     detRenameMaybeBlock :: MaybeO n (Block CmmNode a b) -> DetRnM (MaybeO n (Block CmmNode a b))

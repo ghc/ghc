@@ -194,6 +194,32 @@ convention. Note if a field is longer than a word (e.g. a D_ on
 a 32-bit machine) then the call will push as many words as
 necessary to the stack to accommodate it (e.g. 2).
 
+Note [Two-word frames in Cmm]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Without tables-next-to-code a stack frame has a two-word header: the
+frame's return code below its info pointer (Note [Two-word frames] in
+GHC.Runtime.Heap.Layout).  .cmm source still writes only the info pointer,
+and the parser supplies the code word:
+
+ - INFO_TABLE_RET ( label, FRAME_TYPE, info_ptr, field1, ..., fieldN ):
+   a hidden word-sized stack formal is bound to the code word, below
+   info_ptr.  The liveness bitmap still describes field1..fieldN only.
+
+ - push (info_ptr, field1, ..., fieldN) { ... } and
+   jump f (info_ptr, field1, ..., fieldN) (args): the code word is pushed
+   below info_ptr.  If info_ptr is a label whose name ends in _info, the
+   code word is the label of the same name ending in _ret (the code label
+   that INFO_TABLE_RET(name, ...) defines); otherwise it is loaded from
+   the info table's entry field at run time (entryCode).
+
+ - return (...) jumps to the code word, without loading the entry field.
+
+ - SIZEOF_StgFrameHeader is the size of a frame header in bytes,
+   including the profiling header (like SIZEOF_StgHeader for closures).
+
+With tables-next-to-code none of this happens and frames have one header
+word, as in the picture above.
+
 Memory ordering
 ---------------
 
@@ -615,15 +641,22 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                       liftP $ pure $ do
                         platform <- getPlatform
                         live <- sequence $7
+                        -- With two-word frames the frame starts with a code
+                        -- word below the info pointer; bind it to a hidden
+                        -- formal.  See Note [Two-word frames in Cmm].
+                        code_word <- if twoWordFrames platform
+                                       then (:[]) <$> newTemp (bWord platform)
+                                       else return []
                         let prof = NoProfilingInfo
                             -- drop one for the info pointer
+                            -- (the bitmap describes the fields only)
                             bitmap = mkLiveness platform (drop 1 live)
                             rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
                         return (mkCmmRetLabel home_unit_id $3,
                                 Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel home_unit_id $3
                                              , cit_rep = rep
                                              , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
-                                live) }
+                                code_word ++ live) }
 
 body    :: { CmmParse () }
         : {- empty -}                   { return () }
@@ -1371,7 +1404,7 @@ emitPushBHUpdateFrame sp e = do
 pushStackFrame :: [CmmParse CmmExpr] -> CmmParse () -> CmmParse ()
 pushStackFrame fields body = do
   profile <- getProfile
-  exprs <- sequence fields
+  exprs <- withFrameCode (profilePlatform profile) <$> sequence fields
   updfr_off <- getUpdFrameOff
   let (new_updfr_off, _, g) = copyOutOflow profile NativeReturn Ret Old
                                            [] updfr_off exprs
@@ -1445,7 +1478,10 @@ doReturn exprs_code = do
 mkReturnSimple  :: Profile -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
 mkReturnSimple profile actuals updfr_off =
   mkReturn profile e actuals updfr_off
-  where e = entryCode platform (cmmLoadGCWord platform (CmmStackSlot Old updfr_off))
+  where -- The return address: the info pointer with TNTC (where 'entryCode'
+        -- is the identity), the code word with two-word frames.
+        -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+        e = cmmLoadGCWord platform (CmmStackSlot Old updfr_off)
         platform = profilePlatform profile
 
 doRawJump :: CmmParse CmmExpr -> [GlobalRegUse] -> CmmParse ()
@@ -1460,10 +1496,26 @@ doJumpWithStack :: CmmParse CmmExpr -> [CmmParse CmmExpr]
 doJumpWithStack expr_code stk_code args_code = do
   profile <- getProfile
   expr <- expr_code
-  stk_args <- sequence stk_code
+  stk_args <- withFrameCode (profilePlatform profile) <$> sequence stk_code
   args <- sequence args_code
   updfr_off <- getUpdFrameOff
   emit (mkJumpExtra profile NativeNodeCall expr args updfr_off stk_args)
+
+-- | Add the code word to a stack frame written in .cmm source, given as its
+-- header expression (the info pointer) followed by its fields.
+-- See Note [Two-word frames in Cmm].
+withFrameCode :: Platform -> [CmmExpr] -> [CmmExpr]
+withFrameCode platform (info : fields)
+  | twoWordFrames platform = frameCodeWord platform info : info : fields
+withFrameCode _ exprs = exprs
+
+-- | The code word of a frame, given its info pointer.
+-- See Note [Two-word frames in Cmm].
+frameCodeWord :: Platform -> CmmExpr -> CmmExpr
+frameCodeWord platform info = case info of
+  CmmLit (CmmLabel lbl)
+    | Just ret_lbl <- cmmFrameRetLabel lbl -> CmmLit (CmmLabel ret_lbl)
+  _ -> entryCode platform info
 
 doCall :: CmmParse CmmExpr -> [CmmParse LocalReg] -> [CmmParse CmmExpr]
        -> CmmParse ()
@@ -1638,7 +1690,11 @@ initEnv profile = listToUFM [
   ( fsLit "SIZEOF_StgHeader",
     VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize profile)) (wordWidth platform)) )),
   ( fsLit "SIZEOF_StgInfoTable",
-    VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB profile)) (wordWidth platform)) ))
+    VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB profile)) (wordWidth platform)) )),
+  -- The header of a stack frame (StgFrameHeader); see Note [Two-word frames]
+  -- in GHC.Runtime.Heap.Layout
+  ( fsLit "SIZEOF_StgFrameHeader",
+    VarN (CmmLit (CmmInt (fromIntegral (frameHdrSize profile)) (wordWidth platform)) ))
   ]
   where platform = profilePlatform profile
 

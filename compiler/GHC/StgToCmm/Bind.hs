@@ -788,7 +788,8 @@ pushUpdateFrame lbl updatee body
   = do
        updfr  <- getUpdFrameOff
        profile <- getProfile
-       let hdr         = fixedHdrSize profile
+       let hdr         = frameHdrSize profile
+                         -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout
            frame       = updfr + hdr + pc_SIZEOF_StgUpdateFrame_NoHdr (profileConstants profile)
        --
        emitUpdateFrame (CmmStackSlot Old frame) lbl updatee
@@ -798,13 +799,27 @@ emitUpdateFrame :: CmmExpr -> CLabel -> CmmExpr -> FCode ()
 emitUpdateFrame frame lbl updatee = do
   profile <- getProfile
   let
-           hdr         = fixedHdrSize profile
+           hdr         = frameHdrSize profile
            off_updatee = hdr + pc_OFFSET_StgUpdateFrame_updatee (platformConstants platform)
            platform    = profilePlatform profile
   --
-  emitStore frame (mkLblExpr lbl)
+  emitFrameHeader platform frame lbl
   emitStore (cmmOffset platform frame off_updatee) updatee
   initUpdFrameProf frame
+
+-- | Write the header of an RTS stack frame at @frame@, given the frame's
+-- info table label (a 'CmmRetInfo' label for a frame declared with
+-- INFO_TABLE_RET).  With two-word frames this is the info pointer and, below
+-- it at @frame@, the frame's return code, @toEntryLbl info_lbl@ (f_ret).
+-- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+emitFrameHeader :: Platform -> CmmExpr -> CLabel -> FCode ()
+emitFrameHeader platform frame info_lbl
+  | twoWordFrames platform
+  = do emitStore (cmmOffset platform frame (platformWordSizeInBytes platform))
+                 (mkLblExpr info_lbl)
+       emitStore frame (mkLblExpr (toEntryLbl platform info_lbl))
+  | otherwise
+  = emitStore frame (mkLblExpr info_lbl)
 
 -----------------------------------------------------------------------------
 -- Original thunk info table frames
@@ -836,14 +851,15 @@ pushOrigThunkInfoFrame closure_info body = do
       updfr <- getUpdFrameOff
       profile <- getProfile
       let platform = profilePlatform profile
-          hdr = fixedHdrSize profile
+          hdr = frameHdrSize profile
+                -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout
           orig_info_frame_sz =
               hdr + pc_SIZEOF_StgOrigThunkInfoFrame_NoHdr (profileConstants profile)
           off_orig_info = hdr + pc_OFFSET_StgOrigThunkInfoFrame_info_ptr (profileConstants profile)
           frame_off = updfr + orig_info_frame_sz
           frame = CmmStackSlot Old frame_off
       --
-      emitStore frame (mkLblExpr mkOrigThunkInfoLabel)
+      emitFrameHeader platform frame mkOrigThunkInfoLabel
       emitStore (cmmOffset platform frame off_orig_info) orig_itbl
       withUpdFrameOff frame_off body
 

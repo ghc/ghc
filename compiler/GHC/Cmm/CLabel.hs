@@ -123,6 +123,7 @@ module GHC.Cmm.CLabel (
         toSlowEntryLbl,
         toEntryLbl,
         toInfoLbl,
+        cmmFrameRetLabel,
         toProcDelimiterLbl,
 
         -- * Pretty-printing
@@ -660,9 +661,14 @@ mkDirty_MUT_VAR_Label,
 mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") ForeignLabelInExternalPackage IsFunction
 mkNonmovingWriteBarrierEnabledLabel
                                 = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "nonmoving_write_barrier_enabled") CmmData
-mkOrigThunkInfoLabel            = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_orig_thunk_info_frame") CmmInfo
-mkUpdInfoLabel                  = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_upd_frame")         CmmInfo
-mkBHUpdInfoLabel                = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_bh_upd_frame" )     CmmInfo
+-- The three stack frames below are declared with INFO_TABLE_RET in the RTS,
+-- so their labels are CmmRetInfo: 'toEntryLbl' then gives their return code,
+-- e.g. stg_upd_frame_ret, which two-word frames store below the info pointer
+-- (see Note [Two-word frames] in GHC.Runtime.Heap.Layout).  Both kinds print
+-- as <name>_info.
+mkOrigThunkInfoLabel            = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_orig_thunk_info_frame") CmmRetInfo
+mkUpdInfoLabel                  = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_upd_frame")         CmmRetInfo
+mkBHUpdInfoLabel                = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_bh_upd_frame" )     CmmRetInfo
 mkIndStaticInfoLabel            = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_IND_STATIC")        CmmInfo
 mkMainCapabilityLabel           = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "MainCapability")        CmmData
 mkMAP_FROZEN_CLEAN_infoLabel    = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_MUT_ARR_PTRS_FROZEN_CLEAN") CmmInfo
@@ -939,6 +945,33 @@ toEntryLbl platform lbl = case lbl of
    CmmLabel m ext str CmmInfo    -> CmmLabel m ext str CmmEntry
    CmmLabel m ext str CmmRetInfo -> CmmLabel m ext str CmmRet
    _                             -> pprPanic "toEntryLbl" (pprDebugCLabel platform lbl)
+
+-- | The return code label of an RTS stack frame, given the frame's info
+-- label: for a frame declared with @INFO_TABLE_RET(f, ...)@ the info label
+-- @f_info@ gives @f_ret@.  This works both for 'CmmRetInfo' labels and for
+-- the plain names that .cmm source uses (@stg_upd_frame_info@ in .cmm is a
+-- 'CmmCode' label with the suffix in its name).  'Nothing' if the label
+-- is not of either form.
+-- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+cmmFrameRetLabel :: CLabel -> Maybe CLabel
+cmmFrameRetLabel lbl = case lbl of
+   CmmLabel m ext str CmmRetInfo -> Just (CmmLabel m ext str CmmRet)
+   CmmLabel m ext str CmmCode
+     | Just base <- strip_info str -> Just (CmmLabel m ext (base `appendFS` fsLit "_ret") CmmCode)
+   CmmLabel m ext str CmmData
+     | Just base <- strip_info str -> Just (CmmLabel m ext (base `appendFS` fsLit "_ret") CmmCode)
+   ForeignLabel str src _
+     | Just base <- strip_info str -> Just (ForeignLabel (base `appendFS` fsLit "_ret") src IsFunction)
+   _ -> Nothing
+  where
+    strip_info str
+      | let s = unpackFS str
+            n = length s
+      , n > 5
+      , drop (n - 5) s == "_info"
+      = Just (mkFastString (take (n - 5) s))
+      | otherwise
+      = Nothing
 
 -- | Generate a CmmProc delimiter label from the actual entry label.
 --

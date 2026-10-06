@@ -920,6 +920,7 @@ getRegister' config plat expr
 
         CmmLabelDiffOff _ _ _ _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
         CmmBlock _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
+        CmmBlockCode _ -> pprPanic "getRegister' (CmmLit:CmmBlockCode): " (pdoc plat expr)
         CmmHighStackMark -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
     CmmLoad mem rep _ -> do
       Amode addr addr_code <- getAmode plat (typeWidth rep) mem

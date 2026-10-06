@@ -356,12 +356,21 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
                             -- cannot use panic, this is printed by -ddump-cmm
 
       -- References to procpoint IDs can now be replaced with the
-      -- infotable's label
+      -- infotable's label, and references to their return code (the code
+      -- word of a two-word frame, see Note [Two-word frames] in
+      -- GHC.Runtime.Heap.Layout) with the label of the new procedure.
       replacePPIds g = {-# SCC "replacePPIds" #-}
                        mapGraphNodes (id, mapExp repl, mapExp repl) g
         where repl e@(CmmLit (CmmBlock bid)) =
                 case mapLookup bid procLabels of
                   Just (_, Just info_lbl)  -> CmmLit (CmmLabel info_lbl)
+                  _ -> e
+              -- The label of the new procedure, which is also the entry
+              -- field of its info table (GHC.Cmm.Info.mkInfoTable), i.e.
+              -- blockLbl bid = toEntryLbl (infoTblLbl bid).
+              repl e@(CmmLit (CmmBlockCode bid)) =
+                case mapLookup bid procLabels of
+                  Just (lbl, Just _)  -> CmmLit (CmmLabel lbl)
                   _ -> e
               repl e = e
 

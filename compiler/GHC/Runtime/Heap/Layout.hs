@@ -36,6 +36,10 @@ module GHC.Runtime.Heap.Layout (
         smallArrPtrsHdrSize, smallArrPtrsHdrSizeW, hdrSize, hdrSizeW,
         fixedHdrSize,
 
+        -- ** Stack frame headers
+        -- See Note [Two-word frames]
+        twoWordFrames, frameHdrSizeW, frameHdrBytes, frameHdrSize,
+
         -- ** RTS closure types
         rtsClosureType, rET_SMALL, rET_BIG,
         aRG_GEN, aRG_GEN_BIG,
@@ -312,6 +316,77 @@ fixedHdrSize profile = wordsToBytes (profilePlatform profile) (fixedHdrSizeW pro
 -- | Size of a closure header (StgHeader in includes\/rts\/storage\/Closures.h)
 fixedHdrSizeW :: Profile -> WordOff
 fixedHdrSizeW profile = pc_STD_HDR_SIZE (profileConstants profile) + profHdrSize profile
+
+-- | Are stack frames laid out with a two-word header (a return-code word
+-- below the info-table word)?  This is the case exactly when tables are not
+-- next to code.  See Note [Two-word frames].
+twoWordFrames :: Platform -> Bool
+twoWordFrames platform = not (platformTablesNextToCode platform)
+
+-- | Number of words in a stack frame's header, not counting the profiling
+-- header: 2 with two-word frames, 1 otherwise.  See Note [Two-word frames].
+frameHdrSizeW :: Platform -> WordOff
+frameHdrSizeW platform
+  | twoWordFrames platform = 2
+  | otherwise              = 1
+
+-- | 'frameHdrSizeW' in bytes: the size of the header of a compiled
+-- continuation's frame (which has no profiling header), i.e. the size of
+-- the "return address".  See Note [Two-word frames].
+frameHdrBytes :: Platform -> ByteOff
+frameHdrBytes platform = wordsToBytes platform (frameHdrSizeW platform)
+
+-- | Size in bytes of a stack frame's header (StgFrameHeader in
+-- rts\/include\/rts\/storage\/Closures.h), including the profiling header.
+-- See Note [Two-word frames].
+frameHdrSize :: Profile -> ByteOff
+frameHdrSize profile
+  = wordsToBytes platform (frameHdrSizeW platform + profHdrSize profile)
+  where platform = profilePlatform profile
+
+{- Note [Two-word frames]
+~~~~~~~~~~~~~~~~~~~~~~
+Without tables-next-to-code (TNTC) the word in a stack frame's header is the
+address of the frame's info table, and returning to the frame costs two
+dependent loads: the header word, then the info table's `entry` field.  To
+avoid the second load, a build without TNTC uses /two-word frames/: every
+stack frame starts with two words,
+
+    TNTC:        Sp[0] = info                 [prof hdr]  payload...
+    two-word:    Sp[0] = code   Sp[1] = info  [prof hdr]  payload...
+
+  * `code` is the address of the frame's return code, so a return is a
+    single `jump Sp[0]`, as with TNTC.  For an RTS frame declared with
+    INFO_TABLE_RET(f, ...) it is the label f_ret; for a compiled
+    continuation k it is `blockLbl k` (= `toEntryLbl (infoTblLbl k)`).
+  * `info` is the info-table pointer, the same word as the single header
+    word today.  The identity of a frame is always this word; the GC and
+    every stack walker read it.  The two words always agree:
+    `((StgInfoTable*)info)->entry == code`.
+  * Liveness bitmaps describe the payload only, starting at Sp[2].
+
+The predicate is `twoWordFrames` (= not TNTC); with TNTC everything below
+collapses to the one-word code.  In the code generator:
+
+  * An `Old`/`Young` area offset that denotes "the return address"
+    (`updfr_off`, `Young k + W`) denotes the code word; the info word sits
+    one word higher (offset - W).  So the initial `updfr_off` is
+    frameHdrSizeW*W, `copyIn` skips frameHdrSizeW words, and `copyOutOflow`
+    stores both words for a call (GHC.Cmm.Graph).
+  * The code address of continuation k is the literal `CmmBlockCode k`
+    (GHC.Cmm.Expr), which proc-point splitting resolves to `blockLbl k`
+    (GHC.Cmm.ProcPoint.replacePPIds).
+  * Returns jump to the code word without `entryCode` (emitReturn, the Cmm
+    parser's `return`, lowerSafeForeignCall).
+  * Update and orig-thunk-info frames store `stg_*_ret` and `stg_*_info`
+    (GHC.StgToCmm.Bind); generic-apply frames pushed by slowArgs store
+    `stg_ap_*_ret` and `stg_ap_*_info` (GHC.StgToCmm.Layout).
+  * The Cmm parser supplies the code word of hand-written frames implicitly
+    (see Note [Two-word frames in Cmm] in GHC.Cmm.Parser).
+
+The RTS side uses the same layout: `StgFrameHeader`, FRAME_HDR_W and the
+frame macros in rts/include.
+-}
 
 -- | Size of the profiling part of a closure header
 -- (StgProfHeader in includes\/rts\/storage\/Closures.h)

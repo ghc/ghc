@@ -597,6 +597,7 @@ pprLit platform lit = case lit of
     CmmVec {} -> panic "PprC printing vector literal"
 
     CmmBlock bid       -> mkW_ <> pprCLabelAddr (infoTblLbl bid)
+    CmmBlockCode _     -> panic "PprC printing CmmBlockCode (two-word frames are not supported by the C backend)"
     CmmHighStackMark   -> panic "PprC printing high stack mark"
     CmmLabel clbl      -> mkW_ <> pprCLabelAddr clbl
     CmmLabelOff clbl i -> mkW_ <> pprCLabelAddr clbl <> char '+' <> int i

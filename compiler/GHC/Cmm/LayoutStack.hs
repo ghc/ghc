@@ -13,7 +13,6 @@ import GHC.StgToCmm.Utils      ( callerSaveVolatileRegs  ) -- XXX layering viola
 import GHC.StgToCmm.Foreign    ( saveThreadState, loadThreadState ) -- XXX layering violation
 
 import GHC.Cmm
-import GHC.Cmm.Info
 import GHC.Cmm.BlockId
 import GHC.Cmm.Config
 import GHC.Cmm.Utils
@@ -468,8 +467,9 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
         return $ lastCall cont_lbl cml_args cml_ret_args cml_ret_off
 
       CmmForeignCall{ succ = cont_lbl, .. } ->
-        return $ lastCall cont_lbl (platformWordSizeInBytes platform) ret_args ret_off
-              -- one word of args: the return address
+        return $ lastCall cont_lbl (frameHdrBytes platform) ret_args ret_off
+              -- args: the frame header (the return address), one word or
+              -- two; see Note [Two-word frames] in GHC.Runtime.Heap.Layout
 
       CmmBranch {}     ->  handleBranches
       CmmCondBranch {} ->  handleBranches
@@ -527,7 +527,9 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
              out = mapFromList [ (l', cont_stack)
                                | l' <- successors last ]
          return ( assigs
-                , spOffsetForCall sp0 cont_stack (platformWordSizeInBytes platform)
+                , spOffsetForCall sp0 cont_stack (frameHdrBytes platform)
+                  -- Sp points at the frame header (the return address)
+                  -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout
                 , last
                 , []
                 , out)
@@ -714,6 +716,8 @@ futureContinuation middle = foldBlockNodesB f middle Nothing
    where f :: CmmNode a b -> Maybe BlockId -> Maybe BlockId
          f (CmmStore (CmmStackSlot (Young l) _) (CmmLit (CmmBlock _)) _) _
                = Just l
+         f (CmmStore (CmmStackSlot (Young l) _) (CmmLit (CmmBlockCode _)) _) _
+               = Just l
          f _ r = r
 
 -- -----------------------------------------------------------------------------
@@ -892,7 +896,10 @@ maybeAddSpAdj cfg sp0 sp_off block =
       = CmmUnwind [(Sp, Just sp_unwind)] `blockCons` block
       | otherwise
       = block
-      where sp_unwind = CmmRegOff (spReg platform) (sp0 - platformWordSizeInBytes platform)
+      where sp_unwind = CmmRegOff (spReg platform) (sp0 - frameHdrBytes platform)
+            -- the caller's Sp points at its return address (the code word
+            -- of a two-word frame, see Note [Two-word frames] in
+            -- GHC.Runtime.Heap.Layout)
 
     -- Add unwind pseudo-instruction right after the Sp adjustment
     -- if there is one.
@@ -902,7 +909,7 @@ maybeAddSpAdj cfg sp0 sp_off block =
       = block `blockSnoc` CmmUnwind [(Sp, Just sp_unwind)]
       | otherwise
       = block
-      where sp_unwind = CmmRegOff (spReg platform) (sp0 - platformWordSizeInBytes platform - sp_off)
+      where sp_unwind = CmmRegOff (spReg platform) (sp0 - frameHdrBytes platform - sp_off)
 
 {- Note [SP old/young offsets]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1175,11 +1182,14 @@ lowerSafeForeignCall profile block
         -- received an exception during the call, then the stack might be
         -- different.  Hence we continue by jumping to the top stack frame,
         -- not by jumping to succ.
-        jump = CmmCall { cml_target    = entryCode platform $
-                                         cmmLoadBWord platform (spExpr platform)
+        --
+        -- With two-word frames Sp[0] is the code word, so no 'entryCode'
+        -- is needed (and with TNTC 'entryCode' is the identity).
+        -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+        jump = CmmCall { cml_target    = cmmLoadBWord platform (spExpr platform)
                        , cml_cont      = Just succ
                        , cml_args_regs = regs
-                       , cml_args      = widthInBytes (wordWidth platform)
+                       , cml_args      = frameHdrBytes platform
                        , cml_ret_args  = ret_args
                        , cml_ret_off   = ret_off }
 

@@ -34,7 +34,7 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Data.FastString
 import GHC.Types.ForeignCall
 import GHC.Data.OrdList
-import GHC.Runtime.Heap.Layout (ByteOff)
+import GHC.Runtime.Heap.Layout (ByteOff, twoWordFrames, frameHdrBytes)
 import GHC.Types.Unique.DSM
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Panic
@@ -348,7 +348,10 @@ copyIn profile conv area formals extra_stk
          CmmAssign (CmmLocal reg) (CmmLoad (CmmStackSlot area off) ty NaturallyAligned)
          where ty = localRegType reg
 
-    init_offset = widthInBytes (wordWidth platform) -- infotable
+    -- The frame header (the return address): the info table, preceded
+    -- by the return code with two-word frames.
+    -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+    init_offset = frameHdrBytes platform
 
     (stk_off, stk_args) = assignStack platform init_offset localRegType extra_stk
 
@@ -374,6 +377,11 @@ copyOutOflow :: Profile -> Convention -> Transfer -> Area -> [CmmExpr]
 -- the info table for return and adjust the offsets of the other
 -- parameters.  If this is a call instruction, we adjust the offsets
 -- of the other parameters.
+--
+-- With two-word frames the frame header is two words: the return code
+-- (CmmBlockCode, at the youngest offset, i.e. at Sp[0] on return) and the
+-- info table (CmmBlock) above it.
+-- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
 copyOutOflow profile conv transfer area actuals updfr_off extra_stack_stuff
   = (stk_size, regs, graph)
   where
@@ -416,12 +424,19 @@ copyOutOflow profile conv transfer area actuals updfr_off extra_stack_stuff
             Young id ->  -- Generate a store instruction for
                          -- the return address if making a call
                   case transfer of
-                     Call ->
-                       ([(CmmLit (CmmBlock id), StackParam init_offset)],
-                       widthInBytes (wordWidth platform))
+                     Call
+                       | twoWordFrames platform ->
+                         -- info word, then the code word below it
+                         ([(CmmLit (CmmBlock id),
+                              StackParam (init_offset - widthInBytes (wordWidth platform))),
+                           (CmmLit (CmmBlockCode id), StackParam init_offset)],
+                          frameHdrBytes platform)
+                       | otherwise ->
+                         ([(CmmLit (CmmBlock id), StackParam init_offset)],
+                          widthInBytes (wordWidth platform))
                      JumpRet ->
                        ([],
-                       widthInBytes (wordWidth platform))
+                       frameHdrBytes platform)
                      _other ->
                        ([], 0)
             Old -> ([], updfr_off)

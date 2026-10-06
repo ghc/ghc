@@ -191,6 +191,7 @@ hash_block block =
         hash_lit (CmmLabelOff _ i) = cvt $ 199 + i
         hash_lit (CmmLabelDiffOff _ _ i _) = cvt $ 299 + i
         hash_lit (CmmBlock _) = 191 -- ugh
+        hash_lit (CmmBlockCode _) = 193 -- ugh
         hash_lit (CmmHighStackMark) = cvt 313
 
         hash_tgt (ForeignTarget e _) = hash_e e
@@ -250,6 +251,7 @@ eqExprWith eqBid = eq
   _e1                `eq` _e2                = False
 
   eqLit (CmmBlock id1) (CmmBlock id2) = eqBid id1 id2
+  eqLit (CmmBlockCode id1) (CmmBlockCode id2) = eqBid id1 id2
   eqLit l1 l2 = l1 == l2
 
   eqArea Old Old = True

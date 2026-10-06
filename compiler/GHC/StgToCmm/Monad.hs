@@ -457,12 +457,18 @@ newTemp rep = do { uniq <- DSM.getUniqueM
 ------------------
 initFCodeState :: Platform -> FCodeState
 initFCodeState p =
-  MkFCodeState { fcs_upframeoffset = platformWordSizeInBytes p
+  MkFCodeState { fcs_upframeoffset = initUpdFrameOff p
                , fcs_sequel        = Return
                , fcs_selfloop      = Nothing
                , fcs_ticky         = mkTopTickyCtrLabel
                , fcs_tickscope     = GlobalScope
                }
+
+-- | The initial update frame offset: the size of the header of the frame
+-- we return to (the return address), one word, or two with two-word frames.
+-- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+initUpdFrameOff :: Platform -> UpdFrameOffset
+initUpdFrameOff platform = frameHdrBytes platform
 
 getFCodeState :: FCode FCodeState
 getFCodeState = FCode $ \_ fstate state -> (fstate,state)
@@ -581,7 +587,7 @@ forkClosureBody body_code
         ; us       <- newUniqSupply
         ; state    <- getState
         ; let fcs = fstate { fcs_sequel        = Return
-                           , fcs_upframeoffset = platformWordSizeInBytes platform
+                           , fcs_upframeoffset = initUpdFrameOff platform
                            , fcs_selfloop      = Nothing
                            }
               fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
@@ -760,7 +766,7 @@ emitProcWithStackFrame
 
 emitProcWithStackFrame _conv mb_info lbl _stk_args [] blocks False
   = do  { platform <- getPlatform
-        ; emitProc mb_info lbl [] blocks (widthInBytes (wordWidth platform)) False
+        ; emitProc mb_info lbl [] blocks (frameHdrBytes platform) False
         }
 emitProcWithStackFrame conv mb_info lbl stk_args args (graph, tscope) True
         -- do layout

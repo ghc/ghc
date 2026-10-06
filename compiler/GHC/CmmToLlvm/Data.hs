@@ -237,5 +237,8 @@ genStaticLit (CmmLabelDiffOff l1 l2 off w) = do
 
 genStaticLit (CmmBlock b) = genStaticLit $ CmmLabel $ infoTblLbl b
 
+genStaticLit (CmmBlockCode _)
+    = panic "genStaticLit: CmmBlockCode unsupported (two-word frames are not supported by the LLVM backend)"
+
 genStaticLit (CmmHighStackMark)
     = panic "genStaticLit: CmmHighStackMark unsupported!"

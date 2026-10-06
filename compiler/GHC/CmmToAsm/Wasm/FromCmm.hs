@@ -919,6 +919,7 @@ lower_CmmLit lit = do
               `WasmConcat` WasmConst ty_word (toInteger o)
               `WasmConcat` WasmAdd ty_word
     CmmBlock bid -> lower_CmmLit $ CmmLabel $ infoTblLbl bid
+    CmmBlockCode _ -> panic "lower_CmmLit: CmmBlockCode (two-word frames are not supported by the wasm backend)"
     _ -> panic "lower_CmmLit: unreachable"
 
 --  | Lower a 'CmmReg'. Some of the logic here wouldn't be needed if

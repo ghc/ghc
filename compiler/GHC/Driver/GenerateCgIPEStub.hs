@@ -4,7 +4,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Semigroup ((<>))
 import GHC.Cmm
-import GHC.Cmm.CLabel (CLabel, mkAsmTempLabel)
+import GHC.Cmm.CLabel (CLabel, mkAsmTempLabel, isInfoTableLabel)
 import GHC.Cmm.Config (CmmConfig (..))
 import GHC.Cmm.Dataflow (O)
 import GHC.Cmm.Dataflow.Block (blockSplit, blockToList)
@@ -195,8 +195,10 @@ Given a `CmmGraph`:
   - Check every `CmmBlock` from top (first) to bottom (last).
   - If a `CmmTick` holding a `SourceNote` is found, remember the source location in the tick.
   - If an assignment of the form `... = block_c18M_info;` (a `CmmStore` whose RHS is a
-    `CmmLit (CmmLabel l)`) is found, map that label to the most recently visited source note's
-    location.
+    `CmmLit (CmmLabel l)` where `l` is an info table label) is found, map that label to the most
+    recently visited source note's location.  Other labels are skipped: with two-word frames
+    (Note [Two-word frames] in GHC.Runtime.Heap.Layout) the return frame's code label
+    (`_blk_c18M`) is stored next to `block_c18M_info`.
 
 See `labelsToSourcesSansTNTC` for the implementation of this algorithm.
 -}
@@ -406,7 +408,11 @@ labelsToSourcesSansTNTC this_file acc (CmmProc _ _ _ cmm_graph) =
           -> (Map CLabel IpeSourceLocation, Maybe IpeSourceLocation)
         collectLabels (!acc, lastTick) b =
           case (b, lastTick) of
-            (CmmStore _ (CmmLit (CmmLabel l)) _, Just src_loc) ->
+            (CmmStore _ (CmmLit (CmmLabel l)) _, Just src_loc)
+              -- Only info table labels: with two-word frames the return
+              -- code label is stored next to the info table label.
+              -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
+              | isInfoTableLabel l ->
               (Map.insert l src_loc acc, Nothing)
             (CmmTick t, _)
               -- Pick the innermost source note tick from the current file.

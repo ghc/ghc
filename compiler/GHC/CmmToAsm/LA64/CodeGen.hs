@@ -520,6 +520,7 @@ getRegister' config plat expr =
 
         CmmLabelDiffOff {} -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
         CmmBlock _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
+        CmmBlockCode _ -> pprPanic "getRegister' (CmmLit:CmmBlockCode): " (pdoc plat expr)
         CmmHighStackMark -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
 
     CmmLoad mem rep _ -> do
