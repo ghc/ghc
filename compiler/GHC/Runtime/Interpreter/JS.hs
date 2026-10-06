@@ -127,11 +127,9 @@ startTHRunnerProcess interp_js settings = do
   std_in <- readIORef interp_in
 
   interpPipe <- mkPipeFromHandles rh wh
-  lock <- newMVar ()
   let proc = InterpProcess
               { interpHandle = hdl
               , interpPipe
-              , interpLock   = lock
               }
   pure (std_in, proc)
 
@@ -382,7 +380,7 @@ jsLinkPlan logger tmpfs tmp_dir ar_cache link_cfg cfg inst link_plan = do
   --   Haskell server.
   server_started <- jsServerStarted <$> readMVar (instJSState (instExtra inst))
   if server_started
-    then sendMessageNoResponse inst $ LoadObj all_js
+    then sendMessage inst $ LoadObj all_js
     else jsLoadFile            inst all_js
 
   ----------------------------------------------------------------

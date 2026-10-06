@@ -12,6 +12,7 @@ import GHCi.Message
   , mkPipeFromHandles
   , remoteCall
   , Pipe
+  , closePipe
   )
 import GHCi.Server
   ( CustomMessageHandler
@@ -153,14 +154,13 @@ customMessage pipe c = do
 runClient :: Int -> IO ()
 runClient input = do
   serverExe <- getExecutablePath
-  withServer serverExe $ \hFromServer hToServer -> do
-    pipe <- mkPipeFromHandles hFromServer hToServer
+  withServer serverExe $ \pipe -> do
     res  <- customMessage pipe (SquareCommand input)
     putStrLn $ "Square returned: " ++ show res
     res2  <- customMessage pipe (MulCommand 2 res)
     putStrLn $ "Mul returned: " ++ show res2
 
-withServer :: FilePath -> (Handle -> Handle -> IO a) -> IO a
+withServer :: FilePath -> (Pipe -> IO a) -> IO a
 withServer serverExe action = do
   (ghcRead, serverWrite) <- createPipe
   (serverRead, ghcWrite) <- createPipe
@@ -171,13 +171,12 @@ withServer serverExe action = do
     , std_out = Inherit
     , std_err = Inherit
     }
-  bracket (mkHandles ghcRead ghcWrite)
-          (\(hFromServer, hToServer) -> do
-             hClose hFromServer
-             hClose hToServer
+  bracket (mkHandles ghcRead ghcWrite >>= uncurry mkPipeFromHandles)
+          (\pipe -> do
+             closePipe pipe
              terminateProcess ph
              void (waitForProcess ph))
-          (\(hFromServer, hToServer) -> action hFromServer hToServer)
+          (\pipe -> action pipe)
   where
     mkHandles r w = do
       hR <- fdToHandle r
