@@ -231,6 +231,24 @@ function set_toolchain_paths() {
 }
 
 function cabal_update() {
+  # root key signing changes randomly which affects old 
+  # cabal-install versions
+  CONFIG="${CABAL_CONFIG:-/builds/ghc/ghc/cabal/config}"
+  mkdir -p "$(dirname "$CONFIG")"
+
+  cat > "$CONFIG" <<'EOF'
+repository hackage.haskell.org
+  url: http://hackage.haskell.org/
+  secure: True
+  key-threshold: 0
+  root-keys:
+    fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
+    c7de58fc6a224b92b5b513f26fbb8b370f2d97c7cfe0075a951314a55734be93
+    d26e46f3b631aae1433b89379a6c68bd417eb5d1c408f0643dcc07757fece522
+    1ea9ba32c526d1cc91ab5e5bd364ec5e9e8cb67179a471872f6e26f0ae773d42
+  key-threshold: 3
+EOF
+
   # In principle -w shouldn't be necessary here but with
   # cabal-install 3.8.1.0 it is, due to cabal#8447.
   run "$CABAL" update -w "$GHC" "hackage.haskell.org,${HACKAGE_INDEX_STATE}"
