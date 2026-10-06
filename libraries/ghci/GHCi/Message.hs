@@ -1,6 +1,7 @@
-{-# LANGUAGE GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
-    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
-    CPP, NamedFieldPuns #-}
+{-# LANGUAGE RecursiveDo, GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
+    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards, CPP,
+    NamedFieldPuns, LambdaCase, TypeAbstractions, TypeApplications,
+    LinearTypes, RankNTypes, UnboxedTuples, BlockArguments, TupleSections, MagicHash #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- |
@@ -22,10 +23,25 @@ module GHCi.Message
   , ResumeContext(..)
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
-  , Pipe, mkPipeFromHandles, mkPipeFromContinuations, remoteCall, remoteTHCall, readPipe, writePipe
+
+  , Pipe(..), mkPipeFromHandles, mkPipeFromContinuations, closePipe
+  , remoteCall, remoteTHCall
+  , handleRemoteCall, handleRemoteTHCall
+  , RemoteProcessException(..), PipeClosedException(..)
+
   , BreakModule
   , BreakUnitId
   , LoadedDLL
+
+  -- * Low-level interface for async bidirectional RPC
+  , remoteAsyncReq
+  , handleAsyncReq
+  -- ** Consume `reply` exactly once
+  , WriteReply -- abstract
+  , writeReply
+  -- ** Async matching internals
+  , AsyncManager(..), CorrelationId
+  , IddMsg(..), newAsyncManager
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
@@ -45,6 +61,7 @@ import qualified GHC.Exts.Heap as Heap
 import GHC.ForeignSrcLang
 import GHC.Fingerprint
 import GHC.Conc (pseq, par)
+import GHC.IO (IO(..))
 import Control.Concurrent
 import Control.DeepSeq
 import Control.Exception
@@ -63,6 +80,8 @@ import Data.Dynamic
 import Data.Typeable (TypeRep)
 import Data.IORef
 import Data.Map (Map)
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import Foreign
 import GHC.Generics
 import GHC.Stack.CCS
@@ -70,7 +89,11 @@ import qualified GHC.Boot.TH.Syntax        as TH
 import qualified GHC.Boot.TH.Monad         as TH
 import System.Exit
 import System.IO
-import System.IO.Error
+import Control.Monad
+import Control.Concurrent.STM
+import Data.Bifunctor
+import GHC.Base (State#)
+import GHC.Exts (RealWorld)
 
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server
@@ -693,50 +716,307 @@ serializeBCOs rbcos = parMap doChunk (chunkList 100 rbcos)
 
 -- | An opaque pipe for bidirectional binary data transmission.
 data Pipe = Pipe
-  { getSome :: !(IO ByteString)
-  , putAll :: !(B.Builder -> IO ())
-  , pipeLeftovers :: !(IORef (Maybe ByteString))
+  { getSome         :: !(IO ByteString)
+  , putAll          :: !(B.Builder -> IO ())
+  , pipeLeftovers   :: !(IORef (Maybe ByteString))
+  , pipeLock        :: !(MVar ()) -- ^ Lock to prevent concurrent writes to the stream
+  , pipeAsyncMngr   :: !AsyncManager
+  , pipeIsClosed    :: !(TVar Bool)
+    -- ^ After the pipe is closed, requests can no longer be received nor sent
   }
 
 -- | Make a 'Pipe' from a 'Handle' to read and a 'Handle' to write.
+-- Must call 'closePipe' at the end to clean up.
 mkPipeFromHandles :: Handle -> Handle -> IO Pipe
 mkPipeFromHandles pipeRead pipeWrite = do
   let getSome = B.hGetSome pipeRead (32*1024)
       putAll b = do
         B.hPutBuilder pipeWrite b
         hFlush pipeWrite
-  pipeLeftovers <- newIORef Nothing
-  pure $ Pipe { getSome, putAll, pipeLeftovers }
+  mkPipeFromContinuations getSome putAll
 
 -- | Make a 'Pipe' from a reader function and a writer function.
+-- The pipe should be closed with 'closePipe'.
 mkPipeFromContinuations :: IO ByteString -> (B.Builder -> IO ()) -> IO Pipe
-mkPipeFromContinuations getSome putAll = do
-  pipeLeftovers <- newIORef Nothing
-  pure $ Pipe { getSome, putAll, pipeLeftovers }
+mkPipeFromContinuations getSome putAll = mdo
+  pipeLeftovers   <- newIORef Nothing
+  pipeLock        <- newMVar ()
+  pipeIsClosed    <- newTVarIO False
+  mdo
+    pipeAsyncMngr <- newAsyncManager p
+    let p = Pipe { .. }
+    pure p
 
+-- | Cleanly close our end of the Pipe, terminating the async manager's
+-- drain-read-end thread. Calling 'closePipe' on an already closed pipe is a no-op.
+--
+-- If the pipe was created using 'mkPipeFromHandles', the handles must only by
+-- closed after calling 'closePipe'.
+--
+-- The requests we've sent that are pending are all canceled with
+-- 'PipeClosedException' by ourselves.
+--
+-- The remote process does not necessarily detect that this end of the pipe was
+-- closed, but it must handle cleanly and clean up after exceptions caused from
+-- it such as a handle being closed.
+closePipe :: Pipe -> IO ()
+closePipe Pipe{..} = do
+
+  isAlreadyClosed <- atomically $ swapTVar pipeIsClosed True
+
+  unless isAlreadyClosed $ do
+
+    -- releases handle lock taken by reading, and cleans up by replying to every
+    -- pending request with 'PipeClosedException'.
+    throwTo (asyncDrainTid pipeAsyncMngr) PipeClosedException
+
+-- | Send a 'Message' request to and wait for a reply from the interpreter
+-- (blocks on the calling side, doesn't necessarily block the interpreter)
 remoteCall :: Binary a => Pipe -> Message a -> IO a
-remoteCall pipe msg = do
-  writePipe pipe (putMessage msg)
-  readPipe pipe get
+remoteCall pipe msg = either throwIO (pure . runGet get)
+                  =<< remoteAsyncReq pipe (putMessage msg)
 
-writePipe :: Pipe -> Put -> IO ()
-writePipe Pipe{..} put = putAll $ execPut put
+-- | Handle a single 'Message' request on the interpreter and reply to the host
+handleRemoteCall :: Pipe
+                 -> (Msg -> IO Msg) {-^ Msg hook -}
+                 -> (forall a. (Show a, Binary a) => Message a -> IO a)
+                 -> IO ()
+handleRemoteCall pipe hook k =
+  handleAsyncReq pipe getMessage \writer msg0 -> IO \s0 ->
+    case hook msg0 |#> s0 of -- unIO for linearity checking
+      (# s1, Msg msg #) -> case k msg |#> s1 of
+        (# s2, a #) -> writeReply writer (put a) |#> s2
 
+-- | Send a 'THMessage' request to the host and wait for a reply from the host
+-- to the interpreter
 remoteTHCall :: Binary a => Pipe -> THMessage a -> IO a
-remoteTHCall pipe msg = do
-  writePipe pipe (putTHMessage msg)
-  readPipe pipe get
+remoteTHCall pipe msg = either throwIO (pure . runGet get)
+                    =<< remoteAsyncReq pipe (putTHMessage msg)
 
-readPipe :: Pipe -> Get a -> IO a
-readPipe Pipe{..} get = do
+-- | Handle a 'THMessage' request on the host and reply to the interpreter.
+handleRemoteTHCall
+  :: Pipe -> (forall a. (Show a, Binary a) => THMessage a -> IO a) -> IO ()
+handleRemoteTHCall pipe k =
+  handleAsyncReq pipe getTHMessage \writer (THMsg msg) -> IO \s0 ->
+    case k msg |#> s0 of -- unIO for linearity checking
+      (# s1, a #) -> writeReply writer (put a) |#> s1
+
+--------------------------------------------------------------------------------
+-- * Matching requests with async replies
+--------------------------------------------------------------------------------
+
+-- | Send an asynchronous request and block waiting for a matching reply
+remoteAsyncReq :: Pipe -> Put -> IO (Either SomeException LB.ByteString)
+remoteAsyncReq pipe msg = do
+
+  let pendingReplies = pendingReply (pipeAsyncMngr pipe)
+
+  -- Mark pending request
+  uq <- freshReqId (pipeAsyncMngr pipe)
+  wv <- newEmptyTMVarIO
+
+  isClosed <- atomically $ do
+    isClosed <- readTVar (pipeIsClosed pipe)
+    if isClosed
+      then pure True
+      else do
+        modifyTVar pendingReplies (IntMap.insert uq wv)
+        pure False
+
+  when isClosed $ do
+    throwIO PipeClosedException
+
+  -- Write request
+  writePipe pipe (Request uq (runPut msg))
+    `onException`
+      -- the req wasn't done, or no one will be reading the reply:
+      -- in either case, drop it from the pending map.
+      atomically (modifyTVar pendingReplies (IntMap.delete uq))
+
+  -- Block waiting for reply
+  atomically (takeTMVar wv)
+    `onException`
+      atomically (modifyTVar pendingReplies (IntMap.delete uq))
+
+-- | Receive a single asynchronous request and send a matching reply
+-- asynchronously (the handler may fork a computation that eventually replies
+-- and can return before actually replying, as long as it eventually does).
+--
+-- The handler receives as an argument the function to use to reply to the request.
+-- It must be used exactly once (all requests expect a reply, and you can't
+-- reply more than once). Linear types enforce the handler replies in every
+-- branch, and if the handler otherwise throws, it is handled by 'handleAsyncReq'.
+handleAsyncReq :: Pipe -> Get a -> (WriteReply Put %1 -> a -> IO r) -> IO r
+handleAsyncReq pipe getit k = mask $ \restore -> do
+  ack <- newEmptyMVar
+
+  -- Block waiting for request
+  mbreq <- atomically $ do
+    isClosed <- readTVar (pipeIsClosed pipe)
+    if isClosed
+      then return Nothing
+      else Just <$> readTQueue (requestsQueue (pipeAsyncMngr pipe))
+
+  case mbreq of
+    Nothing -> throwIO PipeClosedException
+    Just (uq, bs) -> do
+      let reply p = do
+            writePipe pipe (Reply uq (bimap toSerializableException runPut p))
+            putMVar ack ()
+
+      -- Run the continuation which must reply exactly once with 'writeReply'
+      case runGetOrFail getit bs of
+        Left (_, _, err) -> do
+          let exc = DecodeAsyncReqException err
+          reply (Left (toException exc))
+          throwIO exc
+        Right (_, _, it) ->
+          restore (k (WriteReply reply) it)
+
+            -- If there's an exception before the reply is sent, reply with an error instead.
+            `catch` \(e :: SomeException) -> do
+
+                tryTakeMVar ack >>= \case
+                  Just () ->
+                    -- Already replied
+                    throwIO e
+                  Nothing -> do
+                    -- Reply with an error
+                    reply (Left e)
+                    throwIO e
+
+-- | An exception that can be thrown on the host process representing an
+-- expection that happened on the remote one.
+newtype RemoteProcessException = RemoteProcessException SerializableException deriving Show
+instance Exception RemoteProcessException
+
+-- | 'handleSyncReq' failed to decode an incoming request payload using the given @'Get' a@
+newtype DecodeAsyncReqException = DecodeAsyncReqException String deriving Show
+instance Exception DecodeAsyncReqException
+
+-- | We've closed the pipe on our end and we terminate all pending requests with this.
+data PipeClosedException = PipeClosedException deriving Show
+instance Exception PipeClosedException
+
+-- ** Async matching "internals" -----------------------------------------------
+
+data AsyncManager = AsyncManager
+  { pendingReply :: !(TVar (IntMap (TMVar (Either SomeException LB.ByteString))))
+    -- ^ When a request is sent, keep track that we're expecting a reply. The
+    -- TMVar is signaled when the reply arrives. The exception can originate
+    -- from the host process, or from the remote one (with 'RemoteProcessException').
+  , requestsQueue :: !(TQueue (CorrelationId, LB.ByteString))
+    -- ^ A queue of pending received requests. When a request is received,
+    -- queue it here. A request handler will pop the next request from it.
+    -- (Nothing except the 'drainPipe' thread should read from the pipe).
+  , asyncDrainTid :: !ThreadId
+  , asyncNextReq  :: !(IORef Int)
+  }
+
+type CorrelationId = Int
+
+-- | We have a single type for requests and replies because both the host and
+-- interpreter may send requests *and* replies on the write end *and* on recv
+-- both on the read end.
+--
+-- For instance:
+--  1. The host sends a RunTH request on its Host Write End (HWE)
+--  2. The interpreter sends a NewName TH request on its Interpreter Write End (IWE)
+--  3. The host sends a reply to the TH request on its HWE
+--  4. The interpreter sends the reply to the RunTH request on its IWE
+data IddMsg  = Request !CorrelationId LB.ByteString
+             | Reply   !CorrelationId (Either SerializableException LB.ByteString)
+
+instance Binary IddMsg where
+  put (Request i bs) = putWord8 0 >> put i >> put bs
+  put (Reply i bs)   = putWord8 1 >> put i >> put bs
+  get = do
+    b <- getWord8
+    case b of
+      0 -> Request <$> get <*> get
+      1 -> Reply   <$> get <*> get
+      _ -> fail $ "impossible: Binary IddMsg - " ++ show b
+
+newAsyncManager :: Pipe -> IO AsyncManager
+newAsyncManager pipe = do
+  asyncNextReq <- newIORef 0
+  pendingReply  <- newTVarIO IntMap.empty
+  requestsQueue  <- newTQueueIO
+
+  -- Fork thread to drain read end.
+  -- (cleaned up on 'closePipe')
+  asyncDrainTid  <- forkIOWithUnmask (drainPipe pipe)
+
+  let am = AsyncManager{..}
+  pure am
+
+-- | Drains the read end of the Pipe and match 'Reply'es against pending 'Request's.
+--
+-- In pratice, we'll have both a thread draining the read end of the host's
+-- 'Pipe' and a thread draining the read end of the interpreter's 'Pipe', since
+-- both processes construct a 'Pipe' and send and receive messages
+drainPipe :: Pipe -> (forall x. IO x -> IO x) -> IO ()
+drainPipe p unmask = catch (unmask loop) replyToPendings where
+  loop = do
+    readPipe p >>= \case
+      -- Receive a reply to a pending notification
+      Just (Reply uq bs) -> do
+        atomically $ do
+          m <- readTVar (pendingReply am)
+          case IntMap.lookup uq m of
+            Nothing ->
+              -- the req was dropped from pending bc there was an exception, and no
+              -- one's listening any more. the reply is ignored
+              pure ()
+            Just wv -> do
+              writeTVar (pendingReply am) (IntMap.delete uq m)
+              -- signal matching request
+              putTMVar wv (bimap (toException . RemoteProcessException) id bs)
+        loop
+      -- Receive a request and queue it
+      Just (Request uq bs) -> do
+        atomically $ writeTQueue (requestsQueue am) (uq,bs)
+        loop
+      -- EOF on read handle
+      Nothing -> do
+        -- clean up pipe then exit loop
+        replyToPendings (toException PipeClosedException)
+        pure ()
+
+  replyToPendings e = atomically $ do
+    writeTVar (pipeIsClosed p) True
+    pendings <- swapTVar (pendingReply am) IntMap.empty -- take pending
+    mapM_ (\p -> putTMVar p (Left e {-host exception-})) pendings
+
+  am = pipeAsyncMngr p
+
+freshReqId :: AsyncManager -> IO CorrelationId
+freshReqId AsyncManager{asyncNextReq} =
+  atomicModifyIORef' asyncNextReq $ \i -> (i+1, i)
+
+--------------------------------------------------------------------------------
+-- * Pipe thread-safe read/write
+--------------------------------------------------------------------------------
+-- All messages on the wire are 'IddMsg', which contain a correlation header
+-- and identify whether they are requests or replies.
+
+writePipe :: Pipe -> IddMsg -> IO ()
+writePipe p@Pipe{..} = withLock p . putAll . execPut . put
+
+-- | Only the 'drainPipe' thread should read from the pipe directly. Other
+-- functions should wait for the matching reply to be delivered asynchronously.
+-- (see 'withAsyncReq'). It doesn't lock to read bc it assumes single reader is 'drainPipe'.
+--
+-- Returns @Nothing@ on EOF.
+readPipe :: Pipe -> IO (Maybe IddMsg)
+readPipe Pipe{..} = do
   leftovers <- readIORef pipeLeftovers
   m <- getBin getSome get leftovers
   case m of
-    Nothing -> throw $
-      mkIOError eofErrorType "GHCi.Message.readPipe" Nothing Nothing
+    Nothing -> return Nothing
     Just (result, new_leftovers) -> do
       writeIORef pipeLeftovers new_leftovers
-      return result
+      return (Just result)
 
 getBin
   :: (IO ByteString) -> Get a -> Maybe ByteString
@@ -758,3 +1038,22 @@ getBin getsome get leftover = go leftover (runGetIncremental get)
         else go Nothing (fun (Just b))
    go _lft (Fail _rest _off str) =
      throwIO (ErrorCall ("getBin: " ++ str))
+
+withLock :: Pipe -> IO c -> IO c
+withLock Pipe{..} = bracket (takeMVar pipeLock) (putMVar pipeLock) . const
+
+--------------------------------------------------------------------------------
+-- * Consume `reply` exactly once
+--------------------------------------------------------------------------------
+
+-- | Every request should get exactly one reply.
+data WriteReply a where
+  WriteReply :: (Either SomeException a -> IO ()) %1 -> WriteReply a
+
+-- | Write a reply exactly once (consuming the ability to write more replies)
+writeReply :: WriteReply a %1 -> a -> IO ()
+writeReply (WriteReply r) = \x -> r (Right x)
+
+-- | Infix, linear, 'unIO'
+(|#>) :: IO a %1 -> State# RealWorld -> (# State# RealWorld, a #)
+(|#>) (IO fs) s = fs s
