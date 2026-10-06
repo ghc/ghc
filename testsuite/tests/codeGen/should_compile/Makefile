@@ -83,3 +83,11 @@ T25166:
 
 T25650:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O2 -dno-typeable-binds -ddump-cmm T25650.hs | awk '/baz_foo_closure|baz_bar_closure/{flag=1}/}]/{flag=0}flag'
+
+# No undefined local label (.L...) in the object: see ntntc-stale-cont.cmm.
+# grep -c prints the number of undefined local labels (and fails if there
+# are none).
+ntntc-stale-cont:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O2 -c ntntc-stale-cont.cmm -o ntntc-stale-cont.o
+	nm ntntc-stale-cont.o > ntntc-stale-cont.nm
+	grep -c ' U \.L' ntntc-stale-cont.nm || true

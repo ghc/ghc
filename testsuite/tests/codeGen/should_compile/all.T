@@ -150,3 +150,22 @@ test('T16351', normal, compile, ['-O2 -ddump-simpl -dno-typeable-binds -dsuppres
 test('T20298a', normal, compile, ['-O2 -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
 test('T20298b', normal, compile, ['-O2 -dno-bignum-rules -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
 test('T20298c', normal, compile, ['-O2 -dno-builtin-rules -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
+
+# Without tables-next-to-code, the native code generator does not split proc
+# points (except on Wasm32 and PPC64): no `_blk_` procs, and the frame of the
+# call in bar saves only what is live (StackRep [False]).
+# TODO: Disable on platforms that require splitting.
+test('ntntc-unsplit',
+     [ when(tables_next_to_code(), skip)
+     , only_ways(['optasm'])
+     , grep_errmsg(r'(_blk_|StackRep \[[^\]]*\])', [1]) ],
+     compile, ['-ddump-cmm -dno-typeable-binds'])
+
+# Without tables-next-to-code, a continuation removed by stack layout must not
+# keep its (out-of-line) info table, which would refer to an undefined local
+# label.
+# TODO: Disable on platforms that require splitting.
+test('ntntc-stale-cont',
+     [ req_cmm
+     , when(tables_next_to_code(), skip) ],
+     makefile_test, [])

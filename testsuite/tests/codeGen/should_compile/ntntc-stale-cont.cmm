@@ -1,0 +1,30 @@
+#include "Cmm.h"
+
+// Without tables-next-to-code, the info table of a call's continuation is
+// emitted out of line, and its first word is the address of the
+// continuation's code, a local label (e.g. .Lc9). The call proc points are
+// found before stack layout, which removes unreachable blocks: here the call
+// under `if (0)` and its continuation, as with the write barrier calls under
+// IF_NONMOVING_WRITE_BARRIER_ENABLED in rts/PrimOps.cmm in the non-threaded
+// RTS. No info table may be kept for the removed continuation: it would
+// refer to a local label that is not defined, an undefined symbol in the
+// object file, and linking would fail.
+//
+// The call returns a result, so that its continuation is a block of its own
+// (it assigns y) and not the join point after the `if`, which stays.
+
+ntntc_stale_cont_callee (W_ x)
+{
+    return (x + 1);
+}
+
+ntntc_stale_cont (W_ x)
+{
+    W_ y;
+    y = x;
+    if (0) {
+        (W_ r) = call ntntc_stale_cont_callee(x);
+        y = r;
+    }
+    return (y + 2);
+}
