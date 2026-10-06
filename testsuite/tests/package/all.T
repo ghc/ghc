@@ -20,7 +20,7 @@ test('package09e', normal, compile_fail, ['-package "containers (Data.Map as M, 
 test('package10',  normal, compile,      ['-hide-all-packages -package "ghc (GHC.Types.Unique.FM as Prelude)" -frebindable-known-names'])
 
 test('T4806', normalise_version('containers'), compile_fail, ['-ignore-package containers'])
-test('T4806a', normalise_version('deepseq', 'containers', 'template-haskell'), compile_fail, ['-ignore-package deepseq'])
+test('T4806a', normalise_version('deepseq', 'containers'), compile_fail, ['-ignore-package deepseq'])
 test('T22884', normalise_version('text'), compile_fail, ['-hide-package text'])
 test('T22884_interactive', normalise_version('text'), ghci_script, ['T22884_interactive.script'])
 test('T4806_interactive', [extra_files(['T4806.hs']), normalise_version('containers')], ghci_script, ['T4806_interactive.script'])

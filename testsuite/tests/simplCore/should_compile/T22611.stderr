@@ -1,11 +1,56 @@
+[1 of 2] Compiling T22611a          ( T22611a.hs, T22611a.o )
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 562, types: 505, coercions: 0, joins: 0/10}
+  = {terms: 62, types: 94, coercions: 0, joins: 0/1}
 
-$WFound
-  = \ @a @m conrep conrep1 ->
-      case conrep of conrep2 { __DEFAULT -> Found conrep2 conrep1 }
+alterF
+  = \ @f @k @a $dFunctor $dOrd f1 k1 m ->
+      case k1 of k2 { __DEFAULT ->
+      case lookupTrace $dOrd k2 m of { TraceResult bx bx1 bx2 ->
+      let { lvl = $wdeleteAlong bx1 bx2 m } in
+      fmap
+        $dFunctor
+        (\ fres ->
+           case fres of {
+             Nothing ->
+               case bx of {
+                 (# _| #) bx4 -> m;
+                 (# |_ #) bx4 -> lvl
+               };
+             Just new ->
+               case new of new1 { __DEFAULT ->
+               case bx of {
+                 (# _| #) bx4 -> $winsertAlong bx1 bx2 k2 new1 m;
+                 (# |_ #) bx4 -> $wreplaceAlong bx1 bx2 new1 m
+               }
+               }
+           })
+        (f1
+           (case bx of {
+              (# _| #) bx4 -> Nothing;
+              (# |_ #) bx4 -> Just bx4
+            }))
+      }
+      }
+
+
+------ Local rules for imported ids --------
+"alterF/Identity"
+    forall @k @a $dFunctor $dOrd k1 f.
+      alterF $dFunctor $dOrd f k1
+      = (\ t -> alter $dOrd (f `cast` <Co:7>) k1 t) `cast` <Co:10>
+"alterF/Const"
+    forall @k @a @b $dFunctor $dOrd k1 f.
+      alterF $dFunctor $dOrd f k1
+      = (\ m -> f (lookup $dOrd k1 m)) `cast` <Co:18>
+
+
+[2 of 2] Compiling T22611           ( T22611.hs, T22611.o )
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 502, types: 578, coercions: 0, joins: 1/8}
 
 $fFunctorCheckRes_$c<$
   = \ @a @a1 @b z ds ->
@@ -29,11 +74,31 @@ $fFunctorCheckRes
   = \ @a -> C:Functor $fFunctorCheckRes_$cfmap $fFunctorCheckRes_$c<$
 
 Rec {
-$w$sgo15
+$w$sgo12
   = \ @a1 ww ww1 ds ds1 ->
       case ds of ds2 { __DEFAULT ->
       case ds1 of {
         Bin ipv2 ipv3 ipv4 ipv5 ipv6 ->
+          join {
+            $j
+              = case ww1 of wild2 {
+                  __DEFAULT ->
+                    let {
+                      hi1 = or# (uncheckedShiftRL# ww 1#) 9223372036854775808## } in
+                    let { zeros = ctz# wild2 } in
+                    let { zeros1 = word2Int# zeros } in
+                    (# (# |_ #) ipv4, uncheckedShiftRL# hi1 zeros1,
+                       or#
+                         (uncheckedShiftRL#
+                            (or# (uncheckedShiftRL# wild2 1#) (uncheckedShiftL# ww 63#))
+                            zeros1)
+                         (uncheckedShiftL# hi1 (-# 64# zeros1)) #);
+                  0## ->
+                    (# (# |_ #) ipv4, 0##,
+                       uncheckedShiftRL#
+                         (or# (uncheckedShiftRL# ww 1#) 9223372036854775808##)
+                         (word2Int# (ctz# ww)) #)
+                } } in
           case ds2 of wild1 {
             Left a2 ->
               case ipv3 of {
@@ -44,33 +109,15 @@ $w$sgo15
                     __DEFAULT ->
                       case ==# x# y# of {
                         __DEFAULT ->
-                          $w$sgo15
+                          $w$sgo12
                             (or# (uncheckedShiftRL# ww 1#) 9223372036854775808##)
                             (or# (uncheckedShiftRL# ww1 1#) (uncheckedShiftL# ww 63#))
                             wild1
                             ipv6;
-                        1# ->
-                          case ww1 of ds3 {
-                            __DEFAULT ->
-                              let {
-                                hi1 = or# (uncheckedShiftRL# ww 1#) 9223372036854775808## } in
-                              let { zeros = ctz# ds3 } in
-                              let { zeros1 = word2Int# zeros } in
-                              (# Just ipv4, uncheckedShiftRL# hi1 zeros1,
-                                 or#
-                                   (uncheckedShiftRL#
-                                      (or# (uncheckedShiftRL# ds3 1#) (uncheckedShiftL# ww 63#))
-                                      zeros1)
-                                   (uncheckedShiftL# hi1 (-# 64# zeros1)) #);
-                            0## ->
-                              (# Just ipv4, 0##,
-                                 uncheckedShiftRL#
-                                   (or# (uncheckedShiftRL# ww 1#) 9223372036854775808##)
-                                   (word2Int# (ctz# ww)) #)
-                          }
+                        1# -> jump $j
                       };
                     1# ->
-                      $w$sgo15
+                      $w$sgo12
                         (uncheckedShiftRL# ww 1#)
                         (or# (uncheckedShiftRL# ww1 1#) (uncheckedShiftL# ww 63#))
                         wild1
@@ -79,7 +126,7 @@ $w$sgo15
                   }
                   };
                 Right ipv ->
-                  $w$sgo15
+                  $w$sgo12
                     (uncheckedShiftRL# ww 1#)
                     (or# (uncheckedShiftRL# ww1 1#) (uncheckedShiftL# ww 63#))
                     wild1
@@ -88,7 +135,7 @@ $w$sgo15
             Right a2 ->
               case ipv3 of {
                 Left ipv ->
-                  $w$sgo15
+                  $w$sgo12
                     (or# (uncheckedShiftRL# ww 1#) 9223372036854775808##)
                     (or# (uncheckedShiftRL# ww1 1#) (uncheckedShiftL# ww 63#))
                     wild1
@@ -100,55 +147,39 @@ $w$sgo15
                     __DEFAULT ->
                       case leChar# x y of {
                         __DEFAULT ->
-                          $w$sgo15
+                          $w$sgo12
                             (or# (uncheckedShiftRL# ww 1#) 9223372036854775808##)
                             (or# (uncheckedShiftRL# ww1 1#) (uncheckedShiftL# ww 63#))
                             wild1
                             ipv6;
                         1# ->
-                          $w$sgo15
+                          $w$sgo12
                             (uncheckedShiftRL# ww 1#)
                             (or# (uncheckedShiftRL# ww1 1#) (uncheckedShiftL# ww 63#))
                             wild1
                             ipv5
                       };
-                    1# ->
-                      case ww1 of ds3 {
-                        __DEFAULT ->
-                          let {
-                            hi1 = or# (uncheckedShiftRL# ww 1#) 9223372036854775808## } in
-                          let { zeros = ctz# ds3 } in
-                          let { zeros1 = word2Int# zeros } in
-                          (# Just ipv4, uncheckedShiftRL# hi1 zeros1,
-                             or#
-                               (uncheckedShiftRL#
-                                  (or# (uncheckedShiftRL# ds3 1#) (uncheckedShiftL# ww 63#)) zeros1)
-                               (uncheckedShiftL# hi1 (-# 64# zeros1)) #);
-                        0## ->
-                          (# Just ipv4, 0##,
-                             uncheckedShiftRL#
-                               (or# (uncheckedShiftRL# ww 1#) 9223372036854775808##)
-                               (word2Int# (ctz# ww)) #)
-                      }
+                    1# -> jump $j
                   }
                   }
                   }
               }
           };
         Tip ->
-          case ww1 of ds3 {
+          case ww1 of wild1 {
             __DEFAULT ->
               let {
                 hi1 = or# (uncheckedShiftRL# ww 1#) 9223372036854775808## } in
-              let { zeros = ctz# ds3 } in
+              let { zeros = ctz# wild1 } in
               let { zeros1 = word2Int# zeros } in
-              (# Nothing, uncheckedShiftRL# hi1 zeros1,
+              (# (# _| #) (##), uncheckedShiftRL# hi1 zeros1,
                  or#
                    (uncheckedShiftRL#
-                      (or# (uncheckedShiftRL# ds3 1#) (uncheckedShiftL# ww 63#)) zeros1)
+                      (or# (uncheckedShiftRL# wild1 1#) (uncheckedShiftL# ww 63#))
+                      zeros1)
                    (uncheckedShiftL# hi1 (-# 64# zeros1)) #);
             0## ->
-              (# Nothing, 0##,
+              (# (# _| #) (##), 0##,
                  uncheckedShiftRL#
                    (or# (uncheckedShiftRL# ww 1#) 9223372036854775808##)
                    (word2Int# (ctz# ww)) #)
@@ -160,9 +191,14 @@ end Rec }
 $salterF
   = \ @v @a f1 k1 m ->
       case k1 of k2 { __DEFAULT ->
-      case $w$sgo15 9223372036854775808## 0## k2 m of
+      case $w$sgo12 9223372036854775808## 0## k2 m of
       { (# ww, ww1, ww2 #) ->
-      case f1 ww of {
+      case f1
+             (case ww of {
+                (# _| #) bx4 -> Nothing;
+                (# |_ #) bx4 -> Just bx4
+              })
+      of {
         NotFound -> NotFound;
         Found a1 a2 ->
           Found
@@ -170,17 +206,14 @@ $salterF
             (case a2 of {
                Nothing ->
                  case ww of {
-                   Nothing -> m;
-                   Just old ->
-                     case m of m1 { __DEFAULT ->
-                     case $wbogus (##) of { __DEFAULT -> $wgo ww1 ww2 m1 }
-                     }
+                   (# _| #) bx4 -> m;
+                   (# |_ #) bx4 -> $wdeleteAlong ww1 ww2 m
                  };
                Just new ->
                  case new of new1 { __DEFAULT ->
                  case ww of {
-                   Nothing -> $winsertAlong ww1 ww2 k2 new1 m;
-                   Just ds -> $wreplaceAlong ww1 ww2 new1 m
+                   (# _| #) bx4 -> $winsertAlong ww1 ww2 k2 new1 m;
+                   (# |_ #) bx4 -> $wreplaceAlong ww1 ww2 new1 m
                  }
                  }
              })
@@ -192,7 +225,7 @@ lvl
   = \ @v ds ->
       case ds of {
         Nothing -> NotFound;
-        Just t -> case t of conrep { __DEFAULT -> Found conrep Nothing }
+        Just t -> Found t Nothing
       }
 
 Rec {
@@ -208,11 +241,12 @@ $wfoo
               $wfoo
                 (Right
                    (case y of { C# c# ->
-                    let { i# = +# (ord# c#) 1# } in
-                    case leWord# (int2Word# i#) 1114111## of {
-                      __DEFAULT -> $wlvl i#;
-                      1# -> C# (chr# i#)
-                    }
+                    C#
+                      (let { i# = +# (ord# c#) 1# } in
+                       case leWord# (int2Word# i#) 1114111## of {
+                         __DEFAULT -> chr_error i#;
+                         1# -> chr# i#
+                       })
                     }))
                 subst1
           };
@@ -226,42 +260,42 @@ foo
   = \ @v x subst ->
       case $wfoo x subst of { (# ww, ww1 #) -> Just (ww, ww1) }
 
-$trModule4 = "main"#
+$trModule1 = "main"#
 
-$trModule3 = TrNameS $trModule4
+$trModule2 = TrNameS $trModule1
 
-$trModule2 = "T22611"#
+$trModule3 = "T22611"#
 
-$trModule1 = TrNameS $trModule2
+$trModule4 = TrNameS $trModule3
 
-$trModule = Module $trModule3 $trModule1
+$trModule = Module $trModule2 $trModule4
 
 $krep = KindRepVar 1#
 
 $krep1 = KindRepVar 0#
 
-$tcCheckRes2 = "CheckRes"#
+$tcCheckRes1 = "CheckRes"#
 
-$tcCheckRes1 = TrNameS $tcCheckRes2
+$tcCheckRes2 = TrNameS $tcCheckRes1
 
 $tcCheckRes
   = TyCon
       2720702776801478797#Word64
       9603347784695333983#Word64
       $trModule
-      $tcCheckRes1
+      $tcCheckRes2
       0#
-      krep$*->*->*
+      krepStarArrStarArr
 
 $krep2 = : $krep []
 
 $krep3 = : $krep1 $krep2
 
-$tc'NotFound1 = KindRepTyConApp $tcCheckRes $krep3
+$krep4 = KindRepTyConApp $tcCheckRes $krep3
 
-$tc'NotFound3 = "'NotFound"#
+$tc'NotFound1 = "'NotFound"#
 
-$tc'NotFound2 = TrNameS $tc'NotFound3
+$tc'NotFound2 = TrNameS $tc'NotFound1
 
 $tc'NotFound
   = TyCon
@@ -270,15 +304,15 @@ $tc'NotFound
       $trModule
       $tc'NotFound2
       2#
-      $tc'NotFound1
+      $krep4
 
-$krep4 = KindRepFun $krep $tc'NotFound1
+$krep5 = KindRepFun $krep $krep4
 
-$tc'Found1 = KindRepFun $krep1 $krep4
+$krep6 = KindRepFun $krep1 $krep5
 
-$tc'Found3 = "'Found"#
+$tc'Found1 = "'Found"#
 
-$tc'Found2 = TrNameS $tc'Found3
+$tc'Found2 = TrNameS $tc'Found1
 
 $tc'Found
   = TyCon
@@ -287,7 +321,7 @@ $tc'Found
       $trModule
       $tc'Found2
       2#
-      $tc'Found1
+      $krep6
 
 
 ------ Local rules for imported ids --------
