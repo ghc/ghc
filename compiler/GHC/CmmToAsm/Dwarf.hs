@@ -219,18 +219,18 @@ debugFrame :: Platform -> Unique -> [DebugBlock] -> DwarfFrame
 debugFrame p u procs
   = DwarfFrame { dwCieLabel = mkAsmTempLabel u
                , dwCieInit  = initUws
-               , dwCieProcs = map (procToFrame initUws) procs
+               , dwCieProcs = map (procToFrame p initUws) procs
                }
   where
     initUws :: UnwindTable
     initUws = Map.fromList [(Sp, Just (UwReg (GlobalRegUse Sp $ bWord p) 0))]
 
 -- | Generates unwind information for a procedure debug block
-procToFrame :: UnwindTable -> DebugBlock -> DwarfFrameProc
-procToFrame initUws blk
+procToFrame :: Platform -> UnwindTable -> DebugBlock -> DwarfFrameProc
+procToFrame platform initUws blk
   = DwarfFrameProc { dwFdeProc    = dblCLabel blk
-                   , dwFdeHasInfo = dblHasInfoTbl blk
-                   , dwFdeBlocks  = map (uncurry blockToFrame)
+                   , dwFdeHasInfo = infoTableBefore platform blk
+                   , dwFdeBlocks  = map (uncurry (blockToFrame platform))
                                         (setHasInfo blockUws)
                    }
   where blockUws :: [(DebugBlock, [UnwindPoint])]
@@ -257,11 +257,21 @@ procToFrame initUws blk
               child { dblHasInfoTbl = dblHasInfoTbl child
                                       || dblHasInfoTbl blk }
 
-blockToFrame :: DebugBlock -> [UnwindPoint] -> DwarfFrameBlock
-blockToFrame blk uws
-  = DwarfFrameBlock { dwFdeBlkHasInfo = dblHasInfoTbl blk
+blockToFrame :: Platform -> DebugBlock -> [UnwindPoint] -> DwarfFrameBlock
+blockToFrame platform blk uws
+  = DwarfFrameBlock { dwFdeBlkHasInfo = infoTableBefore platform blk
                     , dwFdeUnwind     = uws
                     }
+
+-- | Is the block's info table placed directly in front of its code, so that
+-- its start address gets the offset of Note [Info Offset] in
+-- "GHC.CmmToAsm.Dwarf.Types"? Only with tables-next-to-code: without, every
+-- info table is emitted out of line, and an entry in the info map of a proc
+-- only marks the block as an entry point (Note [Proc points without
+-- tables-next-to-code] in "GHC.Cmm.Info").
+infoTableBefore :: Platform -> DebugBlock -> Bool
+infoTableBefore platform blk =
+  platformTablesNextToCode platform && dblHasInfoTbl blk
 
 addDefaultUnwindings :: UnwindTable -> [UnwindPoint] -> [UnwindPoint]
 addDefaultUnwindings tbl pts =

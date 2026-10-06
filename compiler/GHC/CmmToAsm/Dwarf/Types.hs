@@ -440,6 +440,14 @@ pprFrameBlock platform (DwarfFrameBlock hasInfo uws0) =
 --
 -- In the latter two cases we apply the offset unconditionally.
 --
+-- In .debug_frames we apply it only to blocks with an info table in front
+-- of them, i.e. only with tables-next-to-code (infoTableBefore in
+-- "GHC.CmmToAsm.Dwarf"). Without tables-next-to-code the byte before a
+-- continuation's code belongs to whichever block precedes it, since its info
+-- table is emitted out of line (Note [Proc points without
+-- tables-next-to-code] in "GHC.Cmm.Info"); the entry of a proc never had an
+-- info table in the map there, so its frame information is not offset either.
+--
 -- There's a GDB patch to address this at [1]. At the moment of writing
 -- it's not merged, so I recommend building GDB with the patch if you
 -- care about unwinding. The hack above doesn't cover every case.
