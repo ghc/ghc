@@ -184,8 +184,12 @@ cmmExprNative referenceKind expr = do
 
         CmmLit (CmmBlockCode id)
           -> cmmExprNative referenceKind (CmmLit (CmmLabel (blockLbl id)))
-          -- The return code of a two-word frame; normally resolved by
-          -- proc-point splitting already.
+          -- The return code of a two-word frame. Resolved by proc-point
+          -- splitting already when the proc points are split; otherwise
+          -- (the native code generator, except on Wasm32 and PPC_64) it
+          -- is the block's local label, which is also the first word of
+          -- the continuation's out-of-line info table (Note [Proc points
+          -- without tables-next-to-code] in GHC.Cmm.Info).
           -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout.
 
         CmmLit (CmmLabel lbl)

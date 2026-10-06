@@ -374,8 +374,12 @@ collapses to the one-word code.  In the code generator:
     frameHdrSizeW*W, `copyIn` skips frameHdrSizeW words, and `copyOutOflow`
     stores both words for a call (GHC.Cmm.Graph).
   * The code address of continuation k is the literal `CmmBlockCode k`
-    (GHC.Cmm.Expr), which proc-point splitting resolves to `blockLbl k`
-    (GHC.Cmm.ProcPoint.replacePPIds).
+    (GHC.Cmm.Expr), which resolves to `blockLbl k`: by proc-point splitting
+    (GHC.Cmm.ProcPoint.replacePPIds) when the proc points are split, else
+    in the native code generator (cmmExprNative in GHC.Cmm.GenericOpt).
+    Without proc-point splitting, `blockLbl k` is also the first word of
+    k's out-of-line info table (Note [Proc points without
+    tables-next-to-code] in GHC.Cmm.Info), so the two words agree.
   * Returns jump to the code word without `entryCode` (emitReturn, the Cmm
     parser's `return`, lowerSafeForeignCall).
   * Update and orig-thunk-info frames store `stg_*_ret` and `stg_*_info`

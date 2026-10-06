@@ -223,7 +223,9 @@ data CmmLit
 
   | CmmBlockCode {-# UNPACK #-} !BlockId -- Return-code address of a continuation
         -- The code word of a two-word frame; resolved to 'blockLbl' by
-        -- proc-point splitting.  Only used with two-word frames.
+        -- proc-point splitting, or by cmmExprNative in the native code
+        -- generator when the proc points are not split.  Only used with
+        -- two-word frames.
         -- Invariant: must be a continuation BlockId
         -- See Note [Two-word frames] in GHC.Runtime.Heap.Layout and
         -- Note [Continuation BlockIds] in GHC.Cmm.Node.
