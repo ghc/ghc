@@ -645,7 +645,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                         -- word below the info pointer; bind it to a hidden
                         -- formal.  See Note [Two-word frames in Cmm].
                         code_word <- if twoWordFrames platform
-                                       then (:[]) <$> newTemp (bWord platform)
+                                       then fmap (:[]) (newTemp (bWord platform))
                                        else return []
                         let prof = NoProfilingInfo
                             -- drop one for the info pointer
