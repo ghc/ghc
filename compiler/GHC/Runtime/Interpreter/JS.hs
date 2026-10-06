@@ -380,7 +380,7 @@ jsLinkPlan logger tmpfs tmp_dir ar_cache link_cfg cfg inst link_plan = do
   --   Haskell server.
   server_started <- jsServerStarted <$> readMVar (instJSState (instExtra inst))
   if server_started
-    then sendMessageNoResponse inst $ LoadObj all_js
+    then sendMessage inst $ LoadObj all_js
     else jsLoadFile            inst all_js
 
   ----------------------------------------------------------------

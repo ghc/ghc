@@ -12,7 +12,7 @@
 module GHCi.Message
   ( Message(..), Msg(..)
   , ConInfoTable(..)
-  , THMessage(..), THMsg(..)
+  , THMessage(..) -- , THMsg(..)
   , QResult(..)
   , EvalStatus_(..,EvalBreak), EvalStatus, EvalResult(..), EvalOpts(..), EvalExpr(..)
   , EvalBreak(..), EvalBreakpoint (..)
@@ -20,7 +20,7 @@ module GHCi.Message
   , toSerializableException, fromSerializableException
   , THResult(..), THResultType(..)
   , QState(..)
-  , getMessage, putMessage, getTHMessage, putTHMessage
+  , getMessage, putMessage, {- getTHMessage, -} putTHMessage
   , Pipe, mkPipeFromHandles, mkPipeFromContinuations, remoteCall, remoteTHCall, readPipe, writePipe
   , BreakModule
   , BreakUnitId
@@ -62,6 +62,8 @@ import Data.Dynamic
 import Data.Typeable (TypeRep)
 import Data.IORef
 import Data.Map (Map)
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import Foreign
 import GHC.Generics
 import GHC.Stack.CCS
@@ -70,6 +72,7 @@ import qualified GHC.Boot.TH.Monad         as TH
 import System.Exit
 import System.IO
 import System.IO.Error
+import Control.Monad
 
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server
@@ -323,40 +326,40 @@ data THMessage a where
 
 deriving instance Show (THMessage a)
 
-data THMsg = forall a . (Binary a, Show a) => THMsg (THMessage a)
-
-getTHMessage :: Get THMsg
-getTHMessage = do
-  b <- getWord8
-  case b of
-    0  -> THMsg <$> NewName <$> get
-    1  -> THMsg <$> (Report <$> get <*> get)
-    2  -> THMsg <$> (LookupName <$> get <*> get)
-    3  -> THMsg <$> Reify <$> get
-    4  -> THMsg <$> ReifyFixity <$> get
-    5  -> THMsg <$> (ReifyInstances <$> get <*> get)
-    6  -> THMsg <$> ReifyRoles <$> get
-    7  -> THMsg <$> (ReifyAnnotations <$> get <*> get)
-    8  -> THMsg <$> ReifyModule <$> get
-    9  -> THMsg <$> ReifyConStrictness <$> get
-    10 -> THMsg <$> AddDependentFile <$> get
-    11 -> THMsg <$> AddTempFile <$> get
-    12 -> THMsg <$> AddTopDecls <$> get
-    13 -> THMsg <$> (IsExtEnabled <$> get)
-    14 -> THMsg <$> return ExtsEnabled
-    15 -> THMsg <$> return StartRecover
-    16 -> THMsg <$> EndRecover <$> get
-    17 -> THMsg <$> return FailIfErrs
-    18 -> return (THMsg RunTHDone)
-    19 -> THMsg <$> AddModFinalizer <$> get
-    20 -> THMsg <$> (AddForeignFilePath <$> get <*> get)
-    21 -> THMsg <$> AddCorePlugin <$> get
-    22 -> THMsg <$> ReifyType <$> get
-    23 -> THMsg <$> (PutDoc <$> get <*> get)
-    24 -> THMsg <$> GetDoc <$> get
-    25 -> THMsg <$> return GetPackageRoot
-    26 -> THMsg <$> AddDependentDirectory <$> get
-    n -> error ("getTHMessage: unknown message " ++ show n)
+-- data THMsg = forall a . (Binary a, Show a) => THMsg (THMessage a)
+--
+-- getTHMessage :: Get THMsg
+-- getTHMessage = do
+--   b <- getWord8
+--   case b of
+--     0  -> THMsg <$> NewName <$> get
+--     1  -> THMsg <$> (Report <$> get <*> get)
+--     2  -> THMsg <$> (LookupName <$> get <*> get)
+--     3  -> THMsg <$> Reify <$> get
+--     4  -> THMsg <$> ReifyFixity <$> get
+--     5  -> THMsg <$> (ReifyInstances <$> get <*> get)
+--     6  -> THMsg <$> ReifyRoles <$> get
+--     7  -> THMsg <$> (ReifyAnnotations <$> get <*> get)
+--     8  -> THMsg <$> ReifyModule <$> get
+--     9  -> THMsg <$> ReifyConStrictness <$> get
+--     10 -> THMsg <$> AddDependentFile <$> get
+--     11 -> THMsg <$> AddTempFile <$> get
+--     12 -> THMsg <$> AddTopDecls <$> get
+--     13 -> THMsg <$> (IsExtEnabled <$> get)
+--     14 -> THMsg <$> return ExtsEnabled
+--     15 -> THMsg <$> return StartRecover
+--     16 -> THMsg <$> EndRecover <$> get
+--     17 -> THMsg <$> return FailIfErrs
+--     18 -> return (THMsg RunTHDone)
+--     19 -> THMsg <$> AddModFinalizer <$> get
+--     20 -> THMsg <$> (AddForeignFilePath <$> get <*> get)
+--     21 -> THMsg <$> AddCorePlugin <$> get
+--     22 -> THMsg <$> ReifyType <$> get
+--     23 -> THMsg <$> (PutDoc <$> get <*> get)
+--     24 -> THMsg <$> GetDoc <$> get
+--     25 -> THMsg <$> return GetPackageRoot
+--     26 -> THMsg <$> AddDependentDirectory <$> get
+--     n -> error ("getTHMessage: unknown message " ++ show n)
 
 putTHMessage :: THMessage a -> Put
 putTHMessage m = case m of
@@ -719,12 +722,27 @@ serializeBCOs rbcos = parMap doChunk (chunkList 100 rbcos)
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages
 
+type CorrelationId = Int
+data Request = Request !CorrelationId LB.ByteString
+data Reply   = Reply   !CorrelationId LB.ByteString
+
+instance Binary Request where
+  put (Request i bs) = put i >> put bs
+  get = Request <$> get <*> get
+
+instance Binary Reply where
+  put (Reply i bs) = put i >> put bs
+  get = Reply <$> get <*> get
+
 -- | An opaque pipe for bidirectional binary data transmission.
 data Pipe = Pipe
   { getSome         :: !(IO ByteString)
   , putAll          :: !(B.Builder -> IO ())
   , pipeLeftovers   :: !(IORef (Maybe ByteString))
   , pipeLock        :: !(MVar ()) -- ^ Lock to prevent concurrent access to the stream
+  , pipePending     :: !(IORef (IntMap (MVar LB.ByteString)))
+  , pipeDrainThread :: !(MVar ThreadId)
+  , pipeNextReq     :: !(IORef Int)
   }
 
 -- | Make a 'Pipe' from a 'Handle' to read and a 'Handle' to write.
@@ -734,32 +752,59 @@ mkPipeFromHandles pipeRead pipeWrite = do
       putAll b = do
         B.hPutBuilder pipeWrite b
         hFlush pipeWrite
-  pipeLeftovers   <- newIORef Nothing
-  pipeLock        <- newMVar ()
-  pure $ Pipe { .. }
+  mkPipeFromContinuations getSome putAll
 
 -- | Make a 'Pipe' from a reader function and a writer function.
 mkPipeFromContinuations :: IO ByteString -> (B.Builder -> IO ()) -> IO Pipe
 mkPipeFromContinuations getSome putAll = do
   pipeLeftovers   <- newIORef Nothing
   pipeLock        <- newMVar ()
-  pure $ Pipe { .. }
+  pipePending     <- newIORef IntMap.empty
+  pipeDrainThread <- newEmptyMVar
+  pipeNextReq     <- newIORef 0
+  let p = Pipe { .. }
+
+  -- Fork thread to drain read end.
+  drainTid <- forkIO (drainPipe p)
+  putMVar pipeDrainThread drainTid
+  -- todo: proper thread clean up and no leaks
+
+  pure p
 
 remoteCall :: Binary a => Pipe -> Message a -> IO a
 remoteCall pipe msg = do
-  writePipe pipe (putMessage msg)
-  readPipe pipe get
 
-writePipe :: Pipe -> Put -> IO ()
-writePipe Pipe{..} put = putAll $ execPut put
+  -- Mark pending
+  uq <- freshReqId pipe
+  wv <- newEmptyMVar
+  atomicModifyIORef' (pipePending pipe) $
+    \m -> (IntMap.insert uq wv m, ())
+
+  -- Write request
+  writePipe pipe (put (Request uq (runPut (putMessage msg))))
+
+  -- Block waiting for reply
+  runGet get <$> takeMVar wv
 
 remoteTHCall :: Binary a => Pipe -> THMessage a -> IO a
 remoteTHCall pipe msg = do
   writePipe pipe (putTHMessage msg)
   readPipe pipe get
 
+drainPipe :: Pipe -> IO ()
+drainPipe p = forever $ do
+  Reply uq bs <- readPipe p get
+  wv <- atomicModifyIORef' (pipePending p) $ \m -> do
+    case IntMap.lookup uq m of
+      Nothing -> error "drainPipe: Received reply to no pending request"
+      Just wv -> (IntMap.delete uq m, wv)
+  putMVar wv bs -- signal matching request
+
+writePipe :: Pipe -> Put -> IO ()
+writePipe p@Pipe{..} put = withLock p $ putAll $ execPut put
+
 readPipe :: Pipe -> Get a -> IO a
-readPipe Pipe{..} get = do
+readPipe p@Pipe{..} get = withLock p $ do
   leftovers <- readIORef pipeLeftovers
   m <- getBin getSome get leftovers
   case m of
@@ -789,3 +834,9 @@ getBin getsome get leftover = go leftover (runGetIncremental get)
         else go Nothing (fun (Just b))
    go _lft (Fail _rest _off str) =
      throwIO (ErrorCall ("getBin: " ++ str))
+
+withLock :: Pipe -> IO c -> IO c
+withLock Pipe{..} = bracket (takeMVar pipeLock) (putMVar pipeLock) . const
+
+freshReqId :: Pipe -> IO Int
+freshReqId Pipe{pipeNextReq} = atomicModifyIORef' pipeNextReq $ \i -> (i+1, i)

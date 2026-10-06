@@ -2,9 +2,7 @@ module GHC.Runtime.Interpreter.Process
   (
   -- * Message API
     Message(..)
-  -- * Top-level message API
   , sendMessage
-  , sendMessageNoResponse
   )
 where
 
@@ -24,13 +22,7 @@ import System.Process
 -- -----------------------------------------------------------------------------
 -- Top-level Message API
 
--- | Send a message to the interpreter process that doesn't expect a response
---   (locks the interpreter while sending)
-sendMessageNoResponse :: ExtInterpInstance d -> Message () -> IO ()
-sendMessageNoResponse i m = writeInterpProcess (instProcess i) (putMessage m)
-
--- | Send a message to the interpreter that expects a response
---   (locks the interpreter while until the response is received)
+-- | Send a message to the interpreter and expect a response, blocking until it arrives.
 sendMessage :: Binary a => ExtInterpInstance d -> Message a -> IO a
 sendMessage i m = callInterpProcess (instProcess i) m
 
@@ -38,12 +30,6 @@ sendMessage i m = callInterpProcess (instProcess i) m
 callInterpProcess :: Binary a => InterpProcess -> Message a -> IO a
 callInterpProcess i msg =
   remoteCall (interpPipe i) msg
-    `catchException` \(e :: SomeException) -> handleInterpProcessFailure i e
-
--- | Send a value to the interpreter process
-writeInterpProcess :: InterpProcess -> Put -> IO ()
-writeInterpProcess i put =
-  writePipe (interpPipe i) put
     `catchException` \(e :: SomeException) -> handleInterpProcessFailure i e
 
 handleInterpProcessFailure :: InterpProcess -> SomeException -> IO a
