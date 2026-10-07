@@ -270,6 +270,8 @@ howToAccessLabel :: NCGConfig -> Arch -> OS -> ReferenceKind -> CLabel -> LabelA
 -- information does not need to be known (though there are micro-optimisation
 -- opportunities by knowing).
 --
+-- See Note [Tracking labels' target libraries] for details.
+--
 -- If we're compiling a multi-module program (i.e. each Haskell unit as a
 -- separate .dll module) then Haskell symbols from other modules are accessed
 -- by a symbol pointer named __imp_SYMBOL. At runtime we have the following:
