@@ -280,7 +280,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                       includes = vcat [ text "#include \"" <> ftext (mkFastStringShortText h)
                                         <> text "\""
                                       | Header _ h <- nub headers ]
-                      fun_proto = constQual <+> cResType <+> pprCconv <+> ppr wrapperName <> parens argTypes
+                      fun_proto = constQual <+> cResType <+> ppr wrapperName <> parens argTypes
                       cRet
                         | isVoidRes =                   cCall
                         | otherwise = text "return" <+> cCall
@@ -295,7 +295,6 @@ dsFCall fn_id co fcall mDeclHeader = do
                       (mHeader, cResType)
                        | isVoidRes = (Nothing, text "void")
                        | otherwise = toCType raw_res_ty
-                      pprCconv = ccallConvAttribute CApiConv
                       mHeadersArgTypeList
                           = [ (header, cType <+> char 'a' <> int n)
                             | (t, n) <- zip arg_tys [1..]
@@ -492,8 +491,6 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                int64TyConKey, word64TyConKey]
 
   -- Now we can cook up the prototype for the exported function.
-  pprCconv = ccallConvAttribute cc
-
   header_bits = CHeader (text "extern" <+> fun_proto <> semi)
 
   fun_args
@@ -506,7 +503,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
       = text "void" <+> ftext c_nm <>
           parens (text "void *cif STG_UNUSED, void* resp, void** args, void* the_stableptr")
     | otherwise
-      = cResType <+> pprCconv <+> ftext c_nm <> parens fun_args
+      = cResType <+> ftext c_nm <> parens fun_args
 
   -- the target which will form the root of what we ask rts_inCall to run
   the_cfun

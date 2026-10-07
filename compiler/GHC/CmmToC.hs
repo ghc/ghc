@@ -235,7 +235,7 @@ pprStmt platform stmt =
 
         ForeignConvention cconv _ _ ret = conv
 
-        cast_fn = parens (cCast platform (pprCFunType platform (char '*') cconv hresults hargs) fn)
+        cast_fn = parens (cCast platform (pprCFunType platform (char '*') hresults hargs) fn)
 
         -- See wiki:commentary/compiler/backends/ppr-c#prototypes
         fnCall =
@@ -299,21 +299,21 @@ pprForeignCall :: Platform -> SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted
 pprForeignCall platform fn cconv results args = fn_call
   where
     fn_call = braces (
-                 pprCFunType platform (char '*' <> text "ghcFunPtr") cconv results args <> semi
+                 pprCFunType platform (char '*' <> text "ghcFunPtr") results args <> semi
               $$ text "ghcFunPtr" <+> equals <+> cast_fn <> semi
               $$ pprCall platform (text "ghcFunPtr") cconv results args <> semi
              )
-    cast_fn = parens (parens (pprCFunType platform (char '*') cconv results args) <> fn)
+    cast_fn = parens (parens (pprCFunType platform (char '*') results args) <> fn)
 
-pprCFunType :: Platform -> SDoc -> CCallConv -> [Hinted CmmFormal] -> [Hinted CmmActual] -> SDoc
-pprCFunType platform ppr_fn cconv ress args
+pprCFunType :: Platform -> SDoc -> [Hinted CmmFormal] -> [Hinted CmmActual] -> SDoc
+pprCFunType platform ppr_fn ress args
   = let res_type [] = text "void"
         res_type [(one, hint)] = machRepHintCType platform (localRegType one) hint
         res_type _ = panic "pprCFunType: only void or 1 return value supported"
 
         arg_type (expr, hint) = machRepHintCType platform (cmmExprType platform expr) hint
     in res_type ress <+>
-       parens (ccallConvAttribute cconv <> ppr_fn) <>
+       parens (ppr_fn) <>
        parens (commafy (map arg_type args))
 
 -- ---------------------------------------------------------------------
