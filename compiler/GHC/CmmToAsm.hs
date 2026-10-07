@@ -92,6 +92,7 @@ import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Dwarf
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Utils (inlineInfoTables)
 import GHC.Cmm.DebugBlock
 
 import GHC.Cmm.BlockId
@@ -625,7 +626,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
 
         let optimizedCFG :: Maybe CFG
             optimizedCFG =
-                optimizeCFG (ncgCmmStaticPred config) weights cmm <$!> postShortCFG
+                optimizeCFG platform (ncgCmmStaticPred config) weights cmm <$!> postShortCFG
 
         maybeDumpCfg logger optimizedCFG "CFG Weights - Final" proc_name
 
@@ -660,8 +661,12 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                             -> [NatBasicBlock instr]
                 invertConds = invertCondBranches ncgImpl optimizedCFG
                 invert top@CmmData {} = top
+                -- Only jumps over an inline info table must be kept
+                -- (tables-next-to-code); see Note [Proc points without
+                -- tables-next-to-code] in GHC.Cmm.Info.
                 invert (CmmProc info lbl live (ListGraph blocks)) =
-                    CmmProc info lbl live (ListGraph $ invertConds info blocks)
+                    CmmProc info lbl live
+                      (ListGraph $ invertConds (inlineInfoTables platform info) blocks)
 
         -- generate unwinding information from cmm
         let unwinds :: BlockMap [UnwindPoint]

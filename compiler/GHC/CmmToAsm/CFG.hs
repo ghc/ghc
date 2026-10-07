@@ -52,6 +52,7 @@ import GHC.Data.Maybe
 
 import qualified GHC.CmmToAsm.CFG.Dominators as Dom
 import GHC.CmmToAsm.CFG.Weight
+import GHC.CmmToAsm.Utils (inlineInfoTables)
 import Data.IntMap.Strict (IntMap)
 import Data.IntSet (IntSet)
 
@@ -671,20 +672,20 @@ findBackEdges root cfg =
     typedEdges =
       classifyEdges root getSuccs edges :: [((BlockId,BlockId),EdgeType)]
 
-optimizeCFG :: Bool -> Weights -> RawCmmDecl -> CFG -> CFG
-optimizeCFG _ _ (CmmData {}) cfg = cfg
-optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg =
+optimizeCFG :: Platform -> Bool -> Weights -> RawCmmDecl -> CFG -> CFG
+optimizeCFG _ _ _ (CmmData {}) cfg = cfg
+optimizeCFG platform doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg =
   (if doStaticPred then staticPredCfg (g_entry graph) else id) $
-    optHsPatterns weights proc $ cfg
+    optHsPatterns platform weights proc $ cfg
 
 -- | Modify branch weights based on educated guess on
 -- patterns GHC tends to produce and how they affect
 -- performance.
 --
 -- Most importantly we penalize jumps across info tables.
-optHsPatterns :: Weights -> RawCmmDecl -> CFG -> CFG
-optHsPatterns _ (CmmData {}) cfg = cfg
-optHsPatterns weights (CmmProc info _lab _live graph) cfg =
+optHsPatterns :: Platform -> Weights -> RawCmmDecl -> CFG -> CFG
+optHsPatterns _ _ (CmmData {}) cfg = cfg
+optHsPatterns platform weights (CmmProc all_info _lab _live graph) cfg =
     {-# SCC optHsPatterns #-}
     -- pprTrace "Initial:" (pprEdgeWeights cfg) $
     -- pprTrace "Initial:" (ppr $ mkGlobalWeights (g_entry graph) cfg) $
@@ -694,6 +695,11 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
     penalizeInfoTables info .
     increaseBackEdgeWeight (g_entry graph) $ cfg
   where
+    -- Only an info table printed in front of a block (tables-next-to-code)
+    -- stands between it and its predecessor in the layout; without TNTC
+    -- the info map's entries are only entry-point markers.
+    -- See Note [Proc points without tables-next-to-code] in GHC.Cmm.Info.
+    info = inlineInfoTables platform all_info
 
     -- Increase the weight of all backedges in the CFG
     -- this helps to make loop jumpbacks the heaviest edges

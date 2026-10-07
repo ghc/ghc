@@ -20,6 +20,7 @@ import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Utils (inlineInfoTables)
 
 import GHC.Cmm
 import GHC.Cmm.BlockId
@@ -797,22 +798,28 @@ sequenceTop _       _           top@(CmmData _ _) = pure top
 sequenceTop ncgImpl edgeWeights (CmmProc info lbl live (ListGraph blocks)) = do
     let config     = ncgConfig ncgImpl
         platform   = ncgPlatform config
+        -- Layout avoids falling through into a block only if an info table
+        -- is printed in front of it, i.e. with tables-next-to-code. Without
+        -- it the info map's entries are only entry-point markers and a block
+        -- can be a fall-through target like any other.
+        -- See Note [Proc points without tables-next-to-code] in GHC.Cmm.Info.
+        layout_info = inlineInfoTables platform info
 
         seq_blocks =
                   if -- Chain based algorithm
                       | ncgCfgBlockLayout config
                       , backendMaintainsCfg platform
                       , Just cfg <- edgeWeights
-                      -> {-# SCC layoutBlocks #-} sequenceChain info cfg blocks
+                      -> {-# SCC layoutBlocks #-} sequenceChain layout_info cfg blocks
 
                       -- Old algorithm without edge weights
                       | ncgCfgWeightlessLayout config
                         || not (backendMaintainsCfg platform)
-                      -> {-# SCC layoutBlocks #-} sequenceBlocks Nothing info blocks
+                      -> {-# SCC layoutBlocks #-} sequenceBlocks Nothing layout_info blocks
 
                       -- Old algorithm with edge weights (if any)
                       | otherwise
-                      -> {-# SCC layoutBlocks #-} sequenceBlocks edgeWeights info blocks
+                      -> {-# SCC layoutBlocks #-} sequenceBlocks edgeWeights layout_info blocks
 
     far_blocks <- (ncgMakeFarBranches ncgImpl) platform info seq_blocks
     pure $ CmmProc info lbl live $ ListGraph far_blocks
