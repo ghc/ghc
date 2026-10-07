@@ -448,6 +448,9 @@ instance Ord CLabel where
 -- 2. in a different (external) linker unit; or
 -- 3. an unknown unit (could be either local or external).
 --
+-- See Note [Tracking labels' target libraries]
+-- and Note [Windows dll symbol references]
+--
 data ForeignLabelSource
 
    -- | The label target lives in a named Haskell unit. Whether the target
@@ -1223,8 +1226,10 @@ externallyVisibleIdLabel _               = True
 -- -----------------------------------------------------------------------------
 -- Finding the "type" of a CLabel
 
--- For generating correct types in label declarations:
-
+-- | For generating correct types in label declarations.
+--
+-- See also Note [Tracking labels' target type].
+--
 data CLabelType
   = CodeLabel   -- Address of some executable instructions
   | DataLabel   -- Address of data, not a GC ptr
@@ -1242,7 +1247,10 @@ isGcPtrLabel lbl = case labelType lbl of
 
 
 -- | Work out the general type of data at the address of this label
---    whether it be code, data, or static GC object.
+-- whether it be code, data, or static GC object.
+--
+-- See also Note [Tracking labels' target type].
+--
 labelType :: CLabel -> CLabelType
 labelType (IdLabel _ _ info)                    = idInfoLabelType info
 labelType (CmmLabel _ _ _ CmmData)              = DataLabel
@@ -1323,6 +1331,8 @@ isLocalCLabel this_mod lbl =
 
 -- | Where a 'CLabel' target points to, relative to a given local unit.
 --
+-- See Note [Tracking labels' target libraries]
+--
 data LabelLinkerUnit = LinkerUnitLocal
                      | LinkerUnitExternal
                      | LinkerUnitUnknown
@@ -1330,6 +1340,8 @@ data LabelLinkerUnit = LinkerUnitLocal
 
 -- | Does the target entity of a 'CLabel' live in the same linker unit as the
 -- given module?
+--
+-- See Note [Tracking labels' target libraries]
 --
 -- The answer can be:
 -- * 'LinkerUnitLocal': yes, definately same linker unit;
@@ -1359,11 +1371,16 @@ labelLinkerUnit this_mod platform external_dynamic_refs lbl =
    CmmLabel lbl_unit _ _ _
     | os == OSMinGW32 && external_dynamic_refs && (this_unit /= lbl_unit)
                             -> LinkerUnitExternal
+    -- TODO: this is very conservative for non-Windows platforms. We have
+    -- precise information, we should be able to use it! The test
+    -- (this_unit /= lbl_unit) should be valid on all platforms to say if
+    -- the target is local or external. See issue #27909.
     | external_dynamic_refs -> LinkerUnitExternal
     | otherwise             -> LinkerUnitLocal
 
    LocalBlockLabel _    -> LinkerUnitLocal
 
+   -- See Note [Tracking labels' target libraries]
    ForeignLabel _ source _
      | os == OSMinGW32 ->
           case source of
@@ -1389,7 +1406,9 @@ labelLinkerUnit this_mod platform external_dynamic_refs lbl =
 
      -- On Mac OS X and on ELF platforms, false positives are OK,
      -- so we claim that all foreign imports come from dynamic
-     -- libraries
+     -- libraries.
+     -- TODO: we should not need to be conservative here. We do have precise
+     -- information. We could use it! See issue #27909.
      | otherwise -> LinkerUnitExternal
 
    CC_Label cc
