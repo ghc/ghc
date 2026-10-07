@@ -16,102 +16,103 @@ import GHC.Core
 import GHC.Types.Id.Info
 import GHC.Types.Demand( seqDemand, seqDmdSig )
 import GHC.Types.Cpr( seqCprSig )
-import GHC.Types.Basic( seqOccInfo )
+import GHC.Types.Basic( seqOccInfo, SeqResult, seqUnit )
 import GHC.Types.Tickish
 import GHC.Types.Var.Set( seqDVarSet )
 import GHC.Types.Var( varType, tyVarKind )
 import GHC.Core.Type( seqType, isTyVar )
 import GHC.Core.Coercion( seqCo )
 import GHC.Types.Id( idInfo )
+import qualified Data.Monoid as M
 
 -- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the
 -- compiler
-megaSeqIdInfo :: IdInfo -> ()
+megaSeqIdInfo :: IdInfo -> SeqResult
 megaSeqIdInfo info
-  = seqRuleInfo (ruleInfo info)                 `seq`
+  = seqRuleInfo (ruleInfo info)         M.<>
 
 -- Omitting this improves runtimes a little, presumably because
 -- some unfoldings are not calculated at all
---    seqUnfolding (realUnfoldingInfo info)         `seq`
+--    seqUnfolding (realUnfoldingInfo info)         M.<>
 
-    seqDemand (demandInfo info)                 `seq`
-    seqDmdSig (dmdSigInfo info)          `seq`
-    seqCprSig (cprSigInfo info)                    `seq`
-    seqCaf (cafInfo info)                       `seq`
-    seqOneShot (oneShotInfo info)               `seq`
+    seqDemand (demandInfo info)         M.<>
+    seqDmdSig (dmdSigInfo info)         M.<>
+    seqCprSig (cprSigInfo info)         M.<>
+    seqCaf (cafInfo info)               M.<>
+    seqOneShot (oneShotInfo info)       M.<>
     seqOccInfo (occInfo info)
 
-seqOneShot :: OneShotInfo -> ()
-seqOneShot l = l `seq` ()
+seqOneShot :: OneShotInfo -> SeqResult
+seqOneShot = seqUnit
 
-seqRuleInfo :: RuleInfo -> ()
-seqRuleInfo (RuleInfo rules fvs) = seqRules rules `seq` seqDVarSet fvs
+seqRuleInfo :: RuleInfo -> SeqResult
+seqRuleInfo (RuleInfo rules fvs) = seqRules rules M.<> seqDVarSet fvs
 
-seqCaf :: CafInfo -> ()
-seqCaf c = c `seq` ()
+seqCaf :: CafInfo -> SeqResult
+seqCaf = seqUnit
 
-seqRules :: [CoreRule] -> ()
-seqRules [] = ()
+seqRules :: [CoreRule] -> SeqResult
+seqRules [] = mempty
 seqRules (Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs } : rules)
-  = seqBndrs bndrs `seq` seqExprs (rhs:args) `seq` seqRules rules
+  = seqBndrs bndrs M.<> seqExprs (rhs:args) M.<> seqRules rules
 seqRules (BuiltinRule {} : rules) = seqRules rules
 
-seqExpr :: CoreExpr -> ()
-seqExpr (Var v)         = v `seq` ()
-seqExpr (Lit lit)       = lit `seq` ()
-seqExpr (App f a)       = seqExpr f `seq` seqExpr a
-seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
-seqExpr (Let b e)       = seqBind b `seq` seqExpr e
-seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
-seqExpr (Cast e co)     = seqExpr e `seq` seqCo co
-seqExpr (Tick n e)      = seqTickish n `seq` seqExpr e
+seqExpr :: CoreExpr -> SeqResult
+seqExpr (Var v)         = seqUnit v
+seqExpr (Lit lit)       = seqUnit lit
+seqExpr (App f a)       = seqExpr f M.<> seqExpr a
+seqExpr (Lam b e)       = seqBndr b M.<> seqExpr e
+seqExpr (Let b e)       = seqBind b M.<> seqExpr e
+seqExpr (Case e b t as) = seqExpr e M.<> seqBndr b M.<> seqType t M.<> seqAlts as
+seqExpr (Cast e co)     = seqExpr e M.<> seqCo co
+seqExpr (Tick n e)      = seqTickish n M.<> seqExpr e
 seqExpr (Type t)        = seqType t
 seqExpr (Coercion co)   = seqCo co
 
-seqExprs :: [CoreExpr] -> ()
-seqExprs [] = ()
-seqExprs (e:es) = seqExpr e `seq` seqExprs es
+seqExprs :: [CoreExpr] -> SeqResult
+seqExprs []     = mempty
+seqExprs (e:es) = seqExpr e M.<> seqExprs es
 
-seqTickish :: CoreTickish -> ()
-seqTickish ProfNote{ profNoteCC = cc } = cc `seq` ()
-seqTickish HpcTick{} = ()
+seqTickish :: CoreTickish -> SeqResult
+seqTickish ProfNote{ profNoteCC = cc } = seqUnit cc
+seqTickish HpcTick{} = mempty
 seqTickish Breakpoint{ breakpointFVs = ids } = seqBndrs ids
-seqTickish SourceNote{} = ()
+seqTickish SourceNote{} = mempty
 
-seqBndr :: CoreBndr -> ()
+seqBndr :: CoreBndr -> SeqResult
 seqBndr b | isTyVar b = seqType (tyVarKind b)
-          | otherwise = seqType (varType b)             `seq`
-                        megaSeqIdInfo (idInfo b)
+          | otherwise = seqType (varType b)
+                        M.<> megaSeqIdInfo (idInfo b)
 
-seqBndrs :: [CoreBndr] -> ()
-seqBndrs [] = ()
-seqBndrs (b:bs) = seqBndr b `seq` seqBndrs bs
+seqBndrs :: [CoreBndr] -> SeqResult
+seqBndrs []     = mempty
+seqBndrs (b:bs) = seqBndr b M.<> seqBndrs bs
 
-seqBinds :: [Bind CoreBndr] -> ()
-seqBinds bs = foldr (seq . seqBind) () bs
+seqBinds :: [Bind CoreBndr] -> SeqResult
+seqBinds bs = foldr ((M.<>) . seqBind) mempty bs
 
-seqBind :: Bind CoreBndr -> ()
-seqBind (NonRec b e) = seqBndr b `seq` seqExpr e
+seqBind :: Bind CoreBndr -> SeqResult
+seqBind (NonRec b e) = seqBndr b M.<> seqExpr e
 seqBind (Rec prs)    = seqPairs prs
 
-seqPairs :: [(CoreBndr, CoreExpr)] -> ()
-seqPairs [] = ()
-seqPairs ((b,e):prs) = seqBndr b `seq` seqExpr e `seq` seqPairs prs
+seqPairs :: [(CoreBndr, CoreExpr)] -> SeqResult
+seqPairs []          = mempty
+seqPairs ((b,e):prs) = seqBndr b M.<> seqExpr e M.<> seqPairs prs
 
-seqAlts :: [CoreAlt] -> ()
-seqAlts [] = ()
-seqAlts (Alt c bs e:alts) = c `seq` seqBndrs bs `seq` seqExpr e `seq` seqAlts alts
+seqAlts :: [CoreAlt] -> SeqResult
+seqAlts []                = mempty
+seqAlts (Alt c bs e:alts) = seqUnit c M.<> seqBndrs bs M.<> seqExpr e M.<> seqAlts alts
 
-seqUnfolding :: Unfolding -> ()
-seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top,
-                uf_cache = cache, uf_guidance = g})
-  = seqExpr e `seq` top `seq` cache `seq` seqGuidance g
+seqUnfolding :: Unfolding -> SeqResult
+seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top
+                            , uf_cache = cache, uf_guidance = g})
+  = seqExpr e M.<> seqUnit top M.<> seqUnit cache M.<> seqGuidance g
     -- The unf_cache :: UnfoldingCache field is a strict data type,
     -- so it is sufficient to use plain `seq` for this field
     -- See Note [UnfoldingCache] in GHC.Core
 
-seqUnfolding _ = ()
+seqUnfolding _ = mempty
 
-seqGuidance :: UnfoldingGuidance -> ()
-seqGuidance (UnfIfGoodArgs ns n b) = n `seq` sum ns `seq` b `seq` ()
-seqGuidance _                      = ()
+seqGuidance :: UnfoldingGuidance -> SeqResult
+seqGuidance (UnfIfGoodArgs ns n b) = seqUnit n M.<> seqUnit (sum ns) M.<> seqUnit b
+seqGuidance _                      = mempty
