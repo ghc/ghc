@@ -27,7 +27,7 @@ module GHC.Core.TyCo.Ppr
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.CoreToIface
-   ( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndrs
+   ( toIfaceTypeX, toIfaceTyLit, toIfaceForAllTyBndrs
    , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercionX )
 
 import {-# SOURCE #-} GHC.Core.DataCon
@@ -177,12 +177,12 @@ pprSigmaType :: Type -> SDoc
 pprSigmaType = pprIfaceSigmaType ShowForAllWhen . tidyToIfaceType
 
 pprForAll :: [ForAllTyBinder] -> SDoc
-pprForAll tvs = pprIfaceForAll (toIfaceForAllBndrs tvs)
+pprForAll tvs = pprIfaceForAll (toIfaceForAllTyBndrs tvs)
 
 -- | Print a user-level forall; see @Note [When to print foralls]@ in
 -- "GHC.Iface.Type".
 pprUserForAll :: [ForAllTyBinder] -> SDoc
-pprUserForAll = pprUserIfaceForAll . toIfaceForAllBndrs
+pprUserForAll = pprUserIfaceForAll . toIfaceForAllTyBndrs
 
 pprTCvBndrs :: [ForAllTyBinder] -> SDoc
 pprTCvBndrs tvs = sep (map pprTCvBndr tvs)

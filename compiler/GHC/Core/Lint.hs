@@ -54,7 +54,7 @@ import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
-import GHC.Core.TyCo.Compare ( eqType, eqTypes, eqTypeIgnoringMultiplicity, eqForAllVis )
+import GHC.Core.TyCo.Compare ( eqType, eqTypes, eqTypeIgnoringMultiplicity )
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
@@ -2405,7 +2405,7 @@ lintCoercion co@(ForAllCo {})
            -- but at least it's on a cold path (a ForallCo for a CoVar)
            -- Also it works on InTyCoVar and Coercion, which is suspect
            ; when (isCoVar tcv) $
-             do { lintL (visL == coreTyLamForAllTyFlag && visR == coreTyLamForAllTyFlag) $
+             do { lintL (isCoreTyLamForAllTyFlag visL && isCoreTyLamForAllTyFlag visR) $
                   text "Invalid visibility flags in CoVar ForAllCo" <+> ppr co
                   -- See (FC7) in Note [ForAllCo] in GHC.Core.TyCo.Rep
                 ; lintL (almostDevoidCoVarOfCo tcv body_co) $

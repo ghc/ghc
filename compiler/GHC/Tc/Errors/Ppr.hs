@@ -1693,9 +1693,9 @@ instance Diagnostic TcRnMessage where
         sorted_tvs = scopedSort tvs
 
         inferred_tvs  = [ binderVar tcb
-                        | tcb <- tcbs, Inferred == tyConBinderForAllTyFlag tcb ]
+                        | tcb <- tcbs, isInferredForAllTyFlag (tyConBinderForAllTyFlag tcb) ]
         specified_tvs = [ binderVar tcb
-                        | tcb <- tcbs, Specified == tyConBinderForAllTyFlag tcb ]
+                        | tcb <- tcbs, isSpecifiedForAllTyFlag (tyConBinderForAllTyFlag tcb) ]
 
         extra
           | null inferred_tvs && null specified_tvs

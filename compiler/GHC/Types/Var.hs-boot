@@ -2,9 +2,10 @@
 module GHC.Types.Var where
 
 import {-# SOURCE #-} GHC.Types.Name
-import Language.Haskell.Syntax.Specificity (Specificity, ForAllTyFlag)
+import Language.Haskell.Syntax.Specificity (Specificity)
 
 data FunTyFlag
+data ForAllTyFlag
 data Var
 instance NamedThing Var
 data VarBndr var argf

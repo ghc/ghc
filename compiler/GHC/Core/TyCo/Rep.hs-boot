@@ -3,9 +3,8 @@ module GHC.Core.TyCo.Rep where
 
 import GHC.Utils.Outputable ( Outputable )
 import Data.Data  ( Data )
-import {-# SOURCE #-} GHC.Types.Var( Var, VarBndr, FunTyFlag )
+import {-# SOURCE #-} GHC.Types.Var( Var, VarBndr, FunTyFlag, ForAllTyFlag )
 import {-# SOURCE #-} GHC.Core.TyCon ( TyCon )
-import Language.Haskell.Syntax.Specificity (ForAllTyFlag)
 
 data Type
 data Coercion

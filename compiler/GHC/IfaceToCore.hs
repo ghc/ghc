@@ -1174,7 +1174,8 @@ tcIfaceDataCons tycon_name tycon if_cons
                          ifConArgTys = args, ifConFields = lbl_names,
                          ifConStricts = if_stricts,
                          ifConSrcStricts = if_src_stricts})
-     = bindIfaceForAllBndrs user_bndrs $ \ user_tvs ->
+     = bindIfaceForAllBndrs user_bndrs $ \ if_user_tvs ->
+       let user_tvs = [Bndr tv (ifaceForAllTyFlag vis) | Bndr tv vis <- if_user_tvs] in
        bindDataConBinders   univ_bndrs $ \ univ_tvs ->
        bindDataConBinders   ex_bndrs   $ \ ex_tvs  ->
      do { traceIf (text "Start interface-file tc_con_decl" <+> ppr dc_name)
@@ -1528,7 +1529,7 @@ tcIfaceType = go
            ; return (mkTyConApp tc' tks') }
     go (IfaceForAllTy bndr t)
       = bindIfaceForAllBndr bndr $ \ tv' vis ->
-        ForAllTy (Bndr tv' vis) <$> go t
+        ForAllTy (Bndr tv' (ifaceForAllTyFlag vis)) <$> go t
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
@@ -1596,7 +1597,7 @@ tcIfaceCo = go
       = do { k' <- go_mco k
            ; bindIfaceBndr tcv $ \ tv' ->
         do { co' <- go co
-           ; return (ForAllCo { fco_tcv = tv', fco_visL = visL, fco_visR = visR
+           ; return (ForAllCo { fco_tcv = tv', fco_visL = ifaceForAllTyFlag visL, fco_visR = ifaceForAllTyFlag visR
                               , fco_kind = k', fco_body = co' }) } }
     go (IfaceCoVarCo n)           = CoVarCo <$> go_var n
     go (IfaceUnivCo p r t1 t2 ds) = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2

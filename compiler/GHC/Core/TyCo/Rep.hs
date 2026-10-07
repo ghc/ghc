@@ -756,7 +756,7 @@ mkForAllTy bndr body
   where
     -- Check ForAllTy invariants
     good_bndr (Bndr cv vis)
-      | isCoVar cv = vis == coreTyLamForAllTyFlag
+      | isCoVar cv = isCoreTyLamForAllTyFlag vis
                      -- See (FT2) in Note [ForAllTy]
                   && (cv `elemVarSet` tyCoVarsOfType body)
                      -- See (FT3) in Note [ForAllTy]

@@ -158,7 +158,7 @@ recoverFullIfaceTypes sDocContext flattened ast = fmap (printed A.!) ast
     go (HLitTy l) = IfaceLitTy l
     go (HForAllTy ((n, k), af) t) =
       let b = (mkIfLclName $ getOccFS n, k)
-       in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
+       in IfaceForAllTy (Bndr (IfaceTvBndr b) (IfaceForAllTyFlag af)) t
     go (HFunTy w a b) = IfaceFunTy (visArg TypeLike) w a b -- t1 -> t2
     go (HQualTy con b) = IfaceFunTy (invisArg TypeLike) many_ty con b -- c => t
     go (HCastTy a) = a
@@ -170,5 +170,5 @@ recoverFullIfaceTypes sDocContext flattened ast = fmap (printed A.!) ast
     hieToIfaceArgs (HieArgs args) = go' args
       where
         go' [] = IA_Nil
-        go' ((True, x) : xs) = IA_Arg x Required $ go' xs
-        go' ((False, x) : xs) = IA_Arg x Specified $ go' xs
+        go' ((True, x) : xs) = IA_Arg x (IfaceForAllTyFlag Required) $ go' xs
+        go' ((False, x) : xs) = IA_Arg x (IfaceForAllTyFlag Specified) $ go' xs

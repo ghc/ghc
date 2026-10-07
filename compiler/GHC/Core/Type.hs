@@ -2106,7 +2106,7 @@ filterOutInvisibleTypes tc tys = snd $ partitionInvisibleTypes tc tys
 -- arguments.
 filterOutInferredTypes :: TyCon -> [Type] -> [Type]
 filterOutInferredTypes tc tys =
-  filterByList (map (/= Inferred) $ tyConForAllTyFlags tc tys) tys
+  filterByList (map (not . isInferredForAllTyFlag) $ tyConForAllTyFlags tc tys) tys
 
 -- | Given a 'TyCon' and a list of argument types, partition the arguments
 -- into:

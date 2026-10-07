@@ -77,7 +77,7 @@ import GHC.Types.InlinePragma
 import GHC.Types.Tickish
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
-import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike )
+import GHC.Types.Var( VarBndr(..), binderVar, visArgTypeLike )
 
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
@@ -1222,7 +1222,7 @@ pprIfaceDecl ss decl@(IfaceData { ifName = tycon, ifCType = ctype,
     pp_data_inst_forall = pprUserIfaceForAll forall_bndrs
 
     forall_bndrs :: [IfaceForAllBndr]
-    forall_bndrs = [Bndr (binderVar tc_bndr) Specified | tc_bndr <- binders]
+    forall_bndrs = [Bndr (binderVar tc_bndr) (IfaceForAllTyFlag Specified) | tc_bndr <- binders]
 
     cons       = visibleIfConDecls condecls
     pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
@@ -1455,8 +1455,8 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               , pprIfaceType $ foldr (IfaceFunTy visArgTypeLike many_ty)
                                                      pat_ty arg_tys ])
         pat_body = braces $ sep $ punctuate comma $ map ppr pat_fldlbls
-        univ_msg = pprUserIfaceForAll $ tyVarSpecToBinders univ_bndrs
-        ex_msg   = pprUserIfaceForAll $ tyVarSpecToBinders ex_bndrs
+        univ_msg = pprUserIfaceForAll $ ifaceForAllSpecToBndrs univ_bndrs
+        ex_msg   = pprUserIfaceForAll $ ifaceForAllSpecToBndrs ex_bndrs
 
         insert_empty_ctxt = null req_ctxt
             && not (null prov_ctxt && isEmpty sdocCtx ex_msg)
@@ -1716,7 +1716,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     mk_tc_app_args :: [IfaceTyConBinder] -> [IfaceBndr] -> IfaceAppArgs
     mk_tc_app_args [] [] = IA_Nil
     mk_tc_app_args (Bndr _ vis:tc_bndrs) (bndr:univs) =
-      IA_Arg (IfaceTyVar (ifaceBndrName bndr)) (tyConBndrVisForAllTyFlag vis)
+      IA_Arg (IfaceTyVar (ifaceBndrName bndr)) (IfaceForAllTyFlag (tyConBndrVisForAllTyFlag vis))
              (mk_tc_app_args tc_bndrs univs)
     mk_tc_app_args _ _ =
       panic "pprIfaceConDecl: mismatched universal TyCon and DataCon tvs"

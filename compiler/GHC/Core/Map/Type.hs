@@ -37,7 +37,6 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon( isForgetfulSynTyCon )
-import GHC.Core.TyCo.Compare( eqForAllVis )
 import GHC.Data.TrieMap
 
 import GHC.Data.FastString

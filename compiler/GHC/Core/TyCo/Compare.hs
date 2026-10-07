@@ -462,24 +462,9 @@ hasCasts _               = False   -- TyVarTy, TyConApp, FunTy, LitTy
 *                                                                      *
 ********************************************************************* -}
 
--- | Do these denote the same level of visibility? 'Required'
--- arguments are visible, others are not. So this function
--- equates 'Specified' and 'Inferred'. Used for printing.
-eqForAllVis :: ForAllTyFlag -> ForAllTyFlag -> Bool
--- See Note [ForAllTy and type equality]
-eqForAllVis Required      Required      = True
-eqForAllVis (Invisible _) (Invisible _) = True
-eqForAllVis _             _             = False
-
--- | Do these denote the same level of visibility? 'Required'
--- arguments are visible, others are not. So this function
--- equates 'Specified' and 'Inferred'. Used for printing.
-cmpForAllVis :: ForAllTyFlag -> ForAllTyFlag -> Ordering
--- See Note [ForAllTy and type equality]
-cmpForAllVis Required      Required       = EQ
-cmpForAllVis Required      (Invisible {}) = LT
-cmpForAllVis (Invisible _) Required       = GT
-cmpForAllVis (Invisible _) (Invisible _)  = EQ
+-- `eqForAllVis` and `cmpForAllVis` are defined in GHC.Types.Var,
+-- alongside ForAllTyFlag; but they are re-exported from here.
+-- See Note [Comparing visibility].
 
 
 {- Note [ForAllTy and type equality]

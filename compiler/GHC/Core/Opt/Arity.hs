@@ -2366,9 +2366,9 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
 mkEtaForAllMCo :: ForAllTyBinder -> Type -> MCoercion -> MCoercion
 mkEtaForAllMCo (Bndr tcv vis) ty mco
   = case mco of
-      MRefl | vis == coreTyLamForAllTyFlag -> MRefl
-            | otherwise                    -> mk_fco (mkRepReflCo ty)
-      MCo co                               -> mk_fco co
+      MRefl | isCoreTyLamForAllTyFlag vis -> MRefl
+            | otherwise                   -> mk_fco (mkRepReflCo ty)
+      MCo co                              -> mk_fco co
   where
     mk_fco co = MCo (mkForAllCo tcv coreTyLamForAllTyFlag vis MRefl co)
     -- coreTyLamForAllTyFlag: See Note [The EtaInfo mechanism], particularly

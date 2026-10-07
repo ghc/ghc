@@ -22,7 +22,8 @@ module GHC.Iface.Type (
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr,
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
         IfaceForAllSpecBndr,
-        IfaceForAllBndr, ForAllTyFlag(..), FunTyFlag(..), ShowForAllFlag(..),
+        IfaceForAllBndr, IfaceForAllTyFlag(..),
+        ForAllTyFlag(..), FunTyFlag(..), ShowForAllFlag(..),
         ShowSub(..), ShowHowMuch(..), AltPpr(..),
         mkIfaceForAllTvBndr,
         mkIfaceTyConKind,
@@ -79,7 +80,6 @@ import GHC.Base ( Multiplicity(..) )
 import GHC.Core.Multiplicity ( pprArrowWithModifiers )
 import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
 import GHC.Core.TyCo.Rep( CoSel, UnivCoProvenance(..) )
-import GHC.Core.TyCo.Compare( eqForAllVis )
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
@@ -241,12 +241,40 @@ data IfaceTyLit
   deriving (Eq, Ord)
 
 type IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
-type IfaceForAllBndr     = VarBndr IfaceBndr ForAllTyFlag
+type IfaceForAllBndr     = VarBndr IfaceBndr IfaceForAllTyFlag
 type IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
+
+-- | The 'ForAllTyFlag' used in 'IfaceType' and 'IfaceCoercion'.
+--
+-- 'ForAllTyFlag' deliberately has no 'Eq' or 'Ord' instances
+-- (see Note [Comparing visibility] in "GHC.Core.TyCo.Compare").  But
+-- 'IfaceType' needs 'Eq' and 'Ord' instances for deduplication during
+-- interface-file serialisation; see Note [Ord instance of IfaceType].
+-- Those instances must compare /exactly/, distinguishing 'Specified' from
+-- 'Inferred'; otherwise (forall a. ty) and (forall {a}. ty) would be
+-- deduplicated into the same table entry.
+newtype IfaceForAllTyFlag = IfaceForAllTyFlag { ifaceForAllTyFlag :: ForAllTyFlag }
+
+instance Eq IfaceForAllTyFlag where
+  f1 == f2 = compare f1 f2 == EQ
+
+instance Ord IfaceForAllTyFlag where
+  -- Exact comparison; see Note [Ord instance of IfaceType]
+  compare (IfaceForAllTyFlag f1) (IfaceForAllTyFlag f2) = cmpForAllTyFlagExactly f1 f2
+
+instance Outputable IfaceForAllTyFlag where
+  ppr (IfaceForAllTyFlag f) = ppr f
+
+instance Binary IfaceForAllTyFlag where
+  put_ bh (IfaceForAllTyFlag f) = put_ bh f
+  get bh = IfaceForAllTyFlag <$> get bh
+
+instance NFData IfaceForAllTyFlag where
+  rnf (IfaceForAllTyFlag f) = rnf f
 
 -- | Make an 'IfaceForAllBndr' from an 'IfaceTvBndr'.
 mkIfaceForAllTvBndr :: ForAllTyFlag -> IfaceTvBndr -> IfaceForAllBndr
-mkIfaceForAllTvBndr vis var = Bndr (IfaceTvBndr var) vis
+mkIfaceForAllTvBndr vis var = Bndr (IfaceTvBndr var) (IfaceForAllTyFlag vis)
 
 -- | Build the 'tyConKind' from the binders and the result kind.
 -- Keep in sync with 'mkTyConKind' in "GHC.Core.TyCon".
@@ -255,13 +283,13 @@ mkIfaceTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: IfaceTyConBinder -> IfaceKind -> IfaceKind
     mk (Bndr tv AnonTCB)        k = IfaceFunTy FTF_T_T many_ty (ifaceBndrType tv) k
-    mk (Bndr tv (NamedTCB vis)) k = IfaceForAllTy (Bndr tv vis) k
+    mk (Bndr tv (NamedTCB vis)) k = IfaceForAllTy (Bndr tv (IfaceForAllTyFlag vis)) k
 
 ifaceForAllSpecToBndrs :: [IfaceForAllSpecBndr] -> [IfaceForAllBndr]
 ifaceForAllSpecToBndrs = map ifaceForAllSpecToBndr
 
 ifaceForAllSpecToBndr :: IfaceForAllSpecBndr -> IfaceForAllBndr
-ifaceForAllSpecToBndr (Bndr tv spec) = Bndr tv (Invisible spec)
+ifaceForAllSpecToBndr (Bndr tv spec) = Bndr tv (IfaceForAllTyFlag (Invisible spec))
 
 -- | Stores the arguments in a type application as a list.
 -- See @Note [Suppressing invisible arguments]@.
@@ -269,7 +297,7 @@ data IfaceAppArgs
   = IA_Nil
   | IA_Arg IfaceType    -- The type argument
 
-           ForAllTyFlag      -- The argument's visibility. We store this here so
+           IfaceForAllTyFlag -- The argument's visibility. We store this here so
                         -- that we can:
                         --
                         -- 1. Avoid pretty-printing invisible (i.e., specified
@@ -479,7 +507,7 @@ data IfaceCoercion
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
-  | IfaceForAllCo     IfaceBndr !ForAllTyFlag !ForAllTyFlag IfaceMCoercion IfaceCoercion
+  | IfaceForAllCo     IfaceBndr !IfaceForAllTyFlag !IfaceForAllTyFlag IfaceMCoercion IfaceCoercion
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomCo      IfaceAxiomRule [IfaceCoercion]
        -- ^ There are only a fixed number of CoAxiomRules, so it suffices
@@ -533,7 +561,7 @@ isIfaceLiftedTypeKind (IfaceTyConApp tc args)
   = True  -- Type
 
   | tc `ifaceTyConHasKey` tYPETyConKey
-  , IA_Arg arg1 Required IA_Nil <- args
+  , IA_Arg arg1 (IfaceForAllTyFlag Required) IA_Nil <- args
   , isIfaceLiftedRep arg1
   = True  -- TYPE Lifted
 
@@ -547,7 +575,7 @@ isIfaceConstraintKind (IfaceTyConApp tc args)
   = True  -- Type
 
   | tc `ifaceTyConHasKey` cONSTRAINTTyConKey
-  , IA_Arg arg1 Required IA_Nil <- args
+  , IA_Arg arg1 (IfaceForAllTyFlag Required) IA_Nil <- args
   , isIfaceLiftedRep arg1
   = True  -- TYPE Lifted
 
@@ -561,7 +589,7 @@ isIfaceLiftedRep (IfaceTyConApp tc args)
   = True  -- LiftedRep
 
   | tc `ifaceTyConHasKey` boxedRepDataConKey
-  , IA_Arg arg1 Required IA_Nil <- args
+  , IA_Arg arg1 (IfaceForAllTyFlag Required) IA_Nil <- args
   , isIfaceLifted arg1
   = True  -- TYPE Lifted
 
@@ -599,7 +627,7 @@ splitIfaceSigmaTy ty
     (theta, tau)   = split_rho rho
 
     split_foralls (IfaceForAllTy bndr ty)
-        | isInvisibleForAllTyFlag (binderFlag bndr)
+        | isInvisibleForAllTyFlag (ifaceForAllTyFlag (binderFlag bndr))
         = case split_foralls ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
     split_foralls rho = ([], rho)
 
@@ -610,7 +638,7 @@ splitIfaceSigmaTy ty
 
 splitIfaceReqForallTy :: IfaceType -> ([IfaceForAllBndr], IfaceType)
 splitIfaceReqForallTy (IfaceForAllTy bndr ty)
-  | isVisibleForAllTyFlag (binderFlag bndr)
+  | isVisibleForAllTyFlag (ifaceForAllTyFlag (binderFlag bndr))
   = case splitIfaceReqForallTy ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
 splitIfaceReqForallTy rho = ([], rho)
 
@@ -734,7 +762,7 @@ visibleTypeVarOccurencies = go
     go (IfaceCoercionTy {})     = mempty -- Safe
 
     go_args IA_Nil = mempty
-    go_args (IA_Arg arg Required args) = go arg <> go_args args
+    go_args (IA_Arg arg (IfaceForAllTyFlag Required) args) = go arg <> go_args args
     go_args (IA_Arg _arg _ args) = go_args args
 
 {- Note [Substitution on IfaceType]
@@ -822,7 +850,7 @@ stripInvisArgs (PrintExplicitKinds False) tys = suppress_invis tys
         = case c of
             IA_Nil -> IA_Nil
             IA_Arg t argf ts
-              |  isVisibleForAllTyFlag argf
+              |  isVisibleForAllTyFlag (ifaceForAllTyFlag argf)
               -> IA_Arg t argf $ suppress_invis ts
               -- Keep recursing through the remainder of the arguments, as it's
               -- possible that there are remaining invisible ones.
@@ -838,14 +866,14 @@ appArgsIfaceTypes (IA_Arg t _ ts) = t : appArgsIfaceTypes ts
 appArgsIfaceTypesForAllTyFlags :: IfaceAppArgs -> [(IfaceType, ForAllTyFlag)]
 appArgsIfaceTypesForAllTyFlags IA_Nil = []
 appArgsIfaceTypesForAllTyFlags (IA_Arg t a ts)
-                                 = (t, a) : appArgsIfaceTypesForAllTyFlags ts
+                                 = (t, ifaceForAllTyFlag a) : appArgsIfaceTypesForAllTyFlags ts
 
 ifaceVisAppArgsLength :: IfaceAppArgs -> Int
 ifaceVisAppArgsLength = go 0
   where
     go !n IA_Nil = n
     go n  (IA_Arg _ argf rest)
-      | isVisibleForAllTyFlag argf = go (n+1) rest
+      | isVisibleForAllTyFlag (ifaceForAllTyFlag argf) = go (n+1) rest
       | otherwise             = go n rest
 
 ifaceAppArgsLength :: IfaceAppArgs -> Int
@@ -1299,7 +1327,7 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
        -> IfaceType
        -> IfaceType
     go subs True (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
-     | isInvisibleForAllTyFlag argf  -- Don't default *visible* quantification
+     | isInvisibleForAllTyFlag (ifaceForAllTyFlag argf)  -- Don't default *visible* quantification
                                      -- or we get the mess in #13963
      , Just substituted_ty <- check_substitution var_kind
       = let subs' = extendFsEnv subs (ifLclNameFS var) substituted_ty
@@ -1421,7 +1449,7 @@ ppr_app_args ctx_prec = go
   where
     go :: IfaceAppArgs -> SDoc
     go IA_Nil             = empty
-    go (IA_Arg t argf ts) = ppr_app_arg ctx_prec (t, argf) <+> go ts
+    go (IA_Arg t argf ts) = ppr_app_arg ctx_prec (t, ifaceForAllTyFlag argf) <+> go ts
 
 -- See Note [Pretty-printing invisible arguments]
 ppr_app_arg :: PprPrec -> (IfaceType, ForAllTyFlag) -> SDoc
@@ -1461,7 +1489,7 @@ ppr_iface_forall_part show_forall tvs ctxt sdoc
 -- | Render the "forall ... ." or "forall ... ->" bit of a type.
 pprIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprIfaceForAll [] = empty
-pprIfaceForAll bndrs@(Bndr _ vis : _)
+pprIfaceForAll bndrs@(Bndr _ (IfaceForAllTyFlag vis) : _)
   = sep [ add_separator (forAllLit <+> fsep docs)
         , pprIfaceForAll bndrs' ]
   where
@@ -1478,7 +1506,7 @@ pprIfaceForAll bndrs@(Bndr _ vis : _)
 ppr_itv_bndrs :: [IfaceForAllBndr]
              -> ForAllTyFlag  -- ^ visibility of the first binder in the list
              -> ([IfaceForAllBndr], [SDoc])
-ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ vis) : bndrs) vis1
+ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ (IfaceForAllTyFlag vis)) : bndrs) vis1
   | vis `eqForAllVis` vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs vis1 in
                              (bndrs', pprIfaceForAllBndr bndr : doc)
   | otherwise              = (all_bndrs, [])
@@ -1494,7 +1522,7 @@ pprIfaceForAllCoBndrs bndrs = hsep $ map pprIfaceForAllCoBndr bndrs
 pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
 pprIfaceForAllBndr bndr =
   case bndr of
-    Bndr (IfaceTvBndr tv) Inferred ->
+    Bndr (IfaceTvBndr tv) (IfaceForAllTyFlag Inferred) ->
       braces $ pprIfaceTvBndr tv suppress_sig (UseBndrParens False)
     Bndr (IfaceTvBndr tv) _ ->
       pprIfaceTvBndr tv suppress_sig (UseBndrParens True)
@@ -1514,8 +1542,8 @@ pprIfaceForAllCoBndr (tcv, kind_mco, visL, visR)
     kind_co = case kind_mco of
                    IfaceMRefl  -> IfaceReflCo (ifaceBndrType tcv)
                    IfaceMCo co -> co
-    pp_vis | visL == coreTyLamForAllTyFlag
-           , visR == coreTyLamForAllTyFlag
+    pp_vis | isSpecifiedForAllTyFlag visL   -- Omit the visibilities if both are
+           , isSpecifiedForAllTyFlag visR   -- coreTyLamForAllTyFlag (= Specified)
            = empty
            | otherwise
            = ppr visL <> char '~' <> ppr visR    -- "[spec]~[reqd]"
@@ -1588,7 +1616,7 @@ pprUserIfaceForAll tvs
        = not (ifTypeIsVarFree kind)
      tv_has_kind_var _ = False
 
-     tv_is_required = isVisibleForAllTyFlag . binderFlag
+     tv_is_required = isVisibleForAllTyFlag . ifaceForAllTyFlag . binderFlag
 
 {-
 Note [When to print foralls]
@@ -1723,8 +1751,8 @@ pprIfaceTyList ctxt_prec ty1 ty2
      --             = (tys, Just tl) means ty is of form t1:t2:...tn:tl
     gather (IfaceTyConApp tc tys)
       | tc `ifaceTyConHasKey` consDataConKey
-      , IA_Arg _ argf (IA_Arg ty1 Required (IA_Arg ty2 Required IA_Nil)) <- tys
-      , isInvisibleForAllTyFlag argf
+      , IA_Arg _ argf (IA_Arg ty1 (IfaceForAllTyFlag Required) (IA_Arg ty2 (IfaceForAllTyFlag Required) IA_Nil)) <- tys
+      , isInvisibleForAllTyFlag (ifaceForAllTyFlag argf)
       , (args, tl) <- gather ty2
       = (ty1:args, tl)
       | tc `ifaceTyConHasKey` nilDataConKey
@@ -1743,7 +1771,7 @@ pprTyTcApp ctxt_prec tc tys =
 
     if | ifaceTyConName tc `hasKey` ipClassKey
        , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
-                Required (IA_Arg ty Required IA_Nil) <- tys
+                (IfaceForAllTyFlag Required) (IA_Arg ty (IfaceForAllTyFlag Required) IA_Nil) <- tys
        -> maybeParen ctxt_prec funPrec
          $ char '?' <> ftext (getLexicalFastString n) <> dcolon <> ppr_ty topPrec ty
 
@@ -1761,8 +1789,8 @@ pprTyTcApp ctxt_prec tc tys =
 
        | tc `ifaceTyConHasKey` consDataConKey
        , False <- print_kinds
-       , IA_Arg _ argf (IA_Arg ty1 Required (IA_Arg ty2 Required IA_Nil)) <- tys
-       , isInvisibleForAllTyFlag argf
+       , IA_Arg _ argf (IA_Arg ty1 (IfaceForAllTyFlag Required) (IA_Arg ty2 (IfaceForAllTyFlag Required) IA_Nil)) <- tys
+       , isInvisibleForAllTyFlag (ifaceForAllTyFlag argf)
        -> pprIfaceTyList ctxt_prec ty1 ty2
 
        | isIfaceLiftedTypeKind (IfaceTyConApp tc tys)
@@ -1774,7 +1802,7 @@ pprTyTcApp ctxt_prec tc tys =
        -> pprPrefixOcc constraintKindTyConName
 
        | tc `ifaceTyConHasKey` fUNTyConKey
-       , IA_Arg (IfaceTyConApp rep IA_Nil) Required args <- tys
+       , IA_Arg (IfaceTyConApp rep IA_Nil) (IfaceForAllTyFlag Required) args <- tys
        , rep `ifaceTyConHasKey` manyDataConKey
        , print_type_abbreviations  -- See Note [Printing type abbreviations]
        -> pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_app_arg appPrec) $
@@ -2096,7 +2124,7 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
     (tvs, inner_co) = split_co co
 
     split_co (IfaceForAllCo bndr visL visR kind_co co')
-      = let (tvs, co'') = split_co co' in ((bndr,kind_co,visL,visR):tvs,co'')
+      = let (tvs, co'') = split_co co' in ((bndr,kind_co,ifaceForAllTyFlag visL,ifaceForAllTyFlag visR):tvs,co'')
     split_co co' = ([], co')
 
 -- Why these three? See Note [Free TyVars and CoVars in IfaceType]

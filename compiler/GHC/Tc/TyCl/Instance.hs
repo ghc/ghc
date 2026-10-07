@@ -518,7 +518,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty
               -- Map from the skolemized Names to the original Names.
               -- See Note [Associated data family instances and di_scoped_tvs].
               tv_skol_env = mkVarEnv $ map swap tv_skol_prs
-              n_inferred = countWhile ((== Inferred) . binderFlag) $
+              n_inferred = countWhile (isInferredForAllTyFlag . binderFlag) $
                            fst $ splitForAllForAllTyBinders dfun_ty
               visible_skol_tvs = drop n_inferred skol_tvs
 
@@ -2295,7 +2295,7 @@ mkDefMethBind loc dfun_id clas sel_id dm_name dm_spec
     -- Note [Default methods in instances].
     visible_inst_tys =
       [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
-           , tyConBinderForAllTyFlag tcb /= Inferred ]
+           , not (isInferredForAllTyFlag (tyConBinderForAllTyFlag tcb)) ]
 
     visible_sel_tvbs =
       case dm_spec of

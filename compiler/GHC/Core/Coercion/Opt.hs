@@ -14,7 +14,7 @@ import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
-import GHC.Core.TyCo.Compare( eqForAllVis, eqTypeIgnoringMultiplicity )
+import GHC.Core.TyCo.Compare( eqTypeIgnoringMultiplicity )
 import GHC.Core.Coercion
 import GHC.Core.Type as Type hiding( substTyVarBndr, substTy )
 import GHC.Core.TyCon
