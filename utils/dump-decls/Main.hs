@@ -32,7 +32,7 @@ main = do
     mapM_ (run ghcRoot) pkg_names
 
 run :: FilePath -> String -> IO ()
-run root pkg_nm = runGhc (Just root) $ do
+run root pkg_nm = runGhcWithSignalHandlers (Just root) $ do
     let args = map noLoc
             [ "-package=" ++ pkg_nm
             , "-dppr-cols=1000"

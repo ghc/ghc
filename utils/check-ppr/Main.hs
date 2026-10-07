@@ -81,7 +81,7 @@ testOneFile libdir fileName = do
 
 parseOneFile :: FilePath -> FilePath -> IO ParsedModule
 parseOneFile libdir fileName = do
-       runGhc (Just libdir) $ do
+       runGhcWithSignalHandlers (Just libdir) $ do
          dflags <- getSessionDynFlags
          let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
          _ <- setSessionDynFlags dflags2

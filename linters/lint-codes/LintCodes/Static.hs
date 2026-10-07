@@ -31,7 +31,7 @@ import GHC.Types.Error.Codes
 
 -- ghc (API usage)
 import GHC
-  ( runGhc, parseDynamicFlags
+  ( runGhcWithSignalHandlers, parseDynamicFlags
   , getSessionDynFlags, setSessionDynFlags
   , getSession, getLogger
   , noLoc
@@ -145,7 +145,7 @@ newtype LibDir = LibDir { libDir :: FilePath }
 -- | Look up the 'GhcDiagnosticCode' type family using the GHC API.
 ghcDiagnosticCodeTyCon :: Maybe LibDir -> IO TyCon
 ghcDiagnosticCodeTyCon mb_libDir =
-  runGhc (libDir <$> mb_libDir)
+  runGhcWithSignalHandlers (libDir <$> mb_libDir)
 
   -- STEP 1: start a GHC API session with "-package ghc"
   do { dflags1 <- getSessionDynFlags
