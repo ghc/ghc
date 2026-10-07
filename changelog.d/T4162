@@ -1,0 +1,17 @@
+section: compiler
+issues: #4162
+mrs: !16774
+synopsis:
+  `runGhc/runGhcT` no longer hijack process signals, old behaviour provided by
+  `runGhcWithSignalHandlers`.
+description:
+  Functions `runGhc/runGhcT` no longer go out of their way to redirect process
+  signals as exceptions to them.
+
+  The installed handlers make it so other threads are unaware of any signals,
+  which can cause the process to become unresponsive whenever a crash of the GHC
+  session(s) does not cascade into a shutdown of the process itself.
+
+  The old behaviour is available through `runGhcWithSignalHandlers` or by
+  calling `withSignalHandlers`. Only intended to be used from the main thread of
+  your process, see the documentation.

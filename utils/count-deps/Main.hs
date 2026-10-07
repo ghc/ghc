@@ -51,7 +51,7 @@ printDeps libdir modName dot = do
 calcDeps :: String -> FilePath -> IO (Map.Map ModuleName [ModuleName])
 calcDeps modName libdir =
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
-    runGhc (Just libdir) $ do
+    runGhcWithSignalHandlers (Just libdir) $ do
         df <- getSessionDynFlags
         logger <- getLogger
         (df, _, _) <- parseDynamicFlags logger df [noLoc "-package=ghc"]

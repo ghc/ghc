@@ -23,6 +23,7 @@ module GHC (
         -- * GHC Monad
         Ghc, GhcT, GhcMonad(..), HscEnv,
         runGhc, runGhcT, initGhcMonad,
+        runGhcWithSignalHandlers,
         printException,
         handleSourceError,
 
@@ -555,9 +556,25 @@ runGhc :: Maybe FilePath  -- ^ See argument to 'initGhcMonad'.
 runGhc mb_top_dir ghc = do
   ref <- newIORef (panic "empty session")
   let session = Session ref
-  flip unGhc session $ withSignalHandlers $ do -- catch ^C
+  flip unGhc session $ do
     initGhcMonad mb_top_dir
     withCleanupSession ghc
+
+-- | Like 'runGhc' but uses 'withSignalHandlers' to redirect selected signals to
+-- this thread to trigger 'withCleanupSession', and so that interactive
+-- evaluation receives 'UserInterrupt' exceptions.
+--
+-- __WARNING__: Only intended to be called from the __main thread__ of your
+-- process, see 'withSignalHandlers' documentation for more details.
+--
+-- More complex multi-threaded programs are recommended to use 'runGhc' or
+-- 'runGhcT', and handle signals as appropriate for their control flow.
+
+runGhcWithSignalHandlers :: Maybe FilePath  -- ^ See argument to 'initGhcMonad'.
+                         -> Ghc a           -- ^ The action to perform.
+                         -> IO a
+runGhcWithSignalHandlers mb_top_dir ghc = runGhc mb_top_dir $
+  withSignalHandlers $ ghc
 
 -- | Run function for 'GhcT' monad transformer.
 --
@@ -572,7 +589,7 @@ runGhcT :: ExceptionMonad m =>
 runGhcT mb_top_dir ghct = do
   ref <- liftIO $ newIORef (panic "empty session")
   let session = Session ref
-  flip unGhcT session $ withSignalHandlers $ do -- catch ^C
+  flip unGhcT session $ do
     initGhcMonad mb_top_dir
     withCleanupSession ghct
 

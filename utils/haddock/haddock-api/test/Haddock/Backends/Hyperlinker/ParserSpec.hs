@@ -20,7 +20,7 @@ import Haddock.Backends.Hyperlinker.Types
 withDynFlags :: (DynFlags -> IO ()) -> IO ()
 withDynFlags cont = do
   libDir <- fmap snd (getGhcDirs [])
-  runGhc libDir $ do
+  runGhcWithSignalHandlers libDir $ do
     dflags <- getSessionDynFlags
     liftIO $ cont dflags
 

@@ -196,7 +196,7 @@ handleGhcExceptions =
 --
 -- > main = getArgs >>= haddock
 haddock :: [String] -> IO ()
-haddock args = haddockWithGhc withGhc args
+haddock args = withSignalHandlers $ haddockWithGhc withGhc args
 
 haddockWithGhc :: (forall a. [Flag] -> Ghc a -> IO a) -> [String] -> IO ()
 haddockWithGhc ghc args = handleTopExceptions $ do

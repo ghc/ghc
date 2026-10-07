@@ -231,7 +231,7 @@ parseModuleEpAnnsWithCpp libdir cppOptions file = ghcWrapper libdir $ do
 ghcWrapper :: LibDir -> GHC.Ghc a -> IO a
 ghcWrapper libdir a =
   GHC.defaultErrorHandler GHC.defaultFatalMessager GHC.defaultFlushOut
-    $ GHC.runGhc (Just libdir) a
+    $ GHC.runGhcWithSignalHandlers (Just libdir) a
 
 -- | Internal function. Exposed if you want to muck with DynFlags
 -- before parsing.

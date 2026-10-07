@@ -234,8 +234,21 @@ signalHandlersRefCount :: MVar (Word, Maybe S.Handler)
 signalHandlersRefCount = unsafePerformIO $ newMVar (0,Nothing)
 
 
--- | Temporarily install standard signal handlers for catching ^C, which just
--- throw an exception in the current thread.
+-- | Temporarily install signal handlers to redirect the following signals to
+-- the calling thread as async exceptions: @INT@, @QUIT@, @HUP@, @TERM@ on unix, and
+-- @CtrlC@, @Break@ on windows. The original signal handlers are restored when all
+-- concurrent calls of this function are exited.
+--
+-- @INT@, @QUIT@, @CtrlC@, and @Break@ are thrown as @'UserInterrupt'@.
+--
+-- @HUP@, and @TERM@ are thrown as @'Panic' <signal number>@.
+--
+-- __WARNING__: Only intended to be called from the __main thread__ of your
+-- process, as otherwise it can swallow signals the process should react to in
+-- other ways. Nested calls from a single thread are fine, but concurrent calls
+-- from different threads will have the exceptions delivered to only one of
+-- them. If that thread is not @main@, extra care is needed to e.g. actually
+-- terminate the process when it receives @TERM@.
 withSignalHandlers :: ExceptionMonad m => m a -> m a
 #if !defined(HAVE_SIGNAL_H)
 -- No signal functionality exist on the host platform (e.g. on
