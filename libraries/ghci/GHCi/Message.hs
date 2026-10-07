@@ -1,11 +1,8 @@
 {-# LANGUAGE RecursiveDo, GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
-    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
-    CPP, NamedFieldPuns, PatternSynonyms #-}
+    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards, CPP,
+    NamedFieldPuns, PatternSynonyms, LambdaCase, TypeAbstractions, TypeApplications,
+    LinearTypes, RankNTypes, UnboxedTuples, BlockArguments #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
-{-# LANGUAGE TypeData #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE PolyKinds #-}
 
 -- |
 -- Remote GHCi message types and serialization.
@@ -25,12 +22,19 @@ module GHCi.Message
   , THResult(..), THResultType(..)
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
-  , Pipe, mkPipeFromHandles, mkPipeFromContinuations, remoteCall, remoteTHCall
+
+  , Pipe, mkPipeFromHandles, mkPipeFromContinuations
+  , remoteCall, remoteTHCall
+  , handleRemoteCall
+
+  , tailLinearly
+
   , BreakModule
   , BreakUnitId
   , LoadedDLL
   ) where
 
+import GHC.IO (IO(..))
 import Prelude -- See note [Why do we import Prelude here?]
 import GHCi.RemoteTypes
 import GHCi.FFI
@@ -77,7 +81,7 @@ import System.Exit
 import System.IO
 import System.IO.Error
 import Control.Monad
-import Data.Kind
+import Control.Concurrent.STM
 
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server
@@ -755,28 +759,156 @@ mkPipeFromContinuations getSome putAll = mdo
     let p = Pipe { .. }
     pure p
 
--- | Call a method
+-- | Send a 'Message' request to and wait for a reply from the interpreter
 remoteCall :: Binary a => Pipe -> Message a -> IO a
-remoteCall pipe msg = do
-  Reply _ bs <- withAsyncReq pipe (`Request` runPut (putMessage msg))
-  pure $ runGet get bs
+remoteCall pipe msg = runGet get <$> withAsyncReq pipe (putMessage msg)
 
+-- | Handle a single 'Message' request on the interpreter and reply to the host
+handleRemoteCall :: Pipe
+                 -> (Msg -> IO Msg) {-^ Msg hook -}
+                 -> (forall a. Binary a => (a -> IO ()) %1 -> Message a -> IO r)
+                 -> IO r
+handleRemoteCall pipe hook k =
+  withAsyncHandler pipe getMessage \reply msg0 -> do
+    hook msg0 `tailLinearly` \(Msg @a msg) ->
+      k (\(x :: a) -> reply (put x)) msg
+
+-- | Send a 'THMessage' request to the host and wait for a reply from the host
+-- to the interpreter
 remoteTHCall :: Binary a => Pipe -> THMessage a -> IO a
-remoteTHCall pipe msg = do
-  withAsyncReq pipe (`ReverseRequest` putTHMessage msg)
+remoteTHCall pipe msg = runGet get <$> withAsyncReq pipe (putTHMessage msg)
+
+-- | Handle a 'THMessage' request on the host and reply to the interpreter
+-- handleRemoteTHCall = undefined
+
+--------------------------------------------------------------------------------
+-- * Matching requests with async replies
+--------------------------------------------------------------------------------
+
+-- | Send an asynchronous request and block waiting for a matching reply
+withAsyncReq :: Pipe -> Put -> IO LB.ByteString
+withAsyncReq pipe msg = do
+
+  -- Mark pending request
+  uq <- freshReqId (pipeAsyncMngr pipe)
+  wv <- newEmptyMVar
+  atomicModifyIORef' (pendingSent (pipeAsyncMngr pipe)) $
+    \m -> (IntMap.insert uq wv m, ())
+
+  -- Write request
+  writePipe pipe (Request uq (runPut msg))
+
+  -- Block waiting for reply
+  takeMVar wv
+
+-- | Receive a single asynchronous request and send a matching reply
+-- asynchronously (the handler may fork a computation that eventually replies
+-- and can return before actually replying, as long as it eventually does).
+--
+-- The handler receives as an argument the function to use to reply to the request.
+-- It must be used exactly once (all requests expect a reply, and you can't
+-- reply more than once). Linear types enforce this.
+withAsyncHandler :: Pipe -> Get a -> ((Put -> IO ()) %1 -> a -> IO r) %1 -> IO r
+withAsyncHandler pipe getit k =
+  atomically (readTQueue (pendingRecv (pipeAsyncMngr pipe)))
+    `tailLinearly` \(uq, bs) ->
+      k (\p -> writePipe pipe (Reply uq (runPut p))) (runGet getit bs)
+
+-- | End an IO action with an IO action that needs to be consumed linearly.
+tailLinearly :: IO a -> (a -> IO b) %1 -> IO b
+tailLinearly (IO r) k = IO \s -> case r s of
+  (# s', a #) -> case k a of IO k' -> k' s'
+
+-- ** Async matching "internals" -----------------------------------------------
+
+data AsyncManager = AsyncManager
+  { pendingSent :: !(IORef (IntMap (MVar LB.ByteString)))
+    -- ^ When a request is sent, keep track that we're expecting a reply. The
+    -- MVar is signaled when the reply arrives.
+  , pendingRecv :: !(TQueue (CorrelationId, LB.ByteString))
+    -- ^ A queue of pending received requests. When a request is received,
+    -- queue it here. A request handler will pop the next request from it.
+    -- (Nothing except the 'drainPipe' thread should read from the pipe).
+    --
+    -- Seq contract: Dequeue from left, enqueue on right
+  , asyncDrainTid :: !ThreadId
+  , asyncNextReq  :: !(IORef Int)
+  }
+
+type CorrelationId = Int
+
+-- | We have a single type for requests and replies because both the host and
+-- interpreter may send requests *and* replies on the write end *and* on the read end.
+--
+-- For instance:
+--  1. The host sends a RunTH request on its Host Write End (HWE)
+--  2. The interpreter sends a NewName TH request on its Interpreter Write End (IWE)
+--  3. The host sends a reply to the TH request on its HWE
+--  4. The interpreter sends the reply to the RunTH request on its IWE
+data IddMsg  = Request !CorrelationId LB.ByteString
+             | Reply   !CorrelationId LB.ByteString
+
+instance Binary IddMsg where
+  put (Request i bs) = putWord8 0 >> put i >> put bs
+  put (Reply i bs)   = putWord8 1 >> put i >> put bs
+  get = do
+    b <- getWord8
+    case b of
+      0 -> Request <$> get <*> get
+      1 -> Reply   <$> get <*> get
+      _ -> error $ "impossible: Binary IddMsg - " ++ show b
+
+newAsyncManager :: Pipe -> IO AsyncManager
+newAsyncManager pipe = do
+  asyncNextReq <- newIORef 0
+  pendingSent  <- newIORef IntMap.empty
+  pendingRecv  <- newTQueueIO
+
+  mdo
+    -- Fork thread to drain read end.
+    asyncDrainTid  <- forkIO (drainPipe pipe am)
+    -- todo: proper thread clean up and no leaks
+
+    let am = AsyncManager{..}
+    pure am
+
+-- | Drains the read end of the Pipe and match 'Reply'es against pending 'Request's.
+--
+-- In pratice, we'll have both a thread draining the read end of the host's
+-- 'Pipe' and a thread draining the read end of the interpreter's 'Pipe', since
+-- both processes construct a 'Pipe' and send and receive messages:
+drainPipe :: Pipe -> AsyncManager -> IO ()
+drainPipe p am = forever $ do
+  readPipe p >>= \case
+    -- Receive a reply to a pending notification
+    Reply uq bs -> do
+      wv <- atomicModifyIORef' (pendingSent am) $ \m -> do
+        case IntMap.lookup uq m of
+          Nothing -> error "drainPipe: Received reply to no pending request"
+          Just wv -> (IntMap.delete uq m, wv)
+      putMVar wv bs -- signal matching request
+    -- Receive a request and queue it
+    Request uq bs ->
+      atomically $ writeTQueue (pendingRecv am) (uq,bs)
+
+freshReqId :: AsyncManager -> IO CorrelationId
+freshReqId AsyncManager{asyncNextReq} =
+  atomicModifyIORef' asyncNextReq $ \i -> (i+1, i)
 
 --------------------------------------------------------------------------------
 -- * Pipe thread-safe read/write
 --------------------------------------------------------------------------------
+-- All messages on the wire are 'IddMsg', which contain a correlation header
+-- and identify whether they are requests or replies.
 
-writePipe :: Pipe -> Put -> IO ()
-writePipe p@Pipe{..} put = withLock p $ putAll $ execPut put
+writePipe :: Pipe -> IddMsg -> IO ()
+writePipe p@Pipe{..} = withLock p . putAll . execPut . put
 
 -- | Only the 'drainPipe' thread should read from the pipe directly. Other
 -- functions should wait for the matching reply to be delivered asynchronously.
 -- (see 'withAsyncReq')
-readPipe :: Pipe -> Get a -> IO a
-readPipe p@Pipe{..} get = withLock p $ do
+readPipe :: Pipe -> IO IddMsg
+readPipe p@Pipe{..} = withLock p $ do
   leftovers <- readIORef pipeLeftovers
   m <- getBin getSome get leftovers
   case m of
@@ -809,98 +941,3 @@ getBin getsome get leftover = go leftover (runGetIncremental get)
 
 withLock :: Pipe -> IO c -> IO c
 withLock Pipe{..} = bracket (takeMVar pipeLock) (putMVar pipeLock) . const
-
---------------------------------------------------------------------------------
--- * Matching requests with async replies
---------------------------------------------------------------------------------
-
--- | Send an asynchronous request and block waiting for a matching reply
-withAsyncReq :: Pipe -> (CorrelationId -> ToInterpMsg r) -> IO (FromInterpMsg r)
-withAsyncReq pipe msg = do
-
-  -- Mark pending
-  uq <- freshReqId (pipeAsyncMngr pipe)
-  wv <- newEmptyMVar
-  atomicModifyIORef' (asyncPending (pipeAsyncMngr pipe)) $
-    \m -> (IntMap.insert uq wv m, ())
-
-  -- Write request
-  writePipe pipe (put (msg uq))
-
-  -- Block waiting for reply
-  takeMVar wv
-
--- ** Async matching "internals" -----------------------------------------------
-
-data AsyncManager = AsyncManager
-  { asyncPending  :: !(IORef (IntMap (MVar LB.ByteString)))
-  , asyncDrainTid :: !ThreadId
-  , asyncNextReq  :: !(IORef Int)
-  }
-
-type CorrelationId = Int
-
-type data ReqTy = NormReq | RevReq
-
-data ToInterpMsg (r :: ReqTy) where
-  Request      :: !CorrelationId -> LB.ByteString -> ToInterpMsg NormReq
-  ReverseReply :: !CorrelationId -> LB.ByteString -> ToInterpMsg RevReq
-
-data FromInterpMsg (r :: ReqTy) where
-  Reply          :: !CorrelationId -> LB.ByteString -> FromInterpMsg NormReq
-  ReverseRequest :: !CorrelationId -> LB.ByteString -> FromInterpMsg RevReq
-
-newAsyncManager :: Pipe -> IO AsyncManager
-newAsyncManager pipe = do
-  asyncNextReq  <- newIORef 0
-  asyncPending  <- newIORef IntMap.empty
-
-  mdo
-    -- Fork thread to drain read end.
-    asyncDrainTid <- forkIO (drainPipe pipe am)
-    -- todo: proper thread clean up and no leaks
-
-    let am = AsyncManager{..}
-    pure am
-
-drainPipe :: Pipe -> AsyncManager -> IO ()
-drainPipe p am = forever $ do
-  Reply uq bs <- readPipe p get
-  wv <- atomicModifyIORef' (asyncPending am) $ \m -> do
-    case IntMap.lookup uq m of
-      Nothing -> error "drainPipe: Received reply to no pending request"
-      Just wv -> (IntMap.delete uq m, wv)
-  putMVar wv bs -- signal matching request
-
-freshReqId :: AsyncManager -> IO CorrelationId
-freshReqId AsyncManager{asyncNextReq} =
-  atomicModifyIORef' asyncNextReq $ \i -> (i+1, i)
-
--- ** Put/get {To,From}InterpMsg -----------------------------------------------
-
-data SomeMsg (f :: k -> Type) = forall (a :: k). SomeMsg (f a)
-
-putToInterpMsg :: ToInterpMsg r -> Put
-putToInterpMsg (Request i bs)      = put 0 >> put i >> put bs
-putToInterpMsg (ReverseReply i bs) = put 1 >> put i >> put bs
-
-getToInterpMsg :: Get (SomeMsg ToInterpMsg)
-getToInterpMsg = do
-  b <- getWord8
-  case b of
-    0 -> SomeMsg <$> (Request      <$> get <*> get)
-    1 -> SomeMsg <$> (ReverseReply <$> get <*> get)
-    _ -> error $ "impossible: Binary (ToInterpMsg r) - " ++ show b
-
-putFromInterpMsg :: FromInterpMsg r -> Put
-putFromInterpMsg (Reply i bs)          = put 2 >> put i >> put bs
-putFromInterpMsg (ReverseRequest i bs) = put 3 >> put i >> put bs
-
-getFromInterpMsg :: Get (SomeMsg FromInterpMsg)
-getFromInterpMsg = do
-  b <- getWord8
-  case b of
-    2 -> SomeMsg <$> (Reply          <$> get <*> get)
-    3 -> SomeMsg <$> (ReverseRequest <$> get <*> get)
-    _ -> error $ "impossible: Binary (FromInterpMsg r) - " ++ show b
-
