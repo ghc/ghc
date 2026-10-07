@@ -313,7 +313,7 @@ pprCFunType platform ppr_fn cconv ress args
 
         arg_type (expr, hint) = machRepHintCType platform (cmmExprType platform expr) hint
     in res_type ress <+>
-       parens (ccallConvAttribute cconv <> ppr_fn) <>
+       parens (ppr_fn) <>
        parens (commafy (map arg_type args))
 
 -- ---------------------------------------------------------------------

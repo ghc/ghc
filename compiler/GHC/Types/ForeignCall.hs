@@ -76,10 +76,6 @@ module GHC.Types.ForeignCall (
   -- * General sub-types
   -- ** CCallConv
   CCallConv(..),
-  -- *** Default construction
-  defaultCCallConv,
-  -- *** Pretty-printing
-  ccallConvAttribute,
   -- ** CLabelString
   CLabelString,
   -- *** Queries
@@ -216,21 +212,6 @@ instance NFData CCallSpec where
 *                                                                      *
 ************************************************************************
 -}
-
-defaultCCallConv :: CCallConv
-defaultCCallConv = CCallConv
-
-{-
-Generate the gcc attribute corresponding to the given
-calling convention (used by PprAbsC):
--}
---TODO: this is now totally redundant. Remove it.
-ccallConvAttribute :: CCallConv -> SDoc
-ccallConvAttribute StdCallConv       = panic "ccallConvAttribute StdCallConv"
-ccallConvAttribute CCallConv         = empty
-ccallConvAttribute CApiConv          = empty
-ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
-ccallConvAttribute JavaScriptCallConv = empty
 
 instance Binary CCallConv where
     put_ bh CCallConv =
