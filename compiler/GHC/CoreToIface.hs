@@ -453,6 +453,7 @@ toIfaceTopBndr id
 
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId                      = IfVanillaId
+toIfaceIdDetails (InstMethId {})                = IfVanillaId
 toIfaceIdDetails (WorkerLikeId dmds)            = IfWorkerLikeId dmds
 toIfaceIdDetails (DFunId {})                    = IfDFunId
 toIfaceIdDetails (RecSelId { sel_naughty = n

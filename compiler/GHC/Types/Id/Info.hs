@@ -222,6 +222,9 @@ data IdDetails
         --   - the [CbvMark] is always empty (and ignored) until after Tidy
         --     for ids from the current module
         --   - If non-empty, at least is isMarkedCbbv; see (CBV2)
+  | InstMethId Name
+        -- ^ An instance method. The 'Name' identifies the dictionary of the
+        -- instance it belongs to.
 
 data RecSelInfo
   = RSI { rsi_def   :: [ConLike]   -- Record selector defined for these
@@ -449,6 +452,7 @@ pprIdDetails other     = brackets (pp other)
                                            ppWhen is_naughty (text "(naughty)")
    pp CoVarId                 = text "CoVarId"
    pp (JoinId arity marks)    = text "JoinId" <> parens (int arity) <> parens (ppr marks)
+   pp (InstMethId name)       = text "InstMethId" <> parens (ppr name)
 
 {-
 ************************************************************************

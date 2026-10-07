@@ -1,4 +1,4 @@
-{-# LANGUAGE NondecreasingIndentation, DataKinds #-}
+{-# LANGUAGE NondecreasingIndentation, DataKinds, ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -45,6 +45,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name
+import GHC.Types.Name.Env
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Tickish
@@ -105,14 +106,11 @@ addTicksToBinds
                                 -- hasn't set it), so we have to work from this set.
         -> [TyCon]              -- ^ Type constructors in this module
         -> [ClsInst]            -- ^ Class instances in this module
-        -> IdEnv DFunId         -- ^ Mapping from class method Ids to the DFunIds
-                                -- of the class instance they belong to. See Note
-                                -- [Instance Method Coverage].
         -> LHsBinds GhcTc
         -> IO (LHsBinds GhcTc, Maybe (FilePath, SizedSeq Tick, SizedSeq Tick))
 
 addTicksToBinds logger cfg
-                mod mod_loc exports tyCons insts inst_meths binds
+                mod mod_loc exports tyCons insts binds
   | let passes = ticks_passes cfg
   , not (null passes)
   , Just orig_file <- ml_hs_file mod_loc = do
@@ -137,8 +135,8 @@ addTicksToBinds logger cfg
                       , this_mod     = mod
                       , tickishType  = tickish
                       , recSelBinds  = emptyVarEnv
-                      , instMeths    = inst_meths
-                      , instTicks    = emptyVarEnv
+                      , instMeths    = emptyVarEnv
+                      , instTicks    = emptyNameEnv
                       }
                 addTick = do
                   instTicks <- allocInstTicks insts
@@ -276,7 +274,9 @@ addTickLHsBind (L pos (XHsBindsLR bind@(AbsBinds { abs_binds = binds
      env{ instMeths = instMeths env `extendVarEnvList`
                         [ (abe_mono, dfun)
                         | ABE{ abe_poly, abe_mono } <- abs_exports
-                        , Just dfun <- [lookupVarEnv (instMeths env) abe_poly] ] }
+                        , Just dfun <- [instMeth abe_poly] ] }
+     where instMeth (idDetails -> InstMethId dfun) = Just dfun
+           instMeth id = lookupVarEnv (instMeths env) id
 
 addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches }))) = do
   let name = getOccString id
@@ -375,11 +375,9 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches
 -- inherited and hand-written, we need to go out of our way to create top-level
 -- tick boxes only for methods which correspond to user-written code.
 --
--- To do so, 'addTicksToBinds' receives a mapping from class instance 'Id's to
--- the 'DFunId's of the dictionary backing the associated instance. When
--- creating tick boxes for top-level bindings, we can then decide if a given
--- 'FunBind' corresponds to an inherited/generated instance method of a class
--- and skip creating the tick box for it.
+-- Instance method 'Id's carry the name of the 'DFunId' of the instance they
+-- belong to. When creating tick boxes for top-level bindings, we can use this
+-- information to skip creating boxes for inherited/generated instance methods.
 --
 -- Additionally, we also want to inform the user whether or not their class
 -- instance as a whole has been used at run-time. To do so, we create a single
@@ -1152,8 +1150,8 @@ data TickTransEnv = TTE { fileName     :: FastString
                         , this_mod     :: Module
                         , tickishType  :: TickishType
                         , recSelBinds  :: IdEnv DVarSet
-                        , instMeths    :: IdEnv DFunId
-                        , instTicks    :: IdEnv CoreTickish
+                        , instMeths    :: IdEnv Name
+                        , instTicks    :: NameEnv CoreTickish
                         }
 
 --      deriving Show
@@ -1295,19 +1293,19 @@ isBlackListed GeneratedSrcSpan{} = return False
 isBlackListed UnhelpfulSpan{} = return False
 
 -- See Note [Instance Method Coverage].
-allocInstTicks :: [ClsInst] -> TM (IdEnv CoreTickish)
+allocInstTicks :: [ClsInst] -> TM (NameEnv CoreTickish)
 allocInstTicks insts =
-    ifDensity TickForCoverage (mkVarEnv . catMaybes <$> mapM alloc insts) (pure emptyVarEnv)
+    ifDensity TickForCoverage (mkNameEnv . catMaybes <$> mapM alloc insts) (pure emptyNameEnv)
   where
     alloc ClsInst{ is_dfun, is_cls }
       | null (classMethods is_cls) = pure Nothing
-      | otherwise = fmap (is_dfun,) <$> allocATickBox (TopLevelBox [s])
-                                                      False True (getSrcSpan is_dfun) noFVs
+      | otherwise = fmap (idName is_dfun,) <$> allocATickBox (TopLevelBox [s])
+                                                             False True (getSrcSpan is_dfun) noFVs
       where s = showSDocOneLine defaultSDocContext (pprSigmaType (idType is_dfun))
 
 -- See Note [Instance Method Coverage].
 instMethTick :: Id -> TM (Maybe CoreTickish)
-instMethTick id = getEnv <&> \e -> lookupVarEnv (instMeths e) id >>= lookupVarEnv (instTicks e)
+instMethTick id = getEnv <&> \e -> lookupVarEnv (instMeths e) id >>= lookupNameEnv (instTicks e)
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations

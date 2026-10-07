@@ -5,7 +5,7 @@ Result size of Tidy Core
 
 -- RHS size: {terms: 14, types: 9, coercions: 0, joins: 0/0}
 T22375.$fEqX_$c== :: X -> X -> Bool
-[GblId,
+[GblId[InstMethId(T22375.$fEqX)],
  Arity=2,
  Str=<SL><SL>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
@@ -27,7 +27,7 @@ T22375.$fEqX_$c==
 
 -- RHS size: {terms: 18, types: 9, coercions: 0, joins: 0/0}
 T22375.$fEqX_$c/= [InlPrag=INLINE (sat-args=2)] :: X -> X -> Bool
-[GblId,
+[GblId[InstMethId(T22375.$fEqX)],
  Arity=2,
  Str=<SL><SL>,
  Unf=Unf{Src=StableUser, TopLvl=True,

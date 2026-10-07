@@ -3082,6 +3082,7 @@ wantCallsFor _env f
       JoinId {}        -> True
       WorkerLikeId {}  -> True
       RepPolyId {}     -> True
+      InstMethId {}    -> True
 
 interestingDict :: SpecEnv -> CoreExpr -> Bool
 -- This is a subtle and important function

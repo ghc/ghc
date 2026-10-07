@@ -147,7 +147,6 @@ deSugar hsc_env
                             tcg_tcs          = tcs,
                             tcg_default_exports = defaults,
                             tcg_insts        = insts,
-                            tcg_inst_meths   = inst_meths,
                             tcg_fam_insts    = fam_insts,
                             tcg_complete_matches = complete_matches,
                             tcg_self_boot    = self_boot
@@ -172,7 +171,7 @@ deSugar hsc_env
                                        (initTicksConfig (hsc_dflags hsc_env))
                                        mod mod_loc
                                        export_set (typeEnvTyCons type_env)
-                                       insts inst_meths binds
+                                       insts binds
                               else return (binds, Nothing)
         ; let modBreaks
                 | Just (_, _, breakpointSpecs) <- m_tickInfo
