@@ -162,7 +162,7 @@ hieTypeToIface = foldType go
     go (HAppTy a b) = IfaceAppTy a (hieToIfaceArgs b)
     go (HLitTy l) = IfaceLitTy l
     go (HForAllTy ((n,k),af) t) = let b = (mkIfLclName (occNameFS $ getOccName n), k)
-                                  in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
+                                  in IfaceForAllTy (Bndr (IfaceTvBndr b) (IfaceForAllTyFlag af)) t
     go (HFunTy w a b)   = IfaceFunTy visArgTypeLike   w       a    b
     go (HQualTy pred b) = IfaceFunTy invisArgTypeLike many_ty pred b
     go (HCastTy a) = a
@@ -174,8 +174,8 @@ hieTypeToIface = foldType go
     hieToIfaceArgs (HieArgs xs) = go' xs
       where
         go' [] = IA_Nil
-        go' ((True ,x):xs) = IA_Arg x Required $ go' xs
-        go' ((False,x):xs) = IA_Arg x Specified $ go' xs
+        go' ((True ,x):xs) = IA_Arg x (IfaceForAllTyFlag Required) $ go' xs
+        go' ((False,x):xs) = IA_Arg x (IfaceForAllTyFlag Specified) $ go' xs
 
 data HieTypeState
   = HTS

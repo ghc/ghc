@@ -1954,18 +1954,6 @@ instance Binary Specificity where
       0 -> return SpecifiedSpec
       _ -> return InferredSpec
 
-instance Binary ForAllTyFlag where
-  put_ bh Required  = putByte bh 0
-  put_ bh Specified = putByte bh 1
-  put_ bh Inferred  = putByte bh 2
-
-  get bh = do
-    h <- getByte bh
-    case h of
-      0 -> return Required
-      1 -> return Specified
-      _ -> return Inferred
-
 instance Binary HsDocStringDecorator where
   put_ bh x = case x of
     HsDocStringNext -> putByte bh 0

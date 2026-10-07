@@ -1007,7 +1007,7 @@ mk_forall_co :: TyCoVar -> ForAllTyFlag -> ForAllTyFlag
              -> KindMCoercion -> Coercion -> Coercion
 mk_forall_co tcv visL visR kind_co co
   = assertGoodForAllCo tcv visL visR kind_co co $
-    assertPpr (not (isReflCo co && isReflMCo kind_co && visL == visR)) (ppr co) $
+    assertPpr (not (isReflCo co && isReflMCo kind_co && visL `eqForAllVis` visR)) (ppr co) $
     ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
              , fco_kind = kind_co, fco_body = co }
 
@@ -1024,8 +1024,7 @@ assertGoodForAllCo tcv visL visR kind_co co
         -- The kind of the tycovar should be the left-hand kind of the kind coercion.
   . assertPpr (almostDevoidCoVarOfCo tcv co) doc
         -- See (FC6) in Note [ForAllCo] in GHC.Core.TyCo.Rep
-  . assertPpr (visL == coreTyLamForAllTyFlag
-            && visR == coreTyLamForAllTyFlag) doc
+  . assertPpr (isCoreTyLamForAllTyFlag visL && isCoreTyLamForAllTyFlag visR) doc
         -- See (FC7) in Note [ForAllCo] in GHC.Core.TyCo.Rep
   where
     tcv_type      = varType tcv

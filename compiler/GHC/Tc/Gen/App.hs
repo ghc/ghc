@@ -779,7 +779,7 @@ tcInstFun do_ql inst_final rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
     -- Rule ITVDQ from the GHC Proposal #281
     go1 fun_orig pos acc fun_ty ((EValArg { ea_arg = arg }) : rest_args)
       | Just (tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty
-      = assertPpr (binderFlag tvb == Required) (ppr fun_ty $$ ppr arg) $
+      = assertPpr (isVisibleForAllTyFlag (binderFlag tvb)) (ppr fun_ty $$ ppr arg) $
         -- Any invisible binders have been instantiated by IALL above,
         -- so this forall must be visible (i.e. Required)
         do { (ty_arg, inst_body) <- tcVDQ fun_conc_tvs (tvb, body) arg
@@ -1086,7 +1086,7 @@ tcVTA :: ConcreteTyVars
 -- The function type has already had its Inferred binders instantiated
 tcVTA conc_tvs fun_ty hs_ty
   | Just (tvb, inner_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
-  , binderFlag tvb == Specified
+  , isSpecifiedForAllTyFlag (binderFlag tvb)
   = do { tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty }
 
   | otherwise

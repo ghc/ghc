@@ -28,7 +28,7 @@ import GHC.Core.Type              ( coreFullView, isFunTy, Var (..) )
 import GHC.Core.TyCon             ( isTypeSynonymTyCon, isClassTyCon, isFamilyTyCon )
 import GHC.Types.Id               ( Id, isRecordSelector, isClassOpId )
 import GHC.Types.TyThing          ( TyThing (..) )
-import GHC.Types.Var              ( isTyVar, isFUNArg )
+import GHC.Types.Var              ( isTyVar, isFUNArg, cmpForAllTyFlagExactly )
 
 import qualified Data.Array as A
 import qualified Data.Map as M
@@ -158,7 +158,26 @@ data HieType a
   | HLitTy IfaceTyLit
   | HCastTy a
   | HCoercionTy
-    deriving (Functor, Foldable, Traversable, Eq)
+    deriving (Functor, Foldable, Traversable)
+
+-- Tiresomely, we give a hand-written Eq instance for HieType, because
+-- 'ForAllTyFlag' has no 'Eq' instance (see Note [Comparing visibility] in
+-- "GHC.Core.TyCo.Compare").
+--
+-- We compare flags exactly, as the derived instance used to.
+instance Eq a => Eq (HieType a) where
+  HTyVarTy n1         == HTyVarTy n2         = n1 == n2
+  HAppTy f1 as1       == HAppTy f2 as2       = f1 == f2 && as1 == as2
+  HTyConApp tc1 as1   == HTyConApp tc2 as2   = tc1 == tc2 && as1 == as2
+  HForAllTy ((n1,k1),vis1) b1 == HForAllTy ((n2,k2),vis2) b2
+    = n1 == n2 && k1 == k2 && b1 == b2
+      && cmpForAllTyFlagExactly vis1 vis2 == EQ
+  HFunTy w1 a1 r1     == HFunTy w2 a2 r2     = w1 == w2 && a1 == a2 && r1 == r2
+  HQualTy c1 t1       == HQualTy c2 t2       = c1 == c2 && t1 == t2
+  HLitTy l1           == HLitTy l2           = l1 == l2
+  HCastTy t1          == HCastTy t2          = t1 == t2
+  HCoercionTy         == HCoercionTy         = True
+  _                   == _                   = False
 
 instance Outputable a => Outputable (HieType a) where
   ppr (HTyVarTy name) = ppr name
