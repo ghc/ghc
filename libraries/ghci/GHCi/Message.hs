@@ -2,6 +2,10 @@
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
     CPP, NamedFieldPuns, PatternSynonyms #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
+{-# LANGUAGE TypeData #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 
 -- |
 -- Remote GHCi message types and serialization.
@@ -21,7 +25,7 @@ module GHCi.Message
   , THResult(..), THResultType(..)
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
-  , Pipe, mkPipeFromHandles, mkPipeFromContinuations, remoteCall, remoteTHCall, readPipe, writePipe
+  , Pipe, mkPipeFromHandles, mkPipeFromContinuations, remoteCall, remoteTHCall
   , BreakModule
   , BreakUnitId
   , LoadedDLL
@@ -73,6 +77,7 @@ import System.Exit
 import System.IO
 import System.IO.Error
 import Control.Monad
+import Data.Kind
 
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server
@@ -750,11 +755,15 @@ mkPipeFromContinuations getSome putAll = mdo
     let p = Pipe { .. }
     pure p
 
+-- | Call a method
 remoteCall :: Binary a => Pipe -> Message a -> IO a
-remoteCall pipe msg = runGet get <$> withAsyncReq pipe (putMessage msg)
+remoteCall pipe msg = do
+  Reply _ bs <- withAsyncReq pipe (`Request` runPut (putMessage msg))
+  pure $ runGet get bs
 
 remoteTHCall :: Binary a => Pipe -> THMessage a -> IO a
-remoteTHCall pipe msg = runGet get <$> withAsyncReq pipe (putTHMessage msg)
+remoteTHCall pipe msg = do
+  withAsyncReq pipe (`ReverseRequest` putTHMessage msg)
 
 --------------------------------------------------------------------------------
 -- * Pipe thread-safe read/write
@@ -806,7 +815,7 @@ withLock Pipe{..} = bracket (takeMVar pipeLock) (putMVar pipeLock) . const
 --------------------------------------------------------------------------------
 
 -- | Send an asynchronous request and block waiting for a matching reply
-withAsyncReq :: Pipe -> Put -> IO LB.ByteString
+withAsyncReq :: Pipe -> (CorrelationId -> ToInterpMsg r) -> IO (FromInterpMsg r)
 withAsyncReq pipe msg = do
 
   -- Mark pending
@@ -816,7 +825,7 @@ withAsyncReq pipe msg = do
     \m -> (IntMap.insert uq wv m, ())
 
   -- Write request
-  writePipe pipe (put (Request uq (runPut msg)))
+  writePipe pipe (put (msg uq))
 
   -- Block waiting for reply
   takeMVar wv
@@ -830,16 +839,16 @@ data AsyncManager = AsyncManager
   }
 
 type CorrelationId = Int
-data Request = Request !CorrelationId LB.ByteString
-data Reply   = Reply   !CorrelationId LB.ByteString
 
-instance Binary Request where
-  put (Request i bs) = put i >> put bs
-  get = Request <$> get <*> get
+type data ReqTy = NormReq | RevReq
 
-instance Binary Reply where
-  put (Reply i bs) = put i >> put bs
-  get = Reply <$> get <*> get
+data ToInterpMsg (r :: ReqTy) where
+  Request      :: !CorrelationId -> LB.ByteString -> ToInterpMsg NormReq
+  ReverseReply :: !CorrelationId -> LB.ByteString -> ToInterpMsg RevReq
+
+data FromInterpMsg (r :: ReqTy) where
+  Reply          :: !CorrelationId -> LB.ByteString -> FromInterpMsg NormReq
+  ReverseRequest :: !CorrelationId -> LB.ByteString -> FromInterpMsg RevReq
 
 newAsyncManager :: Pipe -> IO AsyncManager
 newAsyncManager pipe = do
@@ -866,4 +875,32 @@ drainPipe p am = forever $ do
 freshReqId :: AsyncManager -> IO CorrelationId
 freshReqId AsyncManager{asyncNextReq} =
   atomicModifyIORef' asyncNextReq $ \i -> (i+1, i)
+
+-- ** Put/get {To,From}InterpMsg -----------------------------------------------
+
+data SomeMsg (f :: k -> Type) = forall (a :: k). SomeMsg (f a)
+
+putToInterpMsg :: ToInterpMsg r -> Put
+putToInterpMsg (Request i bs)      = put 0 >> put i >> put bs
+putToInterpMsg (ReverseReply i bs) = put 1 >> put i >> put bs
+
+getToInterpMsg :: Get (SomeMsg ToInterpMsg)
+getToInterpMsg = do
+  b <- getWord8
+  case b of
+    0 -> SomeMsg <$> (Request      <$> get <*> get)
+    1 -> SomeMsg <$> (ReverseReply <$> get <*> get)
+    _ -> error $ "impossible: Binary (ToInterpMsg r) - " ++ show b
+
+putFromInterpMsg :: FromInterpMsg r -> Put
+putFromInterpMsg (Reply i bs)          = put 2 >> put i >> put bs
+putFromInterpMsg (ReverseRequest i bs) = put 3 >> put i >> put bs
+
+getFromInterpMsg :: Get (SomeMsg FromInterpMsg)
+getFromInterpMsg = do
+  b <- getWord8
+  case b of
+    2 -> SomeMsg <$> (Reply          <$> get <*> get)
+    3 -> SomeMsg <$> (ReverseRequest <$> get <*> get)
+    _ -> error $ "impossible: Binary (FromInterpMsg r) - " ++ show b
 
