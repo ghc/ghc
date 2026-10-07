@@ -91,3 +91,13 @@ test('T27240', [extra_run_opts(f'"{config.libdir}"')], compile_and_run, ['-packa
 test('T27273', [extra_run_opts(f'"{config.libdir}"')],
                compile_and_run,
                ['-package ghc'])
+
+# runGhc must not install signal handlers on behalf of its caller, or a session
+# running off the main thread makes the process unresponsive to signals.
+test('T4162', [ extra_run_opts(f'"{config.libdir}"')
+              # the test re-executes itself, so it has to be a real executable
+              , only_ways(['normal'])
+              , req_process
+              # no subprocesses or signals
+              , when(arch('wasm32') or arch('javascript'), skip)
+              ], compile_and_run, ['-package ghc'])

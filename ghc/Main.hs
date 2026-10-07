@@ -141,7 +141,7 @@ main = do
                    ShowOptions isInteractive -> showOptions isInteractive
         Right postStartupMode ->
             -- start our GHC session
-            GHC.runGhc mbMinusB $ do
+            GHC.runGhcWithSignalHandlers mbMinusB $ do
 
             dflags <- GHC.getSessionDynFlags
 
