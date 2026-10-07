@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
+{-# LANGUAGE RecursiveDo, GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
     CPP, NamedFieldPuns, PatternSynonyms #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
@@ -12,7 +12,7 @@
 module GHCi.Message
   ( Message(..), Msg(..)
   , ConInfoTable(..)
-  , THMessage(..) -- , THMsg(..)
+  , THMessage(..), THMsg(..)
   , QResult(..)
   , EvalStatus_(..,EvalBreak), EvalStatus, EvalResult(..), EvalOpts(..), EvalExpr(..)
   , EvalBreak(..), EvalBreakpoint (..)
@@ -20,7 +20,7 @@ module GHCi.Message
   , toSerializableException, fromSerializableException
   , THResult(..), THResultType(..)
   , QState(..)
-  , getMessage, putMessage, {- getTHMessage, -} putTHMessage
+  , getMessage, putMessage, getTHMessage, putTHMessage
   , Pipe, mkPipeFromHandles, mkPipeFromContinuations, remoteCall, remoteTHCall, readPipe, writePipe
   , BreakModule
   , BreakUnitId
@@ -326,40 +326,40 @@ data THMessage a where
 
 deriving instance Show (THMessage a)
 
--- data THMsg = forall a . (Binary a, Show a) => THMsg (THMessage a)
---
--- getTHMessage :: Get THMsg
--- getTHMessage = do
---   b <- getWord8
---   case b of
---     0  -> THMsg <$> NewName <$> get
---     1  -> THMsg <$> (Report <$> get <*> get)
---     2  -> THMsg <$> (LookupName <$> get <*> get)
---     3  -> THMsg <$> Reify <$> get
---     4  -> THMsg <$> ReifyFixity <$> get
---     5  -> THMsg <$> (ReifyInstances <$> get <*> get)
---     6  -> THMsg <$> ReifyRoles <$> get
---     7  -> THMsg <$> (ReifyAnnotations <$> get <*> get)
---     8  -> THMsg <$> ReifyModule <$> get
---     9  -> THMsg <$> ReifyConStrictness <$> get
---     10 -> THMsg <$> AddDependentFile <$> get
---     11 -> THMsg <$> AddTempFile <$> get
---     12 -> THMsg <$> AddTopDecls <$> get
---     13 -> THMsg <$> (IsExtEnabled <$> get)
---     14 -> THMsg <$> return ExtsEnabled
---     15 -> THMsg <$> return StartRecover
---     16 -> THMsg <$> EndRecover <$> get
---     17 -> THMsg <$> return FailIfErrs
---     18 -> return (THMsg RunTHDone)
---     19 -> THMsg <$> AddModFinalizer <$> get
---     20 -> THMsg <$> (AddForeignFilePath <$> get <*> get)
---     21 -> THMsg <$> AddCorePlugin <$> get
---     22 -> THMsg <$> ReifyType <$> get
---     23 -> THMsg <$> (PutDoc <$> get <*> get)
---     24 -> THMsg <$> GetDoc <$> get
---     25 -> THMsg <$> return GetPackageRoot
---     26 -> THMsg <$> AddDependentDirectory <$> get
---     n -> error ("getTHMessage: unknown message " ++ show n)
+data THMsg = forall a . (Binary a, Show a) => THMsg (THMessage a)
+
+getTHMessage :: Get THMsg
+getTHMessage = do
+  b <- getWord8
+  case b of
+    0  -> THMsg <$> NewName <$> get
+    1  -> THMsg <$> (Report <$> get <*> get)
+    2  -> THMsg <$> (LookupName <$> get <*> get)
+    3  -> THMsg <$> Reify <$> get
+    4  -> THMsg <$> ReifyFixity <$> get
+    5  -> THMsg <$> (ReifyInstances <$> get <*> get)
+    6  -> THMsg <$> ReifyRoles <$> get
+    7  -> THMsg <$> (ReifyAnnotations <$> get <*> get)
+    8  -> THMsg <$> ReifyModule <$> get
+    9  -> THMsg <$> ReifyConStrictness <$> get
+    10 -> THMsg <$> AddDependentFile <$> get
+    11 -> THMsg <$> AddTempFile <$> get
+    12 -> THMsg <$> AddTopDecls <$> get
+    13 -> THMsg <$> (IsExtEnabled <$> get)
+    14 -> THMsg <$> return ExtsEnabled
+    15 -> THMsg <$> return StartRecover
+    16 -> THMsg <$> EndRecover <$> get
+    17 -> THMsg <$> return FailIfErrs
+    18 -> return (THMsg RunTHDone)
+    19 -> THMsg <$> AddModFinalizer <$> get
+    20 -> THMsg <$> (AddForeignFilePath <$> get <*> get)
+    21 -> THMsg <$> AddCorePlugin <$> get
+    22 -> THMsg <$> ReifyType <$> get
+    23 -> THMsg <$> (PutDoc <$> get <*> get)
+    24 -> THMsg <$> GetDoc <$> get
+    25 -> THMsg <$> return GetPackageRoot
+    26 -> THMsg <$> AddDependentDirectory <$> get
+    n -> error ("getTHMessage: unknown message " ++ show n)
 
 putTHMessage :: THMessage a -> Put
 putTHMessage m = case m of
@@ -722,27 +722,13 @@ serializeBCOs rbcos = parMap doChunk (chunkList 100 rbcos)
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages
 
-type CorrelationId = Int
-data Request = Request !CorrelationId LB.ByteString
-data Reply   = Reply   !CorrelationId LB.ByteString
-
-instance Binary Request where
-  put (Request i bs) = put i >> put bs
-  get = Request <$> get <*> get
-
-instance Binary Reply where
-  put (Reply i bs) = put i >> put bs
-  get = Reply <$> get <*> get
-
 -- | An opaque pipe for bidirectional binary data transmission.
 data Pipe = Pipe
   { getSome         :: !(IO ByteString)
   , putAll          :: !(B.Builder -> IO ())
   , pipeLeftovers   :: !(IORef (Maybe ByteString))
   , pipeLock        :: !(MVar ()) -- ^ Lock to prevent concurrent access to the stream
-  , pipePending     :: !(IORef (IntMap (MVar LB.ByteString)))
-  , pipeDrainThread :: !(MVar ThreadId)
-  , pipeNextReq     :: !(IORef Int)
+  , pipeAsyncMngr   :: !AsyncManager
   }
 
 -- | Make a 'Pipe' from a 'Handle' to read and a 'Handle' to write.
@@ -756,53 +742,30 @@ mkPipeFromHandles pipeRead pipeWrite = do
 
 -- | Make a 'Pipe' from a reader function and a writer function.
 mkPipeFromContinuations :: IO ByteString -> (B.Builder -> IO ()) -> IO Pipe
-mkPipeFromContinuations getSome putAll = do
+mkPipeFromContinuations getSome putAll = mdo
   pipeLeftovers   <- newIORef Nothing
   pipeLock        <- newMVar ()
-  pipePending     <- newIORef IntMap.empty
-  pipeDrainThread <- newEmptyMVar
-  pipeNextReq     <- newIORef 0
-  let p = Pipe { .. }
-
-  -- Fork thread to drain read end.
-  drainTid <- forkIO (drainPipe p)
-  putMVar pipeDrainThread drainTid
-  -- todo: proper thread clean up and no leaks
-
-  pure p
+  mdo
+    pipeAsyncMngr <- newAsyncManager p
+    let p = Pipe { .. }
+    pure p
 
 remoteCall :: Binary a => Pipe -> Message a -> IO a
-remoteCall pipe msg = do
-
-  -- Mark pending
-  uq <- freshReqId pipe
-  wv <- newEmptyMVar
-  atomicModifyIORef' (pipePending pipe) $
-    \m -> (IntMap.insert uq wv m, ())
-
-  -- Write request
-  writePipe pipe (put (Request uq (runPut (putMessage msg))))
-
-  -- Block waiting for reply
-  runGet get <$> takeMVar wv
+remoteCall pipe msg = runGet get <$> withAsyncReq pipe (putMessage msg)
 
 remoteTHCall :: Binary a => Pipe -> THMessage a -> IO a
-remoteTHCall pipe msg = do
-  writePipe pipe (putTHMessage msg)
-  readPipe pipe get
+remoteTHCall pipe msg = runGet get <$> withAsyncReq pipe (putTHMessage msg)
 
-drainPipe :: Pipe -> IO ()
-drainPipe p = forever $ do
-  Reply uq bs <- readPipe p get
-  wv <- atomicModifyIORef' (pipePending p) $ \m -> do
-    case IntMap.lookup uq m of
-      Nothing -> error "drainPipe: Received reply to no pending request"
-      Just wv -> (IntMap.delete uq m, wv)
-  putMVar wv bs -- signal matching request
+--------------------------------------------------------------------------------
+-- * Pipe thread-safe read/write
+--------------------------------------------------------------------------------
 
 writePipe :: Pipe -> Put -> IO ()
 writePipe p@Pipe{..} put = withLock p $ putAll $ execPut put
 
+-- | Only the 'drainPipe' thread should read from the pipe directly. Other
+-- functions should wait for the matching reply to be delivered asynchronously.
+-- (see 'withAsyncReq')
 readPipe :: Pipe -> Get a -> IO a
 readPipe p@Pipe{..} get = withLock p $ do
   leftovers <- readIORef pipeLeftovers
@@ -838,5 +801,69 @@ getBin getsome get leftover = go leftover (runGetIncremental get)
 withLock :: Pipe -> IO c -> IO c
 withLock Pipe{..} = bracket (takeMVar pipeLock) (putMVar pipeLock) . const
 
-freshReqId :: Pipe -> IO Int
-freshReqId Pipe{pipeNextReq} = atomicModifyIORef' pipeNextReq $ \i -> (i+1, i)
+--------------------------------------------------------------------------------
+-- * Matching requests with async replies
+--------------------------------------------------------------------------------
+
+-- | Send an asynchronous request and block waiting for a matching reply
+withAsyncReq :: Pipe -> Put -> IO LB.ByteString
+withAsyncReq pipe msg = do
+
+  -- Mark pending
+  uq <- freshReqId (pipeAsyncMngr pipe)
+  wv <- newEmptyMVar
+  atomicModifyIORef' (asyncPending (pipeAsyncMngr pipe)) $
+    \m -> (IntMap.insert uq wv m, ())
+
+  -- Write request
+  writePipe pipe (put (Request uq (runPut msg)))
+
+  -- Block waiting for reply
+  takeMVar wv
+
+-- ** Async matching "internals" -----------------------------------------------
+
+data AsyncManager = AsyncManager
+  { asyncPending  :: !(IORef (IntMap (MVar LB.ByteString)))
+  , asyncDrainTid :: !ThreadId
+  , asyncNextReq  :: !(IORef Int)
+  }
+
+type CorrelationId = Int
+data Request = Request !CorrelationId LB.ByteString
+data Reply   = Reply   !CorrelationId LB.ByteString
+
+instance Binary Request where
+  put (Request i bs) = put i >> put bs
+  get = Request <$> get <*> get
+
+instance Binary Reply where
+  put (Reply i bs) = put i >> put bs
+  get = Reply <$> get <*> get
+
+newAsyncManager :: Pipe -> IO AsyncManager
+newAsyncManager pipe = do
+  asyncNextReq  <- newIORef 0
+  asyncPending  <- newIORef IntMap.empty
+
+  mdo
+    -- Fork thread to drain read end.
+    asyncDrainTid <- forkIO (drainPipe pipe am)
+    -- todo: proper thread clean up and no leaks
+
+    let am = AsyncManager{..}
+    pure am
+
+drainPipe :: Pipe -> AsyncManager -> IO ()
+drainPipe p am = forever $ do
+  Reply uq bs <- readPipe p get
+  wv <- atomicModifyIORef' (asyncPending am) $ \m -> do
+    case IntMap.lookup uq m of
+      Nothing -> error "drainPipe: Received reply to no pending request"
+      Just wv -> (IntMap.delete uq m, wv)
+  putMVar wv bs -- signal matching request
+
+freshReqId :: AsyncManager -> IO CorrelationId
+freshReqId AsyncManager{asyncNextReq} =
+  atomicModifyIORef' asyncNextReq $ \i -> (i+1, i)
+
