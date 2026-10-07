@@ -1335,6 +1335,12 @@ labelDynamic this_mod platform external_dynamic_refs lbl =
    -- its own shared library.
    CmmLabel lbl_unit _ _ _
     | os == OSMinGW32 -> external_dynamic_refs && (this_unit /= lbl_unit)
+      -- See Note [RTS labels referenced from the RTS are not dynamic]
+    | this_unit == rtsUnitId
+    , lbl_unit  == rtsUnitId
+    , osElfTarget os
+    , platformArch platform == ArchX86_64
+                      -> False
     | otherwise       -> external_dynamic_refs
 
    LocalBlockLabel _    -> False
@@ -1375,6 +1381,41 @@ labelDynamic this_mod platform external_dynamic_refs lbl =
   where
     os        = platformOS platform
     this_unit = toUnitId (moduleUnit this_mod)
+
+{-
+Note [RTS labels referenced from the RTS are not dynamic]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the RTS is compiled for the dynamic way (-dynamic -fPIC, so with
+external dynamic references), a CmmLabel used to be dynamic on every ELF
+platform, whatever its unit. The RTS's own Cmm (rts/*.cmm) therefore
+reached even labels it defines itself through the GOT: pushing a frame
+in rts/Exception.cmm was
+
+    movq stg_unmaskAsyncExceptionszh_ret_info@GOTPCREL(%rip),%rax
+    movq %rax,8(%rbp)
+
+All those labels end up in the same shared object, libHSrts*.so, which
+GHC links with -Bsymbolic (Note [-Bsymbolic assumptions by GHC] in
+GHC.Linker.Dynamic), so they cannot be preempted. ld relaxes the GOT
+loads above to `leaq`, but only for `mov` (R_X86_64_REX_GOTPCRELX) and
+only with a toolchain that does the relaxation; a comparison such as
+`cmpq stg_X_info@GOTPCREL(%rip),%rax` stays a load from the GOT.
+
+So when the RTS references a CmmLabel of the RTS unit, the label is not
+dynamic: the NCG uses `leaq lbl(%rip)` (a store of the frame's return
+code and info pointer is a store of a literal address, as in
+non-dynamic code) and direct jumps. Labels of other units stay dynamic,
+and code outside the RTS still reaches RTS labels through the GOT, since
+there they live in another shared object.
+
+This is restricted to x86-64 ELF, where it has been checked. It relies
+on every CmmLabel of the RTS unit referenced from rts/*.cmm being defined
+in the RTS: a label of another library must be imported (`import
+CLOSURE`, `import "pkg"`, `extern`), which gives a ForeignLabel; an
+undefined CmmLabel now shows up as a link error (R_X86_64_PC32 against
+an undefined symbol) instead of a GOT entry.
+-}
 
 -----------------------------------------------------------------------------
 -- Printing out CLabels.
