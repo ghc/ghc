@@ -51,7 +51,6 @@ import GHC.Types.CostCentre.State
 import GHC.Types.Tickish
 import GHC.Types.ProfAuto
 import GHC.Tc.Types.ErrCtxt
-import GHC.Tc.Utils.TcType
 
 import Control.Monad
 import Data.List (isSuffixOf, intersperse)
@@ -1299,9 +1298,8 @@ allocInstTicks insts =
   where
     alloc ClsInst{ is_dfun, is_cls }
       | null (classMethods is_cls) = pure Nothing
-      | otherwise = fmap (idName is_dfun,) <$> allocATickBox (TopLevelBox [s])
+      | otherwise = fmap (idName is_dfun,) <$> allocATickBox (TopLevelBox [getOccString is_dfun])
                                                              False True (getSrcSpan is_dfun) noFVs
-      where s = showSDocOneLine defaultSDocContext (pprSigmaType (idType is_dfun))
 
 -- See Note [Instance Method Coverage].
 instMethTick :: Id -> TM (Maybe CoreTickish)

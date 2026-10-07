@@ -27,7 +27,7 @@ instance Marker (T Bool)
 interesting :: (Int, MixEntry) -> Maybe (Int, HpcPos, String)
 interesting (n, (pos, TopLevelBox [name])) | isInteresting name = Just (n, pos, name)
   where isInteresting = (||) <$> isInst <*> isMeth
-        isInst = ("T" `isInfixOf`)
+        isInst = ("$f" `isPrefixOf`)
         isMeth = (||) <$> (`elem` ["(==)", "(/=)", "show", "showList", "showsPrec", "fmap", "(<$)"])
                       <*> ("Meth" `isInfixOf`)
 interesting _ = Nothing
