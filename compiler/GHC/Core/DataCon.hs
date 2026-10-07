@@ -75,7 +75,7 @@ import GHC.Core.Coercion
 import GHC.Core.Unify
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Subst
-import GHC.Core.TyCo.Compare( eqType, eqForAllVis )
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Multiplicity
 import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Types.FieldLabel
@@ -1872,7 +1872,7 @@ dataConUserTyVarBindersNeedWrapper (MkData { dcUnivTyVars = univ_tvs
   where
     answer = need_reorder || need_flag_cast
     need_reorder   = (univ_tvs ++ ex_tvs) /= binderVars user_tvbs
-    need_flag_cast = any (not . eqForAllVis coreTyLamForAllTyFlag)
+    need_flag_cast = any (not . isCoreTyLamForAllTyFlag)
                          (binderFlags user_tvbs)
       -- See Note [Flag cast in data con wrappers]
 

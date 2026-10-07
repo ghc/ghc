@@ -69,7 +69,8 @@ module GHC.Types.Var (
         Specificity(..),
         isVisibleForAllTyFlag, isInvisibleForAllTyFlag, isInferredForAllTyFlag,
         isSpecifiedForAllTyFlag,
-        coreTyLamForAllTyFlag,
+        coreTyLamForAllTyFlag, isCoreTyLamForAllTyFlag,
+        eqForAllVis, cmpForAllVis, cmpForAllTyFlagExactly,
 
         -- * FunTyFlag
         FunTyFlag(..), isVisibleFunArg, isInvisibleFunArg, isFUNArg,
@@ -459,6 +460,118 @@ updateVarTypeM upd var
   where
     result = do { ty' <- upd (varType var)
                 ; return (var { varType = ty' }) }
+
+{- *********************************************************************
+*                                                                      *
+*                   ForAllTyFlag
+*                                                                      *
+********************************************************************* -}
+
+-- | ForAllTyFlag
+--
+-- Is something required to appear in source Haskell ('Required'),
+-- permitted by request ('Specified') (visible type application), or
+-- prohibited entirely from appearing in source Haskell ('Inferred')?
+-- See Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep"
+data ForAllTyFlag = Invisible !Specificity
+                  | Required
+  deriving (Data)
+  -- No Eq or Ord instances: compare ForAllTyFlags only with
+  -- `eqForAllVis` and `cmpForAllVis`.
+  -- See Note [Comparing visibility] in GHC.Core.TyCo.Compare
+
+pattern Inferred, Specified :: ForAllTyFlag
+pattern Inferred  = Invisible InferredSpec
+pattern Specified = Invisible SpecifiedSpec
+
+{-# COMPLETE Required, Specified, Inferred #-}
+
+instance Outputable ForAllTyFlag where
+  ppr Required  = text "[req]"
+  ppr Specified = text "[spec]"
+  ppr Inferred  = text "[infrd]"
+
+instance Binary ForAllTyFlag where
+  put_ bh Required  = putByte bh 0
+  put_ bh Specified = putByte bh 1
+  put_ bh Inferred  = putByte bh 2
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return Required
+      1 -> return Specified
+      _ -> return Inferred
+
+instance NFData ForAllTyFlag where
+  rnf (Invisible spec) = rnf spec
+  rnf Required = ()
+
+-- | Does this 'ForAllTyFlag' classify an argument that is written in Haskell?
+isVisibleForAllTyFlag :: ForAllTyFlag -> Bool
+isVisibleForAllTyFlag af = not (isInvisibleForAllTyFlag af)
+
+-- | Does this 'ForAllTyFlag' classify an argument that is not written in Haskell?
+isInvisibleForAllTyFlag :: ForAllTyFlag -> Bool
+isInvisibleForAllTyFlag (Invisible {}) = True
+isInvisibleForAllTyFlag Required       = False
+
+isInferredForAllTyFlag :: ForAllTyFlag -> Bool
+-- More restrictive than isInvisibleForAllTyFlag
+isInferredForAllTyFlag (Invisible InferredSpec) = True
+isInferredForAllTyFlag _                        = False
+
+isSpecifiedForAllTyFlag :: ForAllTyFlag -> Bool
+-- More restrictive than isInvisibleForAllTyFlag
+isSpecifiedForAllTyFlag (Invisible SpecifiedSpec) = True
+isSpecifiedForAllTyFlag _                         = False
+
+coreTyLamForAllTyFlag :: ForAllTyFlag
+-- ^ The ForAllTyFlag on a (Lam a e) term, where `a` is a type variable.
+-- If you want other ForAllTyFlag, use a cast.
+-- See Note [Required foralls in Core] in GHC.Core.TyCo.Rep
+coreTyLamForAllTyFlag = Specified
+
+isCoreTyLamForAllTyFlag :: ForAllTyFlag -> Bool
+-- ^ Is this flag the same as 'coreTyLamForAllTyFlag', according to `eqForAllVis`?
+-- Since 'coreTyLamForAllTyFlag' is 'Specified', this is true of any invisible flag;
+-- so this function is the same as 'isInvisibleForAllTyFlag', but its name
+-- documents its purpose. See Note [Comparing visibility] in GHC.Core.TyCo.Compare
+isCoreTyLamForAllTyFlag (Invisible {}) = True
+isCoreTyLamForAllTyFlag Required       = False
+
+-- | Do these denote the same level of visibility? 'Required'
+-- arguments are visible, others are not. So this function
+-- equates 'Specified' and 'Inferred'.
+-- See Note [Comparing visibility] in GHC.Core.TyCo.Compare
+eqForAllVis :: ForAllTyFlag -> ForAllTyFlag -> Bool
+eqForAllVis Required      Required      = True
+eqForAllVis (Invisible _) (Invisible _) = True
+eqForAllVis _             _             = False
+
+-- | Compare levels of visibility. 'Required' arguments are visible,
+-- others are not. So this function equates 'Specified' and 'Inferred'.
+-- See Note [Comparing visibility] in GHC.Core.TyCo.Compare
+cmpForAllVis :: ForAllTyFlag -> ForAllTyFlag -> Ordering
+cmpForAllVis Required      Required       = EQ
+cmpForAllVis Required      (Invisible {}) = LT
+cmpForAllVis (Invisible _) Required       = GT
+cmpForAllVis (Invisible _) (Invisible _)  = EQ
+
+-- | Compare 'ForAllTyFlag's /exactly/, distinguishing 'Specified' from 'Inferred'
+-- (unlike 'cmpForAllVis').  The order is Inferred < Specified < Required.
+-- Use this only when you really need an exact comparison, e.g. for deduplication
+-- in interface files; see Note [Ord instance of IfaceType] in GHC.Iface.Type.
+-- Otherwise use 'eqForAllVis' or 'cmpForAllVis';
+-- see Note [Comparing visibility] in GHC.Core.TyCo.Compare
+cmpForAllTyFlagExactly :: ForAllTyFlag -> ForAllTyFlag -> Ordering
+cmpForAllTyFlagExactly Inferred  Inferred  = EQ
+cmpForAllTyFlagExactly Inferred  _         = LT
+cmpForAllTyFlagExactly Specified Inferred  = GT
+cmpForAllTyFlagExactly Specified Specified = EQ
+cmpForAllTyFlagExactly Specified Required  = LT
+cmpForAllTyFlagExactly Required  Required  = EQ
+cmpForAllTyFlagExactly Required  _         = GT
 
 {- *********************************************************************
 *                                                                      *
