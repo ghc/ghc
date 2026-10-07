@@ -118,7 +118,7 @@ import GHC.Parser.Annotation (AnnCType, noAnn)
 {-
 ************************************************************************
 *                                                                      *
-\subsubsection{Data types}
+\subsubsection{ForeignCall}
 *                                                                      *
 ************************************************************************
 -}
@@ -134,19 +134,17 @@ isSafeForeignCall (CCall (CCallSpec _ _ safe)) = playSafe safe
 instance Outputable ForeignCall where
   ppr (CCall cc)  = ppr cc
 
-playSafe :: Safety -> Bool
-playSafe PlaySafe = True
-playSafe PlayInterruptible = True
-playSafe PlayRisky = False
+instance Binary ForeignCall where
+    put_ bh (CCall aa) = put_ bh aa
+    get bh = do aa <- get bh; return (CCall aa)
 
-playInterruptible :: Safety -> Bool
-playInterruptible PlayInterruptible = True
-playInterruptible _ = False
+instance NFData ForeignCall where
+  rnf (CCall c) = rnf c
 
 {-
 ************************************************************************
 *                                                                      *
-\subsubsection{Calling C}
+\subsubsection{CCallSpec: calling C}
 *                                                                      *
 ************************************************************************
 -}
@@ -157,25 +155,6 @@ data CCallSpec
         CCallConv           -- Calling convention to use.
         Safety
   deriving (Eq)
-
-isDynamicTarget :: CCallTarget p -> Bool
-isDynamicTarget DynamicTarget{} = True
-isDynamicTarget _               = False
-
-defaultCCallConv :: CCallConv
-defaultCCallConv = CCallConv
-
-{-
-Generate the gcc attribute corresponding to the given
-calling convention (used by PprAbsC):
--}
-
-ccallConvAttribute :: CCallConv -> SDoc
-ccallConvAttribute StdCallConv       = panic "ccallConvAttribute StdCallConv"
-ccallConvAttribute CCallConv         = empty
-ccallConvAttribute CApiConv          = empty
-ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
-ccallConvAttribute JavaScriptCallConv = empty
 
 pprCLabelString :: CLabelString -> SDoc
 pprCLabelString = ppr
@@ -216,6 +195,142 @@ instance Outputable CCallSpec where
                <> ppr label
                <+> (pprWithSourceText srcTxt empty)
 
+instance Binary CCallSpec where
+    put_ bh (CCallSpec aa ab ac) = do
+            put_ bh aa
+            put_ bh ab
+            put_ bh ac
+    get bh = do
+          aa <- get bh
+          ab <- get bh
+          ac <- get bh
+          return (CCallSpec aa ab ac)
+
+instance NFData CCallSpec where
+  rnf (CCallSpec t c s) = rnf t `seq` rnf c `seq` rnf s
+
+{-
+************************************************************************
+*                                                                      *
+\subsubsection{Foreign call calling convention}
+*                                                                      *
+************************************************************************
+-}
+
+defaultCCallConv :: CCallConv
+defaultCCallConv = CCallConv
+
+{-
+Generate the gcc attribute corresponding to the given
+calling convention (used by PprAbsC):
+-}
+--TODO: this is now totally redundant. Remove it.
+ccallConvAttribute :: CCallConv -> SDoc
+ccallConvAttribute StdCallConv       = panic "ccallConvAttribute StdCallConv"
+ccallConvAttribute CCallConv         = empty
+ccallConvAttribute CApiConv          = empty
+ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
+ccallConvAttribute JavaScriptCallConv = empty
+
+instance Binary CCallConv where
+    put_ bh CCallConv =
+            putByte bh 0
+    put_ bh StdCallConv =
+            putByte bh 1
+    put_ bh PrimCallConv =
+            putByte bh 2
+    put_ bh CApiConv =
+            putByte bh 3
+    put_ bh JavaScriptCallConv =
+            putByte bh 4
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> return CCallConv
+              1 -> return StdCallConv
+              2 -> return PrimCallConv
+              3 -> return CApiConv
+              _ -> return JavaScriptCallConv
+
+instance Outputable CCallConv where
+    ppr StdCallConv  = text "stdcall"
+    ppr CCallConv    = text "ccall"
+    ppr CApiConv     = text "capi"
+    ppr PrimCallConv = text "prim"
+    ppr JavaScriptCallConv = text "javascript"
+
+{-
+************************************************************************
+*                                                                      *
+\subsubsection{Foreign call safety}
+*                                                                      *
+************************************************************************
+-}
+
+playSafe :: Safety -> Bool
+playSafe PlaySafe = True
+playSafe PlayInterruptible = True
+playSafe PlayRisky = False
+
+playInterruptible :: Safety -> Bool
+playInterruptible PlayInterruptible = True
+playInterruptible _ = False
+
+instance Outputable Safety where
+    ppr PlaySafe = text "safe"
+    ppr PlayInterruptible = text "interruptible"
+    ppr PlayRisky = text "unsafe"
+
+instance Binary Safety where
+    put_ bh = putByte bh . \case
+      PlaySafe -> 0
+      PlayInterruptible -> 1
+      PlayRisky -> 2
+
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> return PlaySafe
+              1 -> return PlayInterruptible
+              _ -> return PlayRisky
+
+{-
+************************************************************************
+*                                                                      *
+\subsubsection{C headers}
+*                                                                      *
+************************************************************************
+-}
+
+type instance XHeader  (GhcPass p) = SourceText
+type instance XXHeader (GhcPass p) = DataConCantHappen
+
+deriving instance Eq (Header (GhcPass p))
+
+typeCheckHeader :: Header GhcRn -> Header GhcTc
+typeCheckHeader (Header a b) = Header a b
+
+renameHeader :: Header GhcPs -> Header GhcRn
+renameHeader (Header a b) = Header a b
+
+instance Binary (Header (GhcPass p)) where
+    put_ bh (Header s h) = put_ bh s >> put_ bh h
+    get bh = do
+      s <- get bh
+      h <- get bh
+      return (Header s h)
+
+instance Outputable (Header (GhcPass p)) where
+    ppr (Header st h) = pprWithSourceText st (doubleQuotes $ ppr h)
+
+{-
+************************************************************************
+*                                                                      *
+\subsubsection{CType}
+*                                                                      *
+************************************************************************
+-}
+
 defaultCType :: String -> CType (GhcPass p)
 defaultCType =
   CType (CTypeGhc NoSourceText NoSourceText noAnn) Nothing . packHText
@@ -227,11 +342,55 @@ mkCType x y ann m =
 typeCheckCType :: CType GhcRn -> CType GhcTc
 typeCheckCType (CType x y z) = CType x (typeCheckHeader <$> y) z
 
-typeCheckHeader :: Header GhcRn -> Header GhcTc
-typeCheckHeader (Header a b) = Header a b
+data CTypeGhc = CTypeGhc
+  { cTypeSourceText :: SourceText
+  , cTypeOtherText  :: SourceText
+  , cTypeAnn        :: AnnCType
+  }
+  deriving (Data, Eq)
 
-renameHeader :: Header GhcPs -> Header GhcRn
-renameHeader (Header a b) = Header a b
+type instance XCType   (GhcPass p) = CTypeGhc
+type instance XXCType  (GhcPass p) = DataConCantHappen
+
+instance NFData CTypeGhc where
+    rnf st =
+      rnf (cTypeSourceText st) `seq`
+      rnf (cTypeOtherText  st)
+
+instance Binary CTypeGhc where
+    put_ bh ct = do
+      put_ bh (cTypeSourceText ct)
+      put_ bh (cTypeOtherText  ct)
+    get bh = do
+      str1 <- get bh
+      str2  <- get bh
+      return $ CTypeGhc
+        { cTypeSourceText = str1
+        , cTypeOtherText  = str2
+        , cTypeAnn        = noAnn
+        }
+
+instance Binary (CType (GhcPass p)) where
+    put_ bh (CType ext mh fs) = do
+        put_ bh ext
+        put_ bh mh
+        put_ bh fs
+    get bh = do
+      ext <- get bh
+      mh  <- get bh
+      fs  <- get bh
+      return (CType ext mh fs)
+
+instance Outputable (CType (GhcPass p)) where
+    ppr (CType ext mh ct) =
+        pprWithSourceText stp (text "{-# CTYPE") <+> hDoc <+>
+        pprWithSourceText stct (doubleQuotes (ppr ct)) <+> text "#-}"
+      where
+        stp  = cTypeSourceText ext
+        stct = cTypeOtherText  ext
+        hDoc = case mh of
+          Nothing -> empty
+          Just h -> ppr h
 
 {-
 ************************************************************************
@@ -317,93 +476,14 @@ instance NFData ForeignLabelIsFunctionOrData where
 {-
 ************************************************************************
 *                                                                      *
-\subsubsection{Misc}
+\subsubsection{CCallTarget and extended attributes}
 *                                                                      *
 ************************************************************************
 -}
 
-instance Binary ForeignCall where
-    put_ bh (CCall aa) = put_ bh aa
-    get bh = do aa <- get bh; return (CCall aa)
-
-instance Binary CCallSpec where
-    put_ bh (CCallSpec aa ab ac) = do
-            put_ bh aa
-            put_ bh ab
-            put_ bh ac
-    get bh = do
-          aa <- get bh
-          ab <- get bh
-          ac <- get bh
-          return (CCallSpec aa ab ac)
-
-instance NFData ForeignCall where
-  rnf (CCall c) = rnf c
-
-instance NFData CCallSpec where
-  rnf (CCallSpec t c s) = rnf t `seq` rnf c `seq` rnf s
-
-instance Binary CCallConv where
-    put_ bh CCallConv =
-            putByte bh 0
-    put_ bh StdCallConv =
-            putByte bh 1
-    put_ bh PrimCallConv =
-            putByte bh 2
-    put_ bh CApiConv =
-            putByte bh 3
-    put_ bh JavaScriptCallConv =
-            putByte bh 4
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return CCallConv
-              1 -> return StdCallConv
-              2 -> return PrimCallConv
-              3 -> return CApiConv
-              _ -> return JavaScriptCallConv
-
--- | Where the entity referred to by the label lives: specifically what linker
--- unit (i.e. executable or shared library).
---
--- This information is used in the code generators (on some platforms) to
--- determine whether a use of label in some linker unit refers to a target
--- within the same (local) linker unit or to a different (external) linker unit.
---
-data CLabelTargetLibrary
-
-    -- | The entity (that the name\/label points to) is in an unknown shared
-    -- library. In particular it could either be in the current library (where
-    -- the label is used) or an external one. This case is used for all
-    -- user-written Haskell FFI ccall\/capi imports, because in this case we do
-    -- not know where the entity the name refers to lives.
-  = CLabelTargetUnknown
-
-    -- | The entity is /known/ to live in a specific Haskell unit (package),
-    -- and thus the shared library corresponding to the unit. Uses of this
-    -- label within the same unit will be intra-library, and inter-library
-    -- otherwise.
-  | CLabelTargetInUnit !UnitId
-  deriving (Data, Eq)
-
-instance Outputable CLabelTargetLibrary where
-   ppr CLabelTargetUnknown       = parens (text "unknown library")
-   ppr (CLabelTargetInUnit unit) = parens (text "in unit " <> ppr unit)
-
-
-data StaticTargetGhc = StaticTargetGhc
-  { staticTargetLabel :: SourceText
-  , staticTargetUnit  :: CLabelTargetLibrary
-    -- ^ What linker unit the target of the label is in.
-  }
-  deriving (Data, Eq)
-
-data CTypeGhc = CTypeGhc
-  { cTypeSourceText :: SourceText
-  , cTypeOtherText  :: SourceText
-  , cTypeAnn        :: AnnCType
-  }
-  deriving (Data, Eq)
+isDynamicTarget :: CCallTarget p -> Bool
+isDynamicTarget DynamicTarget{} = True
+isDynamicTarget _               = False
 
 type instance XStaticTarget   GhcPs      = SourceText
 type instance XStaticTarget   GhcRn      = StaticTargetGhc
@@ -411,46 +491,12 @@ type instance XStaticTarget   GhcTc      = StaticTargetGhc
 type instance XDynamicTarget (GhcPass p) = NoExtField
 type instance XXCCallTarget  (GhcPass p) = DataConCantHappen
 
-type instance XCType   (GhcPass p) = CTypeGhc
-type instance XXCType  (GhcPass p) = DataConCantHappen
-
-type instance XHeader  (GhcPass p) = SourceText
-type instance XXHeader (GhcPass p) = DataConCantHappen
-
-deriving instance Eq (Header (GhcPass p))
-
-
-instance NFData CLabelTargetLibrary where
-    rnf = \case
-      CLabelTargetUnknown     -> ()
-      CLabelTargetInUnit unit -> rnf unit
-
-instance Binary CLabelTargetLibrary where
-    put_ bh = \case
-      CLabelTargetUnknown     -> putByte bh 0
-      CLabelTargetInUnit unit -> putByte bh 1 *> put_ bh unit
-
-    get bh = getByte bh >>= \case
-      0 -> pure CLabelTargetUnknown
-      _ -> CLabelTargetInUnit <$> get bh
-
-instance NFData CTypeGhc where
-    rnf st =
-      rnf (cTypeSourceText st) `seq`
-      rnf (cTypeOtherText  st)
-
-instance Binary CTypeGhc where
-    put_ bh ct = do
-      put_ bh (cTypeSourceText ct)
-      put_ bh (cTypeOtherText  ct)
-    get bh = do
-      str1 <- get bh
-      str2  <- get bh
-      return $ CTypeGhc
-        { cTypeSourceText = str1
-        , cTypeOtherText  = str2
-        , cTypeAnn        = noAnn
-        }
+data StaticTargetGhc = StaticTargetGhc
+  { staticTargetLabel :: SourceText
+  , staticTargetUnit  :: CLabelTargetLibrary
+    -- ^ What linker unit the target of the label is in.
+  }
+  deriving (Data, Eq)
 
 instance NFData StaticTargetGhc where
     rnf st =
@@ -508,6 +554,63 @@ instance forall p. IsPass p => Binary (CCallTarget (GhcPass p)) where
 
         _ -> return $ DynamicTarget NoExtField
 
+{-
+************************************************************************
+*                                                                      *
+\subsubsection{CLabelTargetLibrary}
+*                                                                      *
+************************************************************************
+-}
+
+-- | Where the entity referred to by the label lives: specifically what linker
+-- unit (i.e. executable or shared library).
+--
+-- This information is used in the code generators (on some platforms) to
+-- determine whether a use of label in some linker unit refers to a target
+-- within the same (local) linker unit or to a different (external) linker unit.
+--
+data CLabelTargetLibrary
+
+    -- | The entity (that the name\/label points to) is in an unknown shared
+    -- library. In particular it could either be in the current library (where
+    -- the label is used) or an external one. This case is used for all
+    -- user-written Haskell FFI ccall\/capi imports, because in this case we do
+    -- not know where the entity the name refers to lives.
+  = CLabelTargetUnknown
+
+    -- | The entity is /known/ to live in a specific Haskell unit (package),
+    -- and thus the shared library corresponding to the unit. Uses of this
+    -- label within the same unit will be intra-library, and inter-library
+    -- otherwise.
+  | CLabelTargetInUnit !UnitId
+  deriving (Data, Eq)
+
+instance Outputable CLabelTargetLibrary where
+   ppr CLabelTargetUnknown       = parens (text "unknown library")
+   ppr (CLabelTargetInUnit unit) = parens (text "in unit " <> ppr unit)
+
+instance NFData CLabelTargetLibrary where
+    rnf = \case
+      CLabelTargetUnknown     -> ()
+      CLabelTargetInUnit unit -> rnf unit
+
+instance Binary CLabelTargetLibrary where
+    put_ bh = \case
+      CLabelTargetUnknown     -> putByte bh 0
+      CLabelTargetInUnit unit -> putByte bh 1 *> put_ bh unit
+
+    get bh = getByte bh >>= \case
+      0 -> pure CLabelTargetUnknown
+      _ -> CLabelTargetInUnit <$> get bh
+
+{-
+************************************************************************
+*                                                                      *
+\subsubsection{CCallTarget and extended attributes}
+*                                                                      *
+************************************************************************
+-}
+
 instance Binary CExportSpec where
     put_ bh (CExportStatic aa ab) = do
       put_ bh aa
@@ -517,16 +620,8 @@ instance Binary CExportSpec where
       ab <- get bh
       return (CExportStatic aa ab)
 
-instance Binary (CType (GhcPass p)) where
-    put_ bh (CType ext mh fs) = do
-        put_ bh ext
-        put_ bh mh
-        put_ bh fs
-    get bh = do
-      ext <- get bh
-      mh  <- get bh
-      fs  <- get bh
-      return (CType ext mh fs)
+instance Outputable CExportSpec where
+    ppr (CExportStatic str _) = pprCLabelString str
 
 instance Binary ForeignKind where
     put_ bh = putByte bh . \case
@@ -536,51 +631,3 @@ instance Binary ForeignKind where
       0 -> ForeignValue
       _ -> ForeignFunction
 
-instance Binary (Header (GhcPass p)) where
-    put_ bh (Header s h) = put_ bh s >> put_ bh h
-    get bh = do
-      s <- get bh
-      h <- get bh
-      return (Header s h)
-
-instance Binary Safety where
-    put_ bh = putByte bh . \case
-      PlaySafe -> 0
-      PlayInterruptible -> 1
-      PlayRisky -> 2
-
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return PlaySafe
-              1 -> return PlayInterruptible
-              _ -> return PlayRisky
-
-instance Outputable CCallConv where
-    ppr StdCallConv = text "stdcall"
-    ppr CCallConv   = text "ccall"
-    ppr CApiConv    = text "capi"
-    ppr PrimCallConv = text "prim"
-    ppr JavaScriptCallConv = text "javascript"
-
-instance Outputable CExportSpec where
-    ppr (CExportStatic str _) = pprCLabelString str
-
-instance Outputable (CType (GhcPass p)) where
-    ppr (CType ext mh ct) =
-        pprWithSourceText stp (text "{-# CTYPE") <+> hDoc <+>
-        pprWithSourceText stct (doubleQuotes (ppr ct)) <+> text "#-}"
-      where
-        stp  = cTypeSourceText ext
-        stct = cTypeOtherText  ext
-        hDoc = case mh of
-          Nothing -> empty
-          Just h -> ppr h
-
-instance Outputable (Header (GhcPass p)) where
-    ppr (Header st h) = pprWithSourceText st (doubleQuotes $ ppr h)
-
-instance Outputable Safety where
-    ppr PlaySafe = text "safe"
-    ppr PlayInterruptible = text "interruptible"
-    ppr PlayRisky = text "unsafe"
