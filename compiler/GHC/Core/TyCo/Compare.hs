@@ -463,8 +463,8 @@ hasCasts _               = False   -- TyVarTy, TyConApp, FunTy, LitTy
 ********************************************************************* -}
 
 -- `eqForAllVis` and `cmpForAllVis` are defined in GHC.Types.Var,
--- alongside ForAllTyFlag; but they are re-exported from here.
--- See Note [Comparing visibility].
+-- so that they can be used in GHC.Core.TyCo.Make; but they are
+-- re-exported from here.  See Note [Comparing visibility].
 
 
 {- Note [ForAllTy and type equality]

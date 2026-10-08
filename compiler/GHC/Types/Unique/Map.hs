@@ -52,8 +52,9 @@ module GHC.Types.Unique.Map (
 import GHC.Prelude
 
 import GHC.Types.Unique.FM
-
 import GHC.Types.Unique
+import GHC.Types.Basic( seqUnit )
+
 import GHC.Utils.Outputable
 
 import Data.Semigroup as Semi ( Semigroup(..) )
@@ -83,7 +84,9 @@ instance (Outputable k, Outputable a) => Outputable (UniqMap k a) where
         | (k, v) <- nonDetEltsUFM m ]
 
 instance (NFData k, NFData a) => NFData (UniqMap k a) where
-  rnf (UniqMap fm) = seqEltsUFM rnf fm
+  rnf (UniqMap fm) = seqEltsUFM (seqUnit . rnf) fm `seq` ()
+    -- A bit of a mis-match here between `rnf` (returning ())
+    --       and `seqEltsUFM` (returning SeqResult)
 
 liftC :: (a -> a -> a) -> (k, a) -> (k, a) -> (k, a)
 liftC f (_, v) (k', v') = (k', f v v')
