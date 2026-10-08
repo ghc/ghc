@@ -66,6 +66,7 @@ import GHC.Builtin.WiredIn.Ids( seqId )
 import qualified GHC.Data.List.Infinite as Inf
 import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
 import GHC.Data.FastString
+import GHC.Data.OrdList ( fromOL )  -- TMP
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1285,8 +1286,8 @@ simplExprF1 env expr@(Lam {}) cont
 simplExprF1 env expr@(Case scrut bndr _ alts) cont
   | Just (inner, outer) <- splitContForNoCaseCase env cont
        -- See (COC-INV) in Note [sm_case_case: switching off case continuations]
-  = do { expr' <- simplExprC env expr inner
-       ; rebuild env expr' outer }
+  = do { (floats, expr') <- simplExprF env expr inner
+       ; rebuildWithFloats env floats expr' outer }
 
   | otherwise
   = {-#SCC "simplExprF1-Case" #-}
@@ -1312,8 +1313,9 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
 
 simplExprF1 env expr@(Let {}) cont
   | Just (inner, outer) <- splitContForNoCaseCase env cont
-  = do { expr' <- simplExprC env expr inner
-       ; rebuild env expr' outer }
+       -- See (COC-INV) in Note [sm_case_case: switching off case continuations]
+  = do { (floats, expr') <- simplExprF env expr inner
+       ; rebuildWithFloats env floats expr' outer }
 
 -- Now check for a join point.  It's better to do the preInlineUnconditionally
 -- test first, because joinPointBinding_maybe has to eta-expand, so a trivial
@@ -1625,6 +1627,22 @@ simplTick env tickish expr cont
 
 rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
 rebuild env expr cont = rebuild_go (zapSubstEnv env) expr cont
+
+rebuildWithFloats :: SimplEnv -> SimplFloats -> OutExpr -> SimplCont
+                  -> SimplM (SimplFloats, OutExpr)
+-- (rebuildWithFloats env floats expr cont) rebuilds (let floats in expr)
+-- with continuation `cont`.  Used only when seCaseCase is off.
+-- See (COC3) in Note [sm_case_case: switching off case continuations]
+rebuildWithFloats env floats expr cont
+  | Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont' } <- cont
+  , isEmptyJoinFloats (sfJoinFloats floats)
+  , let env1 = zapSubstEnv env `setInScopeFromF` floats
+  , Just do_it <- knownConCase_maybe (mkAltEnv env1 se) expr bndr alts cont'
+  = do { (floats2, res) <- do_it
+       ; return (floats `addFloats` floats2, res) }
+
+  | otherwise
+  = rebuild env (wrapFloats floats expr) cont
 
 rebuild_go :: HasDebugCallStack
            => SimplEnvIS -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
@@ -3287,41 +3305,9 @@ rebuildCase, reallyRebuildCase
 --      1. Eliminate the case if there's a known constructor
 --------------------------------------------------
 
-rebuildCase (saf,env) scrut case_bndr alts cont
-  | Lit lit <- scrut    -- No need for same treatment as constructors
-                        -- because literals are inlined more vigorously
-  , not (litIsLifted lit)
-  = do  { tick (KnownBranch case_bndr)
-        ; case findAlt (LitAlt lit) alts of
-            Nothing             -> missingAlt env case_bndr alts cont
-            Just (Alt _ bs rhs) -> simpl_rhs env scrut bs rhs }
-
-  | Just (in_scope', wfloats, con, ty_args, other_args)
-      <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
-        -- Works when the scrutinee is a variable with a known unfolding
-        -- as well as when it's an explicit constructor application
-  , let env0 = setInScopeSet env in_scope'
-  = do  { tick (KnownBranch case_bndr)
-        ; let -- case_bndr_unf: see Note [Do not duplicate constructor applications]
-              case_bndr_rhs | exprIsTrivial scrut = scrut
-                            | otherwise           = con_app
-              con_app = Var (dataConWorkId con) `mkTyApps` ty_args
-                                                `mkApps`   other_args
-        ; wrapDataConFloats env wfloats case_bndr cont $
-          case findAlt (DataAlt con) alts of
-            Nothing                   -> missingAlt env0 case_bndr alts cont
-            Just (Alt DEFAULT bs rhs) -> simpl_rhs env0 case_bndr_rhs bs rhs
-            Just (Alt _       bs rhs) -> knownCon env0 scrut con other_args
-                                                  case_bndr bs rhs cont
-        }
-  where
-    simpl_rhs env case_bndr_rhs bs rhs
-      = assert (null bs) $
-        do { (floats1, env') <- simplAuxBind (saf,env) case_bndr case_bndr_rhs
-               -- scrut is a constructor application,
-               -- hence satisfies let-can-float invariant
-           ; (floats2, expr') <- simplExprF env' rhs cont
-           ; return (floats1 `addFloats` floats2, expr') }
+rebuildCase saf_env scrut case_bndr alts cont
+  | Just do_it <- knownConCase_maybe saf_env scrut case_bndr alts cont
+  = do_it
 
 --------------------------------------------------
 --      2. Eliminate the case if scrutinee is evaluated
@@ -3927,6 +3913,58 @@ We could try and be more clever (like maybe `wfloats` only contains
 let binders, so we could float them). But the need for the extra
 complication is not clear.
 -}
+
+knownConCase_maybe :: (SimplAltFlag, SimplEnv)
+                   -> OutExpr          -- Scrutinee
+                   -> InId             -- Case binder
+                   -> [InAlt]          -- Alternatives (increasing order)
+                   -> SimplCont
+                   -> Maybe (SimplM (SimplFloats, OutExpr))
+-- Case-of-known-constructor: returns Just if the scrutinee is a literal
+-- or (via exprIsConApp_maybe) a constructor application
+knownConCase_maybe (saf,env) scrut case_bndr alts cont
+  | Lit lit <- scrut    -- No need for same treatment as constructors
+                        -- because literals are inlined more vigorously
+  , not (litIsLifted lit)
+  = Just $
+    do  { tick (KnownBranch case_bndr)
+        ; case findAlt (LitAlt lit) alts of
+            Nothing             -> missingAlt env case_bndr alts cont
+            Just (Alt _ bs rhs) -> simpl_rhs env scrut bs rhs }
+
+  | Just (in_scope', wfloats, con, ty_args, other_args)
+      <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
+        -- Works when the scrutinee is a variable with a known unfolding
+        -- as well as when it's an explicit constructor application
+  , let env0 = setInScopeSet env in_scope'
+  = Just $
+    (if isEmptyFloatBinds wfloats then id else
+       pprTrace "TMP-knownCon" (vcat [ text "nfloats" <+> ppr (length (fromOL wfloats))
+                                     , text "scrut" <+> ppr scrut ])) $
+    do  { tick (KnownBranch case_bndr)
+        ; let -- case_bndr_unf: see Note [Do not duplicate constructor applications]
+              case_bndr_rhs | exprIsTrivial scrut = scrut
+                            | otherwise           = con_app
+              con_app = Var (dataConWorkId con) `mkTyApps` ty_args
+                                                `mkApps`   other_args
+        ; wrapDataConFloats env wfloats case_bndr cont $
+          case findAlt (DataAlt con) alts of
+            Nothing                   -> missingAlt env0 case_bndr alts cont
+            Just (Alt DEFAULT bs rhs) -> simpl_rhs env0 case_bndr_rhs bs rhs
+            Just (Alt _       bs rhs) -> knownCon env0 scrut con other_args
+                                                  case_bndr bs rhs cont
+        }
+
+  | otherwise
+  = Nothing
+  where
+    simpl_rhs env case_bndr_rhs bs rhs
+      = assert (null bs) $
+        do { (floats1, env') <- simplAuxBind (saf,env) case_bndr case_bndr_rhs
+               -- scrut is a constructor application,
+               -- hence satisfies let-can-float invariant
+           ; (floats2, expr') <- simplExprF env' rhs cont
+           ; return (floats1 `addFloats` floats2, expr') }
 
 wrapDataConFloats :: SimplEnv -> FloatBinds -> InId -> SimplCont
                  -> SimplM (SimplFloats, OutExpr)
