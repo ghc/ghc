@@ -312,7 +312,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id, fun_matches = matches
       exported = idName id `elemNameSet` exported_names
 
   -- See Note [Instance Method Coverage].
-  let generatedInstMeth = density == TickForCoverage
+  let generatedInstMeth = tickishType env == HpcTicks
         && id `elemVarEnv` instMeths env
         && isGenerated (mg_origin (mg_ext matches))
 
@@ -1235,6 +1235,9 @@ getDensity = TM $ \env st -> (density env, noFVs, st)
 ifDensity :: TickDensity -> TM a -> TM a -> TM a
 ifDensity d th el = do d0 <- getDensity; if d == d0 then th else el
 
+ifTickish :: TickishType -> TM a -> TM a -> TM a
+ifTickish want th el = tickishType <$> getEnv >>= \got -> if want == got then th else el
+
 getFreeVars :: TM a -> TM (FreeVars, a)
 getFreeVars (TM m)
   = TM $ \ env st -> case m env st of (a, fv, st') -> ((fv,a), fv, st')
@@ -1294,7 +1297,7 @@ isBlackListed UnhelpfulSpan{} = return False
 -- See Note [Instance Method Coverage].
 allocInstTicks :: [ClsInst] -> TM (NameEnv CoreTickish)
 allocInstTicks insts =
-    ifDensity TickForCoverage (mkNameEnv . catMaybes <$> mapM alloc insts) (pure emptyNameEnv)
+    ifTickish HpcTicks (mkNameEnv . catMaybes <$> mapM alloc insts) (pure emptyNameEnv)
   where
     alloc ClsInst{ is_dfun, is_cls }
       | null (classMethods is_cls) = pure Nothing
