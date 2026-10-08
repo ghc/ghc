@@ -12,13 +12,13 @@ description:
   The fields ``tcPluginStop :: s -> TcPluginM ()`` and ``dePluginStop :: s -> TcPluginM ()``
   are replaced by the two fields::
 
-  tcPluginPostTc   :: s -> TcPluginM ()
-  tcPluginShutdown :: s -> IO ()
+    tcPluginPostTc   :: s -> TcPluginM ()
+    tcPluginShutdown :: s -> IO ()
 
   respectively::
 
-  dePluginPostTc   :: s -> TcPluginM ()
-  dePluginShutdown :: s -> IO ()
+    dePluginPostTc   :: s -> TcPluginM ()
+    dePluginShutdown :: s -> IO ()
 
   The "post-tc" actions are run at the end of typechecking, and can be used to
   inspect the final ``TcGblEnv``/``TcLclEnv`` of the module being typechecker.

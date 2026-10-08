@@ -14,6 +14,6 @@ description:
   comprehensions). The main two issues fixed are:
 
     - GHC can now box types of any representation, including unboxed tuples,
-      unboxed sums, ``AddrRep`` and all ``VecRep``s. This fixes #20864.
+      unboxed sums, ``AddrRep`` and all ``VecRep``\s. This fixes #20864.
     - GHC can now box in the middle of typechecking, before the representation
       of the value to box has even been determined. This fixes #25065.
