@@ -1326,7 +1326,7 @@ allocTickBox boxLabel countEntries topOnly pos m
       return (this_loc (XExpr $ HsTick tickish $ this_loc e))
 
 recSelTick :: Id -> TM (Maybe [CoreTickish])
-recSelTick id = ifDensity TickForCoverage maybe_tick (pure Nothing)
+recSelTick id = ifTickish HpcTicks maybe_tick (pure Nothing)
   where
     maybe_tick = getEnv >>=
       maybe (pure Nothing) tick_all . (`lookupVarEnv` id) . recSelBinds
