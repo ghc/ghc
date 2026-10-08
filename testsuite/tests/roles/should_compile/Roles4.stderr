@@ -9,14 +9,6 @@ Dependent modules: []
 Dependent packages: [(normal, base-4.23.0.0)]
 
 ==================== Typechecker ====================
-Roles4.$tcC3 [InlPrag=[~]]
-  = GHC.Internal.Types.TyCon
-      7508642517340826358#Word64 16938219270597865136#Word64
-      Roles4.$trModule (GHC.Internal.Types.TrNameS "C3"#) 0# $krep
-Roles4.$tc'C:C3 [InlPrag=[~]]
-  = GHC.Internal.Types.TyCon
-      3133378316178104365#Word64 15809386433947157376#Word64
-      Roles4.$trModule (GHC.Internal.Types.TrNameS "'C:C3"#) 1# $krep
 Roles4.$tcC1 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       13392243382482428602#Word64 1780037961948725012#Word64
@@ -25,6 +17,14 @@ Roles4.$tc'C:C1 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       3870707671502302648#Word64 10631907186261837450#Word64
       Roles4.$trModule (GHC.Internal.Types.TrNameS "'C:C1"#) 1# $krep
+Roles4.$tcC3 [InlPrag=[~]]
+  = GHC.Internal.Types.TyCon
+      7508642517340826358#Word64 16938219270597865136#Word64
+      Roles4.$trModule (GHC.Internal.Types.TrNameS "C3"#) 0# $krep
+Roles4.$tc'C:C3 [InlPrag=[~]]
+  = GHC.Internal.Types.TyCon
+      3133378316178104365#Word64 15809386433947157376#Word64
+      Roles4.$trModule (GHC.Internal.Types.TrNameS "'C:C3"#) 1# $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 0
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
@@ -37,9 +37,9 @@ $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepTyConApp
       GHC.Internal.Types.$tcList ((:) $krep [])
 $krep [InlPrag=[~]]
-  = GHC.Internal.Types.KindRepTyConApp Roles4.$tcC3 ((:) $krep [])
-$krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepTyConApp Roles4.$tcC1 ((:) $krep [])
+$krep [InlPrag=[~]]
+  = GHC.Internal.Types.KindRepTyConApp Roles4.$tcC3 ((:) $krep [])
 Roles4.$trModule [InlPrag=[~]]
   = GHC.Internal.Types.Module
       (GHC.Internal.Types.TrNameS "main"#)

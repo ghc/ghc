@@ -1,6 +1,6 @@
 T17608.hs:(4,2)-(20,7): Splicing declarations
-    [d| infixl 4 `n`
-        infixl 4 `f`
+    [d| infixl 4 `f`
+        infixl 4 `n`
         
         f :: Bool
         f = let

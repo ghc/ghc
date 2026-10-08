@@ -34,13 +34,13 @@
            ($dEq [Occ=Dead] :: Eq Int)
            (df :: forall x. Eq x => Eq (g x)).
       f3 @Int @g $dEq df
-      = f3_$sf3 @g df
+      = f3_$sf1 @g df
 "USPEC f3 @_ @[]"
     forall (@c)
            ($dEq :: Eq c)
            (df [Occ=Dead] :: forall x. Eq x => Eq [x]).
       f3 @c @[] $dEq df
-      = f3_$sf1 @c $dEq
+      = f3_$sf3 @c $dEq
 "USPEC f4 @_ @(ST s)"
     forall (@b)
            (@s)

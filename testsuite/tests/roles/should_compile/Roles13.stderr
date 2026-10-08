@@ -55,62 +55,6 @@ $krep1 :: GHC.Internal.Types.KindRep
 $krep1 = GHC.Internal.Types.KindRepVar 0#
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$tcAge1 :: GHC.Internal.Prim.Addr#
-[GblId, Unf=OtherCon []]
-$tcAge1 = "Age"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$tcAge2 :: GHC.Internal.Types.TrName
-[GblId, Unf=OtherCon []]
-$tcAge2 = GHC.Internal.Types.TrNameS $tcAge1
-
--- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-Roles13.$tcAge [InlPrag=[~]] :: GHC.Internal.Types.TyCon
-[GblId, Unf=OtherCon []]
-Roles13.$tcAge
-  = GHC.Internal.Types.TyCon
-      3456257068627873222#Word64
-      14056710845110756026#Word64
-      Roles13.$trModule
-      $tcAge2
-      0#
-      GHC.Internal.Types.krepStar
-
--- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep2 :: GHC.Internal.Types.KindRep
-[GblId, Unf=OtherCon []]
-$krep2
-  = GHC.Internal.Types.KindRepTyConApp
-      Roles13.$tcAge (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
-
--- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep3 :: GHC.Internal.Types.KindRep
-[GblId, Unf=OtherCon []]
-$krep3 = GHC.Internal.Types.KindRepFun $krep $krep2
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$tc'MkAge1 :: GHC.Internal.Prim.Addr#
-[GblId, Unf=OtherCon []]
-$tc'MkAge1 = "'MkAge"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$tc'MkAge2 :: GHC.Internal.Types.TrName
-[GblId, Unf=OtherCon []]
-$tc'MkAge2 = GHC.Internal.Types.TrNameS $tc'MkAge1
-
--- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-Roles13.$tc'MkAge [InlPrag=[~]] :: GHC.Internal.Types.TyCon
-[GblId, Unf=OtherCon []]
-Roles13.$tc'MkAge
-  = GHC.Internal.Types.TyCon
-      18264039750958872441#Word64
-      1870189534242358050#Word64
-      Roles13.$trModule
-      $tc'MkAge2
-      0#
-      $krep3
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $tcWrap1 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $tcWrap1 = "Wrap"#
@@ -133,23 +77,23 @@ Roles13.$tcWrap
       GHC.Internal.Types.krepStarArr
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-$krep4 :: [GHC.Internal.Types.KindRep]
+$krep2 :: [GHC.Internal.Types.KindRep]
 [GblId, Unf=OtherCon []]
-$krep4
+$krep2
   = GHC.Internal.Types.:
       @GHC.Internal.Types.KindRep
       $krep1
       (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep5 :: GHC.Internal.Types.KindRep
+$krep3 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep5 = GHC.Internal.Types.KindRepTyConApp Roles13.$tcWrap $krep4
+$krep3 = GHC.Internal.Types.KindRepTyConApp Roles13.$tcWrap $krep2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-$krep6 :: GHC.Internal.Types.KindRep
+$krep4 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-$krep6 = GHC.Internal.Types.KindRepFun $krep1 $krep5
+$krep4 = GHC.Internal.Types.KindRepFun $krep1 $krep3
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $tc'MkWrap1 :: GHC.Internal.Prim.Addr#
@@ -171,6 +115,62 @@ Roles13.$tc'MkWrap
       Roles13.$trModule
       $tc'MkWrap2
       1#
+      $krep4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tcAge1 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$tcAge1 = "Age"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tcAge2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tcAge2 = GHC.Internal.Types.TrNameS $tcAge1
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Roles13.$tcAge [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
+Roles13.$tcAge
+  = GHC.Internal.Types.TyCon
+      3456257068627873222#Word64
+      14056710845110756026#Word64
+      Roles13.$trModule
+      $tcAge2
+      0#
+      GHC.Internal.Types.krepStar
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep5 :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep5
+  = GHC.Internal.Types.KindRepTyConApp
+      Roles13.$tcAge (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep6 :: GHC.Internal.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep6 = GHC.Internal.Types.KindRepFun $krep $krep5
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tc'MkAge1 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$tc'MkAge1 = "'MkAge"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tc'MkAge2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tc'MkAge2 = GHC.Internal.Types.TrNameS $tc'MkAge1
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Roles13.$tc'MkAge [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
+Roles13.$tc'MkAge
+  = GHC.Internal.Types.TyCon
+      18264039750958872441#Word64
+      1870189534242358050#Word64
+      Roles13.$trModule
+      $tc'MkAge2
+      0#
       $krep6
 
 

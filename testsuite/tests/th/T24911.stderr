@@ -1,6 +1,6 @@
 T24911.hs:(5,2)-(12,7): Splicing declarations
-    [d| infixl 4 type ###
-        infixl 4 data ###
+    [d| infixl 4 data ###
+        infixl 4 type ###
         
         (###) :: a -> a -> a
         x ### y = x

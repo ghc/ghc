@@ -1,20 +1,34 @@
 
 ==================== Final STG: ====================
-MkW_NB :: NU_B %1 -> WNU_B =
-    \r [eta] case eta of eta { __DEFAULT -> MkW_NB [eta]; };
+$WMkW_A :: UA %1 -> WU_A =
+    \r [conrep] case conrep of conrep { Mk_A unbx -> MkW_A [unbx]; };
 
-MkW_NA :: NU_A %1 -> WNU_A =
-    \r [eta] case eta of eta { __DEFAULT -> MkW_NA [eta]; };
+MkW_A :: Int# %1 -> WU_A = \r [eta] MkW_A [eta];
 
-$WMkW_F :: UF %1 -> WU_F =
-    \r [conrep] case conrep of conrep { Mk_F us -> MkW_F [us]; };
+$WMk_A :: Int %1 -> UA =
+    \r [conrep] case conrep of conrep { I# unbx -> Mk_A [unbx]; };
 
-MkW_F :: (# Double #) %1 -> WU_F = \r [us] MkW_F [us];
+Mk_A :: Int# %1 -> UA = \r [eta] Mk_A [eta];
 
-$WMkW_E :: UE %1 -> WU_E =
-    \r [conrep] case conrep of conrep { Mk_E us -> MkW_E [us]; };
+$WMkW_B :: UB %1 -> WU_B =
+    \r [conrep] case conrep of conrep { Mk_B unbx -> MkW_B [unbx]; };
 
-MkW_E :: (# Int# #) %1 -> WU_E = \r [us] MkW_E [us];
+MkW_B :: Int64# %1 -> WU_B = \r [eta] MkW_B [eta];
+
+$WMk_B :: Int64 %1 -> UB =
+    \r [conrep] case conrep of conrep { I64# unbx -> Mk_B [unbx]; };
+
+Mk_B :: Int64# %1 -> UB = \r [eta] Mk_B [eta];
+
+$WMkW_C :: UC %1 -> WU_C =
+    \r [conrep] case conrep of conrep { Mk_C unbx -> MkW_C [unbx]; };
+
+MkW_C :: Int32# %1 -> WU_C = \r [eta] MkW_C [eta];
+
+$WMk_C :: Int32 %1 -> UC =
+    \r [conrep] case conrep of conrep { I32# unbx -> Mk_C [unbx]; };
+
+Mk_C :: Int32# %1 -> UC = \r [eta] Mk_C [eta];
 
 $WMkW_D :: UD %1 -> WU_D =
     \r [conrep]
@@ -22,38 +36,6 @@ $WMkW_D :: UD %1 -> WU_D =
 
 MkW_D :: Int32# %1 -> Int32# %1 -> WU_D =
     \r [eta eta] MkW_D [eta eta];
-
-$WMkW_C :: UC %1 -> WU_C =
-    \r [conrep] case conrep of conrep { Mk_C unbx -> MkW_C [unbx]; };
-
-MkW_C :: Int32# %1 -> WU_C = \r [eta] MkW_C [eta];
-
-$WMkW_B :: UB %1 -> WU_B =
-    \r [conrep] case conrep of conrep { Mk_B unbx -> MkW_B [unbx]; };
-
-MkW_B :: Int64# %1 -> WU_B = \r [eta] MkW_B [eta];
-
-$WMkW_A :: UA %1 -> WU_A =
-    \r [conrep] case conrep of conrep { Mk_A unbx -> MkW_A [unbx]; };
-
-MkW_A :: Int# %1 -> WU_A = \r [eta] MkW_A [eta];
-
-$WNU_MkB :: Int64 %1 -> Int64 %1 -> NU_B =
-    \r [conrep conrep]
-        case conrep of conrep {
-        I64# unbx ->
-        case conrep of conrep { I64# unbx -> NU_MkB [unbx unbx]; };
-        };
-
-NU_MkB :: Int64# %1 -> Int64# %1 -> NU_B =
-    \r [eta eta] NU_MkB [eta eta];
-
-NU_MkA :: (# Int64, Int64 #) %1 -> NU_A =
-    \r [us us] NU_MkA [us us];
-
-Mk_F :: (# Double #) %1 -> UF = \r [us] Mk_F [us];
-
-Mk_E :: (# Int# #) %1 -> UE = \r [us] Mk_E [us];
 
 $WMk_D :: Int32 %1 -> Int32 %1 -> UD =
     \r [conrep conrep]
@@ -64,19 +46,37 @@ $WMk_D :: Int32 %1 -> Int32 %1 -> UD =
 
 Mk_D :: Int32# %1 -> Int32# %1 -> UD = \r [eta eta] Mk_D [eta eta];
 
-$WMk_C :: Int32 %1 -> UC =
-    \r [conrep] case conrep of conrep { I32# unbx -> Mk_C [unbx]; };
+$WMkW_E :: UE %1 -> WU_E =
+    \r [conrep] case conrep of conrep { Mk_E us -> MkW_E [us]; };
 
-Mk_C :: Int32# %1 -> UC = \r [eta] Mk_C [eta];
+MkW_E :: (# Int# #) %1 -> WU_E = \r [us] MkW_E [us];
 
-$WMk_B :: Int64 %1 -> UB =
-    \r [conrep] case conrep of conrep { I64# unbx -> Mk_B [unbx]; };
+Mk_E :: (# Int# #) %1 -> UE = \r [us] Mk_E [us];
 
-Mk_B :: Int64# %1 -> UB = \r [eta] Mk_B [eta];
+$WMkW_F :: UF %1 -> WU_F =
+    \r [conrep] case conrep of conrep { Mk_F us -> MkW_F [us]; };
 
-$WMk_A :: Int %1 -> UA =
-    \r [conrep] case conrep of conrep { I# unbx -> Mk_A [unbx]; };
+MkW_F :: (# Double #) %1 -> WU_F = \r [us] MkW_F [us];
 
-Mk_A :: Int# %1 -> UA = \r [eta] Mk_A [eta];
+Mk_F :: (# Double #) %1 -> UF = \r [us] Mk_F [us];
+
+MkW_NA :: NU_A %1 -> WNU_A =
+    \r [eta] case eta of eta { __DEFAULT -> MkW_NA [eta]; };
+
+NU_MkA :: (# Int64, Int64 #) %1 -> NU_A =
+    \r [us us] NU_MkA [us us];
+
+MkW_NB :: NU_B %1 -> WNU_B =
+    \r [eta] case eta of eta { __DEFAULT -> MkW_NB [eta]; };
+
+$WNU_MkB :: Int64 %1 -> Int64 %1 -> NU_B =
+    \r [conrep conrep]
+        case conrep of conrep {
+        I64# unbx ->
+        case conrep of conrep { I64# unbx -> NU_MkB [unbx unbx]; };
+        };
+
+NU_MkB :: Int64# %1 -> Int64# %1 -> NU_B =
+    \r [eta eta] NU_MkB [eta eta];
 
 

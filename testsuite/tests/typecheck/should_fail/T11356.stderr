@@ -1,4 +1,5 @@
+T11356.hs:5:12: error: [GHC-83865]
+    • Expected kind ‘k0 -> Constraint’, but ‘C x’ has kind ‘Constraint’
+    • In the type ‘C x’
+      In the type synonym declaration for ‘T’
 
-T11356.hs:3:7: error: [GHC-83865]
-    • Expected kind ‘k0 -> Constraint’, but ‘T p’ has kind ‘Constraint’
-    • In the class declaration for ‘C’

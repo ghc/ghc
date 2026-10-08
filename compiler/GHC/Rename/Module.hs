@@ -2821,84 +2821,96 @@ Template Haskell splice.  As it does so it
 
 findSplice :: [LHsDecl GhcPs]
            -> RnM (HsGroup GhcPs, Maybe (SpliceDecl GhcPs, [LHsDecl GhcPs]))
-findSplice ds = addl emptyRdrGroup ds
-
-addl :: HsGroup GhcPs -> [LHsDecl GhcPs]
-     -> RnM (HsGroup GhcPs, Maybe (SpliceDecl GhcPs, [LHsDecl GhcPs]))
--- This stuff reverses the declarations (again) but it doesn't matter
-addl gp []           = return (gp, Nothing)
-addl gp (L l d : ds) = add gp l d ds
-
-
-add :: HsGroup GhcPs -> SrcSpanAnnA -> HsDecl GhcPs -> [LHsDecl GhcPs]
-    -> RnM (HsGroup GhcPs, Maybe (SpliceDecl GhcPs, [LHsDecl GhcPs]))
-
--- #10047: Declaration QuasiQuoters are expanded immediately, without
---         causing a group split
-add gp _ (SpliceD _ (SpliceDecl _ (L _ qq@HsQuasiQuote{}) _)) ds
-  = do { (ds', _) <- rnTopSpliceDecls qq
-       ; addl gp (ds' ++ ds)
-       }
-
-add gp loc (SpliceD _ splice@(SpliceDecl _ _ flag)) ds
-  = do { -- We've found a top-level splice.  If it is an *implicit* one
-         -- (i.e. a naked top level expression), throw an error if
-         -- TemplateHaskell is not enabled.
-         case flag of
-           DollarSplice -> return ()
-           BareSplice -> do { unlessXOptM LangExt.TemplateHaskell
-                            $ setSrcSpan (locA loc)
-                            $ failWith badImplicitSplice }
-
-       ; return (gp, Just (splice, ds)) }
+findSplice ds
+  = do { (rev_decls, mb_splice) <- go [] ds
+       ; return (foldl' (flip add) emptyRdrGroup rev_decls, mb_splice) }
   where
+    -- CQ[findsplice-rev-acc]
+    -- Q: Why accumulate the declarations in reverse and then fold `add`
+    --    over them?
+    -- A~ `add` conses onto the group's lists, so consing the declarations
+    --    in reverse order leaves every list in source order, with O(1) work
+    --    per declaration and no reverse at the end.
+    go :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
+       -> RnM ([LHsDecl GhcPs], Maybe (SpliceDecl GhcPs, [LHsDecl GhcPs]))
+    go acc [] = return (acc, Nothing)
+
+    -- #10047: Declaration QuasiQuoters are expanded immediately, without
+    --         causing a group split
+    go acc (L _ (SpliceD _ (SpliceDecl _ (L _ qq@HsQuasiQuote{}) _)) : ds)
+      = do { (ds', _) <- rnTopSpliceDecls qq
+           ; go acc (ds' ++ ds) }
+
+    go acc (L loc (SpliceD _ splice@(SpliceDecl _ _ flag)) : ds)
+      = do { -- We've found a top-level splice.  If it is an *implicit* one
+             -- (i.e. a naked top level expression), throw an error if
+             -- TemplateHaskell is not enabled.
+             case flag of
+               DollarSplice -> return ()
+               BareSplice -> do { unlessXOptM LangExt.TemplateHaskell
+                                $ setSrcSpan (locA loc)
+                                $ failWith badImplicitSplice }
+
+           ; return (acc, Just (splice, ds)) }
+
+    go acc (d : ds) = go (d : acc) ds
+
     badImplicitSplice :: TcRnMessage
     badImplicitSplice = TcRnTHError (THSyntaxError BadImplicitSplice)
 
+-- CQ[add-strict-fields]
+-- Q: Why the bang on every updated field?
+-- A~ findSplice folds `add` over all declarations of the group; without
+--    forcing the new list each step would leave a thunk per declaration,
+--    and forcing the chain at the end needs stack proportional to the
+--    number of declarations.
+add :: LHsDecl GhcPs -> HsGroup GhcPs -> HsGroup GhcPs
+add (L _ (SpliceD {})) _ = panic "GHC.Rename.Module.add: SpliceD"
+
 -- Class declarations: added to the TyClGroup
-add gp@(HsGroup {hs_tyclds = ts}) l (TyClD _ d) ds
-  = addl (gp { hs_tyclds = add_tycld (L l d) ts }) ds
+add (L l (TyClD _ d)) gp@(HsGroup {hs_tyclds = ts})
+  = let !ts' = add_tycld (L l d) ts in gp { hs_tyclds = ts' }
 
 -- Signatures: fixity sigs go a different place than all others
-add gp@(HsGroup {hs_fixds = ts}) l (SigD _ (FixSig _ f)) ds
-  = addl (gp {hs_fixds = L l f : ts}) ds
+add (L l (SigD _ (FixSig _ f))) gp@(HsGroup {hs_fixds = ts})
+  = let !ts' = L l f : ts in gp { hs_fixds = ts' }
 
 -- Standalone kind signatures: added to the TyClGroup
-add gp@(HsGroup {hs_tyclds = ts}) l (KindSigD _ s) ds
-  = addl (gp {hs_tyclds = add_kisig (L l s) ts}) ds
+add (L l (KindSigD _ s)) gp@(HsGroup {hs_tyclds = ts})
+  = let !ts' = add_kisig (L l s) ts in gp { hs_tyclds = ts' }
 
-add gp@(HsGroup {hs_valds = ts}) l (SigD _ d) ds
-  = addl (gp {hs_valds = add_sig (L l d) ts}) ds
+add (L l (SigD _ d)) gp@(HsGroup {hs_valds = ts})
+  = let !ts' = add_sig (L l d) ts in gp { hs_valds = ts' }
 
 -- Value declarations: use add_bind
-add gp@(HsGroup {hs_valds  = ts}) l (ValD _ d) ds
-  = addl (gp { hs_valds = add_bind (L l d) ts }) ds
+add (L l (ValD _ d)) gp@(HsGroup {hs_valds = ts})
+  = let !ts' = add_bind (L l d) ts in gp { hs_valds = ts' }
 
 -- Role annotations: added to the TyClGroup
-add gp@(HsGroup {hs_tyclds = ts}) l (RoleAnnotD _ d) ds
-  = addl (gp { hs_tyclds = add_role_annot (L l d) ts }) ds
+add (L l (RoleAnnotD _ d)) gp@(HsGroup {hs_tyclds = ts})
+  = let !ts' = add_role_annot (L l d) ts in gp { hs_tyclds = ts' }
 
 -- NB instance declarations go into TyClGroups. We throw them into the first
 -- group, just as we do for the TyClD case. The renamer will go on to group
 -- and order them later.
-add gp@(HsGroup {hs_tyclds = ts})  l (InstD _ d) ds
-  = addl (gp { hs_tyclds = add_instd (L l d) ts }) ds
+add (L l (InstD _ d)) gp@(HsGroup {hs_tyclds = ts})
+  = let !ts' = add_instd (L l d) ts in gp { hs_tyclds = ts' }
 
 -- The rest are routine
-add gp@(HsGroup {hs_derivds = ts})  l (DerivD _ d) ds
-  = addl (gp { hs_derivds = L l d : ts }) ds
-add gp@(HsGroup {hs_defds  = ts})  l (DefD _ d) ds
-  = addl (gp { hs_defds = L l d : ts }) ds
-add gp@(HsGroup {hs_fords  = ts}) l (ForD _ d) ds
-  = addl (gp { hs_fords = L l d : ts }) ds
-add gp@(HsGroup {hs_warnds  = ts})  l (WarningD _ d) ds
-  = addl (gp { hs_warnds = L l d : ts }) ds
-add gp@(HsGroup {hs_annds  = ts}) l (AnnD _ d) ds
-  = addl (gp { hs_annds = L l d : ts }) ds
-add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD _ d) ds
-  = addl (gp { hs_ruleds = L l d : ts }) ds
-add gp l (DocD _ d) ds
-  = addl (gp { hs_docs = (L l d) : (hs_docs gp) })  ds
+add (L l (DerivD _ d)) gp@(HsGroup {hs_derivds = ts})
+  = let !ts' = L l d : ts in gp { hs_derivds = ts' }
+add (L l (DefD _ d)) gp@(HsGroup {hs_defds = ts})
+  = let !ts' = L l d : ts in gp { hs_defds = ts' }
+add (L l (ForD _ d)) gp@(HsGroup {hs_fords = ts})
+  = let !ts' = L l d : ts in gp { hs_fords = ts' }
+add (L l (WarningD _ d)) gp@(HsGroup {hs_warnds = ts})
+  = let !ts' = L l d : ts in gp { hs_warnds = ts' }
+add (L l (AnnD _ d)) gp@(HsGroup {hs_annds = ts})
+  = let !ts' = L l d : ts in gp { hs_annds = ts' }
+add (L l (RuleD _ d)) gp@(HsGroup {hs_ruleds = ts})
+  = let !ts' = L l d : ts in gp { hs_ruleds = ts' }
+add (L l (DocD _ d)) gp@(HsGroup {hs_docs = ts})
+  = let !ts' = L l d : ts in gp { hs_docs = ts' }
 
 add_tycld :: LTyClDecl GhcPs -> [TyClGroup GhcPs]
           -> [TyClGroup GhcPs]
@@ -2949,7 +2961,7 @@ add_kisig d (tycls@(TyClGroup { group_kisigs = kisigs }) : rest)
   = tycls { group_kisigs = d : kisigs } : rest
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
-add_bind b (ValBinds x bs) = ValBinds x (bs ++ [VbBind b])
+add_bind b (ValBinds x bs) = ValBinds x (VbBind b : bs)
 add_bind _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_bind"
 
 add_sig :: LSig (GhcPass a) -> HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)

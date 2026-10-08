@@ -1,8 +1,8 @@
-T13776.hs:13:15-27: Splicing type conT ''(->) ======> (->)
-T13776.hs:10:15-43: Splicing type
-    conT ''[] `appT` conT ''Int ======> [] Int
 T13776.hs:7:15-62: Splicing type
     conT ''(,) `appT` conT ''Int `appT` conT ''Int ======> (,) Int Int
+T13776.hs:10:15-43: Splicing type
+    conT ''[] `appT` conT ''Int ======> [] Int
+T13776.hs:13:15-27: Splicing type conT ''(->) ======> (->)
 T13776.hs:17:15-75: Splicing expression
     conE '(,) `appE` litE (integerL 1) `appE` litE (integerL 1)
   ======>

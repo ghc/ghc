@@ -6,17 +6,17 @@ T15365.hs:(9,2)-(31,7): Splicing declarations
         
         type role (***)
         
-        type (|||) = Either
-        data (***)
-        class (???)
-        data family ($$$)
-        type family (^^^)
         type family (###) where
           (###) = Int
+        type family (^^^)
+        data family ($$$)
+        class (???)
+        data (***)
+        type (|||) = Either
         
-        type instance (^^^) = Int
+        instance (???)
         data instance ($$$)
-        instance (???) |]
+        type instance (^^^) = Int |]
   ======>
     type (|||) = Either
     (&&&) :: Bool -> Bool -> Bool
