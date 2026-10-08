@@ -115,16 +115,21 @@ module GHC.Types.Name.Occurrence (
 import GHC.Prelude
 
 import GHC.Builtin.Uniques
+
 import GHC.Utils.Misc
+
+import GHC.Types.Basic( SeqResult, seqUnit )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import GHC.Data.FastString
-import GHC.Data.FastString.Env
+
 import GHC.Utils.Outputable
 import GHC.Utils.Lexeme
 import GHC.Utils.Binary
 import GHC.Utils.Panic.Plain
+
+import GHC.Data.FastString
+import GHC.Data.FastString.Env
 
 import Control.DeepSeq
 import Data.Char
@@ -818,7 +823,10 @@ pprOccEnv ppr_elt (MkOccEnv env)
     , elt <- nonDetEltsUFM elts ]
 
 instance NFData a => NFData (OccEnv a) where
-  rnf = forceOccEnv rnf
+  rnf env = forceOccEnv (seqUnit . rnf) env `seq` ()
+      -- A bit of a mis-match here between `rnf` (returning ())
+    --       and `forceOccEnv` (returning SeqResult)
+
 
 -- | Map over an 'OccEnv' strictly.
 strictMapOccEnv :: (a -> b) -> OccEnv a -> OccEnv b
@@ -826,7 +834,7 @@ strictMapOccEnv f (MkOccEnv as) =
   MkOccEnv $ strictMapFsEnv (strictMapUFM f) as
 
 -- | Force an 'OccEnv' with the provided function.
-forceOccEnv :: (a -> ()) -> OccEnv a -> ()
+forceOccEnv :: (a -> SeqResult) -> OccEnv a -> SeqResult
 forceOccEnv nf (MkOccEnv fs) = seqEltsUFM (seqEltsUFM nf) fs
 
 --------------------------------------------------------------------------------

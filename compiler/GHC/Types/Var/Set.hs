@@ -48,6 +48,7 @@ module GHC.Types.Var.Set (
 
 import GHC.Prelude
 
+import GHC.Types.Basic    ( SeqResult, seqUnit )
 import GHC.Types.Var      ( Var, TyVar, CoVar, TyCoVar, Id )
 import GHC.Types.Unique
 import GHC.Types.Name     ( Name )
@@ -55,6 +56,7 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.FM( disjointUFM, pluralUFM, pprUFM )
 import GHC.Types.Unique.DFM( disjointUDFM, udfmToUfm, anyUDFM, allUDFM )
+
 import GHC.Utils.Outputable (SDoc)
 
 -- | A non-deterministic Variable Set
@@ -331,8 +333,8 @@ partitionDVarSet = partitionUniqDSet
 delDVarSetList :: DVarSet -> [Var] -> DVarSet
 delDVarSetList = delListFromUniqDSet
 
-seqDVarSet :: DVarSet -> ()
-seqDVarSet s = s `seq` ()
+seqDVarSet :: DVarSet -> SeqResult
+seqDVarSet = seqUnit
 
 -- | Add a list of variables to DVarSet
 extendDVarSetList :: DVarSet -> [Var] -> DVarSet

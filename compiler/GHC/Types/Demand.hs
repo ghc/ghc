@@ -102,6 +102,7 @@ import GHC.Utils.Panic
 
 import Data.Coerce (coerce)
 import Data.Function
+import qualified Data.Monoid as M
 
 {-
 ************************************************************************
@@ -2665,27 +2666,27 @@ trimBoxity (n :* sd) = n :* go sd
 ************************************************************************
 -}
 
-seqDemand :: Demand -> ()
-seqDemand AbsDmd    = ()
-seqDemand BotDmd    = ()
+seqDemand :: Demand -> SeqResult
+seqDemand AbsDmd    = mempty
+seqDemand BotDmd    = mempty
 seqDemand (_ :* sd) = seqSubDemand sd
 
-seqSubDemand :: SubDemand -> ()
+seqSubDemand :: SubDemand -> SeqResult
 seqSubDemand (Prod _ ds) = seqDemandList ds
 seqSubDemand (Call _ sd) = seqSubDemand sd
-seqSubDemand (Poly _ _)  = ()
+seqSubDemand (Poly _ _)  = mempty
 
-seqDemandList :: [Demand] -> ()
-seqDemandList = foldr (seq . seqDemand) ()
+seqDemandList :: [Demand] -> SeqResult
+seqDemandList = foldr ((M.<>) . seqDemand) mempty
 
-seqDmdType :: DmdType -> ()
+seqDmdType :: DmdType -> SeqResult
 seqDmdType (DmdType env ds) =
-  seqDmdEnv env `seq` seqDemandList ds `seq` ()
+  seqDmdEnv env M.<> seqDemandList ds
 
-seqDmdEnv :: DmdEnv -> ()
+seqDmdEnv :: DmdEnv -> SeqResult
 seqDmdEnv (DE fvs _) = seqEltsUFM seqDemand fvs
 
-seqDmdSig :: DmdSig -> ()
+seqDmdSig :: DmdSig -> SeqResult
 seqDmdSig (DmdSig ty) = seqDmdType ty
 
 {-

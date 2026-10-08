@@ -94,6 +94,8 @@ module GHC.Types.Basic (
         ForeignSrcLang (..),
 
         ImportLevel(..), convImportLevel, convImportLevelSpec, allImportLevels,
+
+        SeqResult(..), seqUnit
    ) where
 
 import GHC.Prelude
@@ -101,7 +103,6 @@ import GHC.Prelude
 import GHC.ForeignSrcLang
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Binary
 import GHC.Types.Arity
 
 import qualified GHC.LanguageExtensions as LangExt
@@ -134,15 +135,6 @@ pickLR CRight (_,r) = r
 instance Outputable LeftOrRight where
   ppr CLeft    = text "Left"
   ppr CRight   = text "Right"
-
-instance Binary LeftOrRight where
-   put_ bh CLeft  = putByte bh 0
-   put_ bh CRight = putByte bh 1
-
-   get bh = do { h <- getByte bh
-               ; case h of
-                   0 -> return CLeft
-                   _ -> return CRight }
 
 instance NFData LeftOrRight where
   rnf CLeft  = ()
@@ -384,16 +376,6 @@ instance Outputable FunctionOrData where
     ppr IsFunction = text "(function)"
     ppr IsData     = text "(data)"
 
-instance Binary FunctionOrData where
-    put_ bh IsFunction = putByte bh 0
-    put_ bh IsData     = putByte bh 1
-    get bh = do
-        h <- getByte bh
-        case h of
-          0 -> return IsFunction
-          1 -> return IsData
-          _ -> panic "Binary FunctionOrData"
-
 instance NFData FunctionOrData where
   rnf IsFunction = ()
   rnf IsData = ()
@@ -425,16 +407,6 @@ data CbvMark = MarkedCbv | NotMarkedCbv
 instance Outputable CbvMark where
   ppr MarkedCbv    = text "!"
   ppr NotMarkedCbv = text "~"
-
-instance Binary CbvMark where
-    put_ bh NotMarkedCbv = putByte bh 0
-    put_ bh MarkedCbv    = putByte bh 1
-    get bh =
-      do h <- getByte bh
-         case h of
-           0 -> return NotMarkedCbv
-           1 -> return MarkedCbv
-           _ -> panic "Invalid binary format"
 
 instance NFData CbvMark where
   rnf MarkedCbv    = ()
@@ -475,16 +447,6 @@ instance Outputable RecFlag where
   ppr Recursive    = text "Recursive"
   ppr NonRecursive = text "NonRecursive"
 
-instance Binary RecFlag where
-    put_ bh Recursive =
-            putByte bh 0
-    put_ bh NonRecursive =
-            putByte bh 1
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return Recursive
-              _ -> return NonRecursive
 
 {-
 ************************************************************************
@@ -689,17 +651,6 @@ instance Outputable TupleSort where
       UnboxedTuple    -> "UnboxedTuple"
       ConstraintTuple -> "ConstraintTuple"
 
-instance Binary TupleSort where
-    put_ bh BoxedTuple      = putByte bh 0
-    put_ bh UnboxedTuple    = putByte bh 1
-    put_ bh ConstraintTuple = putByte bh 2
-    get bh = do
-      h <- getByte bh
-      case h of
-        0 -> return BoxedTuple
-        1 -> return UnboxedTuple
-        _ -> return ConstraintTuple
-
 instance NFData TupleSort where
   rnf BoxedTuple      = ()
   rnf UnboxedTuple    = ()
@@ -875,8 +826,8 @@ isManyOccs :: OccInfo -> Bool
 isManyOccs ManyOccs{} = True
 isManyOccs _          = False
 
-seqOccInfo :: OccInfo -> ()
-seqOccInfo occ = occ `seq` ()
+seqOccInfo :: OccInfo -> SeqResult
+seqOccInfo = seqUnit
 
 -----------------
 -- | Interesting Context
@@ -1077,6 +1028,37 @@ failed Failed    = True
 
 {- *********************************************************************
 *                                                                      *
+                  SeqResult
+*                                                                      *
+********************************************************************* -}
+
+{- Note [SeqResult]
+~~~~~~~~~~~~~~~~~~~
+When we want to force an entire data structure it's convenient to use,
+for example,
+   seqType :: Type -> SeqResult
+so that we can define a Monoid instance of SeqResult, and then use
+a generic TyCoFolder to do the traversal.
+
+There is a more elaborate library, with type classes, in deepseq:Control.DeepSeq,
+but it uses `()` as a result type, whose Monoid instance does not do the right
+thing.
+-}
+
+data SeqResult = SeqResult deriving( Eq, Show )
+
+instance Semigroup SeqResult where
+  SeqResult <> x = x    -- Strict in its left argument
+
+instance Monoid SeqResult where
+  mempty = SeqResult
+
+seqUnit :: a -> SeqResult
+{-# INLINE seqUnit #-}
+seqUnit x = x `seq` SeqResult
+
+{- *********************************************************************
+*                                                                      *
                  UnfoldingSource
 *                                                                      *
 ********************************************************************* -}
@@ -1112,19 +1094,6 @@ isStableSource CompulsorySrc   = True
 isStableSource StableSystemSrc = True
 isStableSource StableUserSrc   = True
 isStableSource VanillaSrc      = False
-
-instance Binary UnfoldingSource where
-    put_ bh CompulsorySrc   = putByte bh 0
-    put_ bh StableUserSrc   = putByte bh 1
-    put_ bh StableSystemSrc = putByte bh 2
-    put_ bh VanillaSrc      = putByte bh 3
-    get bh = do
-        h <- getByte bh
-        case h of
-            0 -> return CompulsorySrc
-            1 -> return StableUserSrc
-            2 -> return StableSystemSrc
-            _ -> return VanillaSrc
 
 instance NFData UnfoldingSource where
   rnf = \case
@@ -1262,14 +1231,6 @@ instance Outputable Levity where
   ppr Lifted   = text "Lifted"
   ppr Unlifted = text "Unlifted"
 
-instance Binary Levity where
-  put_ bh = \case
-    Lifted   -> putByte bh 0
-    Unlifted -> putByte bh 1
-  get bh = getByte bh >>= \case
-    0 -> pure Lifted
-    _ -> pure Unlifted
-
 mightBeLifted :: Maybe Levity -> Bool
 mightBeLifted (Just Unlifted) = False
 mightBeLifted _               = True
@@ -1281,15 +1242,6 @@ mightBeUnlifted _             = True
 data TypeOrConstraint
   = TypeLike | ConstraintLike
   deriving( Eq, Ord, Data )
-
-instance Binary TypeOrConstraint where
-  put_ bh = \case
-    TypeLike -> putByte bh 0
-    ConstraintLike -> putByte bh 1
-  get bh = getByte bh >>= \case
-    0 -> pure TypeLike
-    1 -> pure ConstraintLike
-    _ -> panic "TypeOrConstraint.get: invalid value"
 
 instance NFData TypeOrConstraint where
   rnf = \case
@@ -1500,16 +1452,20 @@ instance Outputable DefaultingStrategy where
   ppr DefaultKindVars            = text "DefaultKindVars"
   ppr (NonStandardDefaulting ns) = text "NonStandardDefaulting" <+> ppr ns
 
--- | ImportLevel
 
-data ImportLevel = NormalLevel | SpliceLevel | QuoteLevel deriving (Eq, Ord, Data, Show, Enum, Bounded)
+{- *********************************************************************
+*                                                                      *
+                        ImportLevel
+*                                                                      *
+********************************************************************* -}
+
+data ImportLevel = NormalLevel | SpliceLevel | QuoteLevel
+  deriving (Eq, Ord, Data, Show, Enum, Bounded)
 
 instance Outputable ImportLevel where
   ppr NormalLevel = text "normal"
   ppr SpliceLevel = text "splice"
   ppr QuoteLevel = text "quote"
-
-deriving via (EnumBinary ImportLevel) instance Binary ImportLevel
 
 allImportLevels :: [ImportLevel]
 allImportLevels = [minBound..maxBound]

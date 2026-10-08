@@ -73,8 +73,11 @@ import GHC.Prelude
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
-import Data.Coerce
+import GHC.Types.Basic( SeqResult, seqUnit )
+
 import GHC.Utils.Outputable
+
+import Data.Coerce
 import Data.Data
 import qualified Data.Semigroup as Semi
 import Control.DeepSeq
@@ -92,7 +95,9 @@ newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a a}
                   deriving (Data, Semi.Semigroup, Monoid)
 
 instance NFData a => NFData (UniqSet a) where
-  rnf = forceUniqSet rnf
+  rnf s = forceUniqSet (seqUnit . rnf) s `seq` ()
+    -- A bit of a mis-match here between `rnf` (returning ())
+    --       and `forceUniqSet` (returning SeqResult)
 
 emptyUniqSet :: UniqSet a
 emptyUniqSet = UniqSet emptyUFM
@@ -260,7 +265,7 @@ pprUniqSet :: (a -> SDoc) -> UniqSet a -> SDoc
 -- pretty-printing.
 pprUniqSet f = braces . pprWithCommas f . nonDetEltsUniqSet
 
-forceUniqSet :: (a -> ()) -> UniqSet a -> ()
+forceUniqSet :: (a -> SeqResult) -> UniqSet a -> SeqResult
 forceUniqSet f (UniqSet fm) = seqEltsUFM f fm
 
 --------------------------------------------------------
