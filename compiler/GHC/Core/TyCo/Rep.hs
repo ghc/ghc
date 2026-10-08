@@ -7,16 +7,51 @@
 
 Note [The Type-related module hierarchy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  GHC.Core.Class
-  GHC.Core.Coercion.Axiom
-  GHC.Core.TyCon           imports GHC.Core.{Class, Coercion.Axiom}
-  GHC.Core.TyCo.Rep        imports GHC.Core.{Class, Coercion.Axiom, TyCon}
-  GHC.Core.TyCo.Ppr        imports GHC.Core.TyCo.Rep
-  GHC.Core.TyCo.FVs        imports GHC.Core.TyCo.Rep
-  GHC.Core.TyCo.Subst      imports GHC.Core.TyCo.{Rep, FVs, Ppr}
-  GHC.Core.TyCo.Tidy       imports GHC.Core.TyCo.{Rep, FVs}
-  GHC.Builtin.WiredIn.Prim imports GHC.Core.TyCo.Rep ( including mkTyConTy )
-  GHC.Core.Coercion        imports GHC.Core.Type
+The modules that define Class, TyCon, Type, Coercion etc are central
+to GHC.   This table gives the overall plan, with dependencies.
+
+  ----------------------------------------------------------------
+                           Defines                Needs
+  ----------------------------------------------------------------
+  GHC.Core.Class           Class
+  GHC.Core.Coercion.Axiom  CoAxiom
+
+  GHC.Core.TyCon           TyCon                  Class, CoAxiom
+
+  GHC.Core.TyCo.Rep        Type, Coercion         TyCon
+                           TyCoFolder
+
+  GHC.Core.TyCo.FVs        Free-var finders       TyCoFolder
+
+  GHC.Core.TyCo.Make       Lots of mkX functions  GHC.Core.TyCo.FVS
+    see (TRM1)             TyCoMapper             (free vars)
+
+  GHC.Core.TyCo.Subst      Substitution           GHC.Core.TyCo.Make
+                                                  (TyCoMapper, mkX functions)
+
+  GHC.Core.Type            Many Type functions    GHC.Core.TyCo.Subst
+                           coreView, typeKind
+                           coercionKind
+
+  GHC.Core.TyCo.Compare    Comparison             GHC.Core.Type( coreView )
+
+  GHC.Core.Coercion     Many Coercion functions   GHC.Core.Type
+  ----------------------------------------------------------------
+
+Wrinkles
+
+(TRM1) GHC.Core.TyCo.Make contains TyCoMapper, which maps over a type or coercion.
+   That requires building a new type or coercion, with "smart constructors", like
+   mkTyVarTy, mkTyConApp etc.
+
+     * Some of these smart constructors are simple; they live in GHC.Core.TyCo.Make
+       where they can be inlined into the mapper function.  Examples: mkTyConApp,
+       mkNumLitTy, etc.
+
+     * Others need to do substitution or take type equality, which in turn depend on
+       GHC.Core.TyCo.Subst or GHC.Core.TyCo.Compare.  They are defined "higher
+       up" in GHC.Core.Type or GHC.Core.Coercion, and must be SOURCE-imported into
+       GHC.Core.TyCo.Make.  Examples: mkCastTy, mkInstCo, mkLRCo etc.
 -}
 
 -- We expose the relevant stuff from this module via the Type module
@@ -33,7 +68,7 @@ module GHC.Core.TyCo.Rep (
         ForAllTyFlag(..), FunTyFlag(..),
 
         -- * Coercions
-        Coercion(..), CoSel(..), FunSel(..),
+        Coercion(..), CoSel(..), FunSel(..), Role(..),
         UnivCoProvenance(..),
         CoercionHole(..), CoercionPlusHoles(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
@@ -99,6 +134,8 @@ import GHC.Utils.Binary
 import qualified Data.Data as Data hiding ( TyCon )
 import Data.Coerce
 import Data.IORef ( IORef )   -- for CoercionHole
+
+import qualified Data.Monoid as M
 import Control.DeepSeq
 
 {- **********************************************************************
@@ -1968,20 +2005,27 @@ data TyCoFolder a
   = TyCoFolder
       { tcf_view  :: Type -> Maybe Type   -- Optional "view" function
                                           -- E.g. expand synonyms
+
+      , tcf_lit   :: forall b. b -> a     -- Used for type literals, visibility, provenance
+                                          -- Usually returns a no-op, but can be `seq`
+                                          -- We could have per-type cases if we need to
+
       , tcf_tyvar :: TyVar -> a    -- Does not automatically recur
       , tcf_covar :: CoVar -> a    -- into kinds of variables
-      , tcf_hole  :: CoercionHole -> a
-          -- ^ What to do with coercion holes.
-          -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
+
+      , tcf_hole  :: CoercionHole -> a   -- ^ What to do with coercion holes.
+                                         -- See Note [Coercion holes]
 
       , tcf_tycobinder :: TyCoVar -> a -> a
-          -- ^ The returned env is used in the extended scope
+          -- ^ The CPS style allows us to extend an environment
+          --   See the free-var finders in GHC.Core.TyCo.FVs
       }
 
 {-# INLINE foldTyCo  #-}  -- See Note [Specialising foldType]
 foldTyCo :: Monoid a => TyCoFolder a
          -> (Type -> a, [Type] -> a, Coercion -> a, [Coercion] -> a)
 foldTyCo (TyCoFolder { tcf_view       = view
+                     , tcf_lit        = lit
                      , tcf_tyvar      = tyvar
                      , tcf_tycobinder = tycobinder
                      , tcf_covar      = covar
@@ -1990,51 +2034,52 @@ foldTyCo (TyCoFolder { tcf_view       = view
   where
     go_ty ty | Just ty' <- view ty = go_ty ty'
     go_ty (TyVarTy tv)        = tyvar tv
-    go_ty (AppTy t1 t2)       = go_ty t1 `mappend` go_ty t2
-    go_ty (LitTy {})          = mempty
-    go_ty (CastTy ty co)      = go_ty ty `mappend` go_co co
+    go_ty (LitTy l)           = lit l
+    go_ty (AppTy t1 t2)       = go_ty t1 M.<> go_ty t2
+    go_ty (CastTy ty co)      = go_ty ty M.<> go_co co
     go_ty (CoercionTy co)     = go_co co
-    go_ty (FunTy _ w arg res) = go_ty arg `mappend` go_ty w `mappend` go_ty res
-                                -- As per #23764, ordering is [arg, w, res]
-
-    go_ty (TyConApp _ tys)  = go_tys tys
+    go_ty (TyConApp tc tys)   = lit tc M.<> go_tys tys
+    go_ty (FunTy { ft_af = af, ft_mult =  w, ft_arg = arg, ft_res = res })
+      = lit af M.<> go_ty arg M.<> go_ty w M.<> go_ty res
+        -- As per #23764, ordering is [arg, w, res]
     go_ty (ForAllTy (Bndr tv _) inner)
-      = go_ty (varType tv) `mappend` tycobinder tv (go_ty inner)
+      = go_ty (varType tv) M.<> tycobinder tv (go_ty inner)
 
     -- See Note [Use explicit recursion in foldTyCo]
     go_tys []     = mempty
-    go_tys (t:ts) = go_ty t `mappend` go_tys ts
+    go_tys (t:ts) = go_ty t M.<> go_tys ts
 
     -- See Note [Use explicit recursion in foldTyCo]
     go_cos []     = mempty
-    go_cos (c:cs) = go_co c `mappend` go_cos cs
+    go_cos (c:cs) = go_co c M.<> go_cos cs
 
     go_co (Refl ty)                = go_ty ty
-    go_co (GRefl _ ty MRefl)       = go_ty ty
-    go_co (GRefl _ ty (MCo co))    = go_ty ty `mappend` go_co co
-    go_co (TyConAppCo _ _ args)    = go_cos args
-    go_co (AppCo c1 c2)            = go_co c1 `mappend` go_co c2
+    go_co (GRefl ro ty MRefl)      = lit ro M.<> go_ty ty
+    go_co (GRefl ro ty (MCo co))   = lit ro M.<> go_ty ty M.<> go_co co
+    go_co (TyConAppCo ro tc args)  = lit ro M.<> lit tc M.<> go_cos args
+    go_co (AppCo c1 c2)            = go_co c1 M.<> go_co c2
     go_co (CoVarCo cv)             = covar cv
-    go_co (AxiomCo _ cos)          = go_cos cos
+    go_co (AxiomCo ax cos)         = lit ax M.<> go_cos cos
     go_co (HoleCo hole)            = cohole hole
-    go_co (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps })
-                                   = go_ty t1
-                                     `mappend` go_ty t2
-                                     `mappend` go_cos deps
     go_co (SymCo co)               = go_co co
-    go_co (TransCo c1 c2)          = go_co c1 `mappend` go_co c2
-    go_co (SelCo _ co)             = go_co co
-    go_co (LRCo _ co)              = go_co co
-    go_co (InstCo co arg)          = go_co co `mappend` go_co arg
+    go_co (TransCo c1 c2)          = go_co c1 M.<> go_co c2
+    go_co (SelCo sc co)            = lit sc M.<> go_co co
+    go_co (LRCo lr co)             = lit lr M.<> go_co co
+    go_co (InstCo co arg)          = go_co co M.<> go_co arg
     go_co (KindCo co)              = go_co co
     go_co (SubCo co)               = go_co co
 
-    go_co (FunCo { fco_mult = cw, fco_arg = c1, fco_res = c2 })
-       = go_co cw `mappend` go_co c1 `mappend` go_co c2
+    go_co (UnivCo { uco_prov = prov, uco_role = ro, uco_lty = t1, uco_rty = t2, uco_deps = deps })
+       = lit prov M.<> lit ro M.<> go_ty t1 M.<> go_ty t2 M.<> go_cos deps
+    go_co (FunCo { fco_role = ro, fco_afl = afl, fco_afr = afr
+                 , fco_mult = cw, fco_arg = c1, fco_res = c2 })
+       = lit ro M.<> lit afl M.<> lit afr M.<> go_co cw M.<> go_co c1 M.<> go_co c2
 
-    go_co (ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = co })
-      = go_mco kind_co `mappend` go_ty (varType tcv)
-                       `mappend` tycobinder tcv (go_co co)
+    go_co (ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
+                    , fco_kind = kind_co, fco_body = co })
+      = lit visL M.<> lit visR
+        M.<> go_mco kind_co M.<> go_ty (varType tcv)
+        M.<> tycobinder tcv (go_co co)
 
     go_mco MRefl    = mempty
     go_mco (MCo co) = go_co co

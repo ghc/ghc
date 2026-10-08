@@ -262,7 +262,7 @@ deepTcvFolder :: TyCoFolder TyCoFV
 -- in GHC.Utils.Monad
 deepTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                            , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                           , tcf_hole  = do_hole
+                           , tcf_hole  = do_hole, tcf_lit = const mempty
                            , tcf_tycobinder = addBndrFV }
   where
     do_tcv :: TyVar -> TyCoFV
@@ -319,7 +319,7 @@ shallowCosFV   :: [Coercion] -> TyCoFV
 shallowTcvFolder :: TyCoFolder TyCoFV
 shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                               , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                              , tcf_hole  = do_hole
+                              , tcf_hole  = do_hole, tcf_lit = const mempty
                               , tcf_tycobinder = addBndrFV }
   where
     do_tcv = shallowUnitFV
@@ -393,7 +393,7 @@ deepDetTcvFolder :: TyCoFolder DTyCoFV
 deepDetTcvFolder
   = TyCoFolder { tcf_view = noView
                , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-               , tcf_hole  = do_hole
+               , tcf_hole  = do_hole, tcf_lit = const mempty
                , tcf_tycobinder = addBndrFV }
   where
     do_tcv = deepDetUnitFV deepDetTypeFV
@@ -440,7 +440,7 @@ selectiveTcvFolder :: TyCoFolder SelectiveDFV
 selectiveTcvFolder
   = TyCoFolder { tcf_view  = noView  -- See Note [Free vars and synonyms]
                , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-               , tcf_hole  = do_hole
+               , tcf_hole  = do_hole, tcf_lit = const mempty
                , tcf_tycobinder = addBndrSelectiveFV }
   where
     do_tcv v = MkFV (\bvs -> EndoOS (do_it bvs))
@@ -497,7 +497,7 @@ deepCoVarCosFV :: [Coercion] -> CoVarFV
 deepCoVarFolder :: TyCoFolder CoVarFV
 deepCoVarFolder = TyCoFolder { tcf_view = noView
                              , tcf_tyvar = do_tyvar, tcf_covar = do_covar
-                             , tcf_hole  = do_hole
+                             , tcf_hole  = do_hole, tcf_lit = const mempty
                              , tcf_tycobinder = addBndrFV }
   where
     do_tyvar _  = mempty
@@ -533,6 +533,7 @@ deepDetCoVarFolder = TyCoFolder { tcf_view = noView
                                 , tcf_tyvar = do_tyvar
                                 , tcf_covar = do_covar
                                 , tcf_hole  = do_hole
+                                , tcf_lit   = const mempty
                                 , tcf_tycobinder = addBndrFV }
   where
     do_tyvar _  = mempty
@@ -853,7 +854,7 @@ afvFolder :: (TyCoVar -> Bool) -> TyCoFolder (FV TyCoVarSet DM.Any)
 -- if any free var of a type satisfies a predicate `check_fv`
 afvFolder check_fv = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                                 , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                                , tcf_hole = do_hole
+                                , tcf_hole = do_hole, tcf_lit = const mempty
                                 , tcf_tycobinder = addBndrFV }
   where
     do_tcv tv = MkFV $ \ bvs ->
