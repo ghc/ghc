@@ -1165,7 +1165,9 @@ oneSRT cfg staticFuns lbls caf_lbls isCAF cafs static_data_env = do
           -- when dynamic linking is used we cannot guarantee that the offset
           -- between the SRT and the info table will fit in the offset field.
           -- Consequently we build a singleton SRT in this case.
-          not (labelDynamic this_mod platform (cmmExternalDynamicRefs cfg) lbl)
+          (case labelLinkerUnit this_mod platform (cmmExternalDynamicRefs cfg) lbl of
+             LinkerUnitLocal    -> True
+             LinkerUnitExternal -> False)
 
           -- MachO relocations can't express offsets between compilation units at
           -- all, so we are always forced to build a singleton SRT in this case

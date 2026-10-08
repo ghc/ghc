@@ -235,9 +235,12 @@ absoluteLabel lbl
 
 -- | Helper to check whether the data resides in a DLL or not, see @labelDynamic@
 ncgLabelDynamic :: NCGConfig -> CLabel -> Bool
-ncgLabelDynamic config = labelDynamic (ncgThisModule config)
-                                      (ncgPlatform config)
-                                      (ncgExternalDynamicRefs config)
+ncgLabelDynamic config label =
+   labelLinkerUnit (ncgThisModule config)
+                   (ncgPlatform config)
+                   (ncgExternalDynamicRefs config)
+                   label
+     == LinkerUnitExternal
 
 
 -- We have to decide which labels need to be accessed
