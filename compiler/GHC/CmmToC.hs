@@ -49,7 +49,7 @@ import GHC.Types.Unique
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Monad.State.Strict (State (..), runState, state)
+import GHC.Utils.Monad.StrictState (State (..), runState, state)
 import GHC.Utils.Misc
 
 import Data.ByteString (ByteString)

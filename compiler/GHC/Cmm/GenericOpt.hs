@@ -28,7 +28,7 @@ import GHC.Cmm.CLabel
 import GHC.Data.FastString
 import GHC.Unit
 import Control.Monad.Trans.Reader
-import GHC.Utils.Monad.State.Strict as Strict
+import GHC.Utils.Monad.StrictState as Strict
 
 -- -----------------------------------------------------------------------------
 -- Generic Cmm optimiser

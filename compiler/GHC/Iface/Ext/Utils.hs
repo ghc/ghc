@@ -36,7 +36,7 @@ import Data.Monoid
 import Data.List                  (find)
 import Data.Traversable           ( for )
 import Data.Coerce
-import GHC.Utils.Monad.State.Strict hiding (get)
+import GHC.Utils.Monad.StrictState hiding (get)
 import GHC.Utils.Panic.Plain( assert )
 import Control.Monad.Trans.Reader
 import qualified Data.Tree as Tree

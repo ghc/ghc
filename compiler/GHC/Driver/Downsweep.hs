@@ -72,7 +72,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.TmpFs
 import GHC.Utils.Constants
 import GHC.Utils.Monad (concatMapM)
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 
 import GHC.Types.Error
 import GHC.Types.Target

@@ -12,7 +12,7 @@ module GHC.Cmm.UniqueRenamer
   where
 
 import GHC.Prelude
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import Data.Tuple (swap)
 import GHC.Word
 import GHC.Cmm

@@ -17,7 +17,7 @@ import GHC.CmmToAsm.Types
 import GHC.Types.Unique.FM
 
 import GHC.Utils.Outputable
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import GHC.Platform (Platform)
 
 -- | Build a map of how many times each reg was alloced, clobbered, loaded etc.

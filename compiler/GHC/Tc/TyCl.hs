@@ -108,7 +108,7 @@ import GHC.Utils.Misc
 
 import Control.Monad
 import Data.Foldable ( toList, traverse_ )
-import Data.Functor.Identity
+import GHC.Utils.Monad.StrictIdentity
 import Data.List ( partition)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
@@ -1387,34 +1387,33 @@ swizzleTcTyConBndrs tc_infos
     -- back to the original user-specified Name
     swizzle_env = mkVarEnv (map swap swizzle_prs)
 
-    swizzleMapper :: TyCoMapper () Identity
+    swizzleMapper :: TyCoMapper StrictIdentity
     swizzleMapper = TyCoMapper { tcm_tyvar = swizzle_tv
                                , tcm_covar = swizzle_cv
                                , tcm_hole  = swizzle_hole
                                , tcm_tycobinder = swizzle_bndr
                                , tcm_tcapp_ty   = swizzle_tcapp_ty
                                , tcm_tcapp_co   = swizzle_tcapp_co }
-    swizzle_hole  _ hole = pprPanic "swizzle_hole" (ppr hole)
+    swizzle_hole  hole = pprPanic "swizzle_hole" (ppr hole)
        -- These types are pre-zonked
 
-    swizzle_tcapp_ty _ ty      tc tys' = swizzle_tcapp mkTyConApp          ty tc tys'
-    swizzle_tcapp_co _ co role tc cos' = swizzle_tcapp (mkTyConAppCo role) co tc cos'
+    swizzle_tcapp_ty ty      tc tys' = swizzle_tcapp mkTyConApp          ty tc tys'
+    swizzle_tcapp_co co role tc cos' = swizzle_tcapp (mkTyConAppCo role) co tc cos'
 
     swizzle_tcapp mk tyco tc tycos'
       | isTcTyCon tc = pprPanic "swizzle_tc" (ppr tc) -- TcTyCons can't appear in kinds (yet)
       | null tycos'  = return tyco
       | otherwise    = return (mk tc tycos')
 
-    swizzle_tv _ tv = return (mkTyVarTy (swizzle_var tv))
-    swizzle_cv _ cv = return (mkCoVarCo (swizzle_var cv))
+    swizzle_tv tv = return (mkTyVarTy (swizzle_var tv))
+    swizzle_cv cv = return (mkCoVarCo (swizzle_var cv))
 
-    swizzle_bndr :: ()
-      -> TyCoVar
+    swizzle_bndr :: TyCoVar
       -> ForAllTyFlag
-      -> (() -> TyCoVar -> Identity r)
-      -> Identity r
-    swizzle_bndr _ tcv _ k
-      = k () (swizzle_var tcv)
+      -> (TyCoVar -> StrictIdentity r)
+      -> StrictIdentity r
+    swizzle_bndr tcv _ k
+      = k (swizzle_var tcv)
 
     swizzle_var :: Var -> Var
     swizzle_var v
@@ -1424,7 +1423,7 @@ swizzleTcTyConBndrs tc_infos
       = updateVarType swizzle_ty v
 
     (map_type, _, _, _) = mapTyCo swizzleMapper
-    swizzle_ty ty = runIdentity (map_type ty)
+    swizzle_ty ty = runStrictIdentity (map_type ty)
 
 
 generaliseTcTyCon :: (MonoTcTyCon, TcKind, SkolemInfo, ScopedPairs, TcKind) -> TcM PolyTcTyCon

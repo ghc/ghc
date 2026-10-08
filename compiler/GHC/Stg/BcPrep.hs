@@ -27,7 +27,7 @@ import GHC.Types.Unique.Supply
 
 import GHC.Data.FastString
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 
 import qualified GHC.Types.CostCentre as CC
 import GHC.Stg.Syntax

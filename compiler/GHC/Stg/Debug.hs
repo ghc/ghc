@@ -24,7 +24,7 @@ import GHC.Stg.Debug.Types
 import Control.Monad (when)
 import Control.Monad.Trans.Reader
 import qualified Data.Set as Set
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import Control.Monad.Trans.Class
 import GHC.Types.SrcLoc
 import Control.Applicative
