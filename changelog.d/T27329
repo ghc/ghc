@@ -7,9 +7,9 @@ description: {
     The following language extensions have been marked as deprecated,
     meaning they will now issue a warning with :ghc-flag:`-Wdeprecated-flags`:
 
-    - `AlternativeLayoutRule`
-    - `AlternativeLayoutRuleTransitional`
-    - `ParallelArrays`
+    - ``AlternativeLayoutRule``
+    - ``AlternativeLayoutRuleTransitional``
+    - ``ParallelArrays``
     - :extension:`PolymorphicComponents`
     - :extension:`Rank2Types`
 }
