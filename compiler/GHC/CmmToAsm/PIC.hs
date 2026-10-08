@@ -233,14 +233,21 @@ absoluteLabel lbl
 -- pointers, code stubs and GOT offsets look like is located in the
 -- module CLabel.
 
--- | Helper to check whether the data resides in a DLL or not, see @labelDynamic@
-ncgLabelDynamic :: NCGConfig -> CLabel -> Bool
-ncgLabelDynamic config label =
+-- | Helper to check whether the label's target resides in a local, external or
+-- unknown linker unit. See @labelLinkerUnit@
+--
+-- There are a few ways we use this below, depending on how we want to handle
+-- the unknown ("could be either!") case:
+-- 1. @ncgLabelLinkerUnit config lbl == LinkerUnitExternal@
+--    this means we want to be certain that it is external, unknown as false
+-- 2. @ncgLabelLinkerUnit config lbl /= LinkerUnitLocal@
+--    this means it might be external, unknown as true
+--
+ncgLabelLinkerUnit :: NCGConfig -> CLabel -> LabelLinkerUnit
+ncgLabelLinkerUnit config =
    labelLinkerUnit (ncgThisModule config)
                    (ncgPlatform config)
                    (ncgExternalDynamicRefs config)
-                   label
-     == LinkerUnitExternal
 
 
 -- We have to decide which labels need to be accessed
@@ -281,7 +288,7 @@ howToAccessLabel config _arch OSMinGW32 _kind lbl
 
         -- If the target symbol is in another PE we need to access it via the
         --      appropriate __imp_SYMBOL pointer.
-        | ncgLabelDynamic config lbl
+        | ncgLabelLinkerUnit config lbl == LinkerUnitExternal
         = AccessViaSymbolPtr
 
         -- Target symbol is in the same PE as the caller, so just access it directly.
@@ -296,7 +303,7 @@ howToAccessLabel config ArchAArch64 _os _kind lbl
         | not (ncgExternalDynamicRefs config)
         = AccessDirectly
 
-        | ncgLabelDynamic config lbl
+        | ncgLabelLinkerUnit config lbl /= LinkerUnitLocal
         = AccessViaSymbolPtr
 
         | otherwise
@@ -313,7 +320,7 @@ howToAccessLabel config ArchAArch64 _os _kind lbl
 --
 howToAccessLabel config arch OSDarwin DataReference lbl
         -- data access to a dynamic library goes via a symbol pointer
-        | ncgLabelDynamic config lbl
+        | ncgLabelLinkerUnit config lbl /= LinkerUnitLocal
         = AccessViaSymbolPtr
 
         -- when generating PIC code, all cross-module data references must
@@ -333,7 +340,7 @@ howToAccessLabel config _ OSDarwin JumpReference lbl
         -- dyld code stubs don't work for tailcalls because the
         -- stack alignment is only right for regular calls.
         -- Therefore, we have to go via a symbol pointer:
-        | ncgLabelDynamic config lbl
+        | ncgLabelLinkerUnit config lbl /= LinkerUnitLocal
         = AccessViaSymbolPtr
 
 
@@ -386,7 +393,7 @@ howToAccessLabel config arch os DataReference lbl
         | osElfTarget os
         = case () of
             -- A dynamic label needs to be accessed via a symbol pointer.
-          _ | ncgLabelDynamic config lbl
+          _ | ncgLabelLinkerUnit config lbl /= LinkerUnitLocal
             -> AccessViaSymbolPtr
 
             -- For PowerPC32 -fPIC, we have to access even static data
@@ -414,21 +421,21 @@ howToAccessLabel config arch os DataReference lbl
 
 howToAccessLabel config arch os CallReference lbl
         | osElfTarget os
-        , ncgLabelDynamic config lbl
+        , ncgLabelLinkerUnit config lbl /= LinkerUnitLocal
         , not (ncgPIC config)
         = AccessDirectly
 
         | osElfTarget os
         , arch /= ArchX86
-        , ncgLabelDynamic config lbl
+        , ncgLabelLinkerUnit config lbl /= LinkerUnitLocal
         , ncgPIC config
         = AccessViaStub
 
 howToAccessLabel config _arch os _kind lbl
         | osElfTarget os
-        = if ncgLabelDynamic config lbl
-            then AccessViaSymbolPtr
-            else AccessDirectly
+        = if ncgLabelLinkerUnit config lbl == LinkerUnitLocal
+            then AccessDirectly
+            else AccessViaSymbolPtr
 
 -- On wasm, always keep the original CLabel and let the backend decide
 -- how to handle dynamic references
