@@ -41,7 +41,7 @@ import GHC.Prelude
 import GHC.Word
 import Control.Monad.Fix
 import GHC.Types.Unique
-import qualified GHC.Utils.Monad.State.Strict as Strict
+import qualified GHC.Utils.Monad.StrictState as Strict
 import qualified GHC.Types.Unique.Supply as USM
 import Control.Monad.IO.Class
 

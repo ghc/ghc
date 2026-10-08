@@ -21,7 +21,7 @@ module Utils
   where
 
 import Control.Monad (when)
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import Data.Function
 
 import GHC.Hs.Dump

@@ -29,7 +29,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Utils.Panic (panic)
 

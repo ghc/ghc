@@ -1032,13 +1032,14 @@ Library
         GHC.Utils.Misc
         GHC.Utils.Monad
         GHC.Utils.Monad.Codensity
-        GHC.Utils.Monad.State.Strict
+        GHC.Utils.Monad.StrictIdentity
+        GHC.Utils.Monad.StrictReader
+        GHC.Utils.Monad.StrictState
         GHC.Utils.Outputable
         GHC.Utils.Panic
         GHC.Utils.Panic.Plain
         GHC.Utils.Ppr
         GHC.Utils.Ppr.Colour
-        GHC.Utils.StrictIdentity
         GHC.Utils.TmpFs
         GHC.Utils.Touch
         GHC.Utils.Trace

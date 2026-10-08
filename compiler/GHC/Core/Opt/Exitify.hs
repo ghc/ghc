@@ -49,7 +49,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Basic( JoinPointHood(..) )
 
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import GHC.Utils.Misc( mapSnd )
 
 import GHC.Data.FastString

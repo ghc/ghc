@@ -11,7 +11,7 @@ module GHC.Core.TyCo.Subst
   (
         -- * Substitutions
         Subst(..), TvSubstEnv, CvSubstEnv, IdSubstEnv,
-        substTyCoMapper,
+        substTyCoMapper, SubstM, runSubstM,
 
         emptyIdSubstEnv, emptyTvSubstEnv, emptyCvSubstEnv, composeTCvSubst,
         emptySubst, mkEmptySubst, isEmptyTvSubst, isEmptyTCvSubst, isEmptySubst,
@@ -76,7 +76,8 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.StrictIdentity
+import GHC.Utils.Monad.StrictIdentity
+import GHC.Utils.Monad.StrictReader
 
 import Data.List (mapAccumL)
 
@@ -769,9 +770,16 @@ substTheta = substTys
 substThetaUnchecked :: Subst -> ThetaType -> ThetaType
 substThetaUnchecked = substTysUnchecked
 
-substTyCoMapper :: TyCoMapper Subst StrictIdentity
--- Use StrictIdentity, so that the entire mapping
--- operation is strict, building no thunks
+-- | The monad in which substitution runs: a strict reader monad over 'Subst'.
+-- Use StrictIdentity, so that the entire mapping operation is strict,
+-- building no thunks.  See Note [Specialising mappers] in GHC.Core.TyCo.Make
+type SubstM = StrictReaderT Subst StrictIdentity
+
+runSubstM :: SubstM a -> Subst -> a
+runSubstM m subst = runStrictIdentity (runStrictReaderT m subst)
+{-# INLINE runSubstM #-}
+
+substTyCoMapper :: TyCoMapper SubstM
 substTyCoMapper
   = TyCoMapper { tcm_tyvar      = subst_tv
                , tcm_covar      = subst_cv
@@ -781,35 +789,36 @@ substTyCoMapper
                , tcm_tcapp_co   = tcapp_co
                }
  where
-   subst_tv subst tv = return (substTyVar  subst tv)
-   subst_cv subst cv = return (substCoVar  subst cv)
-   subst_ch subst ch = return (substCoHole subst ch)
+   subst_tv tv = StrictReaderT $ \subst -> return (substTyVar  subst tv)
+   subst_cv cv = StrictReaderT $ \subst -> return (substCoVar  subst cv)
+   subst_ch ch = StrictReaderT $ \subst -> return (substCoHole subst ch)
 
-   tcv_bndr subst tcv _vis k
-     = k subst' tcv'
-     where
-       !(subst', tcv') = substVarBndrUnchecked subst tcv
-       -- Sadly unchecked because subst_ty is used from substTyUnchecked
+   tcv_bndr :: TyCoVar -> ForAllTyFlag -> (TyCoVar -> SubstM r) -> SubstM r
+   tcv_bndr tcv _vis k
+     = StrictReaderT $ \subst ->
+       let !(subst', tcv') = substVarBndrUnchecked subst tcv
+           -- Sadly unchecked because subst_ty is used from substTyUnchecked
+       in runStrictReaderT (k tcv') subst'
 
    -- Avoid allocation in this very
    -- common case (E.g. Int, LiftedRep etc)
-   tcapp_ty :: Subst -> Type -> TyCon -> [Type] -> StrictIdentity Type
-   tcapp_ty _ ty tc tys'
+   tcapp_ty :: Type -> TyCon -> [Type] -> SubstM Type
+   tcapp_ty ty tc tys'
       | null tys'  = return ty
       | otherwise  = return (mkTyConApp tc tys')
-   tcapp_co :: Subst -> Coercion -> Role -> TyCon -> [Coercion] -> StrictIdentity Coercion
-   tcapp_co _ co r tc cos'
+   tcapp_co :: Coercion -> Role -> TyCon -> [Coercion] -> SubstM Coercion
+   tcapp_co co r tc cos'
       | null cos'  = return co
       | otherwise  = return (mkTyConAppCo r tc cos')
 
 subst_ty :: Subst -> Type -> Type
 subst_co :: Subst -> Coercion -> Coercion
 (subst_ty, subst_co)
-  = case mapTyCoX substTyCoMapper of
+  = case mapTyCo substTyCoMapper of
       (ms_ty, _, ms_co, _) -> (run ms_ty, run ms_co)
   where
-    run :: forall a. (Subst -> a -> StrictIdentity a) -> Subst -> a -> a
-    run ms subst x = runStrictIdentity (ms subst x)
+    run :: forall a. (a -> SubstM a) -> Subst -> a -> a
+    run ms subst x = runSubstM (ms x) subst
 
 substTyVar :: Subst -> TyVar -> Type
 substTyVar (Subst _ _ tenv _) tv

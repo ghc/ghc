@@ -44,7 +44,7 @@ import Control.Monad
 import Data.Word
 import GHC.Exts( Ptr(..), noDuplicate#, oneShot )
 import Foreign.Storable
-import GHC.Utils.Monad.State.Strict as Strict
+import GHC.Utils.Monad.StrictState as Strict
 
 #include "MachDeps.h"
 

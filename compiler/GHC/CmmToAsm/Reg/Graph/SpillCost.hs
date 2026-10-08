@@ -29,7 +29,7 @@ import GHC.Data.Graph.Directed          (flattenSCCs)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Format
 import GHC.Utils.Misc

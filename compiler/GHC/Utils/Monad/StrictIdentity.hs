@@ -1,5 +1,5 @@
 -- |
--- Module      :  GHC.Utils.StrictIdentity
+-- Module      :  GHC.Utils.Monad.StrictIdentity
 -- License     :  BSD-style (see the file LICENSE)
 --
 -- The /strict/ identity functor and monad.
@@ -16,7 +16,7 @@
 
 -----------------------------------------------------------------------------
 
-module GHC.Utils.StrictIdentity (
+module GHC.Utils.Monad.StrictIdentity (
     StrictIdentity(..)
   ) where
 
