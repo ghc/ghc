@@ -256,6 +256,8 @@ simplRecBind env0 bind_cxt pairs0
         ; let new_bndrs = map sndOf3 triples
         ; (rec_floats, env2) <- enterRecGroupRHSs env1 new_bndrs $ \env ->
                                 go env triples
+
+           -- In rec_floats, all the `sfLetFloats` bindings are `FltLifted`
         ; return (mkRecFloats rec_floats, env2) }
   where
     add_rules :: SimplEnv -> (InBndr,InExpr) -> SimplM (SimplEnv, (InBndr, OutBndr, InExpr))
@@ -284,7 +286,8 @@ simplRecOrTopPair :: SimplEnv
                   -> BindContext
                   -> InId -> OutBndr -> InExpr  -- Binder and rhs
                   -> SimplM (SimplFloats, SimplEnv)
-
+-- Invariant: in the returned SimplFloats,
+--            all the `sfLetFloats` bindings are `FltLifted`
 simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
   | Just env' <- preInlineUnconditionally env (bindContextLevel bind_cxt)
                                           old_bndr (UnSimplified env) rhs MRefl
@@ -3399,14 +3402,56 @@ doCaseToLet scrut case_bndr
 
 reallyRebuildCase (saf,env) scrut case_bndr alts cont
   = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
-       ; case_expr <- simplAlts (saf,env') scrut
-                                (scaleIdBy holeScaling case_bndr)
-                                (scaleAltsBy holeScaling alts)
-                                cont'
-       ; return (floats, case_expr) }
+       ; traceSmpl "reallyRebuildCase" (vcat [ ppr case_bndr
+                                             , text "cont':" <+> ppr cont'
+                                             , text "in_scope" <+> ppr (seInScope env') ])
+       ; (alt_env, scrut', case_bndr', imposs_deflt_cons, in_alts)
+             <- prepareCase (saf,env') scrut (scaleIdBy holeScaling case_bndr)
+                                             (scaleAltsBy holeScaling alts)
+       ; case in_alts of
+           [in_alt] -> do { (alt_floats, alt') <- simplAlt (saf,alt_env) (Just scrut')
+                                                     imposs_deflt_cons case_bndr'
+                                                     bndr_swap cont' in_alt
+                          ; (case_floats, res) <- rebuildSingleAltCase env' scrut' case_bndr'
+                                                         cont' alt_floats alt'
+                          ; return (floats `addFloats` case_floats, res) }
+
+           _ -> do { case_expr <- simplAlts (saf,alt_env) scrut' case_bndr'
+                                            imposs_deflt_cons bndr_swap cont' in_alts
+                   ; return (floats, case_expr) } }
   where
     holeScaling = contHoleScaling cont
     -- Note [Scaling in case-of-case]
+
+    bndr_swap = scrutOkForBinderSwap scrut
+
+rebuildSingleAltCase :: SimplEnv -> OutExpr -> OutId -> SimplCont
+                     -> SimplFloats -> OutAlt
+                     -> SimplM (SimplFloats, OutExpr)
+-- Build a single-alternative case; but return it as a FloatCase float, so that
+-- the floats from its RHS are not trapped inside it.
+-- See Note [Floating single-alternative cases]
+rebuildSingleAltCase env scrut case_bndr cont alt_floats (Alt con bs rhs)
+  = do { let alts_ty = contResultType cont
+       -- See Note [Avoiding space leaks in OutType]
+       ; case_expr <- seqType alts_ty `seq`
+                      mkCase (seMode env) scrut case_bndr alts_ty
+                             [Alt con bs (wrapFloats alt_floats rhs)]
+                      -- wrapFloats: lazily; see (FSC1)
+       ; case case_expr of
+           Case scrut2 bndr2 _ [Alt con2 bs2 rhs2]
+             | not (noFloats alt_floats)
+             , bndr2 == case_bndr   -- mkCase has not changed the case; see (FSC1)
+             -> return (case_float `addFloats` alt_floats, rhs)
+             | otherwise
+             -> return (case_float, rhs2)
+             where
+               case_float = emptyFloats env `addLetFloats`
+                            unitCaseFloat scrut2 bndr2 con2 bs2
+           _ -> return (emptyFloats env, case_expr) }
+  where
+    noFloats (SimplFloats { sfLetFloats = lfs, sfJoinFloats = jfs })
+      = isEmptyLetFloats lfs && isEmptyJoinFloats jfs
 
 {-
 simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
@@ -3540,17 +3585,16 @@ scale the entire case we are simplifying, by a scaling factor which can be
 computed in the continuation (with function `contHoleScaling`).
 -}
 
-simplAlts :: (SimplAltFlag, SimplEnv)
-          -> OutExpr                       -- Scrutinee
-          -> InId -> [InAlt]  -- Alts (non-empty)
-          -> SimplCont
-          -> SimplM OutExpr  -- Returns the complete simplified case expression
-
-simplAlts (saf,env0) scrut case_bndr alts cont'
-  = do  { traceSmpl "simplAlts" (vcat [ ppr case_bndr
-                                      , text "cont':" <+> ppr cont'
-                                      , text "in_scope" <+> ppr (seInScope env0) ])
-        ; (env1, case_bndr1) <- simplAltIdBinder (saf,env0) case_bndr
+prepareCase :: (SimplAltFlag, SimplEnv)
+            -> OutExpr          -- Scrutinee
+            -> InId -> [InAlt]  -- Case binder and alts (non-empty)
+            -> SimplM ( SimplEnv   -- For the alternatives
+                      , OutExpr    -- Scrutinee, perhaps improved by improveSeq
+                      , OutId      -- Case binder
+                      , [AltCon]   -- Constructors impossible in the DEFAULT alt
+                      , [InAlt] )  -- Alternatives, from prepareAlts
+prepareCase (saf,env0) scrut case_bndr alts
+  = do  { (env1, case_bndr1) <- simplAltIdBinder (saf,env0) case_bndr
         ; let case_bndr2 = case_bndr1 `setIdUnfolding` evaldUnfolding
               env2       = modifyInScope env1 case_bndr2
               -- See Note [Case binder evaluated-ness]
@@ -3565,15 +3609,60 @@ simplAlts (saf,env0) scrut case_bndr alts cont'
           -- NB: pass case_bndr::InId, not case_bndr' :: OutId, to prepareAlts
           --     See Note [Shadowing in prepareAlts] in GHC.Core.Opt.Simplify.Utils
 
-        ; alts' <- forM in_alts $
-            simplAlt (saf,alt_env') (Just scrut') imposs_deflt_cons
-                     case_bndr' (scrutOkForBinderSwap scrut) cont'
+        ; return (alt_env', scrut', case_bndr', imposs_deflt_cons, in_alts) }
+
+simplAlts :: (SimplAltFlag, SimplEnv)
+          -> OutExpr -> OutId       -- Scrutinee and case binder
+          -> [AltCon]               -- Constructors impossible in the DEFAULT alt
+          -> BinderSwapDecision
+          -> SimplCont
+          -> [InAlt]
+          -> SimplM OutExpr  -- Returns the complete simplified case expression
+-- The arguments are prepared by prepareCase
+simplAlts (saf,env) scrut' case_bndr' imposs_deflt_cons bndr_swap cont' in_alts
+  = do  { alts' <- forM in_alts $
+            simplAltC (saf,env) (Just scrut') imposs_deflt_cons
+                      case_bndr' bndr_swap cont'
 
         ; let alts_ty' = contResultType cont'
         -- See Note [Avoiding space leaks in OutType]
         ; seqType alts_ty' `seq`
-          mkCase (seMode env0) scrut' case_bndr' alts_ty' alts' }
+          mkCase (seMode env) scrut' case_bndr' alts_ty' alts' }
 
+
+{- Note [Floating single-alternative cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When reallyRebuildCase finds a single-alternative case (after prepareAlts)
+   case e of b { (# a, c #) -> let x1 = .. in ... let xn = .. in (# e1, e2 #) }
+it does not return the case expression; instead it returns
+  * floats:  [FloatCase e b (# a,c #) [a,c], x1 = .., ..., xn = ..]
+  * result:  (# e1, e2 #)
+This is done by rebuildSingleAltCase.  See Note [LetFloats] in GHC.Core.Opt.Simplify.Env.
+
+Why?  Because a caller (notably rebuildWithFloats, when case-of-case is
+switched off) may want to do case-of-known-constructor on the result. If we
+returned the whole case, exprIsConApp_maybe would have to walk all the way
+down through the case and the lets, which can be quadratic (#27737, T18223).
+
+This is not restricted to the no-case-of-case path: when case-of-case is on,
+the continuation has already been pushed into the alternative, and the
+floats are simply wrapped around the result, or floated further out of a
+strict let (which a StrictBind continuation would do anyway).  The
+FloatFlag (FltCareful or FltOkSpec) stops a case-float from floating out of
+a lazy let, or to top level; see doFloatFromRhs.
+
+Wrinkles:
+
+(FSC1) mkCase may transform the case, e.g. by case-merging, identity-case
+  elimination, or caseRules (mkCase2), which renames the case binder and
+  wraps (let b = ..) around the RHS.  So we call mkCase on the alternative
+  with its floats wrapped (lazily: mkCase inspects only the top of the RHS),
+  and then:
+   - If the alternative has floats, and mkCase has left the case binder
+     unchanged, mkCase cannot have done anything to the RHS (which starts
+     with a let), so we return (case-float + alt-floats, unwrapped RHS).
+   - Otherwise we return the case-float with whatever RHS mkCase produced.
+-}
 
 ------------------------------------
 improveSeq :: (FamInstEnv, FamInstEnv)
@@ -3594,6 +3683,15 @@ improveSeq _ (_,env) scrut _ case_bndr1 _
 
 
 ------------------------------------
+simplAltC :: (SimplAltFlag, SimplEnv) -> Maybe OutExpr -> [AltCon] -> OutId
+          -> BinderSwapDecision -> SimplCont -> InAlt
+          -> SimplM OutAlt
+-- Like simplAlt, but wraps the floats around the RHS
+simplAltC env scrut' imposs_deflt_cons case_bndr' bndr_swap' cont' alt
+  = do { (floats, Alt con bs rhs) <- simplAlt env scrut' imposs_deflt_cons
+                                              case_bndr' bndr_swap' cont' alt
+       ; return (Alt con bs (wrapFloats floats rhs)) }
+
 simplAlt :: (SimplAltFlag, SimplEnv)
          -> Maybe OutExpr       -- The scrutinee
          -> [AltCon]            -- These constructors can't be present when
@@ -3603,19 +3701,21 @@ simplAlt :: (SimplAltFlag, SimplEnv)
                                 --           add unfolding `v :-> bndr |> sym co`
          -> SimplCont
          -> InAlt
-         -> SimplM OutAlt
+         -> SimplM (SimplFloats, OutAlt)
+         -- The floats scope over the RHS only, and may mention the
+         -- binders of the alternative
 
 simplAlt (saf,env) _scrut' imposs_deflt_cons case_bndr' bndr_swap' cont' (Alt DEFAULT bndrs rhs)
   = assert (null bndrs) $
     do  { let env' = addDefaultUnfoldings env case_bndr' bndr_swap' imposs_deflt_cons
-        ; rhs' <- simplAltExprC (saf,env') rhs cont'
-        ; return (Alt DEFAULT [] rhs') }
+        ; (floats, rhs') <- simplAltExprF (saf,env') rhs cont'
+        ; return (floats, Alt DEFAULT [] rhs') }
 
 simplAlt (saf,env) _scrut' _ case_bndr' bndr_swap' cont' (Alt (LitAlt lit) bndrs rhs)
   = assert (null bndrs) $
     do  { let env' = addAltUnfoldings env case_bndr' bndr_swap' (Lit lit)
-        ; rhs' <- simplAltExprC (saf,env') rhs cont'
-        ; return (Alt (LitAlt lit) [] rhs') }
+        ; (floats, rhs') <- simplAltExprF (saf,env') rhs cont'
+        ; return (floats, Alt (LitAlt lit) [] rhs') }
 
 simplAlt (saf,env) scrut' _ case_bndr' bndr_swap' cont' (Alt (DataAlt con) vs rhs)
   = do  { -- See Note [Adding evaluatedness info to pattern-bound variables]
@@ -3633,8 +3733,8 @@ simplAlt (saf,env) scrut' _ case_bndr' bndr_swap' cont' (Alt (DataAlt con) vs rh
               con_app = mkConApp2 con inst_tys' vs'
               env''   = addAltUnfoldings env' case_bndr' bndr_swap' con_app
 
-        ; rhs' <- simplAltExprC (saf,env'') rhs cont'
-        ; return (Alt (DataAlt con) vs' rhs') }
+        ; (floats, rhs') <- simplAltExprF (saf,env'') rhs cont'
+        ; return (floats, Alt (DataAlt con) vs' rhs') }
 
 {- Note [Adding evaluatedness info to pattern-bound variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3814,11 +3914,6 @@ simplAltExprF (saf,env) expr cont
   = case saf of
       SAF_Out -> simplOutExpr env expr cont
       SAF_In  -> simplExprF   env expr cont
-
-simplAltExprC :: (SimplAltFlag, SimplEnv) -> CoreExpr -> SimplCont -> SimplM OutExpr
-simplAltExprC env expr cont
-  = do { (floats, expr') <- simplAltExprF env expr cont
-       ; return (wrapFloats floats expr') }
 
 
 {- Note [Case binder evaluated-ness]
@@ -4338,7 +4433,7 @@ mkDupableContWithDmds env _
                                     scaleIdBy cont_scaling case_bndr
 
         ; alts' <- forM (scaleAltsBy cont_scaling alts) $
-            simplAlt (saf,alt_env1) Nothing [] case_bndr' NoBinderSwap alt_cont
+            simplAltC (saf,alt_env1) Nothing [] case_bndr' NoBinderSwap alt_cont
                 -- Safe to say that there are no handled-cons for the DEFAULT case
                 -- NB: simplBinder does not zap deadness occ-info, so
                 -- a dead case_bndr' will still advertise its deadness
