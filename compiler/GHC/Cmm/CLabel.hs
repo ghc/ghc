@@ -1309,6 +1309,7 @@ isLocalCLabel this_mod lbl =
 --
 data LabelLinkerUnit = LinkerUnitLocal
                      | LinkerUnitExternal
+                     | LinkerUnitUnknown
     deriving Eq
 
 -- | Does the target entity of a 'CLabel' live in the same linker unit as the
@@ -1316,7 +1317,12 @@ data LabelLinkerUnit = LinkerUnitLocal
 --
 -- The answer can be:
 -- * 'LinkerUnitLocal': yes, definately same linker unit;
--- * 'LinkerUnitExternal': no, definately different linker unit.
+-- * 'LinkerUnitExternal': no, definately different linker unit; or
+-- * 'LinkerUnitUnknown': maybe, unknown, could be same unit or different unit.
+--
+-- Typically the caller needs to know if it's certainly local, or certainly
+-- external, so they can match on the positive case they are interested in and
+-- bundle the unknown case into the negative answer.
 --
 labelLinkerUnit :: Module -> Platform -> Bool -> CLabel -> LabelLinkerUnit
 labelLinkerUnit this_mod platform external_dynamic_refs lbl =
