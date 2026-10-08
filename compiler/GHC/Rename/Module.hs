@@ -2823,7 +2823,7 @@ findSplice :: [LHsDecl GhcPs]
            -> RnM (HsGroup GhcPs, Maybe (SpliceDecl GhcPs, [LHsDecl GhcPs]))
 findSplice ds
   = do { (rev_decls, mb_splice) <- go [] ds
-       ; return (foldl' (flip add) emptyRdrGroup rev_decls, mb_splice) }
+       ; return (foldl' add emptyRdrGroup rev_decls, mb_splice) }
   where
     -- CQ[findsplice-rev-acc]
     -- Q: Why accumulate the declarations in reverse and then fold `add`
@@ -2864,52 +2864,52 @@ findSplice ds
 --    forcing the new list each step would leave a thunk per declaration,
 --    and forcing the chain at the end needs stack proportional to the
 --    number of declarations.
-add :: LHsDecl GhcPs -> HsGroup GhcPs -> HsGroup GhcPs
-add (L _ (SpliceD {})) _ = panic "GHC.Rename.Module.add: SpliceD"
+add :: HsGroup GhcPs -> LHsDecl GhcPs -> HsGroup GhcPs
+add _ (L _ (SpliceD {})) = panic "GHC.Rename.Module.add: SpliceD"
 
 -- Class declarations: added to the TyClGroup
-add (L l (TyClD _ d)) gp@(HsGroup {hs_tyclds = ts})
+add gp@(HsGroup {hs_tyclds = ts}) (L l (TyClD _ d))
   = let !ts' = add_tycld (L l d) ts in gp { hs_tyclds = ts' }
 
 -- Signatures: fixity sigs go a different place than all others
-add (L l (SigD _ (FixSig _ f))) gp@(HsGroup {hs_fixds = ts})
+add gp@(HsGroup {hs_fixds = ts}) (L l (SigD _ (FixSig _ f)))
   = let !ts' = L l f : ts in gp { hs_fixds = ts' }
 
 -- Standalone kind signatures: added to the TyClGroup
-add (L l (KindSigD _ s)) gp@(HsGroup {hs_tyclds = ts})
+add gp@(HsGroup {hs_tyclds = ts}) (L l (KindSigD _ s))
   = let !ts' = add_kisig (L l s) ts in gp { hs_tyclds = ts' }
 
-add (L l (SigD _ d)) gp@(HsGroup {hs_valds = ts})
+add gp@(HsGroup {hs_valds = ts}) (L l (SigD _ d))
   = let !ts' = add_sig (L l d) ts in gp { hs_valds = ts' }
 
 -- Value declarations: use add_bind
-add (L l (ValD _ d)) gp@(HsGroup {hs_valds = ts})
+add gp@(HsGroup {hs_valds = ts}) (L l (ValD _ d))
   = let !ts' = add_bind (L l d) ts in gp { hs_valds = ts' }
 
 -- Role annotations: added to the TyClGroup
-add (L l (RoleAnnotD _ d)) gp@(HsGroup {hs_tyclds = ts})
+add gp@(HsGroup {hs_tyclds = ts}) (L l (RoleAnnotD _ d))
   = let !ts' = add_role_annot (L l d) ts in gp { hs_tyclds = ts' }
 
 -- NB instance declarations go into TyClGroups. We throw them into the first
 -- group, just as we do for the TyClD case. The renamer will go on to group
 -- and order them later.
-add (L l (InstD _ d)) gp@(HsGroup {hs_tyclds = ts})
+add gp@(HsGroup {hs_tyclds = ts}) (L l (InstD _ d))
   = let !ts' = add_instd (L l d) ts in gp { hs_tyclds = ts' }
 
 -- The rest are routine
-add (L l (DerivD _ d)) gp@(HsGroup {hs_derivds = ts})
+add gp@(HsGroup {hs_derivds = ts}) (L l (DerivD _ d))
   = let !ts' = L l d : ts in gp { hs_derivds = ts' }
-add (L l (DefD _ d)) gp@(HsGroup {hs_defds = ts})
+add gp@(HsGroup {hs_defds = ts}) (L l (DefD _ d))
   = let !ts' = L l d : ts in gp { hs_defds = ts' }
-add (L l (ForD _ d)) gp@(HsGroup {hs_fords = ts})
+add gp@(HsGroup {hs_fords = ts}) (L l (ForD _ d))
   = let !ts' = L l d : ts in gp { hs_fords = ts' }
-add (L l (WarningD _ d)) gp@(HsGroup {hs_warnds = ts})
+add gp@(HsGroup {hs_warnds = ts}) (L l (WarningD _ d))
   = let !ts' = L l d : ts in gp { hs_warnds = ts' }
-add (L l (AnnD _ d)) gp@(HsGroup {hs_annds = ts})
+add gp@(HsGroup {hs_annds = ts}) (L l (AnnD _ d))
   = let !ts' = L l d : ts in gp { hs_annds = ts' }
-add (L l (RuleD _ d)) gp@(HsGroup {hs_ruleds = ts})
+add gp@(HsGroup {hs_ruleds = ts}) (L l (RuleD _ d))
   = let !ts' = L l d : ts in gp { hs_ruleds = ts' }
-add (L l (DocD _ d)) gp@(HsGroup {hs_docs = ts})
+add gp@(HsGroup {hs_docs = ts}) (L l (DocD _ d))
   = let !ts' = L l d : ts in gp { hs_docs = ts' }
 
 add_tycld :: LTyClDecl GhcPs -> [TyClGroup GhcPs]
