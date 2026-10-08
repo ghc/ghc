@@ -67,7 +67,7 @@ import GHC.Unit.Module
 
 import GHC.Utils.Outputable (SDoc, HDoc, ppr)
 import GHC.Utils.Panic      (pprPanic)
-import GHC.Utils.Monad.State.Strict (State (..), runState, state)
+import GHC.Utils.Monad.StrictState (State (..), runState, state)
 import GHC.Utils.Misc
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.CFG.Weight

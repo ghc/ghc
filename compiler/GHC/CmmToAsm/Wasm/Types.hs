@@ -64,7 +64,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSM
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import GHC.Utils.Outputable hiding ((<>))
 import Unsafe.Coerce
 

@@ -13,7 +13,7 @@ module GHC.Tc.Zonk.Env
   , initZonkEnv
 
     -- * The 'ZonkT' and 'ZonkBndrT' zonking monad transformers
-  , ZonkT(ZonkT,runZonkT), ZonkBndrT(..)
+  , ZonkT, pattern ZonkT, runZonkT, ZonkBndrT(..)
 
     -- ** Going between 'ZonkT' and 'ZonkBndrT'
   , runZonkBndrT
@@ -37,11 +37,11 @@ import GHC.Types.Var ( Id, isTyCoVar )
 import GHC.Types.Var.Env
 
 import GHC.Utils.Monad.Codensity
+import GHC.Utils.Monad.StrictReader
 import GHC.Utils.Outputable
 
 import Control.Monad.Fix         ( MonadFix(..) )
 import Control.Monad.IO.Class    ( MonadIO(..) )
-import Control.Monad.Trans.Class ( MonadTrans(..) )
 import Data.Coerce               ( coerce )
 import Data.IORef                ( IORef, newIORef )
 import Data.List                 ( partition )
@@ -151,72 +151,18 @@ There are three possibilities:
 --
 -- Use 'ZonkBndrT' when you need to modify the 'ZonkEnv' (e.g. to bind
 -- a variable).
-newtype ZonkT m a = ZonkT' { runZonkT :: ZonkEnv -> m a }
+--
+-- It is strict in the 'ZonkEnv', and uses the one-shot trick;
+-- see Note [Instances for StrictReaderT] in GHC.Utils.Monad.StrictReader
+type ZonkT = StrictReaderT ZonkEnv
 
-{- Note [Instances for ZonkT]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Below, we derive the following instances by hand:
-
-  newtype ZonkT m a = ZonkT { runZonkT :: ZonkEnv -> m a }
-    deriving (Functor, Applicative, Monad, MonadIO, MonadFix)
-      via ReaderT ZonkEnv m
-    deriving MonadTrans
-      via ReaderT ZonkEnv
-
-Why? Two reasons:
-
-  1. To use oneShot. See Note [The one-shot state monad trick] in GHC.Utils.Monad.
-  2. To be strict in the ZonkEnv. This allows us to worker-wrapper functions,
-     passing them individual fields of the ZonkEnv instead of the whole record.
-     When this happens, we avoid allocating a ZonkEnv, which is a win.
--}
-
--- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 {-# COMPLETE ZonkT #-}
 pattern ZonkT :: forall m a. (ZonkEnv -> m a) -> ZonkT m a
-pattern ZonkT m <- ZonkT' m
-  where
-    ZonkT m = ZonkT' (oneShot m)
+pattern ZonkT m = StrictReaderT m
 
--- See Note [Instances for ZonkT]
-instance Functor m => Functor (ZonkT m) where
-  fmap f (ZonkT g) = ZonkT $ \ !env -> fmap f (g env)
-  a <$ ZonkT g     = ZonkT $ \ !env -> a <$ g env
-  {-# INLINE fmap #-}
-  {-# INLINE (<$) #-}
-
--- See Note [Instances for ZonkT]
-instance Applicative m => Applicative (ZonkT m) where
-  pure a = ZonkT (\ !_ -> pure a)
-  ZonkT f <*> ZonkT x = ZonkT (\ !env -> f env <*> x env )
-  ZonkT m *> f = ZonkT (\ !env -> m env *> runZonkT f env)
-  {-# INLINE pure #-}
-  {-# INLINE (<*>) #-}
-  {-# INLINE (*>) #-}
-
--- See Note [Instances for ZonkT]
-instance Monad m => Monad (ZonkT m) where
-  ZonkT m >>= f =
-    ZonkT (\ !env -> do { r <- m env
-                        ; runZonkT (f r) env })
-  (>>)   = (*>)
-  {-# INLINE (>>=) #-}
-  {-# INLINE (>>) #-}
-
--- See Note [Instances for ZonkT]
-instance MonadIO m => MonadIO (ZonkT m) where
-  liftIO f = ZonkT (\ !_ -> liftIO f)
-  {-# INLINE liftIO #-}
-
--- See Note [Instances for ZonkT]
-instance MonadTrans ZonkT where
-  lift ma = ZonkT $ \ !_ -> ma
-  {-# INLINE lift #-}
-
--- See Note [Instances for ZonkT]
-instance MonadFix m => MonadFix (ZonkT m) where
-  mfix f = ZonkT $ \ !r -> mfix $ oneShot $ \ a -> runZonkT (f a) r
-  {-# INLINE mfix #-}
+runZonkT :: ZonkT m a -> ZonkEnv -> m a
+runZonkT = runStrictReaderT
+{-# INLINE runZonkT #-}
 
 -- | Zonk binders, bringing them into scope in the inner computation.
 --

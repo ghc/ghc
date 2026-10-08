@@ -85,7 +85,7 @@ module GHC.Core.Type (
         tyConForAllTyFlags, appTyForAllTyFlags,
 
         -- ** Analyzing types
-        TyCoMapper(..), mapTyCo, mapTyCoX,
+        TyCoMapper(..), mapTyCo,
         TyCoFolder(..), foldTyCo, noView,
 
         -- (Newtypes)
@@ -260,7 +260,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isConcreteTyVar )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.StrictIdentity
+import GHC.Utils.Monad.StrictReader
 
 import GHC.Data.FastString
 import GHC.Data.Maybe   ( orElse, isJust )
@@ -484,17 +484,19 @@ expandTypeSynonyms ty
 
 expandTypeSynonymsX :: Subst -> Type -> Type
 expandTypeSynonymsX
-  = case mapTyCoX expandTypeSynonymMapper of
-      (exp_ty, _, _, _) -> \subst ty -> runStrictIdentity (exp_ty subst ty)
+  = case mapTyCo expandTypeSynonymMapper of
+      (exp_ty, _, _, _) -> \subst ty -> runSubstM (exp_ty ty) subst
 
-expandTypeSynonymMapper :: TyCoMapper Subst StrictIdentity
+expandTypeSynonymMapper :: TyCoMapper SubstM
 -- Just like substitution, but treat TyConApp specially
 expandTypeSynonymMapper
   = substTyCoMapper { tcm_tcapp_ty = tcapp_ty, tcm_tycobinder = tcv_bndr }
  where
-   tcapp_ty subst ty tc tys'
+   tcapp_ty :: Type -> TyCon -> [Type] -> SubstM Type
+   tcapp_ty ty tc tys'
       | ExpandsSyn tenv rhs tys'' <- expandSynTyCon_maybe tc tys'
-      = let in_scope    = substInScopeSet subst
+      = StrictReaderT $ \subst ->
+        let in_scope    = substInScopeSet subst
             local_subst = mkTvSubst in_scope (mkVarEnv tenv)
             -- NB: tys' are already expanded, so this works
             --     even in the nested case (#11665)
@@ -512,11 +514,12 @@ expandTypeSynonymMapper
         -- the logic for introducing type synonyms.  But here we are
         -- supposed to be getting /rid/ of type synonyms!
 
-   tcv_bndr subst tcv _vis k
-     = k subst' tcv'
-     where
-       !(subst', tcv') = substVarBndrUsing expandTypeSynonymsX subst tcv
-                         -- Expand synonyms in the kind of the binder
+   tcv_bndr :: TyCoVar -> ForAllTyFlag -> (TyCoVar -> SubstM r) -> SubstM r
+   tcv_bndr tcv _vis k
+     = StrictReaderT $ \subst ->
+       let !(subst', tcv') = substVarBndrUsing expandTypeSynonymsX subst tcv
+                             -- Expand synonyms in the kind of the binder
+       in runStrictReaderT (k tcv') subst'
 
 {- Notes on type synonyms
 ~~~~~~~~~~~~~~~~~~~~~~~~~

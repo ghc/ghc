@@ -41,7 +41,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 
 import GHC.Utils.Misc
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import GHC.Utils.Panic
 
 import GHC.Data.Bag

@@ -2,7 +2,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 
 -- | A state monad which is strict in its state.
-module GHC.Utils.Monad.State.Strict
+module GHC.Utils.Monad.StrictState
   ( -- * The State monad
     State(State, State' {- for deriving via purposes only -})
   , state

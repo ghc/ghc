@@ -51,7 +51,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.DSM
 import GHC.Exts (oneShot)
 
-import GHC.Utils.Monad.State.Strict as Strict
+import GHC.Utils.Monad.StrictState as Strict
 
 type RA_Result freeRegs a = (# a, RA_State freeRegs #)
 

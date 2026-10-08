@@ -12,7 +12,7 @@ module GHC.Core.Opt.CallerCC
 import Data.Maybe
 
 import Control.Applicative
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import Control.Monad
 
 import GHC.Prelude

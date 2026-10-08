@@ -1,4 +1,3 @@
-{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 -- | The 'ZonkM' monad, a stripped down 'TcM', used when zonking within
@@ -7,7 +6,7 @@
 -- See Note [Module structure for zonking] in GHC.Tc.Zonk.Type.
 module GHC.Tc.Zonk.Monad
   ( -- * The 'ZonkM' monad, a stripped down 'TcM' for zonking
-    ZonkM(ZonkM,runZonkM)
+    ZonkM, pattern ZonkM, runZonkM
   , ZonkGblEnv(..), getZonkGblEnv, getZonkTcLevel
 
    -- ** Logging within 'ZonkM'
@@ -28,10 +27,9 @@ import GHC.Tc.Utils.TcType   ( TcLevel )
 import GHC.Utils.Logger
 import GHC.Utils.Outputable
 
-import Control.Monad          ( when )
-import Control.Monad.IO.Class ( MonadIO(..) )
+import GHC.Utils.Monad.StrictReader
 
-import GHC.Exts               ( oneShot )
+import Control.Monad          ( when )
 
 --------------------------------------------------------------------------------
 
@@ -47,50 +45,18 @@ data ZonkGblEnv
     }
 
 -- | A stripped down version of 'TcM' which is sufficient for zonking types.
-newtype ZonkM a = ZonkM' { runZonkM :: ZonkGblEnv -> IO a }
-{-
-NB: we write the following instances by hand:
-
---  deriving (Functor, Applicative, Monad, MonadIO)
---    via ReaderT ZonkGblEnv IO
-
-See Note [Instances for ZonkT] in GHC.Tc.Zonk.Env for the reasoning:
-
-  - oneShot annotations,
-  - strictness annotations to enable worker-wrapper.
--}
+--
+-- It is strict in the 'ZonkGblEnv', and uses the one-shot trick;
+-- see Note [Instances for StrictReaderT] in GHC.Utils.Monad.StrictReader
+type ZonkM = StrictReaderT ZonkGblEnv IO
 
 {-# COMPLETE ZonkM #-}
 pattern ZonkM :: forall a. (ZonkGblEnv -> IO a) -> ZonkM a
-pattern ZonkM m <- ZonkM' m
-  where
-    ZonkM m = ZonkM' (oneShot m)
--- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+pattern ZonkM m = StrictReaderT m
 
-instance Functor ZonkM where
-  fmap f (ZonkM g) = ZonkM $ \ !env -> fmap f (g env)
-  a <$ ZonkM g     = ZonkM $ \ !env -> a <$ g env
-  {-# INLINE fmap #-}
-  {-# INLINE (<$) #-}
-instance Applicative ZonkM where
-  pure a = ZonkM (\ !_ -> pure a)
-  ZonkM f <*> ZonkM x = ZonkM (\ !env -> f env <*> x env )
-  ZonkM m *> f = ZonkM (\ !env -> m env *> runZonkM f env)
-  {-# INLINE pure #-}
-  {-# INLINE (<*>) #-}
-  {-# INLINE (*>) #-}
-
-instance Monad ZonkM where
-  ZonkM m >>= f =
-    ZonkM (\ !env -> do { r <- m env
-                        ; runZonkM (f r) env })
-  (>>)   = (*>)
-  {-# INLINE (>>=) #-}
-  {-# INLINE (>>) #-}
-
-instance MonadIO ZonkM where
-  liftIO f = ZonkM (\ !_ -> f)
-  {-# INLINE liftIO #-}
+runZonkM :: ZonkM a -> ZonkGblEnv -> IO a
+runZonkM = runStrictReaderT
+{-# INLINE runZonkM #-}
 
 getZonkGblEnv :: ZonkM ZonkGblEnv
 getZonkGblEnv = ZonkM return

@@ -20,7 +20,7 @@ import GHC.Cmm.Dataflow.Label
 
 
 import GHC.Utils.Monad
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set

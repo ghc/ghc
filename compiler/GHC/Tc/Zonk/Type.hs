@@ -502,21 +502,19 @@ zonkCoHole hole@(CH { ch_ref = ref, ch_co_var = cv })
                              -- This will be an out-of-scope variable, but keeping
                              -- this as a coercion hole led to #15787
 
-zonk_tycomapper :: TyCoMapper ZonkEnv TcM
+zonk_tycomapper :: TyCoMapper ZonkTcM
 zonk_tycomapper = TyCoMapper
-    { tcm_tyvar      = \ env tv -> runZonkT (zonkTyVarOcc tv) env
-    , tcm_covar      = \ env cv -> runZonkT (zonkCoVarOcc cv) env
-    , tcm_hole       = \ env co -> runZonkT (zonkCoHole   co) env
-    , tcm_tycobinder = \ env tcv _vis k -> flip runZonkT env $
-                       runZonkBndrT (zonkTyBndrX tcv) $
-                       \ tcv' -> ZonkT $ \ env' -> (k env' tcv')
-    , tcm_tcapp_ty   = \_env ty      tc tys -> zonk_tcapp mkTyConApp          ty tc tys
-    , tcm_tcapp_co   = \_env co role tc cos -> zonk_tcapp (mkTyConAppCo role) co tc cos }
+    { tcm_tyvar      = zonkTyVarOcc
+    , tcm_covar      = zonkCoVarOcc
+    , tcm_hole       = zonkCoHole
+    , tcm_tycobinder = \ tcv _vis k -> runZonkBndrT (zonkTyBndrX tcv) k
+    , tcm_tcapp_ty   = \ ty      tc tys -> zonk_tcapp mkTyConApp          ty tc tys
+    , tcm_tcapp_co   = \ co role tc cos -> zonk_tcapp (mkTyConAppCo role) co tc cos }
   where
     {-# INLINE zonk_tcapp #-}  -- So that `mk` is a known function at each call site
     zonk_tcapp mk tyco tc tycos'
       | isTcTyCon tc
-      = do { thing <- tcLookupGlobalOnly (getName tc)
+      = do { thing <- lift $ tcLookupGlobalOnly (getName tc)
            ; case thing of
                 ATyCon real_tc -> return (mk real_tc tycos')
                 _              -> pprPanic "zonkTcTyCon" (ppr tc $$ ppr thing) }
@@ -535,9 +533,8 @@ zonkTcTypeToTypeX   :: TcType   -> ZonkTcM Type
 zonkTcTypesToTypesX :: [TcType] -> ZonkTcM [Type]
 zonkCoToCo          :: Coercion -> ZonkTcM Coercion
 (zonkTcTypeToTypeX, zonkTcTypesToTypesX, zonkCoToCo)
-  = case mapTyCoX zonk_tycomapper of
-      (zty, ztys, zco, _) ->
-        (ZonkT . flip zty, ZonkT . flip ztys, ZonkT . flip zco)
+  = case mapTyCo zonk_tycomapper of
+      (zty, ztys, zco, _) -> (zty, ztys, zco)
 
 zonkScaledTcTypesToTypesX :: [Scaled TcType] -> ZonkTcM [Scaled Type]
 zonkScaledTcTypesToTypesX scaled_tys =

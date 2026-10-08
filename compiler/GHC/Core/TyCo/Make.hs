@@ -73,7 +73,7 @@ module GHC.Core.TyCo.Make (
     , mkTyConBindersPreferAnon
 
     -- Mapping over types
-    , TyCoMapper(..), mapTyCo, mapTyCoX
+    , TyCoMapper(..), mapTyCo
   ) where
 
 
@@ -133,7 +133,7 @@ import GHC.Data.Pair
 These functions do a map-like operation over types, performing some operation
 on all variables and binding sites. Primarily used for zonking.
 
-Note [Efficiency for ForAllCo case of mapTyCoX]
+Note [Efficiency for ForAllCo case of mapTyCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As noted in Note [ForAllCo] in GHC.Core.TyCo.Rep, a ForAllCo is a bit redundant.
 It stores a TyCoVar and a Coercion, where the kind of the TyCoVar always matches
@@ -155,36 +155,52 @@ for now.
 
 Note [Specialising mappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-These INLINE pragmas are indispensable. mapTyCo and mapTyCoX are used
-to implement zonking, and it's vital that they get specialised to the TcM
+These INLINE pragmas are indispensable. mapTyCo is used to implement
+zonking and substitution, and it's vital that it gets specialised to the
 monad and the particular mapper in use.
 
 Even specialising to the monad alone made a 20% allocation difference
-in perf/compiler/T5030.
+in perf/compiler/T5030. See Note [Specialising foldType] in "GHC.Core.TyCo.Rep"
+for more details of this idiom.
 
-See Note [Specialising foldType] in "GHC.Core.TyCo.Rep" for more details of this
-idiom.
+When the mapping needs an environment, `m` is a reader monad, such as
+     ZonkT TcM   = StrictReaderT ZonkEnv TcM
+     SubstM      = StrictReaderT Subst   StrictIdentity
+For good code, the Monad instance for such a reader monad should
+  * Use the one-shot trick, so that `go_ty` etc get arity 2, taking the
+    environment as an argument.
+    See Note [The one-shot state monad trick] in GHC.Utils.Monad
+  * Be strict in the environment, so that the environment can be unboxed
+    by worker/wrapper.
+`StrictReaderT` does both; see Note [Instances for StrictReaderT] in
+GHC.Utils.Monad.StrictReader.
+
 -}
 
 -- | This describes how a "map" operation over a type/coercion should behave
-data TyCoMapper env m
+--
+-- If the mapping needs an environment (e.g. a substitution, or a ZonkEnv),
+-- make `m` a reader monad over that environment; e.g. `ZonkT TcM`, or `SubstM`.
+-- Then `tcm_tycobinder` can extend the environment for its continuation.
+data TyCoMapper m
   = TyCoMapper
-      { tcm_tyvar :: env -> TyVar -> m Type
-      , tcm_covar :: env -> CoVar -> m Coercion
-      , tcm_hole  :: env -> CoercionHole -> m Coercion
+      { tcm_tyvar :: TyVar -> m Type
+      , tcm_covar :: CoVar -> m Coercion
+      , tcm_hole  :: CoercionHole -> m Coercion
           -- ^ What to do with coercion holes.
           -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
 
-      , tcm_tycobinder :: forall r. env -> TyCoVar -> ForAllTyFlag
-                       -> (env -> TyCoVar -> m r) -> m r
-          -- ^ The returned env is used in the extended scope
+      , tcm_tycobinder :: forall r. TyCoVar -> ForAllTyFlag
+                       -> (TyCoVar -> m r) -> m r
+          -- ^ The continuation is run in the extended scope;
+          -- e.g. in an extended environment, if `m` is a reader monad
 
       -- TyConApp and TyConAppCo
       -- Incoming Type is the original (T tys), pre-mapping
       --          [Type] are post-mapping
       -- Similarly for the coercion
-      , tcm_tcapp_ty :: env -> Type             -> TyCon -> [Type]     -> m Type
-      , tcm_tcapp_co :: env -> Coercion -> Role -> TyCon -> [Coercion] -> m Coercion
+      , tcm_tcapp_ty :: Type             -> TyCon -> [Type]     -> m Type
+      , tcm_tcapp_co :: Coercion -> Role -> TyCon -> [Coercion] -> m Coercion
            -- ^ The [Type] have already had the mapping applied
            -- This smart constructor can:
            -- a) To zonk TcTyCons
@@ -195,91 +211,83 @@ data TyCoMapper env m
       }
 
 {-# INLINE mapTyCo #-}  -- See Note [Specialising mappers]
-mapTyCo :: Monad m => TyCoMapper () m
-        -> ( Type       -> m  Type
-           , [Type]     -> m  [Type]
-           , Coercion   -> m  Coercion
+mapTyCo :: forall m. Monad m
+        => TyCoMapper m
+        -> ( Type       -> m Type
+           , [Type]     -> m [Type]
+           , Coercion   -> m Coercion
            , [Coercion] -> m [Coercion] )
-mapTyCo mapper
-  = case mapTyCoX mapper of
-     (go_ty, go_tys, go_co, go_cos)
-        -> (go_ty (), go_tys (), go_co (), go_cos ())
-
-{-# INLINE mapTyCoX #-}  -- See Note [Specialising mappers]
-mapTyCoX :: forall m env. Monad m
-         => TyCoMapper env m
-         -> ( env -> Type       -> m Type
-            , env -> [Type]     -> m [Type]
-            , env -> Coercion   -> m Coercion
-            , env -> [Coercion] -> m [Coercion] )
-mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
-                     , tcm_tycobinder = tycobinder
-                     , tcm_tcapp_ty = tcapp_ty
-                     , tcm_tcapp_co = tcapp_co
-                     , tcm_covar = covar
-                     , tcm_hole = cohole })
+mapTyCo (TyCoMapper { tcm_tyvar = tyvar
+                    , tcm_tycobinder = tycobinder
+                    , tcm_tcapp_ty = tcapp_ty
+                    , tcm_tcapp_co = tcapp_co
+                    , tcm_covar = covar
+                    , tcm_hole = cohole })
   = (go_ty, go_tys, go_co, go_cos)
   where
     -- See Note [Use explicit recursion in mapTyCo]
-    go_tys _   []       = return []
-    go_tys env (ty:tys) = (:) <$> go_ty env ty <*> go_tys env tys
+    go_tys []       = return []
+    go_tys (ty:tys) = (:) <$> go_ty ty <*> go_tys tys
 
-    go_ty env (TyVarTy tv)    = tyvar env tv
-    go_ty env (AppTy t1 t2)   = mkAppTy <$> go_ty env t1 <*> go_ty env t2
-    go_ty _   ty@(LitTy {})   = return ty
-    go_ty env (CastTy ty co)  = mkCastTy <$> go_ty env ty <*> go_co env co
-    go_ty env (CoercionTy co) = CoercionTy <$> go_co env co
+    go_ty (TyVarTy tv)    = tyvar tv
+    go_ty (AppTy t1 t2)   = mkAppTy <$> go_ty t1 <*> go_ty t2
+    go_ty ty@(LitTy {})   = return ty
+    go_ty (CastTy ty co)  = mkCastTy <$> go_ty ty <*> go_co co
+    go_ty (CoercionTy co) = CoercionTy <$> go_co co
 
-    go_ty env ty@(FunTy _ w arg res)
-      = do { w' <- go_ty env w; arg' <- go_ty env arg; res' <- go_ty env res
+    go_ty ty@(FunTy _ w arg res)
+      = do { arg' <- go_ty arg; w' <- go_ty w; res' <- go_ty res
+             -- As per #23764, ordering is [arg, w, res]
+             -- Probably doesn't matter for mapping,
+             -- but it seems sensible to be consistend with foldTyCo
            ; return (ty { ft_mult = w', ft_arg = arg', ft_res = res' }) }
 
-    go_ty env ty@(TyConApp tc tys)
-      = do { tys' <- go_tys env tys; tcapp_ty env ty tc tys' }
+    go_ty ty@(TyConApp tc tys)
+      = do { tys' <- go_tys tys; tcapp_ty ty tc tys' }
 
-    go_ty env (ForAllTy (Bndr tv vis) inner)
-      = do { tycobinder env tv vis $ \env' tv' -> do
-           ; inner' <- go_ty env' inner
+    go_ty (ForAllTy (Bndr tv vis) inner)
+      = do { tycobinder tv vis $ \tv' -> do
+           ; inner' <- go_ty inner
            ; return $ ForAllTy (Bndr tv' vis) inner' }
 
     -- See Note [Use explicit recursion in mapTyCo]
-    go_cos _   []       = return []
-    go_cos env (co:cos) = (:) <$> go_co env co <*> go_cos env cos
+    go_cos []       = return []
+    go_cos (co:cos) = (:) <$> go_co co <*> go_cos cos
 
-    go_mco _   MRefl    = return MRefl
-    go_mco env (MCo co) = kindCoToMKindCo <$> go_co env co
+    go_mco MRefl    = return MRefl
+    go_mco (MCo co) = kindCoToMKindCo <$> go_co co
 
-    go_co :: env -> Coercion -> m Coercion
-    go_co env (Refl ty)                  = Refl <$> go_ty env ty
-    go_co env (GRefl r ty mco)           = mkGReflCo r <$> go_ty env ty <*> go_mco env mco
-    go_co env (AppCo c1 c2)              = mkAppCo <$> go_co env c1 <*> go_co env c2
-    go_co env (FunCo r afl afr cw c1 c2) = mkFunCo2 r afl afr <$> go_co env cw
-                                           <*> go_co env c1 <*> go_co env c2
-    go_co env (CoVarCo cv)               = covar env cv
-    go_co env (HoleCo hole)              = cohole env hole
-    go_co env (UnivCo { uco_prov = p, uco_role = r
-                      , uco_lty = t1, uco_rty = t2, uco_deps = deps })
-                                         = mkUnivCo <$> pure p
-                                                    <*> go_cos env deps
-                                                    <*> pure r
-                                                    <*> go_ty env t1 <*> go_ty env t2
-    go_co env (SymCo co)                 = mkSymCo <$> go_co env co
-    go_co env (TransCo c1 c2)            = mkTransCo <$> go_co env c1 <*> go_co env c2
-    go_co env (AxiomCo r cos)            = mkAxiomCo r <$> go_cos env cos
-    go_co env (SelCo i co)               = mkSelCo i <$> go_co env co
-    go_co env (LRCo lr co)               = mkLRCo lr <$> go_co env co
-    go_co env (InstCo co arg)            = mkInstCo <$> go_co env co <*> go_co env arg
-    go_co env (KindCo co)                = mkKindCo <$> go_co env co
-    go_co env (SubCo co)                 = mkSubCo <$> go_co env co
-    go_co env co@(TyConAppCo r tc cos)   = do { cos' <- go_cos env cos
-                                               ; tcapp_co env co r tc cos' }
-    go_co env (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
-                        , fco_kind = kind_co, fco_body = co })
-      = do { kind_co' <- go_mco env kind_co
-           ; tycobinder env tv visL $ \env' tv' ->  do
-           ; co' <- go_co env' co
+    go_co :: Coercion -> m Coercion
+    go_co (Refl ty)                  = Refl <$> go_ty ty
+    go_co (GRefl r ty mco)           = mkGReflCo r <$> go_ty ty <*> go_mco mco
+    go_co (AppCo c1 c2)              = mkAppCo <$> go_co c1 <*> go_co c2
+    go_co (FunCo r afl afr cw c1 c2) = mkFunCo2 r afl afr <$> go_co cw
+                                       <*> go_co c1 <*> go_co c2
+    go_co (CoVarCo cv)               = covar cv
+    go_co (HoleCo hole)              = cohole hole
+    go_co (UnivCo { uco_prov = p, uco_role = r
+                  , uco_lty = t1, uco_rty = t2, uco_deps = deps })
+                                     = mkUnivCo <$> pure p
+                                                <*> go_cos deps
+                                                <*> pure r
+                                                <*> go_ty t1 <*> go_ty t2
+    go_co (SymCo co)                 = mkSymCo <$> go_co co
+    go_co (TransCo c1 c2)            = mkTransCo <$> go_co c1 <*> go_co c2
+    go_co (AxiomCo r cos)            = mkAxiomCo r <$> go_cos cos
+    go_co (SelCo i co)               = mkSelCo i <$> go_co co
+    go_co (LRCo lr co)               = mkLRCo lr <$> go_co co
+    go_co (InstCo co arg)            = mkInstCo <$> go_co co <*> go_co arg
+    go_co (KindCo co)                = mkKindCo <$> go_co co
+    go_co (SubCo co)                 = mkSubCo <$> go_co co
+    go_co co@(TyConAppCo r tc cos)   = do { cos' <- go_cos cos
+                                          ; tcapp_co co r tc cos' }
+    go_co (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
+                    , fco_kind = kind_co, fco_body = co })
+      = do { kind_co' <- go_mco kind_co
+           ; tycobinder tv visL $ \tv' ->  do
+           ; co' <- go_co co
            ; return $ mkForAllCo tv' visL visR kind_co' co' }
-        -- See Note [Efficiency for ForAllCo case of mapTyCoX]
+        -- See Note [Efficiency for ForAllCo case of mapTyCo]
 
 
 {- Note [Use explicit recursion in mapTyCo]

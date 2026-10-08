@@ -34,7 +34,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Panic
 
 import GHC.Utils.Outputable
-import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Monad.StrictState
 import GHC.Utils.Misc
 
 import GHC.Stg.EnforceEpt.Types

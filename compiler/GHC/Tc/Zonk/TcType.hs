@@ -226,17 +226,17 @@ zonkCo      :: Coercion -> ZonkM Coercion
   where
     -- A suitable TyCoMapper for zonking a type during type-checking,
     -- before all metavars are filled in.
-    zonkTcTypeMapper :: TyCoMapper () ZonkM
+    zonkTcTypeMapper :: TyCoMapper ZonkM
     zonkTcTypeMapper = TyCoMapper
-      { tcm_tyvar = const zonkTcTyVar
-      , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
+      { tcm_tyvar = zonkTcTyVar
+      , tcm_covar = \cv -> mkCoVarCo <$> zonkTyCoVarKind cv
       , tcm_hole       = zonk_hole
-      , tcm_tycobinder = \ _env tcv _vis k -> zonkTyCoVarKind tcv >>= k ()
+      , tcm_tycobinder = \ tcv _vis k -> zonkTyCoVarKind tcv >>= k
       , tcm_tcapp_ty   = zonk_tcapp_ty
       , tcm_tcapp_co   = zonk_tcapp_co }
 
-    zonk_hole :: () -> CoercionHole -> ZonkM Coercion
-    zonk_hole _ hole@(CH { ch_ref = ref, ch_co_var = cv })
+    zonk_hole :: CoercionHole -> ZonkM Coercion
+    zonk_hole hole@(CH { ch_ref = ref, ch_co_var = cv })
       = do { contents <- readTcRef ref
            ; case contents of
                Just (CPH { cph_co = co })
@@ -245,8 +245,8 @@ zonkCo      :: Coercion -> ZonkM Coercion
                Nothing -> do { cv' <- zonkCoVar cv
                              ; return $ HoleCo (hole { ch_co_var = cv' }) } }
 
-    zonk_tcapp_ty _ ty      tc tys' = zonk_tcapp mkTyConApp          ty tc tys'
-    zonk_tcapp_co _ co role tc cos' = zonk_tcapp (mkTyConAppCo role) co tc cos'
+    zonk_tcapp_ty ty      tc tys' = zonk_tcapp mkTyConApp          ty tc tys'
+    zonk_tcapp_co co role tc cos' = zonk_tcapp (mkTyConAppCo role) co tc cos'
 
     {-# INLINE zonk_tcapp #-}  -- So that `mk` is a known function at each call site
     zonk_tcapp :: forall r. (TyCon -> [r] -> r) -> r -> TyCon -> [r] -> ZonkM r
