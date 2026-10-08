@@ -103,8 +103,9 @@ module GHC.Cmm.CLabel (
         isLibcFun,
         isCFunctionLabel,
         isGcPtrLabel,
-        labelDynamic,
         isLocalCLabel,
+        labelLinkerUnit,
+        LabelLinkerUnit(..),
         mayRedirectTo,
         isInfoTableLabel,
         isCmmInfoTableLabel,
@@ -1304,63 +1305,81 @@ isLocalCLabel this_mod lbl =
 
 -- -----------------------------------------------------------------------------
 
--- | Does a 'CLabel' need dynamic linkage?
+-- | Where a 'CLabel' target points to, relative to a given local unit.
 --
--- When referring to data in code, we need to know whether
--- that data resides in a DLL or not. [Win32 only.]
--- @labelDynamic@ returns @True@ if the label is located
--- in a DLL, be it a data reference or not.
-labelDynamic :: Module -> Platform -> Bool -> CLabel -> Bool
-labelDynamic this_mod platform external_dynamic_refs lbl =
-  case lbl of
-   -- is the RTS in a DLL or not?
-   RtsLabel _ ->
-     external_dynamic_refs && (this_unit /= rtsUnitId)
+data LabelLinkerUnit = LinkerUnitLocal
+                     | LinkerUnitExternal
+    deriving Eq
 
-   IdLabel n _ _ ->
-     external_dynamic_refs && isDynLinkName platform this_mod n
+-- | Does the target entity of a 'CLabel' live in the same linker unit as the
+-- given module?
+--
+-- The answer can be:
+-- * 'LinkerUnitLocal': yes, definately same linker unit;
+-- * 'LinkerUnitExternal': no, definately different linker unit.
+--
+labelLinkerUnit :: Module -> Platform -> Bool -> CLabel -> LabelLinkerUnit
+labelLinkerUnit this_mod platform external_dynamic_refs lbl =
+  case lbl of
+   -- is the RTS in a DSO/DLL or not?
+   RtsLabel _
+     | external_dynamic_refs && (this_unit /= rtsUnitId)
+                 -> LinkerUnitExternal
+     | otherwise -> LinkerUnitLocal
+
+   IdLabel n _ _
+     | external_dynamic_refs && isDynLinkName platform this_mod n
+                 -> LinkerUnitExternal
+     | otherwise -> LinkerUnitLocal
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
    CmmLabel lbl_unit _ _ _
-    | os == OSMinGW32 -> external_dynamic_refs && (this_unit /= lbl_unit)
-    | otherwise       -> external_dynamic_refs
+    | os == OSMinGW32 && external_dynamic_refs && (this_unit /= lbl_unit)
+                            -> LinkerUnitExternal
+    | external_dynamic_refs -> LinkerUnitExternal
+    | otherwise             -> LinkerUnitLocal
 
-   LocalBlockLabel _    -> False
+   LocalBlockLabel _    -> LinkerUnitLocal
 
-   ForeignLabel _ source _  ->
-       if os == OSMinGW32
-       then case source of
+   ForeignLabel _ source _
+     | os == OSMinGW32 ->
+          case source of
             -- Foreign label is in some un-named foreign package (or DLL).
-            ForeignLabelInExternalPackage -> True
+            ForeignLabelInExternalPackage -> LinkerUnitExternal
 
             -- Foreign label is linked into the same package as the
             -- source file currently being compiled.
-            ForeignLabelInThisPackage -> False
+            ForeignLabelInThisPackage -> LinkerUnitLocal
 
             -- Foreign label is in some named package.
             -- When compiling in the "dyn" way, each package is to be
             -- linked into its own DLL.
-            ForeignLabelInPackage pkgId ->
-                external_dynamic_refs && (this_unit /= pkgId)
+            ForeignLabelInPackage unitid
+              | external_dynamic_refs && (this_unit /= unitid)
+                          -> LinkerUnitExternal
+              | otherwise -> LinkerUnitLocal
 
-       else -- On Mac OS X and on ELF platforms, false positives are OK,
-            -- so we claim that all foreign imports come from dynamic
-            -- libraries
-            True
+     -- On Mac OS X and on ELF platforms, false positives are OK,
+     -- so we claim that all foreign imports come from dynamic
+     -- libraries
+     | otherwise -> LinkerUnitExternal
 
-   CC_Label cc ->
-     external_dynamic_refs && not (ccFromThisModule cc this_mod)
+   CC_Label cc
+     | external_dynamic_refs && not (ccFromThisModule cc this_mod)
+                 -> LinkerUnitExternal
+     | otherwise -> LinkerUnitLocal
 
    -- CCS_Label always contains a CostCentre defined in the current module
-   CCS_Label _ -> False
-   IPE_Label {} -> True
+   CCS_Label _ -> LinkerUnitLocal
+   IPE_Label {} -> LinkerUnitExternal
 
-   HpcTicksLabel m ->
-     external_dynamic_refs && this_mod /= m
-
+   HpcTicksLabel m
+     | external_dynamic_refs && this_mod /= m
+                 -> LinkerUnitExternal
+     | otherwise -> LinkerUnitLocal
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
-   _                 -> False
+   _                 -> LinkerUnitLocal
   where
     os        = platformOS platform
     this_unit = toUnitId (moduleUnit this_mod)
