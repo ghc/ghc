@@ -913,7 +913,9 @@ rnIfaceCo (IfaceForAllCo bndr visL visR co1 co2)
     = (\bndr' co1' co2' -> IfaceForAllCo bndr' visL visR co1' co2')
       <$> rnIfaceBndr bndr <*> rnIfaceMCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceUnivCo s r t1 t2 deps)
-    = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2 <*> mapM rnIfaceCo deps
+    = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2 <*> pure deps
+      -- The dependencies are either coercion variables or holes.
+      -- These are all local, and thus need no renaming.
 
 rnIfaceTyCon :: Rename IfaceTyCon
 rnIfaceTyCon (IfaceTyCon n info)

@@ -1,0 +1,13 @@
+section: compiler
+synopsis: Speed up type-family-heavy programs by zapping coercions
+issues: #8095 #27336 #27518
+mrs: !16378
+description: {
+  GHC now erases the coercions that it produces when reducing type family
+  applications, keeping only their endpoints and the assumptions they used
+  (a process called "zapping").
+  This greatly speeds up the compilation of type-family-heavy programs (#8095).
+
+  This behaviour is controlled by ``-fzap-coercions`` and enabled by default;
+  disable with ``-fno-zap-coercions``.
+}

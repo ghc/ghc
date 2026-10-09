@@ -25,12 +25,19 @@ import GHC.Core.Type
 import GHC.Tc.Types.Evidence
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- performs delicate algorithm on types
+import GHC.Core.TyCo.FVs( univCoDepsDeepCoVars, univCoDepsHasHoles
+                        , emptyUnivCoDeps, isEmptyUnivCoDeps
+                        , addUnivCoDep, addUnivCoDepCoVar, addUnivCoDepHole
+                        , unionUnivCoDeps
+                        )
 import GHC.Core.Coercion
+import GHC.Core.Lint( lintTcCoercion )
 import GHC.Core.Reduction
 import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Driver.Config.Core.Lint( initLintConfig )
 import GHC.Driver.DynFlags
 import GHC.Tc.Utils.Monad (rewriterTcMPlugins)
 import GHC.Utils.Outputable
@@ -45,7 +52,8 @@ import Control.Applicative (liftA3)
 import GHC.Builtin.WiredIn.Types (tYPETyCon)
 import Data.List ( find )
 import GHC.Data.List.Infinite (Infinite)
-import GHC.Data.Bag( listToBag )
+import GHC.Data.Bag( listToBag, bagToList, isEmptyBag )
+import GHC.Data.Pair (Pair(..))
 import qualified GHC.Data.List.Infinite as Inf
 
 {-
@@ -97,12 +105,16 @@ runRewriteCtEv ev
 -- See Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
 runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, CoHoleSet)
 runRewrite loc flav eq_rel thing_inside
-  = do { rewriters_ref <- newTcRef emptyCoHoleSet
+  = do { dflags <- getDynFlags
+       ; used_cos_ref  <- newTcRef emptyUnivCoDeps
+       ; rewriters_ref <- newTcRef emptyCoHoleSet
        ; let fmode = RE { re_loc       = resetCtLocDepth loc
                             -- Start reducing from zero
                         , re_flavour   = flav
                         , re_eq_rel    = eq_rel
-                        , re_rewriters = rewriters_ref }
+                        , re_rewriters = rewriters_ref
+                        , re_used_cos  = used_cos_ref
+                        , re_zap_coercions = gopt Opt_ZapCoercions dflags }
        ; res <- runRewriteM thing_inside fmode
        ; rewriters <- readTcRef rewriters_ref
        ; return (res, rewriters) }
@@ -153,15 +165,22 @@ bumpReductionDepthRM ty (RewriteM thing_inside)
       ; thing_inside env' }
 
 recordRewriter :: CtEvidence -> RewriteM ()
--- Record that we have rewritten the target with this (equality) evidence
+-- ^ Record that we have rewritten the target with this (equality) evidence
+--
 -- See Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
+--
 -- Precondition: the CtEvidence is for an equality constraint
-recordRewriter (CtGiven {})
-  = return ()
-recordRewriter (CtWanted (WantedCt { ctev_dest = dest }))
-  = case dest of
-      HoleDest hole -> RewriteM $ \env -> updTcRef (re_rewriters env) (`addRewriter` hole)
-      other         -> pprPanic "recordRewriter: non-equality constraint" (ppr other)
+--
+-- Also records the evidence coercion in 're_used_cos',
+-- as per Note [Computing coercion dependencies].
+recordRewriter (CtGiven (GivenCt { ctev_evar = evar })) = mkRewriteM $ \env ->
+  updTcRef (re_used_cos env) (addUnivCoDepCoVar evar)
+recordRewriter (CtWanted (WantedCt { ctev_dest = dest })) =
+  case dest of
+    HoleDest hole -> mkRewriteM $ \env ->
+      do { updTcRef (re_rewriters env) (`addRewriter` hole)
+         ; updTcRef (re_used_cos env) (addUnivCoDepHole hole) }
+    other -> pprPanic "recordRewriter: non-equality constraint" (ppr other)
 
 {- Note [Rewriter EqRels]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -223,10 +242,11 @@ a better error message anyway.)
 -}
 
 -- | See Note [Rewriting].
--- If (xi, co, rewriters) <- rewrite mode ev ty, then co :: xi ~r ty
--- where r is the role in @ev@.
--- `rewriters` is the set of coercion holes that have been used to rewrite
--- See Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint
+--
+-- If @(Reduction co xi, rws) <- rewrite ev ty@,
+-- then @co :: ty ~r xi@, where @r@ is the role in @ev@ and @rws@ is the set of
+-- coercion holes that have been used to rewrite (see Note [Wanteds rewrite Wanteds: rewriter-sets]
+-- in GHC.Tc.Types.Constraint).
 rewrite :: CtEvidence -> TcType
         -> TcS (Reduction, CoHoleSet)
 rewrite ev ty
@@ -377,20 +397,154 @@ If we need to make this yet more performant, a possible way forward is to
 duplicate the rewriter code for the nominal case, and make that case
 faster. This doesn't seem quite worth it, yet.
 
-Note [rewrite_exact_fam_app performance]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Once we've got a rewritten rhs, we extend the famapp-cache to record
-the result. Doing so can save lots of work when the same redex shows up more
-than once. Note that we record the link from the redex all the way to its
-*final* value, not just the single step reduction.
+Note [The family application cache]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To speed up the compilation of type-family heavy programs, when reducing a type
+family application, we /sometimes/ store the resulting reduction in a cache
+(the family application cache) so that further computations that rewrite this
+same type family application directly look up the result in the cache instead of
+re-deriving the reduction from scratch.
 
-If we can reduce the family application right away (the first call
-to try_to_reduce), we do *not* add to the cache. There are two possibilities
-here: 1) we just read the result from the cache, or 2) we used one type
-family instance. In either case, recording the result in the cache doesn't
-save much effort the next time around. And adding to the cache here is
-actually disastrous: it more than doubles the allocations for T9872a. So
-we skip adding to the cache here.
+Specifically:
+
+  - when we rewrite a type family application, and then
+    recursively rewrite the RHS of this reduction, obtaining
+
+      F tys ~> Reduction co xi
+
+  - and [Conditions for adding to the cache] are satisfied
+
+then 'rewriteExactFamApp' stores the reduction 'redn = Reduction co xi'
+into the cache ('inert_famapp_cache'), under the cache key 'F tys'.
+
+For example, rewriting 'Length [5,11]' is a reduction chain of two steps:
+
+  Length [5,11]
+      --> 1 + Length [11]
+      --> 2
+
+in which the nested 'Length [11]' is rewritten by a separate (recursive) call to
+'rewriteExactFamApp'. We then cache:
+  - the whole chain 'Length [5,11] --> 2',
+  - the nested chain 'Length [11] --> 1',
+  - but nothing for the intermediate step '1 + Length [11] --> 2'.
+
+Caching the entire chain of reductions, rather than each single reduction step,
+was measured to reduce the number of type family reductions in T9872{a,b,c} by ~12%.
+
+[Conditions for adding to the cache]
+
+  We only store a reduction in the family application cache when /all/ of the
+  following conditions are satisfied:
+
+  (FAC_Flag)    The -ffamily-application-cache flag is on (which it is by default)
+
+    The cache is just a performance optimisation. It is controlled by a flag to
+    allow A/B testing its effect, and to let users turn it off if it causes issues.
+
+  (FAC_Role)    The ambient role is Nominal
+
+    Type family axioms have Nominal role, and Nominal cache entries can be
+    downgraded to Representational when the ambient role is Representational.
+
+    Storing Representational reductions would require storing the role in the
+    cache key, for an unclear payoff.
+
+  (FAC_Holes)   The reduction's coercion does not contain any coercion holes
+
+    All coercion holes used when rewriting come from Wanteds in the inert set,
+    but a Wanted may be removed from the inert set (e.g. by kick out), so we
+    need to be careful when caching reductions that make use of inert Wanteds.
+
+    For example, suppose we have an inert [W] cohole :: F alpha ~ Int, and
+    that we are normalising [W] G (F alpha) ~ Bool. We rewrite 'F alpha --> Int'
+    using the inert and add 'F alpha ~cohole~> Int' to the fam-app cache.
+    Suppose that we then unify 'alpha', kicking out the previously-inert
+      [W] cohole :: F alpha ~ Int
+    When we come to solving it, we see 'F alpha --> Int' in the fam-app cache
+    and thus solve the Wanted with itself. Bad!
+
+    To avoid this problem, we simply insist that the fam-app cache never
+    contains any coercion holes. The alternative would be to keep the fam-app
+    cache in sync, e.g. when kicking out a Wanted, drop all entries in the cache
+    that mention that Wanted (and similarly for other operations that remove a
+    Wanted from the inert set).
+
+  (FAC_WorthCaching) The reduction is "worth caching".
+
+    See Note [When is a reduction worth caching?]
+
+Note [When is a reduction worth caching?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Whether a chain of type family reductions is "worth caching" is a heuristic
+tuned for compiler performance. Currently, we consider a chain of type family
+reductions "worth caching" precisely when at least one step in the chain has
+one of the following shapes:
+
+  (WorthCaching1)
+    We succeeded in rewriting a type family application,
+    but only after rewriting one of its arguments.
+  (WorthCaching2)
+    We rewrote a type family application using an exactly-matching inert.
+
+In particular, if every step in the chain reduces immediately, using a type
+family equation (or a previously cached reduction) without having to rewrite any
+arguments first, then we don't add to the cache. This is the most important part
+here; adding to the cache in such cases can have disastrous consequences, more
+than doubling the allocations for T9872a.
+
+Examples:
+
+  Id Int ~> Int
+    not worth caching: immediately reduces using an axiom; cheap
+
+  (1 + 2) + 4 ~> 3 + 4 ~> 7
+    worth caching: we had to rewrite (1+2) ~> 3 inside the first argument
+    of the outer (+) in order to make progress
+
+  Id (2 + 3) ~> 2 + 3 ~> 5
+    not worth caching: we did not need to rewrite the argument to 'Id'
+    before reducing it
+
+This heuristic isn't particularly great, it's just what we have today.
+Case in point:
+
+  data Peano = Z | S Peano
+
+  type Length :: [k] -> Peano
+  type family Length xs where
+    Length '[]       = 'Z
+    Length (_ ': xs) = 'S (Length xs)
+
+A reduction chain for this type family looks like:
+
+  Length [x1, ..., x100]
+    ~> 'S (Length [x2, ..., x100])
+    ~> 'S ('S (Length [x3, ..., x100]))
+    ~> ...
+    ~> 100 (as a Peano natural number)
+
+At no point do we rewrite an argument to a type family (given that S is a
+promoted data constructor), so we don't cache any reduction at all in this entire
+chain, and we will re-run the entire computation at every occurrence of
+'Length [x1, ..., x100]'.
+
+On the other hand, consider a reduction chain for factorial:
+
+  type family Factorial n where
+    Factorial 0 = 1
+    Factorial n = n * Factorial (n - 1)
+
+  Factorial 9
+    ~>
+      9 * Factorial (9 - 1)
+        ~> (REWRITE-RESULT)
+          362880
+
+The (*) type family cannot reduce until its second argument is rewritten,
+so this chain of reductions /will/ be cached.
+The result reduction proceeds by rewriting the second argument to (*),
+namely 'Factorial (9 - 1) ~> 40320', which will also be cached.
 -}
 
 {-# INLINE rewrite_args_tc #-}
@@ -470,7 +624,9 @@ rewrite_args_slow :: [PiTyBinder] -> Kind -> TcTyCoVarSet
                   -> RewriteM ArgsReductions
 rewrite_args_slow binders inner_ki fvs roles tys
   = do { rewritten_args <- zipWithM rw (Inf.toList roles) tys
-       ; return (simplifyArgsWorker binders inner_ki fvs roles rewritten_args) }
+       ; return $
+           simplifyArgsWorker binders inner_ki fvs roles tys rewritten_args
+       }
   where
     {-# INLINE rw #-}
     rw :: Role -> Type -> RewriteM Reduction
@@ -485,7 +641,7 @@ rewrite_args_slow binders inner_ki fvs roles tys
     rw Phantom ty
     -- See Note [Phantoms in the rewriter]
       = do { ty <- liftTcS $ zonkTcType ty
-           ; return $ mkReflRedn Phantom ty }
+           ; return $! mkReflRedn Phantom ty }
 
 ------------------
 rewrite_one :: TcType -> RewriteM Reduction
@@ -502,7 +658,7 @@ rewrite_one ty
 
 rewrite_one xi@(LitTy {})
   = do { role <- getRole
-       ; return $ mkReflRedn role xi }
+       ; return $! mkReflRedn role xi }
 
 rewrite_one (TyVarTy tv)
   = rewriteTyVar tv
@@ -550,7 +706,7 @@ rewrite_one (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
           -- be done if we used TyConApp instead of FunTy. These rewritten
           -- representations are seen only in casts of the arg and res, below.
           -- Forgetting this caused #19677.
-       ; return $ mkFunRedn role vis w_redn casted_arg_redn casted_res_redn }
+       ; return $! mkFunRedn role vis w_redn casted_arg_redn casted_res_redn }
 
 rewrite_one ty@(ForAllTy {})
 -- TODO (RAE): This is inadequate, as it doesn't rewrite the kind of
@@ -561,13 +717,13 @@ rewrite_one ty@(ForAllTy {})
 -- applications inside the forall involve the bound type variables.
   = do { let (bndrs, rho) = tcSplitForAllTyVarBinders ty
        ; redn <- rewrite_one rho
-       ; return $ mkHomoForAllRedn bndrs redn }
+       ; return $! mkHomoForAllRedn bndrs redn }
 
 rewrite_one (CastTy ty g)
   = do { redn <- rewrite_one ty
        ; g'   <- rewrite_co g
        ; role <- getRole
-       ; return $ mkCastRedn1 role ty g' redn }
+       ; return $! mkCastRedn1 role ty g' redn }
       -- This calls castCoercionKind1.
       -- It makes a /big/ difference to call castCoercionKind1 not
       -- the more general castCoercionKind2.
@@ -576,7 +732,7 @@ rewrite_one (CastTy ty g)
 rewrite_one (CoercionTy co)
   = do { co' <- rewrite_co co
        ; role <- getRole
-       ; return $ mkReflCoRedn role co' }
+       ; return $! mkReflCoRedn role co' }
 
 -- | "Rewrite" a coercion. Really, just zonk it so we can uphold
 -- (F1) of Note [Rewriting]
@@ -585,9 +741,9 @@ rewrite_co co = liftTcS $ zonkCo co
 
 -- | Rewrite a reduction, composing the resulting coercions.
 rewrite_reduction :: Reduction -> RewriteM Reduction
-rewrite_reduction (Reduction co xi)
-  = do { redn <- rewrite_one xi
-       ; return $ co `mkTransRedn` redn }
+rewrite_reduction (Reduction co ty)
+  = do { redn <- rewrite_one ty
+       ; return $! co `mkTransRedn` redn }
 
 -- rewrite (nested) AppTys
 rewrite_app_tys :: Type -> [Type] -> RewriteM Reduction
@@ -719,17 +875,29 @@ so those families can get reduced.
 
 Note [How to normalise a family application]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Given an exactly saturated family application, how should we normalise it?
-This Note spells out the algorithm and its reasoning.
+To normalise an exactly saturated type family application 'F tys', we proceed
+as follows:
 
-First, we attempt to directly rewrite the type family application,
-without simplifying any of the arguments first, in an attempt to avoid
-doing unnecessary work.
+  - 'rewrite_exact_fam_app' tries to reduce 'F tys'.
+    If it succeeds, say reducing to 'rhs', we then recursively rewrite 'rhs'
+    as it may contain further type family applications (see REWRITE-RESULT below).
+
+  - 'rewriteExactFamApp' wraps 'rewrite_exact_fam_app' and decides what to do
+    with the chain of reductions it produces: it may zap it, and it may add it
+    to the family application cache.
+
+    NB: we deliberately cache the chain of reductions as a whole instead of
+    caching individual steps; see Note [The family application cache].
+
+To reduce a single type family application, we proceed in two phases (in
+'rewrite_exact_fam_app'): first try reducing the type family application without
+rewriting its arguments (to avoid doing unnecessary work), and then try again
+after having rewritten the arguments.
 
 STEP 1a. Call the rewriting plugins. If any plugin rewrites the type family
-application, jump to FINISH.
+application, jump to REWRITE-RESULT.
 
-STEP 1b. Try the famapp-cache. If we get a cache hit, jump to FINISH.
+STEP 1b. Try the famapp-cache. If we get a cache hit, jump to REWRITE-RESULT.
 
 STEP 1c. Try top-level instances. Remember: we haven't simplified the arguments
   yet. Example:
@@ -738,69 +906,137 @@ STEP 1c. Try top-level instances. Remember: we haven't simplified the arguments
   Instead of first trying to simplify (G Bool), we use the instance first. This
   avoids the work of simplifying G Bool.
 
-  If an instance is found, jump to FINISH.
+  If an instance is found, jump to REWRITE-RESULT.
 
 STEP 2: At this point we rewrite all arguments. This might expose more
   information, which might allow plugins to make progress, or allow us to
   pick up a top-level instance.
 
 STEP 3. Try the inerts. Note that we try the inerts *after* rewriting the
-  arguments, because the inerts will have rewritten LHSs.
+  arguments, because the inerts will have rewritten LHSs. That is, trying the
+  inerts is not part of Step 1.
 
-  If an inert is found, jump to FINISH.
+  If an inert is found, jump to REWRITE-RESULT.
 
 Next, we try STEP 1 again, as we might be able to make further progress after
 having rewritten the arguments:
 
-STEP 4a. Query the rewriting plugins again.
+STEP 4a (like STEP 1a). Query the rewriting plugins again.
 
-  If any plugin supplies a rewriting, jump to FINISH.
+  If any plugin supplies a rewriting, jump to REWRITE-RESULT.
 
-STEP 4b. Try the famapp-cache again.
+STEP 4b (like STEP 1b). Try the famapp-cache again.
 
-  If we get a cache hit, jump to FINISH.
+  If we get a cache hit, jump to REWRITE-RESULT.
 
-STEP 4c. Try top-level instances again.
+STEP 4c (like STEP 1c). Try top-level instances again.
 
-  If an instance is found, jump to FINISH.
+  If an instance is found, jump to REWRITE-RESULT.
 
-STEP 5: GIVEUP. No progress to be made. Return what we have. (Do not FINISH.)
+STEP 5: GIVEUP. No progress to be made. Return what we have.
+  (Do not REWRITE-RESULT.)
 
-FINISH 1. We've made a reduction, but the new type may still have more
-  work to do. So rewrite the new type.
-
-FINISH 2. Add the result to the famapp-cache, connecting the type we started
-  with to the one we ended with.
+REWRITE-RESULT. The type family application reduced to 'rhs'.
+  Recursively rewrite 'rhs': if it is itself a family application, go
+  round the loop again from STEP 1; otherwise hand it to the general rewriter.
+  Stop when there is no more work to do (or we hit the rewriter's depth limit).
+  We then return the composite reduction.
 
 Because STEP 1{a,b,c} and STEP 4{a,b,c} happen the same way, they are abstracted into
 try_to_reduce.
-
-FINISH is naturally implemented in `finish`. But, Note [rewrite_exact_fam_app performance]
-tells us that we should not add to the famapp-cache after STEP 1. So `finish`
-is inlined in that case, and only FINISH 1 is performed.
-
 -}
 
+-- | Split the arguments of a (possibly oversaturated) type family application
+-- into the arguments that exactly saturate the 'TyCon', and the remaining
+-- arguments.
+splitFamAppArgs :: TyCon -> [TcType] -> ([TcType], [TcType])
+splitFamAppArgs tc tys
+    -- Type functions are saturated, but might be *over* saturated,
+    -- in which case the remaining arguments are dealt with by AppTys.
+  = assertPpr (tys `lengthAtLeast` arity) (ppr tc $$ ppr arity $$ ppr tys) $
+    splitAt arity tys
+  where
+    arity = tyConArity tc
+
+-- | Rewrite a (possibly oversaturated) type family application.
 rewrite_fam_app :: TyCon -> [TcType] -> RewriteM Reduction
-  --   rewrite_fam_app            can be over-saturated
-  --   rewrite_exact_fam_app      lifts out the application to top level
-  -- Postcondition: Coercion :: Xi ~ F tys
-rewrite_fam_app tc tys  -- Can be over-saturated
-    = assertPpr (tys `lengthAtLeast` tyConArity tc)
-                (ppr tc $$ ppr (tyConArity tc) $$ ppr tys) $
+rewrite_fam_app tc tys
+  = do { let (tys1, tys_rest) = splitFamAppArgs tc tys
+       ; redn <- rewriteExactFamApp tc tys1
+       ; rewrite_app_ty_args redn tys_rest }
 
-                 -- Type functions are saturated
-                 -- The type function might be *over* saturated
-                 -- in which case the remaining arguments should
-                 -- be dealt with by AppTys
-      do { let (tys1, tys_rest) = splitAt (tyConArity tc) tys
-         ; redn <- rewrite_exact_fam_app tc tys1
-         ; rewrite_app_ty_args redn tys_rest }
+-- | Rewrite an exactly-saturated family application.
+--
+-- This dispatches to 'rewrite_exact_fam_app' to rewrite the family application
+-- and recursively rewrite its result, handling:
+--
+--  - dependency tracking (Note [Computing coercion dependencies]),
+--  - zapping (Note [Coercion zapping]),
+--  - extending the family application cache (Note [The family application cache])
+rewriteExactFamApp
+  :: TyCon      -- ^ @F@
+  -> [TcType]   -- ^ @tys@, exactly saturating @F@
+  -> RewriteM Reduction
+rewriteExactFamApp tc tys =
+  do { let !fam_ty = mkTyConApp tc tys
+     ; (deps, res) <- trackingDependencies $
+                      rewrite_exact_fam_app fam_ty tc tys
+     ; case res of
+         FamAppNotReduced redn ->
+            -- We only rewrote the arguments: nothing to zap nor cache.
+           return redn
+         FamAppReduced redn worth_caching ->
+           do { -- Zap the reduction (when -fzap-coercions is on).
+              ; zapped_redn <- zapRedn deps fam_ty redn
 
--- the [TcType] exactly saturate the TyCon
--- See Note [How to normalise a family application]
-rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM Reduction
-rewrite_exact_fam_app tc tys
+                -- See Note [The family application cache]
+              ; eq_rel <- getEqRel
+              ; when (  worth_caching                 -- (FAC_WorthCaching)
+                     && eq_rel == NomEq               -- (FAC_Role)
+                     && not (univCoDepsHasHoles deps) -- (FAC_Holes)
+                     ) $
+                  -- NB: (FAC_Flag) is checked in 'extendFamAppCache'.
+                  liftTcS $ extendFamAppCache tc tys zapped_redn
+
+              ; return zapped_redn
+              }}
+
+-- | Reduce an exactly-saturated type family application.
+--
+-- See Note [How to normalise a family application].
+rewrite_exact_fam_app :: TcType -> TyCon -> [TcType] -> RewriteM FamAppRewrite
+rewrite_exact_fam_app fam_ty tc tys
+  = assertPpr (fam_ty `eqType` mkTyConApp tc tys)
+              (ppr fam_ty $$ ppr tc $$ ppr tys) $
+    do { step <- rewrite_exact_fam_app_step tc tys
+       ; case step of
+           -- STEP 5 (GIVEUP): the type family application did not reduce.
+           FamAppNotReduced {} -> return step
+           -- REWRITE-RESULT: 'F tys' rewrote to 'rhs'; now rewrite 'rhs'.
+           FamAppReduced (Reduction co rhs) worth_caching
+             -> do { (rest_redn, rest_worth_caching)
+                       <- bumpReductionDepthRM fam_ty $ rewrite_rhs rhs
+                   ; return $! FamAppReduced (co `mkTransRedn` rest_redn)
+                                             (worth_caching || rest_worth_caching) } }
+  where
+    -- Rewrite the right-hand side of a type family reduction.
+    -- Also returns whether the reduction is worth adding to the famapp cache.
+    rewrite_rhs :: TcType -> RewriteM (Reduction, Bool)
+    rewrite_rhs rhs
+      | Just (fam_ty', tc', tys', tys_rest) <- splitTyFamApp_maybe rhs
+      -- Another family application: go round the loop again.
+      = do { res <- rewrite_exact_fam_app fam_ty' tc' tys'
+           ; let (redn, worth_caching) = famAppRewriteRedn res
+           ; redn' <- rewrite_app_ty_args redn tys_rest
+           ; return (redn', worth_caching) }
+      | otherwise
+      = do { redn <- rewrite_one rhs
+           ; return (redn, False) }
+
+-- | Try to reduce the an exactly-saturated type family application once:
+-- STEPs 1-5 of Note [How to normalise a family application].
+rewrite_exact_fam_app_step :: TyCon -> [TcType] -> RewriteM FamAppRewrite
+rewrite_exact_fam_app_step tc tys
   = do { -- Query the typechecking plugins for all their rewriting functions
          -- which apply to a type family application headed by the TyCon 'tc'.
        ; tc_rewriters <- getTcPluginRewritersForTyCon tc
@@ -808,9 +1044,9 @@ rewrite_exact_fam_app tc tys
        -- STEP 1. Try to reduce without reducing arguments first.
        ; result1 <- try_to_reduce tc tys tc_rewriters
        ; case result1 of
-             -- Don't use the cache;
-             -- See Note [rewrite_exact_fam_app performance]
-         { Just redn -> finish False redn
+             -- We reduced without rewriting any arguments: not worth caching.
+             -- See Note [When is a reduction worth caching?]
+         { Just redn -> return $! FamAppReduced redn False
          ; Nothing ->
 
         -- That didn't work. So reduce the arguments, in STEP 2.
@@ -838,16 +1074,18 @@ rewrite_exact_fam_app tc tys
        ; let
            role    = eqRelRole eq_rel
            args_co = mkTyConAppCo role tc cos
-       ;  let homogenise :: Reduction -> Reduction
-              homogenise redn
-                = homogeniseHetRedn role
-                $ mkHetReduction
-                    (args_co `mkTransRedn` redn)
-                    kind_co
+       ;  let
+            -- Compose the argument reductions with the given reduction, then homogenise
+            redn_args_and_then :: Reduction -> Reduction
+            redn_args_and_then redn
+              = homogeniseHetRedn role
+              $ mkHetReduction
+                  (args_co `mkTransRedn` redn)
+                  kind_co
 
-              give_up :: Reduction
-              give_up = homogenise $ mkReflRedn role reduced
-                where reduced = mkTyConApp tc xis
+            give_up :: Reduction
+            give_up = redn_args_and_then $ mkReflRedn role reduced
+              where reduced = mkTyConApp tc xis
 
          -- STEP 3: try the inerts
        ; flavour <- getFlavour
@@ -857,7 +1095,8 @@ rewrite_exact_fam_app tc tys
              -> do { traceRewriteM "rewrite family application with inert"
                                 (ppr tc <+> ppr xis $$ ppr redn)
                    ; recordRewriter inert_ev
-                   ; finish (isGiven inert_ev) (homogenise downgraded_redn) }
+                     -- (WorthCaching2) in Note [When is a reduction worth caching?]
+                   ; return $! FamAppReduced (redn_args_and_then downgraded_redn) True }
                -- This will sometimes duplicate an inert in the cache,
                -- but avoiding doing so had no impact on performance, and
                -- it seems easier not to weed out that special case
@@ -869,43 +1108,649 @@ rewrite_exact_fam_app tc tys
 
          ; _ ->
 
-         -- inerts didn't work. Try to reduce again, in STEP 4.
+         -- Inerts didn't work. Try to reduce again, in STEP 4.
     do { result3 <- try_to_reduce tc xis tc_rewriters
        ; case result3 of
-           Just redn -> finish True (homogenise redn)
-           -- we have made no progress at all: STEP 5 (GIVEUP).
-           _         -> return give_up }}}}}
-  where
-      -- call this if the above attempts made progress.
-      -- This recursively rewrites the result and then adds to the cache
-    finish :: Bool  -- add to the cache?
-                    -- Precondition: True ==> input coercion has
-                    --                        no coercion holes
-           -> Reduction -> RewriteM Reduction
-    finish use_cache redn
-      = do { -- rewrite the result: FINISH 1
-             final_redn <- bumpReductionDepthRM (mkTyConApp tc tys) $
-                           rewrite_reduction redn
-           ; eq_rel <- getEqRel
+           -- (WorthCaching1) in Note [When is a reduction worth caching?]
+           Just redn -> return $! FamAppReduced (redn_args_and_then redn) True
+           -- We have made no progress at all: STEP 5 (GIVEUP).
+           _         -> return $! FamAppNotReduced give_up }}}}}
 
-             -- extend the cache: FINISH 2
-           ; when (use_cache && eq_rel == NomEq) $
-             -- the cache only wants Nominal eqs
-             liftTcS $ extendFamAppCache tc tys final_redn
-           ; return final_redn }
-    {-# INLINE finish #-}
+-- | The result of rewriting an exactly-saturated type family application.
+--
+-- See Note [How to normalise a family application].
+data FamAppRewrite
+  -- | The type family application was reduced.
+  = FamAppReduced
+      !Reduction -- ^ the type family reduction @F tys ~ rhs@
+      !Bool -- ^ is this reduction worth caching?
+            -- See (FAC_WorthCaching) in Note [The family application cache].
 
--- Returned coercion is input ~r output, where r is the role in the RewriteM monad
+  -- | The type family application was not reduced, but we have rewritten
+  -- its arguments.
+  | FamAppNotReduced !Reduction
+
+-- | The 'Reduction' obtained by rewriting a type family application, together
+-- with whether it is worth recording in the family application cache.
+famAppRewriteRedn :: FamAppRewrite -> (Reduction, Bool)
+famAppRewriteRedn (FamAppReduced redn worth_caching) = (redn, worth_caching)
+famAppRewriteRedn (FamAppNotReduced redn)            = (redn, False)
+
+-- | Is this type a (possibly oversaturated) type family application?
+--
+-- Returns the exactly-saturated application, its 'TyCon', the arguments that
+-- saturate it, and any remaining arguments (in case of over-saturation).
+splitTyFamApp_maybe :: TcType -> Maybe (TcType, TyCon, [TcType], [TcType])
+splitTyFamApp_maybe ty
+  | Just ty' <- rewriterView ty  -- See Note [Rewriting synonyms]
+  = splitTyFamApp_maybe ty'
+  | TyConApp tc tys <- ty
+  , isTypeFamilyTyCon tc
+  = Just $! case splitFamAppArgs tc tys of
+      (_   , [])       -> (ty                , tc, tys , [])
+      (tys1, tys_rest) -> (mkTyConApp tc tys1, tc, tys1, tys_rest)
+  | otherwise
+  = Nothing
+
+-- | Collect all dependent coercions used within a rewriting action.
+--
+-- Continues to record all inner dependencies in the outer action.
+--
+-- See Note [Computing coercion dependencies].
+trackingDependencies :: RewriteM a -> RewriteM (UnivCoDeps, a)
+trackingDependencies thing_inside = mkRewriteM $ \ env ->
+  do { let ref = re_used_cos env
+     ; outer_deps <- readTcRef ref
+     ; unless (isEmptyUnivCoDeps outer_deps) $
+         writeTcRef ref emptyUnivCoDeps
+     ; res  <- runRewriteM thing_inside env
+     ; deps <- readTcRef ref
+       -- Restore the outer dependencies, adding on the inner ones.
+     ; unless (isEmptyUnivCoDeps outer_deps) $
+         writeTcRef ref $! outer_deps `unionUnivCoDeps` deps
+     ; return (deps, res) }
+{-# INLINE trackingDependencies #-} -- avoid allocating the return pair
+
+{- Note [Coercion zapping]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+When typechecking programs that involve long chains of type family reductions,
+the rewriter naturally produces large proof terms witnessing the reductions.
+
+Two examples illustrate the problem:
+
+  Example A.
+
+    data Nat = Z | S Nat
+
+    type F :: Nat -> Nat
+    type family F n where
+      F Z = Z
+      F (S n) = F n
+
+    co :: F ( S ( S ( S Z ) ) ) ~ Z
+    co = AxiomCo F[1] <S(S Z)>   -- F (S(S(S Z))) ~ F (S(S Z))
+       ; AxiomCo F[1] <S Z>      -- F (S(S Z))    ~ F (S Z)
+       ; AxiomCo F[1] <Z>        -- F (S Z)       ~ F Z
+       ; AxiomCo F[0]            -- F Z           ~ Z
+
+    The proof is a composition of a linear number of type family reduction steps.
+    However, the stored sizes also grow linearly, giving rise to a typical
+    triangular shape, with a total coercion size ≈ O(n²).
+
+  Example B.
+
+    type (++) :: [k] -> [k] -> [k]
+    type family xs ++ ys where
+      '[] ++ ys = ys
+      (x ': xs) ++ ys = x ': (xs ++ ys)
+
+    co :: ([x1, x2, x3] ++ ys) ~ (x1 ': x2 ': x3 ': ys)
+    co = AxiomCo (++)[1] <x1> <[x2, x3]> <ys>  -- Reduce at the top
+       ; TyConAppCo (:) <k> <x1>
+         ( AxiomCo (++)[1] <x2> <[x3]> <ys>    -- reduce under (x1:)
+         ; TyConAppCo (:) <k> <x2>
+           ( AxiomCo (++)[1] <x3> <[]> <ys>    -- reduce under (x1:x2:)
+           ; TyConAppCo (:) <k> <x3>
+             ( AxiomCo (++)[0] <ys> )          -- reduce under (x1:x2:x3:)
+           )
+         )
+
+    This time, the proof interleaves AxiomCo and TyConAppCo. It otherwise has
+    a similar shape as above, with the stored types giving rise to a total
+    coercion size ≈ O(n²).
+
+These large coercions cause significant slowdown (e.g. the simplifier needs to
+traverse them when substituting). To solve this, we need a smaller
+representation of these proof terms. Today, GHC does this by /coercion zapping/.
+
+To /zap/ a coercion is to replace it with a 'UnivCo' with 'ZappedProv' provenance.
+That is, we discard the proof, keeping only the LHS and RHS types it relates,
+together with its dependencies (as required by
+Note [The importance of tracking UnivCo dependencies] in GHC.Core.TyCo.Rep).
+
+Specifically, zapped coercions are created in exactly one place in the compiler:
+
+  (ZapRewrite)
+
+    When -fzap-coercions is on (which it is by default), each time the rewriter
+    produces a chain of type family reductions (see Note [How to normalise a family application]),
+    we zap the coercion stored in the reduction returned by the rewriter
+    (see 'rewriteExactFamApp').
+
+    The zapped coercion thus relates the original type family application with
+    its final reduct, not storing any intermediate types.
+
+    In both Example A and Example B, we end up with a single 'UnivCo' relating
+    the two endpoints, of size O(n).
+
+    The rewriter is the right place to create zapped coercions, because of
+    Wrinkle [Don't look at what you are about to zap].
+
+    A mild bonus of storing both the LHS and RHS types is that 'coercionKind' of
+    a zapped coercion is O(1), which is a boon to 'isReflexiveCo_maybe'.
+
+We make sure to lint the coercion we are about to zap to check we have a valid
+proof before we throw it away forevermore. See Note [Core Lint and zapped coercions].
+
+Wrinkle [We also propagate zappedness]
+
+  The rewriter is the unique birth place of zapped coercions, but the coercion
+  optimiser also /propagates/ zappedness in transitive chains of coercions,
+  regardless of -fzap-coercions.
+  This is a small optimisation that is not at all central to the implementation
+  of coercion zapping. See Note [Propagating zappedness] in GHC.Core.Coercion.Opt.
+
+Wrinkle [Don't look at what you are about to zap]
+
+  The 'Coercion' field of 'Reduction' is deliberately kept lazy so that we don't
+  pay to build a coercion we don't need. It is /critical/ that we never so much
+  as peek at the 'Coercion' we are about to zap. This is because, in practice,
+  the coercions built up by the rewriter are often large trees of smart
+  constructors (particularly 'mkTyConAppCo' and 'mkTransCo').
+  Empirically, compiling T9872a generates about 170k calls to 'mkTyConAppCo'
+  even though we end up zapping only ~1300 coercions in total. Moreover,
+  forcing such trees of smart constructors can be surprisingly expensive
+  (e.g. reflexivity checks).
+
+  This is why zapping in the rewriter is a good fit: we already have in our
+  hands everything we need to produce the zapped coercion, without looking at
+  the coercion we are about to zap:
+
+    - The LHS and RHS types are the type family application we started with
+      and its final reduct (computed by the rewriter).
+
+    - The dependencies are accumulated in the rewriter monad during rewriting,
+      as explained in Note [Computing coercion dependencies].
+
+  In contrast, zapping coercions after the fact (e.g. when zonking, as was
+  attempted in MR !3792) requires traversing the big coercion in order to
+  compute its kind and its dependencies.
+
+  The only exception to this rule is that we do look at the coercion we are
+  about to zap when running Core Lint.
+
+Wrinkle [Zapping a coercion may increase its size]
+
+  Perhaps surprisingly, zapping a coercion may **increase** its size, because
+  a 'UnivCo' must store both its LHS and RHS types.
+
+  For example, if we have:
+    type family F a where F Int = (Int, Bool, Char, [Word], ...) -- some huge type
+  then 'AxiomCo F[0] <Int>' is a much smaller coercion than
+    UnivCo { uco_lty = F Int, uco_rty = (Int, Bool, Char, [Word], ...) }
+
+  You might naively think this can be trivially solved by ad-hoc logic such as
+  "if the zapped coercion is larger, don't zap", but this /does not work/:
+  computing 'coercionSize' traverses the big coercion, which contravenes
+  Wrinkle [Don't look at what you are about to zap]. The same goes for
+  a budgeted traversal (bail out and zap once the coercion looks big).
+
+  We don't have a convincing answer to this today. What limits the damage is
+  that we are careful about which coercions we zap, only zapping entire chains
+  of type family reductions in the rewriter.
+
+  This ensures that, in the following example (taken from T3064), we zap the
+  type family reduction but not the 'TyConAppCo' around it:
+
+    -- all types stored are small
+    ResourceT <[Ch]> <(s,c)> (UnivCo { uco_lty = CtxLabel (CAT s c m), uco_rty = c })
+
+  If we propagated zappedness in 'mkTyConAppCo', we would instead end up with:
+
+    -- very big stored types
+    UnivCo { uco_lty = ResourceT [Ch] (..., CtxLabel (ResourceT ...))
+           , uco_rty = ResourceT [Ch] (..., ...)
+           }
+
+  which would unacceptably regress coercion sizes.
+
+  A more comprehensive potential solution to the problem described here is
+  provided in Note [Directed coercions].
+
+Note [Core Lint and zapped coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When zapping a coercion, we are turning a proof (checkable by Core Lint) into
+a "trust me" atom.
+As a belt-and-braces check, when -dcore-lint is on, we run Core Lint on the
+coercion we are about to zap to ensure that the coercion we are discarding
+really is a valid proof.
+
+The checks are performed in 'checkZappedRedn' called by 'zapRedn', when
+Core Lint is enabled. We check the following:
+
+  (ZapCheck1)
+    The coercion we are about to zap proves what it claims to: it has the right
+    role, and its LHS (RHS) type equals the redex we are rewriting (respectively,
+    the rewritten type), up to zonking.
+
+  (ZapCheck2)
+    The dependencies we are about to declare (the 'UnivCoDeps'), together with
+    the LHS and RHS types of the 'UnivCo' we are about to build, cover every
+    CoVar mentioned in the coercion we are about to zap.
+
+  (ZapCheck3)
+    The coercion we are about to zap is a valid coercion: it passes Core Lint.
+    This makes sure e.g. that all types line up in 'TransCo' chains, etc.
+
+    Traditionally, Core Lint only runs after typechecking is complete. To allow
+    us to run Core Lint in the rewriter, on a coercion that may contain unfilled
+    coercion holes and metavariables, we run a pared-down version of Core Lint
+    which tolerates unfilled coercion holes, using the 'lf_tc_coercion' flag.
+
+This checks every 'ZappedProv' 'UnivCo' at birth, in the rewriter.
+Note that, even with -fno-zap-coercions, Core Lint may still encounter zapped
+coercions (e.g. loaded from interface files that were produced with
+-fzap-coercions). That's fine: Core Lint treats them like any other 'UnivCo'.
+
+The coercion optimiser also discards proofs when it collapses (zapped_co ; co)
+into a single zapped coercion, and performs similar checks when Core Lint is
+enabled. See Wrinkle [Core Lint and propagated zappedness] in
+Note [Propagating zappedness] in GHC.Core.Coercion.Opt.
+
+Note [Computing coercion dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Two situations require us to compute the dependencies of a coercion produced by
+the rewriter:
+
+  1. When we add a reduction to the type family application cache, we must
+     ensure it does not contain any coercion holes.
+     See (FAC_Holes) in Note [The family application cache].
+
+  2. When we zap a coercion, we need to populate the 'uco_deps' field of
+     the 'ZappedProv' 'UnivCo' we are building.
+
+(1) only requires us to know whether there are coercion holes or not, while (2)
+requires a precise accounting of the exact set of dependencies. That is,
+if we zap 'co :: lhs ~ xi' to 'UnivCo ZappedProv deps lhs xi', then 'deps' must
+be exactly the dependencies of 'co', no less and no more.
+See the explanation in Wrinkle [Coercion dependencies must be exact].
+
+As explained in Wrinkle [Don't look at what you are about to zap]
+in Note [Coercion zapping], we must compute 'deps' without inspecting the
+coercion 'co' we are about to zap (e.g. we /must not/ call 'coVarsOfCo co').
+We do so by keeping track, in the rewriter monad, of the inert equalities used
+during rewriting, in the field 're_used_cos' of GHC.Tc.Types.RewriteEnv. Such
+inert equalities can be used in the following ways, each recording the
+dependency in 're_used_cos':
+
+  - Directly, when the rewriter rewrites using an inert equality (either
+    Given or Wanted); see 'recordRewriter'.
+  - Indirectly via a reduction that was stashed in the family application cache
+    and that used an inert equality; see 'lookupFamAppCache'.
+  - Indirectly via a typechecker plugin, which has the obligation to declare
+    dependencies on used inert equalities; see 'runTcPluginRewriters'.
+
+The dependency tracking mechanism is scoped to individual chains of type family
+reductions, in the sense of Note [How to normalise a family application].
+That is, each call to 'rewriteExactFamApp' has its own dependency tracking
+scope (see 'trackingDependencies'), which also means there is exactly one scope
+per zapping site.
+
+These scopes can nest: for example, we may rewrite 'F (G a)' by first rewriting
+the argument 'G a', and the latter is its own chain of type family reductions,
+with its own dependency tracking scope. As the reduction for 'G a' is part of
+the overall reduction of 'F (G a)', everything recorded in the inner scope is
+also added on to the outer scope.
+
+The dependencies recorded in a scope tell us whether the reduction mentions any
+coercion holes, as needed for (1). This is why we track dependencies even with
+-fno-zap-coercions. (This solves #27518.)
+
+When we come to zapping a coercion 'co :: lhs ~ xi' (in 'zapRedn'), we set
+
+  uco_deps = re_used_cos ∪ shallowCoVarsOfTypes [lhs, xi]
+
+NB: we union-in the shallow CoVars (and coercion holes) of the LHS and RHS
+types to satisfy (UnivCoDepsInv) from Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep.
+
+Wrinkle [Coercion dependencies must be exact]
+
+  When we zap 'co :: lhs ~ xi' to 'UnivCo ZappedProv deps lhs xi', we must
+  certainly not under-estimate the dependencies, as explained in
+  Note [The importance of tracking UnivCo dependencies] in GHC.Core.TyCo.Rep.
+  So we must have:
+
+    (NoMissingDeps)   coVarsOfCo co  ⊆  deps
+
+  This is checked by Core Lint: see (ZapCheck2) in
+  Note [Core Lint and zapped coercions].
+  Perhaps more surprisingly, we in fact need the converse containment:
+
+    (NoSpuriousDeps)       deps      ⊆ coVarsOfCo co
+
+  This is because over-estimating the set of dependencies, while sound,
+  can cause us to reject valid programs. See
+  Wrinkle [Spurious dependencies can cause a program to be rejected].
+
+  The dependency tracking scheme outlined above upholds (NoMissingDeps) because
+  every coercion variable or coercion hole appearing in a coercion produced by
+  the rewriter was either:
+
+    - introduced by using an inert equality, which was recorded in one of the
+      three ways listed above, or
+    - already present in the type being rewritten, in which case it appears
+      in 'lhs' (up to zonking), and is thus added to 'deps' by (UnivCoDepsInv).
+
+  It is vitally important that the recording sites stay exhaustive, as missing a
+  dependency risks re-introducing #23923.
+
+  (NoSpuriousDeps) is also upheld. This is clear for the dependencies that come
+  from 'lhs' and 'xi', which are the LHS and RHS types of 'co'. As for the
+  recorded dependencies, every dependency recorded in a scope really is
+  a dependency of the coercion zapped at the end of it:
+
+    a. Every dependency recorded inside a scope ends up stored into a
+       Reduction that is then incorporated (via some Reduction smart constructor)
+       into the final Reduction returned at the end of the scope.
+    b. None of the reduction combinators (mkTransRedn, mkAppRedns...) ever
+       discard any part of a coercion.
+
+  (NB: (b) is not entirely true: for example, 'mkUnivCo' may optimise a
+  reflexive coercion to 'Refl', discarding any inner 'CoVar's or 'CoercionHole's.
+  This infelicity is not specific to zapping, so we accept it.)
+
+Wrinkle [Spurious dependencies can cause a program to be rejected]
+
+  Over-estimating the dependencies may cause a spurious occurs-check failure.
+  This is quite tricky to trigger, but an example is the ZapDeps test. The
+  constraint solving derivation is incredibly painful to write out in full, but
+  it goes roughly like this:
+
+    [W] {hole} :: F (F x) ~ x
+    [G] g1 :: FX xs ~# '[x]
+
+    [G] g2 :: FX (FX xs) ~# xs
+
+      ==> rewrite using g1
+
+      [G] g3 :: FX '[x] ~# xs
+
+      ==> type family reductions (no Givens used)
+
+      [G] g4 :: (F x ': (FX @[Type] '[] |> γ)) ~# xs
+
+        -- here 'γ' is made up entirely of TyConAppCo/CoAxiom/TransCo
+        -- it does not contain a single CoVar (no Givens used)
+
+      ==> re-orient to get a TyVarLHS
+
+      [G] g5 :: xs ~# (F x ': (FX @[Type] '[] |> γ))
+
+  Now, if, in the process of producing the kind coercion 'γ', the rewriter
+  makes the mistake of recording 'g1' as a dependency of 'γ' (e.g. because
+  all dependencies were recorded in a single global scope), this causes an
+  occurs-check failure, because the LHS 'xs' of 'g5' occurs in 'g1'. In this
+  case 'g5' becomes an IrredCt, so we can't use it to now rewrite 'g1'. This
+  stops us from solving the Wanted; that would otherwise proceed as follows
+  (omitting all casts for simplicity):
+
+    [G] g1 :: FX xs ~# '[x]
+
+      ==> rewrite using g5
+
+      [G] g6 :: FX (F x : FX '[]) ~# '[x]
+
+      ==> type family reductions
+
+      [G] g7 :: F ( F x ) ': [] ~# '[x]
+
+      ==> decomposing
+
+      [G] g8 :: F ( F x ) ~ x
+
+  which allows us to solve the Wanted {hole} := g8.
+
+Graveyard: rejected ways to compute coercion dependencies.
+
+  Alternative 1: compute dependencies using 'coVarsOfCo'.
+
+    When zapping, we have the coercion 'co' produced by the rewriter in hand.
+    We could just call 'coVarsOfCo co' to get its dependencies and store that
+    in the zapped coercion.
+
+    The problem with this approach is that it evaluates the coercion, which
+    is exactly what Wrinkle [Don't look at what you are about to zap]
+    in Note [Coercion zapping] warns against.
+
+    Empirically, this approach added ~250MB allocations (~+15%) when compiling
+    T9872a, and ~+35% runtime.
+
+  Alternative 2: store the dependencies in the 'Reduction'.
+
+    Instead of keeping track of dependencies in the rewriter monad, we could
+    store them in the 'Reduction' datatype, updating the combinators to union
+    these dependencies when combining coercions.
+
+    There are two ways we could proceed here:
+
+      2A: Store the dependencies alongside the coercion.
+
+        This is workable, but it is a much bigger amount of code to change for
+        no gain, given that this computes the exact same set of dependencies as
+        the monadic approach. In particular, making sure that the extra field of
+        'Reduction' does not result in extra allocations, while possible,
+        requires a fair amount of delicately crafted code.
+
+      2B: Store the dependencies, don't store the coercion at all.
+
+        It seems wasteful for the rewriter to accumulate a big thunk for the
+        coercion if we are not even going to look at it. This suggests removing
+        the 'Coercion' field of 'Reduction' entirely, replacing it with a set of
+        dependencies.
+
+        However, we only want to zap chains of type family reductions, not
+        arbitrary coercions. So if we tried something like:
+
+          data Reduction = Reduction  Coercion   !Type
+                         | ZappedRedn UnivCoDeps !Type
+
+        the combinators (such as 'mkTyConAppRedn') would have to be implemented
+        either by materialising intermediate UnivCos with possibly large types,
+        or by infectiously propagating zappedness (which would end up zapping
+        way more coercions than we bargained for and bloat coercion sizes
+        as explained in Wrinkle [Zapping a coercion may increase its size]
+        in Note [Coercion zapping]).
+
+Note [Directed coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+This note describes a **non-implemented** alternative design to solve the issues
+described in Note [Coercion zapping], in particular addressing
+Wrinkle [Zapping a coercion may increase its size].
+
+As Example A and Example B from that Note show, the coercions only grow
+quadratically in size because of the types stored therein.
+
+The idea of directed coercions is to use a different coercion representation in
+which we no longer store the LHS type. It becomes implicit from the context
+(e.g. the input type in a reduction). Instead of
+
+  coercionRKind :: Coercion -> Type
+
+one gets:
+
+  dcoercionRKind :: Role -> Type -> DCoercion -> Type
+  dcoercionRKind r lhs_ty dco =
+    case dco of
+      DRefl -> lhs_ty
+      (dco1 ; dco2) ->
+        let mid_ty = dcoercionRKind r lhs_ty dco1
+        in dcoercionRKind r mid_ty dco2
+      ...
+
+The benefit of this approach compared to coercion zapping is that the full proofs
+are retained in Core Lint (no "trust me" 'UnivCo's), and we avoid the problem
+where the zapped coercion may be larger than the original coercion.
+
+This approach was attempted in MR !6476, but that work stalled due to
+difficulties in implementing coercion optimisation (and also due to the
+significant implementation cost).
+-}
+
+-- | When @-fzap-coercions@ is enabled: zap the 'Coercion' stored in the
+-- 'Reduction', replacing it with a 'UnivCo' with 'ZappedProv' provenance.
+--
+-- See (ZapRewrite) in Note [Coercion zapping].
+--
+-- No-op under @-fno-zap-coercions@.
+zapRedn :: UnivCoDeps -- ^ dependencies of the coercion being zapped
+        -> TcType     -- ^ LHS type of the reduction
+        -> Reduction
+        -> RewriteM Reduction
+zapRedn deps lhs redn@(Reduction _co xi) = mkRewriteM $ \env ->
+  if not (re_zap_coercions env)
+  then return redn
+  else
+  do { let
+         -- See Note [Bangs in zapRedn]
+         !r = eqRelRole $ re_eq_rel env
+
+       -- When Core Lint is enabled: check the zapping is valid while we still
+       -- have the proof in hand. See Note [Core Lint and zapped coercions].
+     ; dflags <- getDynFlags
+     ; when (gopt Opt_DoCoreLinting dflags) $
+         checkZappedRedn dflags deps r lhs redn
+
+       -- Crucially, nothing here (save for the check above) inspects
+       -- the reduction's coercion at all.
+       -- See Wrinkle [Don't look at what you are about to zap]
+       -- in Note [Coercion zapping].
+     ; return $! -- See Note [Bangs in zapRedn]
+         mkReduction
+           (mkUnivCoAddTypeDeps ZappedProv deps r lhs xi) xi
+     }
+
+{- Note [Bangs in zapRedn]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+zapRedn is on a hot path, being hammered by the rewriter when reducing type
+family applications.
+
+It's important to make it allocate as little as possible. The bangs in 'zapRedn'
+were measured to shave off about 1% of allocations in T9872{a,b,c}, as they
+avoid allocating intermediate thunks that would end up being forced anyway.
+
+These banging opportunities were found with the usual strategy:
+use -ddump-stg-final and hunt for naughty allocating 'let' bindings.
+
+checkZappedRedn still ends up costing a ~0.3% increase in allocations in those
+tests when Core Lint is off (so the check is skipped), but so be it.
+-}
+
+{-# NOINLINE checkZappedRedn #-} -- cold code (only for Core Lint)
+
+-- | Check that the coercion we are about to zap is valid.
+--
+-- See Note [Core Lint and zapped coercions].
+checkZappedRedn :: DynFlags -> UnivCoDeps -> Role -> TcType -> Reduction -> TcS ()
+checkZappedRedn dflags deps r lhs_ty (Reduction co xi)
+  = do { -- Zonk to handle metavariables that the rewriter looked through.
+         -- See (F0) in Note [Rewriting].
+         lhs_ty <- zonkTcType lhs_ty
+       ; co     <- zonkCo co
+
+       ; let (Pair co_lhs co_rhs, co_role) = coercionKindRole co
+
+             checkEq :: Outputable a => (a -> a -> Bool) -> SDoc -> a -> a -> Maybe SDoc
+             checkEq eq what expected actual
+               | expected `eq` actual
+               = Nothing
+               | otherwise
+               = Just $
+                   hang (text "coercion has incorrect" <+> what)
+                      2 $ vcat [ text "expected:" <+> ppr expected
+                               , text "  actual:" <+> ppr actual ]
+
+             -- The CoVars of the LHS and RHS types count as declared: they are
+             -- stored in the 'UnivCo' we are about to build.
+             deep_deps =
+                univCoDepsDeepCoVars deps
+                  `unionVarSet` coVarsOfTypes [lhs_ty, xi]
+             co_cvs = coVarsOfCo co
+
+             (_warns, lint_errs) = lintTcCoercion (initLintConfig dflags []) co
+
+             errs =
+              catMaybes
+                -- (ZapCheck1): the coercion proves what we want it to prove.
+                [ checkEq eqType (text "LHS")  lhs_ty co_lhs
+                , checkEq eqType (text "RHS")  xi     co_rhs
+                , checkEq (==)   (text "role") r      co_role
+
+                -- (ZapCheck2): the declared dependencies cover the actual dependencies
+                , if co_cvs `subVarSet` deep_deps
+                  then Nothing
+                  else
+                    Just $
+                      hang (text "unrecorded coercion dependency") 2 $
+                        vcat [ text "coercion CoVars:" <+> ppr co_cvs
+                             , text "declared deps:" <+> ppr deps
+                             , text " missing deps:" <+> ppr (co_cvs `minusVarSet` deep_deps)
+                             ]
+                ]
+              ++
+                -- (ZapCheck3): the coercion we are zapping is valid (passes Core Lint).
+                [ hang (text "ill-formed coercion")
+                     2 (vcat $ bagToList lint_errs)
+                | not $ isEmptyBag lint_errs ]
+
+       ; case errs of
+           []  -> return ()
+           _:_ -> pprPanic "checkZappedRedn" $
+                    vcat [ text "  co:" <+> ppr co
+                         , text "deps:" <+> ppr deps
+                         , vcat errs
+                         ]
+       }
+
+-- | Try to reduce a type family application.
+-- Returns a 'Reduction' whose role is the role in the 'RewriteM' monad.
+--
 -- See Note [How to normalise a family application]
 try_to_reduce :: TyCon -> [TcType] -> [TcPluginRewriter]
               -> RewriteM (Maybe Reduction)
 try_to_reduce tc tys tc_rewriters
   = do { rewrite_env <- getRewriteEnv
+       ; let -- Record the dependencies of this reduction, to handle any
+             -- reduction introduced by plugins or looked up in the famapp cache.
+             record_deps :: Maybe Reduction -> TcS (Maybe Reduction)
+             record_deps mb_redn
+               | Just redn <- mb_redn
+               = do { updTcRef (re_used_cos rewrite_env)
+                        ( `addUnivCoDep` reductionCoercion redn )
+                    ; return mb_redn }
+               | otherwise
+               = return mb_redn
+
        ; result <-
             liftTcS $ firstJustsM
-              [ runTcPluginRewriters rewrite_env tc_rewriters tys -- STEP 1a & STEP 4a
-              , lookupFamAppCache tc tys                          -- STEP 1b & STEP 4b
-              , matchFam tc tys ]                                 -- STEP 1c & STEP 4c
+              [ -- STEP 1a & STEP 4a
+                record_deps
+                  =<< runTcPluginRewriters rewrite_env tc_rewriters tys
+              , -- STEP 1b & STEP 4b
+                record_deps
+                  =<< lookupFamAppCache tc tys
+              , -- STEP 1c & STEP 4c
+                matchFam tc tys
+              ]
        ; traverse downgrade result }
   where
     -- The result above is always Nominal. We might want a Representational
@@ -922,7 +1767,7 @@ try_to_reduce tc tys tc_rewriters
               -- common NomEq case
            ; case eq_rel of
                NomEq  -> return redn
-               ReprEq -> return $ mkSubRedn redn }
+               ReprEq -> return $! mkSubRedn redn }
 
 -- Retrieve all type-checking plugins that can rewrite a (saturated) type-family application
 -- headed by the given 'TyCon`.
@@ -995,7 +1840,7 @@ rewriteTyVar tv
              -> do { tv' <- liftTcS $ updateTyVarKindM zonkTcType tv
                    ; role <- getRole
                    ; let ty' = mkTyVarTy tv'
-                   ; return $ mkReflRedn role ty' } }
+                   ; return $! mkReflRedn role ty' } }
 
 rewrite_tyvar1 :: TcTyVar -> RewriteM RewriteTvResult
 -- "Rewriting" a type variable means to apply the substitution to it
@@ -1010,7 +1855,7 @@ rewrite_tyvar1 tv
            Just ty -> do { traceRewriteM "Following filled tyvar"
                              (ppr tv <+> equals <+> ppr ty)
                          ; role <- getRole
-                         ; return $ RTRFollowed $
+                         ; return $! RTRFollowed $!
                              mkReflRedn role ty }
            Nothing -> do { traceRewriteM "Unfilled tyvar" (pprTyVar tv)
                          ; fr <- getFlavourRole
@@ -1045,7 +1890,7 @@ rewrite_tyvar2 tv fr@(_, eq_rel)
                             (NomEq, NomEq)  -> rewriting_co1
                             (NomEq, ReprEq) -> mkSubCo rewriting_co1
 
-                   ; return $ RTRFollowed $ mkReduction rewriting_co rhs_ty }
+                   ; return $! RTRFollowed $! mkReduction rewriting_co rhs_ty }
 
            _other -> return RTRNotFollowed }
 

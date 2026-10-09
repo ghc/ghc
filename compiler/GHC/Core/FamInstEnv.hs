@@ -1613,7 +1613,7 @@ normalise_args :: Kind    -- of the function
 -- cf. GHC.Tc.Solver.Rewrite.rewrite_args_slow
 normalise_args fun_ki roles args
   = do { normed_args <- zipWithM normalise1 (Inf.toList roles) args
-       ; return $ simplifyArgsWorker ki_binders inner_ki fvs roles normed_args }
+       ; return $ simplifyArgsWorker ki_binders inner_ki fvs roles args normed_args }
   where
     (ki_binders, inner_ki) = splitPiTys fun_ki
     fvs = tyCoVarsOfTypes args

@@ -42,7 +42,7 @@ module GHC.Core.TyCo.Subst
         cloneTyVarBndr, cloneTyVarBndrs,
         substVarBndr, substVarBndrs,
         substTyVarBndr, substTyVarBndrs,
-        substCoVarBndr, substDCoVarSet,
+        substCoVarBndr,
         substTyVar, substTyVars,
         substTyCoVars,
         substTyCoBndr,
@@ -859,12 +859,6 @@ substCos :: HasDebugCallStack => Subst -> [Coercion] -> [Coercion]
 substCos subst cos
   | isEmptyTCvSubst subst = cos
   | otherwise = checkValidSubst subst [] cos $ map (subst_co subst) cos
-
--- | Perform a substitution within a 'DVarSet' of free variables,
--- returning the free coercion variables.
-substDCoVarSet :: Subst -> DCoVarSet -> DCoVarSet
-substDCoVarSet subst cvs = coVarsOfCosDSet $ map (substCoVar subst) $
-                           dVarSetElems cvs
 
 substCoHole :: Subst -> CoercionHole -> Coercion
 -- See Note [Substituting in a coercion hole]

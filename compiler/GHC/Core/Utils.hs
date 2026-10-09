@@ -2983,7 +2983,7 @@ cheapEqExpr' ignoreTick e1 e2
 
 
 
--- Used by diffBinds, which is itself only used in GHC.Core.Lint.lintAnnots
+-- Used by diffBinds, which is itself only used in GHC.Core.Opt.Pipeline.lintAnnots
 eqTickish :: RnEnv2 -> CoreTickish -> CoreTickish -> Bool
 eqTickish env (Breakpoint lext lid lids) (Breakpoint rext rid rids)
       = lid == rid &&
@@ -3002,7 +3002,7 @@ eqTickish _ l r = l == r
 -- which we then speculatively match by ordering them. It's by no means
 -- perfect, but gets the job done well enough.
 --
--- Only used in GHC.Core.Lint.lintAnnots
+-- Only used in GHC.Core.Opt.Pipeline.lintAnnots
 diffBinds :: Bool -> RnEnv2 -> [(Var, CoreExpr)] -> [(Var, CoreExpr)]
           -> ([SDoc], RnEnv2)
 diffBinds top env binds1 = go (length binds1) env binds1

@@ -11,6 +11,7 @@ data Coercion
 data FunSel
 data CoSel
 data UnivCoProvenance
+data UnivCoDeps
 data TyLit
 data MCoercion
 

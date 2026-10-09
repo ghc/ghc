@@ -70,6 +70,9 @@ module GHC.Core.TyCo.Rep (
         -- * Coercions
         Coercion(..), CoSel(..), FunSel(..), Role(..),
         UnivCoProvenance(..),
+
+        UnivCoDeps(..),
+
         CoercionHole(..), CoercionPlusHoles(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
         MCoercion(..), MCoercionR, MCoercionN, KindMCoercion,
@@ -108,14 +111,17 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
 import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
-import {-# SOURCE #-} GHC.Core.TyCo.FVs( tyCoVarsOfType ) -- Use in assertions
+import {-# SOURCE #-} GHC.Core.TyCo.FVs( tyCoVarsOfType, univCoDepsCoercions, univCoDepsSize )
 import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstraint )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 -- friends:
 import GHC.Types.Var
-import GHC.Types.Var.Set( elemVarSet )
+import GHC.Types.Var.Set
+  ( elemVarSet, DCoVarSet, dVarSetElems )
+import GHC.Types.Unique.DSet
+  ( UniqDSet, uniqDSetToList )
 import GHC.Types.Unique.Set
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
@@ -131,12 +137,12 @@ import GHC.Utils.Panic
 import GHC.Utils.Binary
 
 -- libraries
-import qualified Data.Data as Data hiding ( TyCon )
+import Control.DeepSeq
 import Data.Coerce
+import qualified Data.Data as Data hiding ( TyCon )
 import Data.IORef ( IORef )   -- for CoercionHole
 
 import qualified Data.Monoid as M
-import Control.DeepSeq
 
 {- **********************************************************************
 *                                                                       *
@@ -956,13 +962,19 @@ data Coercion
      -- The roles of the argument coercions are determined
      -- by the cab_roles field of the relevant branch of the CoAxiom
 
+  -- | A coercion from some type to some other type, with (in general)
+  -- no restrictions on the type.
+  --
+  -- For simplicity, we have just one 'UnivCo' constructor, with the specific
+  -- details of the 'UnivCo' stored in 'UnivCoProvenance'.
   | UnivCo  -- See Note [UnivCo]
             -- Of kind (lty ~role rty)
       { uco_prov         :: UnivCoProvenance
       , uco_role         :: Role
       , uco_lty, uco_rty :: Type
-      , uco_deps         :: [Coercion]  -- Coercions on which it depends
+      , uco_deps         :: UnivCoDeps  -- Coercions on which it depends
                --   See Note [The importance of tracking UnivCo dependencies]
+               --   and Note [UnivCoDeps]
       }
 
   | SymCo Coercion             -- :: e -> e
@@ -1020,6 +1032,9 @@ data FunSel  -- See Note [SelCo]
 
 instance Outputable Coercion where
   ppr = pprCo
+
+instance Outputable UnivCoDeps where
+  ppr = ppr . univCoDepsCoercions
 
 instance Outputable CoSel where
   ppr (SelTyCon n r) = text "Tc" <> parens (int n <> comma <> pprOneCharRole r)
@@ -1584,7 +1599,7 @@ is entirely separate, but they all share the need to represent these fields:
       { uco_prov         :: UnivCoProvenance
       , uco_role         :: Role
       , uco_lty, uco_rty :: Type
-      , uco_deps         :: [Coercion]  -- Coercions on which it depends
+      , uco_deps         :: UnivCoDeps  -- Coercions on which it depends
 
 Here,
  * uco_role, uco_lty, uco_rty express the type of the coercion
@@ -1594,13 +1609,64 @@ Here,
    Note [The importance of tracking UnivCo dependencies]
 -}
 
--- | For simplicity, we have just one UnivCo that represents a coercion from
--- some type to some other type, with (in general) no restrictions on the
--- type. The UnivCoProvenance specifies more exactly what the coercion really
--- is and why a program should (or shouldn't!) trust the coercion.
+-- | The coercions a 'UnivCo' depends on.
+--
+-- See Note [The importance of tracking UnivCo dependencies]
+-- and Note [UnivCoDeps].
+data UnivCoDeps
+  -- | No dependencies at all.
+  --
+  -- (This constructor avoids allocation in the extremely common case that there
+  -- are no dependencies.)
+  = NoUnivCoDeps
+  -- | A collection of 'CoVar's and 'CoercionHole's that a coercion depends on.
+  --
+  -- Invariant: the two fields are not both empty (use 'NoUnivCoDeps' for that).
+  | UnivCoDeps
+      { ucd_cvs   :: !DCoVarSet
+          -- ^ The (shallow) coercion variables the 'UnivCo' depends on, not including
+          -- any 'coHoleCoVar's.
+          --
+          -- Why shallow? See (UCD1) in Note [UnivCoDeps].
+      , ucd_holes :: !(UniqDSet CoercionHole)
+          -- ^ The (shallow) coercion holes the 'UnivCo' depends on.
+          --
+          -- Why shallow? See (UCD1) in Note [UnivCoDeps].
+      }
+  deriving Data.Data
+
+{- Note [UnivCoDeps]
+~~~~~~~~~~~~~~~~~~~~
+All that matters for tracking the dependencies of a UnivCo (see Note [The
+importance of tracking UnivCo dependencies]) are the coercion variables and the
+coercion holes it depends on, so that is exactly what UnivCoDeps stores.
+This reduces the size of the dependencies, which is particularly important for
+coercion zapping; see Note [Coercion zapping] in GHC.Tc.Solver.Rewrite.
+
+Coercion holes are stored separately from coercion variables, because they have
+no binding site, being instead filled in by the typechecker.
+
+Zonking may fill a coercion hole with a large coercion, so we immediately
+gather the resulting coercion's free coercion variables and coercion holes in
+order to avoid accumulating large coercions (see the use of 'mapUnivCoDepsM' in
+GHC.Core.TyCo.Make.mapTyCo).
+
+  (UCD1) We deliberately store /shallow/ dependencies:
+
+    - Keeping 'ucd_cvs' shallow keeps the set small, which saves work when
+      performing substitution (fewer variables to substitute).
+    - Several consumers want the shallow version (e.g. 'elemUnivCoDeps' used
+      by 'almost_devoid_co_var_of_co'). The consumers that want the deep
+      version can close over kinds themselves (e.g. 'univCoDepsDeepCoVars',
+      'univCoDepsHasHoles').
+-}
+
+-- | The 'UnivCoProvenance' specifies more precisely where a 'UnivCo' comes from
+-- and why a program should (or shouldn't!) trust the coercion.
+--
 -- It is reasonable to consider each constructor of 'UnivCoProvenance'
 -- as a totally independent coercion form; their only commonality is
--- that they don't tell you what types they coercion between. (That info
+-- that they don't tell you what types they coerce between. (That info
 -- is in the 'UnivCo' constructor of 'Coercion'.
 data UnivCoProvenance
   = PhantomProv    -- ^ See Note [Phantom coercions]. Only in Phantom
@@ -1614,7 +1680,17 @@ data UnivCoProvenance
       -- ^ From a plugin, which asserts that this coercion is sound.
       --   The string and the variable set are for the use by the plugin.
 
-  | SubMultProv -- ^ A submultiplicity coercion
+  | SubMultProv
+    -- ^ A sub-multiplicity coercion.
+    --
+    -- See 'mkSubMultFunCo' as well as
+    -- Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
+
+  | ZappedProv
+      -- ^ A zapped coercion: a proof that has been erased, keeping only its
+      --   LHS and RHS types and its dependencies.
+      --
+      --   See Note [Coercion zapping] in GHC.Tc.Solver.Rewrite.
 
   | CanonicalProv
       -- ^ Used to coerce a type to the canonical type of its runtime
@@ -1631,6 +1707,7 @@ instance Outputable UnivCoProvenance where
   ppr (PluginProv str)     = parens (text "plugin" <+> brackets (text str))
   ppr SubMultProv          = text "(sub-mult)"
   ppr CanonicalProv        = text "(canonical)"
+  ppr ZappedProv           = text "(zapped)"
 
 instance NFData UnivCoProvenance where
   rnf p = p `seq` ()
@@ -1641,6 +1718,7 @@ instance Binary UnivCoProvenance where
   put_ bh (PluginProv a) = putByte bh 3 >> put_ bh a
   put_ bh SubMultProv    = putByte bh 4
   put_ bh CanonicalProv  = putByte bh 5
+  put_ bh ZappedProv     = putByte bh 6
   get bh = do
       tag <- getByte bh
       case tag of
@@ -1650,6 +1728,7 @@ instance Binary UnivCoProvenance where
                    return $ PluginProv a
            4 -> return SubMultProv
            5 -> return CanonicalProv
+           6 -> return ZappedProv
            _ -> panic ("get UnivCoProvenance " ++ show tag)
 
 {- Note [Phantom coercions]
@@ -1725,11 +1804,58 @@ See #23923 for a real-world example of this happening.
 So it is /crucial/ for the `UnivCo` to mention, in `uco_deps`, the coercion
 variables used by the plugin to justify the `UnivCo` that it builds.  You
 should think of it like `TyConAppCo`: the `UnivCo` proof constructor is
-applied to a list of coercions, just as `TyConAppCo` is
+applied to a list of coercions, just as `TyConAppCo` is.
 
-It's very convenient to record a full coercion, not just a set of free coercion
-variables, because during typechecking those coercions might contain coercion
-holes `HoleCo`, which get filled in later.
+Note [UnivCoDepsInv]
+~~~~~~~~~~~~~~~~~~~~
+There is a design choice to be made with regards to the 'uco_deps' field of
+'UnivCo': does it also store the 'CoVar's of the LHS and RHS types of the
+'UnivCo'?
+
+Our answer: YES. That is, we require:
+
+  (UnivCoDepsInv)
+    shallowCoVars(lty) ∪ shallowCoVars(rty)  ⊆    ucd_cvs(deps)
+     shallowHoles(lty) ∪  shallowHoles(rty)  ⊆  ucd_holes(deps)
+
+which in particular implies (recalling that 'coVarsOfType' is deep):
+
+    coVarsOfType(lty) ∪ coVarsOfType(rty)  ⊆  univCoDepsDeepCoVars(deps)
+
+The invariant is established by 'mkUnivCoAddTypeDeps'/'addUnivCoTypeDeps'.
+
+  Aside: what this invariant buys us.
+
+    This invariant is not required for soundness: it would be perfectly fine to
+    omit 'coVarsOfType(lty)' and 'coVarsOfType(rty)' from 'deps', as the
+    'UnivCo' still stores 'lty' and 'rty', so no dependency is lost.
+
+    However, the invariant is useful: it amounts to caching the result of
+    'coVarsOfTypes [lty, rty]' into 'deps', which has performance benefits.
+    The main benefit we get is when performing coercion zapping in the rewriter.
+    As described in Note [Computing coercion dependencies] in GHC.Tc.Solver.Rewrite,
+    when the rewriter uses a reduction that was returned by a plugin or looked
+    up in the type family application cache, it records the dependencies of that
+    reduction's coercion in the 're_used_cos' field (which is later consulted
+    when zapping): see 'record_deps' in GHC.Tc.Solver.Rewrite, which calls
+    'addUnivCoDep'. (UnivCoDepsInv) allows 'addUnivCoDep' to directly union in
+    the 'uco_deps' field of a 'UnivCo' without traversing its LHS and RHS types,
+    which is a big win in the FamAppCachePerf test (saving ~23% allocations and
+    ~37% maximum residency).
+
+  Aside: rejected alternate design.
+
+    The optimisation in the rewriter described above would also be possible
+    with the following weaker invariant:
+
+      coVarsOfType(rty)  ⊆  coVarsOfType(lty) ∪ univCoDepsDeepCoVars(deps)
+
+    This would seem beneficial in some ways (it requires storing fewer CoVars,
+    which means less work when substituting). However, it is more complex; in
+    particular, it is asymmetric, thus requiring care when calling 'mkSymCo' on
+    a 'UnivCo' (as in 'GHC.Core.Coercion.Opt.opt_univ' say).
+    Empirically, using this weaker invariant does not result in any measurable
+    change in compile times across the testsuite (neither runtime nor allocations).
 -}
 
 {- **********************************************************************
@@ -1996,9 +2122,6 @@ But don't do that for two reasons (see #24591)
   #24591 suggest as much), it builds a local loop (with env free) and I'm not 100%
   confident it'll be lambda lifted in the end. It seems more direct just to write
   the code we want.
-
-  On the other hand in `go_cvs` we might hope that the `foldr` will fuse with the
-  `dVarSetElems` so I have used `foldr`.
 -}
 
 data TyCoFolder a
@@ -2070,7 +2193,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co (SubCo co)               = go_co co
 
     go_co (UnivCo { uco_prov = prov, uco_role = ro, uco_lty = t1, uco_rty = t2, uco_deps = deps })
-       = lit prov M.<> lit ro M.<> go_ty t1 M.<> go_ty t2 M.<> go_cos deps
+      -- NB: we could skip lty and rty here when only collecting CoVars,
+      -- due to Note [UnivCoDepsInv].
+       = lit prov M.<> lit ro M.<> go_ty t1 M.<> go_ty t2 M.<> go_deps deps
     go_co (FunCo { fco_role = ro, fco_afl = afl, fco_afr = afr
                  , fco_mult = cw, fco_arg = c1, fco_res = c2 })
        = lit ro M.<> lit afl M.<> lit afr M.<> go_co cw M.<> go_co c1 M.<> go_co c2
@@ -2083,6 +2208,17 @@ foldTyCo (TyCoFolder { tcf_view       = view
 
     go_mco MRefl    = mempty
     go_mco (MCo co) = go_co co
+
+    -- See Note [Use explicit recursion in foldTyCo]
+    go_deps NoUnivCoDeps = mempty   -- The common case
+    go_deps (UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes })
+      = go_covars (dVarSetElems cvs) M.<> go_holes (uniqDSetToList holes)
+
+    go_covars []       = mempty
+    go_covars (cv:cvs) = covar cv M.<> go_covars cvs
+
+    go_holes []     = mempty
+    go_holes (h:hs) = cohole h M.<> go_holes hs
 
 -- | A view function that looks through nothing.
 noView :: Type -> Maybe Type
@@ -2136,7 +2272,7 @@ coercionSize (HoleCo _)          = 1
 coercionSize (AxiomCo _ cs)      = 1 + sum (map coercionSize cs)
 coercionSize (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps })
                                  = 1 + typeSize t1 + typeSize t2
-                                     + sum (map coercionSize deps)
+                                     + univCoDepsSize deps
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
 coercionSize (SelCo _ co)        = 1 + coercionSize co

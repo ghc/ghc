@@ -18,13 +18,22 @@ module GHC.Core.TyCo.FVs
         tyCoVarsOfThingsDSet,
         deepDetTypeFV, deepDetTypesFV, deepDetCoFV,
 
+        -- UnivCoDeps
+        emptyUnivCoDeps, isEmptyUnivCoDeps, mkUnivCoDepsSets,
+        univCoDepsCoVars, univCoDepsHoles, univCoDepsCoercions,
+        univCoDepsSize,
+        mkUnivCoDeps, addUnivCoDep,
+        addUnivCoDepCoVar, addUnivCoDepHole,
+        mapUnivCoDeps, mapUnivCoDepsM, unionUnivCoDeps, minusUnivCoDeps,
+        addUnivCoTypeDeps,
+        univCoDepsDeepCoVars, univCoDepsHasHoles,
+
         -- Selective
         someTyCoVarsOfType, someTyCoVarsOfTypes,
 
         -- CoVars only
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
-        coVarsOfCoDSet, coVarsOfCosDSet,
 
         -- Selective, deterministic, composable
         shallowSelTypeFV,
@@ -69,6 +78,7 @@ import GHC.Types.Var
 import GHC.Types.Var.FV
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
+import GHC.Types.Unique.DSet
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -388,6 +398,193 @@ tyCoVarsOfCoList :: Coercion -> [TyCoVar]
 -- See Note [Computing deep free variables]
 tyCoVarsOfCoList ty = dVarSetElems $ tyCoVarsOfCoDSet ty
 
+{- *********************************************************************
+*                                                                      *
+                 UnivCoDeps
+*                                                                      *
+********************************************************************* -}
+
+-- | An empty set of dependent coercions.
+emptyUnivCoDeps :: UnivCoDeps
+emptyUnivCoDeps = NoUnivCoDeps
+
+-- | Build a 'UnivCoDeps' out of its two sets, maintaining the invariant
+-- that 'UnivCoDeps' is used only for a non-empty set of dependencies.
+mkUnivCoDepsSets :: DCoVarSet -> UniqDSet CoercionHole -> UnivCoDeps
+mkUnivCoDepsSets cvs holes
+  | isEmptyDVarSet cvs && isEmptyUniqDSet holes
+  = NoUnivCoDeps
+  | otherwise
+  = UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes }
+
+-- | Are there no dependent coercions?
+isEmptyUnivCoDeps :: UnivCoDeps -> Bool
+isEmptyUnivCoDeps NoUnivCoDeps   = True
+isEmptyUnivCoDeps (UnivCoDeps{}) = False
+
+-- | The coercion variables a 'UnivCo' depends on, in deterministic order.
+univCoDepsCoVars :: UnivCoDeps -> [CoVar]
+univCoDepsCoVars NoUnivCoDeps                   = []
+univCoDepsCoVars (UnivCoDeps { ucd_cvs = cvs }) = dVarSetElems cvs
+
+-- | The coercion holes a 'UnivCo' depends on, in deterministic order.
+univCoDepsHoles :: UnivCoDeps -> [CoercionHole]
+univCoDepsHoles NoUnivCoDeps                       = []
+univCoDepsHoles (UnivCoDeps { ucd_holes = holes }) = uniqDSetToList holes
+
+-- | The coercions a 'UnivCo' depends on, in deterministic order.
+univCoDepsCoercions :: UnivCoDeps -> [Coercion]
+univCoDepsCoercions NoUnivCoDeps = []
+univCoDepsCoercions deps
+  = map CoVarCo (univCoDepsCoVars deps) ++ map HoleCo (univCoDepsHoles deps)
+
+-- | The number of dependent coercions.
+univCoDepsSize :: UnivCoDeps -> Int
+univCoDepsSize NoUnivCoDeps = 0
+univCoDepsSize (UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes })
+  = sizeDVarSet cvs + sizeUniqDSet holes
+
+-- | Does the given coercion variable occur in these dependent coercions?
+--
+-- The 'CoVar' of a dependent 'CoercionHole' counts as an occurrence.
+elemUnivCoDeps :: CoVar -> UnivCoDeps -> Bool
+elemUnivCoDeps _ NoUnivCoDeps = False
+elemUnivCoDeps cv (UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes })
+  =  cv `elemDVarSet` cvs
+  || anyUniqDSet ((== cv) . coHoleCoVar) holes
+
+-- | Build the dependencies of a 'UnivCo': all its coercion variables and
+-- coercion holes, in deterministic order.
+--
+-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
+mkUnivCoDeps :: [Coercion] -> UnivCoDeps
+mkUnivCoDeps = addUnivCoDeps emptyUnivCoDeps
+
+-- | The dependency on a single coercion variable.
+--
+-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
+unitUnivCoDepCoVar :: CoVar -> UnivCoDeps
+unitUnivCoDepCoVar cv =
+  UnivCoDeps { ucd_cvs = unitDVarSet cv, ucd_holes = emptyUniqDSet }
+
+-- | The dependency on a single coercion hole.
+--
+-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
+unitUnivCoDepHole :: CoercionHole -> UnivCoDeps
+unitUnivCoDepHole hole =
+  UnivCoDeps { ucd_cvs = emptyDVarSet, ucd_holes = unitUniqDSet hole }
+
+-- | Add a single coercion variable to a 'UnivCoDeps'.
+--
+-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
+addUnivCoDepCoVar :: CoVar -> UnivCoDeps -> UnivCoDeps
+addUnivCoDepCoVar cv NoUnivCoDeps = unitUnivCoDepCoVar cv
+addUnivCoDepCoVar cv deps@(UnivCoDeps { ucd_cvs = cvs })
+  -- The membership test allows us to preserve sharing.
+  | cv `elemDVarSet` cvs = deps
+  | otherwise            = deps { ucd_cvs = cvs `extendDVarSet` cv }
+
+-- | Add a single coercion hole to a 'UnivCoDeps'.
+--
+-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
+addUnivCoDepHole :: CoercionHole -> UnivCoDeps -> UnivCoDeps
+addUnivCoDepHole hole NoUnivCoDeps = unitUnivCoDepHole hole
+addUnivCoDepHole hole deps@(UnivCoDeps { ucd_holes = holes })
+  -- The membership test allows us to preserve sharing.
+  | hole `elementOfUniqDSet` holes = deps
+  | otherwise                      = deps { ucd_holes = holes `addOneToUniqDSet` hole }
+
+-- | Add a list of coercions to a 'UnivCoDeps'.
+--
+-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
+addUnivCoDeps :: UnivCoDeps -> [Coercion] -> UnivCoDeps
+addUnivCoDeps = foldl' addUnivCoDep
+
+-- | Add a single coercion to a 'UnivCoDeps'.
+--
+-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep
+addUnivCoDep :: UnivCoDeps -> Coercion -> UnivCoDeps
+addUnivCoDep deps co =
+  case co of
+    -- Fast paths for simple cases.
+    CoVarCo cv -> addUnivCoDepCoVar cv deps
+    HoleCo h   -> addUnivCoDepHole  h  deps
+    -- A 'UnivCo' already records all the coercion variables and coercion holes
+    -- it depends on, including those of its LHS and RHS types, so there is no
+    -- need to look inside it.
+    -- See Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep
+    UnivCo { uco_deps = co_deps } -> deps `unionUnivCoDeps` co_deps
+
+    -- General case: accumulate directly into 'deps'.
+    _ -> runFVAcc (univCoDepsOfCoFV co) deps
+
+-- | Does this set of dependencies contain any coercion holes,
+-- including deeply (looking into kinds)?
+univCoDepsHasHoles :: UnivCoDeps -> Bool
+univCoDepsHasHoles NoUnivCoDeps = False
+univCoDepsHasHoles (UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes }) =
+  not (isEmptyUniqDSet holes) || anyDVarSet coVarKindHasHole cvs
+
+-- | Map a function over 'UnivCoDeps', e.g. substitution.
+mapUnivCoDeps
+  :: (Coercion -> Coercion) -- ^ function to map
+  -> UnivCoDeps -> UnivCoDeps
+mapUnivCoDeps f deps
+  | isEmptyUnivCoDeps deps = deps -- fast path
+  | otherwise              = mkUnivCoDeps (map f (univCoDepsCoercions deps))
+
+-- | Like 'mapUnivCoDeps', but effectful.
+mapUnivCoDepsM
+  :: Monad m
+  => (Coercion -> m Coercion) -- ^ function to map
+  -> UnivCoDeps -> m UnivCoDeps
+mapUnivCoDepsM f deps
+  | isEmptyUnivCoDeps deps = return deps -- fast path
+  | otherwise              = mkUnivCoDeps <$> mapM f (univCoDepsCoercions deps)
+{-# INLINEABLE mapUnivCoDepsM #-}
+
+-- | Union two 'UnivCoDeps'.
+unionUnivCoDeps :: UnivCoDeps -> UnivCoDeps -> UnivCoDeps
+unionUnivCoDeps NoUnivCoDeps deps2 = deps2
+unionUnivCoDeps deps1 NoUnivCoDeps = deps1
+unionUnivCoDeps (UnivCoDeps cvs1 holes1) (UnivCoDeps cvs2 holes2) =
+  non_empty_union_univ_co_deps cvs1 holes1 cvs2 holes2
+{-# INLINE unionUnivCoDeps #-} -- ensure fast paths are inlined
+
+non_empty_union_univ_co_deps :: DCoVarSet -> UniqDSet CoercionHole -> DCoVarSet -> UniqDSet CoercionHole -> UnivCoDeps
+non_empty_union_univ_co_deps cvs1 holes1 cvs2 holes2 =
+  UnivCoDeps (cvs1 `unionDVarSet` cvs2) (holes1 `unionUniqDSets` holes2)
+{-# NOINLINE non_empty_union_univ_co_deps #-} -- don't inline cold path
+
+-- | Remove the second 'UnivCoDeps' from the first.
+minusUnivCoDeps :: UnivCoDeps -> UnivCoDeps -> UnivCoDeps
+minusUnivCoDeps NoUnivCoDeps _ = NoUnivCoDeps
+minusUnivCoDeps deps1 NoUnivCoDeps = deps1
+minusUnivCoDeps (UnivCoDeps cvs1 holes1) (UnivCoDeps cvs2 holes2) =
+  mkUnivCoDepsSets (cvs1 `minusDVarSet` cvs2) (holes1 `minusUniqDSet` holes2)
+
+-- | The coercion variables a 'UnivCoDeps' depends on, including those free in
+-- the kinds of the coercions.
+univCoDepsDeepCoVars :: UnivCoDeps -> CoVarSet
+univCoDepsDeepCoVars deps
+  = coVarsOfTypes (map varType dep_cvs) `extendVarSetList` dep_cvs
+  where
+    dep_cvs = univCoDepsShallowCoVars deps
+
+-- | Add the (shallow) coercion variables and coercion holes free in the given
+-- types to the dependencies.
+--
+-- See Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep.
+addUnivCoTypeDeps :: [Type] -> UnivCoDeps -> UnivCoDeps
+addUnivCoTypeDeps tys deps
+  = runFVAcc (univCoDepsOfTypesFV tys) deps
+
+-- | The (shallow) coercion variables a 'UnivCoDeps' depends on, including
+-- the 'coHoleCoVar's of the coercion holes.
+univCoDepsShallowCoVars :: UnivCoDeps -> [CoVar]
+univCoDepsShallowCoVars deps =
+  univCoDepsCoVars deps ++ map coHoleCoVar (univCoDepsHoles deps)
+
 -- | Returns free variables of types, including kind variables as
 -- a deterministically ordered list. For type synonyms it does /not/ expand the
 -- synonym.
@@ -548,36 +745,97 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
       -- We /do/ treat a CoercionHole as a free variable
       -- See Note [CoercionHoles and coercion free variables]
 
--------------- Deterministic versions ------------------
-type DCoVarFV  = FV BoundVars (EndoOS DCoVarSet)
+-------- Accumulating UnivCoDeps -----------
 
-coVarsOfCoDSet :: Coercion -> DCoVarSet
-coVarsOfCoDSet co = runTyCoVarsDSet (det_co co)
+-- | Accumulate the __shallow__ free coercion variables and coercion holes of
+-- these types into a 'UnivCoDeps', in left-to-right order.
+--
+-- The 'coHoleCoVar's of the coercion holes are /not/ added to 'ucd_cvs'.
+--
+-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep.
+univCoDepsOfTypesFV :: [Type]   -> FV BoundVars (EndoOS UnivCoDeps)
 
-coVarsOfCosDSet :: [Coercion] -> DCoVarSet
-coVarsOfCosDSet cos = runTyCoVarsDSet (det_cos cos)
+-- | Accumulate the __shallow__ free coercion variables and coercion holes of
+-- this coercion into a 'UnivCoDeps', in left-to-right order.
+--
+-- The 'coHoleCoVar's of the coercion holes are /not/ added to 'ucd_cvs'.
+--
+-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep.
+univCoDepsOfCoFV    :: Coercion -> FV BoundVars (EndoOS UnivCoDeps)
+(_, univCoDepsOfTypesFV, univCoDepsOfCoFV, _) = foldTyCo univCoDepsFolder
 
-det_ty  :: Type       -> DCoVarFV
-det_co  :: Coercion   -> DCoVarFV
-det_cos :: [Coercion] -> DCoVarFV
-(det_ty, _, det_co, det_cos) = foldTyCo deepDetCoVarFolder
+univCoDepsFolder :: TyCoFolder (FV BoundVars (EndoOS UnivCoDeps))
+univCoDepsFolder
+  = TyCoFolder
+  { tcf_view       = noView
 
-deepDetCoVarFolder :: TyCoFolder DCoVarFV
--- Follows deepCoVarFolders, but returns a /deterministic/ set
-deepDetCoVarFolder = TyCoFolder { tcf_view = noView
-                                , tcf_tyvar = do_tyvar
-                                , tcf_covar = do_covar
-                                , tcf_hole  = do_hole
-                                , tcf_lit   = const mempty
-                                , tcf_tycobinder = addBndrFV }
+    -- The following is incorrect: it ignores CoVars/CoercionHoles in the kinds
+    -- of TyVars. This replicates the long-standing wart in 'deepCoVarFolder'.
+  , tcf_tyvar      = \ _ -> mempty
+
+  , tcf_covar      = do_covar
+  , tcf_hole       = do_hole
+  , tcf_lit        = const mempty
+  , tcf_tycobinder = addBndrFV }
   where
-    do_tyvar _  = mempty
+    do_covar v = MkFV $ \ bvs -> EndoOS (add_covar bvs v)
+    do_hole h  = MkFV $ \ _   -> EndoOS (addUnivCoDepHole h)
 
-    do_covar :: CoVar -> DCoVarFV
-    do_covar = deepDetUnitFV (det_ty . varType)
+    add_covar :: BoundVars -> CoVar -> UnivCoDeps -> UnivCoDeps
+    add_covar bvs v deps
+      | v `elemVarSet` bvs = deps
+      | otherwise          = addUnivCoDepCoVar v deps
 
-    do_hole hole  = do_covar (coHoleCoVar hole)
+-------- Detecting CoercionHoles in the kind of a CoVar -----------
 
+-- | Does the kind of this coercion variable mention a coercion hole?
+--
+-- Looks transitively through the kinds of any coercion variables encountered
+-- along the way.
+coVarKindHasHole :: CoVar -> Bool
+coVarKindHasHole cv
+  = hs_found $
+    runFVAcc (hole_search_ty (varType cv)) $
+    HoleSearch { hs_found = False, hs_seen = unitVarSet cv }
+
+data HoleSearch
+  = HoleSearch
+      { hs_found :: !Bool
+          -- ^ Have we found a coercion hole yet?
+      , hs_seen  :: !CoVarSet
+          -- ^ The CoVars whose kind we have already searched.
+      }
+
+hole_search_ty :: Type -> FV BoundVars (EndoOS HoleSearch)
+(hole_search_ty, _, _, _) = foldTyCo holeSearchFolder
+
+holeSearchFolder :: TyCoFolder (FV BoundVars (EndoOS HoleSearch))
+holeSearchFolder
+  = TyCoFolder
+  { tcf_view       = noView
+
+    -- Wart (see 'deepCoVarFolder'): don't look into the kinds of TyVars.
+  , tcf_tyvar      = \ _ -> mempty
+
+  , tcf_covar      = do_covar
+  , tcf_hole       = do_hole
+  , tcf_lit        = const mempty
+  , tcf_tycobinder = addBndrFV }
+  where
+    do_covar v = MkFV $ \ bvs -> EndoOS (search_kind bvs v)
+    do_hole _  = MkFV $ \ _   -> EndoOS found_hole
+
+    found_hole :: HoleSearch -> HoleSearch
+    found_hole acc = acc { hs_found = True }
+
+    search_kind :: BoundVars -> CoVar -> HoleSearch -> HoleSearch
+    search_kind bvs v acc@(HoleSearch { hs_found = found, hs_seen = seen })
+      | found               = acc
+      | v `elemVarSet` bvs  = acc
+      | v `elemVarSet` seen = acc
+      | otherwise
+      = runEndoOS (runFV (hole_search_ty (varType v)) bvs)
+                  (acc { hs_seen = seen `extendVarSet` v })
 
 {- *********************************************************************
 *                                                                      *
@@ -635,7 +893,7 @@ almost_devoid_co_var_of_co (HoleCo h)  cv = (coHoleCoVar h) /= cv
 almost_devoid_co_var_of_co (AxiomCo _ cs) cv
   = almost_devoid_co_var_of_cos cs cv
 almost_devoid_co_var_of_co (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps }) cv
-  =  almost_devoid_co_var_of_cos deps cv
+  =  not (cv `elemUnivCoDeps` deps)
   && almost_devoid_co_var_of_type t1 cv
   && almost_devoid_co_var_of_type t2 cv
 almost_devoid_co_var_of_co (SymCo co) cv
@@ -1000,8 +1258,10 @@ tyConsOfType ty
      go_co (FunCo { fco_mult = m, fco_arg = a, fco_res = r })
                                    = go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
      go_co (AxiomCo ax args)       = go_ax ax `unionUniqSets` go_cos args
-     go_co (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = cos })
-                                   = go t1 `unionUniqSets` go t2 `unionUniqSets` go_cos cos
+     go_co (UnivCo { uco_lty = t1, uco_rty = t2 })
+                                   = go t1 `unionUniqSets` go t2
+               -- NB: uco_deps holds only coercion variables and coercion holes,
+               -- which contribute no TyCons
      go_co (CoVarCo {})            = emptyUniqSet
      go_co (HoleCo {})             = emptyUniqSet
      go_co (SymCo co)              = go_co co
@@ -1209,19 +1469,37 @@ occCheckExpand vs_to_avoid ty
            ; w' <- go_co cxt w
            ; return (co { fco_mult = w', fco_arg = co1', fco_res = co2' })}
 
-    go_co (as,env) co@(CoVarCo c)
-      | Just c' <- lookupVarEnv env c   = return (CoVarCo c')
-      | bad_var_occ as c                = Nothing
-      | otherwise                       = return co
-
-    go_co (as,_) co@(HoleCo h)
-      | bad_var_occ as (ch_co_var h)    = Nothing
-      | otherwise                       = return co
+    go_co cxt (CoVarCo c)               = CoVarCo <$> go_cv cxt c
+    go_co cxt co@(HoleCo h)             = co <$ go_hole cxt h
 
     go_co cxt (AxiomCo ax cs)           = do { cs' <- mapM (go_co cxt) cs
                                              ; return (AxiomCo ax cs') }
-    go_co cxt co@(UnivCo { uco_lty = ty1, uco_rty = ty2, uco_deps = cos })
+    go_co cxt co@(UnivCo { uco_lty = ty1, uco_rty = ty2, uco_deps = deps })
       = do { ty1' <- go cxt ty1
            ; ty2' <- go cxt ty2
-           ; cos' <- mapM (go_co cxt) cos
-           ; return (co { uco_lty = ty1', uco_rty = ty2', uco_deps = cos' }) }
+           ; deps' <- go_deps cxt deps
+           ; return $
+               co { uco_lty = ty1', uco_rty = ty2', uco_deps = deps' }
+           }
+
+    ------------------
+    go_deps :: (VarSet, VarEnv TyCoVar) -> UnivCoDeps -> Maybe UnivCoDeps
+    go_deps _ NoUnivCoDeps = return NoUnivCoDeps
+    go_deps cxt deps@(UnivCoDeps { ucd_cvs = cvs, ucd_holes = holes })
+      = do { cvs' <- mapMUniqDSet (go_cv cxt) cvs
+                       -- go_cv preserves uniques, as mapMUniqDSet requires
+           ; mapM_ (go_hole cxt) (uniqDSetToList holes)
+           ; return (deps { ucd_cvs = cvs' }) }
+                       -- mapMUniqDSet preserves size, so this stays non-empty
+
+    go_cv :: (VarSet, VarEnv TyCoVar) -> CoVar -> Maybe CoVar
+    go_cv (as, env) c
+      | Just c' <- lookupVarEnv env c = return c'
+      | bad_var_occ as c              = Nothing
+      | otherwise                     = return c
+
+    -- A coercion hole is never expanded, so we only check its variable
+    go_hole :: (VarSet, VarEnv TyCoVar) -> CoercionHole -> Maybe ()
+    go_hole (as, _) h
+      | bad_var_occ as (ch_co_var h)  = Nothing
+      | otherwise                     = return ()

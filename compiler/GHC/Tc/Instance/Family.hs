@@ -954,4 +954,6 @@ tcGetFamInstEnvs :: TcM FamInstEnvs
 -- and the home-pkg inst env (includes module being compiled)
 tcGetFamInstEnvs
   = do { eps <- getEps; env <- getGblEnv
-       ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) }
+       ; let !pkg_env  = eps_fam_inst_env eps
+             !home_env = tcg_fam_inst_env env
+       ; return (pkg_env, home_env) }

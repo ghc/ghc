@@ -328,14 +328,10 @@ data InertSet
               -- See Note [
 
        , inert_famapp_cache :: FunEqMap Reduction
-              -- Just a hash-cons cache for use when reducing family applications
-              -- only
+              -- ^ The family application cache: a cache of type family reductions
+              -- used to speed up rewriting of type family applications.
               --
-              -- If    F tys :-> (co, rhs, flav),
-              -- then  co :: F tys ~N rhs
-              -- all evidence is from instances or Givens; no coercion holes here
-              -- (We have no way of "kicking out" from the cache, so putting
-              --  wanteds here means we can end up solving a Wanted with itself. Bad)
+              -- See Note [The family application cache] in GHC.Tc.Solver.Rewrite.
 
        , inert_solved_dicts :: DictMap DictCt
               -- All Wanteds, of form (C t1 .. tn)

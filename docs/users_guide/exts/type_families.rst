@@ -599,6 +599,37 @@ Reducing type family applications
     this will speed up compilation. The use of this flag will not affect
     runtime behaviour.
 
+.. ghc-flag:: -fzap-coercions
+    :shortdesc: Erase the proofs of type family reductions
+    :type: dynamic
+    :reverse: -fno-zap-coercions
+    :category:
+
+    :default: on
+
+    :since: 10.2.1
+
+    When reducing type family applications, GHC normally builds a proof
+    (a *coercion*) recording every reduction step. In type-family-heavy
+    programs these proofs can grow very large and dominate compilation
+    time and memory usage (see `#8095
+    <https://gitlab.haskell.org/ghc/ghc/-/issues/8095>`_).
+
+    With ``-fzap-coercions``, GHC erases these proofs, keeping only the
+    types they relate and the local assumptions they used. This can
+    dramatically speed up compilation of programs that perform many type
+    family reductions.
+
+    The proofs are only ever used internally, by Core Lint and various debug
+    assertions in the compiler, as a soundness check on GHC itself. Only
+    consumers who extend the compiler (GHC API users, typechecker plugin authors)
+    might want to see the original un-zapped coercions, in which case
+    we recommend using ``-dcore-lint -fno-zap-coercions``.
+    General usage doesn't lose anything from zapping, and stands to win big
+    thanks to reduced compilation times.
+
+    This flag does not affect runtime behaviour.
+
 When GHC encounters a type family application (like ``F Int a``) in a program,
 it must often reduce it in order to complete type checking. Here is a simple
 example::

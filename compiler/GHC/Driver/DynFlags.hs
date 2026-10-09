@@ -1224,6 +1224,7 @@ defaultFlags settings
       Opt_DiagnosticsShowCaret,
       Opt_EmbedManifest,
       Opt_FamAppCache,
+      Opt_ZapCoercions,
       Opt_GenManifest,
       Opt_GhciHistory,
       Opt_GhciSandbox,

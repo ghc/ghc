@@ -5,7 +5,7 @@ module GHC.Core.Reduction
      Reduction(..), ReductionN, ReductionR, HetReduction(..),
      Reductions(..),
      mkReduction, mkReductions, mkHetReduction, coercionRedn,
-     reductionOriginalType,
+     isReflRedn,
      downgradeRedn, mkSubRedn,
      mkTransRedn, mkCoherenceRightRedn, mkCoherenceRightMRedn,
      mkCastRedn1, mkCastRedn2,
@@ -41,7 +41,7 @@ import GHC.Types.Var.Set   ( TyCoVarSet )
 
 import GHC.Utils.Misc      ( HasDebugCallStack, equalLength )
 import GHC.Utils.Outputable
-import GHC.Utils.Panic     ( assertPpr )
+import GHC.Utils.Panic     ( assertPpr, panic )
 
 {-
 %************************************************************************
@@ -52,34 +52,30 @@ import GHC.Utils.Panic     ( assertPpr )
 
 Note [The Reduction type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Many functions in the type-checker rewrite a type, using Given type equalitie
+Many functions in the type-checker rewrite a type, using Given type equalities
 or type-family reductions, and return a Reduction, which is just a pair of the
 coercion and the RHS type of the coercion:
   data Reduction = Reduction Coercion !Type
 
 The order of the arguments to the constructor serves as a reminder
-of what the Type is.  In
-    Reduction co ty
-`ty` appears to the right of `co`, reminding us that we must have:
-    co :: unrewritten_ty ~ ty
+of what the 'Type' is: the reduced type `xi` appears to the right of the coercion
+`co`, reminding us that we must have:
+    co :: ty ~ xi
+
+Using 'Reduction' thus allows us to keep track of the coercion orientation,
+reducing mistakes (e.g. forgetting a 'mkSymCo'; see #20161).
+
+Having 'Reduction' be strict in its 'Type' field is important for performance,
+having been observed to reduce allocations by ~2.5% in T9872.
 
 Example functions that use this datatype:
    GHC.Core.FamInstEnv.topNormaliseType_maybe
      :: FamInstEnvs -> Type -> Maybe Reduction
    GHC.Tc.Solver.Rewrite.rewrite
-     :: CtEvidence -> TcType -> TcS Reduction
-
-Having Reduction as a data type, with a strict Type field, rather than using
-a pair (Coercion,Type) gives several advantages (see #20161)
-* The strictness in Type improved performance in rewriting of type families
-  (around 2.5% improvement in T9872),
-* Compared to the situation before, it gives improved consistency around
-  orientation of rewritings, as a Reduction is always left-to-right
-  (the coercion's RHS type is always the type stored in the 'Reduction').
-  No more 'mkSymCo's needed to convert between left-to-right and right-to-left.
+     :: CtEvidence -> TcType -> TcS (Reduction, CoHoleSet)
 
 One could imagine storing the LHS type of the coercion in the Reduction as well,
-but in fact `reductionOriginalType` is very seldom used, so it's not worth it.
+but in fact this LHS type is almost never needed so this would be wasteful.
 -}
 
 -- | A 'Reduction' is the result of an operation that rewrites a type @ty_in@.
@@ -161,9 +157,8 @@ mkReduction co ty = Reduction co ty
 instance Outputable Reduction where
   ppr redn =
     braces $ vcat
-      [ text "reductionOriginalType:" <+> ppr (reductionOriginalType redn)
+      [ text "    reductionCoercion:" <+> ppr (reductionCoercion redn)
       , text " reductionReducedType:" <+> ppr (reductionReducedType redn)
-      , text "    reductionCoercion:" <+> ppr (reductionCoercion redn)
       ]
 
 -- | A 'Reduction' in which the 'Coercion' has 'Nominal' role.
@@ -171,14 +166,6 @@ type ReductionN = Reduction
 
 -- | A 'Reduction' in which the 'Coercion' has 'Representational' role.
 type ReductionR = Reduction
-
--- | Get the original, unreduced type corresponding to a 'Reduction'.
---
--- This is obtained by computing the LHS kind of the stored coercion,
--- which may be slow.
-reductionOriginalType :: Reduction -> Type
-reductionOriginalType = coercionLKind . reductionCoercion
-{-# INLINE reductionOriginalType #-}
 
 -- | Turn a 'Coercion' into a 'Reduction'
 -- by inspecting the RHS type of the coercion.
@@ -188,6 +175,13 @@ reductionOriginalType = coercionLKind . reductionCoercion
 coercionRedn :: Coercion -> Reduction
 coercionRedn co = Reduction co (coercionRKind co)
 {-# INLINE coercionRedn #-}
+
+-- | Is this reduction reflexive?
+--
+-- See Note [Rewriting with Refl] in GHC.Tc.Solver.Equality.
+isReflRedn :: Reduction -> Bool
+isReflRedn (Reduction co _) = isReflCo co
+{-# INLINE isReflRedn #-}
 
 -- | Downgrade the role of the coercion stored in the 'Reduction'.
 downgradeRedn :: Role -- ^ desired role
@@ -651,8 +645,8 @@ kinds are the *unrewritten* types in the decomposed coercion. (See comments on
 decomposePiCos.) Because the rewritten types have unrewritten kinds (because
 rewriting is homogeneous), passing the list of rewritten types to decomposePiCos
 just won't do: later arguments' kinds won't be as expected. So we need to get
-the *unrewritten* types to pass to decomposePiCos. We can do this easily enough
-by taking the kind of the argument coercions, passed in originally.
+the *unrewritten* types to pass to decomposePiCos. We achieve this by passing
+the unrewritten argument types into simplifyArgsWorker.
 
 (Alternative 1: We could re-engineer decomposePiCos to deal with this situation.
 But that function is already gnarly, and other call sites of decomposePiCos
@@ -662,13 +656,6 @@ would suffer from the change, even though they are much more common than this on
 behavior into simplifyArgsWorker. This would work, I think, but then all of the
 complication of decomposePiCos would end up layered on top of all the complication
 here. Please, no.)
-
-(Alternative 3: We could pass the unrewritten arguments into simplifyArgsWorker
-so that we don't have to recreate them. But that would complicate the interface
-of this function to handle a very dark, dark corner case. Better to keep our
-demons to ourselves here instead of exposing them to callers. This decision is
-easily reversed if there is ever any performance trouble due to the call of
-coercionKind.)
 
 So we now call
 
@@ -788,6 +775,8 @@ simplifyArgsWorker :: HasDebugCallStack
                        -- list of binders can be shorter or longer than the list of args
                    -> TyCoVarSet   -- free vars of the args
                    -> Infinite Role-- list of roles, r
+                   -> [Type]       -- the unrewritten arguments, ty_i
+                                   -- See Note [Last case in simplifyArgsWorker]
                    -> [Reduction]  -- rewritten type arguments, arg_i
                                    -- each comes with the coercion used to rewrite it,
                                    -- arg_co_i :: ty_i ~ arg_i
@@ -801,10 +790,10 @@ simplifyArgsWorker :: HasDebugCallStack
 -- function is all about. That is, (f xi_1 ... xi_n), where xi_i are the returned arguments,
 -- *is* well kinded.
 simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
-                   orig_roles orig_simplified_args
+                   orig_roles orig_tys orig_simplified_args
   = go orig_lc
        orig_ki_binders orig_inner_ki
-       orig_roles orig_simplified_args
+       orig_roles orig_tys orig_simplified_args
   where
     orig_lc = emptyLiftingContext $ mkInScopeSet orig_fvs
 
@@ -812,9 +801,10 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
        -> [PiTyBinder]    -- Unsubsted binders of function's kind
        -> Kind            -- Unsubsted result kind of function (not a Pi-type)
        -> Infinite Role   -- Roles at which to rewrite these ...
+       -> [Type]          -- the unrewritten arguments
        -> [Reduction]     -- rewritten arguments, with their rewriting coercions
        -> ArgsReductions
-    go !lc binders inner_ki _ []
+    go !lc binders inner_ki _ _ []
         -- The !lc makes the function strict in the lifting context
         -- which means GHC can unbox that pair.  A modest win.
       = ArgsReductions
@@ -825,7 +815,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
         kind_co | noFreeVarsOfType final_kind = MRefl
                 | otherwise                   = MCo $ liftCoSubst Nominal lc final_kind
 
-    go lc (binder:binders) inner_ki (Inf role roles) (arg_redn:arg_redns)
+    go lc (binder:binders) inner_ki (Inf role roles) orig_tys0 (arg_redn:arg_redns)
       =  -- We rewrite an argument ty with arg_redn = Reduction arg_co arg
          -- By Note [Rewriting] in GHC.Tc.Solver.Rewrite invariant (F2),
          -- typeKind(ty) = typeKind(arg).
@@ -836,7 +826,10 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
          --
          -- The bangs here have been observed to improve performance
          -- significantly in optimized builds; see #18502
-         let !kind_co = liftCoSubst Nominal lc (piTyBinderType binder)
+         let !rest_orig_tys = case orig_tys0 of
+                                _:rest_tys -> rest_tys
+                                []    -> panic "simplifyArgsWorker: too few types"
+             !kind_co = liftCoSubst Nominal lc (piTyBinderType binder)
              !(Reduction casted_co casted_xi)
                       = mkCoherenceRightRedn role arg_redn kind_co
          -- now, extend the lifting context with the new binding
@@ -845,17 +838,17 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
                      | otherwise
                      = lc
              !(ArgsReductions (Reductions cos xis) final_kind_co)
-               = go new_lc binders inner_ki roles arg_redns
+               = go new_lc binders inner_ki roles rest_orig_tys arg_redns
          in ArgsReductions
               (Reductions (casted_co:cos) (casted_xi:xis))
               final_kind_co
 
     -- See Note [Last case in simplifyArgsWorker]
-    go lc [] inner_ki roles arg_redns
+    go lc [] inner_ki roles orig_tys arg_redns
       = let co1 = liftCoSubst Nominal lc inner_ki
             co1_kind              = coercionKind co1
-            unrewritten_tys       = map reductionOriginalType arg_redns
-            (arg_cos, res_co)     = decomposePiCosK co1 co1_kind unrewritten_tys
+            -- Here is where we make use of the passed-in unrewritten types 'orig_tys'.
+            (arg_cos, res_co)     = decomposePiCosK co1 co1_kind orig_tys
             casted_args           = assertPpr (equalLength arg_redns arg_cos)
                                               (ppr arg_redns $$ ppr arg_cos)
                                   $ zipWith3 mkCoherenceRightRedn (Inf.toList roles) arg_redns arg_cos
@@ -870,6 +863,8 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
             (bndrs, new_inner)    = splitPiTys rewritten_kind
 
             ArgsReductions redns_out res_co_out
-              = go zapped_lc bndrs new_inner roles casted_args
+              -- The added casts do not affect the unrewritten (LHS) types,
+              -- so recurring with 'orig_tys' here is OK.
+              = go zapped_lc bndrs new_inner roles orig_tys casted_args
         in
           ArgsReductions redns_out (res_co `mkTransMCoR` res_co_out)

@@ -3,22 +3,28 @@ module GHC.Driver.Config
    ( initOptCoercionOpts
    , initSimpleOpts
    , initEvalOpts
-   , EvalStep(..)
    )
 where
 
 import GHC.Prelude
 
 import GHC.Driver.DynFlags
+import GHC.Driver.Config.Core.Lint ( initLintConfig )
 import GHC.Core.SimpleOpt
 import GHC.Core.Coercion.Opt
+import GHC.Runtime.Eval.Types ( EvalStep(..) )
 import GHCi.Message (EvalOpts(..))
 
 -- | Initialise coercion optimiser configuration from DynFlags
 initOptCoercionOpts :: DynFlags -> OptCoercionOpts
 initOptCoercionOpts dflags = OptCoercionOpts
    { optCoercionEnabled = not (hasNoOptCoercion dflags)
+   , optCoercionLint    = lint_cfg
    }
+  where
+    lint_cfg
+      | gopt Opt_DoCoreLinting dflags = Just (initLintConfig dflags [])
+      | otherwise                     = Nothing
 
 -- | Initialise Simple optimiser configuration from DynFlags
 initSimpleOpts :: DynFlags -> SimpleOpts
@@ -29,16 +35,6 @@ initSimpleOpts dflags = SimpleOpts
    , so_inline  = const True
    , so_can_drop = const True
    }
-
--- | Instruct the interpreter evaluation to break...
-data EvalStep
-  -- | ... at every breakpoint tick
-  = EvalStepSingle
-  -- | ... after any evaluation to WHNF
-  -- (See Note [Debugger: Step-out])
-  | EvalStepOut
-  -- | ... only on explicit breakpoints
-  | EvalStepNone
 
 -- | Extract GHCi options from DynFlags and step
 initEvalOpts :: DynFlags -> EvalStep -> EvalOpts

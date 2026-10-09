@@ -26,6 +26,7 @@ module GHC.Types.Unique.DSet (
         intersectUniqDSets, uniqDSetIntersectUniqSet,
         nonDetStrictFoldUniqDSet,
         elementOfUniqDSet,
+        anyUniqDSet,
         filterUniqDSet,
         sizeUniqDSet,
         isEmptyUniqDSet,
@@ -103,6 +104,9 @@ nonDetStrictFoldUniqDSet f acc (UniqDSet s) = nonDetStrictFoldUDFM f acc s
 
 elementOfUniqDSet :: Uniquable a => a -> UniqDSet a -> Bool
 elementOfUniqDSet k = elemUDFM k . getUniqDSet
+
+anyUniqDSet :: (a -> Bool) -> UniqDSet a -> Bool
+anyUniqDSet p = anyUDFM p . getUniqDSet
 
 filterUniqDSet :: (a -> Bool) -> UniqDSet a -> UniqDSet a
 filterUniqDSet p (UniqDSet s) = UniqDSet (filterUDFM p s)

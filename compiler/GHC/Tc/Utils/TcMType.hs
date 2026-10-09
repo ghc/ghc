@@ -115,6 +115,7 @@ import GHC.Builtin.KnownOccs
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.FVs ( univCoDepsCoVars, univCoDepsHoles )
 import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Tidy
 import GHC.Core.Type
@@ -1524,7 +1525,8 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
     go_co dv (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps })
                                      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv t1
                                           ; dv2 <- collect_cand_qtvs orig_ty True cur_lvl bound dv1 t2
-                                          ; foldM go_co dv2 deps }
+                                          ; dv3 <- foldM go_cv dv2 (univCoDepsCoVars deps)
+                                          ; foldM go_hole dv3 (univCoDepsHoles deps) }
     go_co dv (SymCo co)              = go_co dv co
     go_co dv (TransCo co1 co2)       = foldlM go_co dv [co1, co2]
     go_co dv (SelCo _ co)            = go_co dv co
@@ -1532,14 +1534,8 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
     go_co dv (InstCo co1 co2)        = foldlM go_co dv [co1, co2]
     go_co dv (KindCo co)             = go_co dv co
     go_co dv (SubCo co)              = go_co dv co
-
-    go_co dv (HoleCo hole)
-      = do m_co <- liftZonkM (unpackCoercionHole_maybe hole)
-           case m_co of
-             Just (CPH { cph_co = co }) -> go_co dv co
-             Nothing                    -> go_cv dv (coHoleCoVar hole)
-
-    go_co dv (CoVarCo cv) = go_cv dv cv
+    go_co dv (HoleCo hole)           = go_hole dv hole
+    go_co dv (CoVarCo cv)            = go_cv dv cv
 
     go_co dv (ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = co })
       = do { dv1 <- go_mco dv kind_co
@@ -1547,6 +1543,13 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
 
     go_mco dv MRefl    = return dv
     go_mco dv (MCo co) = go_co dv co
+
+    go_hole :: CandidatesQTvs -> CoercionHole -> TcM CandidatesQTvs
+    go_hole dv hole
+      = do m_co <- liftZonkM (unpackCoercionHole_maybe hole)
+           case m_co of
+             Just (CPH { cph_co = co }) -> go_co dv co
+             Nothing                    -> go_cv dv (coHoleCoVar hole)
 
     go_cv :: CandidatesQTvs -> CoVar -> TcM CandidatesQTvs
     go_cv dv@(DV { dv_cvs = cvs }) cv

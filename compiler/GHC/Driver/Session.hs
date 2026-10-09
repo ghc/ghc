@@ -2575,6 +2575,7 @@ fFlagsDeps = [
   flagSpec "external-dynamic-refs"            Opt_ExternalDynamicRefs,
   flagSpec "external-interpreter"             Opt_ExternalInterpreter,
   flagSpec "family-application-cache"         Opt_FamAppCache,
+  flagSpec "zap-coercions"                    Opt_ZapCoercions,
   flagSpec "float-in"                         Opt_FloatIn,
   flagSpec "force-recomp"                     Opt_ForceRecomp,
   flagSpec "ignore-optim-changes"             Opt_IgnoreOptimChanges,

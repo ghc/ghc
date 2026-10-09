@@ -56,6 +56,7 @@ import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.FVs
 import GHC.Core.TyCo.Rep    -- needs to build types & coercions in a knot
+import GHC.Core.TyCo.FVs ( mkUnivCoDepsSets )
 import GHC.Core.TyCo.Subst ( substTyCoVars )
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
@@ -101,7 +102,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Avail
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.DSet ( mkUniqDSet )
+import GHC.Types.Unique.DSet ( mkUniqDSet, emptyUniqDSet )
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Types.Unique.Supply
 import GHC.Types.Demand( isDeadEndSig )
@@ -1593,11 +1594,18 @@ tcIfaceCo = go
            ; return (ForAllCo { fco_tcv = tv', fco_visL = ifaceForAllTyFlag visL, fco_visR = ifaceForAllTyFlag visR
                               , fco_kind = k', fco_body = co' }) } }
     go (IfaceCoVarCo n)           = CoVarCo <$> go_var n
-    go (IfaceUnivCo p r t1 t2 ds) = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2
-                                       ; ds' <- mapM go ds
-                                       ; return (UnivCo { uco_prov = p, uco_role = r
-                                                        , uco_lty = t1', uco_rty = t2'
-                                                        , uco_deps = ds' }) }
+    go (IfaceUnivCo p r t1 t2 ds) =
+      do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2
+         ; cvs <- mapM go_dep ds
+         ; return $
+             UnivCo
+               { uco_prov = p, uco_role = r
+               , uco_lty = t1', uco_rty = t2'
+                 -- No coercion holes in interface files, as per
+                 -- Note [Holes in IfaceCoercion] in GHC.Iface.Type
+               , uco_deps = mkUnivCoDepsSets (mkDVarSet cvs) emptyUniqDSet
+              }
+         }
     go (IfaceSymCo c)            = SymCo    <$> go c
     go (IfaceTransCo c1 c2)      = TransCo  <$> go c1
                                             <*> go c2
@@ -1612,6 +1620,11 @@ tcIfaceCo = go
                                            <*> mapM go cos
     go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
     go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
+
+    go_dep :: IfaceUnivCoDep -> IfL CoVar
+    go_dep (IfaceUnivCoDepCoVar n)      = go_var n
+    go_dep (IfaceUnivCoDepFreeCoVar cv) = pprPanic "tcIfaceCo:IfaceUnivCoDepFreeCoVar" (ppr cv)
+    go_dep (IfaceUnivCoDepHole cv)      = pprPanic "tcIfaceCo:IfaceUnivCoDepHole"      (ppr cv)
 
     go_var :: IfLclName -> IfL CoVar
     go_var = tcIfaceLclId

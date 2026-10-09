@@ -18,7 +18,8 @@ mkSelCo :: HasDebugCallStack => CoSel -> Coercion -> Coercion
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkInstCo :: Coercion -> Coercion -> Coercion
 mkKindCo :: Coercion -> Coercion
-mkUnivCo :: UnivCoProvenance -> [Coercion] -> Role -> Type -> Type -> Coercion
+mkUnivCo :: HasDebugCallStack => UnivCoProvenance -> [Coercion] -> Role -> Type -> Type -> Coercion
+mkUnivCoAddTypeDeps :: HasDebugCallStack => UnivCoProvenance -> UnivCoDeps -> Role -> Type -> Type -> Coercion
 
 isReflexiveCo :: Coercion -> Bool
 decomposePiCos  :: HasDebugCallStack => Coercion -> [Type] -> ([Coercion], Coercion)

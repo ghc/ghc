@@ -802,6 +802,9 @@ data GeneralFlag
    | Opt_CompactUnwind               -- ^ @-fcompact-unwind@
    | Opt_Hpc
    | Opt_FamAppCache
+   | Opt_ZapCoercions                -- ^ @-fzap-coercions@: erase coercion proofs
+                                     -- built by the typechecker's rewriter.
+                                     -- See Note [Coercion zapping] in GHC.Tc.Solver.Rewrite
    | Opt_ExternalInterpreter
    | Opt_OptimalApplicativeDo
    | Opt_VersionMacros

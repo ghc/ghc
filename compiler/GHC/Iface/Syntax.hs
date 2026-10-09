@@ -2122,8 +2122,10 @@ freeNamesIfCoercion (IfaceForAllCo _tcv _visL _visR kind_co co)
 freeNamesIfCoercion (IfaceFreeCoVar _) = emptyNameSet
 freeNamesIfCoercion (IfaceCoVarCo _)   = emptyNameSet
 freeNamesIfCoercion (IfaceHoleCo _)    = emptyNameSet
-freeNamesIfCoercion (IfaceUnivCo _ _ t1 t2 cos)
-  = freeNamesIfType t1 &&& freeNamesIfType t2 &&& fnList freeNamesIfCoercion cos
+freeNamesIfCoercion (IfaceUnivCo _ _ t1 t2 _deps)
+  = freeNamesIfType t1 &&& freeNamesIfType t2
+    -- The dependencies are either coercion variables or holes.
+    -- These are all local, thus contributing no free names.
 freeNamesIfCoercion (IfaceSymCo c)
   = freeNamesIfCoercion c
 freeNamesIfCoercion (IfaceTransCo c1 c2)

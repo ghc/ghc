@@ -24,7 +24,9 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Unique.DSet ( mapUniqDSet )
 import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
@@ -342,11 +344,11 @@ tidyCo env co
     go (CoVarCo cv)          = CoVarCo $! go_cv cv
     go (HoleCo h)            = HoleCo $! go_hole h
     go (AxiomCo ax cos)      = AxiomCo ax $ strictMap go cos
-    go (UnivCo prov role t1 t2 cos)
+    go (UnivCo prov role t1 t2 deps)
                              = ((UnivCo prov role
                                 $! tidyType env t1)
                                 $! tidyType env t2)
-                                $! strictMap go cos
+                                $! go_deps deps
     go (SymCo co)            = SymCo $! go co
     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
     go (SelCo d co)          = SelCo d $! go co
@@ -354,6 +356,12 @@ tidyCo env co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
     go (KindCo co)           = KindCo $! go co
     go (SubCo co)            = SubCo $! go co
+
+    go_deps NoUnivCoDeps = NoUnivCoDeps
+    go_deps (UnivCoDeps cvs holes)
+      = (UnivCoDeps $! mapDVarSet go_cv cvs) $! mapUniqDSet go_hole holes
+      -- NB: go_cv/go_hole preserve uniques, as mapDVarSet/mapUniqDSet require
+      -- (this also means the dependencies remain non-empty)
 
     go_cv cv = tidyTyCoVarOcc env cv
 

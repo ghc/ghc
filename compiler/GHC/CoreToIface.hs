@@ -60,6 +60,7 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.FVs ( univCoDepsCoVars, univCoDepsHoles )
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCo.Tidy
 
@@ -312,7 +313,8 @@ toIfaceCoercionX fr co
     go (SubCo co)          = IfaceSubCo (go co)
     go (AxiomCo ax cs)     = IfaceAxiomCo (toIfaceAxiomRule ax) (map go cs)
     go (UnivCo { uco_prov = p, uco_role = r, uco_lty = t1, uco_rty = t2, uco_deps = deps })
-        = IfaceUnivCo p r (toIfaceTypeX fr t1) (toIfaceTypeX fr t2) (map go deps)
+        = IfaceUnivCo p r (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+                      (go_deps deps)
 
     go co@(TyConAppCo r tc cos)
       =  assertPpr (isNothing (tyConAppFunCo_maybe r tc cos)) (ppr co) $
@@ -329,6 +331,17 @@ toIfaceCoercionX fr co
                       (toIfaceCoercionX fr' co)
                           where
                             fr' = fr `delVarSet` tv
+
+    go_deps deps
+      = map go_dep_cv   (univCoDepsCoVars deps) ++
+        map go_dep_hole (univCoDepsHoles  deps)
+
+    go_dep_cv cv
+      -- See Note [Free TyVars and CoVars in IfaceType] in GHC.Iface.Type
+      | cv `elemVarSet` fr = IfaceUnivCoDepFreeCoVar cv
+      | otherwise          = IfaceUnivCoDepCoVar (toIfaceCoVar cv)
+
+    go_dep_hole h = IfaceUnivCoDepHole (coHoleCoVar h)
 
 toIfaceAxiomRule :: CoAxiomRule -> IfaceAxiomRule
 toIfaceAxiomRule (BuiltInFamRew  bif) = IfaceAR_X (mkIfLclName (bifrw_name bif))

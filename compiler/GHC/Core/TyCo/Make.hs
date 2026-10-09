@@ -83,8 +83,8 @@ import GHC.Prelude
 -- see Note [The Type-related module hierarchy] in GHC.Core.TyCo.Rep
 import {-# SOURCE #-} GHC.Core.Coercion
     ( mkLRCo, mkInstCo, mkAppCo, mkAppCos, mkSelCo
-    , mkKindCo, mkUnivCo  -- These use eqType; see Note [mkKindCo and mkUnivCo]
-                          -- in GHC.Core.Coercion
+    , mkKindCo, mkUnivCo, mkUnivCoAddTypeDeps
+        -- These use eqType; see Note [mkKindCo and mkUnivCo] in GHC.Core.Coercion
     , decomposePiCos
     , coercionKind -- Used in toPhantomCo
     -- Used in assertions only
@@ -266,10 +266,10 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_co (HoleCo hole)              = cohole hole
     go_co (UnivCo { uco_prov = p, uco_role = r
                   , uco_lty = t1, uco_rty = t2, uco_deps = deps })
-                                     = mkUnivCo <$> pure p
-                                                <*> go_cos deps
-                                                <*> pure r
-                                                <*> go_ty t1 <*> go_ty t2
+      = do { t1'   <- go_ty t1
+           ; t2'   <- go_ty t2
+           ; deps' <- mapUnivCoDepsM go_co deps -- re-computes dependent CoVars after mapping
+           ; return $ mkUnivCoAddTypeDeps p deps' r t1' t2' }
     go_co (SymCo co)                 = mkSymCo <$> go_co co
     go_co (TransCo c1 c2)            = mkTransCo <$> go_co c1 <*> go_co c2
     go_co (AxiomCo r cos)            = mkAxiomCo r <$> go_cos cos

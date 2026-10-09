@@ -20,7 +20,8 @@ module GHC.Core.Lint (
 
     lintCoreBindings, lintUnfolding,
     lintPassResult, lintExpr,
-    lintAnnots, lintAxioms,
+    lintAxioms,
+    lintTcCoercion, lintCoercion_InScope,
 
     -- ** Debug output
     EndPassConfig (..),
@@ -38,7 +39,6 @@ import GHC.Tc.Utils.TcType
   , isFloatingPrimTy, isTyFamFree )
 import GHC.Tc.Types.Origin
   ( FixedRuntimeRepOrigin(..) )
-import GHC.Unit.Module.ModGuts
 import GHC.Platform
 
 import GHC.Core
@@ -64,12 +64,12 @@ import GHC.Core.FamInstEnv( compatibleBranches )
 import GHC.Core.Unify
 import GHC.Core.Opt.Arity    ( typeArity, exprIsDeadEnd )
 
-import GHC.Core.Opt.Monad
 
 import GHC.Types.Literal
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id
@@ -2320,15 +2320,8 @@ lintCoercion :: HasDebugCallStack => Coercion -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 
-lintCoercion (CoVarCo cv)
-  | not (isCoVar cv)
-  = failWithL (hang (text "Bad CoVarCo:" <+> ppr cv)
-                  2 (text "With offending type:" <+> ppr (varType cv)))
-
-  | otherwise  -- C.f. lintType (TyVarTy tv), which has better docs
-  = lintVarOcc cv
-
-lintCoercion (Refl ty)          = lintType ty
+lintCoercion (CoVarCo cv) = lintCoVarOcc cv
+lintCoercion (Refl ty)           = lintType ty
 lintCoercion (GRefl _r ty MRefl) = lintType ty
 
 lintCoercion (GRefl _r ty (MCo co))
@@ -2474,11 +2467,19 @@ lintCoercion co@(UnivCo { uco_role = r, uco_prov = prov
        ; let tk1 = typeKind ty1
              tk2 = typeKind ty2
 
-       ; when (r /= Phantom && isTYPEorCONSTRAINT tk1 && isTYPEorCONSTRAINT tk2)
+         -- Runtime representations are not settled until after constraint solving,
+         -- so skip those checks when dealing with a 'TcCoercion'.
+       ; tc_co <- lf_tc_coercion <$> getLintFlags
+       ; when (not tc_co && r /= Phantom && isTYPEorCONSTRAINT tk1 && isTYPEorCONSTRAINT tk2)
               (checkTypes ty1 ty2)
 
-       -- Check the coercions on which this UnivCo depends
-       ; mapM_ lintCoercion deps }
+       -- Check all dependencies of the UnivCo.
+       ; mapM_ lintCoVarOcc  $ univCoDepsCoVars deps
+       ; mapM_ lintCoHoleOcc $ univCoDepsHoles  deps
+
+       -- Check the invariant of Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep.
+       ; for_ (checkUnivCoDepsInv ty1 ty2 deps) failWithL
+       }
    where
      report s = hang (text $ "Unsafe coercion: " ++ s)
                      2 (vcat [ text "From:" <+> ppr ty1
@@ -2673,8 +2674,58 @@ lintCoercion (SubCo co)
   = do { lintCoercion co
        ; lintRole co Nominal (coercionRole co) }
 
-lintCoercion (HoleCo h)
-  = failWithL (text "Unfilled coercion hole:" <+> ppr h)
+lintCoercion (HoleCo h) = lintCoHoleOcc h
+
+lintCoVarOcc :: HasDebugCallStack => CoVar -> LintM ()
+lintCoVarOcc cv
+  | not (isCoVar cv)
+  = failWithL (mkBadCoVarMsg cv)
+
+  | otherwise  -- C.f. lintType (TyVarTy tv), which has better docs
+  = lintVarOcc cv
+
+mkBadCoVarMsg :: CoVar -> SDoc
+mkBadCoVarMsg cv
+  = hang (text "Bad CoVarCo:" <+> ppr cv)
+       2 (text "With offending type:" <+> ppr (varType cv))
+
+lintCoHoleOcc :: CoercionHole -> LintM ()
+lintCoHoleOcc h
+  = do { tc_co <- lf_tc_coercion <$> getLintFlags
+       ; if tc_co
+           -- When allowing coercion holes, don't try to look up the CoVar from
+           -- the environment: the coercion hole has no binding site.
+         then lintL (isCoVar cv) (mkBadCoVarMsg cv)
+         else failWithL (text "Unfilled coercion hole:" <+> ppr h) }
+  where
+    cv = coHoleCoVar h
+
+-- | Lint a standalone 'Coercion'.
+lintCoercion_InScope
+  :: LintConfig
+  -> InScopeSet
+  -> Coercion
+  -> WarnsAndErrs
+lintCoercion_InScope cfg in_scope co
+  = initL (cfg { l_vars = nonDetEltsUniqSet (getInScopeVars in_scope) }) $
+      -- nonDet is fine: 'initL' only builds a 'VarEnv' from these.
+    addLoc (InCo co) $
+    lintCoercion co
+
+-- | Lint a coercion which may contain unfilled metavariables and coercion
+-- holes.
+--
+-- Precondition: the coercion is zonked.
+lintTcCoercion :: LintConfig -> Coercion -> WarnsAndErrs
+lintTcCoercion cfg co
+  = lintCoercion_InScope cfg' in_scope co
+  where
+    -- We don't have an InScopeSet to provide, so treat the free variables of
+    -- the coercion as being in scope.
+    in_scope = mkInScopeSet (tyCoVarsOfCo co)
+    cfg'     = cfg { l_flags = (l_flags cfg) { lf_tc_coercion       = True
+                                             , lf_check_fixed_rep   = False
+                                             , lf_report_unsat_syns = False } }
 
 {-
 Note [Conflict checking for axiom applications]
@@ -2969,6 +3020,12 @@ data LintFlags
        , lf_allow_weak_joins   :: Bool -- ^ See Note [Linting join points with casts or ticks]
        , lf_allow_beta_joins   :: Bool -- ^ See Note [Join points and beta-redexes]
        , lf_allow_dead_occs    :: Bool -- ^ See Note [Dead occurrences]
+       , lf_tc_coercion        :: Bool
+           -- ^ Are we linting a coercion which may contain unfilled
+           -- metavariables and coercion holes?
+           --
+           -- See 'lintTcCoercion' and Note [Core Lint and zapped coercions]
+           -- in GHC.Tc.Solver.Rewrite.
     }
 
 -- See Note [Checking StaticPtrs]
@@ -3933,65 +3990,3 @@ dupExtVars :: [NonEmpty Name] -> SDoc
 dupExtVars vars
   = hang (text "Duplicate top-level variables with the same qualified name")
        2 (ppr (map toList vars))
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Annotation Linting}
-*                                                                      *
-************************************************************************
--}
-
--- | This checks whether a pass correctly looks through debug
--- annotations (@SourceNote@). This works a bit different from other
--- consistency checks: We check this by running the given task twice,
--- noting all differences between the results.
-lintAnnots :: SDoc -> (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
-lintAnnots pname pass guts = {-# SCC "lintAnnots" #-} do
-  -- Run the pass as we normally would
-  dflags <- getDynFlags
-  logger <- getLogger
-  when (gopt Opt_DoAnnotationLinting dflags) $
-    liftIO $ Err.showPass logger "Annotation linting - first run"
-  -- If appropriate re-run it without debug annotations to make sure
-  -- that they made no difference.
-  if gopt Opt_DoAnnotationLinting dflags
-    then do
-      nguts <- pass guts
-      liftIO $ Err.showPass logger "Annotation linting - second run"
-      nguts' <- withoutAnnots pass guts
-      -- Finally compare the resulting bindings
-      liftIO $ Err.showPass logger "Annotation linting - comparison"
-      let binds = flattenBinds $ mg_binds nguts
-          binds' = flattenBinds $ mg_binds nguts'
-          (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'
-      when (not (null diffs)) $ GHC.Core.Opt.Monad.putMsg $ vcat
-        [ lint_banner "warning" pname
-        , text "Core changes with annotations:"
-        , withPprStyle defaultDumpStyle $ nest 2 $ vcat diffs
-        ]
-      return nguts
-    else
-      pass guts
-
--- | Run the given pass without annotations. This means that we both
--- set the debugLevel setting to 0 in the environment as well as all
--- annotations from incoming modules.
-withoutAnnots :: (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
-withoutAnnots pass guts = do
-  -- Remove debug flag from environment.
-  -- TODO: supply tag here as well ?
-  let withoutFlag = mapDynFlagsCoreM $ \(!dflags) -> dflags { debugLevel = 0 }
-  -- Nuke existing ticks in module.
-  -- TODO: Ticks in unfoldings. Maybe change unfolding so it removes
-  -- them in absence of debugLevel > 0.
-  let nukeTicks = stripTicksE (not . tickishIsCode)
-      nukeAnnotsBind :: CoreBind -> CoreBind
-      nukeAnnotsBind bind = case bind of
-        Rec bs     -> Rec $ map (\(b,e) -> (b, nukeTicks e)) bs
-        NonRec b e -> NonRec b $ nukeTicks e
-      nukeAnnotsMod mg@ModGuts{mg_binds=binds}
-        = mg{mg_binds = map nukeAnnotsBind binds}
-  -- Perform pass with all changes applied. Drop the simple count so it doesn't
-  -- effect the total also
-  dropSimplCount $ withoutFlag $ pass (nukeAnnotsMod guts)

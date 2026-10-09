@@ -216,7 +216,8 @@ data SimpleOpts = SimpleOpts
 defaultSimpleOpts :: SimpleOpts
 defaultSimpleOpts = SimpleOpts
    { so_uf_opts = defaultUnfoldingOpts
-   , so_co_opts = OptCoercionOpts { optCoercionEnabled = False }
+   , so_co_opts = OptCoercionOpts { optCoercionEnabled = False
+                                  , optCoercionLint    = Nothing }
    , so_eta_red = False
    , so_inline  = const True
    , so_can_drop = const True

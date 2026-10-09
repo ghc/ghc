@@ -783,24 +783,25 @@ where the coercion ``co`` has type ``co :: t1 ~N# t2`` or ``co :: t1 ~R# t2``
 respectively.
 
 It is up to the plugin to construct a suitable coercion ``co``.
-However, one possibility is to construct one of form ::
+However, one possibility is to construct a universal coercion using
+``mkUnivCo`` ::
 
-    UnivCo (PluginProv "my-plugin" gcvs) role t1 t2
+    mkUnivCo (PluginProv "my-plugin") deps role t1 t2
 
-A ``UnivCo`` of this form says "trust me: my-plugin has solved this Wanted
-using (only) ``gcvs``".
+A coercion of this form says "trust me: my-plugin has solved this Wanted
+using (only) ``deps``".
 
 Here
 
 * The ``role`` should be the role of the original equality constraint
   (nominal or representational).
-* The ``gcvs`` is a set of "given coercion variables"; these are the coercion
-  variable bound by enclosing Given constraints, which the plugin has used
-  to justify solving the Wanted.
+* The ``deps :: [Coercion]`` are the coercions which the plugin has used to
+  justify solving the Wanted; typically, the evidence of enclosing Given
+  constraints (as obtained with ``ctEvCoercion``).
 
-For soundness, it is very important to include the ``gcvs``; otherwise
+For soundness, it is very important to include the ``deps``; otherwise
 GHC may transform the program into a form that seg-faults.
-See :ghc-ticket:`23923` for a long dicussion.
+See :ghc-ticket:`23923` for a long discussion.
 
 Evidence is required also when creating new Given constraints, which are
 usually implied by old ones. It is not uncommon that the evidence of a new
@@ -822,10 +823,10 @@ by supplying the ``tcPluginRewrite`` field of the ``TcPlugin`` record.
 That is, the plugin registers a map, from a type family's ``TyCon`` to its
 associated rewriting function: ::
 
-    type TcPluginRewriter = [Ct] -> [Type] -> TcPluginM TcPluginRewriteResult
+    type TcPluginRewriter = RewriteEnv -> [Ct] -> [Type] -> TcPluginM TcPluginRewriteResult
 
-This rewriting function is supplied with the Given constraints from the current
-context, and the type family arguments.
+This rewriting function is supplied with the rewriter environment, the Given
+constraints from the current context, and the type family arguments.
 Note that the type family application is guaranteed to be exactly saturated.
 This function should then return a possible rewriting of the type family
 application, by means of the following datatype: ::
@@ -853,6 +854,10 @@ the plugin must also supply a coercion which witnesses this rewriting: ::
 Note in particular that the LHS type of the coercion should be the original
 type-family application, while its RHS type is the type that the plugin wants
 to rewrite the type-family application to.
+
+As in :ref:`constraint-solving-with-plugins`, if the plugin used any Given
+constraints to justify the rewriting, the coercion must mention their evidence,
+e.g. by passing it as the dependencies of a coercion built with ``mkUnivCo``.
 
 .. _source-plugins:
 

@@ -491,6 +491,9 @@ kickOutRewritable ko_spec new_fr
               -- The famapp-cache contains Given evidence from the inert set.
               -- If we're kicking out Givens, we need to remove this evidence
               -- from the cache, too.
+              -- For now the famapp-cache never contains Wanted evidence, so
+              -- kicking out Wanteds requires no such treatment.
+              -- See (FAC_Holes) in Note [The family application cache] in GHC.Tc.Solver.Rewrite.
             ; let kicked_given_ev_vars = foldr add_one emptyVarSet kicked_out
                   add_one :: Ct -> VarSet -> VarSet
                   add_one ct vs | CtGiven (GivenCt { ctev_evar = ev_var }) <- ctEvidence ct
@@ -921,9 +924,10 @@ lookupFamAppCache fam_tc tys
            Nothing -> return Nothing }
 
 extendFamAppCache :: TyCon -> [Type] -> Reduction -> TcS ()
--- NB: co :: rhs ~ F tys, to match expectations of rewriter
 extendFamAppCache tc xi_args stuff@(Reduction _ ty)
   = do { dflags <- getDynFlags
+         -- See (FAC_Flag) in Note [The family application cache]
+         -- in GHC.Tc.Solver.Rewrite
        ; when (gopt Opt_FamAppCache dflags) $
     do { traceTcS "extendFamAppCache" (vcat [ ppr tc <+> ppr xi_args
                                             , ppr ty ])

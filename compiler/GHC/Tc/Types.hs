@@ -141,6 +141,7 @@ import GHC.Tc.Errors.Types
 
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep ( UnivCoDeps )
 import GHC.Core.TyCon  ( TyCon )
 import GHC.Core.PatSyn ( PatSyn )
 import GHC.Core.Lint   ( lintAxioms )
@@ -357,6 +358,21 @@ data RewriteEnv
           -- See Note [Rewriter EqRels] in GHC.Tc.Solver.Rewrite
 
        , re_rewriters :: !(TcRef CoHoleSet)  -- ^ See Note [Wanteds rewrite Wanteds: rewriter-sets]
+
+       , re_used_cos :: !(TcRef UnivCoDeps)
+          -- ^ Accumulates the coercions used to justify the rewrites
+          -- performed in the current scope.
+          --
+          -- Accumulated whether or not we are zapping: we also consult this
+          -- to determine whether a type family reduction may be recorded
+          -- in the family application cache.
+          --
+          -- See Note [Computing coercion dependencies] in GHC.Tc.Solver.Rewrite.
+
+       , re_zap_coercions :: !Bool
+          -- ^ Whether to perform coercion zapping.
+          --
+          -- See Note [Coercion zapping] in GHC.Tc.Solver.Rewrite
        }
 -- RewriteEnv is mostly used in @GHC.Tc.Solver.Rewrite@, but it is defined
 -- here so that it can also be passed to rewriting plugins.

@@ -25,11 +25,11 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 
 import GHC.Core.Class
-import GHC.Core.Reduction( Reduction, reductionCoercion )
+import GHC.Core.Reduction( Reduction, isReflRedn )
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.Make.Box ( boxDictTy, liftConstraint, unliftConstraintExpr )
-import GHC.Core.Coercion( isReflCo, mkSubCo, hasCoercionHole )
+import GHC.Core.Coercion( mkSubCo, hasCoercionHole )
 import GHC.Core.Unify    ( tcMatchTyKis )
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -532,7 +532,7 @@ defaultEquality encl_eqs ct
 
            ; case res of
                PuFail {}   -> cant_default_tv "checkTyEqRhs"
-               PuOK _ redn -> assertPpr (isReflCo (reductionCoercion redn)) (ppr redn) $
+               PuOK _ redn -> assertPpr (isReflRedn redn) (ppr redn) $
                                -- With TEFA_Recurse we never get any reductions
                               default_tv }
       | otherwise

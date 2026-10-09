@@ -1775,7 +1775,7 @@ finish_rewrite
     do { let loc = ctEvLoc ev
              -- mkEvCast optimises ReflCo
              ev_rw_role = ctEvRewriteRole ev
-             new_tm = assert (coercionRole co == ev_rw_role)
+             new_tm = assert (coercionRole co == ev_rw_role) $
                       evCast (evId old_evar) $   -- evCast optimises ReflCo
                       downgradeRole Representational ev_rw_role co
        ; new_ev <- newGivenEv loc (new_pred, new_tm)

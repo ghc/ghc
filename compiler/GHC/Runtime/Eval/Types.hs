@@ -9,7 +9,7 @@
 module GHC.Runtime.Eval.Types (
         Resume(..), ResumeBindings, IcGlobalRdrEnv(..),
         History(..), ExecResult(..),
-        SingleStep(..), enableGhcStepMode, breakHere,
+        SingleStep(..), EvalStep(..), enableGhcStepMode, breakHere,
         ExecOptions(..)
         ) where
 
@@ -18,7 +18,6 @@ import GHC.Prelude
 import GHCi.RemoteTypes
 import GHCi.Message (EvalExpr, ResumeContext)
 import GHC.ByteCode.Types (InternalBreakpointId(..))
-import GHC.Driver.Config (EvalStep(..))
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.TyThing
@@ -70,6 +69,16 @@ enableGhcStepMode RunToCompletion = EvalStepNone
 enableGhcStepMode StepOut{}       = EvalStepOut
 -- for the remaining step modes we need to stop at every single breakpoint.
 enableGhcStepMode _               = EvalStepSingle
+
+-- | Instruct the interpreter evaluation to break...
+data EvalStep
+  -- | ... at every breakpoint tick
+  = EvalStepSingle
+  -- | ... after any evaluation to WHNF
+  -- (See Note [Debugger: Step-out])
+  | EvalStepOut
+  -- | ... only on explicit breakpoints
+  | EvalStepNone
 
 -- | Given a 'SingleStep' mode, whether the breakpoint was explicitly active,
 -- and the SrcSpan of a breakpoint we hit, return @True@ if we should stop at

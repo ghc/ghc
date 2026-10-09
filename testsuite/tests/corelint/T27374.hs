@@ -178,7 +178,8 @@ opt_co co =
   let in_scope = mkInScopeSet $ tyCoVarsOfCo co
   in
     optCoercion
-      ( OptCoercionOpts { optCoercionEnabled = True } )
+      ( OptCoercionOpts { optCoercionEnabled = True
+                        , optCoercionLint    = Nothing } )
       ( mkEmptySubst in_scope )
       co
 

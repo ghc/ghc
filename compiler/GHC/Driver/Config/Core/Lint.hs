@@ -180,4 +180,5 @@ defaultLintFlags dflags = LF { lf_check_global_ids = False
                              , lf_allow_weak_joins = False
                              , lf_allow_beta_joins = False
                              , lf_allow_dead_occs  = False
+                             , lf_tc_coercion      = False
                              }

@@ -13,6 +13,7 @@ module GHC.Iface.Type (
         IfLclName(..), mkIfLclName, ifLclNameFS,
 
         IfaceType(..), IfacePredType, IfaceKind, IfaceCoercion(..),
+        IfaceUnivCoDep(..),
         IfaceAxiomRule(..),IfaceMCoercion(..),
         IfaceMult,
         IfaceTyCon(..),
@@ -513,7 +514,7 @@ data IfaceCoercion
        -- ^ There are only a fixed number of CoAxiomRules, so it suffices
        -- to use an IfaceLclName to distinguish them.
        -- See Note [Adding built-in type families] in GHC.Builtin.WiredIn.TypeLits
-  | IfaceUnivCo       UnivCoProvenance Role IfaceType IfaceType [IfaceCoercion]
+  | IfaceUnivCo       UnivCoProvenance Role IfaceType IfaceType [IfaceUnivCoDep]
   | IfaceSymCo        IfaceCoercion
   | IfaceTransCo      IfaceCoercion IfaceCoercion
   | IfaceSelCo        CoSel IfaceCoercion
@@ -525,6 +526,24 @@ data IfaceCoercion
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
   deriving (Eq, Ord)
   -- Why Ord?  See Note [Ord instance of IfaceType]
+
+-- | A single dependency of an 'IfaceUnivCo'.
+--
+-- See Note [UnivCoDeps] in GHC.Core.TyCo.Rep.
+data IfaceUnivCoDep
+  = IfaceUnivCoDepCoVar     IfLclName
+      -- ^ An in-scope coercion variable (bound by an enclosing binder).
+      --
+      -- This is the only form that occurs in interface files.
+  | IfaceUnivCoDepFreeCoVar CoVar
+      -- ^ A free coercion variable.
+      --
+      -- See Note [Free TyVars and CoVars in IfaceType]
+  | IfaceUnivCoDepHole      CoVar
+      -- ^ A coercion hole.
+      --
+      -- See Note [Holes in IfaceCoercion]
+  deriving (Eq, Ord)
 
 data IfaceAxiomRule
   = IfaceAR_X IfLclName               -- Built-in
@@ -541,6 +560,9 @@ to be able to pretty-print them as we use IfaceType's pretty-printer
 to render Types. For this reason IfaceCoercion has a IfaceHoleCo
 constructor; however, we fails when asked to serialize to a
 IfaceHoleCo to ensure that they don't end up in an interface file.
+
+The dependencies of a UnivCo are subject to the same treatment, via
+IfaceUnivCoDepHole.
 
 
 %************************************************************************
@@ -809,7 +831,7 @@ substIfaceType env ty
     go_co (IfaceFreeCoVar cv)        = IfaceFreeCoVar cv
     go_co (IfaceCoVarCo cv)          = IfaceCoVarCo cv
     go_co (IfaceHoleCo cv)           = IfaceHoleCo cv
-    go_co (IfaceUnivCo p r t1 t2 ds) = IfaceUnivCo p r (go t1) (go t2) (go_cos ds)
+    go_co (IfaceUnivCo p r t1 t2 ds) = IfaceUnivCo p r (go t1) (go t2) ds
     go_co (IfaceSymCo co)            = IfaceSymCo (go_co co)
     go_co (IfaceTransCo co1 co2)     = IfaceTransCo (go_co co1) (go_co co2)
     go_co (IfaceSelCo n co)          = IfaceSelCo n (go_co co)
@@ -2167,6 +2189,12 @@ ppr_special_co ctxt_prec doc cos
   = maybeParen ctxt_prec appPrec
                (sep [doc, nest 4 (sep (map pprParendIfaceCoercion cos))])
 
+-- Rendered as for the corresponding IfaceCoercion constructors above
+instance Outputable IfaceUnivCoDep where
+  ppr (IfaceUnivCoDepCoVar     covar) = ppr covar
+  ppr (IfaceUnivCoDepFreeCoVar covar) = ppr covar
+  ppr (IfaceUnivCoDepHole      covar) = braces (ppr covar)
+
 pprIfAxRule :: IfaceAxiomRule -> SDoc
 pprIfAxRule (IfaceAR_X n)   = ppr n
 pprIfAxRule (IfaceAR_U n)   = ppr n
@@ -2611,6 +2639,18 @@ instance Binary IfaceCoercion where
                    return $ IfaceAxiomCo a b
            _ -> panic ("get IfaceCoercion " ++ show tag)
 
+-- | Only 'IfaceUnivCoDepCoVar' can be serialised, so no tag is written.
+instance Binary IfaceUnivCoDep where
+  put_ bh (IfaceUnivCoDepCoVar n) = put_ bh n
+  put_ _ (IfaceUnivCoDepFreeCoVar cv)
+       = pprPanic "Can't serialise IfaceUnivCoDepFreeCoVar" (ppr cv)
+           -- See Note [Free TyVars and CoVars in IfaceType]
+  put_ _ (IfaceUnivCoDepHole cv)
+       = pprPanic "Can't serialise IfaceUnivCoDepHole" (ppr cv)
+           -- See Note [Holes in IfaceCoercion]
+
+  get bh = IfaceUnivCoDepCoVar <$> get bh
+
 instance Binary IfaceAxiomRule where
   put_ bh (IfaceAR_X n)   = putByte bh 0 >> put_ bh n
   put_ bh (IfaceAR_U n)   = putByte bh 1 >> put_ bh n
@@ -2679,6 +2719,14 @@ instance NFData IfaceCoercion where
     -- See Note [Holes in IfaceCoercion]
     IfaceFreeCoVar f1 -> f1 `seq` ()
     IfaceHoleCo f1 -> f1 `seq` ()
+
+instance NFData IfaceUnivCoDep where
+  rnf = \case
+    IfaceUnivCoDepCoVar f1 -> rnf f1
+    -- As for IfaceFreeCoVar and IfaceHoleCo above, these are only used for
+    -- pretty-printing, so they are not deeply forced.
+    IfaceUnivCoDepFreeCoVar f1 -> f1 `seq` ()
+    IfaceUnivCoDepHole f1 -> f1 `seq` ()
 
 instance NFData IfaceAxiomRule where
   rnf = \case

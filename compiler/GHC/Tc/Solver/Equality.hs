@@ -2262,7 +2262,7 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
            -- We unify alpha := Int, and set co := <Int>.  No need to
            -- swap to   co = sym co'
            --           co' = <Int>
-           new_ev <- if isReflCo (reductionCoercion rhs_redn)
+           new_ev <- if isReflRedn rhs_redn
                      then return ev
                      else rewriteEqEvidence ev swapped
                               (mkReflRedn Nominal (mkTyVarTy tv)) rhs_redn

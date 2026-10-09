@@ -26,8 +26,7 @@ import GHC.Core.SimpleOpt (simpleOptPgm)
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( RuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings, pprRules )
-import GHC.Core.Utils   ( dumpIdInfoOfProgram )
-import GHC.Core.Lint    ( lintAnnots )
+import GHC.Core.Utils   ( dumpIdInfoOfProgram, diffBinds, stripTicksE )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Opt.Simplify ( simplifyExpr, simplifyPgm )
 import GHC.Core.Opt.Simplify.Monad
@@ -49,7 +48,7 @@ import GHC.Core.LateCC.TopLevelBinds (topLevelBindsCCMG)
 import GHC.Core.Seq (seqBinds)
 import GHC.Core.FamInstEnv
 
-import GHC.Utils.Error  ( withTiming )
+import GHC.Utils.Error  ( withTiming, showPass )
 import GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -57,6 +56,8 @@ import GHC.Utils.Panic
 import GHC.Unit.Module.ModGuts
 
 import GHC.Types.Id.Info
+import GHC.Types.Tickish ( tickishIsCode )
+import GHC.Types.Var.Env ( mkRnEnv2, emptyInScopeSet )
 import GHC.Types.InlinePragma ( CompilerPhase(..) )
 import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Name.Ppr
@@ -587,3 +588,66 @@ desugarOpt dflags logger mod binds rules = liftIO $ do
     FormatCore (pprCoreBindings occ_anald_binds $$ pprRules ds_rules_for_imps )
 
   pure (ds_binds, ds_rules_for_imps)
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Annotation Linting}
+*                                                                      *
+************************************************************************
+-}
+
+-- | This checks whether a pass correctly looks through debug
+-- annotations (@SourceNote@). This works a bit different from other
+-- consistency checks: We check this by running the given task twice,
+-- noting all differences between the results.
+lintAnnots :: SDoc -> (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
+lintAnnots pname pass guts = {-# SCC "lintAnnots" #-} do
+  -- Run the pass as we normally would
+  dflags <- getDynFlags
+  logger <- getLogger
+  when (gopt Opt_DoAnnotationLinting dflags) $
+    liftIO $ showPass logger "Annotation linting - first run"
+  -- If appropriate re-run it without debug annotations to make sure
+  -- that they made no difference.
+  if gopt Opt_DoAnnotationLinting dflags
+    then do
+      nguts <- pass guts
+      liftIO $ showPass logger "Annotation linting - second run"
+      nguts' <- withoutAnnots pass guts
+      -- Finally compare the resulting bindings
+      liftIO $ showPass logger "Annotation linting - comparison"
+      let binds = flattenBinds $ mg_binds nguts
+          binds' = flattenBinds $ mg_binds nguts'
+          (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'
+      when (not (null diffs)) $ putMsg $ vcat
+        [ text "*** Annotation linting: the result of" <+> pname
+            <+> text "depends on debug annotations ***"
+        , text "Core changes with annotations:"
+        , withPprStyle defaultDumpStyle $ nest 2 $ vcat diffs
+        ]
+      return nguts
+    else
+      pass guts
+
+-- | Run the given pass without annotations. This means that we both
+-- set the debugLevel setting to 0 in the environment as well as all
+-- annotations from incoming modules.
+withoutAnnots :: (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
+withoutAnnots pass guts = do
+  -- Remove debug flag from environment.
+  -- TODO: supply tag here as well ?
+  let withoutFlag = mapDynFlagsCoreM $ \(!dflags) -> dflags { debugLevel = 0 }
+  -- Nuke existing ticks in module.
+  -- TODO: Ticks in unfoldings. Maybe change unfolding so it removes
+  -- them in absence of debugLevel > 0.
+  let nukeTicks = stripTicksE (not . tickishIsCode)
+      nukeAnnotsBind :: CoreBind -> CoreBind
+      nukeAnnotsBind bind = case bind of
+        Rec bs     -> Rec $ map (\(b,e) -> (b, nukeTicks e)) bs
+        NonRec b e -> NonRec b $ nukeTicks e
+      nukeAnnotsMod mg@ModGuts{mg_binds=binds}
+        = mg{mg_binds = map nukeAnnotsBind binds}
+  -- Perform pass with all changes applied. Drop the simple count so it doesn't
+  -- effect the total also
+  dropSimplCount $ withoutFlag $ pass (nukeAnnotsMod guts)

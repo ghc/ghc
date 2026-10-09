@@ -1,5 +1,7 @@
 TYPE SIGNATURES
-  x :: forall (x :: Bool). P (F Int) (x |> Sym T14729.D:R:FInt)
+  x ::
+    forall (x :: Bool).
+    P (F Int) (x |> Sym Univ(nominal (zapped)[] :: F Int~# Bool))
   y :: forall {x :: Bool}. P Bool x
 TYPE CONSTRUCTORS
   type family F{1} :: * -> *
@@ -11,4 +13,4 @@ COERCION AXIOMS
 FAMILY INSTANCES
   type instance F Int = Bool -- Defined at T14729.hs:10:15
 Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]
+Dependent packages: [(normal, base-4.23.0.0)]

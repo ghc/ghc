@@ -39,7 +39,9 @@ module GHC.Core.Coercion (
         mkNakedForAllCo, mkForAllCo, mkForAllVisCos,
         mkHomoForAllCo, mkHomoForAllCos,
         mkPhantomCo, mkAxiomCo,
-        mkHoleCo, mkUnivCo, mkSubCo,
+        mkHoleCo, mkUnivCo, mkUnivCoFromDeps, mkUnivCoAddTypeDeps,
+        checkUnivCoDepsInv,
+        mkSubCo,
         mkProofIrrelCo,
         downgradeRole,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
@@ -1041,6 +1043,8 @@ setNominalRole_maybe r co
                      PluginProv {}     -> False  -- who knows? This choice is conservative.
                      SubMultProv {}    -> True
                      CanonicalProv {}  -> False  -- representational only; can't make nominal
+                     ZappedProv {}     -> False  -- may have been produced by a
+                                                 -- representational-only rewrite
       = Just $ co { uco_role = Nominal }
     setNominalRole_maybe_helper _ = Nothing
 
@@ -1067,17 +1071,65 @@ These `eqType` short-cuts are important for performance:
 
 -- | Make a universal coercion between two arbitrary types.
 -- See Note [mkKindCo and mkUnivCo]
-mkUnivCo :: UnivCoProvenance
+mkUnivCo :: HasDebugCallStack
+         => UnivCoProvenance
          -> [Coercion] -- ^ Coercions on which this depends
          -> Role       -- ^ role of the built coercion, "r"
          -> Type       -- ^ t1 :: k1
          -> Type       -- ^ t2 :: k2
          -> Coercion   -- ^ :: t1 ~r t2
-mkUnivCo prov deps role ty1 ty2
+mkUnivCo prov dep_cos r ty1 ty2 =
+  mkUnivCoAddTypeDeps prov (mkUnivCoDeps dep_cos) r ty1 ty2
+
+-- | Like 'mkUnivCo', but takes a 'UnivCoDeps' instead of a @[Coercion]@.
+mkUnivCoFromDeps
+  :: HasDebugCallStack
+  => UnivCoProvenance
+  -> UnivCoDeps -- ^ Coercions on which this depends
+  -> Role       -- ^ role of the built coercion, "r"
+  -> Type       -- ^ t1 :: k1
+  -> Type       -- ^ t2 :: k2
+  -> Coercion   -- ^ :: t1 ~r t2
+mkUnivCoFromDeps prov deps role ty1 ty2
   | ty1 `eqType` ty2 = mkReflCo role ty1
-  | otherwise        = UnivCo { uco_prov = prov, uco_role = role
-                              , uco_lty = ty1, uco_rty = ty2
-                              , uco_deps = deps }
+  | otherwise        = mk_univ_co prov deps role ty1 ty2
+
+-- | Like 'mkUnivCoFromDeps', but establishes (UnivCoDepsInv) itself, adding the
+-- 'CoVar's and 'CoercionHole's of the LHS and RHS types to the dependencies.
+mkUnivCoAddTypeDeps :: HasDebugCallStack
+                    => UnivCoProvenance -> UnivCoDeps -> Role -> Type -> Type -> Coercion
+mkUnivCoAddTypeDeps prov deps role ty1 ty2
+  | ty1 `eqType` ty2 = mkReflCo role ty1
+  | otherwise
+  = let !deps' = addUnivCoTypeDeps [ty1, ty2] deps
+    in mk_univ_co prov deps' role ty1 ty2
+
+-- | Shared helper for 'mkUnivCoFromDeps' and 'mkUnivCoAddTypeDeps'.
+mk_univ_co :: HasDebugCallStack
+           => UnivCoProvenance -> UnivCoDeps -> Role -> Type -> Type -> Coercion
+mk_univ_co prov deps role ty1 ty2 =
+  -- Assert (UnivCoDepsInv) from Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep.
+  assertPprMaybe (checkUnivCoDepsInv ty1 ty2 deps) $
+    UnivCo { uco_prov = prov, uco_role = role
+           , uco_lty = ty1, uco_rty = ty2
+           , uco_deps = deps }
+{-# INLINE mk_univ_co #-}
+
+-- | Checks (UnivCoDepsInv) from Note [UnivCoDepsInv] in GHC.Core.TyCo.Rep.
+--
+-- Returns an error message text in case of failure.
+checkUnivCoDepsInv :: Type -> Type -> UnivCoDeps -> Maybe SDoc
+checkUnivCoDepsInv ty1 ty2 deps
+  | isEmptyUnivCoDeps undeclared
+  = Nothing
+  | otherwise
+  = Just $ hang (text "UnivCo: incomplete dependencies") 2 $ vcat
+      [ text "undeclared:" <+> ppr undeclared
+      , text "       lhs:" <+> ppr ty1
+      , text "       rhs:" <+> ppr ty2
+      , text "      deps:" <+> ppr deps ]
+  where
+    undeclared = addUnivCoTypeDeps [ty1, ty2] emptyUnivCoDeps `minusUnivCoDeps` deps
 
 -- | Given @co :: (a :: k) ~ (b :: k')@ produce @co' :: k ~ k'@.
 -- See Note [mkKindCo and mkUnivCo]
