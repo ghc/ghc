@@ -1,0 +1,9 @@
+section: compiler
+issues: #27916
+mrs: !16785
+synopsis:
+  Fix "urk! lookup local fingerprint" panic involving a type synonym in a kind.
+description:
+  GHC no longer crashes when encountering a kind mentioning a type synonym that
+  is defined later on in the same file (a bug due to incorrect declaration
+  dependency analysis).
