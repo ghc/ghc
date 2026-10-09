@@ -75,6 +75,7 @@ ghcWarningsArgs = do
         , package osString     ? pure [ "-Wno-deriving-typeable", "-Wno-unused-imports" ]
         , package parsec       ? pure [ "-Wno-deriving-typeable"
                                       , "-Wno-x-partial"
+                                      , "-Wno-simplifiable-class-constraints" -- https://gitlab.haskell.org/ghc/ghc/-/issues/27913
                                       ]
 
         , package filepath     ? pure [ "-Wno-x-partial" ]
