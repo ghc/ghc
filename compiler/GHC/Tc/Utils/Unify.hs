@@ -3631,7 +3631,6 @@ simpleUnifyCheck :: UnifyCheckCaller -> TcLevel -> TcTyVar -> TcType -> SimpleUn
 -- * Rejects if lhs_tv occurs in rhs_ty (occurs check)
 -- * Rejects foralls unless
 --      lhs_tv is RuntimeUnk (used by GHCi debugger)
---          or is a QL instantiation variable
 -- * Rejects a non-concrete type if lhs_tv is concrete
 -- * Rejects type families unless fam_ok=True
 -- * Does a level-check for type variables, to avoid skolem escape
@@ -3664,11 +3663,10 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
        | isCoVar tcv                                      = occ_check
        | tcTyVarLevel tcv `strictlyDeeperThan` lhs_tv_lvl = True
        | lhs_tv_is_concrete, not (isConcreteTyVar tcv)    = True
-       | lhs_tv_nm == getName tcv                         = True
        | occ_check                                        = True
        | otherwise                                        = False
        where
-         occ_check = anyFreeVarsOfType rhs_tcv_is_bad (varType tcv)
+         occ_check = simpleOccursCheck lhs_tv_nm tcv
 
     rhs_is_bad (TyVarTy tv) = rhs_tcv_is_bad tv
 
@@ -3693,7 +3691,7 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     rhs_is_bad (CoercionTy co)  = co_is_bad co
     rhs_is_bad (LitTy {})       = False
 
-    -- Coercions: see (SUC1) in Note [simpleUnifyCheck]
+    -- Coercions: see Note [Occurs check and coercions]
     co_is_bad co = anyFreeVarsOfCo rhs_tcv_is_bad co
 
 {- Note [simpleUnifyCheck]
@@ -3703,41 +3701,28 @@ It can return a definite decision (SUC_CannotUnify of SUC_CanUnify), or uncertai
 (SUC_NotSure).  In the latter case we will later use `checkTyEqRhs` to resolve.
 In particular, `simpleUnifyCheck`:
 
-* Rejects if lhs_tv occurs in rhs_ty (occurs check)
+* Rejects if lhs_tv occurs in rhs_ty (see Note [Simple occurs check])
 * Rejects foralls unless
       lhs_tv is RuntimeUnk (used by GHCi debugger)
-          or is a QL instantiation variable
 * Rejects a non-concrete type if lhs_tv is concrete
 * Rejects type families unless fam_ok=True
 * Does a level-check for type variables, to avoid skolem escape
 
 This function is pretty heavily used, so it's optimised not to allocate.
 
-(SUC1) `simpleUnifyCheck` used by QuickLook's `qlUnify`, and anything other than
-  SUC_CanUnify will tell `qlUnify` not to proceed.  That makes QuickLook depend
-  (regrettably, delicately) on the exact choices made by `simpleUnifyCheck`.
+Note [Occurs check and coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What if we have
+    alpha ~ Int |>  (CoHole ch :: Type ~ blah)
 
-  A case in point: in #26543. In the repro case in the Descriptions, `qlUnify` failed
-  because there was a coercion /hole/ in the RHS; but one that was ultimately Refl.
+Clearly we want to check that `alpha` doesn't appear free in `blah`.  But even if
+it doesn't, what if `ch` is later filled in with a coercion mentioning `alpha`?
+Tht would be bad: we'd get an infinite structure.
 
-  So in `simpleUnifyCheck` we only look at the /kind/ of a coercion, not the
-  evidence itself.  I'm a bit worried about building a loop, if the evidence
-  mentions the LHS unification variable; but I can't see how that can happen, and
-  I /really/ don't want to be super-conservative for coercion holes (#26543).  So,
-  for now at least, we look just at the kind of the coercion.
-
-  Note that this (unsatisfactorily) differs from the choice in `checkCo`, but
-  changing that too is an unforced change so I have left the inconsistency.
-
-(SUC2) When we come across a type variable, we use `simple_occurs_check`, as also
-  does `checkTyEqRhs`.  That `simple_occurs_check` checks for occurrences in the
-  /kind/ if the type variable, using `anyFreeVarsOfType`.  And that /does/ look
-  inside coercions; while for coercion holes it just looks in the type of the
-  coercion hole.
-
-  This is all sadly inconsistent with (SUC1), but it's not currently causing
-  problems, so I am just leaving breadcrumbs (this Note) to point this out for
-  now.
+The right thing to do is to check for a loop when (later) filling in `ch`.
+We don't do that right now, and it's very obscure.  But in `simpleUnifyCheck`
+we just look in the free vars of the /kind/ of the hole, which is what
+`anyFreeVarsOfCo` does.
 -}
 
 {- *********************************************************************
@@ -4371,9 +4356,8 @@ checkCo flags co =
         , LC_Promote { lc_lvlp = lhs_tv_lvl } <- lc
         -> do { reason <- checkPromoteFreeVars occ_prob lhs_tv lhs_tv_lvl $
                           tyCoVarsOfCo co
-                          -- Maybe we should just check the free vars of the
-                          -- /type/ of the coercion, to line up with
-                          -- (SUC1) in Note [simpleUnifyCheck]
+                           -- See Note [Occurs check and coercions]
+                          --  and Note [checkCo] (2)
               ; return $
                 if cterHasNoProblem reason
                 then pure co
@@ -4670,7 +4654,7 @@ checkTyVar flags occ_tv
                   -- so the only reason for a filled meta-tyvar is promotion
 
                 else do_rhs_checks
-                     [ simpleOccursCheck      occ  occ_tv
+                     [ tyVarOccursCheck      occ  occ_tv
                      , tyVarLevelCheck        lc   occ_tv
                      , tyVarConcretenessCheck conc occ_tv ]
               }
@@ -4728,20 +4712,25 @@ promotionDone occ_tv _ (CC_Promote {}) = isFilledMetaTyVar occ_tv
 promotionDone _      _               _ = return False
 
 ---------------------
-simpleOccursCheck :: OccursCheck -> TcTyVar -> TyVarCheckResult m
+tyVarOccursCheck :: OccursCheck -> TcTyCoVar -> TyVarCheckResult m
 -- ^ The "interpreter" for 'OccursCheck'
--- Check for an occurrence of lhs_tv in occ_tv or its kind
-simpleOccursCheck OC_None _
+-- Check for an occurrence of lhs_tv in occ_tv /or/ its kind
+tyVarOccursCheck OC_None _
   = TyVarCheck_Success
-simpleOccursCheck (OC_Check lhs_tv occ_prob) occ_tv
-  | is_bad occ_tv = TyVarCheck_Error (cteProblem occ_prob)
-  | otherwise     = TyVarCheck_Success
+tyVarOccursCheck (OC_Check { occurs_tv_name = lhs_tv, occurs_problem = prob }) occ_tcv
+  | simpleOccursCheck lhs_tv occ_tcv = TyVarCheck_Error (cteProblem prob)
+  | otherwise                        = TyVarCheck_Success
+
+simpleOccursCheck :: Name -> TyCoVar -> Bool
+-- Check for an occurrence of lhs_tv in occ_tv /or/ its kind
+-- True <=> occurs check fires
+simpleOccursCheck lhs_tv occ_tcv
+  = is_bad occ_tcv
   where
-    -- See (SUC2) in Note [simpleUnifyCheck]
     is_bad :: TyCoVar -> Bool
-    is_bad occ_tv | lhs_tv == tyVarName occ_tv                     = True
-                  | anyFreeVarsOfType is_bad $! (tyVarKind occ_tv) = True
-                  | otherwise                                      = False
+    is_bad occ_tcv | lhs_tv == tyVarName occ_tcv                   = True
+                   | anyFreeVarsOfType is_bad $! (varType occ_tcv) = True
+                   | otherwise                                     = False
 
 -------------------------
 tyVarLevelCheck :: LevelCheck m -> TcTyVar -> TyVarCheckResult m

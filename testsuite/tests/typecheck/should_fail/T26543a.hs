@@ -4,7 +4,7 @@
 -- but was erroneously accpeted with ImpredicativeTypes
 -- See !16566
 
-module T26543 where
+module T26543a where
 
 import Data.Kind
 import Data.Proxy

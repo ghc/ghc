@@ -2156,8 +2156,7 @@ foldQLInstVars check_tv ty
 
 qlUnify ::  TcType -> TcType -> TcM ()
 -- Unify ty1 with ty2:
---   * It can unify both instantiation variables (possibly with polytypes),
---     and ordinary unification variables (but only with monotypes)
+--   * It unifies /only/ instantiation variables (see (UQL6)), hopefully with polytypes
 --   * It does not return a coercion (unlike unifyType); it is called
 --     for the sole purpose of unifying instantiation variables, although it
 --     may also (opportunistically) unify regular unification variables.
@@ -2264,11 +2263,11 @@ In qlUnify, if we find (kappa ~ ty), we are going to update kappa := ty.
 That is the entire point of qlUnify!   Wrinkles:
 
 (UQL1) Before unifying an instantiation variable in `go_flexi`, we must check
-  the usual unification conditions, by calling `GHC.Tc.Utils.Unify.simpleUnifyCheck`.
-  For example that checks for
+  the usual unification conditions. In particular:
     * An occurs-check
-    * Level mis-match
     * An attempt to unify a concrete type variable with a non-concrete type.
+  We don't need a level-check because the level of an instantiation variable
+  is infinity -- see (UQL3).
 
 (UQL2) What if kappa and ty have different kinds?  We simply call the
   ordinary unifier and use the coercion to connect the two.
@@ -2350,6 +2349,9 @@ That is the entire point of qlUnify!   Wrinkles:
 
   The simplest thing is to say that `qlUnify` unifies /only/ instantiation variables
   (see calls to `isQLInstTyVar`).  We could be more ambitious, perhaps, in future.
+  Remember, though, that the /only/ reason for QuickLoook is to unify instantiation variables
+  with polytypes; anything else is optional, and will be picked up with later "ordinary"
+  typechecking.  So unifing only instantiation variables is enough.
 
 (UQL7) If `qlUnify` sees a concrete `kaapa`, thus
             kappa[conc] ~ some-type
