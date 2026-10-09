@@ -38,7 +38,7 @@ module GHC.Core.Opt.Simplify.Env (
 
         -- * Floats
         SimplFloats(..), emptyFloats, isEmptyFloats, mkRecFloats,
-        mkFloatBind, addLetFloats, addJoinFloats, addFloats,
+        mkFloatBind, addLetFloats, addJoinFloats, addFloats, addFloatBindsF,
         extendFloats, wrapFloats,
         isEmptyJoinFloats, isEmptyLetFloats,
         doFloatFromRhs, getTopFloatBinds,
@@ -79,6 +79,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Id as Id
 import GHC.Types.InlinePragma ( ActivationGhc, CompilerPhase, isActiveInPhase )
 import GHC.Types.Basic
+import GHC.Types.Tickish ( CoreTickish, tickishCounts, tickishHasSoftScope )
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
 import GHC.Data.OrdList
@@ -745,45 +746,56 @@ setSubstEnv env tvs cvs ids = env { seTvSubst = tvs, seCvSubst = cvs, seIdSubst 
 
 Note [LetFloats]
 ~~~~~~~~~~~~~~~~
-The LetFloats is a bunch of bindings, classified by a FloatFlag.
+The LetFloats is a bunch of FloatBinds, collectively classified by a FloatFlag.
 
-The `FloatFlag` contains summary information about the bindings, see the data
-type declaration of `FloatFlag`
+The `FloatFlag` contains summary information about the bindings: see the data
+type declaration of `FloatFlag`. A FloatBind can take one of three forms:
+FloatLet, FloatCase, and FloatTick.  We discuss the FloatFlag for each form.
 
+Note [FloatFlag for FloatLet]  -- see `getFF_Let`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Examples
 
-  NonRec x (y:ys)       FltLifted
-  Rec [(x,rhs)]         FltLifted
+    NonRec x (y:ys)       FltLifted
+    Rec [(x,rhs)]         FltLifted
 
-  NonRec x* (p:q)       FltOKSpec   -- RHS is WHNF.  Question: why not FltLifted?
-  NonRec x# (y +# 3)    FltOkSpec   -- Unboxed, but ok-for-spec'n
+    NonRec x* (p:q)       FltOKSpec   -- RHS is WHNF.  Question: why not FltLifted?
+    NonRec x# (y +# 3)    FltOkSpec   -- Unboxed, but ok-for-spec'n
 
-  NonRec x* (f y)       FltCareful  -- Strict binding; might fail or diverge
-  NonRec x# (a /# b)    FltCareful  -- Might fail; does not satisfy let-can-float invariant
-  NonRec x# (f y)       FltCareful  -- Might diverge; does not satisfy let-can-float invariant
+    NonRec x* (f y)       FltCareful  -- Strict binding; might fail or diverge
+    NonRec x# (a /# b)    FltCareful  -- Might fail; does not satisfy let-can-float invariant
+    NonRec x# (f y)       FltCareful  -- Might diverge; does not satisfy let-can-float invariant
 
-A binding that does not satisfy the let-can-float invariant (the last two
-examples above) is represented by a FloatCase, not a FloatLet:
-  FloatCase (a /# b) x# DEFAULT []
-That is done once and for all by `unitLetFloat`, so a FloatLet in a LetFloats
-is always a valid let-binding, and `wrapFloats` does not need to check.
-Such bindings can arise from `makeTrivial`, because an argument need not
-satisfy the let-can-float invariant.  They also arise because
-exprOkForSpeculation is conservative: e.g. it says False for (# s, x #)
-where x is lifted, because it checks the arguments against the
-(representation-polymorphic) type of the unboxed-tuple worker.
+    NonRec s "foo"#       FltLifted   -- Literal string can go to top level
 
-However, a FloatLet can still be FltCareful: the first FltCareful example
-above, NonRec x* (f y), where x* is lifted but has a strict demand
-(isStrUsedDmd).  That is a perfectly valid (lazy) let-binding, but its demand
-info is valid only where it is.  If we floated it out of the RHS of a lazy
-binding
-     let v = let x* = f y in x*+1 in body
- ==> let x* = f y; v = x*+1 in body
-then x's demand info would be a lie, and CorePrep, which case-binds a let
-whose binder has a strict demand, would evaluate (f y) eagerly.  Hence
-FltCareful, which doFloatFromRhs allows to float only out of a strict binding.
+* (FFL1) Note that a FloatLet can still be FltCareful: the first FltCareful example
+  above, NonRec x* (f y), where x* is lifted but has a strict demand
+  (isStrUsedDmd).  That is a perfectly valid (lazy) let-binding, but its demand
+  info is valid only where it is.  If we floated it out of the RHS of a lazy
+  binding
+       let v = let x* = f y in x*+1 in body
+   ==> let x* = f y; v = x*+1 in body
+  then x's demand info would be a lie, and CorePrep, which case-binds a let
+  whose binder has a strict demand, would evaluate (f y) eagerly.  Hence
+  FltCareful, which doFloatFromRhs allows to float only out of a strict binding.
 
+* (FFL2) A literal-string binding is marked FltLifted (a bit of a mis-nomer
+  because it's not a lifted type) because it can go to top level.
+  See Note [Core top-level string literals] in GHC.Core.
+
+* A binding that does not satisfy the let-can-float invariant (the last two
+  examples above) is represented by a FloatCase, not a FloatLet:
+    FloatCase (a /# b) x# DEFAULT []
+  That is done once and for all by `unitLetFloat`, so a FloatLet in a LetFloats
+  is always a valid let-binding, and `wrapFloats` does not need to check.
+  Such bindings can arise from `makeTrivial`, because an argument need not
+  satisfy the let-can-float invariant.  They also arise because
+  exprOkForSpeculation is conservative: e.g. it says False for (# s, x #)
+  where x is lifted, because it checks the arguments against the
+  (representation-polymorphic) type of the unboxed-tuple worker.
+
+Note [FloatFlag for FloatCase]  -- see `getFF_Case`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As well as let-bindings, a LetFloats can contain single-alternative case
 floats (FloatCase), for example
   case e of b { (# a, c #) -> <hole> }
@@ -795,12 +807,29 @@ These are classified just like a strict binding:
 Being strict they are never FltLifted, so they never float to top level or into
 a recursive group.
 
-Currently, we never put a FloatTick in a LetFloats.
+Note [FloatFlag for FloatTick]  -- see `getFF_Tick`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A LetFloats can contain a FloatTick for soft-scoped ticks (only -- see the
+invariant on FloatTick in GHC.Core).
+
+* We certainly don't want a tick to go to top level, or into a recursive group,
+  so its FloatFlag is never FltLifted.
+
+* A /non-counting/ tick (e.g. a source note) is FltOkSpec.  Floating it out of
+  the RHS of a lazy binding
+       let x = tick<t> (let y = e1 in e2) in body
+   ==> tick<t> (let y = e1 in let x = e2 in body)
+  just brings more code (here `body`) under the tick, which is fine for a
+  soft-scoped tick.
+
+* A /counting/ tick (e.g. an HPC tick) is FltCareful.  Floating it out of a lazy
+  RHS would change when (and how often) it is counted: when the let is
+  executed rather than when `x` is evaluated.
 -}
 
 data LetFloats = LetFloats FloatBinds FloatFlag
                  -- See Note [LetFloats]
-                 -- Contains only FloatLet and FloatCase; never FloatTick
+                 -- Invariant: every FloatLet satisfies the let-can-float invariant
 
 type JoinFloat  = OutBind
 type JoinFloats = OrdList JoinFloat
@@ -817,7 +846,7 @@ data FloatFlag
                 --        *and* ok-for-speculation
                 -- Hence ok to float out of the RHS
                 -- of a lazy non-recursive let binding
-                -- (but not to top level, or into a rec group)
+                -- (but /not/ to top level, or into a rec group)
                 -- NB: consequence: all bindings satisfy let-can-float invariant
 
   | FltCareful  -- At least one binding is strict (or unlifted)
@@ -899,37 +928,50 @@ emptyJoinFloats = nilOL
 isEmptyJoinFloats :: JoinFloats -> Bool
 isEmptyJoinFloats = isNilOL
 
+getFF :: FloatBind -> FloatFlag
+getFF (FloatCase e _ _ _) = getFF_Case e
+getFF (FloatLet b)        = getFF_Let b
+getFF (FloatTick t)       = getFF_Tick t
+
+getFF_Let :: CoreBind -> FloatFlag
+-- See Note [FloatFlag for FloatLet]
+getFF_Let (Rec {})        = FltLifted
+getFF_Let (NonRec bndr rhs)
+  | not (isStrictId bndr)    = FltLifted   -- Lazy lifted let
+  | exprIsTickedString rhs   = FltLifted   -- See (FFL2)
+  | exprOkForSpeculation rhs = FltOkSpec   -- Unlifted, or strict lifted, and ok-for-spec (e.g. HNF)
+  | otherwise                = FltCareful  -- See (FFL1) Strict, e.g. let x* = factorial y
+
+getFF_Case :: CoreExpr -> FloatFlag   -- The CoreExpr is the scrutinee
+-- Note [FloatFlag for FloatCase]
+getFF_Case scrut | exprOkForSpeculation scrut = FltOkSpec
+                 | otherwise                  = FltCareful
+
+getFF_Tick :: CoreTickish -> FloatFlag
+-- See Note [FloatFlag for FloatTick]
+getFF_Tick t | tickishCounts t = FltCareful
+             | otherwise       = FltOkSpec
+
 unitLetFloat :: OutBind -> LetFloats
 -- This key function constructs a singleton float with the right form
 -- If the binding does not satisfy the let-can-float invariant, it
 -- makes a FloatCase. See Note [LetFloats]
-unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
-                    mk_float bind
-  where
-    mk_float bind@(Rec {})       = let_float FltLifted bind
-    mk_float bind@(NonRec bndr rhs)
-      | not (isStrictId bndr)    = let_float FltLifted bind
-      | exprIsTickedString rhs   = let_float FltLifted bind
-          -- String literals can be floated freely.
-          -- See Note [Core top-level string literals] in GHC.Core.
-      | exprOkForSpeculation rhs = let_float FltOkSpec bind  -- Unlifted, and lifted but ok-for-spec (eg HNF)
-      | needsCaseBinding (idType bndr) rhs
-      = pprTrace "TMP-unitLetFloat-case" (ppr bind) $
-        LetFloats (unitOL (FloatCase rhs bndr DEFAULT [])) FltCareful
-          -- Unlifted, and not ok-for-spec: does not satisfy let-can-float invariant
-      | otherwise                = let_float FltCareful bind
+unitLetFloat bind
+  | NonRec bndr rhs <- bind
+  , needsCaseBinding (idType bndr) rhs
+  = -- This should never happen, but currently does because of #27910
+    LetFloats (unitOL (FloatCase rhs bndr DEFAULT [])) FltCareful
 
-    let_float flag bind = LetFloats (unitOL (FloatLet bind)) flag
+  | otherwise
+  = assert (all (not . isJoinId) (bindersOf bind)) $
+    LetFloats (unitOL (FloatLet bind)) (getFF_Let bind)
 
 unitCaseFloat :: OutExpr -> OutId -> AltCon -> [OutVar] -> LetFloats
 -- Constructs a singleton single-alternative case float
 --   case scrut of bndr { con bndrs -> <hole> }
 -- See Note [LetFloats]
 unitCaseFloat scrut bndr con bndrs
-  = LetFloats (unitOL (FloatCase scrut bndr con bndrs)) flag
-  where
-    flag | exprOkForSpeculation scrut = FltOkSpec
-         | otherwise                  = FltCareful
+  = LetFloats (unitOL (FloatCase scrut bndr con bndrs)) (getFF_Case scrut)
 
 unitJoinFloat :: OutBind -> JoinFloats
 unitJoinFloat bind = assert (all isJoinId (bindersOf bind)) $
@@ -978,12 +1020,34 @@ addLetFloats :: SimplFloats -> LetFloats -> SimplFloats
 -- Add the let-floats for env2 to env1;
 -- *plus* the in-scope set for env2, which is bigger
 -- than that for env1
-addLetFloats floats let_floats
+addLetFloats floats let_floats@(LetFloats fbs _)
   = floats { sfLetFloats = sfLetFloats floats `addLetFlts` let_floats
-           , sfInScope   = sfInScope floats `extendInScopeFromLF` let_floats }
+           , sfInScope   = sfInScope floats `extendInScopeFromFB` fbs }
 
-extendInScopeFromLF :: InScopeSet -> LetFloats -> InScopeSet
-extendInScopeFromLF in_scope (LetFloats binds _)
+addFloatBindsF :: FloatBinds -> SimplFloats -> SimplFloats
+-- (addFloatBindsF new_fbs floats) adds `new_fbs` /outside/ `floats`;
+-- i.e. `new_fbs` scope over `floats`
+-- Precondition: every FloatLet in `new_fbs` satisfies the let-can-float
+-- invariant (see the FloatBind declaration in GHC.Core), so we can add
+-- them directly; see Note [LetFloats]
+addFloatBindsF new_fbs floats@(SimplFloats { sfLetFloats = LetFloats lf_fbs lf_ff
+                                           , sfInScope = in_scope })
+  | isNilOL new_fbs
+  = floats
+  | otherwise
+  = assertPpr (all ok_float new_fbs) (ppr new_fbs) $
+    floats { sfLetFloats = LetFloats (new_fbs `appOL` lf_fbs)
+                                     (foldr (andFF . getFF) lf_ff new_fbs)
+           , sfInScope   = in_scope `extendInScopeFromFB` new_fbs }
+  where
+    -- Check the invariants on FloatBind; see its declaration in GHC.Core
+    ok_float (FloatLet (NonRec b r))
+      | isId b, not (isCoVar b) = not (needsCaseBinding (idType b) r)
+    ok_float (FloatTick t)      = tickishHasSoftScope t
+    ok_float _                  = True
+
+extendInScopeFromFB :: InScopeSet -> FloatBinds -> InScopeSet
+extendInScopeFromFB in_scope binds
   = foldlOL extend in_scope binds
   where
     extend in_scope (FloatLet bind)        = in_scope `extendInScopeSetBind` bind

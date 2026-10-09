@@ -632,19 +632,24 @@ contOutArgs env cont
     -- No more arguments
     go _ = []
 
-splitContArgs :: SimplCont -> Maybe (SimplCont, SimplCont)
--- Splits `cont` into (inner, outer), where `inner` has only
--- applications and casts, and `outer` is non-trivial
-splitContArgs cont@(ApplyToTy { sc_cont = cont1 })
-  = do { (inner, outer) <- splitContArgs cont1
+splitContArgs :: Bool -> SimplCont -> Maybe (SimplCont, SimplCont)
+-- (splitContArgs push_casts cont) splits `cont` into (inner, outer), where
+-- `inner` has only applications, and casts if `push_casts` is True;
+-- and `outer` is non-trivial.
+-- The caller sets `push_casts` to False if `inner` will be pushed into many
+-- case alternatives: pushing a cast into each of them duplicates the
+-- coercion, which can be big (T5642)
+splitContArgs push_casts cont@(ApplyToTy { sc_cont = cont1 })
+  = do { (inner, outer) <- splitContArgs push_casts cont1
        ; return (cont { sc_cont = inner }, outer) }
-splitContArgs cont@(ApplyToVal { sc_cont = cont1 })
-  = do { (inner, outer) <- splitContArgs cont1
+splitContArgs push_casts cont@(ApplyToVal { sc_cont = cont1 })
+  = do { (inner, outer) <- splitContArgs push_casts cont1
        ; return (cont { sc_cont = inner }, outer) }
-splitContArgs cont@(CastIt { sc_cont = cont1 })
-  = do { (inner, outer) <- splitContArgs cont1
+splitContArgs push_casts cont@(CastIt { sc_cont = cont1 })
+  | push_casts
+  = do { (inner, outer) <- splitContArgs push_casts cont1
        ; return (cont { sc_cont = inner }, outer) }
-splitContArgs outer
+splitContArgs _ outer
   | contIsStop outer = Nothing
   | otherwise        = -- pprTrace "splitContHoleType" (ppr hole_ty) $
                        return (mkBoringStop hole_ty, outer)
