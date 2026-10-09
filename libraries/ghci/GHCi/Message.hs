@@ -34,8 +34,10 @@ module GHCi.Message
   -- * Consume `reply` exactly once
   , WriteReply -- abstract
   , writeReply
-  -- , thenLinearly
-  -- , forkIOLinearly
+
+  -- * Low-level interface for async bidirectional RPC
+  , withAsyncReq
+  , withAsyncHandler
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
@@ -786,7 +788,11 @@ remoteTHCall pipe msg = bimap fromSerializableException id . runGet get
                     <$> withAsyncReq pipe (putTHMessage msg)
 
 -- | Handle a 'THMessage' request on the host and reply to the interpreter
--- handleRemoteTHCall = undefined
+handleRemoteTHCall
+  :: Pipe -> (forall a. Binary a => WriteReply a %1 -> Message a -> IO r) -> IO r
+handleRemoteTHCall pipe k =
+  withAsyncHandler pipe getMessage \(WriteReply reply) (Msg @a msg) -> do
+    k (WriteReply (reply . fmap (put @a))) msg
 
 --------------------------------------------------------------------------------
 -- * Matching requests with async replies
@@ -815,6 +821,10 @@ withAsyncReq pipe msg = do
 -- The handler receives as an argument the function to use to reply to the request.
 -- It must be used exactly once (all requests expect a reply, and you can't
 -- reply more than once). Linear types enforce this.
+--
+-- TODO: list of @a -> Bool@s or other proxy for which the handler runs in a
+-- forked thread? better than linear forkIO that can be misleading or used
+-- improperly for other linear stuff
 withAsyncHandler :: Pipe -> Get a -> (WriteReply Put %1 -> a -> IO r) -> IO r
 withAsyncHandler pipe getit k = do
   ack <- newEmptyMVar
