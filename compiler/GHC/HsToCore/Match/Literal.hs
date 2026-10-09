@@ -115,12 +115,12 @@ dsLit l = do
 
     -- This can be slow for very large literals. See Note [FractionalLit representation]
     -- and #15646
-    HsFloatPrim  _ fl -> return (mkFloatLit  (rationalFromFractionalLit fl))
-    HsDoublePrim _ fl -> return (mkDoubleLit (rationalFromFractionalLit fl))
+    HsFloatPrim  _ fl -> return (Lit (mkFloatingPrimLit LitFloat  fl))
+    HsDoublePrim _ fl -> return (Lit (mkFloatingPrimLit LitDouble fl))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> (`mkStringExprFSWith` mkFastStringShortText str) <$> getMkStringIds dsLookupKnownKeyId
     HsNatural _ i    -> return (mkNaturalExpr platform (il_value i))
-    HsDouble _ fl    -> return (mkDoubleExpr (fromRational (rationalFromFractionalLit fl)))
+    HsDouble _ fl    -> return (mkDoubleExpr (litFloatingFromFractionalLit LitDouble fl))
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
     XLit x           -> case ghcPass @p of
       GhcTc          -> case x of
@@ -236,6 +236,10 @@ dsFractionalLitToRational fl@FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = b
       platform <- targetPlatform <$> getDynFlags
       let litE = mkIntegerExpr platform exp
       return (mkCoreApps (Var mkRational) [litR, litE])
+
+-- | The @Float#@\/@Double#@ Core 'Literal' for a source 'FractionalLit'.
+mkFloatingPrimLit :: LitFloatingType -> FractionalLit (GhcPass p) -> Literal
+mkFloatingPrimLit ty fl = LitFloating ty (litFloatingFromFractionalLit ty fl)
 
 dsRational :: Rational -> DsM CoreExpr
 dsRational (n :% d) = do
@@ -664,8 +668,8 @@ hsLitKey _        (HsWord32Prim _ w)  = mkLitWord32Wrap w
 hsLitKey _        (HsWord64Prim _ w)  = mkLitWord64Wrap w
 hsLitKey _        (HsCharPrim   _ c)  = mkLitChar            c
 -- This following two can be slow. See Note [FractionalLit representation]
-hsLitKey _        (HsFloatPrim  _ fl) = mkLitFloat (rationalFromFractionalLit fl)
-hsLitKey _        (HsDoublePrim _ fl) = mkLitDouble (rationalFromFractionalLit fl)
+hsLitKey _        (HsFloatPrim  _ fl) = mkFloatingPrimLit LitFloat  fl
+hsLitKey _        (HsDoublePrim _ fl) = mkFloatingPrimLit LitDouble fl
 
 hsLitKey _        (HsString _ s)      = LitString (bytesHText s)
 hsLitKey _        l                   = pprPanic "hsLitKey" (ppr l)

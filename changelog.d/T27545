@@ -1,0 +1,8 @@
+section: compiler
+issues: #27545
+mrs: !16405
+synopsis:
+  Source-written `-0.0#` floating-point literals preserve their sign.
+description:
+  GHC now preserves the sign of zero in source-written unboxed floating-point
+  literals.

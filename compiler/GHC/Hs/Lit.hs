@@ -58,6 +58,7 @@ module GHC.Hs.Lit (
   , mkTHFractionalLit
   -- *** Conversion
   , rationalFromFractionalLit
+  , litFloatingFromFractionalLit
   , negateFractionalLit
   , rnFractionalLit
   , tcFractionalLit
@@ -96,6 +97,9 @@ import GHC.Data.FastString
 import GHC.Types.Basic (PprPrec(..), topPrec )
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Types.SourceText
+import GHC.Types.Literal.Floating
+  ( LitFloating, LitFloatingType(..), ConstantFoldingPrecision(..)
+  , floatToLitFloating, doubleToLitFloating, litRationalToFloatOp )
 import GHC.Core.Type
 import GHC.Utils.Misc (split)
 import GHC.Utils.Outputable
@@ -578,14 +582,37 @@ negateFractionalLit (FL text neg i e eb) = case text of
   SourceText      src  -> FL (SourceText ('-' `consFS` src)) True  (negate i) e eb
   NoSourceText         -> FL NoSourceText (not neg) (negate i) e eb
 
+-- | __Warning__: discards the sign of @-0.0@.
+--
+-- Prefer using 'litFloatingFromFractionalLit' when possible.
 rationalFromFractionalLit :: FractionalLit (GhcPass p) -> Rational
 rationalFromFractionalLit (FL _ _ i e expBase) =
   mkRationalWithExponentBase i e expBase
 
+-- | The exact value of a fractional literal as a rational number:
+-- @significand * base ^^ exponent@.
+--
+-- See Note [fractional exponent bases] in Language.Haskell.Syntax.Lit.
 mkRationalWithExponentBase :: Rational -> Integer -> FractionalExponentBase -> Rational
 mkRationalWithExponentBase i e feb = i * (eb ^^ e)
   where eb = case feb of Base2 -> 2 ; Base10 -> 10
 
+-- | Convert a source fractional literal to a 'LitFloating'.
+--
+-- Preserves the sign of zero. NaNs and infinities have no source syntax so
+-- they are not a concern here.
+litFloatingFromFractionalLit :: LitFloatingType -> FractionalLit (GhcPass p) -> LitFloating
+litFloatingFromFractionalLit ty fl
+  | fl_signi fl == 0
+  = case ty of
+      LitFloat  -> floatToLitFloating  $ if fl_neg fl then -0 else 0
+      LitDouble -> doubleToLitFloating $ if fl_neg fl then -0 else 0
+  | otherwise
+  = litRationalToFloatOp prec (rationalFromFractionalLit fl)
+  where
+    prec = case ty of
+      LitFloat  -> FloatPrecision
+      LitDouble -> DoublePrecision
 
 -- For internal use only. DO NOT EXPORT!
 convertFractionalLit :: FractionalLit (GhcPass p) -> FractionalLit (GhcPass p')

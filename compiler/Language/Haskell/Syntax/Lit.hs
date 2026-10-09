@@ -149,7 +149,7 @@ data QualLitVal p
 -- denotes  -5300
 
 data FractionalLit pass = FL
-  { fl_text      :: XFractionalLit pass
+  { fl_text     :: XFractionalLit pass
   , fl_neg      :: Bool                   -- See Note [Negative zero]
   , fl_signi    :: Rational               -- The significand component of the literal
   , fl_exp      :: Integer                -- The exponent component of the literal
