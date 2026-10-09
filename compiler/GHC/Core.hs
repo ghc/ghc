@@ -1720,10 +1720,19 @@ isEmptyFloatBinds = isNilOL
 
 data FloatBind
   = FloatLet  CoreBind
+      -- let(rec) x = e
+      -- Invariant: satisfies the let-can-float invariant
+
   | FloatCase CoreExpr CoreBndr AltCon [CoreBndr]
       -- case e of y { C ys -> ... }
       -- See Note [Floating single-alternative cases] in GHC.Core.Opt.SetLevels
+
   | FloatTick CoreTickish
+      -- tick<t> ...
+      -- Invariant: the tick is always soft-scoped (tickishHasSoftScope holds)
+      -- Why? We are floating these FloatBinds outwards, bringing more code under
+      -- the bindigns; that is only OK for soft-scoped ticks.
+      -- See Note [Scoping ticks and counting ticks] in GHC.Types.Tickish
 
 floatsBinders :: FloatBinds -> [Var]
 floatsBinders fs = foldr ((++) . floatBinders) [] fs
