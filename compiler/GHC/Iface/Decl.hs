@@ -68,7 +68,7 @@ idToIfaceDecl :: Id -> IfaceDecl
 idToIfaceDecl id
   = IfaceId { ifName      = getName id,
               ifType      = toIfaceType (idType id),
-              ifIdDetails = toIfaceIdDetails (idDetails id),
+              ifIdDetails = toIfaceIdDetails (getName id) (idDetails id),
               ifIdInfo    = toIfaceIdInfo (idInfo id) }
 
 --------------------------

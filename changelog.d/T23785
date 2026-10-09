@@ -1,0 +1,7 @@
+section: compiler
+issues: #23785
+mrs: !16784
+synopsis:
+  Silence 'toIfaceIdDetails' debug messages.
+description:
+  GHC no longer emits spurious 'toIfaceIdDetails' warnings.
