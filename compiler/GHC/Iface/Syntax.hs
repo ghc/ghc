@@ -1945,28 +1945,32 @@ freeNamesIfDecl (IfaceId { ifType = t, ifIdDetails = d, ifIdInfo = i})
     freeNamesIfIdInfo i &&&
     freeNamesIfIdDetails d
 
-freeNamesIfDecl (IfaceData { ifBinders = bndrs, ifResKind = res_k
+freeNamesIfDecl (IfaceData { ifKind = kind, ifBinders = bndrs, ifResKind = res_k
                            , ifParent = p, ifCtxt = ctxt, ifCons = cons })
-  = freeNamesIfVarBndrs bndrs &&&
+  = freeNamesIfKind kind &&&
+    freeNamesIfVarBndrs bndrs &&&
     freeNamesIfType res_k &&&
     freeNamesIfaceTyConParent p &&&
     freeNamesIfContext ctxt &&&
     freeNamesIfConDecls cons
 
-freeNamesIfDecl (IfaceSynonym { ifBinders = bndrs, ifResKind = res_k
+freeNamesIfDecl (IfaceSynonym { ifKind = kind, ifBinders = bndrs, ifResKind = res_k
                               , ifSynRhs = rhs })
-  = freeNamesIfVarBndrs bndrs &&&
+  = freeNamesIfKind kind &&&
+    freeNamesIfVarBndrs bndrs &&&
     freeNamesIfKind res_k &&&
     freeNamesIfType rhs
 
-freeNamesIfDecl (IfaceFamily { ifBinders = bndrs, ifResKind = res_k
+freeNamesIfDecl (IfaceFamily { ifKind = kind, ifBinders = bndrs, ifResKind = res_k
                              , ifFamFlav = flav })
-  = freeNamesIfVarBndrs bndrs &&&
+  = freeNamesIfKind kind &&&
+    freeNamesIfVarBndrs bndrs &&&
     freeNamesIfKind res_k &&&
     freeNamesIfFamFlav flav
 
-freeNamesIfDecl (IfaceClass{ ifBinders = bndrs, ifBody = cls_body })
-  = freeNamesIfVarBndrs bndrs &&&
+freeNamesIfDecl (IfaceClass{ ifKind = kind, ifBinders = bndrs, ifBody = cls_body })
+  = freeNamesIfKind kind &&&
+    freeNamesIfVarBndrs bndrs &&&
     freeNamesIfClassBody cls_body
 
 freeNamesIfDecl (IfaceAxiom { ifTyCon = tc, ifAxBranches = branches })
