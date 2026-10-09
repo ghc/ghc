@@ -1,4 +1,3 @@
-
 T20466.hs:28:7: error: [GHC-43085]
     • Overlapping instances for Cls (Either a (F (Either (G a) (G b))))
         arising from a use of ‘foo’
@@ -7,7 +6,7 @@ T20466.hs:28:7: error: [GHC-43085]
       Potentially matching instance:
         instance Cls (Either Int Bool) -- Defined at T20466.hs:22:10
       (The choice depends on the instantiation of ‘a, b’
-       and the result of evaluating ‘G, F’
+       and the result of evaluating ‘F, G’
        To pick the first instance above, use IncoherentInstances
        when compiling the other instance declarations)
     • In the expression: foo
@@ -25,3 +24,4 @@ T20466.hs:34:8: error: [GHC-43085]
        when compiling the other instance declarations)
     • In the expression: foo'
       In an equation for ‘bar'’: bar' = foo'
+

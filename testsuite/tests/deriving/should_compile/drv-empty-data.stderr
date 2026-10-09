@@ -1,22 +1,6 @@
 
 ==================== Derived instances ====================
 Derived class instances:
-  instance GHC.Internal.Read.Read (DrvEmptyData.Void a) where
-    GHC.Internal.Read.readPrec
-      = GHC.Internal.Text.ParserCombinators.ReadPrec.pfail
-    GHC.Internal.Read.readList = GHC.Internal.Read.readListDefault
-    GHC.Internal.Read.readListPrec
-      = GHC.Internal.Read.readListPrecDefault
-  
-  instance GHC.Internal.Show.Show (DrvEmptyData.Void a) where
-    GHC.Internal.Show.showsPrec _ z = case z of {}
-  
-  instance GHC.Internal.Classes.Ord (DrvEmptyData.Void a) where
-    GHC.Internal.Classes.compare _ z = GHC.Internal.Types.EQ
-  
-  instance GHC.Internal.Classes.Eq (DrvEmptyData.Void a) where
-    (GHC.Internal.Classes.==) _ z = GHC.Internal.Types.True
-  
   instance GHC.Internal.Data.Data.Data a =>
            GHC.Internal.Data.Data.Data (DrvEmptyData.Void a) where
     GHC.Internal.Data.Data.gfoldl _ _ z = case z of {}
@@ -26,6 +10,22 @@ Derived class instances:
     GHC.Internal.Data.Data.dataTypeOf _ = $tVoid
     GHC.Internal.Data.Data.dataCast1 f
       = GHC.Internal.Data.Typeable.gcast1 f
+  
+  instance GHC.Internal.Classes.Eq (DrvEmptyData.Void a) where
+    (GHC.Internal.Classes.==) _ z = GHC.Internal.Types.True
+  
+  instance GHC.Internal.Classes.Ord (DrvEmptyData.Void a) where
+    GHC.Internal.Classes.compare _ z = GHC.Internal.Types.EQ
+  
+  instance GHC.Internal.Show.Show (DrvEmptyData.Void a) where
+    GHC.Internal.Show.showsPrec _ z = case z of {}
+  
+  instance GHC.Internal.Read.Read (DrvEmptyData.Void a) where
+    GHC.Internal.Read.readPrec
+      = GHC.Internal.Text.ParserCombinators.ReadPrec.pfail
+    GHC.Internal.Read.readList = GHC.Internal.Read.readListDefault
+    GHC.Internal.Read.readListPrec
+      = GHC.Internal.Read.readListPrecDefault
   
   instance GHC.Internal.Base.Functor DrvEmptyData.Void where
     GHC.Internal.Base.fmap _ z = case z of {}
@@ -72,76 +72,6 @@ Derived type family instances:
                                ('GHC.Internal.Generics.MetaData
                                   "Void" "DrvEmptyData" "main" 'GHC.Internal.Types.False)
                                GHC.Internal.Generics.V1
-
-
-
-==================== Filling in method body ====================
-GHC.Internal.Read.Read [DrvEmptyData.Void a]
-  GHC.Internal.Read.readsPrec
-    = GHC.Internal.Read.$dmreadsPrec @(DrvEmptyData.Void a)
-
-
-
-==================== Filling in method body ====================
-GHC.Internal.Show.Show [DrvEmptyData.Void a]
-  GHC.Internal.Show.show
-    = GHC.Internal.Show.$dmshow @(DrvEmptyData.Void a)
-
-
-
-==================== Filling in method body ====================
-GHC.Internal.Show.Show [DrvEmptyData.Void a]
-  GHC.Internal.Show.showList
-    = GHC.Internal.Show.$dmshowList @(DrvEmptyData.Void a)
-
-
-
-==================== Filling in method body ====================
-GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
-  (GHC.Internal.Classes.<)
-    = GHC.Internal.Classes.$dm< @(DrvEmptyData.Void a)
-
-
-
-==================== Filling in method body ====================
-GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
-  (GHC.Internal.Classes.<=)
-    = GHC.Internal.Classes.$dm<= @(DrvEmptyData.Void a)
-
-
-
-==================== Filling in method body ====================
-GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
-  (GHC.Internal.Classes.>)
-    = GHC.Internal.Classes.$dm> @(DrvEmptyData.Void a)
-
-
-
-==================== Filling in method body ====================
-GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
-  (GHC.Internal.Classes.>=)
-    = GHC.Internal.Classes.$dm>= @(DrvEmptyData.Void a)
-
-
-
-==================== Filling in method body ====================
-GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
-  GHC.Internal.Classes.max
-    = GHC.Internal.Classes.$dmmax @(DrvEmptyData.Void a)
-
-
-
-==================== Filling in method body ====================
-GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
-  GHC.Internal.Classes.min
-    = GHC.Internal.Classes.$dmmin @(DrvEmptyData.Void a)
-
-
-
-==================== Filling in method body ====================
-GHC.Internal.Classes.Eq [DrvEmptyData.Void a]
-  (GHC.Internal.Classes./=)
-    = GHC.Internal.Classes.$dm/= @(DrvEmptyData.Void a)
 
 
 
@@ -205,6 +135,76 @@ GHC.Internal.Data.Data.Data [DrvEmptyData.Void a]
 GHC.Internal.Data.Data.Data [DrvEmptyData.Void a]
   GHC.Internal.Data.Data.gmapMo @m
     = GHC.Internal.Data.Data.$dmgmapMo @(DrvEmptyData.Void a) @m
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Eq [DrvEmptyData.Void a]
+  (GHC.Internal.Classes./=)
+    = GHC.Internal.Classes.$dm/= @(DrvEmptyData.Void a)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
+  (GHC.Internal.Classes.<)
+    = GHC.Internal.Classes.$dm< @(DrvEmptyData.Void a)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
+  (GHC.Internal.Classes.<=)
+    = GHC.Internal.Classes.$dm<= @(DrvEmptyData.Void a)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
+  (GHC.Internal.Classes.>)
+    = GHC.Internal.Classes.$dm> @(DrvEmptyData.Void a)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
+  (GHC.Internal.Classes.>=)
+    = GHC.Internal.Classes.$dm>= @(DrvEmptyData.Void a)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
+  GHC.Internal.Classes.max
+    = GHC.Internal.Classes.$dmmax @(DrvEmptyData.Void a)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Ord [DrvEmptyData.Void a]
+  GHC.Internal.Classes.min
+    = GHC.Internal.Classes.$dmmin @(DrvEmptyData.Void a)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Show.Show [DrvEmptyData.Void a]
+  GHC.Internal.Show.show
+    = GHC.Internal.Show.$dmshow @(DrvEmptyData.Void a)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Show.Show [DrvEmptyData.Void a]
+  GHC.Internal.Show.showList
+    = GHC.Internal.Show.$dmshowList @(DrvEmptyData.Void a)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Read.Read [DrvEmptyData.Void a]
+  GHC.Internal.Read.readsPrec
+    = GHC.Internal.Read.$dmreadsPrec @(DrvEmptyData.Void a)
 
 
 

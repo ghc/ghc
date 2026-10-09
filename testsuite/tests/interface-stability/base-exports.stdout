@@ -10687,12 +10687,12 @@ instance Data.Foldable1.Foldable1 Data.Semigroup.Max -- Defined in ‘Data.Folda
 instance Data.Foldable1.Foldable1 Data.Semigroup.Min -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 GHC.Internal.Base.NonEmpty -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 GHC.Internal.Generics.Par1 -- Defined in ‘Data.Foldable1’
-instance forall (f :: * -> *) (g :: * -> *). (Data.Foldable1.Foldable1 f, Data.Foldable1.Foldable1 g) => Data.Foldable1.Foldable1 (Data.Functor.Product.Product f g) -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 GHC.Internal.Data.Semigroup.Internal.Product -- Defined in ‘Data.Foldable1’
+instance forall (f :: * -> *) (g :: * -> *). (Data.Foldable1.Foldable1 f, Data.Foldable1.Foldable1 g) => Data.Foldable1.Foldable1 (Data.Functor.Product.Product f g) -- Defined in ‘Data.Foldable1’
 instance forall (f :: * -> *). Data.Foldable1.Foldable1 f => Data.Foldable1.Foldable1 (GHC.Internal.Generics.Rec1 f) -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 Solo -- Defined in ‘Data.Foldable1’
-instance forall (f :: * -> *) (g :: * -> *). (Data.Foldable1.Foldable1 f, Data.Foldable1.Foldable1 g) => Data.Foldable1.Foldable1 (Data.Functor.Sum.Sum f g) -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 GHC.Internal.Data.Semigroup.Internal.Sum -- Defined in ‘Data.Foldable1’
+instance forall (f :: * -> *) (g :: * -> *). (Data.Foldable1.Foldable1 f, Data.Foldable1.Foldable1 g) => Data.Foldable1.Foldable1 (Data.Functor.Sum.Sum f g) -- Defined in ‘Data.Foldable1’
 instance forall a. Data.Foldable1.Foldable1 ((,) a) -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 GHC.Internal.Generics.V1 -- Defined in ‘Data.Foldable1’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Eq1 f, Data.Functor.Classes.Eq1 g) => Data.Functor.Classes.Eq1 (f GHC.Internal.Generics.:*: g) -- Defined in ‘Data.Functor.Classes’
@@ -10717,12 +10717,12 @@ instance [safe] forall a. GHC.Internal.Classes.Eq a => Data.Functor.Classes.Eq1 
 instance [safe] forall a b. (GHC.Internal.Classes.Eq a, GHC.Internal.Classes.Eq b) => Data.Functor.Classes.Eq1 ((,,) a b) -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a b c. (GHC.Internal.Classes.Eq a, GHC.Internal.Classes.Eq b, GHC.Internal.Classes.Eq c) => Data.Functor.Classes.Eq1 ((,,,) a b c) -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.U1 -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.UAddr -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.UChar -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.UDouble -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.UFloat -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.UInt -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.UWord -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.UInt -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.UFloat -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.UDouble -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.UChar -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.UAddr -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Generics.V1 -- Defined in ‘Data.Functor.Classes’
 instance forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Eq1 f, Data.Functor.Classes.Eq1 g) => Data.Functor.Classes.Eq1 (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Functor.Compose’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Eq1 f, Data.Functor.Classes.Eq1 g) => Data.Functor.Classes.Eq1 (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
@@ -10753,12 +10753,12 @@ instance [safe] forall a. GHC.Internal.Classes.Ord a => Data.Functor.Classes.Ord
 instance [safe] forall a b. (GHC.Internal.Classes.Ord a, GHC.Internal.Classes.Ord b) => Data.Functor.Classes.Ord1 ((,,) a b) -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a b c. (GHC.Internal.Classes.Ord a, GHC.Internal.Classes.Ord b, GHC.Internal.Classes.Ord c) => Data.Functor.Classes.Ord1 ((,,,) a b c) -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.U1 -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.UAddr -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.UChar -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.UDouble -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.UFloat -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.UInt -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.UWord -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.UInt -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.UFloat -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.UDouble -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.UChar -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.UAddr -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Generics.V1 -- Defined in ‘Data.Functor.Classes’
 instance forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Ord1 f, Data.Functor.Classes.Ord1 g) => Data.Functor.Classes.Ord1 (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Functor.Compose’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Ord1 f, Data.Functor.Classes.Ord1 g) => Data.Functor.Classes.Ord1 (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
@@ -10819,12 +10819,12 @@ instance [safe] forall a. GHC.Internal.Show.Show a => Data.Functor.Classes.Show1
 instance [safe] forall a b. (GHC.Internal.Show.Show a, GHC.Internal.Show.Show b) => Data.Functor.Classes.Show1 ((,,) a b) -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a b c. (GHC.Internal.Show.Show a, GHC.Internal.Show.Show b, GHC.Internal.Show.Show c) => Data.Functor.Classes.Show1 ((,,,) a b c) -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.U1 -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.UAddr -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.UChar -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.UDouble -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.UFloat -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.UInt -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.UWord -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.UInt -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.UFloat -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.UDouble -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.UChar -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.UAddr -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Generics.V1 -- Defined in ‘Data.Functor.Classes’
 instance forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Show1 f, Data.Functor.Classes.Show1 g) => Data.Functor.Classes.Show1 (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Functor.Compose’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Show1 f, Data.Functor.Classes.Show1 g) => Data.Functor.Classes.Show1 (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
@@ -10998,12 +10998,12 @@ instance forall i (c :: GHC.Internal.Generics.Meta) (f :: * -> *). GHC.Internal.
 instance GHC.Internal.Base.Functor GHC.Internal.Generics.Par1 -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *). GHC.Internal.Base.Functor f => GHC.Internal.Base.Functor (GHC.Internal.Generics.Rec1 f) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.Functor GHC.Internal.Generics.U1 -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Types.Word) -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Types.Int) -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Types.Float) -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Types.Double) -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Types.Char) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec (GHC.Internal.Ptr.Ptr ())) -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Types.Char) -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Types.Double) -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Types.Float) -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Types.Int) -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Types.Word) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.Functor GHC.Internal.Generics.V1 -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.Functor GHC.Internal.Text.ParserCombinators.ReadP.P -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
 instance GHC.Internal.Base.Functor GHC.Internal.Text.ParserCombinators.ReadP.ReadP -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
@@ -11432,12 +11432,12 @@ instance forall k (f :: k -> *) (p :: k). GHC.Internal.Classes.Eq (f p) => GHC.I
 instance GHC.Internal.Classes.Eq GHC.Internal.Generics.SourceStrictness -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Classes.Eq GHC.Internal.Generics.SourceUnpackedness -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.U1 p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec GHC.Internal.Types.Word p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec GHC.Internal.Types.Int p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec GHC.Internal.Types.Float p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec GHC.Internal.Types.Double p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec GHC.Internal.Types.Char p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec (GHC.Internal.Ptr.Ptr ()) p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec GHC.Internal.Types.Char p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec GHC.Internal.Types.Double p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec GHC.Internal.Types.Float p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec GHC.Internal.Types.Int p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec GHC.Internal.Types.Word p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.Buffer.BufferState -- Defined in ‘GHC.Internal.IO.Buffer’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.Device.IODeviceType -- Defined in ‘GHC.Internal.IO.Device’
@@ -11596,12 +11596,12 @@ instance forall k (f :: k -> *) (p :: k). GHC.Internal.Classes.Ord (f p) => GHC.
 instance GHC.Internal.Classes.Ord GHC.Internal.Generics.SourceStrictness -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Classes.Ord GHC.Internal.Generics.SourceUnpackedness -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.U1 p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec GHC.Internal.Types.Word p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec GHC.Internal.Types.Int p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec GHC.Internal.Types.Float p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec GHC.Internal.Types.Double p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec GHC.Internal.Types.Char p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec (GHC.Internal.Ptr.Ptr ()) p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec GHC.Internal.Types.Char p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec GHC.Internal.Types.Double p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec GHC.Internal.Types.Float p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec GHC.Internal.Types.Int p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec GHC.Internal.Types.Word p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Classes.Ord GHC.Internal.IO.Device.SeekMode -- Defined in ‘GHC.Internal.IO.Device’
 instance GHC.Internal.Classes.Ord GHC.Internal.IO.Handle.Types.BufferMode -- Defined in ‘GHC.Internal.IO.Handle.Types’
@@ -11659,8 +11659,8 @@ instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Generics.Par1 -- D
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Semigroup.Internal.Product -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall (f :: * -> *). GHC.Internal.Control.Monad.Fix.MonadFix f => GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Generics.Rec1 f) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
-instance forall s. GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall s. GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.ST.ST s) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
+instance forall s. GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix Solo -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Semigroup.Internal.Sum -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Control.Monad.Fix.MonadFix ((,) a) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
@@ -11722,8 +11722,8 @@ instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Con -- Defined in �
 instance forall k a (b :: k). (GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data a, GHC.Internal.Data.Typeable.Internal.Typeable b) => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Foreign.C.ConstPtr.ConstPtr a) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Dec -- Defined in ‘GHC.Internal.Data.Data’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Generics.DecidedStrictness -- Defined in ‘GHC.Internal.Data.Data’
+instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DerivClause -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DerivStrategy -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DocLoc -- Defined in ‘GHC.Internal.Data.Data’
@@ -11734,8 +11734,8 @@ instance forall a b. (GHC.Internal.Data.Data.Data a, GHC.Internal.Data.Data.Data
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Exp -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.FamilyResultSig -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Monoid.First a) -- Defined in ‘GHC.Internal.Data.Data’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Fixity -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Generics.Fixity -- Defined in ‘GHC.Internal.Data.Data’
+instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Fixity -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.FixityDirection -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Foreign -- Defined in ‘GHC.Internal.Data.Data’
@@ -11791,10 +11791,10 @@ instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.RuleBndr -- Defined 
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.RuleMatch -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Safety -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (Solo a) -- Defined in ‘GHC.Internal.Data.Data’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.SourceStrictness -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Generics.SourceStrictness -- Defined in ‘GHC.Internal.Data.Data’
-instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.Data.Data’
+instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.SourceStrictness -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Generics.SourceUnpackedness -- Defined in ‘GHC.Internal.Data.Data’
+instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Exts.SpecConstrAnnotation -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Internal.Data.Data’
@@ -11868,12 +11868,12 @@ instance forall (f :: * -> *) i (c :: GHC.Internal.Generics.Meta). GHC.Internal.
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.Par1 -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *). GHC.Internal.Data.Foldable.Foldable f => GHC.Internal.Data.Foldable.Foldable (GHC.Internal.Generics.Rec1 f) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.U1 -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UAddr -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UChar -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UDouble -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UFloat -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UInt -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UWord -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UInt -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UFloat -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UDouble -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UChar -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UAddr -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.V1 -- Defined in ‘GHC.Internal.Generics’
 instance forall a k (b :: k). GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.String’
@@ -11914,12 +11914,12 @@ instance forall (f :: * -> *) i (c :: GHC.Internal.Generics.Meta). GHC.Internal.
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.Par1 -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *). GHC.Internal.Data.Traversable.Traversable f => GHC.Internal.Data.Traversable.Traversable (GHC.Internal.Generics.Rec1 f) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.U1 -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UAddr -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UChar -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UDouble -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UFloat -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UInt -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UWord -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UInt -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UFloat -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UDouble -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UChar -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UAddr -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.V1 -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Data.Type.Coercion.TestCoercion GHC.Internal.TypeNats.SNat -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Internal.Data.Type.Coercion.TestCoercion GHC.Internal.TypeLits.SChar -- Defined in ‘GHC.Internal.TypeLits’
@@ -12275,12 +12275,12 @@ instance forall a b c d e f g. GHC.Internal.Generics.Generic (a, b, c, d, e, f, 
 instance forall a b c d e f g h. GHC.Internal.Generics.Generic (a, b, c, d, e, f, g, h) -- Defined in ‘GHC.Internal.Generics’
 instance forall a b c d e f g h i. GHC.Internal.Generics.Generic (a, b, c, d, e, f, g, h, i) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.U1 p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.URec GHC.Internal.Types.Word p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.URec GHC.Internal.Types.Int p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.URec GHC.Internal.Types.Float p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.URec GHC.Internal.Types.Double p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.URec GHC.Internal.Types.Char p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.URec (GHC.Internal.Ptr.Ptr ()) p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.URec GHC.Internal.Types.Char p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.URec GHC.Internal.Types.Double p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.URec GHC.Internal.Types.Float p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.URec GHC.Internal.Types.Int p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.URec GHC.Internal.Types.Word p) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic () -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic GHC.Internal.Data.Version.Version -- Defined in ‘GHC.Internal.Generics’
@@ -12355,12 +12355,12 @@ instance forall k i (c :: GHC.Internal.Generics.Meta) (f :: k -> *). GHC.Interna
 instance forall k. GHC.Internal.Generics.Generic1 GHC.Internal.Data.Proxy.Proxy -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *). GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.Rec1 f) -- Defined in ‘GHC.Internal.Generics’
 instance forall k. GHC.Internal.Generics.Generic1 GHC.Internal.Generics.U1 -- Defined in ‘GHC.Internal.Generics’
-instance forall k. GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.URec GHC.Internal.Types.Word) -- Defined in ‘GHC.Internal.Generics’
-instance forall k. GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.URec GHC.Internal.Types.Int) -- Defined in ‘GHC.Internal.Generics’
-instance forall k. GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.URec GHC.Internal.Types.Float) -- Defined in ‘GHC.Internal.Generics’
-instance forall k. GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.URec GHC.Internal.Types.Double) -- Defined in ‘GHC.Internal.Generics’
-instance forall k. GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.URec GHC.Internal.Types.Char) -- Defined in ‘GHC.Internal.Generics’
 instance forall k. GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.URec (GHC.Internal.Ptr.Ptr ())) -- Defined in ‘GHC.Internal.Generics’
+instance forall k. GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.URec GHC.Internal.Types.Char) -- Defined in ‘GHC.Internal.Generics’
+instance forall k. GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.URec GHC.Internal.Types.Double) -- Defined in ‘GHC.Internal.Generics’
+instance forall k. GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.URec GHC.Internal.Types.Float) -- Defined in ‘GHC.Internal.Generics’
+instance forall k. GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.URec GHC.Internal.Types.Int) -- Defined in ‘GHC.Internal.Generics’
+instance forall k. GHC.Internal.Generics.Generic1 (GHC.Internal.Generics.URec GHC.Internal.Types.Word) -- Defined in ‘GHC.Internal.Generics’
 instance forall k. GHC.Internal.Generics.Generic1 GHC.Internal.Generics.V1 -- Defined in ‘GHC.Internal.Generics’
 instance forall (mn :: GHC.Internal.Maybe.Maybe GHC.Internal.Types.Symbol) (su :: GHC.Internal.Generics.SourceUnpackedness) (ss :: GHC.Internal.Generics.SourceStrictness) (ds :: GHC.Internal.Generics.DecidedStrictness). (GHC.Internal.Generics.SingI mn, GHC.Internal.Generics.SingI su, GHC.Internal.Generics.SingI ss, GHC.Internal.Generics.SingI ds) => GHC.Internal.Generics.Selector (GHC.Internal.Generics.MetaSel mn su ss ds) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.SingI GHC.Internal.Generics.LeftAssociative -- Defined in ‘GHC.Internal.Generics’
@@ -12939,11 +12939,11 @@ instance forall k (f :: k -> *) (p :: k). GHC.Internal.Show.Show (f p) => GHC.In
 instance GHC.Internal.Show.Show GHC.Internal.Generics.SourceStrictness -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Show.Show GHC.Internal.Generics.SourceUnpackedness -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.U1 p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Internal.Types.Word p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Internal.Types.Int p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Internal.Types.Float p) -- Defined in ‘GHC.Internal.Generics’
-instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Internal.Types.Double p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Internal.Types.Char p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Internal.Types.Double p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Internal.Types.Float p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Internal.Types.Int p) -- Defined in ‘GHC.Internal.Generics’
+instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Internal.Types.Word p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.UAddr p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Device.SeekMode -- Defined in ‘GHC.Internal.IO.Device’

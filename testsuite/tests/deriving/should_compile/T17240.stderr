@@ -1,13 +1,6 @@
 
 ==================== Derived instances ====================
 Derived class instances:
-  instance GHC.Internal.Classes.Eq T17240.Nullary where
-    (GHC.Internal.Classes.==) a b
-      = case (GHC.Internal.Magic.dataToTag# a) of
-          a#
-            -> case (GHC.Internal.Magic.dataToTag# b) of
-                 b# -> (GHC.Internal.Prim.tagToEnum# (a# GHC.Internal.Prim.==# b#))
-  
   instance GHC.Internal.Classes.Eq T17240.T where
     (GHC.Internal.Classes.==) a b
       = case
@@ -26,8 +19,21 @@ Derived class instances:
                    -> case b of (T17240.D b1) -> ((a1 GHC.Internal.Classes.== b1))
                  _ -> GHC.Internal.Types.True
   
+  instance GHC.Internal.Classes.Eq T17240.Nullary where
+    (GHC.Internal.Classes.==) a b
+      = case (GHC.Internal.Magic.dataToTag# a) of
+          a#
+            -> case (GHC.Internal.Magic.dataToTag# b) of
+                 b# -> (GHC.Internal.Prim.tagToEnum# (a# GHC.Internal.Prim.==# b#))
+  
 
 Derived type family instances:
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Eq [T17240.T]
+  (GHC.Internal.Classes./=) = GHC.Internal.Classes.$dm/= @T17240.T
 
 
 
@@ -35,11 +41,5 @@ Derived type family instances:
 GHC.Internal.Classes.Eq [T17240.Nullary]
   (GHC.Internal.Classes./=)
     = GHC.Internal.Classes.$dm/= @T17240.Nullary
-
-
-
-==================== Filling in method body ====================
-GHC.Internal.Classes.Eq [T17240.T]
-  (GHC.Internal.Classes./=) = GHC.Internal.Classes.$dm/= @T17240.T
 
 

@@ -4,10 +4,10 @@ Loading Targets
 Finding Module
 Getting Module Info
 Showing Details For Module
-([10],[],["Module","Annotations","Rock!!!!"],[])
+([10],[],["Rock!!!!","Annotations","Module"],[])
 Showing Details For Exports
 ([],[Just True],["Type Annotation"],[Annrun01_Help.Baz])
 ([],[],[],[])
-([1],[],["Hello World Again!"],[Annrun01_Help.bar,Annrun01_Help.foo])
+([1],[],["Hello World Again!"],[Annrun01_Help.foo,Annrun01_Help.bar])
 ([],[],[],[])
-([],[],["World!","Hello"],[])
+([],[],["Hello","World!"],[])

@@ -5,14 +5,14 @@
 
 ==================== Foreign export stubs ====================
 #include "T26852.h"
-int** ghczuwrapperZC0ZCmainZCT26852ZCgetzuintzupp(void) {return get_int_pp();}
+void ghczuwrapperZC0ZCmainZCT26852ZCblah(void* a1) {blah(a1);}
 #include "T26852.h"
-void* ghczuwrapperZC1ZCmainZCT26852ZCgetzusimple(void) {return get_simple();}
+void* ghczuwrapperZC1ZCmainZCT26852ZCgetzuabstract(void) {return get_abstract();}
 #include "T26852.h"
 void* ghczuwrapperZC2ZCmainZCT26852ZCgetzuabstract3(void) {return get_abstract3();}
 #include "T26852.h"
-void* ghczuwrapperZC3ZCmainZCT26852ZCgetzuabstract(void) {return get_abstract();}
+void* ghczuwrapperZC3ZCmainZCT26852ZCgetzusimple(void) {return get_simple();}
 #include "T26852.h"
-void ghczuwrapperZC4ZCmainZCT26852ZCblah(void* a1) {blah(a1);}
+int** ghczuwrapperZC4ZCmainZCT26852ZCgetzuintzupp(void) {return get_int_pp();}
 
 

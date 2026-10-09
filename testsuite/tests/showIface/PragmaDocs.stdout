@@ -1,7 +1,7 @@
 Warnings:
-  Deprecated names: x "These are useless"
+  Deprecated names: contains "Use `elem` instead."
+                    x "These are useless"
                     y "These are useless"
-                    contains "Use `elem` instead."
   Deprecated exports: contains "Do not use"
 trusted: none
 require own pkg trusted: False
@@ -79,3 +79,4 @@ docs:
          ListTuplePuns
          ImplicitStagePersistence
 extensible fields:
+

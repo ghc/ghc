@@ -219,13 +219,13 @@ docs:
          avails:
            [wd20]
          avails:
-           [Pretty{Pretty, prettyPrint}]
-         avails:
-           [Corge{Corge, Corge, runCorge}]
+           [Quux{Quux, Quux1, Quux2}]
          avails:
            [Quuz{Quuz, Quuz, quuz1_a}]
          avails:
-           [Quux{Quux, Quux1, Quux2}]
+           [Corge{Corge, Corge, runCorge}]
+         avails:
+           [Pretty{Pretty, prettyPrint}]
          avails:
            [Tup2]
          avails:

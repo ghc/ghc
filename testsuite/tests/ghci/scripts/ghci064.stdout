@@ -30,8 +30,8 @@ instance [safe] MyShow w => MyShow [w]
   -- Defined at ghci064.hs:8:10
 instance Monoid [T] -- Defined in ‘GHC.Internal.Base’
 instance Semigroup [T] -- Defined in ‘GHC.Internal.Base’
-instance [safe] MyShow [T] -- Defined at ghci064.hs:16:10
 instance [safe] MyShow [T] -- Defined at ghci064.hs:8:10
+instance [safe] MyShow [T] -- Defined at ghci064.hs:16:10
 instance Eq Bool -- Defined in ‘GHC.Internal.Classes’
 instance Ord Bool -- Defined in ‘GHC.Internal.Classes’
 instance Read Bool -- Defined in ‘GHC.Internal.Read’

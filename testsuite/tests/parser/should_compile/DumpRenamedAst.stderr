@@ -139,6 +139,564 @@
       []}
      [(L
        (EpAnn
+        (EpaSpan { DumpRenamedAst.hs:(28,1)-(29,12) })
+        []
+        (EpaComments
+         []))
+       (ClassDecl
+        ((,)
+         (HsNestedGroup
+          []
+          []
+          []
+          [(L
+            (EpAnn
+             (EpaSpan { DumpRenamedAst.hs:29:3-12 })
+             []
+             (EpaComments
+              []))
+            (FamilyDecl
+             (AnnFamilyDecl
+              []
+              []
+              (EpTok
+               (EpaSpan { <no location info> }))
+              (EpTok
+               (EpaSpan { <no location info> }))
+              (EpTok
+               (EpaSpan { <no location info> }))
+              (EpUniTok
+               (EpaSpan { <no location info> })
+               (NormalSyntax))
+              (EpTok
+               (EpaSpan { <no location info> }))
+              (EpTok
+               (EpaSpan { <no location info> }))
+              (EpTok
+               (EpaSpan { <no location info> }))
+              (EpTok (EpaSpan { <no location info> }))
+              (EpTok
+               (EpaSpan { <no location info> }))
+              (EpTok (EpaSpan { <no location info> })))
+             (OpenTypeFamily)
+             (NotTopLevel)
+             (L
+              (EpAnn
+               (EpaSpan { DumpRenamedAst.hs:29:8 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              {Name: DumpRenamedAst.F})
+             (HsQTvs
+              []
+              [(L
+                (EpAnn
+                 (EpaSpan { DumpRenamedAst.hs:29:10 })
+                 []
+                 (EpaComments
+                  []))
+                (HsTvb
+                 (AnnTyVarBndr
+                  []
+                  []
+                  (EpTok
+                   (EpaSpan { <no location info> }))
+                  (EpUniTok
+                   (EpaSpan { <no location info> })
+                   (NormalSyntax)))
+                 (HsBndrRequired
+                  (NoExtField))
+                 (HsBndrVar
+                  (NoExtField)
+                  (L
+                   (EpAnn
+                    (EpaSpan { DumpRenamedAst.hs:29:10 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     []))
+                   {Name: a}))
+                 (HsBndrNoKind
+                  (NoExtField))))
+              ,(L
+                (EpAnn
+                 (EpaSpan { DumpRenamedAst.hs:29:12 })
+                 []
+                 (EpaComments
+                  []))
+                (HsTvb
+                 (AnnTyVarBndr
+                  []
+                  []
+                  (EpTok
+                   (EpaSpan { <no location info> }))
+                  (EpUniTok
+                   (EpaSpan { <no location info> })
+                   (NormalSyntax)))
+                 (HsBndrRequired
+                  (NoExtField))
+                 (HsBndrVar
+                  (NoExtField)
+                  (L
+                   (EpAnn
+                    (EpaSpan { DumpRenamedAst.hs:29:12 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     []))
+                   {Name: b}))
+                 (HsBndrNoKind
+                  (NoExtField))))])
+             (Prefix)
+             (L
+              (EpAnn
+               (EpaSpan { <no location info> })
+               (NoEpAnns)
+               (EpaComments
+                []))
+              (NoSig
+               (NoExtField)))
+             (Nothing)))]
+          []
+          [])
+         {NameSet:
+          []})
+        []
+        (Nothing)
+        (L
+         (EpAnn
+          (EpaSpan { DumpRenamedAst.hs:28:7 })
+          (NameAnnTrailing
+           [])
+          (EpaComments
+           []))
+         {Name: DumpRenamedAst.C})
+        (HsQTvs
+         []
+         [(L
+           (EpAnn
+            (EpaSpan { DumpRenamedAst.hs:28:9 })
+            []
+            (EpaComments
+             []))
+           (HsTvb
+            (AnnTyVarBndr
+             []
+             []
+             (EpTok
+              (EpaSpan { <no location info> }))
+             (EpUniTok
+              (EpaSpan { <no location info> })
+              (NormalSyntax)))
+            (HsBndrRequired
+             (NoExtField))
+            (HsBndrVar
+             (NoExtField)
+             (L
+              (EpAnn
+               (EpaSpan { DumpRenamedAst.hs:28:9 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              {Name: a}))
+            (HsBndrNoKind
+             (NoExtField))))])
+        (Prefix)
+        []
+        []))]
+     []
+     []
+     [])
+   ,(TyClGroup
+     {NameSet:
+      []}
+     [(L
+       (EpAnn
+        (EpaSpan { DumpRenamedAst.hs:22:1-29 })
+        []
+        (EpaComments
+         []))
+       (DataDecl
+        (DataDeclRn
+         (False)
+         {NameSet:
+          [{Name: a}
+          ,{Name: f}]})
+        []
+        (L
+         (EpAnn
+          (EpaSpan { DumpRenamedAst.hs:22:6 })
+          (NameAnnTrailing
+           [])
+          (EpaComments
+           []))
+         {Name: DumpRenamedAst.T})
+        (HsQTvs
+         [{Name: k}]
+         [(L
+           (EpAnn
+            (EpaSpan { DumpRenamedAst.hs:22:8 })
+            []
+            (EpaComments
+             []))
+           (HsTvb
+            (AnnTyVarBndr
+             []
+             []
+             (EpTok
+              (EpaSpan { <no location info> }))
+             (EpUniTok
+              (EpaSpan { <no location info> })
+              (NormalSyntax)))
+            (HsBndrRequired
+             (NoExtField))
+            (HsBndrVar
+             (NoExtField)
+             (L
+              (EpAnn
+               (EpaSpan { DumpRenamedAst.hs:22:8 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              {Name: f}))
+            (HsBndrNoKind
+             (NoExtField))))
+         ,(L
+           (EpAnn
+            (EpaSpan { DumpRenamedAst.hs:22:10-17 })
+            []
+            (EpaComments
+             []))
+           (HsTvb
+            (AnnTyVarBndr
+             [(EpaSpan { DumpRenamedAst.hs:22:10 })]
+             [(EpaSpan { DumpRenamedAst.hs:22:17 })]
+             (EpTok
+              (EpaSpan { <no location info> }))
+             (EpUniTok
+              (EpaSpan { DumpRenamedAst.hs:22:13-14 })
+              (NormalSyntax)))
+            (HsBndrRequired
+             (NoExtField))
+            (HsBndrVar
+             (NoExtField)
+             (L
+              (EpAnn
+               (EpaSpan { DumpRenamedAst.hs:22:11 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              {Name: a}))
+            (HsBndrKind
+             (NoExtField)
+             (L
+              (EpAnn
+               (EpaSpan { DumpRenamedAst.hs:22:16 })
+               []
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpTok
+                (EpaSpan { <no location info> }))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { DumpRenamedAst.hs:22:16 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (WithUserRdr
+                 (Unqual
+                  {OccName: k})
+                 {Name: k})))))))])
+        (Prefix)
+        (HsDataDefn
+         (AnnDataDefn
+          []
+          []
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok (EpaSpan { <no location info> }))
+          (EpUniTok
+           (EpaSpan { <no location info> })
+           (NormalSyntax))
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok (EpaSpan { <no location info> }))
+          (EpTok (EpaSpan { <no location info> }))
+          (EpTok
+           (EpaSpan { <no location info> })))
+         (Nothing)
+         (Nothing)
+         (Nothing)
+         (DataTypeCons
+          (False)
+          [(L
+            (EpAnn
+             (EpaSpan { DumpRenamedAst.hs:22:21-29 })
+             []
+             (EpaComments
+              []))
+            (ConDeclH98
+             (NoExtField)
+             []
+             (L
+              (EpAnn
+               (EpaSpan { DumpRenamedAst.hs:22:21-23 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                []))
+              {Name: DumpRenamedAst.MkT})
+             (False)
+             []
+             (Nothing)
+             (PrefixCon
+              (NoExtField)
+              [(CDF
+                ((,)
+                 ((,,)
+                  (EpaDelta { <no location info> } (SameLine 0) [])
+                  (EpTok
+                   (EpaSpan { <no location info> }))
+                  (EpaDelta { <no location info> } (SameLine 0) []))
+                 (NoSourceText))
+                (NoSrcUnpack)
+                (NoSrcStrict)
+                (HsModifiedFunArr
+                 (NoExtField)
+                 []
+                 (HsStandardArr
+                  (NoExtField)))
+                (L
+                 (EpAnn
+                  (EpaSpan { DumpRenamedAst.hs:22:25-29 })
+                  []
+                  (EpaComments
+                   []))
+                 (HsParTy
+                  ((,)
+                   (EpTok (EpaSpan { <no location info> }))
+                   (EpTok (EpaSpan { <no location info> })))
+                  (L
+                   (EpAnn
+                    (EpaSpan { DumpRenamedAst.hs:22:26-28 })
+                    []
+                    (EpaComments
+                     []))
+                   (HsAppTy
+                    (NoExtField)
+                    (L
+                     (EpAnn
+                      (EpaSpan { DumpRenamedAst.hs:22:26 })
+                      []
+                      (EpaComments
+                       []))
+                     (HsTyVar
+                      (EpTok
+                       (EpaSpan { <no location info> }))
+                      (NotPromoted)
+                      (L
+                       (EpAnn
+                        (EpaSpan { DumpRenamedAst.hs:22:26 })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         []))
+                       (WithUserRdr
+                        (Unqual
+                         {OccName: f})
+                        {Name: f}))))
+                    (L
+                     (EpAnn
+                      (EpaSpan { DumpRenamedAst.hs:22:28 })
+                      []
+                      (EpaComments
+                       []))
+                     (HsTyVar
+                      (EpTok
+                       (EpaSpan { <no location info> }))
+                      (NotPromoted)
+                      (L
+                       (EpAnn
+                        (EpaSpan { DumpRenamedAst.hs:22:28 })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         []))
+                       (WithUserRdr
+                        (Unqual
+                         {OccName: a})
+                        {Name: a}))))))))
+                (Nothing))])
+             (Nothing)))])
+         [])))]
+     []
+     []
+     [])
+   ,(TyClGroup
+     {NameSet:
+      []}
+     [(L
+       (EpAnn
+        (EpaSpan { DumpRenamedAst.hs:16:1-33 })
+        []
+        (EpaComments
+         []))
+       (FamDecl
+        (NoExtField)
+        (FamilyDecl
+         (AnnFamilyDecl
+          []
+          []
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpUniTok
+           (EpaSpan { <no location info> })
+           (NormalSyntax))
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok (EpaSpan { <no location info> }))
+          (EpTok
+           (EpaSpan { <no location info> }))
+          (EpTok (EpaSpan { <no location info> })))
+         (DataFamily)
+         (TopLevel)
+         (L
+          (EpAnn
+           (EpaSpan { DumpRenamedAst.hs:16:13-15 })
+           (NameAnnTrailing
+            [])
+           (EpaComments
+            []))
+          {Name: DumpRenamedAst.Nat})
+         (HsQTvs
+          [{Name: k}]
+          [])
+         (Prefix)
+         (L
+          (EpAnn
+           (EpaSpan { DumpRenamedAst.hs:16:17-33 })
+           (NoEpAnns)
+           (EpaComments
+            []))
+          (KindSig
+           (NoExtField)
+           (L
+            (EpAnn
+             (EpaSpan { DumpRenamedAst.hs:16:20-33 })
+             []
+             (EpaComments
+              []))
+            (HsFunTy
+             (NoExtField)
+             (HsModifiedFunArr
+              (NoExtField)
+              []
+              (HsStandardArr
+               (NoExtField)))
+             (L
+              (EpAnn
+               (EpaSpan { DumpRenamedAst.hs:16:20 })
+               []
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpTok
+                (EpaSpan { <no location info> }))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { DumpRenamedAst.hs:16:20 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (WithUserRdr
+                 (Unqual
+                  {OccName: k})
+                 {Name: k}))))
+             (L
+              (EpAnn
+               (EpaSpan { DumpRenamedAst.hs:16:25-33 })
+               []
+               (EpaComments
+                []))
+              (HsFunTy
+               (NoExtField)
+               (HsModifiedFunArr
+                (NoExtField)
+                []
+                (HsStandardArr
+                 (NoExtField)))
+               (L
+                (EpAnn
+                 (EpaSpan { DumpRenamedAst.hs:16:25 })
+                 []
+                 (EpaComments
+                  []))
+                (HsTyVar
+                 (EpTok
+                  (EpaSpan { <no location info> }))
+                 (NotPromoted)
+                 (L
+                  (EpAnn
+                   (EpaSpan { DumpRenamedAst.hs:16:25 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
+                  (WithUserRdr
+                   (Unqual
+                    {OccName: k})
+                   {Name: k}))))
+               (L
+                (EpAnn
+                 (EpaSpan { DumpRenamedAst.hs:16:30-33 })
+                 []
+                 (EpaComments
+                  []))
+                (HsTyVar
+                 (EpTok
+                  (EpaSpan { <no location info> }))
+                 (NotPromoted)
+                 (L
+                  (EpAnn
+                   (EpaSpan { DumpRenamedAst.hs:16:30-33 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
+                  (WithUserRdr
+                   (Unqual
+                    {OccName: Type})
+                   {Name: GHC.Internal.Types.Type}))))))))))
+         (Nothing))))]
+     []
+     []
+     [])
+   ,(TyClGroup
+     {NameSet:
+      []}
+     [(L
+       (EpAnn
         (EpaSpan { DumpRenamedAst.hs:9:1-30 })
         []
         (EpaComments
@@ -766,389 +1324,6 @@
      [])
    ,(TyClGroup
      {NameSet:
-      []}
-     [(L
-       (EpAnn
-        (EpaSpan { DumpRenamedAst.hs:16:1-33 })
-        []
-        (EpaComments
-         []))
-       (FamDecl
-        (NoExtField)
-        (FamilyDecl
-         (AnnFamilyDecl
-          []
-          []
-          (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok
-           (EpaSpan { <no location info> }))
-          (EpUniTok
-           (EpaSpan { <no location info> })
-           (NormalSyntax))
-          (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> }))
-          (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> })))
-         (DataFamily)
-         (TopLevel)
-         (L
-          (EpAnn
-           (EpaSpan { DumpRenamedAst.hs:16:13-15 })
-           (NameAnnTrailing
-            [])
-           (EpaComments
-            []))
-          {Name: DumpRenamedAst.Nat})
-         (HsQTvs
-          [{Name: k}]
-          [])
-         (Prefix)
-         (L
-          (EpAnn
-           (EpaSpan { DumpRenamedAst.hs:16:17-33 })
-           (NoEpAnns)
-           (EpaComments
-            []))
-          (KindSig
-           (NoExtField)
-           (L
-            (EpAnn
-             (EpaSpan { DumpRenamedAst.hs:16:20-33 })
-             []
-             (EpaComments
-              []))
-            (HsFunTy
-             (NoExtField)
-             (HsModifiedFunArr
-              (NoExtField)
-              []
-              (HsStandardArr
-               (NoExtField)))
-             (L
-              (EpAnn
-               (EpaSpan { DumpRenamedAst.hs:16:20 })
-               []
-               (EpaComments
-                []))
-              (HsTyVar
-               (EpTok
-                (EpaSpan { <no location info> }))
-               (NotPromoted)
-               (L
-                (EpAnn
-                 (EpaSpan { DumpRenamedAst.hs:16:20 })
-                 (NameAnnTrailing
-                  [])
-                 (EpaComments
-                  []))
-                (WithUserRdr
-                 (Unqual
-                  {OccName: k})
-                 {Name: k}))))
-             (L
-              (EpAnn
-               (EpaSpan { DumpRenamedAst.hs:16:25-33 })
-               []
-               (EpaComments
-                []))
-              (HsFunTy
-               (NoExtField)
-               (HsModifiedFunArr
-                (NoExtField)
-                []
-                (HsStandardArr
-                 (NoExtField)))
-               (L
-                (EpAnn
-                 (EpaSpan { DumpRenamedAst.hs:16:25 })
-                 []
-                 (EpaComments
-                  []))
-                (HsTyVar
-                 (EpTok
-                  (EpaSpan { <no location info> }))
-                 (NotPromoted)
-                 (L
-                  (EpAnn
-                   (EpaSpan { DumpRenamedAst.hs:16:25 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (WithUserRdr
-                   (Unqual
-                    {OccName: k})
-                   {Name: k}))))
-               (L
-                (EpAnn
-                 (EpaSpan { DumpRenamedAst.hs:16:30-33 })
-                 []
-                 (EpaComments
-                  []))
-                (HsTyVar
-                 (EpTok
-                  (EpaSpan { <no location info> }))
-                 (NotPromoted)
-                 (L
-                  (EpAnn
-                   (EpaSpan { DumpRenamedAst.hs:16:30-33 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (WithUserRdr
-                   (Unqual
-                    {OccName: Type})
-                   {Name: GHC.Internal.Types.Type}))))))))))
-         (Nothing))))]
-     []
-     []
-     [])
-   ,(TyClGroup
-     {NameSet:
-      []}
-     [(L
-       (EpAnn
-        (EpaSpan { DumpRenamedAst.hs:22:1-29 })
-        []
-        (EpaComments
-         []))
-       (DataDecl
-        (DataDeclRn
-         (False)
-         {NameSet:
-          [{Name: a}
-          ,{Name: f}]})
-        []
-        (L
-         (EpAnn
-          (EpaSpan { DumpRenamedAst.hs:22:6 })
-          (NameAnnTrailing
-           [])
-          (EpaComments
-           []))
-         {Name: DumpRenamedAst.T})
-        (HsQTvs
-         [{Name: k}]
-         [(L
-           (EpAnn
-            (EpaSpan { DumpRenamedAst.hs:22:8 })
-            []
-            (EpaComments
-             []))
-           (HsTvb
-            (AnnTyVarBndr
-             []
-             []
-             (EpTok
-              (EpaSpan { <no location info> }))
-             (EpUniTok
-              (EpaSpan { <no location info> })
-              (NormalSyntax)))
-            (HsBndrRequired
-             (NoExtField))
-            (HsBndrVar
-             (NoExtField)
-             (L
-              (EpAnn
-               (EpaSpan { DumpRenamedAst.hs:22:8 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              {Name: f}))
-            (HsBndrNoKind
-             (NoExtField))))
-         ,(L
-           (EpAnn
-            (EpaSpan { DumpRenamedAst.hs:22:10-17 })
-            []
-            (EpaComments
-             []))
-           (HsTvb
-            (AnnTyVarBndr
-             [(EpaSpan { DumpRenamedAst.hs:22:10 })]
-             [(EpaSpan { DumpRenamedAst.hs:22:17 })]
-             (EpTok
-              (EpaSpan { <no location info> }))
-             (EpUniTok
-              (EpaSpan { DumpRenamedAst.hs:22:13-14 })
-              (NormalSyntax)))
-            (HsBndrRequired
-             (NoExtField))
-            (HsBndrVar
-             (NoExtField)
-             (L
-              (EpAnn
-               (EpaSpan { DumpRenamedAst.hs:22:11 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              {Name: a}))
-            (HsBndrKind
-             (NoExtField)
-             (L
-              (EpAnn
-               (EpaSpan { DumpRenamedAst.hs:22:16 })
-               []
-               (EpaComments
-                []))
-              (HsTyVar
-               (EpTok
-                (EpaSpan { <no location info> }))
-               (NotPromoted)
-               (L
-                (EpAnn
-                 (EpaSpan { DumpRenamedAst.hs:22:16 })
-                 (NameAnnTrailing
-                  [])
-                 (EpaComments
-                  []))
-                (WithUserRdr
-                 (Unqual
-                  {OccName: k})
-                 {Name: k})))))))])
-        (Prefix)
-        (HsDataDefn
-         (AnnDataDefn
-          []
-          []
-          (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> }))
-          (EpUniTok
-           (EpaSpan { <no location info> })
-           (NormalSyntax))
-          (EpTok
-           (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> }))
-          (EpTok (EpaSpan { <no location info> }))
-          (EpTok
-           (EpaSpan { <no location info> })))
-         (Nothing)
-         (Nothing)
-         (Nothing)
-         (DataTypeCons
-          (False)
-          [(L
-            (EpAnn
-             (EpaSpan { DumpRenamedAst.hs:22:21-29 })
-             []
-             (EpaComments
-              []))
-            (ConDeclH98
-             (NoExtField)
-             []
-             (L
-              (EpAnn
-               (EpaSpan { DumpRenamedAst.hs:22:21-23 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              {Name: DumpRenamedAst.MkT})
-             (False)
-             []
-             (Nothing)
-             (PrefixCon
-              (NoExtField)
-              [(CDF
-                ((,)
-                 ((,,)
-                  (EpaDelta { <no location info> } (SameLine 0) [])
-                  (EpTok
-                   (EpaSpan { <no location info> }))
-                  (EpaDelta { <no location info> } (SameLine 0) []))
-                 (NoSourceText))
-                (NoSrcUnpack)
-                (NoSrcStrict)
-                (HsModifiedFunArr
-                 (NoExtField)
-                 []
-                 (HsStandardArr
-                  (NoExtField)))
-                (L
-                 (EpAnn
-                  (EpaSpan { DumpRenamedAst.hs:22:25-29 })
-                  []
-                  (EpaComments
-                   []))
-                 (HsParTy
-                  ((,)
-                   (EpTok (EpaSpan { <no location info> }))
-                   (EpTok (EpaSpan { <no location info> })))
-                  (L
-                   (EpAnn
-                    (EpaSpan { DumpRenamedAst.hs:22:26-28 })
-                    []
-                    (EpaComments
-                     []))
-                   (HsAppTy
-                    (NoExtField)
-                    (L
-                     (EpAnn
-                      (EpaSpan { DumpRenamedAst.hs:22:26 })
-                      []
-                      (EpaComments
-                       []))
-                     (HsTyVar
-                      (EpTok
-                       (EpaSpan { <no location info> }))
-                      (NotPromoted)
-                      (L
-                       (EpAnn
-                        (EpaSpan { DumpRenamedAst.hs:22:26 })
-                        (NameAnnTrailing
-                         [])
-                        (EpaComments
-                         []))
-                       (WithUserRdr
-                        (Unqual
-                         {OccName: f})
-                        {Name: f}))))
-                    (L
-                     (EpAnn
-                      (EpaSpan { DumpRenamedAst.hs:22:28 })
-                      []
-                      (EpaComments
-                       []))
-                     (HsTyVar
-                      (EpTok
-                       (EpaSpan { <no location info> }))
-                      (NotPromoted)
-                      (L
-                       (EpAnn
-                        (EpaSpan { DumpRenamedAst.hs:22:28 })
-                        (NameAnnTrailing
-                         [])
-                        (EpaComments
-                         []))
-                       (WithUserRdr
-                        (Unqual
-                         {OccName: a})
-                        {Name: a}))))))))
-                (Nothing))])
-             (Nothing)))])
-         [])))]
-     []
-     []
-     [])
-   ,(TyClGroup
-     {NameSet:
       [{Name: DumpRenamedAst.Peano}
       ,{Name: DumpRenamedAst.T}]}
      [(L
@@ -1724,444 +1899,6 @@
      [])
    ,(TyClGroup
      {NameSet:
-      []}
-     [(L
-       (EpAnn
-        (EpaSpan { DumpRenamedAst.hs:(28,1)-(29,12) })
-        []
-        (EpaComments
-         []))
-       (ClassDecl
-        ((,)
-         (HsNestedGroup
-          []
-          []
-          []
-          [(L
-            (EpAnn
-             (EpaSpan { DumpRenamedAst.hs:29:3-12 })
-             []
-             (EpaComments
-              []))
-            (FamilyDecl
-             (AnnFamilyDecl
-              []
-              []
-              (EpTok
-               (EpaSpan { <no location info> }))
-              (EpTok
-               (EpaSpan { <no location info> }))
-              (EpTok
-               (EpaSpan { <no location info> }))
-              (EpUniTok
-               (EpaSpan { <no location info> })
-               (NormalSyntax))
-              (EpTok
-               (EpaSpan { <no location info> }))
-              (EpTok
-               (EpaSpan { <no location info> }))
-              (EpTok
-               (EpaSpan { <no location info> }))
-              (EpTok (EpaSpan { <no location info> }))
-              (EpTok
-               (EpaSpan { <no location info> }))
-              (EpTok (EpaSpan { <no location info> })))
-             (OpenTypeFamily)
-             (NotTopLevel)
-             (L
-              (EpAnn
-               (EpaSpan { DumpRenamedAst.hs:29:8 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              {Name: DumpRenamedAst.F})
-             (HsQTvs
-              []
-              [(L
-                (EpAnn
-                 (EpaSpan { DumpRenamedAst.hs:29:10 })
-                 []
-                 (EpaComments
-                  []))
-                (HsTvb
-                 (AnnTyVarBndr
-                  []
-                  []
-                  (EpTok
-                   (EpaSpan { <no location info> }))
-                  (EpUniTok
-                   (EpaSpan { <no location info> })
-                   (NormalSyntax)))
-                 (HsBndrRequired
-                  (NoExtField))
-                 (HsBndrVar
-                  (NoExtField)
-                  (L
-                   (EpAnn
-                    (EpaSpan { DumpRenamedAst.hs:29:10 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     []))
-                   {Name: a}))
-                 (HsBndrNoKind
-                  (NoExtField))))
-              ,(L
-                (EpAnn
-                 (EpaSpan { DumpRenamedAst.hs:29:12 })
-                 []
-                 (EpaComments
-                  []))
-                (HsTvb
-                 (AnnTyVarBndr
-                  []
-                  []
-                  (EpTok
-                   (EpaSpan { <no location info> }))
-                  (EpUniTok
-                   (EpaSpan { <no location info> })
-                   (NormalSyntax)))
-                 (HsBndrRequired
-                  (NoExtField))
-                 (HsBndrVar
-                  (NoExtField)
-                  (L
-                   (EpAnn
-                    (EpaSpan { DumpRenamedAst.hs:29:12 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     []))
-                   {Name: b}))
-                 (HsBndrNoKind
-                  (NoExtField))))])
-             (Prefix)
-             (L
-              (EpAnn
-               (EpaSpan { <no location info> })
-               (NoEpAnns)
-               (EpaComments
-                []))
-              (NoSig
-               (NoExtField)))
-             (Nothing)))]
-          []
-          [])
-         {NameSet:
-          []})
-        []
-        (Nothing)
-        (L
-         (EpAnn
-          (EpaSpan { DumpRenamedAst.hs:28:7 })
-          (NameAnnTrailing
-           [])
-          (EpaComments
-           []))
-         {Name: DumpRenamedAst.C})
-        (HsQTvs
-         []
-         [(L
-           (EpAnn
-            (EpaSpan { DumpRenamedAst.hs:28:9 })
-            []
-            (EpaComments
-             []))
-           (HsTvb
-            (AnnTyVarBndr
-             []
-             []
-             (EpTok
-              (EpaSpan { <no location info> }))
-             (EpUniTok
-              (EpaSpan { <no location info> })
-              (NormalSyntax)))
-            (HsBndrRequired
-             (NoExtField))
-            (HsBndrVar
-             (NoExtField)
-             (L
-              (EpAnn
-               (EpaSpan { DumpRenamedAst.hs:28:9 })
-               (NameAnnTrailing
-                [])
-               (EpaComments
-                []))
-              {Name: a}))
-            (HsBndrNoKind
-             (NoExtField))))])
-        (Prefix)
-        []
-        []))]
-     []
-     []
-     [])
-   ,(TyClGroup
-     {NameSet:
-      [{Name: DumpRenamedAst.C}]}
-     []
-     []
-     []
-     [(L
-       (EpAnn
-        (EpaSpan { DumpRenamedAst.hs:(31,1)-(32,27) })
-        []
-        (EpaComments
-         []))
-       (ClsInstD
-        (NoExtField)
-        (ClsInstDecl
-         ((,)
-          (Nothing)
-          (HsNestedGroup
-           []
-           []
-           [(L
-             (EpAnn
-              (EpaSpan { DumpRenamedAst.hs:32:3-27 })
-              []
-              (EpaComments
-               []))
-             (TyFamInstDecl
-              ((,)
-               (EpTok
-                (EpaSpan { DumpRenamedAst.hs:32:3-6 }))
-               (EpTok (EpaSpan { <no location info> })))
-              (FamEqn
-               ((,,)
-                []
-                []
-                (EpTok
-                 (EpaSpan { <no location info> })))
-               (L
-                (EpAnn
-                 (EpaSpan { DumpRenamedAst.hs:32:8 })
-                 (NameAnnTrailing
-                  [])
-                 (EpaComments
-                  []))
-                {Name: DumpRenamedAst.F})
-               (HsOuterImplicit
-                [{Name: b}])
-               [(HsValArg
-                 (NoExtField)
-                 (L
-                  (EpAnn
-                   (EpaSpan { DumpRenamedAst.hs:32:10-12 })
-                   []
-                   (EpaComments
-                    []))
-                  (HsListTy
-                   ((,)
-                    (EpTok
-                     (EpaSpan { DumpRenamedAst.hs:32:10 }))
-                    (EpTok
-                     (EpaSpan { DumpRenamedAst.hs:32:12 })))
-                   (L
-                    (EpAnn
-                     (EpaSpan { DumpRenamedAst.hs:32:11 })
-                     []
-                     (EpaComments
-                      []))
-                    (HsTyVar
-                     (EpTok
-                      (EpaSpan { <no location info> }))
-                     (NotPromoted)
-                     (L
-                      (EpAnn
-                       (EpaSpan { DumpRenamedAst.hs:32:11 })
-                       (NameAnnTrailing
-                        [])
-                       (EpaComments
-                        []))
-                      (WithUserRdr
-                       (Unqual
-                        {OccName: a})
-                       {Name: a})))))))
-               ,(HsValArg
-                 (NoExtField)
-                 (L
-                  (EpAnn
-                   (EpaSpan { DumpRenamedAst.hs:32:14 })
-                   []
-                   (EpaComments
-                    []))
-                  (HsTyVar
-                   (EpTok
-                    (EpaSpan { <no location info> }))
-                   (NotPromoted)
-                   (L
-                    (EpAnn
-                     (EpaSpan { DumpRenamedAst.hs:32:14 })
-                     (NameAnnTrailing
-                      [])
-                     (EpaComments
-                      []))
-                    (WithUserRdr
-                     (Unqual
-                      {OccName: b})
-                     {Name: b})))))]
-               (Prefix)
-               (L
-                (EpAnn
-                 (EpaSpan { DumpRenamedAst.hs:32:18-27 })
-                 []
-                 (EpaComments
-                  []))
-                (HsAppTy
-                 (NoExtField)
-                 (L
-                  (EpAnn
-                   (EpaSpan { DumpRenamedAst.hs:32:18-25 })
-                   []
-                   (EpaComments
-                    []))
-                  (HsAppTy
-                   (NoExtField)
-                   (L
-                    (EpAnn
-                     (EpaSpan { DumpRenamedAst.hs:32:18-23 })
-                     []
-                     (EpaComments
-                      []))
-                    (HsTyVar
-                     (EpTok
-                      (EpaSpan { <no location info> }))
-                     (NotPromoted)
-                     (L
-                      (EpAnn
-                       (EpaSpan { DumpRenamedAst.hs:32:18-23 })
-                       (NameAnnTrailing
-                        [])
-                       (EpaComments
-                        []))
-                      (WithUserRdr
-                       (Unqual
-                        {OccName: Either})
-                       {Name: GHC.Internal.Data.Either.Either}))))
-                   (L
-                    (EpAnn
-                     (EpaSpan { DumpRenamedAst.hs:32:25 })
-                     []
-                     (EpaComments
-                      []))
-                    (HsTyVar
-                     (EpTok
-                      (EpaSpan { <no location info> }))
-                     (NotPromoted)
-                     (L
-                      (EpAnn
-                       (EpaSpan { DumpRenamedAst.hs:32:25 })
-                       (NameAnnTrailing
-                        [])
-                       (EpaComments
-                        []))
-                      (WithUserRdr
-                       (Unqual
-                        {OccName: a})
-                       {Name: a}))))))
-                 (L
-                  (EpAnn
-                   (EpaSpan { DumpRenamedAst.hs:32:27 })
-                   []
-                   (EpaComments
-                    []))
-                  (HsTyVar
-                   (EpTok
-                    (EpaSpan { <no location info> }))
-                   (NotPromoted)
-                   (L
-                    (EpAnn
-                     (EpaSpan { DumpRenamedAst.hs:32:27 })
-                     (NameAnnTrailing
-                      [])
-                     (EpaComments
-                      []))
-                    (WithUserRdr
-                     (Unqual
-                      {OccName: b})
-                     {Name: b})))))))))]
-           []
-           []
-           []))
-         []
-         (L
-          (EpAnn
-           (EpaSpan { DumpRenamedAst.hs:31:10-14 })
-           []
-           (EpaComments
-            []))
-          (HsSig
-           (NoExtField)
-           (HsOuterImplicit
-            [{Name: a}])
-           (L
-            (EpAnn
-             (EpaSpan { DumpRenamedAst.hs:31:10-14 })
-             []
-             (EpaComments
-              []))
-            (HsAppTy
-             (NoExtField)
-             (L
-              (EpAnn
-               (EpaSpan { DumpRenamedAst.hs:31:10 })
-               []
-               (EpaComments
-                []))
-              (HsTyVar
-               (EpTok
-                (EpaSpan { <no location info> }))
-               (NotPromoted)
-               (L
-                (EpAnn
-                 (EpaSpan { DumpRenamedAst.hs:31:10 })
-                 (NameAnnTrailing
-                  [])
-                 (EpaComments
-                  []))
-                (WithUserRdr
-                 (Unqual
-                  {OccName: C})
-                 {Name: DumpRenamedAst.C}))))
-             (L
-              (EpAnn
-               (EpaSpan { DumpRenamedAst.hs:31:12-14 })
-               []
-               (EpaComments
-                []))
-              (HsListTy
-               ((,)
-                (EpTok
-                 (EpaSpan { DumpRenamedAst.hs:31:12 }))
-                (EpTok
-                 (EpaSpan { DumpRenamedAst.hs:31:14 })))
-               (L
-                (EpAnn
-                 (EpaSpan { DumpRenamedAst.hs:31:13 })
-                 []
-                 (EpaComments
-                  []))
-                (HsTyVar
-                 (EpTok
-                  (EpaSpan { <no location info> }))
-                 (NotPromoted)
-                 (L
-                  (EpAnn
-                   (EpaSpan { DumpRenamedAst.hs:31:13 })
-                   (NameAnnTrailing
-                    [])
-                   (EpaComments
-                    []))
-                  (WithUserRdr
-                   (Unqual
-                    {OccName: a})
-                   {Name: a}))))))))))
-         []
-         (Nothing))))])
-   ,(TyClGroup
-     {NameSet:
       [{Name: DumpRenamedAst.Nat}]}
      []
      []
@@ -2710,7 +2447,270 @@
                      {OccName: g})
                     {Name: g}))))))
               (Nothing))))
-           [])))))])]
+           [])))))])
+   ,(TyClGroup
+     {NameSet:
+      [{Name: DumpRenamedAst.C}]}
+     []
+     []
+     []
+     [(L
+       (EpAnn
+        (EpaSpan { DumpRenamedAst.hs:(31,1)-(32,27) })
+        []
+        (EpaComments
+         []))
+       (ClsInstD
+        (NoExtField)
+        (ClsInstDecl
+         ((,)
+          (Nothing)
+          (HsNestedGroup
+           []
+           []
+           [(L
+             (EpAnn
+              (EpaSpan { DumpRenamedAst.hs:32:3-27 })
+              []
+              (EpaComments
+               []))
+             (TyFamInstDecl
+              ((,)
+               (EpTok
+                (EpaSpan { DumpRenamedAst.hs:32:3-6 }))
+               (EpTok (EpaSpan { <no location info> })))
+              (FamEqn
+               ((,,)
+                []
+                []
+                (EpTok
+                 (EpaSpan { <no location info> })))
+               (L
+                (EpAnn
+                 (EpaSpan { DumpRenamedAst.hs:32:8 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                {Name: DumpRenamedAst.F})
+               (HsOuterImplicit
+                [{Name: b}])
+               [(HsValArg
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { DumpRenamedAst.hs:32:10-12 })
+                   []
+                   (EpaComments
+                    []))
+                  (HsListTy
+                   ((,)
+                    (EpTok
+                     (EpaSpan { DumpRenamedAst.hs:32:10 }))
+                    (EpTok
+                     (EpaSpan { DumpRenamedAst.hs:32:12 })))
+                   (L
+                    (EpAnn
+                     (EpaSpan { DumpRenamedAst.hs:32:11 })
+                     []
+                     (EpaComments
+                      []))
+                    (HsTyVar
+                     (EpTok
+                      (EpaSpan { <no location info> }))
+                     (NotPromoted)
+                     (L
+                      (EpAnn
+                       (EpaSpan { DumpRenamedAst.hs:32:11 })
+                       (NameAnnTrailing
+                        [])
+                       (EpaComments
+                        []))
+                      (WithUserRdr
+                       (Unqual
+                        {OccName: a})
+                       {Name: a})))))))
+               ,(HsValArg
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { DumpRenamedAst.hs:32:14 })
+                   []
+                   (EpaComments
+                    []))
+                  (HsTyVar
+                   (EpTok
+                    (EpaSpan { <no location info> }))
+                   (NotPromoted)
+                   (L
+                    (EpAnn
+                     (EpaSpan { DumpRenamedAst.hs:32:14 })
+                     (NameAnnTrailing
+                      [])
+                     (EpaComments
+                      []))
+                    (WithUserRdr
+                     (Unqual
+                      {OccName: b})
+                     {Name: b})))))]
+               (Prefix)
+               (L
+                (EpAnn
+                 (EpaSpan { DumpRenamedAst.hs:32:18-27 })
+                 []
+                 (EpaComments
+                  []))
+                (HsAppTy
+                 (NoExtField)
+                 (L
+                  (EpAnn
+                   (EpaSpan { DumpRenamedAst.hs:32:18-25 })
+                   []
+                   (EpaComments
+                    []))
+                  (HsAppTy
+                   (NoExtField)
+                   (L
+                    (EpAnn
+                     (EpaSpan { DumpRenamedAst.hs:32:18-23 })
+                     []
+                     (EpaComments
+                      []))
+                    (HsTyVar
+                     (EpTok
+                      (EpaSpan { <no location info> }))
+                     (NotPromoted)
+                     (L
+                      (EpAnn
+                       (EpaSpan { DumpRenamedAst.hs:32:18-23 })
+                       (NameAnnTrailing
+                        [])
+                       (EpaComments
+                        []))
+                      (WithUserRdr
+                       (Unqual
+                        {OccName: Either})
+                       {Name: GHC.Internal.Data.Either.Either}))))
+                   (L
+                    (EpAnn
+                     (EpaSpan { DumpRenamedAst.hs:32:25 })
+                     []
+                     (EpaComments
+                      []))
+                    (HsTyVar
+                     (EpTok
+                      (EpaSpan { <no location info> }))
+                     (NotPromoted)
+                     (L
+                      (EpAnn
+                       (EpaSpan { DumpRenamedAst.hs:32:25 })
+                       (NameAnnTrailing
+                        [])
+                       (EpaComments
+                        []))
+                      (WithUserRdr
+                       (Unqual
+                        {OccName: a})
+                       {Name: a}))))))
+                 (L
+                  (EpAnn
+                   (EpaSpan { DumpRenamedAst.hs:32:27 })
+                   []
+                   (EpaComments
+                    []))
+                  (HsTyVar
+                   (EpTok
+                    (EpaSpan { <no location info> }))
+                   (NotPromoted)
+                   (L
+                    (EpAnn
+                     (EpaSpan { DumpRenamedAst.hs:32:27 })
+                     (NameAnnTrailing
+                      [])
+                     (EpaComments
+                      []))
+                    (WithUserRdr
+                     (Unqual
+                      {OccName: b})
+                     {Name: b})))))))))]
+           []
+           []
+           []))
+         []
+         (L
+          (EpAnn
+           (EpaSpan { DumpRenamedAst.hs:31:10-14 })
+           []
+           (EpaComments
+            []))
+          (HsSig
+           (NoExtField)
+           (HsOuterImplicit
+            [{Name: a}])
+           (L
+            (EpAnn
+             (EpaSpan { DumpRenamedAst.hs:31:10-14 })
+             []
+             (EpaComments
+              []))
+            (HsAppTy
+             (NoExtField)
+             (L
+              (EpAnn
+               (EpaSpan { DumpRenamedAst.hs:31:10 })
+               []
+               (EpaComments
+                []))
+              (HsTyVar
+               (EpTok
+                (EpaSpan { <no location info> }))
+               (NotPromoted)
+               (L
+                (EpAnn
+                 (EpaSpan { DumpRenamedAst.hs:31:10 })
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  []))
+                (WithUserRdr
+                 (Unqual
+                  {OccName: C})
+                 {Name: DumpRenamedAst.C}))))
+             (L
+              (EpAnn
+               (EpaSpan { DumpRenamedAst.hs:31:12-14 })
+               []
+               (EpaComments
+                []))
+              (HsListTy
+               ((,)
+                (EpTok
+                 (EpaSpan { DumpRenamedAst.hs:31:12 }))
+                (EpTok
+                 (EpaSpan { DumpRenamedAst.hs:31:14 })))
+               (L
+                (EpAnn
+                 (EpaSpan { DumpRenamedAst.hs:31:13 })
+                 []
+                 (EpaComments
+                  []))
+                (HsTyVar
+                 (EpTok
+                  (EpaSpan { <no location info> }))
+                 (NotPromoted)
+                 (L
+                  (EpAnn
+                   (EpaSpan { DumpRenamedAst.hs:31:13 })
+                   (NameAnnTrailing
+                    [])
+                   (EpaComments
+                    []))
+                  (WithUserRdr
+                   (Unqual
+                    {OccName: a})
+                   {Name: a}))))))))))
+         []
+         (Nothing))))])]
    []
    []
    []

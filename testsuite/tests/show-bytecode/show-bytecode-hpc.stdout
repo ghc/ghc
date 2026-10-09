@@ -336,56 +336,55 @@ objects:
             arity: 0
             literals: info table of ‘W@word_size@#’
             used items: <none>
-  static-construction object ‘$tc'Nested’:
+  static-construction object ‘$tc'Node’:
     data constructor: TyCon
     lifted: yes
     literals:
       word @large_word@
-      word 1
+      word 2
     used items:
       named item ‘$trModule’
-      named item ‘$tc'Nested2_@name_suffix@’
+      named item ‘$tc'Node2_@name_suffix@’
       named item ‘$krep17_@name_suffix@’
-  static-construction object ‘$tc'Nested2_@name_suffix@’:
+  static-construction object ‘$tc'Node2_@name_suffix@’:
     data constructor: TrNameS
     lifted: yes
-    literals: address ‘$tc'Nested1_@name_suffix@’
+    literals: address ‘$tc'Node1_@name_suffix@’
     used items: <none>
   static-construction object ‘$krep17_@name_suffix@’:
     data constructor: KindRepFun
     lifted: yes
     literals: <none>
     used items:
-      named item ‘$krep16_@name_suffix@’
       named item ‘$krep13_@name_suffix@’
+      named item ‘$krep16_@name_suffix@’
   static-construction object ‘$krep16_@name_suffix@’:
-    data constructor: KindRepTyConApp
+    data constructor: KindRepFun
     lifted: yes
     literals: <none>
     used items:
-      named item ‘$tcPerfectTree’
+      named item ‘$krep_@name_suffix@’
       named item ‘$krep15_@name_suffix@’
   static-construction object ‘$krep15_@name_suffix@’:
-    data constructor: (:)
+    data constructor: KindRepFun
     lifted: yes
     literals: <none>
     used items:
-      named item ‘$krep4_@name_suffix@’
-      named item ‘[]’
-  static-construction object ‘$tc'PerfectTree’:
+      named item ‘$krep13_@name_suffix@’
+  static-construction object ‘$tc'Leaf’:
     data constructor: TyCon
     lifted: yes
     literals:
       word @large_word@
-      word 1
+      word 2
     used items:
       named item ‘$trModule’
-      named item ‘$tc'PerfectTree2_@name_suffix@’
+      named item ‘$tc'Leaf2_@name_suffix@’
       named item ‘$krep14_@name_suffix@’
-  static-construction object ‘$tc'PerfectTree2_@name_suffix@’:
+  static-construction object ‘$tc'Leaf2_@name_suffix@’:
     data constructor: TrNameS
     lifted: yes
-    literals: address ‘$tc'PerfectTree1_@name_suffix@’
+    literals: address ‘$tc'Leaf1_@name_suffix@’
     used items: <none>
   static-construction object ‘$krep14_@name_suffix@’:
     data constructor: KindRepFun
@@ -399,7 +398,7 @@ objects:
     lifted: yes
     literals: <none>
     used items:
-      named item ‘$tcPerfectTree’
+      named item ‘$tcBinTree’
       named item ‘$krep12_@name_suffix@’
   static-construction object ‘$krep12_@name_suffix@’:
     data constructor: (:)
@@ -407,94 +406,8 @@ objects:
     literals: <none>
     used items:
       named item ‘$krep1_@name_suffix@’
-      named item ‘[]’
-  static-construction object ‘$tcPerfectTree’:
-    data constructor: TyCon
-    lifted: yes
-    literals:
-      word @large_word@
-      word 0
-    used items:
-      named item ‘$trModule’
-      named item ‘$tcPerfectTree2_@name_suffix@’
-      named item ‘krepStarArr’
-  static-construction object ‘$tcPerfectTree2_@name_suffix@’:
-    data constructor: TrNameS
-    lifted: yes
-    literals: address ‘$tcPerfectTree1_@name_suffix@’
-    used items: <none>
-  static-construction object ‘$tc'Node’:
-    data constructor: TyCon
-    lifted: yes
-    literals:
-      word @large_word@
-      word 2
-    used items:
-      named item ‘$trModule’
-      named item ‘$tc'Node2_@name_suffix@’
       named item ‘$krep11_@name_suffix@’
-  static-construction object ‘$tc'Node2_@name_suffix@’:
-    data constructor: TrNameS
-    lifted: yes
-    literals: address ‘$tc'Node1_@name_suffix@’
-    used items: <none>
   static-construction object ‘$krep11_@name_suffix@’:
-    data constructor: KindRepFun
-    lifted: yes
-    literals: <none>
-    used items:
-      named item ‘$krep7_@name_suffix@’
-      named item ‘$krep10_@name_suffix@’
-  static-construction object ‘$krep10_@name_suffix@’:
-    data constructor: KindRepFun
-    lifted: yes
-    literals: <none>
-    used items:
-      named item ‘$krep_@name_suffix@’
-      named item ‘$krep9_@name_suffix@’
-  static-construction object ‘$krep9_@name_suffix@’:
-    data constructor: KindRepFun
-    lifted: yes
-    literals: <none>
-    used items:
-      named item ‘$krep7_@name_suffix@’
-  static-construction object ‘$tc'Leaf’:
-    data constructor: TyCon
-    lifted: yes
-    literals:
-      word @large_word@
-      word 2
-    used items:
-      named item ‘$trModule’
-      named item ‘$tc'Leaf2_@name_suffix@’
-      named item ‘$krep8_@name_suffix@’
-  static-construction object ‘$tc'Leaf2_@name_suffix@’:
-    data constructor: TrNameS
-    lifted: yes
-    literals: address ‘$tc'Leaf1_@name_suffix@’
-    used items: <none>
-  static-construction object ‘$krep8_@name_suffix@’:
-    data constructor: KindRepFun
-    lifted: yes
-    literals: <none>
-    used items:
-      named item ‘$krep1_@name_suffix@’
-      named item ‘$krep7_@name_suffix@’
-  static-construction object ‘$krep7_@name_suffix@’:
-    data constructor: KindRepTyConApp
-    lifted: yes
-    literals: <none>
-    used items:
-      named item ‘$tcBinTree’
-      named item ‘$krep6_@name_suffix@’
-  static-construction object ‘$krep6_@name_suffix@’:
-    data constructor: (:)
-    lifted: yes
-    literals: <none>
-    used items:
-      named item ‘$krep1_@name_suffix@’
-      named item ‘$krep5_@name_suffix@’
-  static-construction object ‘$krep5_@name_suffix@’:
     data constructor: (:)
     lifted: yes
     literals: <none>
@@ -515,6 +428,93 @@ objects:
     data constructor: TrNameS
     lifted: yes
     literals: address ‘$tcBinTree1_@name_suffix@’
+    used items: <none>
+  static-construction object ‘$tc'Nested’:
+    data constructor: TyCon
+    lifted: yes
+    literals:
+      word @large_word@
+      word 1
+    used items:
+      named item ‘$trModule’
+      named item ‘$tc'Nested2_@name_suffix@’
+      named item ‘$krep10_@name_suffix@’
+  static-construction object ‘$tc'Nested2_@name_suffix@’:
+    data constructor: TrNameS
+    lifted: yes
+    literals: address ‘$tc'Nested1_@name_suffix@’
+    used items: <none>
+  static-construction object ‘$krep10_@name_suffix@’:
+    data constructor: KindRepFun
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep9_@name_suffix@’
+      named item ‘$krep6_@name_suffix@’
+  static-construction object ‘$krep9_@name_suffix@’:
+    data constructor: KindRepTyConApp
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$tcPerfectTree’
+      named item ‘$krep8_@name_suffix@’
+  static-construction object ‘$krep8_@name_suffix@’:
+    data constructor: (:)
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep4_@name_suffix@’
+      named item ‘[]’
+  static-construction object ‘$tc'PerfectTree’:
+    data constructor: TyCon
+    lifted: yes
+    literals:
+      word @large_word@
+      word 1
+    used items:
+      named item ‘$trModule’
+      named item ‘$tc'PerfectTree2_@name_suffix@’
+      named item ‘$krep7_@name_suffix@’
+  static-construction object ‘$tc'PerfectTree2_@name_suffix@’:
+    data constructor: TrNameS
+    lifted: yes
+    literals: address ‘$tc'PerfectTree1_@name_suffix@’
+    used items: <none>
+  static-construction object ‘$krep7_@name_suffix@’:
+    data constructor: KindRepFun
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep1_@name_suffix@’
+      named item ‘$krep6_@name_suffix@’
+  static-construction object ‘$krep6_@name_suffix@’:
+    data constructor: KindRepTyConApp
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$tcPerfectTree’
+      named item ‘$krep5_@name_suffix@’
+  static-construction object ‘$krep5_@name_suffix@’:
+    data constructor: (:)
+    lifted: yes
+    literals: <none>
+    used items:
+      named item ‘$krep1_@name_suffix@’
+      named item ‘[]’
+  static-construction object ‘$tcPerfectTree’:
+    data constructor: TyCon
+    lifted: yes
+    literals:
+      word @large_word@
+      word 0
+    used items:
+      named item ‘$trModule’
+      named item ‘$tcPerfectTree2_@name_suffix@’
+      named item ‘krepStarArr’
+  static-construction object ‘$tcPerfectTree2_@name_suffix@’:
+    data constructor: TrNameS
+    lifted: yes
+    literals: address ‘$tcPerfectTree1_@name_suffix@’
     used items: <none>
   static-construction object ‘$krep4_@name_suffix@’:
     data constructor: KindRepTyConApp
@@ -609,14 +609,6 @@ objects:
               named item ‘$p1Ord’
           named item ‘$p2Real’
       named item ‘$p1Integral’
-  object ‘Node’:
-    arity: 3
-    literals: info table of ‘Node’
-    used items: <none>
-  object ‘Leaf’:
-    arity: 1
-    literals: info table of ‘Leaf’
-    used items: <none>
   object ‘Nested’:
     arity: 1
     literals: info table of ‘Nested’
@@ -625,26 +617,34 @@ objects:
     arity: 1
     literals: info table of ‘PerfectTree’
     used items: <none>
+  object ‘Node’:
+    arity: 3
+    literals: info table of ‘Node’
+    used items: <none>
+  object ‘Leaf’:
+    arity: 1
+    literals: info table of ‘Leaf’
+    used items: <none>
 data constructor info tables:
-  info table of ‘PerfectTree’:
-    number of words for pointers: 1
-    number of words for non-pointers: 0
-  info table of ‘Nested’:
-    number of words for pointers: 1
-    number of words for non-pointers: 0
   info table of ‘Leaf’:
     number of words for pointers: 1
     number of words for non-pointers: 0
   info table of ‘Node’:
     number of words for pointers: 3
     number of words for non-pointers: 0
+  info table of ‘PerfectTree’:
+    number of words for pointers: 1
+    number of words for non-pointers: 0
+  info table of ‘Nested’:
+    number of words for pointers: 1
+    number of words for non-pointers: 0
 top-level strings:
-  $tc'Nested1_@name_suffix@: "'Nested"
-  $tc'PerfectTree1_@name_suffix@: "'PerfectTree"
-  $tcPerfectTree1_@name_suffix@: "PerfectTree"
   $tc'Node1_@name_suffix@: "'Node"
   $tc'Leaf1_@name_suffix@: "'Leaf"
   $tcBinTree1_@name_suffix@: "BinTree"
+  $tc'Nested1_@name_suffix@: "'Nested"
+  $tc'PerfectTree1_@name_suffix@: "'PerfectTree"
+  $tcPerfectTree1_@name_suffix@: "PerfectTree"
   $trModule3_@name_suffix@: "Example"
   $trModule1_@name_suffix@: "main"
 breakpoints: <none>

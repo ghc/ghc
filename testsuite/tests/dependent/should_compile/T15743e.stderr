@@ -45,13 +45,13 @@ TYPE CONSTRUCTORS
           nominal
           phantom
 DATA CONSTRUCTORS
-  MkT2 :: forall {k7} {k1} {k2 :: k1} {k3} {k4 :: k3} {k5} {k6 :: k5}
-                 (f :: k7 -> *) (c :: k7) k8 (a :: k8) (b :: Proxy k2)
-                 (d :: Proxy k4) (e :: Proxy k6).
-          f c -> T2 k8 a b f c d e
   MkT :: forall {k1} {k2} {k3 :: k2} {k4} {k5 :: k4} {k6} {k7 :: k6}
                 (f :: k1 -> *) (c :: k1) k8 (a :: k8) (b :: Proxy k3)
                 (d :: Proxy k5) (e :: Proxy k7).
          f c -> T k8 a b f c d e
+  MkT2 :: forall {k7} {k1} {k2 :: k1} {k3} {k4 :: k3} {k5} {k6 :: k5}
+                 (f :: k7 -> *) (c :: k7) k8 (a :: k8) (b :: Proxy k2)
+                 (d :: Proxy k4) (e :: Proxy k6).
+          f c -> T2 k8 a b f c d e
 Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]
+Dependent packages: [(normal, base-4.23.0.0)]
