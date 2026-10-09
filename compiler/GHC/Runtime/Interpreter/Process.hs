@@ -3,6 +3,7 @@ module GHC.Runtime.Interpreter.Process
   -- * Message API
     Message(..)
   , sendMessage
+  , RemoteCallFailed(..)
   )
 where
 
@@ -18,12 +19,14 @@ import GHC.Utils.Exception as Ex
 import Data.Binary
 import System.Exit
 import System.Process
-import Data.Bifunctor
 
 -- -----------------------------------------------------------------------------
 -- Top-level Message API
 
 -- | Send a message to the interpreter and expect a response, blocking until it arrives.
+--
+-- Throws 'RemoteCallFailed' if the remote call threw an exception in the
+-- external interpreter
 sendMessage :: Binary a => ExtInterpInstance d -> Message a -> IO a
 sendMessage i msg = unwrapRight =<<
   remoteCall (interpPipe proc) msg
@@ -33,10 +36,7 @@ sendMessage i msg = unwrapRight =<<
     unwrapRight :: Either SomeException b -> IO b
     unwrapRight (Right a) = pure a
     unwrapRight (Left er) = do
-      let ex = RemoteCallFailed er
-      unwrapRight . bimap (addExceptionContext (WhileHandling (SomeException ex))) id
-        =<< remoteCall (interpPipe proc) Shutdown
-      throwIO ex
+      throwIO (RemoteCallFailed er)
 
 handleInterpProcessFailure :: InterpProcess -> SomeException -> IO a
 handleInterpProcessFailure i e = do
