@@ -447,26 +447,45 @@ toIfaceTopBndr id
   = if isExternalName name
       then IfGblTopBndr name
       else IfLclTopBndr (mkIfLclName (occNameFS (getOccName id))) (toIfaceType (idType id))
-                        (toIfaceIdInfo (idInfo id)) (toIfaceIdDetails (idDetails id))
+                        (toIfaceIdInfo (idInfo id)) (toIfaceIdDetails name (idDetails id))
   where
     name = getName id
 
-toIfaceIdDetails :: IdDetails -> IfaceIdDetails
-toIfaceIdDetails VanillaId                      = IfVanillaId
-toIfaceIdDetails (WorkerLikeId dmds)            = IfWorkerLikeId dmds
-toIfaceIdDetails (DFunId {})                    = IfDFunId
-toIfaceIdDetails (RecSelId { sel_naughty = n
-                           , sel_tycon = tc
-                           , sel_fieldLabel = fl }) =
+toIfaceIdDetails :: Name   -- ^ for trace/panic messages only
+                 -> IdDetails -> IfaceIdDetails
+toIfaceIdDetails _ VanillaId                      = IfVanillaId
+toIfaceIdDetails _ (WorkerLikeId dmds)            = IfWorkerLikeId dmds
+toIfaceIdDetails _ (DFunId {})                    = IfDFunId
+toIfaceIdDetails _ (RecSelId { sel_naughty = n
+                             , sel_tycon = tc
+                             , sel_fieldLabel = fl }) =
   let (iface, first_con) = case tc of
                 RecSelData ty_con    -> ( Left (toIfaceTyCon ty_con), dataConName $ head $ tyConDataCons ty_con)
                 RecSelPatSyn pat_syn -> ( Right (patSynToIfaceDecl pat_syn), patSynName pat_syn)
   in IfRecSelId iface first_con n fl
 
-  -- The remaining cases are all "implicit Ids" which don't
-  -- appear in interface files at all
-toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
-                         IfVanillaId   -- Unexpected; the other
+  -- NB: we deliberately handle every remaining 'IdDetails' constructor below,
+  --     so that anyone adding a new 'IdDetails' constructor gets an incomplete
+  --     pattern match warning telling them to update this code. See also #23785.
+
+toIfaceIdDetails _ (PrimOpId {})  = IfVanillaId -- Only reachable via 'pprTyThing'
+toIfaceIdDetails _ (ClassOpId {}) = IfVanillaId --   (e.g. GHCi :browse!)
+toIfaceIdDetails _ (RepPolyId {}) = IfVanillaId
+  -- Reachable via 'pprTyThing', but also with 'unsafeCoerce#' due to the
+  -- specific way it is wired-in. Otherwise we should never hit this, because
+  -- 'RepPolyId's are wired-in (and hence don't make it into interface files).
+
+-- Other cases should never occur (not even via 'pprTyThing').
+toIfaceIdDetails nm dets@(DataConWorkId {}) = not_iface_details nm dets
+toIfaceIdDetails nm dets@(DataConWrapId {}) = not_iface_details nm dets
+toIfaceIdDetails nm dets@(FCallId {})       = not_iface_details nm dets
+toIfaceIdDetails nm dets@(TickBoxOpId {})   = not_iface_details nm dets
+toIfaceIdDetails nm dets@(CoVarId {})       = not_iface_details nm dets
+toIfaceIdDetails nm dets@(JoinId {})        = not_iface_details nm dets
+
+not_iface_details :: HasDebugCallStack => Name -> IdDetails -> a
+not_iface_details nm details
+  = pprPanic "toIfaceIdDetails" (ppr nm <+> parens (ppr details))
 
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
