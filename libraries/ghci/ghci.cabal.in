@@ -97,7 +97,7 @@ library
         ghc-boot         == @ProjectVersionMunged@,
         ghc-heap         >= 9.10.1 && <=@ProjectVersionMunged@,
         transformers     >= 0.5 && < 0.7,
-        stm
+        stm              >= 2.4 && < 2.6
 
     if flag(bootstrap)
       build-depends:

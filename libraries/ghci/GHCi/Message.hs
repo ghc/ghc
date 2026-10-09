@@ -1,7 +1,7 @@
 {-# LANGUAGE RecursiveDo, GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards, CPP,
     NamedFieldPuns, PatternSynonyms, LambdaCase, TypeAbstractions, TypeApplications,
-    LinearTypes, RankNTypes, UnboxedTuples, BlockArguments #-}
+    LinearTypes, RankNTypes, UnboxedTuples, BlockArguments, TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- |
@@ -27,14 +27,17 @@ module GHCi.Message
   , remoteCall, remoteTHCall
   , handleRemoteCall
 
-  , tailLinearly
-
   , BreakModule
   , BreakUnitId
   , LoadedDLL
+
+  -- * Consume `reply` exactly once
+  , WriteReply -- abstract
+  , writeReply
+  -- , thenLinearly
+  -- , forkIOLinearly
   ) where
 
-import GHC.IO (IO(..))
 import Prelude -- See note [Why do we import Prelude here?]
 import GHCi.RemoteTypes
 import GHCi.FFI
@@ -82,6 +85,7 @@ import System.IO
 import System.IO.Error
 import Control.Monad
 import Control.Concurrent.STM
+import Data.Bifunctor
 
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server
@@ -760,23 +764,26 @@ mkPipeFromContinuations getSome putAll = mdo
     pure p
 
 -- | Send a 'Message' request to and wait for a reply from the interpreter
-remoteCall :: Binary a => Pipe -> Message a -> IO a
-remoteCall pipe msg = runGet get <$> withAsyncReq pipe (putMessage msg)
+-- (blocks on the calling side, doesn't necessarily block the interpreter)
+remoteCall :: Binary a => Pipe -> Message a -> IO (Either SomeException a)
+remoteCall pipe msg = bimap fromSerializableException id . runGet get
+                  <$> withAsyncReq pipe (putMessage msg)
 
 -- | Handle a single 'Message' request on the interpreter and reply to the host
 handleRemoteCall :: Pipe
                  -> (Msg -> IO Msg) {-^ Msg hook -}
-                 -> (forall a. Binary a => (a -> IO ()) %1 -> Message a -> IO r)
+                 -> (forall a. Binary a => WriteReply a %1 -> Message a -> IO r)
                  -> IO r
 handleRemoteCall pipe hook k =
-  withAsyncHandler pipe getMessage \reply msg0 -> do
-    hook msg0 `tailLinearly` \(Msg @a msg) ->
-      k (\(x :: a) -> reply (put x)) msg
+  withAsyncHandler pipe getMessage \(WriteReply reply) msg0 -> do
+    hook msg0 >>= \(Msg @a msg) ->
+      k (WriteReply (reply . fmap (put @a))) msg
 
 -- | Send a 'THMessage' request to the host and wait for a reply from the host
 -- to the interpreter
-remoteTHCall :: Binary a => Pipe -> THMessage a -> IO a
-remoteTHCall pipe msg = runGet get <$> withAsyncReq pipe (putTHMessage msg)
+remoteTHCall :: Binary a => Pipe -> THMessage a -> IO (Either SomeException a)
+remoteTHCall pipe msg = bimap fromSerializableException id . runGet get
+                    <$> withAsyncReq pipe (putTHMessage msg)
 
 -- | Handle a 'THMessage' request on the host and reply to the interpreter
 -- handleRemoteTHCall = undefined
@@ -808,16 +815,31 @@ withAsyncReq pipe msg = do
 -- The handler receives as an argument the function to use to reply to the request.
 -- It must be used exactly once (all requests expect a reply, and you can't
 -- reply more than once). Linear types enforce this.
-withAsyncHandler :: Pipe -> Get a -> ((Put -> IO ()) %1 -> a -> IO r) %1 -> IO r
-withAsyncHandler pipe getit k =
-  atomically (readTQueue (pendingRecv (pipeAsyncMngr pipe)))
-    `tailLinearly` \(uq, bs) ->
-      k (\p -> writePipe pipe (Reply uq (runPut p))) (runGet getit bs)
+withAsyncHandler :: Pipe -> Get a -> (WriteReply Put %1 -> a -> IO r) -> IO r
+withAsyncHandler pipe getit k = do
+  ack <- newEmptyMVar
 
--- | End an IO action with an IO action that needs to be consumed linearly.
-tailLinearly :: IO a -> (a -> IO b) %1 -> IO b
-tailLinearly (IO r) k = IO \s -> case r s of
-  (# s', a #) -> case k a of IO k' -> k' s'
+  -- Block waiting for request
+  (uq, bs) <- atomically (readTQueue (pendingRecv (pipeAsyncMngr pipe)))
+
+  let reply p = do
+        writePipe pipe (Reply uq (runPut $ either (put . toSerializableException) id p))
+        putMVar ack ()
+
+  -- Run the continuation which must reply exactly once with 'writeReply'
+  k (WriteReply reply) (runGet getit bs)
+
+    -- If there's an exception before the reply is sent, reply with an error instead.
+    `catch` \(e :: SomeException) -> do
+
+        tryTakeMVar ack >>= \case
+          Just () ->
+            -- Already replied
+            throwIO e
+          Nothing -> do
+            -- Reply with an error
+            reply (Left e)
+            throwIO e
 
 -- ** Async matching "internals" -----------------------------------------------
 
@@ -941,3 +963,16 @@ getBin getsome get leftover = go leftover (runGetIncremental get)
 
 withLock :: Pipe -> IO c -> IO c
 withLock Pipe{..} = bracket (takeMVar pipeLock) (putMVar pipeLock) . const
+
+--------------------------------------------------------------------------------
+-- * Consume `reply` exactly once
+--------------------------------------------------------------------------------
+
+-- | Every request should get exactly one reply.
+data WriteReply a where
+  WriteReply :: (Either SomeException a -> IO ()) -- unrestricted, but not exposed (for linearity safety)
+             -> WriteReply a
+
+-- | Write a reply exactly once (consuming the ability to write more replies)
+writeReply :: WriteReply a %1 -> a -> IO ()
+writeReply (WriteReply r) = r . Right

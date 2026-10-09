@@ -64,22 +64,24 @@ servWithCustom verbose hook pipe restore customHandler = loop
  where
   loop = do
     when verbose $ trace "reading pipe..."
-    Msg msg <- readPipe pipe getMessage >>= hook
+    handleRemoteCall pipe hook $ \wr msg -> do
 
-    discardCtrlC
+      let
+        reply :: forall a. (Binary a, Show a) => a -> IO ()
+        reply r = do
+          when verbose $ trace ("writing pipe: " ++ show r)
+          writeReply wr r
 
-    when verbose $ trace ("msg: " ++ (show msg))
-    case msg of
-      CustomMessage tag payload -> handleCustom tag payload
-      Shutdown -> return ()
-      RunTH st q ty loc -> wrapRunTH $ runTH pipe st q ty loc
-      RunModFinalizers st qrefs -> wrapRunTH $ runModFinalizerRefs pipe st qrefs
-      _other -> run msg >>= reply
+      discardCtrlC
 
-  reply :: forall a. (Binary a, Show a) => a -> IO ()
-  reply r = do
-    when verbose $ trace ("writing pipe: " ++ show r)
-    writePipe pipe (put r)
+      when verbose $ trace ("msg: " ++ (show msg))
+      case msg of
+        CustomMessage tag payload -> handleCustom tag payload
+        Shutdown -> return ()
+        RunTH st q ty loc -> wrapRunTH $ runTH pipe st q ty loc
+        RunModFinalizers st qrefs -> wrapRunTH $ runModFinalizerRefs pipe st qrefs
+        _other -> run msg >>= reply
+
     loop
 
   handleCustom tag payload = do
