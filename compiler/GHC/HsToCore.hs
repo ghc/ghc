@@ -194,7 +194,7 @@ deSugar hsc_env
                           { core_prs <- dsTopLHsBinds binds_cvr
                           ; core_prs <- patchMagicDefns core_prs
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
-                          ; (ds_fords, foreign_prs) <- dsForeigns fords
+                          ; (ds_fords, foreign_prs, foreign_rules) <- dsForeigns fords
                           ; ds_rules <- mapMaybeM dsRule rules
                           ; static_prs <- getStaticBinds
                           ; let hpc_init
@@ -205,7 +205,7 @@ deSugar hsc_env
                                      `appOL` foreign_prs
                                      `appOL` core_prs
                                      `appOL` spec_prs
-                                   , spec_rules ++ ds_rules
+                                   , foreign_rules ++ spec_rules ++ ds_rules
                                    , ds_fords `appendStubC` hpc_init) } }
 
         ; case mb_res of {

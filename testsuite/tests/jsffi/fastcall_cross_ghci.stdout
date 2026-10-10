@@ -1,0 +1,3 @@
+Rule fired: fastcall/js_exported (FastcallCrossAux)
+Rule fired: fastcall/js_private (FastcallCrossAux)
+Rule fired: fastcall/js_exported (FastcallCrossAux)

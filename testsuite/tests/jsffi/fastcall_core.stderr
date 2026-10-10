@@ -1,0 +1,7 @@
+Rule fired: fastcall/js_exported (FastcallCore)
+Rule fired: fastcall/js_private (FastcallCore)
+Rule fired: fastcall/js_polymorphic (FastcallCore)
+Rule fired: fastcall/js_polymorphic (FastcallCore)
+Rule fired: fastcall/js_newtype (FastcallCore)
+Rule fired: fastcall/js_io (FastcallCore)
+Rule fired: fastcall/js_nullary (FastcallCore)

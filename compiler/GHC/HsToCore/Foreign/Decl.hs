@@ -26,6 +26,7 @@ import GHC.Hs
 import GHC.Types.Id
 import GHC.Types.ForeignStubs
 import GHC.Unit.Module
+import GHC.Core
 import GHC.Core.Coercion
 
 import GHC.Cmm.CLabel
@@ -36,7 +37,7 @@ import GHC.Platform
 import GHC.Data.OrdList
 import GHC.Driver.Hooks
 
-import Data.List (unzip4)
+import Data.List (unzip5)
 
 {-
 Desugaring of @foreign@ declarations is naturally split up into
@@ -53,47 +54,52 @@ is the same as
 so we reuse the desugaring code in @GHC.HsToCore.Foreign.Call@ to deal with these.
 -}
 
-dsForeigns :: [LForeignDecl GhcTc] -> DsM (ForeignStubs, OrdList Binding)
+dsForeigns ::
+  [LForeignDecl GhcTc] ->
+  DsM (ForeignStubs, OrdList Binding, [CoreRule])
 dsForeigns fos = do
     hooks <- getHooks
     case dsForeignsHook hooks of
         Nothing -> dsForeigns' fos
-        Just h  -> h fos
+        Just h  -> do
+          (stubs, binds) <- h fos
+          pure (stubs, binds, [])
 
 dsForeigns' :: [LForeignDecl GhcTc]
-            -> DsM (ForeignStubs, OrdList Binding)
+            -> DsM (ForeignStubs, OrdList Binding, [CoreRule])
 dsForeigns' []
-  = return (NoStubs, nilOL)
+  = return (NoStubs, nilOL, [])
 dsForeigns' fos = do
     mod <- getModule
     platform <- targetPlatform <$> getDynFlags
     fives <- mapM do_ldecl fos
     let
-        (hs, cs, idss, bindss) = unzip4 fives
+        (hs, cs, idss, bindss, ruless) = unzip5 fives
         fe_ids = concat idss
         fe_init_code = foreignExportsInitialiser platform mod fe_ids
     --
     return (ForeignStubs
              (mconcat hs)
              (mconcat cs `mappend` fe_init_code),
-            foldr (appOL . toOL) nilOL bindss)
+            foldr (appOL . toOL) nilOL bindss,
+            concat ruless)
   where
    do_ldecl (L loc decl) = putSrcSpanDs (locA loc) (do_decl decl)
 
-   do_decl :: ForeignDecl GhcTc -> DsM (CHeader, CStub, [Id], [Binding])
+   do_decl :: ForeignDecl GhcTc -> DsM (CHeader, CStub, [Id], [Binding], [CoreRule])
    do_decl (ForeignImport { fd_name = id, fd_i_ext = co, fd_fi = spec }) = do
       traceIf (text "fi start" <+> ppr id)
       let id' = unLoc id
-      (bs, h, c, ids) <- dsFImport id' co spec
+      (bs, h, c, ids, rules) <- dsFImport id' co spec
       traceIf (text "fi end" <+> ppr id)
-      return (h, c, ids, bs)
+      return (h, c, ids, bs, rules)
 
    do_decl (ForeignExport { fd_name = L _ id
                           , fd_e_ext = co
                           , fd_fe = CExport _
                               (L _ (CExportStatic ext_nm cconv)) }) = do
       (h, c, _, ids, bs) <- dsFExport id co ext_nm cconv ExportIsStatic
-      return (h, c, ids, bs)
+      return (h, c, ids, bs, [])
 
 {-
 ************************************************************************
@@ -124,7 +130,7 @@ because it exposes the boxing to the call site.
 dsFImport :: Id
           -> Coercion
           -> ForeignImport GhcTc
-          -> DsM ([Binding], CHeader, CStub, [Id])
+          -> DsM ([Binding], CHeader, CStub, [Id], [CoreRule])
 dsFImport id co (CImport _ cconv safety mHeader spec) = do
   platform <- getPlatform
   let cconv' = unLoc cconv
@@ -132,12 +138,12 @@ dsFImport id co (CImport _ cconv safety mHeader spec) = do
   case (platformArch platform, cconv') of
     (ArchJavaScript, _) -> do
       (bs, h, c) <- dsJsImport id co spec cconv' safety' mHeader
-      pure (bs, h, c, [])
+      pure (bs, h, c, [], [])
     (ArchWasm32, JavaScriptCallConv) ->
       dsWasmJSImport id co spec safety'
     _ -> do
       (bs, h, c) <- dsCImport id co spec cconv' safety' mHeader
-      pure (bs, h, c, [])
+      pure (bs, h, c, [], [])
 
 {-
 ************************************************************************

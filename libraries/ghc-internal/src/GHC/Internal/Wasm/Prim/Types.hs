@@ -8,6 +8,7 @@
 {-# OPTIONS_GHC -fdefines-known-key-names #-}
 
 module GHC.Internal.Wasm.Prim.Types (
+  fastcall,
   JSVal# (..),
   JSVal (..),
   freeJSVal,
@@ -32,6 +33,15 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
 import GHC.Internal.Show
 import GHC.Internal.Weak
+
+-- | Use the fast, non-reentrant calling convention for a synchronous
+-- @foreign import javascript unsafe@ function when rewrite rules are enabled.
+--
+-- The JavaScript function must not synchronously call back into Haskell.
+-- Violating this requirement may cause the program to terminate.
+{-# NOINLINE[0] fastcall #-}
+fastcall :: a -> a
+fastcall x = x
 
 {-
 

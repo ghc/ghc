@@ -23,10 +23,14 @@ import GHC.Core.Coercion
 import GHC.Core.DataCon
 import GHC.Core.Make
 import GHC.Core.Multiplicity
+import GHC.Core.Rules
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Core.Unfold.Make
 import GHC.Core.Utils
 import GHC.Data.FastString
+import GHC.Driver.Config
+import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.HsToCore.Foreign.Call
 import GHC.HsToCore.Foreign.Utils
@@ -40,6 +44,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Types.ForeignCall
 import GHC.Types.ForeignStubs
 import GHC.Types.Id
+import GHC.Types.InlinePragma
 import GHC.Types.Name
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
@@ -56,18 +61,19 @@ dsWasmJSImport ::
   Coercion ->
   CImportSpec GhcTc ->
   Safety ->
-  DsM ([Binding], CHeader, CStub, [Id])
+  DsM ([Binding], CHeader, CStub, [Id], [CoreRule])
 dsWasmJSImport id co (CFunction (StaticTarget stExt (unpackHText -> js_src) _)) safety
-  | js_src == "wrapper" = dsWasmJSDynamicExport Async id co unitId
-  | js_src == "wrapper sync" = dsWasmJSDynamicExport Sync id co unitId
+  | js_src == "wrapper" = no_rules <$> dsWasmJSDynamicExport Async id co unitId
+  | js_src == "wrapper sync" = no_rules <$> dsWasmJSDynamicExport Sync id co unitId
   | otherwise = do
-      (bs, h, c) <- dsWasmJSStaticImport id co js_src unitId sync
-      pure (bs, h, c, [])
+      (bs, h, c, rules) <- dsWasmJSStaticImport id co js_src unitId sync True
+      pure (bs, h, c, [], rules)
   where
     unitId = staticTargetUnit stExt
     sync = case safety of
       PlayRisky -> Sync
       _ -> Async
+    no_rules (bs, h, c, ids) = (bs, h, c, ids, [])
 dsWasmJSImport _ _ _ _ = panic "dsWasmJSImport: unreachable"
 
 {-
@@ -180,13 +186,14 @@ dsWasmJSDynamicExport sync fn_id co unitId = do
       adjustor_ty = mkForAllTys tv_bndrs $ mkVisFunTysMany [sp_ty] io_jsval_ty
       adjustor_js_src =
         "(...args) => __exports." ++ work_export_name ++ "($1, ...args)"
-  (adjustor_bs, adjustor_h, adjustor_c) <-
+  (adjustor_bs, adjustor_h, adjustor_c, _adjustor_rules) <-
     dsWasmJSStaticImport
       adjustor_id
       (mkRepReflCo adjustor_ty)
       adjustor_js_src
       unitId
       Sync
+      False
   mkJSCallback_id <-
     lookupGhcInternalVarId
       "GHC.Internal.Wasm.Prim.Exports"
@@ -279,13 +286,13 @@ module. Note that above is assembly source file, but we're only
 generating a C stub, so we need to smuggle the assembly code into C
 via __asm__.
 
-The C FFI import that calls the generated C function is always marked
-as safe. There is some extra overhead, but this allows re-entrance by
+The user-facing binding calls the generated C function with a safe C FFI
+call. There is some extra overhead, but this allows re-entrance by
 Haskell -> JavaScript -> Haskell function calls with each call being a
-synchronous one. It's possible to steal the "interruptible" keyword to
-indicate async imports, "safe" for sync imports and "unsafe" for sync
-imports sans the safe C FFI overhead, but it's simply not worth the
-extra complexity.
+synchronous one. We also generate a hidden binding that calls the same C
+function with an unsafe C FFI call, plus a rewrite rule that replaces
+@fastcall foo@ with that hidden binding when rewrite rules are enabled.
+Without the rule, @fastcall@ remains an identity and the safe binding is used.
 
 JSFFI async import is implemented on top of JSFFI sync import. We
 still desugar it to a single Haskell binding that calls C, with some
@@ -312,8 +319,9 @@ dsWasmJSStaticImport ::
   String ->
   CCallStaticTargetUnit ->
   Synchronicity ->
-  DsM ([Binding], CHeader, CStub)
-dsWasmJSStaticImport fn_id co js_src' unitId sync = do
+  Bool ->
+  DsM ([Binding], CHeader, CStub, [CoreRule])
+dsWasmJSStaticImport fn_id co js_src' unitId sync gen_fastcall = do
   cfun_name <- uniqueCFunName
   let ty = coercionLKind co
       (tvs, fun_ty) = tcSplitForAllInvisTyVars ty
@@ -332,12 +340,58 @@ dsWasmJSStaticImport fn_id co js_src' unitId sync = do
             js_src'
   case sync of
     Sync -> do
-      rhs <- importBindingRHS unitId cfun_name tvs arg_tys orig_res_ty id
-      pure
-        ( [(fn_id, Cast rhs co)],
-          CHeader commonCDecls,
-          importCStub Sync cfun_name (map scaledThing arg_tys) res_ty js_src
-        )
+      safe_rhs <-
+        importBindingRHS
+          unitId cfun_name tvs arg_tys orig_res_ty PlaySafe id
+      let safe_binding = (fn_id, Cast safe_rhs co)
+          header = CHeader commonCDecls
+          stub = importCStub Sync cfun_name (map scaledThing arg_tys) res_ty js_src
+      if not gen_fastcall
+        then pure ([safe_binding], header, stub, [])
+        else do
+          fast_uniq <- newUnique
+          fast_rhs <-
+            importBindingRHS
+              unitId cfun_name tvs arg_tys orig_res_ty PlayRisky id
+          fastcall_id <-
+            lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Types" "fastcall"
+          this_mod <- ds_mod <$> getGblEnv
+          dflags <- getDynFlags
+          let safe_id =
+                -- Keep the binding intact until fastcall rules have had a
+                -- chance to fire. A stable INLINE unfolding also prevents
+                -- cast worker/wrapper from obscuring IO and newtype imports.
+                fn_id
+                  `setInlineActivation` activateDuringFinal
+                  `setIdUnfolding` mkInlineUnfoldingWithArity
+                    (initSimpleOpts dflags)
+                    StableSystemSrc
+                    (length arg_tys)
+                    (Cast safe_rhs co)
+              fast_id =
+                mkLocalId
+                  (mkDerivedInternalName mkFastCallOcc fast_uniq (idName fn_id))
+                  ManyTy
+                  (idType fn_id)
+              (rule_tvs, rule_ty) = tcSplitForAllInvisTyVars (idType fn_id)
+              rule_tys = mkTyVarTys rule_tvs
+              rule =
+                mkRule
+                  this_mod
+                  False
+                  (isLocalId fastcall_id)
+                  (mkFastString $ "fastcall/" ++ occNameString (getOccName fn_id))
+                  AlwaysActive
+                  (idName fastcall_id)
+                  rule_tvs
+                  [Type rule_ty, mkTyApps (Var safe_id) rule_tys]
+                  (mkTyApps (Var fast_id) rule_tys)
+          pure
+            ( [(safe_id, Cast safe_rhs co), (fast_id, Cast fast_rhs co)],
+              header,
+              stub,
+              [rule]
+            )
     Async -> do
       mk_str <- getMkStringIds dsLookupKnownKeyId
       let err_msg = mkStringExprWith mk_str js_src
@@ -356,6 +410,8 @@ dsWasmJSStaticImport fn_id co js_src' unitId sync = do
         lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Imports"
           $ "stg_messagePromise"
           ++ ffiType res_ty
+      fastcall_id <-
+        lookupGhcInternalVarId "GHC.Internal.Wasm.Prim.Types" "fastcall"
       unsafeDupablePerformIO_id <-
         lookupGhcInternalVarId
           "GHC.Internal.IO.Unsafe"
@@ -367,6 +423,7 @@ dsWasmJSStaticImport fn_id co js_src' unitId sync = do
           tvs
           arg_tys
           (mkTyConApp io_tycon [jsval_ty])
+          PlaySafe
           $ ( if is_io
                 then id
                 else \m_res ->
@@ -386,15 +443,23 @@ dsWasmJSStaticImport fn_id co js_src' unitId sync = do
                         [ Type res_ty,
                           mkApps
                             (Var blockPromise_id)
-                            [Type res_ty, err_msg, Var promise_id, Var msgPromise_id]
+                            [ Type res_ty,
+                              err_msg,
+                              Var promise_id,
+                              mkApps (Var fastcall_id) [Type (idType msgPromise_id), Var msgPromise_id]
+                            ]
                         ]
                   ]
             )
       pure
         ( [(fn_id, Cast rhs co)],
           CHeader commonCDecls,
-          importCStub Async cfun_name (map scaledThing arg_tys) jsval_ty js_src
+          importCStub Async cfun_name (map scaledThing arg_tys) jsval_ty js_src,
+          []
         )
+
+mkFastCallOcc :: OccName -> OccName
+mkFastCallOcc = mkVarOcc . ("$fastcall_" ++) . occNameString
 
 uniqueCFunName :: DsM FastString
 uniqueCFunName = do
@@ -407,9 +472,10 @@ importBindingRHS ::
   [TyVar] ->
   [Scaled Type] ->
   Type ->
+  Safety ->
   (CoreExpr -> CoreExpr) ->
   DsM CoreExpr
-importBindingRHS unitId cfun_name tvs arg_tys orig_res_ty res_trans = do
+importBindingRHS unitId cfun_name tvs arg_tys orig_res_ty safety res_trans = do
   ccall_uniq <- newUnique
   args_unevaled <- newSysLocalsDs arg_tys
   args_evaled <- newSysLocalsDs arg_tys
@@ -465,9 +531,7 @@ importBindingRHS unitId cfun_name tvs arg_tys orig_res_ty res_trans = do
           ( CCallSpec
               (StaticTarget stExt (fastStringToShortText cfun_name) ForeignFunction)
               CCallConv
-              -- Same even for foreign import javascript unsafe, for
-              -- the sake of re-entrancy.
-              PlaySafe
+              safety
           )
       stExt = StaticTargetGhc
         { staticTargetLabel = NoSourceText
