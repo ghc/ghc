@@ -397,6 +397,28 @@ caveats:
   imported JavaScript code can call into Haskell again, provided that
   Haskell function is exported as a synchronous one.
 
+When a synchronous import is known not to re-enter Haskell,
+``GHC.Wasm.Prim.fastcall :: a -> a`` can be applied to the imported function
+to use a faster, non-reentrant call path when rewrite rules are enabled, as
+they normally are with :ghc-flag:`-O` or :ghc-flag:`-O2`:
+
+.. code:: haskell
+
+   import GHC.Wasm.Prim (fastcall)
+
+   foreign import javascript unsafe "$1 + 1"
+     js_inc :: Int -> Int
+
+   fast_js_inc :: Int -> Int
+   fast_js_inc = fastcall js_inc
+
+This avoids the overhead of suspending and resuming the Haskell thread around
+the JavaScript call. The imported JavaScript must not synchronously call back
+into Haskell when invoked through ``fastcall``; violating this requirement may
+cause the program to terminate. Ordinary uses of ``js_inc`` remain re-entrant.
+When rewrite rules are disabled, ``fastcall`` remains an identity and the
+ordinary re-entrant call path is used.
+
 When a JSFFI import is marked as ``safe`` / ``interruptible`` or lacks
 safety annotation, then it’s treated as an asynchronous import. The
 asynchronous JSFFI imports combine the Haskell concurrency model and the

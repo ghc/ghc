@@ -1,6 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module GHC.Internal.Wasm.Prim (
+  -- * Calling JavaScript
+  fastcall,
+
   -- * User-facing 'JSVal' and related utilities
   JSVal (..),
   freeJSVal,
