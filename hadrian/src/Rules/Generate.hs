@@ -7,6 +7,7 @@ module Rules.Generate (
 import Development.Shake.FilePath
 import qualified Data.Set as Set
 import Base
+import BindistConfig
 import qualified Context
 import Expression
 import Hadrian.Oracles.TextFile (lookupStageBuildConfig)
@@ -275,7 +276,7 @@ generateRules = do
                       then root -/- stageString stage' -/- "lib"
                       else prefix
                 relPkgDb = makeRelativeNoSysLink libTopDir pkgDb
-            go (generateSettings out True relPkgDb) out
+            go (generateSettings libStage out True relPkgDb) out
         (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr (targetStage (succStage stage))) out
 
   where
@@ -451,7 +452,9 @@ bindistRules = do
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
     , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (fmap (isJust . tgtRTSWithLibdw) . targetStage)
     , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
-    , interpolateVar "BaseUnitId" $ pkgUnitId Stage1 base
+    , interpolateVar "BaseUnitId" $ bindistUnitId base
+    , interpolateVar "GhcUnitId" $ bindistUnitId compiler
+    , interpolateVar "GhcInternalUnitId" $ bindistUnitId ghcInternal
     , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
     , interpolateVar "TargetPlatformFull" (setting TargetPlatformFull)
     , interpolateVar "BuildPlatformFull" (setting BuildPlatformFull)
@@ -460,6 +463,9 @@ bindistRules = do
   where
     interp = interpretInContext (semiEmptyTarget Stage2)
     getTarget = interp . queryTarget Stage2
+    bindistUnitId pkg = do
+      stage <- library_stage <$> implicitBindistConfig
+      pkgUnitId stage pkg
 
 -- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
 -- the resulting 'String' is a valid C preprocessor identifier.
@@ -485,18 +491,18 @@ ghcWrapper stage  = do
 -- "package.conf.d"). Callers supply the correct relative path. For bindists
 -- the layout is known statically; for in-tree builds callers compute it. For
 -- bindists, we omit @LibDir@ so it defaults to @topDir@ at runtime.
-generateSettings :: FilePath -> Bool -> FilePath -> Expr String
-generateSettings settingsFile includeLibDir rel_pkg_db = do
+--
+-- @libraryStage@: the stage containing the target package database.
+generateSettings :: Stage -> FilePath -> Bool -> FilePath -> Expr String
+generateSettings libraryStage settingsFile includeLibDir rel_pkg_db = do
     ctx <- getContext
     stage <- getStage
 
-    -- The unit-id of the base package which is always linked against (#25382)
-    base_unit_id <- expr $ do
-      case stage of
-        Stage0 {} -> error "Unable to generate settings for stage0"
-        Stage1 -> pkgUnitId Stage1 base
-        Stage2 -> pkgUnitId Stage1 base
-        Stage3 -> pkgUnitId Stage2 base
+    -- These are the units supplied in the target package database, which can
+    -- differ from the host units linked into a cross compiler.
+    base_unit_id <- expr $ pkgUnitId libraryStage base
+    ghc_unit_id <- expr $ pkgUnitId libraryStage compiler
+    ghc_internal_unit_id <- expr $ pkgUnitId libraryStage ghcInternal
 
     -- For cross compilers, LibDir points to the succeeding stage's lib dir
     -- (which contains the target architecture's libraries). For non-cross,
@@ -519,6 +525,8 @@ generateSettings settingsFile includeLibDir rel_pkg_db = do
           , ("RTS ways", unwords . map show . Set.toList <$> getRtsWays)
           , ("Relative Global Package DB", pure rel_pkg_db)
           , ("base unit-id", pure base_unit_id)
+          , ("ghc unit-id", pure ghc_unit_id)
+          , ("ghc-internal unit-id", pure ghc_internal_unit_id)
           ]
           ++ ([("LibDir", pure rel_lib_topDir) | includeLibDir])
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
@@ -555,7 +563,6 @@ generateConfigHs = do
     -- unit-id in both situations.
     cProjectUnitId <- expr . (`pkgUnitId` compiler) =<< getStage
 
-    cGhcInternalUnitId <- expr . (`pkgUnitId` ghcInternal) =<< getStage
     return $ unlines
         [ "module GHC.Settings.Config"
         , "  ( module GHC.Version"
@@ -565,7 +572,6 @@ generateConfigHs = do
         , "  , cBooterVersion"
         , "  , cStage"
         , "  , cProjectUnitId"
-        , "  , cGhcInternalUnitId"
         , "  ) where"
         , ""
         , "import GHC.Prelude.Basic"
@@ -589,9 +595,6 @@ generateConfigHs = do
         , ""
         , "cProjectUnitId :: String"
         , "cProjectUnitId = " ++ show cProjectUnitId
-        , ""
-        , "cGhcInternalUnitId :: String"
-        , "cGhcInternalUnitId = " ++ show cGhcInternalUnitId
         ]
   where
     stageString (Stage0 InTreeLibs) = "1"

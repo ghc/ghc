@@ -142,6 +142,8 @@ initSettings top_dir = do
   ghcWithInterpreter <- getBooleanSetting "Use interpreter"
 
   baseUnitId <- getSetting_raw "base unit-id"
+  ghcUnitId <- getSetting_raw "ghc unit-id"
+  ghcInternalUnitId <- getSetting_raw "ghc-internal unit-id"
 
   -- LibDir is optional. If not set, derive it from topDir. This allows
   -- bindists to work without explicitly setting LibDir, but gives us the
@@ -174,6 +176,8 @@ initSettings top_dir = do
     , sUnitSettings = UnitSettings
       {
         unitSettings_baseUnitId = stringToUnitId baseUnitId
+      , unitSettings_ghcUnitId = stringToUnitId ghcUnitId
+      , unitSettings_ghcInternalUnitId = stringToUnitId ghcInternalUnitId
       }
 
     , sToolSettings = ToolSettings

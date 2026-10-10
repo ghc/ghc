@@ -94,7 +94,11 @@ data Settings = Settings
   , sRawTarget         :: Target
   }
 
-data UnitSettings = UnitSettings { unitSettings_baseUnitId :: !UnitId }
+data UnitSettings = UnitSettings
+  { unitSettings_baseUnitId        :: !UnitId
+  , unitSettings_ghcUnitId         :: !UnitId
+  , unitSettings_ghcInternalUnitId :: !UnitId
+  }
 
 -- | Settings for other executables GHC calls.
 --

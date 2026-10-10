@@ -27,7 +27,11 @@ fakeSettings =
       sTargetPlatform =
         genericPlatform,
       sPlatformMisc = PlatformMisc {},
-      sUnitSettings = UnitSettings { unitSettings_baseUnitId = stringToUnitId "base" }
+      sUnitSettings = UnitSettings
+        { unitSettings_baseUnitId = stringToUnitId "base"
+        , unitSettings_ghcUnitId = stringToUnitId "ghc"
+        , unitSettings_ghcInternalUnitId = stringToUnitId "ghc-internal"
+        }
     }
 
 fakeDynFlags :: DynFlags

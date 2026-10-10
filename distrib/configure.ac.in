@@ -406,6 +406,12 @@ fi
 
 AC_SUBST(BaseUnitId)
 
+dnl The units supplied with the target libraries, as reported by ghc --info.
+GhcUnitId=@GhcUnitId@
+GhcInternalUnitId=@GhcInternalUnitId@
+AC_SUBST(GhcUnitId)
+AC_SUBST(GhcInternalUnitId)
+
 # We get caught by
 #     http://savannah.gnu.org/bugs/index.php?1516
 #     $(eval ...) inside conditionals causes errors

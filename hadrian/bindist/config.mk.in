@@ -134,6 +134,8 @@ CrossCompilePrefix    = @CrossCompilePrefix@
 GhcUnregisterised     = @Unregisterised@
 EnableDistroToolchain = @EnableDistroToolchain@
 BaseUnitId            = @BaseUnitId@
+GhcUnitId             = @GhcUnitId@
+GhcInternalUnitId     = @GhcInternalUnitId@
 
 # The THREADED_RTS requires `BaseReg` to be in a register and the
 # `GhcUnregisterised` mode doesn't allow that.
