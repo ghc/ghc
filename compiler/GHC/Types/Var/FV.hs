@@ -6,7 +6,7 @@ module GHC.Types.Var.FV (
         BoundVars, VarSetFV, DVarSetFV, SelectiveDFV,
         TyCoFV, DTyCoFV,
         runFVTop, runFVAcc, runTyCoVars, runTyCoVarsDSet,
-        runFVSelective, runFVSelectiveList, runFVSelectiveSet,
+        runFVSelective, runFVSelectiveAcc, runFVSelectiveList, runFVSelectiveSet,
         InterestingVarFun,
 
         updEnvFV, addBndrFV, addBndrsFV, addBndrSelectiveFV, addBndrsSelectiveFV,
@@ -225,8 +225,11 @@ runTyCoVarsDSet :: DTyCoFV -> DTyCoVarSet
 runTyCoVarsDSet f = runFVAcc f emptyDVarSet
 
 runFVSelective :: InterestingVarFun -> SelectiveDFV -> DVarSet
-runFVSelective interesting f
-  = runEndoOS (runFV f (emptyVarSet, interesting)) emptyDVarSet
+runFVSelective interesting f = runFVSelectiveAcc interesting f emptyDVarSet
+
+runFVSelectiveAcc :: InterestingVarFun -> SelectiveDFV -> DVarSet -> DVarSet
+-- Add the interesting free variables to the accumulator
+runFVSelectiveAcc interesting f = runEndoOS (runFV f (emptyVarSet, interesting))
 
 runFVSelectiveList :: InterestingVarFun -> SelectiveDFV -> [Var]
 runFVSelectiveList interesting f = dVarSetElems (runFVSelective interesting f)

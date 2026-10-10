@@ -168,7 +168,6 @@ module GHC.Core.Type (
         typeSize, occCheckExpand,
 
         -- ** Closing over kinds
-        closeOverKindsDSet,
         closeOverKinds,
 
         -- * Forcing evaluation of types

@@ -590,15 +590,15 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
 ------------------
 substDVarSet :: HasDebugCallStack => Subst -> DVarSet -> DVarSet
 -- Apply the substitution to the vars in the set,
--- and take the shallow free vars of the result
+-- and take the (deep) free vars of the result
 substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
   = runFVSelective isLocalVar $
     strictFoldDVarSet (mappend . do_one) mempty fvs
   where
   do_one :: Var -> SelectiveDFV
   do_one fv
-     | isTyVar fv = shallowSelTypeFV (lookupVarEnv tv_env fv `orElse` mkTyVarTy fv)
-     | isCoVar fv = shallowSelCoFV   (lookupVarEnv cv_env fv `orElse` mkCoVarCo fv)
+     | isTyVar fv = deepSelTypeFV (lookupVarEnv tv_env fv `orElse` mkTyVarTy fv)
+     | isCoVar fv = deepSelCoFV   (lookupVarEnv cv_env fv `orElse` mkCoVarCo fv)
      | otherwise  = exprFVs (lookupIdSubst subst fv)
 
 ------------------

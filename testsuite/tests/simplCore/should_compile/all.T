@@ -627,3 +627,6 @@ test('T27749',
      compile, ['-O -g3 -ddump-simpl -dsuppress-uniques'])
 
 test('T27629', only_ways(['optasm']), makefile_test, ['T27629'])
+
+# Only fails in a build with assertions enabled (checkValidSubst)
+test('SimpleOptInScope', normal, compile, ['-fno-opt-coercion -dcore-lint'])

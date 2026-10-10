@@ -2483,13 +2483,13 @@ instance Outputable SpecArg where
   ppr UnspecArg     = text "UnspecArg"
 
 specArgsFVs :: InterestingVarFun -> [SpecArg] -> VarSet
--- Find the shallow deep free vars of the SpecArgs that are not already in scope
+-- Find the (deep) free vars of the SpecArgs
 specArgsFVs interesting args
   = runFVSelectiveSet interesting $
     mapUnionFV get args
   where
     get :: SpecArg -> SelectiveDFV
-    get (SpecType ty)   = shallowSelTypeFV ty
+    get (SpecType ty)   = deepSelTypeFV ty
     get (SpecDict dx)   = exprFVs dx
     get UnspecType      = mempty
     get UnspecArg       = mempty
