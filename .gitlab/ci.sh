@@ -701,7 +701,20 @@ function smoke_test() {
 
     info "Smoke-testing stage3 compiler..."
     file "$stage3_ghc"
-    run ${CROSS_EMULATOR} "$stage3_ghc" --info
+    run ${CROSS_EMULATOR} "$stage3_ghc" --info > stage3-info
+    cat stage3-info
+
+    # The stage3 compiler is a native target compiler: it must not consider
+    # itself a cross-compiler, and GHCi support must be compiled in when the
+    # target supports it.
+    grep -q '"cross compiling","NO"' stage3-info \
+      || fail "stage3 compiler reports itself as cross-compiling"
+
+    if grep -q '"Use interpreter","YES"' stage3-info; then
+      echo 'ghci works' > ghci-expected
+      ${CROSS_EMULATOR:-} "$stage3_ghc" -e 'putStrLn "ghci works"' > ghci-actual
+      run diff -w ghci-expected ghci-actual
+    fi
 
     run ${CROSS_EMULATOR} "$stage3_ghc" -package ghc "$TOP/.gitlab/hello.hs" -o hello-stage3
 

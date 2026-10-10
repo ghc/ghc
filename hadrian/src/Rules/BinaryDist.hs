@@ -70,6 +70,13 @@ These are the steps to build a bindist:
   to
     <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/lib
 
+- for cross-compilers, overwrite the implicitly copied (previous step)
+  <build root>/<library-stage-dir>/lib/targets/default.target file with that of
+  the executable stage. I.e. copy:
+    <build root>/<executable-stage-dir>/lib/targets/default.target
+  to
+    <build root>/<bindist-dir>/ghc-<X>.<Y>.<Z>-<arch>-<os>/lib/targets/default.target
+
 - copy the generated docs (user guide, haddocks, etc):
     <build root>/doc/
   to
@@ -247,6 +254,13 @@ buildBinDistDir root conf@BindistConfig{..} = do
         need =<< haddockDeps library_stage
 
     copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
+
+    -- For cross-compilers we need to override the `targets/default.target`
+    -- file that was implicitly copied from the library stage, because this
+    -- describes a target native compiler (stage3) and not a cross-compiler.
+    when (library_stage /= executable_stage) $
+        copyFile (root -/- stageString executable_stage -/- "lib" -/- "targets" -/- "default.target")
+                 (bindistFilesDir -/- "lib" -/- "targets" -/- "default.target")
 
     -- Regenerate settings file without LibDir. For bindists, LibDir should
     -- be derived from topdir at runtime such that the GHC binary is

@@ -276,10 +276,20 @@ generateRules = do
                       else root -/- stageString libraryStage -/- "lib"
                 relPkgDb = makeRelativeNoSysLink libTopDir pkgDb
             go (generateSettings out True relPkgDb libraryStage) out
-        (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr (targetStage (succStage compilerStage))) out
+        (prefix -/- "targets" -/- "default.target") %> \out ->
+            go (generateTargetFile compilerStage) out
 
   where
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
+
+    generateTargetFile :: Stage -> Expr String
+    generateTargetFile compilerStage = do
+        isCrossStage <- if compilerStage < Stage3
+                          then expr (crossStage compilerStage)
+                          else pure False
+        let libraryStage = if isCrossStage then succStage compilerStage else compilerStage
+        tgt <- expr (targetStage libraryStage)
+        pure $ show tgt { tgtLocallyExecutable = not isCrossStage }
 
 -- TODO: Use the Types, Luke! (drop partial function)
 -- We sometimes need to evaluate expressions that do not require knowing all
