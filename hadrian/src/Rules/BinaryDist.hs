@@ -232,7 +232,7 @@ buildBinDistDir root conf@BindistConfig{..} = do
     let bindistSettings = bindistFilesDir -/- "lib" -/- "settings"
         bindistContext = vanillaContext library_stage compiler
     bindistSettingsContent <- interpretInContext bindistContext $
-        generateSettings bindistSettings False "package.conf.d"
+        generateSettings library_stage bindistSettings False "package.conf.d"
     writeFileAtomic bindistSettings bindistSettingsContent
 
     copyDirectory rtsIncludeDir         bindistFilesDir

@@ -90,6 +90,8 @@ lib/settings : config.mk
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Relative Global Package DB", "package.conf.d")' >> $@
 	@echo ',("base unit-id", "$(BaseUnitId)")' >> $@
+	@echo ',("Project Unit Id", "$(GhcUnitId)")' >> $@
+	@echo ',("ghc-internal Unit Id", "$(GhcInternalUnitId)")' >> $@
 	@echo "]" >> $@
 
 lib/targets/default.target : config.mk default.target

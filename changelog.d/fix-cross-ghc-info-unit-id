@@ -1,0 +1,4 @@
+section: compiler
+synopsis: Fix a bug where unit ids in cross ghc --info output doesn't match ghc-pkg output, breaking cross ghc releases with cabal 3.18.
+mrs: !16790
+issues: #27919
