@@ -970,9 +970,5 @@ test('T23135', normal, compile, [''])
 test('LazyFieldAnnotations', normal, compile, [''])
 test('T27557', normal, compile, [''])
 test('T27664', normal, compile, [''])
-<<<<<<< 6dc35f93cb982ed1a87335c10e1652bc2d46c3e8
 test('T27916', normal, compile, [''])
-||||||| 4cf7628aa66
-=======
 test('T26543_orig', normal, compile, [''])
->>>>>>> 785d28a06410e31d9f0e15e5f2ca6cd678c9c30c

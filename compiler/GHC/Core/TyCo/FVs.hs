@@ -874,19 +874,6 @@ nice tight loops.
 {-# INLINE afvFolder #-}   -- See Note [Any-free-var folder]
 afvFolder :: TyCoFolder (FV (BoundVars, TyCoVar -> Bool) DM.Any)
 -- 'afvFolder' is short for "any-free-var folder", good for checking
-<<<<<<< 6dc35f93cb982ed1a87335c10e1652bc2d46c3e8
--- if any free var of a type satisfies a predicate `check_fv`
-afvFolder check_fv = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
-                                , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                                , tcf_hole = do_hole, tcf_lit = const mempty
-                                , tcf_tycobinder = addBndrFV }
-||||||| 4cf7628aa66
--- if any free var of a type satisfies a predicate `check_fv`
-afvFolder check_fv = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
-                                , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                                , tcf_hole = do_hole
-                                , tcf_tycobinder = addBndrFV }
-=======
 --   if any /deep/ free var of a type satisfies a predicate `check_fv`
 -- The "env" of the (FV env Any) is a pair (bvs,pred) of
 --    the bound variables (which are definitely not free), and
@@ -894,9 +881,8 @@ afvFolder check_fv = TyCoFolder { tcf_view = noView  -- See Note [Free vars and 
 afvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                        , tcf_tyvar = do_tcv
                        , tcf_covar = do_tcv
-                       , tcf_hole  = do_hole
+                       , tcf_hole  = do_hole, tcf_lit = const mempty
                        , tcf_tycobinder = addBndrSelectiveFV }
->>>>>>> 785d28a06410e31d9f0e15e5f2ca6cd678c9c30c
   where
     -- Check the variable itself with check_fv,
     -- and check its kind (this is a deep folder)

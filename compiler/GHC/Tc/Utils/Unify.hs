@@ -3694,26 +3694,12 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     -- Coercions: see Note [Occurs check and coercions]
     co_is_bad co = anyFreeVarsOfCo rhs_tcv_is_bad co
 
-<<<<<<< 6dc35f93cb982ed1a87335c10e1652bc2d46c3e8
-    occ_folder :: TyCoFolder (FV BoundVars Any)
-    occ_folder = TyCoFolder { tcf_view  = noView  -- Don't expand synonyms
-                            , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                            , tcf_lit = mempty, tcf_hole  = do_hole
-                            , tcf_tycobinder = addBndrFV }
-||||||| 4cf7628aa66
-    occ_folder :: TyCoFolder (FV BoundVars Any)
-    occ_folder = TyCoFolder { tcf_view  = noView  -- Don't expand synonyms
-                            , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                            , tcf_hole  = do_hole
-                            , tcf_tycobinder = addBndrFV }
-=======
 {- Note [simpleUnifyCheck]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 The function `simpleUnifyCheck` is a simple, /fast/ check for unifying (tv ~ rhs).
 It can return a definite decision (SUC_CannotUnify of SUC_CanUnify), or uncertainty
 (SUC_NotSure).  In the latter case we will later use `checkTyEqRhs` to resolve.
 In particular, `simpleUnifyCheck`:
->>>>>>> 785d28a06410e31d9f0e15e5f2ca6cd678c9c30c
 
 * Rejects if lhs_tv occurs in rhs_ty (see Note [Simple occurs check])
 * Rejects foralls unless
