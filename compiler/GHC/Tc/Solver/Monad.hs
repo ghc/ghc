@@ -2344,12 +2344,12 @@ checkTypeEq ev eq_rel lhs rhs =
         given_pred = mkNomEqPred fam_app new_ty
         given_term = evCoercion $ mkNomReflCo new_ty  -- See Detail (4) of Note
 
-    -- See Detail (7) of the Note
+    -- See Detail (7) of Note [Type equality cycles: implementation]
     cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
 
 -------------------------
 -- | Fill in CycleBreakerTvs with the variables they stand for.
--- See Note [Type equality cycles] in GHC.Tc.Solver.Equality
+-- See Note [Type equality cycles: Givens] in GHC.Tc.Solver.Equality
 restoreTyVarCycles :: InertSet -> TcM ()
 restoreTyVarCycles is
   = TcM.liftZonkM

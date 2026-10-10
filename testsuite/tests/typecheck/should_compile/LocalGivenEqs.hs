@@ -22,7 +22,7 @@ it mentions b in its RHS. It thus triggers Note [Type equality cycles]
 in GHC.Tc.Solver.Equality. That Note says we change the situation to
   [G] b ~ cbv GhcPs
   [G] Body b ~ cbv
-for some fresh CycleBreakerTv cbv. Now, our original equality looks to be let-like,
+for some fresh GivenCycleBreakerTv cbv. Now, our original equality looks to be let-like,
 but the new cbv equality is *not* let-like -- note that the variable is on the RHS.
 The solution is to consider any equality whose free variables are all at the current
 level to not stop equalities from floating. These are called *local*. Because both

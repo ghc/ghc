@@ -223,11 +223,11 @@ addCoreBndrsFV bndrs fv = foldr addCoreBndrFV fv bndrs
 unitFV :: Var -> SelectiveDFV
 -- Deals with an occurrence
 -- Shallow: does not look at the kind
-unitFV v = MkFV (\bvs -> EndoOS (do_it bvs))
+unitFV v = MkFV (\env -> EndoOS (do_it env))
   where
-    do_it (is_interesting,bvs) acc
+    do_it (bvs, is_interesting) acc
+      | v `elemVarSet` bvs     = acc  -- First exclude the bound vars
       | not (is_interesting v) = acc  -- The "selective" bit
-      | v `elemVarSet` bvs     = acc
       | v `elemDVarSet` acc    = acc
       | otherwise              = acc `extendDVarSet` v
 
