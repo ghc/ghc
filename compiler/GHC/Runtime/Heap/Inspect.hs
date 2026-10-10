@@ -628,18 +628,16 @@ be sigmas and not taus.
 
 {- Note [RuntimeUnkTv]
 ~~~~~~~~~~~~~~~~~~~~~~
-In the GHCi debugger we use unification variables whose MetaInfo is
-RuntimeUnkTv.  The special property of a RuntimeUnkTv is that it can
-unify with a polytype (see GHC.Tc.Utils.Unify.checkTypeEq).
-If we don't do this `:print <term>` will fail if the type of <term>
-has nested `forall`s or `=>`s.
+In the GHCi debugger we use unification variables whose MetaInfo is RuntimeUnkTv.
+The special property of a RuntimeUnkTv is that it can unify with a polytype (see
+GHC.Tc.Utils.Unify.simpleUnifyCheck).  If we don't do this `:print <term>` will fail if
+the type of <term> has nested `forall`s or `=>`s.
 
-This is because the GHCi debugger's internals will attempt to unify a
-metavariable with the type of <term> and then display the result, but
-if the type has nested `forall`s or `=>`s, then unification will fail
-unless we do something special.  As a result, `:print` will bail out
-and the unhelpful result will be `<term> = (_t1::t1)` (where `t1` is a
-metavariable).
+This is because the GHCi debugger's internals will attempt to unify a metavariable
+with the type of <term> and then display the result, but if the type has nested
+`forall`s or `=>`s, then unification will fail unless we do something special.  As
+a result, `:print` will bail out and the unhelpful result will be `<term> =
+(_t1::t1)` (where `t1` is a metavariable).
 
 Beware: <term> can have nested `forall`s even if its definition doesn't use
 RankNTypes! Here is an example from #14828:
@@ -654,13 +652,18 @@ We could envision deeply instantiating this type to get the type
 `forall f a b. Functor f => (a -> b) -> f a -> f b`,
 but this trick wouldn't work for higher-rank types.
 
-Instead, we adopt a simpler fix: allow RuntimeUnkTv to unify with a
-polytype (specifically, see ghci_tv in GHC.Tc.Utils.Unify.preCheck).
-This allows metavariables to unify with types that have
-nested (or higher-rank) `forall`s/`=>`s, which makes `:print fmap`
-display as
-`fmap = (_t1::forall (f :: * -> *) a b. Functor f => (a -> b) -> f a -> f b)`,
+Instead, we adopt a simpler fix: allow RuntimeUnkTv to unify with a polytype
+(specifically, see ghci_tv in GHC.Tc.Utils.Unify.preCheck).  This allows
+metavariables to unify with types that have nested (or higher-rank)
+`forall`s/`=>`s, which makes `:print fmap` display as
+  `fmap = (_t1::forall (f :: * -> *) a b. Functor f => (a -> b) -> f a -> f b)`,
 as expected.
+
+(RUT1) The debugger uses the "on-the-fly" unifier, namely
+          GHC.Tc.Utils.Unify.unifyType
+   and /ignores/ any constraints it generates: see `addConstraint`. It never
+   calls the constraint solver, so the constraint solver does not need to
+   understand about RuntimeUnkTvs.
 -}
 
 

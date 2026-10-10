@@ -2265,7 +2265,7 @@ qlUnify ty1 ty2
       | isConcreteTyVar kappa  -- See (UQL7) in Note [QuickLook unification]
       = return ()
       | anyFreeVarsOfType (== kappa) ty2
-      = return ()  -- Occurs check
+      = return ()  -- Occurs check.  See (UQL10) in Note [QuickLook unification]
       | otherwise
       = do { co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
                    -- unifyKind: see (UQL2) in Note [QuickLook unification]
@@ -2288,7 +2288,7 @@ qlUnify ty1 ty2
 In qlUnify, if we find (kappa ~ ty), we are going to update kappa := ty.
 That is the entire point of qlUnify!   Wrinkles:
 
-(UQL1) Before unifying an instantiation variable in `go_flexi`, we must check
+(UQL1) Before unifying an instantiation variable in `go_kappa`, we must check
   the usual unification conditions. In particular:
     * An occurs-check
     * An attempt to unify a concrete type variable with a non-concrete type.
@@ -2370,11 +2370,13 @@ That is the entire point of qlUnify!   Wrinkles:
   than an instantiation variable `kappa`?  Thus (alpha ~ ty).   It's tempting to just
   unify it, but the regular, on-the-fly unifier has lots of careful checks (levels,
   concreteness etc).  In regular unification it doesn't matter whether we unify on-the-fly
-  or later -- it's just an efficiency issue -- but here it matters because `qlUnify` has
-  /user-visible/ consequences.   This led to #26543.
+  or later -- it's just an efficiency issue -- but we must maintain all the careful invariants.
 
   The simplest thing is to say that `qlUnify` unifies /only/ instantiation variables
-  (see calls to `isQLInstTyVar`).  We could be more ambitious, perhaps, in future.
+  (see calls to `isQLInstTyVar`).  We could be more ambitious, perhaps, in future, but
+  beware of accidentally causing obscure /user-visible/ consequences (#26543),
+  e.g. via Note [Occurs check and coercions].
+
   Remember, though, that the /only/ reason for QuickLoook is to unify instantiation variables
   with polytypes; anything else is optional, and will be picked up with later "ordinary"
   typechecking.  So unifing only instantiation variables is enough.
@@ -2400,6 +2402,10 @@ That is the entire point of qlUnify!   Wrinkles:
   we get (kappa ~ alpha).  That way we don't have to monomorphise `kappa`.  So we
   "look through" all meta-tyvars, not just the instantiation vars.
 
+(UQL10) For the occurs check in `qlUnify` we simply use `anyFreeVarsOfType`.  For
+  coercions that looks at the free vars of the coercion; but for coercion /holes/
+  all it can do is look at the free vars of the hole's type.
+  See Note [Occurs check and coercions] in GHC.Tc.Utils.Unify
 
 Sadly discarded design alternative
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
