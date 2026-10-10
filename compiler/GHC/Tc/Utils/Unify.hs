@@ -3647,6 +3647,7 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     lhs_tv_is_concrete = isConcreteTyVar lhs_tv
     lhs_tv_nm          = tyVarName lhs_tv
 
+    -- See Note [RuntimeUnkTv] in GHC.Runtime.Heap.Inspect, esp (RUT1).
     forall_ok = isRuntimeUnkTyVar lhs_tv
 
     -- This fam_ok thing relates to a very specific perf problem
@@ -3719,7 +3720,7 @@ Clearly we want to check that `alpha` doesn't appear free in `blah`.  But even i
 it doesn't, what if `ch` is later filled in with a coercion mentioning `alpha`?
 Tht would be bad: we'd get an infinite structure.
 
-The right thing to do is to check for a loop when (later) filling in `ch`.
+The Right Thing to do is to check for a loop when (later) filling in `ch`.
 We don't do that right now, and it's very obscure.  But in `simpleUnifyCheck`
 we just look in the free vars of the /kind/ of the hole, which is what
 `anyFreeVarsOfCo` does.
@@ -4239,10 +4240,16 @@ Notably, it can check for things like:
 Its specific behaviour is governed by the `TyEqFlags` that are passed
 to it; see Note [TyEqFlags].
 
-Note, however, that `checkTyEqRhs` specifically does /not/ check for:
-  * Touchability of the LHS (in the case of a unification variable)
-  * Shape of the LHS (e.g. we can't unify Int with a TyVarTv)
-These things are checked by `simpleUnifyCheck`.
+Wrinkles
+
+(CTER1) Note, however, that `checkTyEqRhs` specifically does /not/ check for:
+         * Touchability of the LHS (in the case of a unification variable)
+         * Shape of the LHS (e.g. we can't unify Int with a TyVarTv)
+    These things are checked by `simpleUnifyCheck`.
+
+(CTER2) Also `checkTyEqRhs` does not need to worry about RuntimeUnkTvs, because
+    the solver is never called on constraints involving them.  See (RUT1) in
+    Note [RuntimeUnkTv] in GHC.Runtime.Heap.Inspect.
 -}
 
 
@@ -4300,6 +4307,7 @@ check_ty_eq_rhs :: forall m a
                 => TyEqFlags m a
                 -> TcType           -- Already zonked
                 -> m (PuResult a Reduction)
+{-# INLINEABLE check_ty_eq_rhs #-}
 check_ty_eq_rhs flags ty
   = case ty of
       LitTy {}        -> return $ okCheckRefl ty
@@ -4330,7 +4338,7 @@ check_ty_eq_rhs flags ty
                           ; return (mkReflCoRedn Nominal <$> co_res) }
 
       ForAllTy {}   -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
-{-# INLINEABLE check_ty_eq_rhs #-}
+         -- No need to worry about RuntimeUnkTv
 
 -------------------
 checkCo :: Monad m => TyEqFlags m a -> Coercion -> m (PuResult a Coercion)
