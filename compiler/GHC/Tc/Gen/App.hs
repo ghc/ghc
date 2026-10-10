@@ -2055,6 +2055,8 @@ qlMonoHsWrapper (WpTyApp ty)      = qlMonoTcType ty
 qlMonoHsWrapper _                 = return ()
 
 qlMonoTcType :: TcType -> ZonkM ()
+-- Monomorphise any free instantiation variables of `ty`
+-- This functions zonks as it goes
 -- See Note [Monomorphise instantiation variables]
 qlMonoTcType ty
   = do { traceZonk "monomorphiseQLInstVars {" (ppr ty)
@@ -2189,15 +2191,15 @@ qlUnify ty1 ty2
            ; go res1 res2 }
 
     -- Make sure to not unify "kappa := (a %1 -> b)". See (UQL5).
+    -- NB: we /do/ want to be able to unify "kappa := a => b", as that's
+    -- the main point of QuickLook (allowing meta-variables to be unified
+    -- with qualified types).
     go' (FunTy { ft_mult = OneTy }) _ = return ()
     go' _ (FunTy { ft_mult = OneTy }) = return ()
-      -- NB: we do want to be able to unify "kappa := a => b", as that's
-      -- the main point of QuickLook (allowing meta-variables to be unified
-      -- with qualified types).
 
     -- Type variables; see (UQL6) in Note [QuickLook unification]
-    go' (TyVarTy tv) ty2 | isQLInstTyVar tv = go_kappa tv ty2
-    go' ty1 (TyVarTy tv) | isQLInstTyVar tv = go_kappa tv ty1
+    go' (TyVarTy tv) ty2 | isMetaTyVar tv = go_meta tv ty2
+    go' ty1 (TyVarTy tv) | isMetaTyVar tv = go_meta tv ty1
 
     go' (CastTy ty1 _) ty2 = go ty1 ty2
     go' ty1 (CastTy ty2 _) = go ty1 ty2
@@ -2226,20 +2228,40 @@ qlUnify ty1 ty2
       | Just (t1a, t1b) <- tcSplitAppTyNoView_maybe ty1
       = do { go t1a t2a; go t1b t2b }
 
+    -- Type families have a monomorphic result, so if we see (say)
+    --     Maybe kappa ~ F ty
+    -- we know that kappa must be a monotype
+    go' (TyConApp tc1 _) ty2 | isTypeFamilyTyCon tc1 = monomorphise ty2
+    go' ty1 (TyConApp tc2 _) | isTypeFamilyTyCon tc2 = monomorphise ty1
+
     go' _ _ = return ()
        -- Don't look under foralls; see (UQL4) of Note [QuickLook unification]
 
     ----------------
-    go_kappa kappa ty2
-      = assertPpr (isMetaTyVar kappa) (ppr kappa) $
-        do { info <- readMetaTyVar kappa
-           ; case info of
+    go_meta tv1 ty2
+      = assertPpr (isMetaTyVar tv1) (ppr tv1) $
+        do { info <- readMetaTyVar tv1
+           ; case info of  -- See (UQL9)
                Indirect ty1 -> go ty1 ty2
                Flexi        -> do { ty2 <- liftZonkM $ zonkTcType ty2
-                                  ; go_flexi kappa ty2 } }
+                                  ; go_flexi tv1 ty2 } }
 
     ----------------
-    go_flexi kappa ty2  -- ty2 is zonked
+    -- Both tv1 and ty2 are zonked; tv1 is a unfilled meta-tyvar
+    -- Zonking ty2 makes the occurs-check easier
+    go_flexi tv1 ty2
+      | TyVarTy tv2 <- ty2
+      , lhsPriority tv2 > lhsPriority tv1
+      = go_flexi1 tv2 (TyVarTy tv1)
+      | otherwise
+      = go_flexi1 tv1 ty2
+
+    -- Both tv1 and ty2 are zonked; tv1 is a unfilled meta-tyvar
+    go_flexi1 tv1 ty2
+      | isQLInstTyVar tv1 = go_kappa tv1 ty2
+      | otherwise         = monomorphise ty2
+
+    go_kappa kappa ty2
       | isConcreteTyVar kappa  -- See (UQL7) in Note [QuickLook unification]
       = return ()
       | anyFreeVarsOfType (== kappa) ty2
@@ -2256,6 +2278,10 @@ qlUnify ty1 ty2
       where
         kappa_kind = tyVarKind kappa
         ty2_kind   = typeKind ty2
+
+    monomorphise :: TcType -> TcM ()
+    monomorphise ty  -- See (UQL8)
+      = do { _ <- liftZonkM $ qlMonoTcType ty; return () }
 
 {- Note [QuickLook unification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2358,6 +2384,22 @@ That is the entire point of qlUnify!   Wrinkles:
   we just give up. It's tiresome to do all the checks for concreteness; and concrete
   type variables are never unified with polytypes, so it's fine to leave it for the
   regular unifier.
+
+(UQL8) If we see (Maybe kappa ~ alpha), where `kappa` is an instantiation variable
+  and `alpha` is a regular unification variable, we know that `kappa` must be a
+  monotype, so we can use `qlMonoTcType` to monomorphise it.  This is important,
+  because rule APP-LIGHTNING in the QuickLook paper only fires when there are no free
+  instantiation variables.  Unifying `kappa` with a monotype makes it more possible
+  for APP-LIGHTNING to fire.
+
+  Same if we see (Maybe kappa ~ F tya) where F is a type function, becuase the result
+  of a type function is always a monotype.
+
+(UQL9) If we have (Maybe kappa ~ alpha) and we have /already/ unified alpha:=Maybe beta,
+  then it's more efficient to look through that unification and decompose, so that
+  we get (kappa ~ alpha).  That way we don't have to monomorphise `kappa`.  So we
+  "look through" all meta-tyvars, not just the instantiation vars.
+
 
 Sadly discarded design alternative
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
