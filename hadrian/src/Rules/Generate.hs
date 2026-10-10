@@ -287,7 +287,9 @@ generateRules = do
         isCrossStage <- if compilerStage < Stage3
                           then expr (crossStage compilerStage)
                           else pure False
-        let libraryStage = if isCrossStage then succStage compilerStage else compilerStage
+        let libraryStage = case compilerStage of
+                Stage0 {} -> Stage1
+                _         -> if isCrossStage then succStage compilerStage else compilerStage
         tgt <- expr (targetStage libraryStage)
         pure $ show tgt { tgtLocallyExecutable = not isCrossStage }
 
