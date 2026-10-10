@@ -118,7 +118,6 @@ import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Decls.Overlap ( OverlapMode(..) )
 import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.ImpExp ( NamespaceSpecifier(..) )
-import Language.Haskell.Syntax.Specificity
 import Language.Haskell.Syntax.Module.Name (HsModuleName)
 import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Type ( PromotionFlag(..) )
@@ -1120,11 +1119,6 @@ instance Outputable ModuleName where
 instance Outputable FieldLabelString where
   ppr (FieldLabelString l) = ppr l
 
-instance Outputable ForAllTyFlag where
-  ppr Required  = text "[req]"
-  ppr Specified = text "[spec]"
-  ppr Inferred  = text "[infrd]"
-
 instance Outputable HsDocStringDecorator where
   ppr HsDocStringNext        = text "|"
   ppr HsDocStringPrevious    = text "^"
@@ -1328,7 +1322,8 @@ data BindingSite
     | LetBind     -- ^ The x in   (let x = rhs in e)
     deriving Eq
 
-data JoinPointHood
+data JoinPointHood  -- Defined here because it is used in
+                    -- the type of bndrIsJoin_maybe
   = JoinPoint {-# UNPACK #-} !Int   -- The JoinArity (but an Int here because
   | NotJoinPoint                    -- synonym JoinArity is defined in Types.Basic)
   deriving( Eq )

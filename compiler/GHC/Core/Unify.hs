@@ -2403,7 +2403,8 @@ ty_co_match menv subst (ForAllTy (Bndr tv1 vis1t) ty1)
                        (ForAllCo tv2 vis1c vis2c kind_mco2 co2)
                        lkco rkco
   | isTyVar tv1 && isTyVar tv2
-  , vis1t == vis1c && vis1c == vis2c -- Is this necessary?
+  , vis1t `eqForAllVis` vis1c && vis1c `eqForAllVis` vis2c -- Is this necessary?
+      -- See Note [Comparing visibility] in GHC.Core.TyCo.Compare
       -- Is this visibility check necessary?  @rae says: yes, I think the
       -- check is necessary, if we're caring about visibility (and we are).
       -- But ty_co_match is a dark and not important corner.

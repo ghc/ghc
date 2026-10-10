@@ -23,6 +23,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import qualified Data.Monoid as M
+
 --
 -- * Cpr
 --
@@ -87,9 +89,9 @@ asConCpr (FlatConCpr t) = Just (t, [])
 asConCpr TopCpr         = Nothing
 asConCpr BotCpr         = Nothing
 
-seqCpr :: Cpr -> ()
-seqCpr (ConCpr _ cs) = foldr (seq . seqCpr) () cs
-seqCpr _             = ()
+seqCpr :: Cpr -> SeqResult
+seqCpr (ConCpr _ cs) = foldr ((M.<>) . seqCpr) mempty cs
+seqCpr _             = mempty
 
 --
 -- * CprType
@@ -160,7 +162,7 @@ unpackConFieldsCpr _  BotCpr = AllFieldsSame BotCpr
 unpackConFieldsCpr _  _      = AllFieldsSame TopCpr
 {-# INLINE unpackConFieldsCpr #-}
 
-seqCprTy :: CprType -> ()
+seqCprTy :: CprType -> SeqResult
 seqCprTy (CprType _ cpr) = seqCpr cpr
 
 -- | The arity of the wrapped 'CprType' is the arity at which it is safe
@@ -185,7 +187,7 @@ isTopCprSig (CprSig ty) = ct_cpr ty == topCpr
 mkCprSig :: Arity -> Cpr -> CprSig
 mkCprSig arty cpr = CprSig (CprType arty cpr)
 
-seqCprSig :: CprSig -> ()
+seqCprSig :: CprSig -> SeqResult
 seqCprSig (CprSig ty) = seqCprTy ty
 
 prependArgsCprSig :: Arity -> CprSig -> CprSig

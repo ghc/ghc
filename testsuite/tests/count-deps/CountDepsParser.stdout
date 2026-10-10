@@ -48,6 +48,7 @@ GHC.Core.Stats
 GHC.Core.Subst
 GHC.Core.TyCo.Compare
 GHC.Core.TyCo.FVs
+GHC.Core.TyCo.Make
 GHC.Core.TyCo.Ppr
 GHC.Core.TyCo.Rep
 GHC.Core.TyCo.Subst
@@ -285,6 +286,7 @@ GHC.Utils.Panic
 GHC.Utils.Panic.Plain
 GHC.Utils.Ppr
 GHC.Utils.Ppr.Colour
+GHC.Utils.StrictIdentity
 GHC.Utils.TmpFs
 GHC.Utils.Trace
 GHC.Utils.Word64

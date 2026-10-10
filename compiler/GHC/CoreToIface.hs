@@ -10,6 +10,8 @@ module GHC.CoreToIface
     , toIfaceTopBndr
     , toIfaceForAllBndr
     , toIfaceForAllBndrs
+    , toIfaceForAllTyBndr
+    , toIfaceForAllTyBndrs
     , toIfaceTyVar
       -- * Types
     , toIfaceType, toIfaceTypeX
@@ -158,6 +160,16 @@ toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
 toIfaceForAllBndrX :: VarSet -> (VarBndr TyCoVar flag) -> (VarBndr IfaceBndr flag)
 toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
 
+-- | Convert the binder of a 'ForAllTy'; c.f. 'toIfaceForAllBndr'
+toIfaceForAllTyBndrs :: [ForAllTyBinder] -> [IfaceForAllBndr]
+toIfaceForAllTyBndrs = map toIfaceForAllTyBndr
+
+toIfaceForAllTyBndr :: ForAllTyBinder -> IfaceForAllBndr
+toIfaceForAllTyBndr = toIfaceForAllTyBndrX emptyVarSet
+
+toIfaceForAllTyBndrX :: VarSet -> ForAllTyBinder -> IfaceForAllBndr
+toIfaceForAllTyBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) (IfaceForAllTyFlag vis)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -188,7 +200,7 @@ toIfaceTypeX fr ty@(AppTy {})  =
   let (head, args) = splitAppTys ty
   in IfaceAppTy (toIfaceTypeX fr head) (toIfaceAppTyArgsX fr head args)
 toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
-toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
+toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllTyBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
 toIfaceTypeX fr (FunTy { ft_arg = t1, ft_mult = w, ft_res = t2, ft_af = af })
   = IfaceFunTy af (toIfaceTypeX fr w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
@@ -311,8 +323,8 @@ toIfaceCoercionX fr co
 
     go (ForAllCo tv visL visR k co)
       = IfaceForAllCo (toIfaceBndr tv)
-                      visL
-                      visR
+                      (IfaceForAllTyFlag visL)
+                      (IfaceForAllTyFlag visR)
                       (go_mco k)
                       (toIfaceCoercionX fr' co)
                           where
@@ -355,14 +367,14 @@ toIfaceAppArgsX fr kind ty_args
       | Just ty' <- coreView ty
       = go env ty' ts
     go env (ForAllTy (Bndr tv vis) res) (t:ts)
-      = IA_Arg t' vis ts'
+      = IA_Arg t' (IfaceForAllTyFlag vis) ts'
       where
         t'  = toIfaceTypeX fr t
         ts' = go (extendTCvSubst env tv t) res ts
 
     go env (FunTy { ft_af = af, ft_res = res }) (t:ts)
       = assert (isVisibleFunArg af)
-        IA_Arg (toIfaceTypeX fr t) Required (go env res ts)
+        IA_Arg (toIfaceTypeX fr t) (IfaceForAllTyFlag Required) (go env res ts)
 
     go env ty ts@(t1:ts1)
       | not (isEmptyTCvSubst env)
@@ -376,7 +388,7 @@ toIfaceAppArgsX fr kind ty_args
         -- carry on as if it were FunTy.  Without the test for
         -- isEmptyTCvSubst we'd get an infinite loop (#15473)
         warnPprTrace True "toIfaceAppArgsX" (ppr kind $$ ppr ty_args) $
-        IA_Arg (toIfaceTypeX fr t1) Required (go env ty ts1)
+        IA_Arg (toIfaceTypeX fr t1) (IfaceForAllTyFlag Required) (go env ty ts1)
 
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
 tidyToIfaceType env ty = toIfaceType (tidyType env ty)
