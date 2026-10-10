@@ -25,7 +25,7 @@ test('conc072', only_ways(concurrent_ways), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
 test('T367_letnoescape',
-     [run_timeout_multiplier(0.02), expect_broken_for(7297,['optllvm']),
+     [run_timeout_multiplier(0.02), fragile_for(7297,['optllvm']),
      # wasm32 rts has no timer and scheduler always behaves as -C0,
      # see Note [No timer on wasm32] in rts. It'll be stuck in the
      # thread that infinitely loops, which is the expected behavior.
