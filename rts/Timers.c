@@ -49,6 +49,13 @@ handle_tick(void *unused STG_UNUSED)
 {
   handleProfTick(); // Bad or worse: see issue #27250.
 
+#if defined(THREADED_IDLEGC)
+  handleIdleGcTick();
+#endif
+}
+
+static void handleCtxSwitchTimerTick(void *unused STG_UNUSED)
+{
   if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0)
   {
       ticks_to_ctxt_switch--;
@@ -57,10 +64,6 @@ handle_tick(void *unused STG_UNUSED)
           contextSwitchAllCapabilities(); /* schedule a context switch */
       }
   }
-
-#if defined(THREADED_IDLEGC)
-  handleIdleGcTick();
-#endif
 }
 
 #if defined(THREADED_RTS)
@@ -78,6 +81,7 @@ static void handleEventLogTimerTick(void *unused STG_UNUSED)
 #endif
 
 static Timer *main_timer      = NULL;
+static Timer *ctxswitch_timer = NULL;
 static Timer *eventlog_timer  = NULL;
 
 void initTimers(void)
@@ -99,6 +103,14 @@ void initTimers(void)
     // user code. This is not ok! See issue #27250.
     }
 
+    if (ctxswitch_timer) {
+        reinitTimer(ctxswitch_timer);
+    } else if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0) {
+        ctxswitch_timer = newPeriodicTimer(handleCtxSwitchTimerTick, NULL,
+                                           TimerHandlerShortRunning,
+                                           RtsFlags.MiscFlags.tickInterval);
+    }
+
 #if defined(THREADED_RTS)
     if (eventlog_timer) {
         reinitTimer(eventlog_timer);
@@ -118,6 +130,9 @@ void startTimers(void)
     if (main_timer) {
         runTimer(main_timer);
     }
+    if (ctxswitch_timer) {
+        runTimer(ctxswitch_timer);
+    }
     if (eventlog_timer) {
         runTimer(eventlog_timer);
     }
@@ -129,6 +144,9 @@ void pauseTimers(void)
 #if defined(HAVE_PREEMPTION)
     if (main_timer) {
         pauseTimer(main_timer);
+    }
+    if (ctxswitch_timer) {
+        pauseTimer(ctxswitch_timer);
     }
     if (eventlog_timer) {
         pauseTimer(eventlog_timer);
@@ -142,6 +160,9 @@ void unpauseTimers(void)
     if (main_timer) {
         unpauseTimer(main_timer);
     }
+    if (ctxswitch_timer) {
+        unpauseTimer(ctxswitch_timer);
+    }
     if (eventlog_timer) {
         unpauseTimer(eventlog_timer);
     }
@@ -154,6 +175,10 @@ void exitTimers(void)
     if (main_timer) {
         haltTimer(main_timer);
         freeTimer(main_timer);
+    }
+    if (ctxswitch_timer) {
+        haltTimer(ctxswitch_timer);
+        freeTimer(ctxswitch_timer);
     }
     if (eventlog_timer) {
         haltTimer(eventlog_timer);
