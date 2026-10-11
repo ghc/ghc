@@ -16,4 +16,6 @@ void exitTimer(void);
 void pauseTimer(void);
 void unpauseTimer(void);
 
+void wakeUpRtsViaTimer(void);
+
 #include "EndPrivate.h"

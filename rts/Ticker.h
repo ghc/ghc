@@ -10,16 +10,24 @@
 
 #include "BeginPrivate.h"
 
+typedef struct Ticker Ticker; // opaque
+
 typedef void (*TickProc)(int);
 
 /* The ticker is initialised in a paused state. Use unpauseTicker to start. */
-void initTicker(Time interval, TickProc handle_tick);
+Ticker *initTicker(Time interval, TickProc handle_tick);
 
-/* Stop and terminate the ticker. It does not need to be stopped first.
- * The exitTicker action is *synchronous*. When it returns the caller is
- * guaranteed that the tick action is blocked.
+/* Stop the ticker prior to releasing resources with freeTicker().
+ * The stopTicker action is *synchronous*. When it returns the caller is
+ * guaranteed that the tick action will not be called again.
  */
-void exitTicker(void);
+void stopTicker(Ticker *ticker);
+
+/* Release the ticker's resources. The ticker must be stopped first using
+ * stopTicker(), or alternatively, in the case of posix it should be called in
+ * the child process after a fork().
+ */
+void freeTicker(Ticker *ticker);
 
 /* Pause and unpause (resume) the ticker.
  *
@@ -49,7 +57,7 @@ void exitTicker(void);
  * paired pause/unpause calls concurrently. They can be used by threads based
  * on consistent use of some shared state or observation.
  */
-void pauseTicker(void);
-void unpauseTicker(void);
+void pauseTicker(Ticker *ticker);
+void unpauseTicker(Ticker *ticker);
 
 #include "EndPrivate.h"

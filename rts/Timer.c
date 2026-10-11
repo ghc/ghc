@@ -73,12 +73,20 @@ handle_tick(int unused STG_UNUSED)
 #endif
 }
 
+static Ticker *main_ticker      = NULL;
+
 void initTimer(void)
 {
 #if defined(HAVE_PREEMPTION)
     initProfTimer();
+
+    /* initTimer is called in the child of a fork */
+    if (main_ticker) {
+        freeTicker(main_ticker);
+    }
+
     if (RtsFlags.MiscFlags.tickInterval != 0) {
-        initTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
+        main_ticker = initTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
     }
 #endif
 }
@@ -97,7 +105,7 @@ void pauseTimer(void)
 {
 #if defined(HAVE_PREEMPTION)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
-        pauseTicker();
+        pauseTicker(main_ticker);
     }
 #endif
 }
@@ -106,7 +114,7 @@ void unpauseTimer(void)
 {
 #if defined(HAVE_PREEMPTION)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
-        unpauseTicker();
+        unpauseTicker(main_ticker);
     }
 #endif
 }
@@ -115,7 +123,8 @@ void exitTimer (void)
 {
 #if defined(HAVE_PREEMPTION)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
-        exitTicker();
+        stopTicker(main_ticker);
+        freeTicker(main_ticker);
     }
 #endif
 }

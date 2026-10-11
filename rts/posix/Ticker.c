@@ -113,34 +113,48 @@ typedef struct { struct pollfd pollfds[1]; } fdset;
 typedef struct timeval timeout;   // for select()
 typedef struct { int fd; fd_set selectfds; } fdset; // need to stash fd
 #endif
+
+// local helpers, to hide the difference between ppoll() and select()
 static void poll_init_timeout(timeout *tv, Time t);
 static void poll_init_fdset(fdset *fds, int fd); // single fd only
-// poll_*_timeout returns >0 if fd ready, ==0 if timeout, <0 if error
+// These two return: >0 if fd ready, ==0 if timeout, <0 if error
 static int poll_no_timeout(fdset *fdset);
 static int poll_with_timeout(fdset *fdset, timeout *t);
 
 
-static Time ticker_interval = DEFAULT_TICK_INTERVAL;
+struct Ticker {
+    /* Each ticker runs in its own thread. The thread id is used to wait for
+     * the ticker thread to terminate after asking it politely to exit.
+     */
+    OSThreadId thread_id;
 
-// Atomic variable used by client threads to communicate that they want the
-// ticker thread to pause. This communication is one-way, with no
-// acknowledgement.
-static bool pause_request;
+    /* The tick handler function. */
+    TickProc handle_tick;
 
-// Atomic variable used by other threads to communicate that they want the
-// ticker thread to exit.
-static bool exit_request;
+    /* For periodic tickers this is the tick interval. */
+    Time interval;
 
-// Used to wait for the ticker thread to terminate after asking it to exit.
-static OSThreadId ticker_thread_id;
+    /* Fds used with sendFdWakeup to notify the ticker thread that any of the
+     * request variables below have been modified.
+     */
+    int notifyfd_r;
+    int notifyfd_w;
 
-// Fds used with sendFdWakeup to notify the ticker thread that any of the
-// *_request variables above have been set.
-static int notifyfd_r = -1, notifyfd_w = -1;
+    /* Atomic shared variable used by client threads to communicate that they
+     * want the ticker thread to pause. This communication is one-way, with no
+     * acknowledgement.
+     */
+    bool pause_request;
 
-static void *ticker_thread_func(void *_handle_tick)
+    /* Atomic shared variable used by other threads to communicate that they
+     * want the ticker thread to exit.
+     */
+    bool exit_request;
+};
+
+static void *ticker_thread_func(void *_ticker)
 {
-    TickProc handle_tick = _handle_tick;
+    Ticker *ticker = _ticker;
 
     // Thread-local view of our state. We compare these with the corresponding
     // atomic shared variables used to request state changes.
@@ -150,8 +164,8 @@ static void *ticker_thread_func(void *_handle_tick)
 
     timeout timeout;
     fdset fdset;
-    poll_init_timeout(&timeout, ticker_interval);
-    poll_init_fdset(&fdset, notifyfd_r);
+    poll_init_timeout(&timeout, ticker->interval);
+    poll_init_fdset(&fdset, ticker->notifyfd_r);
 
     while (!exit) {
 
@@ -164,7 +178,7 @@ static void *ticker_thread_func(void *_handle_tick)
 
         if (RTS_LIKELY(notify == 0)) {
             // The time expired, no state change notification.
-            handle_tick(0);
+            ticker->handle_tick(0);
 
         } else if (notify > 0) {
             // State change notification, check the request variables.
@@ -173,10 +187,10 @@ static void *ticker_thread_func(void *_handle_tick)
             // happens-before relation. So if the request variables are set
             // before calling sendFdWakeup, then we should be able to reliably
             // read them here afterwards.
-            collectFdWakeup(notifyfd_r);
+            collectFdWakeup(ticker->notifyfd_r);
 
-            paused = ACQUIRE_LOAD_ALWAYS(&pause_request);
-            exit   = RELAXED_LOAD_ALWAYS(&exit_request);
+            paused = ACQUIRE_LOAD_ALWAYS(&ticker->pause_request);
+            exit   = RELAXED_LOAD_ALWAYS(&ticker->exit_request);
 
         } else if (errno != EINTR) {
             // While the RTS attempts to mask signals, some foreign libraries
@@ -194,12 +208,14 @@ static void *ticker_thread_func(void *_handle_tick)
  *
  * The ticker is started in the paused state. Use unpauseTicker to continue.
  */
-void
-initTicker (Time interval, TickProc handle_tick)
+Ticker *initTicker(Time interval, TickProc handle_tick)
 {
-    ticker_interval     = interval;
-    pause_request       = true;
-    exit_request        = false;
+    Ticker *ticker = stgMallocBytes(sizeof(struct Ticker), "newPeriodicTicker");
+
+    ticker->interval      = interval;
+    ticker->handle_tick   = handle_tick;
+    ticker->pause_request = true;
+    ticker->exit_request  = false;
 
 #if defined(HAVE_SIGNAL_H)
     sigset_t mask, omask;
@@ -218,12 +234,7 @@ initTicker (Time interval, TickProc handle_tick)
      * "close" closed our own timerfd which inadvertently reused the same file
      * descriptor closed by the first call! (see #20618)
      */
-
-    if (notifyfd_r != -1) {
-        // don't leak the old file descriptors after a fork (#25280)
-        closeFdWakeup(notifyfd_r, notifyfd_w);
-    }
-    newFdWakeup(&notifyfd_r, &notifyfd_w);
+    newFdWakeup(&ticker->notifyfd_r, &ticker->notifyfd_w);
 
     /*
      * Create the thread with all blockable signals blocked, leaving signal
@@ -235,7 +246,8 @@ initTicker (Time interval, TickProc handle_tick)
     sigfillset(&mask);
     sigret = pthread_sigmask(SIG_SETMASK, &mask, &omask);
 #endif
-    ret = createAttachedOSThread(&ticker_thread_id, "ghc_ticker", ticker_thread_func, (void*)handle_tick);
+    ret = createAttachedOSThread(&ticker->thread_id, "ghc_ticker",
+                                 ticker_thread_func, (void*)ticker);
 #if defined(HAVE_SIGNAL_H)
     if (sigret == 0)
         pthread_sigmask(SIG_SETMASK, &omask, NULL);
@@ -244,39 +256,50 @@ initTicker (Time interval, TickProc handle_tick)
     if (ret != 0) {
         barf("Ticker: Failed to spawn thread: %s", strerror(errno));
     }
+    return ticker;
 }
 
 /* Asynchronous. Idempotent. */
-void unpauseTicker(void)
+void unpauseTicker(Ticker *ticker)
 {
-    RELEASE_STORE_ALWAYS(&pause_request, false);
-    sendFdWakeup(notifyfd_w);
+    RELEASE_STORE_ALWAYS(&ticker->pause_request, false);
+    sendFdWakeup(ticker->notifyfd_w);
 }
 
 /* Asynchronous. Idempotent.
  * There may be at additional ticks fired after a call to this, but it will
  * usually stop quickly.
  */
-void pauseTicker(void)
+void pauseTicker(Ticker *ticker)
 {
-    RELEASE_STORE_ALWAYS(&pause_request, true);
-    sendFdWakeup(notifyfd_w);
+    RELEASE_STORE_ALWAYS(&ticker->pause_request, true);
+    sendFdWakeup(ticker->notifyfd_w);
 }
 
 /* Synchronous. Not idempotent.
  * The ticker is guaranteed stopped after this.
  */
-void exitTicker(void)
+void stopTicker(Ticker *ticker)
 {
-    ASSERT(!RELAXED_LOAD_ALWAYS(&exit_request));
-    RELEASE_STORE_ALWAYS(&exit_request, true);
-    sendFdWakeup(notifyfd_w);
+    ASSERT(!RELAXED_LOAD_ALWAYS(&ticker->exit_request));
+    RELEASE_STORE_ALWAYS(&ticker->exit_request, true);
+    sendFdWakeup(ticker->notifyfd_w);
 
     // wait for ticker thread to terminate
-    if (pthread_join(ticker_thread_id, NULL)) {
+    if (pthread_join(ticker->thread_id, NULL)) {
         sysErrorBelch("Ticker: Failed to join: %s", strerror(errno));
     }
-    closeFdWakeup(notifyfd_r, notifyfd_w);
+}
+
+/* In the child process after a fork() the thread is gone but the fds remain.
+ * To avoid leaking the old file descriptors (#25280), freeTicker() must be
+ * used in the child process after a fork() and without using stopTicker (which
+ * would fail).
+ */
+void freeTicker(Ticker *ticker)
+{
+    closeFdWakeup(ticker->notifyfd_r, ticker->notifyfd_w);
+    stgFree(ticker);
 }
 
 /* Implementation of the local helpers, to hide the difference between ppoll()
