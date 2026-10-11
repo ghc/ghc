@@ -57,7 +57,15 @@ handle_tick(void *unused STG_UNUSED)
           contextSwitchAllCapabilities(); /* schedule a context switch */
       }
   }
+
+#if defined(THREADED_IDLEGC)
+  handleIdleGcTick();
+#endif
+}
+
 #if defined(THREADED_RTS)
+static void handleEventLogTimerTick(void *unused STG_UNUSED)
+{
   if (eventLogStatus() == EVENTLOG_RUNNING
       && RtsFlags.TraceFlags.eventlogFlushTicks > 0) {
       ticks_to_eventlog_flush--;
@@ -66,14 +74,11 @@ handle_tick(void *unused STG_UNUSED)
           flushEventLog(NULL);  // Bad or worse: see issue #27250.
       }
   }
-#endif
-
-#if defined(THREADED_IDLEGC)
-  handleIdleGcTick();
-#endif
 }
+#endif
 
 static Timer *main_timer      = NULL;
+static Timer *eventlog_timer  = NULL;
 
 void initTimers(void)
 {
@@ -93,6 +98,17 @@ void initTimers(void)
     // capabilities and I/O! And with eventlog providers, it calls arbitrary
     // user code. This is not ok! See issue #27250.
     }
+
+#if defined(THREADED_RTS)
+    if (eventlog_timer) {
+        reinitTimer(eventlog_timer);
+    } else if (RtsFlags.TraceFlags.eventlogFlushTicks > 0) {
+        eventlog_timer = newPeriodicTimer(handleEventLogTimerTick, NULL,
+                                          TimerHandlerLongRunning,
+                                          RtsFlags.MiscFlags.tickInterval);
+    }
+#endif
+
 #endif
 }
 
@@ -101,6 +117,9 @@ void startTimers(void)
 #if defined(HAVE_PREEMPTION)
     if (main_timer) {
         runTimer(main_timer);
+    }
+    if (eventlog_timer) {
+        runTimer(eventlog_timer);
     }
 #endif
 }
@@ -111,6 +130,9 @@ void pauseTimers(void)
     if (main_timer) {
         pauseTimer(main_timer);
     }
+    if (eventlog_timer) {
+        pauseTimer(eventlog_timer);
+    }
 #endif
 }
 
@@ -119,6 +141,9 @@ void unpauseTimers(void)
 #if defined(HAVE_PREEMPTION)
     if (main_timer) {
         unpauseTimer(main_timer);
+    }
+    if (eventlog_timer) {
+        unpauseTimer(eventlog_timer);
     }
 #endif
 }
@@ -129,6 +154,10 @@ void exitTimers(void)
     if (main_timer) {
         haltTimer(main_timer);
         freeTimer(main_timer);
+    }
+    if (eventlog_timer) {
+        haltTimer(eventlog_timer);
+        freeTimer(eventlog_timer);
     }
 #endif
 }
