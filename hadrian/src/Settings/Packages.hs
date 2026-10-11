@@ -163,7 +163,8 @@ packageArgs = do
           -- the Stage1 libraries, as we already know that the bootstrap
           -- compiler comes with the same versions as the one we are building.
           --
-            builder (Cabal Setup) ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
+            -- Not for stage0 of a cross build: these are the target's libffi dirs
+            builder (Cabal Setup) ? orM [notStage0, notCross] ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
           , builder (Cabal Flags) ? mconcat
             [ ifM stage0
                 (andM [cross, bootCross] `cabalFlag` "internal-interpreter")
