@@ -164,7 +164,7 @@ data JSVal
 {-# INLINE freeJSVal #-}
 freeJSVal :: JSVal -> IO ()
 freeJSVal v@(JSVal p) = do
-  js_callback_unregister v
+  fastcall js_callback_unregister v
   IO $ \s0 -> case stg_freeJSVal# p s0 of
     (# s1, _, _ #) -> (# s1, () #)
 
@@ -198,12 +198,12 @@ newtype JSString
 -- eagerly once the resulting 'String' is forced, and the argument
 -- 'JSString' may be explicitly freed if no longer used.
 fromJSString :: JSString -> String
-fromJSString s = case js_stringLength s * 3 of
+fromJSString s = case fastcall js_stringLength s * 3 of
   0 -> ""
   max_len -> unsafePerformIO $ do
     fptr <- mallocPlainForeignPtrBytes max_len
     withForeignPtr fptr $ \ptr -> do
-      len <- js_encodeInto s ptr max_len
+      len <- fastcall js_encodeInto s ptr max_len
       peekCStringLen utf8 (ptr, len)
 
 foreign import javascript unsafe "$1.length"
@@ -214,7 +214,7 @@ foreign import javascript unsafe "(new TextEncoder()).encodeInto($1, new Uint8Ar
 
 -- | Converts a Haskell 'String' to a 'JSString'.
 toJSString :: String -> JSString
-toJSString s = unsafeDupablePerformIO $ withCStringLen utf8 s $ \(buf, len) -> js_toJSString buf len
+toJSString s = unsafeDupablePerformIO $ withCStringLen utf8 s $ \(buf, len) -> fastcall js_toJSString buf len
 
 foreign import javascript unsafe "(new TextDecoder('utf-8', {fatal: true})).decode(new Uint8Array(__exports.memory.buffer, $1, $2))"
   js_toJSString :: Ptr a -> Int -> IO JSString
@@ -242,6 +242,7 @@ jsErrorString e = unsafeDupablePerformIO $ do
   freeJSVal v
   pure r
 
+-- Exception values can have getters or string conversions that re-enter Haskell.
 foreign import javascript unsafe "`${$1.stack ? $1.stack : $1}`"
   js_errorToString :: JSException -> IO JSString
 

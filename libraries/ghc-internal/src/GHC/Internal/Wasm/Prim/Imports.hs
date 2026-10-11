@@ -65,6 +65,12 @@ so for each possible return type, we need to define a distinct
 user's concern, the desugar logic picks the right one to be passed to
 stg_blockPromise.
 
+The desugar logic applies fastcall to the "message promise" function.
+The Promise comes from an async JavaScript function generated for the
+import, so its .then() callbacks run asynchronously, even when the
+import returns a custom thenable. Registering the callbacks therefore
+does not require re-entrancy.
+
 Once the thunk is forced, we first check if we're inside a C FFI
 export's main thread and if so, throw WouldBlockException. Then we pin
 the current TSO via a stable pointer and call the "message promise"

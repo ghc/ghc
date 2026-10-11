@@ -108,7 +108,7 @@ purgeObj f = throwIO $ ErrorCall $ "purgeObj: unsupported on wasm for " <> f
 
 lookupSymbol :: BS.ShortByteString -> IO (Maybe (Ptr a))
 lookupSymbol sym@(BS.SBS ba#) = do
-  r <- js_lookupSymbolPtr ba# (BS.length sym)
+  r <- fastcall js_lookupSymbolPtr ba# (BS.length sym)
   evaluate $ if r == nullPtr then Nothing else Just r
 
 foreign import javascript unsafe "__ghc_wasm_jsffi_dyld.lookupSymbolPtr($1,$2)"

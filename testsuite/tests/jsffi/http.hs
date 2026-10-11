@@ -54,10 +54,10 @@ main = do
   stream_consumers <- js_import $ toJSString "node:stream/consumers"
   req_handler <- js_mk_req_handler $ \req resp -> do
     req_str <- fromJSString <$> js_req_to_str stream_consumers req
-    js_resp_write_head resp
-    js_resp_end resp $ toJSString $ "pong: " <> req_str
-  server <- js_server_create http req_handler
+    fastcall js_resp_write_head resp
+    fastcall js_resp_end resp $ toJSString $ "pong: " <> req_str
+  server <- fastcall js_server_create http req_handler
   port <- js_server_listen server
   pong <- js_fetch_post (toJSString $ "http://localhost:" <> show port) (toJSString "ping")
-  js_print pong
-  js_server_close server
+  fastcall js_print pong
+  fastcall js_server_close server

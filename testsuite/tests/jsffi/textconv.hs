@@ -31,10 +31,10 @@ foreign import javascript unsafe "(new TextDecoder('utf-8', {fatal: true})).deco
 
 textFromJSString :: JSString -> Text
 textFromJSString str = unsafeDupablePerformIO $ do
-  buf <- js_str_encode str
-  I# len# <- js_buf_len buf
+  buf <- fastcall js_str_encode str
+  I# len# <- fastcall js_buf_len buf
   IO $ \s0 -> case newByteArray# len# s0 of
-    (# s1, mba# #) -> case unIO (js_from_buf buf (Ptr (mutableByteArrayContents# mba#))) s1 of
+    (# s1, mba# #) -> case unIO (fastcall js_from_buf buf (Ptr (mutableByteArrayContents# mba#))) s1 of
       (# s2, _ #) -> case unIO (freeJSVal (coerce buf)) s2 of
         (# s3, _ #) -> case unsafeFreezeByteArray# mba# s3 of
           (# s4, ba# #) -> (# s4, Text (ByteArray ba#) 0 (I# len#) #)
@@ -43,7 +43,7 @@ textToJSString :: Text -> JSString
 textToJSString (Text (ByteArray ba#) (I# off#) (I# len#)) = unsafeDupablePerformIO $
   IO $ \s0 -> case newPinnedByteArray# len# s0 of
     (# s1, mba# #) -> case copyByteArray# ba# off# mba# 0# len# s1 of
-      s2 -> keepAlive# mba# s2 $ unIO $ js_to_str (Ptr (mutableByteArrayContents# mba#)) $ I# len#
+      s2 -> keepAlive# mba# s2 $ unIO $ fastcall js_to_str (Ptr (mutableByteArrayContents# mba#)) $ I# len#
 
 foreign export javascript "main sync"
   main :: IO ()

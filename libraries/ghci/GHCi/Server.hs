@@ -218,9 +218,9 @@ newtype JSUint8Array = JSUint8Array { unJSUint8Array :: JSVal }
 recv_buf :: Callback (IO JSUint8Array) -> IO ByteString
 recv_buf cb = do
   buf <- js_recv_buf cb
-  len <- js_buf_len buf
+  len <- fastcall js_buf_len buf
   fp <- mallocForeignPtrBytes len
-  js_download_buf buf $ unsafeForeignPtrToPtr fp
+  fastcall js_download_buf buf $ unsafeForeignPtrToPtr fp
   freeJSVal $ unJSUint8Array buf
   evaluate $ B.fromForeignPtr0 fp len
 
