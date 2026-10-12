@@ -74,17 +74,9 @@ import GHC.Internal.Real ( fromIntegral )
 import GHC.Internal.System.Posix.Types
 
 #if defined(mingw32_HOST_OS)
-import qualified GHC.Internal.Conc.Windows as IOMgr
 import GHC.Internal.Conc.Windows (asyncRead, asyncWrite, asyncDoProc, asyncReadBA,
                          asyncWriteBA, ConsoleEvent(..), win32ConsoleHandler,
                          toWin32ConsoleEvent)
-#elif !defined(javascript_HOST_ARCH)
-import qualified GHC.Internal.Event.Thread as IOMgr
-#endif
-
-#if defined(wasm32_HOST_ARCH)
-import qualified GHC.Internal.Wasm.Prim.Conc as Wasm
-import qualified GHC.Internal.Wasm.Prim.Flag as Wasm
 #endif
 
 -- A switch to control support for calling in-library I/O managers.
@@ -96,6 +88,19 @@ import qualified GHC.Internal.Wasm.Prim.Flag as Wasm
 #else
 -- all other platforms
 #define HAVE_IOMGR_IN_LIB
+#endif
+
+#if defined(HAVE_IOMGR_IN_LIB)
+#if defined(mingw32_HOST_OS)
+import qualified GHC.Internal.Conc.Windows as IOMgr
+#else
+import qualified GHC.Internal.Event.Thread as IOMgr
+#endif
+#endif
+
+#if defined(wasm32_HOST_ARCH)
+import qualified GHC.Internal.Wasm.Prim.Conc as Wasm (threadDelay)
+import qualified GHC.Internal.Wasm.Prim.Flag as Wasm (isJSFFIUsed)
 #endif
 
 ensureIOManagerIsRunning :: IO ()

@@ -42,7 +42,7 @@ module GHC.Internal.Conc.Windows
        , module GHC.Internal.Event.Windows.ConsoleEvent
        ) where
 
-import GHC.Internal.Base (($))
+import GHC.Internal.Base (($), return)
 import qualified GHC.Internal.Conc.POSIX as POSIX
 import qualified GHC.Internal.Event.Windows.Thread as WINIO
 import GHC.Internal.Event.Windows.ConsoleEvent
