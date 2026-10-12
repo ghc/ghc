@@ -190,12 +190,12 @@ We now initialize these correctly. The initialization works like this:
 
   - For top-level bindings, check if the binding is a CAF
 
-    - CAF:      If -fcaf-all is enabled, create a new CAF just for this CAF
+    - CAF:      If -fprof-cafs is enabled, create a new CAF just for this CAF
                 and use it. Note that these new cost centres need to be
                 collected to be able to generate cost centre initialization
                 code, so `coreToTopStgRhs` now returns `CollectedCCs`.
 
-                If -fcaf-all is not enabled, use "all CAFs" cost centre.
+                If -fprof-cafs is not enabled, use "all CAFs" cost centre.
 
     - Non-CAF:  Top-level (static) data is not counted in heap profiles; nor
                 do we set CCCS from it; so we just slam in

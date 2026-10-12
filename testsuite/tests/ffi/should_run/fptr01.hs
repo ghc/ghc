@@ -4,8 +4,6 @@ module Main where
 
 import Foreign
 
-{-# INCLUDE "fptr01.h" #-}
-
 foreign import ccall "&f" fptr :: FunPtr (Ptr Int -> IO ())
 foreign import ccall "&g" gptr :: FunPtr (Ptr Int -> IO ())
 foreign import ccall "&h" hptr :: FunPtr (Ptr Int -> IO ())

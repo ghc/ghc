@@ -8,8 +8,6 @@
 --
 -- (c) The University of Glasgow 2004-2006
 --
--- Print Cmm as real C, for -fvia-C
---
 -- See wiki:commentary/compiler/backends/ppr-c
 --
 -- This is simpler than the old PprAbsC, because Cmm is "macro-expanded"

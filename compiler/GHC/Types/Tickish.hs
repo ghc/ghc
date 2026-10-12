@@ -106,7 +106,7 @@ type CmmTickish = GenTickish 'TickishPassCmm
 -- See Note [GHC Formalism] in GHC.Core.Lint
 data GenTickish pass =
     -- | An @{-# SCC #-}@ profiling annotation, either automatically
-    -- added by the desugarer as a result of -auto-all, or added by
+    -- added by the desugarer as a result of -fprof-auto, or added by
     -- the user.
     ProfNote {
       profNoteCC    :: CostCentre, -- ^ the cost centre

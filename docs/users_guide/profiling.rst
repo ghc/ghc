@@ -594,42 +594,6 @@ of your profiled program will be different to that of the unprofiled one.
     Process (or ignore) manual ``SCC`` annotations. Can be helpful to ignore annotations from libraries which
     are not desired.
 
-.. ghc-flag:: -auto-all
-    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fprof-auto`
-    :type: dynamic
-
-    Deprecated alias for :ghc-flag:`-fprof-auto`
-
-.. ghc-flag:: -auto
-    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fprof-auto-exported`
-    :type: dynamic
-
-    Deprecated alias for :ghc-flag:`-fprof-auto-exported`
-
-.. ghc-flag:: -caf-all
-    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fprof-cafs`
-    :type: dynamic
-
-    Deprecated alias for :ghc-flag:`-fprof-cafs`
-
-.. ghc-flag:: -no-auto-all
-    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fno-prof-auto`
-    :type: dynamic
-
-    Deprecated alias for :ghc-flag:`-fno-prof-auto`
-
-.. ghc-flag:: -no-auto
-    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fno-prof-auto`
-    :type: dynamic
-
-    Deprecated alias for :ghc-flag:`-fno-prof-auto`
-
-.. ghc-flag:: -no-caf-all
-    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fno-prof-cafs`
-    :type: dynamic
-
-    Deprecated alias for :ghc-flag:`-fno-prof-cafs`
-
 .. _prof-time-options:
 
 Time and allocation profiling

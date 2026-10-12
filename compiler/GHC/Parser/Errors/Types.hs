@@ -650,7 +650,6 @@ data TransLayoutReason
 
 data FileHeaderPragmaType
   = OptionsPrag
-  | IncludePrag
   | LanguagePrag
   | DocOptionsPrag
 
