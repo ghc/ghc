@@ -21,7 +21,6 @@ module GHC.Driver.Session (
         Language(..),
         FatalMessager, FlushOut(..),
         ProfAuto(..),
-        glasgowExtsFlags,
         hasPprDebug, hasNoDebugOutput, hasNoStateHack, hasNoOptCoercion,
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
@@ -55,7 +54,7 @@ module GHC.Driver.Session (
         PackageDBFlag(..), PkgDbRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
-        fFlags, fLangFlags, xFlags,
+        fFlags, xFlags,
         wWarningFlags,
         makeDynFlagsConsistent,
         positionIndependent,
@@ -1084,14 +1083,8 @@ add_dep_message (AnySuffix f) message =
 -- See Note [Supporting CLI completion]
 dynamic_flags_deps :: [(Deprecation, Flag (CmdLineP DynFlags))]
 dynamic_flags_deps = [
-    make_dep_flag defFlag "n" (NoArg $ return ())
-        "The -n flag is deprecated and no longer has any effect"
-  , make_ord_flag defFlag "cpp"      (NoArg (setExtensionFlag LangExt.Cpp))
+    make_ord_flag defFlag "cpp"      (NoArg (setExtensionFlag LangExt.Cpp))
   , make_ord_flag defFlag "F"        (NoArg (setGeneralFlag Opt_Pp))
-  , (Deprecated, defFlag "#include"
-      (HasArg (\_s ->
-         deprecate ("-#include and INCLUDE pragmas are " ++
-                    "deprecated: They no longer have any effect"))))
   , make_ord_flag defFlag "v"        (OptIntSuffix setVerbosity)
 
   , make_ord_flag defGhcFlag "j"     (OptIntSuffix
@@ -1408,13 +1401,6 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_Ticky_Dyn_Thunk))
   , make_ord_flag defGhcFlag "ticky-tag-checks"
         (NoArg (setGeneralFlag Opt_Ticky_Tag))
-
-        ------- recompilation checker --------------------------------------
-  , make_dep_flag defGhcFlag "recomp"
-        (NoArg $ unSetGeneralFlag Opt_ForceRecomp)
-             "Use -fno-force-recomp instead"
-  , make_dep_flag defGhcFlag "no-recomp"
-        (NoArg $ setGeneralFlag Opt_ForceRecomp) "Use -fforce-recomp instead"
   , make_ord_flag defFlag "fmax-errors"
       (intSuffix (\n d -> d { maxErrors = Just (max 1 n) }))
   , make_ord_flag defFlag "fno-max-errors"
@@ -1772,8 +1758,6 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "fplugin-library" (hasArg addExternalPlugin)
 
         ------ Optimisation flags ------------------------------------------
-  , make_dep_flag defGhcFlag "Onot"   (noArgM $ setOptLevel 0 )
-                                                            "Use -O0 instead"
   , make_ord_flag defGhcFlag "O"      (optIntSuffixM (\mb_n ->
                                                 setOptLevel (mb_n `orElse` 1)))
                 -- If the number is missing, use 1
@@ -1850,14 +1834,6 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { wantedsFuel = n }))
   , make_ord_flag defFlag "fqcs-expansion-fuel"
       (intSuffix (\n d -> d { qcsFuel = n }))
-  , (Deprecated, defFlag "fcontext-stack"
-      (intSuffixM (\n d ->
-       do { deprecate $ "use -freduction-depth=" ++ show n ++ " instead"
-          ; return $ d { reductionDepth = treatZeroAsInf n } })))
-  , (Deprecated, defFlag "ftype-function-depth"
-      (intSuffixM (\n d ->
-       do { deprecate $ "use -freduction-depth=" ++ show n ++ " instead"
-          ; return $ d { reductionDepth = treatZeroAsInf n } })))
   , make_ord_flag defFlag "fstrictness-before"
       (intSuffix (\n d -> d { strictnessBefore = n : strictnessBefore d }))
   , make_ord_flag defFlag "ffloat-lam-args"
@@ -1936,28 +1912,6 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { uniqueIncrement = n }))
 
         ------ Profiling ----------------------------------------------------
-
-        -- OLD profiling flags
-  , make_dep_flag defGhcFlag "auto-all"
-                    (noArg (\d -> d { profAuto = ProfAutoAll } ))
-                    "Use -fprof-auto instead"
-  , make_dep_flag defGhcFlag "no-auto-all"
-                    (noArg (\d -> d { profAuto = NoProfAuto } ))
-                    "Use -fno-prof-auto instead"
-  , make_dep_flag defGhcFlag "auto"
-                    (noArg (\d -> d { profAuto = ProfAutoExports } ))
-                    "Use -fprof-auto-exported instead"
-  , make_dep_flag defGhcFlag "no-auto"
-            (noArg (\d -> d { profAuto = NoProfAuto } ))
-                    "Use -fno-prof-auto instead"
-  , make_dep_flag defGhcFlag "caf-all"
-            (NoArg (setGeneralFlag Opt_AutoSccsOnIndividualCafs))
-                    "Use -fprof-cafs instead"
-  , make_dep_flag defGhcFlag "no-caf-all"
-            (NoArg (unSetGeneralFlag Opt_AutoSccsOnIndividualCafs))
-                    "Use -fno-prof-cafs instead"
-
-        -- NEW profiling flags
   , make_ord_flag defGhcFlag "fprof-auto"
       (noArg (\d -> d { profAuto = ProfAutoAll } ))
   , make_ord_flag defGhcFlag "fprof-auto-top"
@@ -1982,12 +1936,6 @@ dynamic_flags_deps = [
         ------ Compiler flags -----------------------------------------------
 
   , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend ncgBackend))
-  , make_ord_flag defGhcFlag "fvia-c"           (NoArg
-         (deprecate $ "The -fvia-c flag does nothing; " ++
-                      "it will be removed in a future GHC release"))
-  , make_ord_flag defGhcFlag "fvia-C"           (NoArg
-         (deprecate $ "The -fvia-C flag does nothing; " ++
-                      "it will be removed in a future GHC release"))
   , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjBackend llvmBackend))
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
@@ -2000,11 +1948,6 @@ dynamic_flags_deps = [
       setBackend $ platformDefaultBackend (targetPlatform dflags)
       dflags' <- liftEwM getCmdLineState
       pure $ gopt_unset dflags' Opt_ByteCodeAndObjectCode
-
-  , make_dep_flag defFlag "fglasgow-exts"
-      (NoArg enableGlasgowExts) "Use individual extensions instead"
-  , make_dep_flag defFlag "fno-glasgow-exts"
-      (NoArg disableGlasgowExts) "Use individual extensions instead"
 
         ------ Safe Haskell flags -------------------------------------------
   , make_ord_flag defFlag "fpackage-trust"   (NoArg setPackageTrust)
@@ -2067,8 +2010,6 @@ dynamic_flags_deps = [
     ]
 
      ------ Language flags -------------------------------------------------
- ++ map (mkFlag turnOn  "f"         setExtensionFlag  ) fLangFlagsDeps
- ++ map (mkFlag turnOff "fno-"      unSetExtensionFlag) fLangFlagsDeps
  ++ map (mkFlag turnOn  "X"         setExtensionFlag  ) xFlagsDeps
  ++ map (mkFlag turnOff "XNo"       unSetExtensionFlag) xFlagsDeps
  ++ map (mkFlag turnOn  "X"         setLanguage       ) languageFlagsDeps
@@ -2142,11 +2083,6 @@ package_flags_deps = [
       (NoArg (addPkgDbRef GlobalPkgDb))
   , make_ord_flag defFlag "user-package-db"
       (NoArg (addPkgDbRef UserPkgDb))
-    -- backwards compat with GHC<=7.4 :
-  , make_dep_flag defFlag "package-conf"
-      (HasArg $ addPkgDbRef . PkgDbPath . OsPath.unsafeEncodeUtf) "Use -package-db instead"
-  , make_dep_flag defFlag "no-user-package-conf"
-      (NoArg removeUserPkgDb)              "Use -no-user-package-db instead"
   , make_ord_flag defGhcFlag "package-name"       (HasArg $ \name ->
                                       upd (setUnitId name))
   , make_ord_flag defGhcFlag "this-unit-id"       (hasArg setUnitId)
@@ -2167,7 +2103,6 @@ package_flags_deps = [
       (NoArg (setGeneralFlag Opt_HideAllPluginPackages))
   , make_ord_flag defFlag "package-env"           (HasArg setPackageEnv)
   , make_ord_flag defFlag "ignore-package"        (HasArg ignorePackage)
-  , make_dep_flag defFlag "syslib" (HasArg exposePackage) "Use -package instead"
   , make_ord_flag defFlag "distrust-all-packages"
       (NoArg (setGeneralFlag Opt_DistrustAllPackages))
   , make_ord_flag defFlag "trust"                 (HasArg trustPackage)
@@ -2643,8 +2578,6 @@ fFlagsDeps = [
   flagSpec "prof-late-inline"                 Opt_ProfLateInlineCcs,
   flagSpec "regs-graph"                       Opt_RegsGraph,
   flagSpec "regs-iterative"                   Opt_RegsIterative,
-  depFlagSpec' "rewrite-rules"                Opt_EnableRewriteRules
-   (useInstead "-f" "enable-rewrite-rules"),
   flagSpec "shared-implib"                    Opt_SharedImplib,
   flagSpec "spec-constr"                      Opt_SpecConstr,
   flagSpec "spec-constr-keen"                 Opt_SpecConstrKeen,
@@ -2737,43 +2670,6 @@ fHoleFlags = [
   flagSpec "show-type-app-vars-of-hole-fits"  Opt_ShowTypeAppVarsOfHoleFits,
   flagSpec "show-docs-of-hole-fits"           Opt_ShowDocsOfHoleFits,
   flagSpec "unclutter-valid-hole-fits"        Opt_UnclutterValidHoleFits
-  ]
-
--- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
-fLangFlags :: [FlagSpec LangExt.Extension]
-fLangFlags = map snd fLangFlagsDeps
-
-fLangFlagsDeps :: [(Deprecation, FlagSpec LangExt.Extension)]
-fLangFlagsDeps = [
--- See Note [Updating flag description in the User's Guide]
--- See Note [Supporting CLI completion]
-  depFlagSpecOp' "th"                           LangExt.TemplateHaskell
-    checkTemplateHaskellOk
-    (deprecatedForExtension "TemplateHaskell"),
-  depFlagSpec' "fi"                             LangExt.ForeignFunctionInterface
-    (deprecatedForExtension "ForeignFunctionInterface"),
-  depFlagSpec' "ffi"                            LangExt.ForeignFunctionInterface
-    (deprecatedForExtension "ForeignFunctionInterface"),
-  depFlagSpec' "arrows"                         LangExt.Arrows
-    (deprecatedForExtension "Arrows"),
-  depFlagSpec' "implicit-prelude"               LangExt.ImplicitPrelude
-    (deprecatedForExtension "ImplicitPrelude"),
-  depFlagSpec' "bang-patterns"                  LangExt.BangPatterns
-    (deprecatedForExtension "BangPatterns"),
-  depFlagSpec' "monomorphism-restriction"       LangExt.MonomorphismRestriction
-    (deprecatedForExtension "MonomorphismRestriction"),
-  depFlagSpec' "extended-default-rules"         LangExt.ExtendedDefaultRules
-    (deprecatedForExtension "ExtendedDefaultRules"),
-  depFlagSpec' "implicit-params"                LangExt.ImplicitParams
-    (deprecatedForExtension "ImplicitParams"),
-  depFlagSpec' "scoped-type-variables"          LangExt.ScopedTypeVariables
-    (deprecatedForExtension "ScopedTypeVariables"),
-  depFlagSpec' "allow-overlapping-instances"    LangExt.OverlappingInstances
-    (deprecatedForExtension "OverlappingInstances"),
-  depFlagSpec' "allow-undecidable-instances"    LangExt.UndecidableInstances
-    (deprecatedForExtension "UndecidableInstances"),
-  depFlagSpec' "allow-incoherent-instances"     LangExt.IncoherentInstances
-    (deprecatedForExtension "IncoherentInstances")
   ]
 
 supportedLanguages :: [String]
@@ -2875,15 +2771,6 @@ enableDLint = do
         , Opt_CatchNonexhaustiveCases
         , Opt_LlvmFillUndefWithGarbage
         ]
-
-enableGlasgowExts :: DynP ()
-enableGlasgowExts = do setGeneralFlag Opt_PrintExplicitForalls
-                       mapM_ setExtensionFlag glasgowExtsFlags
-
-disableGlasgowExts :: DynP ()
-disableGlasgowExts = do unSetGeneralFlag Opt_PrintExplicitForalls
-                        mapM_ unSetExtensionFlag glasgowExtsFlags
-
 
 setWarnSafe :: Bool -> DynP ()
 setWarnSafe True  = getCurLoc >>= \l -> upd (\d -> d { warnSafeOnLoc = l })
@@ -3094,7 +2981,6 @@ setExtensionFlag' f dflags = foldr ($) (xopt_set dflags f) deps
 
 unSetExtensionFlag' f dflags = xopt_unset dflags f
    -- When you un-set f, however, we don't un-set the things it implies
-   --      (except for -fno-glasgow-exts, which is treated specially)
 
 --------------------------
 

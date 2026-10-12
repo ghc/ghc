@@ -320,11 +320,6 @@ getOptions' opts sec supported toks
               real_src_span = expectJust (srcSpanToRealSrcSpan src_span)
               starting_loc  = realSrcSpanStart real_src_span
           parseToks (open:close:xs)
-              | ITinclude_prag str <- unLoc open
-              , ITclose_prag       <- unLoc close
-              = fmap (map (L (getLoc open)) ["-#include",removeSpaces str] ++)
-                     (parseToks xs)
-          parseToks (open:close:xs)
               | ITdocOptions str _ <- unLoc open
               , ITclose_prag       <- unLoc close
               = fmap (map (L (getLoc open)) ["-haddock-opts", removeSpaces str] ++)
@@ -355,8 +350,6 @@ getOptions' opts sec supported toks
           mkMessage (L loc token)
             | IToptions_prag _ <- token
             = Just (singleMessage $ mkPlainMsgEnvelope diag_opts loc (PsWarnMisplacedPragma OptionsPrag))
-            | ITinclude_prag _ <- token
-            = Just (singleMessage $ mkPlainMsgEnvelope diag_opts loc (PsWarnMisplacedPragma IncludePrag))
             | ITdocOptions _ _ <- token
             = Just (singleMessage $ mkPlainMsgEnvelope diag_opts loc (PsWarnMisplacedPragma DocOptionsPrag))
             | ITlanguage_prag <- token

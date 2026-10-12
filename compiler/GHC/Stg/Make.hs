@@ -67,7 +67,7 @@ mkTopStgRhs allow_toplevel_con_app opt_AutoSccsOnIndividualCafs this_mod ccs bnd
     upd_flag | isAtMostOnceDmd (idDemandInfo bndr) = SingleEntry
              | otherwise                           = Updatable
 
-    -- CAF cost centres generated for -fcaf-all
+    -- CAF cost centres generated for -fprof-cafs
     caf_cc = mkAutoCC bndr modl
     caf_ccs = mkSingletonCCS caf_cc
            -- careful: the binder might be :Main.main,

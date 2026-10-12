@@ -244,25 +244,3 @@ Similarly, language extensions can be controlled (either enabled or disabled):
      * :extension:`StarIsType`
      * :extension:`TraditionalRecordSyntax`
      * :extension:`ImplicitStagePersistence`
-
-
-
-Although not recommended, the deprecated :ghc-flag:`-fglasgow-exts` flag enables
-a large swath of the extensions supported by GHC at once.
-
-.. ghc-flag:: -fglasgow-exts
-    :shortdesc: Deprecated. Enable most language extensions;
-        see :ref:`options-language` for exactly which ones.
-    :type: dynamic
-    :reverse: -fno-glasgow-exts
-    :category: misc
-
-    The flag ``-fglasgow-exts`` is equivalent to enabling the following extensions:
-
-    .. include:: ../what_glasgow_exts_does.rst
-
-    Enabling these options is the *only* effect of ``-fglasgow-exts``. We are trying
-    to move away from this portmanteau flag, and towards enabling features
-    individually.
-
-

@@ -857,7 +857,6 @@ data Token
   | ITcomplete_prag     SourceText
   | ITclose_prag
   | IToptions_prag String
-  | ITinclude_prag String
   | ITlanguage_prag
   | ITminimal_prag      SourceText
   | IToverlappable_prag SourceText  -- instance overlap mode
@@ -3507,8 +3506,7 @@ linePrags = Map.singleton "line" linePrag
 fileHeaderPrags = Map.fromList([("options", lex_string_prag IToptions_prag),
                                  ("options_ghc", lex_string_prag IToptions_prag),
                                  ("options_haddock", lex_string_prag_comment ITdocOptions),
-                                 ("language", token ITlanguage_prag),
-                                 ("include", lex_string_prag ITinclude_prag)])
+                                 ("language", token ITlanguage_prag)])
 
 ignoredPrags = Map.fromList (map ignored pragmas)
                where ignored opt = (opt, nested_comment)

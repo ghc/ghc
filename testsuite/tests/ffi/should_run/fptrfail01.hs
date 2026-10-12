@@ -5,8 +5,6 @@ module Main where
 import Foreign
 import GHC.ForeignPtr
 
-{-# INCLUDE "fptrfail01.h" #-}
-
 foreign import ccall "&f" fptr :: FunPtr (Ptr Int -> IO ())
 
 main :: IO ()

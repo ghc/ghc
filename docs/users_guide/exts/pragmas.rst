@@ -26,8 +26,8 @@ Certain pragmas are *file-header pragmas*:
 -  File-header pragmas are read once only, before pre-processing the
    file (e.g. with cpp).
 
--  The file-header pragmas are: ``{-# LANGUAGE #-}``,
-   ``{-# OPTIONS_GHC #-}``, and ``{-# INCLUDE #-}``.
+-  The file-header pragmas are: ``{-# LANGUAGE #-}`` and
+   ``{-# OPTIONS_GHC #-}``.
 
 .. _language-pragma:
 
@@ -79,16 +79,6 @@ Previous versions of GHC accepted ``OPTIONS`` rather than
 ``OPTIONS_GHC``, but that is now deprecated.
 
 ``OPTIONS_GHC`` is a file-header pragma (see :ref:`pragmas`).
-
-.. _include-pragma:
-
-``INCLUDE`` pragma
-------------------
-
-The ``INCLUDE`` used to be necessary for specifying header files to be
-included when using the FFI and compiling via C. It is no longer
-required for GHC, but is accepted (and ignored) for compatibility with
-other compilers.
 
 .. _warning-deprecated-pragma:
 

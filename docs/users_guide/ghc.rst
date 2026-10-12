@@ -28,8 +28,7 @@ As a rule of thumb, all the language options are dynamic, as are the
 warning options and the debugging options.
 
 The rest are static, with the notable exceptions of
-``-v``, ``-cpp``, ``-fasm``, ``-fvia-C``, ``-fllvm``, and
-``-#include``.
+``-v``, ``-cpp``, ``-fasm``, and ``-fllvm``.
 The OPTIONS sections lists the status of each flag.
 
 Common suffixes of file names for Haskell are:

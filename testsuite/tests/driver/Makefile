@@ -149,18 +149,16 @@ test026:
 	test -f d026/P/Q$(OBJSUFFIX)
 
 # test stub generation
-# -fvia-C, because we want to check that the .hc file can #include the stub.h
 test027:
 	$(RM) B027/F.hi B027/F$(OBJSUFFIX) B027/F_stub.h
-	"$(TEST_HC)" $(TEST_HC_OPTS) -c B027/F.hs -fno-warn-deprecated-flags -fvia-C
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c B027/F.hs
 	test -f B027/F_stub.h
 
 # test -stubdir
-# -fvia-C, because we want to check that the .hc file can #include the stub.h
 test028:
 	$(RM) B028/F.hi B028/F$(OBJSUFFIX)
 	$(RM) stub028/B028/F_stub.h
-	"$(TEST_HC)" $(TEST_HC_OPTS) -c B028/F.hs -stubdir stub028 -fno-warn-deprecated-flags -fvia-C
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c B028/F.hs -stubdir stub028
 	test -f stub028/B028/F_stub.h
 
 # -----------------------------------------------------------------------------
@@ -289,16 +287,16 @@ test053:
 # -----------------------------------------------------------------------------
 # Other tests
 
-# Test that -keep-s-files works with --make and -fvia-C
+# Test that -keep-s-files works with --make
 test061a:
 	$(RM) A061a.hi A061a$(OBJSUFFIX) A061a.s
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -keep-s-files -fno-warn-deprecated-flags -fvia-C A061a.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -keep-s-files A061a.hs
 	test -f A061a.s
 
 # Test that -keep-s-files works without --make
 test061b:
 	$(RM) A061b.hi A061b$(OBJSUFFIX) A061b.s
-	"$(TEST_HC)" $(TEST_HC_OPTS) -c -keep-s-files -fno-warn-deprecated-flags -fvia-C A061b.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c -keep-s-files A061b.hs
 	test -f A061b.s
 
 # Test that -main-is works with --make

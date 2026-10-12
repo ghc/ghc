@@ -257,7 +257,6 @@ classify tok =
     ITcomplete_prag{} -> TkPragma
     ITclose_prag -> TkPragma
     IToptions_prag{} -> TkPragma
-    ITinclude_prag{} -> TkPragma
     ITlanguage_prag -> TkPragma
     ITminimal_prag{} -> TkPragma
     IToverlappable_prag{} -> TkPragma
@@ -397,7 +396,6 @@ inPragma False tok =
     ITann_prag{} -> True
     ITcomplete_prag{} -> True
     IToptions_prag{} -> True
-    ITinclude_prag{} -> True
     ITlanguage_prag -> True
     ITminimal_prag{} -> True
     IToverlappable_prag{} -> True

@@ -69,23 +69,14 @@ To install LLVM and Clang:
 
 .. _c-code-gen:
 
-C Code Generator (``-fvia-C``)
-------------------------------
+C Code Generator
+----------------
 
 .. index::
    single: C code generator
-   single: -fvia-C
-
-.. ghc-flag:: -fvia-C
-    :shortdesc: use the C code generator
-    :type: dynamic
-    :category: warnings
-
-    Use the C code generator. Only supposed in unregisterised GHC builds.
 
 This is the oldest code generator in GHC and is generally not included
-any more having been deprecated around GHC 7.0. Select it with the
-:ghc-flag:`-fvia-C` flag.
+any more.
 
 The C code generator is only supported when GHC is built in
 unregisterised mode, a mode where GHC produces "portable" C code as
