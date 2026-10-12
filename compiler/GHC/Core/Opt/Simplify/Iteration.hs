@@ -1287,8 +1287,7 @@ simplExprF1 env expr@(Lam {}) cont
         -- and likewise drop counts all binders (incl type lambdas)
 
 simplExprF1 env expr@(Case scrut bndr _ alts) cont
-  | Just (inner, outer) <- splitContForNoCaseCase env (isSingleton alts) cont
-       -- isSingleton: push casts inside only if there is just one alternative
+  | Just (inner, outer) <- splitContForNoCaseCase env cont
        -- See (COC-INV) in Note [sm_case_case: switching off case continuations]
   = do { (floats, expr') <- simplExprF env expr inner
        ; rebuildWithFloats env floats expr' outer }
@@ -1315,12 +1314,9 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
          tick (PreInlineUnconditionally bndr)
        ; simplExprF env' body cont }
 
-simplExprF1 env expr@(Let bind _) cont
-  | Just (inner, outer) <- splitContForNoCaseCase env (not (mightBeJoinBind bind)) cont
+simplExprF1 env expr@(Let {}) cont
+  | Just (inner, outer) <- splitContForNoCaseCase env cont
        -- See (COC-INV) in Note [sm_case_case: switching off case continuations]
-       -- mightBeJoinBind: do not push a cast into a join point's RHS, because
-       -- then we'd have to push it to every jump, including those in
-       -- multi-alternative cases, where we don't want to push casts
   = do { (floats, expr') <- simplExprF env expr inner
        ; rebuildWithFloats env floats expr' outer }
 
@@ -1346,22 +1342,13 @@ simplExprF1 env (Let (Rec pairs) body) cont
     simplRecE env pairs body cont
 
 
-mightBeJoinBind :: InBind -> Bool
--- True if joinPointBind_maybe might succeed; cheap and conservative
-mightBeJoinBind bind = any might_be_join (bindersOf bind)
-  where
-    might_be_join b = isId b && (isJoinId b || isAlwaysTailCalled (idOccInfo b))
-
-splitContForNoCaseCase :: SimplEnv
-                       -> Bool   -- True <=> casts may go in `inner`
-                       -> SimplCont
+splitContForNoCaseCase :: SimplEnv -> SimplCont
                        -> Maybe (SimplCont, SimplCont)
 -- When seCaseCase is off, this function splits `cont` into (inner, outer),
--- where `inner` has only applications (and perhaps casts), and `outer` is
--- non-trivial.  See splitContArgs for the Bool.
-splitContForNoCaseCase env push_casts cont
+-- where `inner` has only applications, and `outer` is non-trivial
+splitContForNoCaseCase env cont
   | seCaseCase env = Nothing
-  | otherwise      = splitContArgs push_casts cont
+  | otherwise      = splitContArgs cont
 
 {- Note [Avoiding space leaks in OutType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2450,7 +2437,7 @@ simplOutId env fun cont
   , ApplyToTy  { sc_cont = cont2 } <- cont1
   , ApplyToVal { sc_cont = cont3, sc_arg = arg, sc_env = arg_se
                , sc_cast = arg_mco, sc_hole_ty = fun_ty } <- cont2
-  = case splitContForNoCaseCase env True cont3 of
+  = case splitContForNoCaseCase env cont3 of
       Nothing -> do { e' <- simplRunRW env fun arg arg_se arg_mco fun_ty cont3
                     ; return (emptyFloats env, e') }
       Just (ink,outk) -> do { e' <- simplRunRW env fun arg arg_se arg_mco fun_ty ink
