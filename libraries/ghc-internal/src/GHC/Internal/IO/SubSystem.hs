@@ -4,6 +4,11 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE MagicHash          #-}
 
+#if defined(javascript_HOST_ARCH)
+-- To avoid sprinkling cpp all over the module
+{-# OPTIONS_GHC -Wno-unused-imports -Wno-unused-top-binds #-}
+#endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.IO.SubSystem
