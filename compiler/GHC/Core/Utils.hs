@@ -2207,6 +2207,8 @@ fun_always_ok _ = True
 -- | A special version of 'exprOkForSpeculation' used during
 -- Note [Speculative evaluation]. When the predicate arg `fun_ok` returns False
 -- for `b`, then `b` is never considered ok-for-spec.
+--
+-- This is the whole reason for the fun_ok arg to expr_ok.
 exprOkForSpecEval :: (Id -> Bool) -> CoreExpr -> Bool
 exprOkForSpecEval fun_ok = expr_ok fun_ok primOpOkForSpeculation
 
@@ -2240,10 +2242,9 @@ expr_ok fun_ok primop_ok (Case scrut bndr _ alts)
   && altsAreExhaustive alts
 
 expr_ok fun_ok primop_ok other_expr
-  | (expr, args) <- collectArgs other_expr
+  | (expr, val_args) <- collectValArgs other_expr
   = case stripTicksTopE (not . tickishCounts) expr of
-        Var f ->
-           app_ok fun_ok primop_ok f args
+        Var f -> app_ok fun_ok primop_ok f val_args
 
         -- 'LitRubbish' is the only literal that can occur in the head of an
         -- application and will not be matched by the above case (Var /= Lit).
@@ -2258,9 +2259,10 @@ expr_ok fun_ok primop_ok other_expr
 
 -----------------------------
 app_ok :: (Id -> Bool) -> (PrimOp -> Bool) -> Id -> [CoreArg] -> Bool
-app_ok fun_ok primop_ok fun args
+app_ok fun_ok primop_ok fun val_args
   | not (fun_ok fun)
-  = False -- This code path is only taken for Note [Speculative evaluation]
+  = False -- This code path is only taken for exprOkForSpecEval
+          -- See Note [Speculative evaluation]
 
   | idArity fun > n_val_args
   -- Partial application: just check passing the arguments is OK
@@ -2281,17 +2283,18 @@ app_ok fun_ok primop_ok fun args
 
       ClassOpId _ is_terminating_result
         | is_terminating_result -- See Note [exprOkForSpeculation and type classes]
-        -> assertPpr (n_val_args == 1) (ppr fun $$ ppr args) $
+        -> assertPpr (n_val_args == 1) (ppr fun $$ ppr val_args) $
            True
            -- assert: terminating result type => can't be applied;
            -- c.f the _other case below
 
       PrimOpId op _
         | primOpIsDiv op
-        , Lit divisor <- last args
+        , Lit divisor <- last val_args
             -- there can be 2 args (most div primops) or 3 args
             -- (WordQuotRem2Op), hence the use of last/init
-        -> not (isZeroLit divisor) && all (expr_ok fun_ok primop_ok) (init args)
+        -> not (isZeroLit divisor) &&
+           all ok_for_spec (init val_args)
               -- Special case for dividing operations that fail
               -- In general they are NOT ok-for-speculation
               -- (which primop_ok will catch), but they ARE OK
@@ -2300,12 +2303,14 @@ app_ok fun_ok primop_ok fun args
               -- can get rid of a thunk in an inner loop
 
         | otherwise -> primop_ok op && args_ok
+              -- Assumes that the primop does not evaluate its
+              -- definitely-lifted arguments
 
       _other  -- Unlifted and terminating types;
               -- Also c.f. the Var case of exprIsHNF
          |  isTerminatingType fun_ty  -- See Note [exprOkForSpeculation and type classes]
          || definitelyUnliftedType fun_ty
-         -> assertPpr (n_val_args == 0) (ppr fun $$ ppr args)
+         -> assertPpr (n_val_args == 0) (ppr fun $$ ppr val_args)
             True  -- Both terminating types (e.g. Eq a), and unlifted types (e.g. Int#)
                   -- are non-functions and so will have no value args.  The assert is
                   -- just to check this.
@@ -2321,32 +2326,43 @@ app_ok fun_ok primop_ok fun args
              --     for evaluated-ness of the fun;
              --     see Note [exprOkForSpeculation and evaluated variables]
   where
-    fun_ty       = idType fun
-    n_val_args   = valArgCount args
-    (arg_tys, _) = splitPiTys fun_ty
+    ok_for_spec = expr_ok fun_ok primop_ok   -- Used for recursive calls
+
+    fun_ty      = idType fun
+    n_val_args  = length val_args
+    val_arg_tys = splitUninstantiatedValArgTys fun_ty
+                  -- val_arg_tys are /uninstantiated/; see (EOKS1)
 
     -- Even if a function call itself is OK, any unlifted
     -- args are still evaluated eagerly and must be checked
-    args_ok = all2Prefix arg_ok arg_tys args
-    arg_ok :: PiTyVarBinder -> CoreExpr -> Bool
-    arg_ok (Named _) _ = True   -- A type argument
-    arg_ok (Anon ty _) arg      -- A term argument
-       | definitelyLiftedType (scaledThing ty)
-       = True -- lifted args are not evaluated eagerly
-       | otherwise
-       = expr_ok fun_ok primop_ok arg
+    --   arg_ok bndr arg = field_ok bndr NotMarkedStrict arg
+    -- See Note [exprOkForSpeculation] (a,b)
+    args_ok = all2Prefix arg_ok val_arg_tys val_args
+    arg_ok :: Type -> CoreExpr -> Bool
+    arg_ok arg_ty arg = ok_for_spec arg || definitely_lifted arg_ty arg
 
     -- Used for strict DataCon worker arguments
     -- See (SFC1) of Note [Strict fields in Core]
-    fields_ok str_marks = all3Prefix field_ok arg_tys str_marks args
-    field_ok :: PiTyVarBinder -> StrictnessMark -> CoreExpr -> Bool
-    field_ok (Named _)   _   _ = True
-    field_ok (Anon ty _) str arg
-       | NotMarkedStrict <- str                 -- iff it's a lazy field
-       , definitelyLiftedType (scaledThing ty)  -- and its type is lifted
-       = True                                   -- then the worker app does not eval
-       | otherwise
-       = expr_ok fun_ok primop_ok arg
+    -- See Note [exprOkForSpeculation] (a,b)
+    fields_ok str_marks = all3Prefix field_ok val_arg_tys str_marks val_args
+    field_ok :: Type -> StrictnessMark -> CoreExpr -> Bool
+    field_ok arg_ty str arg
+       = ok_for_spec arg || (definitely_lifted arg_ty arg && str==NotMarkedStrict)
+       -- The (ok_for_spec arg) test works for /both/ for unlifted types, /and/
+       -- for lifted but strict fields. E.g. K (I# 3) is ok-for-spec,
+       -- even if K is strict
+
+    -- We want to see if the argument type is definitely lifted.
+    -- But consider
+    --     (#,#) @rep1 @rep2 @ty1 @ty2 arg1 arg2
+    -- We don't /instantiate/ the type of (#,#) (although we could) so we don't
+    -- know if the argument type is lifted or not.  So we look at the type of
+    -- the /actual/ argument (it's usually a variable) instead.
+    definitely_lifted uninstantiated_arg_ty arg
+       = case typeLevity_maybe uninstantiated_arg_ty of
+           Just Lifted   -> True
+           Just Unlifted -> False
+           Nothing       -> definitelyLiftedType (exprType arg)
 
 -----------------------------
 altsAreExhaustive :: [Alt b] -> Bool
@@ -2390,8 +2406,42 @@ cantEtaReduceFun fun
        -- Don't undersaturate StrictWorkerIds.
        -- See Note [CBV Function Ids: overview] in GHC.Types.Id.Info.
 
-{- Note [exprOkForSpeculation and type classes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [exprOkForSpeculation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+  data T a = K !a Int# a
+
+Is the call (K e1 e2 e3) ok-for-speculation?  Look at the arguments e1..e3,
+and their types.  The call is ok-for-speculation if each argument satisfies
+`field_ok`, namely:
+  (a) (exprOkForSpeculation arg) holds, OR
+  (b) Arg type is definitely lifted and it is not marked strict
+
+For (a) we conservatively assume we are going to evaluate the argument.
+If it is ok-for-spec, then fine.
+
+But if the argument is of a lifted type, and not marked strict (notably by
+a data constructor) then (b) holds.  For example
+    Just (reverse xs)
+is ok-for-spec.  See (EOKS1) for the argument liftedness test.
+
+If we have a plain variable `x`, is that ok-for-spec? Not if it is lifted:
+it might be a thunk!  Hence the (definitelyUnliftedType fun_ty) test.
+Remember, a naked variable `x` will land in `app_ok x []` with no arguments.
+See Note [exprOkForSpeculation and evaluated variables].
+
+(EOKS1) To get the lifted-ness or otherwise of the arguments we just look at the
+  /uninstantiated/ type of the data constructor or primop.  We'd get better information
+  if we instantiated, but it's also more expensive.  Example:
+    (#,#) :: forall r1 r2 (a::TYPE r1) (b::TYPE r2). a -> b -> (# a, b #)
+  If we have a call
+       (#,#) @LiftedRep @IntRep @Int @Int# 3 4#
+  then we could see accurate liftedness by instantiation, but we don't try.
+  Instead we get the actual type from (exprType arg).  That could be expensive,
+  but it really only happens for unboxed tuples.
+
+Note [exprOkForSpeculation and type classes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider (#22745, #15205)
 
   \(d :: C a b). case eq_sel (sc_sel d) of
@@ -2674,8 +2724,7 @@ exprIsHNFlike is_con is_con_unf rubbish_lit_result e
         -- PAP: Check unlifted val_args
         args_hnf             = all2Prefix check_arg   val_arg_tys           val_args
 
-        fun_ty = idType id
-        val_arg_tys = mapMaybe anonPiTyBinderType_maybe (collectPiTyBinders fun_ty)
+        val_arg_tys = splitUninstantiatedValArgTys (idType id)
           -- val_arg_tys = map exprType val_args, but much less costly.
           -- The obvious definition regresses T16577 by 30% so we don't do it.
 
@@ -2699,7 +2748,6 @@ exprIsHNFlike is_con is_con_unf rubbish_lit_result e
           = Just (dataConRepStrictness dc)
           | otherwise
           = Nothing
-
 
 {-
 Note [exprIsHNF Tick]

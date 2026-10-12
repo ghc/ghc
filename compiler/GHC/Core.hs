@@ -490,7 +490,7 @@ This is a well-kinded type, in an environment-based scheme.  But `typeKind`
 will panic, because the kind of the body of a forall must not mention
 the forall'd variable (and the inner forall's body appears to do so).
 
-It might be possible to make `exprType` and `typeKind`` more complicated, so that
+It might be possible to make `exprType` and `typeKind` more complicated, so that
 they do renaming on the fly.  But instead we impose
 
 INVARIANT (NoTypeShadowing):
