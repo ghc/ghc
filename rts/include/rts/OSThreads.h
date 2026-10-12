@@ -73,7 +73,19 @@ typedef pthread_t       OSThreadId;
 
 #define OSThreadProcAttr /* nothing */
 
-#define INIT_COND_VAR       PTHREAD_COND_INITIALIZER
+/* Static initialiser for Mutex, i.e. we can use:
+ * Mutex mutex = MUTEX_STATIC_INIT;
+ * This can sometimes avoid boring init functions.
+ */
+#if defined(ASSERTS_ENABLED)
+#define MUTEX_STATIC_INIT PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP
+#else
+#define MUTEX_STATIC_INIT PTHREAD_MUTEX_INITIALIZER
+#endif
+
+/* Note that we do not have a corresponding CONDITION_STATIC_INIT because
+ * on posix we sometimes need to set an attribute during cond init.
+ */
 
 #if defined(LOCK_DEBUG)
 #define LOCK_DEBUG_BELCH(what, mutex) \
@@ -139,7 +151,7 @@ typedef DWORD OSThreadId;
 
 #define OSThreadProcAttr
 
-#define INIT_COND_VAR  0
+#define MUTEX_STATIC_INIT SRWLOCK_INIT
 
 /* Note [SRW locks]
    ~~~~~~~~~~~~~~~~
