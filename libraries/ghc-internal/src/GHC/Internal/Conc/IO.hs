@@ -67,36 +67,47 @@ import qualified GHC.Internal.Foreign.C.Error as C
 import GHC.Internal.Foreign.C.Types (CInt)
 import GHC.Internal.Maybe (Maybe(Nothing))
 import GHC.Internal.STM as STM
-import GHC.Internal.Prim (Int#, State#, RealWorld,
-                          delay#, waitRead#, waitWrite#, raiseIO#)
+import GHC.Internal.Prim (Int#, State#, RealWorld, delay#, raiseIO#)
 import GHC.Internal.Real ( fromIntegral )
 import GHC.Internal.System.Posix.Types
 
-#if !defined(javascript_HOST_ARCH)
-import GHC.Internal.IO.SubSystem
-#endif
-
 #if defined(mingw32_HOST_OS)
-import qualified GHC.Internal.Conc.Windows as Windows
 import GHC.Internal.Conc.Windows (asyncRead, asyncWrite, asyncDoProc, asyncReadBA,
                          asyncWriteBA, ConsoleEvent(..), win32ConsoleHandler,
                          toWin32ConsoleEvent)
-#elif !defined(javascript_HOST_ARCH)
-import qualified GHC.Internal.Event.Thread as Event
+#else
+import GHC.Internal.Prim (waitRead#, waitWrite#)
+#endif
+
+-- A switch to control support for calling in-library I/O managers.
+-- Plausible future directions: hoist this to .cabal file feature flag.
+#if defined(javascript_HOST_ARCH)
+-- Turned off for JS (which only has a single in-RTS I/O manager).
+#elif defined(wasm32_HOST_ARCH)
+-- Turned off for wasm (which only has in-RTS I/O managers).
+#else
+-- all other platforms
+#define HAVE_IOMGR_IN_LIB
+#endif
+
+#if defined(HAVE_IOMGR_IN_LIB)
+import GHC.Internal.IO.SubSystem
+#if defined(mingw32_HOST_OS)
+import qualified GHC.Internal.Conc.Windows as IOMgr
+#else
+import qualified GHC.Internal.Event.Thread as IOMgr
+#endif
 #endif
 
 #if defined(wasm32_HOST_ARCH)
-import qualified GHC.Internal.Wasm.Prim.Conc as Wasm
-import qualified GHC.Internal.Wasm.Prim.Flag as Wasm
+import qualified GHC.Internal.Wasm.Prim.Conc as Wasm (threadDelay)
+import qualified GHC.Internal.Wasm.Prim.Flag as Wasm (isJSFFIUsed)
 #endif
 
 ensureIOManagerIsRunning :: IO ()
-#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
 ensureIOManagerIsRunning
-  | iomgrInLib = Event.ensureIOManagerIsRunning
-#elif !defined(javascript_HOST_ARCH)
-ensureIOManagerIsRunning
-  | iomgrInLib = Windows.ensureIOManagerIsRunning
+#if defined(HAVE_IOMGR_IN_LIB)
+  | iomgrInLib = IOMgr.ensureIOManagerIsRunning
 #endif
   | otherwise  = return ()
 
@@ -107,15 +118,15 @@ ensureIOManagerIsRunning
 -- @since base-4.15
 interruptIOManager :: IO ()
 interruptIOManager
-#if defined(mingw32_HOST_OS)
-  | iomgrInLib = Windows.interruptIOManager
+#if defined(HAVE_IOMGR_IN_LIB)
+  | iomgrInLib = IOMgr.interruptIOManager
 #endif
   | otherwise  = return ()
 
 ioManagerCapabilitiesChanged :: IO ()
 ioManagerCapabilitiesChanged
-#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-  | iomgrInLib = Event.ioManagerCapabilitiesChanged
+#if defined(HAVE_IOMGR_IN_LIB)
+  | iomgrInLib = IOMgr.ioManagerCapabilitiesChanged
 #endif
   | otherwise  = return ()
 
@@ -126,14 +137,20 @@ ioManagerCapabilitiesChanged
 -- while this thread was blocked.  To safely close a file descriptor
 -- that has been used with 'threadWaitRead', use 'closeFdWith'.
 threadWaitRead :: Fd -> IO ()
+#if !defined(mingw32_HOST_OS)
 threadWaitRead fd
-#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-  | iomgrInLib = Event.threadWaitRead fd
+#if defined(HAVE_IOMGR_IN_LIB)
+  | iomgrInLib = IOMgr.threadWaitRead fd
 #endif
   | otherwise  = IO $ \s ->
         case fromIntegral fd of { I# fd# ->
         case waitRead# fd# s of { s' -> (# s', () #)
         }}
+#else
+threadWaitRead _fd
+  = errorWithoutStackTrace "threadWaitRead: not available on Windows"
+#endif
+
 
 -- | Block the current thread until data can be written to the
 -- given file descriptor (GHC only).
@@ -142,14 +159,19 @@ threadWaitRead fd
 -- while this thread was blocked.  To safely close a file descriptor
 -- that has been used with 'threadWaitWrite', use 'closeFdWith'.
 threadWaitWrite :: Fd -> IO ()
+#if !defined(mingw32_HOST_OS)
 threadWaitWrite fd
-#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-  | iomgrInLib = Event.threadWaitWrite fd
+#if defined(HAVE_IOMGR_IN_LIB)
+  | iomgrInLib = IOMgr.threadWaitWrite fd
 #endif
   | otherwise  = IO $ \s ->
         case fromIntegral fd of { I# fd# ->
         case waitWrite# fd# s of { s' -> (# s', () #)
         }}
+#else
+threadWaitWrite _fd
+  = errorWithoutStackTrace "threadWaitWrite: not available on Windows"
+#endif
 
 -- | Returns an STM action that can be used to wait for data
 -- to read from a file descriptor. The second returned value
@@ -157,8 +179,8 @@ threadWaitWrite fd
 -- in the file descriptor.
 threadWaitReadSTM :: Fd -> IO (STM.STM (), IO ())
 threadWaitReadSTM fd
-#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-  | iomgrInLib = Event.threadWaitReadSTM fd
+#if defined(HAVE_IOMGR_IN_LIB) && !defined(mingw32_HOST_OS)
+  | iomgrInLib = IOMgr.threadWaitReadSTM fd
 #endif
   | otherwise  = do
       m <- STM.newTVarIO False
@@ -176,8 +198,8 @@ threadWaitReadSTM fd
 -- in the file descriptor.
 threadWaitWriteSTM :: Fd -> IO (STM.STM (), IO ())
 threadWaitWriteSTM fd
-#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-  | iomgrInLib = Event.threadWaitWriteSTM fd
+#if defined(HAVE_IOMGR_IN_LIB) && !defined(mingw32_HOST_OS)
+  | iomgrInLib = IOMgr.threadWaitWriteSTM fd
 #endif
   | otherwise  = do
       m <- STM.newTVarIO False
@@ -209,8 +231,8 @@ closeFdWith :: (Fd -> IO ()) -- ^ Low-level action that performs the real close.
             -> Fd            -- ^ File descriptor to close.
             -> IO ()
 closeFdWith close fd
-#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-  | iomgrInLib = Event.closeFdWith close fd
+#if defined(HAVE_IOMGR_IN_LIB) && !defined(mingw32_HOST_OS)
+  | iomgrInLib = IOMgr.closeFdWith close fd
 #endif
   | otherwise  = close fd
 
@@ -226,12 +248,10 @@ closeFdWith close fd
 -- Consider using @Control.Concurrent.Thread.Delay.delay@ from @unbounded-delays@ package.
 threadDelay :: Int -> IO ()
 threadDelay time
-#if defined(mingw32_HOST_OS)
-  | iomgrInLib        = Windows.threadDelay time
+#if defined(HAVE_IOMGR_IN_LIB)
+  | iomgrInLib        = IOMgr.threadDelay time
 #elif defined(wasm32_HOST_ARCH)
   | Wasm.isJSFFIUsed  = Wasm.threadDelay time
-#elif !defined(javascript_HOST_ARCH)
-  | iomgrInLib        = Event.threadDelay time
 #endif
   | otherwise         = IO $ \s ->
         case time of { I# time# ->
@@ -247,12 +267,10 @@ threadDelay time
 --
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay _usecs
-#if defined(mingw32_HOST_OS)
-  | iomgrInLib        = Windows.registerDelay _usecs
-#elif !defined(javascript_HOST_ARCH)
-  | iomgrInLib        = Event.registerDelay _usecs
+#if defined(HAVE_IOMGR_IN_LIB)
+  | iomgrInLib = IOMgr.registerDelay _usecs
 #endif
-  | otherwise         = errorWithoutStackTrace "registerDelay: requires -threaded"
+  | otherwise  = errorWithoutStackTrace "registerDelay: requires -threaded"
 
 
 -- ---------------------------------------------------------------------------

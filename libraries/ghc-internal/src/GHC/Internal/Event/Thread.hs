@@ -15,6 +15,7 @@ import GHC.Internal.Types ()
     ( getSystemEventManager
     , getSystemTimerManager
     , ensureIOManagerIsRunning
+    , interruptIOManager
     , ioManagerCapabilitiesChanged
     , threadWaitRead
     , threadWaitWrite
@@ -458,5 +459,9 @@ foreign import ccall unsafe "setIOManagerControlFd"
 foreign import ccall unsafe "setTimerManagerControlFd"
    c_setTimerManagerControlFd :: CInt -> IO ()
 #endif
+
+-- No-op. Here to provide a uniform API to call in GHC.Internal.Conc.IO
+interruptIOManager :: IO ()
+interruptIOManager = return ()
 
 #endif

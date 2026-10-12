@@ -24,6 +24,7 @@ module GHC.Internal.Conc.Windows
 #else
        ( ensureIOManagerIsRunning
        , interruptIOManager
+       , ioManagerCapabilitiesChanged
 
        -- * Waiting
        , threadDelay
@@ -41,7 +42,7 @@ module GHC.Internal.Conc.Windows
        , module GHC.Internal.Event.Windows.ConsoleEvent
        ) where
 
-import GHC.Internal.Base (($))
+import GHC.Internal.Base (($), return)
 import qualified GHC.Internal.Conc.POSIX as POSIX
 import qualified GHC.Internal.Event.Windows.Thread as WINIO
 import GHC.Internal.Event.Windows.ConsoleEvent
@@ -121,5 +122,9 @@ ensureIOManagerIsRunning =  POSIX.ensureIOManagerIsRunning
 
 interruptIOManager :: IO ()
 interruptIOManager = POSIX.interruptIOManager <!> WINIO.interruptIOManager
+
+-- No-op. Here to provide a uniform API to call in GHC.Internal.Conc.IO
+ioManagerCapabilitiesChanged :: IO ()
+ioManagerCapabilitiesChanged = return ()
 
 #endif
