@@ -13,10 +13,10 @@ module Memo1
         where
 
 import System.Mem.StableName    ( StableName, makeStableName, hashStableName )
-import System.Mem.Weak          ( Weak, mkWeakPtr, mkWeak, deRefWeak, finalize )
+import System.Mem.Weak          ( Weak, mkWeak, deRefWeak, finalize )
 import Data.Array.IO            ( IOArray, newArray, readArray, writeArray )
 import System.IO.Unsafe         ( unsafePerformIO )
-import Control.Concurrent.MVar  ( MVar, newMVar, putMVar, takeMVar )
+import Control.Concurrent.MVar  ( MVar, newMVar, putMVar, takeMVar, mkWeakMVar )
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -78,7 +78,7 @@ lazyMemoSized size f =
    let (table,weak) = unsafePerformIO (
                 do { tbl <- newArray (0,size) []
                    ; mvar <- newMVar (size,tbl)
-                   ; weak <- mkWeakPtr mvar (Just (table_finalizer tbl size))
+                   ; weak <- mkWeakMVar mvar (table_finalizer tbl size)
                    ; return (mvar,weak)
                    })
    in  memo' f table weak
