@@ -256,18 +256,7 @@ generateRules = do
             prefix = root -/- stageString compilerStage -/- "lib"
             go gen file = generate file (semiEmptyTarget compilerStage) gen
         (prefix -/- "settings") %> \out -> do
-            -- @compilerStage@ is the stage that builds the compiler, i.e. the
-            -- binary whose settings these are; @libraryStage@ is the stage
-            -- whose libraries and package DB that compiler uses. The two
-            -- differ in two cases: Stage0 has no library or package DB of its
-            -- own (the bootstrapping compiler uses Stage1's), and cross
-            -- stages use the successor stage's libraries (a cross compiler
-            -- requires libs from the successor stage, otherwise they are
-            -- compiled for the host and not the target).
-            isCross <- crossStage compilerStage
-            let libraryStage = case compilerStage of
-                    Stage0 {} -> Stage1
-                    _         -> if isCross then succStage compilerStage else compilerStage
+            libraryStage <- libraryStageFor compilerStage
             pkgDb <- packageDbPath (PackageDbLoc libraryStage Final)
             -- addTrailingPathSeparator needed: makeRelativeNoSysLink uses
             -- splitPath where "lib" and "lib/" are distinct components.
@@ -288,9 +277,7 @@ generateRules = do
         isCrossStage <- if compilerStage < Stage3
                           then expr (crossStage compilerStage)
                           else pure False
-        let libraryStage = case compilerStage of
-                Stage0 {} -> Stage1
-                _         -> if isCrossStage then succStage compilerStage else compilerStage
+        libraryStage <- expr (libraryStageFor compilerStage)
         tgt <- expr (targetStage libraryStage)
         pure $ show tgt { tgtLocallyExecutable = not isCrossStage }
 
@@ -556,12 +543,12 @@ bindistRules = do
     interp = interpretInContext (semiEmptyTarget Stage2)
     getTarget stage = interp . queryTarget stage
     getLibTarget executableStage f = do
-      isCross <- crossStage executableStage
-      getTarget (if isCross then succStage executableStage else executableStage) f
+      libStage <- libraryStageFor executableStage
+      getTarget libStage f
     -- | 'targetSupportsSMP' lifted to the library stage (see 'getLibTarget').
     libStageSupportsSMP stage = do
-      isCross <- crossStage stage
-      targetSupportsSMP (if isCross then succStage stage else stage)
+      libStage <- libraryStageFor stage
+      targetSupportsSMP libStage
     -- | The unit id of @pkg@ in the stage whose libraries ship with the
     -- bindist, i.e. the library stage of the implicit bindist config. For
     -- cross compilers these are the target-architecture unit ids, as
