@@ -7,6 +7,8 @@
 -- (c) The University of Glasgow 2005
 --
 -----------------------------------------------------------------------------
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module GHC.Driver.MakeFile
    ( doMkDependHS
@@ -16,47 +18,63 @@ where
 
 import GHC.Prelude
 
-import qualified GHC
-import GHC.Driver.Make
-import GHC.Driver.Monad
+import GHC qualified
+
+import GHC.Data.Bag (listToBag)
+import GHC.Data.FastString (lexicalCompareFS, unpackFS)
+import GHC.Data.Graph.Directed (SCC (..))
+import GHC.Data.OsPath
+
 import GHC.Driver.DynFlags
-import GHC.Utils.Misc
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
-import GHC.Types.UnresolvedImport
-import qualified GHC.SysTools as SysTools
-import GHC.Data.Graph.Directed ( SCC(..) )
-import GHC.Data.OsPath (unsafeDecodeUtf)
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Types.SourceError
-import GHC.Types.SrcLoc
-import GHC.Types.PkgQual
-import Data.List (partition)
-import GHC.Utils.TmpFs
+import GHC.Driver.Make
+import GHC.Driver.Monad
+import GHC.Driver.Session
 
+import GHC.Iface.Errors.Types
 import GHC.Iface.Load (cannotFindModule)
 
-import GHC.Unit.Module
-import GHC.Unit.Module.ModSummary
-import GHC.Unit.Module.Graph
+import GHC.SysTools qualified as SysTools
+import GHC.Types.PkgQual
+import GHC.Types.SourceError
+import GHC.Types.SrcLoc
+import GHC.Types.Unique.Set (UniqSet)
+import GHC.Types.Unique.Set qualified as UniqSet
+import GHC.Types.UnresolvedImport
+
 import GHC.Unit.Finder
+import GHC.Unit.Info
+import GHC.Unit.Info qualified as UnitInfo
+import GHC.Unit.Module
+import GHC.Unit.Module.Graph
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.State (lookupUnitId)
 
-import GHC.Utils.Exception
 import GHC.Utils.Error
+import GHC.Utils.Exception
+import GHC.Utils.Json
 import GHC.Utils.Logger
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.TmpFs
 
-import System.Directory
-import System.FilePath
-import System.IO
-import System.IO.Error  ( isEOFError )
-import Control.Monad    ( when, forM_ )
-import Data.Maybe       ( isJust )
-import Data.IORef
-import qualified Data.Set as Set
-import GHC.Iface.Errors.Types
+import Control.Monad (forM_, guard, when)
 import Data.Either
-import GHC.Data.Bag (listToBag)
+import Data.Foldable (for_, traverse_)
+import Data.IORef
+import Data.List (partition)
+import Data.Map.Strict qualified as Map
+import Data.Maybe (isJust)
+import Data.Monoid qualified as Monoid
+import Data.Set qualified as Set
+import System.Directory
+import System.Directory.OsPath qualified as Directory
+import System.IO
+import System.IO.Error (isEOFError)
+import System.OsPath as OsPath
+import System.OsString qualified as OsString
 
 -----------------------------------------------------------------
 --
@@ -98,27 +116,53 @@ doMkDependHS srcs = do
 
 doMkDependModuleGraph :: GhcMonad m =>  DynFlags -> ModuleGraph -> m ()
 doMkDependModuleGraph dflags module_graph = do
+    hsc_env <- getSession
     logger <- getLogger
-    tmpfs <- hsc_tmpfs <$> getSession
-    let excl_mods = depExcludeMods dflags
+    let
+      tmpfs = hsc_tmpfs hsc_env
+      excl_mods = depExcludeMods dflags
 
-    files <- liftIO $ beginMkDependHS logger tmpfs dflags
+    root <- liftIO Directory.getCurrentDirectory
+
+    let
+      backends = concat
+        [ [ initFileDepWriter logger root tmpfs dflags makefile_output
+          | Just makefile_output <- [depMakefile dflags]
+          ]
+        , [ initJsonDepWriter logger tmpfs dflags json_output
+          | Just json_output <- [depJson dflags]
+          ]
+        ]
+
+
     let sorted = GHC.topSortModuleGraph False module_graph Nothing
-
     -- Print out the dependencies if wanted
     liftIO $ debugTraceMsg logger 2 (text "Module dependencies" $$ ppr sorted)
 
-    -- Process them one by one, dumping results into makefile
-    -- and complaining about cycles
-    hsc_env <- getSession
-    root <- liftIO getCurrentDirectory
-    mapM_ (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files)) sorted
+    liftIO $ do
 
-    -- If -ddump-mod-cycles, show cycles in the module graph
-    liftIO $ dumpModCycles logger module_graph
+      -- Setup the writers
+      writers <- sequenceA backends
 
-    -- Tidy up
-    liftIO $ endMkDependHS logger files
+      -- Do the actual work
+      do
+        -- Process them one by one, dumping results and complaining about cycles
+        forM_
+          sorted
+          (\ mod_graph_node ->
+            processDeps hsc_env (UniqSet.mkUniqSet excl_mods) mod_graph_node >>= \ case
+              Nothing -> pure ()
+              Just dep_node ->
+                traverse_ (\ s -> dw_writeDependency s dep_node) writers
+          )
+
+        -- If -ddump-mod-cycles, show cycles in the module graph
+        liftIO $ dumpModCycles logger module_graph
+
+      -- Tidy up
+      do
+        traverse_ dw_endWriter writers
+
 
     -- Unconditional exiting is a bad idea.  If an error occurs we'll get an
     --exception; if that is not caught it's fine, but at least we have a
@@ -126,6 +170,223 @@ doMkDependModuleGraph dflags module_graph = do
     --line if you disagree.
 
     --`GHC.ghcCatch` \_ -> io $ exitWith (ExitFailure 1)
+
+--------------------------------------------------------------------------------
+-- Types abstracting over the output
+--------------------------------------------------------------------------------
+
+-- | A 'DepNode' is a direct translation of a 'ModuleGraphNode' that
+-- can be serialised to a Makefile or json lines format.
+data DepNode =
+  ModuleDepNode HomeModuleNode [Dep]
+  -- ^ A dependency node of a home module with its dependencies
+
+-- | A home module node.
+-- Everything we know about home modules that can be serialised.
+data HomeModuleNode =
+  HomeModuleNode
+    { hmn_unitId :: UnitId
+    -- ^ 'UnitId' of the 'HomeUnitEnv' this home module belongs to.
+    , hmn_packageName :: Maybe String
+    -- ^ Optional package name, used for @-XPackageImports@.
+    , hmn_mod :: ModuleWithIsBoot
+    -- ^ 'Module' of this home module with 'IsBootInterface' information.
+    , hmn_src :: OsPath
+    -- ^ Where is the source for this home module located.
+    , hmn_obj :: OsPath
+    -- ^ Where is the object file for this home module located if it exists.
+    , hmn_hi :: OsPath
+    -- ^ Where is the interface file for this home module located if it exists.
+    , hmn_preprocessing :: Maybe PreprocessingNode
+    -- ^ Is there a preprocessor that needs to be run for this module before compilation.
+    , hmn_includePkgDeps :: Bool
+    -- ^ When serialising this home module, should we include external package dependencies
+    -- (such as importing @Data.List@ from @base@) in the output?
+    }
+
+-- | Preprocessor that needs to be run before a module can be compiled.
+data PreprocessingNode = PreprocessingNode
+  { pn_preprocessor :: String
+  -- ^ The preprocessor.
+  , pn_arguments :: [String]
+  }
+
+-- | A dependency edge on another module, or cpp path.
+data Dep
+  = DepHi
+    -- ^ A dependency on a Haskell interface.
+    { dep_mod :: Module
+    -- ^ The 'Module' a dependency node is depending on.
+    , dep_path :: OsPath
+    -- ^ Location of the module
+    , dep_unit :: Maybe UnitInfo
+    -- ^ To which external unit does this dependency belong to?
+    -- If this is 'Nothing', then this should mean this is a home module.
+    , dep_local :: Bool
+    -- ^ Is this dependency a home module?
+    , dep_level :: ImportLevel
+    -- ^ Is this dependency used at a specific 'ImportLevel'?
+    , dep_boot :: IsBootInterface
+    -- ^ Is this dependency imported using @{- SOURCE -}@.
+    -- May only be 'IsBoot' if it is a home module from the same home unit
+    -- as the 'DepModuleNode'.
+    }
+  | DepCpp
+    -- ^ A dependency on a CPP @#include@ in the Haskell source file, identified by the preprocessor.
+    { dep_path :: OsPath
+    -- ^ Path to the @#include@d path.
+    }
+
+-- | 'DependencyWriter' is a backend for outputting 'DepNode' in a specific
+-- output format.
+data DependencyWriter = DependencyWriter
+  { dw_writeDependency :: DepNode -> IO ()
+  -- ^ Serialise a 'DepNode' and write it out.
+  , dw_endWriter :: IO ()
+  -- ^ End the serialiation of dependency information and perform
+  -- final steps, such as cleaning up temporary files and copying intermediate
+  -- files to their final location.
+  }
+
+-----------------------------------------------------------------
+--
+--              processDeps
+--
+-----------------------------------------------------------------
+
+processDeps :: HscEnv
+            -> UniqSet ModuleName -- ^ Excludes
+            -> SCC ModuleGraphNode
+            -> IO (Maybe DepNode)
+-- Write suitable dependencies to handle
+-- Always:
+--                      this.o : this.hs
+--
+-- If the dependency is on something other than a .hi file:
+--                      this.o this.p_o ... : dep
+-- otherwise
+--                      this.o ...   : dep.hi
+--                      this.p_o ... : dep.p_hi
+--                      ...
+-- (where .o is $osuf, and the other suffixes come from
+-- the cmdline -s options).
+--
+-- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
+
+processDeps hsc_env _ (CyclicSCC nodes)
+  =     -- There shouldn't be any cycles; report them
+    throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $ cyclicModuleErr nodes
+
+processDeps hsc_env _ (AcyclicSCC (InstantiationNode _uid node))
+  =     -- There shouldn't be any backpack instantiations; report them as well
+    throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $
+      mkPlainErrorMsgEnvelope noSrcSpan $
+      GhcDriverMessage $ DriverInstantiationNodeInDependencyGeneration node
+
+processDeps _ _ (AcyclicSCC (LinkNode {})) = return Nothing
+processDeps _ _ (AcyclicSCC (UnitNode {})) = return Nothing
+processDeps _ _ (AcyclicSCC (ModuleNode _ (ModuleNodeFixed {})))
+  -- No dependencies needed for fixed modules (already compiled)
+  = return Nothing
+
+processDeps hsc_env0 excl_mods (AcyclicSCC (ModuleNode _ (ModuleNodeCompile node))) = do
+  let
+    find_deps imps = do
+      cpp_deps <- find_cpp_deps
+      import_deps <- find_import_deps imps
+      pure $ map Right cpp_deps ++ import_deps
+
+  (missing_dep_errs, deps) <- partitionEithers <$> find_deps (ms_imps node)
+
+  if null missing_dep_errs
+    then do
+      pure $ Just $ ModuleDepNode mkDepNode deps
+    else do
+      let sec = initSourceErrorContext dflags
+      throwErrors sec (mkMessages (listToBag missing_dep_errs))
+  where
+    -- Operations such import resolution depend on the currently active home unit id.
+    -- With multiple home units, each module may be from a different home unit with
+    -- separate dependencies and options.
+    -- Thus, we need to set the active unit id to the one of the module we are processing.
+    hsc_env = hscSetActiveUnitId (ms_unitid node) hsc_env0
+    dflags = ms_hspp_opts node
+    src_file = msHsFileOsPath node
+    mkDepNode =
+      HomeModuleNode
+        { hmn_unitId = ms_unitid node
+        , hmn_packageName = thisPackageName dflags
+        , hmn_mod = GWIB (ms_mod node) (isBootSummary node)
+        , hmn_src = src_file
+        , hmn_obj = msObjFileOsPath node
+        , hmn_hi = msHiFileOsPath node
+        , hmn_preprocessing = preprocessor
+        , hmn_includePkgDeps = depIncludePkgDeps dflags
+        }
+
+    preprocessor :: Maybe PreprocessingNode
+    preprocessor = do
+      guard (gopt Opt_Pp dflags)
+      let pp = pgm_F dflags
+      guard (not $ null pp)
+      let args = opt_F dflags
+      pure $ PreprocessingNode
+        { pn_preprocessor = pp
+        , pn_arguments = args
+        }
+
+    -- Emit a dependency for each CPP import
+    -- CPP deps are discovered in the module parsing phase by parsing
+    -- comment lines left by the preprocessor.
+    -- Note that GHC.parseModule may throw an exception if the module
+    -- fails to parse, which may not be desirable (see #16616).
+    find_cpp_deps :: IO [Dep]
+    find_cpp_deps =
+      if depIncludeCppDeps dflags
+        then do
+          session <- Session <$> newIORef hsc_env
+          parsedMod <- reflectGhc (GHC.parseModule node) session
+          pure (DepCpp . unsafeEncodeUtf <$> GHC.pm_extra_src_files parsedMod)
+        else
+          pure []
+
+    -- Emit a dependency for each import
+    find_import_deps :: [Located (UnresolvedImport PkgQual)] -> IO [Either (MsgEnvelope GhcMessage) Dep]
+    find_import_deps idecls =
+      sequence
+        [ findDependency hsc_env decl
+        | decl <- idecls
+        , not $ ui_mod_name (unLoc decl) `UniqSet.elementOfUniqSet` excl_mods
+        ]
+
+findDependency  :: HscEnv
+                -> Located (UnresolvedImport PkgQual)   -- The import to find
+                -> IO (Either (MsgEnvelope GhcMessage) Dep)  -- Interface file
+findDependency hsc_env (L srcloc imp) = do
+  -- Find the module; this will be fast because
+  -- we've done it once during downsweep.
+  r <- runFinderM $ resolveImport hsc_env imp
+  case r of
+    Found loc dep_mod ->
+      pure $ Right
+        DepHi
+          { dep_mod = dep_mod
+          , dep_path = ml_hi_file_ospath loc
+          , dep_unit = lookupUnitId (hsc_units hsc_env) (moduleUnitId dep_mod)
+          , dep_local = isJust (ml_hs_file loc)
+          , dep_boot = is_boot
+          , dep_level = ui_level imp
+          }
+
+    fail ->
+      return $
+        Left $
+          mkPlainErrorMsgEnvelope srcloc $
+          GhcDriverMessage $ DriverInterfaceError $
+             (Can'tFindInterface (cannotFindModule hsc_env mod_name fail) (LookingForModule mod_name is_boot))
+  where
+    mod_name = ui_mod_name imp
+    is_boot  = ui_boot imp
 
 -----------------------------------------------------------------
 --
@@ -136,22 +397,33 @@ doMkDependModuleGraph dflags module_graph = do
 --
 -----------------------------------------------------------------
 
+initFileDepWriter :: Logger -> OsPath -> TmpFs -> DynFlags -> FilePath -> IO DependencyWriter
+initFileDepWriter logger root tmpfs dflags makefile = do
+  files <- beginMkDependHS logger tmpfs dflags makefile
+  pure DependencyWriter
+    { dw_writeDependency = \ case
+        ModuleDepNode node deps -> do
+          writeDependencies root (mkd_tmp_hdl files) suffixes node deps
+    , dw_endWriter = endMkDependHS logger files
+    }
+  where
+    suffixes = map unsafeEncodeUtf (depSuffixes dflags)
+
 data MkDepFiles
   = MkDep { mkd_make_file :: FilePath,          -- Name of the makefile
             mkd_make_hdl  :: Maybe Handle,      -- Handle for the open makefile
             mkd_tmp_file  :: FilePath,          -- Name of the temporary file
             mkd_tmp_hdl   :: Handle }           -- Handle of the open temporary file
 
-beginMkDependHS :: Logger -> TmpFs -> DynFlags -> IO MkDepFiles
-beginMkDependHS logger tmpfs dflags = do
+beginMkDependHS :: Logger -> TmpFs -> DynFlags -> FilePath -> IO MkDepFiles
+beginMkDependHS logger tmpfs dflags makefile = do
         -- open a new temp file in which to stuff the dependency info
         -- as we go along.
   tmp_file <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "dep"
   tmp_hdl <- openFile tmp_file WriteMode
 
         -- open the makefile
-  let makefile = depMakefile dflags
-  exists <- doesFileExist makefile
+  exists <- System.Directory.doesFileExist makefile
   mb_make_hdl <-
         if not exists
         then return Nothing
@@ -188,141 +460,52 @@ beginMkDependHS logger tmpfs dflags = do
   return (MkDep { mkd_make_file = makefile, mkd_make_hdl = mb_make_hdl,
                   mkd_tmp_file  = tmp_file, mkd_tmp_hdl  = tmp_hdl})
 
-
------------------------------------------------------------------
---
---              processDeps
---
------------------------------------------------------------------
-
-processDeps :: DynFlags
-            -> HscEnv
-            -> [ModuleName]
-            -> FilePath
-            -> Handle           -- Write dependencies to here
-            -> SCC ModuleGraphNode
-            -> IO ()
--- Write suitable dependencies to handle
--- Always:
---                      this.o : this.hs
---
--- If the dependency is on something other than a .hi file:
---                      this.o this.p_o ... : dep
--- otherwise
---                      this.o ...   : dep.hi
---                      this.p_o ... : dep.p_hi
---                      ...
--- (where .o is $osuf, and the other suffixes come from
--- the cmdline -s options).
---
--- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
-
-processDeps _ hsc_env _ _ _ (CyclicSCC nodes)
-  =     -- There shouldn't be any cycles; report them
-    throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $ cyclicModuleErr nodes
-
-processDeps _ hsc_env _ _ _ (AcyclicSCC (InstantiationNode _uid node))
-  =     -- There shouldn't be any backpack instantiations; report them as well
-    throwOneError (initSourceErrorContext (hsc_dflags hsc_env)) $
-      mkPlainErrorMsgEnvelope noSrcSpan $
-      GhcDriverMessage $ DriverInstantiationNodeInDependencyGeneration node
-
-processDeps _dflags _ _ _ _ (AcyclicSCC (LinkNode {})) = return ()
-processDeps _dflags _ _ _ _ (AcyclicSCC (UnitNode {})) = return ()
-processDeps _ _ _ _ _ (AcyclicSCC (ModuleNode _ (ModuleNodeFixed {})))
-  -- No dependencies needed for fixed modules (already compiled)
-  = return ()
-processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ (ModuleNodeCompile node)))
-  = do  { let extra_suffixes = depSuffixes dflags
-              include_pkg_deps = depIncludePkgDeps dflags
-              src_file  = msHsFilePath node
-              obj_file  = msObjFilePath node
-              obj_files = insertSuffixes obj_file extra_suffixes
-
-
-
-                -- Emit std dependency of the object(s) on the source file
-                -- Something like       A.o : A.hs
-        ; writeDependency root hdl obj_files src_file
-
-          -- add dependency between objects and their corresponding .hi-boot
-          -- files if the module has a corresponding .hs-boot file (#14482)
-        ; when (isBootSummary node == IsBoot) $ do
-            let hi_boot = msHiFilePath node
-            let obj     = unsafeDecodeUtf $ removeBootSuffix (msObjFileOsPath node)
-            forM_ extra_suffixes $ \suff -> do
-               let way_obj     = insertSuffixes obj     [suff]
-               let way_hi_boot = insertSuffixes hi_boot [suff]
-               mapM_ (writeDependency root hdl way_obj) way_hi_boot
-
-                -- Emit a dependency for each CPP import
-        ; when (depIncludeCppDeps dflags) $ do
-            -- CPP deps are discovered in the module parsing phase by parsing
-            -- comment lines left by the preprocessor.
-            -- Note that GHC.parseModule may throw an exception if the module
-            -- fails to parse, which may not be desirable (see #16616).
-          { session <- Session <$> newIORef hsc_env
-          ; parsedMod <- reflectGhc (GHC.parseModule node) session
-          ; mapM_ (writeDependency root hdl obj_files)
-                  (GHC.pm_extra_src_files parsedMod)
-          }
-
-                -- Emit a dependency for each import
-
-        ; let find_deps imps = sequence
-                    [ findDependency hsc_env imp include_pkg_deps
-                    | imp <- imps
-                    , ui_mod_name (unLoc imp) `notElem` excl_mods
-                    ]
-
-              do_imp hi_file = do
-                let hi_files = insertSuffixes hi_file extra_suffixes
-                    write_dep (obj,hi) = writeDependency root hdl [obj] hi
-
-                 -- Add one dependency for each suffix;
-                 -- e.g.         A.o   : B.hi
-                 --              A.x_o : B.x_hi
-                mapM_ write_dep (obj_files `zip` hi_files)
-
-        ; (missing_dep_errs, deps) <- partitionEithers <$> find_deps (ms_imps node)
-
-        ; if null missing_dep_errs
-            then mapM_ (mapM_ do_imp) deps
-            else do
-              let sec = initSourceErrorContext (hsc_dflags hsc_env)
-              throwErrors sec (mkMessages (listToBag missing_dep_errs))
-        }
-
-findDependency  :: HscEnv
-                -> Located (UnresolvedImport PkgQual)   -- The import to find
-                -> Bool                 -- Record dependency on package modules
-                -> IO (Either (MsgEnvelope GhcMessage) (Maybe FilePath))  -- Interface file
-findDependency hsc_env (L srcloc imp) include_pkg_deps = do
-  -- Find the module; this will be fast because
-  -- we've done it once during downsweep.
-  r <- runFinderM $ resolveImport hsc_env imp
-  case r of
-    Found loc _
-        -- Home package: just depend on the .hi or hi-boot file
-        | isJust (ml_hs_file loc) || include_pkg_deps
-        -> return (Right (Just (ml_hi_file loc)))
-
-        -- Not in this package: we don't need a dependency
-        | otherwise
-        -> return (Right Nothing)
-
-    fail ->
-      return $
-        Left $
-          mkPlainErrorMsgEnvelope srcloc $
-          GhcDriverMessage $ DriverInterfaceError $
-             (Can'tFindInterface (cannotFindModule hsc_env mod_name fail) (LookingForModule mod_name is_boot))
+writeDependencies ::
+  OsPath ->
+  Handle ->
+  [OsString] ->
+  -- ^ Suffixes
+  HomeModuleNode ->
+  [Dep] ->
+  IO ()
+writeDependencies root hdl suffixes node deps =
+  traverse_ write tasks
   where
-    mod_name = ui_mod_name imp
-    is_boot  = ui_boot imp
+    tasks = source_dep : boot_dep ++ concatMap import_dep deps
+
+    -- Emit std dependency of the object(s) on the source file
+    -- Something like       A.o : A.hs
+    source_dep = (obj_files, hmn_src)
+
+    -- add dependency between objects and their corresponding .hi-boot
+    -- files if the module has a corresponding .hs-boot file (#14482)
+    boot_dep = case gwib_isBoot hmn_mod of
+      IsBoot -> [([obj], hi) | (obj, hi) <- zip (suffixed (removeBootSuffix hmn_obj)) (suffixed hmn_hi)]
+      NotBoot -> []
+
+    -- Add one dependency for each suffix;
+    -- e.g.         A.o   : B.hi
+    --              A.x_o : B.x_hi
+    import_dep = \case
+      DepHi {dep_path, dep_local}
+        | dep_local || hmn_includePkgDeps
+        -> [([obj], hi) | (obj, hi) <- zip obj_files (suffixed dep_path)]
+
+        | otherwise
+        -> []
+
+      DepCpp {dep_path} -> [(obj_files, dep_path)]
+
+    write (from, to) = writeDependency root hdl from to
+
+    obj_files = suffixed hmn_obj
+
+    suffixed f = insertSuffixes f suffixes
+
+    HomeModuleNode {hmn_src, hmn_obj, hmn_hi, hmn_mod, hmn_includePkgDeps} = node
 
 -----------------------------
-writeDependency :: FilePath -> Handle -> [FilePath] -> FilePath -> IO ()
+writeDependency :: OsPath -> Handle -> [OsPath] -> OsPath -> IO ()
 -- (writeDependency r h [t1,t2] dep) writes to handle h the dependency
 --      t1 t2 : dep
 writeDependency root hdl targets dep
@@ -330,33 +513,30 @@ writeDependency root hdl targets dep
            --     c:/foo/...
            -- on Windows as make gets confused by the :
            -- Making relative deps avoids some instances of this.
-           dep' = makeRelative root dep
-           forOutput = escapeSpaces . reslash Forwards . normalise
+           dep' = OsPath.makeRelative root dep
+           forOutput = escapeSpaces . reslash Forwards . unsafeDecodeUtf . OsPath.normalise
            output = unwords (map forOutput targets) ++ " : " ++ forOutput dep'
        hPutStrLn hdl output
 
 -----------------------------
 insertSuffixes
-        :: FilePath     -- Original filename;   e.g. "foo.o"
-        -> [String]     -- Suffix prefixes      e.g. ["x_", "y_"]
-        -> [FilePath]   -- Zapped filenames     e.g. ["foo.x_o", "foo.y_o"]
+        :: OsPath     -- Original filename;   e.g. "foo.o"
+        -> [OsString]     -- Suffix prefixes      e.g. ["x_", "y_"]
+        -> [OsPath]   -- Zapped filenames     e.g. ["foo.x_o", "foo.y_o"]
         -- Note that the extra bit gets inserted *before* the old suffix
         -- We assume the old suffix contains no dots, so we know where to
         -- split it
 insertSuffixes file_name extras
-  = [ basename <.> (extra ++ suffix) | extra <- extras ]
+  = [ basename <.> (extra Monoid.<> suffix) | extra <- extras ]
   where
-    (basename, suffix) = case splitExtension file_name of
+    (basename, suffix) = case OsPath.splitExtension file_name of
                          -- Drop the "." from the extension
-                         (b, s) -> (b, drop 1 s)
+                         (b, s) -> (b, OsString.drop 1 s)
 
 
 -----------------------------------------------------------------
---
---              endMkDependHs
---      Complete the makefile, close the tmp file etc
---
------------------------------------------------------------------
+-- endMkDependHs
+-- Complete the makefile, close the tmp file etc
 
 endMkDependHS :: Logger -> MkDepFiles -> IO ()
 
@@ -385,6 +565,329 @@ endMkDependHS logger
   showPass logger "Installing new makefile"
   SysTools.copyFile tmp_file makefile
 
+-----------------------------------------------------------------
+--
+--              JSON MkDepends output
+--
+-----------------------------------------------------------------
+
+initJsonDepWriter :: Logger -> TmpFs -> DynFlags -> FilePath -> IO DependencyWriter
+initJsonDepWriter logger tmpfs dflags output = do
+  json_var <- mkJsonOutput logger tmpfs dflags output initDepJson
+  pure DependencyWriter
+    { dw_writeDependency = \ case
+        ModuleDepNode node deps ->
+          writeHomeUnitDeps json_var (depIncludePkgDeps dflags) node deps
+    , dw_endWriter = do
+        writeJsonOutput logger json_var
+    }
+
+--------------------------------------------------------------------------------
+-- Output interface for json dumps
+
+-- | Resources for a json dump option, used in "GHC.Driver.MakeFile".
+-- The flag @-dep-json@ add an additional output target for dependency
+-- diagnostics.
+--
+-- Contains temporary file locations to stream output to.
+data JsonOutput =
+  JsonOutput {
+    -- | @-dep-json@ specific state for json lines dependency information generation.
+    json_ref :: IORef DepJson,
+
+    -- | The output file path specified as argument to the flag.
+    json_path :: FilePath,
+    -- | Name of the temporary file
+    json_tmp_file  :: FilePath,
+    -- | Handle of the open temporary file
+    json_tmp_hdl   :: Handle
+  }
+
+-- | Set up json generation for `ghc -M`.
+--
+-- Creates a temporary file that we write the dependency information to.
+-- The temporary file is written to the final output file path in 'writeJsonOutput'.
+mkJsonOutput ::
+  Logger ->
+  TmpFs ->
+  DynFlags ->
+  FilePath ->
+  IO (IORef DepJson) ->
+  IO JsonOutput
+mkJsonOutput logger tmpfs dflags json_path mk_ref = do
+  json_ref <- mk_ref
+  -- open a new temp file in which to stuff the dependency info
+  -- as we go along.
+  json_tmp_file <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "dep"
+  json_tmp_hdl <- openFile json_tmp_file WriteMode
+
+  pure JsonOutput {json_ref, json_path, json_tmp_file, json_tmp_hdl}
+
+updateJson :: JsonOutput -> (DepJson -> DepJson) -> IO ()
+updateJson JsonOutput {json_ref} f = modifyIORef' json_ref f
+
+readJson :: JsonOutput -> IO DepJson
+readJson JsonOutput {json_ref} = readIORef json_ref
+
+-- | Finalise the json generation by copying the temporary file to the final destination.
+-- Avoids partial writes in the case of an error.
+writeJsonOutput ::
+  Logger ->
+  JsonOutput ->
+  IO ()
+writeJsonOutput logger JsonOutput {json_path, json_tmp_file, json_tmp_hdl} = do
+  hClose json_tmp_hdl
+  -- Copy the new jsonl in place
+  showPass logger "Installing new json output"
+  SysTools.copyFile json_tmp_file json_path
+
+--------------------------------------------------------------------------------
+-- Output helpers
+
+writeJsonl :: ToJson a => JsonOutput -> a -> IO ()
+writeJsonl  JsonOutput {json_tmp_hdl} output = do
+  hPutStrLn json_tmp_hdl (showSDocUnsafe $ renderJSON $ json output)
+
+--------------------------------------------------------------------------------
+-- Payload for -dep-json
+
+-- | State of the @-dep-json@ dependency generation.
+data DepJson = DepJson
+  { externalDeps :: Set.Set ExtUnitDep
+  -- ^ The external units we have already published/generated.
+  -- We show each external unit exactly once, before the first time they are referenced.
+  }
+
+-- | The json representation of a home module node.
+--
+-- In the json representation, we omit empty lists and null values from the object, or
+-- when a sensible default can be assumed.
+-- For example, the @boot@ is only present in the final json object, if it is 'IsBoot'.
+data HomeUnitDep = HomeUnitDep
+  { unitId :: UnitId
+  , packageName :: Maybe String
+  , modWithIsBoot :: ModuleWithIsBoot
+  , source :: OsPath
+  , imports :: ImportDeps
+  , cpp :: Set.Set OsPath
+  , preprocessor :: Maybe PreprocessingNode
+  }
+
+addImport :: ImportDep -> HomeUnitDep -> HomeUnitDep
+addImport import_dep mod_node_deps =
+  mod_node_deps
+    { imports = ImportDeps $ Map.insertWith Set.union uid (Set.singleton import_dep) (getImports $ imports mod_node_deps)
+    }
+  where
+    uid = toUnitId $ moduleUnit $ imp_mod import_dep
+
+addCpp :: OsPath -> HomeUnitDep -> HomeUnitDep
+addCpp p mod_node_deps =
+  mod_node_deps
+    { cpp = Set.insert p (cpp mod_node_deps)
+    }
+
+-- | Import object of a home module node.
+-- We group imports by 'UnitId' to avoid repetition when many modules are imported from the
+-- same unit.
+newtype ImportDeps = ImportDeps
+  { getImports :: Map.Map UnitId (Set.Set ImportDep)
+  }
+
+-- | A full import specification.
+-- Note, the json representation of 'ImportDep' omits keys if they are the default value.
+-- In particular, we don't serialise the 'ImportLevel', if it is 'NormalLevel', and we are also omitting
+-- 'IsBootInterface' if it is 'IsBoot'. This allows us to express the default case (a normal, non-source import)
+-- as simply the module name.
+data ImportDep = ImportDep
+  { imp_mod :: Module
+  , imp_level :: ImportLevel
+  , imp_isBoot :: IsBootInterface
+  } deriving (Eq, Ord)
+
+mkImportDep :: Module -> ImportLevel -> IsBootInterface -> ImportDep
+mkImportDep modl level isBoot = ImportDep
+  { imp_mod = modl
+  , imp_level = level
+  , imp_isBoot = isBoot
+  }
+
+data ExtUnitDep = ExtUnitDep
+  { extUnitId :: UnitId
+  -- ^ The 'UnitId' of a unit. This is assumed to be globally unique.
+  , extUnitName :: String
+  , extUnitPackageId :: DPackageId
+  } deriving (Eq, Ord)
+
+newtype DPackageId = DPackageId PackageId
+  deriving newtype (Eq)
+
+instance Ord DPackageId where
+  DPackageId (PackageId d1) `compare` DPackageId (PackageId d2) = d1 `lexicalCompareFS` d2
+
+
+{- Note [ghc -M -dep-json output format]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The instance of 'ToJson' 'DepJson' must conform to the JSON schema
+specified in docs/users_guide/make-depends-json-schema-1_0.json.
+When the schema is altered, please bump the version.
+If the content is altered in a backwards compatible way,
+update the minor version (e.g. 1.3 ~> 1.4).
+If the content is breaking, update the major version (e.g. 1.3 ~> 2.0).
+When updating the schema, replace the above file and name it appropriately with
+the version appended, and change the documentation of the -dep-json
+flag to reflect the new schema.
+To learn more about JSON schemas, check out the below link:
+https://json-schema.org
+-}
+
+
+-- See Note [ghc -M -dep-json output format]
+instance ToJson HomeUnitDep where
+  json HomeUnitDep{unitId, packageName, modWithIsBoot, source, imports, cpp, preprocessor} =
+    JSObject $
+      concat $
+        [ mkPair      "module"       (JSString $ moduleKey (gwib_mod modWithIsBoot))
+        , mkPair      "unit-id"      (JSString $ unitIdString unitId)
+        , isBootKey   "boot"         (gwib_isBoot modWithIsBoot)
+        , mkPair      "imports"      (importsObj imports)
+        , omitIfNull  "package-name" (maybe JSNull JSString packageName)
+        , mkPair      "source"       (JSString . showOsPath $ normalise source)
+        , omitIfEmpty "includes"     (strArray (Set.toList cpp) showOsPath)
+        , omitIfNull  "preprocessor" (maybe JSNull preprocessorObj preprocessor)
+        ]
+   where
+    moduleKey :: Module -> String
+    moduleKey t = moduleNameString (moduleName t)
+
+    isBootKey :: String -> IsBootInterface -> [(String, JsonDoc)]
+    isBootKey k b =
+      omitIfDefault k b (== NotBoot) (JSBool . (== IsBoot))
+
+    importsObj :: ImportDeps -> JsonDoc
+    importsObj importDeps = JSObject $ map importObj (Map.toList $ getImports importDeps)
+
+    importObj :: (UnitId, Set.Set ImportDep) -> (String, JsonDoc)
+    importObj (uid, importSet) =
+      (unitIdString uid, array importSet importDepObj)
+
+    importDepObj :: ImportDep -> JsonDoc
+    importDepObj ImportDep{imp_mod, imp_level, imp_isBoot}
+      | NormalLevel <- imp_level, NotBoot <- imp_isBoot =
+          JSString (moduleKey imp_mod)
+      | otherwise =
+          JSObject $
+            concat
+              [ mkPair        "module" (JSString (moduleKey imp_mod))
+              , omitIfDefault "level"  imp_level (== NormalLevel) importLevel
+              , isBootKey     "boot"   imp_isBoot
+              ]
+
+    importLevel :: ImportLevel -> JsonDoc
+    importLevel lvl =
+      JSString $ case lvl of
+        NormalLevel -> "normal"
+        SpliceLevel -> "splice"
+        QuoteLevel -> "quote"
+
+    preprocessorObj :: PreprocessingNode -> JsonDoc
+    preprocessorObj pp =
+      JSObject $
+        concat
+          [ mkPair      "command"   (JSString $ pn_preprocessor pp)
+          , omitIfEmpty "arguments" (strArray (pn_arguments pp) id)
+          ]
+
+    array values render = JSArray (fmap render (Set.toList values))
+    strArray values render = fmap (JSString . render) values
+
+    omitIfDefault :: String -> a -> (a -> Bool) -> (a -> JsonDoc) -> [(String, JsonDoc)]
+    omitIfDefault k v p toJson
+      | p v = []
+      | otherwise = [(k, toJson v)]
+
+    omitIfNull :: String -> JsonDoc -> [(String, JsonDoc)]
+    omitIfNull _ JSNull = []
+    omitIfNull k v      = [(k, v)]
+
+    omitIfEmpty :: String -> [JsonDoc] -> [(String, JsonDoc)]
+    omitIfEmpty k vs =
+      omitIfDefault k vs null JSArray
+
+    showOsPath = unsafeDecodeUtf
+    mkPair k v = [(k, v)]
+
+-- See Note [ghc -M -dep-json output format]
+instance ToJson ExtUnitDep where
+  json ExtUnitDep {extUnitId, extUnitName, extUnitPackageId} =
+    JSObject
+      [ ("unit-id", JSString $ unitIdString extUnitId)
+      , ("package-name", JSString extUnitName)
+      , ("package-id", JSString $ showPackageId extUnitPackageId)
+      ]
+    where
+      showPackageId (DPackageId (PackageId pid)) = unpackFS pid
+
+initDepJson :: IO (IORef DepJson)
+initDepJson = newIORef $ DepJson Set.empty
+
+cacheExternalDepsJson :: Set.Set ExtUnitDep -> DepJson -> DepJson
+cacheExternalDepsJson extUnits (DepJson e0) =
+  DepJson
+    { externalDeps =
+        Set.union e0 extUnits
+    }
+
+writeHomeUnitDeps :: JsonOutput -> Bool -> HomeModuleNode -> [Dep] -> IO ()
+writeHomeUnitDeps deps_json include_pkgs HomeModuleNode {..} deps = do
+  extUnits <- readJson deps_json
+  let newExtUnits = Set.difference extUnitsDeps (externalDeps extUnits)
+  -- Write new external unit deps before the module that uses them
+  for_ newExtUnits $ \ extUnit -> do
+    writeJsonl deps_json extUnit
+  writeJsonl deps_json payload
+  -- Cache external deps we already reported in the past
+  updateJson deps_json $ cacheExternalDepsJson newExtUnits
+  where
+    (extUnitsDeps, payload) = foldl' go (Set.empty, initial_node_data) deps
+
+    initial_node_data =
+      HomeUnitDep
+        { unitId = hmn_unitId
+        , packageName = hmn_packageName
+        , modWithIsBoot = hmn_mod
+        , source = hmn_src
+        , preprocessor = hmn_preprocessing
+        , cpp = Set.empty
+        , imports = ImportDeps Map.empty
+        }
+
+    go (extDeps, node_data) = \ case
+      DepHi {dep_mod, dep_local, dep_unit, dep_boot, dep_level}
+        | dep_local
+        -> (extDeps, addImport (mkImportDep dep_mod dep_level dep_boot) node_data)
+
+        | include_pkgs
+        , Just unit <- dep_unit
+        , let PackageName nameFS = unitPackageName unit
+              name = unpackFS nameFS
+              withLibName (PackageName c) = name ++ ":" ++ unpackFS c
+              lname = maybe name withLibName (unitComponentName unit)
+              newExtDep = ExtUnitDep
+                { extUnitId = UnitInfo.unitId unit
+                , extUnitName = lname
+                , extUnitPackageId = DPackageId $ unitPackageId unit
+                }
+        ->
+          ( Set.insert newExtDep extDeps
+          , addImport (mkImportDep dep_mod dep_level dep_boot) node_data
+          )
+
+        | otherwise
+        -> (extDeps, node_data)
+
+      DepCpp {dep_path} ->
+        (extDeps, addCpp dep_path node_data)
 
 -----------------------------------------------------------------
 --              Module cycles
