@@ -1,0 +1,4 @@
+section: compiler
+synopsis: Expose link nodes in `ghc -M -dep-json` output
+issues: #28007
+mrs: !16848
