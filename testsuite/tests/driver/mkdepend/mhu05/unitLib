@@ -1,0 +1,1 @@
+-i -i. -working-dir=mhu05/lib -this-unit-id lib -this-package-name lib -staticlib Lib Lib.Internal

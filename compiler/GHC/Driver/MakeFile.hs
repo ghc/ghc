@@ -44,6 +44,7 @@ import GHC.Types.Unique.Set (UniqSet)
 import GHC.Types.Unique.Set qualified as UniqSet
 import GHC.Types.UnresolvedImport
 
+import GHC.Unit.Env qualified as UnitEnv
 import GHC.Unit.Finder
 import GHC.Unit.Home.Graph (HomeUnitEnv (homeUnitEnv_dflags))
 import GHC.Unit.Info
@@ -189,9 +190,10 @@ doMkDependModuleGraph dflags module_graph = do
 
 -- | A 'DepNode' is a direct translation of a 'ModuleGraphNode' that
 -- can be serialised to a Makefile or json lines format.
-data DepNode =
-  ModuleDepNode HomeModuleNode [Dep]
+data DepNode
+  = ModuleDepNode HomeModuleNode [Dep]
   -- ^ A dependency node of a home module with its dependencies
+  | LinkDepNode DepLink [DepLinkNode]
 
 -- | A home module node.
 -- Everything we know about home modules that can be serialised.
@@ -248,6 +250,19 @@ data Dep
     { dep_path :: OsPath
     -- ^ Path to the @#include@d path.
     }
+
+data DepLink
+  = DepLink
+    { link_output :: !UnitId
+    , link_type :: !GhcLink
+    }
+
+data DepLinkNode
+  = DepLink_Unit !UnitId
+  | DepLink_Module !ModuleNameWithIsBoot !UnitId
+  | DepLink_HomeUnit {-# UNPACK #-} !UnitId
+  | DepLink_ExtUnit {-# UNPACK #-} !UnitId
+
 
 -- | 'DependencyWriter' is a backend for outputting 'DepNode' in a specific
 -- output format.
@@ -386,7 +401,21 @@ processDeps hsc_env _ (AcyclicSCC (InstantiationNode _uid node))
       mkPlainErrorMsgEnvelope noSrcSpan $
       GhcDriverMessage $ DriverInstantiationNodeInDependencyGeneration node
 
-processDeps _ _ (AcyclicSCC (LinkNode {})) = return Nothing
+processDeps hsc_env _ (AcyclicSCC (LinkNode keys unitId)) = do
+  let
+    toLinkNodeDep = \ case
+      NodeKey_Unit iu -> DepLink_Unit $ virtualUnitId iu
+      NodeKey_Module node -> DepLink_Module (mnkModuleName node) (mnkUnitId node)
+      NodeKey_Link uid -> DepLink_HomeUnit uid
+      NodeKey_ExternalUnit uid -> DepLink_ExtUnit uid
+
+    linkNode = DepLink
+      { link_output = unitId
+      , link_type = ghcLink $ UnitEnv.ue_unitFlags unitId (hsc_unit_env hsc_env)
+      }
+
+  pure $ Just $ LinkDepNode linkNode (map toLinkNodeDep keys)
+
 processDeps _ _ (AcyclicSCC (UnitNode {})) = return Nothing
 processDeps _ _ (AcyclicSCC (ModuleNode _ (ModuleNodeFixed {})))
   -- No dependencies needed for fixed modules (already compiled)
@@ -507,6 +536,9 @@ initFileDepWriter logger root tmpfs tmpdir suffixes output = do
     { dw_writeDependency = \ case
         ModuleDepNode node deps -> do
           traverse_ (depStream_write stream) (dependencyRules root suffixes node deps)
+        LinkDepNode _node _deps -> do
+          -- Makefile can't handle 'LinkDepNode'
+          pure ()
     , dw_endWriter = depStream_close stream
     , dw_onError = depStream_onError stream
     }
@@ -690,6 +722,8 @@ initJsonDepWriter logger tmpfs tmpdir output = do
             depStream_write stream (renderJsonl payload)
             -- Cache external deps we already reported in the past
             updateJson json_var $ cacheExternalDepsJson newExtUnits
+          LinkDepNode node deps -> do
+            depStream_write stream $ renderJsonl $ linkNodeJson node deps
       , dw_endWriter = depStream_close stream
       , dw_onError = depStream_onError stream
       }
@@ -830,11 +864,30 @@ newtype DPackageId = DPackageId PackageId
 instance Ord DPackageId where
   DPackageId (PackageId d1) `compare` DPackageId (PackageId d2) = d1 `lexicalCompareFS` d2
 
+-- | Json representation of a 'LinkNode'.
+data LinkNodeDep = LinkNodeDep
+  { linkNodeUid :: !UnitId
+  -- ^ The 'UnitId' of the home unit we are producing a link node for.
+  , linkNodeType :: !GhcLink
+  , linkNodeModuleDeps :: !(Map.Map UnitId (Set.Set ModuleNameWithIsBoot))
+  -- ^ Module dependencies grouped by 'UnitId'.
+  , linkNodeUnitDeps :: !(Set.Set UnitId)
+  -- ^ Backpack unit instantiation.
+  , linkNodeHomeUnitDeps :: !(Set.Set UnitId)
+  -- ^ Dependencies on other home unit 'LinkNode's.
+  , linkNodeExtUnitDeps :: !(Set.Set UnitId)
+  -- ^ Dependencies on external 'UnitId's.
+  }
 
 {- Note [ghc -M -dep-json output format]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The instance of 'ToJson' 'DepJson' must conform to the JSON schema
-specified in docs/users_guide/make-depends-json-schema-1_0.json.
+The following instances must conform to the JSON schema:
+
+* 'ToJson' 'HomeUnitDep'
+* 'ToJson' 'ExtUnitDep'
+* 'ToJson' 'LinkNodeDep'
+
+The instances must conform to docs/users_guide/make-depends-json-schema-1_0.json.
 When the schema is altered, please bump the version.
 If the content is altered in a backwards compatible way,
 update the minor version (e.g. 1.3 ~> 1.4).
@@ -933,6 +986,50 @@ instance ToJson ExtUnitDep where
     where
       showPackageId (DPackageId (PackageId pid)) = unpackFS pid
 
+-- See Note [ghc -M -dep-json output format]
+instance ToJson LinkNodeDep where
+  json LinkNodeDep{linkNodeUid, linkNodeType, linkNodeModuleDeps, linkNodeUnitDeps, linkNodeHomeUnitDeps, linkNodeExtUnitDeps} =
+    JSObject
+      [ ("unit-id", JSString $ unitIdString linkNodeUid)
+      , ("link-type", linkTypeJson linkNodeType)
+      , ("links", JSArray $ concat
+        [ map renderMods (Map.toList linkNodeModuleDeps)
+        , map (JSString . unitIdString) (Set.toList linkNodeUnitDeps)
+        , map (JSString . unitIdString) (Set.toList linkNodeHomeUnitDeps)
+        , map (JSString . unitIdString) (Set.toList linkNodeExtUnitDeps)
+        ])
+      ]
+    where
+      linkTypeJson :: GhcLink -> JsonDoc
+      linkTypeJson = JSString . \ case
+        NoLink{} -> panic "Received -no-link, but a link node must not exist with -no-link."
+        LinkExecutable{} -> "executable"
+        LinkInMemory{} -> "in-memory"
+        LinkDynLib{} -> "dynamic-library"
+        LinkBytecodeLib{} -> "bytecode-library"
+        LinkStaticLib{} -> "static-library"
+        LinkMergedObj{} -> "merged-object"
+
+      renderMods (u, ms) =
+        JSObject
+          [ ("unit-id", JSString $ unitIdString u)
+          , ("modules", JSArray $ map moduleKey (Set.toList ms))
+          ]
+
+
+      moduleNameJson m = JSString $ moduleNameString m
+
+      moduleKey :: ModuleNameWithIsBoot -> JsonDoc
+      moduleKey t =
+        case gwib_isBoot t of
+          NotBoot -> moduleNameJson (gwib_mod t)
+          IsBoot -> JSObject
+            [ ("module", moduleNameJson (gwib_mod t))
+            -- Redundant check, but the compiler will fix it and
+            -- this feels like it might avoid bugs in the future.
+            , ("boot", JSBool $ gwib_isBoot t == IsBoot)
+            ]
+
 cacheExternalDepsJson :: Set.Set ExtUnitDep -> DepJson -> DepJson
 cacheExternalDepsJson extUnits (DepJson e0) =
   DepJson
@@ -981,6 +1078,32 @@ homeUnitDeps HomeModuleNode {..} deps =
 
       DepCpp {dep_path} ->
         (extDeps, addCpp dep_path node_data)
+
+linkNodeJson :: DepLink -> [DepLinkNode] -> LinkNodeDep
+linkNodeJson (DepLink uid linkType) deps =
+  LinkNodeDep
+    { linkNodeUid = uid
+    , linkNodeType = linkType
+    , linkNodeModuleDeps = allMods
+    , linkNodeUnitDeps = units
+    , linkNodeHomeUnitDeps = homeUids
+    , linkNodeExtUnitDeps = extUids
+    }
+  where
+    (extUids, homeUids, units, allMods) = foldl' go (Set.empty, Set.empty, Set.empty, Map.empty) deps
+
+    go (ext, homeUid, unit, mods) = \ case
+      DepLink_Module modName u ->
+        let
+          newMods = Map.insertWith (Set.union) u (Set.singleton modName) mods
+        in
+          (ext, homeUid, unit, newMods)
+      DepLink_Unit uid ->
+        (ext, homeUid, Set.insert uid unit, mods)
+      DepLink_HomeUnit uid ->
+        (ext, Set.insert uid homeUid, unit, mods)
+      DepLink_ExtUnit uid ->
+        (Set.insert uid ext, homeUid, unit, mods)
 
 -----------------------------------------------------------------
 --              Module cycles

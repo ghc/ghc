@@ -1,0 +1,5 @@
+{"module":"Lib.Internal","unit-id":"lib","imports":{},"package-name":"lib","source":"mhu04/lib/Lib/Internal.hs"}
+{"module":"Lib","unit-id":"lib","imports":{"lib":["Lib.Internal"]},"package-name":"lib","source":"mhu04/lib/Lib.hs"}
+{"module":"Utils","unit-id":"app","imports":{},"package-name":"app","source":"mhu04/app/Utils.hs"}
+{"module":"Main","unit-id":"app","imports":{"app":["Utils"],"lib":["Lib"]},"package-name":"app","source":"mhu04/app/Main.hs"}
+{"unit-id":"app","link-type":"executable","links":[{"unit-id":"app","modules":["Main","Utils"]}]}
