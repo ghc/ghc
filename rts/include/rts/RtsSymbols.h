@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 typedef void SymbolAddr;
 typedef char SymbolName;
 
@@ -36,6 +37,9 @@ typedef struct _RtsSymbolVal {
     SymbolAddr* addr;
     SymStrength strength;
     SymType type;
+    // If this is a redirection, then this is the lable of the
+    // target symbol. Otherwise NULL.
+    const SymbolName* lbl_redirect_target;
 } RtsSymbolVal;
 
 RtsSymbolVal const * getRtsSymbols(void);
