@@ -335,7 +335,8 @@ data DynFlags = DynFlags {
     -- ^ External plugins loaded from shared libraries
 
   --  For ghc -M
-  depMakefile           :: FilePath,
+  depMakefile           :: Maybe FilePath,
+  depJson               :: Maybe FilePath,
   depIncludePkgDeps     :: Bool,
   depIncludeCppDeps     :: Bool,
   depExcludeMods        :: [ModuleName],
@@ -669,7 +670,8 @@ defaultDynFlags mySettings =
         llvmOptLevel            = 0,
 
         -- ghc -M values
-        depMakefile       = "Makefile",
+        depMakefile       = Just "Makefile",
+        depJson           = Nothing,
         depIncludePkgDeps = False,
         depIncludeCppDeps = False,
         depExcludeMods    = [],
