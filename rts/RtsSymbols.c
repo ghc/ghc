@@ -1220,13 +1220,13 @@ RTS_SYMBOLS_PRIM
 /* See Note [Naming Scheme for Symbol Macros] */
 
 #define SymI_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
+                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE, NULL },
 #define SymI_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
+                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA, NULL },
 #define SymE_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
+            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE, NULL },
 #define SymE_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
+            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA, NULL },
 
 #define SymI_NeedsProto(vvv) SymI_HasProto(vvv)
 #define SymI_NeedsDataProto(vvv) SymI_HasDataProto(vvv)
@@ -1237,7 +1237,7 @@ RTS_SYMBOLS_PRIM
 // another symbol.  See newCAF/newRetainedCAF/newGCdCAF for an example.
 #define SymI_HasProto_redirect(vvv,xxx,strength,ty) \
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
-      (void*)(&(xxx)), strength, ty },
+      (void*)(&(xxx)), strength, ty, MAYBE_LEADING_UNDERSCORE_STR(#xxx) },
 
 static RtsSymbolVal * rtsSyms = NULL;
 
@@ -1264,7 +1264,7 @@ RtsSymbolVal const * getRtsSymbols(void) {
                   RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
                   RTS_SYMBOLS_PRIM
                   SymI_HasDataProto(nonmoving_write_barrier_enabled)
-                  { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
+                  { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE, NULL } /* sentinel */
             };
 
             uint32_t n = 1;
@@ -1362,7 +1362,7 @@ RtsSymbolVal const * getRtsSymbols(void) {
 //          CODE_SYM(getauxval)
 //          CODE_SYM(posix_spawn_file_actions_init)
 //          ...
-//          { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
+//          { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE, NULL } /* sentinel */
 //      };
 //
 //      RtsSymbolVal* rtsExtraSyms() {
@@ -1375,7 +1375,7 @@ RtsSymbolVal const * getRtsSymbols(void) {
 //
 
 static RtsSymbolVal default_extra_syms[] = {
-      { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
+      { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE, NULL } /* sentinel */
 };
 
 /* Default empty extra RTS symbols. See Note[Extra RTS symbols] */

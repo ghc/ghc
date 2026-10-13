@@ -23,7 +23,7 @@ int main (int argc, char *argv[])
 // can use the FFI call to foobar in a TH splice.
 
 #define SymI_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
+                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE, NULL },
 
 
 void foobar(int x) {

@@ -19,18 +19,27 @@ main = do
          -- want to avoid copying that logic again in the test. So we just ignore some
          -- symbols so that CI can pass and in the future we aim to fix RtsSymbols.c and
          -- reduce the size of ignoredSymbols.
-         ignoreSymbols <- S.fromList
+         ignoreSymbols' <- S.fromList
                            . filter (not . null)
                            . lines
                            <$> readFile ignoreSymbolsFile
 
+         let symbolFilter :: String -> CodeOrData -> Bool
+             symbolFilter name cd =
+               -- Not in ingore list
+               not (S.member name ignoreSymbols')
+               -- Doesn't look like a entry/return code symbol
+               -- (These can appear in unregisterd builds wihere tables next to code is disabled)
+               && not ("_entry" `isSuffixOf` name && cd == Code)
+               && not ("_ret"   `isSuffixOf` name && cd == Code)
+
          declaredSymbolsStr <- readFile declaredSymbolsFile
          observedSymbolsStr <- readFile observedSymbolsFile
 
-         let declaredSymbols = readCodeOrData <$> linePairs declaredSymbolsStr
-         let observedSymbols = parseReadelf observedSymbolsStr
+         let declaredSymbols = M.filterWithKey symbolFilter $ readCodeOrData <$> linePairs declaredSymbolsStr
+         let observedSymbols = M.filterWithKey symbolFilter $ parseReadelf observedSymbolsStr
 
-         let diffStr = diff ignoreSymbols declaredSymbols observedSymbols
+         let diffStr = diff declaredSymbols observedSymbols
          -- writeFile "<ghc root>/testsuite/tests/rts/symbols/rts-check-symbols.stdout"
          putStrLn diffStr
 
@@ -44,8 +53,8 @@ data CodeOrData = Code | Data
 
 -- Compare observedSymbols (symbols observed in the DSO) to declaredSymbols
 -- (symbols declared in RtsSymbols.c)
-diff :: S.Set String -> M.Map String CodeOrData -> M.Map String CodeOrData -> String
-diff ignoreSymbols declaredSymbolsAll observedSymbolsAll = unlines $
+diff :: M.Map String CodeOrData -> M.Map String CodeOrData -> String
+diff declaredSymbols observedSymbols = unlines $
       [ "Symbols declared in RtsSymbols.c but not observed in the DSO:" ]
    ++ [ "Declared> " ++ k ++ " " ++ show v | (k, v) <- M.toList diffInDeclaredSymbols ]
    ++ [ "" ]
@@ -56,10 +65,6 @@ diff ignoreSymbols declaredSymbolsAll observedSymbolsAll = unlines $
    ++ [ "WrongType> " ++ k ++ " (declared, observed): (" ++ show declared ++ ", " ++ show observed ++ ")"
          | (k, (declared, observed)) <- M.toList diffOnType ]
    where
-      -- Ignore some symbols
-      declaredSymbols = declaredSymbolsAll `M.withoutKeys` ignoreSymbols
-      observedSymbols = observedSymbolsAll `M.withoutKeys` ignoreSymbols
-
       -- Undeclared observed symbols
       diffInObservedSymbols :: M.Map String CodeOrData
       diffInObservedSymbols = observedSymbols M.\\ declaredSymbols
