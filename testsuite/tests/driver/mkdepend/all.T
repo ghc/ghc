@@ -30,6 +30,13 @@ test('mkdepend_mhu03',
      , when(opsys('mingw32'), skip) # shell script preprocessor
      ],
      make_depend_multiunit, [['mhu03/unitA'], ''])
+# Link nodes
+test('mkdepend_mhu04',
+     [ extra_files(['mhu04/']), dep_makefile, dep_json ],
+     make_depend_multiunit, [['mhu04/unitLib', 'mhu04/unitApp'], ''])
+test('mkdepend_mhu05',
+     [ extra_files(['mhu05/']), dep_makefile, dep_json ],
+     make_depend_multiunit, [['mhu05/unitLib', 'mhu05/unitApp', 'mhu05/unitTest'], ''])
 
 # Honour -F
 test('mkdepend01',

@@ -1,0 +1,1 @@
+-i -i. -working-dir=mhu05/test -this-unit-id test -this-package-name test -package-id lib -main-is Spec -o test Spec

@@ -1,0 +1,79 @@
+{
+  "imports": {},
+  "includes": [],
+  "module": "Lib.Internal",
+  "package-name": "lib",
+  "source": "mhu05/lib/Lib/Internal.hs",
+  "unit-id": "lib"
+}
+{
+  "imports": {
+    "lib": [
+      "Lib.Internal"
+    ]
+  },
+  "includes": [],
+  "module": "Lib",
+  "package-name": "lib",
+  "source": "mhu05/lib/Lib.hs",
+  "unit-id": "lib"
+}
+{
+  "deps": [
+    {
+      "modules": [
+        "Lib",
+        "Lib.Internal"
+      ],
+      "unit-id": "lib"
+    }
+  ],
+  "unit-id": "lib"
+}
+{
+  "imports": {
+    "lib": [
+      "Lib"
+    ]
+  },
+  "includes": [],
+  "module": "Main",
+  "package-name": "app",
+  "source": "mhu05/app/Main.hs",
+  "unit-id": "app"
+}
+{
+  "deps": [
+    {
+      "modules": [
+        "Main"
+      ],
+      "unit-id": "app"
+    }
+  ],
+  "unit-id": "app"
+}
+{
+  "imports": {
+    "lib": [
+      "Lib",
+      "Lib.Internal"
+    ]
+  },
+  "includes": [],
+  "module": "Spec",
+  "package-name": "test",
+  "source": "mhu05/test/Spec.hs",
+  "unit-id": "test"
+}
+{
+  "deps": [
+    {
+      "modules": [
+        "Spec"
+      ],
+      "unit-id": "test"
+    }
+  ],
+  "unit-id": "test"
+}

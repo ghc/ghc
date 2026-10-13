@@ -1,0 +1,55 @@
+{
+  "imports": {},
+  "includes": [],
+  "module": "Lib.Internal",
+  "package-name": "lib",
+  "source": "mhu04/lib/Lib/Internal.hs",
+  "unit-id": "lib"
+}
+{
+  "imports": {
+    "lib": [
+      "Lib.Internal"
+    ]
+  },
+  "includes": [],
+  "module": "Lib",
+  "package-name": "lib",
+  "source": "mhu04/lib/Lib.hs",
+  "unit-id": "lib"
+}
+{
+  "imports": {},
+  "includes": [],
+  "module": "Utils",
+  "package-name": "app",
+  "source": "mhu04/app/Utils.hs",
+  "unit-id": "app"
+}
+{
+  "imports": {
+    "app": [
+      "Utils"
+    ],
+    "lib": [
+      "Lib"
+    ]
+  },
+  "includes": [],
+  "module": "Main",
+  "package-name": "app",
+  "source": "mhu04/app/Main.hs",
+  "unit-id": "app"
+}
+{
+  "deps": [
+    {
+      "modules": [
+        "Main",
+        "Utils"
+      ],
+      "unit-id": "app"
+    }
+  ],
+  "unit-id": "app"
+}
