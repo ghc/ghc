@@ -1,0 +1,7 @@
+{"module":"E","unit-id":"main","imports":{},"source":"E.hs"}
+{"module":"C","unit-id":"main","boot":true,"imports":{"main":["E"]},"source":"C.hs-boot"}
+{"module":"A","unit-id":"main","imports":{"main":[{"module":"C","boot":true}]},"source":"A.hs"}
+{"module":"C","unit-id":"main","imports":{"main":["A"]},"source":"C.hs"}
+{"module":"B","unit-id":"main","boot":true,"imports":{"main":["A"]},"source":"lib/B.hs-boot"}
+{"module":"B","unit-id":"main","imports":{"main":["A"]},"source":"lib/B.hs"}
+{"module":"D","unit-id":"main","imports":{"main":["B","C"]},"source":"D.hs"}
