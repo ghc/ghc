@@ -1,0 +1,7 @@
+{"module":"Lib.Internal","unit-id":"lib","imports":{},"package-name":"lib","source":"mhu05/lib/Lib/Internal.hs"}
+{"module":"Lib","unit-id":"lib","imports":{"lib":["Lib.Internal"]},"package-name":"lib","source":"mhu05/lib/Lib.hs"}
+{"unit-id":"lib","link-type":"static-library","links":[{"unit-id":"lib","modules":["Lib","Lib.Internal"]}]}
+{"module":"Main","unit-id":"app","imports":{"lib":["Lib"]},"package-name":"app","source":"mhu05/app/Main.hs"}
+{"unit-id":"app","link-type":"executable","links":[{"unit-id":"app","modules":["Main"]}]}
+{"module":"Spec","unit-id":"test","imports":{"lib":["Lib","Lib.Internal"]},"package-name":"test","source":"mhu05/test/Spec.hs"}
+{"unit-id":"test","link-type":"executable","links":[{"unit-id":"test","modules":["Spec"]}]}
