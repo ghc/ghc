@@ -77,6 +77,7 @@ import System.IO
 import System.IO.Error (isEOFError)
 import System.OsPath as OsPath
 import System.OsString qualified as OsString
+import qualified GHC.Unit.Env as UnitEnv
 
 -----------------------------------------------------------------
 --
@@ -216,6 +217,19 @@ data Dep
     { dep_path :: OsPath
     }
 
+data DepLink
+  = DepLink
+    { link_output :: !UnitId
+    , link_nodes :: ![DepLinkNode]
+    , link_type :: GhcLink
+    }
+
+data DepLinkNode
+  = DepLink_Unit !UnitId
+  | DepLink_Module !ModuleNameWithIsBoot !UnitId
+  | DepLink_HomeUnit {-# UNPACK #-} !UnitId
+  | DepLink_ExtUnit {-# UNPACK #-} !UnitId
+
 data DependencyWriter = DependencyWriter
   { dw_beginWriter :: IO DepSink
   , dw_endWriter :: IO ()
@@ -223,6 +237,7 @@ data DependencyWriter = DependencyWriter
 
 data DepSink = DepSink
   { ds_writeDependency :: DepNode -> [Dep] -> IO ()
+  , ds_writeLinkDependency :: DepLink -> IO ()
   }
 
 -----------------------------------------------------------------
@@ -261,7 +276,22 @@ processDeps hsc_env _ _ (AcyclicSCC (InstantiationNode _uid node))
       mkPlainErrorMsgEnvelope noSrcSpan $
       GhcDriverMessage $ DriverInstantiationNodeInDependencyGeneration node
 
-processDeps _ _ _ (AcyclicSCC (LinkNode {})) = return ()
+processDeps hsc_env _ sinks (AcyclicSCC (LinkNode keys unitId)) = do
+  let
+    toLinkNodeDep = \ case
+      NodeKey_Unit iu -> DepLink_Unit $ virtualUnitId iu
+      NodeKey_Module node -> DepLink_Module (mnkModuleName node) (mnkUnitId node)
+      NodeKey_Link uid -> DepLink_HomeUnit uid
+      NodeKey_ExternalUnit uid -> DepLink_ExtUnit uid
+
+    linkNode = DepLink
+      { link_nodes = map toLinkNodeDep keys
+      , link_output = unitId
+      , link_type = ghcLink $ UnitEnv.ue_unitFlags unitId (hsc_unit_env hsc_env)
+      }
+
+  traverse_ (\ sink -> ds_writeLinkDependency sink linkNode) sinks
+
 processDeps _ _ _ (AcyclicSCC (UnitNode {})) = return ()
 processDeps _ _ _ (AcyclicSCC (ModuleNode _ (ModuleNodeFixed {})))
   -- No dependencies needed for fixed modules (already compiled)
@@ -385,8 +415,13 @@ initFileDepWriter logger root tmpfs dflags makefile = do
   files <- beginMkDependHS logger tmpfs dflags makefile
   pure DependencyWriter
     { dw_beginWriter = do
-        pure $ DepSink $ \ node deps -> do
-          writeDependencies root (mkd_tmp_hdl files) suffixes node deps
+        pure DepSink
+          { ds_writeDependency = \ node deps -> do
+              writeDependencies root (mkd_tmp_hdl files) suffixes node deps
+          , ds_writeLinkDependency = \ _linkNode -> do
+              -- Link nodes are not supported
+              pure ()
+          }
     , dw_endWriter = endMkDependHS logger files
     }
   where
@@ -559,8 +594,13 @@ initJsonDepWriter logger tmpfs dflags output = do
   json_var <- mkJsonOutput logger tmpfs dflags output initDepJson
   pure DependencyWriter
     { dw_beginWriter =
-        pure $ DepSink $ \ node deps ->
-          writeHomeUnitDeps json_var node deps
+        pure DepSink
+          { ds_writeDependency = \ node deps ->
+              writeHomeUnitDeps json_var node deps
+          , ds_writeLinkDependency = \ link ->
+              -- Link nodes are not supported
+              writeLinkNode json_var link
+          }
     , dw_endWriter = do
         writeJsonOutput logger json_var
     }
@@ -629,8 +669,12 @@ writeJsonOutput logger JsonOutput {json_path, json_tmp_file, json_tmp_hdl} = do
 -- Output helpers
 
 writeJsonl :: ToJson a => JsonOutput -> a -> IO ()
-writeJsonl  JsonOutput {json_tmp_hdl} output = do
-  hPutStrLn json_tmp_hdl (showSDocUnsafe $ renderJSON $ json output)
+writeJsonl deps_json output = do
+  writeJsonl' deps_json (json output)
+
+writeJsonl' :: JsonOutput -> JsonDoc -> IO ()
+writeJsonl'  JsonOutput {json_tmp_hdl} output = do
+  hPutStrLn json_tmp_hdl (showSDocUnsafe $ renderJSON output)
 
 --------------------------------------------------------------------------------
 -- Payload for -dep-json
@@ -848,6 +892,65 @@ writeHomeUnitDeps deps_json DepNode {..} deps = do
 
       DepCpp {dep_path} ->
         (extDeps, addCpp dep_path node_data)
+
+writeLinkNode :: JsonOutput -> DepLink -> IO ()
+writeLinkNode dep_json (DepLink uid deps linkType) = do
+  writeJsonl' dep_json $
+    JSObject
+      [ ("unit-id", JSString $ unitIdString uid)
+      , ("link-type", linkTypeJson linkType)
+      , ("links", JSArray $ concat
+        [ map renderMods (Map.toList allMods)
+        , map (JSString . unitIdString) (Set.toList units)
+        , map (JSString . unitIdString) (Set.toList homeUids)
+        , map (JSString . unitIdString) (Set.toList extUids)
+        ])
+      ]
+  where
+    (extUids, homeUids, units, allMods) = foldl' go (Set.empty, Set.empty, Set.empty, Map.empty) deps
+
+    renderMods (u, ms) =
+      JSObject
+        [ ("unit-id", JSString $ unitIdString u)
+        , ("modules", JSArray $ map moduleKey (Set.toList ms))
+        ]
+
+
+    go (ext, homeUid, unit, mods) = \ case
+      DepLink_Module modName u ->
+        let
+          newMods = Map.insertWith (Set.union) u (Set.singleton modName) mods
+        in
+          (ext, homeUid, unit, newMods)
+      DepLink_Unit uid ->
+        (ext, homeUid, Set.insert uid unit, mods)
+      DepLink_HomeUnit uid ->
+        (ext, Set.insert uid homeUid, unit, mods)
+      DepLink_ExtUnit uid ->
+        (Set.insert uid ext, homeUid, unit, mods)
+
+    moduleNameJson m = JSString $ moduleNameString m
+
+    moduleKey :: ModuleNameWithIsBoot -> JsonDoc
+    moduleKey t =
+      case gwib_isBoot t of
+        NotBoot -> moduleNameJson (gwib_mod t)
+        IsBoot -> JSObject
+          [ ("module", moduleNameJson (gwib_mod t))
+          -- Redundant check, but the compiler will fix it and
+          -- this feels like it might avoid bugs in the future.
+          , ("boot", JSBool $ gwib_isBoot t == IsBoot)
+          ]
+
+    linkTypeJson :: GhcLink -> JsonDoc
+    linkTypeJson = JSString . \ case
+      NoLink{} -> panic "Received -no-link, but a link node must not exist with -no-link."
+      LinkExecutable{} -> "executable"
+      LinkInMemory{} -> "in-memory"
+      LinkDynLib{} -> "dynamic-library"
+      LinkBytecodeLib{} -> "bytecode-library"
+      LinkStaticLib{} -> "static-library"
+      LinkMergedObj{} -> "merged-object"
 
 -----------------------------------------------------------------
 --              Module cycles

@@ -1,0 +1,2 @@
+{"module":"Main","unit-id":"main","imports":{},"source":"mkdepend02/Main.hs"}
+{"unit-id":"main","link-type":"executable","links":[{"unit-id":"main","modules":["Main"]}]}

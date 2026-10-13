@@ -1,0 +1,10 @@
+# DO NOT DELETE: Beginning of Haskell dependencies
+mhu05/lib/Lib/Internal.o : mhu05/lib/Lib/Internal.hs
+mhu05/lib/Lib.o : mhu05/lib/Lib.hs
+mhu05/lib/Lib.o : mhu05/lib/Lib/Internal.hi
+mhu05/app/Main.o : mhu05/app/Main.hs
+mhu05/app/Main.o : mhu05/lib/Lib.hi
+mhu05/test/Spec.o : mhu05/test/Spec.hs
+mhu05/test/Spec.o : mhu05/lib/Lib/Internal.hi
+mhu05/test/Spec.o : mhu05/lib/Lib.hi
+# DO NOT DELETE: End of Haskell dependencies

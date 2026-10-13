@@ -1,0 +1,20 @@
+unit p where
+    signature H where
+        data T
+        x :: Bool
+    module A where
+        import H
+        data A = MkA T
+        y = x
+
+unit q where
+    dependency p[H=<H>]
+
+unit h where
+    module H where
+        data T = T
+        x = True
+
+unit r where
+    dependency h
+    dependency q[H=h:H]

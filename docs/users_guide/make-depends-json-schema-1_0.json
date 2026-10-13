@@ -3,14 +3,15 @@
   "title": "GHC dependencies",
   "description": "The dependency graph of a Haskell program.",
   "oneOf": [
-    { "$ref": "#/definitions/home-module" },
-    { "$ref": "#/definitions/external-unit" }
+    { "$ref": "#/definitions/external-unit" },
+    { "$ref": "#/definitions/module" },
+    { "$ref": "#/definitions/link" }
   ],
   "definitions": {
     "external-unit": {
       "type": "object",
       "properties": {
-        "unit-id": { "$ref": "#/definitions/unit-name" },
+        "unit-id": { "$ref": "#/definitions/unit-id" },
         "package-name": { "$ref": "#/definitions/package-name" },
         "package-id": { "$ref": "#/definitions/package-id" }
       },
@@ -29,17 +30,17 @@
     "module-name": {
       "type": "string"
     },
-    "home-module": {
+    "module": {
       "type": "object",
       "properties": {
         "module": { "$ref": "#/definitions/module-name" },
         "unit-id": { "$ref": "#/definitions/unit-id" },
         "package-name": { "$ref": "#/definitions/package-name" },
-        "source": { "$ref": "#/definitions/home-module-source" },
-        "boot": { "type": "boolean" },
+        "source": { "$ref": "#/definitions/module-source" },
+        "boot": { "$ref": "#/definitions/boot" },
         "includes": {
           "type": "array",
-          "items": { "$ref": "#/definitions/home-module-include" }
+          "items": { "$ref": "#/definitions/module-include" }
         },
         "imports": {
           "type": "object",
@@ -48,18 +49,18 @@
             "items": { "$ref": "#/definitions/import" }
           }
         },
-        "preprocessor": { "$ref": "#/definitions/home-module-preprocessor" }
+        "preprocessor": { "$ref": "#/definitions/module-preprocessor" }
       },
       "required": ["module", "unit-id", "source"],
       "unevaluatedProperties": false
     },
-    "home-module-source": {
+    "module-source": {
       "type": "string"
     },
-    "home-module-include": {
+    "module-include": {
       "type": "string"
     },
-    "home-module-preprocessor": {
+    "module-preprocessor": {
       "type": "string"
     },
     "import": {
@@ -70,17 +71,66 @@
           "properties": {
             "module": { "$ref": "#/definitions/module-name" },
             "level": { "$ref": "#/definitions/import-level" },
-            "boot": { "type": "boolean" }
+            "boot": { "$ref": "#/definitions/boot" }
           },
           "required": ["module"],
           "unevaluatedProperties": false
         }
       ]
     },
+    "boot": {
+      "type": "boolean",
+      "default": false
+    },
     "import-level": {
       "type": "string",
       "enum": ["normal", "quote", "splice"],
       "default": "normal"
+    },
+    "link": {
+      "type": "object",
+      "link-type": { "$ref": "#/definitions/link-type" },
+      "properties": {
+        "links": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/link-unit" }
+        }
+      }
+    },
+    "link-type": {
+      "type": "string",
+      "enum": [
+        "executable",
+        "in-memory",
+        "dynamic-library",
+        "bytecode-library",
+        "static-library",
+        "merged-object"
+      ]
+    },
+    "link-unit": {
+      "type": "object",
+      "properties": {
+        "unit-id": { "$ref": "#/definitions/unit-id" },
+        "modules": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/link-module" }
+        }
+      },
+      "required": ["unit-id"]
+    },
+    "link-module": {
+      "oneOf": [
+        { "$ref": "#/definitions/module-name" },
+        {
+          "type": "object",
+          "properties": {
+            "module": { "$ref": "#/definitions/module-name" },
+            "boot": { "$ref": "#/definitions/boot" }
+          },
+          "required": ["module"]
+        }
+      ]
     }
   }
 }
