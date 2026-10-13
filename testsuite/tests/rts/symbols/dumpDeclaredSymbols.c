@@ -19,8 +19,16 @@ void dumpDeclaredSymbols(void) {
             type = "data";
         }
 
+        const char * lbl = NULL;
+        if (sym->lbl_redirect_target) {
+            // In the case of redirects, the true symbol name is lbl_redirect_target
+            lbl = sym->lbl_redirect_target;
+        } else {
+            lbl = sym->lbl;
+        }
+
         if (type) {
-            printf("%s %s\n", sym->lbl, type);
+            printf("%s %s\n", lbl, type);
         }
     }
 }

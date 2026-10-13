@@ -1,6 +1,4 @@
 Symbols declared in RtsSymbols.c but not observed in the DSO:
-Declared> __udivti3 Code
-Declared> __umodti3 Code
 Declared> atomic_dec Code
 Declared> dirty_TVAR Code
 Declared> ffi_call Code
@@ -172,7 +170,6 @@ Observed> lookupIPEId Code
 Observed> m32_free_page_pool Data
 Observed> m32_free_page_pool_size Data
 Observed> makeGot Code
-Observed> mblock_address_space Data
 Observed> mblocks_allocated Data
 Observed> modules Data
 Observed> mpc_misses Data
