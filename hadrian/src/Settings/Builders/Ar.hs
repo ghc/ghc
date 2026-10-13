@@ -10,7 +10,11 @@ arBuilderArgs = do
   stage <- getStage
   mconcat
     [ builder (Ar Pack) ? mconcat
-      [ -- When building on platforms which don't support object merging
+      [ -- JS target: emar (llvm-ar) uses the Darwin archive format on Darwin
+        -- hosts. Force the GNU format to avoid padding after wasm objects.
+        -- See Note [Wasm objects in Darwin archives] in GHC.StgToJS.Object
+        expr (isJsTarget stage) ? arg "--format=gnu"
+      , -- When building on platforms which don't support object merging
         -- we must use the -L flag supported by llvm-ar, which ensures that
         -- .a files added to the archive are merged into the resulting archive,
         -- not added as a single file. This requires that we are using llvm-ar

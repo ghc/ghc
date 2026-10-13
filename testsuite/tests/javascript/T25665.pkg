@@ -1,0 +1,9 @@
+name: t25665-lib
+version: 1.0
+id: t25665-lib
+key: t25665-lib
+exposed: True
+exposed-modules: T25665Lib
+import-dirs: ${pkgroot}/T25665pkg
+library-dirs: ${pkgroot}/T25665pkg
+hs-libraries: HSt25665-lib

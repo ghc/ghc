@@ -269,9 +269,10 @@ jsLink lc_cfg cfg logger tmpfs ar_cache out link_plan = do
                   go_entries emcc_opts cc_objs es
                 Just ObjCc -> do
                   -- extract the object file from the archive in a temporary
-                  -- file and return its path
+                  -- file and return its path.
+                  -- See Note [Wasm objects in Darwin archives] in GHC.StgToJS.Object
                   cc_obj_fn <- newTempName logger tmpfs tmp_dir TFL_CurrentModule "o"
-                  B.writeFile cc_obj_fn (Ar.filedata e)
+                  B.writeFile cc_obj_fn (trimWasmObjectBS (Ar.filedata e))
                   let cc_objs' = cc_obj_fn:cc_objs
                   go_entries emcc_opts cc_objs' es
                 Just ObjJs -> do

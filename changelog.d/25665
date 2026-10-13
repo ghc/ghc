@@ -1,0 +1,6 @@
+section: js-backend
+synopsis: Fix linking of C sources in packages on Darwin (``wasm-ld: section too large``).
+  The padding added by ``llvm-ar`` after wasm objects in Darwin format archives is now removed.
+  Hadrian now also builds the archives of the JS boot libraries in the GNU format.
+mrs: !16809
+issues: #25665

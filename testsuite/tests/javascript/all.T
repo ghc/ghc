@@ -30,3 +30,4 @@ test('T25633', normal, compile_and_run, [''])
 test('T24886', normal, compile, [''])
 
 test('T27788', normal, compile_and_run, ['-O0'])
+test('T25665', extra_files(['T25665Lib.hs','T25665_js.js','T25665_c.c','T25665.pkg']), makefile_test, ['T25665'])

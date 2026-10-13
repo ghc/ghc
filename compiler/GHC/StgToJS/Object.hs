@@ -26,6 +26,8 @@ module GHC.StgToJS.Object
   ( ObjectKind(..)
   , getObjectKind
   , getObjectKindBS
+  -- * Cc object
+  , trimWasmObjectBS
   -- * JS object
   , JSOptions(..)
   , defaultJSOptions
@@ -109,7 +111,8 @@ import qualified Control.Exception as Exception
 data ObjectKind
   = ObjJs -- ^ JavaScript source embedded in a .o
   | ObjHs -- ^ JS backend object for Haskell code
-  | ObjCc -- ^ Wasm module object as produced by emcc
+  | ObjCc -- ^ Wasm module object as produced by emcc.
+          -- See Note [Cc object format]
   deriving (Show,Eq,Ord)
 
 -- | Get the kind of a file object, if any
@@ -140,6 +143,120 @@ hsHeader = unsafePerformIO $ B.unsafePackAddressLen 8 "GHCJS_HS"#
 
 wasmHeader :: B.ByteString
 wasmHeader = unsafePerformIO $ B.unsafePackAddressLen 4 "\0asm"#
+
+-- Note [Cc object format]
+-- ~~~~~~~~~~~~~~~~~~~~~~~
+-- Cc objects are wasm object files produced by emcc (clang). A wasm object
+-- file is a wasm module binary with additional custom sections ("linking",
+-- "reloc.*") for the linker. Layout:
+--
+--   magic    : 4 bytes "\0asm"
+--   version  : 4 bytes, u32 little-endian (1)
+--   sections : until the end of the file. Each section is:
+--     id       : 1 byte
+--     size     : u32 as unsigned LEB128 (1 to 5 bytes): size of the contents
+--     contents : `size` bytes
+--
+-- There is no section count and no total size: a reader reads sections until
+-- the end of the file. Thus a reader reads trailing bytes as a section (see
+-- Note [Wasm objects in Darwin archives]).
+--
+-- Unsigned LEB128: each byte gives 7 bits of the value, least significant
+-- group first. Bit 7 is set in all the bytes except the last one. E.g. 300
+-- (0b10_0101100) is encoded as [0xac, 0x02].
+--
+-- We only use the magic (to detect Cc objects, see getObjectKindBS) and the
+-- section headers (to find the end of the last section, see
+-- trimWasmObjectBS). We do not read the contents of the sections.
+--
+-- References:
+--   - WebAssembly spec, binary format of modules and sections:
+--       https://webassembly.github.io/spec/core/binary/modules.html
+--   - WebAssembly spec, LEB128 integers:
+--       https://webassembly.github.io/spec/core/binary/values.html
+--   - Wasm object files (tool conventions, not in the spec):
+--       https://github.com/WebAssembly/tool-conventions/blob/main/Linking.md
+--   - LLVM implementation (used by wasm-ld): readSection in
+--       llvm/lib/Object/WasmObjectFile.cpp
+
+-- | Remove the archive padding at the end of a wasm object, if any.
+--
+-- See Note [Wasm objects in Darwin archives] and Note [Cc object format]
+trimWasmObjectBS :: B.ByteString -> B.ByteString
+trimWasmObjectBS bs = go 8 -- skip magic and version
+  where
+    len = B.length bs
+
+    go !off
+      | off >= len
+      = bs
+      | Just sz <- full_section_size off
+      , off + sz <= len
+      = go (off + sz)
+      | is_padding (B.drop off bs)
+      = B.take off bs
+      | otherwise
+      = bs -- not padding: keep the object and let wasm-ld report the error
+
+    is_padding rest = B.length rest < 8 && B.all (== 0x0a) rest
+
+    -- full size of the section at the given offset: id, payload size, payload
+    full_section_size off = do
+      (payload_sz, n) <- get_uleb128 (off + 1) 0 0
+      pure (1 + n + payload_sz)
+
+    -- read a LEB128 u32 (5 bytes max). Return the value and its size in bytes.
+    get_uleb128 :: Int -> Int -> Int -> Maybe (Int, Int)
+    get_uleb128 start i acc
+      | i >= 5 || start + i >= len
+      = Nothing
+      | otherwise
+      = let b    = B.index bs (start + i)
+            !acc' = acc .|. (fromIntegral (b .&. 0x7f) `shiftL` (7 * i))
+        in if testBit b 7
+            then get_uleb128 start (i + 1) acc'
+            else Just (acc', i + 1)
+
+-- Note [Wasm objects in Darwin archives]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- llvm-ar (used as emar) supports several archive formats: gnu, bsd, darwin,
+-- etc. (see the --format option). On Darwin hosts, it uses the Darwin format
+-- by default when the first member is not a known object file, which is the
+-- case for the JS and HS objects of the JS backend.
+--
+-- The Darwin format is a variant of the BSD format: member names are stored
+-- in the member data (#1/N names) and the data of each member is aligned to 8
+-- bytes with '\n' (0x0a) bytes. This alignment is what ld64 expects (see
+-- computeMemberData in llvm/lib/Object/ArchiveWriter.cpp). The size in the
+-- member header includes the name and the padding. The archive parser
+-- (GHC.SysTools.Ar) removes the name but not the padding: it returns the
+-- padding as part of the member data. The JS linker removes it with
+-- trimWasmObjectBS (see below).
+--
+-- Only the Darwin format has this padding: the gnu and bsd formats do not.
+-- "llvm-ar --format=darwin" reproduces the issue on any host.
+--
+-- JS and HS objects accept trailing bytes. A wasm object does not: it is a
+-- sequence of sections until the end of the file.
+-- See Note [Cc object format]. wasm-ld reads "\n\n" as a section with id 10
+-- and payload size 10 and fails with "section too large" (#25665).
+--
+-- Thus, before we give a wasm object from an archive to emcc, the JS linker
+-- calls trimWasmObjectBS: we read the sections of the object and we remove the
+-- trailing bytes if they are padding (less than 8 '\n' bytes).
+-- Padding never contains a full section: a section that starts
+-- with 0x0a has at least 12 bytes. If the trailing bytes are not padding, we
+-- keep the object unchanged and wasm-ld reports the error.
+--
+-- In addition, Hadrian passes --format=gnu to emar, thus the archives of the
+-- boot libraries have no padding. Cabal does not do this, thus we still need
+-- the code above for other libraries and for older installations.
+--
+-- References:
+--   - llvm-ar formats: https://llvm.org/docs/CommandGuide/llvm-ar.html
+--   - Darwin padding and format detection: computeMemberData and
+--     NewArchiveMember::detectKindFromObject in
+--     llvm/lib/Object/ArchiveWriter.cpp
 
 
 
