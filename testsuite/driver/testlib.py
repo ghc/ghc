@@ -20,6 +20,7 @@ from pathlib import Path, PurePath
 import collections
 import collections.abc
 import subprocess
+import json
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, \
                         TestRun, TestResult, TestOptions, PerfMetric
@@ -432,6 +433,28 @@ def ignore_extension(name, opts):
 
 def combined_output( name, opts ):
     opts.combined_output = True
+
+def dep_makefile( name, opts ):
+    """
+    For make_depend tests: write the -dep-makefile output and
+    compare it against <name>.dep-makefile.
+    """
+    opts.dep_makefile = True
+
+def dep_json( name, opts ):
+    """
+    For make_depend tests: write the -dep-json output and
+    compare it against <name>.dep-json.
+    """
+    opts.dep_json = True
+
+def ignore_dep_outputs( name, opts ):
+    """
+    For make_depend tests: still write the outputs requested by 'dep_makefile'
+    and 'dep_json', but don't compare them against the expected files.
+    Useful for performance tests.
+    """
+    opts.ignore_dep_outputs = True
 
 def use_specs( specs ):
     """
@@ -2060,10 +2083,10 @@ async def multimod_compile_filter( name, way, top_mod, extra_hc_opts, filter_wit
     return await do_compile( name, way, False, top_mod, [], [], extra_hc_opts, filter_with=filter_with, suppress_stdout=suppress_stdout )
 
 async def multiunit_compile( name, way, units, extra_hc_opts ):
-    return await do_compile( name, way, False, None, [], units, extra_hc_opts )
+    return await do_compile( name, way, False, None, [], units, extra_hc_opts, srcs = [] )
 
 async def multiunit_compile_fail( name, way, units, extra_hc_opts ):
-    return await do_compile( name, way, True, None, [], units, extra_hc_opts )
+    return await do_compile( name, way, True, None, [], units, extra_hc_opts, srcs = [] )
 
 async def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
     return await do_compile( name, way, False, top_mod, extra_mods, [], extra_hc_opts)
@@ -2072,7 +2095,52 @@ async def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
     return await do_compile( name, way, True, top_mod, extra_mods, [], extra_hc_opts)
 
 async def make_depend( name, way, mods, extra_hc_opts ):
-    return await do_compile( name, way, False, Path(' '.join(mods)), [], [], extra_hc_opts, mode = '-M')
+    return await do_make_depend( name, way, mods, extra_hc_opts )
+
+async def do_make_depend(name: TestName,
+                   way: WayName,
+                   srcs: List[str],
+                   extra_hc_opts: str
+                   ) -> PassFail:
+    """
+    Run `ghc -M`. Each output has to be requested explicitly:
+
+      * 'dep_makefile': write the -dep-makefile output and compare it
+        against <name>.dep-makefile. Otherwise, -no-dep-makefile is passed.
+      * 'dep_json': write the -dep-json output and compare it
+        against <name>.dep-json.
+    """
+    opts = getTestOpts()
+
+    def actual_file(kind: str) -> Path:
+        return add_suffix(name, 'comp.' + kind)
+
+    outputs = []
+    output_flags = []
+    if opts.dep_makefile:
+        outputs.append(('dep-makefile', normalise_dep_makefile))
+        output_flags.append('-dep-makefile %s' % actual_file('dep-makefile'))
+    else:
+        output_flags.append('-no-dep-makefile')
+    if opts.dep_json:
+        outputs.append(('dep-json', normalise_dep_json))
+        output_flags.append('-dep-json %s' % actual_file('dep-json'))
+
+    result = await do_compile( name, way, False, None, [], [],
+                               ' '.join(output_flags + [extra_hc_opts]),
+                               mode = '-M', srcs = srcs )
+    if badResult(result) or opts.ignore_dep_outputs:
+        return result
+
+    for (kind, normaliser) in outputs:
+        output_match = await compare_outputs(way, kind,
+                           join_normalisers(opts.extra_normaliser,
+                                            normalise_slashes_, normaliser),
+                           find_expected_file(name, kind, way), actual_file(kind))
+        if not output_match:
+            return failBecause(kind + ' mismatch', diff=output_match.diff)
+
+    return passed()
 
 async def do_compile(name: TestName,
                way: WayName,
@@ -2361,22 +2429,31 @@ async def simple_build(name: Union[TestName, str],
                  suppress_stdout: bool = False,
                  filter_with: str = '',
                  # Override auto-detection of whether to use --make or -c etc.
-                 mode: Optional[str] = None) -> Any:
+                 mode: Optional[str] = None,
+                 # Override the source files passed to the compiler.
+                 # If None, then top_mod is used as the only source argument.
+                 # Otherwise, use the sources and pass them to the ghc invocation.
+                 srcs: Optional[List[str]] = None) -> Any:
     opts = getTestOpts()
 
     # Redirect stdout and stderr to the same file
     stdout = in_testdir(name, 'comp.stderr')
     stderr = subprocess.STDOUT if not suppress_stdout else None
 
-    if top_mod is not None:
-        srcname = top_mod
+    assert srcs is None or top_mod is None, 'srcs and top_mod are mutually exclusive'
+
+    src_args: Union[str, Path]
+    if srcs is not None:
+        src_args = ' '.join(srcs)
+    elif top_mod is not None:
+        src_args = top_mod
     elif addsuf:
         if backpack:
-            srcname = add_suffix(name, 'bkp')
+            src_args = add_suffix(name, 'bkp')
         else:
-            srcname = add_hs_lhs_suffix(name)
+            src_args = add_hs_lhs_suffix(name)
     else:
-        srcname = Path(name)
+        src_args = Path(name)
 
     if mode is not None:
         to_do = mode
@@ -2424,7 +2501,7 @@ async def simple_build(name: Union[TestName, str],
     flags = ' '.join(get_compiler_flags() + config.way_flags[way])
 
     cmd = ('{cmd_prefix} '
-           '{{compiler}} {to_do} {srcname} {flags} {extra_hc_opts}'
+           '{{compiler}} {to_do} {src_args} {flags} {extra_hc_opts}'
           ).format(**locals())
 
     if filter_with != '':
@@ -3350,6 +3427,82 @@ def normalise_asm( s: str ) -> str:
         else:
           out.append(ins[0])
     return '\n'.join(out)
+
+_WHITESPACE = re.compile(r"\s*")
+
+def normalise_dep_json(s: str) -> str:
+    """
+    Normalise the jsonl output of `ghc -M -dep-json output.json`.
+
+    We format the jsonl nicely, and replace absolute file paths.
+    This also works on a formatted version of jsonl, e.g. when the json object is formatted
+    over multiple lines
+    """
+
+    def normalise_includes(j):
+        # only replace in jsonl objects that contain the "includes" key
+        if isinstance(j, dict) and "includes" in j:
+            # Absolute includes come from the toolchain (e.g. ghcversion.h, stdc-predef.h)
+            # and are platform dependent, so we drop them.
+            j["includes"] = sorted(
+                p for p in j["includes"] if not __is_absolute_path(p)
+            )
+        return j
+
+    decoder = json.JSONDecoder()
+    objects = []
+    m = _WHITESPACE.match(s)
+    assert m is not None
+    pos = m.end()
+    try:
+        while pos < len(s):
+            obj, pos = decoder.raw_decode(s, pos)
+            objects.append(normalise_includes(obj))
+            m = _WHITESPACE.match(s, pos)
+            assert m is not None
+            pos = m.end()
+    except json.JSONDecodeError:
+        return s
+
+    return "\n".join(
+        json.dumps(o, indent=2, sort_keys=True, ensure_ascii=False) for o in objects
+    )
+
+def normalise_dep_makefile(s: str) -> str:
+    """
+    Normalise the Makefile output of `ghc -M`.
+
+    We ensure the output is stable by sorting the rules and replacing absolute file paths.
+    We filter out system file dependencies, as they are very hard to record in a platform independent way.
+    """
+
+    lines = s.split("\n")
+    try:
+        begin = lines.index("# DO NOT DELETE: Beginning of Haskell dependencies") + 1
+        end = lines.index("# DO NOT DELETE: End of Haskell dependencies", begin)
+    except ValueError:
+        return s
+
+    def normalise_rule(rule: str) -> Optional[str]:
+        target, sep, dep = rule.partition(" : ")
+        if __is_absolute_path(dep):
+            if dep.endswith(("hi", "hi-boot")):
+                return target + sep + __replace_absolute_path(dep)
+            else:
+                return None # Filter out system paths
+        else:
+            return target + sep + dep
+
+    rules = sorted(r for r in map(normalise_rule, lines[begin:end]) if r is not None)
+    return "\n".join(lines[:begin] + rules + lines[end:])
+
+def __is_absolute_path(s: str) -> bool:
+    return s.startswith("/")
+
+def __replace_absolute_path(s: str) -> str:
+    if s.startswith("/"):
+        return "<absolute-path>/" + s.rsplit("/", 1)[-1]
+    return s
 
 def safe_print(s: str) -> None:
     s2 = s.encode(sys.stdout.encoding, errors='replace').decode(sys.stdout.encoding)
