@@ -498,7 +498,9 @@ contIsDupable (ApplyToVal { sc_env = se }) = okToDupSE se -- See (SE1) in Note [
 contIsDupable (Select { sc_env = se })     = okToDupSE se -- ...ditto...
 contIsDupable (StrictBind { sc_env = se }) = okToDupSE se -- ...ditto...
 contIsDupable (StrictArg { sc_dup = dup }) = okToDup dup  -- ...ditto...
-contIsDupable (CastIt { sc_cont = k })     = contIsDupable k
+contIsDupable (CastIt { sc_co = co, sc_cont = k })
+  = coercionIsSmall co && contIsDupable k   -- See (LBC2) in Note [Let-bound coercions]
+                                            --     in GHC.Core
 contIsDupable (TickIt _ k)                 = contIsDupable k
 
 -------------------

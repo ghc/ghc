@@ -787,7 +787,8 @@ Note [Core type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow a /non-recursive/, /non-top-level/ let to bind type and
 coercion variables.  These can be very convenient for postponing type
-substitutions until the next run of the simplifier.
+substitutions until the next run of the simplifier.  Coercion bindings
+are also used to share big coercions; see Note [Let-bound coercions].
 
 * A type variable binding must have a RHS of (Type ty)
 
@@ -803,6 +804,66 @@ substitutions until the next run of the simplifier.
   Which is very exotic, and I think never encountered; but see
   Note [Equality superclasses in quantified constraints]
   in GHC.Tc.Solver.Dict
+
+Note [Let-bound coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Coercions can be big, and the Simplifier can duplicate them; e.g. case-of-case
+pushes a cast into every branch:
+    case ((case x of { A -> e1; B -> e2 }) |> co) of alts
+  ==>
+    case x of { A -> case (e1 |> co) of alts; B -> case (e2 |> co) of alts }
+Duplicating a big coercion costs compile time and space, because every later
+pass (substitution, optCoercion, Lint, serialisation in interface files ...)
+traverses each copy separately.
+
+So we use a let-binding (see Note [Core type and coercion invariant]) to share
+a big coercion:
+    let cv = Coercion co in ...(e1 |> cv)...(e2 |> cv)...
+and we do not inline a let-bound coercion unless it is small, as measured by
+`coercionIsSmall`.
+
+(LBC1) When to inline.  In the Simplifier (`completeBind`) and the simple
+  optimiser (`simple_bind_pair`, `simple_out_bind`), a binding `cv = Coercion co`
+  is
+    - dropped if `cv` is dead
+    - inlined (by extending the substitution) if `coercionIsSmall co`,
+      or if `cv` occurs just once, not inside a lambda
+    - otherwise retained
+  To support this, the occurrence analyser gathers accurate, counted,
+  occurrence info for CoVars; see Note [Gather occurrences of coercion
+  variables] in GHC.Core.Opt.OccurAnal.
+
+  Why "not inside a lambda", given that inlining a coercion never duplicates
+  work?  Because the occurrence analyser marks the arguments of a constructor
+  in a let RHS as inside-lambda (Note [Arguments of let-bound constructors]
+  in GHC.Core.Opt.OccurAnal), and `prepareRhs` ANF-ises such arguments.  If we
+  ignored inside-lambda we'd ANF-ise `let x = K co` to `let cv = co; x = K cv`,
+  then inline `cv` again, and so on forever.
+
+(LBC2) Where we let-bind.
+  * `exprIsTrivial (Coercion co)` holds only if `coercionIsSmall co`.  So
+    `makeTrivial` will let-bind a big coercion argument (it has a special case
+    for `Coercion`, to make a CoVar binder).  This deals with, for example, the
+    ApplyToVal case of `mkDupableContWithDmds`.
+  * `mkDupableContWithDmds` let-binds the coercion of a `CastIt`, if it is big.
+  * Correspondingly, `contIsDupable` says False for a `CastIt` with a big
+    coercion, so that we do call `mkDupableContWithDmds` in the first place.
+
+(LBC3) We do not (yet) allow top-level coercion bindings.  It's not hard to
+  allow them in Core, but interface files have no way to refer to an imported
+  CoVar.  So we must never float a coercion binding to top level.  Since a CoVar
+  has an unlifted type, its binding is never `FltLifted` in the Simplifier,
+  so `doFloatFromRhs` will not float it to top level; and `makeTrivial` does
+  not make top-level bindings for unlifted things (see `bindingOk`).
+  SetLevels never floats a CoVar binding at all.
+
+(LBC4) Coercion bindings have no operational significance, and are discarded
+  by CoreToStg.  CorePrep keeps them (so that its output passes Lint) as a
+  `LetBound` float, which is `LazyContextFloatable` (not `TopLvlFloatable`;
+  see (LBC3)).
+
+(LBC5) Nested coercion bindings can appear in unfoldings, and so in interface
+  files.  `tcIfaceExpr` must make a CoVar (not an Id) for the binder.
 
 Note [Representation polymorphism invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

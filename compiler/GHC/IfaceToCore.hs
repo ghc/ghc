@@ -61,6 +61,7 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core
 import GHC.Core.RoughMap( RoughMatchTc(..) )
+import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Utils
 import GHC.Core.Unfold( calcUnfoldingGuidance )
 import GHC.Core.Unfold.Make
@@ -1713,7 +1714,10 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               NotTopLevel name ty' info
-        ; let id = mkLocalIdWithInfo name ManyTy ty' id_info
+        ; let id | isCoVarType ty'  -- A let-bound coercion
+                 = mkLocalCoVar name ty'  -- See Note [Let-bound coercions] in GHC.Core
+                 | otherwise
+                 = mkLocalIdWithInfo name ManyTy ty' id_info
                      `asJoinId_maybe` ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)

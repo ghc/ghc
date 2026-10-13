@@ -3086,6 +3086,11 @@ wantCallsFor _env f
 interestingDict :: SpecEnv -> CoreExpr -> Bool
 -- This is a subtle and important function
 -- See Note [Interesting dictionary arguments]
+interestingDict _ (Coercion {})
+  -- A coercion argument (e.g. the field of an equality-class dictionary)
+  -- is never interesting, even if it is big and hence not exprIsTrivial
+  = False
+
 interestingDict env (Var v)  -- See (ID3) and (ID5)
   -- (ID6.a) Might fail for loop breaker dicts but that seems fine.
   | Just rhs <- maybeUnfoldingTemplate (idUnfolding v)

@@ -583,6 +583,14 @@ cpeBind top_lvl env (NonRec bndr rhs)
                  emptyFloats,
                  Just (NonRec bndr2 rhs1)) }
 
+  -- A let-bound coercion: see (LBC4) in Note [Let-bound coercions] in GHC.Core
+  | Coercion co <- rhs
+  = assertPpr (isCoVar bndr && not (isTopLevel top_lvl)) (ppr bndr) $
+    do { (env1, bndr1) <- cpCloneBndr env bndr
+       ; let float = Float (NonRec bndr1 (Coercion (cpSubstCo env co)))
+                           LetBound LazyContextFloatable
+       ; return (env1, snocFloat emptyFloats float, Nothing) }
+
   | otherwise
   = do { (env1, bndr1) <- cpCloneBndr env bndr
        ; let dmd = idDemandInfo bndr
@@ -2094,8 +2102,9 @@ The `FloatInfo` of a `Float` describes how far it can float without
                     such as `case x +# y of r -> { __DEFAULT -> I# r }`.
 
 This meaning of "at least" is encoded in `floatsAtLeastAsFarAs`.
-Note that today, `LetBound` implies `TopLvlFloatable`, so we could make do with
-the the following enum (check `mkNonRecFloat` for whether this is up to date):
+Note that today, `LetBound` implies `TopLvlFloatable` (with one exception, see
+below), so we could make do with the the following enum (check `mkNonRecFloat`
+for whether this is up to date):
 
    LetBoundTopLvlFloatable          (lifted or boxed values)
   CaseBoundTopLvlFloatable          (strings, ok-for-spec-eval and lifted)
@@ -2104,6 +2113,10 @@ the the following enum (check `mkNonRecFloat` for whether this is up to date):
 
 Although there is redundancy in the current encoding, SG thinks it is cleaner
 conceptually.
+
+The exception: a let-bound coercion `let cv = Coercion co` is `LetBound` but
+only `LazyContextFloatable`, because we don't allow top-level coercion bindings.
+See (LBC4) in Note [Let-bound coercions] in GHC.Core.
 
 See also Note [Floats and FloatDecision] for how we maintain whole groups of
 floats and how far they go.

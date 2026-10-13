@@ -77,7 +77,7 @@ bar [InlPrag=[2]]
                  ($dShow [Occ=Once1] :: Show a)
                  (eta [Occ=Once1!] :: Int)
                  (eta1 [Occ=Once1] :: a) ->
-                 case $d~ of { GHC.Internal.Types.Eq# ww ->
+                 case $d~ of { GHC.Internal.Types.Eq# ww [Occ=Once1] ->
                  case eta of { GHC.Internal.Types.I# ww1 [Occ=Once1] ->
                  case T23398.$wbar
                         @a @b @~(ww :: a GHC.Internal.Prim.~# b) $dShow ww1 eta1

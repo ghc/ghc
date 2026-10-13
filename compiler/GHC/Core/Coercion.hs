@@ -78,7 +78,7 @@ module GHC.Core.Coercion (
 
         -- ** Free variables
         tyCoVarsOfCo, tyCoVarsOfCos, coVarsOfCo,
-        coercionSize, anyFreeVarsOfCo,
+        coercionSize, coercionIsSmall, anyFreeVarsOfCo,
 
         -- ** Substitution
         CvSubstEnv, emptyCvSubstEnv,

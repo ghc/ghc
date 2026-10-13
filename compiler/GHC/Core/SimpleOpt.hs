@@ -705,8 +705,13 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst, soe_opts = opt
 
   | Coercion co <- in_rhs
   , let out_co = optCoercion (so_co_opts (soe_opts env)) (soe_subst rhs_env) co
-  = assert (isCoVar in_bndr)
-    (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
+  = assert (isCoVar in_bndr) $
+    if inline_co_bind in_bndr out_co
+    then (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
+    else let (env', out_bndr) = case mb_out_bndr of
+                                  Just out_bndr -> (env, out_bndr)
+                                  Nothing       -> subst_opt_bndr env in_bndr
+         in (env', Just (out_bndr, Coercion out_co))
 
   | assertPpr (isNonCoVarId in_bndr) (ppr in_bndr)
     -- The previous two guards got rid of tyvars and coercions
@@ -753,6 +758,11 @@ safe_to_inline OneOcc{ occ_in_lam = NotInsideLam
 safe_to_inline OneOcc{}                           = False
 safe_to_inline ManyOccs{}                         = False
 
+inline_co_bind :: InVar -> OutCoercion -> Bool
+-- True <=> substitute for this let-bound CoVar, rather than keeping the binding
+-- See Note [Let-bound coercions] in GHC.Core
+inline_co_bind cv co = coercionIsSmall co || safe_to_inline (idOccInfo cv)
+
 do_beta_by_substitution :: Id -> CoreExpr -> Bool
 -- True <=> you can inline (bndr = rhs) by substitution
 -- See Note [Exploit occ-info in exprIsConApp_maybe]
@@ -777,8 +787,11 @@ simple_out_bind top_level env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion out_co <- out_rhs
-  = assert (isCoVar in_bndr)
-    (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
+  = assert (isCoVar in_bndr) $
+    if inline_co_bind in_bndr out_co
+    then (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
+    else let (env', out_bndr) = subst_opt_bndr env in_bndr
+         in (env', Just (out_bndr, out_rhs))
 
   | otherwise
   = simple_out_bind_pair env in_bndr Nothing out_rhs
@@ -825,9 +838,12 @@ simple_out_bind_pair env@(SOE { soe_subst = subst, soe_opts = opts })
     coercible_hack | (Var fun, args) <- collectArgs out_rhs
                    , Just dc <- isDataConWorkId_maybe fun
                    , dc `hasKey` heqDataConKey || dc `hasKey` coercibleDataConKey
-                   = all exprIsTrivial args
+                   = all triv_arg args
                    | otherwise
                    = False
+    triv_arg arg = isTyCoArg arg || exprIsTrivial arg
+       -- isTyCoArg: inline even if the coercion argument is big,
+       -- else the map/coerce RULE may not fire
 
 {- Note [Exported Ids and trivial RHSs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

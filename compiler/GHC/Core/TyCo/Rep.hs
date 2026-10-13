@@ -63,7 +63,7 @@ module GHC.Core.TyCo.Rep (
         TyCoFolder(..), foldTyCo, noView,
 
         -- * Sizes
-        typeSize, typesSize, coercionSize,
+        typeSize, typesSize, coercionSize, coercionIsSmall,
 
         -- * Multiplicities
         Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
@@ -2103,6 +2103,67 @@ coercionSize (SubCo co)          = 1 + coercionSize co
 mCoercionSize :: MCoercion -> Int
 mCoercionSize MRefl    = 0
 mCoercionSize (MCo co) = coercionSize co
+
+-- | Is this coercion small enough to inline freely?
+-- Bales out quickly if the coercion is big; it costs O(smallCoercionSize)
+-- however big the coercion is.
+-- See Note [Let-bound coercions] in GHC.Core
+coercionIsSmall :: Coercion -> Bool
+coercionIsSmall co = coBudget smallCoercionSize co >= 0
+
+smallCoercionSize :: Int
+-- An arbitrary threshold, measured in the units of coercionSize
+smallCoercionSize = 10
+
+coBudget :: Int -> Coercion -> Int
+-- (coBudget n co) = n - coercionSize co, except that it
+-- stops early (returning a negative number) if that is negative
+coBudget n _ | n < 0 = n
+coBudget n co = case co of
+  Refl ty              -> tyBudget n ty
+  GRefl _ ty mco       -> mcoBudget (tyBudget n ty) mco
+  TyConAppCo _ _ args  -> cosBudget (n-1) args
+  AppCo co arg         -> coBudget (coBudget n co) arg
+  ForAllCo { fco_kind = h, fco_body = co }
+                       -> mcoBudget (coBudget (n-1) co) h
+  FunCo _ _ _ w c1 c2  -> coBudget (coBudget (coBudget (n-1) c1) c2) w
+  CoVarCo _            -> n-1
+  HoleCo _             -> n-1
+  AxiomCo _ cs         -> cosBudget (n-1) cs
+  UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps }
+                       -> cosBudget (tyBudget (tyBudget (n-1) t1) t2) deps
+  SymCo co             -> coBudget (n-1) co
+  TransCo co1 co2      -> coBudget (coBudget (n-1) co1) co2
+  SelCo _ co           -> coBudget (n-1) co
+  LRCo  _ co           -> coBudget (n-1) co
+  InstCo co arg        -> coBudget (coBudget (n-1) co) arg
+  KindCo co            -> coBudget (n-1) co
+  SubCo co             -> coBudget (n-1) co
+
+cosBudget :: Int -> [Coercion] -> Int
+cosBudget n []       = n
+cosBudget n (co:cos) = cosBudget (coBudget n co) cos
+
+mcoBudget :: Int -> MCoercion -> Int
+mcoBudget n MRefl    = n
+mcoBudget n (MCo co) = coBudget n co
+
+tyBudget :: Int -> Type -> Int
+-- Like coBudget, but for types; follows typeSize
+tyBudget n _ | n < 0 = n
+tyBudget n ty = case ty of
+  LitTy {}               -> n-1
+  TyVarTy {}             -> n-1
+  AppTy t1 t2            -> tyBudget (tyBudget n t1) t2
+  FunTy _ _ t1 t2        -> tyBudget (tyBudget n t1) t2
+  ForAllTy (Bndr tv _) t -> tyBudget (tyBudget n (varType tv)) t
+  TyConApp _ ts          -> tysBudget (n-1) ts
+  CastTy ty co           -> coBudget (tyBudget n ty) co
+  CoercionTy co          -> coBudget n co
+
+tysBudget :: Int -> [Type] -> Int
+tysBudget n []       = n
+tysBudget n (ty:tys) = tysBudget (tyBudget n ty) tys
 
 {-
 ************************************************************************

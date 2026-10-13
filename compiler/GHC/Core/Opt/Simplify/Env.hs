@@ -817,6 +817,9 @@ doFloatFromRhs fe lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs 
      can_float = case ff of
                    FltLifted  -> True
                    FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
+                     -- NB: coercion bindings are FltOkSpec, so this ensures
+                     -- that they never float to top level; see (LBC3) in
+                     -- Note [Let-bound coercions] in GHC.Core
                    FltCareful -> isNotTopLevel lvl && isNonRec rec && strict_bind
 
      -- Whether any floating is allowed by flags.

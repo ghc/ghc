@@ -843,6 +843,14 @@ makeTrivialArg env arg@(ValArg { as_arg = e, as_dmd = dmd })
 makeTrivialArg _ arg@(TyArg {})
   = return (emptyLetFloats, arg)
 
+makeTrivialCo :: SimplEnvIS -> OutCoercion -> SimplM (LetFloats, OutCoercion)
+-- Let-bind a non-trivial coercion; only for non-top-level use
+makeTrivialCo env co
+  = do { (floats, triv_co) <- makeTrivial env NotTopLevel topDmd (fsLit "co") (Coercion co)
+       ; case triv_co of
+           Coercion co' -> return (floats, co')
+           _            -> pprPanic "makeTrivialCo" (ppr co) }
+
 makeTrivial :: HasDebugCallStack
             => SimplEnvIS -> TopLevelFlag -> Demand
             -> FastString  -- ^ A "friendly name" to build the new binder from
@@ -859,6 +867,11 @@ makeTrivial env top_lvl dmd occ_fs expr
   | Cast expr' co <- expr
   = do { (floats, triv_expr) <- makeTrivial env top_lvl dmd occ_fs expr'
        ; return (floats, Cast triv_expr co) }
+
+  | Coercion co <- expr   -- A big coercion; bind it to a CoVar
+                          -- See Note [Let-bound coercions] in GHC.Core
+  = do { cv <- newId occ_fs ManyTy (coercionType co)
+       ; return (unitLetFloat (NonRec cv expr), Coercion (mkCoVarCo cv)) }
 
   | otherwise -- 'expr' is not of form (Cast e co)
   = do  { (floats, expr1) <- prepareRhs env top_lvl occ_fs expr
@@ -957,10 +970,22 @@ completeBind :: BindContext
 -- Binder /can/ be a JoinId
 -- Precondition: rhs obeys the let-can-float invariant
 completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
- | isCoVar old_bndr
- = case new_rhs of
-     Coercion co -> return (emptyFloats env, extendCvSubst env old_bndr co)
-     _           -> return (mkFloatBind env (NonRec new_bndr new_rhs))
+ | isCoVar old_bndr  -- See Note [Let-bound coercions] in GHC.Core
+ = let occ = idOccInfo old_bndr
+       occurs_once = case occ of
+                       OneOcc { occ_n_br = 1, occ_in_lam = NotInsideLam } -> True
+                       _                                                 -> False
+         -- NotInsideLam: see (LBC1) in Note [Let-bound coercions] in GHC.Core
+   in case new_rhs of
+     Coercion co
+       | isDeadOcc occ || coercionIsSmall co || occurs_once
+       -> return (emptyFloats env, extendCvSubst env old_bndr co)
+          -- Even if old_bndr is dead, we must extend the substitution, to
+          -- override any [old_bndr :-> new_bndr] cloning substitution in `env`;
+          -- new_bndr may not be in the in-scope set of `env`
+     _ -> -- No top-level coercion bindings: see (LBC3) in Note [Let-bound coercions]
+          assertPpr (isNotTopLevel (bindContextLevel bind_cxt)) (ppr old_bndr) $
+          return (mkFloatBind env (NonRec new_bndr new_rhs))
 
  | otherwise
  = assert (isId new_bndr) $
@@ -4122,10 +4147,14 @@ mkDupableContWithDmds env remaining_dmds cont
 mkDupableContWithDmds _ _ (Stop {}) = panic "mkDupableCont"     -- Handled by previous eqn
 
 mkDupableContWithDmds env dmds (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
-  = do  { (floats, cont') <- mkDupableContWithDmds env dmds cont
-        ; return (floats, CastIt { sc_co = optOutCoercion env co opt
-                                 , sc_opt = True, sc_cont = cont' }) }
-                 -- optOutCoercion: see Note [Avoid re-simplifying coercions]
+  = do  { (floats1, cont') <- mkDupableContWithDmds env dmds cont
+        ; let co1 = optOutCoercion env co opt
+                    -- optOutCoercion: see Note [Avoid re-simplifying coercions]
+        ; (floats2, co2) <- makeTrivialCo env co1
+                    -- Let-bind a big coercion, rather than duplicating it
+                    -- See (LBC2) in Note [Let-bound coercions] in GHC.Core
+        ; return ( floats1 `addLetFloats` floats2
+                 , CastIt { sc_co = co2, sc_opt = True, sc_cont = cont' }) }
 
 -- Duplicating ticks for now, not sure if this is good or not
 mkDupableContWithDmds env dmds (TickIt t cont)

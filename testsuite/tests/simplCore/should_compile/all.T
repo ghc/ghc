@@ -627,3 +627,4 @@ test('T27749',
      compile, ['-O -g3 -ddump-simpl -dsuppress-uniques'])
 
 test('T27629', only_ways(['optasm']), makefile_test, ['T27629'])
+test('LetBoundCoercion1', [grep_errmsg(r'D:R:G\[0\]')], compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])

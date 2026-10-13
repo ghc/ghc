@@ -59,12 +59,14 @@ import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Var.FV     ( FV(..), BoundVars, addBndrFV, runFVAcc )
 import GHC.Types.Var
 import GHC.Types.Demand ( argOneShots, argsOneShots, isDeadEndSig )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.EndoOS
 
 import GHC.Builtin.KnownKeys( runRWKey )
 import GHC.Unit.Module( Module )
@@ -2341,7 +2343,7 @@ occ_anal_lam_tail env expr@(Lam {})
 occ_anal_lam_tail env (Cast expr co)
   = let  WUD usage expr' = occ_anal_lam_tail env expr
          -- usage1: see Note [Gather occurrences of coercion variables]
-         usage1 = addManyOccs usage (coVarsOfCo co)
+         usage1 = addCoVarOccsCo usage co
 
          -- usage2: see Note [Occ-anal and cast worker/wrapper]
          usage2 = case expr of
@@ -2581,18 +2583,22 @@ occAnal env expr@(Var _) = occAnalApp env (expr, [], [])
     -- weren't used at all.
 
 occAnal _ expr@(Type ty)
-  = WUD (addManyOccs emptyDetails (coVarsOfType ty)) expr
+  = WUD (addCoVarOccsTy emptyDetails ty) expr
 occAnal _ expr@(Coercion co)
-  = WUD (addManyOccs emptyDetails (coVarsOfCo co)) expr
+  = WUD (addCoVarOccsCo emptyDetails co) expr
         -- See Note [Gather occurrences of coercion variables]
 
 {- Note [Gather occurrences of coercion variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We need to gather info about what coercion variables appear, for two reasons:
+We need to gather info about what coercion variables appear, for three reasons:
 
 1. So that we can sort them into the right place when doing dependency analysis.
 
 2. So that we know when they are surely dead.
+
+3. So that we know when a let-bound CoVar occurs just once, and hence can
+   be inlined without duplicating its (possibly big) coercion.
+   See Note [Let-bound coercions] in GHC.Core.
 
 It is useful to know when they a coercion variable is surely dead,
 when we want to discard a case-expression, in GHC.Core.Opt.Simplify.rebuildCase.
@@ -2613,21 +2619,44 @@ simpified to
 We can only  drop the case altogether if 'cv' is unused, which is not
 the case here.
 
+Moreover, a let-bound CoVar that is (wrongly) deemed dead will have its
+binding discarded, leaving its occurrences out of scope.
+
 Conclusion: we need accurate dead-ness info for CoVars.
 We gather CoVar occurrences from:
 
-  * The (Type ty) and (Coercion co) cases of occAnal
+  * The (Type ty) and (Coercion co) cases of occAnal, and the coercion
+    in (Cast e co)
 
   * The type 'ty' of a lambda-binder (\(x:ty). blah)
-    See addCoVarOccs
+    See addLamCoVarOccs
 
-But it is not necessary to gather CoVars from the types of other binders.
+  * The result type 'ty' of an /empty/ case (case e of ty {}); see below.
 
-* For let-binders, if the type mentions a CoVar, so will the RHS (since
-  it has the same type)
+We count the occurrences (using addCoVarOccsTy, addCoVarOccsCo), so that
+a CoVar can get OneOccL info, not just ManyOccL.  "Inside a lambda" is
+irrelevant for CoVars: inlining a coercion never duplicates work.
 
-* For case-alt binders, if the type mentions a CoVar, so will the scrutinee
-  (since it has the same type)
+But it is not necessary to gather CoVars from the types of other binders,
+nor from the result type of a non-empty case. The key invariant is this:
+if the type of an expression `e` mentions a CoVar `cv`, then so does `e`
+itself (syntactically).  Why?
+
+* For a variable `x`, the type of `x` mentions `cv` only if `x` is bound
+  inside the scope of `cv`:
+    - lambda-binders: we gather CoVars from their types
+    - let-binders: if the type mentions a CoVar, so will the RHS (since
+      it has the same type)
+    - case-alt binders: if the type mentions a CoVar, so will the
+      scrutinee (since it has the same type)
+
+* For a non-empty case (case e of ty { alts }), the type `ty` is also
+  the type of each alternative, so any CoVar in `ty` occurs in the alts.
+
+* But for an /empty/ case (case e of ty {}) the type `ty` comes from
+  nowhere: `cv` may occur in `ty` and nowhere else.  For example
+     let cv = <big coercion> in case x of (T |> cv) {}
+  So for empty cases we must gather CoVars from `ty`.
 -}
 
 occAnal env (Tick tickish body)
@@ -2659,7 +2688,7 @@ occAnal env (Cast expr co)
   = let
       WUD usage expr' = occAnal env expr
       -- usage1: see Note [Gather occurrences of coercion variables]
-      usage1 = addManyOccs usage (coVarsOfCo co)
+      usage1 = addCoVarOccsCo usage co
       -- usage2: see (JCT1) in Note [Join points, casts, and ticks] in GHC.Core.
       usage2 = markAllNonTail_CastOrTick env usage1
     in
@@ -2688,7 +2717,12 @@ occAnal env (Case scrut bndr ty alts)
       total_usage = markAllNonTail scrut_usage `andUDs` alts_usage
                     -- Alts can have tail calls, but the scrutinee can't
 
-    in WUD total_usage (Case scrut' tagged_bndr ty alts')
+      -- For an empty case, gather CoVars from the result type
+      -- See "empty case" in Note [Gather occurrences of coercion variables]
+      total_usage' | null alts = addCoVarOccsTy total_usage ty
+                   | otherwise = total_usage
+
+    in WUD total_usage' (Case scrut' tagged_bndr ty alts')
   where
     do_alts :: OccEnv -> [CoreAlt] -> WithUsageDetails [CoreAlt]
     do_alts _   []         = WUD emptyDetails []
@@ -3920,7 +3954,48 @@ addLamCoVarOccs :: UsageDetails -> [Var] -> UsageDetails
 addLamCoVarOccs uds bndrs
   = foldr add uds bndrs
   where
-    add bndr uds = uds `addManyOccs` coVarsOfType (varType bndr)
+    add bndr uds = uds `addCoVarOccsTy` varType bndr
+
+addCoVarOccsTy :: UsageDetails -> Type -> UsageDetails
+addCoVarOccsCo :: UsageDetails -> Coercion -> UsageDetails
+-- Add an occurrence for each free occurrence of a CoVar in the type/coercion
+-- Unlike addManyOccs, these count the occurrences: a CoVar that occurs just
+-- once gets OneOccL info.
+-- See Note [Gather occurrences of coercion variables]
+addCoVarOccsTy uds ty = add_co_var_occs uds (coVarOccsTy ty)
+addCoVarOccsCo uds co = add_co_var_occs uds (coVarOccsCo co)
+
+add_co_var_occs :: UsageDetails -> CoVarOccFV -> UsageDetails
+add_co_var_occs uds fv
+  | isEmptyVarEnv occs = uds
+  | otherwise          = mkSimpleDetails occs `andUDs` uds
+  where
+    occs = runFVAcc fv emptyVarEnv
+
+type CoVarOccFV = FV BoundVars (EndoOS OccInfoEnv)
+
+coVarOccsTy :: Type     -> CoVarOccFV
+coVarOccsCo :: Coercion -> CoVarOccFV
+(coVarOccsTy, _, coVarOccsCo, _) = foldTyCo coVarOccFolder
+
+coVarOccFolder :: TyCoFolder CoVarOccFV
+-- Like GHC.Core.TyCo.FVs.deepCoVarFolder, but counts occurrences,
+-- returning OccInfoEnv rather than a CoVarSet
+coVarOccFolder = TyCoFolder { tcf_view = noView
+                            , tcf_tyvar = \_ -> mempty
+                            , tcf_covar = do_covar
+                            , tcf_hole  = \_ -> mempty  -- No holes after typechecking
+                            , tcf_tycobinder = addBndrFV }
+  where
+    do_covar :: CoVar -> CoVarOccFV
+    do_covar cv = MkFV (\bvs -> EndoOS (do_it bvs))
+      where
+        do_it bvs env
+          | cv `elemVarSet` bvs = env
+          | otherwise           = extendVarEnv_C andLocalOcc env cv one_occ
+
+    one_occ = OneOccL { lo_n_br = 1, lo_tail = NoTailCallInfo
+                      , lo_int_cxt = NotInteresting }
 
 emptyDetails :: UsageDetails
 emptyDetails = mkSimpleDetails emptyVarEnv

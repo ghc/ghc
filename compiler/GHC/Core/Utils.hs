@@ -1676,7 +1676,9 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     go (Var v)                            = k_id v  -- See Note [Variables are trivial]
     go (Lit l)    | litIsTrivial l        = k_lit l
     go (Type _)                           = k_triv
-    go (Coercion _)                       = k_triv
+    go (Coercion co)
+      | coercionIsSmall co                = k_triv      -- See Note [Let-bound coercions]
+      | otherwise                         = k_not_triv  --     in GHC.Core
     go (App f arg)
       | not (isRuntimeArg arg)            = go f
       | exprIsUnaryClassFun f             = go arg
