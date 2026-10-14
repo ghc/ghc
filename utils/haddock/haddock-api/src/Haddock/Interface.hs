@@ -261,7 +261,9 @@ loadHiFile verbosity hsc_env doc requested = initIfaceLoad hsc_env $ do
   iface_fetch_result <- liftIO $ findAndReadIface hsc_env doc installed requested NotBoot
   case iface_fetch_result of
     Failed _ -> do
-      out verbosity normal "Interface fetching failed"
+      out verbosity normal $ "Loading interface for "                ++
+                             moduleNameString (moduleName requested) ++
+                             " failed"
       liftIO exitFailure
     Succeeded (mod_iface, _) -> do
       insts <- initIfaceLcl (mi_semantic_module mod_iface) doc (mi_boot mod_iface) $ do
