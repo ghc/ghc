@@ -79,7 +79,7 @@ servWithCustom verbose hook pipe restore customHandler = newIORef False >>= loop
         _other -> run msg >>= reply
 
     isDone <- readIORef doneRef
-    if isDone then return ()
+    if isDone then closePipe pipe
               else loop doneRef
 
   handleCustom tag payload = do
@@ -184,7 +184,7 @@ defaultServerWithCustom customHandler = do
 #if defined(wasm32_HOST_ARCH)
   -- See Note [wasm ghci signal handlers] for details
   installSignalHandlers $ js_register_signal_handler cb_sig
-  pipe <- mkPipeFromContinuations (recv_buf cb_recv) (send_buf cb_send) (pure ())
+  pipe <- mkPipeFromContinuations (recv_buf cb_recv) (send_buf cb_send)
 #else
   when verbose $
     printf "GHC iserv starting (in: %s; out: %s)\n" (show inh) (show outh)
