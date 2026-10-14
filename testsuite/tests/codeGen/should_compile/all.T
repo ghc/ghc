@@ -152,3 +152,4 @@ test('T20298b', normal, compile, ['-O2 -dno-bignum-rules -ddump-simpl -dno-typea
 test('T20298c', normal, compile, ['-O2 -dno-builtin-rules -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
 
 test('T27368', normal, compile, ['-O'])
+test('T27694', normal, compile, ['-dasm-lint'])

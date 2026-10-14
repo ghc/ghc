@@ -127,6 +127,7 @@ test('T7319', exit_code(1), compile_and_run, [''])
 
 test('Word2Float32', unless(wordsize(32), skip), compile_and_run, [''])
 test('Word2Float64', unless(wordsize(64), skip), compile_and_run, [''])
+test('T27915', normal, compile_and_run, ['-O -dasm-lint'])
 
 test('T7361', normal, compile_and_run, [''])
 test('T7600', normal, compile_and_run, [''])
