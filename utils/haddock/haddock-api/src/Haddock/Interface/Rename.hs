@@ -758,7 +758,7 @@ renameCon
     { con_names = lnames
     , con_outer_bndrs = outer_bndrs
     , con_inner_bndrs = inner_bndrs
-    , con_mb_cxt = lcontext
+    , con_cxts = lcontexts
     , con_g_args = details
     , con_res_ty = res_ty
     , con_modifiers = mods
@@ -767,7 +767,7 @@ renameCon
     lnames' <- mapM renameNameL lnames
     outer_bndrs' <- mapM renameOuterTyVarBndrs outer_bndrs
     inner_bndrs' <- mapM renameHsGadtTelescope inner_bndrs
-    lcontext' <- traverse renameLContext lcontext
+    lcontexts' <- traverse renameLContext lcontexts
     details' <- renameGADTDetails details
     res_ty' <- renameLType res_ty
     mods' <- renameModifiers mods
@@ -778,7 +778,7 @@ renameCon
           , con_names = lnames'
           , con_outer_bndrs = outer_bndrs'
           , con_inner_bndrs = inner_bndrs'
-          , con_mb_cxt = lcontext'
+          , con_cxts = lcontexts'
           , con_g_args = details'
           , con_res_ty = res_ty'
           , con_modifiers = mods'

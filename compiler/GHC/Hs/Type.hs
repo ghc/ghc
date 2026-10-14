@@ -126,6 +126,7 @@ import GHC.Utils.Misc (count)
 
 import Data.Maybe
 import Data.Data (Data)
+import Data.Foldable ( toList )
 
 import qualified Data.Semigroup as S
 import GHC.Data.Bag
@@ -896,7 +897,7 @@ splitLHsSigmaTyInvis ty
   = (tvs, ctxt, ty2)
 
 -- | Decompose a GADT type into its constituent parts.
--- Returns @(outer_bndrs, inner_bndrs, mb_ctxt, body)@, where:
+-- Returns @(outer_bndrs, inner_bndrs, ctxts, body)@, where:
 --
 -- * @outer_bndrs@ are 'HsOuterExplicit' if the type has explicit, outermost
 --   type variable binders. Otherwise, they are 'HsOuterImplicit'.
@@ -904,10 +905,9 @@ splitLHsSigmaTyInvis ty
 -- * @inner_bndrs@ are the remaining @forall@ telescopes, interleaved with the
 --   parentheses that enclose them.
 --
--- * @mb_ctxt@ is @Just@ the context, if it is provided.
---   Otherwise, it is @Nothing@.
+-- * @ctxts@ are the contexts adjacent to the @forall@s, if any.
 --
--- * @body@ is the body of the type after the optional @forall@s and context.
+-- * @body@ is the body of the type after the optional @forall@s and contexts.
 --
 -- This function does look through parentheses, but it does not discard them:
 -- they are syntactically significant, so they are recorded in @inner_bndrs@.
@@ -915,16 +915,22 @@ splitLHsSigmaTyInvis ty
 -- in "GHC.Hs.Decls" for why this is important.
 splitLHsGadtTy ::
      LHsSigType GhcPs
-  -> (HsOuterSigTyVarBndrs GhcPs, [LHsGadtTelescope GhcPs], Maybe (LHsContext GhcPs), LHsType GhcPs)
+  -> (HsOuterSigTyVarBndrs GhcPs, [LHsGadtTelescope GhcPs], [LHsContext GhcPs], LHsType GhcPs)
 splitLHsGadtTy (L _ sig_ty)
   | (outer_bndrs, sigma_ty) <- split_outer_bndrs sig_ty
   , (inner_bndrs, phi_ty)   <- split_inner_bndrs sigma_ty
-  , (mb_ctxt, rho_ty)       <- splitLHsQualTy_KP phi_ty
-  = if is_gadt_rec_ty rho_ty && not (null inner_bndrs)
-        -- Bad! Record GADTs are not allowed to have inner_bndrs,
-        -- undo the split to get a proper error message later
-      then (outer_bndrs, [], Nothing, sigma_ty)
-      else (outer_bndrs, inner_bndrs, mb_ctxt, rho_ty)
+  , (outer_theta, phi_ty')  <- splitLHsQualTy_KP phi_ty
+  , (inner_theta, rho_ty)   <- split_ctxts phi_ty'
+  = case rho_ty of
+      -- Record GADTs are not allowed to have multiple foralls or contexts.
+      -- Detect and undo the split to get a proper error message later.
+      L _ (HsFunTy _ _ (L _ (XHsType HsRecTy{})) _)
+        | not (null inner_bndrs) -> (outer_bndrs, [], [], sigma_ty)
+        | not (null inner_theta) -> (outer_bndrs, inner_bndrs, toList outer_theta, phi_ty')
+      -- All good: either a prefix GADT con, or a record GADT con with at most
+      -- one forall and at most one context.
+      _ -> let theta_tys = toList outer_theta ++ inner_theta
+           in (outer_bndrs, inner_bndrs, theta_tys, rho_ty)
   where
     split_outer_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
     split_outer_bndrs (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) =
@@ -941,9 +947,10 @@ splitLHsGadtTy (L _ sig_ty)
         in (L l (HsGadtPar toks) : args, t)
     split_inner_bndrs t = ([], t)
 
-    -- type of form {fld :: ty, ...} -> ResTy
-    is_gadt_rec_ty (L _ (HsFunTy _ _ (L _ (XHsType HsRecTy{})) _)) = True
-    is_gadt_rec_ty _ = False
+    split_ctxts :: LHsType GhcPs -> ([LHsContext GhcPs], LHsType GhcPs)
+    split_ctxts (L _ HsQualTy { hst_ctxt = ctxt, hst_body = body })
+      = let { ~(ctxts, t) = split_ctxts body } in (ctxt : ctxts, t)
+    split_ctxts t = ([], t)
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that
@@ -1426,10 +1433,9 @@ pprHsForAllTelescope tele =
   -- be updated to match.
       | otherwise = forAllLit <+> interppSP qtvs <> separator
 
-pprLHsContext :: (OutputableBndrId p)
-              => Maybe (LHsContext (GhcPass p)) -> SDoc
-pprLHsContext Nothing = empty
-pprLHsContext (Just lctxt) = pprLHsContextAlways lctxt
+pprLHsContext :: (Foldable t, OutputableBndrId p)
+              => t (LHsContext (GhcPass p)) -> SDoc
+pprLHsContext = sep . map pprLHsContextAlways . toList
 
 -- For use in a HsQualTy, which always gets printed if it exists.
 pprLHsContextAlways :: (OutputableBndrId p)

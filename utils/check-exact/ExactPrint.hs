@@ -433,7 +433,7 @@ https://gitlab.haskell.org/ghc/ghc/-/merge_requests/16644, using
 
   data InnerBindings
     = InnerMore (LHsGadtTelescope GhcPs) InnerBindings
-    | InnerDone (Maybe (LHsContext GhcPs), HsConDeclGADTDetails GhcPs, LHsType GhcPs)
+    | InnerDone ([LHsContext GhcPs], HsConDeclGADTDetails GhcPs, LHsType GhcPs)
 
 The key part of the ExactPrint instance for this is
 
@@ -4155,6 +4155,14 @@ instance ExactPrint (HsType GhcPs) where
     (ann', mt') <- exactBang (ann, mt) str
     ty' <- markAnnotated ty
     return (XHsType (HsBangTy ann' (HsSrcBang mt' up str) ty'))
+  -- mkGadtDecl sometimes leaves HsRecTy intact instead of converting
+  -- it to RecConGADT, counting on the renamer to reject it later on.
+  -- Exact printing must cope with it.
+  exact (XHsType (HsRecTy (o,c) flds)) = do
+    o' <- markEpToken o
+    flds' <- markAnnotated flds
+    c' <- markEpToken c
+    return (XHsType (HsRecTy (o',c') flds'))
   exact (HsExplicitListTy (sq,o,c) prom tys) = do
     sq' <- if (isPromoted prom)
              then markEpToken sq
@@ -4471,7 +4479,7 @@ instance ExactPrint (ConDecl GhcPs) where
                      , con_names = cons
                      , con_outer_bndrs = outer_bndrs
                      , con_inner_bndrs = inner_bndrs
-                     , con_mb_cxt = mcxt, con_g_args = args
+                     , con_cxts = cxts, con_g_args = args
                      , con_modifiers = mods
                      , con_res_ty = res_ty, con_doc = doc }) = do
     mods' <- mapM markAnnotated mods
@@ -4484,15 +4492,15 @@ instance ExactPrint (ConDecl GhcPs) where
       L _ (HsOuterImplicit _) -> return outer_bndrs
       _ -> markAnnotated outer_bndrs
 
-    let ib = toInnerBindings inner_bndrs (mcxt, args, res_ty)
+    let ib = toInnerBindings inner_bndrs (cxts, args, res_ty)
     ib' <- markAnnotated ib
-    let (inner_bndrs', (mcxt', args', res_ty')) = fromInnerBindings ib'
+    let (inner_bndrs', (cxts', args', res_ty')) = fromInnerBindings ib'
 
     return (ConDeclGADT { con_g_ext = AnnConDeclGADT [] [] dcol'
                         , con_names = cons'
                         , con_outer_bndrs = outer_bndrs'
                         , con_inner_bndrs = inner_bndrs'
-                        , con_mb_cxt = mcxt', con_g_args = args'
+                        , con_cxts = cxts', con_g_args = args'
                         , con_modifiers = mods'
                         , con_res_ty = res_ty', con_doc = doc })
 
@@ -4500,14 +4508,14 @@ instance ExactPrint (ConDecl GhcPs) where
 
 data InnerBindings
   = InnerMore (LHsGadtTelescope GhcPs) InnerBindings
-  | InnerDone (Maybe (LHsContext GhcPs), HsConDeclGADTDetails GhcPs, LHsType GhcPs)
+  | InnerDone ([LHsContext GhcPs], HsConDeclGADTDetails GhcPs, LHsType GhcPs)
 
 toInnerBindings :: [LHsGadtTelescope GhcPs]
-                -> (Maybe (LHsContext GhcPs), HsConDeclGADTDetails GhcPs, LHsType GhcPs) -> InnerBindings
+                -> ([LHsContext GhcPs], HsConDeclGADTDetails GhcPs, LHsType GhcPs) -> InnerBindings
 toInnerBindings [] inner = InnerDone inner
 toInnerBindings (b:bs) inner = InnerMore b (toInnerBindings bs inner)
 
-fromInnerBindings :: InnerBindings -> ([LHsGadtTelescope GhcPs], (Maybe (LHsContext GhcPs), HsConDeclGADTDetails GhcPs, LHsType GhcPs))
+fromInnerBindings :: InnerBindings -> ([LHsGadtTelescope GhcPs], ([LHsContext GhcPs], HsConDeclGADTDetails GhcPs, LHsType GhcPs))
 fromInnerBindings = go []
   where
     go acc (InnerMore b n) = go (b:acc) n
@@ -4529,8 +4537,8 @@ instance ExactPrint InnerBindings where
     xs' <- markAnnotated xs
     rp' <- markEpToken rp
     return (InnerMore (L l (HsGadtPar (lp',rp'))) xs')
-  exact (InnerDone (mcxt, args, res_ty)) = do
-    mcxt' <- markAnnotated mcxt
+  exact (InnerDone (cxts, args, res_ty)) = do
+    cxts' <- mapM markAnnotated cxts
     args' <-
       case args of
           (PrefixConGADT x args0) -> do
@@ -4543,7 +4551,7 @@ instance ExactPrint InnerBindings where
             rarr' <- markEpUniToken rarr
             return (RecConGADT (oc',cc',rarr') fields')
     res_ty' <- markAnnotated res_ty
-    return (InnerDone (mcxt', args', res_ty'))
+    return (InnerDone (cxts', args', res_ty'))
 
 -- ---------------------------------------------------------------------
 

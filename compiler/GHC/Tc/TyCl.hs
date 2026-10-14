@@ -2270,14 +2270,14 @@ kcConDecl new_or_data _tc_res_kind
           (ConDeclGADT { con_names = names
                        , con_outer_bndrs = L _ outer_bndrs
                        , con_inner_bndrs = inner_bndrs
-                       , con_mb_cxt = cxt
+                       , con_cxts = cxts
                        , con_g_args = args
                        , con_res_ty = res_ty })
   = -- See Note [kcConDecls: kind-checking data type decls]
     addErrCtxt (DataConDefCtxt names) $
     -- Not sure this is right, should just extend rather than skolemise but no test
     bind_con_tvbs outer_bndrs inner_bndrs $
-    do { _ <- tcHsContext cxt
+    do { _ <- tcHsContext cxts
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
        ; con_res_kind <- newOpenTypeKind
        ; _ <- tcCheckLHsTypeInContext res_ty (TheKind con_res_kind)
@@ -4182,7 +4182,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
           (ConDeclGADT { con_names = names
                        , con_outer_bndrs = L _ outer_bndrs
                        , con_inner_bndrs = inner_bndrs
-                       , con_mb_cxt = cxt, con_g_args = hs_args
+                       , con_cxts = cxts, con_g_args = hs_args
                        , con_res_ty = hs_res_ty })
   = addErrCtxt (DataConDefCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
@@ -4191,7 +4191,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; (tclvl, wanted, (tvbs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
               tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
-              do { ctxt <- tcHsContext cxt
+              do { ctxt <- tcHsContext cxts
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
 

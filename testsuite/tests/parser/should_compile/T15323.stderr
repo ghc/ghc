@@ -189,8 +189,7 @@
                 (HsBndrNoKind
                  (NoExtField))))]))
            []
-           (Just
-            (L
+           [(L
              (EpAnn
               (EpaSpan { T15323.hs:6:31-36 })
               [(AddDarrowAnn
@@ -258,7 +257,7 @@
                        (EpaComments
                         []))
                       (Unqual
-                       {OccName: v}))))))))])))
+                       {OccName: v}))))))))]))]
            (PrefixConGADT
             (NoExtField)
             [])

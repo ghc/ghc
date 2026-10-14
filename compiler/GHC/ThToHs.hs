@@ -59,7 +59,7 @@ import Data.Bifunctor (first)
 import Data.Foldable (for_)
 import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe( catMaybes, isNothing )
+import Data.Maybe( catMaybes, maybeToList, isNothing )
 import Data.Word (Word64)
 import GHC.Boot.TH.Syntax as TH
 import Foreign.ForeignPtr
@@ -686,6 +686,44 @@ is_ip_bind decl             = Right decl
 --      Data types
 ---------------------------------------------------
 
+{- Note [Contexts of nested ForallC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Since #27424, prefix GADT constructors can have curried contexts, so the
+con_cxts field of ConDeclGADT is a list. How should nested ForallC be converted?
+Consider (test: th/T27424d)
+
+  ForallC [] [AppT (ConT ''Eq) (VarT a)] $
+    ForallC [] [AppT (ConT ''Show) (VarT a)] $
+      RecGadtC [mkName "MkR"] [(mkName "fld", bang, VarT a)] (AppT (ConT (mkName "R")) (VarT a))
+
+Should it be spliced with one context per ForallC, as generated, or with the
+contexts flattened into one?
+
+  (nested)    MkR :: Eq a => Show a => {fld :: a} -> R a
+  (flattened) MkR :: (Eq a, Show a) => {fld :: a} -> R a
+
+We flatten (see prepend_cxt), for two reasons:
+
+1. To keep the output of -ddump-splices valid source code for record GADT
+   constructors. They accept at most one context in source syntax, so the
+   nested form above is rejected. This is not enforced for TH-generated
+   declarations, so it would be accepted, but it could not be copy-pasted
+   into a program.
+
+2. To avoid redundant empty contexts in the output of -ddump-splices.
+   ForallC carries both type variable binders and a context, meaning binders
+   cannot be given without a context. So without flattening, the constructor
+
+     G2 :: forall a. forall b. (a, b) -> G a
+
+   would be printed as (test: th/GadtConSigs_th_dump1)
+
+     G2 :: forall a b. () => () => (a, b) -> G a
+
+We flatten the contexts of prefix GADT constructors too, which matches the
+behaviour from before #27424.
+-}
+
 cvtConstr :: TH.Name -- ^ name of first constructor of parent type
           -> (TH.Name -> CvtM (LocatedN RdrName)) -- ^ convert constructor name
           -> TH.Con -> CvtM (LConDecl GhcPs)
@@ -719,16 +757,23 @@ cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
     add_cxt (L loc (HsContext _ cxt1)) (Just (L _ (HsContext _ cxt2)))
       = Just (L loc (HsContext noAnn (cxt1 ++ cxt2)))
 
-    -- Nested foralls end up flattened (see tests/th/GadtConSigs_th_dump1.stderr)
-    -- but it doesn't seem to matter.
+    -- Why not simply prepend_cxt=(:)? See Note [Contexts of nested ForallC]
+    prepend_cxt :: LHsContext GhcPs -> [LHsContext GhcPs] -> [LHsContext GhcPs]
+    prepend_cxt lcxt = map_mb_head (add_cxt lcxt)
+      where
+        map_mb_head :: (Maybe a -> Maybe a) -> [a] -> [a]
+        map_mb_head f []     = maybeToList (f Nothing)
+        map_mb_head f (x:xs) = maybeToList (f (Just x)) ++ xs
+
+    -- Nested foralls and contexts end up flattened (see tests/th/GadtConSigs_th_dump1.stderr)
     add_forall :: [LHsTyVarBndr Hs.Specificity GhcPs] -> LHsContext GhcPs
                -> ConDecl GhcPs -> ConDecl GhcPs
     add_forall tvs' cxt' con@(ConDeclGADT { con_outer_bndrs = L l outer_bndrs
                                           , con_inner_bndrs = inner_bndrs
-                                          , con_mb_cxt = cxt })
+                                          , con_cxts = cxts })
       = con { con_outer_bndrs = L l outer_bndrs'
             , con_inner_bndrs = inner_bndrs
-            , con_mb_cxt = add_cxt cxt' cxt }
+            , con_cxts = prepend_cxt cxt' cxts }
       where
         outer_bndrs'
           | null all_tvs = mkHsOuterImplicit
@@ -771,7 +816,7 @@ mk_gadt_decl names args res_ty
                    , con_names  = names
                    , con_outer_bndrs = outer_bndrs
                    , con_inner_bndrs = []
-                   , con_mb_cxt = Nothing
+                   , con_cxts = []
                    , con_g_args = args
                    , con_res_ty = res_ty
                    , con_modifiers = []

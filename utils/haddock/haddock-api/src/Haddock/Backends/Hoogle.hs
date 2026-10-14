@@ -340,7 +340,7 @@ ppCtor
       { con_names = names
       , con_outer_bndrs = L _ outer_bndrs
       , con_inner_bndrs = inner_bndrs
-      , con_mb_cxt = mcxt
+      , con_cxts = cxts
       , con_g_args = args
       , con_res_ty = res_ty
       }
@@ -352,9 +352,7 @@ ppCtor
       con_sig_ty = HsSig noExtField outer_bndrs $
                    mkGadtArgTys inner_bndrs phi_ty
         where
-          phi_ty = case mcxt of
-            Just theta -> mkQualTy theta tau_ty
-            Nothing -> tau_ty
+          phi_ty = foldr mkQualTy tau_ty cxts
           tau_ty = foldr mkFunTy res_ty $
             case args of
               PrefixConGADT _ pos_args -> map cdf_type pos_args
