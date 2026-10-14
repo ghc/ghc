@@ -29,6 +29,10 @@ module GHCi.Message
   , handleRemoteCall, handleRemoteTHCall
   , RemoteProcessException(..), PipeClosedException(..)
 
+  , InboxId(..)
+  , newMailbox
+  , closeMailbox
+
   , BreakModule
   , BreakUnitId
   , LoadedDLL
@@ -237,14 +241,16 @@ data Message a where
   -- they did, we have to serialize the value anyway, so we might
   -- as well serialize it to force it.
   RunTH
-   :: RemoteRef (IORef QState)
+   :: InboxId -- ^ announce mailbox for related 'remoteTHCall's
+   -> RemoteRef (IORef QState)
    -> HValueRef {- e.g. TH.Q TH.Exp -}
    -> THResultType
    -> Maybe TH.Loc
    -> Message (QResult ByteString)
 
   -- | Run the given mod finalizers.
-  RunModFinalizers :: RemoteRef (IORef QState)
+  RunModFinalizers :: InboxId -- ^ announce mailbox for related 'remoteTHCall's
+                   -> RemoteRef (IORef QState)
                    -> [RemoteRef (TH.Q ())]
                    -> Message (QResult ())
 
@@ -536,11 +542,13 @@ instance Binary THResultType
 -- StartTH message.  A new one is created per module that GHC
 -- typechecks.
 data QState = QState
-  { qsMap        :: Map TypeRep Dynamic
+  { qsMap      :: Map TypeRep Dynamic
        -- ^ persistent data between splices in a module
-  , qsLocation   :: Maybe TH.Loc
+  , qsLocation :: Maybe TH.Loc
        -- ^ location for current splice, if any
-  , qsPipe :: Pipe
+  , qsInboxId  :: InboxId
+      -- ^ the mailbox expecting requests for each RunTH-like run
+  , qsPipe     :: Pipe
        -- ^ pipe to communicate with GHC
   }
 instance Show QState where show _ = "<QState>"
@@ -623,9 +631,9 @@ getMessage = do
       29 -> Msg <$> (BreakpointStatus <$> get <*> get)
       30 -> Msg <$> (GetBreakpointVar <$> get <*> get)
       31 -> Msg <$> return StartTH
-      32 -> Msg <$> (RunModFinalizers <$> get <*> get)
+      32 -> Msg <$> (RunModFinalizers <$> get <*> get <*> get)
       33 -> Msg <$> (AddSptEntry <$> get <*> get)
-      34 -> Msg <$> (RunTH <$> get <*> get <*> get <*> get)
+      34 -> Msg <$> (RunTH <$> get <*> get <*> get <*> get <*> get)
       35 -> Msg <$> (GetClosure <$> get)
       36 -> Msg <$> (Seq <$> get)
       37 -> Msg <$> return RtsRevertCAFs
@@ -671,9 +679,9 @@ putMessage m = case m of
   BreakpointStatus arr ix     -> putWord8 29 >> put arr >> put ix
   GetBreakpointVar a b        -> putWord8 30 >> put a >> put b
   StartTH                     -> putWord8 31
-  RunModFinalizers a b        -> putWord8 32 >> put a >> put b
+  RunModFinalizers a b c      -> putWord8 32 >> put a >> put b >> put c
   AddSptEntry a b             -> putWord8 33 >> put a >> put b
-  RunTH st q loc ty           -> putWord8 34 >> put st >> put q >> put loc >> put ty
+  RunTH ii st q loc ty        -> putWord8 34 >> put ii >> put st >> put q >> put loc >> put ty
   GetClosure a                -> putWord8 35 >> put a
   Seq a                       -> putWord8 36 >> put a
   RtsRevertCAFs               -> putWord8 37
@@ -774,7 +782,7 @@ closePipe Pipe{..} = do
 -- (blocks on the calling side, doesn't necessarily block the interpreter)
 remoteCall :: Binary a => Pipe -> Message a -> IO a
 remoteCall pipe msg = either throwIO (pure . runGet get)
-                  =<< remoteAsyncReq pipe (putMessage msg)
+                  =<< remoteAsyncReq pipe (putMessage msg) Nothing
 
 -- | Handle a single 'Message' request on the interpreter and reply to the host
 handleRemoteCall :: Pipe
@@ -782,22 +790,28 @@ handleRemoteCall :: Pipe
                  -> (forall a. (Show a, Binary a) => Message a -> IO a)
                  -> IO ()
 handleRemoteCall pipe hook k =
-  handleAsyncReq pipe getMessage \writer msg0 -> IO \s0 ->
+  handleAsyncReq pipe getMessage Nothing \writer msg0 -> IO \s0 ->
     case hook msg0 |#> s0 of -- unIO for linearity checking
       (# s1, Msg msg #) -> case k msg |#> s1 of
         (# s2, a #) -> writeReply writer (put a) |#> s2
 
 -- | Send a 'THMessage' request to the host and wait for a reply from the host
--- to the interpreter
-remoteTHCall :: Binary a => Pipe -> THMessage a -> IO a
-remoteTHCall pipe msg = either throwIO (pure . runGet get)
-                    =<< remoteAsyncReq pipe (putTHMessage msg)
+-- to the interpreter.
+--
+-- A 'THMessage' request from the interpreter is always associated with a
+-- 'RunTH'-like run. Since the host may have many in-flight TH runs, we always
+-- want a specific host 'InboxId' (which is announced in the 'RunTH' request)
+remoteTHCall :: Binary a => Pipe -> InboxId -> THMessage a -> IO a
+remoteTHCall pipe ii msg = either throwIO (pure . runGet get)
+                       =<< remoteAsyncReq pipe (putTHMessage msg) (Just ii)
 
 -- | Handle a 'THMessage' request on the host and reply to the interpreter.
+-- Symmterically to 'remoteTHCall', we always want to specify the 'InboxId' for
+-- RunTH "reverse requests"
 handleRemoteTHCall
-  :: Pipe -> (forall a. (Show a, Binary a) => THMessage a -> IO a) -> IO ()
-handleRemoteTHCall pipe k =
-  handleAsyncReq pipe getTHMessage \writer (THMsg msg) -> IO \s0 ->
+  :: Pipe -> InboxId -> (forall a. (Show a, Binary a) => THMessage a -> IO a) -> IO ()
+handleRemoteTHCall pipe ii k =
+  handleAsyncReq pipe getTHMessage (Just ii) \writer (THMsg msg) -> IO \s0 ->
     case k msg |#> s0 of -- unIO for linearity checking
       (# s1, a #) -> writeReply writer (put a) |#> s1
 
@@ -806,13 +820,13 @@ handleRemoteTHCall pipe k =
 --------------------------------------------------------------------------------
 
 -- | Send an asynchronous request and block waiting for a matching reply
-remoteAsyncReq :: Pipe -> Put -> IO (Either SomeException LB.ByteString)
-remoteAsyncReq pipe msg = do
+remoteAsyncReq :: Pipe -> Put -> (Maybe InboxId) -> IO (Either SomeException LB.ByteString)
+remoteAsyncReq pipe msg ii = do
 
   let pendingReplies = pendingReply (pipeAsyncMngr pipe)
 
   -- Mark pending request
-  uq <- freshReqId (pipeAsyncMngr pipe)
+  uq <- freshId (pipeAsyncMngr pipe)
   wv <- newEmptyTMVarIO
 
   isClosed <- atomically $ do
@@ -827,7 +841,7 @@ remoteAsyncReq pipe msg = do
     throwIO PipeClosedException
 
   -- Write request
-  writePipe pipe (Request uq (runPut msg))
+  writePipe pipe (Request uq ii (runPut msg))
     `onException`
       -- the req wasn't done, or no one will be reading the reply:
       -- in either case, drop it from the pending map.
@@ -846,8 +860,9 @@ remoteAsyncReq pipe msg = do
 -- It must be used exactly once (all requests expect a reply, and you can't
 -- reply more than once). Linear types enforce the handler replies in every
 -- branch, and if the handler otherwise throws, it is handled by 'handleAsyncReq'.
-handleAsyncReq :: Pipe -> Get a -> (WriteReply Put %1 -> a -> IO r) -> IO r
-handleAsyncReq pipe getit k = mask $ \restore -> do
+handleAsyncReq :: Pipe -> Get a -> (Maybe InboxId) -> (WriteReply Put %1 -> a -> IO r) -> IO r
+handleAsyncReq pipe getit mii k = mask $ \restore -> do
+  let am = pipeAsyncMngr pipe
   ack <- newEmptyMVar
 
   -- Block waiting for request
@@ -855,7 +870,9 @@ handleAsyncReq pipe getit k = mask $ \restore -> do
     isClosed <- readTVar (pipeIsClosed pipe)
     if isClosed
       then return Nothing
-      else Just <$> readTQueue (requestsQueue (pipeAsyncMngr pipe))
+      else Just <$> case mii of
+        Nothing -> readTQueue  $  requestsQueue am
+        Just ii -> readTQueue =<< getMailbox am ii
 
   case mbreq of
     Nothing -> throwIO PipeClosedException
@@ -906,14 +923,39 @@ data AsyncManager = AsyncManager
     -- TMVar is signaled when the reply arrives. The exception can originate
     -- from the host process, or from the remote one (with 'RemoteProcessException').
   , requestsQueue :: !(TQueue (CorrelationId, LB.ByteString))
-    -- ^ A queue of pending received requests. When a request is received,
-    -- queue it here. A request handler will pop the next request from it.
-    -- (Nothing except the 'drainPipe' thread should read from the pipe).
+    -- ^ A queue of pending received requests. When a request is received
+    -- /without/ a specific 'InboxId', queue it here. A request handler will
+    -- pop the next request from it. (Nothing except the 'drainPipe' thread
+    -- should read from the pipe). Read with @'handleAsyncReq' p get Nothing@.
+  , mailboxQueues :: !(TVar (IntMap (TQueue (CorrelationId, LB.ByteString))))
+    -- ^ Requests for a specific 'InboxId' that can be read using
+    -- @'handleAsyncReq' p get (Just <mailboxid>)@.
   , asyncDrainTid :: !ThreadId
-  , asyncNextReq  :: !(IORef Int)
+  , asyncFreshId  :: !(IORef Int)
   }
 
+-- | Each 'Request' expects a 'Reply' with a matching 'CorrelationId'.
 type CorrelationId = Int
+
+-- | A 'Request' may optionally declare an 'InboxId'. If it does, it can only
+-- be read by a 'handleAsyncReq' for that specific 'InboxId'. That is,
+-- @'handleAsyncReq' p get Nothing@ will not receive messages meant for a
+-- specific inbox.
+--
+-- This is useful to prevent mixing up reverse requests, where we want to send
+-- many reverse requests but have the caller handle them without interleaving
+-- them.
+newtype InboxId = InboxId Int deriving (Show, Binary)
+
+-- | Create a new mailbox from where we can read all requests addressed to this 'InboxId'.
+newMailbox :: AsyncManager -> IO InboxId
+newMailbox am = InboxId <$> freshId am
+  -- `mailboxQueues` is written on demand, no need to do it here.
+
+-- | Clean up a created mailbox by 'InboxId'.
+closeMailbox :: AsyncManager -> InboxId -> IO ()
+closeMailbox AsyncManager{..} (InboxId ii) =
+  atomically (modifyTVar mailboxQueues (IntMap.delete ii))
 
 -- | We have a single type for requests and replies because both the host and
 -- interpreter may send requests *and* replies on the write end *and* on recv
@@ -924,28 +966,37 @@ type CorrelationId = Int
 --  2. The interpreter sends a NewName TH request on its Interpreter Write End (IWE)
 --  3. The host sends a reply to the TH request on its HWE
 --  4. The interpreter sends the reply to the RunTH request on its IWE
-data IddMsg  = Request !CorrelationId LB.ByteString
+--
+-- Additionally, we want to keep concurrent TH requests for independent RunTH
+-- calls separated. Thus the interpreter requests additionally specify a
+-- mailbox announced by RunTH:
+--  1. To interpreter:   @Request _ Nothing (RunTH <mailid>)@
+--  2. From interpreter: @Request _ (Just <mailid>) NewName@
+-- And the host will relate the <mailid> reverse requests to that RunTH run
+-- exclusively.
+data IddMsg  = Request !CorrelationId !(Maybe InboxId) LB.ByteString
              | Reply   !CorrelationId (Either SerializableException LB.ByteString)
 
 instance Binary IddMsg where
-  put (Request i bs) = putWord8 0 >> put i >> put bs
-  put (Reply i bs)   = putWord8 1 >> put i >> put bs
+  put (Request i ii bs) = putWord8 0 >> put i >> put ii >> put bs
+  put (Reply i bs)      = putWord8 1 >> put i >> put bs
   get = do
     b <- getWord8
     case b of
-      0 -> Request <$> get <*> get
+      0 -> Request <$> get <*> get <*> get
       1 -> Reply   <$> get <*> get
       _ -> fail $ "impossible: Binary IddMsg - " ++ show b
 
 newAsyncManager :: Pipe -> IO AsyncManager
 newAsyncManager pipe = do
-  asyncNextReq <- newIORef 0
+  asyncFreshId  <- newIORef 0
   pendingReply  <- newTVarIO IntMap.empty
-  requestsQueue  <- newTQueueIO
+  requestsQueue <- newTQueueIO
+  mailboxQueues <- newTVarIO IntMap.empty
 
   -- Fork thread to drain read end.
   -- (cleaned up on 'closePipe')
-  asyncDrainTid  <- forkIOWithUnmask (drainPipe pipe)
+  asyncDrainTid <- forkIOWithUnmask (drainPipe pipe)
 
   let am = AsyncManager{..}
   pure am
@@ -974,8 +1025,15 @@ drainPipe p unmask = catch (unmask loop) replyToPendings where
               putTMVar wv (bimap (toException . RemoteProcessException) id bs)
         loop
       -- Receive a request and queue it
-      Just (Request uq bs) -> do
-        atomically $ writeTQueue (requestsQueue am) (uq,bs)
+      Just (Request uq mbi bs) -> do
+        atomically $ case mbi of
+          Nothing ->
+            -- "Global" request
+            writeTQueue (requestsQueue am) (uq,bs)
+          Just ii -> do
+            -- "Specific mailbox" request
+            q <- getMailbox am ii
+            writeTQueue q (uq,bs)
         loop
       -- EOF on read handle
       Nothing -> do
@@ -990,9 +1048,20 @@ drainPipe p unmask = catch (unmask loop) replyToPendings where
 
   am = pipeAsyncMngr p
 
-freshReqId :: AsyncManager -> IO CorrelationId
-freshReqId AsyncManager{asyncNextReq} =
-  atomicModifyIORef' asyncNextReq $ \i -> (i+1, i)
+freshId :: AsyncManager -> IO Int
+freshId AsyncManager{asyncFreshId} =
+  atomicModifyIORef' asyncFreshId $ \i -> (i+1, i)
+
+getMailbox :: AsyncManager -> InboxId -> STM (TQueue (CorrelationId, LB.ByteString))
+getMailbox am (InboxId ii) = do
+  mboxes <- readTVar (mailboxQueues am)
+  case IntMap.lookup ii mboxes of
+    Nothing -> do
+      q <- newTQueue
+      writeTVar (mailboxQueues am) (IntMap.insert ii q mboxes)
+      pure q
+    Just q ->
+      pure q
 
 --------------------------------------------------------------------------------
 -- * Pipe thread-safe read/write
