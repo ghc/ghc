@@ -65,14 +65,16 @@ import GHC.Driver.Pipeline (compileFile)
 import GHC.HsToCore.Docs (getMainDeclBinder)
 import GHC.Iface.Load (findAndReadIface)
 import GHC.IfaceToCore (tcIfaceInst, tcIfaceFamInst)
-import GHC.Tc.Utils.Monad (initIfaceLoad, initIfaceLcl)
+import GHC.Tc.Types (IfG)
+import GHC.Tc.Utils.Monad (getTopEnv, initIfaceLoad, initIfaceLcl)
 import GHC.Tc.Utils.Env (lookupGlobal_maybe)
 import GHC.Types.Error (mkUnknownDiagnostic)
 import GHC.Types.Name.Occurrence (emptyOccEnv)
 import GHC.Unit.Finder (findImportedModule, ModuleLookupScope(..), FindResult(Found))
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
-import GHC.Unit.Module (getModuleInstantiation)
+import GHC.Unit.Home.Graph (lookupHugByModule)
+import GHC.Unit.Module (InstalledModule, getModuleInstantiation)
 import GHC.Unit.Module.Graph (ModuleGraphNode (..), ModuleNodeInfo(..))
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface (mi_semantic_module, mi_boot)
@@ -257,20 +259,34 @@ dropErr (Failed _) = Nothing
 
 loadHiFile :: Verbosity -> HscEnv -> Outputable.SDoc -> Module -> IO (ModIface, ([ClsInst], [FamInst]))
 loadHiFile verbosity hsc_env doc requested = initIfaceLoad hsc_env $ do
-  let installed = fst (getModuleInstantiation requested)
-  iface_fetch_result <- liftIO $ findAndReadIface hsc_env doc installed requested NotBoot
-  case iface_fetch_result of
-    Failed _ -> do
-      out verbosity normal $ "Loading interface for "                ++
-                             moduleNameString (moduleName requested) ++
-                             " failed"
-      liftIO exitFailure
-    Succeeded (mod_iface, _) -> do
-      insts <- initIfaceLcl (mi_semantic_module mod_iface) doc (mi_boot mod_iface) $ do
-        new_eps_insts     <- mapM tcIfaceInst (mi_insts mod_iface)
-        new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts mod_iface)
-        pure (new_eps_insts, new_eps_fam_insts)
-      pure (mod_iface, insts)
+  mod_iface <- acquire_mod_iface
+  insts <- initIfaceLcl (mi_semantic_module mod_iface) doc (mi_boot mod_iface) $ do
+    new_eps_insts     <- mapM tcIfaceInst (mi_insts mod_iface)
+    new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts mod_iface)
+    pure (new_eps_insts, new_eps_fam_insts)
+  pure (mod_iface, insts)
+  where
+
+  installed :: InstalledModule
+  installed = fst (getModuleInstantiation requested)
+
+  read_mod_iface :: IO ModIface
+  read_mod_iface = do
+    reading_result <- findAndReadIface hsc_env doc installed requested NotBoot
+    case reading_result of
+      Failed _ -> do
+        out verbosity normal $ "Loading interface for "                ++
+                               moduleNameString (moduleName requested) ++
+                               " failed"
+        exitFailure
+      Succeeded (mod_iface, _) -> do
+        return mod_iface
+
+  acquire_mod_iface :: IfG ModIface
+  acquire_mod_iface = do
+    hug <- hsc_HUG <$> getTopEnv
+    liftIO $ lookupHugByModule requested hug >>=
+             maybe read_mod_iface (return . hm_iface)
 
 processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> WarningMap -> Ghc (Maybe Interface)
 processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
