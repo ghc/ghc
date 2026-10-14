@@ -76,6 +76,7 @@ library
     exposed-modules:
         GHCi.BreakArray
         GHCi.Message
+        GHCi.Message.Async
         GHCi.ResolvedBCO
         GHCi.RemoteTypes
         GHCi.FFI
