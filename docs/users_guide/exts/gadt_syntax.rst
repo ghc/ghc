@@ -124,7 +124,7 @@ grammar is subject to change in the future.
 
 .. code-block:: none
 
-  gadt_con ::= conids '::' foralls opt_ctxt gadt_body
+  gadt_con ::= conids '::' foralls ctxts gadt_body
 
   conids ::= conid
           |  conid ',' conids
@@ -145,9 +145,9 @@ grammar is subject to change in the future.
                  |  '{' tyvar '}'
                  |  '{' tyvar '::' ctype '}'
 
-  opt_ctxt ::= <empty>
-            |  btype '=>'
-            |  '(' ctxt ')' '=>'
+  ctxts ::= <empty>
+         |  btype '=>'
+         |  '(' ctxt ')' '=>'
 
   ctxt ::= ctype
         |  ctype ',' ctxt
@@ -194,15 +194,29 @@ syntactically allowed. Some further various observations about this grammar:
 
 - GADT constructor types are currently not permitted to have arbitrarily nested
   ``forall``\ s or ``=>``\ s. (e.g., something like ``MkT :: Int -> forall a. a -> T``
-  would be rejected.) As a result, ``gadt_sig`` puts all of its quantification
-  and constraints up front with ``foralls`` and ``opt_context``. Note that
+  would be rejected.) As a result, ``gadt_con`` puts all of its quantification
+  and constraints up front with ``foralls`` and ``ctxts``. Note that
   higher-rank ``forall``\ s and ``=>``\ s are only permitted if they do not appear
   directly to the right of a function arrow in a `prefix_gadt_body`. (e.g.,
   something like ``MkS :: Int -> (forall a. a) -> S`` is allowed, since
   parentheses separate the ``forall`` from the ``->``.)
 
+- A prefix GADT constructor may be given several consecutive contexts, as
+  indicated by `ctxts`. Curried contexts are equivalent to a single conjoined
+  context, so the following constructors have interchangeable types: ::
+
+    data G a where
+      MkCurried :: C a => D a => E a => G a
+      MkConjoined :: (C a, D a, E a) => G a
+      MkMixedL :: (C a, D a) => E a => G a
+      MkMixedR :: C a => (D a, E a) => G a
+
+  Note that, per the grammar above, the contexts must be consecutive: it is
+  currently not possible to interleave contexts with foralls or function arrows.
+  This restriction will be lifted in a future release of GHC.
+
 - GADT constructors permit outermost parentheses that surround the ``foralls``
-  or ``opt_ctxt``, as well as interleaved parentheses between multiple
+  or ``ctxts``, as well as interleaved parentheses between multiple
   ``foralls``. For example, ``MkU :: (forall a. a -> U)`` is accepted, as is
   ``MkW :: forall a. (forall b. a -> b -> W)``.
 

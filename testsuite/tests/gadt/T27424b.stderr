@@ -1,0 +1,24 @@
+T27424b.hs:11:18: error: [GHC-71492]
+    • GADT constructor type signature cannot contain nested ‘forall’s or contexts
+    • In the definition of data constructor ‘MkT1’
+
+T27424b.hs:11:25: error: [GHC-89246]
+    • Record syntax is illegal here: {fld1 :: a}
+    • In the definition of data constructor ‘MkT1’
+
+T27424b.hs:14:30: error: [GHC-71492]
+    • GADT constructor type signature cannot contain nested ‘forall’s or contexts
+    • In the definition of data constructor ‘MkT2’
+
+T27424b.hs:14:39: error: [GHC-89246]
+    • Record syntax is illegal here: {fld2 :: a}
+    • In the definition of data constructor ‘MkT2’
+
+T27424b.hs:17:17: error: [GHC-71492]
+    • GADT constructor type signature cannot contain nested ‘forall’s or contexts
+    • In the definition of data constructor ‘MkT3’
+
+T27424b.hs:17:23: error: [GHC-89246]
+    • Record syntax is illegal here: {fld3 :: a}
+    • In the definition of data constructor ‘MkT3’
+

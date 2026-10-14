@@ -1,0 +1,15 @@
+section: language
+synopsis: Allow multiple consecutive contexts in prefix GADT constructor declarations (GHC Proposal `#402 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0402-gadt-syntax.rst>`_ "Stable GADT constructor syntax")
+issues: #27424
+mrs: !16819
+
+description: {
+  Prefix GADT constructor declarations now accept multiple consecutive contexts,
+  equivalent to a single conjoined context. For example::
+
+    data G a where
+      MkCurried :: C a => (D a, E a) => G a
+      MkConjoined :: (C a, D a, E a) => G a
+
+  Record-style GADT constructor declarations continue to accept at most one context.
+}

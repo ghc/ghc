@@ -6,7 +6,7 @@ mrs: !16321
 
 description:
   Parenthesized types are now accepted in prefix GADT constructor declarations,
-  even when they contain explicit ``forall`` quantifiers. For example:
+  even when they contain explicit ``forall`` quantifiers. For example::
 
     data T where
       MkT :: (forall a. a -> b -> T)
