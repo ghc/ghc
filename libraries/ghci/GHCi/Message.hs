@@ -934,7 +934,7 @@ instance Binary IddMsg where
     case b of
       0 -> Request <$> get <*> get
       1 -> Reply   <$> get <*> get
-      _ -> error $ "impossible: Binary IddMsg - " ++ show b
+      _ -> fail $ "impossible: Binary IddMsg - " ++ show b
 
 newAsyncManager :: Pipe -> IO AsyncManager
 newAsyncManager pipe = do
