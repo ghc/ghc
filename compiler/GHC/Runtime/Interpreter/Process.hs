@@ -48,7 +48,7 @@ sendMessage i msg =
 sendTHComputation
   :: Binary a
   => ExtInterpInstance d
-  -> Message a
+  -> (InboxId -> Message a)
   -> (forall b. Binary b => THMessage b -> IO (Bool, b))
   -- ^ Handle one message. Return True to end the loop.
   -- This handler must never uninterrutibly mask an expression which may get
@@ -56,21 +56,22 @@ sendTHComputation
   -> IO a
 sendTHComputation i msg reqHandler = mask $ \restore -> do
   -- inline "withAsync/wait"
-  var <- newEmptyTMVarIO
-  ht  <- forkFinally (restore handlerLoop) (atomically . putTMVar var)
-  restore (sendMessage i msg <* atomically (readTMVar var))
+  var  <- newEmptyTMVarIO
+  mbox <- newMailbox (pipeAsyncMngr (interpPipe proc))
+  ht   <- forkFinally (restore (handlerLoop mbox)) (atomically . putTMVar var)
+  restore (sendMessage i (msg mbox) <* atomically (readTMVar var))
     `onException` uninterruptibleMask_ (throwTo ht CancelTHHandler)
   where
     proc = instProcess i
-    handleOne doneRef = do
-      handleRemoteTHCall (interpPipe proc) $ \req -> do
+    handleOne mbox doneRef = do
+      handleRemoteTHCall (interpPipe proc) mbox $ \req -> do
         (stop, res) <- reqHandler req
         writeIORef doneRef stop
         return res
-    handlerLoop = do
+    handlerLoop mbox = do
       doneRef <- newIORef False
       let loop = do
-            handleOne doneRef
+            handleOne mbox doneRef
             isDone <- readIORef doneRef
             if isDone then return ()
                       else loop

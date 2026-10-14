@@ -1170,7 +1170,7 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
             recovers <- newIORef []
             withForeignRef fhv $ \st ->
               withForeignRefs finRefs $ \qrefs ->
-                sendTHComputation inst (RunModFinalizers st qrefs) $ \msg ->
+                sendTHComputation inst (\ii -> RunModFinalizers ii st qrefs) $ \msg ->
                   runInIO (runRemoteTH recovers msg)
           checkQResult qr
 
@@ -1830,7 +1830,7 @@ runTH ty fhv = do
         recovers <- newIORef []
         withForeignRef rstate $ \state_hv ->
           withForeignRef fhv $ \q_hv ->
-            sendTHComputation inst (RunTH state_hv q_hv ty (Just loc)) $ \msg ->
+            sendTHComputation inst (\ii -> RunTH ii state_hv q_hv ty (Just loc)) $ \msg ->
               runInIO (runRemoteTH recovers msg)
       bs <- checkQResult qr
       return $! runGet get (LB.fromStrict bs)
