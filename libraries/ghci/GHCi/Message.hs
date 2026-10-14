@@ -944,7 +944,7 @@ newAsyncManager pipe = do
 
   -- Fork thread to drain read end.
   -- (cleaned up on 'closePipe')
-  asyncDrainTid  <- forkIO (drainPipe pipe)
+  asyncDrainTid  <- forkIOWithUnmask (drainPipe pipe)
 
   let am = AsyncManager{..}
   pure am
@@ -954,8 +954,8 @@ newAsyncManager pipe = do
 -- In pratice, we'll have both a thread draining the read end of the host's
 -- 'Pipe' and a thread draining the read end of the interpreter's 'Pipe', since
 -- both processes construct a 'Pipe' and send and receive messages
-drainPipe :: Pipe -> IO ()
-drainPipe p = catch loop replyToPendings where
+drainPipe :: Pipe -> (forall x. IO x -> IO x) -> IO ()
+drainPipe p unmask = catch (unmask loop) replyToPendings where
   loop = do
     readPipe p >>= \case
       -- Receive a reply to a pending notification
