@@ -220,7 +220,7 @@ getGADTConType
   ( ConDeclGADT
       { con_outer_bndrs = outer_bndrs
       , con_inner_bndrs = inner_bndrs
-      , con_mb_cxt = mcxt
+      , con_cxts = cxts
       , con_g_args = args
       , con_res_ty = res_ty
       }
@@ -234,9 +234,7 @@ getGADTConType
       )
     where
       phi_ty :: LHsType DocNameI
-      phi_ty = case mcxt of
-        Nothing    -> tau_ty
-        Just theta -> mkQualTy theta tau_ty
+      phi_ty = foldr mkQualTy tau_ty cxts
 
       tau_ty :: LHsType DocNameI
       tau_ty = case args of

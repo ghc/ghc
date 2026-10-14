@@ -1,0 +1,15 @@
+T27424d.hs:(14,2)-(22,14): Splicing declarations
+    do let r = mkName "R"
+           a = mkName "a"
+           bang = Bang NoSourceUnpackedness NoSourceStrictness
+       return
+         [DataD
+            [] r [PlainTV a BndrReq] Nothing
+            [ForallC [] [AppT (ConT ''Eq) (VarT a)]
+               $ ForallC [] [AppT (ConT ''Show) (VarT a)]
+                   $ RecGadtC
+                       [mkName "MkR"] [(mkName "fld", bang, VarT a)]
+                       (AppT (ConT r) (VarT a))]
+            []]
+  ======>
+    data R a where MkR :: (Eq a, Show a) => {fld :: a} -> R a

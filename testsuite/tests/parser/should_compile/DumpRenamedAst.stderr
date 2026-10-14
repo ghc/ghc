@@ -2459,7 +2459,7 @@
                 [{Name: f}
                 ,{Name: g}]))
               []
-              (Nothing)
+              []
               (PrefixConGADT
                (NoExtField)
                [(CDF

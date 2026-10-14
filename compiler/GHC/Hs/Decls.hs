@@ -886,9 +886,8 @@ getRecConArgs_maybe (ConDeclGADT{con_g_args = args}) = case args of
   PrefixConGADT{} -> Nothing
   RecConGADT _ flds -> Just flds
 
-hsConDeclTheta :: Maybe (LHsContext (GhcPass p)) -> [LHsType (GhcPass p)]
-hsConDeclTheta Nothing            = []
-hsConDeclTheta (Just (L _ (HsContext _ theta))) = theta
+hsConDeclTheta :: Foldable t => t (LHsContext (GhcPass p)) -> [LHsType (GhcPass p)]
+hsConDeclTheta = concatMap (hsc_ctxt . unLoc)
 
 ppDataDefnHeader
  :: (OutputableBndrId p)
@@ -971,11 +970,11 @@ pprConDecl (ConDeclH98 { con_name = L _ con
 pprConDecl (ConDeclGADT { con_names = cons
                         , con_outer_bndrs = L _ outer_bndrs
                         , con_inner_bndrs = inner_bndrs
-                        , con_mb_cxt = mcxt, con_g_args = args
+                        , con_cxts = cxts, con_g_args = args
                         , con_res_ty = res_ty, con_modifiers = mods, con_doc = doc })
   = pprMaybeWithDoc doc $ pprLHsModifiers mods <+> ppr_con_names (toList cons) <+> dcolon
     <+> sep [ppr_outer_bndrs, ppr_inner_bndrs (
-                sep [ pprLHsContext mcxt,
+                sep [ pprLHsContext cxts,
                       sep (ppr_args args ++ [ppr res_ty])])]
   where
     ppr_args (PrefixConGADT _ args) = map (pprHsConDeclFieldWith (\arr tyDoc -> tyDoc <+> pprHsModifiedFunArr arr)) args

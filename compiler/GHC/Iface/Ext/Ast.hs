@@ -1762,7 +1762,7 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
       ConDeclGADT { con_names = names
                   , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
                   , con_inner_bndrs = inner_bndrs
-                  , con_mb_cxt = ctx
+                  , con_cxts = cxts
                   , con_g_args = args
                   , con_res_ty = typ
                   , con_doc = doc} ->
@@ -1771,14 +1771,14 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
             map (C $ TyVarBind (mkScope outer_bndrs_loc) (ResolvedScopes [sigmaScope]))
                 imp_vars
         , toHie $ tvScopes (ResolvedScopes [phiScope]) NoScope exp_bndrs
-        , toHie ctx
+        , toHie cxts
         , toHie args
         , toHie typ
         , toHie doc
         ]
         where
           rhsScope = combineScopes argsScope tyScope
-          ctxScope = maybe NoScope mkScope ctx
+          ctxScope = foldr combineScopes NoScope (map mkScope cxts)
           argsScope = case args of
             PrefixConGADT _ xs -> scaled_args_scope xs
             RecConGADT _ x     -> mkScope x

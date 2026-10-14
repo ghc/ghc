@@ -127,7 +127,7 @@
             (HsOuterImplicit
              (NoExtField)))
            []
-           (Nothing)
+           []
            (PrefixConGADT
             (NoExtField)
             [(CDF

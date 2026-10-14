@@ -28,7 +28,8 @@ import GHC.Rename.HsType
 import GHC.Rename.Bind
 import GHC.Rename.Doc
 import GHC.Rename.Env
-import GHC.Rename.Utils ( mapFvRn, bindLocalNames
+import GHC.Rename.Utils ( mapFvRn, mapMaybeFvRn
+                        , bindLocalNames
                         , checkDupRdrNames, bindLocalNamesFV
                         , warnUnusedTypePatterns
                         , noNestedForallsContextsErr
@@ -2630,7 +2631,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
         ; let ctxt = ConDeclCtx [new_name]
         ; bindLHsTyVarBndrs ctxt WarnUnusedForalls
                             Nothing ex_tvs $ \ new_ex_tvs ->
-    do  { (new_context, fvs1) <- rnMbContext ctxt mcxt
+    do  { (new_context, fvs1) <- mapMaybeFvRn (rnContext ctxt) mcxt
         ; (new_args,    fvs2) <- rnConDeclH98Details (unLoc new_name) ctxt args
         ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
         ; let all_fvs  = fvs1 `plusFN` fvs2 `plusFN` mods_fvs
@@ -2650,7 +2651,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
 rnConDecl (ConDeclGADT { con_names   = names
                        , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
                        , con_inner_bndrs = inner_bndrs
-                       , con_mb_cxt  = mcxt
+                       , con_cxts    = cxts
                        , con_g_args  = args
                        , con_res_ty  = res_ty
                        , con_modifiers = mods
@@ -2666,7 +2667,7 @@ rnConDecl (ConDeclGADT { con_names   = names
               implicit_bndrs =
                 extractHsOuterTvBndrs outer_bndrs           $
                 extractHsGadtTelescopes inner_bndrs         $
-                extractHsTysRdrTyVars (hsConDeclTheta mcxt) $
+                extractHsTysRdrTyVars (hsConDeclTheta cxts) $
                 extractConDeclGADTDetailsTyVars args        $
                 extractHsTysRdrTyVars [res_ty] []
 
@@ -2674,7 +2675,7 @@ rnConDecl (ConDeclGADT { con_names   = names
 
         ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
           bindHsGadtTelescopes ctxt inner_bndrs $ \inner_bndrs' ->
-    do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
+    do  { (new_cxts, fvs1)   <- mapFvRn (rnContext ctxt) cxts
         ; (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
         ; (mods', mods_fvs) <- rnModifiersContextAndWarn ctxt mods
@@ -2693,16 +2694,10 @@ rnConDecl (ConDeclGADT { con_names   = names
         ; return (ConDeclGADT { con_g_ext = noExtField, con_names = new_names
                               , con_outer_bndrs = L outer_bndrs_loc outer_bndrs'
                               , con_inner_bndrs = inner_bndrs'
-                              , con_mb_cxt = new_cxt
+                              , con_cxts = new_cxts
                               , con_g_args = new_args, con_res_ty = new_res_ty
                               , con_doc = new_mb_doc, con_modifiers = mods' },
                   all_fvs) } }
-
-rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)
-            -> RnM (Maybe (LHsContext GhcRn), FreeNames)
-rnMbContext _    Nothing    = return (Nothing, emptyFNs)
-rnMbContext doc cxt = do { (ctx',fvs) <- rnMaybeContext doc cxt
-                         ; return (ctx',fvs) }
 
 rnConDeclH98Details ::
       Name

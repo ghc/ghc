@@ -1,9 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
-module T12087 where
 
-data F1 a where
-  MkF1 :: Ord a => Eq a => a -> F1 a
+module T12087b where
 
 data F2 a where
   MkF2 :: Ord a => a -> Eq a => F2 a

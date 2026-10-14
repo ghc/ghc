@@ -29,7 +29,7 @@ module Haddock.Convert
 
 import Control.DeepSeq (force)
 import Data.Either (lefts, partitionEithers, rights)
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.Maybe (catMaybes, mapMaybe, maybeToList)
 import GHC.Builtin.KnownKeys
   ( boxedRepDataConKey
   , eqTyConKey
@@ -625,7 +625,7 @@ synifyDataCon use_gadt_syntax dc =
               , con_names = pure name
               , con_outer_bndrs = noLocA outer_bndrs
               , con_inner_bndrs = inner_bndrs
-              , con_mb_cxt = ctx
+              , con_cxts = maybeToList ctx
               , con_g_args = hat
               , con_res_ty = synifyType WithinType emptyVarSet res_ty
               , con_modifiers = []
