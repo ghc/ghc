@@ -83,9 +83,6 @@ module GHC.Types.Id.Info (
         lfInfo, setLFInfo, setTagSig,
 
         tagSig,
-
-        -- ** Tick-box Info
-        TickBoxOp(..), TickBoxId,
     ) where
 
 import GHC.Prelude
@@ -102,7 +99,6 @@ import GHC.Core.Type (mkTyConApp)
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Types.ForeignCall
-import GHC.Unit.Module
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.InlinePragma
@@ -194,8 +190,6 @@ data IdDetails
 
   | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call.
                                 -- Type will be simple: no type families, newtypes, etc
-
-  | TickBoxOpId TickBoxOp       -- ^ The 'Id' is for a HPC tick box (both traditional and binary)
 
   | DFunId Bool                 -- ^ A dictionary function.
        -- Bool = True <=> a dictionary of this class cannot be bottom
@@ -445,7 +439,6 @@ pprIdDetails other     = brackets (pp other)
    pp (RepPolyId {})          = text "RepPolyId"
    pp (PrimOpId {})           = text "PrimOp"
    pp (FCallId _)             = text "ForeignCall"
-   pp (TickBoxOpId _)         = text "TickBoxOp"
    pp (DFunId terminating)    = text "DFunId"
                                 <> ppWhen (not terminating) (text "(may-be-bottom)")
    pp (RecSelId { sel_naughty = is_naughty })
@@ -970,20 +963,3 @@ zapTailCallInfo info
 
 zapCallArityInfo :: IdInfo -> IdInfo
 zapCallArityInfo info = setCallArityInfo info 0
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{TickBoxOp}
-*                                                                      *
-************************************************************************
--}
-
-type TickBoxId = Int
-
--- | Tick box for Hpc-style coverage
-data TickBoxOp
-   = TickBox Module {-# UNPACK #-} !TickBoxId
-
-instance Outputable TickBoxOp where
-    ppr (TickBox mod n)         = text "tick" <+> ppr (mod,n)

@@ -163,9 +163,6 @@ ctxIsEvaluated i =
       -- JoinId {} -> False
       --   -- Don't speculate join points
 
-      -- TickBoxOpId {} -> False
-      --   -- Don't speculate box ticking
-
       -- -- Tagged (evaluated) ids
       -- _ | Just sig <- idTagSig_maybe i
       --   , isTaggedSig sig
