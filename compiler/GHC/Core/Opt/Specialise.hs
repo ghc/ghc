@@ -1867,7 +1867,7 @@ the specialised Id correct:
   allows unboxing of all previous CBV args, in which case sticking to
   VanillaIds was the only correct choice to begin with.
 
-* RecSelId, DataCon*Id, ClassOpId, PrimOpId, FCallId, CoVarId, TickBoxId:
+* RecSelId, DataCon*Id, ClassOpId, PrimOpId, FCallId, CoVarId:
   Never specialised.
 
 Note [Specialisation Must Preserve Sharing]
@@ -3074,7 +3074,6 @@ wantCallsFor _env f
       ClassOpId {}     -> False
       PrimOpId {}      -> False
       FCallId {}       -> False
-      TickBoxOpId {}   -> False
       CoVarId {}       -> False
 
       DFunId {}        -> True

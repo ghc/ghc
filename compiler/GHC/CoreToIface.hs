@@ -492,7 +492,6 @@ toIfaceIdDetails _ (RepPolyId {}) = IfVanillaId
 toIfaceIdDetails nm dets@(DataConWorkId {}) = not_iface_details nm dets
 toIfaceIdDetails nm dets@(DataConWrapId {}) = not_iface_details nm dets
 toIfaceIdDetails nm dets@(FCallId {})       = not_iface_details nm dets
-toIfaceIdDetails nm dets@(TickBoxOpId {})   = not_iface_details nm dets
 toIfaceIdDetails nm dets@(CoVarId {})       = not_iface_details nm dets
 toIfaceIdDetails nm dets@(JoinId {})        = not_iface_details nm dets
 

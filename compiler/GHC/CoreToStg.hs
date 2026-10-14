@@ -587,8 +587,6 @@ mkStgApp f how_bound core_args stg_args res_ty
       FCallId call     -> assert exactly_saturated $
                           StgOpApp (StgFCallOp call (idType f)) stg_args res_ty
 
-      TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,stg_args)
-
       _other           -> StgApp f stg_args
   where
     -- Mostly, the arity info of a function is in the fn's IdInfo

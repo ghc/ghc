@@ -1,0 +1,8 @@
+synopsis: Remove ``TickBoxOpId`` constructor of ``IdDetails`` and related dead code
+section: ghc-lib
+issues: #27946
+mrs: !16816
+description:
+  The obsolete ``TickBoxOpId`` constructor of ``GHC.Types.Id.Info.IdDetails``,
+  along with the associated types ``TickBoxOp`` and ``TickBoxId`` have been
+  removed.
