@@ -115,8 +115,8 @@ import qualified GHC.Boot.TH.Monad as TH
 import Unsafe.Coerce
 
 -- | Create a new instance of 'QState'
-initQState :: Pipe -> QState
-initQState p = QState M.empty Nothing p
+initQState :: Pipe -> InboxId -> QState
+initQState p ii = QState M.empty Nothing ii p
 
 -- | The monad in which we run TH computations on the server
 newtype GHCiQ a = GHCiQ { runGHCiQ :: IORef QState -> IO a }
@@ -156,7 +156,7 @@ noLoc = TH.Loc "<no file>" "<no package>" "<no module>" (0,0) (0,0)
 ghcCmd :: Binary a => THMessage (THResult a) -> GHCiQ a
 ghcCmd m = GHCiQ $ \sRef -> do
   s <- readIORef sRef
-  r <- remoteTHCall (qsPipe s) m
+  r <- remoteTHCall (qsPipe s) (qsInboxId s) m
   case r of
     THException str -> throwIO (GHCiQException s str)
     THComplete res -> return res
@@ -189,9 +189,9 @@ metaHandlersGHCiQ runInIO = TH.MetaHandlers {
   -- See Note [TH recover with -fexternal-interpreter] in GHC.Tc.Gen.Splice
   , mRecover = \h a -> runInIO $ GHCiQ $ \sRef -> mask $ \unmask -> do
       s <- readIORef sRef
-      remoteTHCall (qsPipe s) StartRecover
+      remoteTHCall (qsPipe s) (qsInboxId s) StartRecover
       e <- try $ unmask $ runGHCiQ (runQinGHCiQ a <* ghcCmd FailIfErrs) sRef
-      remoteTHCall (qsPipe s) (EndRecover (isLeft e))
+      remoteTHCall (qsPipe s) (qsInboxId s) (EndRecover (isLeft e))
       case e of
         Left GHCiQException{} ->
           runGHCiQ (runQinGHCiQ h) sRef
@@ -233,26 +233,28 @@ metaHandlersGHCiQ runInIO = TH.MetaHandlers {
 -- a new IORef QState, and return a RemoteRef to it.
 startTH :: IO (RemoteRef (IORef QState))
 startTH = do
-  r <- newIORef (initQState (error "startTH: no pipe"))
+  r <- newIORef (initQState (error "startTH: no pipe") (error "startTH: no inbox id"))
   mkRemoteRef r
 
 -- | Runs the mod finalizers.
 --
 -- The references must be created on the caller process.
-runModFinalizerRefs :: Pipe -> RemoteRef (IORef QState)
+runModFinalizerRefs :: Pipe -> InboxId
+                    -> RemoteRef (IORef QState)
                     -> [RemoteRef (TH.Q ())]
                     -> IO ()
-runModFinalizerRefs pipe rstate qrefs = do
+runModFinalizerRefs pipe ii rstate qrefs = do
   qs <- mapM localRef qrefs
   qstateref <- localRef rstate
   qstate <- readIORef qstateref
-  qstate' <- newIORef $ qstate { qsPipe = pipe }
+  qstate' <- newIORef $ qstate { qsInboxId = ii, qsPipe = pipe }
   _ <- runGHCiQ (runQinGHCiQ $ sequence_ qs) qstate'
   return ()
 
 -- | The implementation of the 'RunTH' message
 runTH
   :: Pipe
+  -> InboxId
   -> RemoteRef (IORef QState)
       -- ^ The TH state, created by 'startTH'
   -> HValueRef
@@ -264,13 +266,13 @@ runTH
   -> IO ByteString
       -- ^ Returns an (encoded) result that depends on the THResultType
 
-runTH pipe rstate rhv ty mb_loc = do
+runTH pipe ii rstate rhv ty mb_loc = do
   hv <- localRef rhv
   case ty of
-    THExp -> runTHQ pipe rstate mb_loc (unsafeCoerce hv :: TH.Q TH.Exp)
-    THPat -> runTHQ pipe rstate mb_loc (unsafeCoerce hv :: TH.Q TH.Pat)
-    THType -> runTHQ pipe rstate mb_loc (unsafeCoerce hv :: TH.Q TH.Type)
-    THDec -> runTHQ pipe rstate mb_loc (unsafeCoerce hv :: TH.Q [TH.Dec])
+    THExp -> runTHQ pipe ii rstate mb_loc (unsafeCoerce hv :: TH.Q TH.Exp)
+    THPat -> runTHQ pipe ii rstate mb_loc (unsafeCoerce hv :: TH.Q TH.Pat)
+    THType -> runTHQ pipe ii rstate mb_loc (unsafeCoerce hv :: TH.Q TH.Type)
+    THDec -> runTHQ pipe ii rstate mb_loc (unsafeCoerce hv :: TH.Q [TH.Dec])
     THAnnWrapper -> do
       hv <- unsafeCoerce <$> localRef rhv
       case hv :: AnnotationWrapper of
@@ -279,10 +281,10 @@ runTH pipe rstate rhv ty mb_loc = do
 
 -- | Run a Q computation.
 runTHQ
-  :: Binary a => Pipe -> RemoteRef (IORef QState) -> Maybe TH.Loc -> TH.Q a
+  :: Binary a => Pipe -> InboxId -> RemoteRef (IORef QState) -> Maybe TH.Loc -> TH.Q a
   -> IO ByteString
-runTHQ pipe rstate mb_loc ghciq = do
+runTHQ pipe ii rstate mb_loc ghciq = do
   qstateref <- localRef rstate
-  modifyIORef' qstateref (\qstate -> qstate { qsLocation = mb_loc, qsPipe = pipe })
+  modifyIORef' qstateref (\qstate -> qstate { qsLocation = mb_loc, qsInboxId = ii, qsPipe = pipe })
   r <- runGHCiQ (runQinGHCiQ ghciq) qstateref
   return $! LB.toStrict (runPut (put r))
