@@ -2,7 +2,8 @@
  *
  * (c) The GHC Team, 1995-2009
  *
- * Interface to the RTS timer signal (uses OS-dependent Ticker.h underneath)
+ * Compatibility interface to what historically was the RTS timer signal.
+ * None of these functions do anything anymore. Do not use them.
  *
  * Do not #include this file directly: #include "Rts.h" instead.
  *

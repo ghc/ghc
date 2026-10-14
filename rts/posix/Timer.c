@@ -5,9 +5,7 @@
  * The posix implementation of the interval timer, used for pre-emptive
  * scheduling of Haskell threads, and for sample based profiling.
  *
- * This file defines the "ticker": the platform-specific service to install and
- * run the timer. See rts/Timer.c for the platform-dependent view of interval
- * timing.
+ * See rts/Timers.c for uses of timers.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -15,13 +13,13 @@
  * using either the ppoll() or select() API. This lets it also block on a file
  * descriptor for early wakeup.
  *
- * The design uses a simple relative time delay with no catchup. That is, time
- * spent by the ticker thread itself (e.g. flushing eventlog buffers) is not
- * accounted for, and the next tick is delayed by that much (modulo wakeup
- * jitter). This is probably the right thing to do: generally in realtime
- * systems one does not want to try to catch up when behind, since that tends
- * towards oversubscribing resources. Graceful degredation is usually
- * preferable.
+ * The design for periodic timers uses a simple relative time delay with no
+ * catchup. That is, time spent by the timer handler (e.g. flushing eventlog
+ * buffers) is not accounted for, and the next timer tick is delayed by that
+ * much (modulo wakeup jitter). This is probably the right thing to do:
+ * generally in realtime systems one does not want to try to catch up when
+ * behind, since that tends towards oversubscribing resources. Graceful
+ * degredation is usually preferable.
  *
  * Experimental results (on Linux 6.18 on x86-64) to measure the typical
  * difference between the requested wakeup time and actual wakeup time for
@@ -46,7 +44,7 @@
  * default interval (10ms, 10000us) and for shorter intervals used during
  * profiling.
  *
- * Historically we had ticker implementations using signals. This was always a
+ * Historically we had timer implementations using signals. This was always a
  * rather shakey thing to do but we originally had few alternatives.
  * - One problem with using signals is that there are severe limits on what
  *   code can be called from signal handlers. In particular it's not possible
@@ -60,7 +58,7 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
-#include "Ticker.h"
+#include "Timer.h"
 #include "RtsUtils.h"
 #include "Proftimer.h"
 #include "Schedule.h"
@@ -122,39 +120,39 @@ static int poll_no_timeout(fdset *fdset);
 static int poll_with_timeout(fdset *fdset, timeout *t);
 
 
-struct Ticker {
-    /* Each ticker runs in its own thread. The thread id is used to wait for
-     * the ticker thread to terminate after asking it politely to exit.
+struct Timer {
+    /* Each timer runs in its own thread. The thread id is used to wait for
+     * the timer thread to terminate after asking it politely to exit.
      */
     OSThreadId thread_id;
 
     /* The tick handler function. */
     TickProc handle_tick;
 
-    /* For periodic tickers this is the tick interval. */
+    /* For periodic timers this is the tick interval. */
     Time interval;
 
-    /* Fds used with sendFdWakeup to notify the ticker thread that any of the
+    /* Fds used with sendFdWakeup to notify the timer thread that any of the
      * request variables below have been modified.
      */
     int notifyfd_r;
     int notifyfd_w;
 
     /* Atomic shared variable used by client threads to communicate that they
-     * want the ticker thread to pause. This communication is one-way, with no
+     * want the timer thread to pause. This communication is one-way, with no
      * acknowledgement.
      */
     bool pause_request;
 
     /* Atomic shared variable used by other threads to communicate that they
-     * want the ticker thread to exit.
+     * want the timer thread to exit.
      */
     bool exit_request;
 };
 
-static void *ticker_thread_func(void *_ticker)
+static void *timer_thread_func(void *_timer)
 {
-    Ticker *ticker = _ticker;
+    Timer *timer = _timer;
 
     // Thread-local view of our state. We compare these with the corresponding
     // atomic shared variables used to request state changes.
@@ -164,8 +162,8 @@ static void *ticker_thread_func(void *_ticker)
 
     timeout timeout;
     fdset fdset;
-    poll_init_timeout(&timeout, ticker->interval);
-    poll_init_fdset(&fdset, ticker->notifyfd_r);
+    poll_init_timeout(&timeout, timer->interval);
+    poll_init_fdset(&fdset, timer->notifyfd_r);
 
     while (!exit) {
 
@@ -178,7 +176,7 @@ static void *ticker_thread_func(void *_ticker)
 
         if (RTS_LIKELY(notify == 0)) {
             // The time expired, no state change notification.
-            ticker->handle_tick(0);
+            timer->handle_tick(0);
 
         } else if (notify > 0) {
             // State change notification, check the request variables.
@@ -187,35 +185,35 @@ static void *ticker_thread_func(void *_ticker)
             // happens-before relation. So if the request variables are set
             // before calling sendFdWakeup, then we should be able to reliably
             // read them here afterwards.
-            collectFdWakeup(ticker->notifyfd_r);
+            collectFdWakeup(timer->notifyfd_r);
 
-            paused = ACQUIRE_LOAD_ALWAYS(&ticker->pause_request);
-            exit   = RELAXED_LOAD_ALWAYS(&ticker->exit_request);
+            paused = ACQUIRE_LOAD_ALWAYS(&timer->pause_request);
+            exit   = RELAXED_LOAD_ALWAYS(&timer->exit_request);
 
         } else if (errno != EINTR) {
             // While the RTS attempts to mask signals, some foreign libraries
             // that rely on signal delivery may unmask them. Consequently we
             // may see EINTR. See #24610.
-            sysErrorBelch("Ticker: poll failed: %s", strerror(errno));
+            sysErrorBelch("Timer: poll failed: %s", strerror(errno));
         }
     }
 
     return NULL;
 }
 
-/* Initialise the ticker on startup or re-initialise the ticker after a fork().
+/* Initialise the timer on startup or re-initialise the timer after a fork().
  * In the fork case, the thread will not be present, but fds are inherited.
  *
- * The ticker is started in the paused state. Use unpauseTicker to continue.
+ * The timer is started in the paused state. Use unpauseTimer to continue.
  */
-Ticker *initTicker(Time interval, TickProc handle_tick)
+Timer *initTimer(Time interval, TickProc handle_tick)
 {
-    Ticker *ticker = stgMallocBytes(sizeof(struct Ticker), "newPeriodicTicker");
+    Timer *timer = stgMallocBytes(sizeof(struct Timer), "newPeriodicTimer");
 
-    ticker->interval      = interval;
-    ticker->handle_tick   = handle_tick;
-    ticker->pause_request = true;
-    ticker->exit_request  = false;
+    timer->interval      = interval;
+    timer->handle_tick   = handle_tick;
+    timer->pause_request = true;
+    timer->exit_request  = false;
 
 #if defined(HAVE_SIGNAL_H)
     sigset_t mask, omask;
@@ -225,7 +223,7 @@ Ticker *initTicker(Time interval, TickProc handle_tick)
 
     /* Open the interrupt fd synchronously.
      *
-     * We used to do it in ticker_thread_func (i.e. in the timer thread) but it
+     * We used to do it in timer_thread_func (i.e. in the timer thread) but it
      * meant that some user code could run before it and get confused by the
      * allocation of the timerfd.
      *
@@ -234,7 +232,7 @@ Ticker *initTicker(Time interval, TickProc handle_tick)
      * "close" closed our own timerfd which inadvertently reused the same file
      * descriptor closed by the first call! (see #20618)
      */
-    newFdWakeup(&ticker->notifyfd_r, &ticker->notifyfd_w);
+    newFdWakeup(&timer->notifyfd_r, &timer->notifyfd_w);
 
     /*
      * Create the thread with all blockable signals blocked, leaving signal
@@ -246,60 +244,60 @@ Ticker *initTicker(Time interval, TickProc handle_tick)
     sigfillset(&mask);
     sigret = pthread_sigmask(SIG_SETMASK, &mask, &omask);
 #endif
-    ret = createAttachedOSThread(&ticker->thread_id, "ghc_ticker",
-                                 ticker_thread_func, (void*)ticker);
+    ret = createAttachedOSThread(&timer->thread_id, "ghc_timer",
+                                 timer_thread_func, (void*)timer);
 #if defined(HAVE_SIGNAL_H)
     if (sigret == 0)
         pthread_sigmask(SIG_SETMASK, &omask, NULL);
 #endif
 
     if (ret != 0) {
-        barf("Ticker: Failed to spawn thread: %s", strerror(errno));
+        barf("Timer: Failed to spawn thread: %s", strerror(errno));
     }
-    return ticker;
+    return timer;
 }
 
 /* Asynchronous. Idempotent. */
-void unpauseTicker(Ticker *ticker)
+void unpauseTimer(Timer *timer)
 {
-    RELEASE_STORE_ALWAYS(&ticker->pause_request, false);
-    sendFdWakeup(ticker->notifyfd_w);
+    RELEASE_STORE_ALWAYS(&timer->pause_request, false);
+    sendFdWakeup(timer->notifyfd_w);
 }
 
 /* Asynchronous. Idempotent.
  * There may be at additional ticks fired after a call to this, but it will
  * usually stop quickly.
  */
-void pauseTicker(Ticker *ticker)
+void pauseTimer(Timer *timer)
 {
-    RELEASE_STORE_ALWAYS(&ticker->pause_request, true);
-    sendFdWakeup(ticker->notifyfd_w);
+    RELEASE_STORE_ALWAYS(&timer->pause_request, true);
+    sendFdWakeup(timer->notifyfd_w);
 }
 
 /* Synchronous. Not idempotent.
- * The ticker is guaranteed stopped after this.
+ * The timer is guaranteed stopped after this.
  */
-void stopTicker(Ticker *ticker)
+void haltTimer(Timer *timer)
 {
-    ASSERT(!RELAXED_LOAD_ALWAYS(&ticker->exit_request));
-    RELEASE_STORE_ALWAYS(&ticker->exit_request, true);
-    sendFdWakeup(ticker->notifyfd_w);
+    ASSERT(!RELAXED_LOAD_ALWAYS(&timer->exit_request));
+    RELEASE_STORE_ALWAYS(&timer->exit_request, true);
+    sendFdWakeup(timer->notifyfd_w);
 
-    // wait for ticker thread to terminate
-    if (pthread_join(ticker->thread_id, NULL)) {
-        sysErrorBelch("Ticker: Failed to join: %s", strerror(errno));
+    // wait for timer thread to terminate
+    if (pthread_join(timer->thread_id, NULL)) {
+        sysErrorBelch("Timer: Failed to join: %s", strerror(errno));
     }
 }
 
 /* In the child process after a fork() the thread is gone but the fds remain.
- * To avoid leaking the old file descriptors (#25280), freeTicker() must be
- * used in the child process after a fork() and without using stopTicker (which
+ * To avoid leaking the old file descriptors (#25280), freeTimer() must be
+ * used in the child process after a fork() and without using haltTimer (which
  * would fail).
  */
-void freeTicker(Ticker *ticker)
+void freeTimer(Timer *timer)
 {
-    closeFdWakeup(ticker->notifyfd_r, ticker->notifyfd_w);
-    stgFree(ticker);
+    closeFdWakeup(timer->notifyfd_r, timer->notifyfd_w);
+    stgFree(timer);
 }
 
 /* Implementation of the local helpers, to hide the difference between ppoll()

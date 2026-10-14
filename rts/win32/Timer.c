@@ -4,7 +4,7 @@
  */
 
 #include "Rts.h"
-#include "Ticker.h"
+#include "Timer.h"
 #include <windows.h>
 #include <stdio.h>
 #include <process.h>
@@ -23,7 +23,7 @@
 // This seems to be the case starting at some point during the
 // Windows 7 lifetime and any newer versions of windows.
 
-struct Ticker {
+struct Timer {
     Mutex    lock;
     HANDLE   timer;
     TickProc handle_tick;
@@ -33,16 +33,16 @@ struct Ticker {
 
 static Mutex  timer_queue_lock = INIT_MUTEX;
 static HANDLE timer_queue      = NULL;
-static int    ticker_count     = 0;
+static int    timer_count     = 0;
 
 // Forward decls
-static void startTicker_(Ticker *ticker);
-static void stopTicker_(Ticker *ticker, bool synchronous);
+static void startTimer_(Timer *timer);
+static void stopTimer_(Timer *timer, bool synchronous);
 
-void initTicker (Time interval, TickProc handle_tick)
+void initTimer (Time interval, TickProc handle_tick)
 {
     OS_ACQUIRE_LOCK(timer_queue_lock);
-    ticker_count++;
+    timer_count++;
     if (count == 1) {
         ASSERT(timer_queue == NULL);
         timer_queue = CreateTimerQueue();
@@ -55,59 +55,59 @@ void initTicker (Time interval, TickProc handle_tick)
     }
     OS_RELEASE_LOCK(timer_queue_lock);
 
-    Ticker *ticker = stgMallocBytes(sizeof(struct Ticker), "newPeriodicTicker");
-    OS_INIT_LOCK(&ticker->lock);
-    ticker->timer       = NULL;
-    ticker->handle_tick = handle_tick;
-    ticker->interval    = stg_min((DWORD) 1, TimeToMS(interval));
-    ticker->paused      = true; // starts paused
+    Timer *timer = stgMallocBytes(sizeof(struct Timer), "newPeriodicTimer");
+    OS_INIT_LOCK(&timer->lock);
+    timer->timer       = NULL;
+    timer->handle_tick = handle_tick;
+    timer->interval    = stg_min((DWORD) 1, TimeToMS(interval));
+    timer->paused      = true; // starts paused
 }
 
 // Asynchronous. Idempotent.
 void
-unpauseTicker(Ticker *ticker)
+unpauseTimer(Timer *timer)
 {
-    OS_ACQUIRE_LOCK(&ticker->lock);
-    if (ticker->paused) {
-        startTicker_(ticker);
+    OS_ACQUIRE_LOCK(&timer->lock);
+    if (timer->paused) {
+        startTimer_(timer);
     }
-    ticker->paused = false;
-    OS_RELEASE_LOCK(&ticker->lock);
+    timer->paused = false;
+    OS_RELEASE_LOCK(&timer->lock);
 }
 
 // Asynchronous. Idempotent.
 void
-pauseTicker(Ticker *ticker)
+pauseTimer(Timer *timer)
 {
-    OS_ACQUIRE_LOCK(&ticker->lock);
-    if (!ticker->paused) {
-        /* pauseTicker is called from within the handle_tick, so stopping
-         * the ticker here /must/ be asynchronous or we will deadlock! */
-        stopTicker_(ticker, false /* asynchronous */);
+    OS_ACQUIRE_LOCK(&timer->lock);
+    if (!timer->paused) {
+        /* pauseTimer is called from within the handle_tick, so stopping
+         * the timer here /must/ be asynchronous or we will deadlock! */
+        stopTimer_(timer, false /* asynchronous */);
     }
-    ticker->paused = true;
-    OS_RELEASE_LOCK(&ticker->lock);
+    timer->paused = true;
+    OS_RELEASE_LOCK(&timer->lock);
 }
 
 void
-stopTicker(Ticker *ticker)
+haltTimer(Timer *timer)
 {
     ASSERT(timer_queue != NULL);
 
-    OS_ACQUIRE_LOCK(&ticker->lock);
-    if (!ticker->paused) {
-        stopTicker(ticker, true /* synchronous */);
+    OS_ACQUIRE_LOCK(&timer->lock);
+    if (!timer->paused) {
+        stopTimer_(timer, true /* synchronous */);
     }
-    OS_RELEASE_LOCK(&ticker->lock);
+    OS_RELEASE_LOCK(&timer->lock);
 
     OS_ACQUIRE_LOCK(timer_queue_lock);
-    ticker_count--;
-    if (ticker_count == 0) {
+    timer_count--;
+    if (timer_count == 0) {
         // From the docs for DeleteTimerQueueEx:
         //   If this parameter is INVALID_HANDLE_VALUE, the function waits
         //   for all callback functions to complete before returning.
-        // This is a belt-and-braces approach to ensuring exitTicker is synchronous,
-        // since stopTicker(true) is already synchronous and there's only one timer.
+        // This is a belt-and-braces approach to ensuring haltTimer is
+        // synchronous, since stopTimer_(timer, true) is already synchronous.
         HANDLE completion = INVALID_HANDLE_VALUE;
         DeleteTimerQueueEx(timer_queue, completion);
         timer_queue = NULL;
@@ -115,26 +115,26 @@ stopTicker(Ticker *ticker)
     OS_RELEASE_LOCK(timer_queue_lock);
 }
 
-void freeTicker(Ticker ticker)
+void freeTimer(Timer timer)
 {
-    stgFree(ticker);
+    stgFree(timer);
 }
 
 static VOID CALLBACK tick_callback (PVOID lpParameter,
                                     BOOLEAN TimerOrWaitFired STG_UNUSED)
 {
-    Ticker *ticker = (Ticker *) lpParameter;
-    ticker->handle_tick();
+    Timer *timer = (Timer *) lpParameter;
+    timer->handle_tick();
 }
 
-static void startTicker_(Ticker *ticker) {
-    ASSERT(timer_queue != NULL && ticker->timer == NULL);
-    BOOL r = CreateTimerQueueTimer(&ticker->timer,
+static void startTimer_(Timer *timer) {
+    ASSERT(timer_queue != NULL && timer->timer == NULL);
+    BOOL r = CreateTimerQueueTimer(&timer->timer,
                                    timer_queue,
                                    tick_callback,
-                                   ticker,   // callback param
-                                   ticker->interval, // inital interval
-                                   ticker->interval, // recurrant interval
+                                   timer,   // callback param
+                                   timer->interval, // inital interval
+                                   timer->interval, // recurrant interval
                                    WT_EXECUTEINTIMERTHREAD);
     //TODO: using WT_EXECUTEINTIMERTHREAD is fine for context switching, and
     // plausibly also ok for profile sampling but is way out for eventlog
@@ -145,15 +145,15 @@ static void startTicker_(Ticker *ticker) {
         sysErrorBelch("CreateTimerQueueTimer");
         stg_exit(EXIT_FAILURE);
     }
-    ASSERT(ticker->timer != NULL);
+    ASSERT(timer->timer != NULL);
 }
 
-static void stopTicker_(Ticker *ticker, bool synchronous) {
-    ASSERT(timer_queue != NULL && ticker->timer != NULL);
+static void stopTimer_(Timer *timer, bool synchronous) {
+    ASSERT(timer_queue != NULL && timer->timer != NULL);
     // From the docs for DeleteTimerQueueTimer:
     // If this parameter is INVALID_HANDLE_VALUE, the function waits for any
     // running timer callback functions to complete before returning.
     HANDLE completion = synchronous ? INVALID_HANDLE_VALUE : NULL;
-    DeleteTimerQueueTimer(timer_queue, ticker->timer, completion);
-    ticker->timer = NULL;
+    DeleteTimerQueueTimer(timer_queue, timer->timer, completion);
+    timer->timer = NULL;
 }

@@ -41,7 +41,7 @@
 #include "RaiseAsync.h"
 #include "Threads.h"
 #include "Timer.h"
-#include "Ticker.h"
+#include "Timers.h"
 #include "IdleGC.h"
 #include "ThreadPaused.h"
 #include "ThreadLabels.h"
@@ -2074,7 +2074,7 @@ forkProcess(HsStablePtr *entry
 
         // The timer thread is not present in the child process, so we need
         // to initialise the timer again.
-        initTimer();
+        initTimers();
 
         // TODO: need to trace various other things in the child
         // like startup event, capabilities, process info etc
@@ -2084,7 +2084,7 @@ forkProcess(HsStablePtr *entry
 
         // start timer after the IOManager is initialized
         // (the idle GC may wake up the IOManager)
-        unpauseTimer();
+        unpauseTimers();
 
         // Install toplevel exception handlers, so interruption
         // signal will be sent to the main thread.

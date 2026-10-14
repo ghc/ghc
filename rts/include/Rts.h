@@ -259,7 +259,7 @@ void _warnFail(const char *filename, unsigned int linenum);
 #include "rts/IOInterface.h"
 #include "rts/Linker.h"
 #include "rts/Ticky.h"
-#include "rts/Timer.h"
+#include "rts/OldTimer.h"
 #include "rts/StablePtr.h"
 #include "rts/StableName.h"
 #include "rts/TTY.h"

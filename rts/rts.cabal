@@ -316,7 +316,7 @@ library
                         rts/Threads.h
                         rts/Ticky.h
                         rts/Time.h
-                        rts/Timer.h
+                        rts/OldTimer.h
                         rts/TSANUtils.h
                         rts/Types.h
                         rts/Utils.h
@@ -467,7 +467,7 @@ library
                  Threads.c
                  Ticky.c
                  TimeoutQueue.c
-                 Timer.c
+                 Timers.c
                  TopHandler.c
                  Trace.c
                  TraverseHeap.c
@@ -557,7 +557,7 @@ library
                     win32/OSMem.c
                     win32/OSThreads.c
                     win32/ThrIOManager.c
-                    win32/Ticker.c
+                    win32/Timer.c
                     win32/WorkQueue.c
                     win32/veh_excn.c
                     -- win32/**/*.c
@@ -579,7 +579,7 @@ library
       else
          c-sources: posix/GetEnv.c
                     posix/GetTime.c
-                    posix/Ticker.c
+                    posix/Timer.c
                     posix/OSMem.c
                     posix/OSThreads.c
                     posix/FdWakeup.c

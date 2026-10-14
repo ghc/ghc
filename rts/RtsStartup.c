@@ -36,7 +36,7 @@
 #include "Profiling.h"
 #include "IPE.h"
 #include "ProfHeap.h"
-#include "Timer.h"
+#include "Timers.h"
 #include "Globals.h"
 #include "FileLock.h"
 #include "LinkerInternals.h"
@@ -455,12 +455,10 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* Initialise libdw session pool */
     libdwPoolInit();
 
-    /* Start the "ticker" and profiling timer but don't start until the
-     * scheduler is up. However, the ticker itself needs to be initialized
-     * before the scheduler to ensure that the ticker mutex is initialized as
-     * moreCapabilities will attempt to acquire it.
+    /* Initialise the timers, but don't start them running until the scheduler
+     * is up.
      */
-    initTimer();
+    initTimers();
 
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
@@ -509,8 +507,8 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     traceInitEvent(dumpIPEToEventLog);
     initHeapProfiling();
 
-    /* start the timer (after initTimer above) */
-    unpauseTimer();
+    /* start the timer (after initTimers above) */
+    unpauseTimers();
 
 #if defined(RTS_USER_SIGNALS)
     /* Set up handler to run on SIGINT, etc. */
@@ -601,7 +599,7 @@ hs_exit_(bool wait_foreign)
      * We are about to start freeing resources used by the timer handler (like
      * the capabilities, eventlog and profiling data structures).
      */
-    exitTimer();
+    exitTimers();
 
     /*
      * Dump the ticky counter definitions

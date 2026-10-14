@@ -11,19 +11,19 @@
  *
  * This file defines the platform-independent view of interval timing, relying
  * on platform-specific services to install and run the timers. See
- * posix/Ticker.c and win32/Ticker.c for the platform specific parts.
+ * posix/Timer.c and win32/Timer.c for the platform specific parts.
  *
  * If you are looking for Itimer.c then you either file or one of the
- * platform-specific Ticker.c files.
+ * platform-specific Timer.c files.
  */
 
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
 #include "Timer.h"
+#include "Timers.h"
 #include "Proftimer.h"
 #include "IdleGC.h"
-#include "Ticker.h"
 #include "Capability.h"
 #include "RtsSignals.h"
 #include "rts/EventLogWriter.h"
@@ -73,20 +73,20 @@ handle_tick(int unused STG_UNUSED)
 #endif
 }
 
-static Ticker *main_ticker      = NULL;
+static Timer *main_timer      = NULL;
 
-void initTimer(void)
+void initTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
     initProfTimer();
 
     /* initTimer is called in the child of a fork */
-    if (main_ticker) {
-        freeTicker(main_ticker);
+    if (main_timer) {
+        freeTimer(main_timer);
     }
 
     if (RtsFlags.MiscFlags.tickInterval != 0) {
-        main_ticker = initTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
+        main_timer = initTimer(RtsFlags.MiscFlags.tickInterval, handle_tick);
     }
 #endif
 }
@@ -97,34 +97,37 @@ void initTimer(void)
  * keep going off in the child process and confusing everything. The interval
  * timer no longer uses signals, so there is no need any more for libraries to
  * disable the timer. Also, the timer internal API has changed.
+ *
+ * They are however stealing the good names! We're forced to use run/halt
+ * until we can get rid of these entirely.
  */
 void stopTimer(void)  { /* no-op */ }
 void startTimer(void) { /* no-op */ }
 
-void pauseTimer(void)
+void pauseTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
-        pauseTicker(main_ticker);
+        pauseTimer(main_timer);
     }
 #endif
 }
 
-void unpauseTimer(void)
+void unpauseTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
-        unpauseTicker(main_ticker);
+        unpauseTimer(main_timer);
     }
 #endif
 }
 
-void exitTimer (void)
+void exitTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
-        stopTicker(main_ticker);
-        freeTicker(main_ticker);
+        haltTimer(main_timer);
+        freeTimer(main_timer);
     }
 #endif
 }

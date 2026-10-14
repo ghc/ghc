@@ -1644,8 +1644,8 @@ static void flushEventLog_(Capability **cap USED_IF_THREADS)
 
     // N.B. Don't flush if shutting down: this was done in
     // finishCapEventLogging and the capabilities have already been freed.
-    // This can also race against the shutdown if the flush is triggered by the
-    // ticker thread. (#26573)
+    // This can also race against the shutdown if the flush is triggered by a
+    // timer thread. (#26573)
     if (getSchedState() == SCHED_SHUTTING_DOWN) {
       return;
     }

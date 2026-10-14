@@ -10,7 +10,7 @@
 #include "Rts.h"
 
 #include "IdleGC.h"
-#include "Timer.h"
+#include "Timers.h"
 #include "Schedule.h"
 
 /*
@@ -72,7 +72,7 @@ On non-threaded platforms without pre-emption, e.g. wasm, we have to use a
 different design for scheduling idle GC (and thus deadlock detection, see
 Note [Deadlock detection]).
 
-Instead of a ticker thread that interrupts the idle capability after some delay,
+Instead of a timer thread that interrupts the idle capability after some delay,
 we arrange for the I/O manager to only sleep for a maximum of the idle GC delay
 time. The function getNextIdleGcDelayTime() returns this time, accounting for
 the interIdleGCWait.
@@ -261,13 +261,13 @@ the situation where there is no deadlock. See test T26408c.
  * ACTIVITY_MAYBE_NO, waits for RtsFlags.GcFlags.idleGCDelayTime,
  * and then:
  *   - if idle GC is on, set ACTIVITY_INACTIVE and wakeUpRts()
- *   - if idle GC is off, set ACTIVITY_PAUSED and pauseTimer()
+ *   - if idle GC is off, set ACTIVITY_PAUSED and pauseTimers()
  *
  * If the scheduler finds ACTIVITY_INACTIVE, then it sets
- * ACTIVITY_DONE_GC, performs the GC and calls pauseTimer().
+ * ACTIVITY_DONE_GC, performs the GC and calls pauseTimers().
  *
  * If the scheduler finds ACTIVITY_DONE_GC and it has a thread to run,
- * it enables the timer again with unpauseTimer().
+ * it enables the timer again with unpauseTimers().
  */
 enum RecentActivity {
     // the RTS is active
@@ -345,7 +345,7 @@ void handleIdleGcTick(void)
               inter_gc_ticks_to_gc = RtsFlags.GcFlags.interIdleGCWait /
                                      RtsFlags.MiscFlags.tickInterval;
               wakeUpRts();
-              // The scheduler will call pauseTimer() when it has done
+              // The scheduler will call pauseTimers() when it has done
               // the GC.
           } else {
               setRecentActivity(ACTIVITY_PAUSED);
@@ -356,10 +356,10 @@ void handleIdleGcTick(void)
 #if defined(PROFILING)
               if (!(RtsFlags.ProfFlags.doHeapProfile
                     || RtsFlags.CcFlags.doCostCentres)) {
-                  pauseTimer();
+                  pauseTimers();
               }
 #else
-              pauseTimer();
+              pauseTimers();
 #endif
           }
       } else {
@@ -437,7 +437,7 @@ void notifyIdleGcActive(void)
         prev = setRecentActivity(ACTIVITY_YES);
         if (prev == ACTIVITY_DONE_GC || prev == ACTIVITY_PAUSED) {
 #if !defined(PROFILING)
-            unpauseTimer();
+            unpauseTimers();
 #endif
         }
         break;
@@ -464,7 +464,7 @@ void notifyIdleGcDone(bool force_major)
             // it will get re-enabled if we run any threads after the GC.
             setRecentActivity(ACTIVITY_DONE_GC);
 #if !defined(PROFILING)
-            pauseTimer();
+            pauseTimers();
 #endif
 #if !defined(THREADED_IDLEGC)
             last_idle_gc_time = getProcessElapsedTime();

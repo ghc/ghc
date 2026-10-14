@@ -257,9 +257,9 @@ extern bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout)
 // Mutexes
 //
 // Even in the non-threaded RTS we use threads and mutexes! In particular the
-// timer/ticker is implemented using a thread. And using threads needs locks.
-// In particular we need locks for the data shared between the timer/ticker
-// thread and the thread running the main capability.
+// timers are implemented using threads. And using threads needs locks. We
+// need locks for the data shared between timer handlers and the thread
+// running the main capability.
 #if defined(HAVE_PREEMPTION)
 extern void initMutex             ( Mutex* pMut );
 extern void closeMutex            ( Mutex* pMut );

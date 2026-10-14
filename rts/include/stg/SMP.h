@@ -19,9 +19,10 @@ void arm_atomic_spin_unlock(void);
 #endif
 
 // Unconditionally atomic operations
-// These are atomic even in the non-threaded RTS. These are necessary in the
-// Proftimer implementation, which may be called from the pthreads-based
-// Ticker implementation.
+// These are atomic even in the non-threaded RTS. These are necessary for use
+// with threads that are used even in the non-threaded RTS. In particular this
+// includes timer handlers (e.g. for context switching and profile sampling)
+// and the implementation of the Timer abstraction for posix platforms.
 #define RELAXED_LOAD_ALWAYS(ptr) __atomic_load_n(ptr, __ATOMIC_RELAXED)
 #define RELAXED_STORE_ALWAYS(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELAXED)
 #define RELAXED_ADD_ALWAYS(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_RELAXED)
