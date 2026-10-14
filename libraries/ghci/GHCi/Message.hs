@@ -36,16 +36,6 @@ module GHCi.Message
   , BreakModule
   , BreakUnitId
   , LoadedDLL
-
-  -- * Low-level interface for async bidirectional RPC
-  , remoteAsyncReq
-  , handleAsyncReq
-  -- ** Consume `reply` exactly once
-  , WriteReply -- abstract
-  , writeReply
-  -- ** Async matching internals
-  , AsyncManager(..), CorrelationId
-  , IddMsg(..), newAsyncManager
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
