@@ -853,8 +853,7 @@ handleAsyncReq pipe getit k = mask $ \restore -> do
   -- Block waiting for request
   mbreq <- atomically $ do
     isClosed <- readTVar (pipeIsClosed pipe)
-    isEmpty  <- isEmptyTQueue (requestsQueue (pipeAsyncMngr pipe))
-    if isClosed && isEmpty
+    if isClosed
       then return Nothing
       else Just <$> readTQueue (requestsQueue (pipeAsyncMngr pipe))
 
