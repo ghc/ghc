@@ -845,7 +845,7 @@ remoteAsyncReq pipe msg = do
 -- reply more than once). Linear types enforce the handler replies in every
 -- branch, and if the handler otherwise throws, it is handled by 'withAsyncHandler'.
 handleAsyncReq :: Pipe -> Get a -> (WriteReply Put %1 -> a -> IO r) -> IO r
-handleAsyncReq pipe getit k = do
+handleAsyncReq pipe getit k = mask $ \restore -> do
   ack <- newEmptyMVar
 
   -- Block waiting for request
@@ -870,7 +870,7 @@ handleAsyncReq pipe getit k = do
           reply (Left (toException exc))
           throwIO exc
         Right (_, _, it) ->
-          k (WriteReply reply) it
+          restore (k (WriteReply reply) it)
 
             -- If there's an exception before the reply is sent, reply with an error instead.
             `catch` \(e :: SomeException) -> do
