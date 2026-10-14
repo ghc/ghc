@@ -994,6 +994,34 @@ AC_CONFIG_FILES(
   hadrian/cfg/default.target
 ])
 
+dnl Preprocess .cabal.in files. Hadrian does this itself, but other
+dnl Cabal-based builds (e.g. `cabal buck2`) need the pre-processed
+dnl files before they can start.
+AC_CONFIG_FILES(
+[ compiler/ghc.cabal
+  driver/ghci/ghci-wrapper.cabal
+  ghc/ghc-bin.cabal
+  libraries/base/base.cabal
+  libraries/ghc-boot/ghc-boot.cabal
+  libraries/ghc-experimental/ghc-experimental.cabal
+  libraries/ghc-heap/ghc-heap.cabal
+  libraries/ghc-internal/ghc-internal.cabal
+  libraries/ghci/ghci.cabal
+  libraries/template-haskell/template-haskell.cabal
+  utils/ghc-pkg/ghc-pkg.cabal
+  utils/remote-iserv/remote-iserv.cabal
+  utils/runghc/runghc.cabal
+])
+
+dnl ghc-boot-th and ghc-boot-th-next come from one template, which is
+dnl instantiated with a different package name suffix and source directory
+dnl for each: see Note [Bootstrapping Template Haskell].
+m4_define([GHC_BOOT_TH_CABAL],
+  [AC_CONFIG_FILES([$1:libraries/ghc-boot-th/ghc-boot-th.cabal.in],
+    [sed -e 's|@Suffix@|$2|g' -e 's|@SourceRoot@|$3|g' $1 > $1.tmp && mv $1.tmp $1])])
+GHC_BOOT_TH_CABAL([libraries/ghc-boot-th/ghc-boot-th.cabal], [], [.])
+GHC_BOOT_TH_CABAL([libraries/ghc-boot-th-next/ghc-boot-th-next.cabal], [-next], [../ghc-boot-th])
+
 dnl Create the VERSION file, satisfying #22322.
 printf "$ProjectVersion" > VERSION
 
