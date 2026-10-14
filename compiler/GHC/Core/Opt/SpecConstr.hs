@@ -60,6 +60,7 @@ import GHC.Types.Unique( hasKey )
 
 import GHC.Data.Maybe     ( fromMaybe, orElse, catMaybes, isJust, isNothing )
 import GHC.Data.FastString
+import GHC.Data.Pair
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -2317,17 +2318,18 @@ they are constructor applications.
 Note [Free type variables of the qvar types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In a call (f @a x True), that we want to specialise, what variables should
-we quantify over.  Clearly over 'a' and 'x', but what about any type variables
-free in x's type?  In fact we don't need to worry about them because (f @a)
-can only be a well-typed application if its type is compatible with x, so any
-variables free in x's type must be free in (f @a), and hence either be gathered
-via 'a' itself, or be in scope at f's defn.  Hence we just take
-  (exprsFreeVars pats).
+we quantify over?  Clearly over 'a' and 'x', but what about any type variables
+free in x's type?  In fact we don't need to worry about them, because
+argsToPats gives 'x' the type of the corresponding argument of f, instantiated
+at the type arguments of the call pattern (and similarly for the fields of a
+data constructor in the pattern).  So any variables free in x's type are free
+in (f @a), and hence either gathered via 'a' itself, or in scope at f's defn.
+Hence we just take (exprsFreeVars pats).
 
-BUT phantom type synonyms can mess this reasoning up,
-  eg   x::T b   with  type T b = Int
-So we apply expandTypeSynonyms to the bound Ids.
-See # 5458.  Yuk.
+We do not use the type of the actual argument: it is not necessarily
+syntactically equal to the type of f's argument, and so may mention other
+variables, e.g. with a phantom type synonym (#5458)
+  x::T b   with  type T b = Int
 
 Note [SpecConstr call patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2337,7 +2339,7 @@ Wrinkles:
 
 * The list of argument patterns, cp_args, is no longer than the
   visible lambdas of the binding, ri_arg_occs.  This is done via
-  the zipWithM in callToPat.
+  argsToPats in callToPat.
 
 * The list of argument patterns can certainly be shorter than the
   lambdas in the function definition (under-saturated).  For example
@@ -2602,8 +2604,9 @@ callToPat :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
 callToPat env bndr_occs call@(Call fn args con_env)
   = do  { let in_scope = substInScopeSet (sc_subst env)
 
-        ; arg_triples <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
-                   -- This zip trims the args to be no longer than
+        ; arg_triples <- argsToPats env in_scope con_env (idType fn) args bndr_occs
+                                    (repeat NotMarkedStrict)
+                   -- This trims the args to be no longer than
                    -- the lambdas in the function definition (bndr_occs)
 
           -- Drop boring patterns from the end
@@ -2631,13 +2634,10 @@ callToPat env bndr_occs call@(Call fn args con_env)
                 -- See Note [Shadowing in SpecConstr] at the top
 
               (qktvs, qids) = partition isTyVar qvars
-              qvars'        = scopedSort qktvs ++ map sanitise qids
+              qvars'        = scopedSort qktvs ++ qids
                 -- Order into kind variables, type variables, term variables
                 -- The kind of a type variable may mention a kind variable
                 -- and the type of a term variable may mention a type variable
-
-              sanitise id = updateIdTypeAndMult expandTypeSynonyms id
-                -- See Note [Free type variables of the qvar types]
 
         -- Check for bad coercion variables: see Note [SpecConstr and casts]
         ; let bad_covars = filter isCoVar qids
@@ -2657,18 +2657,49 @@ callToPat env bndr_occs call@(Call fn args con_env)
                   ; return (Just cp_res) }
           else return Nothing }
 
-    -- argToPat takes an actual argument, and returns an abstracted
-    -- version, consisting of just the "constructor skeleton" of the
-    -- argument, with non-constructor sub-expression replaced by new
-    -- placeholder variables.  For example:
-    --    C a (D (f x) (g y))  ==>  C p1 (D p2 p3)
+-- | Turn the arguments of an application into patterns using 'argToPat'.
+--
+-- See Note [Free type variables of the qvar types].
+argsToPats :: ScEnv
+           -> InScopeSet          -- ^ what's in scope at the function definition site
+           -> ValueEnv            -- ^ 'ValueEnv' at the call site
+           -> Type                -- ^ type of the head (function or data constructor)
+           -> [CoreArg]           -- ^ arguments of the head
+           -> [ArgOcc]            -- ^ occurrence info, one per argument; the result is trimmed to this length
+           -> [StrictnessMark]    -- ^ strictness info, one per value argument
+           -> UniqSM [(Bool, CoreArg, [Id])]
+argsToPats env in_scope val_env = go
+  where
+    go _ [] _ _ = return []
+    go _ _ [] _ = return []
+    go fun_ty (arg : args) (occ : occs) strs
+      = do { (pat, strs') <- case arg of
+               Type {} -> do { pat <- argToPat env in_scope val_env arg_ty arg occ NotMarkedStrict
+                             ; return (pat, strs) }
+               _ | str : strs' <- strs
+                       -> do { pat <- argToPat env in_scope val_env arg_ty arg occ str
+                             ; return (pat, strs') }
+                 | otherwise
+                       -> pprPanic "argsToPats: more value arguments than strictness marks"
+                                   (ppr fun_ty $$ ppr (arg : args))
+           ; pats <- go (applyTypeToArgs fun_ty [sndOf3 pat]) args occs strs'
+           ; return (pat : pats) }
+      where
+        arg_ty = piTyBinderType (fst (splitPiTy fun_ty))
 
+-- | 'argToPat' takes an actual argument, and returns an abstracted
+-- version, consisting of just the "constructor skeleton" of the
+-- argument, with non-constructor sub-expression replaced by new
+-- placeholder variables.  For example:
+--
+-- > C a (D (f x) (g y))  ==>  C p1 (D p2 p3)
 argToPat :: ScEnv
-         -> InScopeSet                  -- What's in scope at the fn defn site
-         -> ValueEnv                    -- ValueEnv at the call site
-         -> CoreArg                     -- A call arg (or component thereof)
-         -> ArgOcc
-         -> StrictnessMark              -- Tells us if this argument is a strict field of a data constructor
+         -> InScopeSet                  -- ^ what's in scope at the function definition site
+         -> ValueEnv                    -- ^ 'ValueEnv' at the call site
+         -> Type                        -- ^ type for this argument
+         -> CoreArg                     -- ^ A call arg (or component thereof)
+         -> ArgOcc                      -- ^ occurrence info for the argument
+         -> StrictnessMark              -- ^ Tells us if this argument is a strict field of a data constructor
                                         -- See Note [SpecConstr and strict fields]
          -> UniqSM (Bool, CoreArg, [Id])
 
@@ -2682,25 +2713,26 @@ argToPat :: ScEnv
 --              lvl7         --> (True, lvl7)      if lvl7 is bound
 --                                                 somewhere further out
 
-argToPat env in_scope val_env arg arg_occ arg_str
+argToPat env in_scope val_env pat_ty arg arg_occ arg_str
   = do
     -- pprTraceM "argToPatIn" (ppr arg)
-    !res <- argToPat1 env in_scope val_env arg arg_occ arg_str
+    !res <- argToPat1 env in_scope val_env pat_ty arg arg_occ arg_str
     -- pprTraceM "argToPatOut" (ppr res)
     return res
 
 argToPat1 :: ScEnv
   -> InScopeSet
   -> ValueEnv
+  -> Type
   -> Expr CoreBndr
   -> ArgOcc
   -> StrictnessMark
   -> UniqSM (Bool, Expr CoreBndr, [Id])
-argToPat1 _env _in_scope _val_env arg@(Type {}) _arg_occ _arg_str
+argToPat1 _env _in_scope _val_env _pat_ty arg@(Type {}) _arg_occ _arg_str
   = return (False, arg, [])
 
-argToPat1 env in_scope val_env (Tick _ arg) arg_occ arg_str
-  = argToPat env in_scope val_env arg arg_occ arg_str
+argToPat1 env in_scope val_env pat_ty (Tick _ arg) arg_occ arg_str
+  = argToPat env in_scope val_env pat_ty arg arg_occ arg_str
         -- Note [Tick annotations in call patterns]
         -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         -- Ignore Notes.  In particular, we want to ignore any InlineMe notes
@@ -2708,8 +2740,8 @@ argToPat1 env in_scope val_env (Tick _ arg) arg_occ arg_str
         -- ride roughshod over them all for now.
         --- See Note [Tick annotations in RULE matching] in GHC.Core.Rules
 
-argToPat1 env in_scope val_env (Let _ arg) arg_occ arg_str
-  = argToPat env in_scope val_env arg arg_occ arg_str
+argToPat1 env in_scope val_env pat_ty (Let _ arg) arg_occ arg_str
+  = argToPat env in_scope val_env pat_ty arg arg_occ arg_str
         -- See Note [Matching lets] in "GHC.Core.Rules"
         -- Look through let expressions
         -- e.g.         f (let v = rhs in (v,w))
@@ -2717,35 +2749,34 @@ argToPat1 env in_scope val_env (Let _ arg) arg_occ arg_str
         -- because the rule-matcher will look through the let.
 
    -- Casts: see Note [SpecConstr and casts]
-argToPat1 env in_scope val_env (Cast arg co) arg_occ arg_str
+argToPat1 env in_scope val_env pat_ty (Cast arg co) arg_occ arg_str
   | not (ignoreType env ty2)
-  = do  { (interesting, arg', strict_args) <- argToPat env in_scope val_env arg arg_occ arg_str
+  = do  { (interesting, arg', strict_args) <- argToPat env in_scope val_env ty1 arg arg_occ arg_str
         ; if not interesting then
-                wildCardPat ty2 arg_str
+                wildCardPat pat_ty arg_str
           else
                 return (interesting, Cast arg' co, strict_args) }
   where
-    ty2 = coercionRKind co
+    Pair ty1 ty2 = coercionKind co
 
   -- Check for a constructor application
   -- NB: this *precedes* the Var case, so that we catch nullary constrs
-argToPat1 env in_scope val_env arg arg_occ _arg_str
+argToPat1 env in_scope val_env _pat_ty arg arg_occ _arg_str
   | Just (ConVal _wf (DataAlt dc) args) <- isValue val_env arg
     -- Ignore `_wf` here; see Note [ConVal work-free-ness] (2)
   , not (ignoreDataCon env dc)        -- See Note [NoSpecConstr]
   , Just arg_occs <- mb_scrut dc
   = do { let (ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) args
-             con_str, matched_str :: [StrictnessMark]
+             con_str :: [StrictnessMark]
              -- con_str corresponds 1-1 with the /value/ arguments
-             -- matched_str corresponds 1-1 with /all/ arguments
              con_str = dataConRepStrictness dc
-             matched_str = match_vals con_str rest_args
+             con_ty  = applyTypeToArgs (dataConRepType dc) ty_args
       --  ; pprTraceM "bangs" (ppr (length rest_args == length con_str) $$
       --       ppr dc $$
       --       ppr con_str $$
       --       ppr rest_args $$
       --       ppr (map isTypeArg rest_args))
-       ; prs <- zipWith3M (argToPat env in_scope val_env) rest_args arg_occs matched_str
+       ; prs <- argsToPats env in_scope val_env con_ty rest_args arg_occs con_str
        ; let args' = map sndOf3 prs :: [CoreArg]
        ; assertPpr (length con_str == length (filter isRuntimeArg rest_args))
             ( ppr con_str $$ ppr rest_args $$
@@ -2760,17 +2791,6 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
                             -> Just (repeat UnkOcc)
                             | otherwise
                             -> Nothing
-    match_vals bangs (arg:args)
-      | isTypeArg arg
-      = NotMarkedStrict : match_vals bangs args
-      | (b:bs) <- bangs
-      = b : match_vals bs args
-    match_vals [] [] = []
-    match_vals as bs =
-        pprPanic "spec-constr:argToPat - Bangs don't match value arguments"
-            (text "arg:" <> ppr arg $$
-             text "remaining args:" <> ppr as $$
-             text "remaining bangs:" <> ppr bs)
 
   -- Check if the argument is a variable that
   --    (a) is used in an interesting way in the function body
@@ -2779,7 +2799,7 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
   --         business of absence analysis, not SpecConstr.)
   --    (b) we know what its value is
   -- In that case it counts as "interesting"
-argToPat1 env in_scope val_env (Var v) arg_occ arg_str
+argToPat1 env in_scope val_env _pat_ty (Var v) arg_occ arg_str
   | sc_force env || specialisableArgOcc arg_occ  -- (a)
     -- See Note [Forcing specialisation], point (FS3)
   , is_value                                     -- (b)
@@ -2836,8 +2856,8 @@ argToPat in_scope val_env arg arg_occ
 
   -- The default case: make a wild-card
   -- We use this for coercions too
-argToPat1 _env _in_scope _val_env arg _arg_occ arg_str
-  = wildCardPat (exprType arg) arg_str
+argToPat1 _env _in_scope _val_env pat_ty _arg _arg_occ arg_str
+  = wildCardPat pat_ty arg_str
 
 -- | wildCardPats are always boring
 wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id])

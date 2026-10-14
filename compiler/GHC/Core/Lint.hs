@@ -2216,7 +2216,8 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
   where
     rule_doc = text "Rule" <+> doubleQuotes (ftext name) <> colon
 
-    lhs_fvs = deepExprsFreeVarsDSet args  -- Matching binds deeply
+    lhs_fvs = exprsFreeVarsDSet args  -- Rule matching binds deeply, so compare
+                                      -- against the deep free vars
     rhs_fvs = exprFreeVarsDSet rhs
 
     is_bad_bndr :: Var -> Bool

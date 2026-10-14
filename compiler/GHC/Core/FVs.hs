@@ -11,18 +11,17 @@ Taken quite directly from the Peyton Jones/Lester paper.
 module GHC.Core.FVs (
         -- * Free variables of expressions and binding groups
         exprFreeVars,     exprsFreeVars,
-        exprFreeVarsDSet,
+        exprFreeVarsDSet, exprsFreeVarsDSet,
         exprFreeVarsList, exprsFreeVarsList,
         exprFreeIds,      exprsFreeIds,
         exprFreeIdsDSet,  exprsFreeIdsDSet,
         exprFreeIdsList,  exprsFreeIdsList,
         bindFreeVars,
 
-        -- * Selective shallow free variables of expressions
+        -- * Selective free variables of expressions
         InterestingVarFun,
         exprSomeFreeVars, exprsSomeFreeVars,
         exprSomeFreeVarsList, exprsSomeFreeVarsList, exprsSomeFreeVarsDSet,
-        deepExprsFreeVarsDSet,
 
         -- * Free variables of Rules, Vars and Ids
         bndrTypeTyCoFVs, bndrFVs, dBndrFreeVars,
@@ -73,95 +72,118 @@ import GHC.Builtin.WiredIn.Types( unrestrictedFunTyConName )
 import GHC.Builtin.WiredIn.Prim( fUNTyCon )
 import GHC.Data.Maybe( orElse )
 
-import GHC.Utils.EndoOS
 import GHC.Utils.Misc
 import GHC.Utils.Panic.Plain
 
 {-
 ************************************************************************
 *                                                                      *
-       Find the shallow free variables of term
+                  Free variables of terms
 *                                                                      *
 ************************************************************************
 
 Note [Free variables of an expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This function simply finds the shallow free variables of an expression.
-So far as type variables are concerned, it only finds tyvars that are
-        * free in type arguments,
-        * free in the type of a binder,
-but not those that are free in the type of variable occurrences.
+'exprFreeVars' computes the /deep/ free variables of an expression, in the
+sense of Note [Shallow and deep free variables] in GHC.Core.TyCo.FVs:
 
-(FVE1) For /types/ we have a shallow free-var finder and a deep free-var finder,
-  both implemented via TyCoFolder.  For /terms/ we have just one free-var
-  finder (shallow).
+(FVE1) An occurrence of a variable `v` contributes `v` together with the deep
+  free variables of v's type (and, for an Id, of its multiplicity).
 
-  If we want the deep free vars (as in `deepExprsFreeVarsDSet`) we use
-  `closeOverKinds`. There is no deep reason for this.  Maybe we should
-  make a folder for terms as well.
+The selective variants, e.g. 'exprSomeFreeVars', are also deep.
+They only collect interesting free variables, and entirely skip looking into
+the kind of non-interesting free variables.
+
+The type of a variable is traversed only when the variable is first collected,
+so each free variable's type is visited at most once per call; see
+Note [Computing deep free variables] in GHC.Core.TyCo.FVs.
 -}
-
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a non-deterministic set.
+--
+-- The result is deep; see Note [Free variables of an expression].
 exprFreeVars :: CoreExpr -> VarSet
 exprFreeVars = dVarSetToVarSet . exprFreeVarsDSet
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a deterministic set.
+--
+-- The result is deep; see Note [Free variables of an expression].
 exprFreeVarsDSet :: CoreExpr -> DVarSet
 exprFreeVarsDSet = runFVSelective isLocalVar . exprFVs
 
--- | Find all locally-defined free Ids or type variables in several expressions
+-- | Find all locally-defined free Ids or type variables in several expressions,
 -- returning a non-deterministic set.
+--
+-- The result is deep; see Note [Free variables of an expression].
 exprsFreeVars :: [CoreExpr] -> VarSet
 exprsFreeVars = dVarSetToVarSet . exprsFreeVarsDSet
 
--- | Find all locally-defined free Ids or type variables in several expressions
+-- | Find all locally-defined free Ids or type variables in several expressions,
 -- returning a deterministically ordered list.
+--
+-- The result is deep; see Note [Free variables of an expression].
 exprsFreeVarsList :: [CoreExpr] -> [Var]
 exprsFreeVarsList = runFVSelectiveList isLocalVar . exprsFVs
 
+-- | Find all locally-defined free Ids or type variables in several expressions,
+-- returning a deterministic set.
+--
+-- The result is deep; see Note [Free variables of an expression].
 exprsFreeVarsDSet :: [CoreExpr] -> DVarSet
 exprsFreeVarsDSet = runFVSelective isLocalVar . exprsFVs
 
-deepExprsFreeVarsDSet :: [CoreExpr] -> DVarSet
--- See (FVE1) in Note [Free variables of an expression]
-deepExprsFreeVarsDSet = closeOverKindsDSet . exprsFreeVarsDSet
-
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a deterministically ordered list.
+--
+-- The result is deep; see Note [Free variables of an expression].
 exprFreeVarsList :: CoreExpr -> [Var]
 exprFreeVarsList = dVarSetElems . exprFreeVarsDSet
 
--- | Find all locally-defined free Ids in an expression
-exprFreeIds :: CoreExpr -> IdSet        -- Find all locally-defined free Ids
+-- | Find all locally-defined free Ids in an expression.
+--
+-- The result is deep; see Note [Free variables of an expression].
+exprFreeIds :: CoreExpr -> IdSet
 exprFreeIds = dVarSetToVarSet . exprFreeIdsDSet
 
-exprsFreeIds :: [CoreExpr] -> IdSet        -- Find all locally-defined free Ids
+-- | Find all locally-defined free Ids in several expressions.
+--
+-- The result is deep; see Note [Free variables of an expression].
+exprsFreeIds :: [CoreExpr] -> IdSet
 exprsFreeIds = dVarSetToVarSet . exprsFreeIdsDSet
 
 -- | Find all locally-defined free Ids in an expression
 -- returning a deterministic set.
-exprFreeIdsDSet :: CoreExpr -> DIdSet -- Find all locally-defined free Ids
+--
+-- The result is deep; see Note [Free variables of an expression].
+exprFreeIdsDSet :: CoreExpr -> DIdSet
 exprFreeIdsDSet = runFVSelective isLocalId . exprFVs
 
 -- | Find all locally-defined free Ids in several expressions
 -- returning a deterministic set.
-exprsFreeIdsDSet :: [CoreExpr] -> DIdSet -- Find all locally-defined free Ids
+--
+-- The result is deep; see Note [Free variables of an expression].
+exprsFreeIdsDSet :: [CoreExpr] -> DIdSet
 exprsFreeIdsDSet = runFVSelective isLocalId . exprsFVs
 
 -- | Find all locally-defined free Ids in an expression
 -- returning a deterministically ordered list.
-exprFreeIdsList :: CoreExpr -> [Id] -- Find all locally-defined free Ids
+--
+-- The result is deep; see Note [Free variables of an expression].
+exprFreeIdsList :: CoreExpr -> [Id]
 exprFreeIdsList = dVarSetElems . exprFreeIdsDSet
 
 -- | Find all locally-defined free Ids in several expressions
 -- returning a deterministically ordered list.
-exprsFreeIdsList :: [CoreExpr] -> [Id]   -- Find all locally-defined free Ids
+--
+-- The result is deep; see Note [Free variables of an expression].
+exprsFreeIdsList :: [CoreExpr] -> [Id]
 exprsFreeIdsList = dVarSetElems . exprsFreeIdsDSet
 
--- | Find all locally defined free Ids in a binding group
+-- | Find all locally-defined free Ids or type variables in a binding group.
+--
+-- The result is deep; see Note [Free variables of an expression].
 bindFreeVars :: CoreBind -> VarSet
 bindFreeVars = runFVSelectiveSet isLocalVar . bind_fvs
 
@@ -171,6 +193,8 @@ bind_fvs (Rec prs)    = addBndrsSelectiveFV (map fst prs) $
                         mapUnionFV rhs_fvs prs
 
 -- | Finds free variables in an expression selected by a predicate
+--
+-- See Note [Free variables of an expression].
 exprSomeFreeVars :: InterestingVarFun   -- ^ Says which 'Var's are interesting
                  -> CoreExpr
                  -> VarSet
@@ -221,30 +245,25 @@ addCoreBndrsFV :: [CoreBndr] -> SelectiveDFV -> SelectiveDFV
 addCoreBndrsFV bndrs fv = foldr addCoreBndrFV fv bndrs
 
 unitFV :: Var -> SelectiveDFV
--- Deals with an occurrence
--- Shallow: does not look at the kind
-unitFV v = MkFV (\env -> EndoOS (do_it env))
-  where
-    do_it (bvs, is_interesting) acc
-      | v `elemVarSet` bvs     = acc  -- First exclude the bound vars
-      | not (is_interesting v) = acc  -- The "selective" bit
-      | v `elemDVarSet` acc    = acc
-      | otherwise              = acc `extendDVarSet` v
+-- Deals with an occurrence: the variable and, if it is newly collected,
+-- the free variables of its type and multiplicity.
+-- See (FVE1) in Note [Free variables of an expression]
+unitFV = deepSelUnitFV bndrTypeTyCoFVs
 
 exprsFVs :: [CoreExpr] -> SelectiveDFV
 exprsFVs = mapUnionFV exprFVs
 
 exprFVs :: CoreExpr -> SelectiveDFV
-exprFVs (Type ty)       = shallowSelTypeFV ty
-exprFVs (Coercion co)   = shallowSelCoFV co
+exprFVs (Type ty)       = deepSelTypeFV ty
+exprFVs (Coercion co)   = deepSelCoFV co
 exprFVs (Var var)       = unitFV var
 exprFVs (Lit _)         = mempty
 exprFVs (Tick t expr)   = tickish_fvs t `mappend` exprFVs expr
 exprFVs (App fun arg)   = exprFVs fun `mappend` exprFVs arg
 exprFVs (Lam bndr body) = addCoreBndrFV bndr (exprFVs body)
-exprFVs (Cast expr co)  = exprFVs expr `mappend` shallowSelCoFV co
+exprFVs (Cast expr co)  = exprFVs expr `mappend` deepSelCoFV co
 exprFVs (Case scrut bndr ty alts)
-  = exprFVs scrut `mappend` shallowSelTypeFV ty `mappend`
+  = exprFVs scrut `mappend` deepSelTypeFV ty `mappend`
     addCoreBndrFV bndr (mapUnionFV alt_fvs alts)
   where
     alt_fvs (Alt _ bndrs rhs) = addCoreBndrsFV bndrs (exprFVs rhs)
@@ -267,13 +286,13 @@ tickish_fvs _ = mempty
 
 ---------
 bndrTypeTyCoFVs :: Var -> SelectiveDFV
--- Find the free variables of a binder.
+-- Find the (deep) free variables of the type of a variable.
 -- In the case of ids, don't forget the multiplicity field!
 bndrTypeTyCoFVs var
-  = shallowSelTypeFV (varType var) `mappend` mult_fvs
+  = deepSelTypeFV (varType var) `mappend` mult_fvs
   where
     mult_fvs = case varMultMaybe var of
-                 Just mult -> shallowSelTypeFV mult
+                 Just mult -> deepSelTypeFV mult
                  Nothing   -> mempty
 
 dBndrTypeTyCoVars :: Var -> DTyCoVarSet
@@ -286,11 +305,10 @@ bndrFreeVars id = assert (isId id) $
                   dBndrFreeVars id
 
 dBndrFreeVars :: Id -> DVarSet
--- Shallow free vars
 dBndrFreeVars id = runFVSelective isLocalVar $ bndrFVs id
 
 bndrFVs :: Id -> SelectiveDFV
--- Shallow free vars of types, rules, and inlining
+-- Free vars of types, rules, and inlining
 bndrFVs id = assert (isId id) $
              bndrTypeTyCoFVs id `mappend`
              bndrRuleAndUnfoldingFVs id
@@ -593,7 +611,8 @@ Note [The FVAnn invariant]
 Invariant: a FVAnn, say S, is closed:
   That is: if v is in S,
            then freevars( v's type/kind ) is also in S
-So FVAnn computes /deep/ free variables
+So FVAnn computes /deep/ free variables, just like `exprFreeVars` does;
+see Note [Free variables of an expression].
 -}
 
 type FVAnn = DVarSet  -- See Note [The FVAnn invariant]
@@ -690,22 +709,15 @@ freeVars = go
   where
     go :: CoreExpr -> CoreExprWithFVs
     go (Var v)
-      | isLocalVar v = (aFreeVar v `unionDVarSet` ty_fvs `unionDVarSet` mult_vars, AnnVar v)
-      | otherwise    = (emptyDVarSet,                 AnnVar v)
-      where
-        mult_vars = tyCoVarsOfTypeDSet (idMult v)
-        ty_fvs = dBndrTypeTyCoVars v
-                 -- See Note [The FVAnn invariant]
+      | isLocalVar v = (aFreeVar v `unionDVarSet` dBndrTypeTyCoVars v, AnnVar v)
+                       -- See Note [The FVAnn invariant]
+      | otherwise    = (emptyDVarSet, AnnVar v)
 
     go (Lit lit) = (emptyDVarSet, AnnLit lit)
     go (Lam b body)
-      = ( b_fvs `unionDVarSet` (b `delBinderFV` body_fvs)
-        , AnnLam b body' )
+      = ( b `delBinderFV` body_fvs, AnnLam b body' )
       where
         body'@(body_fvs, _) = go body
-        b_ty  = idType b
-        b_fvs = tyCoVarsOfTypeDSet b_ty
-                -- See Note [The FVAnn invariant]
 
     go (App fun arg)
       = ( freeVarsOf fun' `unionDVarSet` freeVarsOf arg'
@@ -750,8 +762,7 @@ freeVars = go
         , AnnTick tickish expr2 )
       where
         expr2 = go expr
-        tickishFVs (Breakpoint _ _ ids) = mkDVarSet ids
-        tickishFVs _                    = emptyDVarSet
+        tickishFVs = runFVSelective isLocalVar . tickish_fvs
 
     go (Type ty)     = (tyCoVarsOfTypeDSet ty, AnnType ty)
     go (Coercion co) = (tyCoVarsOfCoDSet co, AnnCoercion co)

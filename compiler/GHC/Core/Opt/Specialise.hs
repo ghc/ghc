@@ -2111,7 +2111,7 @@ to push the cast back inside. It would be terrible if the cast
 defeated specialisation!  Hence the use of collectBindersPushingCo.
 
 Note [Evidence foralls]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 Suppose (#12212) that we are specialising
    f :: forall a b. (Num a, F a ~# F b) => blah
 with a=b=Int. Then the RULE will be something like
@@ -2120,18 +2120,13 @@ with a=b=Int. Then the RULE will be something like
 where that `g` is really (Coercion (CoVar g)), since `g` is a
 coercion variable and can't appear as (Var g).
 
-But both varToCoreExpr (when constructing the LHS args), and the
-simplifier (when simplifying the LHS args), will transform to
+When simplifying the LHS args, the simplifier may replace g with Refl:
    RULE forall (d:Num Int) (g :: F Int ~ F Int).
         f Int Int d <F Int> = f_spec
-by replacing g with Refl.  So now 'g' is unbound, which results in a later
-crash. So we use Refl right off the bat, and do not forall-quantify 'g':
- * varToCoreExpr generates a (Coercion Refl)
- * exprsFreeIdsList returns the Ids bound by the args,
-   which won't include g
-
-You might wonder if this will match as often, but the simplifier replaces
-complicated Refl coercions with Refl pretty aggressively.
+So now 'g' is unbound on the LHS. That is OK: since g's type is
+reflexive, the rule matcher instantiates it to Refl when the rule fires;
+see Note [Unbound RULE binders] in GHC.Core.Rules. So specHeader simply
+forall-quantifies 'g' like any other unspecialised binder.
 
 Note [Orphans and auto-generated rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2483,13 +2478,13 @@ instance Outputable SpecArg where
   ppr UnspecArg     = text "UnspecArg"
 
 specArgsFVs :: InterestingVarFun -> [SpecArg] -> VarSet
--- Find the shallow deep free vars of the SpecArgs that are not already in scope
+-- Find the (deep) free vars of the SpecArgs
 specArgsFVs interesting args
   = runFVSelectiveSet interesting $
     mapUnionFV get args
   where
     get :: SpecArg -> SelectiveDFV
-    get (SpecType ty)   = shallowSelTypeFV ty
+    get (SpecType ty)   = deepSelTypeFV ty
     get (SpecDict dx)   = exprFVs dx
     get UnspecType      = mempty
     get UnspecArg       = mempty
@@ -2652,15 +2647,12 @@ specHeader subst (bndr:bndrs) (UnspecArg : args)
              <- specHeader subst1 bndrs args
 
        ; let dummy_arg = varToCoreExpr bndr'
-               -- dummy_arg is usually just (Var bndr),
-               -- but if bndr :: t1 ~# t2, it'll be (Coercion (CoVar bndr))
-               --     or even Coercion Refl (if t1=t2)
-               -- See Note [Evidence foralls]
-             bndrs = exprFreeIdsList dummy_arg
+               -- dummy_arg is (Var bndr'), or (Coercion (CoVarCo bndr'))
+               -- if bndr' is a coercion variable; see Note [Evidence foralls]
 
        ; pure ( useful, subst2
-              , bndrs ++ rule_bs,     dummy_arg : rule_es
-              , bndrs ++ spec_bs, dx, dummy_arg : spec_args ) }
+              , bndr' : rule_bs,     dummy_arg : rule_es
+              , bndr' : spec_bs, dx, dummy_arg : spec_args ) }
 
 
 -- | Binds a dictionary argument to a fresh name, to preserve sharing

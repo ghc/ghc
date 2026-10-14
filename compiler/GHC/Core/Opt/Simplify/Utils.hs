@@ -2360,13 +2360,14 @@ new binding is abstracted.  Several points worth noting
            poly_t = /\ a b -> (e1, e2)
            poly_x = /\ a   -> fst (poly_t a *b*)
 
-(AB2) We must do closeOverKinds.  Example (#10934):
+(AB2) We must abstract over kind variables too.  Example (#10934):
        f = /\k (f:k->*) (a:k). let t = AccFailure @ (f a) in ...
       Here we want to float 't', but we must remember to abstract over
       'k' as well, even though it is not explicitly mentioned in the RHS,
       otherwise we get
          t = /\ (f:k->*) (a:k). AccFailure @ (f a)
-      which is obviously bogus.
+      which is obviously bogus.  `exprSomeFreeVars isTyVar` is deep,
+      so the kind variables are picked up with the rest.
 
 (AB3) We get the variables to abstract over by filtering down the
       the main_tvs for the original function, picking only ones
@@ -2449,7 +2450,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
         rhs' = GHC.Core.Subst.substExpr subst rhs
 
         -- tvs_here: see Note [Which type variables to abstract over]
-        tvs_here = choose_tvs (exprSomeFreeVars isTyVar rhs')
+        tvs_here = choose_tvs (exprSomeFreeVars isTyVar rhs')  -- (AB2)
 
     abstract subst (CyclicSCC trpls)
       = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 tvs_here) ids
@@ -2478,14 +2479,12 @@ abstractFloats uf_opts top_lvl main_tvs floats body
                           --    because it has a non-CoVar precondition
            | Just poly_app <- GHC.Core.Subst.lookupIdSubst_maybe subst var
            = -- 'var' is like 'x' in (AB4)
-             exprSomeFreeVars isTyVar poly_app `unionVarSet` free_tvs
+             exprSomeFreeVars isTyVar poly_app `unionVarSet` free_tvs  -- (AB2)
            | otherwise
            = free_tvs
 
     choose_tvs free_tvs
-       = filter (`elemVarSet` all_free_tvs) main_tvs  -- (AB3)
-       where
-         all_free_tvs = closeOverKinds free_tvs       -- (AB2)
+       = filter (`elemVarSet` free_tvs) main_tvs  -- (AB3)
 
     mk_poly1 :: [TyVar] -> Id -> SimplM (Id, CoreExpr)
     mk_poly1 tvs_here var

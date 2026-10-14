@@ -3230,15 +3230,12 @@ etaBodyForJoinPoint need_args body
                                          ppr body $$ ppr (exprType body)
 
     body_ty = exprType body
-    in_scope = mkInScopeSet (exprFreeVars body `unionVarSet` tyCoVarsOfType body_ty)
-    -- in_scope is a bit tricky.
-    -- - We are wrapping `body` in some value lambdas, so must not shadow
-    --   any free vars of `body`
-    -- - We are wrapping `body` in some type lambdas, so must not shadow any
-    --   tyvars in body_ty.  Example: body is just a variable
-    --            (g :: forall (a::k). T k a -> Int)
-    --   We must not shadown that `k` when adding the /\a. So treat the free vars
-    --   of body_ty as in-scope.  Showed up in #23026.
+    in_scope = mkInScopeSet (exprFreeVars body)
+    -- We are wrapping `body` in lambdas, so the in-scope set must contain the
+    -- /deep/ free vars of `body` (exprFreeVars returns deep free vars).
+    -- Why? See Note [No type-shadowing in Core]: if body is just a variable
+    --        (g :: forall (a::k). T k a -> Int)
+    -- we must not shadow that `k` when adding the /\a (#23026).
 
 --------------
 freshEtaId :: Int -> Subst -> Scaled Type -> (Subst, Id)

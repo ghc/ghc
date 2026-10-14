@@ -1,0 +1,6 @@
+section: compiler
+synopsis:
+  Ensure in-scope set computations always look into kinds, avoiding
+  "needInScope" assertion failures in various places in the compiler.
+mrs: !16799
+issues: #27936

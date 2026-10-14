@@ -183,7 +183,7 @@ module GHC.Tc.Utils.TcType (
   coreView,
 
   tyCoVarsOfType, tyCoVarsOfTypes, closeOverKinds,
-  tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet, closeOverKindsDSet,
+  tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet,
   tyCoVarsOfTypeList, tyCoVarsOfTypesList,
   noFreeVarsOfType,
 

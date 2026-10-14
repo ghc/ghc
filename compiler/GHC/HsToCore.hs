@@ -92,6 +92,7 @@ import GHC.Types.Id.Info
 import GHC.Types.InlinePragma ( alwaysInlinePragma, competesWith )
 import GHC.Types.ForeignStubs
 import GHC.Types.Avail
+import GHC.Types.Var ( isNonCoVarId )
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -479,7 +480,7 @@ dsWarnRuleShadowing fn_id
   where
     bndrs_set = mkVarSet bndrs
     arg_ids = filterOut (`elemVarSet` bndrs_set) $
-              exprsSomeFreeVarsList isId args
+              exprsSomeFreeVarsList isNonCoVarId args
 
     check check_rules_too lhs_id
       | isLocalId lhs_id || canUnfold (idUnfolding lhs_id)
