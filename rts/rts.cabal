@@ -430,6 +430,7 @@ library
                  ReportMemoryMap.c
                  Messages.c
                  OldARMAtomic.c
+                 OldTimer.c
                  PathUtils.c
                  Pool.c
                  Printer.c

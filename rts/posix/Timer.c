@@ -371,10 +371,3 @@ static int poll_with_timeout(fdset *fds, timeout *tv)
     return select(nfds, &fds->selectfds, NULL, NULL, &tv_tmp);
 }
 #endif
-
-/* This is obsolete, but is used in the unix package for now */
-int
-rtsTimerSignal(void)
-{
-    return SIGALRM;
-}

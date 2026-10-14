@@ -91,19 +91,6 @@ void initTimers(void)
 #endif
 }
 
-/* Deprecated exported functions. Now no-ops.
- * Historically they were used by the process and unix libraries to disable
- * the signal-based interval timer, since otherwise the timer signal would
- * keep going off in the child process and confusing everything. The interval
- * timer no longer uses signals, so there is no need any more for libraries to
- * disable the timer. Also, the timer internal API has changed.
- *
- * They are however stealing the good names! We're forced to use run/halt
- * until we can get rid of these entirely.
- */
-void stopTimer(void)  { /* no-op */ }
-void startTimer(void) { /* no-op */ }
-
 void pauseTimers(void)
 {
 #if defined(HAVE_PREEMPTION)

@@ -14,6 +14,29 @@
 
 #pragma once
 
-void startTimer (void);    // Deprecated: see issue #27073
-void stopTimer (void);     // Deprecated: see issue #27073
-int rtsTimerSignal (void); // Deprecated: see issue #27073
+/* Deprecated exported functions. Now no-ops.
+ * Historically they were used by the process and unix libraries to disable
+ * the signal-based interval timer, since otherwise the timer signal would
+ * keep going off in the child process and confusing everything. The interval
+ * timer no longer uses signals, so there is no need any more for libraries to
+ * disable the timer. Also, the timer internal API has changed.
+ *
+ * They are however stealing the good names! We're forced to use run/halt
+ * until we can get rid of these entirely.
+ */
+void startTimer (void)
+  __attribute__((deprecated("startTimer is now a no-op. See issue #27073")));
+
+void stopTimer (void)
+  __attribute__((deprecated("startTimer is now a no-op. See issue #27073")));
+
+#if !defined(mingw32_HOST_OS) && !defined(wasm32_HOST_ARCH)
+/* This is obsolete, but is used in the unix package for now.
+ *
+ * It used to report the signal that the RTS used for its timer. The RTS no
+ * longer uses signals, so this information is redundant.
+ */
+int rtsTimerSignal (void)
+  __attribute__((deprecated("rtsTimerSignal is now meaningless. "
+                            "See issue #27073")));
+#endif
