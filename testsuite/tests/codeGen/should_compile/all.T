@@ -150,3 +150,4 @@ test('T16351', normal, compile, ['-O2 -ddump-simpl -dno-typeable-binds -dsuppres
 test('T20298a', normal, compile, ['-O2 -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
 test('T20298b', normal, compile, ['-O2 -dno-bignum-rules -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
 test('T20298c', normal, compile, ['-O2 -dno-builtin-rules -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
+test('T27694', normal, compile, ['-dasm-lint'])

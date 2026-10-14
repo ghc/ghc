@@ -13,6 +13,7 @@ module GHC.CmmToAsm.CFG
     , addNodesBetween, shortcutWeightMap
     , reverseEdges, filterEdges
     , addImmediateSuccessor
+    , addPreentryBlock
     , mkWeightInfo, adjustEdgeWeight, setEdgeWeight
 
     --Query the CFG
@@ -39,6 +40,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Cmm.BlockId
+import GHC.CmmToAsm.Instr
 import GHC.Cmm as Cmm
 
 import GHC.Cmm.Switch
@@ -208,24 +210,41 @@ hasNode m node =
     where
       found = mapMember node m
 
-
+hasEdge :: CFG -> (BlockId,BlockId) -> Bool
+hasEdge cfg (from,to)
+  | Just to_map <- mapLookup from cfg
+  , Just _ <- mapLookup to to_map
+  = True
+  | otherwise = False
 
 -- | Check if the nodes in the cfg and the set of blocks are the same.
+--   Additionally check that the branches in the code have an edge in the CFG.
 --   In a case of a mismatch we panic and show the difference.
-sanityCheckCfg :: CFG -> LabelSet -> SDoc -> Bool
-sanityCheckCfg m blockSet msg
-    | blockSet == cfgNodes
+sanityCheckCfg :: Instruction i => CFG -> [GenBasicBlock i] -> SDoc -> Bool
+sanityCheckCfg m blocks msg
+    | setNull node_diff
+    , null missing_edges
     = True
     | otherwise =
         pprPanic "Block list and cfg nodes don't match" (
-            text "difference:" <+> ppr diff $$
+            text "difference:" <+> ppr node_diff $$
+            text "missing edges:" <+> ppr missing_edges $$
             text "blocks:" <+> ppr blockSet $$
             text "cfg:" <+> pprEdgeWeights m $$
             msg )
             False
     where
-      cfgNodes = setFromList $ getCfgNodes m :: LabelSet
-      diff = (setUnion cfgNodes blockSet) `setDifference` (setIntersection cfgNodes blockSet) :: LabelSet
+
+      cfg_nodes = setFromList $ getCfgNodes m :: LabelSet
+
+      blockSet = setFromList $ fmap blockId blocks
+      edges = [(from,to)
+              | BasicBlock from instrs <- blocks
+              , to <- concatMap jumpDestsOfInstr instrs
+              ]
+      missing_edges = filter (not . hasEdge m) edges
+
+      node_diff = (setUnion cfg_nodes blockSet) `setDifference` (setIntersection cfg_nodes blockSet) :: LabelSet
 
 -- | Filter the CFG with a custom function f.
 --   Parameters are `f from to edgeInfo`
@@ -335,6 +354,42 @@ shortcutWeightMap cuts cfg
         -- Node wasn't in the cuts map, so just add it back
         | otherwise = mapInsert to_edge edge_info new_map
 
+
+-- | Record that @entry@ became a pre-entry block for @block@.
+--
+--   A pre-entry block is only executed when the proc is entered from the
+--   outside: by a call returning to @entry@ or by a jump to its label. It
+--   ends in an unconditional jump to @block@, which now holds the code of
+--   @entry@. Local jumps to @entry@ have been retargeted to @block@ so they
+--   skip the pre-entry block.
+--
+--   'allocMoreStack' creates such blocks to grow the C stack exactly once
+--   per entry into the proc. See Note [extra spill slots] in
+--   GHC.CmmToAsm.X86.Instr.
+--
+-- >  Before:  P --jump--> entry -> S     After:  P --jump--> block -> S
+-- >           C --call--> entry                  C --call--> entry -> block
+--
+addPreentryBlock :: Weights
+                 -> BlockId -- ^ the entry block, now a pre-entry block
+                 -> BlockId -- ^ the block holding the code of the entry block
+                 -> CFG -> CFG
+addPreentryBlock weights entry block cfg
+    = mapMapWithKey retarget (addImmediateSuccessor weights entry block cfg)
+    where
+      -- Jump edges P -> entry become P -> block. The entry -> block edge
+      -- added by addImmediateSuccessor and the call edges stay.
+      retarget from succs
+        | from == entry = succs
+        | Just info <- mapLookup entry succs
+        , not (is_call_edge info)
+        = mapInsert block info (mapDelete entry succs)
+        | otherwise = succs
+
+      is_call_edge info = case transitionSource info of
+        CmmSource { trans_cmmNode = CmmCall {} }        -> True
+        CmmSource { trans_cmmNode = CmmForeignCall {} } -> True
+        _                                               -> False
 
 -- | Sometimes we insert a block which should unconditionally be executed
 --   after a given block. This function updates the CFG for these cases.
