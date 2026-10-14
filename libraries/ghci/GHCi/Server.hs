@@ -74,8 +74,8 @@ servWithCustom verbose hook pipe restore customHandler = newIORef False >>= loop
         CustomMessage tag payload -> handleCustom tag payload
         Shutdown -> writeIORef doneRef True >> reply ()
         -- TODO: These two should probably be done off the main thread
-        RunTH st q ty loc -> wrapRunTH $ runTH pipe st q ty loc
-        RunModFinalizers st qrefs -> wrapRunTH $ runModFinalizerRefs pipe st qrefs
+        RunTH ii st q ty loc -> wrapRunTH ii $ runTH pipe ii st q ty loc
+        RunModFinalizers ii st qrefs -> wrapRunTH ii $ runModFinalizerRefs pipe ii st qrefs
         _other -> run msg >>= reply
 
     isDone <- readIORef doneRef
@@ -98,13 +98,13 @@ servWithCustom verbose hook pipe restore customHandler = newIORef False >>= loop
   -- THMessage requests, and then finally send RunTHDone followed by a
   -- QResult.  For an overview of how TH works with Remote GHCi, see
   -- Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
-  wrapRunTH :: forall a. (Binary a, Show a) => IO a -> IO (QResult a)
-  wrapRunTH io = do
+  wrapRunTH :: forall a. (Binary a, Show a) => InboxId -> IO a -> IO (QResult a)
+  wrapRunTH ii io = do
     when verbose $ trace "wrapRunTH..."
     r <- try io
     when verbose $ trace "wrapRunTH done."
     when verbose $ trace "writing RunTHDone."
-    remoteTHCall pipe RunTHDone
+    remoteTHCall pipe ii RunTHDone
     case r of
       Left e
         | Just (GHCiQException _ err) <- fromException e  -> do
