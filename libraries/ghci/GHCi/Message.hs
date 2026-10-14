@@ -845,7 +845,7 @@ remoteAsyncReq pipe msg = do
 -- The handler receives as an argument the function to use to reply to the request.
 -- It must be used exactly once (all requests expect a reply, and you can't
 -- reply more than once). Linear types enforce the handler replies in every
--- branch, and if the handler otherwise throws, it is handled by 'withAsyncHandler'.
+-- branch, and if the handler otherwise throws, it is handled by 'handleAsyncReq'.
 handleAsyncReq :: Pipe -> Get a -> (WriteReply Put %1 -> a -> IO r) -> IO r
 handleAsyncReq pipe getit k = mask $ \restore -> do
   ack <- newEmptyMVar
