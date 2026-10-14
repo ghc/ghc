@@ -695,7 +695,7 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
     extendHdkA (locA l_con_decl) $
     case con_decl of
       ConDeclGADT { con_g_ext, con_names, con_outer_bndrs, con_inner_bndrs
-                  , con_mb_cxt, con_g_args, con_res_ty, con_modifiers } -> do
+                  , con_cxts, con_g_args, con_res_ty, con_modifiers } -> do
         con_doc' <- getConDoc (getLocA (NE.head con_names))
         con_g_args' <-
           case con_g_args of
@@ -706,7 +706,7 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
         con_res_ty' <- addHaddock con_res_ty
         pure $ L l_con_decl $
           ConDeclGADT { con_g_ext, con_names,
-                        con_outer_bndrs, con_inner_bndrs, con_mb_cxt, con_modifiers,
+                        con_outer_bndrs, con_inner_bndrs, con_cxts, con_modifiers,
                         con_doc = lexLHsDocString <$> con_doc',
                         con_g_args = con_g_args',
                         con_res_ty = con_res_ty' }

@@ -2575,15 +2575,44 @@ gadt_constrs :: { Located [LConDecl GhcPs] }
         | gadt_constr                   { L (glA $1) [$1] }
         | {- empty -}                   { noLoc [] }
 
--- We allow the following forms:
---      C :: Eq a => a -> T a
---      C :: forall a. Eq a => !a -> T a
---      D { x,y :: a } :: T a
---      forall a. Eq a => D { x,y :: a } :: T a
+-- We allow the following forms in 'gadt_constr'.
+--
+-- Prefix GADT syntax:
+--      C :: a -> b -> T a b                         -- simple prefix con
+--      C, D :: a -> b -> T a b                      -- multiple con names
+--      C :: forall a b. a -> b -> T a b             -- explicit forall
+--      C :: forall a b. !a -> !b -> T a b           -- strict fields
+--      C :: (Eq a, Show a) => a -> T a              -- context
+--      C :: forall a. Eq a => a -> T a              -- explicit forall and context
+--      C :: (forall a. Eq a => a -> T a)            -- outer parens
+--      C :: forall a. forall b. a -> T a b          -- nested foralls
+--      C :: forall a. forall b -> a -> T a b        -- visible forall (with -XRequiredTypeArguments)
+--      C :: Eq a => Ord a => a -> T a               -- nested contexts
+--      %Mod C :: a -> T a                           -- modifiers (with -XModifiers)
+--
+-- Record GADT syntax:
+--      C :: { x,y :: a } -> T a                     -- simple record con
+--      C, D :: { x,y :: a } -> T a                  -- multiple con names
+--      C :: forall a. { x,y :: a } -> T a           -- explicit forall
+--      C :: Eq a => { x,y :: a } -> T a             -- context
+--      C :: forall a. Eq a => { x,y :: a } -> T a   -- explicit forall and context
+--
+-- We disallow the following forms:
+--      C :: forall a. forall b. { x :: a } -> T a b -- nested foralls in record con
+--      C :: Eq a => Ord a => { x,y :: a } -> T a    -- nested contexts in record con
+--
+-- The type after '::' is parsed as an ordinary 'sigtype', so the grammar
+-- accepts any number of foralls and contexts, regardless of whether the
+-- constructor is prefix or record. 'mkGadtDecl' then splits the type into its
+-- components (using 'splitLHsGadtTy'). Prefix constructors may have multiple
+-- foralls and multiple contexts, but record constructors may have at most one
+-- of each. If a record constructor has more, 'splitLHsGadtTy' leaves the extra
+-- foralls/contexts in the body of the type, and the renamer rejects it.
+--
+-- See the grammar in docs/users_guide/exts/gadt_syntax.rst for details.
 
 gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
-    -- Returns a list because of:   C,D :: ty
     -- TODO:AZ capture the optSemi. Why leading?
         : optSemi modifiers con_list '::' sigtype
                 {% do { unless (null $ unLoc $2) $ hintModifiers (getLoc $2)

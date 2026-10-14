@@ -840,13 +840,13 @@ mkGadtDecl loc mods names dcol ty = do
                      , con_names  = names
                      , con_outer_bndrs = L outer_bndrs_loc outer_bndrs
                      , con_inner_bndrs = inner_bndrs
-                     , con_mb_cxt = mcxt
+                     , con_cxts = cxts
                      , con_g_args = args
                      , con_res_ty = res_ty
                      , con_modifiers = mods
                      , con_doc    = Nothing }
   where
-    (outer_bndrs, inner_bndrs, mcxt, body_ty) = splitLHsGadtTy ty
+    (outer_bndrs, inner_bndrs, cxts, body_ty) = splitLHsGadtTy ty
     outer_bndrs_loc = case outer_bndrs of
       HsOuterImplicit{} -> getLoc ty
       HsOuterExplicit an _ -> EpAnn (entry an) noAnn emptyComments

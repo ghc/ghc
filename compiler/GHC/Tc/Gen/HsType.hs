@@ -2144,9 +2144,8 @@ checkExpKind _rn_ty ty ki (Infer cell) = do
 
 ---------------------------
 
-tcHsContext :: Maybe (LHsContext GhcRn) -> TcM [PredType]
-tcHsContext Nothing    = return []
-tcHsContext (Just cxt) = tc_hs_context typeLevelMode cxt
+tcHsContext :: Foldable t => t (LHsContext GhcRn) -> TcM [PredType]
+tcHsContext = foldMapM (tc_hs_context typeLevelMode)
 
 tcLHsPredType :: LHsType GhcRn -> TcM PredType
 tcLHsPredType pred = tc_lhs_pred typeLevelMode pred

@@ -889,7 +889,7 @@ repC (L _ (ConDeclH98 { con_name = con
                       , con_args = args }))
   = addHsTyVarBinds FreshNamesOnly con_tvs $ \ ex_bndrs ->
          do { c'    <- repH98DataCon con args
-            ; ctxt' <- repMbContext mcxt
+            ; ctxt' <- repContexts mcxt
             ; if not is_existential && isNothing mcxt
               then return c'
               else rep2 forallCOcc ([unC ex_bndrs, unC ctxt', unC c'])
@@ -898,7 +898,7 @@ repC (L _ (ConDeclH98 { con_name = con
 repC (L l (ConDeclGADT { con_names  = cons
                        , con_outer_bndrs = L _ outer_bndrs
                        , con_inner_bndrs = inner_bndrs
-                       , con_mb_cxt = mcxt
+                       , con_cxts   = cxts
                        , con_g_args = args
                        , con_res_ty = res_ty }))
   | no_explicit_forall, no_context
@@ -909,9 +909,9 @@ repC (L l (ConDeclGADT { con_names  = cons
 
   | Just invis_inner_bndrs <- m_invis_inner_bndrs
   = addHsOuterSigTyVarBinds outer_bndrs $ \ outer_bndrs' ->
-    -- the context is attached to the innermost ForallC
+    -- the contexts are flattened and attached to the innermost ForallC
     let loop last_bndrs' [] = do
-          ctxt' <- repMbContext mcxt
+          ctxt' <- repContexts cxts
           c'    <- repGadtDataCons cons args res_ty
           rep2 forallCOcc ([unC last_bndrs', unC ctxt', unC c'])
         loop last_bndrs' (bndrs : bndrs_s) =
@@ -928,7 +928,7 @@ repC (L l (ConDeclGADT { con_names  = cons
     inner_teles = gadtArgTelescopes inner_bndrs
 
     no_explicit_forall = nullOuterExplicit outer_bndrs && null inner_teles
-    no_context         = isNothing mcxt
+    no_context         = null cxts
 
     m_invis_inner_bndrs :: Maybe [[LHsTyVarBndr Specificity GhcRn]]
     m_invis_inner_bndrs = traverse get_invis_bndrs inner_teles
@@ -937,9 +937,9 @@ repC (L l (ConDeclGADT { con_names  = cons
     get_invis_bndrs HsForAllVis{} = Nothing
     get_invis_bndrs HsForAllInvis { hsf_invis_bndrs = tvbs } = Just tvbs
 
-repMbContext :: Maybe (LHsContext GhcRn) -> MetaM (Core (M TH.Cxt))
-repMbContext Nothing          = repContext emptyContext
-repMbContext (Just (L _ cxt)) = repContext cxt
+-- | Flatten several contexts into a single 'TH.Cxt'.
+repContexts :: Foldable t => t (LHsContext GhcRn) -> MetaM (Core (M TH.Cxt))
+repContexts cxts = repContext $ HsContext noAnn (hsConDeclTheta cxts)
 
 repSrcUnpackedness :: SrcUnpackedness -> MetaM (Core (M TH.SourceUnpackedness))
 repSrcUnpackedness SrcUnpack   = rep2 sourceUnpackOcc         []
