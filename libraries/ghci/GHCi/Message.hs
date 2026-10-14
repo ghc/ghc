@@ -835,6 +835,8 @@ remoteAsyncReq pipe msg = do
 
   -- Block waiting for reply
   atomically (takeTMVar wv)
+    `onException`
+      atomically (modifyTVar pendingReplies (IntMap.delete uq))
 
 -- | Receive a single asynchronous request and send a matching reply
 -- asynchronously (the handler may fork a computation that eventually replies
