@@ -114,10 +114,11 @@ Note [Instantiation variables are short lived]
 * Ordinary unification variables always stand for monotypes; only instantiation
   variables can be unified with a polytype (by `qlUnify`).
 
-* When we start typechecking the arguments of the call, in tcValArgs, we will
-  (a) monomorphise any un-filled-in instantiation variables
+* Before we start typechecking the arguments of the call, in tcValArgs, we will
+  (a) Monomorphise any un-filled-in instantiation variables
       (see Note [Monomorphise instantiation variables]),
-  (b) zonk the argument type to reveal any polytypes before typechecking that
+      This happens in Step 4, at the start of `finishApp`.
+  (b) Zonk the argument type to reveal any polytypes before typechecking that
       argument (see calls to `zonkTcType` and "Crucial step" in tcValArg).
   See Section 4.3 "Applications and instantiation" of the paper.
 
@@ -277,39 +278,30 @@ tcApp works on the application chain by:
    variables", written using \kappa in the paper.
    See Note [Instantiating type variables in QuickLook]
 
-Now we split into two cases:
+   Note that we take a quick look at the arguments before quick-looking
+   the result type; see Note [QuickLook: arguments before result]
 
-3. Case NoQL: no Quick Look
+3. In case DoQL, when we are checking, use quickLookResultType to take a
+   quick look at the result type.
 
-   3.1 Use checkResultTy to connect the the result type.
-       Do this /before/ checking the arguments; see
-       Note [Unify with expected type before typechecking arguments]
+The next steps are in `finishApp`:
 
-   3.2 Check the arguments with `tcValArgs`.
+4. In case DoQL:
+   4.1  Monomorphise any as-yet-ununified instantiation variables (`qlMonoInstArgs`)
+        See Note [Monomorphise instantiation variables]
+   4.2  Use `zonkTcType` to expose the polymorphism hidden under instantiation
+        variables in `app_res_rho`, and the monomorphic versions of any
+        un-unified instantiation variables.
 
-   3.3 Use `finishApp` to wrap up.
+5. Use `checkResultTy` to connect the result type.
+   Do this /before/ checking the arguments; see
+   Note [Unify with expected type before typechecking arguments]
 
-4. Case DoQL: use Quick Look
+6.  Check the arguments with `tcValArgs`. Importantly, we must remember to zonk in
+    the EValArg case, to expose polymorphism
 
-   4.1 Use `quickLookResultType` to take a quick look at the result type,
-       when in checking mode.  This is the shaded part of APP-Downarrow
-       in Fig 4.  It also implements the key part of
-       Note [Unify with expected type before typechecking arguments]
-
-   4.2 Check the arguments with `tcValArgs`. Importantly, this will
-       monomorphise all the instantiation variables of the call.
-       See Note [Monomorphise instantiation variables].
-
-   4.3 Use `zonkTcType` to expose the polymophism hidden under instantiation
-       variables in `app_res_rho`, and the monomorphic versions of any
-       un-unified instantiation variables.
-
-   4.4 Use `checkResTy` to do the subsumption check as usual
-
-   4.5 Use `finishApp` to wrap up
-
-The funcion `finishApp` mainly calls `rebuildHsApps` to rebuild the
-application; but it also has a horrile special case for `tagToEnum`.
+7. The function `finishApp` mainly calls `rebuildHsApps` to rebuild the
+   application; but it also has a horrible special case for `tagToEnum`.
 
 Note [Quick Look for particular Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -327,6 +319,53 @@ particular Ids:
   GHC.Rename.Expr), and we want them to be instantiated impredicatively
   so that (f `op`), say, will work OK even if `f` is higher rank.
   See Note [Left and right sections] in GHC.Rename.Expr.
+
+Note [QuickLook: arguments before result]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally we try to push the expected result type into the call;
+see Note [Unify with expected type before typechecking arguments].
+But surprisingly we can't do that for QuickLook.  (#26599 was a failed
+attempt to suggest this.)  Consider
+   h :: (Int->Int) -> Int    ids :: [forall a. a->a]
+and the call
+   h (head ids)
+Let's say we instantiate `head :: [a] -> a` with `a:=kappa`.
+We QuickLook at the argument with expected type (Int->Int). We must NOT
+unify kappa:=(Int->Int), because kappa:=forall a. a->a is the only
+solution, and one that we will find if we look at the argument first.
+
+TL;DR: we must do `quickLookArg` on all arguments before doing `quickLookResultType`
+on the result type.
+
+Remember: `quickLookResultType` is really anticipating a /subsumption/ test, not
+an equality test.  Doing `qlUnify` on the result type (always a rho-type) is
+in general wrong if there is an un-guarded kappa in the result type.  It's wrong
+UNLESS we have already gotten all the info about `kappa` (from the
+arguments) that we are going to get.  That's why we QuickLook the arguments first.
+
+This is a bit sad, as #26599 shows.  Consider
+
+  woo :: (x, [forall a. a->a])
+  bar1 = snd woo
+  bar2 = snd (id woo)
+
+For `bar1` we instantiate `snd` at [a:=k1,b:=k2].  Then we QL on the argument `woo`
+(instantiating with `x:=k3`).  Since the result type is guarded we qlUnify
+    (k3,forall a.a->a) ~ (k1,k2)
+and thus succeed in discovering k2:=forall a.a->a, as desired.
+
+But for `bar2` we fail. When quick-looking (id woo) we instantiate `id` with [a:=k],
+and quick-look the argument `woo` with expected type `k`.  That's not guarded,
+so we get no information.  Adding the `id` call makes it un-typeable. Boo.
+
+This is a bit tricky.
+* We QuickLook the arguments (tcInstFun)
+     THEN QuickLook the result type (quickLookResultType).
+  See this Note
+* and then...
+* We typecheck the result type (checkResultTy)
+     THEN typecheck the arguments (tcValArgs)
+  see Note [Unify with expected type before typechecking arguments]
 
 Note [Unify with expected type before typechecking arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -353,7 +392,7 @@ Unify result type /before/ typechecking the args
         Actual: String
     • In the first argument of ‘Pair’, namely ‘"yes"’
 
-The latter is much better. That is why we call `checkResultTy` before tcValArgs.
+The latter is much better. That is why we call `checkResultTy` before `tcValArgs`.
 -}
 
 --------------------
@@ -365,18 +404,18 @@ tcApp :: HsExpr GhcRn        -- ^ The whole application (For error messages)
 -- See Note [tcApp: typechecking applications]
 -- See Note [splitHsApps] in GHC.Tc.Head
 tcApp rn_expr rn_fun rn_args exp_res_ty
-  = do { fun_lspan <- getFunSrcSpan rn_args
+  = do { do_ql     <- wantQuickLook rn_fun
+       ; fun_lspan <- getFunSrcSpan rn_args
        ; traceTc "tcApp {" $
            vcat [ text "rn_fun:" <+> ppr rn_fun
                 , text "fun_lspan:" <+> ppr fun_lspan
                 , text "rn_args:" <+> ppr rn_args ]
 
-       ; let rn_head = (rn_fun, fun_lspan)
 
        -- Step 1: Infer the type of `fun`, the head of the application
+       ; let rn_head = (rn_fun, fun_lspan)
        ; (tc_fun, fun_sigma) <- tcInferAppHead rn_head
-       ; let tc_head = (tc_fun, fun_lspan)
-             -- inst_final: top-instantiate the result type of the application,
+       ; let -- inst_final: top-instantiate the result type of the application,
              -- EXCEPT if we are trying to infer a sigma-type
              inst_final = case exp_res_ty of
                              Check {} -> True
@@ -386,75 +425,73 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
                                   IIF_DeepRho    -> True
                                   IIF_Sigma      -> False
 
-       -- Step 2: Instantiate the function type (taking a quick look at args)
-       -- See Note [Quick Look for particular Ids]
-       ; do_ql <- wantQuickLook rn_fun
-
        ; traceTc "tcApp:inferAppHead" $
          vcat [ text "tc_fun:" <+> ppr tc_fun
               , text "fun_sigma:" <+> ppr fun_sigma
               , text "do_ql:" <+> ppr do_ql]
-       ; (inst_args, app_res_rho)
-              <- tcInstFun do_ql inst_final rn_head tc_fun fun_sigma rn_args
-         -- See (TCAPP1) and (TCAPP2) in
-         -- Note [tcApp: typechecking applications]
 
-       ; case do_ql of
-            NoQL -> do { traceTc "tcApp:NoQL" (ppr rn_fun $$ ppr app_res_rho)
+       -- Step 2: Instantiate the function type (taking a quick look at args)
+       -- See Note [Quick Look for particular Ids]
+       ; (inst_args, app_res_rho) <- tcInstFun do_ql inst_final rn_head tc_fun fun_sigma rn_args
 
-                         -- Step 3.1: subsumption check against expected result type
-                         -- See Note [Unify with expected type before typechecking arguments]
-                       ; res_wrap <- checkResultTy rn_expr tc_head inst_args
-                                                   app_res_rho exp_res_ty
-                         -- Step 3.2: typecheck the  arguments
-                       ; tc_args <- tcValArgs NoQL rn_head inst_args
+       ; -- Step 3: Take a quick look at the result type
+         -- See Note [QuickLook: arguments before result]
+         case (do_ql, exp_res_ty) of
+            (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
+            _                     -> return ()
 
-                         -- Step 3.3: wrap up
-                       ; finishApp tc_fun tc_args app_res_rho res_wrap }
+       ; finishApp do_ql rn_expr fun_lspan rn_fun tc_fun
+                         inst_args app_res_rho exp_res_ty }
 
-            DoQL -> do { traceTc "tcApp:DoQL" (ppr rn_fun $$ ppr app_res_rho)
-
-                         -- Step 4.1: Take a quick look at the result type
-                       ; quickLookResultType app_res_rho exp_res_ty
-
-                         -- Step 4.2: typecheck the arguments, and monomorphise
-                         --           any un-unified instantiation variables
-                       ; tc_args <- tcValArgs DoQL rn_head inst_args
-
-                         -- Step 4.3: zonk to expose the polymorphism hidden under
-                         --           QuickLook instantiation variables in `app_res_rho`
-                       ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
-
-                         -- Step 4.4: subsumption check against the expected type
-                       ; res_wrap <- checkResultTy rn_expr tc_head inst_args
-                                                    app_res_rho exp_res_ty
-                         -- Step 4.5: wrap up
-                       ; finishApp tc_fun tc_args app_res_rho res_wrap } }
-
-quickLookResultType :: TcRhoType -> ExpRhoType -> TcM ()
--- This function implements the shaded bit of rule APP-Downarrow in
--- Fig 5 of the QL paper: "A quick look at impredicativity" (ICFP'20).
-quickLookResultType app_res_rho (Check exp_rho) = qlUnify app_res_rho exp_rho
-quickLookResultType _           _               = return ()
-
-finishApp :: HsExpr GhcTc -> [HsExprArg 'TcpTc]
-          -> TcRhoType -> HsWrapper
+finishApp :: QLFlag
+          -> HsExpr GhcRn           -- The whole application
+          -> SrcSpan                -- Span for the /head/ of the application
+          -> HsExpr GhcRn           -- The head of the application (renamed)
+          -> HsExpr GhcTc           -- The head of the application (typechecked)
+          -> [HsExprArg 'TcpInst]   -- Arguments
+          -> TcRhoType -> ExpRhoType
           -> TcM (HsExpr GhcTc)
--- Do final checks and wrap up the result
-finishApp tc_fun tc_args app_res_rho res_wrap
-  = do {
-       -- Reconstruct, with a horrible special case for tagToEnum#.
-         res_expr <- if isTagToEnum tc_fun
+-- Instantiation and Quick Look are done.  Now do typechecking,
+-- of both the result type and the arguments, before rebuilding.
+finishApp do_ql rn_expr fun_loc rn_fun tc_fun inst_args
+          app_res_rho exp_res_ty
+  = do { -- Step 4.1: monomorphise un-unified QuickLook instantiation variables
+         -- Step 4.2: zonk app_res_rho to expose the polymorphism hidden under
+         --           instantiation variables in `app_res_rho`
+         app_res_rho <- case do_ql of
+           NoQL -> return app_res_rho
+           DoQL -> liftZonkM $
+                   do { qlMonoInstArgs inst_args
+                      ; zonkTcType app_res_rho }
+
+         -- Step 5: subsumption check against the expected type
+         -- See Note [Unify with expected type before typechecking arguments]
+       ; res_wrap <- checkResultTy rn_expr (tc_fun, fun_loc) inst_args
+                                   app_res_rho exp_res_ty
+
+         -- Step 6: Typecheck the arguments
+       ; tc_args <- tcValArgs do_ql (rn_fun, fun_loc) inst_args
+
+         -- Step 7: Horrible special case for tagToEnum#.
+       ; res_expr <- if isTagToEnum tc_fun
                      then tcTagToEnum tc_fun tc_args app_res_rho
                      else return (rebuildHsApps tc_fun tc_args)
+
        ; traceTc "End tcApp }" (ppr tc_fun)
        ; return (mkHsWrap res_wrap res_expr) }
+
+quickLookResultType :: TcRhoType -> TcRhoType -> TcM ()
+-- This function implements the shaded bit of rule APP-Downarrow in
+-- Fig 5 of the QL paper: "A quick look at impredicativity" (ICFP'20).
+-- See Note [QuickLook: arguments before result]
+quickLookResultType app_res_rho exp_res_rho
+  = qlUnify app_res_rho exp_res_rho
 
 -- | Connect up the inferred type of an application with the expected type.
 -- This is usually just a unification, but with deep subsumption there is more to do.
 checkResultTy :: HsExpr GhcRn
               -> (HsExpr GhcTc, SrcSpan)  -- Head
-              -> [HsExprArg p]            -- Arguments, just error messages
+              -> [HsExprArg p]            -- Arguments, just for error messages
               -> TcRhoType  -- Inferred type of the application; zonked to
                             --   expose foralls, but maybe not /deeply/ instantiated
               -> ExpRhoType -- Expected type; this is deeply skolemised
@@ -476,13 +513,10 @@ checkResultTy rn_expr (tc_fun, fun_loc) inst_args app_res_rho res_ty
 
 ----------------
 tcValArgs :: QLFlag
-          -> (HsExpr GhcRn, SrcSpan) -- Head of the application chain (used only for error message generation)
+          -> (HsExpr GhcRn, SrcSpan) -- Head of the application chain
+                                     -- (used only for error message generation)
           -> [HsExprArg 'TcpInst]
           -> TcM [HsExprArg 'TcpTc]
--- Importantly, tcValArgs works left-to-right, so that by the time we
--- encounter an argument, we have monomorphised all the instantiation
--- variables that its type contains.  All that is left to do is an ordinary
--- zonkTcType.  See Note [Monomorphise instantiation variables].
 tcValArgs do_ql rn_head args = go do_ql 0 args
   where
     go _ _ [] = return []
@@ -505,16 +539,15 @@ tcValArg :: QLFlag                  -- ^ Are we typechecking with Quick Look tur
          -> (HsExpr GhcRn, SrcSpan) -- ^ Head of the application chain (used only for error message generation)
          -> HsExprArg 'TcpInst      -- ^ Actual argument
          -> TcM (HsExprArg 'TcpTc)  -- ^ Resulting argument
-tcValArg _     _ _ (EPrag l p)         = return (EPrag l (tcExprPrag p))
-tcValArg _     _ _ (ETypeArg l hty ty) = return (ETypeArg l hty ty)
-tcValArg do_ql _ _ (EWrap (EHsWrap w)) = do { whenQL do_ql $ qlMonoHsWrapper w
-                                            ; return (EWrap (EHsWrap w)) }
-  -- qlMonoHsWrapper: see Note [Monomorphise instantiation variables]
-tcValArg _     _ _ (EWrap ew)          = return (EWrap ew)
+tcValArg _ _ _ (EPrag l p)         = return (EPrag l (tcExprPrag p))
+tcValArg _ _ _ (ETypeArg l hty ty) = return (ETypeArg l hty ty)
+tcValArg _ _ _ (EWrap (EHsWrap w)) = return (EWrap (EHsWrap w))
+tcValArg _ _ _ (EWrap ew)          = return (EWrap ew)
 
-tcValArg do_ql pos rn_fun_head (EValArg { ea_loc_span  = lspan
-                            , ea_arg    = larg@(L arg_loc arg)
-                            , ea_arg_ty = sc_arg_ty })
+tcValArg do_ql pos rn_fun_head
+         (EValArg { ea_loc_span  = lspan
+                  , ea_arg    = larg@(L arg_loc arg)
+                  , ea_arg_ty = sc_arg_ty })
   = addArgCtxt pos rn_fun_head larg $
     do { -- Crucial step: expose QL results before checking exp_arg_ty
          -- So far as the paper is concerned, this step applies
@@ -546,17 +579,17 @@ tcValArg do_ql pos rn_fun_head (EValArg { ea_loc_span  = lspan
                          , ea_arg = L arg_loc arg'
                          , ea_arg_ty = noExtField }) }
 
-tcValArg _ pos rn_fun_head (EValArgQL {
-                        eaql_wanted   = wanted
-                      , eaql_loc_span = lspan
-                      , eaql_arg_ty   = sc_arg_ty
-                      , eaql_larg     = larg@(L arg_loc rn_expr)
-                      , eaql_tc_fun   = tc_arg_head@(tc_fun,arg_head_loc)
-                      , eaql_rn_fun   = rn_arg_head
-                      , eaql_fun_ue   = head_ue
-                      , eaql_args     = inst_args
-                      , eaql_encl     = arg_influences_enclosing_call
-                      , eaql_res_rho  = app_res_rho })
+tcValArg _ pos rn_fun_head
+         (EValArgQL { eaql_wanted   = wanted
+                    , eaql_loc_span = lspan
+                    , eaql_arg_ty   = sc_arg_ty
+                    , eaql_larg     = larg@(L arg_loc rn_expr)
+                    , eaql_rn_fun   = rn_fun
+                    , eaql_tc_fun   = tc_arg_head@(tc_fun,arg_head_loc)
+                    , eaql_fun_ue   = head_ue
+                    , eaql_args     = inst_args
+                    , eaql_encl     = arg_influences_enclosing_call
+                    , eaql_res_rho  = app_res_rho })
   = addArgCtxt pos rn_fun_head larg $
     do { -- Expose QL results to tcSkolemise, as in EValArg case
          Scaled mult exp_arg_ty <- liftZonkM $ zonkScaledTcType sc_arg_ty
@@ -582,14 +615,11 @@ tcValArg _ pos rn_fun_head (EValArgQL {
 
                     -- Unify with context if we have not already done so
                     -- See (QLA4) in Note [Quick Look at value arguments]
-                  ; unless arg_influences_enclosing_call $  -- Don't repeat
-                    qlUnify app_res_rho exp_arg_rho         -- the qlUnify
+                  ; unless arg_influences_enclosing_call $   -- Don't repeat
+                    qlUnify app_res_rho exp_arg_rho          -- the qlUnify
 
-                  ; tc_args <- tcValArgs DoQL (rn_arg_head, arg_head_loc) inst_args
-                  ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
-                  ; res_wrap <- checkResultTy rn_expr tc_arg_head inst_args
-                                              app_res_rho (mkCheckExpType exp_arg_rho)
-                  ; finishApp tc_fun tc_args app_res_rho res_wrap }
+                  ; finishApp DoQL rn_expr arg_head_loc rn_fun tc_fun inst_args app_res_rho
+                              (mkCheckExpType exp_arg_rho) }
 
        ; traceTc "tcEValArgQL }" $
            vcat [ text "app_res_rho:" <+> ppr app_res_rho ]
@@ -605,6 +635,13 @@ wantQuickLook (HsVar _ (L _ (WithUserRdr _ f)))
   | getUnique f `elem` quickLookKeys = return DoQL
 wantQuickLook _                      = do { impred <- xoptM LangExt.ImpredicativeTypes
                                           ; if impred then return DoQL else return NoQL }
+
+skipQuickLook :: HsExprLoc -> LHsExpr GhcRn -> Scaled TcRhoType
+              -> TcM (HsExprArg 'TcpInst)
+skipQuickLook loc larg arg_ty
+  = return (EValArg { ea_loc_span = loc
+                    , ea_arg      = larg
+                    , ea_arg_ty   = arg_ty })
 
 quickLookKeys :: [Unique]
 -- See Note [Quick Look for particular Ids]
@@ -1860,17 +1897,6 @@ quickLookArg DoQL pos app_lspan fun_and_lspan larg orig_arg_ty
          then skipQuickLook app_lspan larg orig_arg_ty
          else quickLookArg1 pos app_lspan fun_and_lspan larg orig_arg_ty }
 
-skipQuickLook :: HsExprLoc -> LHsExpr GhcRn -> Scaled TcRhoType
-              -> TcM (HsExprArg 'TcpInst)
-skipQuickLook app_lspan larg arg_ty
-  = return (EValArg { ea_loc_span   = app_lspan
-                    , ea_arg    = larg
-                    , ea_arg_ty = arg_ty })
-
-whenQL :: QLFlag -> ZonkM () -> TcM ()
-whenQL DoQL thing_inside = liftZonkM thing_inside
-whenQL NoQL _            = return ()
-
 qlArgHasRhoType :: TcType -> TcM Bool
 -- `qlArgHasRhoType` checks that the expected argument type in rule
 -- App-lightning-bolt (Fig 5 in the paper) is indeed a rho-type.
@@ -1959,7 +1985,7 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
              <- captureConstraints $
                 tcInstFun do_ql True (rn_fun_arg, fun_lspan_arg) tc_fun_arg_head fun_sigma_arg_head rn_args
                 -- We must capture type-class and equality constraints here, but
-                -- not usage information.  See (QLA6) in Note [Quick Look at
+                -- not usage constraints.  See (QLA6) in Note [Quick Look at
                 -- value arguments]
 
        ; traceTc "quickLookArg 2" $
@@ -1969,13 +1995,16 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
 
        -- Step 3: Check the two other premises of APP-lightning-bolt (Fig 5 in the paper)
        --         Namely: (A) is orig_arg_rho is guarded
-         --           or: (B) fiv(app_res_rho) = emptyset
+       --             or: (B) fiv(app_res_rho) = emptyset
+       -- then Step 4: do quick-look unification if either (A) or (B) hold
+       --
+       -- For (B) see Note [The fiv test in quickLookArg]
        -- This tells us if the quick look at the argument yields information that
        -- influences the enclosing function call
-       -- NB: guardedness is computed based on the original,
-       -- unzonked orig_arg_rho, so that we deliberately do
-       -- not exploit guardedness that emerges a result of QL on earlier args
-       -- We must do the anyFreeKappa test /after/ tcInstFun; see (QLA3).
+       -- NB: `isGuardedTy` is computed based on the original,
+       --         unzonked orig_arg_rho, so that we deliberately do not exploit
+       --         guardedness that emerges a result of QL on earlier args
+       --     In contrast, we must do the `anyFreeKappa` test /after/ tcInstFun; see (QLA3).
        ; arg_influences_enclosing_call
             <- if isGuardedTy orig_arg_rho
                then return True
@@ -1983,6 +2012,7 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
                     -- For (B) see Note [The fiv test in quickLookArg]
 
        -- Step 4: do quick-look unification if either (A) or (B) hold
+       -- This is part of APP-lightning-bolt (Fig 5 in the paper)
        -- NB: orig_arg_rho may not be zonked, but that's ok
        ; when arg_influences_enclosing_call $
          qlUnify app_res_rho orig_arg_rho
@@ -2000,7 +2030,6 @@ quickLookArg1 pos app_lspan rn_head larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_
                            , eaql_encl     = arg_influences_enclosing_call
                            , eaql_res_rho  = app_res_rho }) }}}
 
-
 {- *********************************************************************
 *                                                                      *
                  Folding over instantiation variables
@@ -2014,20 +2043,16 @@ When we are done with Quick Look on a call, we must turn any un-unified
 lower-case 'theta' (a mono-substitution) in the APP-DOWN rule of Fig 5 of the
 Quick Look paper.
 
-We so this by look at the arguments, left to right, monomorphising the free
-instantiation variables of the /type/ arguments of the call.  Those type
-arguments appear (only) in
+We do this in `qlMonoInstArgs` by looking at the arguments, monomorphising
+the free instantiation variables of the /type/ arguments of the call.  Those
+type arguments appear (only) in
   * the `WpTyApp` components of
   * the `HsWrapper` of
   * a `EWrap` argument
-See `qlMonoHsWrapper`.
-
-By going left to right, we are sure to monomorphise instantiation variables
-before we encounter them in an argument type (in `tcValArg`).
 
 All instantiation variables for a call will be reachable from the type(s)
 at which the function is instantiated -- i.e. those WpTyApps.  Even instantiation
-variables allocoated by tcInstFun itself, such as in the IRESULT rule, end up
+variables allocated by tcInstFun itself, such as in the IRESULT rule, end up
 connected to the original type(s) at which the function is instantiated.
 
 To monomorphise the free QL instantiation variables of a type, we use
@@ -2047,6 +2072,16 @@ Wrinkles:
   `co` is the only place that `k1` will show up in the traversal, and yet
   we want to monomrphise it.  Hence the do_hole in `foldQLInstTyVars`
 -}
+
+
+qlMonoInstArgs :: [HsExprArg 'TcpInst] -> ZonkM ()
+-- See Note [Monomorphise instantiation variables]
+qlMonoInstArgs args = mapM_ qlMonoInstArg args
+
+qlMonoInstArg :: HsExprArg 'TcpInst -> ZonkM ()
+-- See Note [Monomorphise instantiation variables]
+qlMonoInstArg (EWrap (EHsWrap w)) = qlMonoHsWrapper w
+qlMonoInstArg _                   = return ()
 
 qlMonoHsWrapper :: HsWrapper -> ZonkM ()
 -- See Note [Monomorphise instantiation variables]
@@ -2108,13 +2143,14 @@ We will instantiate Just with kappa, say, and then call
     quickLookArg1 False {kappa} (ids ++ ids) kappa
 The call to tcInstFun will return with app_res_rho = [forall a. a->a]
 which has no free instantiation variables, so we can QL-unify
-  kappa ~ [Forall a. a->a]
+  kappa ~ [forall a. a->a]
 -}
 
 anyFreeKappa :: TcType -> TcM Bool
 -- True if there is a free instantiation variable
 -- in the argument type, after zonking
 -- See Note [The fiv test in quickLookArg]
+-- The function is monadic; it does not require a zonked type as input
 anyFreeKappa ty = unTcMBool (foldQLInstVars go_tv ty)
   where
     go_tv tv = TCMB $ do { info <- readMetaTyVar tv
