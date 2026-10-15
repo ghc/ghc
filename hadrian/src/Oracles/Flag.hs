@@ -77,13 +77,13 @@ getFlag = expr . flag
 
 targetRTSLinkerOnlySupportsSharedLibs :: Stage -> Action Bool
 targetRTSLinkerOnlySupportsSharedLibs s =
-  queryTargetTarget s Toolchain.tgtRTSLinkerOnlySupportsSharedLibs
+  queryPerStageTargetSpec s Toolchain.tgtRTSLinkerOnlySupportsSharedLibs
 
 arSupportsDashL :: Stage -> Action Bool
-arSupportsDashL stage = Toolchain.arSupportsDashL . tgtAr <$> targetStage stage
+arSupportsDashL stage = Toolchain.arSupportsDashL . tgtAr <$> perStageTarget stage
 
 arSupportsAtFile :: Stage -> Action Bool
-arSupportsAtFile stage = Toolchain.arSupportsAtFile . tgtAr <$> targetStage stage
+arSupportsAtFile stage = Toolchain.arSupportsAtFile . tgtAr <$> perStageTarget stage
 
 targetSupportsSharedLibs :: Stage -> Action Bool
 targetSupportsSharedLibs stage = do
@@ -101,10 +101,10 @@ targetSupportsThreadedRts stage = do
 
 -- | Does the target support the -N RTS flag?
 targetSupportsSMP :: Stage -> Action Bool
-targetSupportsSMP stage = queryTargetTarget stage Toolchain.tgtSupportsSMP
+targetSupportsSMP stage = queryPerStageTargetSpec stage Toolchain.tgtSupportsSMP
 
 targetUseLibffiForAdjustors :: Stage -> Action Bool
-targetUseLibffiForAdjustors stage = queryTargetTarget stage tgtUseLibffiForAdjustors
+targetUseLibffiForAdjustors stage = queryPerStageTargetSpec stage tgtUseLibffiForAdjustors
 
 useLibdw :: Stage -> Action Bool
-useLibdw stage = queryTargetTarget stage (isJust . tgtRTSWithLibdw)
+useLibdw stage = queryPerStageTargetSpec stage (isJust . tgtRTSWithLibdw)

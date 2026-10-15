@@ -1,3 +1,5 @@
+**This is severely outdated. And is here merely for historical interest**
+
 ## Build a cross-compiling GHC
 
 In this example, our host machine is "Ubuntu 16.04.2 LTS, Linux ubuntu 4.4.0-79-generic 86_64".
