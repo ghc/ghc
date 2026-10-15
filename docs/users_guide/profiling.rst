@@ -1522,11 +1522,11 @@ after the program is run.
 
 Running the program generates a file with the ``.tix`` suffix, in this
 case :file:`Recip.tix`, which contains the coverage data for this run of the
-program. The program may be run multiple times (e.g. with different test
-data), and the coverage data from the separate runs is accumulated in
-the ``.tix`` file. This behaviour can be controlled with the :rts-flag:`--read-tix-file=\<yes|no\>`
-You can control where the ``.tix`` file is generated using the
-environment variable :envvar:`HPCTIXFILE`.
+program. Running the program multiple times (e.g. with different test data)
+will overwrite this file with coverage data from the latest run. To accumulate
+coverage data from multiple runs in the ``.tix`` file,
+:rts-flag:`--read-tix-file=\<yes|no\>` can be used. You can control where the
+``.tix`` file is generated using the environment variable :envvar:`HPCTIXFILE`.
 
 .. envvar:: HPCTIXFILE
 

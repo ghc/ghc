@@ -1,0 +1,16 @@
+section: compiler
+synopsis: Accumulating coverage data over multiple runs is no longer the default
+issues: #27956
+mrs: !16826
+description:
+  Programs compiled using :ghc-flag:`-fhpc` will, when executed, no longer read
+  an existing ``.tix`` file for the program and add coverage data to it by
+  default. Instead, the new default is to overwrite an existing ``.tix`` file
+  with only the coverage data from the latest run.
+
+  :rts-flag:`--read-tix-file=\<yes|no\>` can be used to control this behaviour
+  as before. This release merely changes the default from
+  ``--read-tix-file=yes`` to ``--read-tix-file=no``.
+
+  Additionally, the deprecation warning introduced in GHC 9.12 to warn about
+  this change of default behaviour in the future has been removed.

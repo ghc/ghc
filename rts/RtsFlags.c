@@ -305,7 +305,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TickyFlags.showTickyStats   = false;
     RtsFlags.TickyFlags.tickyFile        = NULL;
 #endif
-    RtsFlags.HpcFlags.readTixFile        = HPC_YES_IMPLICIT;
+    RtsFlags.HpcFlags.readTixFile        = false;
     RtsFlags.HpcFlags.writeTixFile       = true;
 }
 
@@ -1100,12 +1100,12 @@ error = true;
                   else if (strequal("read-tix-file=yes",
                               &rts_argv[arg][2])) {
                        OPTION_UNSAFE;
-                       RtsFlags.HpcFlags.readTixFile = HPC_YES_EXPLICIT;
+                       RtsFlags.HpcFlags.readTixFile = true;
                   }
                   else if (strequal("read-tix-file=no",
                               &rts_argv[arg][2])) {
                        OPTION_UNSAFE;
-                       RtsFlags.HpcFlags.readTixFile = HPC_NO_EXPLICIT;
+                       RtsFlags.HpcFlags.readTixFile = false;
                   }
                   else if (strequal("write-tix-file=yes",
                               &rts_argv[arg][2])) {
