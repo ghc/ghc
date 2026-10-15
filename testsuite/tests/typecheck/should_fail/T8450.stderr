@@ -1,6 +1,6 @@
 T8450.hs:8:19: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘Bool’
-      Expected: Either Bool ()
+      Expected: Either Bool a
         Actual: Either a ()
       ‘a’ is a rigid type variable bound by
         the type signature for:
