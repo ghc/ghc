@@ -78,6 +78,9 @@ servWithCustom verbose hook pipe restore customHandler = newIORef False >>= loop
         RunModFinalizers ii st qrefs -> wrapRunTH ii $ runModFinalizerRefs pipe ii st qrefs
         _other -> run msg >>= reply
 
+    -- closePipe here will wait until every active pipeWrite pipe exits, but
+    -- they should never block for long, as the host process is either reading
+    -- or has called pipeCloseRead.
     isDone <- readIORef doneRef
     if isDone then closePipe pipe
               else loop doneRef
@@ -184,7 +187,7 @@ defaultServerWithCustom customHandler = do
 #if defined(wasm32_HOST_ARCH)
   -- See Note [wasm ghci signal handlers] for details
   installSignalHandlers $ js_register_signal_handler cb_sig
-  pipe <- mkPipeFromContinuations (recv_buf cb_recv) (send_buf cb_send)
+  pipe <- mkPipeFromContinuations (recv_buf cb_recv) (send_buf cb_send) (pure ()) (pure ())
 #else
   when verbose $
     printf "GHC iserv starting (in: %s; out: %s)\n" (show inh) (show outh)
