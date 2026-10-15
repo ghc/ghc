@@ -51,7 +51,7 @@ getWay = way <$> getContext
 
 -- | Get the 'Target' configuration of the current stage
 getStagedTarget :: Expr Context b Target
-getStagedTarget = expr . targetStage =<< getStage
+getStagedTarget = expr . perStageTarget =<< getStage
 
 -- | Path to the directory containing the final artifact in a given 'Context'.
 libPath :: Context -> Action FilePath

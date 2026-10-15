@@ -445,10 +445,7 @@ lint-submods-branch:
 hadrian-ghc-in-ghci:
   stage: quick-build
   extends: .lint-ghc-toolchain
-  needs:
-    - job: lint-linters
-    - job: lint-submods
-      optional: true
+  needs: []
   variables:
     GHC_FLAGS: -Werror -Wwarn=unused-imports
   script:
@@ -546,9 +543,18 @@ stack-hadrian-build:
 # Testing reinstallable ghc codepath
 ####################################
 
+# cabal-reinstall artifacts aren't in the
+# bindists so it needs to run its testsuite
+# in-tree.
 test-cabal-reinstall-x86_64-linux-deb13:
   extends: nightly-x86_64-linux-deb13-validate
   stage: full-build
+  script:
+  - sudo chown ghc:ghc -R .
+  - .gitlab/ci.sh setup
+  - .gitlab/ci.sh configure
+  - .gitlab/ci.sh build_hadrian
+  - .gitlab/ci.sh test_hadrian
   variables:
     REINSTALL_GHC: "yes"
     BUILD_FLAVOUR: validate
