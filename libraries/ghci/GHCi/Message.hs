@@ -27,7 +27,7 @@ module GHCi.Message
   , Pipe(..), mkPipeFromHandles, mkPipeFromContinuations, closePipe
   , remoteCall, remoteTHCall
   , handleRemoteCall, handleRemoteTHCall
-  , RemoteProcessException(..), PipeClosedException(..)
+  , RemoteProcessException(..), PipeReadClosedException(..)
 
   , InboxId(..)
   , newMailbox
