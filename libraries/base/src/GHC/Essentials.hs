@@ -318,7 +318,7 @@ import GHC.Internal.Control.Arrow( arr, first, app, (|||) )
 import GHC.Internal.Desugar( (>>>) )  -- See Note [Tricky known-occ cases]
 import GHC.Internal.OverloadedLabels( fromLabel )
 import GHC.Internal.Records
-import GHC.Internal.Types as CS
+import GHC.Internal.CString as CS
   ( unpackCString# , unpackCStringUtf8#
   , unpackFoldrCString#, unpackFoldrCStringUtf8#, unpackAppendCString#
   , unpackAppendCStringUtf8#, cstringLength# )

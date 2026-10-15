@@ -412,7 +412,7 @@ import GHC.Internal.IO (seq#)
 import GHC.Internal.Magic.Dict
 #endif
 import GHC.Internal.Maybe
-import qualified GHC.Types as CS (
+import qualified GHC.Internal.CString as CS (
   unpackCString#, unpackAppendCString#, unpackFoldrCString#,
   cstringLength#,
   unpackCStringUtf8#, unpackAppendCStringUtf8#, unpackFoldrCStringUtf8#,
