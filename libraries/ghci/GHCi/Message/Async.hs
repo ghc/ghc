@@ -7,7 +7,7 @@ module GHCi.Message.Async
   (
     -- * Pipes
     Pipe(..), mkPipeFromHandles, mkPipeFromContinuations
-  , closePipe, PipeClosedException(..)
+  , closePipe, PipeReadClosedException(..)
 
     -- * Interface for async bidirectional RPC
   , remoteAsyncReq, handleAsyncReq
@@ -70,8 +70,13 @@ data Pipe = Pipe
   , pipeLeftovers   :: !(IORef (Maybe ByteString))
   , pipeLock        :: !(MVar ()) -- ^ Lock to prevent concurrent writes to the stream
   , pipeAsyncMngr   :: !AsyncManager
-  , pipeIsClosed    :: !(TVar Bool)
-    -- ^ After the pipe is closed, requests can no longer be received nor sent
+  , pipeCloseRead   :: !(IO ())
+  -- ^ closes read end of the pipe
+  , pipeCloseWrite  :: !(IO ())
+  -- ^ closes write end of the pipe
+  , pipeReadClosed  :: !(TVar Bool)
+    -- ^ After the pipe is closed, messages can no longer be received from the
+    -- other end, but the 'AsyncManager' queues might not be empty yet.
   }
 
 -- | Make a 'Pipe' from a 'Handle' to read and a 'Handle' to write.
@@ -82,46 +87,52 @@ mkPipeFromHandles pipeRead pipeWrite = do
       putAll b = do
         B.hPutBuilder pipeWrite b
         hFlush pipeWrite
-  mkPipeFromContinuations getSome putAll
+  mkPipeFromContinuations getSome putAll (hClose pipeRead) (hClose pipeWrite)
 
 -- | Make a 'Pipe' from a reader function and a writer function.
--- The pipe should be closed with 'closePipe'.
-mkPipeFromContinuations :: IO ByteString -> (B.Builder -> IO ()) -> IO Pipe
-mkPipeFromContinuations getSome putAll = mdo
+-- The pipe should be closed with 'closePipe', which will call 'pipeCloseRead' and 'pipeCloseWrite'.
+mkPipeFromContinuations :: IO ByteString -> (B.Builder -> IO ())
+                        -> IO ()
+                        -- ^ pipeCloseRead
+                        -> IO ()
+                        -- ^ pipeCloseWrite
+                        -> IO Pipe
+mkPipeFromContinuations getSome putAll pipeCloseRead pipeCloseWrite = mdo
   pipeLeftovers   <- newIORef Nothing
   pipeLock        <- newMVar ()
-  pipeIsClosed    <- newTVarIO False
+  pipeReadClosed  <- newTVarIO False
   mdo
     pipeAsyncMngr <- newAsyncManager p
     let p = Pipe { .. }
     pure p
 
--- | Cleanly close our end of the Pipe, terminating the async manager's
--- drain-read-end thread. Calling 'closePipe' on an already closed pipe is a no-op.
+-- | Cleanly close our ends of the Pipe, terminating the async manager's
+-- drain-read-end thread. Also calls 'pipeCloseRead' and 'pipeCloseWrite', in that order.
 --
--- If the pipe was created using 'mkPipeFromHandles', the handles must only by
--- closed after calling 'closePipe'.
+-- If the pipe was created using 'mkPipeFromHandles', the handles are also closed.
 --
 -- The requests we've sent that are pending are all canceled with
--- 'PipeClosedException' by ourselves.
+-- 'PipeReadClosedException' by ourselves.
 --
--- The remote process does not necessarily detect that this end of the pipe was
--- closed, but it must handle cleanly and clean up after exceptions caused from
--- it such as a handle being closed.
+-- No special notification is sent to the remote process, a message to that
+-- effect should be sent ahead of time if one is needed (see 'Shutdown').
 closePipe :: Pipe -> IO ()
 closePipe Pipe{..} = do
 
-  isAlreadyClosed <- atomically $ swapTVar pipeIsClosed True
+  readAlreadyClosed <- atomically $ swapTVar pipeReadClosed True
 
-  unless isAlreadyClosed $ do
+  -- this triggers pipeCloseRead
+  unless readAlreadyClosed $ do
 
     -- releases handle lock taken by reading, and cleans up by replying to every
-    -- pending request with 'PipeClosedException'.
-    throwTo (asyncDrainTid pipeAsyncMngr) PipeClosedException
+    -- pending request with 'PipeReadClosedException'.
+    throwTo (asyncDrainTid pipeAsyncMngr) PipeReadClosedException
 
--- | We've closed the pipe on our end and we terminate all pending requests with this.
-data PipeClosedException = PipeClosedException deriving Show
-instance Exception PipeClosedException
+  pipeCloseWrite
+
+-- | We've closed the pipe read end on this process
+data PipeReadClosedException = PipeReadClosedException deriving Show
+instance Exception PipeReadClosedException
 
 --------------------------------------------------------------------------------
 -- ** Pipe thread-safe read/write
@@ -186,7 +197,8 @@ remoteAsyncReq pipe msg ii = do
   wv <- newEmptyTMVarIO
 
   isClosed <- atomically $ do
-    isClosed <- readTVar (pipeIsClosed pipe)
+    isClosed <- readTVar (pipeReadClosed pipe)
+                -- don't send the req if we won't get a reply.
     if isClosed
       then pure True
       else do
@@ -194,7 +206,7 @@ remoteAsyncReq pipe msg ii = do
         pure False
 
   when isClosed $ do
-    throwIO PipeClosedException
+    throwIO PipeReadClosedException
 
   -- Write request
   writePipe pipe (Request uq ii (runPut msg))
@@ -223,7 +235,7 @@ handleAsyncReq pipe getit mii k = mask $ \restore -> do
 
   -- Block waiting for request
   mbreq <- atomically $ do
-    isClosed <- readTVar (pipeIsClosed pipe)
+    isClosed <- readTVar (pipeReadClosed pipe)
     taken <- case mii of
       Nothing -> tryReadTQueue  $  requestsQueue am
       Just ii -> tryReadTQueue =<< getMailbox am ii
@@ -233,7 +245,7 @@ handleAsyncReq pipe getit mii k = mask $ \restore -> do
                | otherwise -> retry -- wait for msg
 
   case mbreq of
-    Nothing -> throwIO PipeClosedException
+    Nothing -> throwIO PipeReadClosedException -- can't expect reqs
     Just (uq, bs) -> do
       let reply p = do
             writePipe pipe (Reply uq (bimap toSerializableException runPut p))
@@ -370,8 +382,10 @@ newAsyncManager pipe = do
 -- In pratice, we'll have both a thread draining the read end of the host's
 -- 'Pipe' and a thread draining the read end of the interpreter's 'Pipe', since
 -- both processes construct a 'Pipe' and send and receive messages
+--
+-- Closes the Pipe read end when done reading
 drainPipe :: Pipe -> (forall x. IO x -> IO x) -> IO ()
-drainPipe p unmask = catch (unmask loop) replyToPendings where
+drainPipe p unmask = catch (unmask $ loop `finally` pipeCloseRead p) replyToPendings  where
   loop = do
     readPipe p >>= \case
       -- Receive a reply to a pending notification
@@ -402,11 +416,13 @@ drainPipe p unmask = catch (unmask loop) replyToPendings where
       -- EOF on read handle
       Nothing -> do
         -- clean up pipe then exit loop
-        replyToPendings (toException PipeClosedException)
+        replyToPendings (toException PipeReadClosedException)
         pure ()
 
   replyToPendings e = atomically $ do
-    writeTVar (pipeIsClosed p) True
+    -- reqs are only added if pipe not closed;
+    -- thus we close and take all pending atomically.
+    writeTVar (pipeReadClosed p) True
     pendings <- swapTVar (pendingReply am) IntMap.empty -- take pending
     mapM_ (\p -> putTMVar p (Left e {-host exception-})) pendings
 
