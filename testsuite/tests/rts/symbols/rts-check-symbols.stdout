@@ -73,10 +73,10 @@ Observed> collect_pointers Code
 Observed> compact_nfdata_full_sizeW Code
 Observed> containsSpan Code
 Observed> continuation_sizeW Code
-Observed> createAttachedOSThread Code
 Observed> createGenThread Code
 Observed> createIOThread Code
 Observed> createOSThread Code
+Observed> createPThread Code
 Observed> createStrictIOThread Code
 Observed> createThread Code
 Observed> currentWorkerCount Data

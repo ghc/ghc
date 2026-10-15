@@ -61,9 +61,11 @@
 #include "Timer.h"
 #include "RtsUtils.h"
 #include "Proftimer.h"
+
 #include "Schedule.h"
 #include "posix/Clock.h"
 #include "posix/FdWakeup.h"
+#include "posix/OSThreads.h"
 
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
 /* We prefer the ppoll() function if available since it allows sanely waiting
@@ -238,6 +240,10 @@ Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
      */
     newFdWakeup(&timer->notifyfd_r, &timer->notifyfd_w);
 
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    /* We will use pthread_join on this thread later */
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     /*
      * Create the thread with all blockable signals blocked, leaving signal
      * handling to the main and/or other threads.  This is especially useful in
@@ -248,8 +254,9 @@ Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
     sigfillset(&mask);
     sigret = pthread_sigmask(SIG_SETMASK, &mask, &omask);
 #endif
-    ret = createAttachedOSThread(&timer->thread_id, "ghc_timer",
-                                 timer_thread_func, (void*)timer);
+    ret = createPThread(&timer->thread_id, "ghc_timer",
+                        timer_thread_func, (void*)timer,
+                        &attr);
 #if defined(HAVE_SIGNAL_H)
     if (sigret == 0)
         pthread_sigmask(SIG_SETMASK, &omask, NULL);
