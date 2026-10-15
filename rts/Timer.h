@@ -16,13 +16,18 @@ typedef struct Timer Timer; // opaque
 typedef void (*TimerHandler)(void*);
 
 enum TimerHandlerHint {
-    /* The handler promises to run for a short (and certainly bounded) time.
-     * In particular this means no locks and no I/O.
+    /* The handler promises to:
+     * 1. Run for a short (and certainly bounded) time. In particular this
+     *    means no locks and no I/O.
+     * 2. Use bounded and modest stack space. In particular this means no calls
+     *    to arbitrary user code.
+     *
+     * This combination allows implementation(s) to save resources.
      */
     TimerHandlerShortRunning,
 
     /* The handler may be long running or may block, e.g. taking locks or
-     * performing I/O.
+     * performing I/O, or may use significant stack depth.
      */
     TimerHandlerLongRunning
 };

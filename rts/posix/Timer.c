@@ -132,6 +132,8 @@ struct Timer {
     TimerHandler handler;
     void        *handler_arg;
 
+    enum TimerHandlerHint hint;
+
     /* For periodic timers this is the tick interval. */
     Time interval;
 
@@ -209,7 +211,7 @@ static void *timer_thread_func(void *_timer)
  * The timer is started in the paused state. Use unpauseTimer to continue.
  */
 Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
-                        enum TimerHandlerHint timerhint STG_UNUSED,
+                        enum TimerHandlerHint hint,
                         Time interval)
 {
     ASSERT(interval > 0);
@@ -220,6 +222,7 @@ Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
     timer->handler_arg   = handler_arg;
     timer->pause_request = true;
     timer->exit_request  = false;
+    timer->hint          = hint;
 
     /* Open the interrupt fd synchronously.
      *
@@ -238,6 +241,11 @@ Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
     pthread_attr_init(&attr);
     /* We will use pthread_join on this thread later */
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+    /* Save resources for timers that do little by using a smaller stack. */
+    if (timer->hint == TimerHandlerShortRunning) {
+        pthread_attr_setstacksize(&attr, PTHREAD_STACK_MIN);
+    }
 
     /*
      * Create the thread with all blockable signals blocked, leaving signal
