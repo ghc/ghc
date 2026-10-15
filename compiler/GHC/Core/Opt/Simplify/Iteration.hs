@@ -2410,7 +2410,8 @@ simplOutId env noinline_fun cont
                              `App` Type rep
                              `App` Type new_call_ty
                              `App` call1
-       ; (floats2, res) <- rebuild env noinline_expr rest_cont
+       ; (floats2, res) <- rebuild (env `setInScopeFromF` floats1)
+                                   noinline_expr rest_cont
        ; return (floats1 `addFloats` floats2 , res) }
   where
 

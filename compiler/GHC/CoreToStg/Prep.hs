@@ -1137,7 +1137,7 @@ cpeApp top_env expr
                Nothing    -> do { massert (null unsat_ticks); return (floats, app) }
                Just fn_id -> return (floats, maybeSaturate fn_id app depth unsat_ticks) }
         where
-          depth = val_args args
+          depth = count_val_args args
           stricts = case idDmdSig v of
                             DmdSig (DmdType _ demands)
                               | listLengthCmp demands depth /= GT -> demands
@@ -1166,24 +1166,20 @@ cpeApp top_env expr
            ; return (floats, app) }
 
     -- Count the number of value arguments *and* coercions (since we don't eliminate the later in STG)
-    val_args :: [ArgInfo] -> Int
-    val_args args = go args 0
+    count_val_args :: [ArgInfo] -> Int
+    count_val_args args = go args 0
       where
         go [] !n = n
         go (info:infos) n =
           case info of
-            AICast {} -> go infos n
             AITick tickish
-              | tickishFloatable tickish                 -> go infos n
+              | tickishFloatable tickish -> go infos n
+              | otherwise                -> n  -- Stop now
               -- If we can't guarantee a tick will be floated out of the application
               -- we can't guarantee the value args following it will be applied.
-              | otherwise                             -> n
-            AIApp e                                  -> go infos n'
-              where
-                !n'
-                  | isTypeArg e = n
-                  | otherwise   = n+1
-
+            AIApp e | isTypeArg e -> go infos n
+                    | otherwise   -> go infos (n+1)
+            AICast {} -> go infos n
 
     -- Deconstruct and rebuild the application, floating any non-atomic
     -- arguments to the outside.  We collect the type of the expression,
@@ -1221,8 +1217,8 @@ cpeApp top_env expr
     rebuild_app' env (a : as) fun' floats ss rt_ticks req_depth = case a of
       -- See Note [Ticks and mandatory eta expansion]
       _ | not (null rt_ticks), req_depth <= 0
-        -> let tick_fun = foldr mkTickCpe fun' rt_ticks
-           in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
+        -> let ticked_fun = foldr mkTickCpe fun' rt_ticks
+           in rebuild_app' env (a : as) ticked_fun floats ss rt_ticks req_depth
 
       AIApp (Type arg_ty)
         -> rebuild_app' env as (App fun' (Type arg_ty')) floats ss rt_ticks req_depth
@@ -1265,6 +1261,14 @@ isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
 isLazyExpr _                       = False
 
 eliminateMagicCall :: Id -> [ArgInfo] -> Maybe (CoreExpr, [ArgInfo])
+
+-- Ugh!  Simply discard ticks enclosing one of these magic Ids
+-- e.g.   (Tick t (Var noInlineId)) `TyApp` t1 `TyApp` t2
+--      We must see those type applications or we'll end up in
+--      a panic.  When we fix #27141 this may become irrelevant
+eliminateMagicCall f (AITick {} : all_args)
+  = eliminateMagicCall f all_args
+
 eliminateMagicCall f all_args
   -- Replace (lazy a) with a, and
   -- See Note [lazyId magic] in GHC.Types.Id.Make
