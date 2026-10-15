@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team 2005
  *
- * Interface to the OS-specific implementation of a regular time signal.
+ * Interface to the OS-specific implementation of periodic timers.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -10,12 +10,19 @@
 
 #include "BeginPrivate.h"
 
+
 typedef struct Timer Timer; // opaque
 
-typedef void (*TickProc)(int);
+typedef void (*TimerHandler)(void*);
 
-/* The timer is initialised in a paused state. Use unpauseTimer to start. */
-Timer *initTimer(Time interval, TickProc handle_tick);
+/* Create a new periodic timer, with the given handler and interval.
+ *
+ * A periodic timer is one that calls the tick handler every interval.
+ *
+ * The timer is initialised in a paused state. Use unpauseTimer to start.
+ */
+Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
+                        Time interval);
 
 /* Stop the timer prior to releasing resources with freeTimer().
  * The haltTimer action is *synchronous*. When it returns the caller is

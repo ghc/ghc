@@ -45,7 +45,7 @@ static int ticks_to_eventlog_flush = 0;
  */
 static
 void
-handle_tick(int unused STG_UNUSED)
+handle_tick(void *unused STG_UNUSED)
 {
   handleProfTick(); // Bad or worse: see issue #27250.
 
@@ -86,7 +86,8 @@ void initTimers(void)
     }
 
     if (RtsFlags.MiscFlags.tickInterval != 0) {
-        main_timer = initTimer(RtsFlags.MiscFlags.tickInterval, handle_tick);
+        main_timer = newPeriodicTimer(handle_tick, NULL,
+                                      RtsFlags.MiscFlags.tickInterval);
     }
 #endif
 }

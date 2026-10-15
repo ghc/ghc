@@ -126,8 +126,9 @@ struct Timer {
      */
     OSThreadId thread_id;
 
-    /* The tick handler function. */
-    TickProc handle_tick;
+    /* The timer handler function and argument. */
+    TimerHandler handler;
+    void        *handler_arg;
 
     /* For periodic timers this is the tick interval. */
     Time interval;
@@ -176,7 +177,7 @@ static void *timer_thread_func(void *_timer)
 
         if (RTS_LIKELY(notify == 0)) {
             // The time expired, no state change notification.
-            timer->handle_tick(0);
+            timer->handler(timer->handler_arg);
 
         } else if (notify > 0) {
             // State change notification, check the request variables.
@@ -201,17 +202,19 @@ static void *timer_thread_func(void *_timer)
     return NULL;
 }
 
-/* Initialise the timer on startup or re-initialise the timer after a fork().
- * In the fork case, the thread will not be present, but fds are inherited.
+/* Create a new periodic timer.
  *
  * The timer is started in the paused state. Use unpauseTimer to continue.
  */
-Timer *initTimer(Time interval, TickProc handle_tick)
+Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
+                        Time interval)
 {
+    ASSERT(interval > 0);
     Timer *timer = stgMallocBytes(sizeof(struct Timer), "newPeriodicTimer");
 
     timer->interval      = interval;
-    timer->handle_tick   = handle_tick;
+    timer->handler       = handler;
+    timer->handler_arg   = handler_arg;
     timer->pause_request = true;
     timer->exit_request  = false;
 

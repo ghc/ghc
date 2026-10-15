@@ -26,7 +26,8 @@
 struct Timer {
     Mutex    lock;
     HANDLE   timer;
-    TickProc handle_tick;
+    TimerHandler handler;
+    void        *handler_arg;
     DWORD    interval; // milliseconds
     bool     paused;
 };
@@ -39,7 +40,8 @@ static int    timer_count     = 0;
 static void startTimer_(Timer *timer);
 static void stopTimer_(Timer *timer, bool synchronous);
 
-void initTimer (Time interval, TickProc handle_tick)
+Ticker *newPeriodicTimer(TimerHandler handler, void *handler_arg,
+                         Time interval)
 {
     OS_ACQUIRE_LOCK(timer_queue_lock);
     timer_count++;
@@ -58,7 +60,8 @@ void initTimer (Time interval, TickProc handle_tick)
     Timer *timer = stgMallocBytes(sizeof(struct Timer), "newPeriodicTimer");
     OS_INIT_LOCK(&timer->lock);
     timer->timer       = NULL;
-    timer->handle_tick = handle_tick;
+    timer->handler     = handler;
+    timer->handler_arg = handler_arg;
     timer->interval    = stg_min((DWORD) 1, TimeToMS(interval));
     timer->paused      = true; // starts paused
 }
@@ -124,7 +127,7 @@ static VOID CALLBACK tick_callback (PVOID lpParameter,
                                     BOOLEAN TimerOrWaitFired STG_UNUSED)
 {
     Timer *timer = (Timer *) lpParameter;
-    timer->handle_tick();
+    timer->handler(timer->handler_arg);
 }
 
 static void startTimer_(Timer *timer) {
