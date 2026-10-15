@@ -224,11 +224,13 @@ handleAsyncReq pipe getit mii k = mask $ \restore -> do
   -- Block waiting for request
   mbreq <- atomically $ do
     isClosed <- readTVar (pipeIsClosed pipe)
-    if isClosed
-      then return Nothing
-      else Just <$> case mii of
-        Nothing -> readTQueue  $  requestsQueue am
-        Just ii -> readTQueue =<< getMailbox am ii
+    taken <- case mii of
+      Nothing -> tryReadTQueue  $  requestsQueue am
+      Just ii -> tryReadTQueue =<< getMailbox am ii
+    case taken of
+      Just req -> pure (Just req)
+      Nothing  | isClosed  -> pure Nothing -- empty and closed
+               | otherwise -> retry -- wait for msg
 
   case mbreq of
     Nothing -> throwIO PipeClosedException
