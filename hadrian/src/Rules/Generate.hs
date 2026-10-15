@@ -492,24 +492,36 @@ bindistRules = do
       , crossStageInterps
       ]
 
-  -- We can build two kinds of bindists: Regular Stage2 (including
-  -- cross-compilers) and fully cross-compiled Stage3. To avoid
-  -- race-conditions, stale files, etc. build the `configure` scripts as part
-  -- of the stage's _build files. This requires copying several files such that
-  -- they are available to the autoconf run.
+  -- Note [Bindist configure autoconf srcdir]
+  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  -- We can build binary distributions for several stages. These may need
+  -- different `configure` scripts. To avoid race-conditions on temporary
+  -- autoconf files (including `configure`), we generate those in the stages'
+  -- dedicated build folders (`_build/<stage>`).
+  --
+  -- The generated `configure.ac` lives in `_build/<stage>/distrib`, while the
+  -- m4 macros are one level up in _build/<stage>/m4. This mirrors the
+  -- repository layout, where `distrib/configure.ac.in` refers to the macros
+  -- via AC_CONFIG_MACRO_DIRS([../m4]) (i.e. the repository's top-level `m4/`).
+  -- Keeping the same relative layout means the template needs no change.
+  --
+  -- We deliberately do *not* copy the top-level `aclocal.m4`: its m4_include
+  -- directives are relative to the directory aclocal first ran in. Instead we
+  -- run autoreconf next to the staged `configure.ac` and let aclocal pick the
+  -- macro directory up from its AC_CONFIG_MACRO_DIRS([../m4]), regenerating
+  -- `aclocal.m4` with `../m4/...` includes that resolve from there.
+  --
+  -- The other copied files need to be present for autoconf and/or autoreconf.
   forM_ [Stage1, Stage2] $ \stage -> do
-    let distribDir = root -/- stageString stage -/- "distrib"
-
-    distribDir -/- "aclocal.m4" %> \out -> do
-      top <- topDirectory
-      copyFile (top -/- "aclocal.m4") out
+    let stageDir   = root -/- stageString stage
+        distribDir = stageDir -/- "distrib"
 
     forM_ ["config.sub", "config.guess", "install-sh"] $ \f ->
       distribDir -/- f %> \out -> do
         top <- topDirectory
         copyFile (top -/- f) out
 
-    distribDir -/- "m4/*.m4" %> \out -> do
+    stageDir -/- "m4/*.m4" %> \out -> do
       top <- topDirectory
       copyFile (top -/- "m4" -/- takeFileName out) out
 
@@ -520,9 +532,8 @@ bindistRules = do
              , distribDir -/- "config.sub"
              , distribDir -/- "config.guess"
              , distribDir -/- "install-sh"
-             , distribDir -/- "aclocal.m4"
              ]
-           ++ [ distribDir -/- "m4" -/- takeFileName f | f <- m4Files ]
+           ++ [ stageDir -/- "m4" -/- takeFileName f | f <- m4Files ]
 
       -- Note [Autoreconf unix paths from ACLOCAL_PATH]
       -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
