@@ -22,8 +22,7 @@ import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.Opt.Simplify.Utils
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs )
-import GHC.Core.Make hiding( wrapFloats )
-import qualified GHC.Core.Make
+import GHC.Core.Make
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Reduction
@@ -57,7 +56,6 @@ import GHC.Types.Demand
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Types.Var    ( isTyCoVar )
 
 import GHC.Builtin.WiredIn.Prim( realWorldStatePrimTy )
 import GHC.Builtin.KnownKeys( runRWKey, seqHashKey )
@@ -66,7 +64,8 @@ import GHC.Builtin.WiredIn.Ids( seqId )
 import qualified GHC.Data.List.Infinite as Inf
 import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
 import GHC.Data.FastString
-import GHC.Data.OrdList ( unitOL )
+import GHC.Data.OrdList ( unitOL, isNilOL, appOL, snocOL, foldlOL )
+import GHC.Types.Var.Env ( InScopeSet )
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -352,25 +351,27 @@ simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
         ; (body_floats0, body0) <- {-#SCC "simplExprF" #-} simplExprF body_env body rhs_cont
 
         -- ANF-ise a constructor or PAP rhs
-        ; (body_floats2, body2) <- {-#SCC "prepareBinding" #-}
-                                   prepareBinding env top_lvl is_rec
-                                                  False  -- Not strict; this is simplLazyBind
-                                                  bndr1 body_floats0 body0
+        ; (body_lets, lets_in_scope, body2)
+              <- {-#SCC "prepareBinding" #-}
+                 prepareBinding env top_lvl is_rec
+                                               bndr1 (contResultType rhs_cont)
+                                               body_floats0 body0
           -- Subtle point: we do not need or want tvs' in the InScope set
           -- of body_floats2, so we pass in 'env' not 'body_env'.
           -- Don't want: if tvs' are in-scope in the scope of this let-binding, we may do
           -- more renaming than necessary => extra work (see !7777 and test T16577).
           -- Don't need: we wrap tvs' around the RHS anyway.
 
+        ; let body_floats2 = mkLetSimplFloats lets_in_scope body_lets
         ; (rhs_floats, body3)
-            <-  if isEmptyFloats body_floats2 || null tvs then   -- Simple floating
+            <-  if isNilOL body_lets || null tvs then   -- Simple floating
                      {-#SCC "simplLazyBind-simple-floating" #-}
                      return (body_floats2, body2)
 
                 else -- Non-empty floats, and non-empty tyvars: do type-abstraction first
                      {-#SCC "simplLazyBind-type-abstraction-first" #-}
-                     do { (poly_binds, body3) <- abstractFloats (seUnfoldingOpts env) top_lvl
-                                                                tvs' body_floats2 body2
+                     do { (poly_binds, body3) <- abstractFloats (seUnfoldingOpts env) top_lvl tvs'
+                                                                lets_in_scope body_lets body2
                         ; let poly_floats = foldl' extendFloats (emptyFloats env) poly_binds
                         ; return (poly_floats, body3) }
 
@@ -430,7 +431,7 @@ simplAuxBind (saf,env) bndr new_rhs
   = do  { -- ANF-ise the RHS
           let !occ_fs = getOccFS bndr
         ; (anf_floats, rhs1) <- prepareRhs env NotTopLevel occ_fs new_rhs
-        ; unless (isEmptyLetFloats anf_floats) (tick LetFloatFromLet)
+        ; unless (isNilOL anf_floats) (tick LetFloatFromLet)
         ; let rhs_floats = emptyFloats env `addLetFloats` anf_floats
 
           -- Simplify the binder and complete the binding
@@ -632,15 +633,14 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
   = do  { uniq <- getUniqueM
         ; let work_name = mkSystemVarName uniq occ_fs
               work_id   = mkLocalIdWithInfo work_name ManyTy work_ty work_info
-              is_strict = isStrictId bndr
 
-        ; (rhs_floats, work_rhs) <- prepareBinding env top_lvl is_rec is_strict
-                                                   work_id (emptyFloats env) rhs
+        ; (rhs_lets, lets_in_scope, work_rhs)
+              <- prepareBinding env top_lvl is_rec work_id work_ty (emptyFloats env) rhs
 
         ; work_unf <- mk_worker_unfolding top_lvl work_id work_rhs
         ; let  work_id_w_unf = work_id `setIdUnfolding` work_unf
-               floats   = rhs_floats `addLetFloats`
-                          unitLetFloat (NonRec work_id_w_unf work_rhs)
+               floats   = mkLetSimplFloats lets_in_scope rhs_lets `addLetFloat`
+                          NonRec work_id_w_unf work_rhs
 
                triv_rhs = Cast (Var work_id_w_unf) co
 
@@ -718,10 +718,12 @@ mkCastWrapperInlinePrag prag = prag
 *                                                                      *
 ********************************************************************* -}
 
-prepareBinding :: SimplEnv -> TopLevelFlag -> RecFlag -> Bool
-               -> Id   -- Used only for its OccName; can be InId or OutId
+prepareBinding :: SimplEnv -> TopLevelFlag -> RecFlag
+               -> Id       -- Used only for its OccName; can be InId or OutId
+               -> OutType  -- The type of the RHS
                -> SimplFloats -> OutExpr
-               -> SimplM (SimplFloats, OutExpr)
+               -> SimplM (LetFloats, InScopeSet, OutExpr)
+                  -- The InScopeSet includes the binders of the LetFloats
 -- In (prepareBinding ... bndr floats rhs), the binding is really just
 --    bndr = let floats in rhs
 -- Maybe we can ANF-ise this binding and float out; e.g.
@@ -732,8 +734,8 @@ prepareBinding :: SimplEnv -> TopLevelFlag -> RecFlag -> Bool
 --    bndr = K a a tmp
 -- That's what prepareBinding does
 -- Precondition: binder is not a JoinId
--- Postcondition: the returned SimplFloats contains only let-floats
-prepareBinding env top_lvl is_rec strict_bind bndr rhs_floats rhs
+-- Postcondition: returns only let-bindings; see Note [prepareBinding]
+prepareBinding env top_lvl is_rec bndr rhs_ty rhs_floats rhs
   = do { -- Never float join-floats out of a non-join let-binding (which this is)
          -- So wrap the body in the join-floats right now
          -- Hence: rhs_floats1 consists only of let-floats
@@ -749,16 +751,73 @@ prepareBinding env top_lvl is_rec strict_bind bndr rhs_floats rhs
        ; (anf_floats, rhs2) <- prepareRhs rhs_env top_lvl occ_fs rhs1
 
        -- Finally, decide whether or not to float
-       ; let all_floats = rhs_floats1 `addLetFloats` anf_floats
-       ; if doFloatFromRhs (seFloatEnable env) top_lvl is_rec strict_bind all_floats rhs2
-         then -- Float!
-              do { tick LetFloatFromLet
-                 ; return (all_floats, rhs2) }
+       -- The anf_floats are already let-bindings, so we need not add them
+       -- to rhs_floats1 (and its in-scope set) just to check them
+       ; case onlyLazyLetFloats rhs_floats1 anf_floats of
+           Just (all_lets, ff)   -- Float only lazy or ok-for-spec let-bindings
+                                 -- See Note [prepareBinding]
+             | doFloatFromRhs (seFloatEnable env) top_lvl is_rec all_lets ff rhs2
+             -> do { tick LetFloatFromLet
+                   ; let !in_scope = foldlOL extendInScopeSetBind
+                                             (sfInScope rhs_floats1) anf_floats
+                           -- rhs_floats1 already has the binders of its own floats
+                   ; return (all_lets, in_scope, rhs2) }
 
-         else -- Abandon floating altogether; revert to original rhs
-              -- Since we have already built rhs1, we just need to add
-              -- rhs_floats1 to it
-              return (emptyFloats env, wrapFloats rhs_floats1 rhs1) }
+           _ -> -- Abandon floating altogether; revert to original rhs
+                -- Since we have already built rhs1, we just need to add
+                -- rhs_floats1 to it
+                do { rhs' <- simplWrapFloats (seMode env) rhs_floats1 rhs1 rhs_ty
+                   ; return (emptyLetFloats, seInScope env, rhs') } }
+
+{- Note [prepareBinding]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+In (prepareBinding ... bndr floats rhs), the binding is really
+   bndr = let floats in rhs
+and prepareBinding decides whether to float the floats out, so that we get
+   floats; bndr = rhs
+using doFloatFromRhs to make the decision.  First it ANF-ises the RHS with
+prepareRhs, which may add more floats.
+
+prepareBinding floats only let-bindings, and only lazy or ok-for-speculation
+ones (FltLifted or FltOkSpec): if any of the floats is a case-float, a tick-float,
+or a FltCareful let-binding, it floats nothing.  So it returns just let-bindings
+(LetFloats), and doFloatFromRhs is concerned only with let-bindings.  All this is
+done by onlyLazyLetFloats, in a single pass over the floats.
+
+We never float a FltCareful let-binding (a strict one whose RHS is not
+ok-for-speculation), even out of the RHS of a strict binding: we just don't
+think it is worth it.  See (FFL1) in Note [FloatFlag for FloatLet] in
+GHC.Core.Opt.Simplify.Env.
+
+Why not float case-floats and tick-floats too?
+
+(PB1) If the RHS of a lazy binding is  /\tvs. body  (with no value lambda),
+  simplLazyBind strips off the type lambdas, simplifies the body, and calls
+  prepareBinding on the body.  If prepareBinding floats anything, simplLazyBind
+  must then abstract those floats over the `tvs`, with abstractFloats; see
+  Note [Floating and type abstraction] in GHC.Core.Opt.Simplify.Utils.  But
+  abstractFloats can only deal with let-bindings: a case-float binds pattern
+  variables strictly, and cannot be abstracted over the `tvs`.  T27737a was a
+  panic arising from a case-float reaching abstractFloats.
+
+(PB2) For a tick-float, see Note [Tick-floats] in GHC.Core.Opt.Simplify.Env.
+
+(PB3) It is simple, and before case-floats existed, a case simply stayed in the
+  RHS, so we lose nothing compared to that.
+
+(PB4) Lost opportunity.  Consider
+     x = case addIntC# a b of (# r, c #) -> K r c
+  The scrutinee is ok-for-speculation, so we /could/ float the case-float out,
+  to get
+     case addIntC# a b of (# r, c #) -> let x = K r c in ...
+  Now x is bound to a value, so case-of-known-constructor can see through it.
+  That is just what we do for a strict let with an ok-for-speculation RHS (which
+  is FltOkSpec).  But we would need to classify case-floats with a FloatFlag
+  (FltOkSpec if the scrutinee is ok-for-speculation, otherwise FltCareful), and
+  to avoid floating them when they must be abstracted over type variables (PB1).
+  We do not currently do this; the simplicity of returning only let-bindings
+  seems to be worth more.
+-}
 
 {- Note [prepareRhs]
 ~~~~~~~~~~~~~~~~~~~~
@@ -817,7 +876,7 @@ prepareRhs env top_lvl occ rhs0
     anfise (App fun arg)
         = do { (floats1, fun') <- anfise fun
              ; (floats2, arg') <- makeTrivial env top_lvl topDmd occ arg
-             ; return (floats1 `addLetFlts` floats2, App fun' arg') }
+             ; return (floats1 `appOL` floats2, App fun' arg') }
     anfise (Var fun)
         = return (emptyLetFloats, Var fun)
 
@@ -883,43 +942,69 @@ makeTrivial env top_lvl dmd occ_fs expr
               bind     = NonRec final_id expr2
 
         ; traceSmpl "makeTrivial" (vcat [text "final_id" <+> ppr final_id, text "rhs" <+> ppr expr2 ])
-        ; return ( floats `addLetFlts` unitLetFloat bind, Var final_id ) }
+        ; return ( assertPpr (not (needsCaseBinding expr_ty expr2)) (ppr bind) $
+                         -- See bindingOk and Note [Cannot trivialise]
+                   floats `snocOL` bind, Var final_id ) }
   where
     id_info = vanillaIdInfo `setDemandInfo` dmd
     expr_ty = exprType expr
 
 bindingOk :: TopLevelFlag -> CoreExpr -> Type -> Bool
--- True iff we can have a binding of this expression at this level
+-- True iff we can have a let-binding of this expression at this level
 -- Precondition: the type is the type of the expression
+-- See Note [Cannot trivialise]
 bindingOk top_lvl expr expr_ty
   | isTopLevel top_lvl = exprIsTopLevelBindable expr expr_ty
-  | otherwise          = True
+  | otherwise          = not (needsCaseBinding expr_ty expr)
 
 {- Note [Cannot trivialise]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider:
-   f :: Int -> Addr#
+The goal of makeTrivial (when called from prepareRhs) is to transform
+    x = Just (f y)
+into
+    x = let z = f y in Just z
+and thence, by floating, into
+    z = f y
+    x = Just z
+so that x is bound to a value.  It returns only let-bindings (LetFloats), so
+sometimes it cannot trivialise its argument, and must return it unchanged.
 
-   foo :: Bar
-   foo = Bar (f 3)
+(CT1) Nested bindings.  Suppose that (f y) had type Int#, with a different data
+  constructor Just' :: Int# -> T.  Then we cannot let-bind (f y), because that
+  would violate the let-can-float invariant (unless (f y) is ok-for-speculation).
+  We could case-bind it instead, to get
+       x = case f y of r -> Just' r
+  but there is no point: x is no more of a value than it was before.  So we
+  lose nothing by not trivialising (f y); CorePrep will case-bind it anyway.
+  Hence the needsCaseBinding test in bindingOk.  (See also #27910.)
 
-Then we can't ANF-ise foo, even though we'd like to, because
-we can't make a top-level binding for the Addr# (f 3). And if
-so we don't want to turn it into
-   foo = let x = f 3 in Bar x
-because we'll just end up inlining x back, and that makes the
-simplifier loop.  Better not to ANF-ise it at all.
+  makeTrivialArg, called from mkDupableCont, may therefore return a non-trivial
+  argument, which may then be duplicated into several branches.  That duplicates
+  code but not work, since only one branch is executed.
 
-Literal strings are an exception.
+(CT2) Top-level bindings.  Consider:
+     f :: Int -> Addr#
 
-   foo = Ptr "blob"#
+     foo :: Bar
+     foo = Bar (f 3)
 
-We want to turn this into:
+  Then we can't ANF-ise foo, even though we'd like to, because
+  we can't make a top-level binding for the Addr# (f 3). And if
+  so we don't want to turn it into
+     foo = let x = f 3 in Bar x
+  because we'll just end up inlining x back, and that makes the
+  simplifier loop.  Better not to ANF-ise it at all.
 
-   foo1 = "blob"#
-   foo = Ptr foo1
+  Literal strings are an exception.
 
-See Note [Core top-level string literals] in GHC.Core.
+     foo = Ptr "blob"#
+
+  We want to turn this into:
+
+     foo1 = "blob"#
+     foo = Ptr foo1
+
+  See Note [Core top-level string literals] in GHC.Core.
 
 ************************************************************************
 *                                                                      *
@@ -1195,7 +1280,7 @@ simplExprC env expr cont
         ; -- pprTrace "simplExprC ret" (ppr expr $$ ppr expr') $
           -- pprTrace "simplExprC ret3" (ppr (seInScope env')) $
           -- pprTrace "simplExprC ret4" (ppr (seLetFloats env')) $
-          return (wrapFloats floats expr') }
+          simplWrapFloats (seMode env) floats expr' (contResultType cont) }
 
 --------------------------------------------------
 simplExprF :: SimplEnv
@@ -1392,6 +1477,13 @@ work. T5631 is a good example of this.
   emit it into the output program, after obtaining it from
   contResultType. (The hole type in ApplyToTy is only directly used
   to form the result type in a new Stop continuation.)
+
+- In particular, the type annotation on a Case is forced by returnCase in
+  GHC.Core.Opt.Simplify.Utils, where the Case is finally built (via mkCase, or
+  directly).  Its callers
+  should not force it themselves: e.g. simplWrapFloats is given the type of the
+  body, but needs it only if there is a case-float, and forcing it in other
+  cases can do a lot of unnecessary work.
 -}
 
 ---------------------------------
@@ -1509,7 +1601,7 @@ simplTick env tickish expr cont
   -- notably single-alternative case floats) remains covered, as soft scope
   -- requires; and yet `expr'` is exposed to the caller, e.g. for
   -- case-of-known-constructor in rebuildWithFloats.
-  -- See Note [FloatFlag for FloatTick] in GHC.Core.Opt.Simplify.Env
+  -- See Note [Tick-floats] in GHC.Core.Opt.Simplify.Env
   | tickishHasSoftScope tickish
   = do { (floats, expr') <- simplExprF env expr cont
        ; return (unitOL (FloatTick tickish) `addFloatBindsF` floats, expr') }
@@ -1549,9 +1641,8 @@ simplTick env tickish expr cont
 
   no_floating_past_tick =
     do { let (inc,outc) = splitCont cont
-       ; (floats, expr1) <- simplExprF env expr inc
-       ; let expr2    = wrapFloats floats expr1
-             tickish' = simplTickish env tickish
+       ; expr2 <- simplExprC env expr inc
+       ; let tickish' = simplTickish env tickish
        ; rebuild env (mkTick tickish' expr2) outc
        }
 
@@ -1651,7 +1742,8 @@ rebuildWithFloats env floats expr cont
        ; return (floats `addFloats` floats2, res) }
 
   | otherwise
-  = rebuild env (wrapFloats floats expr) cont
+  = do { expr' <- simplWrapFloats (seMode env) floats expr (contHoleType cont)
+       ; rebuild env expr' cont }
 
 rebuild_go :: HasDebugCallStack
            => SimplEnvIS -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
@@ -1707,24 +1799,22 @@ completeBindX env from_what bndr rhs body cont
   = do { (env1, bndr1)   <- simplNonRecBndr env bndr  -- Lambda binders don't have rules
        ; (floats, expr') <- simplNonRecBody env1 from_what body cont
        -- Do not float floats past the Case binder below
-       ; let expr'' = wrapFloats floats expr'
-             case_expr = Case rhs bndr1 (contResultType cont) [Alt DEFAULT [] expr'']
+       ; let res_ty = contResultType cont
+       ; expr'' <- simplWrapFloats (seMode env) floats expr' res_ty
+       ; case_expr <- returnCase rhs bndr1 res_ty [Alt DEFAULT [] expr'']
        ; return (emptyFloats env, case_expr) }
 
   | otherwise -- Make a let-binding
   = do  { (env1, bndr1) <- simplNonRecBndr env bndr
         ; (env2, bndr2) <- addBndrRules env1 bndr bndr1 (BC_Let NotTopLevel NonRecursive)
 
-        ; let is_strict = isStrictId bndr2
-              -- isStrictId: use simplified binder because the InId bndr might not have
-              -- a fixed runtime representation, which isStrictId doesn't expect
-              -- c.f. Note [Dark corner with representation polymorphism]
-
-        ; (rhs_floats, rhs1) <- prepareBinding env NotTopLevel NonRecursive is_strict
-                                               bndr2 (emptyFloats env) rhs
+        ; (rhs_lets, lets_in_scope, rhs1)
+              <- prepareBinding env NotTopLevel NonRecursive
+                                bndr2 (idType bndr2) (emptyFloats env) rhs
               -- NB: it makes a surprisingly big difference (5% in compiler allocation
               -- in T9630) to pass 'env' rather than 'env1'.  It's fine to pass 'env',
               -- because this is completeBindX, so bndr is not in scope in the RHS.
+        ; let rhs_floats = mkLetSimplFloats lets_in_scope rhs_lets
 
         ; let env3 = env2 `setInScopeFromF` rhs_floats
         ; (bind_float, env4) <- completeBind (BC_Let NotTopLevel NonRecursive)
@@ -3373,87 +3463,73 @@ rebuildCase (saf,env) scrut case_bndr alts cont
   | otherwise
   = reallyRebuildCase (saf,env) scrut case_bndr alts cont
 
-doCaseToLet :: OutExpr          -- Scrutinee
-            -> InId             -- Case binder
-            -> Bool
--- The situation is         case scrut of b { DEFAULT -> body }
--- Can we transform thus?   let { b = scrut } in body
-doCaseToLet scrut case_bndr
-  | isTyCoVar case_bndr    -- Respect GHC.Core
-  = isTyCoArg scrut        -- Note [Core type and coercion invariant]
-
-  | isUnliftedType (exprType scrut)
-    -- We can call isUnliftedType here: scrutinees always have a fixed RuntimeRep (see FRRCase).
-    -- Note however that we must check 'scrut' (which is an 'OutExpr') and not 'case_bndr'
-    -- (which is an 'InId'): see Note [Dark corner with representation polymorphism].
-    -- Using `exprType` is typically cheap because `scrut` is typically a variable.
-    -- We could instead use mightBeUnliftedType (idType case_bndr), but that hurts
-    -- the brain more.  Consider that if this test ever turns out to be a perf
-    -- problem (which seems unlikely).
-  = exprOkForSpeculation scrut
-
-  | otherwise  -- Scrut has a lifted type
-  = exprIsHNF scrut
-       --    || isStrUsedDmd (idDemandInfo case_bndr)
-       -- We no longer look at the demand on the case binder
-       -- See Note [Case-to-let for strictly-used binders]
-
 --------------------------------------------------
 --      3. Catch-all case
 --------------------------------------------------
 
 reallyRebuildCase (saf,env) scrut case_bndr alts cont
-  = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
-       ; traceSmpl "reallyRebuildCase" (vcat [ ppr case_bndr
-                                             , text "cont':" <+> ppr cont'
-                                             , text "in_scope" <+> ppr (seInScope env') ])
-       ; (alt_env, scrut', case_bndr', imposs_deflt_cons, in_alts)
-             <- prepareCase (saf,env') scrut (scaleIdBy holeScaling case_bndr)
-                                             (scaleAltsBy holeScaling alts)
+  = do { (alt_env, scrut', case_bndr', imposs_deflt_cons, in_alts)
+             <- prepareCase (saf,env) scrut (scaleIdBy holeScaling case_bndr)
+                                            (scaleAltsBy holeScaling alts)
        ; case in_alts of
-           [in_alt] -> do { (alt_floats, alt') <- simplAlt (saf,alt_env) (Just scrut')
-                                                     imposs_deflt_cons case_bndr'
-                                                     bndr_swap cont' in_alt
-                          ; (case_floats, res) <- rebuildSingleAltCase env' scrut' case_bndr'
-                                                         cont' alt_floats alt'
-                          ; return (floats `addFloats` case_floats, res) }
-
-           _ -> do { case_expr <- simplAlts (saf,alt_env) scrut' case_bndr'
-                                            imposs_deflt_cons bndr_swap cont' in_alts
-                   ; return (floats, case_expr) } }
+           [in_alt] -> rebuildSingleAltCase (saf,alt_env) scrut' case_bndr'
+                                            imposs_deflt_cons bndr_swap cont in_alt
+           _        -> rebuildMultiAltCase (saf,alt_env) scrut' case_bndr'
+                                           imposs_deflt_cons bndr_swap cont in_alts }
   where
     holeScaling = contHoleScaling cont
     -- Note [Scaling in case-of-case]
 
     bndr_swap = scrutOkForBinderSwap scrut
 
-rebuildSingleAltCase :: SimplEnv -> OutExpr -> OutId -> SimplCont
-                     -> SimplFloats -> OutAlt
+rebuildSingleAltCase :: (SimplAltFlag, SimplEnv)
+                     -> OutExpr -> OutId       -- Scrutinee and case binder
+                     -> [AltCon]               -- Constructors impossible in the DEFAULT alt
+                     -> BinderSwapDecision
+                     -> SimplCont
+                     -> InAlt
                      -> SimplM (SimplFloats, OutExpr)
--- Build a single-alternative case; but return it as a FloatCase float, so that
--- the floats from its RHS are not trapped inside it.
--- See Note [Floating single-alternative cases]
-rebuildSingleAltCase env scrut case_bndr cont alt_floats (Alt con bs rhs)
-  = do { let alts_ty = contResultType cont
-       -- See Note [Avoiding space leaks in OutType]
-       ; case_expr <- seqType alts_ty `seq`
-                      mkCase (seMode env) scrut case_bndr alts_ty
-                             [Alt con bs (wrapFloats alt_floats rhs)]
-                      -- wrapFloats: lazily; see (FSC1)
-       ; case case_expr of
-           Case scrut2 bndr2 _ [Alt con2 bs2 rhs2]
-             | not (noFloats alt_floats)
-             , bndr2 == case_bndr   -- mkCase has not changed the case; see (FSC1)
-             -> return (case_float `addFloats` alt_floats, rhs)
-             | otherwise
-             -> return (case_float, rhs2)
-             where
-               case_float = emptyFloats env `addLetFloats`
-                            unitCaseFloat scrut2 bndr2 con2 bs2
-           _ -> return (emptyFloats env, case_expr) }
-  where
-    noFloats (SimplFloats { sfLetFloats = lfs, sfJoinFloats = jfs })
-      = isEmptyLetFloats lfs && isEmptyJoinFloats jfs
+-- The arguments are prepared by prepareCase
+-- We return the case as a FloatCase float, so that the floats from its RHS
+-- are not trapped inside it.  See Note [Floating single-alternative cases]
+-- There is only one alternative, so no need to make `cont` dupable
+rebuildSingleAltCase (saf,alt_env) scrut' case_bndr' imposs_deflt_cons bndr_swap cont in_alt
+  = do { (con, bs', alt_floats, rhs') <- simplAlt (saf,alt_env) (Just scrut') imposs_deflt_cons
+                                                  case_bndr' bndr_swap cont in_alt
+       ; let no_floats = emptyFloats alt_env
+             case_float
+               | DEFAULT <- con
+               , doCaseToLet scrut' case_bndr'
+               = -- Make a let-float, not a case-float, to maintain invariant
+                 -- (FFC1) of Note [Case-floats] in GHC.Core.Opt.Simplify.Env.
+                 -- We get here (rather than doing case-to-let in rebuildCase) when
+                 -- prepareAlts has pruned away all but the DEFAULT alternative
+                 no_floats `addLetFloat` NonRec case_bndr' scrut'
+               | otherwise
+               = addCaseFloat no_floats scrut' case_bndr' con bs'
+       ; return (case_float `addFloats` alt_floats, rhs') }
+
+rebuildMultiAltCase :: (SimplAltFlag, SimplEnv)
+                    -> OutExpr -> OutId       -- Scrutinee and case binder
+                    -> [AltCon]               -- Constructors impossible in the DEFAULT alt
+                    -> BinderSwapDecision
+                    -> SimplCont
+                    -> [InAlt]
+                    -> SimplM (SimplFloats, OutExpr)
+-- The arguments are prepared by prepareCase
+rebuildMultiAltCase (saf,alt_env) scrut' case_bndr' imposs_deflt_cons bndr_swap cont in_alts
+  = do { -- NB: pass alt_env, not the env before prepareCase, to mkDupableCaseCont,
+         -- so that the case binder stays in scope in env'
+         (floats, env', cont') <- mkDupableCaseCont alt_env in_alts cont
+       ; traceSmpl "rebuildMultiAltCase" (vcat [ ppr case_bndr'
+                                               , text "cont':" <+> ppr cont'
+                                               , text "in_scope" <+> ppr (seInScope env') ])
+       ; alts' <- forM in_alts $
+                  simplAltC (saf,env') (Just scrut') imposs_deflt_cons
+                            case_bndr' bndr_swap cont'
+       ; case_expr <- mkCase (seMode env') scrut' case_bndr' (contResultType cont') alts'
+                      -- mkCase forces the type; see Note [Avoiding space leaks in OutType]
+       ; return (floats, case_expr) }
 
 {-
 simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
@@ -3612,25 +3688,6 @@ prepareCase (saf,env0) scrut case_bndr alts
 
         ; return (alt_env', scrut', case_bndr', imposs_deflt_cons, in_alts) }
 
-simplAlts :: (SimplAltFlag, SimplEnv)
-          -> OutExpr -> OutId       -- Scrutinee and case binder
-          -> [AltCon]               -- Constructors impossible in the DEFAULT alt
-          -> BinderSwapDecision
-          -> SimplCont
-          -> [InAlt]
-          -> SimplM OutExpr  -- Returns the complete simplified case expression
--- The arguments are prepared by prepareCase
-simplAlts (saf,env) scrut' case_bndr' imposs_deflt_cons bndr_swap cont' in_alts
-  = do  { alts' <- forM in_alts $
-            simplAltC (saf,env) (Just scrut') imposs_deflt_cons
-                      case_bndr' bndr_swap cont'
-
-        ; let alts_ty' = contResultType cont'
-        -- See Note [Avoiding space leaks in OutType]
-        ; seqType alts_ty' `seq`
-          mkCase (seMode env) scrut' case_bndr' alts_ty' alts' }
-
-
 {- Note [Floating single-alternative cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When reallyRebuildCase finds a single-alternative case (after prepareAlts)
@@ -3652,17 +3709,10 @@ strict let (which a StrictBind continuation would do anyway).  The
 FloatFlag (FltCareful or FltOkSpec) stops a case-float from floating out of
 a lazy let, or to top level; see doFloatFromRhs.
 
-Wrinkles:
-
-(FSC1) mkCase may transform the case, e.g. by case-merging, identity-case
-  elimination, or caseRules (mkCase2), which renames the case binder and
-  wraps (let b = ..) around the RHS.  So we call mkCase on the alternative
-  with its floats wrapped (lazily: mkCase inspects only the top of the RHS),
-  and then:
-   - If the alternative has floats, and mkCase has left the case binder
-     unchanged, mkCase cannot have done anything to the RHS (which starts
-     with a let), so we return (case-float + alt-floats, unwrapped RHS).
-   - Otherwise we return the case-float with whatever RHS mkCase produced.
+We do not call mkCase when we build the FloatCase.  Instead, simplWrapFloats
+calls mkCase when we eventually wrap the FloatCase around an expression, so we
+still get case-merging, identity-case elimination, caseRules, etc.
+See Note [Wrapping case-floats with mkCase] in GHC.Core.Opt.Simplify.Utils.
 -}
 
 ------------------------------------
@@ -3689,9 +3739,10 @@ simplAltC :: (SimplAltFlag, SimplEnv) -> Maybe OutExpr -> [AltCon] -> OutId
           -> SimplM OutAlt
 -- Like simplAlt, but wraps the floats around the RHS
 simplAltC env scrut' imposs_deflt_cons case_bndr' bndr_swap' cont' alt
-  = do { (floats, Alt con bs rhs) <- simplAlt env scrut' imposs_deflt_cons
-                                              case_bndr' bndr_swap' cont' alt
-       ; return (Alt con bs (wrapFloats floats rhs)) }
+  = do { (con, bs, floats, rhs) <- simplAlt env scrut' imposs_deflt_cons
+                                            case_bndr' bndr_swap' cont' alt
+       ; rhs' <- simplWrapFloats (seMode (snd env)) floats rhs (contResultType cont')
+       ; return (Alt con bs rhs') }
 
 simplAlt :: (SimplAltFlag, SimplEnv)
          -> Maybe OutExpr       -- The scrutinee
@@ -3702,21 +3753,24 @@ simplAlt :: (SimplAltFlag, SimplEnv)
                                 --           add unfolding `v :-> bndr |> sym co`
          -> SimplCont
          -> InAlt
-         -> SimplM (SimplFloats, OutAlt)
+         -> SimplM (AltCon, [OutVar], SimplFloats, OutExpr)
+         -- Returns the simplified alternative, in pieces
          -- The floats scope over the RHS only, and may mention the
-         -- binders of the alternative
+         -- binders of the alternative.  So the caller must either wrap
+         -- them around the RHS (simplAltC), or put them after a case-float
+         -- that binds the binders (rebuildSingleAltCase)
 
 simplAlt (saf,env) _scrut' imposs_deflt_cons case_bndr' bndr_swap' cont' (Alt DEFAULT bndrs rhs)
   = assert (null bndrs) $
     do  { let env' = addDefaultUnfoldings env case_bndr' bndr_swap' imposs_deflt_cons
         ; (floats, rhs') <- simplAltExprF (saf,env') rhs cont'
-        ; return (floats, Alt DEFAULT [] rhs') }
+        ; return (DEFAULT, [], floats, rhs') }
 
 simplAlt (saf,env) _scrut' _ case_bndr' bndr_swap' cont' (Alt (LitAlt lit) bndrs rhs)
   = assert (null bndrs) $
     do  { let env' = addAltUnfoldings env case_bndr' bndr_swap' (Lit lit)
         ; (floats, rhs') <- simplAltExprF (saf,env') rhs cont'
-        ; return (floats, Alt (LitAlt lit) [] rhs') }
+        ; return (LitAlt lit, [], floats, rhs') }
 
 simplAlt (saf,env) scrut' _ case_bndr' bndr_swap' cont' (Alt (DataAlt con) vs rhs)
   = do  { -- See Note [Adding evaluatedness info to pattern-bound variables]
@@ -3735,7 +3789,7 @@ simplAlt (saf,env) scrut' _ case_bndr' bndr_swap' cont' (Alt (DataAlt con) vs rh
               env''   = addAltUnfoldings env' case_bndr' bndr_swap' con_app
 
         ; (floats, rhs') <- simplAltExprF (saf,env'') rhs cont'
-        ; return (floats, Alt (DataAlt con) vs' rhs') }
+        ; return (DataAlt con, vs', floats, rhs') }
 
 {- Note [Adding evaluatedness info to pattern-bound variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4335,8 +4389,8 @@ mkDupableContWithDmds env _
           -- No need to use mkDupableCont before simplNonRecBody; we
           -- use cont once here, and then share the result if necessary
 
-       ; let join_body = wrapFloats floats1 join_inner
-             res_ty    = contResultType cont
+       ; let res_ty = contResultType cont
+       ; join_body <- simplWrapFloats (seMode env) floats1 join_inner res_ty
 
        ; mkDupableStrictBind env bndr' join_body res_ty }
 
@@ -4371,7 +4425,8 @@ mkDupableContWithDmds env _
        ; arg_bndr <- newId (fsLit "arg") m arg_ty
        ; let env' = env `addNewInScopeIds` [arg_bndr]
        ; (floats, join_rhs) <- rebuildCall env' (addValArgTo fun (Var arg_bndr) fun_ty) cont
-       ; mkDupableStrictBind env' arg_bndr (wrapFloats floats join_rhs) rhs_ty }
+       ; join_rhs' <- simplWrapFloats (seMode env) floats join_rhs rhs_ty
+       ; mkDupableStrictBind env' arg_bndr join_rhs' rhs_ty }
   where
     thumbsUpPlanA (StrictArg {})               = False
     thumbsUpPlanA (StrictBind {})              = True

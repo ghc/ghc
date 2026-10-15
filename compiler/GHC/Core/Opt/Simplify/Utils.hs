@@ -8,7 +8,7 @@ The simplifier utilities
 
 module GHC.Core.Opt.Simplify.Utils (
         -- Rebuilding
-        rebuildLam, mkCase, prepareAlts,
+        rebuildLam, mkCase, returnCase, prepareAlts, simplWrapFloats,
         tryEtaExpandRhs, wantEtaExpansion,
 
         -- Inlining,
@@ -74,12 +74,13 @@ import GHC.Types.InlinePragma
 import GHC.Types.Tickish
 import GHC.Types.Demand
 import GHC.Types.Var.Set
+import GHC.Types.Var.Env ( InScopeSet )
 import GHC.Types.Basic
 import GHC.Types.Name.Env
 
 import GHC.Data.List.Infinite ( Infinite(..) )
 import qualified GHC.Data.List.Infinite as Inf
-import GHC.Data.OrdList ( isNilOL )
+import GHC.Data.OrdList ( fromOL )
 import GHC.Data.FastString ( fsLit )
 
 import GHC.Utils.Misc
@@ -173,7 +174,8 @@ data SimplCont
       , sc_opt  :: Bool         -- True <=> sc_co has had optCoercion applied to it
                                 --      See Note [Avoid re-simplifying coercions]
                                 --      in GHC.Core.Opt.Simplify.Iteration
-      , sc_cont :: SimplCont }
+      , sc_cont :: SimplCont }  -- Invariant: never a CastIt; successive casts
+                                --   are merged (see pushCast in GHC.Core.Opt.Simplify.Iteration)
 
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
       { sc_hole_ty :: OutType    -- Type of the function, presumably (ty1 -> ty2)
@@ -495,11 +497,53 @@ contIsDupable :: SimplCont -> Bool
 contIsDupable (Stop {})                    = True
 contIsDupable (ApplyToTy  { sc_cont = k }) = contIsDupable k
 contIsDupable (ApplyToVal { sc_env = se }) = okToDupSE se -- See (SE1) in Note [StaticEnv]
-contIsDupable (Select { sc_env = se })     = okToDupSE se -- ...ditto...
+contIsDupable (Select { sc_env = se, sc_bndr = bndr, sc_alts = alts, sc_cont = k })
+  = okToDupSE se -- ...ditto...
+    || (isUnpackingAlts bndr alts && contIsDupable k)
+         -- See Note [Duplicating unpacking continuations]
 contIsDupable (StrictBind { sc_env = se }) = okToDupSE se -- ...ditto...
 contIsDupable (StrictArg { sc_dup = dup }) = okToDup dup  -- ...ditto...
 contIsDupable (CastIt { sc_cont = k })     = contIsDupable k
 contIsDupable (TickIt _ k)                 = contIsDupable k
+
+isUnpackingAlts :: InId -> [InAlt] -> Bool
+-- True of the alternatives of  case e of b { K x y -> y }
+-- and nested versions thereof;  see Note [Duplicating unpacking continuations]
+isUnpackingAlts case_bndr [Alt _ bndrs rhs] = go (case_bndr : bndrs) rhs
+  where
+    go bound (Var v) = v `elem` bound
+    go bound (Case (Var v) b _ [Alt _ bs rhs])
+      | v `elem` bound = go (b : bs ++ bound) rhs
+    go _ _ = False
+isUnpackingAlts _ _ = False
+
+{- Note [Duplicating unpacking continuations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Worker/wrapper for CPR produces a worker like this
+   $wf = \ds -> case (case ds of { A -> R e1; B -> R e2 }) of ww { __DEFAULT ->
+                case ww of { R y -> y } }
+The intention is that the unboxing (case . of R y -> y) cancels with the boxing
+(R e1) and (R e2).  But the continuation pushed into the inner case is
+   (Select ww [__DEFAULT -> case ww of { R y -> y }])
+which has more than one alternative to go into, so mkDupableCont would make it
+dupable by creating a join point
+   join $j ww = case ww of { __DEFAULT -> case ww of { R y -> y } }
+   in case ds of { A -> jump $j (R e1); B -> jump $j (R e2) }
+That is terrible if $j fails to inline; and even if it does inline, it takes an
+extra Simplifier iteration to tidy up (T15304).
+
+So contIsDupable treats a Select as dupable if its alternatives are "unpacking
+alternatives": a single alternative whose RHS is a variable bound by that
+alternative (a pattern variable or the case binder), or a single-alternative case
+on such a variable whose own RHS is again unpacking, and so on (to allow for nested
+CPR).  Such a continuation is tiny, so duplicating it costs nothing, and then
+case-of-known-constructor cancels it with the constructor in each branch, giving
+   $wf = \ds -> case ds of { A -> e1; B -> e2 }
+
+We insist that the variables are /bound/ by the continuation: a free variable might
+be mapped by the substitution in the (UnSimplified env) to a big expression, which
+we would then duplicate.
+-}
 
 -------------------
 contIsTrivial :: SimplCont -> Bool
@@ -635,6 +679,8 @@ contOutArgs env cont
 splitContArgs :: SimplCont -> Maybe (SimplCont, SimplCont)
 -- Splits `cont` into (inner, outer), where `inner` has only
 -- applications and casts, and `outer` is non-trivial
+-- A cast goes in `inner` only if it is followed by an application;
+-- see Note [Do not push a cast inwards unnecessarily]
 splitContArgs cont@(ApplyToTy { sc_cont = cont1 })
   = do { (inner, outer) <- splitContArgs cont1
        ; return (cont { sc_cont = inner }, outer) }
@@ -642,6 +688,8 @@ splitContArgs cont@(ApplyToVal { sc_cont = cont1 })
   = do { (inner, outer) <- splitContArgs cont1
        ; return (cont { sc_cont = inner }, outer) }
 splitContArgs cont@(CastIt { sc_cont = cont1 })
+  | isAppCont cont1   -- No need for isAppCont to look past a CastIt, because
+                      -- cont1 is never a CastIt; see the invariant on CastIt
   = do { (inner, outer) <- splitContArgs cont1
        ; return (cont { sc_cont = inner }, outer) }
 splitContArgs outer
@@ -650,6 +698,42 @@ splitContArgs outer
                        return (mkBoringStop hole_ty, outer)
   where
     hole_ty = contHoleType outer
+
+isAppCont :: SimplCont -> Bool
+-- True of an application continuation
+isAppCont (ApplyToVal {}) = True
+isAppCont (ApplyToTy {})  = True
+isAppCont _               = False
+
+{- Note [Do not push a cast inwards unnecessarily]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When case-of-case is off, splitContArgs splits the continuation into an `inner`
+part, which we push into a `case` or `let`, and an `outer` part, which we
+rebuild around the result.  The point of `inner` is to push applications
+inwards, so it should stop as soon as it can.  So a cast goes in `inner` only
+if it is followed by an application, e.g. (CastIt (ApplyToVal ..)); otherwise,
+e.g. (CastIt Stop) or (CastIt (Select ..)), the cast goes in `outer`.
+(Successive casts are merged, so we need not look past a CastIt.)  Consider
+   f x = Wrap (case x of { 0 -> g 10; 1 -> g 20; _ -> g 30 })
+where Wrap is a newtype constructor, so we have a cast round the case.
+If we pushed the cast into the alternatives we would get
+   f = \x -> case x of { 0 -> g 10 |> co; 1 -> g 20 |> co; _ -> g 30 |> co }
+Then
+ * We duplicate the coercion in every alternative.  The coercion can be big:
+   for a derived Generic instance, `from` has one alternative per constructor
+   and the coercion mentions the whole representation type, so the total is
+   quadratic (T5642, T16577).
+ * We lose cast worker/wrapper: the RHS is no longer of form (e |> co), so
+   we never get   f = $wf |> co.  And nothing ever moves the casts back out
+   of the alternatives, so the duplication lasts all the way to CorePrep.
+
+Leaving the cast in `outer` gives
+   f = \x -> (case x of { 0 -> g 10; 1 -> g 20; _ -> g 30 }) |> co
+We do this for every caller of splitContArgs, including a `let` with join
+points: if we pushed the cast into a join point's RHS we would have to push
+it into every jump too, but the jumps may be in a multi-alternative case
+from which we are keeping it out.
+-}
 
 dropContArgs :: FullArgCount -> SimplCont -> SimplCont
 dropContArgs 0 cont = cont
@@ -2427,7 +2511,7 @@ new binding is abstracted.  Several points worth noting
 
       (Why is it OK to float the unlifted `foo` there?
       See Note [Core top-level string literals] in GHC.Core;
-      it is controlled by GHC.Core.Opt.Simplify.Env.unitLetFloat.)
+      it is controlled by GHC.Core.Opt.Simplify.Env.getFF_Let.)
 
       It is also necessary to do dependency analysis, because
       otherwise (in #24551) we might get `foo = \@_ -> "missing"#` at the
@@ -2435,18 +2519,20 @@ new binding is abstracted.  Several points worth noting
       manifestly a literal string.
 -}
 
-abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
-              -> OutExpr -> SimplM ([OutBind], OutExpr)
-abstractFloats uf_opts top_lvl main_tvs floats body
+abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar]
+               -> InScopeSet   -- Includes the binders of the LetFloats
+               -> LetFloats    -- Let-bindings only: see (PB1) in Note [prepareBinding]
+                               -- in GHC.Core.Opt.Simplify.Iteration
+               -> OutExpr -> SimplM ([OutBind], OutExpr)
+abstractFloats uf_opts top_lvl main_tvs in_scope floats body
   = assert (notNull body_floats) $
-    assert (isNilOL (sfJoinFloats floats)) $
     do  { let sccs = concatMap to_sccs body_floats
         ; (subst, float_binds) <- mapAccumLM abstract empty_subst sccs
         ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl
-    body_floats = letFloatBinds (sfLetFloats floats)
-    empty_subst = GHC.Core.Subst.mkEmptySubst (sfInScope floats)
+    body_floats = fromOL floats
+    empty_subst = GHC.Core.Subst.mkEmptySubst in_scope
 
     -- See wrinkle (AB5) in Note [Which type variables to abstract over]
     -- for why we need to re-do dependency analysis
@@ -2881,7 +2967,64 @@ and now we can do case-merge again, getting the desired
 
 -}
 
-mkCase, mkCase1, mkCase2, mkCase3
+simplWrapFloats :: SimplMode -> SimplFloats
+                -> OutExpr      -- The body
+                -> OutType      -- The type of the body
+                -> SimplM OutExpr
+-- Wrap the floats around the body, using mkCase for case-floats
+-- See Note [Wrapping case-floats with mkCase]
+simplWrapFloats mode (SimplFloats { sfLetFloats = lfs, sfJoinFloats = jbs }) body body_ty
+  = go (fromOL lfs)
+  where
+    go []         = return (wrapJoinFloats jbs body)
+                    -- Always safe to put the joins on the inside,
+                    -- since the values can't refer to them
+    go (fb : fbs) = do { body' <- go fbs; wrap fb body' }
+
+    wrap (FloatLet bind)    body = return (Let bind body)
+    wrap (FloatTick t)      body = return (mkTick t body)
+    wrap (FloatCase scrut bndr con bs) body
+      = mkCase mode scrut bndr body_ty [Alt con bs body]
+        -- NB: we must not force body_ty if there are no case-floats; that can
+        -- do a lot of unnecessary work.  mkCase forces it when it builds the Case;
+        -- see Note [Avoiding space leaks in OutType] in GHC.Core.Opt.Simplify.Iteration
+        -- body_ty: lets, ticks and cases do not change the type, so every
+        -- case-float has the same result type: the type of the original body.
+        -- And body_ty comes from outside, so it cannot mention `bs`
+
+{- Note [Wrapping case-floats with mkCase]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Simplifier returns a single-alternative case as a FloatCase, rather than
+building it with mkCase; see Note [Floating single-alternative cases] in
+GHC.Core.Opt.Simplify.Iteration.  So when we eventually wrap the floats around
+an expression, simplWrapFloats uses mkCase for each FloatCase, so that we get
+all the things that mkCase does: case-merging, identity-case elimination,
+caseRules, etc.  For example, case-merging turns
+     case x of b { DEFAULT -> case b of { A -> e1; B -> e2 } }
+into  case x of b { A -> e1; B -> e2 }
+which arises, for example, from  x `seq` case x of { A -> e1; B -> e2 }.
+
+Is the case-merging expensive?  mergeCaseAlts looks past lets (wrinkle (MC4) of
+Note [Merge Nested Cases] in GHC.Core.Utils), but it stops at anything else,
+such as a case that does not scrutinise the case binder.  So in a chain
+    FloatCase e1 b1, lets1, FloatCase e2 b2, lets2, ...
+each let is examined by only one FloatCase, and the total cost is linear.
+
+It could be quadratic if successive FloatCases evaluated the /same/ value:
+    FloatCase e b1, FloatCase b1 b2, FloatCase b2 b3, lots of lets, case b3 of alts
+Then each FloatCase merges with the case below it, floating the lets out again,
+so that the next one looks past all of them again.  But such a chain does not
+survive simplification: a case whose scrutinee is already evaluated (such as
+the case binder b1 of an enclosing case) is eliminated by rebuildCase (see
+Note [Case to let transformation] in GHC.Core.Opt.Simplify.Iteration) long before
+it becomes a FloatCase.  (Calling mkCase on every case, as we used to, has
+exactly the same theoretical exposure.)
+
+We do not use simplWrapFloats for the FloatBinds returned by the rule matcher;
+GHC.Core.Make.wrapFloats is fine for those.
+-}
+
+mkCase, mkCase1, mkCase2
    :: SimplMode
    -> OutExpr -> OutId
    -> OutType -> [OutAlt]               -- Alternatives in standard (increasing) order
@@ -2976,12 +3119,12 @@ mkCase2 mode scrut bndr alts_ty alts
                   -- See Note [Unreachable caseRules alternatives]
                   -- in GHC.Core.Opt.ConstantFold
 
-       ; mkCase3 mode scrut' bndr' alts_ty $
+       ; returnCase scrut' bndr' alts_ty $
          add_default (re_sort alts')
        }
 
   | otherwise
-  = mkCase3 mode scrut bndr alts_ty alts
+  = returnCase scrut bndr alts_ty alts
   where
     -- We need to keep the correct association between the scrutinee and its
     -- binder if the latter isn't dead. Hence we wrap rhs of alternatives with
@@ -3058,8 +3201,12 @@ in GHC.Core.Opt.ConstantFold)
 --------------------------------------------------
 --      Catch-all
 --------------------------------------------------
-mkCase3 _mode scrut bndr alts_ty alts
-  = return (Case scrut bndr alts_ty alts)
+returnCase :: OutExpr -> OutId -> OutType -> [OutAlt] -> SimplM OutExpr
+-- Build the Case, forcing alts_ty as we emit it into the output program
+-- See Note [Avoiding space leaks in OutType] in GHC.Core.Opt.Simplify.Iteration
+returnCase scrut bndr alts_ty alts
+  = seqType alts_ty `seq`
+    return (Case scrut bndr alts_ty alts)
 
 -- See Note [Exitification] and Note [Do not inline exit join points] in
 -- GHC.Core.Opt.Exitify

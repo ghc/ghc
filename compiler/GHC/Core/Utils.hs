@@ -804,6 +804,9 @@ mkSingleAltCase scrut case_bndr con bndrs body
     body_ty = exprType body
 
     case_ty -- See Note [Care with the type of a case expression]
+      | not (any isTyCoVar bndrs)   -- Fast path: only TyCoVars can occur in body_ty
+      = body_ty
+
       | Just body_ty' <- occCheckExpand bndrs body_ty
       = body_ty'
 
