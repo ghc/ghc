@@ -340,6 +340,9 @@ int FS(translate_mode) (const wchar_t* mode)
           case L'D':
             oflag |= _O_TEMPORARY;
             break;
+          case L'x':
+            oflag |= _O_EXCL;
+            break;
           default:
             if (wcsncmp (mode, L"ccs=UNICODE", 11) == 0)
               oflag |= _O_WTEXT;
