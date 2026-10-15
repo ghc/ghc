@@ -87,7 +87,13 @@ void initTimers(void)
 
     if (RtsFlags.MiscFlags.tickInterval != 0) {
         main_timer = newPeriodicTimer(handle_tick, NULL,
+                                      TimerHandlerShortRunning,
                                       RtsFlags.MiscFlags.tickInterval);
+    //TODO: using TickerHandlerShortRunning is fine for context switching, and
+    // plausibly also ok for profile sampling but is way out for eventlog
+    // flushing. The eventlog flush does a global synchronisation of all
+    // capabilities and I/O! And with eventlog providers, it calls arbitrary
+    // user code. This is not ok! See issue #27250.
     }
 #endif
 }

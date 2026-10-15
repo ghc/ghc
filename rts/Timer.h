@@ -15,6 +15,19 @@ typedef struct Timer Timer; // opaque
 
 typedef void (*TimerHandler)(void*);
 
+enum TimerHandlerHint {
+    /* The handler promises to run for a short (and certainly bounded) time.
+     * In particular this means no locks and no I/O.
+     */
+    TimerHandlerShortRunning,
+
+    /* The handler may be long running or may block, e.g. taking locks or
+     * performing I/O.
+     */
+    TimerHandlerLongRunning
+};
+
+
 /* Create a new periodic timer, with the given handler and interval.
  *
  * A periodic timer is one that calls the tick handler every interval.
@@ -22,6 +35,7 @@ typedef void (*TimerHandler)(void*);
  * The timer is initialised in a paused state. Use unpauseTimer to start.
  */
 Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
+                        enum TimerHandlerHint timerhint,
                         Time interval);
 
 /* Stop the timer prior to releasing resources with freeTimer().

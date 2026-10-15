@@ -207,6 +207,7 @@ static void *timer_thread_func(void *_timer)
  * The timer is started in the paused state. Use unpauseTimer to continue.
  */
 Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
+                        enum TimerHandlerHint timerhint STG_UNUSED,
                         Time interval)
 {
     ASSERT(interval > 0);

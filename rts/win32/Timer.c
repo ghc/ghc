@@ -30,6 +30,7 @@ struct Timer {
     void        *handler_arg;
     DWORD    interval; // milliseconds
     bool     paused;
+    enum TimerHandlerHint hint;
 };
 
 static Mutex  timer_queue_lock = INIT_MUTEX;
@@ -41,6 +42,7 @@ static void startTimer_(Timer *timer);
 static void stopTimer_(Timer *timer, bool synchronous);
 
 Ticker *newPeriodicTimer(TimerHandler handler, void *handler_arg,
+                         enum TimerHandlerHint hint,
                          Time interval)
 {
     OS_ACQUIRE_LOCK(timer_queue_lock);
@@ -64,6 +66,7 @@ Ticker *newPeriodicTimer(TimerHandler handler, void *handler_arg,
     timer->handler_arg = handler_arg;
     timer->interval    = stg_min((DWORD) 1, TimeToMS(interval));
     timer->paused      = true; // starts paused
+    timer->hint        = hint;
 }
 
 // Asynchronous. Idempotent.
@@ -132,18 +135,16 @@ static VOID CALLBACK tick_callback (PVOID lpParameter,
 
 static void startTimer_(Timer *timer) {
     ASSERT(timer_queue != NULL && timer->timer == NULL);
+    ULONG flags = timer->hint == TimerHandlerShortRunning
+                ? WT_EXECUTEINTIMERTHREAD
+                : WT_EXECUTEDEFAULT;
     BOOL r = CreateTimerQueueTimer(&timer->timer,
                                    timer_queue,
                                    tick_callback,
                                    timer,   // callback param
                                    timer->interval, // inital interval
                                    timer->interval, // recurrant interval
-                                   WT_EXECUTEINTIMERTHREAD);
-    //TODO: using WT_EXECUTEINTIMERTHREAD is fine for context switching, and
-    // plausibly also ok for profile sampling but is way out for eventlog
-    // flushing. The eventlog flush does a global synchronisation of all
-    // capabilities and I/O! And with eventlog providers, it calls arbitrary
-    // user code. This is not ok! See issue #27250.
+                                   flags);
     if (r == 0) {
         sysErrorBelch("CreateTimerQueueTimer");
         stg_exit(EXIT_FAILURE);
