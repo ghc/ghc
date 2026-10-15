@@ -105,6 +105,26 @@ AC_DEFUN([FP_CHECK_PTHREAD_FUNCS],
     AC_MSG_RESULT(no)
   )
 
+  dnl glibc
+  AC_MSG_CHECKING([for pthread_attr_setsigmask_np])
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM(
+      [[
+      #define _GNU_SOURCE
+      #include <pthread.h>
+      #include <signal.h>
+      ]],
+      [[pthread_attr_t attr; sigset_t mask;
+        pthread_attr_setsigmask_np(&attr, &mask);]]
+    )],
+    [
+      AC_MSG_RESULT(yes)
+      AC_DEFINE([HAVE_PTHREAD_SETSIGMASK_NP], [1],
+        [Define to 1 if you have pthread_attr_setsigmask_np])
+    ],
+    AC_MSG_RESULT(no)
+  )
+
   AC_CHECK_FUNCS_ONCE([pthread_condattr_setclock])
   LIBS=$OLD_LIBS
 ])

@@ -221,12 +221,6 @@ Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
     timer->pause_request = true;
     timer->exit_request  = false;
 
-#if defined(HAVE_SIGNAL_H)
-    sigset_t mask, omask;
-    int sigret;
-#endif
-    int ret;
-
     /* Open the interrupt fd synchronously.
      *
      * We used to do it in timer_thread_func (i.e. in the timer thread) but it
@@ -244,20 +238,32 @@ Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
     pthread_attr_init(&attr);
     /* We will use pthread_join on this thread later */
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
     /*
      * Create the thread with all blockable signals blocked, leaving signal
      * handling to the main and/or other threads.  This is especially useful in
      * the non-threaded runtime, where applications might expect sigprocmask(2)
      * or pthread_sigmask(3) to effectively block signals.
      */
-#if defined(HAVE_SIGNAL_H)
+#if defined(HAVE_PTHREAD_SETSIGMASK_NP)
+    /* Set the signal mask as an attribute of the new thread, if available. */
+    sigset_t mask;
     sigfillset(&mask);
-    sigret = pthread_sigmask(SIG_SETMASK, &mask, &omask);
+    pthread_attr_setsigmask_np(&attr, &mask);
+#elif defined(HAVE_SIGNAL_H)
+    /* Otherwise set (and later unset) our own thread's signal mask and have
+     * that be inherited by the new thread.
+     */
+    sigset_t mask, omask;
+    sigfillset(&mask);
+    int sigret = pthread_sigmask(SIG_SETMASK, &mask, &omask);
 #endif
-    ret = createPThread(&timer->thread_id, "ghc_timer",
-                        timer_thread_func, (void*)timer,
-                        &attr);
-#if defined(HAVE_SIGNAL_H)
+
+    int ret = createPThread(&timer->thread_id, "ghc_timer",
+                            timer_thread_func, (void*)timer,
+                            &attr);
+
+#if defined(HAVE_SIGNAL_H) && !defined(HAVE_PTHREAD_SETSIGMASK_NP)
     if (sigret == 0)
         pthread_sigmask(SIG_SETMASK, &omask, NULL);
 #endif
