@@ -171,14 +171,12 @@ withServer serverExe action = do
     , std_out = Inherit
     , std_err = Inherit
     }
-  bracket (mkHandles ghcRead ghcWrite >>= \hds -> (hds,) <$> uncurry mkPipeFromHandles hds)
-          (\((hFromServer, hToServer), pipe) -> do
+  bracket (mkHandles ghcRead ghcWrite >>= uncurry mkPipeFromHandles)
+          (\pipe -> do
              closePipe pipe
-             hClose hFromServer
-             hClose hToServer
              terminateProcess ph
              void (waitForProcess ph))
-          (\(_, pipe) -> action pipe)
+          (\pipe -> action pipe)
   where
     mkHandles r w = do
       hR <- fdToHandle r

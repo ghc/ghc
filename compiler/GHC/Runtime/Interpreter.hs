@@ -654,6 +654,8 @@ stopInterp interp = case interpInstance interp of
             if isJust ex
                then pure ()
                else sendMessage i Shutdown
+            -- We asked the server to shutdown, so we will also shutdown any communication.
+            closePipe (interpPipe (instProcess i))
             pure InterpPending
 
 -- -----------------------------------------------------------------------------
