@@ -277,7 +277,7 @@ generateRules = do
                       else prefix
                 relPkgDb = makeRelativeNoSysLink libTopDir pkgDb
             go (generateSettings libStage out True relPkgDb) out
-        (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr (targetStage (succStage stage))) out
+        (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr (perStageTarget (succStage stage))) out
 
   where
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
@@ -450,7 +450,7 @@ bindistRules = do
     , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
     , interpolateVar "TargetWordSize" $ getTarget wordSize
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
-    , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (fmap (isJust . tgtRTSWithLibdw) . targetStage)
+    , interpolateVar "UseLibdw" $ fmap yesNo $ interp $ staged (fmap (isJust . tgtRTSWithLibdw) . perStageTarget)
     , interpolateVar "UseLibffiForAdjustors" $ yesNo <$> getTarget tgtUseLibffiForAdjustors
     , interpolateVar "BaseUnitId" $ bindistUnitId base
     , interpolateVar "GhcUnitId" $ bindistUnitId compiler
@@ -546,7 +546,7 @@ generateConfigHs :: Expr String
 generateConfigHs = do
     stage <- getStage
     let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
-    let queryTarget f = f <$> expr (targetStage stage)
+    let queryTarget f = f <$> expr (perStageTarget stage)
     -- Not right for stage3
     buildPlatform <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
     hostPlatform <- queryTarget targetPlatformTriple
