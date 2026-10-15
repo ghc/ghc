@@ -95,6 +95,9 @@ import GHC.Internal.Data.Data
 import GHC.Internal.TypeLits (KnownNat, natVal)
 import GHC.Internal.Read
 import GHC.Internal.Text.ParserCombinators.ReadPrec( ReadPrec )
+#if __GLASGOW_HASKELL__ < 1001
+import GHC.Internal.Text.ParserCombinators.ReadPrec( pfail )
+#endif
 import GHC.Internal.Text.Read.Lex
 #if __GLASGOW_HASKELL__ < 1000
 import GHC.Internal.TH.Syntax (unsafeCodeCoerce)
