@@ -70,8 +70,13 @@ data Pipe = Pipe
   , pipeLeftovers   :: !(IORef (Maybe ByteString))
   , pipeLock        :: !(MVar ()) -- ^ Lock to prevent concurrent writes to the stream
   , pipeAsyncMngr   :: !AsyncManager
+  , pipeCloseRead   :: !(IO ())
+  -- ^ closes read end of the pipe
+  , pipeCloseWrite  :: !(IO ())
+  -- ^ closes write end of the pipe
   , pipeIsClosed    :: !(TVar Bool)
-    -- ^ After the pipe is closed, requests can no longer be received nor sent
+    -- ^ After the pipe is closed, messages can no longer be received from the
+    -- other end, but the 'AsyncManager' queues might not be empty yet.
   }
 
 -- | Make a 'Pipe' from a 'Handle' to read and a 'Handle' to write.
@@ -82,12 +87,17 @@ mkPipeFromHandles pipeRead pipeWrite = do
       putAll b = do
         B.hPutBuilder pipeWrite b
         hFlush pipeWrite
-  mkPipeFromContinuations getSome putAll
+  mkPipeFromContinuations getSome putAll (hClose pipeRead) (hClose pipeWrite)
 
 -- | Make a 'Pipe' from a reader function and a writer function.
--- The pipe should be closed with 'closePipe'.
-mkPipeFromContinuations :: IO ByteString -> (B.Builder -> IO ()) -> IO Pipe
-mkPipeFromContinuations getSome putAll = mdo
+-- The pipe should be closed with 'closePipe', which will call 'pipeCloseRead' and 'pipeCloseWrite'.
+mkPipeFromContinuations :: IO ByteString -> (B.Builder -> IO ())
+                        -> IO ()
+                        -- ^ pipeCloseRead
+                        -> IO ()
+                        -- ^ pipeCloseWrite
+                        -> IO Pipe
+mkPipeFromContinuations getSome putAll pipeCloseRead pipeCloseWrite = mdo
   pipeLeftovers   <- newIORef Nothing
   pipeLock        <- newMVar ()
   pipeIsClosed    <- newTVarIO False
@@ -96,18 +106,16 @@ mkPipeFromContinuations getSome putAll = mdo
     let p = Pipe { .. }
     pure p
 
--- | Cleanly close our end of the Pipe, terminating the async manager's
--- drain-read-end thread. Calling 'closePipe' on an already closed pipe is a no-op.
+-- | Cleanly close our ends of the Pipe, terminating the async manager's
+-- drain-read-end thread. Also calls 'pipeCloseRead' and 'pipeCloseWrite', in that order.
 --
--- If the pipe was created using 'mkPipeFromHandles', the handles must only by
--- closed after calling 'closePipe'.
+-- If the pipe was created using 'mkPipeFromHandles', the handles are also closed.
 --
 -- The requests we've sent that are pending are all canceled with
 -- 'PipeClosedException' by ourselves.
 --
--- The remote process does not necessarily detect that this end of the pipe was
--- closed, but it must handle cleanly and clean up after exceptions caused from
--- it such as a handle being closed.
+-- No special notification is sent to the remote process, a message to that
+-- effect should be sent ahead of time if one is needed (see 'Shutdown').
 closePipe :: Pipe -> IO ()
 closePipe Pipe{..} = do
 
@@ -118,6 +126,8 @@ closePipe Pipe{..} = do
     -- releases handle lock taken by reading, and cleans up by replying to every
     -- pending request with 'PipeClosedException'.
     throwTo (asyncDrainTid pipeAsyncMngr) PipeClosedException
+
+  pipeCloseWrite
 
 -- | We've closed the pipe on our end and we terminate all pending requests with this.
 data PipeClosedException = PipeClosedException deriving Show
@@ -369,7 +379,7 @@ newAsyncManager pipe = do
 -- 'Pipe' and a thread draining the read end of the interpreter's 'Pipe', since
 -- both processes construct a 'Pipe' and send and receive messages
 drainPipe :: Pipe -> (forall x. IO x -> IO x) -> IO ()
-drainPipe p unmask = catch (unmask loop) replyToPendings where
+drainPipe p unmask = catch (unmask $ loop `finally` pipeCloseRead p) replyToPendings  where
   loop = do
     readPipe p >>= \case
       -- Receive a reply to a pending notification
