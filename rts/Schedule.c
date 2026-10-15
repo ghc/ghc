@@ -2084,7 +2084,7 @@ forkProcess(HsStablePtr *entry
 
         // start timer after the IOManager is initialized
         // (the idle GC may wake up the IOManager)
-        unpauseTimers();
+        startTimers();
 
         // Install toplevel exception handlers, so interruption
         // signal will be sent to the main thread.

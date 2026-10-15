@@ -123,8 +123,17 @@ static int poll_with_timeout(fdset *fdset, timeout *t);
 
 
 struct Timer {
-    /* Each timer runs in its own thread. The thread id is used to wait for
-     * the timer thread to terminate after asking it politely to exit.
+    /* Mutex to protect changes to the running state and thread id.
+     */
+    Mutex running_mutex;
+
+    /* Variable used to track if the timer is running or stopped.
+     */
+    bool running;
+
+    /* When running (i.e. not stopped) each timer runs in its own thread.
+     * The thread id is used to wait for the timer thread to terminate after
+     * asking it politely to stop.
      */
     OSThreadId thread_id;
 
@@ -150,9 +159,9 @@ struct Timer {
     bool pause_request;
 
     /* Atomic shared variable used by other threads to communicate that they
-     * want the timer thread to exit.
+     * want the timer thread to stop.
      */
-    bool exit_request;
+    bool stop_request;
 };
 
 static void *timer_thread_func(void *_timer)
@@ -161,16 +170,15 @@ static void *timer_thread_func(void *_timer)
 
     // Thread-local view of our state. We compare these with the corresponding
     // atomic shared variables used to request state changes.
-    bool paused  = true;  // updated from atomic shared var pause_request
-    bool exit    = false; // updated from atomic shared var exit_request
-    // Note that we start paused.
+    bool paused = ACQUIRE_LOAD_ALWAYS(&timer->pause_request);
+    bool stop   = RELAXED_LOAD_ALWAYS(&timer->stop_request);
 
     timeout timeout;
     fdset fdset;
     poll_init_timeout(&timeout, timer->interval);
     poll_init_fdset(&fdset, timer->notifyfd_r);
 
-    while (!exit) {
+    while (!stop) {
 
         int notify;
         if (paused) {
@@ -193,7 +201,7 @@ static void *timer_thread_func(void *_timer)
             collectFdWakeup(timer->notifyfd_r);
 
             paused = ACQUIRE_LOAD_ALWAYS(&timer->pause_request);
-            exit   = RELAXED_LOAD_ALWAYS(&timer->exit_request);
+            stop   = RELAXED_LOAD_ALWAYS(&timer->stop_request);
 
         } else if (errno != EINTR) {
             // While the RTS attempts to mask signals, some foreign libraries
@@ -208,7 +216,7 @@ static void *timer_thread_func(void *_timer)
 
 /* Create a new periodic timer.
  *
- * The timer is started in the paused state. Use unpauseTimer to continue.
+ * The timer is created in the stopped state. Use runTimer to continue.
  */
 Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
                         enum TimerHandlerHint hint,
@@ -220,22 +228,40 @@ Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
     timer->interval      = interval;
     timer->handler       = handler;
     timer->handler_arg   = handler_arg;
-    timer->pause_request = true;
-    timer->exit_request  = false;
     timer->hint          = hint;
+    reinitTimer(timer);
+    return timer;
+}
 
-    /* Open the interrupt fd synchronously.
-     *
-     * We used to do it in timer_thread_func (i.e. in the timer thread) but it
-     * meant that some user code could run before it and get confused by the
-     * allocation of the timerfd.
-     *
-     * See hClose002 which unsafely closes a file descriptor twice expecting an
-     * exception the second time: it sometimes failed when the second call to
-     * "close" closed our own timerfd which inadvertently reused the same file
-     * descriptor closed by the first call! (see #20618)
+
+/* Called after fork() in the child process. The mutex is in an unknown state
+ * but we can re-init, as we do elsewhere in the RTS (though POSIX appears
+ * unclear on the matter).
+ */
+void reinitTimer(Timer *timer)
+{
+    timer->pause_request = false;
+    timer->stop_request  = false;
+    timer->running       = false;
+    initMutex(&timer->running_mutex);
+
+    /* In the child process after a fork() the thread is gone but the fds
+     * remain. To avoid leaking the old file descriptors (#25280), we must
+     * close them and create new ones for the child.
      */
+    closeFdWakeup(timer->notifyfd_r, timer->notifyfd_w);
     newFdWakeup(&timer->notifyfd_r, &timer->notifyfd_w);
+}
+
+
+/* Idempotent. */
+void runTimer(Timer *timer)
+{
+    ACQUIRE_LOCK_ALWAYS(&timer->running_mutex);
+    if (timer->running) {
+        RELEASE_LOCK_ALWAYS(&timer->running_mutex);
+        return;
+    }
 
     pthread_attr_t attr;
     pthread_attr_init(&attr);
@@ -279,15 +305,50 @@ Timer *newPeriodicTimer(TimerHandler handler, void *handler_arg,
     if (ret != 0) {
         barf("Timer: Failed to spawn thread: %s", strerror(errno));
     }
-    return timer;
+    timer->running = true;
+    RELEASE_LOCK_ALWAYS(&timer->running_mutex);
 }
+
+
+/* Synchronous. Idempotent.
+ * The timer is guaranteed stopped after this.
+ */
+void haltTimer(Timer *timer)
+{
+    ACQUIRE_LOCK_ALWAYS(&timer->running_mutex);
+    if (!timer->running) {
+        RELEASE_LOCK_ALWAYS(&timer->running_mutex);
+        return;
+    }
+
+    RELEASE_STORE_ALWAYS(&timer->stop_request, true);
+    sendFdWakeup(timer->notifyfd_w);
+
+    // wait for the timer thread to terminate
+    if (pthread_join(timer->thread_id, NULL)) {
+        sysErrorBelch("Timer: Failed to join: %s", strerror(errno));
+    }
+    timer->running = false;
+    RELEASE_LOCK_ALWAYS(&timer->running_mutex);
+}
+
 
 /* Asynchronous. Idempotent. */
 void unpauseTimer(Timer *timer)
 {
     RELEASE_STORE_ALWAYS(&timer->pause_request, false);
     sendFdWakeup(timer->notifyfd_w);
+    /* TODO: there's a bit of a resource problem here. If the fd wakeup is
+     * using pipes then if the timer thread is not running then the pipe will
+     * fill. This is not a corectness problem: the pipe is written to with
+     * non-blocking writes. But it does pointlessly use up memory.
+     *
+     * It might be better to use a condition variable rather than the fdwakeup.
+     * For flexible timers however using timerfd, one would still want to use
+     * eventfd. And for kqueue there is probably another solution.
+     */
 }
+
 
 /* Asynchronous. Idempotent.
  * There may be at additional ticks fired after a call to this, but it will
@@ -299,31 +360,13 @@ void pauseTimer(Timer *timer)
     sendFdWakeup(timer->notifyfd_w);
 }
 
-/* Synchronous. Not idempotent.
- * The timer is guaranteed stopped after this.
- */
-void haltTimer(Timer *timer)
-{
-    ASSERT(!RELAXED_LOAD_ALWAYS(&timer->exit_request));
-    RELEASE_STORE_ALWAYS(&timer->exit_request, true);
-    sendFdWakeup(timer->notifyfd_w);
 
-    // wait for timer thread to terminate
-    if (pthread_join(timer->thread_id, NULL)) {
-        sysErrorBelch("Timer: Failed to join: %s", strerror(errno));
-    }
-}
-
-/* In the child process after a fork() the thread is gone but the fds remain.
- * To avoid leaking the old file descriptors (#25280), freeTimer() must be
- * used in the child process after a fork() and without using haltTimer (which
- * would fail).
- */
 void freeTimer(Timer *timer)
 {
     closeFdWakeup(timer->notifyfd_r, timer->notifyfd_w);
     stgFree(timer);
 }
+
 
 /* Implementation of the local helpers, to hide the difference between ppoll()
  * and select().

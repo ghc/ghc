@@ -13,6 +13,8 @@
  *  + eventlog flushing
  *  + idle GC
  *
+ * See also Timer.h for the interface to individual timers.
+ *
  * ---------------------------------------------------------------------------*/
 
 #pragma once
@@ -20,6 +22,7 @@
 #include "BeginPrivate.h"
 
 void initTimers(void);
+void startTimers(void);
 void exitTimers(void);
 
 void pauseTimers(void);

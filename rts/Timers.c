@@ -82,10 +82,8 @@ void initTimers(void)
 
     /* initTimer is called in the child of a fork */
     if (main_timer) {
-        freeTimer(main_timer);
-    }
-
-    if (RtsFlags.MiscFlags.tickInterval != 0) {
+        reinitTimer(main_timer);
+    } else if (RtsFlags.MiscFlags.tickInterval != 0) {
         main_timer = newPeriodicTimer(handle_tick, NULL,
                                       TimerHandlerShortRunning,
                                       RtsFlags.MiscFlags.tickInterval);
@@ -98,10 +96,19 @@ void initTimers(void)
 #endif
 }
 
+void startTimers(void)
+{
+#if defined(HAVE_PREEMPTION)
+    if (main_timer) {
+        runTimer(main_timer);
+    }
+#endif
+}
+
 void pauseTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (RtsFlags.MiscFlags.tickInterval != 0) {
+    if (main_timer) {
         pauseTimer(main_timer);
     }
 #endif
@@ -110,7 +117,7 @@ void pauseTimers(void)
 void unpauseTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (RtsFlags.MiscFlags.tickInterval != 0) {
+    if (main_timer) {
         unpauseTimer(main_timer);
     }
 #endif
@@ -119,7 +126,7 @@ void unpauseTimers(void)
 void exitTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (RtsFlags.MiscFlags.tickInterval != 0) {
+    if (main_timer) {
         haltTimer(main_timer);
         freeTimer(main_timer);
     }

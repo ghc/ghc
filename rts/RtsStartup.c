@@ -508,7 +508,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initHeapProfiling();
 
     /* start the timer (after initTimers above) */
-    unpauseTimers();
+    startTimers();
 
 #if defined(RTS_USER_SIGNALS)
     /* Set up handler to run on SIGINT, etc. */

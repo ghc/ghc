@@ -30,6 +30,7 @@ struct Timer {
     void        *handler_arg;
     DWORD    interval; // milliseconds
     bool     paused;
+    bool     running;
     enum TimerHandlerHint hint;
 };
 
@@ -74,7 +75,7 @@ void
 unpauseTimer(Timer *timer)
 {
     OS_ACQUIRE_LOCK(&timer->lock);
-    if (timer->paused) {
+    if (timer->running && timer->paused) {
         startTimer_(timer);
     }
     timer->paused = false;
@@ -86,7 +87,7 @@ void
 pauseTimer(Timer *timer)
 {
     OS_ACQUIRE_LOCK(&timer->lock);
-    if (!timer->paused) {
+    if (timer->running && !timer->paused) {
         /* pauseTimer is called from within the handle_tick, so stopping
          * the timer here /must/ be asynchronous or we will deadlock! */
         stopTimer_(timer, false /* asynchronous */);
@@ -96,15 +97,33 @@ pauseTimer(Timer *timer)
 }
 
 void
+runTimer(Timer *timer)
+{
+    OS_ACQUIRE_LOCK(&timer->lock);
+    if (!timer->running && !timer->paused) {
+        startTimer_(timer);
+    }
+    timer->running = true;
+    OS_RELEASE_LOCK(&timer->lock);
+}
+
+void
 haltTimer(Timer *timer)
 {
-    ASSERT(timer_queue != NULL);
-
     OS_ACQUIRE_LOCK(&timer->lock);
-    if (!timer->paused) {
+    //FIXME: there is a danger here that if the timer was very recently paused
+    // then it may still be stopping asynchronously, but we cannot now stop it
+    // synchronously.
+    if (timer->running && !timer->paused) {
         stopTimer_(timer, true /* synchronous */);
     }
+    timer->running = false;
     OS_RELEASE_LOCK(&timer->lock);
+}
+
+void freeTimer(Timer timer)
+{
+    stgFree(timer);
 
     OS_ACQUIRE_LOCK(timer_queue_lock);
     timer_count--;
@@ -119,11 +138,6 @@ haltTimer(Timer *timer)
         timer_queue = NULL;
     }
     OS_RELEASE_LOCK(timer_queue_lock);
-}
-
-void freeTimer(Timer timer)
-{
-    stgFree(timer);
 }
 
 static VOID CALLBACK tick_callback (PVOID lpParameter,
