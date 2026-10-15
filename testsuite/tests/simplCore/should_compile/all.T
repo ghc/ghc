@@ -628,4 +628,7 @@ test('T27749',
 
 test('T27629', only_ways(['optasm']), makefile_test, ['T27629'])
 test('T27936', normal, compile, [''])
+
+# A case-float reaching abstractFloats used to make the Simplifier panic
+test('T27737a', normal, compile, ['-O'])
 test('T27910', grep_errmsg(r'KnownBranch'), compile, ['-O -dno-typeable-binds -ddump-simpl-stats -dsuppress-uniques'])
