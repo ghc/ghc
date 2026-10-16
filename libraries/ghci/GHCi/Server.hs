@@ -78,9 +78,6 @@ servWithCustom verbose hook pipe restore customHandler = newIORef False >>= loop
         RunModFinalizers ii st qrefs -> wrapRunTH ii $ runModFinalizerRefs pipe ii st qrefs
         _other -> run msg >>= reply
 
-    -- closePipe here will wait until every active pipeWrite pipe exits, but
-    -- they should never block for long, as the host process is either reading
-    -- or has called pipeCloseRead.
     isDone <- readIORef doneRef
     if isDone then closePipe pipe
               else loop doneRef
@@ -167,8 +164,8 @@ defaultServerWithCustom customHandler = do
   (outh, inh, rest) <-
       case args of
         arg0:arg1:rest -> do
-            inh  <- readGhcHandle arg1
-            outh <- readGhcHandle arg0
+            inh  <- readGhcHandle ReadMode arg1
+            outh <- readGhcHandle WriteMode arg0
             return (outh, inh, rest)
         _ -> dieWithUsage
 #endif
