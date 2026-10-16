@@ -637,6 +637,7 @@ instance Outputable IdInfo where
     [ (has_prag,         text "InlPrag=" <> pprInlineDebug prag_info)
     , (has_occ,          text "Occ=" <> ppr occ_info)
     , (has_dmd,          text "Dmd=" <> ppr dmd_info)
+    , (has_cpr,          text "Cpr=" <> ppr dmd_info)
     , (has_lbv ,         text "OS=" <> ppr lbv_info)
     , (has_arity,        text "Arity=" <> int arity)
     , (has_called_arity, text "CallArity=" <> int called_arity)
@@ -657,6 +658,9 @@ instance Outputable IdInfo where
 
       lbv_info  = oneShotInfo info
       has_lbv   = not (hasNoOneShotInfo lbv_info)
+
+      cpr = cprSigInfo info
+      has_cpr = not $ isTopCprSig cpr
 
       arity = arityInfo info
       has_arity = arity /= 0

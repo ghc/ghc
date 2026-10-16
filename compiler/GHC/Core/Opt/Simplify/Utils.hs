@@ -201,10 +201,11 @@ data SimplCont
   -- The two strict forms have no DupFlag, because we never duplicate them
   | StrictBind          -- (StrictBind x b K)[e] = let x = e in K[b]
                         --       or, equivalently,  = K[ (\x.b) e ]
+                        -- See Note [StrictBind] in GHC.Core.Opt.Simplify.Iteration
       { sc_from  :: FromWhat
       , sc_env   :: StaticEnv  -- See Note [StaticEnv]
                                -- The sc_env in StrictBind is never (Simplified NoDup)
-      , sc_bndr  :: Id
+      , sc_bndr  :: Id         -- See (SB3) in Note [StrictBind]
       , sc_body  :: CoreExpr
 
       , sc_cont  :: SimplCont }

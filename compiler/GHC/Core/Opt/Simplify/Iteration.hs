@@ -1653,6 +1653,7 @@ completeBindX env from_what bndr rhs body cont
   | FromBeta arg_levity <- from_what
   , needsCaseBindingL arg_levity rhs -- Enforcing the let-can-float-invariant
   = do { (env1, bndr1)   <- simplNonRecBndr env bndr  -- Lambda binders don't have rules
+                            -- See Note [Core binder IdInfo invariants] in GHC.Core
        ; (floats, expr') <- simplNonRecBody env1 from_what body cont
        -- Do not float floats past the Case binder below
        ; let expr'' = wrapFloats floats expr'
@@ -1869,7 +1870,7 @@ simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- could have a stable unfolding;
 -- see Historical Note [Case binders and join points]
 -- But now it is much simpler! We now only remove unfoldings.
--- See Note [Never put `OtherCon` unfoldings on lambda binders]
+-- See (CBI1) in Note [Core binder IdInfo invariants]
 simplLamBndr env bndr = simplBinder env (zapIdUnfolding bndr)
 
 simplLamBndrs :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
@@ -1902,11 +1903,11 @@ simplNonRecE :: HasDebugCallStack
 -- Otherwise it may or may not satisfy it.
 
 simplNonRecE env from_what bndr (rhs, rhs_se) body cont
-  | assert (isId bndr && not (isJoinId bndr) ) $
-    is_strict_bind
+  | assertPpr (isId bndr && not (isJoinId bndr)) (ppr bndr) True
+  , Just bndr' <- useStrictBind_maybe env from_what bndr
   = -- Evaluate RHS strictly
     simplExprF (rhs_se `setInScopeFromE` env) rhs
-               (StrictBind { sc_bndr = bndr, sc_body = body, sc_from = from_what
+               (StrictBind { sc_bndr = bndr', sc_body = body, sc_from = from_what
                            , sc_env = UnSimplified env, sc_cont = cont })
 
   | otherwise  -- Evaluate RHS lazily
@@ -1916,17 +1917,6 @@ simplNonRecE env from_what bndr (rhs, rhs_se) body cont
                                            (bndr,env) (bndr2,env2) (rhs,rhs_se)
        ; (floats2, expr') <- simplNonRecBody env3 from_what body cont
        ; return (floats1 `addFloats` floats2, expr') }
-
-  where
-    is_strict_bind = case from_what of
-       FromBeta Unlifted -> True
-       -- If we are coming from a beta-reduction (FromBeta) we must
-       -- establish the let-can-float invariant, so go via StrictBind
-       -- If not, the invariant holds already, and it's optional.
-
-       -- (FromBeta Lifted) or FromLet: look at the demand info
-       _ -> seCaseCase env && isStrUsedDmd (idDemandInfo bndr)
-
 
 ------------------
 simplRecE :: SimplEnv
@@ -1947,6 +1937,49 @@ simplRecE env pairs body cont
         ; (floats1, env2)  <- simplRecBind env1 (BC_Let NotTopLevel Recursive) pairs
         ; (floats2, expr') <- simplExprF env2 body cont
         ; return (floats1 `addFloats` floats2, expr') }
+
+
+useStrictBind_maybe :: SimplEnv -> FromWhat -> InId -> Maybe InId
+-- Can we use a StrictBind continuation for this let-binding?
+-- If so, return a binder that is suitable to become a lambda binder,
+-- i.e. one satisfying `lamBndrInfoOK`; see (SB3) in Note [StrictBind]
+useStrictBind_maybe env from_what bndr
+  -- If we are coming from a beta-reduction (FromBeta) we must
+  -- establish the let-can-float invariant, so we must go via StrictBind
+  -- If not, the invariant holds already, and it's optional.
+  | FromBeta Unlifted <- from_what
+  = Just bndr   -- Already a lambda binder
+
+  -- Not if the demand is non-strict
+  | not (isStrUsedDmd dmd_info)
+  = Nothing
+
+  -- Not if case-of-case is off
+  -- See (SB1) in Note [StrictBind]
+  | not (seCaseCase env)
+  = Nothing
+
+  | FromBeta Lifted <- from_what
+  = Just bndr   -- Already a lambda binder
+
+  -- Not for things with RULES or INLINE or NOINLINE
+  -- See (SB3) in Note [StrictBind]
+  | isStableUnfolding (unfoldingInfo info)
+    || not (isEmptyRuleInfo (ruleInfo info))
+    || not (isAlwaysActive (inlinePragmaActivation (inlinePragInfo info)))
+  = Nothing
+
+  | otherwise   -- FromLet: zap the IdInfo that a lambda binder may not have
+  = Just (bndr `setIdInfo` zapped_info)
+
+  where
+    info     = idInfo bndr
+    dmd_info = demandInfo info
+
+    -- A lambda binder may have only occurrence and demand info;
+    -- see (SB3) in Note [StrictBind]
+    zapped_info = vanillaIdInfo `setOccInfo`    occInfo info
+                                `setDemandInfo` dmd_info
 
 {- Note [Dark corner with representation polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3420,6 +3453,7 @@ simplAlts (saf,env0) scrut case_bndr alts cont'
         ; let case_bndr2 = case_bndr1 `setIdUnfolding` evaldUnfolding
               env2       = modifyInScope env1 case_bndr2
               -- See Note [Case binder evaluated-ness]
+              -- and Note [Evaluated-ness on case binders] in GHC.Core
               fam_envs   = seFamEnvs env0
 
         ; (alt_env', scrut', case_bndr') <- improveSeq fam_envs (saf,env2) scrut
@@ -4043,7 +4077,7 @@ mkDupableContWithDmds env dmds (TickIt t cont)
 mkDupableContWithDmds env _
      cont1@(StrictBind { sc_bndr = bndr, sc_body = body, sc_from = from_what
                        , sc_env = se, sc_cont = cont})
--- See Note [Duplicating StrictBind]
+-- See (SB2) in Note [StrictBind]
 -- K[ let x = <> in b ]  -->   join j x = K[ b ]
 --                             j <>
   = do { let sb_env = case se of
@@ -4060,7 +4094,10 @@ mkDupableContWithDmds env _
        ; let join_body = wrapFloats floats1 join_inner
              res_ty    = contResultType cont
 
-       ; mkDupableStrictBind env bndr' join_body res_ty }
+       -- bndr' is about to become a lambda binder, so it must have suitable
+       -- IdInfo; simplNonRecE ensures this.  See Note [Core binder IdInfo invariants]
+       ; assertPpr (lamBndrInfoOK bndr') (ppr bndr' $$ ppr (idInfo bndr')) $
+         mkDupableStrictBind env bndr' join_body res_ty }
 
 mkDupableContWithDmds env _
     (StrictArg { sc_fun = fun, sc_cont = cont
@@ -4253,7 +4290,9 @@ mkDupableAlt _env case_bndr jfloats (Alt con alt_bndrs alt_rhs_in)
                          | otherwise = v
 
               -- No lambda binder has an unfolding, but (currently) case binders can,
-              -- so we must zap them here.
+              -- so we must zap them here.  But case binders never have a pragma,
+              -- stable unfolding or RULES, so there is no need to zap those.
+              -- See Note [Core binder IdInfo invariants] in GHC.Core
               join_rhs   = mkLams (map zapIdUnfolding final_bndrs) rhs_with_seqs
 
         ; join_bndr <- newJoinId filtered_binders rhs_ty'
@@ -4569,7 +4608,7 @@ There are two ways to make it duplicable.
                   ; False -> jump $j r2 }
 
   Notice that Plan B is very like the way we handle strict bindings;
-  see Note [Duplicating StrictBind].  And Plan B is exactly what we'd
+  see Note [StrictBind].  And Plan B is exactly what we'd
   get if we turned use a case expression to evaluate the strict arg:
 
        case (case x of { True -> r1; False -> r2 }) of
@@ -4642,23 +4681,66 @@ Note [Inline small things to avoid creating a thunk] in
 Simplify.Utils. But if we do inline them, the entire process will
 repeat -- back to exponential behaviour.
 
-So we are careful to keep the demand-info on a2 and a3.  Then they'll
-be /strict/ let-bindings, which will be dealt with by StrictBind.
-That's why contIsDupableWithDmds is careful to propagage demand
-info to the auxiliary bindings it creates.  See the Demand argument
-to makeTrivial.
+So we are careful to keep the demand-info on a2 and a3.  Then they'll be
+/strict/ let-bindings, which will be dealt with by `StrictBind` (see
+Note [StrictBind]).  That's why `contIsDupableWithDmds` is careful to
+propagate demand info to the auxiliary bindings it creates.  See the
+`Demand` argument to `makeTrivial`.
 
-Note [Duplicating StrictBind]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We make a StrictBind duplicable in a very similar way to
-that for case expressions.  After all,
-   let x* = e in b   is similar to    case e of x -> b
+Note [StrictBind]
+~~~~~~~~~~~~~~~~~
+We use StrictBind when we fine
+   let x! = rhs in body
+where the `x` is definitely demanded in body.  When this happens we can
+float out case-expressions etc from inside `e`; e.g.
+   let { x! = case a of (p,q) -> rhs } in b
+-->
+   case a of (p,q) -> let x! = rhs in b
 
-So we potentially make a join-point for the body, thus:
-   let x = <> in b   ==>   join j x = b
-                           in j <>
+We simplify `rhs` with a StrictBind continuation that continues with
+`body`
 
-Just like StrictArg in fact -- and indeed they share code.
+(SB1) We only use StrictBind when case-of-case is on:
+   see Note [Case-of-case and full laziness]
+
+(SB2) We make a StrictBind /duplicable/ in a very similar way to
+   that for case expressions.  After all,
+      let x! = e in b   is similar to    case e of x -> b
+
+   So we potentially make a join-point for the body, thus:
+     let x = <> in b   ==>   join j x = b
+                             in j <>
+
+   Just like StrictArg in fact -- and indeed they share code.
+
+(SB3) When we duplicate a StrictBind (SB2), the binder `x` becomes a lambda
+   binder, and so must satisfy `lamBndrInfoOK`; see Note [Core binder IdInfo
+   invariants] in GHC.Core.  But a let-binder `x` usually has IdInfo that a
+   lambda binder may not have (an unfolding, arity, a demand signature...).
+   So `useStrictBind_maybe` zaps that info, keeping only the occurrence info
+   and the demand info.  If it happens to stay as a let-binding it can be
+   re-derived, so nothing is lost.
+
+   The exceptions are RULES, a stable unfolding, and a non-default inlining
+   activation: these cannot be re-derived, and we have nowhere convenient to
+   put them if `x` becomes a lambda binder. For example:
+       let {-# NOINLINE x #-}
+           x! = case y of { ... }
+       in blah
+   If we make a join point  j x = blah, we have nowhere convenient
+   to put that NOINLINE.  Ditto INLINE or RULES.  So in these cases we
+   simply don't use StrictBind.  It's very unusual, so no harm done.
+   But it does happen; one example is this, in the Applicative (ST s)
+   instance in GHC.Internal.Control.Monad.St.Lazy.Imp
+         {-# NOINLINE res1 #-}
+         !res1 = unST fm s
+
+   TL;DR: the sc_bndr::Id field in StrictBind always satisfies `lamBndrInfoOK`.
+   This means that in the above example { x! = case y of ... } we won't
+   float the `case y` out. And perhaps that's fine because of the NOINLNE.
+   We could imagine instead imposing these conditions only when we /duplicate/
+   the StrictBind, rather than when we /create/ it, but that would require a
+   bigger refactor.
 
 Note [Join point abstraction]  Historical note
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
