@@ -94,6 +94,7 @@ module GHC.Types.Id (
         idArity,
         idCallArity, idFunRepArity,
         idSpecialisation, idCoreRules, idHasRules,
+        lamBndrInfoOK,
         idCafInfo, idLFInfo_maybe,
         idOneShotInfo,
         idOccInfo,
@@ -904,6 +905,16 @@ idCoreRules id = ruleInfoRules (idSpecialisation id)
 
 idHasRules :: Id -> Bool
 idHasRules id = not (isEmptyRuleInfo (idSpecialisation id))
+
+-- | True <=> the Id has no (non-default) inline pragma, no stable unfolding,
+-- and no RULES.  Lambda binders, case binders, and case-alternative binders
+-- must all satisfy this.
+-- See Note [Lambda and case binders have vanilla IdInfo] in GHC.Core
+lamBndrInfoOK :: Id -> Bool
+lamBndrInfoOK id
+  =  isDefaultInlinePragma (idInlinePragma id)
+  && not (isStableUnfolding (realIdUnfolding id))
+  && not (idHasRules id)
 
 setIdSpecialisation :: Id -> RuleInfo -> Id
 setIdSpecialisation id spec_info = modifyIdInfo (`setRuleInfo` spec_info) id

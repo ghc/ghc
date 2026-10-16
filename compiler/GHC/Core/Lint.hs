@@ -1858,6 +1858,17 @@ lintIdBndr top_lvl bind_site id thing_inside
          hang (text "Lambda binder" <+> quotes (ppr id) <+> text "has an unfolding")
             2 (ppr unf)
 
+       -- Check that lambda, case, and case-alternative binders have
+       -- no RULES, no inline pragma, and no stable unfolding
+       -- See Note [Lambda and case binders have vanilla IdInfo] in GHC.Core
+       ; checkL (is_let_bind || lamBndrInfoOK id) $
+         hang (text "Non-let binder" <+> quotes (ppr id)
+               <+> text "has RULES, an inline pragma, or a stable unfolding")
+            2 (vcat [ text "Binding site:" <+> text (show_site bind_site)
+                    , text "Inline pragma:" <+> ppr (idInlinePragma id)
+                    , text "Rules:" <+> ppr (idCoreRules id)
+                    , text "Unfolding:" <+> ppr (realIdUnfolding id) ])
+
        ; addLoc (IdTy id) (lintValueType id_ty)
 
        ; addInScopeId id thing_inside }
@@ -1868,6 +1879,12 @@ lintIdBndr top_lvl bind_site id thing_inside
     is_let_bind = case bind_site of
                     LetBind -> True
                     _       -> False
+
+    show_site :: BindingSite -> String
+    show_site LambdaBind  = "lambda"
+    show_site CaseBind    = "case binder"
+    show_site CasePatBind = "case alternative"
+    show_site LetBind     = "let"
 
 {-
 %************************************************************************
