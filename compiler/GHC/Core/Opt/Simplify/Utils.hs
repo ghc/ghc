@@ -12,7 +12,8 @@ module GHC.Core.Opt.Simplify.Utils (
         tryEtaExpandRhs, wantEtaExpansion,
 
         -- Inlining,
-        preInlineUnconditionally, postInlineUnconditionally,
+        preInlineLetUnconditionally, preInlineBetaUnconditionally,
+        postInlineUnconditionally,
         activeRule,
         getUnfoldingInRuleMatch,
         updModeForStableUnfoldings, updModeForRuleLHS, updModeForRuleRHS,
@@ -180,10 +181,9 @@ data SimplCont
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
       { sc_hole_ty :: OutType    -- Type of the function, presumably (forall a. blah)
                                  -- See Note [The hole type in ApplyToTy]
-      , sc_env  :: StaticEnv     -- See Note [StaticEnv]
-      , sc_arg  :: CoreExpr      -- The argument
-      , sc_cast :: MOutCoercion  -- Wrap this OutCoercion around the (simplified) argument
-                                 -- See Note [The sc_cast field of ApplyToVal]
+      , sc_dup  :: DupFlag       -- See Note [The argument of ApplyToVal]
+      , sc_arg  :: SimplClo      -- The argument
+                                 -- Invariant: if sc_arg is a ContEx, then sc_dup = NoDup
       , sc_cont :: SimplCont }
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
@@ -252,49 +252,85 @@ perhapsSubstTy (UnSimplified env) ty = substTy env ty
 
 {- Note [StaticEnv]
 ~~~~~~~~~~~~~~~~~~~
-Consider ApplyToVal, which has
-    sc_env :: StaticEnv
-    sc_arg :: CoreExpr
-Initially, `sc_arg` is an un-simplified InExpr, and `sc_env` is (UnSimplified env),
-where `env` gives meaning to the free variables of `sc_arg`; in particular, `env`
-may have substitutions that must apply to the argument.
+Consider Select, which has
+    sc_env  :: StaticEnv
+    sc_bndr :: Id
+    sc_alts :: [CoreAlt]
+Initially, `sc_bndr` and `sc_alts` are un-simplified InThings, and `sc_env` is
+(UnSimplified env), where `env` gives meaning to their free variables; in
+particular, `env` may have substitutions that must apply to them.
 
-But sometimes we simplify the argument, and in that case, `sc_arg` is an OutExpr,
-the simplified argument, and `sc_env` is (Simplified NoDup) or (Simplified OkDup).
-The former is the safe, conservative option, but in `mkDupableCont` we want to make
-the continuation duplicable, so we make the argument small and tag it with
-(Simplified OkDup).
+But sometimes (notably in `mkDupableCont`) we simplify them, and in that case
+`sc_bndr` and `sc_alts` are OutThings, and `sc_env` is (Simplified dup).
 
-We later simplify the argument, e.g. in `simplArg`.  Then
-  * If sc_env is Simplified, it's a no-op
-  * If sc_env is (UnSimplified arg_env) we simplify `sc_arg` with
-     - Its captured envt `arg_env`
+When we finally simplify the alternatives (see `mkAltEnv`)
+  * If sc_env is Simplified, there is nothing to do
+  * If sc_env is (UnSimplified alt_env) we simplify them with
+     - Their captured envt `alt_env`
      - but overriding its InScopeSet with the larger one at the
        simplification point.
     Why override the InScopeSet?  Example:
-          (let y = ey in f) ex
-    By the time we simplify ex, 'y' will be in scope.
-  All this is done in `simplArg`.
+          case (let y = ey in f) of alts
+    By the time we simplify alts, 'y' will be in scope.
 
 Note that:
 
 * In the Simplified case there is no environment, because the substitution has
   already been applied.
 
-* We say sc_arg :: CoreExpr, rather than sc_arg :: InExpr or sc_arg :: OutExpr,
-  because whether it is InExpr or OutExpr depends on `sc_env`
+* We say sc_alts :: [CoreAlt], rather than [InAlt] or [OutAlt],
+  because whether they are InAlts or OutAlts depends on `sc_env`
 
-* Same deal for Select, and StrictBind, but the StaticEnv scopes over
-    * sc_bndr and sc_alts (for Select)
-    * sc_bndr and sc_body (for StrictBind)
+* Same deal for StrictBind, where the StaticEnv scopes over sc_bndr and sc_body.
 
-* Even though the InScopeSet of an (UnSimplified se) is overridden in `simplArg`,
-  that InScopeSet is not irrelevant: it should include all the free vars of
-  applying the substitution to the InExpr. Reason: contHoleType uses perhapsSubstTy
-  to apply the substitution to the expression, and that (rightly) gives ASSERT
-  failures if the InScopeSet isn't big enough.
+* ApplyToVal is similar, but simpler: it uses a SimplClo instead.
+  See Note [The argument of ApplyToVal].
+
+* Even though the InScopeSet of an (UnSimplified se) is overridden, that
+  InScopeSet is not irrelevant: it should include all the free vars of
+  applying the substitution to the InThing. Reason: contHoleType uses
+  perhapsSubstTy to apply the substitution to the binder, and that
+  (rightly) gives ASSERT failures if the InScopeSet isn't big enough.
 
 (SE1) If dup = OkToDup, then continuation k is also ok-to-dup
+
+Note [The argument of ApplyToVal]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ApplyToVal has
+    sc_dup :: DupFlag
+    sc_arg :: SimplClo
+
+Initially, `sc_arg` is (ContEx env arg MRefl), where `arg` is the un-simplified
+InExpr, and `env` gives meaning to the free variables of `arg`; in particular,
+`env` may have substitutions that must apply to the argument.
+
+But sometimes we simplify the argument, and in that case, `sc_arg` is
+(DoneEx arg' NotJoinPoint), where `arg'` is the simplified argument.
+
+The `sc_dup` flag says whether the continuation can be duplicated.  NoDup is
+the safe, conservative option, but in `mkDupableCont` we want to make the
+continuation duplicable, so we make the argument small (and hence a DoneEx)
+and set `sc_dup` to OkDup.  Invariants:
+
+  (AV1) If `sc_arg` is a ContEx, then `sc_dup` is NoDup.
+
+  (AV2) If `sc_dup` is OkDup then `sc_cont` is also ok-to-dup; see (SE1)
+        in Note [StaticEnv].
+
+We later simplify the argument, in `simplArg`.  Then
+  * If `sc_arg` is a DoneEx (or DoneId), it's a no-op
+  * If `sc_arg` is (ContEx arg_env arg mco) we simplify `arg` with
+     - Its captured envt `arg_env`
+     - but overriding its InScopeSet with the larger one at the
+       simplification point.
+    Why override the InScopeSet?  Example:
+          (let y = ey in f) ex
+    By the time we simplify ex, 'y' will be in scope.
+    Then we wrap the cast `mco` around the result.
+    See Note [The MOutCoercion field of ContEx].
+
+Using a SimplClo for the argument means that it can be substituted for a lambda
+binder, in `preInlineBetaUnconditionally`, without further ado.
 -}
 
 instance Outputable DupFlag where
@@ -312,9 +348,9 @@ instance Outputable SimplCont where
     = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
     = (text "ApplyToTy" <+> pprParendType ty) $$ ppr cont
-  ppr (ApplyToVal { sc_arg = arg, sc_env = env, sc_cont = cont, sc_hole_ty = hole_ty })
-    = (hang (text "ApplyToVal" <> braces (ppr env) <+> text "hole-ty:" <+> pprParendType hole_ty)
-          2 (pprParendExpr arg))
+  ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont, sc_hole_ty = hole_ty })
+    = (hang (text "ApplyToVal" <> braces (ppr dup) <+> text "hole-ty:" <+> pprParendType hole_ty)
+          2 (ppr arg))
       $$ ppr cont
   ppr (StrictBind { sc_bndr = b, sc_cont = cont })
     = (text "StrictBind" <+> ppr b) $$ ppr cont
@@ -433,8 +469,8 @@ pushOutArgs fun_ty (arg:args) cont
   = ApplyToTy { sc_hole_ty = fun_ty, sc_arg_ty = ty
               , sc_cont = pushOutArgs (piResultTy fun_ty ty) args cont }
   | otherwise
-  = ApplyToVal { sc_hole_ty = fun_ty, sc_cast = MRefl
-               , sc_arg = arg, sc_env = Simplified NoDup
+  = ApplyToVal { sc_hole_ty = fun_ty
+               , sc_arg = DoneEx arg NotJoinPoint, sc_dup = NoDup
                , sc_cont = pushOutArgs (funResultTy fun_ty) args  cont}
 
 pushArgSpecs :: [ArgSpec]   -- In normal, forward order
@@ -445,7 +481,7 @@ pushArgSpec :: ArgSpec -> SimplCont -> SimplCont
 pushArgSpec (TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }) cont
   = ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont }
 pushArgSpec (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
-  = ApplyToVal { sc_arg = arg, sc_env = Simplified NoDup, sc_cast = MRefl
+  = ApplyToVal { sc_arg = DoneEx arg NotJoinPoint, sc_dup = NoDup
                , sc_hole_ty = hole_ty, sc_cont = cont }
 
 argSpecArg :: ArgSpec -> OutExpr
@@ -496,7 +532,12 @@ contIsStop _         = False
 contIsDupable :: SimplCont -> Bool
 contIsDupable (Stop {})                    = True
 contIsDupable (ApplyToTy  { sc_cont = k }) = contIsDupable k
-contIsDupable (ApplyToVal { sc_env = se }) = okToDupSE se -- See (SE1) in Note [StaticEnv]
+contIsDupable (ApplyToVal { sc_dup = dup, sc_arg = arg })
+  = assertPpr (not (okToDup dup && is_cont_ex arg)) (ppr arg) $
+    okToDup dup -- See (AV1,AV2) in Note [The argument of ApplyToVal]
+  where
+    is_cont_ex (ContEx {}) = True
+    is_cont_ex _           = False
 contIsDupable (Select { sc_env = se })     = okToDupSE se -- ...ditto...
 contIsDupable (StrictBind { sc_env = se }) = okToDupSE se -- ...ditto...
 contIsDupable (StrictArg { sc_dup = dup }) = okToDup dup  -- ...ditto...
@@ -605,8 +646,8 @@ contArgs env cont
     lone (CastIt {})     = False  --     stops it being "lone"
     lone _               = True
 
-    go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
-                                        = go (interestingArg env se arg : args) k
+    go args (ApplyToVal { sc_arg = arg, sc_cont = k })
+                                        = go (interestingArg env arg : args) k
     go args (ApplyToTy { sc_cont = k }) = go args k
     go args (CastIt { sc_cont = k })    = go args k
     go args k                           = (False, reverse args, k)
@@ -621,15 +662,13 @@ contOutArgs env cont
     go (ApplyToTy { sc_arg_ty = ty, sc_cont = cont })
       = Type ty : go cont
 
-    go (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = cont })
-      = case se of
-          Simplified {}    -> arg : go cont
-          UnSimplified env -> GHC.Core.Subst.substExpr (getFullSubst in_scope env) arg : go cont
-        -- Make sure we apply the static environment `sc_env` as a substitution
+    go (ApplyToVal { sc_arg = arg, sc_cont = cont })
+      = simplCloExpr in_scope arg : go cont
+        -- Make sure we apply the static environment of a ContEx as a substitution
         --   to get an OutExpr.  See (BF1) in Note [tryRules: plan (BEFORE)]
         --   in GHC.Core.Opt.Simplify.Iteration
-        -- NB: we use substExpr, not substExprSC: we want to get the benefit of
-        --     knowing what is evaluated etc, via the in-scope set
+        -- simplCloExpr also wraps the pending cast (if any) around the argument;
+        --   omitting it can make a rule fail to match (#27963)
 
     -- No more arguments
     go _ = []
@@ -826,19 +865,27 @@ make use of the strictness info for the function.
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [The sc_cast field of ApplyToVal]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [The MOutCoercion field of ContEx]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the `ApplyToVal` case of `pushCast` we want to push an `OutCoercion` into the
-argument.  But the argument may or may not have been simplified (see Note [StaticEnv])
-so we definitely can't just wrap the cast around the argument. Instead we store it
-in the `sc_cast` field -- this is the whole reason for the `sc_cast` field.
+argument.  But the argument may or may not have been simplified (see Note [The
+argument of ApplyToVal]):
+
+* If it has been simplified, it is (DoneEx arg' _), and we can simply wrap the
+  cast around `arg'`.
+
+* If it has not, it is (ContEx env arg mco), and we definitely can't just wrap
+  the (Out)cast around the InExpr `arg`. Instead we compose it with `mco` --
+  this is the whole reason for the MOutCoercion field of `ContEx`.
+
+All this is done by `mkCloCastMCo`.
 
 We deal with that pending cast mainly in `simplArg`.
 
 But we /also/ sometimes want to substitute that argument for a lambda-binder, in
-`preInlineUnconditionally`.  So we also have to put that pending cast into
-`ContEx`; hence the MOutCoercion field of `ContEx`.  Then we deal with it
-appropriately when /applying/ the substitution in `simplInId`.
+`preInlineBetaUnconditionally`; and since the substitution maps an Id to a SimplClo,
+the pending cast comes along for free.  Then we deal with it appropriately when
+/applying/ the substitution in `simplInId`.
 -}
 
 optOutCoercion :: SimplEnvIS -> OutCoercion -> Bool -> OutCoercion
@@ -886,21 +933,17 @@ pushCast env co cont
     -- where   co :: (s1->s2) ~ (t1->t2)
     --         co1 :: t1 ~ s1
     --         co2 :: s2 ~ t2
-    go co co_is_opt cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                     , sc_cast = arg_mco, sc_cont = tail })
+    go co co_is_opt cont@(ApplyToVal { sc_arg = arg, sc_cont = tail })
       | not co_is_opt
       = -- pushCoValArg duplicates the coercion, so optimise first
         go (optOutCoercion (zapSubstEnv env) co co_is_opt) True cont
 
       | Just (tyL, m_co1, m_co2) <- pushCoValArg co
       = {-#SCC "addCoerce-pushCoValArg" #-}
-        -- Dealing with m_co1 is the entire reason for the sc_cast field
-        -- of ApplyToVal; see Note [The sc_cast field of ApplyToVal]
-        ApplyToVal { sc_arg  = arg
-                   , sc_env  = arg_se
-                   , sc_cast = arg_mco `mkTransMCo` m_co1
-                   , sc_cont = go_mco m_co2 True tail
-                   , sc_hole_ty = tyL }
+        -- See Note [The MOutCoercion field of ContEx]
+        cont { sc_arg     = mkCloCastMCo arg m_co1
+             , sc_cont    = go_mco m_co2 True tail
+             , sc_hole_ty = tyL }
 
     go co co_is_opt cont
       | isReflCo co = cont  -- Having this at the end makes a huge
@@ -913,6 +956,13 @@ pushCast env co cont
     go_mco :: MOutCoercion -> Bool -> SimplCont -> SimplCont
     go_mco MRefl    _   cont = cont
     go_mco (MCo co) opt cont = go co opt cont
+
+mkCloCastMCo :: SimplClo -> MOutCoercion -> SimplClo
+-- See Note [The MOutCoercion field of ContEx]
+mkCloCastMCo clo               MRefl    = clo
+mkCloCastMCo (DoneId v)        (MCo co) = DoneEx (mkCast (Var v) co) NotJoinPoint
+mkCloCastMCo (DoneEx e _)      (MCo co) = DoneEx (mkCast e co)       NotJoinPoint
+mkCloCastMCo (ContEx se e mco) (MCo co) = ContEx se e (mco `mkTransMCo` MCo co)
 
 
 {-
@@ -1227,19 +1277,17 @@ Wrinkles:
 
 -}
 
-interestingArg :: SimplEnv -> StaticEnv -> CoreExpr -> ArgSummary
+interestingArg :: SimplEnv -> SimplClo -> ArgSummary
 -- See Note [Interesting arguments]
-interestingArg env se e
-  = case se of
-      Simplified {}           -> go env                                0 e
-      UnSimplified static_env -> go (static_env `setInScopeFromE` env) 0 e
+interestingArg env clo
+  = go_clo env 0 clo
   where
+    go_clo _   n (DoneId v)       = go_var n v
+    go_clo env n (DoneEx e _)     = go (zapSubstEnv env)          n e
+    go_clo env n (ContEx se e _)  = go (se `setInScopeFromE` env) n e
+
     -- n is # value args to which the expression is applied
-    go env n (Var v)
-       = case substId env v of
-           DoneId v'            -> go_var n v'
-           DoneEx e _           -> go (zapSubstEnv env)          n e
-           ContEx se e _mco     -> go (se `setInScopeFromE` env) n e
+    go env n (Var v) = go_clo env n (substId env v)
 
     go _   _ (Lit l)
        | isLitRubbish l        = NonTrivArg -- See (IA3) in Note [Interesting arguments]
@@ -1738,15 +1786,15 @@ is a term (not a coercion) so we can't necessarily inline the latter in
 the former.
 -}
 
-preInlineUnconditionally
+preInlineLetUnconditionally
     :: SimplEnv -> TopLevelFlag -> InId
-    -> StaticEnv -> CoreExpr -> MOutCoercion  -- The argument
+    -> InExpr -> SimplEnv   -- These two go together
     -> Maybe SimplEnv       -- Returned env has extended substitution
 -- Precondition: rhs satisfies the let-can-float invariant
 -- See Note [Core let-can-float invariant] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
-preInlineUnconditionally env top_lvl bndr rhs_se rhs rhs_mco
+preInlineLetUnconditionally env top_lvl bndr rhs rhs_env
   | not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
@@ -1758,26 +1806,15 @@ preInlineUnconditionally env top_lvl bndr rhs_se rhs rhs_mco
 
   -- See Note [Stable unfoldings and preInlineUnconditionally]
   | not (isInlinePragma inline_prag)
-  , Just inl <- maybeUnfoldingTemplate unf   = assertPpr (isReflMCo rhs_mco) (ppr bndr) $
-                                               Just $! (extend_subst_with inl)
+  , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
 
   | otherwise                                = Nothing
   where
     unf = idUnfolding bndr
 
-    -- If the rhs is /not/ already simplified, extend the envt with ContEx, which captures
-    --    the the lexical environment for us to restore in `simplInId`.
-    -- If the rhs /is/ already simplified, then extend the envt with DoneEx;
-    --    That makes `simplInId` call `simplOutExpr` which avoids re-simplifying
-    --    the RHS.
-    -- See Note [Avoid repeated simplification] in GHC.Core.Opt.Simplify.Iteration
-    extend_subst_with inl_rhs
-      = extendIdSubst env bndr $!
-        case rhs_se of
-          Simplified _ -> case rhs_mco of
-                             MRefl  -> DoneEx inl_rhs NotJoinPoint -- Common case
-                             MCo co -> DoneEx (mkCast inl_rhs co) NotJoinPoint
-          UnSimplified rhs_env -> ContEx rhs_env inl_rhs rhs_mco
+    -- The rhs is not yet simplified, so extend the envt with ContEx, which
+    -- captures the lexical environment for us to restore in `simplInId`.
+    extend_subst_with inl_rhs = extendIdSubst env bndr $! ContEx rhs_env inl_rhs MRefl
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br   = 1
@@ -1792,39 +1829,6 @@ preInlineUnconditionally env top_lvl bndr rhs_se rhs rhs_mco
            $ inlinePragmaActivation inline_prag
              -- See Note [pre/postInlineUnconditionally in gentle mode]
     inline_prag = idInlinePragma bndr
-
--- Be very careful before inlining inside a lambda, because (a) we must not
--- invalidate occurrence information, and (b) we want to avoid pushing a
--- single allocation (here) into multiple allocations (inside lambda).
--- Inlining a *function* with a single *saturated* call would be ok, mind you.
---      || (if is_cheap && not (canInlineInLam rhs) then pprTrace "preinline" (ppr bndr <+> ppr rhs) ok else ok)
---      where
---              is_cheap = exprIsCheap rhs
---              ok = is_cheap && int_cxt
-
-        --      int_cxt         The context isn't totally boring
-        -- E.g. let f = \ab.BIG in \y. map f xs
-        --      Don't want to substitute for f, because then we allocate
-        --      its closure every time the \y is called
-        -- But: let f = \ab.BIG in \y. map (f y) xs
-        --      Now we do want to substitute for f, even though it's not
-        --      saturated, because we're going to allocate a closure for
-        --      (f y) every time round the loop anyhow.
-
-        -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
-        -- so substituting rhs inside a lambda doesn't change the occ info.
-        -- Sadly, not quite the same as exprIsHNF.
-    canInlineInLam (Lit _)    = True
-    canInlineInLam (Cast e _) = canInlineInLam e
-    canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
-    canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
-    canInlineInLam (Var v)    = case idOccInfo v of
-                                  OneOcc { occ_in_lam = IsInsideLam } -> True
-                                  ManyOccs {}                         -> True
-                                  _                                   -> False
-    canInlineInLam _          = False
-      -- not ticks.  Counting ticks cannot be duplicated, and non-counting
-      -- ticks around a Lam will disappear anyway.
 
     early_phase =
       case sePhase env of
@@ -1855,6 +1859,90 @@ preInlineUnconditionally env top_lvl bndr rhs_se rhs rhs_mco
     -- here.
     -- (Nor can we check for `exprIsExpandable rhs`, because that needs to look
     -- at the non-existent unfolding for the `I# 2#` which is also floated out.)
+
+preInlineBetaUnconditionally
+    :: SimplEnv -> Levity -> InId
+    -> SimplClo             -- The argument
+    -> Maybe SimplEnv       -- Returned env has extended substitution
+-- Like preInlineLetUnconditionally, but for a beta-redex (\bndr. body) arg
+-- The argument may or may not be already simplified (DoneEx or ContEx)
+--
+-- Compared to preInlineLetUnconditionally we omit some checks:
+--   * The binder is never top-level, so no need for the
+--     Note [Top-level bottoming Ids] check, nor for `early_phase`
+--   * A lambda binder is never a join point, so no need for the
+--     Note [Do not inline exit join points] check
+--   * A lambda binder never has an inline pragma, a stable unfolding, or RULES
+--     (see `lamBndrInfoOK`), so no need to check activation, nor for
+--     Note [Stable unfoldings and preInlineUnconditionally]
+preInlineBetaUnconditionally env levity bndr arg
+  | assertPpr (lamBndrInfoOK bndr) (ppr bndr) $
+    not pre_inline_unconditionally           = Nothing
+  | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
+  | not (one_occ (idOccInfo bndr))           = Nothing
+  | needs_case_binding                       = Nothing
+  | otherwise                                = Just $! extendIdSubst env bndr arg
+    -- If the arg is not yet simplified, it is a ContEx, which captures the
+    --    lexical environment for us to restore in `simplInId`.
+    -- If the arg is already simplified, then it is a DoneEx;
+    --    That makes `simplInId` call `simplOutExpr` which avoids re-simplifying
+    --    the arg.
+    -- See Note [Avoid repeated simplification] in GHC.Core.Opt.Simplify.Iteration
+  where
+    pre_inline_unconditionally = sePreInline env
+
+    one_occ IAmDead = True -- Happens in ((\x.1) v)
+    one_occ OneOcc{ occ_n_br   = 1
+                  , occ_in_lam = NotInsideLam }   = True
+    one_occ OneOcc{ occ_n_br   = 1
+                  , occ_in_lam = IsInsideLam
+                  , occ_int_cxt = IsInteresting } = case arg of
+                                                      ContEx _ e _ -> canInlineInLam e
+                                                      DoneEx e _   -> canInlineInLam e
+                                                      DoneId v     -> canInlineInLam (Var v)
+    one_occ _                                     = False
+
+    -- Enforce the let-can-float invariant
+    -- Ok to test an InExpr in needsCaseBinding because
+    -- exprOkForSpeculation is stable under simplification
+    needs_case_binding = case arg of
+                           ContEx _ e _ -> needsCaseBindingL levity e
+                           DoneEx e _   -> needsCaseBindingL levity e
+                           DoneId v     -> needsCaseBindingL levity (Var v)
+
+canInlineInLam :: CoreExpr -> Bool
+-- Be very careful before inlining inside a lambda, because (a) we must not
+-- invalidate occurrence information, and (b) we want to avoid pushing a
+-- single allocation (here) into multiple allocations (inside lambda).
+-- Inlining a *function* with a single *saturated* call would be ok, mind you.
+--      || (if is_cheap && not (canInlineInLam rhs) then pprTrace "preinline" (ppr bndr <+> ppr rhs) ok else ok)
+--      where
+--              is_cheap = exprIsCheap rhs
+--              ok = is_cheap && int_cxt
+
+        --      int_cxt         The context isn't totally boring
+        -- E.g. let f = \ab.BIG in \y. map f xs
+        --      Don't want to substitute for f, because then we allocate
+        --      its closure every time the \y is called
+        -- But: let f = \ab.BIG in \y. map (f y) xs
+        --      Now we do want to substitute for f, even though it's not
+        --      saturated, because we're going to allocate a closure for
+        --      (f y) every time round the loop anyhow.
+
+        -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
+        -- so substituting rhs inside a lambda doesn't change the occ info.
+        -- Sadly, not quite the same as exprIsHNF.
+canInlineInLam (Lit _)    = True
+canInlineInLam (Cast e _) = canInlineInLam e
+canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
+canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
+canInlineInLam (Var v)    = case idOccInfo v of
+                              OneOcc { occ_in_lam = IsInsideLam } -> True
+                              ManyOccs {}                         -> True
+                              _                                   -> False
+canInlineInLam _          = False
+  -- not ticks.  Counting ticks cannot be duplicated, and non-counting
+  -- ticks around a Lam will disappear anyway.
 
 {-
 ************************************************************************
