@@ -1752,6 +1752,44 @@ So unfoldings on lambda binders can never really be trusted when on lambda binde
 is the chance of the call site to change. So it's easiest to just never attach any
 to lambda binders to begin with, as well as stripping them off if we e.g. float out
 and expression while abstracting over some arguments.
+
+See also Note [Lambda and case binders have vanilla IdInfo].
+
+Note [Lambda and case binders have vanilla IdInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Invariant: the following binders
+  * lambda binders                 (\x. e)
+  * case binders                   case e of x { ... }
+  * case-alternative binders       case e of _ { K x y -> ... }
+have none of
+  (a) RULES
+  (b) a (non-default) inline pragma, such as INLINE or NOINLINE
+  (c) a stable unfolding
+The predicate `GHC.Types.Id.lamBndrInfoOK` checks (a-c), and Core Lint checks
+it (in `lintIdBndr`).  Moreover lambda binders have no unfolding at all, not
+even an OtherCon one: see Note [Never put `OtherCon` unfoldings on lambda binders].
+
+Why?  RULES, pragmas, and stable unfoldings describe a /let-bound/ Id, whose
+definition is right there in the binding.  It is far from clear what they would
+mean for a lambda binder, whose value is supplied by the caller; and we can't
+easily work out the consequences of allowing them.  It is much simpler just to
+rule them out.  For example, `preInlineBetaUnconditionally` assumes the
+invariant, and so does not check the binder's activation or stable unfolding.
+This is very much in the spirit of #17530, when we stopped adding unfoldings to
+lambda binders.
+
+Why case binders and case-alternative binders?  Because they can become lambda
+binders, when `mkDupableAlt` abstracts a join point over them.
+
+Places that must take care to maintain the invariant (#27965):
+
+* The desugarer, when desugaring a strict binding  let !x = rhs in body,
+  generates  case x of x { DEFAULT -> body }; the case binder must not inherit
+  x's IdInfo.  See `GHC.HsToCore.Utils.seqVar`.
+
+* The Simplifier, when duplicating a StrictBind continuation  let x = <> in b,
+  makes a join point whose lambda binder must not inherit x's IdInfo.
+  See (DSB1) in Note [Duplicating StrictBind] in GHC.Core.Opt.Simplify.Iteration.
 -}
 
 -- | Records the /unfolding/ of an identifier, which is approximately the form the
