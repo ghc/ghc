@@ -631,4 +631,5 @@ test('T27936', normal, compile, [''])
 test('T27910', grep_errmsg(r'KnownBranch'), compile, ['-O -dno-typeable-binds -ddump-simpl-stats -dsuppress-uniques'])
 test('T27962', normal, compile, [''])
 test('T27962a', [extra_files(['T27962.hs'])], multimod_compile, ['T27962', '-v0 -O'])
+test('T27963', [grep_errmsg(r'f/42')], compile, ['-O -ddump-rule-firings'])
 
