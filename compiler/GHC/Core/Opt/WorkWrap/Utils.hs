@@ -1041,7 +1041,7 @@ unbox_one_arg opts arg_var
 
              -- Apply str info to new args. Also remove OtherCon unfoldings so they
              -- don't end up in lambda binders of the worker.
-             -- See Note [Never put `OtherCon` unfoldings on lambda binders]
+             -- See (CBI1) in Note [Core binder IdInfo invariants]
              arg_ids' = map zapIdUnfolding $
                         zipWithEqual setIdDemandInfo arg_ids ds
 

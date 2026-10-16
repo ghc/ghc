@@ -1858,6 +1858,15 @@ lintIdBndr top_lvl bind_site id thing_inside
          hang (text "Lambda binder" <+> quotes (ppr id) <+> text "has an unfolding")
             2 (ppr unf)
 
+       -- Check that lambda, case, and case-alternative binders have
+       -- only the IdInfo permitted by the table in
+       -- Note [Core binder IdInfo invariants] in GHC.Core
+       ; checkL (is_let_bind || lamBndrInfoOK id) $
+         hang (text "Non-let binder" <+> quotes (ppr id)
+               <+> text "has IdInfo that only a let-binder may have")
+            2 (vcat [ text "Binding site:" <+> text (show_site bind_site)
+                    , text "IdInfo:" <+> ppr (idInfo id) ])
+
        ; addLoc (IdTy id) (lintValueType id_ty)
 
        ; addInScopeId id thing_inside }
@@ -1868,6 +1877,12 @@ lintIdBndr top_lvl bind_site id thing_inside
     is_let_bind = case bind_site of
                     LetBind -> True
                     _       -> False
+
+    show_site :: BindingSite -> String
+    show_site LambdaBind  = "lambda"
+    show_site CaseBind    = "case binder"
+    show_site CasePatBind = "case alternative"
+    show_site LetBind     = "let"
 
 {-
 %************************************************************************

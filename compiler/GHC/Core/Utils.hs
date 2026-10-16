@@ -13,7 +13,7 @@ module GHC.Core.Utils (
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
         mkTickCpe,
         bindNonRec, needsCaseBinding, needsCaseBindingL,
-        mkAltExpr, mkDefaultCase, mkSingleAltCase,
+        mkAltExpr, mkDefaultCase, mkSingleAltCase, mkCaseFromLet,
 
         -- * Taking expressions apart
         findDefault, addDefault, findAlt, isDefaultAlt,
@@ -756,8 +756,17 @@ bindNonRec bndr rhs body
   | needsCaseBinding (idType bndr) rhs = case_bind
   | otherwise                          = let_bind
   where
-    case_bind = mkDefaultCase rhs bndr body
     let_bind  = Let (NonRec bndr rhs) body
+    case_bind = mkCaseFromLet bndr rhs body
+
+mkCaseFromLet :: Id -> CoreExpr -> CoreExpr -> CoreExpr
+-- Given x=rhs in body, return
+--   case rhs of x { DEFAULT -> body }
+mkCaseFromLet bndr rhs body
+  = mkDefaultCase rhs (mkCaseBndrFromLetBndr bndr) body
+    -- mkCaseBndrFromLetBndr: bndr may have IdInfo suitable for a
+    -- let-binder; see Note [Core binder IdInfo invariants]
+    -- in GHC.Core
 
 -- | `needsCaseBinding` tests whether we have to use a @case@ rather than @let@
 -- binding for this expression as per the invariants of 'CoreExpr': see

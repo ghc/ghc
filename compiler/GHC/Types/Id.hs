@@ -94,6 +94,7 @@ module GHC.Types.Id (
         idArity,
         idCallArity, idFunRepArity,
         idSpecialisation, idCoreRules, idHasRules,
+        lamBndrInfoOK,
         idCafInfo, idLFInfo_maybe,
         idOneShotInfo,
         idOccInfo,
@@ -103,6 +104,7 @@ module GHC.Types.Id (
 
         -- ** Writing 'IdInfo' fields
         setIdUnfolding, zapIdUnfolding, setCaseBndrEvald,
+        mkCaseBndrFromLetBndr, mkLamBndrFromLetBndr,
         setIdArity,
         setIdCallArity,
 
@@ -881,9 +883,32 @@ setCaseBndrEvald :: StrictnessMark -> Id -> Id
 -- itself, and any pattern-bound variables that are argument of a
 -- strict constructor.  It just marks the variable as already-evaluated,
 -- so that (for example) a subsequent 'seq' can be dropped
+-- See Note [Evaluated-ness on case binders] in GHC.Core
 setCaseBndrEvald str id
   | isMarkedStrict str = id `setIdUnfolding` evaldUnfolding
   | otherwise          = id
+
+-- | Just like `mkLamBndrFromLetBndr` but in addition
+--   record that it is evaluated.
+-- See Note [Core binder IdInfo invariants] in GHC.Core
+mkCaseBndrFromLetBndr :: Id -> Id
+mkCaseBndrFromLetBndr id
+  = mkLamBndrFromLetBndr id `setIdUnfolding` evaldUnfolding
+
+-- | Make a lambda binder from a binder that might have been let-bound, e.g.
+--      let x = rhs in body   ==>   (\x. body) rhs
+-- The let-binder may have IdInfo (an unfolding, an inline pragma, RULES)
+-- that a case binder must not have, so we keep its Name, type, multiplicity
+-- and IdDetails, plus OccInfo and DemandInfo, but reset its other IdInfo.
+-- See Note [Core binder IdInfo invariants] in GHC.Core
+mkLamBndrFromLetBndr :: Id -> Id
+mkLamBndrFromLetBndr id
+  = localiseId id `setIdInfo` zapped_info
+  where
+    info = idInfo id
+    zapped_info = vanillaIdInfo `setOccInfo`    occInfo info
+                                `setDemandInfo` (demandInfo info)
+
 
 -- | Similar to trimUnfolding, but also removes evaldness info.
 zapIdUnfolding :: Id -> Id
@@ -904,6 +929,32 @@ idCoreRules id = ruleInfoRules (idSpecialisation id)
 
 idHasRules :: Id -> Bool
 idHasRules id = not (isEmptyRuleInfo (idSpecialisation id))
+
+-- | True <=> the Id has only the IdInfo permitted on a lambda, case, or
+-- case-alternative binder.  See the table in Note [Core binder IdInfo invariants]
+-- in GHC.Core; Core Lint checks this invariant.
+--
+-- We allow occurrence info, demand info, and one-shot info (which the table
+-- permits only on lambda binders, but a case binder may be about to become one).
+-- We also allow an `OtherCon []` unfolding; lambda binders must have no unfolding
+-- at all, but Lint checks that separately.
+lamBndrInfoOK :: Id -> Bool
+lamBndrInfoOK id
+  =  isDefaultInlinePragma (inlinePragInfo info)
+  && isNopSig (dmdSigInfo info)
+  && isTopCprSig (cprSigInfo info)
+  && mayHaveCafRefs (cafInfo info)
+  && arityInfo info == unknownArity
+  && callArityInfo info == unknownArity
+  && isEmptyRuleInfo (ruleInfo info)
+  && unf_ok (realUnfoldingInfo info)
+  where
+    info = idInfo id
+
+    -- See Note [Evaluated-ness on case binders] in GHC.Core
+    unf_ok NoUnfolding   = True
+    unf_ok (OtherCon []) = True
+    unf_ok _             = False
 
 setIdSpecialisation :: Id -> RuleInfo -> Id
 setIdSpecialisation id spec_info = modifyIdInfo (`setRuleInfo` spec_info) id

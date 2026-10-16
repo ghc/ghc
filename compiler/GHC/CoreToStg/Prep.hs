@@ -2366,7 +2366,7 @@ wrapBinds floats body
     -- See Note [BindInfo and FloatInfo] on whether we pick Case or Let here
     mk_bind f@(Float bind CaseBound _) body
       | NonRec bndr rhs <- bind
-      = mkDefaultCase rhs bndr body
+      = mkCaseFromLet bndr rhs body
       | otherwise
       = pprPanic "wrapBinds" (ppr f)
     mk_bind (Float bind _ _) body
