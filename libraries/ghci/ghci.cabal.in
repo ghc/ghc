@@ -68,6 +68,7 @@ library
             GHCi.StaticPtrTable
             GHCi.TH
             GHCi.Server
+            GHCi.Server.Threads
 
         if !arch(javascript)
           exposed-modules:

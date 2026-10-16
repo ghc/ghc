@@ -23,8 +23,8 @@ module GHCi.Message.Async
   , IddMsg(..), newAsyncManager
 
     -- ** Consume `reply` exactly once
-  , WriteReply(..)
-  , writeReply, (|#>)
+  , WriteReply(..), writeReply
+  , runWriteReply, (|#>), (%>>=)
 
     -- * Serializable exceptions
   , SerializableException(..)
@@ -447,9 +447,19 @@ data WriteReply a where
 writeReply :: WriteReply a %1 -> a -> IO ()
 writeReply (WriteReply r) = \x -> r (Right x)
 
+-- | Write the reply with a value or an exception
+runWriteReply :: WriteReply a %1 -> Either SomeException a -> IO ()
+runWriteReply (WriteReply r) = r
+
 -- | Infix, linear, 'unIO'
 (|#>) :: IO a %1 -> State# RealWorld -> (# State# RealWorld, a #)
 (|#>) (IO fs) s = fs s
+
+(%>>=) :: (IO a) -> (a -> IO b) %1 -> IO b
+(%>>=) = \ m f -> IO (\s0 ->
+        case m |#> s0 of -- unIO for linearity checking
+          (# s1, x #) -> f x |#> s1)
+infixl 1 %>>=
 
 --------------------------------------------------------------------------------
 -- * Serializable Exceptions

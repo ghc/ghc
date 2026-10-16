@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, CPP, RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase, CPP, RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables, LinearTypes #-}
 module GHCi.Server
   ( MessageHook
   , CustomMessageHandler
@@ -31,13 +31,16 @@ import GHCi.Utils
 import Control.DeepSeq
 import Control.Exception
 import Control.Monad
-import Control.Concurrent (threadDelay)
 import Data.Binary
 
 import Text.Printf
 import System.Environment (getProgName, getArgs)
 import System.Exit
 import System.IO
+
+import Control.Concurrent
+import GHCi.Message.Async (runWriteReply, (%>>=))
+import GHCi.Server.Threads
 
 type MessageHook = Msg -> IO Msg
 
@@ -58,29 +61,35 @@ servWithCustom
   :: Bool
   -> MessageHook
   -> Pipe
-  -> (forall a .IO a -> IO a)
+  -> (forall a. IO a -> IO a)
   -> CustomMessageHandler
   -> IO ()
-servWithCustom verbose hook pipe restore customHandler = newIORef False >>= loop
+servWithCustom verbose hook pipe restore customHandler = do
+  ref <- newIORef False
+  withThreadManager $ \mngr ->
+    loop ref mngr `finally` closePipe pipe
  where
-  loop doneRef = do
+  loop doneRef mngr = do
     when verbose $ trace "reading pipe..."
-    handleRemoteCall pipe hook $ \(msg :: Message a) -> do
 
-      discardCtrlC
+    handleRemoteCall pipe hook $ \wr (msg :: Message a) ->
 
-      when verbose $ trace ("msg: " ++ (show msg))
+      discardCtrlC                                 %>>= \_ ->
+      when verbose (trace ("msg: " ++ (show msg))) %>>= \_ ->
+
       case msg of
-        CustomMessage tag payload -> handleCustom tag payload
-        Shutdown -> writeIORef doneRef True >> reply ()
-        -- TODO: These two should probably be done off the main thread
-        RunTH ii st q ty loc -> wrapRunTH ii $ runTH pipe ii st q ty loc
-        RunModFinalizers ii st qrefs -> wrapRunTH ii $ runModFinalizerRefs pipe ii st qrefs
-        _other -> run msg >>= reply
+        CustomMessage tag payload -> handleCustom tag payload %>>= writeReply wr
+        Shutdown                  -> writeIORef doneRef True >>
+                                     reply ()                 %>>= writeReply wr
+        RunTH ii st q ty loc      -> spawnFinally mngr         (runWriteReply wr)
+                                     (wrapRunTH ii (runTH pipe ii st q ty loc))
+        RunModFinalizers ii st qs -> spawnFinally mngr         (runWriteReply wr)
+                                     (wrapRunTH ii (runModFinalizerRefs pipe ii st qs))
+        _other                    -> run msg >>= reply        %>>= writeReply wr
 
     isDone <- readIORef doneRef
-    if isDone then closePipe pipe
-              else loop doneRef
+    if isDone then pure ()
+              else loop doneRef mngr
 
   handleCustom tag payload = do
     mresp <- customHandler tag payload
@@ -92,7 +101,7 @@ servWithCustom verbose hook pipe restore customHandler = newIORef False >>= loop
   reply :: forall a. Show a => a -> IO a
   reply r = do
     when verbose $ trace ("writing pipe: " ++ show r)
-    return r -- the result of the handler gets sent
+    return r -- the result of the handler is passed to writeReply
 
   -- Run some TH code, which may interact with GHC by sending
   -- THMessage requests, and then finally send RunTHDone followed by a
