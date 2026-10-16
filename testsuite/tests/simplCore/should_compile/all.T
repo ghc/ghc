@@ -629,3 +629,5 @@ test('T27749',
 test('T27629', only_ways(['optasm']), makefile_test, ['T27629'])
 
 test('T27936', normal, compile, [''])
+test('T27962', normal, compile, [''])
+test('T27962a', [extra_files(['T27962.hs'])], multimod_compile, ['T27962', '-v0 -O'])
