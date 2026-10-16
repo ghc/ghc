@@ -756,7 +756,10 @@ bindNonRec bndr rhs body
   | needsCaseBinding (idType bndr) rhs = case_bind
   | otherwise                          = let_bind
   where
-    case_bind = mkDefaultCase rhs bndr body
+    case_bind = mkDefaultCase rhs (mkCaseBndrFromLetBndr bndr) body
+                -- mkCaseBndrFromLetBndr: bndr may have IdInfo suitable for a
+                -- let-binder; see Note [Core binder IdInfo invariants]
+                -- in GHC.Core
     let_bind  = Let (NonRec bndr rhs) body
 
 -- | `needsCaseBinding` tests whether we have to use a @case@ rather than @let@
@@ -2697,6 +2700,8 @@ exprIsHNFlike is_con is_con_unf rubbish_lit_result e
     app_is_value _          _  = False
 
     id_app_is_value id val_args
+      | null val_args  -- We can get here via (f @Int), say
+      = varIsHNFlike is_con is_con_unf id
       | Just dc <- isDataConWorkId_maybe id
       , isUnaryClassDataCon  dc
       = all is_hnf_like val_args  -- Look through unary class data cons

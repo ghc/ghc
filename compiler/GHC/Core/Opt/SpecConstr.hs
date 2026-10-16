@@ -2068,7 +2068,11 @@ mkSeqs seqees res_ty rhs =
         -- Argument representing strict field and it's worth passing via cbv
         | wantCbvForId arg_id
         = Case (Var arg_id)
-               (localiseId arg_id)  -- See (SCF1) in Note [SpecConstr and strict fields]
+               (mkCaseBndrFromLetBndr (localiseId arg_id))
+                   -- localiseId: see (SCF1) in Note [SpecConstr and strict fields]
+                   -- mkCaseBndrFromLetBndr: arg_id may have IdInfo (e.g. an unfolding,
+                   --   if it is a global) that a case binder must not have; see
+                   --   Note [Core binder IdInfo invariants] in GHC.Core
                res_ty
                ([Alt DEFAULT [] rhs])
 

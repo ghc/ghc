@@ -629,3 +629,4 @@ test('T27749',
 test('T27629', only_ways(['optasm']), makefile_test, ['T27629'])
 test('T27936', normal, compile, [''])
 test('T27910', grep_errmsg(r'KnownBranch'), compile, ['-O -dno-typeable-binds -ddump-simpl-stats -dsuppress-uniques'])
+test('T27965', normal, compile, [''])
