@@ -2278,12 +2278,17 @@ simplOutId env fun cont
        --    * If we don't do this we get a beta-redex every time, so the
        --      simplifier keeps doing more iterations.
        --    * Even more important: see Note [No eta-expansion in runRW#]
+       --
+       -- But only if there is no pending cast on the argument (#27962);
+       -- if there is, the general case below deals with it properly
        ; arg' <- case arg of
-           Lam s body -> do { (env', s') <- simplBinder arg_env s
-                            ; body' <- simplExprC env' body inner_cont
-                            ; return (Lam s' body') }
-                            -- Important: do not try to eta-expand this lambda
-                            -- See Note [No eta-expansion in runRW#]
+           Lam s body
+             | MRefl <- arg_mco
+             -> do { (env', s') <- simplBinder arg_env s
+                   ; body' <- simplExprC env' body inner_cont
+                   ; return (Lam s' body') }
+                   -- Important: do not try to eta-expand this lambda
+                   -- See Note [No eta-expansion in runRW#]
 
            _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
                    ; let (m,_,_) = splitFunTy fun_ty
