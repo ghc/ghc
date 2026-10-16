@@ -26,7 +26,7 @@ module GHCi.Message
 
   , Pipe(..), mkPipeFromHandles, mkPipeFromContinuations, closePipe
   , remoteCall, remoteTHCall
-  , handleRemoteCall, handleRemoteTHCall
+  , handleRemoteCall, handleRemoteTHCall, writeReply
   , RemoteProcessException(..), PipeReadClosedException(..)
 
   , InboxId(..)
@@ -666,13 +666,12 @@ remoteCall pipe msg = either throwIO (pure . runGet get)
 -- | Handle a single 'Message' request on the interpreter and reply to the host
 handleRemoteCall :: Pipe
                  -> (Msg -> IO Msg) {-^ Msg hook -}
-                 -> (forall a. (Show a, Binary a) => Message a -> IO a)
-                 -> IO ()
+                 -> (forall a. (Show a, Binary a) => WriteReply a %1 -> Message a -> IO r)
+                 -> IO r
 handleRemoteCall pipe hook k =
-  handleAsyncReq pipe getMessage Nothing \writer msg0 -> IO \s0 ->
+  handleAsyncReq pipe getMessage Nothing \(WriteReply writer) msg0 -> IO \s0 ->
     case hook msg0 |#> s0 of -- unIO for linearity checking
-      (# s1, Msg msg #) -> case k msg |#> s1 of
-        (# s2, a #) -> writeReply writer (put a) |#> s2
+      (# s1, Msg msg #) -> k (WriteReply \x -> writer (fmap put x)) msg |#> s1
 
 -- | Send a 'THMessage' request to the host and wait for a reply from the host
 -- to the interpreter.
