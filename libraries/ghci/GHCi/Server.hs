@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, CPP, RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase, CPP, RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables, LinearTypes #-}
 module GHCi.Server
   ( MessageHook
   , CustomMessageHandler
@@ -31,13 +31,21 @@ import GHCi.Utils
 import Control.DeepSeq
 import Control.Exception
 import Control.Monad
-import Control.Concurrent (threadDelay)
 import Data.Binary
 
 import Text.Printf
 import System.Environment (getProgName, getArgs)
 import System.Exit
 import System.IO
+
+import Control.Concurrent
+import Control.Concurrent.STM
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IM
+import GHCi.Message.Async (bindIO)
+import qualified Unsafe.Coerce as Unsafe
+
+type CorrelationId = Int
 
 type MessageHook = Msg -> IO Msg
 
@@ -54,22 +62,71 @@ serv :: Bool -> MessageHook -> Pipe -> (forall a .IO a -> IO a) -> IO ()
 serv verbose hook pipe restore =
   servWithCustom verbose hook pipe restore noCustomHandler
 
+
+data ThreadManager = ThreadManager
+  { managedThreads :: !(TVar (IntMap ThreadId))
+  , managerClosed :: !(TVar Bool)
+  }
+
+-- | Cancels and Waits for all threads spawned by ThreadManager to terminate before returning.
+withThreadManager :: (ThreadManager -> IO a) -> IO a
+withThreadManager k = do
+  managedThreads <- newTVarIO IM.empty
+  managerClosed <- newTVarIO False
+  let tm = ThreadManager{..}
+  k tm `finally` shutdown tm
+  where
+    shutdown ThreadManager{..} = do
+      ts <- atomically $ do
+        writeTVar managerClosed True
+        IM.elems <$> readTVar managedThreads
+      mapM_ killThread ts
+
+spawn :: ThreadManager -> CorrelationId -> IO () %1 -> IO ()
+spawn mng i = Unsafe.unsafeCoerce (spawn' mng i)
+
+spawn' :: ThreadManager -> CorrelationId -> IO () -> IO ()
+spawn' ThreadManager{..} i action = void $ mask_ $ forkIOWithUnmask $ \unmask -> do
+   tid <- myThreadId
+   registered <- atomically $ do
+     s <- readTVar managerClosed
+     unless s $ modifyTVar' managedThreads (IM.insert i tid)
+     pure (not s)
+   when registered $
+     (unmask action)
+       `finally` atomically (modifyTVar' managedThreads (IM.delete i))
+
+-- could be used to cancel a specific handler.
+-- cancel :: ThreadManager -> CorrelationId -> IO ()
+-- cancel ThreadManager{..} i = do
+--   ts <- atomically $ do
+--     readTVar managedThreads
+--   case IM.lookup i ts of
+--     Just tid -> killThread tid
+--     Nothing  -> pure ()
+
 servWithCustom
   :: Bool
   -> MessageHook
   -> Pipe
-  -> (forall a .IO a -> IO a)
+  -> (forall a. IO a -> IO a)
   -> CustomMessageHandler
   -> IO ()
-servWithCustom verbose hook pipe restore customHandler = newIORef False >>= loop
+servWithCustom verbose hook pipe restore customHandler = do
+  ref <- newIORef False
+  withThreadManager $ \mngr ->
+    loop ref mngr `finally` closePipe pipe
  where
-  loop doneRef = do
+  forkHandler mngr uq hndlr msg0@(Msg msg) = do
+    (do discardCtrlC
+        when verbose $ trace ("msg: " ++ (show msg))) `bindIO` \ _ -> do
+      case msg of
+        RunTH{}            -> spawn mngr uq (hndlr msg0)
+        RunModFinalizers{} -> spawn mngr uq (hndlr msg0)
+        _                  -> hndlr msg0
+  loop doneRef mngr = do
     when verbose $ trace "reading pipe..."
-    handleRemoteCall pipe hook $ \(msg :: Message a) -> do
-
-      discardCtrlC
-
-      when verbose $ trace ("msg: " ++ (show msg))
+    handleRemoteCall pipe (\uq msg act -> hook msg `bindIO` forkHandler mngr uq act) $ \(msg :: Message a) -> do
       case msg of
         CustomMessage tag payload -> handleCustom tag payload
         Shutdown -> writeIORef doneRef True >> reply ()
@@ -79,8 +136,8 @@ servWithCustom verbose hook pipe restore customHandler = newIORef False >>= loop
         _other -> run msg >>= reply
 
     isDone <- readIORef doneRef
-    if isDone then closePipe pipe
-              else loop doneRef
+    if isDone then pure ()
+              else loop doneRef mngr
 
   handleCustom tag payload = do
     mresp <- customHandler tag payload

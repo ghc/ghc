@@ -24,7 +24,7 @@ module GHCi.Message.Async
 
     -- ** Consume `reply` exactly once
   , WriteReply(..)
-  , writeReply, (|#>)
+  , writeReply, (|#>), bindIO
 
     -- * Serializable exceptions
   , SerializableException(..)
@@ -439,6 +439,11 @@ writeReply (WriteReply r) = \x -> r (Right x)
 -- | Infix, linear, 'unIO'
 (|#>) :: IO a %1 -> State# RealWorld -> (# State# RealWorld, a #)
 (|#>) (IO fs) s = fs s
+
+bindIO :: (IO a) -> (a -> IO b) %1 -> IO b
+bindIO = \ m f -> IO (\s0 ->
+        case m |#> s0 of -- unIO for linearity checking
+          (# s1, x #) -> f x |#> s1)
 
 --------------------------------------------------------------------------------
 -- * Serializable Exceptions
