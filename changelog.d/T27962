@@ -1,0 +1,7 @@
+section: compiler
+issues: #27962
+mrs: !16869
+synopsis:
+  Fix a Lint error when using `runRW#` and `coerce` together
+description:
+  Just an internal compiler bug, of long standing.
