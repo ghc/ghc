@@ -49,15 +49,17 @@ import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr, dsSyntaxExpr )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
-import GHC.Core
+
+import GHC.Rename.Utils (wrapGenSpan')
+import GHC.Rename.Env ( irrefutableConLikeTc )
+import GHC.Tc.Types.Evidence
 import GHC.HsToCore.Monad
 
+import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.Core.Make.Box ( boxTy )
 import GHC.Core.Make.BigTuple
-import GHC.Types.Id
-import GHC.Types.Literal
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
@@ -65,26 +67,29 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep( Scaled(..) )
 import GHC.Core.ConLike
+
+import GHC.Types.Id
+import GHC.Types.Id.Info( hasRulesOrInline )
+import GHC.Types.Literal
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
 import GHC.Types.Id.Make( DataConBoxer(..) )
-import GHC.Unit.Module
-import GHC.Builtin.KnownKeys
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Rename.Utils (wrapGenSpan')
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
+
+import GHC.Unit.Module
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
+
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import qualified GHC.LanguageExtensions as LangExt
 
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Ids
-
-import GHC.Rename.Env ( irrefutableConLikeTc )
-import GHC.Tc.Types.Evidence
 
 import Control.Monad    ( zipWithM )
 import Data.List.NonEmpty (NonEmpty(..))
@@ -131,22 +136,35 @@ selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 
 selectMatchVar :: Mult -> Pat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
-selectMatchVar w (BangPat _ pat)    = selectMatchVar w (unLoc pat)
-selectMatchVar w (LazyPat _ pat)    = selectMatchVar w (unLoc pat)
-selectMatchVar w (ParPat _  pat)    = selectMatchVar w (unLoc pat)
-selectMatchVar _w (VarPat _ var)    = return (localiseId (unLoc var))
-                                  -- Note [Localise pattern binders]
-                                  --
-                                  -- Remark: when the pattern is a variable (or
-                                  -- an @-pattern), then w is the same as the
-                                  -- multiplicity stored within the variable
-                                  -- itself. It's easier to pull it from the
-                                  -- variable, so we ignore the multiplicity.
-selectMatchVar _w (AsPat _ var _) = assert (isManyTy _w ) (return (localiseId (unLoc var)))
-selectMatchVar w other_pat        = newSysLocalDs (Scaled w (hsPatType other_pat))
+selectMatchVar w pat = go pat
+  where
+    go (BangPat _ (L _ pat)) = go pat
+    go (LazyPat _ (L _ pat)) = go pat
+    go (ParPat _  (L _ pat)) = go pat
+    go (VarPat _ (L _ var))  = go_leaf var
+    go (AsPat _ (L _ var) _) = go_leaf var
+    go pat                   = new_match_var (hsPatType pat)
+
+    go_leaf var
+      | not (hasRulesOrInline (idInfo var))
+      = assert (isManyTy w) $
+        return (mkLamBndrFromLetBndr var)
+      | otherwise
+      = new_match_var (idType var)
+
+    new_match_var ty = newSysLocalDs (Scaled w ty)
+
+    -- mkLamBndrFromLetBndr in go_leaf: see Note [Localise pattern binders]
+    -- In the weird case where the variable carries (say) an INLINE
+    -- pragma, just avoid picking it as the match-var
+    --
+    -- Remark: in `go_leaf` the multiplicity `w` is the same as
+    -- the multiplicity stored within the variable itself.
 
 {- Note [Localise pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Match Ids] in GHC.HsToCore.Monad
+
 Consider     module M where
                [Just a] = e
 After renaming it looks like
@@ -167,9 +185,15 @@ It's quite rare for this to actually *happen* -- the only case I know
 of is tc003 compiled with the 'hpc' way -- but that only makes it
 all the more annoying.
 
-To avoid this, we craftily call 'localiseId' in the desugarer, which
-simply turns the External Name for the Id into an Internal one, but
-doesn't change the unique.  So the desugarer produces this:
+Very similarly, we might have
+    {-# NOINLINE a #-}
+    [Just a] = e
+and we don't allow a NOINLINE on case-alternative binders.
+
+To avoid these problems, we craftily call `mkLamBndrFromLetBndr` in the
+desugarer, which simply turns the External Name for the Id into an Internal one,
+and expunges bad IdInfo, but doesn't change the unique.  So the desugarer produces
+this:
              M.a{r8} = case e of (v:_) ->
                        case v of Just a{r8} -> M.a{r8}
 The unique is still 'r8', but the binding site in the pattern
@@ -181,8 +205,6 @@ un-shadowing it, so we'll get
 In fact, even GHC.Core.Subst.simplOptExpr will do this, and simpleOptExpr
 runs on the output of the desugarer, so all is well by the end of
 the desugaring pass.
-
-See also Note [Match Ids] in GHC.HsToCore.Monad
 
 ************************************************************************
 *                                                                      *
@@ -265,8 +287,14 @@ bindMatchId new mid body
 -- Used to force variables when desugaring strict binders. It's crucial that the
 -- variable is shadowed by the case binder. See Wrinkle 1 in
 -- Note [Desugar Strict binds] in GHC.HsToCore.Binds.
+--
 seqVar :: Var -> CoreExpr -> CoreExpr
-seqVar var body = mkDefaultCase (Var var) var body
+seqVar var body = mkCaseFromLet var (Var var) body
+    -- mkCaseFromLet: the case binder has the same Name (and hence Unique), type
+    -- and multiplicity as `var`, but not its IdInfo: `var` may have, say, a
+    -- NOINLINE pragma, but a case binder must not; see Note [Core binder IdInfo
+    -- invariants] in GHC.Core, and #27965.  E.g. `res1` in
+    -- GHC.Internal.Control.Monad.ST.Lazy.Imp has a NOINLINE pragma.
 
 mkCoLetMatchResult :: HasDebugCallStack => CoreBind -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkCoLetMatchResult bind = fmap (mkCoreLet bind)
@@ -276,9 +304,8 @@ mkCoLetMatchResult bind = fmap (mkCoreLet bind)
 mkViewMatchResult :: HasDebugCallStack => Id -> CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkViewMatchResult var' viewExpr = fmap $ mkCoreLet $ NonRec var' viewExpr
 
-mkEvalMatchResult :: Id -> Type -> MatchResult CoreExpr -> MatchResult CoreExpr
-mkEvalMatchResult var ty = fmap $ \e ->
-  Case (Var var) var ty [Alt DEFAULT [] e]
+mkEvalMatchResult :: Id -> MatchResult CoreExpr -> MatchResult CoreExpr
+mkEvalMatchResult var = fmap $ \e -> mkCaseFromLet var (Var var) e
 
 mkGuardedMatchResult :: CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkGuardedMatchResult pred_expr mr = MR_Fallible $ \fail -> do
@@ -684,7 +711,7 @@ mkSelectorBinds ticks pat ctx val_expr
     binders = collectPatBinders CollNoDictBinders pat'
     ticks'  = ticks ++ repeat []
 
-    local_binders = map localiseId binders      -- See Note [Localise pattern binders]
+    local_binders = map mkLamBndrFromLetBndr binders  -- See Note [Localise pattern binders]
 
 strip_bangs :: LPat (GhcPass p) -> LPat (GhcPass p)
 -- Remove outermost bangs and parens

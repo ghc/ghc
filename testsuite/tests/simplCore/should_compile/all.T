@@ -632,3 +632,10 @@ test('T27910', grep_errmsg(r'KnownBranch'), compile, ['-O -dno-typeable-binds -d
 test('T27892', grep_errmsg(r'^f = g$'), compile, ['-O -ddump-cse -dsuppress-all -dsuppress-uniques'])
 test('T28095a', grep_errmsg(r'^f = g$'), compile, ['-O -ddump-cse -dsuppress-all -dsuppress-uniques'])
 test('T27212', normal, compile, ['-O'])
+test('T27962', normal, compile, [''])
+test('T27962a', [extra_files(['T27962.hs'])], multimod_compile, ['T27962', '-v0 -O'])
+test('T27963', [grep_errmsg(r'f/42')], compile, ['-O -ddump-rule-firings'])
+test('T27965', normal, compile, ['-O'])
+test('T27965a', normal, compile, ['-O'])
+test('T27965b', normal, compile, ['-O'])
+

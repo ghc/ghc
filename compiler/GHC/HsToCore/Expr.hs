@@ -260,8 +260,8 @@ dsUnliftedBind (PatBind { pat_lhs = pat, pat_rhs = grhss
        ; rhs          <- dsGuarded grhss (patBindGRHSType ext) match_nablas
        ; let eqn = EqnMatch { eqn_pat = pat, eqn_rest = EqnDone (cantFailMatchResult body) }
        ; var    <- selectMatchVar ManyTy (unLoc pat)
-                    -- `var` will end up in a let binder, so the multiplicity
-                    -- doesn't matter.
+                    -- `var` will end up as a let binder,
+                    -- so the multiplicity doesn't matter.
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
        ; return (bindNonRec var rhs result) }
 
@@ -619,7 +619,7 @@ Note [Desugaring seq]
 There are a few subtleties in the desugaring of `seq`, all
 implemented in the `seqId` case of `ds_app_var`:
 
- 1. (as described in #1031)
+(SEQ1) (as described in #1031)
 
     Consider,
        f x y = x `seq` (y `seq` (# x,y #))
@@ -634,32 +634,32 @@ implemented in the `seqId` case of `ds_app_var`:
     Seq is very, very special!  So we recognise it right here, and desugar to
             case x of _ -> case y of _ -> (# x,y #)
 
- 2. (as described in #2273)
+(SEQ2) (as described in #2273)
 
     Consider
        let chp = case b of { True -> fst x; False -> 0 }
        in chp `seq` ...chp...
-    Here the seq is designed to plug the space leak of retaining (snd x)
+    Here the `seq` is designed to plug the space leak of retaining (snd x)
     for too long.
 
-    If we rely on the ordinary inlining of seq, we'll get
+    If we rely on the ordinary inlining of `seq`, we'll get
        let chp = case b of { True -> fst x; False -> 0 }
        case chp of _ { I# -> ...chp... }
 
-    But since chp is cheap, and the case is an alluring context, we'll
-    inline chp into the case scrutinee.  Now there is only one use of chp,
+    But since `chp` is cheap, and the case is an alluring context, we'll
+    inline `chp` into the case scrutinee.  Now there is only one use of `chp`,
     so we'll inline a second copy.  Alas, we've now ruined the purpose of
-    the seq, by re-introducing the space leak:
+    the `seq`, by re-introducing the space leak:
         case (case b of {True -> fst x; False -> 0}) of
           I# _ -> ...case b of {True -> fst x; False -> 0}...
 
-    We can try to avoid doing this by ensuring that the binder-swap in the
-    case happens, so we get this at an early stage:
+    In fact, the binder-swap transformation will probably stop this happening,
+    because we'll get this instead:
+       let chp = case b of { True -> fst x; False -> 0 }
        case chp of chp2 { I# -> ...chp2... }
-    But this is fragile.  The real culprit is the source program.  Perhaps we
-    should have said explicitly
+    But I'm a little anxious that this is fragile.  The real culprit is the source
+    program.  Perhaps we should have said explicitly
        let !chp2 = chp in ...chp2...
-
     But that's painful.  So the code here does a little hack to make seq
     more robust: a saturated application of 'seq' is turned *directly* into
     the case expression, thus:
@@ -672,9 +672,9 @@ implemented in the `seqId` case of `ds_app_var`:
     And now all is well.
 
     The reason it's a hack is because if you define mySeq=seq, the hack
-    won't work on mySeq.
+    won't work on `mySeq`.  But it'll probably be fine anyway.
 
- 3. (as described in #2409)
+(SEQ3) (as described in #2409)
 
     The isInternalName ensures that we don't turn
             True `seq` e
@@ -807,15 +807,16 @@ ds_app_var (L loc fun_id) hs_args core_args
 
   -----------------------
   -- Deal with `seq`
-  -- See Note [Desugaring seq], points (1) and (2)
+  -- See Note [Desugaring seq]
   | fun_id `hasKey` seqIdKey
-  , Type _r : Type ty1 : Type ty2 : arg1 : arg2 : rest_args <- core_args
+  , Type _r : Type ty1 : Type _ty2 : arg1 : arg2 : rest_args <- core_args
   , let case_bndr = case arg1 of
-            Var v1 | isInternalName (idName v1)
-                  -> v1        -- Note [Desugaring seq], points (2) and (3)
-            _     -> mkWildValBinder ManyTy ty1
-  = return (Case arg1 case_bndr ty2 [Alt DEFAULT [] arg2]
-            `mkCoreApps` rest_args)
+          Var v1  -- Special case for Var: (SEQ2)
+            | isInternalName (idName v1) -- Extra test for isInternalName: (SEQ3)
+            -> mkCaseBndrFromLetBndr v1
+               -- mkCaseBndrFromLetBndr: see Note [Core binder IdInfo invariants]
+          _ -> mkWildValBinder ManyTy ty1
+  = return (mkDefaultCase arg1 case_bndr arg2 `mkCoreApps` rest_args)
 
   -----------------------
   -- Desugar away the magic 'box'/'unbox' Ids.

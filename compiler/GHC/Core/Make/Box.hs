@@ -21,7 +21,7 @@ import GHC.Core.Make
   ( mkWildCase, mkWildValBinder, mkImpossibleExpr
   , mkCoreTup, mkCoreUnboxedTuple, mkCoreUnboxedSum
   , mkChunkedTupleCase )
-import GHC.Core.Utils ( mkCast, mkCastMCo )
+import GHC.Core.Utils ( mkCast, mkCastMCo, bindNonRec )
 import GHC.Core.Type
 import GHC.Core.TyCon ( newTyConCo )
 import GHC.Core.TyCo.Rep ( UnivCoProvenance(CanonicalProv) )
@@ -280,7 +280,7 @@ unwrapBox var body_ty body =
       do { var'    <- mkSysLocalM (fsLit "uc") ManyTy box_ty
            -- let-or-case var = unbox var' in body
          ; unboxed <- mkUnbox (getRuntimeRep var_ty) var_ty (Var var')
-         ; return (var', let_or_case unboxed) }
+         ; return (var', bindNonRec var unboxed body) }
     ConstraintLike ->
       do { var'  <- mkSysLocalM (fsLit "uc") ManyTy box_ty
          ; d_var <- mkSysLocalM (fsLit "uc") ManyTy (liftConstraint var_ty)
@@ -288,18 +288,11 @@ unwrapBox var body_ty body =
          ; return ( var'
                   , Case (Var var') var' body_ty
                        [Alt (DataAlt mkDictBoxDataCon) [d_var]
-                            (let_or_case (unliftConstraintExpr (Var d_var)))] ) }
+                            (bindNonRec var (unliftConstraintExpr (Var d_var)) body)]
+                  ) }
   where
     var_ty = idType var
     box_ty = boxTy var_ty
-
-    -- Bind @var = rhs@ in @body@, using @let@ or @case@ as appropriate
-    -- depending on the levity of @var@.
-    let_or_case rhs
-      | mightBeUnliftedType var_ty
-      = Case rhs var body_ty [Alt DEFAULT [] body]
-      | otherwise
-      = Let (NonRec var rhs) body
 
 -- | @unwrapBoxCo rep ty :: Box \@rep ty ~R# BoxTF rep@: unwrap the 'Box' newtype.
 unwrapBoxCo :: RuntimeRepType -> Type -> Coercion

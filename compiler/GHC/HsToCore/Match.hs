@@ -324,7 +324,7 @@ matchBangs :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchR
 matchBangs (var :| vars) ty eqns
   = do  { match_result <- match (var:vars) ty $ NE.toList $
                           decomposeFirstPat getBangPat <$> eqns
-        ; return (mkEvalMatchResult (matchId var) ty match_result) }
+        ; return (mkEvalMatchResult (matchId var) match_result) }
 
 matchCoercion :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
 -- Match against a coercion pattern (CoPat)

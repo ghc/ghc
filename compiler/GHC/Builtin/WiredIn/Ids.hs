@@ -471,7 +471,7 @@ Note [seqId magic]
 a) Its fixity is set in GHC.Iface.Load.ghcPrimIface
 
 b) It has quite a bit of desugaring magic.
-   See GHC.HsToCore.Utils Note [Desugaring seq] (1) and (2) and (3)
+   See GHC.HsToCore.Utils Note [Desugaring seq]
 
 c) There is some special rule handing: Note [User-defined RULES for seq]
 
