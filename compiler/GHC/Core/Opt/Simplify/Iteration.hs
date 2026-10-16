@@ -38,7 +38,7 @@ import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
-                          , pushCoTyArg, pushCoValArg, exprIsDeadEnd
+                          , exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo {- exprsFreeIds -} )
@@ -1229,11 +1229,11 @@ simplExprF1 env (Cast body co) cont
   = do  { co1 <- {-#SCC "simplCast-simplCoercion" #-}
                  simplCoercion env co
 
-        ; cont1 <- {-#SCC "simplCast-addCoerce" #-}
-                   if isReflCo co1
-                   then return cont  -- See Note [Optimising reflexivity]
-                   else pushCast env co1 cont
-                        -- True <=> co1 is optimised
+        ; let cont1 = {-#SCC "simplCast-addCoerce" #-}
+                      if isReflCo co1
+                      then cont  -- See Note [Optimising reflexivity]
+                      else pushCast env co1 cont
+                           -- True <=> co1 is optimised
 
         ; {-#SCC "simplCast-simplExprF" #-}
           simplExprF env body cont1 }
@@ -1747,98 +1747,8 @@ on each successive composition -- that's at least quadratic.  So:
   duplicating a CastIt, optimise the coercion. Otherwise we'll end up
   optimising it separately in the duplicate copies.
 
-* See also Note [The sc_cast field of ApplyToVal].
-
-Note [The sc_cast field of ApplyToVal]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In the `ApplyToVal` case of `pushCast` we want to push an `OutCoercion` into the
-argument.  But the argument may or may not have been simplified (see Note [StaticEnv])
-so we definitely can't just wrap the cast around the argument. Instead we store it
-in the `sc_cast` field -- this is the whole reason for the `sc_cast` field.
-
-We deal with that pending cast mainly in `simplArg`.
-
-But we /also/ sometimes want to substitute that argument for a lambda-binder, in
-`preInlineUnconditionally`.  So we also have to put that pending cast into
-`ContEx`; hence the MOutCoercion field of `ContEx`.  Then we deal with it
-appropriately when /applying/ the substitution in `simplInId`.
+* See also Note [The sc_cast field of ApplyToVal] in GHC.Core.Opt.Simplify.Utils.
 -}
-
-
-optOutCoercion :: SimplEnvIS -> OutCoercion -> Bool -> OutCoercion
--- See Note [Avoid re-simplifying coercions]
-optOutCoercion env co already_optimised
-  | already_optimised = co  -- See Note [Avoid re-simplifying coercions]
-  | otherwise         = optCoercion opts empty_subst co
-  where
-    empty_subst = mkEmptySubst (seInScope env)
-    opts = seOptCoercionOpts env
-
-addCastMCo :: MOutCoercion -> SimplCont -> SimplCont
--- Simpler, non-monadic version of pushCastMCo when we are certain that
--- the cast should be at the top; i.e. cont is Stop or StrictArg
-addCastMCo MRefl    cont = cont
-addCastMCo (MCo co) cont = CastIt { sc_co = co, sc_opt = False, sc_cont = cont }
-
-pushCastMCo :: SimplEnv -> MOutCoercion -> SimplCont -> SimplM SimplCont
-pushCastMCo _env MRefl    cont = return cont
-pushCastMCo env  (MCo co) cont = pushCast env co cont
-
-pushCast :: SimplEnv -> OutCoercion -> SimplCont -> SimplM SimplCont
-pushCast env co cont
-  = go co True cont
-  where
-
-    -- ToDo:   pushCast Refl (ApplylToVal arg1 (ApplyToVal arg2 ...))
-    --         will do lots of unnecessary work.
-    go :: OutCoercion -> Bool -> SimplCont -> SimplM SimplCont
-    go co1 _ (CastIt { sc_co = co2, sc_cont = cont })  -- See Note [Optimising reflexivity]
-      = go (mkTransCo co1 co2) False cont
-                  -- False: (mkTransCo co1 co2) is not fully optimised
-                  -- See Note [Avoid re-simplifying coercions]
-
-    go co co_is_opt (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
-      | Just (tyL, arg_ty', m_co') <- pushCoTyArg co arg_ty
-      = {-#SCC "addCoerce-pushCoTyArg" #-}
-        do { tail' <- go_mco m_co' co_is_opt tail
-           ; return (ApplyToTy { sc_arg_ty  = arg_ty'
-                               , sc_cont    = tail'
-                               , sc_hole_ty = tyL }) }
-                                    -- NB!  As the cast goes past, the
-                                    -- type of the hole changes (#16312)
-
-    -- (f |> co) arg   ===>   (f (arg |> co1)) |> co2
-    -- where   co :: (s1->s2) ~ (t1->t2)
-    --         co1 :: t1 ~ s1
-    --         co2 :: s2 ~ t2
-    go co co_is_opt cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                     , sc_cast = arg_mco, sc_cont = tail })
-      | not co_is_opt
-      = -- pushCoValArg duplicates the coercion, so optimise first
-        go (optOutCoercion (zapSubstEnv env) co co_is_opt) True cont
-
-      | Just (tyL, m_co1, m_co2) <- pushCoValArg co
-      = {-#SCC "addCoerce-pushCoValArg" #-}
-        do { tail' <- go_mco m_co2 True tail
-             -- Dealing with m_co1 is the entire reason for the sc_cast field
-             -- of ApplyToVal; see Note [The sc_cast field of ApplyToVal]
-           ; return (ApplyToVal { sc_arg  = arg
-                                , sc_env  = arg_se
-                                , sc_cast = arg_mco `mkTransMCo` m_co1
-                                , sc_cont = tail'
-                                , sc_hole_ty = tyL }) }
-
-    go co co_is_opt cont
-      | isReflCo co = return cont  -- Having this at the end makes a huge
-                                   -- difference in T12227, for some reason
-                                   -- See Note [Optimising reflexivity]
-      | otherwise = return (CastIt { sc_co = co, sc_opt = co_is_opt, sc_cont = cont })
-
-        -- If the first parameter is MRefl, then simplifying revealed a
-        -- reflexive coercion. Omit.
-    go_mco :: MOutCoercion -> Bool -> SimplCont -> SimplM SimplCont
-    go_mco MRefl    _   cont = return cont
-    go_mco (MCo co) opt cont = go co opt cont
 
 simplArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
          -> Maybe ArgInfo           -- ^ Just <=> This arg `ai` occurs in an app
@@ -2284,8 +2194,7 @@ simplInId env var cont
   = assertPpr (not (isCoVar var)) (ppr var) $
     case substId env var of
       ContEx se e mco
-        -> do { cont' <- pushCastMCo env mco cont
-              ; simplExprF (se `setInScopeFromE` env) e cont' }
+        -> simplExprF (se `setInScopeFromE` env) e (pushCastMCo env mco cont)
         -- Don't trimJoinCont; haven't already simplified e,
         -- so the cont is not embodied in e
 
@@ -2322,8 +2231,7 @@ simplOutExpr env expr cont
 
   | Cast e co <- expr  -- The inlined expression may be (x |> co)
                        -- and the cast may cancel with `cont`
-  = do { cont' <- pushCast env co cont
-       ; simplOutExpr env e cont' }
+  = simplOutExpr env e (pushCast env co cont)
 
   | (Var v, args) <- collectArgs expr
   , not (isDataConWorkId v)
@@ -2384,12 +2292,12 @@ simplOutId env fun cont
                    ; let (m,_,_) = splitFunTy fun_ty
                          env'  = arg_env `addNewInScopeIds` [s']
                          hole_ty = mkVisFunTy m realWorldStatePrimTy new_runrw_res_ty
-                   ; cont' <- pushCastMCo env' arg_mco $
-                              ApplyToVal { sc_arg = Var s', sc_cast = MRefl
-                                         , sc_env = Simplified OkDup
-                                         , sc_cont = inner_cont
-                                         , sc_hole_ty = hole_ty }
-                                -- cont' applies to s', then K
+                         cont' = pushCastMCo env' arg_mco $
+                                 ApplyToVal { sc_arg = Var s', sc_cast = MRefl
+                                            , sc_env = Simplified OkDup
+                                            , sc_cont = inner_cont
+                                            , sc_hole_ty = hole_ty }
+                                 -- cont' applies to s', then K
                    ; body' <- simplExprC env' arg cont'
                    ; return (Lam s' body') }
 
