@@ -2296,10 +2296,14 @@ simplOutId env fun cont
                          hole_ty = mkVisFunTy m realWorldStatePrimTy new_runrw_res_ty
                          cont' = pushCastMCo env' arg_mco $
                                  ApplyToVal { sc_arg = DoneEx (Var s') NotJoinPoint
-                                            , sc_dup = OkDup
+                                            , sc_dup = dup
                                             , sc_cont = inner_cont
                                             , sc_hole_ty = hole_ty }
                                  -- cont' applies to s', then K
+                         -- The argument (Var s') is small, but inner_cont may not be
+                         -- dupable; see (AV2) in Note [The argument of ApplyToVal]
+                         dup | contIsDupable inner_cont = OkDup
+                             | otherwise                = NoDup
                    ; body' <- simplExprC env' arg cont'
                    ; return (Lam s' body') }
 
