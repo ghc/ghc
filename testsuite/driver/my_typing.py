@@ -10,7 +10,7 @@ The testsuite driver can be typechecked using mypy [1].
 
 from typing import *
 import typing
-
+import enum
 
 ####################################################
 # Backwards compatibility shims
@@ -34,3 +34,7 @@ GitHash = NewType("GitHash", str) # a Git commit hash
 GitRef = NewType("GitRef", str)
 TestEnv = NewType("TestEnv", str)
 MetricName = NewType("MetricName", str)
+
+# Used by `ghc -M` test mode
+DepMode = enum.Enum('DepMode', [('NONE', 0), ('FILE', 1), ('STDOUT', 2)])
+

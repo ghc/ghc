@@ -1,0 +1,16 @@
+section: compiler
+synopsis: Allow streaming `ghc -M` output to stdout
+issues: #27937
+mrs: !16830
+description: {
+    Add options `-dep-makefile-stdout` and `-dep-json-stdout` which stream the dependency generation
+    output to stdout.
+
+    The Makefile and json dependency generation can stream to separate targets, e.g. `-dep-makefile target.Makefile -dep-json-stdout`
+    streams the JSON Lines output to stdout and the Makefile to `target.Makefile`.
+
+    If `-dep-makefile-stdout`, `-dep-json` or `-dep-json-stdout` is given, we no longer generate a Makefile by default, but only
+    if the user explicitly requests the Makefile dependency generation.
+
+    The output from a particular backend can be disabled via `-no-dep-json` and `-no-dep-makefile` respectively.
+}
