@@ -39,13 +39,8 @@ import System.Exit
 import System.IO
 
 import Control.Concurrent
-import Control.Concurrent.STM
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IM
-import GHCi.Message.Async (bindIO)
-import qualified Unsafe.Coerce as Unsafe
-
-type CorrelationId = Int
+import GHCi.Message.Async (runWriteReply, (%>>=))
+import GHCi.Server.Threads
 
 type MessageHook = Msg -> IO Msg
 
@@ -62,49 +57,6 @@ serv :: Bool -> MessageHook -> Pipe -> (forall a .IO a -> IO a) -> IO ()
 serv verbose hook pipe restore =
   servWithCustom verbose hook pipe restore noCustomHandler
 
-
-data ThreadManager = ThreadManager
-  { managedThreads :: !(TVar (IntMap ThreadId))
-  , managerClosed :: !(TVar Bool)
-  }
-
--- | Cancels and Waits for all threads spawned by ThreadManager to terminate before returning.
-withThreadManager :: (ThreadManager -> IO a) -> IO a
-withThreadManager k = do
-  managedThreads <- newTVarIO IM.empty
-  managerClosed <- newTVarIO False
-  let tm = ThreadManager{..}
-  k tm `finally` shutdown tm
-  where
-    shutdown ThreadManager{..} = do
-      ts <- atomically $ do
-        writeTVar managerClosed True
-        IM.elems <$> readTVar managedThreads
-      mapM_ killThread ts
-
-spawn :: ThreadManager -> CorrelationId -> IO () %1 -> IO ()
-spawn mng i = Unsafe.unsafeCoerce (spawn' mng i)
-
-spawn' :: ThreadManager -> CorrelationId -> IO () -> IO ()
-spawn' ThreadManager{..} i action = void $ mask_ $ forkIOWithUnmask $ \unmask -> do
-   tid <- myThreadId
-   registered <- atomically $ do
-     s <- readTVar managerClosed
-     unless s $ modifyTVar' managedThreads (IM.insert i tid)
-     pure (not s)
-   when registered $
-     (unmask action)
-       `finally` atomically (modifyTVar' managedThreads (IM.delete i))
-
--- could be used to cancel a specific handler.
--- cancel :: ThreadManager -> CorrelationId -> IO ()
--- cancel ThreadManager{..} i = do
---   ts <- atomically $ do
---     readTVar managedThreads
---   case IM.lookup i ts of
---     Just tid -> killThread tid
---     Nothing  -> pure ()
-
 servWithCustom
   :: Bool
   -> MessageHook
@@ -117,23 +69,23 @@ servWithCustom verbose hook pipe restore customHandler = do
   withThreadManager $ \mngr ->
     loop ref mngr `finally` closePipe pipe
  where
-  forkHandler mngr uq hndlr msg0@(Msg msg) = do
-    (do discardCtrlC
-        when verbose $ trace ("msg: " ++ (show msg))) `bindIO` \ _ -> do
-      case msg of
-        RunTH{}            -> spawn mngr uq (hndlr msg0)
-        RunModFinalizers{} -> spawn mngr uq (hndlr msg0)
-        _                  -> hndlr msg0
   loop doneRef mngr = do
     when verbose $ trace "reading pipe..."
-    handleRemoteCall pipe (\uq msg act -> hook msg `bindIO` forkHandler mngr uq act) $ \(msg :: Message a) -> do
+
+    handleRemoteCall pipe hook $ \wr (msg :: Message a) ->
+
+      discardCtrlC                                 %>>= \_ ->
+      when verbose (trace ("msg: " ++ (show msg))) %>>= \_ ->
+
       case msg of
-        CustomMessage tag payload -> handleCustom tag payload
-        Shutdown -> writeIORef doneRef True >> reply ()
-        -- TODO: These two should probably be done off the main thread
-        RunTH ii st q ty loc -> wrapRunTH ii $ runTH pipe ii st q ty loc
-        RunModFinalizers ii st qrefs -> wrapRunTH ii $ runModFinalizerRefs pipe ii st qrefs
-        _other -> run msg >>= reply
+        CustomMessage tag payload -> handleCustom tag payload %>>= writeReply wr
+        Shutdown                  -> writeIORef doneRef True >>
+                                     reply ()                 %>>= writeReply wr
+        RunTH ii st q ty loc      -> spawnFinally mngr         (runWriteReply wr)
+                                     (wrapRunTH ii (runTH pipe ii st q ty loc))
+        RunModFinalizers ii st qs -> spawnFinally mngr         (runWriteReply wr)
+                                     (wrapRunTH ii (runModFinalizerRefs pipe ii st qs))
+        _other                    -> run msg >>= reply        %>>= writeReply wr
 
     isDone <- readIORef doneRef
     if isDone then pure ()
@@ -149,7 +101,7 @@ servWithCustom verbose hook pipe restore customHandler = do
   reply :: forall a. Show a => a -> IO a
   reply r = do
     when verbose $ trace ("writing pipe: " ++ show r)
-    return r -- the result of the handler gets sent
+    return r -- the result of the handler is passed to writeReply
 
   -- Run some TH code, which may interact with GHC by sending
   -- THMessage requests, and then finally send RunTHDone followed by a
