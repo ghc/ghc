@@ -55,6 +55,7 @@ import qualified GHC.Exts.Heap as Heap
 import GHC.ForeignSrcLang
 import GHC.Fingerprint
 import GHC.Conc (pseq, par)
+import GHC.IO (IO(..))
 import Control.Concurrent
 import Control.DeepSeq
 import Control.Exception
@@ -664,11 +665,14 @@ remoteCall pipe msg = either throwIO (pure . runGet get)
 
 -- | Handle a single 'Message' request on the interpreter and reply to the host
 handleRemoteCall :: Pipe
-                 -> (CorrelationId -> Msg -> (Msg -> IO ()) %1 -> IO ()) {-^ called with action that handles req and writes reply -}
+                 -> (Msg -> IO Msg) {-^ Msg hook -}
                  -> (forall a. (Show a, Binary a) => Message a -> IO a)
                  -> IO ()
-handleRemoteCall pipe forkHandler k =
-  handleAsyncReq pipe getMessage Nothing (\(Msg msg) -> fmap put . k $ msg) forkHandler
+handleRemoteCall pipe hook k =
+  handleAsyncReq pipe getMessage Nothing \writer msg0 -> IO \s0 ->
+    case hook msg0 |#> s0 of -- unIO for linearity checking
+      (# s1, Msg msg #) -> case k msg |#> s1 of
+        (# s2, a #) -> writeReply writer (put a) |#> s2
 
 -- | Send a 'THMessage' request to the host and wait for a reply from the host
 -- to the interpreter.
@@ -686,5 +690,7 @@ remoteTHCall pipe ii msg = either throwIO (pure . runGet get)
 handleRemoteTHCall
   :: Pipe -> InboxId -> (forall a. (Show a, Binary a) => THMessage a -> IO a) -> IO ()
 handleRemoteTHCall pipe ii k =
-  handleAsyncReq pipe getTHMessage (Just ii) (\(THMsg msg) -> fmap put . k $ msg) $ \ _ msg hndlr -> hndlr msg
+  handleAsyncReq pipe getTHMessage (Just ii) \writer (THMsg msg) -> IO \s0 ->
+    case k msg |#> s0 of -- unIO for linearity checking
+      (# s1, a #) -> writeReply writer (put a) |#> s1
 

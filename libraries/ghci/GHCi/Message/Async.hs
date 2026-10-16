@@ -226,9 +226,10 @@ remoteAsyncReq pipe msg ii = do
 -- It must be used exactly once (all requests expect a reply, and you can't
 -- reply more than once). Linear types enforce the handler replies in every
 -- branch, and if the handler otherwise throws, it is handled by 'handleAsyncReq'.
-handleAsyncReq :: Pipe -> Get a -> (Maybe InboxId) -> (a -> IO Put) -> (CorrelationId -> a -> (a -> IO ()) %1 -> IO ()) -> IO ()
-handleAsyncReq pipe getit mii hndlr k = mask $ \restore -> do
+handleAsyncReq :: Pipe -> Get a -> (Maybe InboxId) -> (WriteReply Put %1 -> a -> IO r) -> IO r
+handleAsyncReq pipe getit mii k = mask $ \restore -> do
   let am = pipeAsyncMngr pipe
+  ack <- newEmptyMVar
 
   -- Block waiting for request
   mbreq <- atomically $ do
@@ -246,6 +247,7 @@ handleAsyncReq pipe getit mii hndlr k = mask $ \restore -> do
     Just (uq, bs) -> do
       let reply p = do
             writePipe pipe (Reply uq (bimap toSerializableException runPut p))
+            putMVar ack ()
 
       -- Run the continuation which must reply exactly once with 'writeReply'
       case runGetOrFail getit bs of
@@ -253,11 +255,20 @@ handleAsyncReq pipe getit mii hndlr k = mask $ \restore -> do
           let exc = DecodeAsyncReqException err
           reply (Left (toException exc))
           throwIO exc
-        Right (_, _, it) -> k uq it (\ msg -> do
-          try @SomeException (restore (hndlr msg)) >>= \x -> do
-            reply x
-            either throwIO (const $ pure ()) x
-          )
+        Right (_, _, it) ->
+          restore (k (WriteReply reply) it)
+
+            -- If there's an exception before the reply is sent, reply with an error instead.
+            `catch` \(e :: SomeException) -> do
+
+                tryTakeMVar ack >>= \case
+                  Just () ->
+                    -- Already replied
+                    throwIO e
+                  Nothing -> do
+                    -- Reply with an error
+                    reply (Left e)
+                    throwIO e
 
 -- | 'handleSyncReq' failed to decode an incoming request payload using the given @'Get' a@
 newtype DecodeAsyncReqException = DecodeAsyncReqException String deriving Show
