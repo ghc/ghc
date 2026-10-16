@@ -117,7 +117,7 @@ Library
     Build-Depends: base       >= 4.11 && < 4.24,
                    deepseq    >= 1.4 && < 1.6,
                    directory  >= 1   && < 1.4,
-                   process    >= 1   && < 1.7,
+                   process    >= 1.6.20 && < 1.7,
                    bytestring >= 0.11 && < 0.13,
                    binary     == 0.8.*,
                    text       >= 2.0 && < 2.2,
