@@ -438,14 +438,26 @@ def dep_makefile( name, opts ):
     For make_depend tests: write the -dep-makefile output and
     compare it against <name>.dep-makefile.
     """
-    opts.dep_makefile = True
+    opts.dep_makefile = DepMode.FILE
 
 def dep_json( name, opts ):
     """
     For make_depend tests: write the -dep-json output and
     compare it against <name>.dep-json.
     """
-    opts.dep_json = True
+    opts.dep_json = DepMode.FILE
+
+def dep_makefile_stdout( name, opts ):
+    """
+    For make_depend tests: add -dep-makefile-stdout flag.
+    """
+    opts.dep_makefile = DepMode.STDOUT
+
+def dep_json_stdout( name, opts ):
+    """
+    For make_depend tests: add -dep-json-stdout flag.
+    """
+    opts.dep_json = DepMode.STDOUT
 
 def ignore_dep_outputs( name, opts ):
     """
@@ -2052,6 +2064,10 @@ async def do_make_depend(name: TestName,
         against <name>.dep-makefile. Otherwise, -no-dep-makefile is passed.
       * 'dep_json': write the -dep-json output and compare it
         against <name>.dep-json.
+      * 'dep_json_stdout': write the -dep-json-stdout and compare it with
+        <name>.stderr
+      * 'dep_makefile_stdout': write the -dep-makefile-stdout and compare it with
+        <name>.stderr
     """
     opts = getTestOpts()
 
@@ -2060,14 +2076,29 @@ async def do_make_depend(name: TestName,
 
     outputs = []
     output_flags = []
-    if opts.dep_makefile:
+    if opts.dep_makefile == DepMode.FILE:
         outputs.append(('dep-makefile', normalise_dep_makefile))
         output_flags.append('-dep-makefile %s' % actual_file('dep-makefile'))
-    else:
-        output_flags.append('-no-dep-makefile')
-    if opts.dep_json:
+    elif opts.dep_makefile == DepMode.STDOUT:
+        outputs.append(('stdout', normalise_dep_makefile))
+        output_flags.append('-dep-makefile-stdout')
+
+    if opts.dep_json == DepMode.FILE:
         outputs.append(('dep-json', normalise_dep_json))
         output_flags.append('-dep-json %s' % actual_file('dep-json'))
+    elif opts.dep_json == DepMode.STDOUT:
+        outputs.append(('stdout', normalise_dep_json))
+        output_flags.append('-dep-json-stdout')
+
+    # Somewhat non-sensical here, but `do_compile` outputs stdout and stderr into the same.
+    # Then, it only applies the `normalise_errmsg_fun` to the output, and compares it against
+    # <name>.stderr as the golden file.
+    #
+    # This is not really what we want in this situation, but it seems this requires more refactoring
+    # of the `do_compile` function than what fendor is ready to commit to.
+    # Thus, as a workaround, we simply add the normalisers for the stderr...
+    stdout_normalisers = [ n for (k, n) in outputs if k == 'stdout' ]
+    opts.extra_errmsg_normaliser = join_normalisers(opts.extra_errmsg_normaliser, normalise_slashes_, *stdout_normalisers)
 
     result = await do_compile( name, way, False, None, [], units,
                                ' '.join(output_flags + [extra_hc_opts]),
@@ -2077,9 +2108,9 @@ async def do_make_depend(name: TestName,
 
     for (kind, normaliser) in outputs:
         output_match = await compare_outputs(way, kind,
-                           join_normalisers(opts.extra_normaliser,
-                                            normalise_slashes_, normaliser),
-                           find_expected_file(name, kind, way), actual_file(kind))
+                           join_normalisers(opts.extra_normaliser, normalise_slashes_, normaliser),
+                           find_expected_file(name, kind, way),
+                           actual_file(kind))
         if not output_match:
             return failBecause(kind + ' mismatch', diff=output_match.diff)
 

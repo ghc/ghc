@@ -390,8 +390,8 @@ class TestOptions:
        self.ignore_extension = False
 
        # make_depend tests: which outputs to write and check
-       self.dep_makefile = False
-       self.dep_json = False
+       self.dep_makefile: DepMode = DepMode.NONE
+       self.dep_json: DepMode = DepMode.NONE
        self.ignore_dep_outputs = False
 
        # Backpack test
