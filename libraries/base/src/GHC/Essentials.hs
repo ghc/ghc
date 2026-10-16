@@ -1,9 +1,6 @@
 {-# LANGUAGE MagicHash, Trustworthy, RankNTypes, CPP #-}
 {-# OPTIONS_HADDOCK hide #-}
-
-#if __GLASGOW_HASKELL__ >= 1001
 {-# OPTIONS_GHC -fdefines-known-key-names #-} -- See Note [JS/WASM primitives known-keys for other targets]
-#endif
 
 -- |
 --
@@ -318,7 +315,7 @@ import GHC.Internal.Control.Arrow( arr, first, app, (|||) )
 import GHC.Internal.Desugar( (>>>) )  -- See Note [Tricky known-occ cases]
 import GHC.Internal.OverloadedLabels( fromLabel )
 import GHC.Internal.Records
-import GHC.Internal.CString as CS
+import GHC.Internal.Types as CS
   ( unpackCString# , unpackCStringUtf8#
   , unpackFoldrCString#, unpackFoldrCStringUtf8#, unpackAppendCString#
   , unpackAppendCStringUtf8#, cstringLength# )
