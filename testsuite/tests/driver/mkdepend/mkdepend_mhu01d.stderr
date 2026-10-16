@@ -1,0 +1,8 @@
+{"module":"A.Base","unit-id":"a","boot":true,"imports":{},"package-name":"a","source":"mhu01/a/A/Base.hs-boot"}
+{"module":"Util","unit-id":"a","imports":{"a":[{"module":"A.Base","boot":true}]},"package-name":"a","source":"mhu01/a/Util.hs"}
+{"module":"A.Base","unit-id":"a","imports":{"a":["Util"]},"package-name":"a","source":"mhu01/a/A/Base.hs"}
+{"module":"A.TH","unit-id":"a","imports":{"a":["A.Base"]},"package-name":"a","source":"mhu01/a/A/TH.hs"}
+{"module":"Util","unit-id":"b","imports":{},"package-name":"b","source":"mhu01/b/Util.hs"}
+{"module":"B.Splice","unit-id":"b","imports":{"a":[{"module":"A.Base","level":"quote"},{"module":"A.TH","level":"splice"}],"b":["Util"]},"package-name":"b","source":"mhu01/b/B/Splice.hs"}
+{"module":"B.Normal","unit-id":"b","imports":{"a":["A.Base"],"b":["B.Splice"]},"package-name":"b","source":"mhu01/b/B/Normal.hs"}
+{"module":"C","unit-id":"c","imports":{"a":[{"module":"Util","level":"splice"}],"b":["B.Normal",{"module":"B.Splice","level":"splice"},{"module":"Util","level":"quote"}]},"package-name":"c","source":"mhu01/c/C.hs"}

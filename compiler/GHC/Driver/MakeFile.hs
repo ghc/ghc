@@ -132,7 +132,7 @@ doMkDepend = do
     module_graph <- GHC.depanal excl_mods True {- Allow dup roots -}
     doMkDependModuleGraph dflags module_graph
 
-doMkDependModuleGraph :: GhcMonad m =>  DynFlags -> ModuleGraph -> m ()
+doMkDependModuleGraph :: GhcMonad m => DynFlags -> ModuleGraph -> m ()
 doMkDependModuleGraph dflags module_graph = do
     hsc_env <- getSession
     logger <- getLogger
@@ -143,12 +143,14 @@ doMkDependModuleGraph dflags module_graph = do
     root <- liftIO Directory.getCurrentDirectory
 
     let
+      suffixes = fmap unsafeEncodeUtf (depSuffixes dflags)
+      tmpdir = tmpDir dflags
       backends = concat
-        [ [ initFileDepWriter logger root tmpfs dflags makefile_output
-          | Just makefile_output <- [depMakefile dflags]
+        [ [ initFileDepWriter logger root tmpfs tmpdir suffixes makefile_output
+          | Just makefile_output <- [initDepOutput (depMakefile dflags)]
           ]
-        , [ initJsonDepWriter logger tmpfs dflags json_output
-          | Just json_output <- [depJson dflags]
+        , [ initJsonDepWriter logger tmpfs tmpdir json_output
+          | Just json_output <- [initDepOutput (depJson dflags)]
           ]
         ]
 
@@ -160,27 +162,19 @@ doMkDependModuleGraph dflags module_graph = do
     liftIO $ do
 
       -- Setup the writers
-      writers <- sequenceA backends
-
-      -- Do the actual work
-      do
+      withWriters backends $ \ write_dep -> do
+        -- Do the actual work
         -- Process them one by one, dumping results and complaining about cycles
         forM_
           sorted
           (\ mod_graph_node ->
             processDeps hsc_env (UniqSet.mkUniqSet excl_mods) mod_graph_node >>= \ case
               Nothing -> pure ()
-              Just dep_node ->
-                traverse_ (\ s -> dw_writeDependency s dep_node) writers
+              Just dep_node -> write_dep dep_node
           )
 
         -- If -ddump-mod-cycles, show cycles in the module graph
         liftIO $ dumpModCycles logger module_graph
-
-      -- Tidy up
-      do
-        traverse_ dw_endWriter writers
-
 
     -- Unconditional exiting is a bad idea.  If an error occurs we'll get an
     --exception; if that is not caught it's fine, but at least we have a
@@ -261,10 +255,101 @@ data DependencyWriter = DependencyWriter
   { dw_writeDependency :: DepNode -> IO ()
   -- ^ Serialise a 'DepNode' and write it out.
   , dw_endWriter :: IO ()
-  -- ^ End the serialiation of dependency information and perform
-  -- final steps, such as cleaning up temporary files and copying intermediate
-  -- files to their final location.
+  -- ^ We finished consuming the dependency information, perform final
+  -- tidy up operations. This may be a no-op, but could also
+  -- copy temporary files, close open handlers, etc...
+  --
+  -- If 'dw_endWriter' was called, calling 'dw_onError' is unnecessary,
+  -- but it must be safe to call 'dw_onError' any way.
+  , dw_onError :: IO ()
+  -- ^ Something crashed! Clean up any resources opened by this 'DependencyWriter'.
   }
+
+-- | Initialise multiple backends and combine them into one output function.
+--
+-- Combines the 'DepSink' of each 'DependencyWriter' into one single consumer.
+withWriters :: [IO DependencyWriter] -> ((DepNode -> IO ()) -> IO a) -> IO a
+withWriters [] k = k (\ _ -> pure ())
+withWriters (dw : dws) k =
+  withWriter
+    dw
+    $ \s -> withWriters dws (\s' -> k (s `mappendWriter` s'))
+  where
+    mappendWriter w1 w2 = \ node -> w1 node >> w2 node
+
+-- | Initialise a single 'DependencyWriter', making sure any allocated resource
+-- get's tidied up again.
+--
+-- Accepts 'IO' 'DependencyWriter' since the initialisation may perform setup operations,
+-- such as opening file handles, or intermediate data types.
+withWriter :: IO DependencyWriter -> ((DepNode -> IO ()) -> IO r) -> IO r
+withWriter dwIO k =
+  bracketOnError dwIO dw_onError $ \ dw -> do
+    r <- k (dw_writeDependency dw)
+    -- Clean up open resources
+    dw_endWriter dw
+    pure r
+
+-- | Where should the dependency output end up?
+data DepOutput
+  = DepStreamHandle Handle
+  -- ^ The dependency information should be written to this 'Handle'.
+  | DepFileOutput FilePath
+  -- ^ The dependency information should be written to this 'FilePath'.
+
+-- | A 'DepStream' is an abstraction over how to output single elements
+-- of the dependency generation, e.g., a json object or one makefile rule.
+data DepStream = DepStream
+  { depStream_write :: String -> IO ()
+  , depStream_close :: IO ()
+  , depStream_onError :: IO ()
+  }
+
+initDepOutput :: MkDependOutput -> Maybe DepOutput
+initDepOutput = \ case
+  MkDepend_None -> Nothing
+  MkDepend_Default fp -> Just $ DepFileOutput fp
+  MkDepend_Explicit fp -> Just $ DepFileOutput fp
+  MkDepend_StdOut -> Just $ DepStreamHandle stdout
+
+initMakefileDepStream :: Logger -> TmpFs -> TempDir -> DepOutput -> IO DepStream
+initMakefileDepStream _ _ _ (DepStreamHandle h) =
+  pure $ depStreamHandle h
+initMakefileDepStream logger tmpfs tmpdir (DepFileOutput fp) = do
+  files <- beginMkDependHS logger tmpfs tmpdir fp
+  pure $
+    DepStream
+      { depStream_write = hPutStrLn (mkd_tmp_hdl files)
+      , depStream_onError = do
+          hClose $ mkd_tmp_hdl files
+          case mkd_make_hdl files of
+            Nothing -> return ()
+            Just hdl -> hClose hdl
+      , depStream_close = endMkDependHS logger files
+      }
+
+initJsonDepStream :: Logger -> TmpFs -> TempDir -> DepOutput -> IO DepStream
+initJsonDepStream _ _ _ (DepStreamHandle h) =
+  pure $ depStreamHandle h
+initJsonDepStream logger tmpfs tmpdir (DepFileOutput fp) = do
+  files <- initJsonDepFiles logger tmpfs tmpdir fp
+  pure $
+    DepStream
+      { depStream_write = hPutStrLn (json_tmp_hdl files)
+      , depStream_onError = hClose (json_tmp_hdl files)
+      , depStream_close = endJsonDepFiles logger files
+      }
+
+depStreamHandle :: Handle -> DepStream
+depStreamHandle h =
+    DepStream
+      { depStream_write =
+          \output -> do
+            hPutStrLn h output
+            hFlush h -- We flush to ensure the output is streamed per line.
+      , depStream_close = pure ()
+      , depStream_onError = pure ()
+      }
 
 -----------------------------------------------------------------
 --
@@ -415,17 +500,16 @@ findDependency hsc_env (L srcloc imp) = do
 --
 -----------------------------------------------------------------
 
-initFileDepWriter :: Logger -> OsPath -> TmpFs -> DynFlags -> FilePath -> IO DependencyWriter
-initFileDepWriter logger root tmpfs dflags makefile = do
-  files <- beginMkDependHS logger tmpfs dflags makefile
+initFileDepWriter :: Logger -> OsPath -> TmpFs -> TempDir -> [OsPath] -> DepOutput -> IO DependencyWriter
+initFileDepWriter logger root tmpfs tmpdir suffixes output = do
+  stream <- initMakefileDepStream logger tmpfs tmpdir output
   pure DependencyWriter
     { dw_writeDependency = \ case
         ModuleDepNode node deps -> do
-          writeDependencies root (mkd_tmp_hdl files) suffixes node deps
-    , dw_endWriter = endMkDependHS logger files
+          traverse_ (depStream_write stream) (dependencyRules root suffixes node deps)
+    , dw_endWriter = depStream_close stream
+    , dw_onError = depStream_onError stream
     }
-  where
-    suffixes = map unsafeEncodeUtf (depSuffixes dflags)
 
 data MkDepFiles
   = MkDep { mkd_make_file :: FilePath,          -- Name of the makefile
@@ -433,11 +517,11 @@ data MkDepFiles
             mkd_tmp_file  :: FilePath,          -- Name of the temporary file
             mkd_tmp_hdl   :: Handle }           -- Handle of the open temporary file
 
-beginMkDependHS :: Logger -> TmpFs -> DynFlags -> FilePath -> IO MkDepFiles
-beginMkDependHS logger tmpfs dflags makefile = do
+beginMkDependHS :: Logger -> TmpFs -> TempDir -> FilePath -> IO MkDepFiles
+beginMkDependHS logger tmpfs tmpdir makefile = do
         -- open a new temp file in which to stuff the dependency info
         -- as we go along.
-  tmp_file <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "dep"
+  tmp_file <- newTempName logger tmpfs tmpdir TFL_CurrentModule "dep"
   tmp_hdl <- openFile tmp_file WriteMode
 
         -- open the makefile
@@ -478,16 +562,15 @@ beginMkDependHS logger tmpfs dflags makefile = do
   return (MkDep { mkd_make_file = makefile, mkd_make_hdl = mb_make_hdl,
                   mkd_tmp_file  = tmp_file, mkd_tmp_hdl  = tmp_hdl})
 
-writeDependencies ::
+dependencyRules ::
   OsPath ->
-  Handle ->
   [OsString] ->
   -- ^ Suffixes
   HomeModuleNode ->
   [Dep] ->
-  IO ()
-writeDependencies root hdl suffixes node deps =
-  traverse_ write tasks
+  [String]
+dependencyRules root suffixes node deps =
+  map rule tasks
   where
     tasks = source_dep : boot_dep ++ concatMap import_dep deps
 
@@ -514,7 +597,7 @@ writeDependencies root hdl suffixes node deps =
 
       DepCpp {dep_path} -> [(obj_files, dep_path)]
 
-    write (from, to) = writeDependency root hdl from to
+    rule (from, to) = dependencyRule root from to
 
     obj_files = suffixed hmn_obj
 
@@ -523,18 +606,18 @@ writeDependencies root hdl suffixes node deps =
     HomeModuleNode {hmn_src, hmn_obj, hmn_hi, hmn_mod, hmn_includePkgDeps} = node
 
 -----------------------------
-writeDependency :: OsPath -> Handle -> [OsPath] -> OsPath -> IO ()
--- (writeDependency r h [t1,t2] dep) writes to handle h the dependency
+dependencyRule :: OsPath -> [OsPath] -> OsPath -> String
+-- (dependencyRule r [t1,t2] dep) renders the dependency
 --      t1 t2 : dep
-writeDependency root hdl targets dep
-  = do let -- We need to avoid making deps on
-           --     c:/foo/...
-           -- on Windows as make gets confused by the :
-           -- Making relative deps avoids some instances of this.
-           dep' = OsPath.makeRelative root dep
-           forOutput = escapeSpaces . reslash Forwards . unsafeDecodeUtf . OsPath.normalise
-           output = unwords (map forOutput targets) ++ " : " ++ forOutput dep'
-       hPutStrLn hdl output
+dependencyRule root targets dep
+  = let -- We need to avoid making deps on
+        --     c:/foo/...
+        -- on Windows as make gets confused by the :
+        -- Making relative deps avoids some instances of this.
+        dep' = OsPath.makeRelative root dep
+        forOutput = escapeSpaces . reslash Forwards . unsafeDecodeUtf . OsPath.normalise
+    in
+        unwords (map forOutput targets) ++ " : " ++ forOutput dep'
 
 -----------------------------
 insertSuffixes
@@ -589,82 +672,86 @@ endMkDependHS logger
 --
 -----------------------------------------------------------------
 
-initJsonDepWriter :: Logger -> TmpFs -> DynFlags -> FilePath -> IO DependencyWriter
-initJsonDepWriter logger tmpfs dflags output = do
-  json_var <- mkJsonOutput logger tmpfs dflags output initDepJson
-  pure DependencyWriter
-    { dw_writeDependency = \ case
-        ModuleDepNode node deps ->
-          writeHomeUnitDeps json_var node deps
-    , dw_endWriter = do
-        writeJsonOutput logger json_var
-    }
+initJsonDepWriter :: Logger -> TmpFs -> TempDir -> DepOutput -> IO DependencyWriter
+initJsonDepWriter logger tmpfs tmpdir output = do
+  stream <- initJsonDepStream logger tmpfs tmpdir output
+  json_var <- mkJsonOutput
+  pure
+    DependencyWriter
+      { dw_writeDependency = \ case
+          ModuleDepNode node deps -> do
+            extUnits <- readJson json_var
+            let
+              (extUnitsDeps, payload) = homeUnitDeps node deps
+              newExtUnits = Set.difference extUnitsDeps (externalDeps extUnits)
+            -- Write new external unit deps before the module that uses them
+            for_ newExtUnits $ \extUnit -> do
+              depStream_write stream (renderJsonl extUnit)
+            depStream_write stream (renderJsonl payload)
+            -- Cache external deps we already reported in the past
+            updateJson json_var $ cacheExternalDepsJson newExtUnits
+      , dw_endWriter = depStream_close stream
+      , dw_onError = depStream_onError stream
+      }
 
 --------------------------------------------------------------------------------
 -- Output interface for json dumps
 
--- | Resources for a json dump option, used in "GHC.Driver.MakeFile".
--- The flag @-dep-json@ add an additional output target for dependency
--- diagnostics.
---
--- Contains temporary file locations to stream output to.
-data JsonOutput =
-  JsonOutput {
-    -- | @-dep-json@ specific state for json lines dependency information generation.
-    json_ref :: IORef DepJson,
-
-    -- | The output file path specified as argument to the flag.
-    json_path :: FilePath,
-    -- | Name of the temporary file
-    json_tmp_file  :: FilePath,
-    -- | Handle of the open temporary file
-    json_tmp_hdl   :: Handle
+-- | State to keep track of during `-dep-json` generation.
+newtype JsonState
+  = JsonState
+  { json_ref :: IORef DepJson
+  -- ^ This ref is updated in @processDeps@ incrementally, using a
+  -- flag-specific type.
   }
 
--- | Set up json generation for `ghc -M`.
---
--- Creates a temporary file that we write the dependency information to.
--- The temporary file is written to the final output file path in 'writeJsonOutput'.
-mkJsonOutput ::
-  Logger ->
-  TmpFs ->
-  DynFlags ->
-  FilePath ->
-  IO (IORef DepJson) ->
-  IO JsonOutput
-mkJsonOutput logger tmpfs dflags json_path mk_ref = do
-  json_ref <- mk_ref
-  -- open a new temp file in which to stuff the dependency info
+data JsonDepFiles = JsonDepFiles
+  { json_path :: FilePath
+    -- ^ The output file path specified as argument to the flag.
+  , json_tmp_file  :: FilePath
+    -- ^ Name of the temporary file
+  , json_tmp_hdl   :: Handle
+    -- ^ Handle of the open temporary file
+  }
+
+initJsonDepFiles :: Logger -> TmpFs -> TempDir -> FilePath -> IO JsonDepFiles
+initJsonDepFiles logger tmpfs tmpdir path = do
+  -- open a new temp file in which to stuff the dependency info into
   -- as we go along.
-  json_tmp_file <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "dep"
+  json_tmp_file <- newTempName logger tmpfs tmpdir TFL_CurrentModule "dep-json"
   json_tmp_hdl <- openFile json_tmp_file WriteMode
-
-  pure JsonOutput {json_ref, json_path, json_tmp_file, json_tmp_hdl}
-
-updateJson :: JsonOutput -> (DepJson -> DepJson) -> IO ()
-updateJson JsonOutput {json_ref} f = modifyIORef' json_ref f
-
-readJson :: JsonOutput -> IO DepJson
-readJson JsonOutput {json_ref} = readIORef json_ref
+  pure $ JsonDepFiles
+    { json_path = path
+    , json_tmp_file = json_tmp_file
+    , json_tmp_hdl = json_tmp_hdl
+    }
 
 -- | Finalise the json generation by copying the temporary file to the final destination.
 -- Avoids partial writes in the case of an error.
-writeJsonOutput ::
-  Logger ->
-  JsonOutput ->
-  IO ()
-writeJsonOutput logger JsonOutput {json_path, json_tmp_file, json_tmp_hdl} = do
+endJsonDepFiles :: Logger -> JsonDepFiles -> IO ()
+endJsonDepFiles logger JsonDepFiles {json_path, json_tmp_file, json_tmp_hdl} = do
   hClose json_tmp_hdl
   -- Copy the new jsonl in place
   showPass logger "Installing new json output"
   SysTools.copyFile json_tmp_file json_path
 
+-- | Set up json generation for `ghc -M`.
+mkJsonOutput :: IO JsonState
+mkJsonOutput =
+  JsonState <$> newIORef (DepJson Set.empty)
+
+updateJson :: JsonState -> (DepJson -> DepJson) -> IO ()
+updateJson JsonState {json_ref} f = modifyIORef' json_ref f
+
+readJson :: JsonState -> IO DepJson
+readJson JsonState {json_ref} = readIORef json_ref
+
 --------------------------------------------------------------------------------
 -- Output helpers
 
-writeJsonl :: ToJson a => JsonOutput -> a -> IO ()
-writeJsonl  JsonOutput {json_tmp_hdl} output = do
-  hPutStrLn json_tmp_hdl (showSDocUnsafe $ renderJSON $ json output)
+renderJsonl :: ToJson a => a -> String
+renderJsonl output =
+  showSDocUnsafe $ renderJSON $ json output
 
 --------------------------------------------------------------------------------
 -- Payload for -dep-json
@@ -846,9 +933,6 @@ instance ToJson ExtUnitDep where
     where
       showPackageId (DPackageId (PackageId pid)) = unpackFS pid
 
-initDepJson :: IO (IORef DepJson)
-initDepJson = newIORef $ DepJson Set.empty
-
 cacheExternalDepsJson :: Set.Set ExtUnitDep -> DepJson -> DepJson
 cacheExternalDepsJson extUnits (DepJson e0) =
   DepJson
@@ -856,19 +940,10 @@ cacheExternalDepsJson extUnits (DepJson e0) =
         Set.union e0 extUnits
     }
 
-writeHomeUnitDeps :: JsonOutput -> HomeModuleNode -> [Dep] -> IO ()
-writeHomeUnitDeps deps_json HomeModuleNode {..} deps = do
-  extUnits <- readJson deps_json
-  let newExtUnits = Set.difference extUnitsDeps (externalDeps extUnits)
-  -- Write new external unit deps before the module that uses them
-  for_ newExtUnits $ \ extUnit -> do
-    writeJsonl deps_json extUnit
-  writeJsonl deps_json payload
-  -- Cache external deps we already reported in the past
-  updateJson deps_json $ cacheExternalDepsJson newExtUnits
+homeUnitDeps :: Foldable t => HomeModuleNode -> t Dep -> (Set.Set ExtUnitDep, HomeUnitDep)
+homeUnitDeps HomeModuleNode {..} deps =
+  foldl' go (Set.empty, initial_node_data) deps
   where
-    (extUnitsDeps, payload) = foldl' go (Set.empty, initial_node_data) deps
-
     initial_node_data =
       HomeUnitDep
         { unitId = hmn_unitId
