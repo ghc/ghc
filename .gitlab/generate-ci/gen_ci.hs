@@ -955,9 +955,10 @@ job arch opsys buildConfig =
     buildJobArtifacts = Artifacts
       { junitReport = "junit.xml"
       , expireIn = "2 weeks"
-      , artifactPaths = [binDistName arch opsys buildConfig ++ ".tar.xz"
-                        ,"junit.xml"
-                        ,"unexpected-test-output.tar.gz"]
+      , artifactPaths = [ binDistName arch opsys buildConfig ++ ".tar.xz"
+                        , "junit.xml"
+                        , "unexpected-test-output.tar.gz"
+                        , "_build/stage1/haddock-timing-files"]
       , artifactsWhen = ArtifactsAlways
       }
 

@@ -963,6 +963,7 @@ function clean() {
       --exclude=ci_timings.txt \
       --exclude=ghc-*.tar.xz \
       --exclude=junit.xml \
+      --exclude=_build/stage1/haddock-timing-files \
       --exclude=unexpected-test-output.tar.gz
   fi
 }
