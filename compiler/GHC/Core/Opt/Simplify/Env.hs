@@ -28,7 +28,7 @@ module GHC.Core.Opt.Simplify.Env (
         SimplEnvIS,  checkSimplEnvIS, pprBadSimplEnvIS,
 
         -- * Substitution results
-        SimplSR(..), substId, lookupRecBndr,
+        SimplClo(..), simplCloExpr, substId, lookupRecBndr,
 
         -- * Simplifying 'Id' binders
         simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
@@ -61,7 +61,7 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Rules.Config ( RuleOpts(..) )
 import GHC.Core
 import GHC.Core.Utils
-import GHC.Core.Subst( substExprSC )
+import GHC.Core.Subst( substExpr, substExprSC )
 import GHC.Core.Unfold
 import GHC.Core.TyCo.Subst (emptyIdSubstEnv, mkSubst)
 import GHC.Core.Multiplicity( Scaled(..), mkMultMul )
@@ -470,11 +470,16 @@ pprSimplEnv env
    ppr_one v | isId v = ppr v <+> ppr (idUnfolding v)
              | otherwise = ppr v
 
-type SimplIdSubst = IdEnv SimplSR -- IdId |--> OutExpr
+type SimplIdSubst = IdEnv SimplClo -- IdId |--> OutExpr
         -- See Note [Extending the IdSubstEnv] in GHC.Core.Subst
 
--- | A substitution result.
-data SimplSR
+-- | A "closure" used in the Simplifier.  It is used
+--     * as the range of the substitution, 'SimplIdSubst'
+--     * as the argument in an 'ApplyToVal' continuation
+-- Roughly: either an (InExpr, StaticEnv) pair for an
+--                 as-yet-unsimplified expression
+--          or     an OutExpr, for an already-simplified one
+data SimplClo
   = DoneEx OutExpr JoinPointHood
        -- If  x :-> DoneEx e ja   is in the SimplIdSubst
        -- then replace occurrences of x by e
@@ -490,11 +495,11 @@ data SimplSR
 
   | ContEx SimplEnv
            InExpr
-           MOutCoercion  -- See Note [The sc_cast field of ApplyToVal]
+           MOutCoercion  -- See Note [The MOutCoercion field of ContEx]
       -- If   x :-> ContEx static_env e mco   is in the SimplISubst
       -- then replace occurrences of x by (subst static_env e) |> mco
 
-instance Outputable SimplSR where
+instance Outputable SimplClo where
   ppr (DoneId v)    = text "DoneId" <+> ppr v
   ppr (DoneEx e mj) = text "DoneEx" <> pp_mj <+> ppr e
     where
@@ -637,7 +642,7 @@ reSimplifying :: SimplEnv -> Bool
 reSimplifying (SimplEnv { seInlineDepth = n }) = n>0
 
 ---------------------
-extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
+extendIdSubst :: SimplEnv -> Id -> SimplClo -> SimplEnv
 extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
   = assertPpr (isId var && not (isCoVar var)) (ppr var) $
     env { seIdSubst = extendVarEnv subst var res }
@@ -1032,7 +1037,7 @@ So we want to look up the inner X.g_34 in the substitution, where we'll
 find that it has been substituted by b.  (Or conceivably cloned.)
 -}
 
-substId :: SimplEnv -> InId -> SimplSR
+substId :: SimplEnv -> InId -> SimplClo
 -- Returns DoneEx only on a non-Var expression
 substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = case lookupVarEnv ids v of  -- Note [Global Ids in the substitution]
@@ -1366,13 +1371,24 @@ getFullSubst :: InScopeSet -> SimplEnv -> Subst
 getFullSubst in_scope (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
   = mkSubst in_scope (mapVarEnv to_expr id_env) tv_env cv_env
   where
-    to_expr :: SimplSR -> CoreExpr
+    to_expr :: SimplClo -> CoreExpr
     -- A tiresome impedence-matcher
     to_expr (DoneEx e _)       = e
     to_expr (DoneId v)         = Var v
     to_expr (ContEx env e mco) = mkCastMCo e' mco
       where
         e' = GHC.Core.Subst.substExprSC (getFullSubst in_scope env) e
+
+simplCloExpr :: InScopeSet -> SimplClo -> OutExpr
+-- Turn a SimplClo into an OutExpr, by applying the substitution
+-- (if any) and the pending cast (if any)
+simplCloExpr _        (DoneEx e _)       = e
+simplCloExpr _        (DoneId v)         = Var v
+simplCloExpr in_scope (ContEx env e mco) = mkCastMCo e' mco
+  where
+    e' = GHC.Core.Subst.substExpr (getFullSubst in_scope env) e
+    -- NB: we use substExpr, not substExprSC: we want to get the benefit of
+    --     knowing what is evaluated etc, via the in-scope set
 
 substTy :: HasDebugCallStack => SimplEnv -> Type -> Type
 substTy env ty = Type.substTy (getTCvSubst env) ty
