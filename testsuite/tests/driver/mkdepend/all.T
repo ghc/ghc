@@ -15,9 +15,20 @@ test('T24384b', [ *T24384_extras, when(opsys('mingw32'), skip), *json_normaliser
 test('T24384c', [ *T24384_extras, when(opsys('mingw32'), skip), *json_normalisers ], makefile_test, [])
 
 # Multiple home units with explicit level imports.
-test('mkdepend_mhu01',
+test('mkdepend_mhu01a',
      [ extra_files(['mhu01/']), dep_makefile, dep_json ],
      make_depend_multiunit, [['mhu01/unitA', 'mhu01/unitB', 'mhu01/unitC'], ''])
+# test the output streaming and writing to files
+test('mkdepend_mhu01b',
+     [ extra_files(['mhu01/']), dep_json_stdout ],
+     make_depend_multiunit, [['mhu01/unitA', 'mhu01/unitB', 'mhu01/unitC'], ''])
+test('mkdepend_mhu01c',
+     [ extra_files(['mhu01/']), dep_makefile_stdout ],
+     make_depend_multiunit, [['mhu01/unitA', 'mhu01/unitB', 'mhu01/unitC'], ''])
+test('mkdepend_mhu01d',
+     [ extra_files(['mhu01/']), dep_json_stdout, dep_makefile ],
+     make_depend_multiunit, [['mhu01/unitA', 'mhu01/unitB', 'mhu01/unitC'], ''])
+
 # Preprocessor must not be inherited by default active home unit
 test('mkdepend_mhu02',
      [ extra_files(['mhu02/']), dep_json

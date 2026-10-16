@@ -1511,6 +1511,23 @@ generation are:
 
     Introduced in GHC 10.1, ``-no-dep-makefile`` disables the generation of a Makefile altogether.
 
+.. ghc-flag:: -dep-makefile-stdout
+    :shortdesc: Write dependency generation to stdout using makefile format
+    :type: dynamic
+    :reverse: -no-dep-makefile
+    :category: redirect-output
+
+    :since: 10.1
+
+    Stream the dependency generation of :ghc-flag:`-dep-makefile ⟨file⟩` to stdout instead of ⟨file⟩.
+
+    Contrary to :ghc-flag:`-dep-makefile ⟨file⟩`, the markers
+
+    * "``# DO NOT DELETE: Beginning of Haskell dependencies``" and
+    * "``# DO NOT DELETE: End of Haskell dependencies``"
+
+    are not emitted.
+
 .. ghc-flag:: -dep-json ⟨file⟩
     :shortdesc: Write dependencies to ⟨file⟩ as a JSON Lines format
     :type: dynamic
@@ -1540,8 +1557,19 @@ generation are:
 
     ``-no-dep-json`` disables the generation of the JSON file.
 
-    By default, :ghc-flag:`-dep-makefile ⟨file⟩` is enabled even if :ghc-flag:`-dep-json ⟨file⟩` is given.
-    Disable the generation of any Makefile via ``-no-dep-makefile``.
+    :ghc-flag:`-dep-json ⟨file⟩` and :ghc-flag:`-dep-json-stdout` disable the default generation of a Makefile.
+    To generate a Makefile for the dependency information, explicitly use :ghc-flag:`-dep-makefile ⟨file⟩` or
+    :ghc-flag:`-dep-makefile-stdout`.
+
+.. ghc-flag:: -dep-json-stdout
+    :shortdesc: Write dependency generation to stdout using JSON Lines format
+    :type: dynamic
+    :reverse: -no-dep-json
+    :category: redirect-output
+
+    :since: 10.1
+
+    Stream the dependency generation of :ghc-flag:`-dep-json ⟨file⟩` to stdout instead of ⟨file⟩.
 
 .. ghc-flag:: -dep-suffix ⟨suffix⟩
     :shortdesc: Make dependencies that declare that files with suffix
