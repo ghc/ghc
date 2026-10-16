@@ -1,0 +1,7 @@
+section: compiler
+issues: #27963
+mrs: !16869
+synopsis:
+  Fix a rather obscure interaction of `coerce` and RULES
+description:
+  A `coerce` could prevent a RULE firing.
