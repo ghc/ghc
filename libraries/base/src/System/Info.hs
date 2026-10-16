@@ -27,7 +27,9 @@ module System.Info
   ) where
 
 import GHC.Internal.Data.Version (Version (..))
+#if __GLASGOW_HASKELL__ >= 1001
 import GHC.Essentials
+#endif
 import Prelude
 
 -- | The version of 'compilerName' with which the program was compiled
