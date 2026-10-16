@@ -29,6 +29,7 @@ module GHC.Core.Opt.Simplify.Utils (
         hasArgs, countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
+        pushCast, pushCastMCo, addCastMCo, optOutCoercion,
 
         -- ArgInfo
         ArgInfo(..), ArgSpec(..), RemainingArgDmds, mkArgInfo,
@@ -64,6 +65,7 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )
+import GHC.Core.Coercion.Opt    ( optCoercion )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import GHC.Core.Multiplicity
 import GHC.Core.Opt.ConstantFold
@@ -817,6 +819,100 @@ it, but the simplest solution was to check sm_inline; if it is False,
 which it is on the LHS of a rule (see updModeForRuleLHS), then don't
 make use of the strictness info for the function.
 -}
+
+{- *********************************************************************
+*                                                                      *
+          Pushing a cast onto a continuation
+*                                                                      *
+********************************************************************* -}
+
+{- Note [The sc_cast field of ApplyToVal]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the `ApplyToVal` case of `pushCast` we want to push an `OutCoercion` into the
+argument.  But the argument may or may not have been simplified (see Note [StaticEnv])
+so we definitely can't just wrap the cast around the argument. Instead we store it
+in the `sc_cast` field -- this is the whole reason for the `sc_cast` field.
+
+We deal with that pending cast mainly in `simplArg`.
+
+But we /also/ sometimes want to substitute that argument for a lambda-binder, in
+`preInlineUnconditionally`.  So we also have to put that pending cast into
+`ContEx`; hence the MOutCoercion field of `ContEx`.  Then we deal with it
+appropriately when /applying/ the substitution in `simplInId`.
+-}
+
+optOutCoercion :: SimplEnvIS -> OutCoercion -> Bool -> OutCoercion
+-- See Note [Avoid re-simplifying coercions] in GHC.Core.Opt.Simplify.Iteration
+optOutCoercion env co already_optimised
+  | already_optimised = co  -- Ditto
+  | otherwise         = optCoercion opts empty_subst co
+  where
+    empty_subst = mkEmptySubst (seInScope env)
+    opts = seOptCoercionOpts env
+
+addCastMCo :: MOutCoercion -> SimplCont -> SimplCont
+-- Simpler version of pushCastMCo when we are certain that
+-- the cast should be at the top; i.e. cont is Stop or StrictArg
+addCastMCo MRefl    cont = cont
+addCastMCo (MCo co) cont = CastIt { sc_co = co, sc_opt = False, sc_cont = cont }
+
+pushCastMCo :: SimplEnv -> MOutCoercion -> SimplCont -> SimplCont
+pushCastMCo _env MRefl    cont = cont
+pushCastMCo env  (MCo co) cont = pushCast env co cont
+
+pushCast :: SimplEnv -> OutCoercion -> SimplCont -> SimplCont
+pushCast env co cont
+  = go co True cont
+  where
+
+    -- ToDo:   pushCast Refl (ApplylToVal arg1 (ApplyToVal arg2 ...))
+    --         will do lots of unnecessary work.
+    go :: OutCoercion -> Bool -> SimplCont -> SimplCont
+    go co1 _ (CastIt { sc_co = co2, sc_cont = cont })  -- See Note [Optimising reflexivity] in GHC.Core.Opt.Simplify.Iteration
+      = go (mkTransCo co1 co2) False cont
+                  -- False: (mkTransCo co1 co2) is not fully optimised
+                  -- See Note [Avoid re-simplifying coercions] in GHC.Core.Opt.Simplify.Iteration
+
+    go co co_is_opt (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
+      | Just (tyL, arg_ty', m_co') <- pushCoTyArg co arg_ty
+      = {-#SCC "addCoerce-pushCoTyArg" #-}
+        ApplyToTy { sc_arg_ty  = arg_ty'
+                  , sc_cont    = go_mco m_co' co_is_opt tail
+                  , sc_hole_ty = tyL }
+                       -- NB!  As the cast goes past, the
+                       -- type of the hole changes (#16312)
+
+    -- (f |> co) arg   ===>   (f (arg |> co1)) |> co2
+    -- where   co :: (s1->s2) ~ (t1->t2)
+    --         co1 :: t1 ~ s1
+    --         co2 :: s2 ~ t2
+    go co co_is_opt cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
+                                     , sc_cast = arg_mco, sc_cont = tail })
+      | not co_is_opt
+      = -- pushCoValArg duplicates the coercion, so optimise first
+        go (optOutCoercion (zapSubstEnv env) co co_is_opt) True cont
+
+      | Just (tyL, m_co1, m_co2) <- pushCoValArg co
+      = {-#SCC "addCoerce-pushCoValArg" #-}
+        -- Dealing with m_co1 is the entire reason for the sc_cast field
+        -- of ApplyToVal; see Note [The sc_cast field of ApplyToVal]
+        ApplyToVal { sc_arg  = arg
+                   , sc_env  = arg_se
+                   , sc_cast = arg_mco `mkTransMCo` m_co1
+                   , sc_cont = go_mco m_co2 True tail
+                   , sc_hole_ty = tyL }
+
+    go co co_is_opt cont
+      | isReflCo co = cont  -- Having this at the end makes a huge
+                            -- difference in T12227, for some reason
+                            -- See Note [Optimising reflexivity] in GHC.Core.Opt.Simplify.Iteration
+      | otherwise = CastIt { sc_co = co, sc_opt = co_is_opt, sc_cont = cont }
+
+        -- If the first parameter is MRefl, then simplifying revealed a
+        -- reflexive coercion. Omit.
+    go_mco :: MOutCoercion -> Bool -> SimplCont -> SimplCont
+    go_mco MRefl    _   cont = cont
+    go_mco (MCo co) opt cont = go co opt cont
 
 
 {-
