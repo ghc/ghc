@@ -106,29 +106,23 @@ mkPipeFromContinuations getSome putAll pipeCloseRead pipeCloseWrite = mdo
     let p = Pipe { .. }
     pure p
 
--- | Cleanly close our ends of the Pipe, terminating the async manager's
--- drain-read-end thread. Also calls 'pipeCloseRead' and 'pipeCloseWrite', in that order.
+-- | Close our ends of the pipe.
 --
--- If the pipe was created using 'mkPipeFromHandles', the handles are also closed.
---
--- The requests we've sent that are pending are all canceled with
--- 'PipeReadClosedException' by ourselves.
---
--- No special notification is sent to the remote process, a message to that
--- effect should be sent ahead of time if one is needed (see 'Shutdown').
+-- The ordering is subtle and important. We first fail any requests still
+-- waiting for a reply, then close the write end so the other side sees EOF.
+-- We take the write lock to close it, so we never close under a concurrent
+-- write. Only then do we stop the drain thread, which closes the read end
+-- itself once its read has finished. On Windows its read can't be
+-- interrupted, so this waits for the other side to close its write end too.
 closePipe :: Pipe -> IO ()
-closePipe Pipe{..} = do
-
-  readAlreadyClosed <- atomically $ swapTVar pipeReadClosed True
-
-  -- this triggers pipeCloseRead
-  unless readAlreadyClosed $ do
-
-    -- releases handle lock taken by reading, and cleans up by replying to every
-    -- pending request with 'PipeReadClosedException'.
-    throwTo (asyncDrainTid pipeAsyncMngr) PipeReadClosedException
-
-  pipeCloseWrite
+closePipe p@Pipe{..} = do
+  readAlreadyClosed <- atomically $ do
+    closed <- readTVar pipeReadClosed
+    failPendingReplies p (toException PipeReadClosedException)
+    pure closed
+  withLock p pipeCloseWrite `finally`
+    unless readAlreadyClosed
+      (throwTo (asyncDrainTid pipeAsyncMngr) PipeReadClosedException)
 
 -- | We've closed the pipe read end on this process
 data PipeReadClosedException = PipeReadClosedException deriving Show
@@ -419,14 +413,17 @@ drainPipe p unmask = catch (unmask $ loop `finally` pipeCloseRead p) replyToPend
         replyToPendings (toException PipeReadClosedException)
         pure ()
 
-  replyToPendings e = atomically $ do
-    -- reqs are only added if pipe not closed;
-    -- thus we close and take all pending atomically.
-    writeTVar (pipeReadClosed p) True
-    pendings <- swapTVar (pendingReply am) IntMap.empty -- take pending
-    mapM_ (\p -> putTMVar p (Left e {-host exception-})) pendings
+  replyToPendings e = atomically $ failPendingReplies p e
 
   am = pipeAsyncMngr p
+
+failPendingReplies :: Pipe -> SomeException -> STM ()
+failPendingReplies p e = do
+  -- reqs are only added if pipe not closed;
+  -- thus we close and take all pending atomically.
+  writeTVar (pipeReadClosed p) True
+  pendings <- swapTVar (pendingReply (pipeAsyncMngr p)) IntMap.empty
+  mapM_ (\wv -> putTMVar wv (Left e)) pendings
 
 -- | An exception that can be thrown on the host process representing an
 -- expection that happened on the remote one.

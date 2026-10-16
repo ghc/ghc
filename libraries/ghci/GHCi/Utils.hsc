@@ -8,19 +8,22 @@ where
 import Prelude
 import Foreign.C
 import GHC.IO.Handle (Handle())
+import GHC.IO.IOMode
 #if defined(mingw32_HOST_OS)
-import Foreign.Ptr (ptrToIntPtr,wordPtrToPtr)
+import Foreign.Ptr (ptrToIntPtr)
 import GHC.IO (onException)
 import GHC.IO.Handle.FD (fdToHandle)
-import GHC.Windows (HANDLE)
+import GHC.Windows (BOOL, DWORD, HANDLE, failIfFalse_)
 import GHC.IO.SubSystem ((<!>))
 import GHC.IO.Handle.Windows (mkHandleFromHANDLE)
 import GHC.IO.Device as IODevice
 import GHC.IO.Encoding (getLocaleEncoding)
-import GHC.IO.IOMode
 import GHC.IO.Windows.Handle (fromHANDLE, Io(), NativeHandle())
+import System.Process.CommunicationHandle.Internal
+  ( CommunicationHandle(..), useCommunicationHandle )
 
 #include <fcntl.h>     /* for _O_BINARY */
+#include <windows.h>
 
 #else
 import System.Posix
@@ -54,18 +57,23 @@ getGhcHandle fd     = fdToHandle $ Fd fd
 #endif
 
 -- | Read a handle passed on the command-line and prepare it to be used with the IO manager
-readGhcHandle :: String -> IO Handle
-readGhcHandle s = do
+-- also make the handle non-inheritable so we don't have additional references floating
+-- around that stop reads from unblocking on close
+readGhcHandle :: IOMode -> String -> IO Handle
 #if defined(mingw32_HOST_OS)
-  let fd = wordPtrToPtr (Prelude.read s)
-# if defined(__IO_MANAGER_WINIO__)
-  -- register the handles we received with
-  -- our I/O manager otherwise we can't use
-  -- them correctly.
-  return () <!> associateHandle' fd
-# endif
-#else
-  let fd = Prelude.read s
-#endif
-  getGhcHandle fd
+readGhcHandle mode s = do
+  let ch@(CommunicationHandle h) = Prelude.read s
+  failIfFalse_ "SetHandleInformation" $
+    c_SetHandleInformation h (#const HANDLE_FLAG_INHERIT) 0
+  useCommunicationHandle (mode == ReadMode) ch
 
+foreign import ccall unsafe "windows.h SetHandleInformation"
+  c_SetHandleInformation :: HANDLE -> DWORD -> DWORD -> IO BOOL
+#else
+readGhcHandle _ s = do
+  let fd = Prelude.read s
+# if !defined(javascript_HOST_ARCH)
+  setFdOption (Fd fd) CloseOnExec True
+# endif
+  getGhcHandle fd
+#endif
