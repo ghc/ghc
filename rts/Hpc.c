@@ -13,6 +13,8 @@
 #include <ctype.h>
 #include <string.h>
 #include <assert.h>
+#include <limits.h>
+#include <errno.h>
 #include <fs_rts.h>
 
 #if defined(HAVE_SYS_TYPES_H)
@@ -36,6 +38,7 @@
 static int hpc_inited = 0;              // Have you started this component?
 static pid_t hpc_pid = 0;               // pid of this process at hpc-boot time.
                                         // Only this pid will read or write .tix file(s).
+static char *tixDir = NULL;             // Directory to write .tix files to
 static FILE *tixFile;                   // file being read/written
 static int tix_ch;                      // current char
 
@@ -216,27 +219,20 @@ startupHpc(void)
   if (hpc_tixfile != NULL) {
     tixFilename = strdup(hpc_tixfile);
   } else if (hpc_tixdir != NULL) {
-    /* Make sure the directory is present;
-     * conditional code for mkdir lifted from lndir.c
-     */
+    tixDir = strdup(hpc_tixdir);
 #if defined(WIN32)
-    mkdir(hpc_tixdir);
+    mkdir(tixDir);
 #else
-    mkdir(hpc_tixdir,0777);
+    mkdir(tixDir,0777);
 #endif
-    /* Then, try open the file
-     */
-    tixFilename = (char *) stgMallocBytes(strlen(hpc_tixdir) +
-                                          strlen(prog_name) + 12,
-                                          "Hpc.startupHpc");
-    sprintf(tixFilename,"%s/%s-%d.tix",hpc_tixdir,prog_name,(int)hpc_pid);
   } else {
     tixFilename = (char *) stgMallocBytes(strlen(prog_name) + 6,
                                           "Hpc.startupHpc");
     sprintf(tixFilename, "%s.tix", prog_name);
   }
 
-  if (RtsFlags.HpcFlags.readTixFile && init_open(__rts_fopen(tixFilename,"r"))) {
+  if (tixFilename != NULL && RtsFlags.HpcFlags.readTixFile
+      && init_open(__rts_fopen(tixFilename,"r"))) {
     readTix();
   }
 }
@@ -377,6 +373,29 @@ freeHpcModuleInfo (HpcModuleInfo *mod)
     stgFree(mod);
 }
 
+// Just using mkstemps would be so much nicer, but it's not available on all
+// target platforms. We could use it on platforms where it is, but that would
+// just make it even more complicated. In this particular context, the approach
+// below seems fine.
+static FILE *uniqueFile(const char *dir) {
+  const char fmt[] = "%s/%s-%d-%u.tix";
+  int len = snprintf(NULL, 0, fmt, dir, prog_name, (int)hpc_pid, UINT_MAX);
+  if (len < 0)
+    return NULL;
+
+  char *name = stgMallocBytes((size_t)len + 1, "Hpc.uniqueFile");
+  FILE *f = NULL;
+  for (unsigned int i = 0; i < UINT_MAX; i++) {
+    snprintf(name, (size_t)len + 1, fmt, dir, prog_name, (int)hpc_pid, i);
+    f = __rts_fopen(name, "wx");
+    if (f != NULL || errno != EEXIST)
+      break;
+  }
+
+  stgFree(name);
+  return f;
+}
+
 /* Called at the end of execution, to write out the Hpc *.tix file
  * for this execution. Safe to call, even if coverage is not used.
  */
@@ -398,7 +417,7 @@ exitHpc(void) {
   bool is_subprocess = false;
 #endif
   if (!is_subprocess && RtsFlags.HpcFlags.writeTixFile) {
-    FILE *f = __rts_fopen(tixFilename,"w+");
+    FILE *f = tixDir != NULL ? uniqueFile(tixDir) : __rts_fopen(tixFilename, "w+");
     writeTix(f);
   }
 
@@ -407,6 +426,8 @@ exitHpc(void) {
 
   stgFree(tixFilename);
   tixFilename = NULL;
+  free(tixDir);
+  tixDir = NULL;
 }
 
 //////////////////////////////////////////////////////////////////////////////

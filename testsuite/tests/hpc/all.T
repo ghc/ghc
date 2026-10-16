@@ -7,6 +7,16 @@ test('T10138', [extra_files(['.keepme.hpc.T10138/']),
 
 test('T11798', normal, makefile_test, [])
 
+def tixDirTwice(cmd):
+    return (
+        'HPCTIXDIR=tix-files ' + cmd + ' && '
+        'HPCTIXDIR=tix-files ' + cmd + ' && '
+        'set -- tix-files/*.tix && '
+        'test "$#" -eq 4'
+    )
+
+test('tixDir', [cmd_wrapper(tixDirTwice)], compile_and_run, ['-fhpc'])
+
 # Run tests below only for the hpc way.
 #
 # Do not explicitly specify '-fhpc' in extra_hc_opts, unless also setting
