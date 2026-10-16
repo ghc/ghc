@@ -790,16 +790,30 @@ addOptCmmP f = alterToolSettings $ \s -> s
           }
 
 setDepMakefile :: FilePath -> DynFlags -> DynFlags
-setDepMakefile f d = d { depMakefile = Just f }
+setDepMakefile f d = d { depMakefile = MkDepend_Explicit f
+                       , depJson = unsetMkDependOutputIfDefault (depJson d)
+                       }
+
+setDepMakefileStdout :: DynFlags -> DynFlags
+setDepMakefileStdout d = d { depMakefile = MkDepend_StdOut }
 
 unsetDepMakefile :: DynFlags -> DynFlags
-unsetDepMakefile d = d { depMakefile = Nothing }
+unsetDepMakefile d = d { depMakefile = MkDepend_None }
 
 setDepJson :: FilePath -> DynFlags -> DynFlags
-setDepJson f d = d { depJson = Just f }
+setDepJson f d = d { depJson = MkDepend_Explicit f
+                   , depMakefile = unsetMkDependOutputIfDefault (depMakefile d)
+                   }
+
+setDepJsonStdout :: DynFlags -> DynFlags
+setDepJsonStdout d = d { depJson = MkDepend_StdOut }
 
 unsetDepJson :: DynFlags -> DynFlags
-unsetDepJson d = d { depJson = Nothing }
+unsetDepJson d = d { depJson = MkDepend_None }
+
+unsetMkDependOutputIfDefault :: MkDependOutput -> MkDependOutput
+unsetMkDependOutputIfDefault (MkDepend_Default _) = MkDepend_None
+unsetMkDependOutputIfDefault mkDepend_output      = mkDepend_output
 
 setDepIncludeCppDeps :: Bool -> DynFlags -> DynFlags
 setDepIncludeCppDeps b d = d { depIncludeCppDeps = b }
@@ -1272,8 +1286,10 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "dep-suffix"              (hasArg addDepSuffix)
   , make_ord_flag defGhcFlag "dep-makefile"            (hasArg setDepMakefile)
   , make_ord_flag defGhcFlag "no-dep-makefile"         (noArg unsetDepMakefile)
+  , make_ord_flag defGhcFlag "dep-makefile-stdout"     (noArg setDepMakefileStdout)
   , make_ord_flag defGhcFlag "dep-json"                (hasArg setDepJson)
   , make_ord_flag defGhcFlag "no-dep-json"             (noArg unsetDepJson)
+  , make_ord_flag defGhcFlag "dep-json-stdout"         (noArg setDepJsonStdout)
   , make_ord_flag defGhcFlag "include-cpp-deps"
         (noArg (setDepIncludeCppDeps True))
   , make_ord_flag defGhcFlag "include-pkg-deps"
