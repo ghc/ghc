@@ -2424,6 +2424,9 @@ simplOutId env fun cont
              out_args     = contOutArgs env cont :: [OutExpr]
        ; mb_match <- if not (null rules_for_me) &&
                         (isClassOpId fun || activeUnfolding (seMode env) fun)
+                        -- Only do BEFORE if there is a risk that the function
+                        -- will inline; otherwise doing AFTER only is more
+                        -- efficient.  Hence the `activeUnfolding` call.
                      then tryRules env rules_for_me fun out_args
                      else return Nothing
        ; case mb_match of {
