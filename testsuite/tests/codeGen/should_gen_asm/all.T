@@ -4,7 +4,7 @@ is_amd64_codegen = [
 ]
 
 test('memcpy', is_amd64_codegen,  compile_cmp_asm, ['cmm', ''])
-test('memcpy-unroll', is_amd64_codegen, compile_cmp_asm, ['cmm', ''])
+test('memcpy-unroll', is_amd64_codegen + [cmm_src, filecheck_stderr], compile, ['-no-hs-main -O -ddump-asm'])
 test('memcpy-unroll-conprop', is_amd64_codegen, compile_cmp_asm, ['cmm', ''])
 test('memset-unroll', is_amd64_codegen, compile_cmp_asm, ['cmm', ''])
 test('bytearray-memset-unroll', is_amd64_codegen + [filecheck_stderr], compile, ['-O -ddump-asm'])

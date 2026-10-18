@@ -1,6 +1,18 @@
 #include "Cmm.h"
 
-// Small memcpies should unroll
+// A small memcpy unrolls into load/store pairs through one scratch
+// register, with no call.
+// CHECK-LABEL: callMemcpy:
+// CHECK:       movl 0(%r14),[[T:%e[a-z]+]]
+// CHECK-NEXT:  movl [[T]],0(%rbx)
+// CHECK-NEXT:  movl 4(%r14),[[T]]
+// CHECK-NEXT:  movl [[T]],4(%rbx)
+// CHECK-NEXT:  movl 8(%r14),[[T]]
+// CHECK-NEXT:  movl [[T]],8(%rbx)
+// CHECK-NEXT:  movl 12(%r14),[[T]]
+// CHECK-NEXT:  movl [[T]],12(%rbx)
+// CHECK-NOT:   call
+// CHECK:       jmp *(%rbp)
 callMemcpy (W_ dst, W_ src)
 {
   prim %memcpy(dst, src, 16, 4);
