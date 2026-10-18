@@ -1,12 +1,24 @@
 -- Nothing is loaded
 f 5
+-- CHECK:      <interactive>:{{[0-9]+}}:1: error: [GHC-88464]
+-- CHECK-NEXT: Variable not in scope: f
 g 5
+-- CHECK:      <interactive>:{{[0-9]+}}:1: error: [GHC-88464]
+-- CHECK-NEXT: Variable not in scope: g
 h 5
+-- CHECK:      <interactive>:{{[0-9]+}}:1: error: [GHC-88464]
+-- CHECK-NEXT: Variable not in scope: h
 -- Can't add modules to context, as they are not loaded
 :m A
+-- CHECK:      error: [GHC-35235]
+-- CHECK-NEXT: Could not find module ‘A’.
 -- Load more modules
 :reload A B
 :m A B
 f 5
+-- CHECK-NOT:  error:
 g 5
+-- CHECK:      <interactive>:{{[0-9]+}}:1: error: [GHC-88464]
+-- CHECK-NEXT: Variable not in scope: g
 h 5
+-- CHECK-NOT:  error:
