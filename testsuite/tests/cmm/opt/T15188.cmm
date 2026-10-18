@@ -1,3 +1,5 @@
+// Both branches jump to the same block, so no conditional may survive.
+// CHECK-NOT: if
 func(bits64 r2) {
   foo:
     if (r2 == 0) { goto bar; } else { goto bar; }

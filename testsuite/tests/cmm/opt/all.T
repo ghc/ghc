@@ -1,6 +1,4 @@
-# Verify that we optimize away conditional branches which always jump
-# to the same target.
-test('T15188', cmm_src, makefile_test, [])
+test('T15188', [cmm_src, filecheck_stderr], compile, ['-no-hs-main -O -ddump-cmm-cps -dsuppress-all'])
 test('T18141', normal, compile, [''])
 test('T20142', normal, compile, [''])
 
