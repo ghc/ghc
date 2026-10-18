@@ -903,7 +903,9 @@ function save_hpc_coverage() {
   # Keep whatever has been generated even if the build or tests failed.
   if [[ -d _build/ghc-hpc || -d _build/ghc-tix ]]; then
     mkdir -p _build/ghc-hpc _build/ghc-tix
+    du -sh _build/ghc-hpc _build/ghc-tix
     tar -czf ghc-hpc-coverage.tar.gz _build/ghc-hpc _build/ghc-tix
+    ls -lh ghc-hpc-coverage.tar.gz
   else
     warn "No HPC coverage directories found"
   fi
