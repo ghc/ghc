@@ -4,7 +4,11 @@
 -- it ended up calling the overloaded exp5Tail (with a dictionary argument),
 -- because the specialiser ran before the overloaded call was floated to
 -- the top level.  So the dumped Core for this module must mention no
--- exp5Tail at all.
+-- exp5Tail at all.  The CHECK-LABEL guards against an empty dump.
+--
+-- CHECK-NOT:   exp5Tail
+-- CHECK-LABEL: {{^}}foo1
+-- CHECK-NOT:   exp5Tail
 module T7803 (foo1) where
 
 import T7803a

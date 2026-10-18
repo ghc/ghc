@@ -148,11 +148,8 @@ test('T7785', [ only_ways(['optasm']),
                grep_errmsg(r'SPEC') ],
       compile, ['-ddump-cse'])
 
-# T7803: we expect NO calls to the overloaded 'exp5Tail' in T7803.hs
-# In the bug report #7803, the unspecialised call was signalled by 'exp5Tail'
-#    in foo1's Core, so we grep for that; also for 'foo1', lest we dump nothing
-# One module, T7803.hs, has OPTIONS_GHC -ddump-simpl
-test('T7803', [ grep_errmsg(r'exp5Tail|foo1') ],
+# One module, T7803.hs, has OPTIONS_GHC -ddump-simpl; the checks are in there too.
+test('T7803', [ filecheck_stderr ],
      multimod_compile, ['T7803', '-O2 -v0 -dsuppress-all -dsuppress-uniques -dno-typeable-binds'])
 
 test('T7702',
