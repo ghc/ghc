@@ -58,12 +58,13 @@ test('T15723',
   ], makefile_test, [])
 
 test('T15155',
-  [ unless(have_ncg(), skip)
-  ], makefile_test, [])
+  [ unless(have_ncg(), skip), filecheck_stderr(prefixes=['ASM'])
+  ], compile, ['-O0 -ddump-asm'])
 
 test('T15155l',
-     [when(unregisterised(), skip), unless(have_llvm(), skip), only_ways(llvm_ways)],
-     makefile_test, [])
+     [when(unregisterised(), skip), unless(have_llvm(), skip), only_ways(llvm_ways),
+      filecheck_stderr('T15155.hs', prefixes=['LLVM'])],
+     multimod_compile, ['T15155', '-O0 -fllvm -ddump-llvm -v0'])
 
 test('T16449_1', normal, compile, [''])
 

@@ -44,19 +44,6 @@ T15723:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -prof -fPIC -fexternal-dynamic-refs -fforce-recomp -O2 -c T15723B.hs -o T15723B.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -dynamic -shared T15723B.o -o T15723B.so
 
-# Check that the static indirection b is compiled to an equiv directive
-# This will be .equiv T15155_b_closure,T15155_a_closure
-#           or .equiv _T15155_b_closure,_T15155_a_closure on Darwin
-T15155:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-asm T15155l.hs | \
-		grep -F ".equiv"
-
-# Same as above, but in LLVM. Check that the static indirection b is compiled to
-# an alias.
-T15155l:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -fllvm -ddump-llvm T15155l.hs 2>/dev/null | \
-		grep -F "@T15155_b_closure = alias i8, i8* @T15155_a_closure"
-
 # Without -fcatch-nonexhaustive-cases `f` is non-CAFFY. With
 # -fcatch-nonexhaustive-cases it becomes CAFFY. Before CafInfo rework
 # (c846618a) this used to cause incorrect CafInfo attached to `f` in the
