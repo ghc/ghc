@@ -12,19 +12,33 @@ CONFIGURE=configure \
 TEST_BUILD='$(TEST_HC)' $(TEST_HC_OPTS) -fhide-source-paths -fforce-recomp
 ONLY_BASE=-hide-all-packages -package base
 
+# Each case announces itself and merges stderr into stdout, so that
+# mhu-closure.check can pin the expected outcome per case (CHECK-LABEL).
 mhu-closure: clean pkg-database
-	! $(TEST_BUILD) -unit @unitP
-	! $(TEST_BUILD) -unit @unitP -unit @unitQ
-	! $(TEST_BUILD) -unit @unitP -unit @unitR
-	! $(TEST_BUILD) -unit @unitP -unit @unitR1
-	$(TEST_BUILD) -unit @unitP -unit @unitQ -unit @unitR
-	! $(TEST_BUILD) -unit @unitP -unit @unitQ -unit @unitR1
-	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP
-	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitQ
-	! $(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitR
-	! $(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitR1
-	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitQ -unit @unitR
-	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitQ -unit @unitR1
+	@echo "== P =="
+	! $(TEST_BUILD) -unit @unitP 2>&1
+	@echo "== P Q =="
+	! $(TEST_BUILD) -unit @unitP -unit @unitQ 2>&1
+	@echo "== P R =="
+	! $(TEST_BUILD) -unit @unitP -unit @unitR 2>&1
+	@echo "== P R1 =="
+	! $(TEST_BUILD) -unit @unitP -unit @unitR1 2>&1
+	@echo "== P Q R =="
+	$(TEST_BUILD) -unit @unitP -unit @unitQ -unit @unitR 2>&1
+	@echo "== P Q R1 =="
+	! $(TEST_BUILD) -unit @unitP -unit @unitQ -unit @unitR1 2>&1
+	@echo "== base-only P =="
+	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP 2>&1
+	@echo "== base-only P Q =="
+	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitQ 2>&1
+	@echo "== base-only P R =="
+	! $(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitR 2>&1
+	@echo "== base-only P R1 =="
+	! $(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitR1 2>&1
+	@echo "== base-only P Q R =="
+	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitQ -unit @unitR 2>&1
+	@echo "== base-only P Q R1 =="
+	$(TEST_BUILD) $(ONLY_BASE) -unit @unitP -unit @unitQ -unit @unitR1 2>&1
 
 .PHONY: pkg-database
 pkg-database:

@@ -1,0 +1,61 @@
+Home-unit closure: the package db exposes q (depends on p) and r (depends
+on q).  Loading a unit as a home unit while a db unit that depends on it
+stays unloaded must be rejected.  With -hide-all-packages the db units
+are invisible, so only genuinely missing home units count.
+
+CHECK-LABEL: == P ==
+CHECK:       error: [GHC-03271]
+CHECK-NEXT:  Some units are not loaded but depend on loaded units.
+CHECK-NEXT:  q-0.1.0.0 -> p-0.1.0.0
+
+CHECK-LABEL: == P Q ==
+CHECK:       error: [GHC-03271]
+CHECK-NEXT:  Some units are not loaded but depend on loaded units.
+CHECK-NEXT:  r-0.1.0.0 -> q-0.1.0.0
+
+CHECK-LABEL: == P R ==
+CHECK:       error: [GHC-03271]
+CHECK-NEXT:  Some units are not loaded but depend on loaded units.
+CHECK-NEXT:  q-0.1.0.0 -> p-0.1.0.0
+
+CHECK-LABEL: == P R1 ==
+CHECK:       error: [GHC-03271]
+CHECK-NEXT:  Some units are not loaded but depend on loaded units.
+CHECK-NEXT:  q-0.1.0.0 -> p-0.1.0.0
+
+CHECK-LABEL: == P Q R ==
+CHECK:       [1 of 3] Compiling P[p-0.1.0.0]
+CHECK-NEXT:  [2 of 3] Compiling Q[q-0.1.0.0]
+CHECK-NEXT:  [3 of 3] Compiling R[r-0.1.0.0]
+
+CHECK-LABEL: == P Q R1 ==
+CHECK:       error: [GHC-03271]
+CHECK-NEXT:  Some units are not loaded but depend on loaded units.
+CHECK-NEXT:  r-0.1.0.0 -> q-0.1.0.0
+
+CHECK-LABEL: == base-only P ==
+CHECK:       [1 of 1] Compiling P
+
+CHECK-LABEL: == base-only P Q ==
+CHECK:       [1 of 2] Compiling P[p-0.1.0.0]
+CHECK-NEXT:  [2 of 2] Compiling Q[q-0.1.0.0]
+
+CHECK-LABEL: == base-only P R ==
+CHECK:       error: [GHC-03271]
+CHECK-NEXT:  Some units are not loaded but depend on loaded units.
+CHECK-NEXT:  q-0.1.0.0 -> p-0.1.0.0
+
+CHECK-LABEL: == base-only P R1 ==
+CHECK:       error: [GHC-03271]
+CHECK-NEXT:  Some units are not loaded but depend on loaded units.
+CHECK-NEXT:  q-0.1.0.0 -> p-0.1.0.0
+
+CHECK-LABEL: == base-only P Q R ==
+CHECK:       [1 of 3] Compiling P[p-0.1.0.0]
+CHECK-NEXT:  [2 of 3] Compiling Q[q-0.1.0.0]
+CHECK-NEXT:  [3 of 3] Compiling R[r-0.1.0.0]
+
+CHECK-LABEL: == base-only P Q R1 ==
+CHECK:       [1 of 3] Compiling P[p-0.1.0.0]
+CHECK-NEXT:  [2 of 3] Compiling Q[q-0.1.0.0]
+CHECK-NEXT:  [3 of 3] Compiling R[r1-0.1.0.0]
