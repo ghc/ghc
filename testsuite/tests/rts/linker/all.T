@@ -48,22 +48,6 @@ test('T2615',
      ['-package ghc'])
 
 ######################################
-# Workaround bug #8458: old dlopen opens sections in the wrong order,
-# so we just accept both orders.
-def checkDynAsm(actual_file, normaliser):
-    actual_raw = read_no_crs(actual_file)
-    actual_str = normaliser(actual_raw)
-    actual = actual_str.split()
-    if actual == ['initArray1', 'initArray2', 'success']:
-        return True
-    elif opsys('darwin') and actual == ['modInitFunc1', 'modInitFunc2', 'success']:
-        return True
-    elif opsys('mingw32') and actual == ['ctors1', 'ctors2', 'success']:
-        return True
-    else:
-        if_verbose(1, 'T5435_dyn_asm failed with %s, see all.T for details' % actual)
-        return False
-
 # T5435_v_asm got split into two tests because depending
 # on the linker, .init_array and .ctors sections are loaded
 # in a different order (but all entries within a section
@@ -97,7 +81,7 @@ test('T5435_dyn_asm',
      [extra_files(['T5435.hs', 'T5435_asm.c']),
       fragile(22970),
       req_c,
-      check_stdout(checkDynAsm)],
+      filecheck_stdout('T5435_dyn_asm.check')],
      makefile_test, ['T5435_dyn_asm'])
 test('T5435_dyn_gcc',
      [extra_files(['T5435.hs', 'T5435_gcc.c']),

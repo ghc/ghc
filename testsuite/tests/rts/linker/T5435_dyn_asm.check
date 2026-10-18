@@ -1,0 +1,8 @@
+Both initialisers must run before the Haskell side reports success.  An
+old dlopen runs them in the wrong order (#8458), so their order is not
+pinned.  The section kind, and so the initialiser name, differs per
+platform (see T5435_asm.c).
+
+CHECK-DAG: {{initArray|modInitFunc|ctors}}1
+CHECK-DAG: {{initArray|modInitFunc|ctors}}2
+CHECK:     success
