@@ -386,8 +386,16 @@ enableHieFiles flavour = flavour { ghcHieFiles = (>= Stage1) }
 
 enableCoverage :: Flavour -> Flavour
 enableCoverage =
-  addArgs $ stage1 ? builder (Ghc CompileHs) ? packageOneOf [compiler, ghc] ?
-    pure ["-fhpc", "-hpcdir", "_build/ghc-hpc"]
+  addArgs $ stage1 ? mconcat
+    [ builder (Ghc CompileHs) ? packageOneOf [compiler, ghc] ?
+        pure ["-fhpc", "-hpcdir", "_build/ghc-hpc"]
+
+    , builder (Ghc LinkHs) ? package ghc ? do
+        root <- getBuildRoot
+        dir <- exprIO $ makeAbsolute (root -/- "ghc-tix")
+        arg $ "-with-rtsopts=" ++ unwords
+          [ "--hpc-tix-format=binary", "--hpc-tix-dir=" ++ dir ]
+    ]
 
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
 -- recompilation.

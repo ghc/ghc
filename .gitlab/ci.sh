@@ -650,13 +650,6 @@ function install_bindist() {
 }
 
 function test_hadrian() {
-  if [[ "${BUILD_FLAVOUR:-}" == *+coverage* ]]; then
-    export HPCTIX2=1
-    # GHC invocations run in per-test working directories.
-    export HPCTIXDIR="$TOP/_build/ghc-tix"
-    mkdir -p "$HPCTIXDIR"
-  fi
-
   check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
 
