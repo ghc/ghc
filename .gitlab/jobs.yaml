@@ -2,6 +2,7 @@
 {
   "aarch64-darwin-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -13,7 +14,8 @@
       "paths": [
         "ghc-aarch64-darwin-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -55,7 +57,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-aarch64-darwin-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
@@ -69,6 +71,7 @@
   },
   "aarch64-linux-alpine3_23-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -80,7 +83,8 @@
       "paths": [
         "ghc-aarch64-linux-alpine3_23-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -123,7 +127,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-aarch64-linux-alpine3_23-validate",
       "BROKEN_TESTS": "encoding004 T10458",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-ignore-build-platform-mismatch --build=aarch64-unknown-linux --host=aarch64-unknown-linux --target=aarch64-unknown-linux --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -133,6 +137,7 @@
   },
   "aarch64-linux-deb11-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -144,7 +149,8 @@
       "paths": [
         "ghc-aarch64-linux-deb11-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -186,7 +192,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb11-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -196,6 +202,7 @@
   },
   "aarch64-linux-deb12-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -207,7 +214,8 @@
       "paths": [
         "ghc-aarch64-linux-deb12-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -249,7 +257,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -259,6 +267,7 @@
   },
   "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -270,7 +279,8 @@
       "paths": [
         "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -313,7 +323,7 @@
       "AR": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar",
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CC": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
       "CFLAGS": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
@@ -343,6 +353,7 @@
   },
   "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -354,7 +365,8 @@
       "paths": [
         "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -397,7 +409,7 @@
       "AR": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ar",
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
-      "BUILD_FLAVOUR": "validate+llvm",
+      "BUILD_FLAVOUR": "validate+llvm+coverage",
       "CC": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-clang",
       "CFLAGS": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
@@ -427,6 +439,7 @@
   },
   "aarch64-linux-deb13-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -438,7 +451,8 @@
       "paths": [
         "ghc-aarch64-linux-deb13-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -480,7 +494,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb13-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -490,6 +504,7 @@
   },
   "aarch64-linux-deb13-validate+llvm": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -501,7 +516,8 @@
       "paths": [
         "ghc-aarch64-linux-deb13-validate+llvm.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -543,7 +559,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb13-validate+llvm",
-      "BUILD_FLAVOUR": "validate+llvm",
+      "BUILD_FLAVOUR": "validate+llvm+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -553,6 +569,7 @@
   },
   "i386-linux-alpine3_23-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -564,7 +581,8 @@
       "paths": [
         "ghc-i386-linux-alpine3_23-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -607,7 +625,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-i386-linux-alpine3_23-validate",
       "BROKEN_TESTS": "encoding004 T10458 simd009 T25169",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -617,6 +635,7 @@
   },
   "i386-linux-deb11-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -628,7 +647,8 @@
       "paths": [
         "ghc-i386-linux-deb11-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -670,7 +690,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-i386-linux-deb11-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -680,6 +700,7 @@
   },
   "i386-linux-deb12-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -691,7 +712,8 @@
       "paths": [
         "ghc-i386-linux-deb12-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -733,7 +755,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-i386-linux-deb12-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -743,6 +765,7 @@
   },
   "i386-linux-deb13-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -754,7 +777,8 @@
       "paths": [
         "ghc-i386-linux-deb13-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -796,7 +820,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-i386-linux-deb13-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -5612,6 +5636,7 @@
   },
   "x86_64-darwin-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -5623,7 +5648,8 @@
       "paths": [
         "ghc-x86_64-darwin-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -5665,7 +5691,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-darwin-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
@@ -5682,6 +5708,7 @@
   },
   "x86_64-freebsd14-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -5693,7 +5720,8 @@
       "paths": [
         "ghc-x86_64-freebsd14-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -5734,7 +5762,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-freebsd14-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CABAL_INSTALL_VERSION": "3.14.2.0",
       "CC": "cc",
       "CONFIGURE_ARGS": "--with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib --with-system-libffi --with-ffi-includes=/usr/local/include --with-ffi-libraries=/usr/local/lib --with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --enable-strict-ghc-toolchain-check",
@@ -5748,6 +5776,7 @@
   },
   "x86_64-linux-alpine3_12-int_native-validate+fully_static": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -5759,7 +5788,8 @@
       "paths": [
         "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -5802,7 +5832,7 @@
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static",
       "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458",
-      "BUILD_FLAVOUR": "validate+fully_static",
+      "BUILD_FLAVOUR": "validate+fully_static+coverage",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -5812,6 +5842,7 @@
   },
   "x86_64-linux-alpine3_12-validate+fully_static": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -5823,7 +5854,8 @@
       "paths": [
         "ghc-x86_64-linux-alpine3_12-validate+fully_static.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -5866,7 +5898,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-validate+fully_static",
       "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458",
-      "BUILD_FLAVOUR": "validate+fully_static",
+      "BUILD_FLAVOUR": "validate+fully_static+coverage",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -5876,6 +5908,7 @@
   },
   "x86_64-linux-alpine3_23-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -5887,7 +5920,8 @@
       "paths": [
         "ghc-x86_64-linux-alpine3_23-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -5930,7 +5964,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_23-validate",
       "BROKEN_TESTS": "encoding004 T10458",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -5940,6 +5974,7 @@
   },
   "x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -5951,7 +5986,8 @@
       "paths": [
         "ghc-x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -5993,7 +6029,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
-      "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf",
+      "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf+coverage",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "wasm32-wasi",
@@ -6006,6 +6042,7 @@
   },
   "x86_64-linux-alpine3_23-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6017,7 +6054,8 @@
       "paths": [
         "ghc-x86_64-linux-alpine3_23-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6060,7 +6098,7 @@
     "variables": {
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_23-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
-      "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf",
+      "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf+coverage",
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "wasm32-wasi",
@@ -6073,6 +6111,7 @@
   },
   "x86_64-linux-alpine3_23-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6084,7 +6123,8 @@
       "paths": [
         "ghc-x86_64-linux-alpine3_23-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6127,7 +6167,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_23-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
-      "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf",
+      "BUILD_FLAVOUR": "release+host_fully_static+text_simdutf+coverage",
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi --enable-strict-ghc-toolchain-check",
       "CROSS_STAGE": "2",
       "CROSS_TARGET": "wasm32-wasi",
@@ -6140,6 +6180,7 @@
   },
   "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6151,7 +6192,8 @@
       "paths": [
         "ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6193,7 +6235,7 @@
     "variables": {
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_STAGE": "2",
@@ -6206,6 +6248,7 @@
   },
   "x86_64-linux-deb11-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6217,7 +6260,8 @@
       "paths": [
         "ghc-x86_64-linux-deb11-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6259,7 +6303,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -6269,6 +6313,7 @@
   },
   "x86_64-linux-deb11-validate+debug_info": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6280,7 +6325,8 @@
       "paths": [
         "ghc-x86_64-linux-deb11-validate+debug_info.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6322,7 +6368,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-validate+debug_info",
-      "BUILD_FLAVOUR": "validate+debug_info",
+      "BUILD_FLAVOUR": "validate+debug_info+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -6332,6 +6378,7 @@
   },
   "x86_64-linux-deb12-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6343,7 +6390,8 @@
       "paths": [
         "ghc-x86_64-linux-deb12-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6385,7 +6433,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -6395,6 +6443,7 @@
   },
   "x86_64-linux-deb13-cross_aarch64-linux-gnu-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6406,7 +6455,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-cross_aarch64-linux-gnu-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6448,7 +6498,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-cross_aarch64-linux-gnu-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
       "CROSS_STAGE": "2",
@@ -6461,6 +6511,7 @@
   },
   "x86_64-linux-deb13-int_native-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6472,7 +6523,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-int_native-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6514,7 +6566,7 @@
     "variables": {
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-int_native-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -6524,6 +6576,7 @@
   },
   "x86_64-linux-deb13-no_tntc-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6535,7 +6588,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-no_tntc-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6578,7 +6632,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-no_tntc-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--disable-tables-next-to-code --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -6588,6 +6642,7 @@
   },
   "x86_64-linux-deb13-numa-slow-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6599,7 +6654,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-numa-slow-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6641,7 +6697,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-numa-slow-validate",
-      "BUILD_FLAVOUR": "slow-validate",
+      "BUILD_FLAVOUR": "slow-validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "ENABLE_NUMA": "1",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
@@ -6652,6 +6708,7 @@
   },
   "x86_64-linux-deb13-release-perf": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6663,7 +6720,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-release.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6705,7 +6763,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-release",
-      "BUILD_FLAVOUR": "release",
+      "BUILD_FLAVOUR": "release+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": " --config perf_path=perf",
@@ -6715,6 +6773,7 @@
   },
   "x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6726,7 +6785,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6768,7 +6828,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
       "CROSS_STAGE": "2",
@@ -6781,6 +6841,7 @@
   },
   "x86_64-linux-deb13-unreg-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6792,7 +6853,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-unreg-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6834,7 +6896,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-unreg-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-unregisterised --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -6844,6 +6906,7 @@
   },
   "x86_64-linux-deb13-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6855,7 +6918,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6897,7 +6961,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -6907,6 +6971,7 @@
   },
   "x86_64-linux-deb13-validate+boot_nonmoving_gc": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6918,7 +6983,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-validate+boot_nonmoving_gc.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -6960,7 +7026,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-validate+boot_nonmoving_gc",
-      "BUILD_FLAVOUR": "validate+boot_nonmoving_gc",
+      "BUILD_FLAVOUR": "validate+boot_nonmoving_gc+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity",
@@ -6970,6 +7036,7 @@
   },
   "x86_64-linux-deb13-validate+llvm": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -6981,7 +7048,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-validate+llvm.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7023,7 +7091,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-validate+llvm",
-      "BUILD_FLAVOUR": "validate+llvm",
+      "BUILD_FLAVOUR": "validate+llvm+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -7033,6 +7101,7 @@
   },
   "x86_64-linux-deb13-validate+thread_sanitizer_cmm": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -7044,7 +7113,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-validate+thread_sanitizer_cmm.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7087,7 +7157,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-validate+thread_sanitizer_cmm",
-      "BUILD_FLAVOUR": "validate+thread_sanitizer_cmm",
+      "BUILD_FLAVOUR": "validate+thread_sanitizer_cmm+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=none",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
@@ -7099,6 +7169,7 @@
   },
   "x86_64-linux-deb13-zstd-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -7110,7 +7181,8 @@
       "paths": [
         "ghc-x86_64-linux-deb13-zstd-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7152,7 +7224,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb13-zstd-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-ipe-data-compression --enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -7162,6 +7234,7 @@
   },
   "x86_64-linux-fedora43-release": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -7173,7 +7246,8 @@
       "paths": [
         "ghc-x86_64-linux-fedora43-release.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7215,7 +7289,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-fedora43-release",
-      "BUILD_FLAVOUR": "release",
+      "BUILD_FLAVOUR": "release+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -7225,6 +7299,7 @@
   },
   "x86_64-linux-fedora43-release-hackage": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -7236,7 +7311,8 @@
       "paths": [
         "ghc-x86_64-linux-fedora43-release.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7278,7 +7354,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-fedora43-release",
-      "BUILD_FLAVOUR": "release",
+      "BUILD_FLAVOUR": "release+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--haddock-for-hackage",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
@@ -7289,6 +7365,7 @@
   },
   "x86_64-linux-fedora43-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -7300,7 +7377,8 @@
       "paths": [
         "ghc-x86_64-linux-fedora43-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7342,7 +7420,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-fedora43-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -7352,6 +7430,7 @@
   },
   "x86_64-linux-fedora43-validate+debug_info": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -7363,7 +7442,8 @@
       "paths": [
         "ghc-x86_64-linux-fedora43-validate+debug_info.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7405,7 +7485,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-fedora43-validate+debug_info",
-      "BUILD_FLAVOUR": "validate+debug_info",
+      "BUILD_FLAVOUR": "validate+debug_info+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -7415,6 +7495,7 @@
   },
   "x86_64-linux-fedora43-validate+debug_info+ubsan": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -7426,7 +7507,8 @@
       "paths": [
         "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7468,7 +7550,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan",
-      "BUILD_FLAVOUR": "validate+debug_info+ubsan",
+      "BUILD_FLAVOUR": "validate+debug_info+ubsan+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=none",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
@@ -7480,6 +7562,7 @@
   },
   "x86_64-linux-rocky8-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -7491,7 +7574,8 @@
       "paths": [
         "ghc-x86_64-linux-rocky8-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7533,7 +7617,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-rocky8-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -7543,6 +7627,7 @@
   },
   "x86_64-linux-ubuntu22_04-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -7554,7 +7639,8 @@
       "paths": [
         "ghc-x86_64-linux-ubuntu22_04-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7596,7 +7682,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu22_04-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -7606,6 +7692,7 @@
   },
   "x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -7617,7 +7704,8 @@
       "paths": [
         "ghc-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7659,7 +7747,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-loongarch64 -L /usr/loongarch64-linux-gnu",
       "CROSS_STAGE": "2",
@@ -7672,6 +7760,7 @@
   },
   "x86_64-linux-ubuntu24_04-validate": {
     "after_script": [
+      ".gitlab/ci.sh save_hpc_coverage",
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
@@ -7683,7 +7772,8 @@
       "paths": [
         "ghc-x86_64-linux-ubuntu24_04-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7725,7 +7815,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu24_04-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
@@ -7735,6 +7825,7 @@
   },
   "x86_64-windows-int_native-validate": {
     "after_script": [
+      "bash .gitlab/ci.sh save_hpc_coverage",
       "bash .gitlab/ci.sh save_cache",
       "bash .gitlab/ci.sh save_test_output",
       "bash .gitlab/ci.sh clean"
@@ -7745,7 +7836,8 @@
       "paths": [
         "ghc-x86_64-windows-int_native-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7783,7 +7875,7 @@
     "variables": {
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-x86_64-windows-int_native-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CABAL_INSTALL_VERSION": "3.14.2.0",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "FETCH_GHC_VERSION": "9.10.3",
@@ -7798,6 +7890,7 @@
   },
   "x86_64-windows-validate": {
     "after_script": [
+      "bash .gitlab/ci.sh save_hpc_coverage",
       "bash .gitlab/ci.sh save_cache",
       "bash .gitlab/ci.sh save_test_output",
       "bash .gitlab/ci.sh clean"
@@ -7808,7 +7901,8 @@
       "paths": [
         "ghc-x86_64-windows-validate.tar.xz",
         "junit.xml",
-        "unexpected-test-output.tar.gz"
+        "unexpected-test-output.tar.gz",
+        "ghc-hpc-coverage.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -7846,7 +7940,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-windows-validate",
-      "BUILD_FLAVOUR": "validate",
+      "BUILD_FLAVOUR": "validate+coverage",
       "CABAL_INSTALL_VERSION": "3.14.2.0",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "FETCH_GHC_VERSION": "9.10.3",
