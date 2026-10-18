@@ -1,3 +1,5 @@
 :add Data.List
+-- CHECK: error: [GHCi-23305]
 :reload
+-- CHECK-NOT: error
 putStrLn ":add Data.List should fail and a subsequent :reload should succeed"
