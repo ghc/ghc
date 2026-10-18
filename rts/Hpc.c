@@ -314,6 +314,57 @@ hs_hpc_module(char *modName,
   }
 }
 
+static void writeULEB128(FILE *f, StgWord64 value) {
+  do {
+    unsigned int byte = (unsigned int)(value & 0x7f);
+    value >>= 7;
+    if (value != 0) byte |= 0x80;
+    fputc(byte, f);
+  } while (value != 0);
+}
+
+static void writeLE32(FILE *f, StgWord32 value) {
+  for (unsigned int shift = 0; shift < 32; shift += 8)
+    fputc((int)((value >> shift) & 0xff), f);
+}
+
+static void writeTix2(FILE *f) {
+  if (f == NULL) return;
+
+  StgWord64 moduleCount = 0;
+  for (HpcModuleInfo *m = modules; m != NULL; m = m->next)
+    moduleCount++;
+
+  fwrite("HPCTIX\0", 1, 7, f);
+  writeULEB128(f, moduleCount);
+
+  for (HpcModuleInfo *m = modules; m != NULL; m = m->next) {
+    size_t nameLength = strlen(m->modName);
+    writeULEB128(f, (StgWord64)nameLength);
+    fwrite(m->modName, 1, nameLength, f);
+    writeLE32(f, m->hashNo);
+    writeULEB128(f, m->tickCount);
+
+    const StgWord64 *counts = m->tixArr;
+    StgWord32 i = 0;
+
+    while (i < m->tickCount) {
+      StgWord32 zeroStart = i;
+      while (i < m->tickCount && (counts == NULL || counts[i] == 0)) i++;
+      StgWord32 nonzeroStart = i;
+      while (i < m->tickCount && counts != NULL && counts[i] != 0) i++;
+      writeULEB128(f, nonzeroStart - zeroStart);
+      writeULEB128(f, i - nonzeroStart);
+      for (StgWord32 j = nonzeroStart; j < i; j++)
+        writeULEB128(f, counts[j]);
+    }
+  }
+
+  bool writeFailed = ferror(f) != 0;
+  if (fclose(f) != 0 || writeFailed)
+    failure("could not write binary .tix file");
+}
+
 static void
 writeTix(FILE *f) {
   HpcModuleInfo *tmpModule;
@@ -387,7 +438,7 @@ static FILE *uniqueFile(const char *dir) {
   FILE *f = NULL;
   for (unsigned int i = 0; i < UINT_MAX; i++) {
     snprintf(name, (size_t)len + 1, fmt, dir, prog_name, (int)hpc_pid, i);
-    f = __rts_fopen(name, "wx");
+    f = __rts_fopen(name, "wbx");
     if (f != NULL || errno != EEXIST)
       break;
   }
@@ -418,7 +469,8 @@ exitHpc(void) {
 #endif
   if (!is_subprocess && RtsFlags.HpcFlags.writeTixFile) {
     FILE *f = tixDir != NULL ? uniqueFile(tixDir) : __rts_fopen(tixFilename, "w+");
-    writeTix(f);
+    if (getenv("HPCTIX2")) writeTix2(f);
+    else writeTix(f);
   }
 
   freeStrHashTable(moduleHash, (void (*)(void *))freeHpcModuleInfo);
