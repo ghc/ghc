@@ -3,6 +3,12 @@
 
 -- This only started to work with 9.6, this test checks that we don't
 -- regress on this.
+--
+-- CHECK-LABEL: [2 of 2] Compiling T22611
+-- CHECK:       {{^}}$salterF
+-- CHECK:       case $salterF
+-- CHECK-LABEL: Local rules for imported ids
+-- CHECK:       alterF $dFunctor $dOrd = $salterF
 
 {-# language LambdaCase, Strict, DeriveFunctor, DerivingStrategies #-}
 
