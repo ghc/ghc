@@ -32,6 +32,7 @@ test('ghci.prog022e',
 test('ghci.prog022f',
      [req_interp,
       cmd_prefix('ghciWayFlags=' + config.ghci_way_flags),
-      extra_files(['A.hs', 'B.hs', 'ghci.prog022f.script'])
+      extra_files(['A.hs', 'B.hs', 'ghci.prog022f.script']),
+      filecheck_stderr('ghci.prog022f.script')
      ],
      makefile_test, ['ghci.prog022f'])

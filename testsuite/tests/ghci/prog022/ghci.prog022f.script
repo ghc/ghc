@@ -1,23 +1,40 @@
 "No module is imported"
 :show imports
 f 5
+-- CHECK:      <interactive>:{{[0-9]+}}:1: error: [GHC-88464]
+-- CHECK-NEXT: Variable not in scope: f
 g 5
+-- CHECK:      <interactive>:{{[0-9]+}}:1: error: [GHC-88464]
+-- CHECK-NEXT: Variable not in scope: g
 h 5
+-- CHECK:      <interactive>:{{[0-9]+}}:1: error: [GHC-88464]
+-- CHECK-NEXT: Variable not in scope: h
 "Reload all modules"
 :reload
 :show imports
 f 5
 g 5
 h 5
+-- CHECK-NOT:  error:
 "Unload all modules"
 :reload none
 :show imports
 f 5
+-- CHECK:      <interactive>:{{[0-9]+}}:1: error: [GHC-88464]
+-- CHECK-NEXT: Variable not in scope: f
 g 5
+-- CHECK:      <interactive>:{{[0-9]+}}:1: error: [GHC-88464]
+-- CHECK-NEXT: Variable not in scope: g
 h 5
+-- CHECK:      <interactive>:{{[0-9]+}}:1: error: [GHC-88464]
+-- CHECK-NEXT: Variable not in scope: h
 "Reload up to A"
 :reload A
 :show imports
 f 5
 g 5
+-- CHECK-NOT:  error:
 h 5
+-- CHECK:      <interactive>:{{[0-9]+}}:1: error: [GHC-88464]
+-- CHECK-NEXT: Variable not in scope: h
+-- CHECK-NOT:  error:
