@@ -323,6 +323,8 @@ typedef struct _HPC_FLAGS {
                                     file at the end of execution */
   bool           readTixFile;    /* Whether the RTS should read a tix
                                     file at the beginning of execution */
+  bool binTix;
+  char *tixDir;
 } HPC_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

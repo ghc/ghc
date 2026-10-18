@@ -307,6 +307,8 @@ void initRtsFlagsDefaults(void)
 #endif
     RtsFlags.HpcFlags.readTixFile        = false;
     RtsFlags.HpcFlags.writeTixFile       = true;
+    RtsFlags.HpcFlags.binTix = false;
+    RtsFlags.HpcFlags.tixDir = NULL;
 }
 
 static const char *
@@ -1116,6 +1118,24 @@ error = true;
                               &rts_argv[arg][2])) {
                        OPTION_UNSAFE;
                        RtsFlags.HpcFlags.writeTixFile = false;
+                  }
+                  else if (strequal("hpc-tix-format=binary", &rts_argv[arg][2])) {
+                       OPTION_UNSAFE;
+                       RtsFlags.HpcFlags.binTix = true;
+                  }
+                  else if (strequal("hpc-tix-format=text", &rts_argv[arg][2])) {
+                       OPTION_UNSAFE;
+                       RtsFlags.HpcFlags.binTix = false;
+                  }
+                  else if (!strncmp("hpc-tix-dir=", &rts_argv[arg][2], 12)) {
+                       OPTION_UNSAFE;
+                       char *dir = &rts_argv[arg][14];
+                       if (*dir == '\0') {
+                           errorBelch("--hpc-tix-dir requires a directory");
+                           error = true;
+                       } else {
+                           RtsFlags.HpcFlags.tixDir = dir;
+                       }
                   }
 #if defined(THREADED_RTS)
 #if defined(mingw32_HOST_OS)

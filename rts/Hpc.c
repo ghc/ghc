@@ -218,8 +218,8 @@ startupHpc(void)
          enough bytes */
   if (hpc_tixfile != NULL) {
     tixFilename = strdup(hpc_tixfile);
-  } else if (hpc_tixdir != NULL) {
-    tixDir = strdup(hpc_tixdir);
+  } else if (hpc_tixdir != NULL || RtsFlags.HpcFlags.tixDir != NULL) {
+    tixDir = strdup(hpc_tixdir != NULL ? hpc_tixdir : RtsFlags.HpcFlags.tixDir);
 #if defined(WIN32)
     mkdir(tixDir);
 #else
@@ -469,7 +469,7 @@ exitHpc(void) {
 #endif
   if (!is_subprocess && RtsFlags.HpcFlags.writeTixFile) {
     FILE *f = tixDir != NULL ? uniqueFile(tixDir) : __rts_fopen(tixFilename, "w+");
-    if (getenv("HPCTIX2")) writeTix2(f);
+    if (RtsFlags.HpcFlags.binTix) writeTix2(f);
     else writeTix(f);
   }
 
