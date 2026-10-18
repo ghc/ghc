@@ -127,7 +127,7 @@ test('mk-big-obj',
      multimod_compile, ['mk-big-obj.c', '-c -v0 -no-hs-main'])
 test('T21710a', [ unless(tables_next_to_code(), skip) , when(wordsize(32), skip)
                 , only_ways(['optasm'])
-                , grep_errmsg('(call)',[1]) ]
+                , filecheck_stderr ]
                 , compile, ['-ddump-cmm -dno-typeable-binds'])
 test('T23002', normal, compile, ['-fregs-graph'])
 test('T24264', [req_cmm, filecheck_stderr],
