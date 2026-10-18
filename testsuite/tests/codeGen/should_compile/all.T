@@ -97,14 +97,10 @@ test('T14373c',
      multimod_compile_filter, ['T14373c', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_only])
 
-switch_skeleton_and_entries_only = (r'grep -e "switch \[" -e "case " -e "default: " -e "Default_entry(" -e "R1 = .*_closure+2;"'
-                                    r'| sed -e "s|\] .*|\]|g" -e "s|goto .*|goto |g" -e "s|R1 = .*_closure+2;.*|R1 = XYZ_closure+2;|g" -e "s|//.*|//|g"')
-
 test('T14373d',
-      [ req_cmm
+      [ req_cmm, filecheck_stderr
       ],
-     multimod_compile_filter, ['T14373d', '-fasm -O2 -c -ddump-cmm-from-stg',
-     switch_skeleton_and_entries_only])
+     compile, ['-fasm -O2 -ddump-cmm-from-stg'])
 
 test('T17648', js_broken(22370), makefile_test, [])
 test('T17904', normal, compile, ['-O'])
