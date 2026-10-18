@@ -998,7 +998,21 @@ delVariable k j = j { jobVariables = MonoidalMap $ Map.delete k $ unMonoidalMap 
 
 -- | Make a normal validate CI job
 validate :: Arch -> Opsys -> BuildConfig -> NamedJob Job
-validate = job
+validate arch opsys bc =
+  let NamedJob n j = job arch opsys bc
+      covered = setVariable "BUILD_FLAVOUR"
+                  (flavourString (mkJobFlavour bc) ++ "+coverage") j
+      saveCoverage = (if opsys == Windows then "bash " else "")
+                     ++ ".gitlab/ci.sh save_hpc_coverage"
+  in NamedJob
+       { name = n
+       , jobInfo = covered
+           { jobAfterScript = saveCoverage : jobAfterScript covered
+           , jobArtifacts = (jobArtifacts covered)
+               { artifactPaths = artifactPaths (jobArtifacts covered)
+                                 ++ ["ghc-hpc-coverage.tar.gz"] }
+           }
+       }
 
 -- Nightly and release apply the FastCI configuration to all jobs so that they all run in
 -- the pipeline (not conditional on the full-ci label)

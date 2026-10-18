@@ -54,6 +54,7 @@ Common Modes:
   clean             Clean the tree
   shell             Run an interactive shell with a configured build environment.
   save_test_output  Generate unexpected-test-output.tar.gz
+  save_hpc_coverage Generate ghc-hpc-coverage.tar.gz
   save_cache        Preserve the cabal cache
   build_hadrian     Build GHC via the Hadrian build system
   test_hadrian      Test GHC via the Hadrian build system
@@ -649,6 +650,13 @@ function install_bindist() {
 }
 
 function test_hadrian() {
+  if [[ "${BUILD_FLAVOUR:-}" == *+coverage* ]]; then
+    export HPCTIX2=1
+    # GHC invocations run in per-test working directories.
+    export HPCTIXDIR="$TOP/_build/ghc-tix"
+    mkdir -p "$HPCTIXDIR"
+  fi
+
   check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
 
@@ -898,6 +906,16 @@ function save_test_output() {
     tar -czf unexpected-test-output.tar.gz unexpected-test-output
 }
 
+function save_hpc_coverage() {
+  # Keep whatever has been generated even if the build or tests failed.
+  if [[ -d _build/ghc-hpc || -d _build/ghc-tix ]]; then
+    mkdir -p _build/ghc-hpc _build/ghc-tix
+    tar -czf ghc-hpc-coverage.tar.gz _build/ghc-hpc _build/ghc-tix
+  else
+    warn "No HPC coverage directories found"
+  fi
+}
+
 function save_cache () {
   info "Storing cabal cache from $CABAL_DIR to $CABAL_CACHE..."
   rm -Rf "$CABAL_CACHE"
@@ -934,7 +952,8 @@ function clean() {
       --exclude=ci_timings.txt \
       --exclude=ghc-*.tar.xz \
       --exclude=junit.xml \
-      --exclude=unexpected-test-output.tar.gz
+      --exclude=unexpected-test-output.tar.gz \
+      --exclude=ghc-hpc-coverage.tar.gz
   fi
 }
 
