@@ -1000,7 +1000,11 @@ delVariable k j = j { jobVariables = MonoidalMap $ Map.delete k $ unMonoidalMap 
 validate :: Arch -> Opsys -> BuildConfig -> NamedJob Job
 validate arch opsys bc =
   let NamedJob n j = job arch opsys bc
-      covered = ignorePerfFailures $ setVariable "BUILD_FLAVOUR"
+      covered = ignorePerfFailures
+              $ setVariable "RUNTEST_ARGS"
+                  (unwords $ fromMaybe [] (mmlookup "RUNTEST_ARGS" (jobVariables j))
+                           ++ ["-e config.timeout+=config.timeout+config.timeout"])
+              $ setVariable "BUILD_FLAVOUR"
                   (flavourString (mkJobFlavour bc) ++ "+coverage") j
       saveCoverage = (if opsys == Windows then "bash " else "")
                      ++ ".gitlab/ci.sh save_hpc_coverage"
