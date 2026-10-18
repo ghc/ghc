@@ -2,14 +2,15 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+# Output is checked by ghci024.check; the flag lists themselves change
+# with every new default, so only their structure and a few entries are pinned.
 ghci024:
 	@echo "~~~~~~~~~~ Testing :set"
 	printf ":set\n" \
 	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021
 	@echo "~~~~~~~~~~ Testing :set -a"
 	printf ":set -a\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021\
-	    | grep -E "^([^ ]|  -fno-print-explicit-foralls|  -Wno-implicit-prelude)"
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021
 	@echo "~~~~~~~~~~ Testing :show languages"
 	printf ":show languages\n" \
 	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021
@@ -18,14 +19,10 @@ ghci024:
 	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021
 	@echo "~~~~~~~~~~ Testing :show packages"
 	printf ":show packages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021\
-	    | grep -E "^([^ ]|  -package|base|ghc-prim|integer|rts|Cabal)" \
-	    | sed "s/Cabal-[0-9.]*/Cabal-VERSION/"
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021
 	@echo "~~~~~~~~~~ Testing :show packages, including the ghc package"
 	printf ":set -package ghc\n:show packages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021\
-	    | grep -E "^([^ ]|  -package|base|ghc-prim|integer|rts|Cabal)" \
-	    | sed "s/Cabal-[0-9.]*/Cabal-VERSION/"
+	    | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -XGHC2021
 
 .PHONY: ghci037
 ghci037:
