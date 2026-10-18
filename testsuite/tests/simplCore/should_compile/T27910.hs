@@ -1,4 +1,9 @@
 {-# LANGUAGE UnboxedTuples, MagicHash #-}
+-- Case-of-known-constructor on the unboxed tuple should fire once per
+-- site and then settle.  Before the fix the Simplifier redid it on every
+-- iteration (28 KnownBranch) and never reached a fixed point.
+--
+-- CHECK: {{^}}4 KnownBranch
 module T27910 where
 import GHC.Exts
 
