@@ -86,6 +86,7 @@ flavourTransformers = M.fromList
     , "dump_stg"         =: enableDumpStg
     , "hash_unit_ids"    =: enableHashUnitIds
     , "hie_files"        =: enableHieFiles
+    , "coverage"         =: enableCoverage
     ]
   where (=:) = (,)
 
@@ -382,6 +383,11 @@ enableHashUnitIds flavour = flavour { hashUnitIds = True }
 
 enableHieFiles :: Flavour -> Flavour
 enableHieFiles flavour = flavour { ghcHieFiles = (>= Stage1) }
+
+enableCoverage :: Flavour -> Flavour
+enableCoverage =
+  addArgs $ stage1 ? builder (Ghc CompileHs) ? packageOneOf [compiler, ghc] ?
+    pure ["-fhpc", "-hpcdir", "_build/ghc-hpc"]
 
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
 -- recompilation.
