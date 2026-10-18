@@ -1152,6 +1152,7 @@ case ${1:-help} in
   compare_interfaces_of) shift; compare_interfaces_of "$@" ;;
   clean) clean ;;
   save_test_output) save_test_output ;;
+  save_hpc_coverage) save_hpc_coverage ;;
   save_cache) save_cache ;;
   shell) shift; shell "$@" ;;
   *) fail "unknown mode $1" ;;
