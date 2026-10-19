@@ -13,16 +13,23 @@
 
 #pragma once
 
-/* Used by runProcess() in the process package
+/* Used by runProcess() in the process package, but this is almost certainly
+ * a bad idea.
+ *
+ * See also:
+ *  + https://github.com/haskell/process/issues/384
+ *  + https://github.com/haskell/process/issues/385
+ *  + GHC issue #27968
+ *  + See Note [pthread_sigmask and the ineffectiveness of masking signals]
  */
 
 /*
  * Function: blockUserSignals()
  *
- * Temporarily block the delivery of further console events. Needed to
- * avoid race conditions when GCing the queue of outstanding handlers or
- * when emptying the queue by running the handlers.
+ * Temporarily block the delivery of further user-registered posix signals.
  *
+ * This is exported from the RTS but should no longer be used. It is likely to
+ * be removed in future.
  */
 void blockUserSignals(void);
 
