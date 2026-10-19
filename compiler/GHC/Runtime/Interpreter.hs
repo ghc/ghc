@@ -197,9 +197,7 @@ interpCmd interp msg = case interpInstance interp of
   InternalInterp     -> run msg -- Just run it directly
 #endif
   ExternalInterp ext -> withExtInterp ext $ \inst ->
-    uninterruptibleMask_ $ -- Note [uninterruptibleMask_ and interpCmd]
-      sendMessage inst msg
-
+    sendMessage inst msg
 
 withExtInterp :: ExceptionMonad m => ExtInterp -> (forall d. ExtInterpInstance d -> m a) -> m a
 withExtInterp ext action = case ext of
@@ -212,15 +210,6 @@ withExtInterpStatus ext action = case ext of
   ExtJS    i -> action (interpStatus i)
   ExtWasm  i -> action $ interpStatus i
   ExtIServ i -> action (interpStatus i)
-
--- Note [uninterruptibleMask_ and interpCmd]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- If we receive an async exception, such as ^C, while communicating
--- with the iserv process then we will be out-of-sync and not be able
--- to recover.  Thus we use uninterruptibleMask_ during
--- communication.  A ^C will be delivered to the iserv process (because
--- signals get sent to the whole process group) which will interrupt
--- the running computation and return an EvalException result.
 
 -- | Grab a lock on the 'IServ' and do something with it.
 -- Overloaded because this is used from TcM as well as IO.
@@ -480,11 +469,9 @@ lookupSymbol interp str = withSymbolCache interp str $
 #endif
     ExternalInterp ext -> case ext of
       ExtIServ i -> withIServ i $ \inst -> do
-        uninterruptibleMask_ $
           sendMessage inst (LookupSymbol (fastStringToShortByteString (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
       ExtWasm i -> withWasmInterp i $ \inst -> do
-        uninterruptibleMask_ $
           sendMessage inst (LookupSymbol (fastStringToShortByteString (interpSymbolToCLabel str)))
 
 lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> InterpSymbol s -> IO (Maybe (RemotePtr ()))
@@ -495,7 +482,6 @@ lookupSymbolInDLL interp dll str = withSymbolCache interp str $
 #endif
     ExternalInterp ext -> case ext of
       ExtIServ i -> withIServ i $ \inst -> do
-        uninterruptibleMask_ $
           sendMessage inst (LookupSymbolInDLL dll (fastStringToShortByteString (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
       -- wasm dyld doesn't track which symbol comes from which .so
