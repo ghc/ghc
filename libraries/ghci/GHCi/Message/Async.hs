@@ -152,7 +152,7 @@ instance Exception PipeWriteClosedException
 -- and identify whether they are requests or replies.
 
 writePipe :: Pipe -> IddMsg -> IO ()
-writePipe p@Pipe{..} msg = atomically $ do
+writePipe Pipe{..} msg = atomically $ do
   readTVar pipeWriteClosed >>= \case
     True -> throwSTM PipeWriteClosedException
     False -> pure ()
