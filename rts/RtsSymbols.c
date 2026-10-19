@@ -1241,6 +1241,9 @@ RTS_SYMBOLS_PRIM
       (void*)(&(xxx)), strength, ty },
 
 
+#pragma GCC diagnostic push
+/* Don't warn about exporting deprecated RTS functions. */
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 /* Initialize (if not already initialized) and return an array of symbols with stuff from the RTS. */
 void initLinkerRtsSyms (StrHashTable *symhash) {
@@ -1278,6 +1281,7 @@ void initLinkerRtsSyms (StrHashTable *symhash) {
     IF_DEBUG(linker, debugBelch("done with built-in RTS symbols\n"));
 }
 
+#pragma GCC diagnostic pop
 
 
 // Note [Extra RTS symbols]
