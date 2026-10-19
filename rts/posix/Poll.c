@@ -23,7 +23,7 @@
 #include "Trace.h"
 
 #include "Poll.h"
-#include "RtsSignals.h"
+#include "posix/Signals.h"
 
 #include <limits.h>
 #include <errno.h>

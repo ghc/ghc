@@ -12,7 +12,7 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
-#include "RtsSignals.h"
+#include "posix/Signals.h"
 #include "Schedule.h"
 #include "Prelude.h"
 #include "RtsUtils.h"
