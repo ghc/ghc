@@ -39,6 +39,41 @@
 
 #include <string.h>
 
+/* Note [pthread_sigmask and the ineffectiveness of masking signals]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Relevant posix signals facts:
+ *
+ *  + Every (OS) thread has a signal mask, which can be manipulated by that
+ *    thread itself (though sigprocmask on macOS breaks this).
+ *  + Signal masks are inherited when new threads or processes are created (or
+ *    can be set as an attribute in posix spawn on some platforms).
+ *  + Most signals are processes directed, while some are thread-directed.
+ *  + Process-directed signals will be delivered to _any_ thread that does not
+ *    have the signal masked.
+ *
+ * The important consequence of the "any thread will do" property is that:
+ *
+ *  + it is generally _effective_ to unmask a signal in a thread, because at
+ *    least the calling thread has the signal unmasked; however
+ *  + it is generally _ineffective_ to mask a signal in a thread, because
+ *    the signal will likely still be unmasked in some other thread and thus
+ *    be delivered there.
+ *
+ * Thus we should avoid use the masking signals as a mechanism that we rely on,
+ * since it will not in general be effective. In best-effort cases where there
+ * is a reasonable likelyhood that the calling thread is the only thread with
+ * signals unmasked then it is ok.
+ *
+ * Closely related: always avoid sigprocmask, and prefer pthread_sigmask.
+ * The older function is sigprocmask but it's meaning in multi-threaded
+ * programs is explicitly unspecified by Posix. On Linux it modifies the
+ * calling thread's signal mask, but on macOS it modifies the signal mask of
+ * every thread in the process, leading to chaos. The new function is
+ * pthread_sigmask which is well defined and operates only on the signal mask
+ * of the calling thread.
+ */
+
 /* This curious flag is provided for the benefit of the Haskell binding
  * to POSIX.1 to control whether or not to include SA_NOCLDSTOP when
  * installing a SIGCHLD handler.

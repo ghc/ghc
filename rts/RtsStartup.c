@@ -725,10 +725,12 @@ exitBySignal(int sig)
     dfl.sa_handler = SIG_DFL;
     (void)sigaction(sig, &dfl, NULL);
 
-    // Then we unblock the signal so we can deliver it to ourselves
+    // Then we unmask the signal so we can deliver it to ourselves.
+    // This is a (rare) valid use of signal mask manipulation.
+    // See Note [pthread_sigmask and the ineffectiveness of masking signals].
     sigemptyset(&sigset);
     sigaddset(&sigset, sig);
-    sigprocmask(SIG_UNBLOCK, &sigset, NULL);
+    pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
 
     switch (sig) {
       case SIGSTOP: case SIGTSTP: case SIGTTIN: case SIGTTOU: case SIGCONT:
