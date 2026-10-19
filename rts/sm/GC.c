@@ -314,13 +314,6 @@ GarbageCollect (struct GcConfig config,
 
   ACQUIRE_SM_LOCK;
 
-#if defined(RTS_USER_SIGNALS)
-  if (RtsFlags.MiscFlags.install_signal_handlers) {
-    // block signals
-    blockUserSignals();
-  }
-#endif
-
   ASSERT(sizeof(gen_workspace) == 16 * sizeof(StgWord));
   // otherwise adjust the padding in gen_workspace.
 
@@ -1154,13 +1147,6 @@ GarbageCollect (struct GcConfig config,
              N, n_gc_threads, gc_threads,
              par_max_copied, par_balanced_copied,
              any_work, scav_find_work, max_n_todo_overflow);
-
-#if defined(RTS_USER_SIGNALS)
-  if (RtsFlags.MiscFlags.install_signal_handlers) {
-    // unblock signals again
-    unblockUserSignals();
-  }
-#endif
 
   RELEASE_SM_LOCK;
 
