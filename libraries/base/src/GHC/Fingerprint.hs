@@ -13,9 +13,10 @@ module GHC.Fingerprint (
 import qualified GHC.Essentials as Rebindable
 #endif
 
+import GHC.Internal.Fingerprint
+
 #if __GLASGOW_HASKELL__ >= 1000
 
-import GHC.Internal.Fingerprint
 import Data.Function (($))
 import Control.Monad (return, when)
 import Data.Bool (not, (&&))

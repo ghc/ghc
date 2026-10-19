@@ -380,7 +380,7 @@ import GHC.Prim hiding
 
 import GHC.Prim.Ext
 
-import qualified GHC.Types as CS (
+import qualified GHC.Internal.CString as CS (
   unpackCString#,
   unpackAppendCString#,
   unpackFoldrCString#,
