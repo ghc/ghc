@@ -13,6 +13,8 @@
 
 #pragma once
 
+#if !defined(mingw32_HOST_OS)
+
 /* Used by runProcess() in the process package, but this is almost certainly
  * a bad idea.
  *
@@ -39,3 +41,5 @@ void blockUserSignals(void);
  * The inverse of blockUserSignals(); re-enable the deliver of console events.
  */
 void unblockUserSignals(void);
+
+#endif
