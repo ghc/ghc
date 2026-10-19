@@ -10,6 +10,7 @@
 #include "Rts.h"
 
 #include "RtsSignals.h"
+#include "posix/Signals.h"
 #include "RtsUtils.h"
 #include "Schedule.h"
 #include "Prelude.h"
