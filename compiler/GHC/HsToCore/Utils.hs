@@ -57,7 +57,6 @@ import GHC.Core.Make
 import GHC.Core.Make.Box ( boxTy )
 import GHC.Core.Make.BigTuple
 import GHC.Types.Id
-import GHC.Types.Id.Info ( vanillaIdInfo )
 import GHC.Types.Literal
 import GHC.Core.TyCon
 import GHC.Core.DataCon
@@ -267,12 +266,12 @@ bindMatchId new mid body
 -- Note [Desugar Strict binds] in GHC.HsToCore.Binds.
 --
 -- The case binder has the same Name (and hence Unique), type and multiplicity
--- as `var`, but vanilla IdInfo: `var` may have, say, a NOINLINE pragma, but a
+-- as `var`, but not its IdInfo: `var` may have, say, a NOINLINE pragma, but a
 -- case binder must not; see Note [Lambda and case binders have vanilla IdInfo]
 -- in GHC.Core, and #27965.  E.g. `res1` in GHC.Internal.Control.Monad.ST.Lazy.Imp
 -- has a NOINLINE pragma.
 seqVar :: Var -> CoreExpr -> CoreExpr
-seqVar var body = mkDefaultCase (Var var) (var `setIdInfo` vanillaIdInfo) body
+seqVar var body = mkDefaultCase (Var var) (mkCaseBndrFromLetBndr var) body
 
 mkCoLetMatchResult :: HasDebugCallStack => CoreBind -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkCoLetMatchResult bind = fmap (mkCoreLet bind)

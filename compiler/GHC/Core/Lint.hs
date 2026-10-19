@@ -1859,11 +1859,11 @@ lintIdBndr top_lvl bind_site id thing_inside
             2 (ppr unf)
 
        -- Check that lambda, case, and case-alternative binders have
-       -- no RULES, no inline pragma, and no stable unfolding
+       -- no RULES, no inline pragma, and no unfolding other than OtherCon
        -- See Note [Lambda and case binders have vanilla IdInfo] in GHC.Core
        ; checkL (is_let_bind || lamBndrInfoOK id) $
          hang (text "Non-let binder" <+> quotes (ppr id)
-               <+> text "has RULES, an inline pragma, or a stable unfolding")
+               <+> text "has RULES, an inline pragma, or a non-OtherCon unfolding")
             2 (vcat [ text "Binding site:" <+> text (show_site bind_site)
                     , text "Inline pragma:" <+> ppr (idInlinePragma id)
                     , text "Rules:" <+> ppr (idCoreRules id)

@@ -1764,7 +1764,9 @@ Invariant: the following binders
 have none of
   (a) RULES
   (b) a (non-default) inline pragma, such as INLINE or NOINLINE
-  (c) a stable unfolding
+  (c) an unfolding, except that case binders and case-alternative binders may
+      have an evaluated-ness unfolding (OtherCon);
+      see Note [Evaluated-ness on case binders]
 The predicate `GHC.Types.Id.lamBndrInfoOK` checks (a-c), and Core Lint checks
 it (in `lintIdBndr`).  Moreover lambda binders have no unfolding at all, not
 even an OtherCon one: see Note [Never put `OtherCon` unfoldings on lambda binders].
@@ -1787,9 +1789,79 @@ Places that must take care to maintain the invariant (#27965):
   generates  case x of x { DEFAULT -> body }; the case binder must not inherit
   x's IdInfo.  See `GHC.HsToCore.Utils.seqVar`.
 
+* `GHC.Core.Utils.bindNonRec` (used by `mkCoreLet`, and hence by the
+  Simplifier's `wrapFloats`), which turns  let x = rhs in body  into
+  case rhs of x { DEFAULT -> body }  when `rhs` is unlifted and not
+  ok-for-speculation.  Here `x` may well have a let-unfolding, e.g. one made
+  by `makeTrivial`.
+
+Both use `GHC.Types.Id.mkCaseBndrFromLetBndr`.
+
 * The Simplifier, when duplicating a StrictBind continuation  let x = <> in b,
   makes a join point whose lambda binder must not inherit x's IdInfo.
   See (DSB1) in Note [Duplicating StrictBind] in GHC.Core.Opt.Simplify.Iteration.
+
+Note [Evaluated-ness on case binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some binders carry an `OtherCon []` (aka `evaldUnfolding`) unfolding in the
+syntax tree, meaning "this variable is certainly evaluated":
+
+* Case binders, by `GHC.Core.Opt.Simplify.Iteration.simplAlts`, and by
+  CorePrep, which puts it on every case binder it builds.
+
+* Case-alternative binders for strict constructor fields (and some case
+  binders), via `GHC.Types.Id.setCaseBndrEvald`.  For example in
+      data T = MkT !Int Int
+      case x of MkT y z -> ...
+  `y` gets an evaldUnfolding.  This is done by `GHC.Core.Utils.dataConRepFSInstPat`
+  (used by the interface-file loader, among others), `GHC.Core.SimpleOpt`, the
+  Simplifier (`adjustFieldsIdInfo`), and worker/wrapper (for the argument and
+  CPR result binders it makes; see Note [Record evaluated-ness in worker/wrapper]
+  in GHC.Core.Opt.WorkWrap.Utils).
+
+Why is this information on the /binder/?  Within the Simplifier it is not
+needed there: in each case alternative the Simplifier adds a more precise
+unfolding for the case binder (and evaluated-ness for strict-field binders) to
+its in-scope set, and refreshes every occurrence from that.  But many other
+passes rebuild variable occurrences /from the binder/: substitution-based
+passes (SimpleOpt, Specialise, SpecConstr, CSE), SetLevels/FloatOut, the binder
+swap in the occurrence analyser, CoreTidy, and CorePrep.  After such a pass,
+an occurrence knows that the variable is evaluated only if the binder does.
+
+That knowledge is used, mainly via `exprIsHNF`/`varIsHNF` (not by
+`exprOkForSpeculation`; see Note [exprOkForSpeculation and evaluated variables]
+in GHC.Core.Utils), by:
+
+* CorePrep: deciding whether a let-binding is a value (allocate directly) or
+  a thunk, e.g. `let x = Box y` where `y` is a strict field.
+  See Note [Pin evaluatedness on floats] in GHC.CoreToStg.Prep.  CorePrep runs
+  just after CoreTidy, which propagates binder IdInfo to occurrences.
+
+* SetLevels/FloatOut: floating single-alternative cases out of loops, when the
+  scrutinee is evaluated; see Note [Floating single-alternative cases] in
+  GHC.Core.Opt.SetLevels.  Also the call-by-value marks given to abstracted
+  variables (`GHC.Types.Id.transferPolyIdInfo`).
+
+* Worker/wrapper: `move_transit_vars` avoids an unboxed 1-tuple for a single
+  evaluated transit variable (test T18109); and the CPR result binders of the
+  wrapper remain evaluated (tests T13077a, #13027).  The latter matters because
+  unboxed-tuple alternatives take a fast path in the Simplifier's
+  `adjustFieldsIdInfo`, and so get evaluated-ness only from the binder.
+
+* SimpleOpt: eliminating a case on an evaluated variable, and `mkFieldSeqFloats`.
+
+* Minor heuristic uses: FloatIn (the late FloatIn runs after FloatOut and CSE
+  with no Simplifier in between) and occurrences created by CSE or the binder
+  swap, until the next Simplifier run.
+
+Core Lint does /not/ depend on this information.  Nor does anything in STG or
+tag inference.
+
+Removing the information from the binders would require these passes to track
+evaluated-ness in an environment instead (as SpecConstr already does with its
+ValueEnv), which they currently don't.  So we allow an OtherCon unfolding (and
+only that) on case binders and case-alternative binders: see (c) in
+Note [Lambda and case binders have vanilla IdInfo].
 -}
 
 -- | Records the /unfolding/ of an identifier, which is approximately the form the

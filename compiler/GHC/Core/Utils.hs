@@ -756,7 +756,10 @@ bindNonRec bndr rhs body
   | needsCaseBinding (idType bndr) rhs = case_bind
   | otherwise                          = let_bind
   where
-    case_bind = mkDefaultCase rhs bndr body
+    case_bind = mkDefaultCase rhs (mkCaseBndrFromLetBndr bndr) body
+                -- mkCaseBndrFromLetBndr: bndr may have IdInfo suitable for a
+                -- let-binder; see Note [Lambda and case binders have vanilla IdInfo]
+                -- in GHC.Core
     let_bind  = Let (NonRec bndr rhs) body
 
 -- | `needsCaseBinding` tests whether we have to use a @case@ rather than @let@

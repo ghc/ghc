@@ -3425,6 +3425,7 @@ simplAlts (saf,env0) scrut case_bndr alts cont'
         ; let case_bndr2 = case_bndr1 `setIdUnfolding` evaldUnfolding
               env2       = modifyInScope env1 case_bndr2
               -- See Note [Case binder evaluated-ness]
+              -- and Note [Evaluated-ness on case binders] in GHC.Core
               fam_envs   = seFamEnvs env0
 
         ; (alt_env', scrut', case_bndr') <- improveSeq fam_envs (saf,env2) scrut

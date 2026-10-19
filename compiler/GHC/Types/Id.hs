@@ -103,7 +103,7 @@ module GHC.Types.Id (
         alwaysActiveUnfoldingFun, whenActiveUnfoldingFun, noUnfoldingFun,
 
         -- ** Writing 'IdInfo' fields
-        setIdUnfolding, zapIdUnfolding, setCaseBndrEvald,
+        setIdUnfolding, zapIdUnfolding, setCaseBndrEvald, mkCaseBndrFromLetBndr,
         setIdArity,
         setIdCallArity,
 
@@ -882,9 +882,20 @@ setCaseBndrEvald :: StrictnessMark -> Id -> Id
 -- itself, and any pattern-bound variables that are argument of a
 -- strict constructor.  It just marks the variable as already-evaluated,
 -- so that (for example) a subsequent 'seq' can be dropped
+-- See Note [Evaluated-ness on case binders] in GHC.Core
 setCaseBndrEvald str id
   | isMarkedStrict str = id `setIdUnfolding` evaldUnfolding
   | otherwise          = id
+
+-- | Make a case binder from a binder that might have been let-bound, e.g.
+--      let x = rhs in body   ==>   case rhs of x { DEFAULT -> body }
+-- The let-binder may have IdInfo (an unfolding, an inline pragma, RULES)
+-- that a case binder must not have, so we keep its Name, type, multiplicity
+-- and IdDetails, but reset its IdInfo, except that we record that it is
+-- evaluated.
+-- See Note [Lambda and case binders have vanilla IdInfo] in GHC.Core
+mkCaseBndrFromLetBndr :: Id -> Id
+mkCaseBndrFromLetBndr id = id `setIdInfo` (vanillaIdInfo `setUnfoldingInfo` evaldUnfolding)
 
 -- | Similar to trimUnfolding, but also removes evaldness info.
 zapIdUnfolding :: Id -> Id
@@ -906,15 +917,20 @@ idCoreRules id = ruleInfoRules (idSpecialisation id)
 idHasRules :: Id -> Bool
 idHasRules id = not (isEmptyRuleInfo (idSpecialisation id))
 
--- | True <=> the Id has no (non-default) inline pragma, no stable unfolding,
--- and no RULES.  Lambda binders, case binders, and case-alternative binders
--- must all satisfy this.
+-- | True <=> the Id has no (non-default) inline pragma, no RULES, and no
+-- unfolding except perhaps an evaluated-ness one (OtherCon).  Lambda binders,
+-- case binders, and case-alternative binders must all satisfy this.
 -- See Note [Lambda and case binders have vanilla IdInfo] in GHC.Core
 lamBndrInfoOK :: Id -> Bool
 lamBndrInfoOK id
   =  isDefaultInlinePragma (idInlinePragma id)
-  && not (isStableUnfolding (realIdUnfolding id))
+  && unf_ok (realIdUnfolding id)
   && not (idHasRules id)
+  where
+    -- See Note [Evaluated-ness on case binders] in GHC.Core
+    unf_ok NoUnfolding  = True
+    unf_ok (OtherCon _) = True
+    unf_ok _            = False
 
 setIdSpecialisation :: Id -> RuleInfo -> Id
 setIdSpecialisation id spec_info = modifyIdInfo (`setRuleInfo` spec_info) id
