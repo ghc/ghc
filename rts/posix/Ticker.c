@@ -242,7 +242,7 @@ initTicker (Time interval, TickProc handle_tick)
      * Create the thread with all blockable signals blocked, leaving signal
      * handling to the main and/or other threads.  This is especially useful in
      * the non-threaded runtime, where applications might expect sigprocmask(2)
-     * to effectively block signals.
+     * or pthread_sigmask(3) to effectively block signals.
      */
 #if defined(HAVE_SIGNAL_H)
     sigfillset(&mask);
