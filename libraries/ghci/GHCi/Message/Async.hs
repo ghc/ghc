@@ -135,11 +135,7 @@ instance Exception PipeReadClosedException
 -- and identify whether they are requests or replies.
 
 writePipe :: Pipe -> IddMsg -> IO ()
-writePipe p@Pipe{..} msg = withLock p $ do
-  putAll (execPut (put msg)) `catch` \(e :: IOError) -> do
-    pipeCloseWrite
-    -- TODO: do we need a pipeCloseWrite TVar ?
-    throwIO e
+writePipe p@Pipe{..} = withLock p . putAll . execPut . put
 
 -- | Only the 'drainPipe' thread should read from the pipe directly. Other
 -- functions should wait for the matching reply to be delivered asynchronously.
