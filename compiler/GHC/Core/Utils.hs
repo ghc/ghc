@@ -29,7 +29,7 @@ module GHC.Core.Utils (
         exprIsTrivial, getIdFromTrivialExpr, getIdFromTrivialExpr_maybe,
         trivial_expr_fold,
         exprIsDupable, exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
-        exprIsHNF, exprOkForSpeculation, exprOkToDiscard, exprOkForSpecEval,
+        exprIsHNF, varIsHNF, exprOkForSpeculation, exprOkToDiscard, exprOkForSpecEval,
         exprIsWorkFree, exprIsConLike,
         isCheapApp, isExpandableApp, isSaturatedConApp,
         exprIsTickedString, exprIsTickedString_maybe,
@@ -2639,11 +2639,36 @@ it doesn't have the trickiness of the let-can-float invariant to worry about.
 exprIsHNF :: CoreExpr -> Bool           -- True => Value-lambda, constructor, PAP
 exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding True
 
+-- | @varIsHNF v@ is the same as @exprIsHNF (Var v)@, but avoids building
+-- the @Var@ only to take it apart again
+varIsHNF :: Var -> Bool
+varIsHNF = varIsHNFlike isDataConWorkId isEvaldUnfolding
+
 -- | Similar to 'exprIsHNF' but includes CONLIKE functions as well as
 -- data constructors. Conlike arguments are considered interesting by the
 -- inliner.
 exprIsConLike :: CoreExpr -> Bool       -- True => lambda, conlike, PAP
 exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding False
+
+varIsHNFlike :: (Var -> Bool) -> (Unfolding -> Bool) -> Var -> Bool
+-- The (Var v) case of exprIsHNFlike
+{-# INLINE varIsHNFlike #-}
+varIsHNFlike is_con is_con_unf v
+  =  idArity v > 0 || is_con v
+        -- A PAP is a value, as is a nullary constructor, so that [] and ()
+        -- are values, for example; and (e.g.) primops that don't have unfoldings.
+        -- This is (id_app_is_value v []) in exprIsHNFlike
+
+  || is_con_unf (idUnfolding v)
+        -- Check the thing's unfolding; it might be bound to a value
+        --   or to a guaranteed-evaluated variable (isEvaldUnfolding)
+        --   Contrast with Note [exprOkForSpeculation and evaluated variables]
+        -- We don't look through loop breakers here, which is a bit conservative
+        -- but otherwise I worry that if an Id's unfolding is just itself,
+        -- we could get an infinite loop
+
+  || definitelyUnliftedType (idType v)
+        -- Unlifted binders are always evaluated (#20140)
 
 -- | Returns true for values or value-like expressions. These are lambdas,
 -- constructors / CONLIKE functions (as determined by the function argument)
@@ -2658,20 +2683,8 @@ exprIsHNFlike is_con is_con_unf rubbish_lit_result e
   = -- pprTraceWith "hnf" (\r -> ppr r <+> ppr e) $
     is_hnf_like e
   where
-    is_hnf_like (Var v) -- NB: There are no value args at this point
-      =  id_app_is_value v [] -- Catches nullary constructors,
-                              --      so that [] and () are values, for example
-                              -- and (e.g.) primops that don't have unfoldings
-      || is_con_unf (idUnfolding v)
-        -- Check the thing's unfolding; it might be bound to a value
-        --   or to a guaranteed-evaluated variable (isEvaldUnfolding)
-        --   Contrast with Note [exprOkForSpeculation and evaluated variables]
-        -- We don't look through loop breakers here, which is a bit conservative
-        -- but otherwise I worry that if an Id's unfolding is just itself,
-        -- we could get an infinite loop
-
-      || definitelyUnliftedType (idType v)
-        -- Unlifted binders are always evaluated (#20140)
+    is_hnf_like (Var v) = varIsHNFlike is_con is_con_unf v
+                          -- NB: There are no value args at this point
 
     is_hnf_like (Lit lit)
       | isLitRubbish lit = rubbish_lit_result
@@ -2706,6 +2719,8 @@ exprIsHNFlike is_con is_con_unf rubbish_lit_result e
     app_is_value _          _  = False
 
     id_app_is_value id val_args
+      | null val_args  -- We can get here via (f @Int), say
+      = varIsHNFlike is_con is_con_unf id
       | Just dc <- isDataConWorkId_maybe id
       , isUnaryClassDataCon  dc
       = all is_hnf_like val_args  -- Look through unary class data cons
