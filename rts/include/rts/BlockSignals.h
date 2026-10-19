@@ -33,13 +33,17 @@
  * This is exported from the RTS but should no longer be used. It is likely to
  * be removed in future.
  */
-void blockUserSignals(void);
+void blockUserSignals(void)
+       __attribute__((deprecated("blockUserSignals should no longer be used, "
+                                 "use pthread_sigmask or similar.")));
 
 /*
  * Function: unblockUserSignals()
  *
  * The inverse of blockUserSignals(); re-enable the deliver of console events.
  */
-void unblockUserSignals(void);
+void unblockUserSignals(void)
+       __attribute__((deprecated("unblockUserSignals should no longer be "
+                                 "used, use pthread_sigmask or similar.")));
 
 #endif

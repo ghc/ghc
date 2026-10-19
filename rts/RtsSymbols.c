@@ -1243,6 +1243,10 @@ RTS_SYMBOLS_PRIM
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
       (void*)(&(xxx)), strength, ty, MAYBE_LEADING_UNDERSCORE_STR(#xxx) },
 
+#pragma GCC diagnostic push
+/* Don't warn about exporting deprecated RTS functions. */
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 // Allocate and return an array of rts symbols.
 // The final element marks the end of the array and has `.lbl=NULL`.
 // The caller must free the array.
@@ -1275,6 +1279,7 @@ RtsSymbolVal const * getRtsSymbols(void) {
       return rtsSyms;
 }
 
+#pragma GCC diagnostic pop
 
 
 // Note [Extra RTS symbols]
