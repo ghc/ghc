@@ -235,13 +235,13 @@ generic_handler(int sig USED_IF_THREADS,
 void
 blockUserSignals(void)
 {
-    sigprocmask(SIG_BLOCK, &userSignals, &savedSignals);
+    pthread_sigmask(SIG_BLOCK, &userSignals, &savedSignals);
 }
 
 void
 unblockUserSignals(void)
 {
-    sigprocmask(SIG_SETMASK, &savedSignals, NULL);
+    pthread_sigmask(SIG_SETMASK, &savedSignals, NULL);
 }
 
 /* -----------------------------------------------------------------------------
