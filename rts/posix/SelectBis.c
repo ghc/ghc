@@ -25,7 +25,7 @@
 #include "Trace.h"
 
 #include "SelectBis.h"
-#include "RtsSignals.h"
+#include "posix/Signals.h"
 
 #include <errno.h>
 #include <sys/select.h>

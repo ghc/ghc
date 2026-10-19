@@ -5,7 +5,7 @@
  * Signal processing / handling. This is the shared API to the subsystems for
  * POSIX signals and Win32 console events.
  *
- * Platform specific APIs live in win32/ConsoleHandler.h
+ * Platform specific APIs live in win32/ConsoleHandler.h and posix/Signals.h
  *
  * ---------------------------------------------------------------------------*/
 
@@ -38,16 +38,6 @@ void freeSignalHandlers(void);
  * TODO: unify this and freeSignalHandlers together, and make them make sense!
  */
 void finiUserSignals(void);
-
-/*
- * Function: startPendingSignalHandlers()
- *
- * If there are any queued up posix signals or win32 console events, run the
- * handlers associated with them. This is used by some in-RTS I/O managers.
- */
-#if !defined(THREADED_RTS)
-void startPendingSignalHandlers(Capability *cap);
-#endif
 
 #include "EndPrivate.h"
 
