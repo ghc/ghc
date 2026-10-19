@@ -31,11 +31,7 @@ void initUserSignals(void);
 void initDefaultHandlers(void);
 void resetDefaultHandlers(void);
 
-void freeSignalHandlers(void);
-
-/* Tear down and shut down user signal processing.
- * This is called *after* freeSignalHandlers, but unconditionally!
- * TODO: unify this and freeSignalHandlers together, and make them make sense!
+/* Finalise signal and console events handling.
  */
 void finiUserSignals(void);
 

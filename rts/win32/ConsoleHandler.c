@@ -54,11 +54,6 @@ initUserSignals(void)
     return;
 }
 
-void
-freeSignalHandlers(void) {
-    /* Do nothing */
-}
-
 /* Called in hs_exit to clean up resources.  */
 void
 finiUserSignals(void)
