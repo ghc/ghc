@@ -1838,16 +1838,18 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
           -- __atomic_load_n(&a, __ATOMIC_ACQUIRE);
           -- __atomic_load_n(&a, __ATOMIC_SEQ_CST);
           let instrs = case ord of
-                MemOrderRelaxed -> unitOL $ ann moDescr (LDR (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p))
+                -- N.B. use an unsigned load to maintain the subword invariant;
+                -- a signed load would leave the upper bits sign-extended.
+                MemOrderRelaxed -> unitOL $ ann moDescr (LDRU (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p))
                 MemOrderAcquire ->
                   toOL
-                    [ ann moDescr (LDR (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p)),
+                    [ ann moDescr (LDRU (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p)),
                       FENCE FenceRead FenceReadWrite
                     ]
                 MemOrderSeqCst ->
                   toOL
                     [ ann moDescr (FENCE FenceReadWrite FenceReadWrite),
-                      LDR (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p),
+                      LDRU (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p),
                       FENCE FenceRead FenceReadWrite
                     ]
                 MemOrderRelease -> panic $ "Unexpected MemOrderRelease on an AtomicRead: " ++ show mo

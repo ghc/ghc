@@ -1,0 +1,14 @@
+section: compiler
+synopsis: Fix the RISC-V NCG sign-extending the result of atomic reads of subword values
+issues: #28130
+mrs: !16997
+
+description: {
+  Atomic reads of 8-, 16-, and 32-bit values used a signed load (``LDR``),
+  which left the upper bits sign-extended. This violated the zero-extended
+  subword invariant maintained by the RISC-V NCG, so for example an atomic
+  read of a byte holding ``0xff`` produced ``-1`` instead of ``255``.
+
+  The reads now use ``LDRU``, which maps to ``lbu``, ``lhu``, ``lwu``, or
+  ``ld`` depending on the width.
+}
