@@ -1003,7 +1003,7 @@ validate arch opsys bc =
       covered = ignorePerfFailures
               $ setVariable "RUNTEST_ARGS"
                   (unwords $ fromMaybe [] (mmlookup "RUNTEST_ARGS" (jobVariables j))
-                           ++ ["-e config.timeout+=config.timeout+config.timeout"])
+                           ++ ["-e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout"])
               $ setVariable "BUILD_FLAVOUR"
                   (flavourString (mkJobFlavour bc) ++ "+coverage") j
       saveCoverage = (if opsys == Windows then "bash " else "")
