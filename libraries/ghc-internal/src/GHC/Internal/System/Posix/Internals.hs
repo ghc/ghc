@@ -878,7 +878,12 @@ foreign import capi unsafe "signal.h sigemptyset"
 foreign import capi unsafe "signal.h sigaddset"
    c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
 
-foreign import capi unsafe "signal.h sigprocmask"
+-- Actually uses @pthread_sigmask@, which is the more modern version
+-- specified by Posix. pthread_sigmask() is specified to be per-thread.
+--
+-- Use of this is still very dubious however!
+-- See Note [pthread_sigmask and the ineffectiveness of masking signals]
+foreign import capi unsafe "signal.h pthread_sigmask"
    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
 #endif
 
