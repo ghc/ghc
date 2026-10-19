@@ -1711,8 +1711,7 @@ unbox_one_result opts res_bndr
 move_transit_vars :: [Id] -> (CoreExpr -> CoreExpr -> CoreExpr, CoreExpr)
 move_transit_vars vars
   | [var] <- vars
-  , let var_ty = idType var
-  , isUnliftedType var_ty || exprIsHNF (Var var)
+  , varIsHNF var  -- NB: True of variables of unlifted type
   -- See Note [No unboxed tuple for single, unlifted transit var]
   --   * Wrapper: `unbox scrut alt = (case <scrut> of a -> <alt>)`
   --   * Worker:  `tup = a`
@@ -1816,7 +1815,7 @@ return unboxed instead of in an unboxed singleton tuple:
     We want  `$wh :: Int# -> [Int]`.
     We'd get `$wh :: Int# -> (# [Int] #)`.
 
-By considering vars as unlifted that satisfy 'exprIsHNF', we catch (3).
+By considering vars as unlifted that satisfy 'varIsHNF', we catch (3).
 Why not check for 'exprOkForSpeculation'? Quite perplexingly, evaluated vars
 are not ok-for-spec, see Note [exprOkForSpeculation and evaluated variables].
 For (1) and (2) we would have to look at the term. WW only looks at the
