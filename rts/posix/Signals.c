@@ -111,8 +111,8 @@ initUserSignals(void)
 #endif
 }
 
-void
-freeSignalHandlers(void) {
+void finiUserSignals(void)
+{
     if (signal_handlers != NULL) {
         stgFree(signal_handlers);
         signal_handlers = NULL;
@@ -121,11 +121,6 @@ freeSignalHandlers(void) {
 #if defined(THREADED_RTS)
     closeMutex(&sig_mutex);
 #endif
-}
-
-void finiUserSignals(void)
-{
-    /* nothing */
 };
 
 /* -----------------------------------------------------------------------------
