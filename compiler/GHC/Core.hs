@@ -1803,21 +1803,23 @@ Both use `GHC.Types.Id.mkCaseBndrFromLetBndr`.
 
 Note [Evaluated-ness on case binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Some binders carry an `OtherCon []` (aka `evaldUnfolding`) unfolding in the
-syntax tree, meaning "this variable is certainly evaluated":
+The binding site of an Id in case expression (case-binder or case alternative)
+has only vanillaIdInfo, /except/ that it may carry an `OtherCon []` (aka `evaldUnfolding`).
+meaning "this variable is certainly evaluated".  Specifically:
 
-* Case binders, by `GHC.Core.Opt.Simplify.Iteration.simplAlts`, and by
-  CorePrep, which puts it on every case binder it builds.
+* Case binders are always evaluated.  `GHC.Core.Opt.Simplify.Iteration.simplAlts` and
+  CorePrep add `evaldUnfolding` to every case binder.
 
-* Case-alternative binders for strict constructor fields (and some case
-  binders), via `GHC.Types.Id.setCaseBndrEvald`.  For example in
+* Case-alternative binders for strict constructor fields
+  binders)
       data T = MkT !Int Int
       case x of MkT y z -> ...
-  `y` gets an evaldUnfolding.  This is done by `GHC.Core.Utils.dataConRepFSInstPat`
-  (used by the interface-file loader, among others), `GHC.Core.SimpleOpt`, the
-  Simplifier (`adjustFieldsIdInfo`), and worker/wrapper (for the argument and
-  CPR result binders it makes; see Note [Record evaluated-ness in worker/wrapper]
-  in GHC.Core.Opt.WorkWrap.Utils).
+  `y` gets an evaldUnfolding.
+
+  This is done by `GHC.Core.Utils.dataConRepFSInstPat` (used by the interface-file loader,
+  among others), `GHC.Core.SimpleOpt`, the Simplifier (`adjustFieldsIdInfo`), and
+  worker/wrapper (for the argument and CPR result binders it makes;
+  see Note [Record evaluated-ness in worker/wrapper] in GHC.Core.Opt.WorkWrap.Utils).
 
 Why is this information on the /binder/?  Within the Simplifier it is not
 needed there: in each case alternative the Simplifier adds a more precise
