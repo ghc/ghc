@@ -127,28 +127,18 @@ void resetDefaultHandlers(void)
     }
 }
 
-/*
- * Function: blockUserSignals()
- *
- * Temporarily block the delivery of further console events. Needed to
- * avoid race conditions when GCing the stack of outstanding handlers or
- * when emptying the stack by running the handlers.
- *
+/* Temporarily block the delivery of further console events. Needed to
+ * avoid race conditions when emptying the stack by running the handlers.
  */
-void
-blockUserSignals(void)
+static void blockUserSignals(void)
 {
     deliver_event = false;
 }
 
 
-/*
- * Function: unblockUserSignals()
- *
- * The inverse of blockUserSignals(); re-enable the deliver of console events.
+/* The inverse of blockUserSignals(); re-enable the deliver of console events.
  */
-void
-unblockUserSignals(void)
+static void unblockUserSignals(void)
 {
     deliver_event = true;
 }
