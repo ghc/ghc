@@ -50,6 +50,7 @@ import qualified Data.ByteString.Lazy as LB
 import Data.IORef
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.Maybe
 import GHC.Generics
 import System.Exit
 import System.IO
@@ -77,6 +78,10 @@ data Pipe = Pipe
   , pipeReadClosed  :: !(TVar Bool)
     -- ^ After the pipe is closed, messages can no longer be received from the
     -- other end, but the 'AsyncManager' queues might not be empty yet.
+  , pipeWriteClosed :: !(TVar Bool)
+    -- ^ After the write end of the pipe is closed we can no longer submit
+    -- requests or respond to ones we receive, but we might still receive
+    -- replies.
   }
 
 -- | Make a 'Pipe' from a 'Handle' to read and a 'Handle' to write.
@@ -101,6 +106,7 @@ mkPipeFromContinuations getSome putAll pipeCloseRead pipeCloseWrite = mdo
   pipeLeftovers   <- newIORef Nothing
   pipeLock        <- newMVar ()
   pipeReadClosed  <- newTVarIO False
+  pipeWriteClosed  <- newTVarIO False
   mdo
     pipeAsyncMngr <- newAsyncManager p
     let p = Pipe { .. }
@@ -114,19 +120,30 @@ mkPipeFromContinuations getSome putAll pipeCloseRead pipeCloseWrite = mdo
 -- write. Only then do we stop the drain thread, which closes the read end
 -- itself once its read has finished. On Windows its read can't be
 -- interrupted, so this waits for the other side to close its write end too.
+-- Finally we stop the write thread, which could be blocked waiting for more to write.
 closePipe :: Pipe -> IO ()
 closePipe p@Pipe{..} = do
   readAlreadyClosed <- atomically $ do
     closed <- readTVar pipeReadClosed
     failPendingReplies p (toException PipeReadClosedException)
     pure closed
-  withLock p pipeCloseWrite `finally`
-    unless readAlreadyClosed
-      (throwTo (asyncDrainTid pipeAsyncMngr) PipeReadClosedException)
+
+  writeAlreadyClosed <- readTVarIO pipeWriteClosed
+
+  unless writeAlreadyClosed (withLock p pipeCloseWrite)
+    `finally` do
+      unless readAlreadyClosed
+        (throwTo (asyncDrainTid pipeAsyncMngr) PipeReadClosedException)
+      unless writeAlreadyClosed
+        (throwTo (asyncFillTid pipeAsyncMngr) PipeWriteClosedException)
 
 -- | We've closed the pipe read end on this process
 data PipeReadClosedException = PipeReadClosedException deriving Show
 instance Exception PipeReadClosedException
+
+-- | We've closed the pipe write end on this process
+data PipeWriteClosedException = PipeWriteClosedException deriving Show
+instance Exception PipeWriteClosedException
 
 --------------------------------------------------------------------------------
 -- ** Pipe thread-safe read/write
@@ -135,7 +152,11 @@ instance Exception PipeReadClosedException
 -- and identify whether they are requests or replies.
 
 writePipe :: Pipe -> IddMsg -> IO ()
-writePipe p@Pipe{..} = withLock p . putAll . execPut . put
+writePipe p@Pipe{..} msg = atomically $ do
+  readTVar pipeWriteClosed >>= \case
+    True -> throwSTM PipeWriteClosedException
+    False -> pure ()
+  writeTQueue (writeQueue pipeAsyncMngr) msg
 
 -- | Only the 'drainPipe' thread should read from the pipe directly. Other
 -- functions should wait for the matching reply to be delivered asynchronously.
@@ -229,6 +250,10 @@ handleAsyncReq pipe getit mii k = mask $ \restore -> do
 
   -- Block waiting for request
   mbreq <- atomically $ do
+    readTVar (pipeWriteClosed pipe) >>= \case
+      -- We will not be able to write the reply, so no point in continuiting.
+      True -> throwSTM PipeWriteClosedException
+      False -> pure ()
     isClosed <- readTVar (pipeReadClosed pipe)
     taken <- case mii of
       Nothing -> tryReadTQueue  $  requestsQueue am
@@ -320,7 +345,10 @@ data AsyncManager = AsyncManager
   , mailboxQueues :: !(TVar (IntMap (TQueue (CorrelationId, LB.ByteString))))
     -- ^ Requests for a specific 'InboxId' that can be read using
     -- @'handleAsyncReq' p get (Just <mailboxid>)@.
+  , writeQueue    :: !(TQueue IddMsg)
+    -- ^ Messages to write on the pipe.
   , asyncDrainTid :: !ThreadId
+  , asyncFillTid  :: !ThreadId
   , asyncFreshId  :: !(IORef Int)
   }
 
@@ -363,10 +391,15 @@ newAsyncManager pipe = do
   pendingReply  <- newTVarIO IntMap.empty
   requestsQueue <- newTQueueIO
   mailboxQueues <- newTVarIO IntMap.empty
+  writeQueue <- newTQueueIO
 
   -- Fork thread to drain read end.
   -- (cleaned up on 'closePipe')
   asyncDrainTid <- forkIOWithUnmask (drainPipe pipe)
+
+  -- Fork thread to fill write end.
+  -- (cleaned up on 'closePipe')
+  asyncFillTid <- forkIOWithUnmask (fillPipe pipe)
 
   let am = AsyncManager{..}
   pure am
@@ -416,6 +449,30 @@ drainPipe p unmask = catch (unmask $ loop `finally` pipeCloseRead p) replyToPend
   replyToPendings e = atomically $ failPendingReplies p e
 
   am = pipeAsyncMngr p
+
+
+-- | "Fill"s write end of the Pipe with queues messages.
+--
+-- Closes the Pipe write end when stopping, notifying any requests still queued to write.
+fillPipe :: Pipe -> (forall x. IO x -> IO x) -> IO ()
+fillPipe p unmask = unmask $ catch (loop `finally` pipeCloseWrite p) failPendingWrites where
+  loop = do
+    msg <- atomically $ readTQueue (writeQueue am)
+    withLock p . putAll p . execPut . put $ msg
+    loop
+
+  am = pipeAsyncMngr p
+
+  failPendingWrites :: SomeException -> IO ()
+  failPendingWrites e = atomically $ do
+    writeTVar (pipeWriteClosed p) True
+
+    writes <- flushTQueue (writeQueue am)
+    let uqs = [uq | Request uq _ _ <- writes]
+    pendings <- readTVar (pendingReply (pipeAsyncMngr p))
+    let tmvars = mapMaybe (`IntMap.lookup` pendings) uqs
+    writeTVar (pendingReply (pipeAsyncMngr p)) $! (foldl' (flip IntMap.delete) pendings uqs)
+    mapM_ (`writeTMVar` Left e) tmvars
 
 failPendingReplies :: Pipe -> SomeException -> STM ()
 failPendingReplies p e = do
