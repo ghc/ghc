@@ -460,8 +460,13 @@ static void output_name(char *buf, size_t cap, size_t group) {
     if (snprintf(buf, cap, "merged-%04zu.tix", group + 1) >= (int)cap)
         die("too many output groups");
 }
+#ifndef _WIN32
+#  define MKDIR(p) mkdir((p), 0777)
+#else
+#  define MKDIR(p) mkdir((p))
+#endif
 static void ensure_empty_output_dir(const char *in, const char *out) {
-    if (mkdir(out, 0777) && errno != EEXIST) { perror(out); exit(1); }
+    if (MKDIR(out) && errno != EEXIST) { perror(out); exit(1); }
     struct stat a, b;
     if (stat(in, &a) || stat(out, &b) || !S_ISDIR(b.st_mode))
         die("invalid input/output directory");
