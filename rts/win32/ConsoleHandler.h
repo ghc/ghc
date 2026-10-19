@@ -26,6 +26,14 @@
  */
 
 /*
+ * Function: startPendingSignalHandlers()
+ *
+ * If there are any queued up win32 console events, run the handlers
+ * associated with them.
+ */
+void startPendingSignalHandlers(Capability *cap);
+
+/*
  * Function: rts_waitConsoleHandlerCompletion()
  *
  * Esoteric entry point used by worker thread that got woken
