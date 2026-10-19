@@ -46,14 +46,21 @@ resetTerminalSettings (void)
 #if HAVE_TERMIOS_H
     // Reset the terminal settings on the standard file descriptors,
     // if we changed them.  See System.Posix.Internals.tcSetAttr for
-    // more details, including the reason we temporarily disable
+    // more details, including the reason we temporarily mask
     // SIGTTOU here.
+    //
+    // This masking best effort only: it will only be effective if the
+    // calling thread is the only thread left in the process with
+    // signals unmasked. This should typically be true when this is
+    // called during shutdown, but there are many ways to make it false.
+    //
+    // See Note [pthread_sigmask and the ineffectiveness of masking signals].
     {
         int fd;
         sigset_t sigset, old_sigset;
         sigemptyset(&sigset);
         sigaddset(&sigset, SIGTTOU);
-        sigprocmask(SIG_BLOCK, &sigset, &old_sigset);
+        pthread_sigmask(SIG_BLOCK, &sigset, &old_sigset);
         for (fd = 0; fd <= 2; fd++) {
             struct termios* ts =
                 (struct termios*)__hscore_get_saved_termios(fd);
@@ -61,7 +68,7 @@ resetTerminalSettings (void)
                 tcsetattr(fd,TCSANOW,ts);
             }
         }
-        sigprocmask(SIG_SETMASK, &old_sigset, NULL);
+        pthread_sigmask(SIG_SETMASK, &old_sigset, NULL);
     }
 #endif
 }
