@@ -510,12 +510,6 @@ hs_exit_(bool wait_foreign)
     }
     runAllCFinalizers(nonmoving_weak_ptr_list);
 
-#if defined(RTS_USER_SIGNALS)
-    if (RtsFlags.MiscFlags.install_signal_handlers) {
-        freeSignalHandlers();
-    }
-#endif
-
     /* We rely on the guarantee that exitTimer stops the timer synchronously,
      * which ensures the timer handler does not get run again after this point.
      * We are about to start freeing resources used by the timer handler (like
