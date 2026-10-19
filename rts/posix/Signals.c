@@ -525,8 +525,8 @@ set_sigtstp_action (bool handle)
 void
 initDefaultHandlers(void)
 {
-    // N.B. We can't use initializers here as CentOS's ancient toolchain throws
-    // spurious warnings. See #23577.
+    if (!RtsFlags.MiscFlags.install_signal_handlers) return;
+
     struct sigaction action, oact;
     memset(&oact, 0, sizeof(struct sigaction));
     memset(&action, 0, sizeof(struct sigaction));
@@ -590,6 +590,8 @@ initDefaultHandlers(void)
 void
 resetDefaultHandlers(void)
 {
+    if (!RtsFlags.MiscFlags.install_signal_handlers) return;
+
     struct sigaction action;
 
     action.sa_handler = SIG_DFL;

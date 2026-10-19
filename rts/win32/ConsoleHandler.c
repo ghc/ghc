@@ -110,6 +110,8 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
  */
 void initDefaultHandlers(void)
 {
+    if (!RtsFlags.MiscFlags.install_signal_handlers) return;
+
     if ( !SetConsoleCtrlHandler(shutdown_handler, true) ) {
         errorBelch("warning: failed to install default console handler");
     }
@@ -117,6 +119,8 @@ void initDefaultHandlers(void)
 
 void resetDefaultHandlers(void)
 {
+    if (!RtsFlags.MiscFlags.install_signal_handlers) return;
+
     if ( !SetConsoleCtrlHandler(shutdown_handler, false) ) {
         errorBelch("warning: failed to uninstall default console handler");
     }

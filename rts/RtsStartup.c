@@ -513,12 +513,11 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     unpauseTimer();
 
 #if defined(RTS_USER_SIGNALS)
-    if (RtsFlags.MiscFlags.install_signal_handlers) {
-        /* Initialise the user signal handler set */
-        initUserSignals();
-        /* Set up handler to run on SIGINT, etc. */
-        initDefaultHandlers();
-    }
+    /* Initialise the user signal handler set */
+    initUserSignals();
+
+    /* Set up handler to run on SIGINT, etc. */
+    initDefaultHandlers();
 #endif
 
     startIOManager();
@@ -624,10 +623,8 @@ hs_exit_(bool wait_foreign)
 #endif
 
 #if defined(RTS_USER_SIGNALS)
-    if (RtsFlags.MiscFlags.install_signal_handlers) {
-        // uninstall signal handlers
-        resetDefaultHandlers();
-    }
+    // uninstall signal handlers
+    resetDefaultHandlers();
 #endif
 
     /* stop timing the shutdown, we're about to print stats */
