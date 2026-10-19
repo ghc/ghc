@@ -903,11 +903,11 @@ function save_hpc_coverage() {
   # Keep whatever has been generated even if the build or tests failed.
   $GHC -c -o tix-rle-merge.o tix-rle-merge.c
   $GHC -no-hs-main -o tix-rle-merge tix-rle-merge.o
-  ./tix-rle-merge _build/ghc-tix/ _build/ghc.tix
+  ./tix-rle-merge _build/ghc-tix/ _build/tix-merged
   if [[ -d _build/ghc-hpc || -d _build/ghc-tix ]]; then
     mkdir -p _build/ghc-hpc _build/ghc-tix
-    du -sh _build/ghc-hpc _build/ghc-tix _build/ghc.tix
-    tar -czf ghc-hpc-coverage.tar.gz _build/ghc-hpc _build/ghc.tix
+    du -sh _build/ghc-hpc _build/ghc-tix _build/tix-merged
+    tar -czf ghc-hpc-coverage.tar.gz _build/ghc-hpc _build/tix-merged
     ls -lh ghc-hpc-coverage.tar.gz
   else
     warn "No HPC coverage directories found"
