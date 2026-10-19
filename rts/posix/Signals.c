@@ -255,28 +255,25 @@ unblockUserSignals(void)
 int
 stg_sig_install(int sig, int spi, void *mask)
 {
-    sigset_t signals, osignals;
-    StgInt previous_spi;
-
-    struct sigaction action;
-    memset(&action, 0, sizeof(struct sigaction));
-
     ACQUIRE_LOCK(&sig_mutex);
 
-    // Block the signal until we figure out what to do
-    // Count on this to fail if the signal number is invalid
-    if (sig < 0 ||
-          sigemptyset(&signals) ||
-          sigaddset(&signals, sig) ||
-          sigprocmask(SIG_BLOCK, &signals, &osignals)) {
-        RELEASE_LOCK(&sig_mutex);
-        return STG_SIG_ERR;
+    // Use sigaddset as a way to validate the signal number.
+    // We do not use the resulting signal set.
+    {
+        sigset_t signals;
+        sigemptyset(&signals);
+        if (sig < 0 || sigaddset(&signals, sig)) {
+            RELEASE_LOCK(&sig_mutex);
+            return STG_SIG_ERR;
+        }
     }
 
     more_handlers(sig);
 
-    previous_spi = signal_handlers[sig];
+    StgInt previous_spi = signal_handlers[sig];
 
+    struct sigaction action;
+    memset(&action, 0, sizeof(struct sigaction));
     action.sa_flags = 0;
 
     switch(spi) {
@@ -300,15 +297,15 @@ stg_sig_install(int sig, int spi, void *mask)
         barf("stg_sig_install: bad spi");
     }
 
-    if (mask != NULL)
+    if (mask != NULL) {
         action.sa_mask = *(sigset_t *)mask;
-    else
+    } else {
         sigemptyset(&action.sa_mask);
+    }
 
     action.sa_flags |= sig == SIGCHLD && nocldstop ? SA_NOCLDSTOP : 0;
 
-    if (sigaction(sig, &action, NULL))
-    {
+    if (sigaction(sig, &action, NULL)) {
         errorBelch("sigaction");
         RELEASE_LOCK(&sig_mutex);
         return STG_SIG_ERR;
@@ -325,13 +322,6 @@ stg_sig_install(int sig, int spi, void *mask)
     default:
         sigdelset(&userSignals, sig);
         break;
-    }
-
-    if (sigprocmask(SIG_SETMASK, &osignals, NULL))
-    {
-        errorBelch("sigprocmask");
-        RELEASE_LOCK(&sig_mutex);
-        return STG_SIG_ERR;
     }
 
     RELEASE_LOCK(&sig_mutex);
