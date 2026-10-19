@@ -1451,21 +1451,23 @@ genCondJump bid expr = do
                   `appOL` code_y
                   `snocOL` annExpr expr (BCOND cmp x' y' (TBlock bid))
 
-          sbcond w cmp = do
+          sbcond _w cmp = do
             -- compute both sides.
             (reg_x, format_x, code_x) <- getSomeReg x
             (reg_y, format_y, code_y) <- getSomeReg y
-            let x' = OpReg w reg_x
-                y' = OpReg w reg_y
-            return $ case w of
-              w
-                | w `elem` [W8, W16, W32] ->
-                    code_x
-                      `appOL` signExtend (formatToWidth format_x) W64 reg_x reg_x
-                      `appOL` code_y
-                      `appOL` signExtend (formatToWidth format_y) W64 reg_y reg_y
-                      `appOL` unitOL (annExpr expr (BCOND cmp x' y' (TBlock bid)))
-              _ -> code_x `appOL` code_y `appOL` unitOL (annExpr expr (BCOND cmp x' y' (TBlock bid)))
+            -- Sign-extend the operands into fresh registers rather than in
+            -- place.  The source may be a local which is still live past the
+            -- branch and in-place extension would violate the subword
+            -- invariant documented in Note [Signed arithmetic on RISCV64].
+            (reg_x', code_x') <- signExtendReg (formatToWidth format_x) W64 reg_x
+            (reg_y', code_y') <- signExtendReg (formatToWidth format_y) W64 reg_y
+            let x' = OpReg W64 reg_x'
+                y' = OpReg W64 reg_y'
+            return $ code_x
+              `appOL` code_x'
+              `appOL` code_y
+              `appOL` code_y'
+              `snocOL` annExpr expr (BCOND cmp x' y' (TBlock bid))
 
           fbcond w cmp = do
             -- ensure we get float regs

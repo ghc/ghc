@@ -1,0 +1,14 @@
+section: compiler
+synopsis: Fix the RISC-V NCG sign-extending subword branch operands in place, corrupting live values
+issues: #28050
+mrs: !16998
+
+description: {
+  The signed subword path of ``genCondJump`` sign-extended its operands in
+  place. If an operand was a local that remained live after the branch, its
+  value was corrupted, violating the zero-extended subword invariant that the
+  RISC-V NCG relies on.
+
+  The operands are now sign-extended into fresh registers and the comparison is
+  performed at 64-bit width, leaving the source registers untouched.
+}

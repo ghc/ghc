@@ -305,3 +305,5 @@ test('T27533', [req_cmm, extra_ways(['optasm'])], multi_compile_and_run,
 test('T27537', normal, compile_and_run, ['-O'])
 
 test('T27538', normal, compile_and_run, ['-O'])
+
+test('T28050', normal, compile_and_run, ['-O'])
