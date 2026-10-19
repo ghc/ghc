@@ -679,6 +679,12 @@ Wrinkles
    so for now we simply disable (NOI1) magic if pushing arguments inward would result
    in an argument that doesn't have a fixed runtime rep.
 
+(NOI7) If we have
+            let f = <rhs> in ...(noinline (f e1 e2))...
+   we obviously don't want to inline `f`, /even/ if it occurs precisely once.
+   Danger: since it occurs once, preInlineUnconditionally may inline it. Boo!
+   Solution: the occurrence analyser needs to give `f` a ManyOcc occurrence.
+
 Note [nospecId magic]
 ~~~~~~~~~~~~~~~~~~~~~
 The 'nospec' magic Id is used to ensure to make a value opaque to the typeclass

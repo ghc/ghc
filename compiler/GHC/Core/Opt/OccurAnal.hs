@@ -66,7 +66,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
-import GHC.Builtin.KnownKeys( runRWKey )
+import GHC.Builtin.KnownKeys( runRWKey, noinlineIdKey )
 import GHC.Unit.Module( Module )
 
 import Data.List (mapAccumL)
@@ -2778,17 +2778,14 @@ Constructors are rather like lambdas in this way.
 occAnalApp :: OccEnv
            -> (Expr CoreBndr, [Arg CoreBndr], [CoreTickish])
            -> WithUsageDetails (Expr CoreBndr)
-occAnalApp !env (Var fun_id, [], ticks)
+occAnalApp !env (fun@(Var fun_id), [], ticks)
   = -- Naked variables (not applied) end up here too, and it's worth giving
     -- this common case special treatment, because there is so much less to do.
     -- This is just a specialised copy of the (Var fun_id) case below
     WUD fun_uds (mkTicks ticks fun')
   where
-    !(fun', fun_id')  = lookupBndrSwap env fun_id
-    !fun_uds = mkOneOcc env fun_id' int_cxt 0
-    !int_cxt = case occ_encl env of
-                   OccScrut -> IsInteresting
-                   _other   -> NotInteresting
+    !(fun', fun_id')  = lookupBndrSwap env fun fun_id
+    !fun_uds = mkOneOcc env fun_id' 0 0
 
 occAnalApp env (Var fun, args, ticks)
   -- Account for join arity of runRW# continuation
@@ -2805,17 +2802,25 @@ occAnalApp env (Var fun, args, ticks)
   = let app_out = mkTicks ticks $ mkApps (Var fun) [t1, t2, arg']
     in WUD usage app_out
 
-occAnalApp env (Var fun_id, args, ticks)
+-- For (noinline e) set occ_encl to OccNoinline, and recurse
+-- See (NOI7) in Note [noinlineId magic] in GHC.Builtin.WiredIn.Ids
+occAnalApp env (fun@(Var fun_id), args, ticks)
+  | fun_id `hasKey` noinlineIdKey
+  , let env_args = env { occ_encl = OccNoinline }
+  , WUD args_uds app' <- occAnalArgs env_args fun args []
+  = WUD args_uds (mkTicks ticks app')
+
+occAnalApp env (fun@(Var fun_id), args, ticks)
   = let app_out = mkTicks ticks app'
     in WUD all_uds app_out
   where
-    -- Lots of banged bindings: this is a very heavily bit of code,
-    -- so it pays not to make lots of thunks here, all of which
+    -- Lots of banged bindings: this is a very heavily-used bit of
+    -- code, so it pays not to make lots of thunks here, all of which
     -- will ultimately be forced.
-    !(fun', fun_id')  = lookupBndrSwap env fun_id
+    !(fun', fun_id')  = lookupBndrSwap env fun fun_id
     !(WUD args_uds app') = occAnalArgs env fun' args one_shots
 
-    fun_uds = mkOneOcc env fun_id' int_cxt n_args
+    fun_uds = mkOneOcc env fun_id' n_args n_val_args
        -- NB: fun_uds is computed for fun_id', not fun_id
        -- See (BS1) in Note [The binder-swap substitution]
 
@@ -2836,11 +2841,6 @@ occAnalApp env (Var fun_id, args, ticks)
 
     !n_val_args = valArgCount args
     !n_args     = length args
-    !int_cxt    = case occ_encl env of
-                   OccScrut -> IsInteresting
-                   _other   | n_val_args > 0 -> IsInteresting
-                            | otherwise      -> NotInteresting
-
     !is_exp     = isExpandableApp fun_id n_val_args
         -- See Note [CONLIKE pragma] in GHC.Types.Basic
         -- The definition of is_exp should match that in GHC.Core.Opt.Simplify.prepareRhs
@@ -3070,12 +3070,15 @@ OccEncl is used to control whether to inline into constructor arguments.
 data OccEncl -- See Note [OccEncl]
   = OccRhs         -- RHS of let(rec), albeit perhaps inside a type lambda
   | OccScrut       -- Scrutintee of a case
+  | OccNoinline    -- Argument of noinline; see (NOI7) in Note [noinlineId magic]
+                   --   in GHC.Builtin.WiredIn.Ids
   | OccVanilla     -- Everything else
 
 instance Outputable OccEncl where
-  ppr OccRhs     = text "occRhs"
-  ppr OccScrut   = text "occScrut"
-  ppr OccVanilla = text "occVanilla"
+  ppr OccRhs      = text "occRhs"
+  ppr OccScrut    = text "occScrut"
+  ppr OccNoinline = text "occNoinline"
+  ppr OccVanilla  = text "occVanilla"
 
 -- See Note [OneShots]
 type OneShots = [OneShotInfo]
@@ -3658,18 +3661,24 @@ addBndrSwap scrut case_bndr
     case_bndr' = zapIdOccInfo case_bndr
                  -- See Note [Zap case binders in proxy bindings]
 
-lookupBndrSwap :: OccEnv -> Id -> (CoreExpr, Id)
+lookupBndrSwap :: OccEnv -> CoreExpr -> Id -> (CoreExpr, Id)
 -- See Note [The binder-swap substitution]
 -- Returns an expression of the same type as Id
-lookupBndrSwap env@(OccEnv { occ_bs_env = bs_env })  bndr
-  = case lookupVarEnv bs_env bndr of {
-       Nothing           -> (Var bndr, bndr) ;
-       Just (bndr1, mco) ->
-
+-- In (lookupBndrSwap env fun fun_id), it's always the case that
+--    fun = Var fun_id
+-- Reason: save allocation in the common no-swap case
+lookupBndrSwap (OccEnv { occ_bs_env = bs_env }) fun fun_id
+  = case lookupVarEnv bs_env fun_id of
+       Nothing           -> (fun, fun_id)
+       Just (bndr1, mco) -> wrap_mco mco (go bndr1)
+  where
     -- Why do we iterate here?
     -- See (BS2) in Note [The binder-swap substitution]
-    case lookupBndrSwap env bndr1 of
-      (fun, fun_id) -> (mkCastMCo fun mco, fun_id) }
+    go lfun = case lookupVarEnv bs_env lfun of
+                Nothing           -> (Var lfun, lfun)
+                Just (lfun1, mco) -> wrap_mco mco (go lfun1)
+
+    wrap_mco mco (fun', fun_id') =  (mkCastMCo fun' mco, fun_id')
 
 {- Historical note [Proxy let-bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3877,24 +3886,38 @@ combineJoinPointUDs (OccEnv { occ_nested_lets = nested_lets }) uds1 uds2
       | uniq `elemVarSetByKey` nested_lets = orLocalOcc  occ1 occ2
       | otherwise                          = andLocalOcc occ1 occ2
 
-mkOneOcc :: OccEnv -> Id -> InterestingCxt -> JoinArity -> UsageDetails
-mkOneOcc !env id int_cxt arity
+mkOneOcc :: OccEnv -> Id -> JoinArity -> Arity -> UsageDetails
+mkOneOcc (OccEnv {}) id _ _
   | not (isLocalId id)
   = emptyDetails
 
-  | Just join_uds <- lookupVarEnv (occ_join_points env) id
+mkOneOcc (OccEnv { occ_encl = encl }) id _ _
+  | OccNoinline <- encl
+  = -- We are looking at the `f` in (noinline (f e1 e2))
+    -- We want to make it ManyOcc
+    -- See (NOI7) in Note [noinlineId magic] in GHC.Builtin.WiredIn.Ids
+    mkSimpleDetails (unitVarEnv id (ManyOccL NoTailCallInfo))
+
+mkOneOcc (OccEnv { occ_encl = encl, occ_join_points = jps }) id n_args n_val_args
+  | Just join_uds <- lookupVarEnv jps id
   = -- See Note [Occurrence analysis for join points]
     assertPpr (not (isEmptyVarEnv join_uds)) (ppr id) $
        -- We only put non-empty join-points into occ_join_points
     mkSimpleDetails (extendVarEnv join_uds id occ)
 
+
   | otherwise
   = mkSimpleDetails (unitVarEnv id occ)
 
   where
-    occ = OneOccL { lo_n_br = 1
-                  , lo_int_cxt = int_cxt
-                  , lo_tail = AlwaysTailCalled arity }
+    !int_cxt = case encl of
+                   OccScrut -> IsInteresting
+                   _other   | n_val_args > 0 -> IsInteresting
+                            | otherwise      -> NotInteresting
+
+    !occ = OneOccL { lo_n_br = 1
+                   , lo_int_cxt = int_cxt
+                   , lo_tail = AlwaysTailCalled n_args }
 
 -- Add several occurrences, assumed not to be tail calls
 add_many_occ :: Var -> OccInfoEnv -> OccInfoEnv
