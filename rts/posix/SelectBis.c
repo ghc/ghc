@@ -25,12 +25,12 @@
 #include "Trace.h"
 
 #include "SelectBis.h"
-#include "posix/Signals.h"
 
 #include <errno.h>
 #include <sys/select.h>
 
 #include "IOManagerInternals.h"
+#include "IOManSignals.h"
 #include "Timeout.h"
 #include "FdWakeup.h"
 

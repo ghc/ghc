@@ -579,6 +579,7 @@ library
          c-sources: posix/GetEnv.c
                     posix/GetTime.c
                     posix/Ticker.c
+                    posix/IOManSignals.c
                     posix/OSMem.c
                     posix/OSThreads.c
                     posix/FdWakeup.c

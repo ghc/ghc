@@ -23,7 +23,6 @@
 #include "Trace.h"
 
 #include "Poll.h"
-#include "posix/Signals.h"
 
 #include <limits.h>
 #include <errno.h>
@@ -39,6 +38,7 @@
 #endif
 
 #include "IOManagerInternals.h"
+#include "IOManSignals.h"
 #include "Timeout.h"
 #include "FdWakeup.h"
 
