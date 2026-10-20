@@ -46,6 +46,7 @@ module GHC.Internal.Event.Windows.FFI (
     zeroOverlapped,
     pokeOffsetOverlapped,
     overlappedIOStatus,
+    overlappedIOErrCode,
     overlappedIONumBytes,
 
     -- * Cancel pending I/O
@@ -209,10 +210,16 @@ getQueuedCompletionStatusEx iocp arr timeout =
 overlappedIOStatus :: LPOVERLAPPED -> IO NTSTATUS
 overlappedIOStatus lpol = do
   status <- #{peek OVERLAPPED, Internal} lpol
-  -- TODO: Map NTSTATUS to ErrCode?
-  -- See https://github.com/libuv/libuv/blob/b12624c13693c4d29ca84b3556eadc9e9c0936a4/src/win/winsock.c#L153
   return status
 {-# INLINE overlappedIOStatus #-}
+
+foreign import ccall unsafe "winternl.h RtlNtStatusToDosError"
+    c_RtlNtStatusToDosError :: NTSTATUS -> IO ULONG
+
+overlappedIOErrCode :: LPOVERLAPPED -> IO ErrCode
+overlappedIOErrCode lpol = do
+  status <- overlappedIOStatus lpol
+  c_RtlNtStatusToDosError status
 
 overlappedIONumBytes :: LPOVERLAPPED -> IO ULONG_PTR
 overlappedIONumBytes lpol = do

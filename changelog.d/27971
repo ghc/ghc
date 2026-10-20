@@ -1,0 +1,5 @@
+section: base
+synopsis: WinIO: Fix a bug where WinIO could confuse Win32 and NTSTATUS error codes
+mrs: !16838
+issues: #27971
+description: This could lead to the result of certian I/O operations being misinterpreted, mishandled and misreported
