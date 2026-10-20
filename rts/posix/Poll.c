@@ -158,11 +158,23 @@ void initCapabilityIOManagerPoll(CapIOManager *iomgr)
                                   .revents = 0
                                 };
     iomgr->aiop_poll_table = iomgr->full_poll_table+1; /* hence empty */
+
+#if defined(RTS_USER_SIGNALS)
+    /* Signal handlers are shared across all caps. Only init once. */
+    if (iomgr->cap->no == 0) {
+        initUserSignals();
+    }
+#endif
 }
 
 
 void freeCapabilityIOManagerPoll(CapIOManager *iomgr)
 {
+#if defined(RTS_USER_SIGNALS)
+    if (iomgr->cap->no == 0) {
+        finiUserSignals();
+    }
+#endif
     stgFree(iomgr->full_poll_table);
 #if defined(HAVE_PREEMPTION)
     closeFdWakeup(iomgr->interrupt_fd_r, iomgr->interrupt_fd_w);
