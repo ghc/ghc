@@ -20,5 +20,7 @@
 void startPendingSignalHandlers(Capability *cap);
 #endif
 
+int installUserSignalHandler(int sig, int spi, void *mask, bool nocldstop);
+
 #include "EndPrivate.h"
 
