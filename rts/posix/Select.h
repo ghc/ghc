@@ -22,5 +22,10 @@ void wakeupIOManagerSelect(CapIOManager *iomgr);
 bool awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait);
 void interruptIOManagerSelect(CapIOManager *iomgr);
 
+#if defined(RTS_USER_SIGNALS)
+int  installUserSignalHandlerSelect(int sig, int spi, sigset_t *mask,
+                                    bool nocldstop);
+#endif
+
 #include "EndPrivate.h"
 
