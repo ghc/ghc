@@ -66,16 +66,16 @@ data SingleStep
    | ModuleStep
       { breakAt :: SrcSpan }
 
--- | Just like @'isolateThreadBreaks'@, determining whether the
--- execution/resuming execution of an expression should stop whenever any
--- non-isolated thread hits a breakpoint, or only when the thread executing
--- that expression specifically stops.
+-- | Just like @'isolateThreadBreaks'@, on whether breakpoints hit during the
+-- execution of this expression should be visible by 'WaitAnyThreadBreak' or
+-- isolated and only visible using @'WaitThreadResult' <tid>@ specifically.
 data ThreadBreaksIsolationMode
-  -- | Stop exclusively on the breakpoints in this thread
-  = SingleThreadedBreaks
-  -- | Stop whenever any thread that is not running in 'SingleThreadedBreaks'
-  -- isolation mode hits a breakpoint
-  | MultiThreadedBreaks
+  -- | Hide this thread breakpoint hits from 'WaitAnyThreadBreak'; read the
+  -- result or break hits using @'WaitThreadResult' <tid>@ directly instead.
+  = ThreadBreaksIsolated
+  -- | If this thread hits a breakpoint, 'WaitAnyThreadBreak' anywhere might
+  -- return this thread's 'EvalBreak'.
+  | ThreadBreaksVisible
 
 -- | Whether this 'SingleStep' mode requires instructing the interpreter to
 -- step at every breakpoint or after every return (see @'EvalStep'@).
@@ -86,8 +86,8 @@ enableGhcStepMode StepOut{}       = EvalStepOut
 enableGhcStepMode _               = EvalStepSingle
 
 enableIsolateThreadBreaks :: ThreadBreaksIsolationMode -> Bool
-enableIsolateThreadBreaks SingleThreadedBreaks = True
-enableIsolateThreadBreaks MultiThreadedBreaks  = False
+enableIsolateThreadBreaks ThreadBreaksIsolated = True
+enableIsolateThreadBreaks ThreadBreaksVisible  = False
 
 -- | Given a 'SingleStep' mode, whether the breakpoint was explicitly active,
 -- and the SrcSpan of a breakpoint we hit, return @True@ if we should stop at

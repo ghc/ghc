@@ -184,8 +184,7 @@ execOptions = ExecOptions
   , execSourceFile = "<interactive>"
   , execLineNumber = 1
   , execWrap = EvalThis -- just run the statement, don't wrap it in anything
-  , execIsolateMode = SingleThreadedBreaks
-    -- by default we just care about breakpoints hit in this eval thread
+  , execIsolateMode = ThreadBreaksIsolated -- by default this execution runs isolated from 'WaitAnyThreadBreak'
   }
 
 -- | Run a statement in the current interactive context, as a new thread in the interpreter.

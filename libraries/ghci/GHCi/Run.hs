@@ -295,12 +295,12 @@ abandonStmt :: RemoteRef ThreadId -> IO ()
 abandonStmt hvref = do
   tid <- localRef hvref
   ResumeContext{..} <- getThreadResumeContext tid
+  setIsolatedThread tid
   killThread tid
-  withIsolatedThread tid $ do
-    putMVar resumeBreakMVar ()
-    _ <- atomically $
-      readThreadEvalStatus tid
-    return ()
+  putMVar resumeBreakMVar ()
+  _ <- atomically $
+    readThreadEvalStatus tid
+  return ()
 
 --------------------------------------------------------------------------------
 
@@ -411,21 +411,9 @@ sandboxIO opts io
       let allocs = negate $ fromIntegral ctr
       return (EvalComplete allocs a)
 
--- | This function sets up the given thread for catching breakpoints, and
--- resets everything when the computation has stopped running. It unfortunately
--- still does some global things (namely, may set the global
+-- | This function sets up the given thread for catching breakpoints
+-- It unfortunately still does some global things (namely, may set the global
 -- break-on-exceptions rts flag), but otherwise acts only on the given thread.
---
--- The continuation `IO` action receives an `IO` argument. That IO argument
--- will block waiting for a result from the interpreter; when 'EvalOpts' sets
--- @isolateThreadBreaks == True@, this result will come from the given thread
--- exclusively (either Break or Complete), otherwise, the result might be a
--- Break from any non-isolated thread or Complete from this thread specifically.
---
--- Note that 'EvalComplete' results must be written by the thread explicitly to the
--- global thread eval status mapping using 'writeThreadEvalStatus'. 'EvalBreak'
--- results are automatically written by a thread which hits a breakpoint.
--- See e.g. 'sandboxIO' for an example of writing 'EvalComplete'.
 setBreakAction :: EvalOpts -> ThreadId -> IO ()
 setBreakAction opts tid@(ThreadId tid#) = do
   ctx <- getThreadResumeContext tid
