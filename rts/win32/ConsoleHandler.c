@@ -33,12 +33,12 @@ DWORD stg_pending_buf[N_PENDING_EVENTS]; /* their associated event numbers. */
 #endif
 
 /*
- * Function: initUserSignals()
+ * Function: initConsoleEvents()
  *
  * Initialize the console handling substrate.
  */
 void
-initUserSignals(void)
+initConsoleEvents(void)
 {
     console_handler = STG_SIG_DFL;
 #if !defined(THREADED_RTS)
@@ -56,7 +56,7 @@ initUserSignals(void)
 
 /* Called in hs_exit to clean up resources.  */
 void
-finiUserSignals(void)
+finiConsoleEvents(void)
 {
 #if !defined(THREADED_RTS)
     if (hConsoleEvent != INVALID_HANDLE_VALUE) {
@@ -129,15 +129,15 @@ void resetDefaultHandlers(void)
 /* Temporarily block the delivery of further console events. Needed to
  * avoid race conditions when emptying the stack by running the handlers.
  */
-static void blockUserSignals(void)
+static void blockConsoleEvents(void)
 {
     deliver_event = false;
 }
 
 
-/* The inverse of blockUserSignals(); re-enable the deliver of console events.
+/* The inverse of blockConsoleEvents(); re-enable the deliver of console events.
  */
-static void unblockUserSignals(void)
+static void unblockConsoleEvents(void)
 {
     deliver_event = true;
 }
@@ -145,12 +145,12 @@ static void unblockUserSignals(void)
 
 #if !defined(THREADED_RTS)
 /*
- * Function: startPendingSignalHandlers()
+ * Function: startPendingConsoleEventHandlers()
  *
  * If there are any queued up console events, run the handlers associated with
  * them. Console event delivery is blocked for the duration of this call.
  */
-void startPendingSignalHandlers(Capability *cap)
+void startPendingConsoleEventHandlers(Capability *cap)
 {
     StgStablePtr handler;
 
@@ -158,7 +158,7 @@ void startPendingSignalHandlers(Capability *cap)
         return;
     }
 
-    blockUserSignals();
+    blockConsoleEvents();
     ACQUIRE_LOCK(&sched_mutex);
 
     handler = deRefStablePtr((StgStablePtr)console_handler);
@@ -176,7 +176,7 @@ void startPendingSignalHandlers(Capability *cap)
     }
 
     RELEASE_LOCK(&sched_mutex);
-    unblockUserSignals();
+    unblockConsoleEvents();
 }
 #endif /* !THREADED_RTS */
 
