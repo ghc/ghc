@@ -602,6 +602,15 @@ void interruptIOManagerSelectBis(CapIOManager *iomgr USED_IF_PREEMPTION)
 }
 
 
+#if defined(RTS_USER_SIGNALS)
+int installUserSignalHandlerSelectBis(int sig, int spi, sigset_t *mask,
+                                      bool nocldstop)
+{
+    return installSignalHandler(sig, spi, mask, nocldstop, generic_handler);
+}
+#endif
+
+
 /* Helper function to double the size of the aiop_table.
  */
 static bool enlargeTables(CapIOManager *iomgr)

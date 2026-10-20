@@ -523,4 +523,12 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
     return !interrupt;
 }
 
+#if defined(RTS_USER_SIGNALS)
+int installUserSignalHandlerSelect(int sig, int spi, sigset_t *mask,
+                                   bool nocldstop)
+{
+    return installSignalHandler(sig, spi, mask, nocldstop, generic_handler);
+}
+#endif
+
 #endif /* IOMGR_ENABLED_SELECT */
