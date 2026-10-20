@@ -429,13 +429,9 @@ setBreakAction opts tid@(ThreadId tid#) = do
       runIf# singleStep rts_enableStopNextBreakpoint
       runIf# stepOut    rts_enableStopAfterReturn
 
-      runIfCtx ctx isolateThreadBreaks setIsolatedCtx
-
-    _resetBreakAction ctx () = do
-      poke exceptionFlag 0 -- just wrong, expection flag should be per-thread
-      rts_disableStopAfterReturn    tid#
-      rts_disableStopNextBreakpoint tid#
-      runIfCtx ctx isolateThreadBreaks unsetIsolatedCtx
+      if isolateThreadBreaks opts
+        then setIsolatedCtx ctx
+        else unsetIsolatedCtx ctx
 
       -- freeStablePtr stablePtr TODO: we never free the global stablePtr for
       -- global action. Maybe we should have a de-init for clean up.
@@ -444,7 +440,6 @@ setBreakAction opts tid@(ThreadId tid#) = do
 
     runIf    pred what     = when (pred opts) (what tid)
     runIf#   pred what     = when (pred opts) (what tid#)
-    runIfCtx ctx pred what = when (pred opts) (what ctx)
 
 -- While we're waiting for the sandbox thread to return a result, if
 -- the current thread receives an asynchronous exception we re-throw
