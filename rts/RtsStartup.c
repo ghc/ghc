@@ -513,9 +513,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     unpauseTimer();
 
 #if defined(RTS_USER_SIGNALS)
-    /* Initialise the user signal handler set */
-    initUserSignals();
-
     /* Set up handler to run on SIGINT, etc. */
     initDefaultHandlers();
 #endif
@@ -702,10 +699,6 @@ hs_exit_(bool wait_foreign)
 #if defined(mingw32_HOST_OS)
    if (is_io_mng_native_p())
       hs_restoreConsoleCP();
-#endif
-
-#if defined(RTS_USER_SIGNALS)
-   finiUserSignals ();
 #endif
 
     /* tear down statistics subsystem */
