@@ -16,6 +16,10 @@ test('annrun01',
      multimod_compile_and_run,
      ['annrun01', '-package ghc ' + config.ghc_th_way_flags])
 
+# Skipping on windows because of platform-specific failures.  See
+# https://gitlab.haskell.org/ghc/ghc/-/merge_requests/16841#note_706770
+test('T16841', [req_th, windows_skip, extra_files(['T16841.hs'])], makefile_test, ['T16841'])
+
 """"
 Helpful things to C+P:
 

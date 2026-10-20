@@ -100,7 +100,6 @@ import Control.Monad.IO.Class (MonadIO (..))
 import Data.Binary
 import Data.Binary.Put
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Data
 import Data.Dynamic
@@ -169,7 +168,7 @@ instance MonadIO GHCiQ where
   -- serialize irrelevant annotations.
 reifyAnnotations :: forall a . Data a => TH.AnnLookup -> GHCiQ [a]
 reifyAnnotations lookup =
-    map (deserializeWithData . B.unpack) <$>
+    map deserializeWithData <$>
       ghcCmd (ReifyAnnotations lookup typerep)
     where typerep = typeOf (undefined :: a)
 

@@ -297,7 +297,7 @@ data THMessage a where
   ReifyInstances :: TH.Name -> [TH.Type] -> THMessage (THResult [TH.Dec])
   ReifyRoles :: TH.Name -> THMessage (THResult [TH.Role])
   ReifyAnnotations :: TH.AnnLookup -> TypeRep
-    -> THMessage (THResult [ByteString])
+    -> THMessage (THResult [BS.ShortByteString])
   ReifyModule :: TH.Module -> THMessage (THResult TH.ModuleInfo)
   ReifyConStrictness :: TH.Name -> THMessage (THResult [TH.DecidedStrictness])
 

@@ -138,6 +138,7 @@ import GHC.Utils.Misc (lastMaybe, snocView)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as Short
 import Data.Char
 import qualified Data.Map as M
 import Data.Int
@@ -1105,7 +1106,7 @@ instance Outputable a => Outputable (SCC a) where
    ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
 
 instance Outputable Serialized where
-    ppr (Serialized the_type bytes) = int (length bytes) <+> text "of type" <+> text (show the_type)
+    ppr (Serialized the_type bytes) = int (Short.length bytes) <+> text "of type" <+> text (show the_type)
 
 instance Outputable Extension where
     ppr = text . show

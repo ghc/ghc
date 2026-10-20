@@ -68,9 +68,9 @@ import GHC.Unit.Module.ModGuts
 import GHC.Unit.External
 
 import Data.Bifunctor ( bimap )
+import Data.ByteString.Short ( ShortByteString )
 import Data.Dynamic
 import Data.Maybe (listToMaybe)
-import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
 
@@ -323,14 +323,14 @@ get_eps = do
 -- annotations.
 --
 -- See Note [Annotations]
-getAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (ModuleEnv [a], NameEnv [a])
+getAnnotations :: Typeable a => (ShortByteString -> a) -> ModGuts -> CoreM (ModuleEnv [a], NameEnv [a])
 getAnnotations deserialize guts = do
      hsc_env <- getHscEnv
      ann_env <- liftIO $ prepareAnnotations hsc_env (Just guts)
      return (deserializeAnns deserialize ann_env)
 
 -- | Get at most one annotation of a given type per annotatable item.
-getFirstAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (ModuleEnv a, NameEnv a)
+getFirstAnnotations :: Typeable a => (ShortByteString -> a) -> ModGuts -> CoreM (ModuleEnv a, NameEnv a)
 getFirstAnnotations deserialize guts
   = bimap mod name <$> getAnnotations deserialize guts
   where

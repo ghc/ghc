@@ -155,10 +155,10 @@ import Control.DeepSeq
 import Control.Monad
 import Data.Binary
 import Data.Binary.Get
+import Data.ByteString.Short (ShortByteString)
 import Data.Containers.ListUtils ( nubOrd )
 import Data.List ( sortBy )
 import Data.Maybe
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic  ( fromDynamic, toDyn )
 import qualified Data.IntMap as IntMap
@@ -1947,7 +1947,7 @@ handleTHMessage msg = case msg of
   ReifyInstances n ts -> wrapTHResult $ runQinTcM $ TH.reifyInstances n ts
   ReifyRoles n -> wrapTHResult $ runQinTcM $ TH.reifyRoles n
   ReifyAnnotations lookup tyrep ->
-    wrapTHResult $ (map B.pack <$> getAnnotationsByTypeRep lookup tyrep)
+    wrapTHResult $ getAnnotationsByTypeRep lookup tyrep
   ReifyModule m -> wrapTHResult $ runQinTcM $ TH.reifyModule m
   ReifyConStrictness nm -> wrapTHResult $ runQinTcM $ TH.reifyConStrictness nm
   GetPackageRoot -> wrapTHResult $ runQinTcM $ TH.getPackageRoot
@@ -1967,7 +1967,7 @@ handleTHMessage msg = case msg of
   FailIfErrs -> wrapTHResult failIfErrsM
   _ -> panic ("handleTHMessage: unexpected message " ++ show msg)
 
-getAnnotationsByTypeRep :: TH.AnnLookup -> TypeRep -> TcM [[Word8]]
+getAnnotationsByTypeRep :: TH.AnnLookup -> TypeRep -> TcM [ShortByteString]
 getAnnotationsByTypeRep th_name tyrep
   = do { name <- lookupThAnnLookup th_name
        ; topEnv <- getTopEnv

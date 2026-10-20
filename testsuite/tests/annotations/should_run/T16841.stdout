@@ -1,0 +1,9 @@
+Module target T16841 annotated by 15 of type Either Int [Char]
+Named target foo annotated by 1509 of type [Int]
+Named target foo annotated by 18 of type Maybe Bool
+Named target foo annotated by 119 of type [Char]
+Named target foo annotated by 2 of type Char
+Named target foo annotated by 11 of type Double
+Named target foo annotated by 24 of type Integer
+Named target foo annotated by 6 of type Int
+

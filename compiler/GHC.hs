@@ -453,12 +453,12 @@ import qualified GHC.Unit.Home.Graph as HUG
 import Control.Applicative ((<|>))
 import Control.Monad
 import Control.Monad.Catch as MC
+import Data.ByteString.Short (ShortByteString)
 import Data.Foldable
 import Data.Function ((&))
 import Data.IORef
 import Data.List (isPrefixOf)
 import Data.Typeable    ( Typeable )
-import Data.Word        ( Word8 )
 
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -1526,7 +1526,7 @@ lookupGlobalName :: GhcMonad m => Name -> m (Maybe TyThing)
 lookupGlobalName name = withSession $ \hsc_env -> do
    liftIO $ lookupType hsc_env name
 
-findGlobalAnns :: (GhcMonad m, Typeable a) => ([Word8] -> a) -> AnnTarget Name -> m [a]
+findGlobalAnns :: (GhcMonad m, Typeable a) => (ShortByteString -> a) -> AnnTarget Name -> m [a]
 findGlobalAnns deserialize target = withSession $ \hsc_env -> do
     ann_env <- liftIO $ prepareAnnotations hsc_env Nothing
     return (findAnns deserialize ann_env target)

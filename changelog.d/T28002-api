@@ -1,0 +1,21 @@
+section: ghc-lib
+issues: #28002
+mrs: !16841
+synopsis:
+  Use ``ShortByteString`` in the ``Serialized`` type instead of ``[Word8]``
+description:
+  Breaking change: All functions that previously handled annotations in ``[Word8]``
+  form now use ``ShortByteString``. The following definitions have modified types:
+  * ``GHC.findGlobalAnns``
+  * ``GHC.Tc.Gen.Splice.getAnnotationsByTypeRep``
+  * ``GHC.Core.Opt.Monad.getAnnotations``
+  * ``GHC.Core.Opt.Monad.getFirstAnnotations``
+  * ``GHC.Types.Annotations.deserializeAnns``
+  * ``GHC.Types.Annotations.findAnns``
+  * ``GHC.Types.Annotations.findAnnsByTypeRep``
+  * ``GHC.Serialized.Serialized``
+  * ``GHC.Serialized.toSerialized``
+  * ``GHC.Serialized.fromSerialized``
+  * ``GHC.Serialized.serializeWithData``
+  * ``GHC.Serialized.deserializeWithData``
+  * ``GHCi.Message.ReifyAnnotations``

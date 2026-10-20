@@ -27,9 +27,9 @@ import GHC.Utils.Outputable
 import GHC.Serialized
 
 import Control.Monad
+import Data.ByteString.Short ( ShortByteString )
 import Data.Maybe
 import Data.Typeable
-import Data.Word        ( Word8 )
 import Control.DeepSeq
 
 -- | Represents an annotation after it has been sufficiently desugared from
@@ -112,14 +112,14 @@ plusAnnEnv a b =
 -- | Find the annotations attached to the given target as 'Typeable'
 --   values of your choice. If no deserializer is specified,
 --   only transient annotations will be returned.
-findAnns :: Typeable a => ([Word8] -> a) -> AnnEnv -> CoreAnnTarget -> [a]
+findAnns :: Typeable a => (ShortByteString -> a) -> AnnEnv -> CoreAnnTarget -> [a]
 findAnns deserialize env
   = mapMaybe (fromSerialized deserialize) . findAnnPayloads env
 
 -- | Find the annotations attached to the given target as 'Typeable'
 --   values of your choice. If no deserializer is specified,
 --   only transient annotations will be returned.
-findAnnsByTypeRep :: AnnEnv -> CoreAnnTarget -> TypeRep -> [[Word8]]
+findAnnsByTypeRep :: AnnEnv -> CoreAnnTarget -> TypeRep -> [ShortByteString]
 findAnnsByTypeRep env target tyrep
   = [ ws | Serialized tyrep' ws <- findAnnPayloads env target
     , tyrep' == tyrep ]
@@ -134,7 +134,7 @@ findAnnPayloads env target =
 -- | Deserialize all annotations of a given type. This happens lazily, that is
 --   no deserialization will take place until the [a] is actually demanded and
 --   the [a] can also be empty (the UniqFM is not filtered).
-deserializeAnns :: Typeable a => ([Word8] -> a) -> AnnEnv -> (ModuleEnv [a], NameEnv [a])
+deserializeAnns :: Typeable a => (ShortByteString -> a) -> AnnEnv -> (ModuleEnv [a], NameEnv [a])
 deserializeAnns deserialize env
   = ( mapModuleEnv deserAnns (ann_mod_env env)
     , mapNameEnv deserAnns (ann_name_env env)

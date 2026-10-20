@@ -1,0 +1,8 @@
+section: compiler
+issues: #28002
+mrs: !16841
+synopsis:
+  Use ``ShortByteString`` in the ``Serialized`` type instead of ``[Word8]``
+description:
+  ``GHC.Serialized.Serialized`` now uses ``ByteString`` to store serialized data.
+  This makes in-memory representation more compact.

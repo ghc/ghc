@@ -7,6 +7,7 @@ import GHC
 import GHC.Plugins
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad
+import qualified Data.ByteString.Short as Short
 import qualified Data.Map as Map
 import Data.Word (Word8)
 import System.IO (hFlush, stdout)
@@ -38,5 +39,5 @@ plugin = defaultPlugin { typeCheckResultAction = typecheckPlugin }
       -- check that it is visible from other modules.
       let ann = Annotation
                   (ModuleTarget $ tcg_mod gblEnv)
-                  (toSerialized id [0])
+                  (toSerialized id (Short.pack [0]))
       return gblEnv { tcg_anns = ann : tcg_anns gblEnv }

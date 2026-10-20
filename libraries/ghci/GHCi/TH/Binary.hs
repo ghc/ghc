@@ -9,7 +9,6 @@ module GHCi.TH.Binary () where
 
 import Prelude -- See note [Why do we import Prelude here?]
 import Data.Binary
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B
 import GHC.Serialized
 import qualified GHC.Boot.TH.Syntax as TH
@@ -74,8 +73,8 @@ instance Binary TH.DocLoc
 -- We need Binary TypeRep for serializing annotations
 
 instance Binary Serialized where
-    put (Serialized tyrep wds) = put tyrep >> put (B.pack wds)
-    get = Serialized <$> get <*> (B.unpack <$> get)
+    put (Serialized tyrep wds) = put tyrep >> put wds
+    get = Serialized <$> get <*> get
 
 instance Binary TH.Bytes where
    put (TH.Bytes ptr off sz) = put bs
