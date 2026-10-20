@@ -42,7 +42,8 @@ void setTimerManagerControlFd(int fd) {
 }
 
 #if defined(THREADED_RTS)
-void timerManagerNotifySignal(int sig, siginfo_t *info)
+static void timerManagerNotifySignal(int sig, siginfo_t *info,
+                                     void *p STG_UNUSED)
 {
     StgWord8 buf[sizeof(siginfo_t) + 1];
     int r;
@@ -73,7 +74,7 @@ int installUserSignalHandlerMIO(int sig, int spi, sigset_t *mask,
                                 bool nocldstop)
 {
     return installSignalHandler(sig, spi, mask, nocldstop,
-                                generic_handler);
+                                timerManagerNotifySignal);
 }
 #endif
 
