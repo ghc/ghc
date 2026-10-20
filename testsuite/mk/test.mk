@@ -107,6 +107,7 @@ RUNTEST_OPTS += -e "config.tables_next_to_code=False"
 endif
 
 HAVE_GDB := $(shell if gdb --version > /dev/null 2> /dev/null; then echo YES; else echo NO; fi)
+HAVE_LDD := $(shell if ldd --version > /dev/null 2> /dev/null; then echo YES; else echo NO; fi)
 HAVE_READELF := $(shell if readelf --version > /dev/null 2> /dev/null; then echo YES; else echo NO; fi)
 
 # Detect whether the fast (GMP) bignum backend is in use. The GMP backend module
@@ -152,6 +153,12 @@ ifeq "$(HAVE_GDB)" "YES"
 RUNTEST_OPTS += -e config.have_gdb=True
 else
 RUNTEST_OPTS += -e config.have_gdb=False
+endif
+
+ifeq "$(HAVE_LDD)" "YES"
+RUNTEST_OPTS += -e config.have_ldd=True
+else
+RUNTEST_OPTS += -e config.have_ldd=False
 endif
 
 ifeq "$(HAVE_READELF)" "YES"

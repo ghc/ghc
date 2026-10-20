@@ -182,6 +182,9 @@ class TestConfig:
         # Is gdb available?
         self.have_gdb = False
 
+        # Is ldd available?
+        self.have_ldd = False
+
         # Is readelf available?
         self.have_readelf = False
 
