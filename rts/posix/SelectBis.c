@@ -153,11 +153,23 @@ void initCapabilityIOManagerSelectBis(CapIOManager *iomgr)
 
     iomgr->rfds = stgMallocBytes(sizeof (fd_set), "IOManagerSelectBis");
     iomgr->wfds = stgMallocBytes(sizeof (fd_set), "IOManagerSelectBis");
+
+#if defined(RTS_USER_SIGNALS)
+    /* Signal handlers are shared across all caps. Only init once. */
+    if (iomgr->cap->no == 0) {
+        initUserSignals();
+    }
+#endif
 }
 
 
 void freeCapabilityIOManagerSelectBis(CapIOManager *iomgr)
 {
+#if defined(RTS_USER_SIGNALS)
+    if (iomgr->cap->no == 0) {
+        finiUserSignals();
+    }
+#endif
     stgFree(iomgr->rfds);
     stgFree(iomgr->wfds);
 #if defined(HAVE_PREEMPTION)

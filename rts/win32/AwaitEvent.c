@@ -46,7 +46,7 @@ awaitCompletedTimeoutsOrIOWin32(Capability *cap, bool wait)
 
     // If a signal was raised, we need to service it. This will typically
     // start a thread, which will cause us to drop out of the loop.
-    startPendingSignalHandlers(cap);
+    startPendingConsoleEventHandlers(cap);
 
     // The return value from awaitRequests() reports if it was interrupted by
     // abandonRequestWait(). Return to the scheduler if !wait, or
