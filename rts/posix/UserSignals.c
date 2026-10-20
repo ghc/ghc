@@ -21,7 +21,6 @@
 #include "MIO.h"
 
 #include <unistd.h>
-#include <signal.h>
 #include <string.h>
 
 /* -----------------------------------------------------------------------------
@@ -112,7 +111,7 @@ static inline bool signals_pending(void) {
  * started up at the next context switch.
  * -------------------------------------------------------------------------- */
 
-static void
+void
 generic_handler(int sig USED_IF_THREADS,
                 siginfo_t *info,
                 void *p STG_UNUSED)
@@ -191,7 +190,8 @@ unblockUserSignals(void)
  * -------------------------------------------------------------------------- */
 
 int
-installUserSignalHandler(int sig, int spi, void *mask, bool nocldstop)
+installSignalHandler(int sig, int spi, sigset_t *mask, bool nocldstop,
+                     SignalHandler signal_handler)
 {
     ACQUIRE_LOCK(&sig_mutex);
 
@@ -227,7 +227,7 @@ installUserSignalHandler(int sig, int spi, void *mask, bool nocldstop)
         action.sa_flags |= SA_RESETHAND;
         /* fall through */
     case STG_SIG_HAN:
-        action.sa_sigaction = generic_handler;
+        action.sa_sigaction = signal_handler;
         action.sa_flags |= SA_SIGINFO;
         break;
 
@@ -236,7 +236,7 @@ installUserSignalHandler(int sig, int spi, void *mask, bool nocldstop)
     }
 
     if (mask != NULL) {
-        action.sa_mask = *(sigset_t *)mask;
+        action.sa_mask = *mask;
     } else {
         sigemptyset(&action.sa_mask);
     }

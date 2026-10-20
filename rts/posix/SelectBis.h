@@ -32,6 +32,10 @@
 
 #include "IOManager.h"
 
+#if defined(RTS_USER_SIGNALS)
+#include <signal.h>
+#endif
+
 #include "BeginPrivate.h"
 
 #if defined(IOMGR_ENABLED_SELECTBIS)
@@ -54,6 +58,12 @@ void asyncIOCancelSelectBis(CapIOManager *iomgr, StgAsyncIOOp *aiop);
 void pollCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr);
 bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr);
 void interruptIOManagerSelectBis(CapIOManager *iomgr);
+
+/* Signals */
+#if defined(RTS_USER_SIGNALS)
+int  installUserSignalHandlerSelectBis(int sig, int spi, sigset_t *mask,
+                                       bool nocldstop);
+#endif
 
 #endif /* IOMGR_ENABLED_SELECTBIS */
 

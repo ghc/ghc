@@ -33,7 +33,6 @@
  */
 #define _GNU_SOURCE 1
 #define __BSD_VISIBLE 1
-#include <signal.h>
 #include <poll.h>
 #endif
 
@@ -590,6 +589,15 @@ void interruptIOManagerPoll(CapIOManager *iomgr USED_IF_PREEMPTION)
     sendFdWakeup(iomgr->interrupt_fd_w);
 #endif
 }
+
+
+#if defined(RTS_USER_SIGNALS)
+int installUserSignalHandlerPoll(int sig, int spi, sigset_t *mask,
+                                 bool nocldstop)
+{
+    return installSignalHandler(sig, spi, mask, nocldstop, generic_handler);
+}
+#endif
 
 
 /* Helper function to double the size of the aiop_table and aiop_poll_table.
