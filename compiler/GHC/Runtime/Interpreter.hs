@@ -12,6 +12,8 @@ module GHC.Runtime.Interpreter
   , resumeStmt
   , abandonStmt
   , waitThreadResult
+  , waitAnyThreadBreak
+  , waitThreadResultOrAnyThreadBreak
   , evalIO
   , evalString
   , evalStringToIOString
@@ -313,6 +315,18 @@ waitThreadResult
 waitThreadResult interp tid = do
   status <- withForeignRef tid $ \rhv -> do
     interpCmd interp (WaitThreadResult rhv)
+  handleEvalStatus interp status
+
+waitAnyThreadBreak :: Interp -> IO EvalBreak
+waitAnyThreadBreak interp = interpCmd interp WaitAnyThreadBreak
+
+waitThreadResultOrAnyThreadBreak
+  :: Interp
+  -> ForeignRef ThreadId
+  -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
+waitThreadResultOrAnyThreadBreak interp tid = do
+  status <- withForeignRef tid $ \rhv ->
+    interpCmd interp (WaitThreadResultOrAnyThreadBreak rhv)
   handleEvalStatus interp status
 
 handleEvalStatus

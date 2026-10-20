@@ -11,7 +11,6 @@ module GHCi.Run.Breakpoints
   , readCtxEvalStatus, writeCtxEvalStatus
 
   -- ** Isolating thread breakpoints
-  , withIsolatedThread
   , setIsolatedThread, unsetIsolatedThread
   , setIsolatedCtx, unsetIsolatedCtx
 
@@ -32,7 +31,6 @@ import GHCi.RemoteTypes
 
 import qualified Data.Map as Map
 import Control.Concurrent
-import Control.Exception
 import qualified Data.ByteString.Short.Internal as BS
 import GHC.Exts
 import GHC.Stack
@@ -98,11 +96,10 @@ globalBreakAction info_mod# info_mod_uid# infox# is_exception apStack = do
 --------------------------------------------------------------------------------
 
 -- | To evaluate a statement in the interpreter, a thread is forked by
--- `sandboxIO` to run the statement. To synchronize, the statement result will
--- be written by the thread to the global thread dbg status
--- (`writeThreadEvalStatus`) and `sandboxIO` will block waiting for either any
--- breakpoint to be hit ('readAnyThreadEvalBreak') /or/ for the thread
--- specifically to write its final result. To wait for that thread
+-- `sandboxIO` to run the statement. The statement result will be written by
+-- the thread to the global thread dbg status (`writeThreadEvalStatus`) and we
+-- can await either for any breakpoint to be hit ('readAnyThreadEvalBreak')
+-- /or/ for a thread specifically to write its result. To wait for that thread
 -- specifically, use this function.
 --
 -- Succeeds when the given thread writes to the global debugger map an eval result.
@@ -127,7 +124,10 @@ readCtxEvalStatus ResumeContext{resumeEvalStatus} =
 -- | All threads running in the interpreter will be debugger-enabled, meaning
 -- if they hit an enabled breakpoint, the 'globalBreakAction' will be
 -- executed and write a 'EvalBreak' value to the global thread dbg status map.
--- The debugger will be waiting for threads to break using `readAnyThreadEvalBreak`.
+--
+-- A debugger can await for any thread (including threads spawned by EvalStmt
+-- expressions) to break using `readAnyThreadEvalBreak`. Any thread with
+-- @'isolateThreadBreaks' = True@ is ignored.
 --
 -- Succeeds when any thread hits a breakpoint.
 --
@@ -173,10 +173,6 @@ writeCtxEvalStatus ResumeContext{resumeEvalStatus} status =
 
 
 -- ** Isolating thread breakpoints ---------------------------------------------
-
--- | Brackets 'setIsolatedThread'
-withIsolatedThread :: ThreadId -> IO a -> IO a
-withIsolatedThread tid = bracket_ (setIsolatedThread tid) (unsetIsolatedThread tid)
 
 -- | Make sure that anyone watching for threads hitting breakpoints with
 -- 'readAnyThreadEvalBreak' ignore the given thread if it ever hits a breakpoint.
