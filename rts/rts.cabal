@@ -587,5 +587,6 @@ library
                     posix/Select.c
                     posix/SelectBis.c
                     posix/Signals.c
+                    posix/UserSignals.c
                     posix/Timeout.c
                     posix/TTY.c

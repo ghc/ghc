@@ -1,9 +1,8 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2005
+ * (c) The GHC Team, 1998-2005, 2026
  *
- * Extra posix-specific signal processing / handling functions. This is in
- * addition the shared API in RtsSignals.h
+ * Shared utilities for I/O managers: signal handling functionality.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -15,7 +14,7 @@
 /*
  * Function: startPendingSignalHandlers()
  *
- * If there are any queued up win32 console events, run the handlers
+ * If there are any queued up posix signals, run the handlers
  * associated with them.
  */
 void startPendingSignalHandlers(Capability *cap);
