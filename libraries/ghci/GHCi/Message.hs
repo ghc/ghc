@@ -1,6 +1,6 @@
 {-# LANGUAGE RecursiveDo, GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards, CPP,
-    NamedFieldPuns, LambdaCase, TypeAbstractions, TypeApplications, PatternSynonyms
+    NamedFieldPuns, LambdaCase, TypeAbstractions, TypeApplications, PatternSynonyms,
     LinearTypes, RankNTypes, UnboxedTuples, BlockArguments, TupleSections, MagicHash #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
