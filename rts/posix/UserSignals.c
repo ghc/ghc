@@ -110,16 +110,12 @@ static inline bool signals_pending(void) {
  * started up at the next context switch.
  * -------------------------------------------------------------------------- */
 
+#if !defined(THREADED_RTS)
 void
 generic_handler(int sig USED_IF_THREADS,
                 siginfo_t *info,
                 void *p STG_UNUSED)
 {
-#if defined(THREADED_RTS)
-    //TODO: This calls MIO directly. We should go via IOManager API.
-    // The IOManager API should be extended to cover signals.
-    timerManagerNotifySignal(sig, info);
-#else /* not THREADED_RTS */
 
     /* Can't call allocate from here.  Probably can't call malloc
        either.  However, we have to schedule a new thread somehow.
@@ -161,8 +157,8 @@ generic_handler(int sig USED_IF_THREADS,
 
     interruptCapability(&MainCapability);
 
-#endif /* THREADED_RTS */
 }
+#endif /* THREADED_RTS */
 
 /* -----------------------------------------------------------------------------
  * Blocking/Unblocking of the user signals
