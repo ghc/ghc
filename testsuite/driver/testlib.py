@@ -1091,6 +1091,9 @@ def debug_rts( ) -> bool:
 def have_gdb( ) -> bool:
     return config.have_gdb
 
+def have_ldd( ) -> bool:
+    return config.have_ldd
+
 def have_readelf( ) -> bool:
     return config.have_readelf
 

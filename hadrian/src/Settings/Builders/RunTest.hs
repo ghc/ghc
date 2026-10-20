@@ -255,6 +255,7 @@ runTestBuilderArgs = builder Testsuite ? do
         asBool s b = s ++ show b
 
     have_gdb     <- expr $ liftIO (isJust <$> findExecutable "gdb")
+    have_ldd     <- expr $ liftIO (isJust <$> findExecutable "ldd")
     have_readelf <- expr $ liftIO (isJust <$> findExecutable "readelf")
 
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
@@ -278,6 +279,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ asBool "config.have_ncg=" withNativeCodeGen
             , arg "-e", arg $ asBool "config.have_llvm=" have_llvm
             , arg "-e", arg $ asBool "config.have_gdb=" have_gdb
+            , arg "-e", arg $ asBool "config.have_ldd=" have_ldd
             , arg "-e", arg $ asBool "config.have_readelf=" have_readelf
 
             , arg "-e", arg $ asBool "config.compiler_profiled=" profiled
