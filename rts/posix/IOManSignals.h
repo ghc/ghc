@@ -8,6 +8,10 @@
 
 #pragma once
 
+#if defined(RTS_USER_SIGNALS)
+
+#include <signal.h>
+
 #include "BeginPrivate.h"
 
 /*
@@ -31,7 +35,17 @@ void finiUserSignals(void);
 void startPendingSignalHandlers(Capability *cap);
 #endif
 
-int installUserSignalHandler(int sig, int spi, void *mask, bool nocldstop);
+typedef void (*SignalHandler)(int sig, siginfo_t *info, void *p);
+
+int installSignalHandler(int sig, int spi, sigset_t *mask, bool nocldstop,
+                         SignalHandler handler);
+
+/* Temporary */
+void generic_handler(int sig USED_IF_THREADS,
+                     siginfo_t *info,
+                     void *p STG_UNUSED);
+
+#endif
 
 #include "EndPrivate.h"
 

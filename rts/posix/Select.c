@@ -524,4 +524,10 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
     return !interrupt;
 }
 
+int installUserSignalHandlerSelect(int sig, int spi, sigset_t *mask,
+                                   bool nocldstop)
+{
+    return installSignalHandler(sig, spi, mask, nocldstop, generic_handler);
+}
+
 #endif /* IOMGR_ENABLED_SELECT */

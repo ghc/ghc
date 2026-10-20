@@ -68,6 +68,13 @@ void timerManagerNotifySignal(int sig, siginfo_t *info)
     // of its pipe is, there's not much we can do here, so just ignore
     // the signal..
 }
+
+int installUserSignalHandlerMIO(int sig, int spi, sigset_t *mask,
+                                bool nocldstop)
+{
+    return installSignalHandler(sig, spi, mask, nocldstop,
+                                generic_handler);
+}
 #endif
 
 

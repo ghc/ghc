@@ -595,6 +595,13 @@ void interruptIOManagerSelectBis(CapIOManager *iomgr USED_IF_PREEMPTION)
 }
 
 
+int installUserSignalHandlerSelectBis(int sig, int spi, sigset_t *mask,
+                                      bool nocldstop)
+{
+    return installSignalHandler(sig, spi, mask, nocldstop, generic_handler);
+}
+
+
 /* Helper function to double the size of the aiop_table.
  */
 static bool enlargeTables(CapIOManager *iomgr)

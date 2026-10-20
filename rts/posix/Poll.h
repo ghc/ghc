@@ -34,6 +34,9 @@ void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr);
 bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr);
 void interruptIOManagerPoll(CapIOManager *iomgr);
 
+/* Signals */
+int  installUserSignalHandlerPoll(int sig, int spi, sigset_t *mask, bool nocldstop);
+
 #endif /* IOMGR_ENABLED_POLL */
 
 #include "EndPrivate.h"

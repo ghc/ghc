@@ -653,6 +653,41 @@ setIOManagerControlFd(uint32_t cap_no, int fd) {
 
 
 #if !defined(mingw32_HOST_OS)
+/* This is a plausible candidate for a newer public API, but it isn't yet.
+ * It is currently the worker for stg_sig_install below.
+ */
+static int installUserSignalHandler(int sig, int spi, sigset_t *mask,
+                                    bool nocldstop)
+{
+#if !defined(RTS_USER_SIGNALS)
+    return STG_SIG_DFL;
+#endif
+
+    debugTrace(DEBUG_iomanager, "Installing a signal handler for sig %d", sig);
+
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+          return installUserSignalHandlerSelect(sig, spi, mask, nocldstop);
+#endif
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+          return installUserSignalHandlerSelectBis(sig, spi, mask, nocldstop);
+#endif
+#if defined(IOMGR_ENABLED_POLL)
+        case IO_MANAGER_POLL:
+          return installUserSignalHandlerPoll(sig, spi, mask, nocldstop);
+#endif
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MANAGER_MIO_POSIX:
+          return installUserSignalHandlerMIO(sig, spi, mask, nocldstop);
+#endif
+        default:
+            barf("installUserSignalHandler not implemented");
+    }
+}
+
+
 /* This flag is a public API, used by the unix package. It is an _implicit_
  * argument to stg_sig_install to control whether or not to include
  * SA_NOCLDSTOP when installing a SIGCHLD handler.
@@ -668,17 +703,8 @@ HsInt nocldstop = 0;
  */
 int stg_sig_install(int sig, int spi, void *mask)
 {
-    debugTrace(DEBUG_iomanager, "Installing a signal handler for sig %d", sig);
-
     /* Grab the current value of the nocldstop argument. Yes this is madness. */
-    bool nocldstop_arg = nocldstop;
-
-#if defined(RTS_USER_SIGNALS)
-    return installUserSignalHandler(sig, spi, mask, nocldstop_arg);
-
-#else /* !RTS_USER_SIGNALS */
-  return STG_SIG_DFL;
-#endif
+    return installUserSignalHandler(sig, spi, mask, nocldstop);
 }
 #endif
 

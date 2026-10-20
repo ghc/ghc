@@ -55,6 +55,10 @@ void pollCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr);
 bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr);
 void interruptIOManagerSelectBis(CapIOManager *iomgr);
 
+/* Signals */
+int  installUserSignalHandlerSelectBis(int sig, int spi, sigset_t *mask,
+                                       bool nocldstop);
+
 #endif /* IOMGR_ENABLED_SELECTBIS */
 
 #include "EndPrivate.h"

@@ -21,6 +21,8 @@ void wakeupIOManagerSelect(CapIOManager *iomgr);
 
 bool awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait);
 void interruptIOManagerSelect(CapIOManager *iomgr);
+int  installUserSignalHandlerSelect(int sig, int spi, sigset_t *mask,
+                                    bool nocldstop);
 
 #include "EndPrivate.h"
 
