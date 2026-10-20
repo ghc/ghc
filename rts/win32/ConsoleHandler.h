@@ -19,6 +19,17 @@
  * handling code also.
  */
 
+/*
+ * Function: initUserSignals()
+ *
+ * Initialize the console handling substrate.
+ */
+void initUserSignals(void);
+
+/* Finalise signal and console events handling.
+ */
+void finiUserSignals(void);
+
 #if !defined(THREADED_RTS)
 /*
  * under THREADED_RTS, console events are passed to the IO manager
