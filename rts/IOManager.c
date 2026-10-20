@@ -55,6 +55,7 @@
 #if defined(IOMGR_ENABLED_MIO_WIN32)
 #include "win32/ThrIOManager.h"
 #include "win32/AsyncMIO.h"
+#include "win32/ConsoleHandler.h"
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
@@ -62,6 +63,7 @@
 #include "win32/AsyncMIO.h"
 #include "win32/AwaitEvent.h"
 #include "win32/MIOManager.h"
+#include "win32/ConsoleHandler.h"
 #endif
 
 #if defined(IOMGR_ENABLED_WINIO)
@@ -70,6 +72,7 @@
 #if !defined(THREADED_RTS)
 #include "win32/AwaitEvent.h"
 #endif
+#include "win32/ConsoleHandler.h"
 #endif
 
 #include <string.h>
@@ -480,6 +483,13 @@ void startIOManager(void)
         default:
             break;
     }
+
+/* For the moment this is called here, but eventually it will be up to
+ * each I/O manager to decide what to do.
+ */
+#if defined(RTS_USER_SIGNALS)
+    initUserSignals();
+#endif
 }
 
 /* Called from forkProcess in the child process on the surviving capability.
@@ -584,6 +594,13 @@ exitIOManager(bool wait_threads)
         default:
             break;
     }
+
+/* For the moment this is called here, but eventually it will be up to
+ * each I/O manager to decide what to do.
+ */
+#if defined(RTS_USER_SIGNALS)
+   finiUserSignals ();
+#endif
 }
 
 void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr)

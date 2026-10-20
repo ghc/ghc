@@ -10,6 +10,17 @@
 
 #include "BeginPrivate.h"
 
+/*
+ * Function: initUserSignals()
+ *
+ * Initialize the console handling substrate.
+ */
+void initUserSignals(void);
+
+/* Finalise signal and console events handling.
+ */
+void finiUserSignals(void);
+
 #if !defined(THREADED_RTS)
 /*
  * Function: startPendingSignalHandlers()

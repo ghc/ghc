@@ -16,13 +16,6 @@
 #include "BeginPrivate.h"
 
 /*
- * Function: initUserSignals()
- *
- * Initialize the console handling substrate.
- */
-void initUserSignals(void);
-
-/*
  * Function: initDefaultHandlers()
  *
  * Install any default signal/console handlers. Currently we install a
@@ -30,10 +23,6 @@ void initUserSignals(void);
  */
 void initDefaultHandlers(void);
 void resetDefaultHandlers(void);
-
-/* Finalise signal and console events handling.
- */
-void finiUserSignals(void);
 
 #include "EndPrivate.h"
 
