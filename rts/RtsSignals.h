@@ -5,7 +5,7 @@
  * Signal processing / handling. This is the shared API to the subsystems for
  * POSIX signals and Win32 console events.
  *
- * Platform specific APIs live in win32/ConsoleHandler.h and posix/Signals.h
+ * Platform specific APIs live in win32/ConsoleHandler.h
  *
  * ---------------------------------------------------------------------------*/
 
