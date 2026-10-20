@@ -380,7 +380,8 @@ runStmt stmt stmt_text step = do
                   , GHC.execSingleStep = step
                   , GHC.execWrap = \fhv -> EvalApp (EvalThis (evalWrapper st))
                                                    (EvalThis fhv) }
-    Just <$> GHC.execStmt' stmt stmt_text opts
+    waitRes <- GHC.execStmt' stmt stmt_text opts
+    Just <$> waitRes
 
 runDecls :: GhciMonad m => String -> m (Maybe [GHC.TyThing])
 runDecls decls = do
@@ -418,7 +419,8 @@ resume step mbIgnoreCnt = do
                 throwGhcExceptionIO (GHC.ProgramError "not stopped at a breakpoint")
           (r:rs) -> do
             modifySession $ \env -> env{hsc_IC = (hsc_IC env){ ic_resume = rs }}
-            GHC.resumeExec step GHC.SingleThreadedBreaks mbIgnoreCnt r
+            waitRes <- GHC.resumeExec step GHC.ThreadBreaksIsolated mbIgnoreCnt r
+            waitRes
 
 -- --------------------------------------------------------------------------
 -- timing & statistics

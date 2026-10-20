@@ -31,7 +31,6 @@ import GHCi.RemoteTypes
 
 import qualified Data.Map as Map
 import Control.Concurrent
-import Control.Exception
 import qualified Data.ByteString.Short.Internal as BS
 import GHC.Exts
 import GHC.Stack
