@@ -27,6 +27,11 @@
 
 #include "IOManagerInternals.h"
 
+#if !defined(mingw32_HOST_OS)
+// TODO: make this per-I/O manager, not called from here directly.
+#include "posix/IOManSignals.h"
+#endif
+
 #if defined(IOMGR_ENABLED_SELECT)
 #include "Threads.h"
 #include "posix/Select.h"
@@ -629,6 +634,31 @@ setIOManagerControlFd(uint32_t cap_no, int fd) {
     } else {
         errorBelch("warning: setIOManagerControlFd called with illegal capability number.");
     }
+#endif
+}
+#endif
+
+
+#if !defined(mingw32_HOST_OS)
+/* This curious flag is provided for the benefit of the Haskell binding
+ * to POSIX.1 to control whether or not to include SA_NOCLDSTOP when
+ * installing a SIGCHLD handler.
+ */
+HsInt nocldstop = 0;
+
+
+/* Declared in rts/IOInterface.h.  This is a public API, used by the unix
+ * package for installHandler.
+ */
+int stg_sig_install(int sig, int spi, void *mask)
+{
+    debugTrace(DEBUG_iomanager, "Installing a signal handler for sig %d", sig);
+
+#if defined(RTS_USER_SIGNALS)
+    return installUserSignalHandler(sig, spi, mask, nocldstop);
+
+#else /* !RTS_USER_SIGNALS */
+  return STG_SIG_DFL;
 #endif
 }
 #endif

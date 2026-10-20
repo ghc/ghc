@@ -24,16 +24,6 @@
 #include <signal.h>
 #include <string.h>
 
-#endif
-
-/* This curious flag is provided for the benefit of the Haskell binding
- * to POSIX.1 to control whether or not to include SA_NOCLDSTOP when
- * installing a SIGCHLD handler.
- */
-HsInt nocldstop = 0;
-
-#if defined(RTS_USER_SIGNALS)
-
 /* -----------------------------------------------------------------------------
  * The table of signal handlers
  * -------------------------------------------------------------------------- */
@@ -200,7 +190,7 @@ unblockUserSignals(void)
  * -------------------------------------------------------------------------- */
 
 int
-stg_sig_install(int sig, int spi, void *mask)
+installUserSignalHandler(int sig, int spi, void *mask, bool nocldstop)
 {
     ACQUIRE_LOCK(&sig_mutex);
 
@@ -322,14 +312,4 @@ startPendingSignalHandlers(Capability *cap)
 }
 #endif
 
-#else /* !RTS_USER_SIGNALS */
-StgInt
-stg_sig_install(StgInt sig STG_UNUSED,
-                StgInt spi STG_UNUSED,
-                void* mask STG_UNUSED)
-{
-  //barf("User signals not supported");
-  return STG_SIG_DFL;
-}
-
-#endif
+#endif /* RTS_USER_SIGNALS */
