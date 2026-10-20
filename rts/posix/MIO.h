@@ -23,7 +23,6 @@ void ioManagerDie (void);
 void ioManagerStart (void);
 void ioManagerStartCap (/* inout */ Capability **cap);
 
-void timerManagerNotifySignal(int sig, siginfo_t *info);
 int installUserSignalHandlerMIO(int sig, int spi, sigset_t *mask,
                                 bool nocldstop);
 #endif
