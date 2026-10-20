@@ -186,3 +186,11 @@ test('T17912', [only_ways(['threaded1']), when(opsys('mingw32'),expect_broken(1)
 test('T18832', only_ways(['threaded1']), compile_and_run, [''])
 
 test('mkdirExists', [exit_code(1), when(opsys('mingw32'), ignore_stderr)], compile_and_run, [''])
+
+test('T27971',
+     [ unless(opsys('mingw32'), skip)
+     , extra_ways(['winio_threaded'])
+     , only_ways(['threaded1', 'winio_threaded'])
+     , extra_hc_opts('-package process')
+     ],
+     compile_and_run, [''])
