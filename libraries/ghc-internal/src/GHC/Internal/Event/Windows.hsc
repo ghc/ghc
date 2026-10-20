@@ -591,7 +591,7 @@ withOverlappedEx mgr fname h async offset startCB completionCB = do
                 ++ " ptr_lpol:" ++ show ptr_lpol
                 ++ " *ptr_lpol:" ++ show cdDataCheck
 
-        startCBResult <- startCB lpol `onException`
+        (startCBResult, startErr) <- startCB lpol `onException`
                         (CbError `fmap` Win32.getLastError) >>= \result -> do
           -- Check to see if the operation was completed on a
           -- non-overlapping handle or was completed immediately.
@@ -629,7 +629,7 @@ withOverlappedEx mgr fname h async offset startCB completionCB = do
                              -- I don't know what the best default here is...
                              | otherwise                                   -> CbPending
                   _                                                        -> result
-          case result' of
+          fmap (\r -> (r, err)) $ case result' of
             CbNone    _ -> error "withOverlappedEx: CbNone shouldn't happen."
             CbIncomplete -> do
                debugIO $ "handling incomplete request synchronously " ++ show (h, lpol)
@@ -728,13 +728,13 @@ withOverlappedEx mgr fname h async offset startCB completionCB = do
                    debugIO $ dbgMsg $ ":: done bytes: " ++ show bytes
                    case bytes of
                      Just res -> completionCB 0 res
-                     Nothing  -> do err <- FFI.overlappedIOStatus lpol
+                     Nothing  -> do status <- FFI.overlappedIOStatus lpol
+                                    err <- if status == #{const STATUS_PENDING}
+                                             then return startErr
+                                             else FFI.overlappedIOErrCode lpol
                                     numBytes <- FFI.overlappedIONumBytes lpol
-                                    -- TODO: Remap between STATUS_ and ERROR_ instead
-                                    -- of re-interpret here. But for now, don't care.
-                                    let err' = fromIntegral err
-                                    debugIO $ dbgMsg $ ":: done callback: " ++ show err' ++ " - " ++ show numBytes
-                                    completionCB err' (fromIntegral numBytes)
+                                    debugIO $ dbgMsg $ ":: done callback: " ++ show err ++ " - " ++ show numBytes
+                                    completionCB err (fromIntegral numBytes)
               else readMVar signal
           CbError err  -> do
             reqs3 <- removeRequest
@@ -1097,10 +1097,7 @@ processCompletion Manager{..} n delay = do
                cb <- deRefStablePtr (cdCallback payload)
                reqs <- removeRequest
                debugIO $ "-1.. " ++ show reqs ++ " requests queued."
-               status <- FFI.overlappedIOStatus (lpOverlapped oe)
-               -- TODO: Remap between STATUS_ and ERROR_ instead
-               -- of re-interpret here. But for now, don't care.
-               let status' = fromIntegral status
+               status' <- FFI.overlappedIOErrCode (lpOverlapped oe)
                -- We no longer explicitly free the memory, this is because we
                -- now require the callback to free the memory since the
                -- callback allocated it.  This allows us to simplify memory
