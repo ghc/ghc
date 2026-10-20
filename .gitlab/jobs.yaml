@@ -65,7 +65,7 @@
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "aarch64-darwin-validate",
       "TEST_WAYS": ""
     }
@@ -132,7 +132,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-ignore-build-platform-mismatch --build=aarch64-unknown-linux --host=aarch64-unknown-linux --target=aarch64-unknown-linux --enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "aarch64-linux-alpine3_23-validate",
       "TEST_WAYS": ""
     }
@@ -198,7 +198,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "aarch64-linux-deb11-validate",
       "TEST_WAYS": ""
     }
@@ -264,7 +264,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "aarch64-linux-deb12-validate",
       "TEST_WAYS": ""
     }
@@ -346,7 +346,7 @@
       "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
       "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
       "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
-      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
@@ -433,7 +433,7 @@
       "OBJCOPY": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objcopy",
       "OBJDUMP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-objdump",
       "RANLIB": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-llvm-ranlib",
-      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "SIZE": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-size",
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
@@ -504,7 +504,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "aarch64-linux-deb13-validate",
       "TEST_WAYS": ""
     }
@@ -570,7 +570,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "aarch64-linux-deb13-validate+llvm",
       "TEST_WAYS": "llvm optllvm"
     }
@@ -637,7 +637,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "i386-linux-alpine3_23-validate",
       "TEST_WAYS": ""
     }
@@ -703,7 +703,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "i386-linux-deb11-validate",
       "TEST_WAYS": ""
     }
@@ -769,7 +769,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "i386-linux-deb12-validate",
       "TEST_WAYS": ""
     }
@@ -835,7 +835,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "i386-linux-deb13-validate",
       "TEST_WAYS": ""
     }
@@ -5711,7 +5711,7 @@
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "x86_64-darwin",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-darwin-validate",
       "TEST_WAYS": "",
       "ac_cv_func_clock_gettime": "no",
@@ -5783,7 +5783,7 @@
       "FETCH_GHC_VERSION": "9.10.3",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-freebsd14-validate",
       "TEST_WAYS": ""
     }
@@ -5850,7 +5850,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-validate+fully_static",
       "TEST_WAYS": ""
     }
@@ -5917,7 +5917,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static",
       "TEST_WAYS": ""
     }
@@ -5984,7 +5984,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override --enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-alpine3_23-validate",
       "TEST_WAYS": ""
     }
@@ -6053,7 +6053,7 @@
       "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "IGNORE_PERF_FAILURES": "all",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
       "TEST_WAYS": ""
     }
@@ -6123,7 +6123,7 @@
       "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "IGNORE_PERF_FAILURES": "all",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-alpine3_23-wasm-int_native-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
       "TEST_WAYS": ""
     }
@@ -6193,7 +6193,7 @@
       "FIREFOX_LAUNCH_OPTS": "{\"browser\":\"firefox\",\"executablePath\":\"/usr/bin/firefox\"}",
       "HADRIAN_ARGS": "--docs=no-sphinx-pdfs --docs=no-sphinx-man",
       "IGNORE_PERF_FAILURES": "all",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-alpine3_23-wasm-unreg-cross_wasm32-wasi-release+host_fully_static+text_simdutf",
       "TEST_WAYS": ""
     }
@@ -6262,7 +6262,7 @@
       "CROSS_TARGET": "javascript-unknown-ghcjs",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb11-emsdk-closure-int_native-cross_javascript-unknown-ghcjs-validate",
       "TEST_WAYS": ""
     }
@@ -6328,7 +6328,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb11-validate",
       "TEST_WAYS": ""
     }
@@ -6394,7 +6394,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb11-validate+debug_info",
       "TEST_WAYS": ""
     }
@@ -6460,7 +6460,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb12-validate",
       "TEST_WAYS": ""
     }
@@ -6529,7 +6529,7 @@
       "CROSS_TARGET": "aarch64-linux-gnu",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-cross_aarch64-linux-gnu-validate",
       "TEST_WAYS": ""
     }
@@ -6595,7 +6595,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-int_native-validate",
       "TEST_WAYS": ""
     }
@@ -6662,7 +6662,7 @@
       "CONFIGURE_ARGS": "--disable-tables-next-to-code --enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-no_tntc-validate",
       "TEST_WAYS": ""
     }
@@ -6729,7 +6729,7 @@
       "ENABLE_NUMA": "1",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-numa-slow-validate",
       "TEST_WAYS": ""
     }
@@ -6795,7 +6795,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " --config perf_path=perf -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " --config perf_path=perf -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-release",
       "TEST_WAYS": ""
     }
@@ -6864,7 +6864,7 @@
       "CROSS_TARGET": "riscv64-linux-gnu",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-riscv-cross_riscv64-linux-gnu-validate",
       "TEST_WAYS": ""
     }
@@ -6930,7 +6930,7 @@
       "CONFIGURE_ARGS": "--enable-unregisterised --enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-unreg-validate",
       "TEST_WAYS": ""
     }
@@ -6996,7 +6996,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-validate",
       "TEST_WAYS": ""
     }
@@ -7062,7 +7062,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-validate+boot_nonmoving_gc",
       "TEST_WAYS": ""
     }
@@ -7128,7 +7128,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-validate+llvm",
       "TEST_WAYS": "llvm optllvm"
     }
@@ -7196,7 +7196,7 @@
       "HADRIAN_ARGS": "--docs=none",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-validate+thread_sanitizer_cmm",
       "TEST_WAYS": "",
       "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
@@ -7263,7 +7263,7 @@
       "CONFIGURE_ARGS": "--enable-ipe-data-compression --enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-deb13-zstd-validate",
       "TEST_WAYS": ""
     }
@@ -7329,7 +7329,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-fedora43-release",
       "TEST_WAYS": ""
     }
@@ -7396,7 +7396,7 @@
       "HADRIAN_ARGS": "--haddock-for-hackage",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-fedora43-release",
       "TEST_WAYS": ""
     }
@@ -7462,7 +7462,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-fedora43-validate",
       "TEST_WAYS": ""
     }
@@ -7528,7 +7528,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-fedora43-validate+debug_info",
       "TEST_WAYS": ""
     }
@@ -7595,7 +7595,7 @@
       "HADRIAN_ARGS": "--docs=none",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-fedora43-validate+debug_info+ubsan",
       "TEST_WAYS": "",
       "UBSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.ubsan-suppressions"
@@ -7662,7 +7662,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-rocky8-validate",
       "TEST_WAYS": ""
     }
@@ -7728,7 +7728,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-ubuntu22_04-validate",
       "TEST_WAYS": ""
     }
@@ -7797,7 +7797,7 @@
       "CROSS_TARGET": "loongarch64-linux-gnu",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": "-e config.timeout=900 -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-ubuntu24_04-loongarch-cross_loongarch64-linux-gnu-validate",
       "TEST_WAYS": ""
     }
@@ -7863,7 +7863,7 @@
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-linux-ubuntu24_04-validate",
       "TEST_WAYS": ""
     }
@@ -7929,7 +7929,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-windows-int_native-validate",
       "TEST_WAYS": ""
     }
@@ -7995,7 +7995,7 @@
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
-      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout",
+      "RUNTEST_ARGS": " -e config.timeout+=config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout+config.timeout",
       "TEST_ENV": "x86_64-windows-validate",
       "TEST_WAYS": ""
     }
