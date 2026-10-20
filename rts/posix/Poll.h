@@ -12,6 +12,10 @@
 
 #include "IOManager.h"
 
+#if defined(RTS_USER_SIGNALS)
+#include <signal.h>
+#endif
+
 #include "BeginPrivate.h"
 
 #if defined(IOMGR_ENABLED_POLL)
@@ -33,6 +37,12 @@ void asyncIOCancelPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop);
 void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr);
 bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr);
 void interruptIOManagerPoll(CapIOManager *iomgr);
+
+/* Signals */
+#if defined(RTS_USER_SIGNALS)
+int installUserSignalHandlerPoll(int sig, int spi, sigset_t *mask,
+                                 bool nocldstop);
+#endif
 
 #endif /* IOMGR_ENABLED_POLL */
 

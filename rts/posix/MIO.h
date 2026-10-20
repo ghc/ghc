@@ -10,8 +10,8 @@
 
 #include "IOManager.h"
 
-#if defined(HAVE_SIGNAL_H)
-# include <signal.h>
+#if defined(RTS_USER_SIGNALS)
+#include <signal.h>
 #endif
 
 #include "BeginPrivate.h"
@@ -24,6 +24,10 @@ void ioManagerStart (void);
 void ioManagerStartCap (/* inout */ Capability **cap);
 
 void timerManagerNotifySignal(int sig, siginfo_t *info);
+#if defined(RTS_USER_SIGNALS)
+int installUserSignalHandlerMIO(int sig, int spi, sigset_t *mask,
+                                bool nocldstop);
+#endif
 #endif
 
 #include "EndPrivate.h"
