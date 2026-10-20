@@ -209,8 +209,6 @@ defaultServerWithCustom customHandler = do
   uninterruptibleMask $ \restore -> servWithCustom verbose hook pipe restore customHandler
 
   where hook = return -- empty hook
-    -- we cannot allow any async exceptions while communicating, because
-    -- we will lose sync in the protocol, hence uninterruptibleMask.
 
 dieWithUsage :: IO a
 dieWithUsage = do

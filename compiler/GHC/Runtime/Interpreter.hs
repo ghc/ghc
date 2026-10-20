@@ -653,7 +653,7 @@ stopInterp interp = case interpInstance interp of
             ex <- getProcessExitCode (interpHandle (instProcess i))
             if isJust ex
                then pure ()
-               else sendMessage i Shutdown
+               else sendMessage i Shutdown `catch` \ PipeReadClosedException -> pure ()
             -- We asked the server to shutdown, so we will also shutdown any communication.
             closePipe (interpPipe (instProcess i))
             pure InterpPending
