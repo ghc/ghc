@@ -21,6 +21,7 @@
 #include "MIO.h"
 #include "IOManager.h"
 #include "IOManagerInternals.h"
+#include "IOManSignals.h"
 
 #if defined(HAVE_ERRNO_H)
 # include <errno.h>
@@ -74,6 +75,8 @@ void timerManagerNotifySignal(int sig, siginfo_t *info)
 void
 ioManagerDie (void)
 {
+    finiUserSignals();
+
     StgWord8 byte = (StgWord8)IO_MANAGER_DIE;
     uint32_t i;
     int r;
@@ -110,6 +113,8 @@ ioManagerStartCap (Capability **cap)
 void
 ioManagerStart (void)
 {
+    initUserSignals();
+
     // Make sure the IO manager thread is running
     Capability *cap;
     if (SEQ_CST_LOAD(&timer_manager_control_wr_fd) < 0) {

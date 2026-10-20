@@ -72,10 +72,16 @@ void initCapabilityIOManagerSelect(CapIOManager *iomgr)
         barf("initCapabilityIOManagerSelect: fds out of select range");
     }
 #endif
+#if defined(RTS_USER_SIGNALS)
+    initUserSignals();
+#endif
 }
 
 void freeCapabilityIOManagerSelect(CapIOManager *iomgr USED_IF_PREEMPTION)
 {
+#if defined(RTS_USER_SIGNALS)
+    finiUserSignals();
+#endif
 #if defined(HAVE_PREEMPTION)
     closeFdWakeup(iomgr->interrupt_fd_r, iomgr->interrupt_fd_w);
 #endif

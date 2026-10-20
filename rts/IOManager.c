@@ -457,6 +457,7 @@ void startIOManager(void)
              * TODO: rename ioManagerStart to be less generic, impl specific
              */
             ioManagerStart();
+            initConsoleEvents(); //TODO: fully integrate
             break;
 #endif
 #if defined(IOMGR_ENABLED_WINIO)
@@ -473,23 +474,18 @@ void startIOManager(void)
 #else
             startupAsyncWinIO();
 #endif
+            initConsoleEvents(); //TODO: fully integrate
             break;
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
         case IO_MANAGER_WIN32_LEGACY:
             startupAsyncIO();
+            initConsoleEvents(); //TODO: fully integrate
             break;
 #endif
         default:
             break;
     }
-
-/* For the moment this is called here, but eventually it will be up to
- * each I/O manager to decide what to do.
- */
-#if defined(RTS_USER_SIGNALS)
-    initUserSignals();
-#endif
 }
 
 /* Called from forkProcess in the child process on the surviving capability.
@@ -581,26 +577,26 @@ void
 exitIOManager(bool wait_threads)
 {
     switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_MIO_WIN32)
+        case IO_MANAGER_MIO_WIN32:
+            finiConsoleEvents(); //TODO: fully integrate
+            break;
+#endif
 #if defined(IOMGR_ENABLED_WINIO)
         case IO_MANAGER_WINIO:
             shutdownAsyncWinIO(wait_threads);
+            finiConsoleEvents(); //TODO: fully integrate
             break;
 #endif
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
         case IO_MANAGER_WIN32_LEGACY:
             shutdownAsyncIO(wait_threads);
+            finiConsoleEvents(); //TODO: fully integrate
             break;
 #endif
         default:
             break;
     }
-
-/* For the moment this is called here, but eventually it will be up to
- * each I/O manager to decide what to do.
- */
-#if defined(RTS_USER_SIGNALS)
-   finiUserSignals ();
-#endif
 }
 
 void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr)

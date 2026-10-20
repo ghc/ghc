@@ -20,15 +20,15 @@
  */
 
 /*
- * Function: initUserSignals()
+ * Function: initConsoleEvents()
  *
  * Initialize the console handling substrate.
  */
-void initUserSignals(void);
+void initConsoleEvents(void);
 
 /* Finalise signal and console events handling.
  */
-void finiUserSignals(void);
+void finiConsoleEvents(void);
 
 #if !defined(THREADED_RTS)
 /*
@@ -37,12 +37,12 @@ void finiUserSignals(void);
  */
 
 /*
- * Function: startPendingSignalHandlers()
+ * Function: startPendingConsoleEventHandlers()
  *
  * If there are any queued up win32 console events, run the handlers
  * associated with them.
  */
-void startPendingSignalHandlers(Capability *cap);
+void startPendingConsoleEventHandlers(Capability *cap);
 
 /*
  * Function: rts_waitConsoleHandlerCompletion()
