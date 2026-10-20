@@ -284,10 +284,6 @@ void exitHeapOverflow(void) STG_NORETURN;;
 
 void stg_exit(int n) STG_NORETURN;
 
-#if !defined(mingw32_HOST_OS)
-int stg_sig_install (int, int, void *);
-#endif
-
 /* -----------------------------------------------------------------------------
    Ways
    -------------------------------------------------------------------------- */

@@ -33,6 +33,7 @@ void     ioManagerFinished  (void);
 
 void     setIOManagerControlFd   (uint32_t cap_no, int fd);
 void     setTimerManagerControlFd(int fd);
+int      stg_sig_install(int sig, int spi, void *mask);
 
 #endif
 
