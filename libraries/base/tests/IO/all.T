@@ -198,3 +198,10 @@ test('osHandles002WindowsHandles', only_ways(['winio', 'winio_threaded']), compi
 # executables, emulates part of POSIX, enough for this test. As a
 # result, this test could be generalized to also supporting Windows, but
 # this would likely involve creating bindings to C code.
+test('T27971',
+     [ unless(opsys('mingw32'), skip)
+     , extra_ways(['winio_threaded'])
+     , only_ways(['threaded1', 'winio_threaded'])
+     , extra_hc_opts('-package process')
+     ],
+     compile_and_run, [''])
