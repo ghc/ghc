@@ -338,7 +338,10 @@ sandboxIO opts io
         -- A solution would be to have an "initialize interpreter" command
         -- which sets this at the start. A different solution is to have a
         -- global lock and only write this once here, then lock.
+        --
         poke breakPointIOAction globalBreakStablePtr
+        -- freeStablePtr stablePtr TODO: we never free the global stablePtr for
+        -- global action. Maybe we should have a de-init for clean up.
 
         tid <- mask_ $ forkIOWithUnmask $ \unmask -> do
 
@@ -432,11 +435,6 @@ setBreakAction opts tid@(ThreadId tid#) = do
       if isolateThreadBreaks opts
         then setIsolatedCtx ctx
         else unsetIsolatedCtx ctx
-
-      -- freeStablePtr stablePtr TODO: we never free the global stablePtr for
-      -- global action. Maybe we should have a de-init for clean up.
-      -- TODO: don't set it in `setBreakAction` either. Should be on
-      -- interpreter initialization.
 
     runIf#   pred what     = when (pred opts) (what tid#)
 
