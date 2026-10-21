@@ -972,6 +972,6 @@ test('T27557', normal, compile, [''])
 test('T27664', normal, compile, [''])
 test('T27916', normal, compile, [''])
 test('T26543_orig', normal, compile, [''])
-test('T7994', normal, compile, [''])
-test('T7994a', normal, compile, [''])
+test('T27994',  normal, compile, [''])
+test('T27994a', normal, compile, [''])
 
