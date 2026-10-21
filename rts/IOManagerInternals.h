@@ -30,6 +30,11 @@
 
 #include "BeginPrivate.h"
 
+/* Forward reference */
+struct _CapIOManagerShared;
+typedef struct _CapIOManagerShared CapIOManagerShared;
+
+
 /* The per-capability data structures belonging to the I/O manager.
  *
  * It can be accessed as cap->iomgr. Or given just the iomgr, you can access
@@ -42,8 +47,11 @@
  */
 struct _CapIOManager {
 
-   /* Back reference to the containing capability */
+    /* Back reference to the containing capability */
     Capability *cap;
+
+    /* Data shared between the I/O manager instances across all capabilities */
+    CapIOManagerShared *shared;
 
 #if defined(IOMGR_ENABLED_SELECT)
     /* Thread queue for threads blocked on I/O completion. */
@@ -95,6 +103,18 @@ struct _CapIOManager {
 #endif
 
 };
+
+
+/* Much like above, but for I/O manager data that is shared between the
+ * I/O manager instances for all the capabilities.
+ *
+ * This gets allocated and linked by the shared IOManager.c code, and should be
+ * initialised by the individual I/O manager's init function but only for cap 0.
+ */
+struct _CapIOManagerShared {
+
+};
+
 
 /* Fill in the outcome and result/error on the TSO's stack frame.
  * The TSO must be blocked using one of the stg_block_io_* blocking actions.

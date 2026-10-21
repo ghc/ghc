@@ -369,6 +369,18 @@ CapIOManager *allocCapabilityIOManager(Capability *cap)
  */
 void initCapabilityIOManager(CapIOManager *iomgr)
 {
+    /* Allocate or link the shared I/O manager data structure.
+     *
+     * We do this here, not in allocCapabilityIOManager, because when we
+     * forkProcess, we free and re-init the CapIOManager without reallocating.
+     */
+    if (iomgr->cap->no == 0) {
+        iomgr->shared = stgMallocBytes(sizeof(CapIOManagerShared),
+                                       "allocCapabilityIOManager");
+    } else {
+        iomgr->shared = capabilities[0]->iomgr->shared;
+    }
+
     debugTrace(DEBUG_iomanager, "initialising I/O manager %s for cap %d",
                showIOManager(), iomgr->cap->no);
 
@@ -431,6 +443,13 @@ void freeCapabilityIOManager(CapIOManager *iomgr)
 #endif
         default:
             break;
+    }
+
+    /* We expect the per-impl free function (for cap 0) to free anything within
+     * the shared structure.
+     */
+    if (iomgr->cap->no == 0) {
+        stgFree(iomgr->shared);
     }
 }
 
