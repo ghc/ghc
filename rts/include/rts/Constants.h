@@ -395,6 +395,11 @@
 #define TSO_STOP_AFTER_RETURN 1024
 
 /*
+ * Enables break-on-exception mode for this thread
+ */
+#define TSO_STOP_ON_EXCEPTION 2048
+
+/*
  * The number of times we spin in a spin lock before yielding (see
  * #3758).  To tune this value, use the benchmark in #3758: run the
  * server with -N2 and the client both on a dual-core.  Also make sure

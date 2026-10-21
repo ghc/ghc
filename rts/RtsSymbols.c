@@ -944,6 +944,10 @@ extern char **environ;
       SymI_NeedsProto(rts_disableStopNextBreakpoint)                    \
       SymI_NeedsProto(rts_enableStopAfterReturn)                        \
       SymI_NeedsProto(rts_disableStopAfterReturn)                       \
+      SymI_NeedsProto(rts_enableStopOnException)                        \
+      SymI_NeedsProto(rts_disableStopOnException)                       \
+      SymI_NeedsProto(rts_enableStopOnExceptionAll)                     \
+      SymI_NeedsProto(rts_disableStopOnExceptionAll)                    \
       SymI_HasProto(stopTimer)                                          \
       SymI_HasDataProto(n_capabilities)                                     \
       SymI_HasDataProto(max_n_capabilities)                                 \
