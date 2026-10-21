@@ -494,11 +494,9 @@ lookupSymbol interp str = withSymbolCache interp str $
 #endif
     ExternalInterp ext -> case ext of
       ExtIServ i -> withIServ i $ \inst -> do
-        uninterruptibleMask_ $
           sendMessage inst (LookupSymbol (fastStringToShortByteString (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
       ExtWasm i -> withWasmInterp i $ \inst -> do
-        uninterruptibleMask_ $
           sendMessage inst (LookupSymbol (fastStringToShortByteString (interpSymbolToCLabel str)))
 
 lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> InterpSymbol s -> IO (Maybe (RemotePtr ()))
@@ -509,8 +507,7 @@ lookupSymbolInDLL interp dll str = withSymbolCache interp str $
 #endif
     ExternalInterp ext -> case ext of
       ExtIServ i -> withIServ i $ \inst -> do
-        uninterruptibleMask_ $
-          sendMessage inst (LookupSymbolInDLL dll (fastStringToShortByteString (interpSymbolToCLabel str)))
+        sendMessage inst (LookupSymbolInDLL dll (fastStringToShortByteString (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
       -- wasm dyld doesn't track which symbol comes from which .so
       ExtWasm {} -> lookupSymbol interp str
