@@ -127,18 +127,15 @@ run m = case m of
   Seq ref -> doSeq ref
   ResumeSeq ref -> resumeSeq ref
 
-  WaitThreadResult rtid -> do
-    tid <- localRef rtid
-    redirectInterrupts tid $ atomically (readThreadEvalStatus tid)
-  WaitAnyThreadBreak -> do
-    atomically $ readAnyThreadEvalBreak
+  WaitThreadResult tid -> localRef tid >>= atomically . readThreadEvalStatus
+  WaitAnyThreadBreak   -> atomically $ readAnyThreadEvalBreak
   WaitThreadResultOrAnyThreadBreak t -> do
     tid <- localRef t
-    redirectInterrupts tid $
-      atomically $
-        readThreadEvalStatus tid
-          `orElse`
-        (EvalPaused <$> readAnyThreadEvalBreak)
+    atomically $
+      readThreadEvalStatus tid
+        `orElse`
+      (EvalPaused <$> readAnyThreadEvalBreak)
+
   Shutdown            -> unexpectedMessage m
   RunTH {}            -> unexpectedMessage m
   RunModFinalizers {} -> unexpectedMessage m
