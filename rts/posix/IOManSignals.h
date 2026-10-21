@@ -35,10 +35,17 @@ void finiUserSignals(void);
 void startPendingSignalHandlers(Capability *cap);
 #endif
 
+void startSignalHandler(Capability *cap, int sig, siginfo_t *info);
+
 typedef void (*SignalHandler)(int sig, siginfo_t *info, void *p);
 
 int installSignalHandler(int sig, int spi, sigset_t *mask, bool nocldstop,
                          SignalHandler handler);
+
+/* Utilities to help with the self-pipe trick for signal handling. */
+void newNonBlockingPipe(int *pipe_fd_r, int *pipe_fd_w);
+void writeSignalInfoToPipe (int  sig, siginfo_t *info, int fd);
+bool readSignalInfoFromPipe(int *sig, siginfo_t *info, int fd);
 
 /* Temporary */
 void generic_handler(int sig USED_IF_THREADS,
