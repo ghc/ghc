@@ -1284,10 +1284,6 @@ export async function main({
     const reader = rpc.readStream.getReader();
     const writer = rpc.writeStream.getWriter();
 
-    const cb_sig = (cb) => {
-      rpc.installSignalHandlers(cb);
-    };
-
     const cb_recv = async () => {
       const { done, value } = await reader.read();
       if (done) {
@@ -1299,7 +1295,7 @@ export async function main({
       writer.write(new Uint8Array(buf));
     };
 
-    return await dyld.exportFuncs.defaultServer(cb_sig, cb_recv, cb_send);
+    return await dyld.exportFuncs.defaultServer(cb_recv, cb_send);
   } finally {
     if (isIserv) {
       rpc.close();

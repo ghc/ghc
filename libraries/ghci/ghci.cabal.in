@@ -65,7 +65,6 @@ library
             GHCi.Debugger
             GHCi.CreateBCO
             GHCi.ObjLink
-            GHCi.Signals
             GHCi.StaticPtrTable
             GHCi.TH
             GHCi.Server

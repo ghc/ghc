@@ -162,17 +162,16 @@ servWithCustom verbose hook pipe restore customHandler = do
 
 -- | Default server
 #if defined(wasm32_HOST_ARCH)
-defaultServer :: Callback (JSVal -> IO ()) -> Callback (IO JSUint8Array) -> Callback (JSUint8Array -> IO ()) -> IO ()
-defaultServer cb_sig cb_recv cb_send =
-  defaultServerWithCustom cb_sig cb_recv cb_send noCustomHandler
+defaultServer :: Callback (IO JSUint8Array) -> Callback (JSUint8Array -> IO ()) -> IO ()
+defaultServer cb_recv cb_send =
+  defaultServerWithCustom cb_recv cb_send noCustomHandler
 
 defaultServerWithCustom
-  :: Callback (JSVal -> IO ())
-  -> Callback (IO JSUint8Array)
+  :: Callback (IO JSUint8Array)
   -> Callback (JSUint8Array -> IO ())
   -> CustomMessageHandler
   -> IO ()
-defaultServerWithCustom cb_sig cb_recv cb_send customHandler = do
+defaultServerWithCustom cb_recv cb_send customHandler = do
   args <- getArgs
   let rest = args
 #else
@@ -203,13 +202,10 @@ defaultServerWithCustom customHandler = do
     dieWithUsage
 
 #if defined(wasm32_HOST_ARCH)
-  -- See Note [wasm ghci signal handlers] for details
-  installSignalHandlers $ js_register_signal_handler cb_sig
   pipe <- mkPipeFromContinuations (recv_buf cb_recv) (send_buf cb_send) (pure ()) (pure ())
 #else
   when verbose $
     printf "GHC iserv starting (in: %s; out: %s)\n" (show inh) (show outh)
-  installSignalHandlers
   pipe <- mkPipeFromHandles inh outh
 #endif
 
