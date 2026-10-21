@@ -61,7 +61,6 @@ import GHC.Prelude
 
 import GHC.Hs
 import GHC.Tc.Errors.Types ( HsCtxt(..) )
-import GHC.Tc.Errors.Ppr   ( pprHsCtxt )
 import GHC.Tc.Utils.Concrete
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
@@ -2801,17 +2800,15 @@ uType_defer (UE { u_loc = loc, u_defer = ref
          -- snocBag: see Note [Work-list ordering] in GHC.Tc.Solver.Equality
 
        -- Error trace only
-       -- NB. do *not* call tidyErrCtxt unless tracing is on,
-       --     because it is hugely expensive (#5631)
+       -- NB. do *not* call tidyErrCtxt because
+       -- (a) it is hugely expensive (#5631) and
+       -- (b) it crashes in some cases because because it reads
+       --     res_ty too early via FunResCtxt and getCheckExpType
        ; whenDOptM Opt_D_dump_tc_trace $
-         do { ctxt     <- getErrCtxt
-            ; err_ctxt <- tidyErrCtxt emptyTidyEnv ctxt
-            ; traceTc "utype_defer" $
-                vcat ( ppr role
-                     : debugPprType ty1
-                     : debugPprType ty2
-                     : map pprHsCtxt err_ctxt )
-            ; traceTc "utype_defer2" (ppr co) }
+         traceTc "utype_defer" $
+                vcat [ text "role:" <+> ppr role
+                     , text "ty1:" <+> debugPprType ty1
+                     , text "ty2:" <+> debugPprType ty2 ]
 
        ; return co }
 
