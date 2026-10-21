@@ -193,7 +193,27 @@ data Liveness
         = Liveness
         { liveBorn      :: Regs      -- ^ registers born in this instruction (written to for first time).
         , liveDieRead   :: Regs      -- ^ registers that died because they were read for the last time.
-        , liveDieWrite  :: Regs }    -- ^ registers that died because they were clobbered by something.
+        , liveDieWrite  :: Regs      -- ^ registers that died because they were clobbered by something.
+        , liveRegUsage  :: !RegUsage -- ^ registers read and written by this instruction.
+                                     --   See Note [Cached register usage in liveness annotations]
+        }
+
+{- Note [Cached register usage in liveness annotations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'regUsageOfInstr' allocates fresh lists of registers each time it is called.
+The backward liveness pass, the forward liveness pass and the linear register
+allocator all need the usage of every instruction, so without a cache the lists
+are rebuilt three times per instruction. This was about 1.3% of all allocation
+when compiling a large module with -O2.
+
+The backward pass ('liveness1') is the first consumer, so it stores the usage in
+the 'liveRegUsage' field of the annotation. Later passes read the field instead
+of calling 'regUsageOfInstr' again.
+
+The cached usage is only valid for the instruction it was computed from.
+'patchRegsLiveInstr' renames registers in the instruction, so it recomputes the
+field for the patched instruction.
+-}
 
 
 -- | Stash regs live on entry to each basic block in the info part of the cmm code.
@@ -670,14 +690,17 @@ patchRegsLiveInstr platform patchF li
          -> LiveInstr (patchRegsOfInstr platform instr patchF) Nothing
 
         LiveInstr instr (Just live)
-         -> LiveInstr
-                (patchRegsOfInstr platform instr patchF)
+         -> let instr' = patchRegsOfInstr platform instr patchF
+            in LiveInstr instr'
                 (Just live
                         { -- WARNING: have to go via lists here because patchF changes the uniq in the Reg
                           liveBorn      = mapRegs patchF $ liveBorn live
                         , liveDieRead   = mapRegs patchF $ liveDieRead live
-                        , liveDieWrite  = mapRegs patchF $ liveDieWrite live })
+                        , liveDieWrite  = mapRegs patchF $ liveDieWrite live
                           -- See Note [Unique Determinism and code generation]
+                          -- The instruction changed: recompute the cached usage.
+                          -- See Note [Cached register usage in liveness annotations]
+                        , liveRegUsage  = regUsageOfInstr platform instr' })
 
 --------------------------------------------------------------------------------
 -- | Convert a NatCmmDecl to a LiveCmmDecl, with liveness information
@@ -945,7 +968,7 @@ livenessBlock platform blockmap (BasicBlock block_id instrs)
             = livenessBack platform noRegs blockmap [] (reverse instrs)
         blockmap'       = mapInsert block_id regsLiveOnEntry blockmap
 
-        instrs2         = livenessForward platform regsLiveOnEntry instrs1
+        instrs2         = livenessForward regsLiveOnEntry instrs1
 
         output          = BasicBlock block_id instrs2
 
@@ -955,16 +978,15 @@ livenessBlock platform blockmap (BasicBlock block_id instrs)
 --   filling in when regs are born
 
 livenessForward
-        :: Instruction instr
-        => Platform
-        -> Regs -- regs live on this instr
+        :: Regs -- regs live on this instr
         -> [LiveInstr instr] -> [LiveInstr instr]
 
-livenessForward _        _           []  = []
-livenessForward platform rsLiveEntry (li@(LiveInstr instr mLive) : lis)
+livenessForward _           []  = []
+livenessForward rsLiveEntry (li@(LiveInstr instr mLive) : lis)
         | Just live <- mLive
         = let
-                RU _ rsWritten  = regUsageOfInstr platform instr
+                -- See Note [Cached register usage in liveness annotations]
+                RU _ rsWritten  = liveRegUsage live
                 -- Regs that are written to but weren't live on entry to this instruction
                 --      are recorded as being born here.
                 rsBorn          = mkRegsMaxFmt
@@ -979,10 +1001,10 @@ livenessForward platform rsLiveEntry (li@(LiveInstr instr mLive) : lis)
                                         `minusRegs` (liveDieWrite live) -- (FmtFwd2)
 
         in LiveInstr instr (Just live { liveBorn = rsBorn })
-                : livenessForward platform rsLiveNext lis
+                : livenessForward rsLiveNext lis
 
         | otherwise
-        = li : livenessForward platform rsLiveEntry lis
+        = li : livenessForward rsLiveEntry lis
 
 
 -- | Calculate liveness going backwards,
@@ -1023,17 +1045,20 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
                         (Just $ Liveness
                         { liveBorn      = noRegs
                         , liveDieRead   = r_dying
-                        , liveDieWrite  = w_dying }))
+                        , liveDieWrite  = w_dying
+                        , liveRegUsage  = usage }))
 
         | otherwise
         = (liveregs_br, LiveInstr instr
                         (Just $ Liveness
                         { liveBorn      = noRegs
                         , liveDieRead   = r_dying_br
-                        , liveDieWrite  = w_dying }))
+                        , liveDieWrite  = w_dying
+                        , liveRegUsage  = usage }))
 
         where
-            !(RU read written) = regUsageOfInstr platform instr
+            -- See Note [Cached register usage in liveness annotations]
+            !usage@(RU read written) = regUsageOfInstr platform instr
 
             -- registers that were written here are dead going backwards.
             -- registers that were read here are live going backwards.

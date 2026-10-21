@@ -460,7 +460,7 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
           -}
            return (new_instrs, [])
 
-        _ -> genRaInsn block_live new_instrs id instr
+        _ -> genRaInsn block_live new_instrs id instr (liveRegUsage live)
                         (map regWithFormat_reg $ nonDetEltsUniqSet $ getRegs $ liveDieRead live)
                         (map regWithFormat_reg $ nonDetEltsUniqSet $ getRegs $ liveDieWrite live)
                         -- See Note [Unique Determinism and code generation]
@@ -498,14 +498,17 @@ genRaInsn :: forall freeRegs instr.
           -> [instr]
           -> BlockId
           -> instr
+          -> RegUsage   -- ^ registers read and written by the instruction
+                        -- See Note [Cached register usage in liveness annotations]
+                        -- in GHC.CmmToAsm.Reg.Liveness
           -> [Reg]
           -> [Reg]
           -> RegM freeRegs ([instr], [NatBasicBlock instr])
 
-genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
+genRaInsn block_live new_instrs block_id instr usage r_dying w_dying = do
 -- pprTraceM "genRaInsn" $ ppr (block_id, instr)
   platform <- getPlatform
-  case regUsageOfInstr platform instr of { RU read written ->
+  case usage of { RU read written ->
     do
     let real_written = [ rr                          | RegWithFormat {regWithFormat_reg = RegReal rr} <- written ]
     let virt_written = [ VirtualRegWithFormat vr fmt | RegWithFormat (RegVirtual vr) fmt              <- written ]
