@@ -632,6 +632,7 @@ data TsoFlags
   | TsoAllocLimit
   | TsoStopNextBreakpoint
   | TsoStopAfterReturn
+  | TsoStopOnException
   | TsoFlagsUnknownValue Word32 -- ^ Please report this as a bug
   deriving (Eq, Show, Generic, Ord)
 

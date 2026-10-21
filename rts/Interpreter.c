@@ -388,8 +388,6 @@ is_ret_bco_frame(const StgPtr frame_head) {
       );
 }
 
-int rts_stop_on_exception = 0;
-
 /* ---------------------------------------------------------------------------
  * Enabling and disabling global single step mode
  * ------------------------------------------------------------------------ */
@@ -473,7 +471,40 @@ A limitation of this approach is that stepping-out of a function that was
 tail-called will skip its caller since no stack frame is pushed for a tail
 call (i.e. a tail call returns directly to its caller's first non-tail caller).
 */
-/* -------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+ * Enabling and disabling global break-on-exception
+ * ------------------------------------------------------------------------ */
+
+int rts_stop_on_exception = 0;
+
+void rts_enableStopOnExceptionAll(void)
+{
+  rts_stop_on_exception = 1;
+}
+
+void rts_disableStopOnExceptionAll(void)
+{
+  rts_stop_on_exception = 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Enabling and disabling per-thread break-on-exception
+ * ------------------------------------------------------------------------ */
+
+void rts_enableStopOnException(StgTSO* tso)
+{
+  Capability* cap = rts_unsafeGetMyCapability();
+  setThreadFlag(cap, tso, TSO_STOP_ON_EXCEPTION);
+}
+
+void rts_disableStopOnException(StgTSO* tso)
+{
+  Capability* cap = rts_unsafeGetMyCapability();
+  unsetThreadFlag(cap, tso, TSO_STOP_ON_EXCEPTION);
+}
+
+/* ------------------------------------------------------------------------ */
 
 #if defined(INTERP_STATS)
 

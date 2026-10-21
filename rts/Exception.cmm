@@ -523,14 +523,16 @@ retry_pop_stack:
     if (W_[no_break_on_exception] != 0) {
         W_[no_break_on_exception] = 0;
     } else {
-        if (TO_W_(CInt[rts_stop_on_exception]) != 0) {
+        if (TO_W_(CInt[rts_stop_on_exception]) != 0 ||
+            (TO_W_(StgTSO_flags(CurrentTSO)) & TSO_STOP_ON_EXCEPTION) != 0) {
             W_ ioAction;
             // we don't want any further exceptions to be caught,
             // until GHCi is ready to handle them.  This prevents
             // deadlock if an exception is raised in InteractiveUI,
-            // for example.  Perhaps the stop_on_exception flag should
-            // be per-thread.
+            // for example.
             CInt[rts_stop_on_exception] = 0;
+            StgTSO_flags(CurrentTSO) = %lobits32(
+              TO_W_(StgTSO_flags(CurrentTSO)) & ~TSO_STOP_ON_EXCEPTION);
             ("ptr" ioAction) = ccall deRefStablePtr (W_[rts_breakpoint_io_action] "ptr");
             Sp = Sp - WDS(11);
             Sp(10) = exception;
