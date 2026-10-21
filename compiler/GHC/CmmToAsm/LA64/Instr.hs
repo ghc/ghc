@@ -8,13 +8,13 @@ import GHC.CmmToAsm.LA64.Cond
 import GHC.CmmToAsm.LA64.Regs
 
 import GHC.CmmToAsm.Instr (RegUsage(..))
+import GHC.CmmToAsm.RegUsage (Usage, (<.>), runUsage, readReg, writeReg, modifyReg, foldMapUsage, withPlatform)
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
 import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
 
-import GHC.Platform.Regs
 import GHC.Platform.Reg.Class.Separate
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
@@ -67,178 +67,197 @@ instance Outputable RegUsage where
 --
 -- RegUsage = RU [<read regs>] [<write regs>]
 regUsageOfInstr :: Platform -> Instr -> RegUsage
-regUsageOfInstr platform instr = case instr of
+regUsageOfInstr platform (ANN _ i) = regUsageOfInstr platform i
+regUsageOfInstr platform instr = runUsage platform $ case instr of
   -- Pseudo Instructions
-  ANN _ i                  -> regUsageOfInstr platform i
-  COMMENT{}                -> usage ([], [])
-  MULTILINE_COMMENT{}      -> usage ([], [])
-  PUSH_STACK_FRAME         -> usage ([], [])
-  POP_STACK_FRAME          -> usage ([], [])
-  DELTA{}                  -> usage ([], [])
-  LOCATION{}               -> usage ([], [])
+  COMMENT{}                -> mempty
+  MULTILINE_COMMENT{}      -> mempty
+  PUSH_STACK_FRAME         -> mempty
+  POP_STACK_FRAME          -> mempty
+  DELTA{}                  -> mempty
+  LOCATION{}               -> mempty
 
   -- 1. Arithmetic Instructions ------------------------------------------------
-  ADD dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SUB dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  ALSL dst src1 src2 src3  -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
-  ALSLU dst src1 src2 src3 -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
-  LU12I dst src1           -> usage (regOp src1, regOp dst)
-  LU32I dst src1           -> usage (regOp src1, regOp dst)
-  LU52I dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SSLT dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SSLTU dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
-  PCADDI dst src1          -> usage (regOp src1, regOp dst)
-  PCADDU12I dst src1       -> usage (regOp src1, regOp dst)
-  PCADDU18I dst src1       -> usage (regOp src1, regOp dst)
-  PCALAU12I dst src1       -> usage (regOp src1, regOp dst)
-  AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  OR dst src1 src2         -> usage (regOp src1 ++ regOp src2, regOp dst)
-  XOR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  NOR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  ANDN dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-  ORN dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  MUL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  MULW dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-  MULWU dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
-  MULH dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-  MULHU dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
-  DIV dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  DIVU dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-  MOD dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  MODU dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
+  ADD dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  SUB dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  ALSL dst src1 src2 src3       -> readOp src1 <.> readOp src2 <.> readOp src3 <.> writeOp dst
+  ALSLU dst src1 src2 src3      -> readOp src1 <.> readOp src2 <.> readOp src3 <.> writeOp dst
+  LU12I dst src1                -> readOp src1 <.> writeOp dst
+  LU32I dst src1                -> readOp src1 <.> writeOp dst
+  LU52I dst src1 src2           -> readOp src1 <.> readOp src2 <.> writeOp dst
+  SSLT dst src1 src2            -> readOp src1 <.> readOp src2 <.> writeOp dst
+  SSLTU dst src1 src2           -> readOp src1 <.> readOp src2 <.> writeOp dst
+  PCADDI dst src1               -> readOp src1 <.> writeOp dst
+  PCADDU12I dst src1            -> readOp src1 <.> writeOp dst
+  PCADDU18I dst src1            -> readOp src1 <.> writeOp dst
+  PCALAU12I dst src1            -> readOp src1 <.> writeOp dst
+  AND dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  OR dst src1 src2              -> readOp src1 <.> readOp src2 <.> writeOp dst
+  XOR dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  NOR dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  ANDN dst src1 src2            -> readOp src1 <.> readOp src2 <.> writeOp dst
+  ORN dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  MUL dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  MULW dst src1 src2            -> readOp src1 <.> readOp src2 <.> writeOp dst
+  MULWU dst src1 src2           -> readOp src1 <.> readOp src2 <.> writeOp dst
+  MULH dst src1 src2            -> readOp src1 <.> readOp src2 <.> writeOp dst
+  MULHU dst src1 src2           -> readOp src1 <.> readOp src2 <.> writeOp dst
+  DIV dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  DIVU dst src1 src2            -> readOp src1 <.> readOp src2 <.> writeOp dst
+  MOD dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  MODU dst src1 src2            -> readOp src1 <.> readOp src2 <.> writeOp dst
   -- 2. Bit-shift Instructions ------------------------------------------
-  SLL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SRL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SRA dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  ROTR dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
+  SLL dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  SRL dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  SRA dst src1 src2             -> readOp src1 <.> readOp src2 <.> writeOp dst
+  ROTR dst src1 src2            -> readOp src1 <.> readOp src2 <.> writeOp dst
   -- 3. Bit Manipulation Instructions ------------------------------------------
-  EXT dst src1             -> usage (regOp src1, regOp dst)
-  CLO dst src1             -> usage (regOp src1, regOp dst)
-  CLZ dst src1             -> usage (regOp src1, regOp dst)
-  CTO dst src1             -> usage (regOp src1, regOp dst)
-  CTZ dst src1             -> usage (regOp src1, regOp dst)
-  BYTEPICK dst src1 src2 src3 -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
-  REVB2H dst src1          -> usage (regOp src1, regOp dst)
-  REVB4H dst src1          -> usage (regOp src1, regOp dst)
-  REVB2W dst src1          -> usage (regOp src1, regOp dst)
-  REVBD  dst src1          -> usage (regOp src1, regOp dst)
-  REVH2W dst src1          -> usage (regOp src1, regOp dst)
-  REVHD  dst src1          -> usage (regOp src1, regOp dst)
-  BITREV4B dst src1        -> usage (regOp src1, regOp dst)
-  BITREV8B dst src1        -> usage (regOp src1, regOp dst)
-  BITREV dst src1          -> usage (regOp src1, regOp dst)
-  BSTRINS _ dst src1 src2 src3  -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
-  BSTRPICK _ dst src1 src2 src3 -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
-  MASKEQZ dst src1 src2         -> usage (regOp src1 ++ regOp src2, regOp dst)
-  MASKNEZ dst src1 src2         -> usage (regOp src1 ++ regOp src2, regOp dst)
+  EXT dst src1                  -> readOp src1 <.> writeOp dst
+  CLO dst src1                  -> readOp src1 <.> writeOp dst
+  CLZ dst src1                  -> readOp src1 <.> writeOp dst
+  CTO dst src1                  -> readOp src1 <.> writeOp dst
+  CTZ dst src1                  -> readOp src1 <.> writeOp dst
+  BYTEPICK dst src1 src2 src3   -> readOp src1 <.> readOp src2 <.> readOp src3 <.> writeOp dst
+  REVB2H dst src1               -> readOp src1 <.> writeOp dst
+  REVB4H dst src1               -> readOp src1 <.> writeOp dst
+  REVB2W dst src1               -> readOp src1 <.> writeOp dst
+  REVBD  dst src1               -> readOp src1 <.> writeOp dst
+  REVH2W dst src1               -> readOp src1 <.> writeOp dst
+  REVHD  dst src1               -> readOp src1 <.> writeOp dst
+  BITREV4B dst src1             -> readOp src1 <.> writeOp dst
+  BITREV8B dst src1             -> readOp src1 <.> writeOp dst
+  BITREV dst src1               -> readOp src1 <.> writeOp dst
+  BSTRINS _ dst src1 src2 src3  -> readOp src1 <.> readOp src2 <.> readOp src3 <.> writeOp dst
+  BSTRPICK _ dst src1 src2 src3 -> readOp src1 <.> readOp src2 <.> readOp src3 <.> writeOp dst
+  MASKEQZ dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
+  MASKNEZ dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
   --
   -- Pseudo instructions
-  NOP                      -> usage ([], [])
-  MOV dst src              -> usage (regOp src, regOp dst)
-  NEG dst src              -> usage (regOp src, regOp dst)
-  CSET _cond dst src1 src2  -> usage (regOp src1 ++ regOp src2 , regOp dst)
+  NOP                           -> mempty
+  MOV dst src                   -> readOp src <.> writeOp dst
+  NEG dst src                   -> readOp src <.> writeOp dst
+  CSET _cond dst src1 src2      -> readOp src1 <.> readOp src2 <.> writeOp dst
   -- 4. Branch Instructions ----------------------------------------------------
-  J t                      -> usage (regTarget t, [])
-  J_TBL _ _ t              -> usage ([t], [])
-  B t                      -> usage (regTarget t, [])
-  BL t ps                  -> usage (regTarget t ++ ps, callerSavedRegisters)
-  CALL t ps                -> usage (regTarget t ++ ps, callerSavedRegisters)
-  CALL36 t                 -> usage (regTarget t, [])
-  TAIL36 r t               -> usage (regTarget t, regOp r)
+  J t                           -> readTarget t
+  J_TBL _ _ t                   -> readR t
+  B t                           -> readTarget t
+  BL t ps                       -> readTarget t <.> foldMapUsage readR ps <.> clobbered
+  CALL t ps                     -> readTarget t <.> foldMapUsage readR ps <.> clobbered
+  CALL36 t                      -> readTarget t
+  TAIL36 r t                    -> readTarget t <.> writeOp r
   -- Here two kinds of BCOND and BCOND1 are implemented, mainly because we want
   -- to distinguish between two kinds of conditional jumps with different jump
   -- ranges, corresponding to 2 and 1 instruction implementations respectively.
   --
   -- BCOND1 is selected by default.
-  BCOND1 _ j d t        -> usage (regTarget t ++ regOp j ++ regOp d, [])
-  BCOND _ j d t         -> usage (regTarget t ++ regOp j ++ regOp d, [])
-  BEQZ1 o1 o2           -> usage (regOp o1 ++ regOp o2, [])
-  BEQZ j t              -> usage (regTarget t ++ regOp j, [])
-  BNEZ j t              -> usage (regTarget t ++ regOp j, [])
+  BCOND1 _ j d t                -> readTarget t <.> readOp j <.> readOp d
+  BCOND _ j d t                 -> readTarget t <.> readOp j <.> readOp d
+  BEQZ1 o1 o2                   -> readOp o1 <.> readOp o2
+  BEQZ j t                      -> readTarget t <.> readOp j
+  BNEZ j t                      -> readTarget t <.> readOp j
   -- 5. Common Memory Access Instructions --------------------------------------
-  LD _ dst src             -> usage (regOp src, regOp dst)
-  LDU _ dst src            -> usage (regOp src, regOp dst)
-  ST _ dst src             -> usage (regOp src ++ regOp dst, [])
-  LDX _ dst src            -> usage (regOp src, regOp dst)
-  LDXU _ dst src           -> usage (regOp src, regOp dst)
-  STX _ dst src            -> usage (regOp src ++ regOp dst, [])
-  LDPTR _ dst src          -> usage (regOp src, regOp dst)
-  STPTR _ dst src          -> usage (regOp src ++ regOp dst, [])
-  PRELD _hint src          -> usage (regOp src, [])
+  LD _ dst src                  -> readOp src <.> writeOp dst
+  LDU _ dst src                 -> readOp src <.> writeOp dst
+  ST _ dst src                  -> readOp src <.> readOp dst
+  LDX _ dst src                 -> readOp src <.> writeOp dst
+  LDXU _ dst src                -> readOp src <.> writeOp dst
+  STX _ dst src                 -> readOp src <.> readOp dst
+  LDPTR _ dst src               -> readOp src <.> writeOp dst
+  STPTR _ dst src               -> readOp src <.> readOp dst
+  PRELD _hint src               -> readOp src
   -- 6. Bound Check Memory Access Instructions ---------------------------------
   -- LDCOND dst src1 src2     -> usage (regOp src1 ++ regOp src2, regOp dst)
   -- STCOND dst src1 src2     -> usage (regOp src1 ++ regOp src2, regOp dst)
   -- 7. Atomic Memory Access Instructions --------------------------------------
   -- In LoongArch, if the AM* atomic memory access instruction has the same register number as rd and rj,
   -- the execution will trigger an Instruction Non-defined Exception. Here should be avoided.
-  AMSWAPDB _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  AMADDDB  _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  AMANDDB  _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  AMORDB   _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  AMXORDB  _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  AMSWAPDB _ dst src1 src2      -> readOp src1 <.> readOp src2 <.> writeOp dst
+  AMADDDB  _ dst src1 src2      -> readOp src1 <.> readOp src2 <.> writeOp dst
+  AMANDDB  _ dst src1 src2      -> readOp src1 <.> readOp src2 <.> writeOp dst
+  AMORDB   _ dst src1 src2      -> readOp src1 <.> readOp src2 <.> writeOp dst
+  AMXORDB  _ dst src1 src2      -> readOp src1 <.> readOp src2 <.> writeOp dst
   --AMCASDB  _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp src1 ++ regOp src2 ++ regOp dst)
-  AMCASDB  _ dst src1 src2 -> usage (regOp dst ++ regOp src1 ++ regOp src2, regOp dst)
-  LL  _ dst src1 _ -> usage (regOp src1, regOp dst)
-  SC  _ dst src1 _ -> usage (regOp src1, regOp dst)
+  AMCASDB  _ dst src1 src2      -> modifyOp dst <.> readOp src1 <.> readOp src2
+  LL  _ dst src1 _              -> readOp src1 <.> writeOp dst
+  SC  _ dst src1 _              -> readOp src1 <.> writeOp dst
   -- 8. Barrier Instructions ---------------------------------------------------
-  DBAR _hint               -> usage ([], [])
-  IBAR _hint               -> usage ([], [])
+  DBAR _hint                    -> mempty
+  IBAR _hint                    -> mempty
   -- 11. Floating Point Instructions -------------------------------------------
-  FMAX dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-  FMIN dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-  FMAXA dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
-  FMINA dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
-  FNEG dst src1            -> usage (regOp src1, regOp dst)
+  FMAX dst src1 src2            -> readOp src1 <.> readOp src2 <.> writeOp dst
+  FMIN dst src1 src2            -> readOp src1 <.> readOp src2 <.> writeOp dst
+  FMAXA dst src1 src2           -> readOp src1 <.> readOp src2 <.> writeOp dst
+  FMINA dst src1 src2           -> readOp src1 <.> readOp src2 <.> writeOp dst
+  FNEG dst src1                 -> readOp src1 <.> writeOp dst
 
-  FCVT dst src             -> usage (regOp src, regOp dst)
+  FCVT dst src                  -> readOp src <.> writeOp dst
   -- SCVTF dst src            -> usage (regOp src, regOp src ++ regOp dst)
-  SCVTF dst src            -> usage (regOp src, regOp dst)
-  FCVTZS dst src1 src2     -> usage (regOp src2, regOp src1 ++ regOp dst)
-  FABS dst src             -> usage (regOp src, regOp dst)
-  FSQRT dst src            -> usage (regOp src, regOp dst)
-  FMA _ dst src1 src2 src3 -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
+  SCVTF dst src                 -> readOp src <.> writeOp dst
+  FCVTZS dst src1 src2          -> readOp src2 <.> writeOp src1 <.> writeOp dst
+  FABS dst src                  -> readOp src <.> writeOp dst
+  FSQRT dst src                 -> readOp src <.> writeOp dst
+  FMA _ dst src1 src2 src3      -> readOp src1 <.> readOp src2 <.> readOp src3 <.> writeOp dst
 
-  _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
+  _                             -> panic $ "regUsageOfInstr: " ++ instrCon instr
 
+-- Helpers for regUsageOfInstr. See Note [Register usage DSL] in
+-- GHC.CmmToAsm.RegUsage.
+
+-- | Format of a register.
+--
+-- SIMD NCG TODO: the format here is used for register spilling/unspilling.
+-- As this NCG does not currently support SIMD registers, this simple
+-- logic is OK.
+regFormat :: Platform -> Reg -> Format
+regFormat platform r = case cls of
+    RcInteger -> II64
+    RcFloat   -> FF64
+    RcVector  -> sorry "The LoongArch64 NCG does not (yet) support vectors; please use -fllvm."
   where
-        -- filtering the usage is necessary, otherwise the register
-        -- allocator will try to allocate pre-defined fixed stg
-        -- registers as well, as they show up.
-        usage :: ([Reg], [Reg]) -> RegUsage
-        usage (srcRegs, dstRegs) =
-          RU
-            (map mkFmt $ filter (interesting platform) srcRegs)
-            (map mkFmt $ filter (interesting platform) dstRegs)
+    cls = case r of
+      RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
+      RegReal rr    -> classOfRealReg rr
+{-# NOINLINE regFormat #-}
+-- NOINLINE: see Note [Register usage DSL] in GHC.CmmToAsm.RegUsage.
 
-        mkFmt r = RegWithFormat r fmt
-          where
-            fmt = case cls of
-              RcInteger -> II64
-              RcFloat   -> FF64
-              RcVector  -> sorry "The LoongArch64 NCG does not (yet) support vectors; please use -fllvm."
-            cls = case r of
-              RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
-              RegReal rr -> classOfRealReg rr
+readR, writeR, modifyR :: Reg -> Usage
+readR   r = withPlatform $ \platform -> readReg   (regFormat platform r) r
+writeR  r = withPlatform $ \platform -> writeReg  (regFormat platform r) r
+modifyR r = withPlatform $ \platform -> modifyReg (regFormat platform r) r
+{-# INLINE readR #-}
+{-# INLINE writeR #-}
+{-# INLINE modifyR #-}
 
-        regAddr :: AddrMode -> [Reg]
-        regAddr (AddrRegReg r1 r2) = [r1, r2]
-        regAddr (AddrRegImm r1 _)  = [r1]
-        regAddr (AddrReg r1)       = [r1]
+-- | The registers of an operand.
+op :: (Reg -> Usage) -> Operand -> Usage
+op k (OpReg _ r) = k r
+op k (OpAddr a)  = addr k a
+op _ (OpImm _)   = mempty
+{-# INLINE op #-}
 
-        regOp :: Operand -> [Reg]
-        regOp (OpReg _ r1) = [r1]
-        regOp (OpAddr a)    = regAddr a
-        regOp (OpImm _)     = []
+addr :: (Reg -> Usage) -> AddrMode -> Usage
+addr k (AddrRegReg r1 r2) = k r1 <.> k r2
+addr k (AddrRegImm r _) = k r
+addr k (AddrReg r)      = k r
+{-# INLINE addr #-}
 
-        regTarget :: Target -> [Reg]
-        regTarget (TBlock _) = []
-        regTarget (TLabel _) = []
-        regTarget (TReg r1)  = [r1]
+readOp, writeOp, modifyOp :: Operand -> Usage
+readOp   o = op readR o
+writeOp  o = op writeR o
+modifyOp o = op modifyR o
+{-# NOINLINE readOp #-}
+{-# NOINLINE writeOp #-}
+{-# NOINLINE modifyOp #-}
 
-        -- Is this register interesting for the register allocator?
-        interesting :: Platform -> Reg -> Bool
-        interesting _        (RegVirtual _)                 = True
-        interesting platform (RegReal (RealRegSingle i))    = freeReg platform i
+readTarget :: Target -> Usage
+readTarget (TBlock _) = mempty
+readTarget (TLabel _) = mempty
+readTarget (TReg r)   = readR r
+
+-- | Registers clobbered by a call.
+clobbered :: Usage
+clobbered = foldMapUsage writeR callerSavedRegisters
+{-# NOINLINE clobbered #-}
 
 -- | Caller-saved registers (according to calling convention)
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------

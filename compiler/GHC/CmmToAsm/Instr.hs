@@ -17,29 +17,9 @@ import GHC.Cmm.BlockId
 import GHC.CmmToAsm.Config
 import GHC.Data.FastString
 import GHC.CmmToAsm.Format
+import GHC.CmmToAsm.RegUsage (RegUsage(..), noUsage)
 
 import GHC.Utils.Misc (HasDebugCallStack)
-
--- | Holds a list of source and destination registers used by a
---      particular instruction.
---
---   Machine registers that are pre-allocated to stgRegs are filtered
---      out, because they are uninteresting from a register allocation
---      standpoint.  (We wouldn't want them to end up on the free list!)
---
---   As far as we are concerned, the fixed registers simply don't exist
---      (for allocation purposes, anyway).
---
-data RegUsage
-        = RU    {
-                reads :: [RegWithFormat],
-                writes :: [RegWithFormat]
-                }
-        deriving Show
-
--- | No regs read or written to.
-noUsage :: RegUsage
-noUsage  = RU [] []
 
 -- | Common things that we can do with instructions, on all architectures.
 --      These are used by the shared parts of the native code generator,

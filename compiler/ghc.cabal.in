@@ -320,6 +320,7 @@ Library
         GHC.CmmToAsm.Reg.Regs
         GHC.CmmToAsm.Reg.Target
         GHC.CmmToAsm.Reg.Utils
+        GHC.CmmToAsm.RegUsage
         GHC.CmmToAsm.RV64
         GHC.CmmToAsm.RV64.CodeGen
         GHC.CmmToAsm.RV64.Cond

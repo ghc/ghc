@@ -37,14 +37,14 @@ import GHC.Prelude hiding (head, init, last, tail)
 import GHC.CmmToAsm.PPC.Regs
 import GHC.CmmToAsm.PPC.Cond
 import GHC.CmmToAsm.Types
-import GHC.CmmToAsm.Instr (RegUsage(..), noUsage)
+import GHC.CmmToAsm.Instr (RegUsage)
+import GHC.CmmToAsm.RegUsage (Usage, (<.>), runUsage, readReg, writeReg, foldMapUsage, withPlatform)
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
 import GHC.Platform.Reg.Class.Unified
 import GHC.Platform.Reg
 
-import GHC.Platform.Regs
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
@@ -313,99 +313,119 @@ data Instr
 --
 regUsageOfInstr :: Platform -> Instr -> RegUsage
 regUsageOfInstr platform instr
- = case instr of
-    LD      _ reg addr       -> usage (regAddr addr, [reg])
-    LDFAR   _ reg addr       -> usage (regAddr addr, [reg])
-    LDR     _ reg addr       -> usage (regAddr addr, [reg])
-    LA      _ reg addr       -> usage (regAddr addr, [reg])
-    ST      _ reg addr       -> usage (reg : regAddr addr, [])
-    STFAR   _ reg addr       -> usage (reg : regAddr addr, [])
-    STU     _ reg addr       -> usage (reg : regAddr addr, [])
-    STC     _ reg addr       -> usage (reg : regAddr addr, [])
-    LIS     reg _            -> usage ([], [reg])
-    LI      reg _            -> usage ([], [reg])
-    MR      reg1 reg2        -> usage ([reg2], [reg1])
-    CMP     _ reg ri         -> usage (reg : regRI ri,[])
-    CMPL    _ reg ri         -> usage (reg : regRI ri,[])
-    BCC     _ _ _            -> noUsage
-    BCCFAR  _ _ _            -> noUsage
-    JMP     _ regs           -> usage (map regWithFormat_reg regs, [])
-    MTCTR   reg              -> usage ([reg],[])
-    BCTR    _ _ regs         -> usage (map regWithFormat_reg regs, [])
-    BL      _ params         -> usage (params, callClobberedRegs platform)
-    BCTRL   params           -> usage (params, callClobberedRegs platform)
+ = runUsage platform $ case instr of
+    LD      _ reg addr       -> readAddr addr <.> writeR reg
+    LDFAR   _ reg addr       -> readAddr addr <.> writeR reg
+    LDR     _ reg addr       -> readAddr addr <.> writeR reg
+    LA      _ reg addr       -> readAddr addr <.> writeR reg
+    ST      _ reg addr       -> readR reg <.> readAddr addr
+    STFAR   _ reg addr       -> readR reg <.> readAddr addr
+    STU     _ reg addr       -> readR reg <.> readAddr addr
+    STC     _ reg addr       -> readR reg <.> readAddr addr
+    LIS     reg _            -> writeR reg
+    LI      reg _            -> writeR reg
+    MR      reg1 reg2        -> readR reg2 <.> writeR reg1
+    CMP     _ reg ri         -> readR reg <.> readRI ri
+    CMPL    _ reg ri         -> readR reg <.> readRI ri
+    BCC     _ _ _            -> mempty
+    BCCFAR  _ _ _            -> mempty
+    JMP     _ regs           -> readJumpRegs regs
+    MTCTR   reg              -> readR reg
+    BCTR    _ _ regs         -> readJumpRegs regs
+    BL      _ params         -> foldMapUsage readR params <.> clobbered
+    BCTRL   params           -> foldMapUsage readR params <.> clobbered
 
-    ADD     reg1 reg2 ri     -> usage (reg2 : regRI ri, [reg1])
-    ADDO    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    ADDC    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    ADDE    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    ADDZE   reg1 reg2        -> usage ([reg2], [reg1])
-    ADDIS   reg1 reg2 _      -> usage ([reg2], [reg1])
-    SUBF    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    SUBFO   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    SUBFC   reg1 reg2 ri     -> usage (reg2 : regRI ri, [reg1])
-    SUBFE   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    MULL    _ reg1 reg2 ri   -> usage (reg2 : regRI ri, [reg1])
-    MULLO   _ reg1 reg2 reg3 -> usage ([reg2,reg3], [reg1])
-    MFOV    _ reg            -> usage ([], [reg])
-    MULHU   _ reg1 reg2 reg3 -> usage ([reg2,reg3], [reg1])
+    ADD     reg1 reg2 ri     -> readR reg2 <.> readRI ri <.> writeR reg1
+    ADDO    reg1 reg2 reg3   -> readR reg2 <.> readR reg3 <.> writeR reg1
+    ADDC    reg1 reg2 reg3   -> readR reg2 <.> readR reg3 <.> writeR reg1
+    ADDE    reg1 reg2 reg3   -> readR reg2 <.> readR reg3 <.> writeR reg1
+    ADDZE   reg1 reg2        -> readR reg2 <.> writeR reg1
+    ADDIS   reg1 reg2 _      -> readR reg2 <.> writeR reg1
+    SUBF    reg1 reg2 reg3   -> readR reg2 <.> readR reg3 <.> writeR reg1
+    SUBFO   reg1 reg2 reg3   -> readR reg2 <.> readR reg3 <.> writeR reg1
+    SUBFC   reg1 reg2 ri     -> readR reg2 <.> readRI ri <.> writeR reg1
+    SUBFE   reg1 reg2 reg3   -> readR reg2 <.> readR reg3 <.> writeR reg1
+    MULL    _ reg1 reg2 ri   -> readR reg2 <.> readRI ri <.> writeR reg1
+    MULLO   _ reg1 reg2 reg3 -> readR reg2 <.> readR reg3 <.> writeR reg1
+    MFOV    _ reg            -> writeR reg
+    MULHU   _ reg1 reg2 reg3 -> readR reg2 <.> readR reg3 <.> writeR reg1
     DIV     _ _ reg1 reg2 reg3
-                             -> usage ([reg2,reg3], [reg1])
+                             -> readR reg2 <.> readR reg3 <.> writeR reg1
 
-    AND     reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
-    ANDC    reg1 reg2 reg3  -> usage ([reg2,reg3], [reg1])
-    NAND    reg1 reg2 reg3  -> usage ([reg2,reg3], [reg1])
-    OR      reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
-    ORIS    reg1 reg2 _     -> usage ([reg2], [reg1])
-    XOR     reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
-    XORIS   reg1 reg2 _     -> usage ([reg2], [reg1])
-    EXTS    _  reg1 reg2    -> usage ([reg2], [reg1])
-    CNTLZ   _  reg1 reg2    -> usage ([reg2], [reg1])
-    NEG     reg1 reg2       -> usage ([reg2], [reg1])
-    NOT     reg1 reg2       -> usage ([reg2], [reg1])
-    SL      _ reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
-    SR      _ reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
-    SRA     _ reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
-    RLWINM  reg1 reg2 _ _ _ -> usage ([reg2], [reg1])
-    CLRLI   _ reg1 reg2 _   -> usage ([reg2], [reg1])
-    CLRRI   _ reg1 reg2 _   -> usage ([reg2], [reg1])
+    AND     reg1 reg2 ri     -> readR reg2 <.> readRI ri <.> writeR reg1
+    ANDC    reg1 reg2 reg3   -> readR reg2 <.> readR reg3 <.> writeR reg1
+    NAND    reg1 reg2 reg3   -> readR reg2 <.> readR reg3 <.> writeR reg1
+    OR      reg1 reg2 ri     -> readR reg2 <.> readRI ri <.> writeR reg1
+    ORIS    reg1 reg2 _      -> readR reg2 <.> writeR reg1
+    XOR     reg1 reg2 ri     -> readR reg2 <.> readRI ri <.> writeR reg1
+    XORIS   reg1 reg2 _      -> readR reg2 <.> writeR reg1
+    EXTS    _  reg1 reg2     -> readR reg2 <.> writeR reg1
+    CNTLZ   _  reg1 reg2     -> readR reg2 <.> writeR reg1
+    NEG     reg1 reg2        -> readR reg2 <.> writeR reg1
+    NOT     reg1 reg2        -> readR reg2 <.> writeR reg1
+    SL      _ reg1 reg2 ri   -> readR reg2 <.> readRI ri <.> writeR reg1
+    SR      _ reg1 reg2 ri   -> readR reg2 <.> readRI ri <.> writeR reg1
+    SRA     _ reg1 reg2 ri   -> readR reg2 <.> readRI ri <.> writeR reg1
+    RLWINM  reg1 reg2 _ _ _  -> readR reg2 <.> writeR reg1
+    CLRLI   _ reg1 reg2 _    -> readR reg2 <.> writeR reg1
+    CLRRI   _ reg1 reg2 _    -> readR reg2 <.> writeR reg1
 
-    FADD    _ r1 r2 r3      -> usage ([r2,r3], [r1])
-    FSUB    _ r1 r2 r3      -> usage ([r2,r3], [r1])
-    FMUL    _ r1 r2 r3      -> usage ([r2,r3], [r1])
-    FDIV    _ r1 r2 r3      -> usage ([r2,r3], [r1])
-    FABS    r1 r2           -> usage ([r2], [r1])
-    FNEG    r1 r2           -> usage ([r2], [r1])
-    FCMP    r1 r2           -> usage ([r1,r2], [])
-    FCTIWZ  r1 r2           -> usage ([r2], [r1])
-    FCTIDZ  r1 r2           -> usage ([r2], [r1])
-    FCFID   r1 r2           -> usage ([r2], [r1])
-    FRSP    r1 r2           -> usage ([r2], [r1])
-    MFCR    reg             -> usage ([], [reg])
-    MFLR    reg             -> usage ([], [reg])
-    FETCHPC reg             -> usage ([], [reg])
-    FMADD _ _ rt ra rc rb   -> usage ([ra, rc, rb], [rt])
-    _                       -> noUsage
-  where
-    usage (src, dst) = RU (map mkFmt $ filter (interesting platform) src)
-                          (map mkFmt $ filter (interesting platform) dst)
-      -- SIMD NCG TODO: the format here is used for register spilling/unspilling.
-      -- As the PowerPC NCG does not currently support SIMD registers,
-      -- this simple logic is OK.
-    mkFmt r = RegWithFormat r fmt
-      where fmt = case targetClassOfReg platform r of
-                    RcInteger -> archWordFormat (target32Bit platform)
-                    RcFloatOrVector -> FF64
-    regAddr (AddrRegReg r1 r2) = [r1, r2]
-    regAddr (AddrRegImm r1 _)  = [r1]
+    FADD    _ r1 r2 r3       -> readR r2 <.> readR r3 <.> writeR r1
+    FSUB    _ r1 r2 r3       -> readR r2 <.> readR r3 <.> writeR r1
+    FMUL    _ r1 r2 r3       -> readR r2 <.> readR r3 <.> writeR r1
+    FDIV    _ r1 r2 r3       -> readR r2 <.> readR r3 <.> writeR r1
+    FABS    r1 r2            -> readR r2 <.> writeR r1
+    FNEG    r1 r2            -> readR r2 <.> writeR r1
+    FCMP    r1 r2            -> readR r1 <.> readR r2
+    FCTIWZ  r1 r2            -> readR r2 <.> writeR r1
+    FCTIDZ  r1 r2            -> readR r2 <.> writeR r1
+    FCFID   r1 r2            -> readR r2 <.> writeR r1
+    FRSP    r1 r2            -> readR r2 <.> writeR r1
+    MFCR    reg              -> writeR reg
+    MFLR    reg              -> writeR reg
+    FETCHPC reg              -> writeR reg
+    FMADD _ _ rt ra rc rb    -> readR ra <.> readR rc <.> readR rb <.> writeR rt
+    _                        -> mempty
 
-    regRI (RIReg r) = [r]
-    regRI  _        = []
+-- Helpers for regUsageOfInstr. See Note [Register usage DSL] in
+-- GHC.CmmToAsm.RegUsage.
 
-interesting :: Platform -> Reg -> Bool
-interesting _        (RegVirtual _)              = True
-interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
+-- | Format of a register.
+--
+-- SIMD NCG TODO: the format here is used for register spilling/unspilling.
+-- As the PowerPC NCG does not currently support SIMD registers,
+-- this simple logic is OK.
+regFormat :: Platform -> Reg -> Format
+regFormat platform r = case targetClassOfReg platform r of
+  RcInteger       -> archWordFormat (target32Bit platform)
+  RcFloatOrVector -> FF64
+{-# NOINLINE regFormat #-}
+-- NOINLINE: see Note [Register usage DSL] in GHC.CmmToAsm.RegUsage.
 
+readR, writeR :: Reg -> Usage
+readR  r = withPlatform $ \platform -> readReg  (regFormat platform r) r
+writeR r = withPlatform $ \platform -> writeReg (regFormat platform r) r
+{-# NOINLINE readR #-}
+{-# NOINLINE writeR #-}
+
+readAddr :: AddrMode -> Usage
+readAddr (AddrRegReg r1 r2) = readR r1 <.> readR r2
+readAddr (AddrRegImm r1 _)  = readR r1
+{-# NOINLINE readAddr #-}
+
+readRI :: RI -> Usage
+readRI (RIReg r) = readR r
+readRI _         = mempty
+
+-- | Registers live at a jump. The format stored by the code generator is
+-- not used: it is recomputed from the register class, as it always was.
+readJumpRegs :: [RegWithFormat] -> Usage
+readJumpRegs = foldMapUsage (readR . regWithFormat_reg)
+
+-- | Registers clobbered by a call.
+clobbered :: Usage
+clobbered = withPlatform $ \platform -> foldMapUsage writeR (callClobberedRegs platform)
+{-# NOINLINE clobbered #-}
 
 -- | Apply a given mapping to all the register references in this
 -- instruction.

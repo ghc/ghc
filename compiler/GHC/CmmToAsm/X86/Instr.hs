@@ -51,7 +51,7 @@ import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Reg.Target (targetClassOfReg)
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
-import GHC.CmmToAsm.Instr (RegUsage(..), noUsage)
+import GHC.CmmToAsm.RegUsage
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class.Unified
 
@@ -59,7 +59,6 @@ import GHC.CmmToAsm.Config
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
-import GHC.Platform.Regs
 import GHC.Cmm
 import GHC.Utils.Constants ( debugIsOn )
 import GHC.Utils.Outputable
@@ -424,9 +423,14 @@ data FMAPermutation = FMA132 | FMA213 | FMA231
 
 -- | Returns which registers are read and written as a (read, written)
 -- pair.
+-- See Note [Register usage DSL] in GHC.CmmToAsm.RegUsage.
 regUsageOfInstr :: Platform -> Instr -> RegUsage
+-- The LOCK prefix does not change the usage of the instruction. It is
+-- handled here so that the case below is not recursive.
+-- See Note [Register usage DSL] in GHC.CmmToAsm.RegUsage.
+regUsageOfInstr platform (LOCK i) = regUsageOfInstr platform i
 regUsageOfInstr platform instr
- = case instr of
+ = runUsage platform $ case instr of
 
     -- Recall that MOV is always a scalar move instruction, but when the destination
     -- is an XMM register, we make the distinction between:
@@ -443,130 +447,130 @@ regUsageOfInstr platform instr
       , isFloatScalarFormat sFmt
       , OpReg {} <- src
       , OpReg {} <- dst
-      -> usageRM dst_fmt src dst
+      -> readOp dst_fmt src <.> modifyOp dst_fmt dst
       -- other MOV instructions zero any remaining upper part of the destination
       -- (largely to avoid partial register stalls)
       | otherwise
-      -> usageRW dst_fmt src dst
+      -> readOp dst_fmt src <.> writeOp dst_fmt dst
     MOVD fmt1 fmt2 src dst    ->
       -- NB: MOVD and MOVQ always zero any remaining upper part of destination,
       -- so the destination is "written" not "modified".
-      usageRW' fmt1 fmt2 src dst
-    CMOV _ fmt src dst    -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
-    MOVZxL fmt src dst    -> usageRW fmt src dst
-    MOVSxL fmt src dst    -> usageRW fmt src dst
-    LEA    fmt src dst    -> usageRW fmt src dst
-    ADD    fmt src dst    -> usageRM fmt src dst
-    ADC    fmt src dst    -> usageRM fmt src dst
-    SUB    fmt src dst    -> usageRM fmt src dst
-    SBB    fmt src dst    -> usageRM fmt src dst
-    IMUL   fmt src dst    -> usageRM fmt src dst
+      readOp fmt1 src <.> writeOp fmt2 dst
+    CMOV _ fmt src dst             -> readOp fmt src <.> modifyReg fmt dst
+    MOVZxL fmt src dst             -> readOp fmt src <.> writeOp fmt dst
+    MOVSxL fmt src dst             -> readOp fmt src <.> writeOp fmt dst
+    LEA    fmt src dst             -> readOp fmt src <.> writeOp fmt dst
+    ADD    fmt src dst             -> readOp fmt src <.> modifyOp fmt dst
+    ADC    fmt src dst             -> readOp fmt src <.> modifyOp fmt dst
+    SUB    fmt src dst             -> readOp fmt src <.> modifyOp fmt dst
+    SBB    fmt src dst             -> readOp fmt src <.> modifyOp fmt dst
+    IMUL   fmt src dst             -> readOp fmt src <.> modifyOp fmt dst
 
     -- Result of IMULB will be in just in %ax
-    IMUL2  II8 src       -> mkRU (mk II8 eax:use_R II8 src []) [mk II16 eax]
+    IMUL2  II8 src                 -> readReg II8 eax <.> readOp II8 src <.> writeReg II16 eax
     -- Result of IMUL for wider values, will be split between %dx/%edx/%rdx and
     -- %ax/%eax/%rax.
-    IMUL2  fmt src        -> mkRU (mk fmt eax:use_R fmt src []) [mk fmt eax,mk fmt edx]
+    IMUL2  fmt src                 -> readReg fmt eax <.> readOp fmt src <.> writeReg fmt eax <.> writeReg fmt edx
 
-    MUL    fmt src dst    -> usageRM fmt src dst
-    MUL2   fmt src        -> mkRU (mk fmt eax:use_R fmt src []) [mk fmt eax,mk fmt edx]
-    DIV    fmt op -> mkRU (mk fmt eax:mk fmt edx:use_R fmt op []) [mk fmt eax, mk fmt edx]
-    IDIV   fmt op -> mkRU (mk fmt eax:mk fmt edx:use_R fmt op []) [mk fmt eax, mk fmt edx]
-    ADD_CC fmt src dst    -> usageRM fmt src dst
-    SUB_CC fmt src dst    -> usageRM fmt src dst
+    MUL    fmt src dst             -> readOp fmt src <.> modifyOp fmt dst
+    MUL2   fmt src                 -> readReg fmt eax <.> readOp fmt src <.> writeReg fmt eax <.> writeReg fmt edx
+    DIV    fmt op                  -> readReg fmt eax <.> readReg fmt edx <.> readOp fmt op <.> writeReg fmt eax <.> writeReg fmt edx
+    IDIV   fmt op                  -> readReg fmt eax <.> readReg fmt edx <.> readOp fmt op <.> writeReg fmt eax <.> writeReg fmt edx
+    ADD_CC fmt src dst             -> readOp fmt src <.> modifyOp fmt dst
+    SUB_CC fmt src dst             -> readOp fmt src <.> modifyOp fmt dst
 
-    AND    fmt src dst    -> usageRM fmt src dst
+    AND    fmt src dst             -> readOp fmt src <.> modifyOp fmt dst
     VAND   fmt src1 src2 dst
-      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
+      -> readOp fmt src1 <.> readReg fmt src2 <.> writeReg fmt dst
 
-    OR     fmt src dst    -> usageRM fmt src dst
+    OR     fmt src dst             -> readOp fmt src <.> modifyOp fmt dst
     VOR    fmt src1 src2 dst
-      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
+      -> readOp fmt src1 <.> readReg fmt src2 <.> writeReg fmt dst
 
     XOR    fmt (OpReg src) (OpReg dst)
       | src == dst
-      -> mkRU [] [mk fmt dst]
+      -> writeReg fmt dst
     XOR    fmt src dst
-      -> usageRM fmt src dst
+      -> readOp fmt src <.> modifyOp fmt dst
     VXOR fmt (OpReg src1) src2 dst
       | src1 == src2, src1 == dst
-      -> mkRU [] [mk fmt dst]
+      -> writeReg fmt dst
     VXOR fmt src1 src2 dst
-      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
+      -> readOp fmt src1 <.> readReg fmt src2 <.> writeReg fmt dst
 
-    NOT    fmt op         -> usageM fmt op
-    BSWAP  fmt reg        -> mkRU [mk fmt reg] [mk fmt reg]
-    NEGI   fmt op         -> usageM fmt op
-    SHL    fmt imm dst    -> usageRM fmt imm dst
-    SAR    fmt imm dst    -> usageRM fmt imm dst
-    SHR    fmt imm dst    -> usageRM fmt imm dst
-    SHLD   fmt imm dst1 dst2 -> usageRMM fmt imm dst1 dst2
-    SHRD   fmt imm dst1 dst2 -> usageRMM fmt imm dst1 dst2
-    BT     fmt _   src    -> mkRUR (use_R fmt src [])
-    BTR    fmt off dst    -> usageRM fmt off dst
-    BTS    fmt off dst    -> usageRM fmt off dst
-    BTC    fmt off dst    -> usageRM fmt off dst
+    NOT    fmt op                  -> modifyOp fmt op
+    BSWAP  fmt reg                 -> modifyReg fmt reg
+    NEGI   fmt op                  -> modifyOp fmt op
+    SHL    fmt imm dst             -> readOp fmt imm <.> modifyOp fmt dst
+    SAR    fmt imm dst             -> readOp fmt imm <.> modifyOp fmt dst
+    SHR    fmt imm dst             -> readOp fmt imm <.> modifyOp fmt dst
+    SHLD   fmt imm dst1 dst2       -> readModifyModify fmt imm dst1 dst2
+    SHRD   fmt imm dst1 dst2       -> readModifyModify fmt imm dst1 dst2
+    BT     fmt _   src             -> readOp fmt src
+    BTR    fmt off dst             -> readOp fmt off <.> modifyOp fmt dst
+    BTS    fmt off dst             -> readOp fmt off <.> modifyOp fmt dst
+    BTC    fmt off dst             -> readOp fmt off <.> modifyOp fmt dst
 
-    PUSH   fmt op         -> mkRUR (use_R fmt op [])
-    POP    fmt op         -> mkRU [] (def_W fmt op)
-    TEST   fmt src dst    -> mkRUR (use_R fmt src $! use_R fmt dst [])
-    CMP    fmt src dst    -> mkRUR (use_R fmt src $! use_R fmt dst [])
-    SETCC  _ op         -> mkRU [] (def_W II8 op)
-    JXX    _ _          -> mkRU [] []
-    JXX_GBL _ _         -> mkRU [] []
-    JMP     op regs     -> mkRU (use_R addrFmt op regs) []
-    JMP_TBL op _ _ _ _  -> mkRU (use_R addrFmt op []) []
-    CALL (Left _)  params   -> mkRU params (map mkFmt $ callClobberedRegs platform)
-    CALL (Right reg) params -> mkRU (mk addrFmt reg:params) (map mkFmt $ callClobberedRegs platform)
-    CLTD   fmt          -> mkRU [mk fmt eax] [mk fmt edx]
-    NOP                 -> mkRU [] []
+    PUSH   fmt op                  -> readOp fmt op
+    POP    fmt op                  -> defOp fmt op
+    TEST   fmt src dst             -> readOp fmt src <.> readOp fmt dst
+    CMP    fmt src dst             -> readOp fmt src <.> readOp fmt dst
+    SETCC  _ op                    -> defOp II8 op
+    JXX    _ _                     -> mempty
+    JXX_GBL _ _                    -> mempty
+    JMP     op regs                -> atAddrFmt (\fmt -> readOp fmt op) <.> readRegs regs
+    JMP_TBL op _ _ _ _             -> atAddrFmt (\fmt -> readOp fmt op)
+    CALL (Left _)  params          -> readRegs params <.> clobbered
+    CALL (Right reg) params        -> atAddrFmt (\fmt -> readReg fmt reg) <.> readRegs params <.> clobbered
+    CLTD   fmt                     -> readReg fmt eax <.> writeReg fmt edx
+    NOP                            -> mempty
 
-    X87Store _fmt  dst -> mkRUR (use_EA dst [])
+    X87Store _fmt  dst             -> readAddr dst
 
-    CVTSS2SD   src dst  -> mkRU [mk FF32 src] [mk FF64 dst]
-    CVTSD2SS   src dst  -> mkRU [mk FF64 src] [mk FF32 dst]
-    CVTTSS2SIQ fmt src dst -> mkRU (use_R FF32 src []) [mk fmt dst]
-    CVTTSD2SIQ fmt src dst -> mkRU (use_R FF64 src []) [mk fmt dst]
-    CVTSI2SS   fmt src dst -> mkRU (use_R fmt src []) [mk FF32 dst]
-    CVTSI2SD   fmt src dst -> mkRU (use_R fmt src []) [mk FF64 dst]
-    FDIV fmt     src dst  -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
-    SQRT fmt src dst      -> mkRU (use_R fmt src []) [mk fmt dst]
+    CVTSS2SD   src dst             -> readReg FF32 src <.> writeReg FF64 dst
+    CVTSD2SS   src dst             -> readReg FF64 src <.> writeReg FF32 dst
+    CVTTSS2SIQ fmt src dst         -> readOp FF32 src <.> writeReg fmt dst
+    CVTTSD2SIQ fmt src dst         -> readOp FF64 src <.> writeReg fmt dst
+    CVTSI2SS   fmt src dst         -> readOp fmt src <.> writeReg FF32 dst
+    CVTSI2SD   fmt src dst         -> readOp fmt src <.> writeReg FF64 dst
+    FDIV fmt     src dst           -> readOp fmt src <.> modifyReg fmt dst
+    SQRT fmt src dst               -> readOp fmt src <.> writeReg fmt dst
 
-    FETCHGOT reg        -> mkRU [] [mk addrFmt reg]
-    FETCHPC  reg        -> mkRU [] [mk addrFmt reg]
+    FETCHGOT reg                   -> atAddrFmt (\fmt -> writeReg fmt reg)
+    FETCHPC  reg                   -> atAddrFmt (\fmt -> writeReg fmt reg)
 
-    COMMENT _           -> noUsage
-    LOCATION{}          -> noUsage
-    UNWIND{}            -> noUsage
-    DELTA   _           -> noUsage
-    LDATA{}             -> noUsage
-    NEWBLOCK{}          -> noUsage
+    COMMENT _                      -> mempty
+    LOCATION{}                     -> mempty
+    UNWIND{}                       -> mempty
+    DELTA   _                      -> mempty
+    LDATA{}                        -> mempty
+    NEWBLOCK{}                     -> mempty
 
-    POPCNT fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
-    LZCNT  fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
-    TZCNT  fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
-    BSF    fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
-    BSR    fmt src dst -> mkRU (use_R fmt src []) [mk fmt dst]
+    POPCNT fmt src dst             -> readOp fmt src <.> writeReg fmt dst
+    LZCNT  fmt src dst             -> readOp fmt src <.> writeReg fmt dst
+    TZCNT  fmt src dst             -> readOp fmt src <.> writeReg fmt dst
+    BSF    fmt src dst             -> readOp fmt src <.> writeReg fmt dst
+    BSR    fmt src dst             -> readOp fmt src <.> writeReg fmt dst
 
-    PDEP   fmt src mask dst -> mkRU (use_R fmt src $ use_R fmt mask []) [mk fmt dst]
-    PEXT   fmt src mask dst -> mkRU (use_R fmt src $ use_R fmt mask []) [mk fmt dst]
+    PDEP   fmt src mask dst        -> readOp fmt src <.> readOp fmt mask <.> writeReg fmt dst
+    PEXT   fmt src mask dst        -> readOp fmt src <.> readOp fmt mask <.> writeReg fmt dst
 
-    FMA3 fmt _ _ src3 src2 dst -> usageFMA fmt src3 src2 dst
+    FMA3 fmt _ _ src3 src2 dst     -> readOp fmt src3 <.> readReg fmt src2 <.> modifyReg fmt dst
 
     -- note: might be a better way to do this
-    PREFETCH _  fmt src -> mkRU (use_R fmt src []) []
-    LOCK i              -> regUsageOfInstr platform i
-    XADD fmt src dst      -> usageMM fmt src dst
-    CMPXCHG fmt src dst   -> usageRMM fmt src dst (OpReg eax)
-    XCHG fmt src dst      -> usageMM fmt src (OpReg dst)
-    MFENCE -> noUsage
+    PREFETCH _  fmt src            -> readOp fmt src
+    XADD fmt (OpReg src) (OpAddr ea) -> readAddr ea <.> modifyReg fmt src
+    XADD fmt src dst               -> modifyOp fmt src <.> modifyOp fmt dst
+    CMPXCHG fmt src dst            -> readModifyModify fmt src dst (OpReg eax)
+    XCHG fmt src dst               -> modifyOp fmt src <.> modifyReg fmt dst
+    MFENCE                         -> mempty
 
     -- vector instructions
-    VBROADCAST fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
-    VPBROADCAST sFmt vFmt src dst -> mkRU (use_R sFmt src []) [mk vFmt dst]
-    VEXTRACT     fmt _off src dst -> usageRW fmt (OpReg src) dst
+    VBROADCAST fmt src dst         -> readOp fmt src <.> writeReg fmt dst
+    VPBROADCAST sFmt vFmt src dst  -> readOp sFmt src <.> writeReg vFmt dst
+    VEXTRACT     fmt _off src dst  -> readReg fmt src <.> writeOp fmt dst
     INSERTPS     fmt (ImmInt off) src dst
-      -> mkRU (use_R fmt src [mk fmt dst | not doesNotReadDst]) [mk fmt dst]
+      -> readOp fmt src <.> (if doesNotReadDst then writeReg fmt dst else modifyReg fmt dst)
         where
           -- Compute whether the instruction reads the destination register or not.
           -- Immediate bits: ss_dd_zzzz s = src pos, d = dst pos, z = zeroed components.
@@ -575,232 +579,208 @@ regUsageOfInstr platform instr
             -- are being zeroed.
             where pos = ( off `shiftR` 4 ) .&. 0b11
     INSERTPS fmt _off src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     VINSERTPS fmt _imm src2 src1 dst
-      -> mkRU (use_R fmt src2 [mk fmt src1]) [mk fmt dst]
+      -> readOp fmt src2 <.> readReg fmt src1 <.> writeReg fmt dst
     PINSR sFmt vFmt _off src dst
-      -> mkRU (use_R sFmt src [mk vFmt dst]) [mk vFmt dst]
+      -> readOp sFmt src <.> modifyReg vFmt dst
     PEXTR sFmt vFmt _off src dst
-      -> usageRW' vFmt sFmt (OpReg src) dst
+      -> readReg vFmt src <.> writeOp sFmt dst
 
-    VMOVU        fmt src dst   -> usageRW fmt src dst
-    MOVU         fmt src dst   -> usageRW fmt src dst
-    MOVL         fmt src dst   -> usageRM fmt src dst
-    MOVH         fmt src dst   -> usageRM fmt src dst
-    MOVDQU       fmt src dst   -> usageRW fmt src dst
-    VMOVDQU      fmt src dst   -> usageRW fmt src dst
-    VMOV_MERGE   fmt src2 src1 dst -> mkRU [mk fmt src1, mk fmt src2] [mk fmt dst]
+    VMOVU        fmt src dst       -> readOp fmt src <.> writeOp fmt dst
+    MOVU         fmt src dst       -> readOp fmt src <.> writeOp fmt dst
+    MOVL         fmt src dst       -> readOp fmt src <.> modifyOp fmt dst
+    MOVH         fmt src dst       -> readOp fmt src <.> modifyOp fmt dst
+    MOVDQU       fmt src dst       -> readOp fmt src <.> writeOp fmt dst
+    VMOVDQU      fmt src dst       -> readOp fmt src <.> writeOp fmt dst
+    VMOV_MERGE   fmt src2 src1 dst -> readReg fmt src1 <.> readReg fmt src2 <.> writeReg fmt dst
 
     PXOR fmt src dst
       | OpReg src_reg <- src
       , src_reg == dst
-      -> mkRU [] [mk fmt dst]
+      -> writeReg fmt dst
       | otherwise
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
 
     VPXOR        fmt s1 s2 dst
       | OpReg s1_reg <- s1
       , s1_reg == s2, s1_reg == dst
-      -> mkRU [] [mk fmt dst]
+      -> writeReg fmt dst
       | otherwise
-      -> mkRU (use_R fmt s1 [mk fmt s2]) [mk fmt dst]
+      -> readOp fmt s1 <.> readReg fmt s2 <.> writeReg fmt dst
 
-    PAND         fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
-    PANDN        fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
-    VPAND        fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
-    POR          fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
-    VPOR         fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
+    PAND         fmt src dst       -> readOp fmt src <.> modifyReg fmt dst
+    PANDN        fmt src dst       -> readOp fmt src <.> modifyReg fmt dst
+    VPAND        fmt s1 s2 dst     -> readOp fmt s1 <.> readReg fmt s2 <.> writeReg fmt dst
+    POR          fmt src dst       -> readOp fmt src <.> modifyReg fmt dst
+    VPOR         fmt s1 s2 dst     -> readOp fmt s1 <.> readReg fmt s2 <.> writeReg fmt dst
 
-    VADD         fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
-    VSUB         fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
-    VMUL         fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
-    VDIV         fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
-    PADD         fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
-    PSUB         fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
-    PMULL        fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
-    VPMULL       fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
-    PMULUDQ      fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
-    PABS         fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
-    VPABS        fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
-    VSQRT        fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
+    VADD         fmt s1 s2 dst     -> readOp fmt s1 <.> readReg fmt s2 <.> writeReg fmt dst
+    VSUB         fmt s1 s2 dst     -> readOp fmt s1 <.> readReg fmt s2 <.> writeReg fmt dst
+    VMUL         fmt s1 s2 dst     -> readOp fmt s1 <.> readReg fmt s2 <.> writeReg fmt dst
+    VDIV         fmt s1 s2 dst     -> readOp fmt s1 <.> readReg fmt s2 <.> writeReg fmt dst
+    PADD         fmt src dst       -> readOp fmt src <.> modifyReg fmt dst
+    PSUB         fmt src dst       -> readOp fmt src <.> modifyReg fmt dst
+    PMULL        fmt src dst       -> readOp fmt src <.> modifyReg fmt dst
+    VPMULL       fmt s1 s2 dst     -> readOp fmt s1 <.> readReg fmt s2 <.> writeReg fmt dst
+    PMULUDQ      fmt src dst       -> readOp fmt src <.> modifyReg fmt dst
+    PABS         fmt src dst       -> readOp fmt src <.> writeReg fmt dst
+    VPABS        fmt src dst       -> readOp fmt src <.> writeReg fmt dst
+    VSQRT        fmt src dst       -> readOp fmt src <.> writeReg fmt dst
 
-    PCMPGT       fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PCMPGT       fmt src dst       -> readOp fmt src <.> modifyReg fmt dst
 
     SHUF fmt _mask src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     VSHUF fmt _mask src1 src2 dst
-      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
+      -> readOp fmt src1 <.> readReg fmt src2 <.> writeReg fmt dst
     PSHUFB fmt mask dst
-      -> mkRU (use_R fmt mask [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt mask <.> modifyReg fmt dst
     PSHUFLW fmt _mask src dst
-      -> mkRU (use_R fmt src []) [mk fmt dst]
+      -> readOp fmt src <.> writeReg fmt dst
     PSHUFHW fmt _mask src dst
-      -> mkRU (use_R fmt src []) [mk fmt dst]
+      -> readOp fmt src <.> writeReg fmt dst
     PSHUFD fmt _mask src dst
-      -> mkRU (use_R fmt src []) [mk fmt dst]
+      -> readOp fmt src <.> writeReg fmt dst
     VPSHUFD fmt _mask src dst
-      -> mkRU (use_R fmt src []) [mk fmt dst]
+      -> readOp fmt src <.> writeReg fmt dst
     BLEND fmt _mask src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     VBLEND fmt _mask src2 src1 dst
-      -> mkRU (use_R fmt src2 [mk fmt src1]) [mk fmt dst]
+      -> readOp fmt src2 <.> readReg fmt src1 <.> writeReg fmt dst
     PBLENDW fmt _mask src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
 
-    PSLL   fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
-    PSLLDQ fmt _off dst -> mkRU [mk fmt dst] [mk fmt dst]
-    PSRL   fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
-    PSRA   fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
-    PSRLDQ fmt _off dst -> mkRU [mk fmt dst] [mk fmt dst]
-    PALIGNR fmt _off src dst -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PSLL   fmt off dst             -> readOp fmt off <.> modifyReg fmt dst
+    PSLLDQ fmt _off dst            -> modifyReg fmt dst
+    PSRL   fmt off dst             -> readOp fmt off <.> modifyReg fmt dst
+    PSRA   fmt off dst             -> readOp fmt off <.> modifyReg fmt dst
+    PSRLDQ fmt _off dst            -> modifyReg fmt dst
+    PALIGNR fmt _off src dst       -> readOp fmt src <.> modifyReg fmt dst
 
     MOVHLPS    fmt src dst
       -> case fmt of
-           VecFormat {} -> mkRU [mk fmt src, mk fmt dst] [mk fmt dst]
+           VecFormat {} -> readReg fmt src <.> modifyReg fmt dst
            -- MOVHLPS moves the high 64 bits of src to the low 64 bits of dst,
            -- keeping the high 64 bits of dst intact.
            -- If we only care about the lower 64 bits of the result,
            -- dst is only written to, not read.
-           FF64 -> mkRU [mk (VecFormat 2 FmtDouble) src] [mk fmt dst]
-           FF32 -> mkRU [mk (VecFormat 4 FmtFloat) src] [mk fmt dst]
-           _ -> pprPanic "regUsage: invalid format for MOVHLPS" (ppr fmt)
+           FF64 -> readReg (VecFormat 2 FmtDouble) src <.> writeReg fmt dst
+           FF32 -> readReg (VecFormat 4 FmtFloat) src <.> writeReg fmt dst
+           _    -> pprPanic "regUsage: invalid format for MOVHLPS" (ppr fmt)
     VMOVHLPS   fmt src2 src1 dst
-      -> mkRU [mk fmt src1, mk fmt src2] [mk fmt dst]
+      -> readReg fmt src1 <.> readReg fmt src2 <.> writeReg fmt dst
     MOVLHPS    fmt src dst
-      -> mkRU [mk fmt src, mk fmt dst] [mk fmt dst]
+      -> readReg fmt src <.> modifyReg fmt dst
     VMOVLHPS   fmt src2 src1 dst
-      -> mkRU [mk fmt src1, mk fmt src2] [mk fmt dst]
+      -> readReg fmt src1 <.> readReg fmt src2 <.> writeReg fmt dst
     UNPCKL fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     VUNPCKL fmt src2 src1 dst
-      -> mkRU (use_R fmt src2 [mk fmt src1]) [mk fmt dst]
+      -> readOp fmt src2 <.> readReg fmt src1 <.> writeReg fmt dst
     UNPCKH fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     VUNPCKH fmt src2 src1 dst
-      -> mkRU (use_R fmt src2 [mk fmt src1]) [mk fmt dst]
+      -> readOp fmt src2 <.> readReg fmt src1 <.> writeReg fmt dst
     PUNPCKLQDQ fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     PUNPCKLDQ fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     PUNPCKLWD fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     PUNPCKLBW fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     PUNPCKHQDQ fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     PUNPCKHDQ fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     PUNPCKHWD fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     PUNPCKHBW fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     PACKUSWB fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
 
     MINMAX _ _ fmt src dst
-      -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+      -> readOp fmt src <.> modifyReg fmt dst
     VMINMAX _ _ fmt src1 src2 dst
-      -> mkRU (use_R fmt src1 [mk fmt src2]) [mk fmt dst]
- where
+      -> readOp fmt src1 <.> readReg fmt src2 <.> writeReg fmt dst
 
-    -- # Definitions
-    --
-    -- Written: If the operand is a register, it's written. If it's an
-    -- address, registers mentioned in the address are read.
-    --
-    -- Modified: If the operand is a register, it's both read and
-    -- written. If it's an address, registers mentioned in the address
-    -- are read.
+-- Helpers for regUsageOfInstr. See Note [Register usage DSL] in
+-- GHC.CmmToAsm.RegUsage.
+--
+-- Written: if the operand is a register, it is written. If it is an
+-- address, the registers of the address are read.
+--
+-- Modified: if the operand is a register, it is both read and written. If
+-- it is an address, the registers of the address are read.
 
-    -- 2 operand form; first operand Read; second Written
-    usageRW :: HasDebugCallStack => Format -> Operand -> Operand -> RegUsage
-    usageRW fmt op (OpReg reg)      = mkRU (use_R fmt op []) [mk fmt reg]
-    usageRW fmt op (OpAddr ea)      = mkRUR (use_R fmt op $! use_EA ea [])
-    usageRW _ _ _                   = panic "X86.RegInfo.usageRW: no match"
+readOp :: Format -> Operand -> Usage
+readOp fmt (OpReg r)   = readReg fmt r
+readOp _   (OpImm _)   = mempty
+readOp _   (OpAddr ea) = readAddr ea
+{-# NOINLINE readOp #-}
 
-    usageRW' :: HasDebugCallStack => Format -> Format -> Operand -> Operand -> RegUsage
-    usageRW' fmt1 fmt2 op (OpReg reg) = mkRU (use_R fmt1 op []) [mk fmt2 reg]
-    usageRW' fmt1 _    op (OpAddr ea) = mkRUR (use_R fmt1 op $! use_EA ea [])
-    usageRW' _  _ _ _                 = panic "X86.RegInfo.usageRW: no match"
+writeOp :: Format -> Operand -> Usage
+writeOp fmt (OpReg r)   = writeReg fmt r
+writeOp _   (OpAddr ea) = readAddr ea
+writeOp _   (OpImm _)   = panic "X86.regUsageOfInstr.writeOp: immediate"
+{-# NOINLINE writeOp #-}
 
-    -- 2 operand form; first operand Read; second Modified
-    usageRM :: HasDebugCallStack => Format -> Operand -> Operand -> RegUsage
-    usageRM fmt op (OpReg reg)      = mkRU (use_R fmt op [mk fmt reg]) [mk fmt reg]
-    usageRM fmt op (OpAddr ea)      = mkRUR (use_R fmt op $! use_EA ea [])
-    usageRM _ _ _                   = panic "X86.RegInfo.usageRM: no match"
+modifyOp :: Format -> Operand -> Usage
+modifyOp fmt (OpReg r)   = modifyReg fmt r
+modifyOp _   (OpAddr ea) = readAddr ea
+modifyOp _   (OpImm _)   = panic "X86.regUsageOfInstr.modifyOp: immediate"
+{-# NOINLINE modifyOp #-}
 
-    -- 2 operand form; first operand Modified; second Modified
-    usageMM :: HasDebugCallStack => Format -> Operand -> Operand -> RegUsage
-    usageMM fmt (OpReg src) (OpReg dst) = mkRU [mk fmt src, mk fmt dst] [mk fmt src, mk fmt dst]
-    usageMM fmt (OpReg src) (OpAddr ea) = mkRU (use_EA ea [mk fmt src]) [mk fmt src]
-    usageMM fmt (OpAddr ea) (OpReg dst) = mkRU (use_EA ea [mk fmt dst]) [mk fmt dst]
-    usageMM _ _ _                       = panic "X86.RegInfo.usageMM: no match"
+-- | Registers used to compute an effective address: base, then index.
+readAddr :: AddrMode -> Usage
+readAddr (ImmAddr _ _) = mempty
+readAddr (AddrBaseIndex base index _) = atAddrFmt $ \fmt ->
+  let read_base  (EABaseReg r) = readReg fmt r
+      read_base  _             = mempty
+      read_index (EAIndex r _) = readReg fmt r
+      read_index EAIndexNone   = mempty
+  in read_base base <.> read_index index
+{-# NOINLINE readAddr #-}
 
-    -- 3 operand form; first operand Read; second Modified; third Modified
-    usageRMM :: HasDebugCallStack => Format -> Operand -> Operand -> Operand -> RegUsage
-    usageRMM fmt (OpReg src) (OpReg dst) (OpReg reg) = mkRU [mk fmt src, mk fmt dst, mk fmt reg] [mk fmt dst, mk fmt reg]
-    usageRMM fmt (OpReg src) (OpAddr ea) (OpReg reg) = mkRU (use_EA ea [mk fmt src, mk fmt reg]) [mk fmt reg]
-    usageRMM _ _ _ _                                 = panic "X86.RegInfo.usageRMM: no match"
+-- | Format of an address.
+addrFmt :: Platform -> Format
+addrFmt platform = archWordFormat (target32Bit platform)
 
-    -- 3 operand form of FMA instructions.
-    usageFMA :: HasDebugCallStack => Format -> Operand -> Reg -> Reg -> RegUsage
-    usageFMA fmt (OpReg src1) src2 dst =
-      mkRU [mk fmt src1, mk fmt src2, mk fmt dst] [mk fmt dst]
-    usageFMA fmt (OpAddr ea1) src2 dst
-      = mkRU (use_EA ea1 [mk fmt src2, mk fmt  dst]) [mk fmt dst]
-    usageFMA _ _ _ _
-      = panic "X86.RegInfo.usageFMA: no match"
+-- | A usage at the format of an address. The format is forced here: it is
+-- cheap, and a lazy format becomes a thunk when several items use it.
+-- See Note [Register usage DSL implementation] in GHC.CmmToAsm.RegUsage.
+atAddrFmt :: (Format -> Usage) -> Usage
+atAddrFmt f = withPlatform $ \platform -> let !fmt = addrFmt platform in f fmt
+{-# INLINE atAddrFmt #-}
 
-    -- 1 operand form; operand Modified
-    usageM :: HasDebugCallStack => Format -> Operand -> RegUsage
-    usageM fmt (OpReg reg) =
-      let r' = mk fmt reg
-      in mkRU [r'] [r']
-    usageM _ (OpAddr ea) = mkRUR (use_EA ea [])
-    usageM _ _ = panic "X86.RegInfo.usageM: no match"
+-- | Operand defined by POP and SETCC. A memory operand contributes nothing,
+-- not even its address registers (unchanged behaviour; the code generator
+-- only uses registers here).
+defOp :: Format -> Operand -> Usage
+defOp fmt (OpReg r)  = writeReg fmt r
+defOp _   (OpAddr _) = mempty
+defOp _   (OpImm _)  = panic "X86.regUsageOfInstr.defOp: immediate"
 
-    -- Registers defd when an operand is written.
-    def_W fmt (OpReg reg)         = [mk fmt reg]
-    def_W _   (OpAddr _ )         = []
-    def_W _   _                   = panic "X86.RegInfo.def_W: no match"
+-- | src read, dst modified, reg modified (SHLD, SHRD, CMPXCHG). For a
+-- memory dst its address registers come first, then src: this is the order
+-- the allocator has always seen.
+readModifyModify :: Format -> Operand -> Operand -> Operand -> Usage
+readModifyModify fmt src (OpAddr ea) reg = readAddr ea <.> readOp fmt src <.> modifyOp fmt reg
+readModifyModify fmt src dst         reg = readOp fmt src <.> modifyOp fmt dst <.> modifyOp fmt reg
 
-    -- Registers used when an operand is read.
-    use_R :: HasDebugCallStack => Format -> Operand -> [RegWithFormat] -> [RegWithFormat]
-    use_R fmt (OpReg reg)  tl = mk fmt reg : tl
-    use_R _   (OpImm _)    tl = tl
-    use_R _   (OpAddr ea)  tl = use_EA ea tl
+-- | Registers clobbered by a call.
+clobbered :: Usage
+clobbered = withPlatform $ \platform ->
+  writeRegs [ RegWithFormat r (fmtOfReg platform r) | r <- callClobberedRegs platform ]
+{-# NOINLINE clobbered #-}
 
-    -- Registers used to compute an effective address.
-    use_EA (ImmAddr _ _) tl = tl
-    use_EA (AddrBaseIndex base index _) tl =
-        use_base base $! use_index index tl
-        where use_base (EABaseReg r)  tl = mk addrFmt r : tl
-              use_base _              tl = tl
-              use_index EAIndexNone   tl = tl
-              use_index (EAIndex i _) tl = mk addrFmt i : tl
-
-    mkRUR :: [RegWithFormat] -> RegUsage
-    mkRUR src = mkRU src []
-
-    mkRU :: [RegWithFormat] -> [RegWithFormat] -> RegUsage
-    mkRU src dst = src' `seq` dst' `seq` RU src' dst'
-        where src' = filter (interesting platform . regWithFormat_reg) src
-              dst' = filter (interesting platform . regWithFormat_reg) dst
-
-    addrFmt = archWordFormat (target32Bit platform)
-    mk :: Format -> Reg -> RegWithFormat
-    mk fmt r = RegWithFormat r fmt
-
-    mkFmt :: Reg -> RegWithFormat
-    mkFmt r = RegWithFormat r $ case targetClassOfReg platform r of
-      RcInteger -> addrFmt
-      RcFloatOrVector -> FF64
-
--- | Is this register interesting for the register allocator?
-interesting :: Platform -> Reg -> Bool
-interesting _        (RegVirtual _)              = True
-interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
-
+-- | Format of a real register whose use has no format of its own.
+fmtOfReg :: Platform -> Reg -> Format
+fmtOfReg platform r = case targetClassOfReg platform r of
+  RcInteger       -> addrFmt platform
+  RcFloatOrVector -> FF64
 
 -- | Applies the supplied function to all registers in instructions.
 -- Typically used to change virtual registers to real registers.

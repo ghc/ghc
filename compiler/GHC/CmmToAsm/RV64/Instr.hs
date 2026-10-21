@@ -13,6 +13,7 @@ import GHC.Cmm.Dataflow.Label
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Instr (RegUsage (..))
+import GHC.CmmToAsm.RegUsage (Usage, (<.>), runUsage, readReg, writeReg, foldMapUsage, withPlatform)
 import GHC.CmmToAsm.RV64.Cond
 import GHC.CmmToAsm.RV64.Regs
 import GHC.CmmToAsm.Types
@@ -20,7 +21,6 @@ import GHC.CmmToAsm.Utils
 import GHC.Data.FastString (LexicalFastString)
 import GHC.Platform
 import GHC.Platform.Reg
-import GHC.Platform.Regs
 import GHC.Platform.Reg.Class.Separate
 import GHC.Prelude
 import GHC.Stack
@@ -69,90 +69,103 @@ instance Outputable RegUsage where
 --
 -- RegUsage = RU [<read regs>] [<write regs>]
 regUsageOfInstr :: Platform -> Instr -> RegUsage
-regUsageOfInstr platform instr = case instr of
-  ANN _ i -> regUsageOfInstr platform i
-  COMMENT {} -> usage ([], [])
-  MULTILINE_COMMENT {} -> usage ([], [])
-  PUSH_STACK_FRAME -> usage ([], [])
-  POP_STACK_FRAME -> usage ([], [])
-  LOCATION {} -> usage ([], [])
-  DELTA {} -> usage ([], [])
-  ADD dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  MUL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  NEG dst src -> usage (regOp src, regOp dst)
-  MULH dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  DIV dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  REM dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  REMU dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SUB dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  DIVU dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  AND dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  OR dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SRA dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  XOR dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SLL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SRL dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  MOV dst src -> usage (regOp src, regOp dst)
+regUsageOfInstr platform (ANN _ i) = regUsageOfInstr platform i
+regUsageOfInstr platform instr = runUsage platform $ case instr of
+  COMMENT {}                -> mempty
+  MULTILINE_COMMENT {}      -> mempty
+  PUSH_STACK_FRAME          -> mempty
+  POP_STACK_FRAME           -> mempty
+  LOCATION {}               -> mempty
+  DELTA {}                  -> mempty
+  ADD dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
+  MUL dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
+  NEG dst src               -> readOp src <.> writeOp dst
+  MULH dst src1 src2        -> readOp src1 <.> readOp src2 <.> writeOp dst
+  DIV dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
+  REM dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
+  REMU dst src1 src2        -> readOp src1 <.> readOp src2 <.> writeOp dst
+  SUB dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
+  DIVU dst src1 src2        -> readOp src1 <.> readOp src2 <.> writeOp dst
+  AND dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
+  OR dst src1 src2          -> readOp src1 <.> readOp src2 <.> writeOp dst
+  SRA dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
+  XOR dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
+  SLL dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
+  SRL dst src1 src2         -> readOp src1 <.> readOp src2 <.> writeOp dst
+  MOV dst src               -> readOp src <.> writeOp dst
   -- ORI's third operand is always an immediate
-  ORI dst src1 _ -> usage (regOp src1, regOp dst)
-  XORI dst src1 _ -> usage (regOp src1, regOp dst)
-  J_TBL _ _ t -> usage ([t], [])
-  J t -> usage (regTarget t, [])
-  B t -> usage (regTarget t, [])
-  BCOND _ l r t -> usage (regTarget t ++ regOp l ++ regOp r, [])
-  BL t ps -> usage (t : ps, callerSavedRegisters)
-  CSET dst l r _ -> usage (regOp l ++ regOp r, regOp dst)
-  STR _ src dst -> usage (regOp src ++ regOp dst, [])
-  LDR _ dst src -> usage (regOp src, regOp dst)
-  LDRU _ dst src -> usage (regOp src, regOp dst)
-  FENCE _ _ -> usage ([], [])
-  FCVT _variant dst src _rm -> usage (regOp src, regOp dst)
-  FABS dst src -> usage (regOp src, regOp dst)
-  FMIN dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
-  FMAX dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  ORI dst src1 _            -> readOp src1 <.> writeOp dst
+  XORI dst src1 _           -> readOp src1 <.> writeOp dst
+  J_TBL _ _ t               -> readR t
+  J t                       -> readTarget t
+  B t                       -> readTarget t
+  BCOND _ l r t             -> readTarget t <.> readOp l <.> readOp r
+  BL t ps                   -> readR t <.> foldMapUsage readR ps <.> clobbered
+  CSET dst l r _            -> readOp l <.> readOp r <.> writeOp dst
+  STR _ src dst             -> readOp src <.> readOp dst
+  LDR _ dst src             -> readOp src <.> writeOp dst
+  LDRU _ dst src            -> readOp src <.> writeOp dst
+  FENCE _ _                 -> mempty
+  FCVT _variant dst src _rm -> readOp src <.> writeOp dst
+  FABS dst src              -> readOp src <.> writeOp dst
+  FMIN dst src1 src2        -> readOp src1 <.> readOp src2 <.> writeOp dst
+  FMAX dst src1 src2        -> readOp src1 <.> readOp src2 <.> writeOp dst
   FMA _ dst src1 src2 src3 ->
-    usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
-  _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
+    readOp src1 <.> readOp src2 <.> readOp src3 <.> writeOp dst
+  _                         -> panic $ "regUsageOfInstr: " ++ instrCon instr
+
+-- Helpers for regUsageOfInstr. See Note [Register usage DSL] in
+-- GHC.CmmToAsm.RegUsage.
+
+-- | Format of a register.
+--
+-- SIMD NCG TODO: the format here is used for register spilling/unspilling.
+-- As this NCG does not currently support SIMD registers, this simple
+-- logic is OK.
+regFormat :: Platform -> Reg -> Format
+regFormat platform r = case cls of
+    RcInteger -> II64
+    RcFloat   -> FF64
+    RcVector  -> sorry "The RISCV64 NCG does not (yet) support vectors; please use -fllvm."
   where
-    -- filtering the usage is necessary, otherwise the register
-    -- allocator will try to allocate pre-defined fixed stg
-    -- registers as well, as they show up.
-    usage :: ([Reg], [Reg]) -> RegUsage
-    usage (srcRegs, dstRegs) =
-      RU
-        (map mkFmt $ filter (interesting platform) srcRegs)
-        (map mkFmt $ filter (interesting platform) dstRegs)
+    cls = case r of
+      RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
+      RegReal rr    -> classOfRealReg rr
+{-# NOINLINE regFormat #-}
+-- NOINLINE: see Note [Register usage DSL] in GHC.CmmToAsm.RegUsage.
 
-      -- SIMD NCG TODO: the format here is used for register spilling/unspilling.
-      -- As the RISCV64 NCG does not currently support SIMD registers,
-      -- this simple logic is OK.
-    mkFmt r = RegWithFormat r fmt
-      where
-        fmt = case cls of
-                RcInteger -> II64
-                RcFloat   -> FF64
-                RcVector  -> sorry "The RISCV64 NCG does not (yet) support vectors; please use -fllvm."
-        cls = case r of
-                RegVirtual vr -> classOfVirtualReg (platformArch platform) vr
-                RegReal rr -> classOfRealReg rr
+readR, writeR :: Reg -> Usage
+readR   r = withPlatform $ \platform -> readReg   (regFormat platform r) r
+writeR  r = withPlatform $ \platform -> writeReg  (regFormat platform r) r
+{-# INLINE readR #-}
+{-# INLINE writeR #-}
 
-    regAddr :: AddrMode -> [Reg]
-    regAddr (AddrRegImm r1 _imm) = [r1]
-    regAddr (AddrReg r1) = [r1]
+-- | The registers of an operand.
+op :: (Reg -> Usage) -> Operand -> Usage
+op k (OpReg _ r) = k r
+op k (OpAddr a)  = addr k a
+op _ (OpImm _)   = mempty
+{-# INLINE op #-}
 
-    regOp :: Operand -> [Reg]
-    regOp (OpReg _w r1) = [r1]
-    regOp (OpAddr a) = regAddr a
-    regOp (OpImm _imm) = []
+addr :: (Reg -> Usage) -> AddrMode -> Usage
+addr k (AddrRegImm r _) = k r
+addr k (AddrReg r)      = k r
+{-# INLINE addr #-}
 
-    regTarget :: Target -> [Reg]
-    regTarget (TBlock _bid) = []
-    regTarget (TReg r1) = [r1]
+readOp, writeOp :: Operand -> Usage
+readOp   o = op readR o
+writeOp  o = op writeR o
+{-# NOINLINE readOp #-}
+{-# NOINLINE writeOp #-}
 
-    -- Is this register interesting for the register allocator?
-    interesting :: Platform -> Reg -> Bool
-    interesting _ (RegVirtual _) = True
-    interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
+readTarget :: Target -> Usage
+readTarget (TBlock _) = mempty
+readTarget (TReg r)   = readR r
+
+-- | Registers clobbered by a call.
+clobbered :: Usage
+clobbered = foldMapUsage writeR callerSavedRegisters
+{-# NOINLINE clobbered #-}
 
 -- | Caller-saved registers (according to calling convention)
 --
