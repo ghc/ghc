@@ -17,9 +17,7 @@ import GHC.ConsoleHandler
 #endif
 
 -- | Install standard signal handlers for catching ^C, which just throw an
---   exception in the target thread.  The current target thread is the
---   thread at the head of the list in the MVar passed to
---   installSignalHandlers.
+--   exception in the target thread.
 #if defined(wasm32_HOST_ARCH)
 installSignalHandlers :: (JSVal -> IO ()) -> IO ()
 installSignalHandlers cb_sig = do
@@ -62,9 +60,7 @@ installSignalHandlers = do
 --
 -- For native ghc with -fexternal-interpreter, when you press ^C,
 -- SIGINT is delivered to both ghc/iserv. iserv SIGINT handler raises
--- an async UserInterrupt exception in the main thread, which might
--- handle it right away, or later since it's doing I/O under
--- uninterruptibleMask.
+-- an async UserInterrupt exception in the main thread
 --
 -- wasm is no different here. The node process needs to catch the same
 -- signals. Instead of calling process.on('SIGINT', handler) in
