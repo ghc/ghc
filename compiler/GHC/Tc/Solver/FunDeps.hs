@@ -735,7 +735,8 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
       | Just {} <- tcUnifyTysForInjectivity Matching [branch_rhs] [work_rhs]
         -- No need for an apartness check here;
         -- for open type families there are no "preceding" equations
-      = Just (mkInjectivityFDEqn inj_flags branch_qtvs branch_lhs_tys work_args)
+      = Just (mkInjectivityFDEqn inj_flags branch_qtvs
+                                 (branch_rhs:branch_lhs_tys) (work_rhs:work_args))
 
       | otherwise
       = Nothing

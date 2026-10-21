@@ -1138,8 +1138,11 @@ niFixSubst, niFixSubst' :: InScopeSet -> TvSubstEnv -> Subst
 --   see Note [Finding the substitution fixpoint]
 -- ToDo: use laziness instead of iteration?
 niFixSubst in_scope tenv
-  =  pprTrace "niFixSubst" (vcat [ text "In: " <+> ppr tenv
-                                 , text "Out:" <+> ppr (S.getTvSubstEnv subst) ])
+  | isEmptyVarEnv tenv     -- Fast path for common case
+  = mkEmptySubst in_scope
+  | otherwise
+  =  -- pprTrace "niFixSubst" (vcat [ text "In: " <+> ppr tenv
+     --                             , text "Out:" <+> ppr (S.getTvSubstEnv subst) ])
      subst
   where
      subst = niFixSubst' in_scope tenv
