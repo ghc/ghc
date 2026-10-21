@@ -12,6 +12,11 @@ RTS_PRIVATE Capability *interpretBCO (Capability* cap);
 void interp_startup ( void );
 void interp_shutdown ( void );
 
+// The following debugger functions are exported from here, but not from the
+// RTS public api (RtsApi.h). They are used by the `ghci` library to implement
+// debugger commands on the interpreter like step-next, step-out, and
+// break-on-exception.
+
 // Debugger single step
 void rts_enableStopNextBreakpointAll  ( void );
 void rts_disableStopNextBreakpointAll ( void );
@@ -21,3 +26,9 @@ void rts_disableStopNextBreakpoint    ( StgTSO* );
 // Debugger step out
 void rts_enableStopAfterReturn        ( StgTSO* );
 void rts_disableStopAfterReturn       ( StgTSO* );
+
+// Debugger stop on exception
+void rts_enableStopOnException        ( StgTSO* );
+void rts_disableStopOnException       ( StgTSO* );
+void rts_enableStopOnExceptionAll     ( void );
+void rts_disableStopOnExceptionAll    ( void );

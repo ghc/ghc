@@ -15,5 +15,6 @@ main = do
     assertEqual (parseTsoFlags 256) [TsoAllocLimit]
     assertEqual (parseTsoFlags 512) [TsoStopNextBreakpoint]
     assertEqual (parseTsoFlags 1024) [TsoStopAfterReturn]
+    assertEqual (parseTsoFlags 2048) [TsoStopOnException]
 
     assertEqual (parseTsoFlags 6) [TsoLocked, TsoBlockx]
