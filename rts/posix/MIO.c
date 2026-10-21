@@ -49,20 +49,8 @@ void setTimerManagerControlFd(int fd) {
     RELAXED_STORE(timer_manager_control_wr_fd, fd);
 }
 
-static void timerManagerNotifySignal(int sig, siginfo_t *info,
-                                     void *p STG_UNUSED)
+static void signal_handler(int sig, siginfo_t *info, void *p STG_UNUSED)
 {
-    StgWord8 buf[sizeof(siginfo_t) + 1];
-    int r;
-
-    buf[0] = sig;
-    if (info == NULL) {
-        // info may be NULL on Solaris (see #3790)
-        memset(buf+1, 0, sizeof(siginfo_t));
-    } else {
-        memcpy(buf+1, info, sizeof(siginfo_t));
-    }
-
     /* In the signal handler we do not have Capability context, so access the
      * control fd via MainCapability.
      */
@@ -71,10 +59,7 @@ static void timerManagerNotifySignal(int sig, siginfo_t *info,
     int timer_control_fd = RELAXED_LOAD(timer_manager_control_wr_fd);
     if (0 <= timer_control_fd)
     {
-        r = write(timer_control_fd, buf, sizeof(siginfo_t)+1);
-        if (r == -1 && errno == EAGAIN) {
-            errorBelch("lost signal due to full pipe: %d\n", sig);
-        }
+        writeSignalInfoToPipe(sig, info, timer_control_fd);
     }
 
     // If the IO manager hasn't told us what the FD of the write end
@@ -85,8 +70,7 @@ static void timerManagerNotifySignal(int sig, siginfo_t *info,
 int installUserSignalHandlerMIO(int sig, int spi, sigset_t *mask,
                                 bool nocldstop)
 {
-    return installSignalHandler(sig, spi, mask, nocldstop,
-                                timerManagerNotifySignal);
+    return installSignalHandler(sig, spi, mask, nocldstop, signal_handler);
 }
 
 void

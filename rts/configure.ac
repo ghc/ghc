@@ -221,10 +221,6 @@ AC_LINK_IFELSE([AC_LANG_CALL([], [printf\$LDBLStub])],
 
 FP_CHECK_PTHREAD_FUNCS
 
-dnl ** check for eventfd which is needed by the I/O manager
-AC_CHECK_HEADERS([sys/eventfd.h])
-AC_CHECK_FUNCS([eventfd])
-
 AC_CHECK_FUNCS([getpid getuid raise])
 
 dnl large address space support (see rts/include/rts/storage/MBlock.h)
@@ -358,6 +354,10 @@ dnl -------------------------------------------------------------------
 
 dnl Here we check for platform constraints. The result is the CPP flag
 dnl IOMGR_BUILD_<name> and a EnableIOManager<Name> var for use here later.
+
+dnl Check for functions (optionally) used by several I/O managers
+AC_CHECK_HEADERS([sys/eventfd.h])
+AC_CHECK_FUNCS([eventfd pipe2])
 
 GHC_IOMANAGER_ENABLE([select], [EnableIOManagerSelect], [IOMGR_BUILD_SELECT],
   [if test "$HostOS" = "mingw32"; then

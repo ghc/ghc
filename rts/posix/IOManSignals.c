@@ -22,6 +22,7 @@
 
 #include <unistd.h>
 #include <signal.h>
+#include <fcntl.h>
 #include <string.h>
 
 /* -----------------------------------------------------------------------------
@@ -286,12 +287,27 @@ startPendingSignalHandlers(Capability *cap)
         continue; // handler has been changed.
     }
 
-    info = stgMallocBytes(sizeof(siginfo_t), "startPendingSignalHandlers");
-           // freed by runHandler
-    memcpy(info, next_pending_handler, sizeof(siginfo_t));
+    info = next_pending_handler;
+    startSignalHandler(cap, sig, info);
+  }
+
+  unblockUserSignals();
+}
+#endif
+
+void startSignalHandler(Capability *cap, int sig, siginfo_t *info)
+{
+    /* Allocate a copy. This is freed by runHandler. */
+    // TODO: this could be improved to use a GC'd pinned byte array, but this
+    // would need coordination with the unix library.
+    siginfo_t *info_copy = stgMallocBytes(sizeof(siginfo_t), "startSignalHandler");
+    *info_copy = *info;
+
+    /* The info structure can be zero on solaris. So at least set the signo. */
+    info_copy->si_signo = sig;
 
     debugTrace(DEBUG_iomanager,
-               "Handling pending signal, no %d", info->si_signo);
+               "Handling pending signal, no %d", info_copy->si_signo);
 
     StgTSO *t =
         createIOThread(cap,
@@ -299,14 +315,75 @@ startPendingSignalHandlers(Capability *cap)
                        rts_apply(cap,
                                  rts_apply(cap,
                                            runHandlersPtr_closure,
-                                           rts_mkPtr(cap, info)),
-                                 rts_mkInt(cap, info->si_signo)));
+                                           rts_mkPtr(cap, info_copy)),
+                                 rts_mkInt(cap, info_copy->si_signo)));
     scheduleThread(cap, t);
     setThreadLabel(cap, t, "signal handler thread");
-  }
-
-  unblockUserSignals();
 }
+
+void newNonBlockingPipe(int *pipe_fd_r, int *pipe_fd_w)
+{
+    int pipefd[2];
+#if defined(HAVE_PIPE2)
+    int res = pipe2(pipefd, O_CLOEXEC | O_NONBLOCK);
+#else
+    int res = pipe(pipefd);
 #endif
+    if (RTS_UNLIKELY(res < 0)) {
+        sysErrorBelch("newNonBlockingPipe");
+        stg_exit(EXIT_FAILURE);
+    }
+#if !defined(HAVE_PIPE2)
+    for (int i = 0; i < 2; i++) {
+        int res1 = fcntl(pipefd[i], F_SETFD, FD_CLOEXEC);
+        int res2 = fcntl(pipefd[i], F_SETFL, O_NONBLOCK);
+        if (RTS_UNLIKELY(res1 < 0 || res2 < 0)) {
+            sysErrorBelch("newFdWakeup fcntl()");
+            stg_exit(EXIT_FAILURE);
+        }
+    }
+#endif
+    *pipe_fd_r = pipefd[0]; /* read end */
+    *pipe_fd_w = pipefd[1]; /* write end */
+}
+
+/* Write the signal number and siginfo into the given fd (which is
+ * typically a pipe in non-blocking mode).
+ */
+void writeSignalInfoToPipe(int sig, siginfo_t *info, int fd)
+{
+    StgWord8 buf[sizeof(siginfo_t) + 1];
+
+    buf[0] = sig;
+    if (info) {
+        memcpy(buf+1, info, sizeof(siginfo_t));
+    } else {
+        // info may be NULL on Solaris (see #3790)
+        memset(buf+1, 0, sizeof(siginfo_t));
+    }
+
+    int r = write(fd, buf, sizeof(siginfo_t)+1);
+    if (r == -1 && errno == EAGAIN) {
+        errorBelch("lost signal due to full pipe: %d\n", sig);
+    }
+}
+
+bool readSignalInfoFromPipe(int *sig, siginfo_t *info, int fd)
+{
+    StgWord8 buf[sizeof(siginfo_t) + 1];
+
+    int r = read(fd, buf, sizeof(siginfo_t)+1);
+
+    if (r == sizeof(siginfo_t)+1) {
+        *sig = (int) buf[0];
+        memcpy(info, buf+1, sizeof(siginfo_t));
+        return true;
+    } else {
+        // TODO: if r is >0 and < expected then we're kind of screwed
+        // it means we're all out of sync with the protocol.
+        // it _should_ never happen of course!
+        return false;
+    }
+}
 
 #endif /* RTS_USER_SIGNALS */
