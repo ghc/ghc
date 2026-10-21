@@ -27,6 +27,16 @@
    Apples mobile platforms.
 
    Oracle's Solaris 11 supports only up to XPG6, hence the ifdef.
+
+   One gotcha to watch out for is that FreeBSD takes the approach that defining
+   _POSIX_C_SOURCE should hide anything that's not defined in the posix
+   standard. For example, FreeBSD supports pipe2 and the man page says that one
+   should include <unistd.h>, but with _POSIX_C_SOURCE defined (as below) then
+   pipe2 will be hidden. There do not appear to be any (non-internal) feature
+   flags to enable FreeBSD extensions in addition to a posix baseline. Rather
+   the advice from the FreeBSD people is to _not_ define _POSIX_C_SOURCEin the
+   first place! This advice is unfortunately at odds with behaviour on other
+   platforms.
   */
 
 #undef _POSIX_C_SOURCE

@@ -21,6 +21,8 @@
 #include "MIO.h"
 
 #include <unistd.h>
+#include <fcntl.h>
+#include <limits.h>
 #include <string.h>
 
 /* -----------------------------------------------------------------------------
@@ -286,12 +288,27 @@ startPendingSignalHandlers(Capability *cap)
         continue; // handler has been changed.
     }
 
-    info = stgMallocBytes(sizeof(siginfo_t), "startPendingSignalHandlers");
-           // freed by runHandler
-    memcpy(info, next_pending_handler, sizeof(siginfo_t));
+    info = next_pending_handler;
+    startSignalHandler(cap, sig, info);
+  }
+
+  unblockUserSignals();
+}
+#endif
+
+void startSignalHandler(Capability *cap, int sig, siginfo_t *info)
+{
+    /* Allocate a copy. This is freed by runHandler. */
+    // TODO: this could be improved to use a GC'd pinned byte array, but this
+    // would need coordination with the unix library.
+    siginfo_t *info_copy = stgMallocBytes(sizeof(siginfo_t), "startSignalHandler");
+    *info_copy = *info;
+
+    /* The info structure can be zero on solaris. So at least set the signo. */
+    info_copy->si_signo = sig;
 
     debugTrace(DEBUG_iomanager,
-               "Handling pending signal, no %d", info->si_signo);
+               "Handling pending signal, no %d", info_copy->si_signo);
 
     StgTSO *t =
         createIOThread(cap,
@@ -299,14 +316,73 @@ startPendingSignalHandlers(Capability *cap)
                        rts_apply(cap,
                                  rts_apply(cap,
                                            runHandlersPtr_closure,
-                                           rts_mkPtr(cap, info)),
-                                 rts_mkInt(cap, info->si_signo)));
+                                           rts_mkPtr(cap, info_copy)),
+                                 rts_mkInt(cap, info_copy->si_signo)));
     scheduleThread(cap, t);
     setThreadLabel(cap, t, "signal handler thread");
-  }
-
-  unblockUserSignals();
 }
-#endif
+
+void newNonBlockingPipe(int *pipe_fd_r, int *pipe_fd_w)
+{
+    /* In theory we could use pipe2 here, but in practice it's not worth it.
+     * Getting it to work on FreeBSD (where it's theoretically supported) is
+     * an exercise in pain. See FreeBSD comments in rts/PosixSource.h
+     */
+    int pipefd[2];
+    int res = pipe(pipefd);
+    if (RTS_UNLIKELY(res < 0)) {
+        sysErrorBelch("newNonBlockingPipe");
+        stg_exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < 2; i++) {
+        int res1 = fcntl(pipefd[i], F_SETFD, FD_CLOEXEC);
+        int res2 = fcntl(pipefd[i], F_SETFL, O_NONBLOCK);
+        if (RTS_UNLIKELY(res1 < 0 || res2 < 0)) {
+            sysErrorBelch("newFdWakeup fcntl()");
+            stg_exit(EXIT_FAILURE);
+        }
+    }
+    *pipe_fd_r = pipefd[0]; /* read end */
+    *pipe_fd_w = pipefd[1]; /* write end */
+}
+
+/* Write the signal number and siginfo into the given fd (which is
+ * typically a pipe in non-blocking mode).
+ */
+void writeSignalInfoToPipe(int sig, siginfo_t *info, int fd)
+{
+    StgWord8 buf[sizeof(siginfo_t) + 1];
+
+    buf[0] = sig;
+    if (info) {
+        memcpy(buf+1, info, sizeof(siginfo_t));
+    } else {
+        // info may be NULL on Solaris (see #3790)
+        memset(buf+1, 0, sizeof(siginfo_t));
+    }
+
+    int r STG_UNUSED = write(fd, buf, sizeof(siginfo_t)+1);
+    /* We rely on the POSIX.1 guarantee that writes less than PIPE_BUF are
+     * atomic (even for non-blocking pipes): it will write all or none, but
+     * never partial (e.g. whatever fits into the pipe buffer). A write failure
+     * here should mean the pipe was full, and we'll loose this signal.There's
+     * nothing we can do about dropping the signal, and in a signal handler
+     * context we can't call any of our logging functions like errorBelch.
+     */
+}
+
+void readSignalInfoFromPipe(int *sig, siginfo_t *info, int fd)
+{
+    /* We rely on the POSIX guarantee that writes less than PIPE_BUF are
+     * atomic. Our message sizes really should be a lot less than PIPE_BUF. */
+    ASSERT(sizeof(siginfo_t)+1 <= PIPE_BUF);
+
+    StgWord8 buf[sizeof(siginfo_t) + 1];
+
+    int r = read(fd, buf, sizeof(siginfo_t)+1);
+    CHECK(r == sizeof(siginfo_t)+1);
+    *sig = (int) buf[0];
+    memcpy(info, buf+1, sizeof(siginfo_t));
+}
 
 #endif
