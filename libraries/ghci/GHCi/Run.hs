@@ -343,7 +343,7 @@ sandboxIO opts io
         -- global lock and only write this once here, then lock.
         poke breakPointIOAction globalBreakStablePtr
 
-        tid <- forkIO $ do
+        tid <- mask_ $ forkIOWithUnmask $ \unmask -> do
 
           takeMVar wait -- don't run anything in this thread before
                         -- `setBreakAction` has a chance to set up.
@@ -354,7 +354,7 @@ sandboxIO opts io
           -- We only write the thread status map in two places:
           -- * When the "main" thread finishes (here)
           -- * When any thread hits a breakpoint (global break action)
-          runIt >>= writeThreadEvalStatus tid
+          unmask runIt >>= writeThreadEvalStatus tid
 
         setBreakAction opts tid
         putMVar wait ()
