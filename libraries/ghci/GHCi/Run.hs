@@ -269,14 +269,17 @@ rethrow EvalOpts{..} io =
   catchNoPropagate io $ \(ExceptionWithContext cx se) -> do
     -- If -fbreak-on-error, we break unconditionally,
     --  but with care of not breaking twice
+    ThreadId mytid <- myThreadId
     if breakOnError && not breakOnException
-       then poke exceptionFlag 1
+       then rts_enableStopOnException mytid
        else case fromException se of
                -- If it is a "UserInterrupt" exception, we allow
                --  a possible break by way of -fbreak-on-exception
                Just UserInterrupt -> return ()
                -- In any other case, we don't want to break
-               _ -> poke exceptionFlag 0
+               _ -> do
+                  rts_disableStopOnException mytid
+                  rts_disableStopOnExceptionAll
     rethrowIO (ExceptionWithContext cx se)
 
 --
@@ -338,7 +341,11 @@ withBreakAction opts breakMVar statusMVar mtid act
    setBreakAction = do
      stablePtr <- newStablePtr onBreak
      poke breakPointIOAction stablePtr
-     when (breakOnException opts) $ poke exceptionFlag 1
+     when (breakOnException opts) $ do
+      case mtid of
+        Nothing -> rts_enableStopOnExceptionAll
+        Just (ThreadId tid) -> do
+          rts_enableStopOnException tid
      when (singleStep opts) rts_enableStopNextBreakpointAll
      when (stepOut opts) $ do
       case mtid of
@@ -380,7 +387,9 @@ withBreakAction opts breakMVar statusMVar mtid act
 
    resetBreakAction stablePtr = do
      poke breakPointIOAction noBreakStablePtr
-     poke exceptionFlag 0
+     case mtid of
+      Just (ThreadId tid) -> rts_disableStopOnException tid
+      _                   -> rts_disableStopOnExceptionAll
      rts_disableStopNextBreakpointAll
      case mtid of
       Just (ThreadId tid) -> rts_disableStopAfterReturn tid

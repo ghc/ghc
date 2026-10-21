@@ -583,7 +583,6 @@ RTS_FUN_DECL(stg_annotateStackzh);
 #if IN_STG_CODE && !IN_STGCRUN
 
 // Interpreter.c
-extern StgWord rts_stop_next_breakpoint[];
 extern StgWord rts_stop_on_exception[];
 extern StgWord rts_breakpoint_io_action[];
 
