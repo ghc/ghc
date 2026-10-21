@@ -13,7 +13,10 @@ module GHCi.Debugger
   , rts_disableStopAfterReturn
 
   -- * Stop on exception
-  , exceptionFlag
+  , rts_enableStopOnException
+  , rts_disableStopOnException
+  , rts_enableStopOnExceptionAll
+  , rts_disableStopOnExceptionAll
 
   -- * Breakpoint Callback
   , BreakpointCallback
@@ -23,7 +26,6 @@ module GHCi.Debugger
 import Prelude -- See note [Why do we import Prelude here?]
 
 import GHC.Base (ThreadId#, Addr#, Int#)
-import Foreign.C (CInt)
 import Foreign (StablePtr, Ptr)
 import GHCi.RemoteTypes (HValue)
 
@@ -60,7 +62,19 @@ foreign import ccall unsafe "rts_disableStopAfterReturn"
 
 --------------------------------------------------------------------------------
 
-foreign import ccall "&rts_stop_on_exception" exceptionFlag :: Ptr CInt
+-- | Make this thread break when an exception is hit
+foreign import ccall unsafe "rts_enableStopOnException"  rts_enableStopOnException  :: ThreadId# -> IO ()
+
+-- | No longer have this thread break when an exception is hit
+foreign import ccall unsafe "rts_disableStopOnException" rts_disableStopOnException :: ThreadId# -> IO ()
+
+-- | Enables global break-on-exception for all threads
+foreign import ccall unsafe "rts_enableStopOnExceptionAll"  rts_enableStopOnExceptionAll :: IO ()
+
+-- | Disables the global break-on-exception for all threads. Individual threads
+-- with break-on-exception will still break on exception if the global flag is
+-- disabled.
+foreign import ccall unsafe "rts_disableStopOnExceptionAll" rts_disableStopOnExceptionAll :: IO ()
 
 --------------------------------------------------------------------------------
 

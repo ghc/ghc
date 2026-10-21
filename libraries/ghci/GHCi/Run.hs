@@ -393,14 +393,15 @@ sandboxIO opts io
       catchNoPropagate io $ \(ExceptionWithContext cx se) -> do
         -- If -fbreak-on-error, we break unconditionally,
         --  but with care of not breaking twice
+        ThreadId mytid <- myThreadId
         if breakOnError && not breakOnException
-           then poke exceptionFlag 1
+           then rts_enableStopOnException mytid
            else case fromException se of
                    -- If it is a "UserInterrupt" exception, we allow
                    --  a possible break by way of -fbreak-on-exception
                    Just UserInterrupt -> return ()
                    -- In any other case, we don't want to break
-                   _ -> poke exceptionFlag 0
+                   _ -> rts_disableStopOnException mytid
         rethrowIO (ExceptionWithContext cx se)
 
     measureAlloc :: IO (EvalResult a) -> IO (EvalStatus a)
@@ -420,14 +421,13 @@ setBreakAction opts tid@(ThreadId tid#) = do
   setBreakAction' ctx
   where
     setBreakAction' ctx = do
-      -- TODO: TERRIBLY NOT MULTI-THREAD FRIENDLY. Each thread needs its own RTS flag exceptionFlag, like we have for step-in or step-out.
-      runIf breakOnException $ \_ -> poke exceptionFlag 1
-        -- Breaking on exceptions is not enabled by default, since it
-        -- might be a bit surprising. The exception flag is turned off
-        -- as soon as it is hit, or in resetBreakAction below.
 
       runIf# singleStep rts_enableStopNextBreakpoint
       runIf# stepOut    rts_enableStopAfterReturn
+
+      -- Breaking on exceptions is not enabled by default, since it might be a
+      -- bit surprising. The exception flag is turned off as soon as it is hit.
+      runIf# breakOnException rts_enableStopOnException
 
       if isolateThreadBreaks opts
         then setIsolatedCtx ctx
@@ -438,7 +438,6 @@ setBreakAction opts tid@(ThreadId tid#) = do
       -- TODO: don't set it in `setBreakAction` either. Should be on
       -- interpreter initialization.
 
-    runIf    pred what     = when (pred opts) (what tid)
     runIf#   pred what     = when (pred opts) (what tid#)
 
 -- While we're waiting for the sandbox thread to return a result, if
