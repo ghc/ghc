@@ -700,7 +700,9 @@ types/kinds are fully settled and zonked.
 -- See also Note [Ordering of implicit variables] in "GHC.Rename.HsType"
 
 scopedSort :: [Var] -> [Var]
-scopedSort = go [] []
+scopedSort xs
+  | null xs   = []
+  | otherwise = go [] [] xs
   where
     go :: [Var] -- already sorted, in reverse order
        -> [TyCoVarSet] -- each set contains all the variables which must be placed

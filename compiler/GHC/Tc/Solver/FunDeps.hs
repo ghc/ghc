@@ -29,13 +29,10 @@ import GHC.Core.TyCon
 import GHC.Core.Unify( AmIUnifying(..)
                      , tcUnifyTysForInjectivity, typeListsAreApart )
 import GHC.Core.Coercion.Axiom
-import GHC.Core.TyCo.Subst( elemSubst, extendTvSubstWithClone )
 
 import GHC.Builtin.WiredIn.TypeLits( tryInteractTopFam, tryInteractInertFam )
 
-import GHC.Types.Var( TyVar, tyVarKind, setTyVarKind )
 import GHC.Types.Var.Set
-import GHC.Types.Var.Env( mkInScopeSet )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -56,7 +53,6 @@ Here is our plan for dealing with functional dependencies
        * kick out any inert constraints that mention the unified variables
        * send the current constraint back to the start of the pipeline;
          it might now be soluble, and it probably isn't inert
-
 
 * Once a unification is done, it can't be un-done.  So we must be very careful
   not to threaten completeness by doing a unification when there might be
@@ -709,18 +705,16 @@ getRelevantBranches ax work_args work_rhs
                                         , cab_lhs = lhs_tys
                                         , cab_rhs = rhs_ty })
             | Just subst <- tcUnifyTysForInjectivity Unifying (rhs_ty:lhs_tys) work_tys
-              -- See (RW1)-(RW3) in Note [Relevance]
-              -- This is a pre-/unification/ check (not matching)
-              -- so `subst` can bind both `qtvs` and fvs(work_tys)
-            , let (subst',qtvs') = trim_qtvs subst qtvs
-                  lhs_tys'       = substTys subst' lhs_tys
-                  rhs_ty'        = substTy  subst' rhs_ty
-                  branch_tys'    = rhs_ty' : lhs_tys'
+                            -- See (RW1)-(RW3) in Note [Relevance]
+            , let lhs_tys' = substTys subst lhs_tys
             , noEarlierMatchCheck lhs_tys' branch  -- See (RW4) in Note [Relevance]
-            = Just (FDEqns { fd_qtvs = qtvs'
-                           , fd_eqs  = zipWith Pair branch_tys' work_tys })
-                              -- Do not apply the substition to `work_tys`;
-                              -- See (CF7) in Note [Exploiting closed type families]
+            = -- Ignore the substitution, except for `noEarlierMatchCheck`
+              -- See (CF7) in Note [Exploiting closed type families]
+                Just (FDEqns { fd_qtvs = qtvs
+                           , fd_eqs  = zipWith Pair (rhs_ty:lhs_tys) work_tys })
+              -- Do not apply the substitution to `work_tys`;
+              -- See (CF8) in Note [Exploiting closed type families]
+
             | otherwise
             = Nothing
 
@@ -738,12 +732,10 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
     do_one (CoAxBranch { cab_tvs = branch_qtvs
                        , cab_lhs = branch_lhs_tys
                        , cab_rhs = branch_rhs })
-      | Just subst <- tcUnifyTysForInjectivity Matching [branch_rhs] [work_rhs]
-      , let (subst', qtvs') = trim_qtvs subst branch_qtvs
-            branch_lhs_tys' = substTys subst' branch_lhs_tys
-        -- No need for an apartness check here; for open type families
-        -- there are no "preceding" equations
-      = Just (mkInjectivityFDEqn inj_flags qtvs' branch_lhs_tys' work_args)
+      | Just {} <- tcUnifyTysForInjectivity Matching [branch_rhs] [work_rhs]
+        -- No need for an apartness check here;
+        -- for open type families there are no "preceding" equations
+      = Just (mkInjectivityFDEqn inj_flags branch_qtvs branch_lhs_tys work_args)
 
       | otherwise
       = Nothing
@@ -770,6 +762,9 @@ mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
 
     mk_eqn iargs = mkInjectivityFDEqn inj_flags [] work_args iargs
 
+
+{- See Historical Note [trim_qtvs]
+
 trim_qtvs :: Subst -> [TyVar] -> (Subst, [TyVar])
 -- Tricky stuff: see (OF1) in Note [Exploiting open type families]
 trim_qtvs unif_subst qtvs
@@ -790,7 +785,7 @@ trim_qtvs unif_subst qtvs
         subst' = extendTvSubstWithClone subst tv tv'
                  -- extendTvSubstWithClone: see (OF1b) in
                  -- Note [Exploiting open type families]
-
+-}
 
 -----------------------------------------
 --  Built-in type families
@@ -1104,7 +1099,7 @@ the Injective Type Families paper. For open type families, suppose we have
 
    [W] F alpha ~ Int->Int
 
-Then, since F has been checked as injective, and the RHS `a->a` (pre-)unifies
+Then, since F has been checked as injective, and the RHS `a->a` (pre-)matches
 with the `Int->Int` in the Wanted with substitution [a :-> Int], we can
 add a derived FunDepEqns
    FDEqns{ fd_qtvs = [], fd_eqs = [ [Int] ~ alpha ] }
@@ -1133,36 +1128,44 @@ In general we have:
   type instance forall qs. F t1 ... tn = rhs
   [W] F a1 ... an ~ b
 
-Suppose `b` pre-unifies with `rhs`, with substitution `S` that binds
-some (but perhaps not all) of the `qs`.  Lets say
-   unbound_qs = qs \ dom(S)
+Suppose `b` pre-matches with `rhs`, with substitution `S`.  We /ignore/
+`S` and simply generate the FunDepEqs
+   FDEqns{ fd_qtvs = qs, fd_eqs = [ t1 ~ a1, t3 ~ a3 ]
+These 'fd_qtvs' are subsequently instantiated to fresh meta-variables by
+'instantiateFunDepEqns'.  See Historial Note [trim_qtvs].
 
-Then we generate the FunDepEqs
-   FDEqns{ fd_qtvs = unbound_qs
-         , fd_eqs = [ S(t1) ~ S(a1), S(t3) ~ S(a3) ]
+Historial Note [trim_qtvs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Note [Exploiting open type families], we previously tried to make use of
+the matching substitution `S`, by defining
+     unbound_qs = qs \ dom(S)
+so that we could make fresh meta-variables for only the unbound `qs`.
+But it turned out to be tricky.  Suppose (TQ1)
+    qs = [ k::*, a::k ]
+    S  = [ k :-> UnliftedType ]
+Then we want
+    unbound_qs = [ a::UnliftedType ]    -- Must apply S to q's kind!!
 
-These 'fd_qtvs' are subsequently instantiated to fresh metavariables by
-'instantiateFunDepEqns'.
+And (TQ2), although I'm not sure if this can acutally happen:
+     qs = [ k::*, a::(k::*), b::(a::k) ]
+     S  = [ k :-> UnliftedType ]
+We want
+     unbound_qs = [ a::UnliftedType, b::(a::UnliftedType) ]
+Note that the occurrence of `a` in b's kind should be replaced by the
+newly-kinded `a` not the original `a::k`.
 
-(OF1) The computation of `unbound_qs` is done by `trim_qtvs`, but we
-   have to be careful.   Suppose (OF1a)
-       qs = [ k::*, a::k ]
-       S  = [ k :-> UnliftedType ]
-   Then we want
-       unbound_qs = [ a::UnliftedType ]    -- Must apply S to q's kind!!
+This fancy footwork for `fd_qtvs` used to be done by `trim_qtvs`.  It
+ * Drops a quantified tyvar that /is/ matched
+ * Substitutes in the kind of a quantified tyvar `a` that is /not/ matched
+ * Adds the substitution [a::k :-> a::S(k)] to the substitution
 
-   And (OF1b), although I'm not sure if this can acutally happen:
-        qs = [ k::*, a::(k::*), b::(a::k) ]
-        S  = [ k :-> UnliftedType ]
-   We want
-        unbound_qs = [ a::UnliftedType, b::(a::UnliftedType) ]
-   Note that the occurrence of `a` in b's kind should be replaced by the
-   newly-kinded `a` not the original `a::k`.
+(TQ3) This was hard enough for open type type families, which use matching.
+But it was ridiculously hard for /closed/ type families which use pre-/unification/
+so that the substitution `S` has both meta-tyvars and instance-head tyvars in
+the range.
 
-   This fancy footwork for `fd_qtvs` is done by `trim_qtvs`.  It
-    * Drops a quantified tyvar that /is/ matched
-    * Substitutes in the kind of a quantified tyvar `a` that is /not/ matched
-    * Adds the substitution [a::k :-> a::S(k)] to the substitution
+It's much easier to drop all this and just make fresh meta-tyvars for
+all the quantified type variables.
 
 Note [Exploiting closed type families] see `mkTopClosedFamEqFDs`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1193,9 +1196,6 @@ More precisely, here is the very clever Closed Family Fundep Algorithm (CFFA)
           [W] wrhs ~ rhs     See (CF2) below.
     with fresh unification vars in lhs and rhs for the quantified variables of the
     equation.
-
-    Actually we take advantage of the substitution generated by the relevance
-    check, see (CF7) below.
 
 See Note [Relevance] for what "relevant" means.
 We need to take care about non-termination; see (CF3).
@@ -1391,13 +1391,29 @@ Key point: equations that are not relevant do not need to be considered for fund
 (CF7) Relevance.  When computing relevance in the Closed Family Fundep Algorithm,
   for [W] F wlhs1 wlhs2 ~ wrhs, against an equation   F lhs1 lhs2 ~ rhs
   we get back a pre-unifying substitution S that makes the two as equal as poss.
-  Then we use `trim_qtvs` in exactly the same way as in
-       (OF1) of Note [Exploiting open type families], to generate qtvs' and S'
-  Then we generate
-      FDEqns { fd_qtvs = qtvs', fd_eqs [ S'(lhs1) ~ wlhs1
-                                       , S'(lhs2) ~ wlhs2
-                                       , S'(rhs)  ~ wrhs ] }
-  Notice that we do /not/ apply S' to wlhs/wrhs.  These type contain unification
+  This substitution can bind both /quantified/ type variables from the instance,
+  and /unification variables/ from the solver. Moreover, both kind of type variable
+  can appear in the range of the substitution.
+
+  That's pretty complicated, so we are very cautious about using the returned
+  substitution.  I had a long stuggle (#27994) when we were previously trying to
+  apply that returned substitution as an optimisation.  But because type variables
+  can occur in kinds, it was a losing battle -- I ended up with TyVars from the
+  instance head escaping into the solver.   Consider
+
+      type F :: forall k. k -> *
+      type instance F k a where
+         F (k->*) (b::k->*) = Int
+
+      [W] F kappa (alpha::kappa) ~ Int
+
+  We unify the Wanted with the equation to get the subsitution
+      [ kappa :-> k->*,  b :-> alpha ]
+  I tried using `trim_qtvs` (see Historical Note [trim_qtvs]) but my head hurt
+  FAR too much: #27994 is an excellent example.  I gave up and now just ignore
+  the substitution, making a fresh meta-var for each quantified variable.
+
+(CF8)  Notice that we do /not/ apply S' to wlhs/wrhs.  These type contain unification
   variables that we must actually unify! Example
      type family F a b where
        F [a] (Maybe b) = (a,  G b)
@@ -1408,7 +1424,6 @@ Key point: equations that are not relevant do not need to be considered for fund
      FDEqns { fd_qtvs = [b], fd_eqs [ [Int] ~ alpha
                                     , Maybe b ~ beta
                                     , (Int,G b) ~ (Int, [gamma]) ] }
-
   Notice also that by applying the substitution to the template but not to the
   Wanted, we uphold the `fd_eqs` invariant in `FDEqns` (see its data type decl)
 
@@ -1517,10 +1532,12 @@ instantiateFunDepEqns (FDEqns { fd_qtvs = qtvs, fd_eqs = eqs })
     rev_eqs = reverse eqs
        -- (reverse eqs): See Note [Reverse order of fundep equations]
 
+    empty_subst = emptySubst
+    -- If you re-instate `trim_qtvs`, take care here:
     -- The kinds of `qtvs` can have free variables, because of `trim_qtvs`
     -- Example: T27828b
-    empty_subst = mkEmptySubst $ mkInScopeSet $
-                  tyCoVarsOfTypes (map tyVarKind qtvs)
+    -- empty_subst = mkEmptySubst $ mkInScopeSet $
+    --              tyCoVarsOfTypes (map tyVarKind qtvs)
 
     subst_pair subst (Pair ty1 ty2)
        = Pair (substTy subst' ty1) ty2

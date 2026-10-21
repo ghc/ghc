@@ -49,6 +49,7 @@ module GHC.Core.TyCo.FVs
         -- Any and No Free vars
         anyFreeVarsOfType, anyFreeVarsOfTypes, anyFreeVarsOfCo,
         noFreeVarsOfType, noFreeVarsOfTypes, noFreeVarsOfCo,
+        anyShallowFreeVarsOfType,
 
         -- * Free type constructors
         tyConsOfType, tyConsOfTypes,
@@ -1159,10 +1160,12 @@ nice tight loops.
 {-# INLINE afvFolder #-}   -- See Note [Any-free-var folder]
 afvFolder :: TyCoFolder (FV (BoundVars, TyCoVar -> Bool) DM.Any)
 -- 'afvFolder' is short for "any-free-var folder", good for checking
---   if any /deep/ free var of a type satisfies a predicate `check_fv`
+--   if any /shallow/ free var of a type satisfies a predicate `check_fv`
 -- The "env" of the (FV env Any) is a pair (bvs,pred) of
 --    the bound variables (which are definitely not free), and
 --    an "interesting var" predicate which the client supplies
+--
+-- You can get "deep" by supplying a predicte that also looks in the kind
 afvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                        , tcf_tyvar = do_tcv
                        , tcf_covar = do_tcv
@@ -1173,8 +1176,7 @@ afvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
     -- Check the variable itself with check_fv,
     -- and check its kind (this is a deep folder)
     do_tcv tcv = MkFV $ \ (bvs,check_fv) ->
-                 Any (not (tcv `elemVarSet` bvs) &&
-                      (check_fv tcv || runAny check_fv (afv_type (varType tcv))))
+                 Any (not (tcv `elemVarSet` bvs) && check_fv tcv)
     do_hole hole = do_tcv (coHoleCoVar hole)
 
 afv_type  :: Type     -> FV (BoundVars, TyVar -> Bool) DM.Any
@@ -1186,16 +1188,34 @@ runAny :: (TyVar -> Bool) -> FV (BoundVars, TyCoVar -> Bool) DM.Any -> Bool
 {-# INLINE runAny #-}
 runAny check_fv fvs = DM.getAny (runFV fvs (emptyVarSet, check_fv))
 
+---------------------------------------------
+-- anyShallowFreeVarsOfType and friends look only for shallow free vars
+
+anyShallowFreeVarsOfType :: (TyCoVar -> Bool) -> Type -> Bool
+{-# INLINE anyShallowFreeVarsOfType #-}
+-- Shallow only
+anyShallowFreeVarsOfType check_fv ty = runAny check_fv (afv_type ty)
+
+
+---------------------------------------------
+-- anyFreeVarsOfType and friends look for deep free vars
+
+deep_check :: (TyCoVar -> Bool) -> TyCoVar -> Bool
+-- This is inefficient because if one tyvar occurs many times
+-- in a type, it'll look in its kind at each occurrence. Boo.
+deep_check check_fv tcv = check_fv tcv || anyFreeVarsOfType check_fv (varType tcv)
+
 anyFreeVarsOfType :: (TyCoVar -> Bool) -> Type -> Bool
 {-# INLINE anyFreeVarsOfType #-}
-anyFreeVarsOfType check_fv ty = runAny check_fv (afv_type ty)
+-- Looks deeply, into the kinds of the free vars
+anyFreeVarsOfType check_fv ty = runAny (deep_check check_fv) (afv_type ty)
 
 anyFreeVarsOfTypes :: (TyCoVar -> Bool) -> [Type] -> Bool
 {-# INLINE anyFreeVarsOfTypes #-}
-anyFreeVarsOfTypes check_fv tys = runAny check_fv (afv_types tys)
+anyFreeVarsOfTypes check_fv tys = runAny (deep_check check_fv) (afv_types tys)
 
 anyFreeVarsOfCo :: (TyCoVar -> Bool) -> Coercion -> Bool
-anyFreeVarsOfCo check_fv co = runAny check_fv (afv_co co)
+anyFreeVarsOfCo check_fv co = runAny (deep_check check_fv) (afv_co co)
 
 noFreeVarsOfType :: Type -> Bool
 noFreeVarsOfType ty = not $ runAny (const True) (afv_type ty)
@@ -1205,6 +1225,7 @@ noFreeVarsOfTypes tys = not $ runAny (const True) (afv_types tys)
 
 noFreeVarsOfCo :: Coercion -> Bool
 noFreeVarsOfCo co = not $ runAny (const True) (afv_co co)
+
 
 {-
 ************************************************************************

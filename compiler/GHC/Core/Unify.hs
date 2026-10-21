@@ -33,7 +33,9 @@ import GHC.Core.TyCon
 import GHC.Core.Predicate( CanEqLHS(..), canEqLHS_maybe )
 import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Compare ( eqType, tcEqType, tcEqTyConAppArgs )
+import qualified GHC.Core.TyCo.Subst as S
 import GHC.Core.TyCo.Subst   ( mkTvSubst )
 import GHC.Core.Map.Type
 import GHC.Core.Multiplicity
@@ -1090,43 +1092,37 @@ the invocation of F!  We don't have a function that recursively
 applies substitutions inside the kinds of variable occurrences (and
 probably rightly so).
 
-So, we work as follows:
+Ugh!  This whole thing is pretty horrible. We work as follows:
 
  1. Start with the current substitution (which we are
     trying to fixpoint
        [ xs :-> F a (z :: a) (rest :: G a (z :: a))
        , a  :-> b ]
 
- 2. Take all the free vars of the range of the substitution:
-       {a, z, rest, b}
-    NB: the free variable finder closes over
-        the kinds of variable occurrences
+ 2. Find its fixed point.  Remember, substitution is shallow. That gives:
+       [ xs :-> F b (z :: a) (rest :: G a (z :: a))
+       , a  :-> b ]
+    Note the 'a' lurking inside (z::a)
 
- 3. If none are in the domain of the substitution, stop.
-    We have found a fixpoint.
+ 3. Take all the deep free vars of the range of the substitution:
+       {a, (z::a), (rest::G a z), b}
 
  4. Remove the variables that are bound by the substitution, leaving
        {z, rest, b}
 
- 5. Do a topo-sort to put them in dependency order:
+ 5. Do a `scopedSort` to put them in dependency order:
        [ b :: *, z :: a, rest :: G a z ]
 
- 6. Apply the substitution left-to-right to the kinds of these
-    tyvars, extending it each time with a new binding, so we
-    finish up with
-       [ xs   :-> ..as before..
-       , a    :-> b
-       , b    :-> b    :: *
+ 6. Make a "re-kinding substitution" by applying the fixpoint from (2)
+    to the kind of each tyvar in this list -- and then applying the
+    re-kinding from earlier variables.
+       [ b    :-> b    :: *
        , z    :-> z    :: b
        , rest :-> rest :: G b (z :: b) ]
     Note that rest now has the right kind
 
  7. Apply this extended substitution (once) to the range of the
-    /original/ substitution.  (Note that the extended substitution
-    would go on forever if you tried to find its fixpoint, because it
-    maps z to z.)
-
- 8. And go back to step 1
+    fixpoint substitution from (2).
 
 In Step 6 we use the free vars from Step 2 as the initial
 in-scope set, because all of those variables appear in the
@@ -1136,13 +1132,59 @@ variables in the in-scope set; it is used only to ensure no
 shadowing.
 -}
 
-niFixSubst :: InScopeSet -> TvSubstEnv -> Subst
+niFixSubst, niFixSubst' :: InScopeSet -> TvSubstEnv -> Subst
 -- Find the idempotent fixed point of the non-idempotent substitution
 -- This is surprisingly tricky:
 --   see Note [Finding the substitution fixpoint]
 -- ToDo: use laziness instead of iteration?
 niFixSubst in_scope tenv
-  | not_fixpoint = niFixSubst in_scope (mapVarEnv (substTy subst) tenv)
+  =  pprTrace "niFixSubst" (vcat [ text "In: " <+> ppr tenv
+                                 , text "Out:" <+> ppr (S.getTvSubstEnv subst) ])
+     subst
+  where
+     subst = niFixSubst' in_scope tenv
+
+niFixSubst' in_scope orig_tenv
+  = mkTvSubst in_scope (mapVarEnv (subst_tenv rekinding_tenv) fix_tenv)
+  where
+    in_dom tv = tv `elemVarEnv` orig_tenv
+
+    fix_tenv :: TvSubstEnv
+    fix_tenv = go_fix orig_tenv  -- Repeatedly apply tenv until we get a fixpoint
+
+    go_fix tenv_so_far
+       | anyVarEnv (anyShallowFreeVarsOfType in_dom) tenv_so_far
+       = go_fix (mapVarEnv (subst_tenv tenv_so_far) tenv_so_far)
+       | otherwise
+       = tenv_so_far
+
+    free_tvs :: [TyVar]
+    free_tvs = scopedSort        $
+               filterOut in_dom  $
+               nonDetVarSetElems $
+               tyCoVarsOfTypes   $
+               nonDetEltsUFM orig_tenv
+          -- It's OK to use nonDetEltsUFM (twice) here because
+          -- the order of range_tvs is immaterial
+
+    rekinding_tenv = foldl' add_free_tv emptyTvSubstEnv free_tvs
+
+    add_free_tv :: TvSubstEnv -> TyVar -> TvSubstEnv
+    add_free_tv rke_so_far tv
+      | isTyVar tv
+      , let k' = subst_tenv rke_so_far $
+                 subst_tenv fix_tenv   $
+                 tyVarKind tv
+      = extendVarEnv rke_so_far tv (mkTyVarTy (setTyVarKind tv k'))
+      | otherwise
+      = rke_so_far
+
+    subst_tenv :: TvSubstEnv -> Type -> Type
+    subst_tenv tenv = substTy (mkTvSubst in_scope tenv)
+
+{-
+--  | not_fixpoint = niFixSubst' in_scope (mapVarEnv (substTy subst) tenv)
+  | not_fixpoint = niFixSubst' in_scope (mapVarEnv (substTy subst) tenv)
   | otherwise    = tenv_subst
   where
     tenv_subst = mkTvSubst in_scope tenv   -- This is our starting point
@@ -1154,12 +1196,26 @@ niFixSubst in_scope tenv
           -- It's OK to use nonDetEltsUFM (twice) here because
           -- the order of range_tvs is immaterial
 
-    not_fixpoint  = any in_domain range_tvs
-    in_domain tv  = tv `elemVarEnv` tenv
-
-    free_tvs = scopedSort (filterOut in_domain range_tvs)
+    not_fixpoint = any in_domain range_tvs
+    in_domain tv = tv `elemVarEnv` tenv
+    free_tvs     = scopedSort (filterOut in_domain range_tvs)
 
     -- See Note [Finding the substitution fixpoint], Step 6
+    rekinding_tenv = foldl' add_free_tv emptyTvSubstEnv free_tvs
+    add_free_tv :: TvSubstEnv -> TyVar -> TvSubstEnv
+    add_free_tv rke tv
+      | isTyVar tv, anyFreeVarsOfType in_domain (varType tv)
+      , let tv' = updateTyVarKind (substTy tenv_subst) tv
+      = extendVarEnv rke tv (mkTyVarTy tv')
+      | otherwise
+      = rke
+
+    rekinding_subst = mkTvSubst in_scope rekinding_tenv
+
+    subst = mkTvSubst in_scope (rekinding_tenv `plusVarEnv`
+                                mapVarEnv (substTy rekinding_subst) tenv)
+
+{-
     subst = foldl' add_free_tv tenv_subst free_tvs
 
     add_free_tv :: Subst -> TyVar -> Subst
@@ -1168,6 +1224,8 @@ niFixSubst in_scope tenv
       | otherwise  = subst  -- Ignore free coercion variables
      where
         tv' = updateTyVarKind (substTy subst) tv
+-}
+-}
 
 {-
 ************************************************************************
