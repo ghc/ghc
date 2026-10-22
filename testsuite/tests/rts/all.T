@@ -647,3 +647,12 @@ test('T27477',
      , only_ways(['threaded1', 'threaded2'])
      ],
      compile_and_run, ['-O2'])
+
+test('T27272',
+     [ req_target_smp
+     , omit_ghci
+     , omit_ways(['hpc'])
+     , pre_cmd('$PYTHON T27272_gen.py 200 > T27272_Lits.hs')
+     , extra_run_opts('+RTS -N3 -ki512 -kc1k -kb128 -RTS')
+     ],
+     multimod_compile_and_run, ['T27272', '-O -threaded -fno-prof-auto'])

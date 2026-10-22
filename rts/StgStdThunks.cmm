@@ -342,18 +342,11 @@ INFO_TABLE(stg_ap_7_upd,7,0,THUNK,"stg_ap_7_upd_info","stg_ap_7_upd_info")
  *
  */
 
-stg_do_unpack_cstring(P_ node, P_ newCAF_ret) {
-    STK_CHK_PP(WDS(SIZEOF_StgUpdateFrame), stg_do_unpack_cstring, node, newCAF_ret);
-    W_ str;
-    str = StgThunk_payload(node, 2);
-    push (UPDATE_FRAME_FIELDS(,,stg_bh_upd_frame_info, CCCS, 0, newCAF_ret)) {
-        jump %ENTRY_CODE(HsIface_unpackCStringzh_info(W_[ghc_hs_iface]))(node, str);
-    }
-}
-
 INFO_TABLE(stg_unpack_cstring, 0, 0, THUNK_STATIC, "stg_unpack_cstring", "stg_unpack_cstring")
     (P_ node)
 {
+    // The stack check needs to come before newCAF: see #27272
+    STK_CHK_NP(node);
     W_ newCAF_ret;
     (newCAF_ret) = ccall newCAF(BaseReg "ptr", node "ptr");
 
@@ -362,22 +355,19 @@ INFO_TABLE(stg_unpack_cstring, 0, 0, THUNK_STATIC, "stg_unpack_cstring", "stg_un
         // `node` should now be an indirection.
         ENTER(node);
     } else {
-        jump stg_do_unpack_cstring(node, newCAF_ret);
-    }
-}
-
-stg_do_unpack_cstring_utf8(P_ node, P_ newCAF_ret) {
-    STK_CHK_PP(WDS(SIZEOF_StgUpdateFrame), stg_do_unpack_cstring_utf8, node, newCAF_ret);
-    W_ str;
-    str = StgThunk_payload(node, 2);
-    push (UPDATE_FRAME_FIELDS(,,stg_bh_upd_frame_info, CCCS, 0, newCAF_ret)) {
-        jump %ENTRY_CODE(HsIface_unpackCStringUtf8zh_info(W_[ghc_hs_iface]))(node, str);
+        W_ str;
+        str = StgThunk_payload(node, 2);
+        push (UPDATE_FRAME_FIELDS(,,stg_bh_upd_frame_info, CCCS, 0, newCAF_ret)) {
+            jump %ENTRY_CODE(HsIface_unpackCStringzh_info(W_[ghc_hs_iface]))(node, str);
+        }
     }
 }
 
 INFO_TABLE(stg_unpack_cstring_utf8, 0, 0, THUNK_STATIC, "stg_unpack_cstring_utf8", "stg_unpack_cstring_utf8")
     (P_ node)
 {
+    // The stack check needs to come before newCAF: see #27272
+    STK_CHK_NP(node);
     W_ newCAF_ret;
     (newCAF_ret) = ccall newCAF(BaseReg "ptr", node "ptr");
 
@@ -386,6 +376,10 @@ INFO_TABLE(stg_unpack_cstring_utf8, 0, 0, THUNK_STATIC, "stg_unpack_cstring_utf8
         // `node` should now be an indirection.
         ENTER(node);
     } else {
-        jump stg_do_unpack_cstring_utf8(node, newCAF_ret);
+        W_ str;
+        str = StgThunk_payload(node, 2);
+        push (UPDATE_FRAME_FIELDS(,,stg_bh_upd_frame_info, CCCS, 0, newCAF_ret)) {
+            jump %ENTRY_CODE(HsIface_unpackCStringUtf8zh_info(W_[ghc_hs_iface]))(node, str);
+        }
     }
 }
