@@ -528,7 +528,9 @@ class (MonadIO m, MonadFail m) => Quasi m where
   -- | Report an error (True) or warning (False)
   -- ...but carry on; use 'fail' to stop. See 'report'.
   qReport  :: Bool -> String -> m ()
-  qReport b s = qRunQ $ report b s
+  -- 'msg' is forced to ensure exceptions don't escape,
+  -- see Note [Exceptions in TH]
+  qReport b msg = seqList msg $ qRunQ $ Internal.report b msg
 
   -- | See 'recover'.
   qRecover :: m a -- ^ the error handler
@@ -665,13 +667,18 @@ instance Quasi Q where
 -- | Report an error (True) or warning (False),
 -- but carry on; use 'fail' to stop.
 report  :: Bool -> String -> Q ()
-report = Internal.report
+report = qReport
 {-# DEPRECATED report "Use reportError or reportWarning instead" #-} -- deprecated in 7.6
 
 -- | Report an error to the user, but allow the current splice's computation to carry on. To abort the computation, use 'fail'.
 reportError :: String -> Q ()
-reportError = report True
+reportError = qReport True
 
 -- | Report a warning to the user, and carry on.
 reportWarning :: String -> Q ()
-reportWarning = report False
+reportWarning = qReport False
+
+-- | copied from GHC.Utils.Misc
+seqList :: [a] -> b -> b
+seqList [] b = b
+seqList (x:xs) b = x `seq` seqList xs b
