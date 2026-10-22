@@ -479,13 +479,16 @@ type SimplIdSubst = IdEnv SimplClo -- IdId |--> OutExpr
 -- Roughly: either an (InExpr, StaticEnv) pair for an
 --                 as-yet-unsimplified expression
 --          or     an OutExpr, for an already-simplified one
+-- It's a bit like thunk: we may "evaluate" the SimplClo in a ApplyToVal
+--   and thereby transform it from `ContEx` to `DoneEx`
+--   This happens in the `ApplyToVal` case of `mkDupableContWithDmds`
+--   See Note [The argument of ApplyToVal] in GHC.Core.Opt.Simplify.Utils
 data SimplClo
   = DoneEx OutExpr JoinPointHood
        -- If  x :-> DoneEx e ja   is in the SimplIdSubst
        -- then replace occurrences of x by e
        -- and  ja = Just a <=> x is a join-point of arity a
        -- See Note [Join arity in SimplIdSubst]
-
 
   | DoneId OutId
        -- If  x :-> DoneId v   is in the SimplIdSubst

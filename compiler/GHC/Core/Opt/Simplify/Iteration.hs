@@ -1226,17 +1226,8 @@ simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t exp
 simplExprF1 env (Coercion co)  cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
 
 simplExprF1 env (Cast body co) cont
-  = do  { co1 <- {-#SCC "simplCast-simplCoercion" #-}
-                 simplCoercion env co
-
-        ; let cont1 = {-#SCC "simplCast-addCoerce" #-}
-                      if isReflCo co1
-                      then cont  -- See Note [Optimising reflexivity]
-                      else pushCast env co1 cont
-                           -- True <=> co1 is optimised
-
-        ; {-#SCC "simplCast-simplExprF" #-}
-          simplExprF env body cont1 }
+  = do  { co1 <- simplCoercion env co
+        ; simplExprF env body (pushCast env co1 cont) }
 
 simplExprF1 env (App fun arg) cont
   = {-#SCC "simplExprF1-App" #-} case arg of
@@ -1652,8 +1643,7 @@ completeBindX env from_what bndr rhs body cont
   | FromBeta arg_levity <- from_what
   , needsCaseBindingL arg_levity rhs -- Enforcing the let-can-float-invariant
   = do { (env1, bndr1)   <- simplNonRecBndr env bndr  -- Lambda binders don't have rules
-                                                      -- See Note [Lambda and case binders have
-                                                      --      vanilla IdInfo] in GHC.Core
+                            -- See Note [Lambda and case binders have vanilla IdInfo] in GHC.Core
        ; (floats, expr') <- simplNonRecBody env1 from_what body cont
        -- Do not float floats past the Case binder below
        ; let expr'' = wrapFloats floats expr'
@@ -1687,69 +1677,12 @@ completeBindX env from_what bndr rhs body cont
         ; let all_floats = rhs_floats `addFloats` bind_float `addFloats` body_floats
         ; return ( all_floats, body' ) }
 
-{-
-************************************************************************
+
+{- *********************************************************************
 *                                                                      *
-\subsection{Lambdas}
+                Arguments
 *                                                                      *
-************************************************************************
--}
-
-{- Note [Optimising reflexivity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's important (for compiler performance) to get rid of reflexivity as soon
-as it appears.  See #11735, #14737, and #15019.
-
-In particular, we want to behave well on
-
- *  e |> co1 |> co2
-    where the two happen to cancel out entirely. That is quite common;
-    e.g. a newtype wrapping and unwrapping cancel.
-
-
- * (f |> co) @t1 @t2 ... @tn x1 .. xm
-   Here we will use pushCoTyArg and pushCoValArg successively, which
-   build up SelCo stacks.  Silly to do that if co is reflexive.
-
-However, we don't want to call isReflexiveCo too much, because it uses
-type equality which is expensive on big types (#14737 comment:7).
-
-A good compromise (determined experimentally) seems to be to call
-isReflexiveCo
- * when composing casts, and
- * at the end
-
-In investigating this I saw missed opportunities for on-the-fly
-coercion shrinkage. See #15090.
-
-Note [Avoid re-simplifying coercions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In some benchmarks (with deeply nested cases) we successively push
-casts onto the SimplCont.  We don't want to call the coercion optimiser
-on each successive composition -- that's at least quadratic.  So:
-
-* The CastIt constructor in SimplCont has a `sc_opt :: Bool` flag to
-  record whether the coercion optimiser has been applied to the coercion.
-
-* In `simplCast`, when we see (Cast e co), we simplify `co` to get
-  an OutCoercion, and built a CastIt with sc_opt=True.
-
-  Actually not quite: if we are simplifying the result of inlining an
-  unfolding (seInlineDepth > 0), then instead of /optimising/ it again,
-  just /substitute/ which is cheaper.  See `simplCoercion`.
-
-* In `pushCast` if we combine this new coercion with an existing one,
-  we build a CastIt for (co1 ; co2) with sc_opt=False.
-
-* When unpacking a CastIt, in `rebuild`, we optimise the (presumably
-  composed) coercion if sc_opt=False; this is done by `optOutCoercion`.
-
-* When duplicating a continuation in `mkDupableContWithDmds`, before
-  duplicating a CastIt, optimise the coercion. Otherwise we'll end up
-  optimising it separately in the duplicate copies.
-
-* See also Note [The MOutCoercion field of ContEx] in GHC.Core.Opt.Simplify.Utils.
--}
+********************************************************************* -}
 
 simplArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
          -> Maybe ArgInfo           -- ^ Just <=> This arg `ai` occurs in an app
@@ -1771,13 +1704,12 @@ simplArg env mb_arg_info fun_ty (ContEx arg_se arg mco)
              cont     = addCastMCo mco stop
        ; simplExprC arg_env' arg cont }
 
-{-
-************************************************************************
+
+{- *********************************************************************
 *                                                                      *
-\subsection{Lambdas}
+                Lambdas
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 simplNonRecBody :: SimplEnv -> FromWhat
                 -> InExpr -> SimplCont
@@ -2295,8 +2227,8 @@ simplOutId env fun cont
                          env'  = arg_env `addNewInScopeIds` [s']
                          hole_ty = mkVisFunTy m realWorldStatePrimTy new_runrw_res_ty
                          cont' = pushCastMCo env' arg_mco $
-                                 ApplyToVal { sc_arg = DoneEx (Var s') NotJoinPoint
-                                            , sc_dup = dup
+                                 ApplyToVal { sc_arg  = DoneId s'
+                                            , sc_dup  = dup
                                             , sc_cont = inner_cont
                                             , sc_hole_ty = hole_ty }
                                  -- cont' applies to s', then K

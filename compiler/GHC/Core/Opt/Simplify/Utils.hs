@@ -175,7 +175,6 @@ data SimplCont
                                 -- Invariant: never an identity coercion
       , sc_opt  :: Bool         -- True <=> sc_co has had optCoercion applied to it
                                 --      See Note [Avoid re-simplifying coercions]
-                                --      in GHC.Core.Opt.Simplify.Iteration
       , sc_cont :: SimplCont }
 
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
@@ -886,10 +885,65 @@ But we /also/ sometimes want to substitute that argument for a lambda-binder, in
 `preInlineBetaUnconditionally`; and since the substitution maps an Id to a SimplClo,
 the pending cast comes along for free.  Then we deal with it appropriately when
 /applying/ the substitution in `simplInId`.
+
+Note [Optimising reflexivity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's important (for compiler performance) to get rid of reflexivity as soon
+as it appears.  See #11735, #14737, and #15019.
+
+In particular, we want to behave well on
+
+ *  e |> co1 |> co2
+    where the two happen to cancel out entirely. That is quite common;
+    e.g. a newtype wrapping and unwrapping cancel.
+
+
+ * (f |> co) @t1 @t2 ... @tn x1 .. xm
+   Here we will use pushCoTyArg and pushCoValArg successively, which
+   build up SelCo stacks.  Silly to do that if co is reflexive.
+
+However, we don't want to call isReflexiveCo too much, because it uses
+type equality which is expensive on big types (#14737 comment:7).
+
+A good compromise (determined experimentally) seems to be to call
+isReflexiveCo
+ * when composing casts, and
+ * at the end
+
+In investigating this I saw missed opportunities for on-the-fly
+coercion shrinkage. See #15090.
+
+Note [Avoid re-simplifying coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In some benchmarks (with deeply nested cases) we successively push
+casts onto the SimplCont.  We don't want to call the coercion optimiser
+on each successive composition -- that's at least quadratic.  So:
+
+* The CastIt constructor in SimplCont has a `sc_opt :: Bool` flag to
+  record whether the coercion optimiser has been applied to the coercion.
+
+* In `simplCast`, when we see (Cast e co), we simplify `co` to get
+  an OutCoercion, and built a CastIt with sc_opt=True.
+
+  Actually not quite: if we are simplifying the result of inlining an
+  unfolding (seInlineDepth > 0), then instead of /optimising/ it again,
+  just /substitute/ which is cheaper.  See `simplCoercion`.
+
+* In `pushCast` if we combine this new coercion with an existing one,
+  we build a CastIt for (co1 ; co2) with sc_opt=False.
+
+* When unpacking a CastIt, in `rebuild`, we optimise the (presumably
+  composed) coercion if sc_opt=False; this is done by `optOutCoercion`.
+
+* When duplicating a continuation in `mkDupableContWithDmds`, before
+  duplicating a CastIt, optimise the coercion. Otherwise we'll end up
+  optimising it separately in the duplicate copies.
+
+* See also Note [The MOutCoercion field of ContEx]
 -}
 
 optOutCoercion :: SimplEnvIS -> OutCoercion -> Bool -> OutCoercion
--- See Note [Avoid re-simplifying coercions] in GHC.Core.Opt.Simplify.Iteration
+-- See Note [Avoid re-simplifying coercions]
 optOutCoercion env co already_optimised
   | already_optimised = co  -- Ditto
   | otherwise         = optCoercion opts empty_subst co
@@ -909,7 +963,8 @@ pushCastMCo env  (MCo co) cont = pushCast env co cont
 
 pushCast :: SimplEnv -> OutCoercion -> SimplCont -> SimplCont
 pushCast env co cont
-  = go co True cont
+  | isReflCo co = cont     -- See Note [Optimising reflexivity]
+  | otherwise   = go co True cont
   where
 
     -- ToDo:   pushCast Refl (ApplylToVal arg1 (ApplyToVal arg2 ...))
@@ -918,7 +973,7 @@ pushCast env co cont
     go co1 _ (CastIt { sc_co = co2, sc_cont = cont })  -- See Note [Optimising reflexivity] in GHC.Core.Opt.Simplify.Iteration
       = go (mkTransCo co1 co2) False cont
                   -- False: (mkTransCo co1 co2) is not fully optimised
-                  -- See Note [Avoid re-simplifying coercions] in GHC.Core.Opt.Simplify.Iteration
+                  -- See Note [Avoid re-simplifying coercions]
 
     go co co_is_opt (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
       | Just (tyL, arg_ty', m_co') <- pushCoTyArg co arg_ty
