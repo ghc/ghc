@@ -1,0 +1,5 @@
+section: rts
+synopsis: Fix a deadlock where threads could block forever on a string literal
+  if entering the string literal triggered a stack overflow.
+mrs: !16849
+issues: #27272
