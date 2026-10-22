@@ -1472,11 +1472,9 @@ when showing an error message.
 To call runQ in the Tc monad, we need to make TcM an instance of Quasi:
 -}
 
--- 'msg' is forced to ensure exceptions don't escape,
--- see Note [Exceptions in TH]
 report :: Bool -> [Char] -> TcM ()
-report True msg  = seqList msg $ addErr        $ TcRnTHError $ ReportCustomQuasiError True  msg
-report False msg = seqList msg $ addDiagnostic $ TcRnTHError $ ReportCustomQuasiError False msg
+report True  msg = addErr        $ TcRnTHError $ ReportCustomQuasiError True  msg
+report False msg = addDiagnostic $ TcRnTHError $ ReportCustomQuasiError False msg
 
 addTopDecls :: [TH.Dec] -> TcM ()
 addTopDecls thds = do
@@ -1575,7 +1573,7 @@ metaHandlersTcM runInIO = TH.MetaHandlers {
                       ; let i = toInteger (getKey u)
                       ; return (TH.mkNameU s i) }
 
-    , mReport = fmap runInIO . report
+    , mReport = \ b msg -> runInIO (report b msg)
 
     , mLocation = runInIO location
 
