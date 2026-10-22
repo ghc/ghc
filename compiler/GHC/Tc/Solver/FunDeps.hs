@@ -735,8 +735,9 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
       | Just {} <- tcUnifyTysForInjectivity Matching [branch_rhs] [work_rhs]
         -- No need for an apartness check here;
         -- for open type families there are no "preceding" equations
-      = Just (mkInjectivityFDEqn inj_flags branch_qtvs
-                                 (branch_rhs:branch_lhs_tys) (work_rhs:work_args))
+      = Just (mkInjectivityFDEqn branch_qtvs (True:       inj_flags)
+                                             (branch_rhs: branch_lhs_tys)
+                                             (work_rhs:   work_args))
 
       | otherwise
       = Nothing
@@ -761,7 +762,7 @@ mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
       | otherwise                     = Nothing
     do_one _ = pprPanic "interactFunEq 2" (ppr fam_tc)  -- TyVarLHS
 
-    mk_eqn iargs = mkInjectivityFDEqn inj_flags [] work_args iargs
+    mk_eqn iargs = mkInjectivityFDEqn [] inj_flags work_args iargs
 
 
 {- See Historical Note [trim_qtvs]
@@ -879,15 +880,22 @@ mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
        ; return (eqns_from_inerts ++ eqns_from_self) }
 
 --------------------
-mkInjectivityFDEqn :: [Bool]       -- Injectivity flags
-                   -> [TcTyVar]    -- Quantify these
+mkInjectivityFDEqn :: [TcTyVar]             -- Quantify these
+                   -> [Bool]                -- Injectivity flags
                    -> [TcType] -> [TcType]  -- Make these equal
                    -> FunDepEqns
 -- When F s1 s2 s3 ~ F t1 t2 t3, and F has injectivity info [True,False,True]
 --   return the FDEqns { fd_eqs = [Pair s1 t1, Pair s3 t3] }
--- The injectivity flags [Bool] will not all be False, but nothing goes wrong if they are
-mkInjectivityFDEqn inj_args qtvs lhs_args rhs_args
-  = FDEqns { fd_qtvs = qtvs, fd_eqs = eqs }
+-- The injectivity flags [Bool] will not all be False,
+--   but nothing goes wrong if they are
+mkInjectivityFDEqn qtvs inj_args lhs_args rhs_args
+  = assertPpr (let len = length inj_args in
+               len == length lhs_args && len == length rhs_args)
+              (vcat [ text "inj_args:" <+> ppr inj_args
+                    , text "lhs_args:" <+> ppr lhs_args
+                    , text "rhs_args:" <+> ppr rhs_args ]) $
+    -- Need inj_args lhs_args and rhs_args to be same length for zip3
+    FDEqns { fd_qtvs = qtvs, fd_eqs = eqs }
   where
     eqs = [ Pair lhs_arg rhs_arg
           | (True, lhs_arg, rhs_arg) <- zip3 inj_args lhs_args rhs_args ]

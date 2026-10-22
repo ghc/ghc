@@ -1166,9 +1166,9 @@ niFixSubst' in_scope orig_tenv
                filterOut in_dom  $
                nonDetVarSetElems $
                tyCoVarsOfTypes   $
-               nonDetEltsUFM orig_tenv
+               nonDetEltsUFM fix_tenv
           -- It's OK to use nonDetEltsUFM (twice) here because
-          -- the order of range_tvs is immaterial
+          -- the exact order of free_tvs is immaterial
 
     rekinding_tenv = foldl' add_free_tv emptyTvSubstEnv free_tvs
 
