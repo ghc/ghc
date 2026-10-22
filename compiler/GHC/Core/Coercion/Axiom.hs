@@ -277,8 +277,8 @@ data CoAxBranch
        -- See Note [CoAxBranch type variables]
     , cab_eta_tvs  :: [TyVar]
        -- ^ Eta-reduced tyvars
-       -- cab_tvs and cab_lhs may be eta-reduced; see
-       -- Note [Eta reduction for data families]
+       -- For a data family (only) cab_tvs and cab_lhs may be eta-reduced
+       -- See Note [Eta reduction for data families]
     , cab_cvs      :: [CoVar]
       -- ^ Bound coercion variables
        -- Always empty, for now.
@@ -286,8 +286,14 @@ data CoAxBranch
        -- in GHC.Tc.TyCl
     , cab_roles    :: [Role]
        -- ^ See Note [CoAxBranch roles]
+
     , cab_lhs      :: [Type]
        -- ^ Type patterns to match against
+       -- For a data family `cab_lhs` may be shorter than the arity
+       --     of the data type
+       -- For a type family `cab_lhs` is exactly the family arity
+       -- See Note [Eta reduction for data families]
+
     , cab_rhs      :: Type
        -- ^ Right-hand side of the equality
        -- See Note [CoAxioms are homogeneous]

@@ -24,7 +24,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep( Type(..) )
-import GHC.Core.Predicate( EqRel(..) )
+import GHC.Core.Predicate( EqRel(..), saturatedFamApp_maybe )
 import GHC.Core.TyCon
 import GHC.Core.Unify( AmIUnifying(..)
                      , tcUnifyTysForInjectivity, typeListsAreApart )
@@ -32,7 +32,9 @@ import GHC.Core.Coercion.Axiom
 
 import GHC.Builtin.WiredIn.TypeLits( tryInteractTopFam, tryInteractInertFam )
 
+import GHC.Types.Var( tyVarKind )
 import GHC.Types.Var.Set
+import GHC.Types.Var.Env( mkInScopeSet )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -609,6 +611,7 @@ tryFamEqFunDeps mode eqs_for_me fam_tc work_args
 
 mkTopFamEqFDs :: TyCon -> [TcType] -> EqCt -> SolverStage [FunDepEqns]
 mkTopFamEqFDs fam_tc work_args work_item
+  -- NB: work_args exactly saturate fam_tc
   | isOpenTypeFamilyTyCon fam_tc
   , Injective inj_flags <- tyConInjectivityInfo fam_tc
   = -- Open, injective type families
@@ -721,6 +724,7 @@ getRelevantBranches ax work_args work_rhs
 mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> EqCt -> TcS [FunDepEqns]
 -- Implements (INJFAM:Wanted/top-open)
 -- See Note [Exploiting open type families]
+-- NB: work_args exactly saturate fam_tc
 mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
   = do { fam_envs <- getFamInstEnvs
        ; let branches :: [CoAxBranch]
@@ -735,6 +739,7 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
       | Just {} <- tcUnifyTysForInjectivity Matching [branch_rhs] [work_rhs]
         -- No need for an apartness check here;
         -- for open type families there are no "preceding" equations
+        -- Both branch_lhs_tys and work_args exactly saturate fam_tc
       = Just (mkInjectivityFDEqn branch_qtvs (True:       inj_flags)
                                              (branch_rhs: branch_lhs_tys)
                                              (work_rhs:   work_args))
@@ -750,9 +755,9 @@ mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
   = do { let -- eqns_from_inerts: see (INJFAM:Wanted/other)
              eqns_from_inerts = mapMaybe do_one eqs_for_me
              -- eqns_from_self: see (INJFAM:Wanted/Self)
-             eqns_from_self   = case tcSplitTyConApp_maybe work_rhs of
-                                  Just (tc,rhs_tys) | tc==fam_tc -> [mk_eqn rhs_tys]
-                                  _                              -> []
+             eqns_from_self = case saturatedFamApp_maybe work_rhs of
+                                Just (tc, rhs_tys) | fam_tc == tc -> [mk_eqn rhs_tys]
+                                _                                 -> []
 
        ; return (eqns_from_inerts ++ eqns_from_self) }
   where
@@ -1541,12 +1546,10 @@ instantiateFunDepEqns (FDEqns { fd_qtvs = qtvs, fd_eqs = eqs })
     rev_eqs = reverse eqs
        -- (reverse eqs): See Note [Reverse order of fundep equations]
 
-    empty_subst = emptySubst
-    -- If you re-instate `trim_qtvs`, take care here:
-    -- The kinds of `qtvs` can have free variables, because of `trim_qtvs`
-    -- Example: T27828b
-    -- empty_subst = mkEmptySubst $ mkInScopeSet $
-    --              tyCoVarsOfTypes (map tyVarKind qtvs)
+    -- The kinds of `qtvs` can have free variables;
+    -- in the FDEqns produced by GHC.Tc.Instance.improveFromInstEnv
+    empty_subst = mkEmptySubst $ mkInScopeSet $
+                  tyCoVarsOfTypes (map tyVarKind qtvs)
 
     subst_pair subst (Pair ty1 ty2)
        = Pair (substTy subst' ty1) ty2

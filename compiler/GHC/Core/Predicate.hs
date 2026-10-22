@@ -36,7 +36,7 @@ module GHC.Core.Predicate (
 
   -- Equality left-hand sides
   CanEqLHS(..), canEqLHS_maybe, canTyFamEqLHS_maybe,
-  canEqLHSKind, canEqLHSType, eqCanEqLHS
+  canEqLHSKind, canEqLHSType, eqCanEqLHS, saturatedFamApp_maybe
 
   ) where
 
@@ -60,6 +60,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.FastString
+
+import GHC.Exts( inline )
 
 
 {- *********************************************************************
@@ -783,13 +785,19 @@ canEqLHS_maybe xi
   | otherwise
   = canTyFamEqLHS_maybe xi
 
-canTyFamEqLHS_maybe :: Type -> Maybe CanEqLHS
-canTyFamEqLHS_maybe xi
+saturatedFamApp_maybe :: Type -> Maybe (TyCon,[Type])
+saturatedFamApp_maybe xi
   | Just (tc, args) <- tcSplitTyConApp_maybe xi
   , isTypeFamilyTyCon tc
   , args `lengthIs` tyConArity tc
-  = Just $ TyFamLHS tc args
+  = Just (tc,args)
+  | otherwise
+  = Nothing
 
+canTyFamEqLHS_maybe :: Type -> Maybe CanEqLHS
+canTyFamEqLHS_maybe xi
+  | Just (tc, args) <- inline saturatedFamApp_maybe xi
+  = Just $ TyFamLHS tc args
   | otherwise
   = Nothing
 

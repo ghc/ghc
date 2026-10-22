@@ -16,6 +16,7 @@ import GHC.Prelude
 import GHC.Driver.DynFlags
 import GHC.Driver.Env
 
+import GHC.Core.Predicate( saturatedFamApp_maybe )
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Core.TyCon
@@ -715,15 +716,9 @@ reportInjectivityErrors dflags fi_ax axiom inj
        when wrong_bare_rhs $ reportBareVariableInRHSErr   fam_tc bare_variables axiom
 
 -- | Is type headed by a type family application?
-isTFHeaded :: Type -> Bool
 -- See Note [Verifying injectivity annotation], case 3.
-isTFHeaded ty | Just ty' <- coreView ty
-              = isTFHeaded ty'
-isTFHeaded ty | (TyConApp tc args) <- ty
-              , isTypeFamilyTyCon tc
-              = args `lengthIs` tyConArity tc
-isTFHeaded _  = False
-
+isTFHeaded :: Type -> Bool
+isTFHeaded ty = isJust (saturatedFamApp_maybe ty)
 
 -- | If a RHS is a bare type variable return a set of LHS patterns that are not
 -- bare type variables.

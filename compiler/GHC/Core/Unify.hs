@@ -17,6 +17,9 @@ module GHC.Core.Unify (
         UnifyResult, UnifyResultM(..), MaybeApartReason(..),
         typesCantMatch, typesAreApart, typeListsAreApart,
 
+        -- Finding the fixpoint of a substitution
+        niFixSubst,
+
         -- Matching a type against a lifted type (coercion)
         liftCoMatch
    ) where
