@@ -157,6 +157,7 @@ data Flag
   | FlagVerbosity (Maybe String)
   | FlagUnitId
   | FlagShowUnitIds
+  | FlagAlwaysUseCache
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -204,7 +205,9 @@ flags = [
   Option [] ["ipid", "unit-id"] (NoArg FlagUnitId)
         "interpret package arguments as unit IDs (e.g. installed package IDs)",
   Option ['v'] ["verbose"] (OptArg FlagVerbosity "Verbosity")
-        "verbosity level (0-2, default 1)"
+        "verbosity level (0-2, default 1)",
+  Option [] ["always-use-cache"] (NoArg FlagAlwaysUseCache)
+        "use a package database's cache even if it is older than its package files"
   ]
 
 data Verbosity = Silent | Normal | Verbose
@@ -622,7 +625,7 @@ getPkgDatabases :: Verbosity
                           -- is used as the list of package DBs for
                           -- commands that just read the DB, such as 'list'.
 
-getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
+getPkgDatabases verbosity mode use_user use_cache_flag expand_vars my_flags = do
   -- Second we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-package-db flag by the
@@ -777,6 +780,11 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
 
   return (db_stack, db_to_operate_on, flag_db_stack)
   where
+    use_cache
+      | not use_cache_flag = NoCache
+      | FlagAlwaysUseCache `elem` my_flags = AlwaysUseCache
+      | otherwise = UseCache
+
     getDatabases top_dir mb_user_conf flag_db_names
                  final_stack top_db = case mode of
       -- When we open in read only mode, we simply read all of the databases/
@@ -882,10 +890,16 @@ lookForPackageDBIn dir = do
     exists_file <- doesFileExist path_file
     if exists_file then return (Just path_file) else return Nothing
 
+-- | Whether to read a package database's cache: not at all, if it is up to
+-- date (no older than any of the database's package files), or always
+-- (the files' modification times can't be relied on, say).
+data UseCache = NoCache | UseCache | AlwaysUseCache
+  deriving Eq
+
 readParseDatabase :: forall mode t. Verbosity
                   -> Maybe (OsPath,Bool)
                   -> GhcPkg.DbOpenMode mode t
-                  -> Bool -- use cache
+                  -> UseCache
                   -> OsPath
                   -> IO (PackageDB mode)
 readParseDatabase verbosity mb_user_conf mode use_cache path
@@ -913,7 +927,7 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
 
            | otherwise -> ioError err
          Right fs
-           | not use_cache -> ignore_cache (const $ return ())
+           | use_cache == NoCache -> ignore_cache (const $ return ())
            | otherwise -> do
               e_tcache <- tryIO $ getModificationTime cache
               case e_tcache of
@@ -936,8 +950,10 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
                       warn ("Timestamp " ++ show tcache ++ " for " ++ showOsPath cache)
                   -- If any of the .conf files is newer than package.cache, we
                   -- assume that cache is out of date.
-                  cache_outdated <- (`anyM` confs) $ \conf ->
-                    (tcache <) <$> getModificationTime conf
+                  cache_outdated <- if use_cache == AlwaysUseCache
+                    then return False
+                    else (`anyM` confs) $ \conf ->
+                      (tcache <) <$> getModificationTime conf
                   if not cache_outdated
                       then do
                           when (verbosity > Normal) $
@@ -1087,7 +1103,7 @@ mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
 -- ghc itself also cooperates in this workaround
 
 tryReadParseOldFileStyleDatabase :: Verbosity -> Maybe (OsPath, Bool)
-                                 -> GhcPkg.DbOpenMode mode t -> Bool -> OsPath
+                                 -> GhcPkg.DbOpenMode mode t -> UseCache -> OsPath
                                  -> IO (Maybe (PackageDB mode))
 tryReadParseOldFileStyleDatabase verbosity mb_user_conf
                                  mode use_cache path = do
