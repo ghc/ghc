@@ -33,9 +33,8 @@ import GHC.Core.TyCon
 import GHC.Core.Predicate( CanEqLHS(..), canEqLHS_maybe )
 import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.FVs( anyShallowFreeVarsOfType )
 import GHC.Core.TyCo.Compare ( eqType, tcEqType, tcEqTyConAppArgs )
-import qualified GHC.Core.TyCo.Subst as S
 import GHC.Core.TyCo.Subst   ( mkTvSubst )
 import GHC.Core.Map.Type
 import GHC.Core.Multiplicity
@@ -1071,15 +1070,16 @@ unification is much trickier than it looks, because of kinds.  Consider
 If we unify, we get the substitution
    [ k -> *
    , g -> H k (f:k) ]
+This isn't idempotent: it mentions `k` in the range.
+
 To make it idempotent we don't want to get just
    [ k -> *
    , g -> H * (f:k) ]
-We also want to substitute inside f's kind, to get
-   [ k -> *
-   , g -> H k (f:*) ]
-If we don't do this, we may apply the substitution to something,
-and get an ill-formed type, i.e. one where typeKind will fail.
+because (H * (f:k)) is itself ill-kinded, and `typeKind` will fail.
 This happened, for example, in #9106.
+So (yuckily) we must also substitute inside f's kind, to get
+   [ k -> *
+   , g -> H * (f:*) ]
 
 It gets worse.  In #14164 we wanted to take the fixpoint of
 this substitution
@@ -1094,42 +1094,41 @@ probably rightly so).
 
 Ugh!  This whole thing is pretty horrible. We work as follows:
 
- 1. Start with the current substitution (which we are
-    trying to fixpoint
-       [ xs :-> F a (z :: a) (rest :: G a (z :: a))
-       , a  :-> b ]
-
- 2. Find its fixed point.  Remember, substitution is shallow. That gives:
-       [ xs :-> F b (z :: a) (rest :: G a (z :: a))
-       , a  :-> b ]
+ 1. Start with the current substitution S, which we are fixpointing
+       S = [ xs :-> F a (z :: a) (rest :: G a (z :: a))
+           , a  :-> (b::*) ]
     Note the 'a' lurking inside (z::a)
 
- 3. Take all the deep free vars of the range of the substitution:
-       {a, (z::a), (rest::G a z), b}
+ 2. Find `range_tvs`, the deep free vars of the range of the substitution:
+       range_tvs = {a, (z::a), (rest::G a z), b}
 
- 4. Remove the variables that are bound by the substitution, leaving
-       {z, rest, b}
+ 3. If none of the `range_tvs` are in the domain of the substitution, stop.
 
- 5. Do a `scopedSort` to put them in dependency order:
-       [ b :: *, z :: a, rest :: G a z ]
+ 4. Find `free_tvs`, the `range_tvs` that are NOT in the substitution domain
+    and used `scopedSort` to put them in dependency order:
+       free_tvs = [z::a, rest::G a z, b]
 
- 6. Make a "re-kinding substitution" by applying the fixpoint from (2)
-    to the kind of each tyvar in this list -- and then applying the
-    re-kinding from earlier variables.
-       [ b    :-> b    :: *
-       , z    :-> z    :: b
-       , rest :-> rest :: G b (z :: b) ]
-    Note that rest now has the right kind
+ 5. Extend the substitution with "re-kinding bindings", mapping each free_tv
+    to the self-same variable, but with the original substitution applied
+    to its kind.
+       S_plus_rekinding = S + [ z    :-> z::b
+                              , rest :-> rest::G b (z::b)
+                              , b    :-> b]
+    Here we see the reason for putting `free_tvs` in dependency order:
+    we want the new kind of `rest` to be well-kinded, not (G b (z:a)).
+       S_plus_rekinding = S + [ z    :-> z::b
+                              , rest :-> rest::G b (z::b) ]
 
- 7. Apply this extended substitution (once) to the range of the
-    fixpoint substitution from (2).
+    Optimisation: if the kind of a free_tvs is a fixpoint of the substitution,
+    no need to add it to the substitution.  So we get
 
-In Step 6 we use the free vars from Step 2 as the initial
-in-scope set, because all of those variables appear in the
-range of the substitution, so they must all be in the in-scope
-set.  But NB that the type substitution engine does not look up
-variables in the in-scope set; it is used only to ensure no
-shadowing.
+ 6.  Apply S_plus_rekinding to the range of S
+       S_new = [ xs :-> F b (z::b) (rest::G b (z::b))
+               , a :-> b ]
+
+ 7. Loop back to (2)
+
+In our example, the substitution is now a fixpoint.
 -}
 
 niFixSubst, niFixSubst' :: InScopeSet -> TvSubstEnv -> Subst
@@ -1147,88 +1146,38 @@ niFixSubst in_scope tenv
   where
      subst = niFixSubst' in_scope tenv
 
-niFixSubst' in_scope orig_tenv
-  = mkTvSubst in_scope (mapVarEnv (subst_tenv rekinding_tenv) fix_tenv)
+niFixSubst' in_scope tenv_orig
+  | not (any in_dom range_tvs) = mkTvSubst in_scope tenv_orig
+  | otherwise                  = niFixSubst' in_scope tenv_new
   where
-    in_dom tv = tv `elemVarEnv` orig_tenv
-
-    fix_tenv :: TvSubstEnv
-    fix_tenv = go_fix orig_tenv  -- Repeatedly apply tenv until we get a fixpoint
-
-    go_fix tenv_so_far
-       | anyVarEnv (anyShallowFreeVarsOfType in_dom) tenv_so_far
-       = go_fix (mapVarEnv (subst_tenv tenv_so_far) tenv_so_far)
-       | otherwise
-       = tenv_so_far
-
-    free_tvs :: [TyVar]
-    free_tvs = scopedSort        $
-               filterOut in_dom  $
-               nonDetVarSetElems $
-               tyCoVarsOfTypes   $
-               nonDetEltsUFM fix_tenv
-          -- It's OK to use nonDetEltsUFM (twice) here because
-          -- the exact order of free_tvs is immaterial
-
-    rekinding_tenv = foldl' add_free_tv emptyTvSubstEnv free_tvs
-
-    add_free_tv :: TvSubstEnv -> TyVar -> TvSubstEnv
-    add_free_tv rke_so_far tv
-      | isTyVar tv
-      , let k' = subst_tenv rke_so_far $
-                 subst_tenv fix_tenv   $
-                 tyVarKind tv
-      = extendVarEnv rke_so_far tv (mkTyVarTy (setTyVarKind tv k'))
-      | otherwise
-      = rke_so_far
-
-    subst_tenv :: TvSubstEnv -> Type -> Type
-    subst_tenv tenv = substTy (mkTvSubst in_scope tenv)
-
-{-
---  | not_fixpoint = niFixSubst' in_scope (mapVarEnv (substTy subst) tenv)
-  | not_fixpoint = niFixSubst' in_scope (mapVarEnv (substTy subst) tenv)
-  | otherwise    = tenv_subst
-  where
-    tenv_subst = mkTvSubst in_scope tenv   -- This is our starting point
+    in_dom tv = tv `elemVarEnv` tenv_orig
 
     range_tvs :: [TyVar]
     range_tvs = nonDetVarSetElems $
                 tyCoVarsOfTypes $
-                nonDetEltsUFM tenv
+                nonDetEltsUFM tenv_orig
           -- It's OK to use nonDetEltsUFM (twice) here because
           -- the order of range_tvs is immaterial
 
-    not_fixpoint = any in_domain range_tvs
-    in_domain tv = tv `elemVarEnv` tenv
-    free_tvs     = scopedSort (filterOut in_domain range_tvs)
+    free_tvs = scopedSort (filterOut in_dom range_tvs)
 
-    -- See Note [Finding the substitution fixpoint], Step 6
-    rekinding_tenv = foldl' add_free_tv emptyTvSubstEnv free_tvs
+    tenv_plus_rekinding = foldl' add_free_tv tenv_orig free_tvs
+    tenv_new = mapVarEnv (subst_tenv tenv_plus_rekinding) tenv_orig
+
     add_free_tv :: TvSubstEnv -> TyVar -> TvSubstEnv
-    add_free_tv rke tv
-      | isTyVar tv, anyFreeVarsOfType in_domain (varType tv)
-      , let tv' = updateTyVarKind (substTy tenv_subst) tv
-      = extendVarEnv rke tv (mkTyVarTy tv')
+    add_free_tv so_far tv
+      | isTyVar tv
+      , let kind = tyVarKind tv
+      , anyShallowFreeVarsOfType (`elemVarEnv` so_far) kind
+        -- Shallow free vars because substitution is shallow
+      = extendVarEnv so_far tv $ mkTyVarTy $
+        setTyVarKind tv $ subst_tenv so_far kind
       | otherwise
-      = rke
+      = so_far
 
-    rekinding_subst = mkTvSubst in_scope rekinding_tenv
+    subst_tenv :: TvSubstEnv -> Type -> Type
+    subst_tenv tenv = substTy (mkTvSubst in_scope tenv)
 
-    subst = mkTvSubst in_scope (rekinding_tenv `plusVarEnv`
-                                mapVarEnv (substTy rekinding_subst) tenv)
-
-{-
-    subst = foldl' add_free_tv tenv_subst free_tvs
-
-    add_free_tv :: Subst -> TyVar -> Subst
-    add_free_tv subst tv
-      | isTyVar tv = extendTvSubst subst tv (mkTyVarTy tv')
-      | otherwise  = subst  -- Ignore free coercion variables
-     where
-        tv' = updateTyVarKind (substTy subst) tv
--}
--}
 
 {-
 ************************************************************************
