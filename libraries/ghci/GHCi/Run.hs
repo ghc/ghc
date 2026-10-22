@@ -8,9 +8,7 @@
 -- For details on Remote GHCi, see Note [Remote GHCi] in
 -- compiler/GHC/Runtime/Interpreter.hs.
 --
-module GHCi.Run
-  ( run, redirectInterrupts
-  ) where
+module GHCi.Run ( run ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
 
@@ -127,14 +125,19 @@ run m = case m of
   Seq ref -> doSeq ref
   ResumeSeq ref -> resumeSeq ref
 
-  WaitThreadResult tid -> localRef tid >>= atomically . readThreadEvalStatus
-  WaitAnyThreadBreak   -> atomically $ readAnyThreadEvalBreak
+  WaitThreadResult t -> do
+    tid <- localRef t
+    redirectInterrupts tid $
+      atomically (readThreadEvalStatus tid)
+  WaitAnyThreadBreak -> do
+    atomically $ readAnyThreadEvalBreak
   WaitThreadResultOrAnyThreadBreak t -> do
     tid <- localRef t
-    atomically $
-      readThreadEvalStatus tid
-        `orElse`
-      (EvalPaused <$> readAnyThreadEvalBreak)
+    redirectInterrupts tid $
+      atomically $
+        readThreadEvalStatus tid
+          `orElse`
+        (EvalPaused <$> readAnyThreadEvalBreak)
 
   Shutdown            -> unexpectedMessage m
   RunTH {}            -> unexpectedMessage m
@@ -438,18 +441,17 @@ setBreakAction opts tid@(ThreadId tid#) = do
 
     runIf#   pred what     = when (pred opts) (what tid#)
 
--- While we're waiting for the sandbox thread to return a result, if
+-- | While we're waiting for the target thread to return a result, if
 -- the current thread receives an asynchronous exception we re-throw
--- it at the sandbox thread and continue to wait.
+-- it at the target thread and continue to wait.
 --
--- This is for two reasons:
---
---  * So that ^C interrupts runStmt (e.g. in GHCi), allowing the
---    computation to run its exception handlers before returning the
---    exception result to the caller of runStmt.
+--  * So that ^C interrupts runStmt (e.g. in GHCi/internal interpreter),
+--  allowing the computation to run its exception handlers before returning the
+--  exception result to the caller of runStmt.
 --
 --  * clients of the GHC API can terminate a runStmt in progress
 --    without knowing the ThreadId of the sandbox thread (#1381)
+--    (e.g. @evalStmt >>= waitThreadResult@)
 --
 -- NB. use a weak pointer to the thread, so that the thread can still
 -- be considered deadlocked by the RTS and sent a BlockedIndefinitely
