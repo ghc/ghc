@@ -757,3 +757,5 @@ test('T27618',
      [req_target_smp, omit_ghci],
      compile_and_run, ['-O2 -threaded -with-rtsopts "-N4 -A32k"'])
 
+
+test('T28012', normal, compile_and_run, [''])

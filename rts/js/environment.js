@@ -389,6 +389,13 @@ function h$performMajorGC() {
     if(err) throw err;
 }
 
+function h$performGC() {
+    h$performMajorGC();
+}
+
+function h$performBlockingMajorGC() {
+    h$performMajorGC();
+}
 
 function h$ghczminternalZCSystemziCPUTimeZCgetrusage() {
   return 0;

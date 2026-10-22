@@ -1,0 +1,4 @@
+section: js-backend
+synopsis: The JavaScript RTS now implements ``performMinorGC`` and ``performBlockingMajorGC``; calling them used to throw a JavaScript ``ReferenceError``.
+issues: #28012
+mrs: !16847

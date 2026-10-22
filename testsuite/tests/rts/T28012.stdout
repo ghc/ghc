@@ -1,0 +1,4 @@
+performGC ok
+performMinorGC ok
+performMajorGC ok
+performBlockingMajorGC ok
