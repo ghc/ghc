@@ -12,8 +12,14 @@ test('T27287', [just_ghci, combined_output], makefile_test, [])
 
 test('T3171',
      [when(opsys('mingw32'),skip),
-      fragile(15383),
       req_interp,
+      combined_output],
+     makefile_test, [])
+
+test('T3171ext',
+     [when(opsys('mingw32'),skip),
+      req_interp,
+      unless(config.have_ext_interp, skip),
       combined_output],
      makefile_test, [])
 
