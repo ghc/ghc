@@ -156,7 +156,7 @@ Unit instantiation / on-the-fly instantiation
 ---------------------------------------------
 
 Indefinite units can be instantiated with modules from other units. The
-instantiating units can also be instantiated themselves (if there are
+instantiating units can also be instantiated themselves (if they are
 indefinite) and so on.
 
 On-the-fly unit instantiation is a tricky optimization explained in
@@ -253,7 +253,7 @@ module/name variables]). E.g.
                                  , ...
                                  }
 
-Note that non-instantiated units are also stored as an instantiation of
+Note that definite units are also stored as an instantiation of
 themselves.  It is a reminiscence of previous terminology (when "instanceOf" was
 "componentId"). E.g.
 

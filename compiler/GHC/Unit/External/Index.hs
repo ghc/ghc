@@ -1,14 +1,14 @@
--- | The 'UnitIndex' is a 'UnitEnv' wide data structure that shares
--- external unit information across the 'UnitState' of all home units
--- (e.g., 'HomeUnitEnv') in a particular 'UnitEnv'.
+-- | The 'UnitIndex' is a 'UnitEnv'-wide data structure that shares
+-- external unit information across the 'UnitState's of all home units
+-- (e.g., 'HomeUnitEnv's) in a particular 'UnitEnv'.
 --
 -- It caches already read unit databases, all processed 'UnitInfo's and
 -- the 'WireMap'.
 --
 -- This module is meant to be imported as @Index@.
 --
--- A short overview of how the different types here related to 'UnitState', 'UnitEnv'
--- and the 'HomeUnitEnv'.
+-- A short overview of how the different types here relate to 'UnitState', 'UnitEnv'
+-- and 'HomeUnitEnv'.
 --
 -- ┌─────────┐
 -- │ UnitEnv │

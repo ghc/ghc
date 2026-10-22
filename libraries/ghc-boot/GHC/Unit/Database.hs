@@ -109,7 +109,8 @@ import qualified System.File.OsPath as FileIO
 -- | @ghc-boot@'s UnitInfo, serialized to the database.
 type DbUnitInfo      = GenericUnitInfo BS.ByteString BS.ByteString BS.ByteString BS.ByteString DbModule
 
--- | Information about an unit (a unit is an installed module library).
+-- | Information about a unit. (For the definition of “unit” see the
+-- documentation of "GHC.Unit".)
 --
 -- This is a subset of Cabal's 'InstalledPackageInfo', with just the bits
 -- that GHC is interested in.
@@ -135,8 +136,8 @@ data GenericUnitInfo srcpkgid srcpkgname uid modulename mod = GenericUnitInfo
    , unitPackageId      :: srcpkgid
       -- ^ Source package identifier.
       --
-      -- Cabal instantiates this with Distribution.Types.PackageId.PackageId
-      -- type which only contains the source package name and version. Notice
+      -- Cabal uses the 'Distribution.Types.PackageId.PackageId' type for this,
+      -- which only covers the source package name and version. Notice
       -- that it doesn't contain the Hackage revision, nor any kind of hash.
 
    , unitPackageName    :: srcpkgname
@@ -176,21 +177,21 @@ data GenericUnitInfo srcpkgid srcpkgname uid modulename mod = GenericUnitInfo
 
    , unitExtDepLibsSys  :: [ST.ShortText]
       -- ^ Names of the external system libraries that this unit depends on. See
-      -- also `unitExtDepLibsGhc` field.
+      -- also the `unitExtDepLibsGhc` field.
       --
    , unitExtDepLibsStaticSys  :: [ST.ShortText]
       -- ^ Names of the external static system libraries that this unit depends on. See
-      -- also `unitExtDepLibsGhc` field.
+      -- also the `unitExtDepLibsGhc` field.
 
    , unitExtDepLibsGhc  :: [ST.ShortText]
       -- ^ Because of slight differences between the GHC dynamic linker (in
       -- GHC.Runtime.Linker) and the
       -- native system linker, some packages have to link with a different list
-      -- of libraries when using GHC's. Examples include: libs that are actually
-      -- gnu ld scripts, and the possibility that the .a libs do not exactly
+      -- of libraries when using GHC's. Examples include libs that are actually
+      -- gnu ld scripts and .a libs that do not exactly
       -- match the .so/.dll equivalents.
       --
-      -- If this field is set, then we use that instead of the
+      -- If this field is set, then we use it instead of the
       -- `unitExtDepLibsSys` field.
 
    , unitLibraryDirs    :: [FilePathST]
@@ -261,7 +262,7 @@ data GenericUnitInfo srcpkgid srcpkgname uid modulename mod = GenericUnitInfo
 
    , unitIsExposed      :: Bool
       -- ^ True if the unit is exposed. A unit could be installed in a database
-      -- by "disabled" by not being exposed.
+      -- but marked "disabled" and thus not be exposed.
 
    , unitIsTrusted      :: Bool
       -- ^ True if the unit is trusted (cf Safe Haskell)
