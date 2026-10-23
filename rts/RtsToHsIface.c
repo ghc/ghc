@@ -38,8 +38,8 @@
  * explicit.
  *
  * Note that the init_ghc_hs_iface symbol is explicitly included in the final
- * binary via the linker flag `-uinit_ghc_hs_iface`, when an executable is
- * linked against ghc-internal by GHC.
+ * binary via the linker flag `-uinit_ghc_hs_iface`, which we put
+ * in the rts package's ld-options.
  *
  * `-uinit_ghc_hs_iface` ensures that the `init_ghc_hs_iface` symbol is
  * included in the final link, even when we link against `ghc-internal.a`

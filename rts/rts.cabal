@@ -351,6 +351,13 @@ library
                         stg/Ticky.h
                         stg/Types.h
 
+      -- The RTS calls init_ghc_hs_iface, which is defined in ghc-internal: see
+      -- Note [RTS/ghc-internal interface] in RtsToHsIface.c.
+      if flag(leading-underscore)
+        ld-options: -Wl,-u,_init_ghc_hs_iface
+      else
+        ld-options: -Wl,-u,init_ghc_hs_iface
+
       if os(osx)
         ld-options: "-Wl,-search_paths_first"
         if !arch(x86_64) && !arch(aarch64)
