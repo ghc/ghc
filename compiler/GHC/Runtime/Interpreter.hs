@@ -11,9 +11,14 @@ module GHC.Runtime.Interpreter
   , evalStmt, EvalStatus_(..), EvalStatus, EvalResult(..), EvalExpr(..)
   , resumeStmt
   , abandonStmt
+
+  , evalStmtAsync
+  , resumeStmtAsync
   , waitThreadResult
   , waitAnyThreadBreak
   , waitThreadResultOrAnyThreadBreak
+  , redirectInterrupts
+
   , evalIO
   , evalString
   , evalStringToIOString
@@ -278,8 +283,35 @@ evalStmt
   :: Interp
   -> EvalOpts
   -> EvalExpr ForeignHValue
+  -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
+evalStmt i o e = do
+  t <- evalStmtAsync i o e
+  redirectInterrupts i t $
+    waitThreadResult i t
+
+resumeStmt
+  :: Interp
+  -> EvalOpts
+  -> ForeignRef ThreadId
+  -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
+resumeStmt i o t = do
+  resumeStmtAsync i o t
+  redirectInterrupts i t $
+    waitThreadResult i t
+
+abandonStmt :: Interp -> ForeignRef ThreadId -> IO ()
+abandonStmt interp resume_tid =
+  withForeignRef resume_tid $ \rhv ->
+    interpCmd interp (AbandonStmt rhv)
+
+-- | 'evalStmt' but don't wait on the result synchronously. The remote thread
+-- can be awaited on using e.g. 'waitThreadResult'
+evalStmtAsync
+  :: Interp
+  -> EvalOpts
+  -> EvalExpr ForeignHValue
   -> IO (ForeignRef ThreadId)
-evalStmt interp opts foreign_expr = do
+evalStmtAsync interp opts foreign_expr = do
   r <- withExpr foreign_expr $ \expr ->
     interpCmd interp (EvalStmt opts expr)
   mkFinalizedHValue interp r
@@ -292,20 +324,17 @@ evalStmt interp opts foreign_expr = do
     withExpr fr $ \fr' ->
     cont (EvalApp fl' fr')
 
-resumeStmt
+resumeStmtAsync
   :: Interp
   -> EvalOpts
   -> ForeignRef ThreadId
   -> IO ()
-resumeStmt interp opts resume_tid = do
+resumeStmtAsync interp opts resume_tid = do
   withForeignRef resume_tid $ \rhv ->
     interpCmd interp (ResumeStmt opts rhv)
 
-abandonStmt :: Interp -> ForeignRef ThreadId -> IO ()
-abandonStmt interp resume_tid =
-  withForeignRef resume_tid $ \rhv ->
-    interpCmd interp (AbandonStmt rhv)
-
+-- | If asynchronous exceptions should be thrown to the thread we're waiting
+-- for, don't forget to wrap this in @'redirectInterrupts' interp rtid@
 waitThreadResult
   :: Interp
   -> ForeignRef ThreadId
@@ -315,9 +344,11 @@ waitThreadResult interp tid = do
     interpCmd interp (WaitThreadResult rhv)
   handleEvalStatus interp status
 
+-- | See 'readAnyThreadEvalBreak' and 'ThreadBreaksIsolationMode'
 waitAnyThreadBreak :: Interp -> IO EvalBreak
 waitAnyThreadBreak interp = interpCmd interp WaitAnyThreadBreak
 
+-- | Essentially, @'waitThreadResult' `orElse` 'waitAnyThreadBreak'@.
 waitThreadResultOrAnyThreadBreak
   :: Interp
   -> ForeignRef ThreadId
@@ -479,6 +510,26 @@ handleSeqHValueStatus interp unit_env logger eval_status =
         handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
     (EvalComplete _ r) -> return r
 
+-- | While we're waiting for the target thread to return a result, if the
+-- current thread receives an asynchronous exception we re-throw it at the
+-- target thread and continue to wait.
+--
+--  * So that ^C interrupts runStmt (e.g. in GHCi/internal interpreter),
+--  allowing the computation to run its exception handlers before returning the
+--  exception result to the caller of runStmt.
+--
+--  * clients of the GHC API can terminate a runStmt in progress
+--    without knowing the ThreadId of the sandbox thread (#1381)
+--    (e.g. @evalStmt >>= waitThreadResult@)
+--
+-- This may also be used in other contexts where an async exception should be
+-- redirected to a given (possibly remote) thread.
+redirectInterrupts :: Interp -> ForeignRef ThreadId -> IO a -> IO a
+redirectInterrupts interp thread wait =
+  wait `catch` \e -> do
+    withForeignRef thread $ \rtid ->
+      interpCmd interp (ThrowTo rtid (toSerializableException (e :: SomeException)))
+    wait
 
 -- -----------------------------------------------------------------------------
 -- Interface to the object-code linker

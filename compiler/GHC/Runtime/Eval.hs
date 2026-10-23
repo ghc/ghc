@@ -234,14 +234,14 @@ execStmt' stmt stmt_text ExecOptions{..} = do
 
         let eval_opts = initEvalOpts idflags' (enableGhcStepMode execSingleStep)
                           (enableIsolateThreadBreaks execIsolateMode)
-        rtid <- liftIO $ evalStmt interp eval_opts (execWrap hval)
+        rtid <- liftIO $ evalStmtAsync interp eval_opts (execWrap hval)
 
         let ic = hsc_IC hsc_env
             bindings = (ic_tythings ic, ic_gre_cache ic)
 
             size = ghciHistSize idflags'
         pure $ do
-          status <- liftIO (waitThreadResult interp rtid)
+          status <- liftIO (redirectInterrupts interp rtid $ waitThreadResult interp rtid)
           handleRunStatus execSingleStep eval_opts stmt_text bindings ids
                           status (emptyHistory size)
 
@@ -403,7 +403,6 @@ handleRunStatus step eval_opts expr bindings final_ids status history0 = do
         -- resume with the same step type
         status <- liftIO $ do
           GHCi.resumeStmt interp eval_opts resume_tid_fhv
-          GHCi.waitThreadResult interp resume_tid_fhv
         history <- if not tracing then pure history0 else do
           history1 <- liftIO $ mkHistory hug apStack_fhv ibi
           let !history' = history1 `consBL` history0
@@ -461,9 +460,9 @@ resumeExec step isolateMode mbCnt r = do
 
           let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
                             (enableIsolateThreadBreaks isolateMode)
-          liftIO $ GHCi.resumeStmt interp eval_opts rtid
+          liftIO $ GHCi.resumeStmtAsync interp eval_opts rtid
           pure $ do
-            status <- liftIO $ GHCi.waitThreadResult interp rtid
+            status <- liftIO $ redirectInterrupts interp rtid $ GHCi.waitThreadResult interp rtid
             let prevHistoryLst = fromListBL 50 hist
                 hug = hsc_HUG hsc_env
                 hist' = case mb_brkpt of
@@ -1285,8 +1284,7 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   updateFixityEnv fix_env
   let eval_opts = initEvalOpts dflags EvalStepNone True
   status <- liftIO $ do
-    rtid <- evalStmt interp eval_opts (EvalThis hvals_io)
-    waitThreadResult interp rtid
+    evalStmt interp eval_opts (EvalThis hvals_io)
   case status of
     EvalComplete _ (EvalSuccess [hval]) -> return hval
     EvalComplete _ (EvalException e) ->
