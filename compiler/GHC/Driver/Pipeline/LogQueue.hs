@@ -15,7 +15,6 @@ module GHC.Driver.Pipeline.LogQueue ( LogQueue(..)
 
 import GHC.Prelude
 import Control.Concurrent
-import Data.IORef
 import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Utils.Logger
@@ -26,34 +25,35 @@ import Control.Monad
 -- LogQueue Abstraction
 
 -- | Each module is given a unique 'LogQueue' to redirect compilation messages
--- to. A 'Nothing' value contains the result of compilation, and denotes the
--- end of the message queue.
+-- to.
+--
+-- Log queues are printed one at a time, in order, so that the output of
+-- different modules does not interleave. The messages of the current queue are
+-- printed as they arrive, and the next queue is only started once the current
+-- one is /finished/ (with 'finishLogQueue'), i.e. once its module is done
+-- logging.
 data LogQueue = LogQueue { logQueueId :: !Int
-                         , logQueueMessages :: !(IORef [Maybe (MessageClass, SrcSpan, SDoc, LogFlags)])
-                         , logQueueSemaphore :: !(MVar ())
+                         , logQueueMessages :: !(TQueue (MessageClass, SrcSpan, SDoc, LogFlags))
+                           -- ^ messages not yet printed, in chronological order
+                         , logQueueFinished :: !(TVar Bool)
+                           -- ^ whether the queue is finished
                          }
 
 newLogQueue :: Int -> IO LogQueue
-newLogQueue n = do
-  mqueue <- newIORef []
-  sem <- newMVar ()
-  return (LogQueue n mqueue sem)
+newLogQueue n = LogQueue n <$> newTQueueIO <*> newTVarIO False
 
+-- | Finish the log queue: messages written afterwards are not recorded.
 finishLogQueue :: LogQueue -> IO ()
-finishLogQueue lq = do
-  writeLogQueueInternal lq Nothing
-
+finishLogQueue lq = atomically $ writeTVar (logQueueFinished lq) True
 
 writeLogQueue :: LogQueue -> (MessageClass,SrcSpan,SDoc, LogFlags) -> IO ()
-writeLogQueue lq msg = do
-  writeLogQueueInternal lq (Just msg)
-
--- | Internal helper for writing log messages
-writeLogQueueInternal :: LogQueue -> Maybe (MessageClass,SrcSpan,SDoc, LogFlags) -> IO ()
-writeLogQueueInternal (LogQueue _n ref sem) msg = do
-    atomicModifyIORef' ref $ \msgs -> (msg:msgs,())
-    _ <- tryPutMVar sem ()
-    return ()
+writeLogQueue (LogQueue _n msgs finished) msg = atomically $ do
+  is_finished <- readTVar finished
+  -- TODO: messages written after the queue has been finished are dropped.
+  -- This can happen when a thunk that captured the logger is forced later,
+  -- e.g. lazy interface typechecking ('GHC.Tc.Utils.Monad.forkM') logging
+  -- with -ddump-if-trace.
+  unless is_finished $ writeTQueue msgs msg
 
 -- The log_action callback that is used to synchronize messages from a
 -- worker thread.
@@ -62,20 +62,21 @@ parLogAction log_queue log_flags !msgClass !srcSpan !msg =
     writeLogQueue log_queue (msgClass,srcSpan,msg, log_flags)
 
 -- Print each message from the log_queue using the global logger
+--
+-- Returns once the queue has been finished and all of its messages printed.
 printLogs :: Logger -> LogQueue -> IO ()
-printLogs !logger (LogQueue _n ref sem) = read_msgs
-  where read_msgs = do
-            takeMVar sem
-            msgs <- atomicModifyIORef' ref $ \xs -> ([], reverse xs)
-            print_loop msgs
-
-        print_loop [] = read_msgs
-        print_loop (x:xs) = case x of
-            Just (msgClass,srcSpan,msg,flags) -> do
-                logMsg (setLogFlags logger flags) msgClass srcSpan msg
-                print_loop xs
-            -- Exit the loop once we encounter the end marker.
-            Nothing -> return ()
+printLogs !logger (LogQueue _n msgs_var finished_var) = loop
+  where
+    loop = do
+      (msgs, finished) <- atomically $ do
+        msgs <- flushTQueue msgs_var
+        finished <- readTVar finished_var
+        -- Wait until there is something to print, or the queue is finished.
+        when (null msgs && not finished) retry
+        return (msgs, finished)
+      forM_ msgs $ \ (msgClass, srcSpan, msg, flags) ->
+        logMsg (setLogFlags logger flags) msgClass srcSpan msg
+      unless finished loop
 
 -- The LogQueueQueue abstraction
 
