@@ -66,13 +66,13 @@ servWithCustom
   -> IO ()
 servWithCustom verbose hook pipe restore customHandler = do
   ref <- newIORef False
-  withThreadManager $ \mngr ->
+  withThreadManager $ \mngr -> do
     loop ref mngr `finally` closePipe pipe
  where
   loop doneRef mngr = do
     when verbose $ trace "reading pipe..."
 
-    handleRemoteCall pipe hook $ \wr (msg :: Message a) ->
+    handleRemoteCall pipe hook $ \wr setCancel (msg :: Message a) ->
 
       discardCtrlC                                 %>>= \_ ->
       when verbose (trace ("msg: " ++ (show msg))) %>>= \_ ->
@@ -82,9 +82,11 @@ servWithCustom verbose hook pipe restore customHandler = do
         Shutdown                  -> writeIORef doneRef True >>
                                      reply ()                 %>>= writeReply wr
         RunTH ii st q ty loc      -> spawnFinally mngr         (runWriteReply wr)
-                                     (wrapRunTH ii (runTH pipe ii st q ty loc))
+                                     (restore $ wrapRunTH ii (runTH pipe ii st q ty loc))
+                                     (setCancel . void . forkIO . killThread)
         RunModFinalizers ii st qs -> spawnFinally mngr         (runWriteReply wr)
-                                     (wrapRunTH ii (runModFinalizerRefs pipe ii st qs))
+                                     (restore $ wrapRunTH ii (runModFinalizerRefs pipe ii st qs))
+                                     (setCancel . void . forkIO . killThread)
         _other                    -> run msg >>= reply        %>>= writeReply wr
 
     isDone <- readIORef doneRef
