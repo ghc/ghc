@@ -64,7 +64,7 @@ sendTHComputation i msg reqHandler = mask $ \restore -> do
   where
     proc = instProcess i
     handleOne mbox doneRef = do
-      handleRemoteTHCall (interpPipe proc) mbox $ \req -> do
+      handleRemoteTHCall (interpPipe proc) mbox $ \_setCancel req -> do
         (stop, res) <- reqHandler req
         writeIORef doneRef stop
         return res
