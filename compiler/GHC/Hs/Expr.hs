@@ -652,7 +652,7 @@ tupArgsPresent_maybe = traverse tupArgPresent_maybe
 *                                                                      *
 ********************************************************************* -}
 
-type instance XXExpr GhcPs = DataConCantHappen
+type instance XXExpr GhcPs = XXExprGhcPs
 type instance XXExpr GhcRn = XXExprGhcRn
 type instance XXExpr GhcTc = XXExprGhcTc
 -- XXExprGhcRn: see Note [Rebindable syntax and XXExprGhcRn] below
@@ -664,6 +664,10 @@ type instance XXExpr GhcTc = XXExprGhcTc
       See Note [Handling overloaded and rebindable constructs]
 *                                                                      *
 ********************************************************************* -}
+
+data XXExprGhcPs
+  = ReSynBinds HsModuleName (HsExpr GhcPs)
+
 
 -- See Note [Rebindable syntax and XXExprGhcRn]
 -- See Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
@@ -680,6 +684,7 @@ data XXExprGhcRn
   | HsRecSelRn  (FieldOcc GhcRn)   -- ^ Variable pointing to record selector
                            -- See Note [Non-overloaded record field selectors] and
                            -- Note [Record selectors in the AST]
+
 
 data XXExprGhcTc
   = WrapExpr        -- Type and evidence application and abstractions
@@ -1029,9 +1034,12 @@ ppr_expr (HsFunArr _ arr arg res)
   = sep [ppr_lexpr arg, pprHsModifiedFunArr arr <+> ppr_lexpr res]
 
 ppr_expr (XExpr x) = case ghcPass @p of
+  GhcPs -> ppr x
   GhcRn -> ppr x
   GhcTc -> ppr x
 
+instance Outputable XXExprGhcPs where
+  ppr (ReSynBinds m e) = text "{{" <+> ppr m <+> text "}}" <+> ppr e
 
 ppr_hse :: forall p. (IsPass p) => HsExpansion (GhcPass p) -> SDoc
 ppr_hse hse
@@ -1088,9 +1096,13 @@ ppr_infix_expr (HsHole x) = Just $ pprInfixOcc $ case (ghcPass @p, x) of
   (GhcTc, (HoleVar (L _ v), _)) -> v
   _ -> unnamedHoleRdrName -- TODO: this is the HoleError case; this should print the source text instead of "_".
 ppr_infix_expr (XExpr x)            = case ghcPass @p of
+                                        GhcPs -> ppr_infix_expr_ps x
                                         GhcRn -> ppr_infix_expr_rn x
                                         GhcTc -> ppr_infix_expr_tc x
 ppr_infix_expr _ = Nothing
+
+ppr_infix_expr_ps :: XXExprGhcPs -> Maybe SDoc
+ppr_infix_expr_ps (ReSynBinds{}) = Nothing
 
 ppr_infix_expr_rn :: XXExprGhcRn -> Maybe SDoc
 ppr_infix_expr_rn (ExpandedThingRn (HSE thing _)) = ppr_infix_hs_expansion thing
@@ -1182,8 +1194,12 @@ hsExprNeedsParens prec = go
     go (HsQual{})                     = prec >= funPrec
     go (HsFunArr{})                   = prec >= funPrec
     go (XExpr x) = case ghcPass @p of
+                     GhcPs -> go_x_ps x
                      GhcTc -> go_x_tc x
                      GhcRn -> go_x_rn x
+
+    go_x_ps :: XXExprGhcPs -> Bool
+    go_x_ps (ReSynBinds _ e) = hsExprNeedsParens prec e
 
     go_x_tc :: XXExprGhcTc -> Bool
     go_x_tc (WrapExpr _ e)                   = hsExprNeedsParens prec e

@@ -904,6 +904,8 @@ data Exp
   | ForallE [TyVarBndr Specificity] Exp -- ^ @forall \<vars\>. \<expr\>@
   | ForallVisE [TyVarBndr ()] Exp      -- ^ @forall \<vars\> -> \<expr\>@
   | ConstrainedE [Exp] Exp             -- ^ @\<ctxt\> => \<expr\>@
+  | ReSynBindsE ModName Exp            -- Remember to use bindings from the specified modname
+                                       -- while typechecking a typed splice for rebindable syntax
   deriving( Show, Eq, Ord, Generic )
 
 -- | A (field name, expression) pair. See 'RecConE' and 'RecUpdE'.

@@ -1228,6 +1228,8 @@ cvtl e = wrapLA (cvt e)
          ; let tele = setTelescopeBndrsNameSpace varName $
                       mkHsForAllVisTele noAnn tvs'
          ; return $ HsForAll noExtField tele body' }
+    cvt (ReSynBindsE m e) = do { e' <- cvt e
+                              ; return $ XExpr (ReSynBinds (mk_modtext m) e') }
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
 Consider this example:
