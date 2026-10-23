@@ -35,7 +35,8 @@ import Control.Concurrent.STM
 sendMessage :: Binary a => ExtInterpInstance d -> Message a -> IO a
 sendMessage i msg =
   remoteCall (interpPipe proc) msg
-    `catchException` \(e :: SomeException) -> handleInterpProcessFailure proc e
+    -- `catchException` \(e :: SomeException) ->
+    --   handleInterpProcessFailure proc e
   where
     proc = instProcess i
 
@@ -78,17 +79,17 @@ sendTHComputation i msg reqHandler = mask $ \restore -> do
                       else loop
        in loop
 
-handleInterpProcessFailure :: InterpProcess -> SomeException -> IO a
-handleInterpProcessFailure i e = do
-  let hdl = interpHandle i
-  ex <- getProcessExitCode hdl
-  case ex of
-    Just (ExitFailure n) ->
-      throwIO (InstallationError ("External interpreter terminated (" ++ show n ++ ")"))
-    _ -> do
-      terminateProcess hdl
-      _ <- waitForProcess hdl
-      throw e
+-- handleInterpProcessFailure :: InterpProcess -> SomeException -> IO a
+-- handleInterpProcessFailure i e = do
+--   let hdl = interpHandle i
+--   ex <- getProcessExitCode hdl
+--   case ex of
+--     Just (ExitFailure n) ->
+--       throwIO (InstallationError ("External interpreter terminated (" ++ show n ++ ")"))
+--     _ -> do
+--       terminateProcess hdl
+--       _ <- waitForProcess hdl
+--       throw e
 
 data CancelTHHandler = CancelTHHandler deriving Show
 instance Exception CancelTHHandler where
