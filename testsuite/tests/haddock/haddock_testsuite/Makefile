@@ -84,3 +84,12 @@ haddockForeignTest:
 .PHONY: T26114
 T26114:
 	'$(HADDOCK)' T26114.hs
+
+# Check that `haddock --incremental` looks for the module in the
+# unit given by `-this-unit-id`.
+.PHONY: haddockIncrementalUnitId
+haddockIncrementalUnitId:
+	rm -f IncrementalUnitId.hi IncrementalUnitId.o IncrementalUnitId.haddock IncrementalUnitId2.haddock
+	'$(TEST_HC)' -c -haddock -fwrite-interface -this-unit-id mypkg-1.0 IncrementalUnitId.hs
+	@echo "== haddock finds the module in the unit given by -this-unit-id =="
+	'$(HADDOCK)' --incremental=IncrementalUnitId --optghc=-this-unit-id=mypkg-1.0 --dump-interface=IncrementalUnitId.haddock

@@ -1,3 +1,10 @@
+## Changes in next
+
+ * Allow the `--incremental` flag for modules in other units than main.
+   In the initial implementation, the argument to incremental could only
+   be the name of a module in the main unit. Now this can be changed by
+   specifying `--optghc=-this-unit-id=my-unit-id` when invoking haddock.
+
 ## Changes in 2.32.0
  * Add highlighting for inline-code-blocks (sections enclosed in @'s)
 
