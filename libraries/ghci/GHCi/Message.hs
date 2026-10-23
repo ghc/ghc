@@ -75,6 +75,7 @@ import GHC.Stack.CCS
 import qualified GHC.Boot.TH.Syntax        as TH
 import qualified GHC.Boot.TH.Monad         as TH
 import GHCi.Message.Async
+import Control.Monad.STM
 
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server
@@ -666,12 +667,12 @@ remoteCall pipe msg = either throwIO (pure . runGet get)
 -- | Handle a single 'Message' request on the interpreter and reply to the host
 handleRemoteCall :: Pipe
                  -> (Msg -> IO Msg) {-^ Msg hook -}
-                 -> (forall a. (Show a, Binary a) => WriteReply a %1 -> Message a -> IO r)
+                 -> (forall a. (Show a, Binary a) => WriteReply a %1 -> (IO () -> IO ()) -> Message a -> IO r)
                  -> IO r
 handleRemoteCall pipe hook k =
-  handleAsyncReq pipe getMessage Nothing \(WriteReply writer) msg0 -> IO \s0 ->
+  handleAsyncReq pipe getMessage Nothing \(WriteReply writer) sa msg0 -> IO \s0 ->
     case hook msg0 |#> s0 of -- unIO for linearity checking
-      (# s1, Msg msg #) -> k (WriteReply \x -> writer (fmap put x)) msg |#> s1
+      (# s1, Msg msg #) -> k (WriteReply \x -> writer (fmap put x)) sa msg |#> s1
 
 -- | Send a 'THMessage' request to the host and wait for a reply from the host
 -- to the interpreter.
@@ -687,9 +688,9 @@ remoteTHCall pipe ii msg = either throwIO (pure . runGet get)
 -- Symmterically to 'remoteTHCall', we always want to specify the 'InboxId' for
 -- RunTH "reverse requests"
 handleRemoteTHCall
-  :: Pipe -> InboxId -> (forall a. (Show a, Binary a) => THMessage a -> IO a) -> IO ()
+  :: Pipe -> InboxId -> (forall a. (Show a, Binary a) => (IO () -> IO ()) -> THMessage a -> IO a) -> IO ()
 handleRemoteTHCall pipe ii k =
-  handleAsyncReq pipe getTHMessage (Just ii) \writer (THMsg msg) -> IO \s0 ->
-    case k msg |#> s0 of -- unIO for linearity checking
+  handleAsyncReq pipe getTHMessage (Just ii) \writer sa (THMsg msg) -> IO \s0 ->
+    case k sa msg |#> s0 of -- unIO for linearity checking
       (# s1, a #) -> writeReply writer (put a) |#> s1
 
