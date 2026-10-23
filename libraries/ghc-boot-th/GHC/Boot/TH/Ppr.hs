@@ -56,6 +56,9 @@ instance Ppr a => Ppr [a] where
 instance Ppr Name where
     ppr v = pprName v
 
+instance Ppr ModName where
+    ppr (ModName s) = text s
+
 ------------------------------
 instance Ppr Info where
     ppr (TyConI d)     = ppr d
@@ -250,6 +253,7 @@ pprExp i (ForallE tvars body) =
   parensIf (i >= funPrec) $ sep [pprForall tvars [], pprExp qualPrec body]
 pprExp i (ConstrainedE ctx body) =
   parensIf (i >= funPrec) $ sep [pprCtxWith pprExp ctx, pprExp qualPrec body]
+pprExp i (ReSynBindsE m e) = text "{{" <+> ppr m <+> text "}}" <+> pprExp i e
 
 pprFields :: [(Name,Exp)] -> Doc
 pprFields = sep . punctuate comma . map (\(s,e) -> pprName' Applied s <+> equals <+> ppr e)
