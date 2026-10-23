@@ -193,6 +193,12 @@ test('T7653', [when(opsys('mingw32'), skip),
                omit_ways(prof_ways + ghci_ways)], compile_and_run, [''])
 test('T7787', normal, compile_and_run, [''])
 
+# Before the fix for #9809 this needed more than 256MB of heap.
+test('T9809', [req_ghc_smp,
+               req_target_smp,
+               only_ways(['threaded1', 'threaded2', 'nonmoving_thr'])],
+               compile_and_run, ['-threaded -with-rtsopts="-N2 -M128m"'])
+
 test('topHandler01', [when(opsys('mingw32'), skip), js_broken(22261), req_process], compile_and_run, [''])
 test('topHandler02',
      [when(opsys('mingw32'), skip),
