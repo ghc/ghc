@@ -41,8 +41,8 @@ withThreadManager k = do
 
 -- | Linear and resource-safe because 'ThreadManager' is guaranteed to wait or
 -- cancel all threads.
-spawnFinally :: ThreadManager -> (Either SomeException a -> IO ()) %1 -> IO a -> IO ()
-spawnFinally ThreadManager{..} = unsafe_linear \fin -> \action -> void $
+spawnFinally :: ThreadManager -> (Either SomeException a -> IO ()) %1 -> IO a -> (ThreadId -> IO b) -> IO b
+spawnFinally ThreadManager{..} = unsafe_linear \fin -> \action -> \k ->
   forkFinally
     ( mask $ \unmask -> do
         tid <- myThreadId
@@ -57,6 +57,7 @@ spawnFinally ThreadManager{..} = unsafe_linear \fin -> \action -> void $
           else throwIO ThreadKilled
     )
     ( \ea -> fin ea )
+    >>= k
 
 unsafe_linear :: (a -> b) %1 -> (a %1 -> b)
 unsafe_linear = Unsafe.unsafeCoerce (Unsafe.unsafeCoerce :: (a -> b) -> (a %1 -> b))
