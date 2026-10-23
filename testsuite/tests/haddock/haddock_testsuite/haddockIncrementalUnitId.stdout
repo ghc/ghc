@@ -1,0 +1,3 @@
+== haddock finds the module in the unit given by -this-unit-id ==
+Warning: IncrementalUnitId: could not find link destinations for: 
+	- GHC.Internal.Types.Int

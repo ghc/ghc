@@ -47,7 +47,6 @@ import Debug.Trace (traceMarkerIO)
 import System.Exit (exitFailure ) -- TODO use Haddock's die
 import Text.Printf
 import GHC hiding (verbosity, SuccessFlag(..))
-import GHC.Builtin.Modules (mkMainModule_)
 import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.Graph.Directed
@@ -76,6 +75,7 @@ import GHC.Unit.Module.Graph (ModuleGraphNode (..), ModuleNodeInfo(..))
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface (mi_semantic_module, mi_boot)
 import GHC.Unit.Module.ModSummary (isBootSummary)
+import GHC.Unit.Types (stringToUnit, unitIdString)
 import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName, text)
 import GHC.Utils.Error (withTiming)
 import GHC.Utils.Monad (mapMaybeM)
@@ -369,12 +369,14 @@ createOneShotIface verbosity flags instIfaceMap moduleNameStr = do
 
   out verbosity verbose $ "Checking interface " ++ moduleNameStr ++ "..."
 
-  -- Turn on GHC's one-shot mode
+  -- Turn on GHC's one-shot mode.
   dflags <- (\df -> df{ ghcMode = OneShot }) <$> getDynFlags
   modifySession $ hscSetFlags dflags
   hsc_env <- getSession
 
-  (iface, insts) <- liftIO $ loadHiFile hsc_env doc $ mkMainModule_ moduleNm
+  let oneShotUnit = stringToUnit (unitIdString (homeUnitId_ dflags))
+
+  (iface, insts) <- liftIO $ loadHiFile hsc_env doc $ mkModule oneShotUnit moduleNm
 
   -- Update the DynFlags with the extensions from the source file (as stored in the interface file)
   -- This is instead of ms_hspp_opts from ModSummary, which is not available in one-shot mode.
