@@ -264,6 +264,11 @@ data Message a where
     :: RemoteRef ThreadId
     -> Message (EvalStatus [HValueRef])
 
+  ThrowTo
+    :: RemoteRef ThreadId
+    -> SerializableException
+    -> Message ()
+
   -- | User-defined request encoded as a tag/payload pair.  This is left
   -- uninterpreted by GHC and is meant for GHC API applications to be able to supply
   -- their own interpreter which understands additional commands.
@@ -606,6 +611,7 @@ getMessage = do
       43 -> Msg <$> (WaitThreadResult <$> get)
       44 -> Msg <$> return WaitAnyThreadBreak
       45 -> Msg <$> (WaitThreadResultOrAnyThreadBreak <$> get)
+      46 -> Msg <$> (ThrowTo <$> get <*> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -658,6 +664,7 @@ putMessage m = case m of
   WaitAnyThreadBreak          -> putWord8 44
   WaitThreadResultOrAnyThreadBreak tid
                               -> putWord8 45 >> put tid
+  ThrowTo tid ex              -> putWord8 46 >> put tid >> put ex
 
 {-
 Note [Parallelize CreateBCOs serialization]

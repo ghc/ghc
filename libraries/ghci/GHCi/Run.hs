@@ -45,7 +45,6 @@ import GHC.Stack
 import Foreign hiding (void)
 import Foreign.C
 import GHC.Conc.Sync
-import System.Mem.Weak  ( deRefWeak )
 import Unsafe.Coerce
 
 -- -----------------------------------------------------------------------------
@@ -124,21 +123,20 @@ run m = case m of
     InfoProv.whereFrom =<< localRef ref
   Seq ref -> doSeq ref
   ResumeSeq ref -> resumeSeq ref
-
   WaitThreadResult t -> do
     tid <- localRef t
-    redirectInterrupts tid $
-      atomically (readThreadEvalStatus tid)
+    atomically (readThreadEvalStatus tid)
   WaitAnyThreadBreak -> do
     atomically $ readAnyThreadEvalBreak
   WaitThreadResultOrAnyThreadBreak t -> do
     tid <- localRef t
-    redirectInterrupts tid $
-      atomically $
-        readThreadEvalStatus tid
-          `orElse`
-        (EvalPaused <$> readAnyThreadEvalBreak)
-
+    atomically $
+      readThreadEvalStatus tid
+        `orElse`
+      (EvalPaused <$> readAnyThreadEvalBreak)
+  ThrowTo t e -> do
+    tid <- localRef t
+    throwTo tid (fromSerializableException e)
   Shutdown            -> unexpectedMessage m
   RunTH {}            -> unexpectedMessage m
   RunModFinalizers {} -> unexpectedMessage m
@@ -316,16 +314,10 @@ resumeStmt opts rtid = do
   putMVar resumeBreakMVar () -- this awakens the stopped thread
                              -- await the result with `WaitThreadResult` or friends
 
--- When running a computation, we redirect ^C exceptions to the running
--- thread.  ToDo: we might want a way to continue even if the target
--- thread doesn't die when it receives the exception... "this thread
--- is not responding".
---
 -- Careful here: there may be ^C exceptions flying around, so we start the new
 -- thread blocked (forkIO inherits mask from the parent, #1048), and unblock
 -- only while we execute the user's code.  We can't afford to lose the final
--- putMVar, otherwise deadlock ensues. (#1583, #1922, #1946)
-
+-- 'writeThreadEvalStatus', otherwise deadlock ensues. (#1583, #1922, #1946)
 sandboxIO :: EvalOpts -> IO [HValueRef] -> IO (RemoteRef ThreadId)
 sandboxIO opts io
     | useSandboxThread opts
@@ -440,30 +432,3 @@ setBreakAction opts tid@(ThreadId tid#) = do
         else unsetIsolatedCtx ctx
 
     runIf#   pred what     = when (pred opts) (what tid#)
-
--- | While we're waiting for the target thread to return a result, if
--- the current thread receives an asynchronous exception we re-throw
--- it at the target thread and continue to wait.
---
---  * So that ^C interrupts runStmt (e.g. in GHCi/internal interpreter),
---  allowing the computation to run its exception handlers before returning the
---  exception result to the caller of runStmt.
---
---  * clients of the GHC API can terminate a runStmt in progress
---    without knowing the ThreadId of the sandbox thread (#1381)
---    (e.g. @evalStmt >>= waitThreadResult@)
---
--- NB. use a weak pointer to the thread, so that the thread can still
--- be considered deadlocked by the RTS and sent a BlockedIndefinitely
--- exception.  A symptom of getting this wrong is that conc033(ghci)
--- will hang.
---
-redirectInterrupts :: ThreadId -> IO a -> IO a
-redirectInterrupts target wait = do
-  wtid <- mkWeakThreadId target
-  wait `catch` \e -> do
-     m <- deRefWeak wtid
-     case m of
-       Nothing -> wait
-       Just target -> do throwTo target (e :: SomeException); wait
-
