@@ -13,8 +13,10 @@ import GHC.Internal.Types ()
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 -- TODO: use the new Windows IO manager
 module GHC.Internal.Event.TimerManager
@@ -53,6 +55,9 @@ import GHC.Internal.Control.Exception (finally)
 import GHC.Internal.Data.Foldable (sequence_)
 import GHC.Internal.Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
+import GHC.Internal.IORef (IORef(..))
+import GHC.Internal.Prim (casMutVar#, readMutVar#)
+import GHC.Internal.STRef (STRef(..))
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Clock (getMonotonicTimeNSec)
 import GHC.Internal.Conc.Signal (runHandlers)
@@ -188,6 +193,11 @@ step mgr = do
 
   -- Call all expired timer callbacks and return the time to the
   -- next timeout.
+  --
+  -- This function uses atomicModifyIORef' whereas we use casMutVar# below
+  -- in modifyTimeouts. We deliberately avoid modifyTimeouts here
+  -- because this update is long, and with a CAS it would rarely win
+  -- against a stream of registrations, starving the manager. See #9809.
   mkTimeout :: IO Timeout
   mkTimeout = do
       now <- getMonotonicTimeNSec
@@ -260,7 +270,7 @@ updateTimeout mgr (TK key) us = do
 
 editTimeouts :: TimerManager -> TimeoutEdit -> IO ()
 editTimeouts mgr g = do
-  wake <- atomicModifyIORef' (emTimeouts mgr) f
+  wake <- modifyTimeouts (emTimeouts mgr) f
   when wake (wakeManager mgr)
   where
     f q = (q', wake)
@@ -275,5 +285,36 @@ editTimeouts mgr g = do
                       -- minimum element didn't change.
                       t0 /= t1
                     _ -> True
+
+-- The issue in #9809 was that for the threaded runtime (where each process
+-- has its own timer manager), timer events added to the shared list of
+-- events were potentially added unevaluated. When many threads (eg 100,000)
+-- add entries at the same time, the program can slow down considerably and
+-- use significant amounts of memory. The crux of the matter was that each
+-- thread updated the shared list lazily. In this case it's easy to build a
+-- massive list of unevaluated thunks.
+--
+-- The solution is for each thread that wants to update the shared list to
+-- apply its edit to a copy of the list and fully evaluate the result before
+-- replacing the shared list. Updating the list is an O(log n) process and it
+-- runs in constant stack space, see #7653. The old list is replaced by the
+-- new list using a compare-and-swap (CAS) operation (which compares machine
+-- level pointers). If the CAS fails (ie the list has been updated by another
+-- thread) it starts again with the new list created by the other thread.
+
+-- NOINLINE could have been used here but OPAQUE has stronger guarantees
+-- (ie worker/wrapper optimisation is prevented). If this function were
+-- inlined above (possible without either pragma), the CAS operation may end up
+-- comparing with a different pointer to the one it read (eg if GHC replaces a
+-- thunk or indirection with the evaluated value).
+{-# OPAQUE modifyTimeouts #-}
+modifyTimeouts :: IORef TimeoutQueue -> (TimeoutQueue -> (TimeoutQueue, b)) -> IO b
+modifyTimeouts (IORef (STRef ref)) f = IO modLoop
+  where
+    modLoop s0 = case readMutVar# ref s0 of
+      (# s1, oldVar #) -> case f oldVar of
+        (newVar, r) -> newVar `seq` case casMutVar# ref oldVar newVar s1 of
+          (# s2, 0#, _ #) -> (# s2, r #)
+          (# s2, _, _ #) -> modLoop s2
 
 #endif
