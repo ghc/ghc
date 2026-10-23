@@ -1,0 +1,12 @@
+section: ghc-internal
+synopsis: Fix excessive GC, memory use and timer latency when many threads
+  register timeouts at once with ``threadDelay``, ``registerDelay`` or
+  ``System.Timeout.timeout``.
+issues: #9809
+mrs: !16863
+description: {
+    Threads registering timeouts now publish only fully evaluated updates to
+    the timer manager's timeout queue, using a compare-and-swap loop, instead
+    of building chains of unevaluated updates that other threads then had to
+    evaluate or block on.
+}
