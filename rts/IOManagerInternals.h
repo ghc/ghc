@@ -113,6 +113,12 @@ struct _CapIOManager {
  */
 struct _CapIOManagerShared {
 
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+    /* The timer manager control pipe (write end). This is the pipe into which
+     * we will send our signals.
+     */
+    int timer_manager_control_wr_fd;
+#endif
 };
 
 

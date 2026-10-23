@@ -412,7 +412,7 @@ void initCapabilityIOManager(CapIOManager *iomgr)
 
 #if defined(IOMGR_ENABLED_MIO_POSIX)
         case IO_MANAGER_MIO_POSIX:
-            iomgr->control_fd = -1;
+            initCapabilityIOManagerMIO(iomgr);
             break;
 #endif
         default:

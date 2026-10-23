@@ -13,15 +13,18 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
+#include "IOManager.h"
+
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+
+#include "MIO.h"
+#include "IOManagerInternals.h"
+#include "IOManSignals.h"
+
 #include "Schedule.h"
 #include "RtsUtils.h"
 #include "Prelude.h"
 #include "ThreadLabels.h"
-
-#include "MIO.h"
-#include "IOManager.h"
-#include "IOManagerInternals.h"
-#include "IOManSignals.h"
 
 #if defined(HAVE_ERRNO_H)
 # include <errno.h>
@@ -30,18 +33,22 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-// Here's the pipe into which we will send our signals
-static int timer_manager_control_wr_fd = -1;
-// TODO: Eliminate these globals. Put then into the CapIOManager, but the
-// problem is these are shared across all caps, not per cap.
-
 #define IO_MANAGER_DIE    0xfe
 
-void setTimerManagerControlFd(int fd) {
-    RELAXED_STORE(&timer_manager_control_wr_fd, fd);
+void initCapabilityIOManagerMIO(CapIOManager *iomgr)
+{
+    iomgr->control_fd = -1;
+    if (iomgr->cap == 0) {
+        iomgr->shared->timer_manager_control_wr_fd = -1;
+    }
 }
 
-#if defined(THREADED_RTS)
+void setTimerManagerControlFd(int fd) {
+    int *timer_manager_control_wr_fd =
+            &MainCapability.iomgr->shared->timer_manager_control_wr_fd;
+    RELAXED_STORE(timer_manager_control_wr_fd, fd);
+}
+
 static void timerManagerNotifySignal(int sig, siginfo_t *info,
                                      void *p STG_UNUSED)
 {
@@ -56,7 +63,12 @@ static void timerManagerNotifySignal(int sig, siginfo_t *info,
         memcpy(buf+1, info, sizeof(siginfo_t));
     }
 
-    int timer_control_fd = RELAXED_LOAD(&timer_manager_control_wr_fd);
+    /* In the signal handler we do not have Capability context, so access the
+     * control fd via MainCapability.
+     */
+    int *timer_manager_control_wr_fd =
+            &MainCapability.iomgr->shared->timer_manager_control_wr_fd;
+    int timer_control_fd = RELAXED_LOAD(timer_manager_control_wr_fd);
     if (0 <= timer_control_fd)
     {
         r = write(timer_control_fd, buf, sizeof(siginfo_t)+1);
@@ -76,14 +88,14 @@ int installUserSignalHandlerMIO(int sig, int spi, sigset_t *mask,
     return installSignalHandler(sig, spi, mask, nocldstop,
                                 timerManagerNotifySignal);
 }
-#endif
 
-
-#if defined(THREADED_RTS)
 void
 ioManagerDie (void)
 {
     finiUserSignals();
+
+    int *timer_manager_control_wr_fd =
+            &MainCapability.iomgr->shared->timer_manager_control_wr_fd;
 
     StgWord8 byte = (StgWord8)IO_MANAGER_DIE;
     uint32_t i;
@@ -91,11 +103,11 @@ ioManagerDie (void)
 
     {
         // Shut down timer manager
-        const int fd = RELAXED_LOAD(&timer_manager_control_wr_fd);
+        const int fd = RELAXED_LOAD(timer_manager_control_wr_fd);
         if (0 <= fd) {
             r = write(fd, &byte, 1);
             if (r == -1) { sysErrorBelch("ioManagerDie: write"); }
-            RELAXED_STORE(&timer_manager_control_wr_fd, -1);
+            RELAXED_STORE(timer_manager_control_wr_fd, -1);
         }
     }
 
@@ -123,13 +135,21 @@ ioManagerStart (void)
 {
     initUserSignals();
 
+    int *timer_manager_control_wr_fd =
+            &MainCapability.iomgr->shared->timer_manager_control_wr_fd;
+
     // Make sure the IO manager thread is running
     Capability *cap;
-    if (SEQ_CST_LOAD(&timer_manager_control_wr_fd) < 0) {
+    if (SEQ_CST_LOAD(timer_manager_control_wr_fd) < 0) {
         cap = rts_lock();
         ioManagerStartCap(&cap);
         rts_unlock(cap);
     }
 }
-#endif
 
+#else // !IOMGR_ENABLED_MIO_POSIX
+
+/* This is exported from the RTS unconditionally, but only used for MIO. */
+void setTimerManagerControlFd(int fd STG_UNUSED) { /* do nothing */ }
+
+#endif // IOMGR_ENABLED_MIO_POSIX
