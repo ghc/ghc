@@ -160,14 +160,19 @@ instance Exception PipeWriteClosedException
 -- and identify whether they are requests or replies.
 
 writePipe :: Pipe -> IddMsg -> IO ()
-writePipe Pipe{..} msg = do
-  var <- newEmptyTMVarIO
-  atomically $ do
+writePipe p msg = do
+  var <- atomically $ writePipeAsync p msg
+  either throwIO pure =<< atomically (takeTMVar var)
+
+writePipeAsync :: Pipe -> IddMsg -> STM (TMVar (Either SomeException ()))
+writePipeAsync Pipe{..} msg = do
+    var <- newEmptyTMVar
     readTVar pipeWriteClosed >>= \case
       True -> throwSTM PipeWriteClosedException
       False -> pure ()
     writeTQueue (writeQueue pipeAsyncMngr) (msg, var)
-  either throwIO pure =<< atomically (takeTMVar var)
+    pure var
+
 
 -- | Only the 'drainPipe' thread should read from the pipe directly. Other
 -- functions should wait for the matching reply to be delivered asynchronously.
@@ -239,14 +244,18 @@ remoteAsyncReq pipe msg ii = do
   -- Write request
   writePipe pipe (Request uq ii (runPut msg))
     `onException`
-      -- the req wasn't done, or no one will be reading the reply:
-      -- in either case, drop it from the pending map.
-      atomically (modifyTVar pendingReplies (IntMap.delete uq))
+        -- the req wasn't done, or no one will be reading the reply:
+        -- in either case, drop it from the pending map.
+        atomically (modifyTVar pendingReplies (IntMap.delete uq))
 
   -- Block waiting for reply
   atomically (takeTMVar wv)
     `onException`
-      atomically (modifyTVar pendingReplies (IntMap.delete uq))
+       atomically (do
+         modifyTVar pendingReplies (IntMap.delete uq)
+         -- we don't wait for Cancel to be written on the pipe,
+         -- and won't get a reply: nowhere to report it anyway.
+         writePipeAsync pipe (Cancel uq))
 
 -- | Receive a single asynchronous request and send a matching reply
 -- asynchronously (the handler may fork a computation that eventually replies
@@ -258,7 +267,7 @@ remoteAsyncReq pipe msg ii = do
 -- branch, and if the handler otherwise throws, it is handled by 'handleAsyncReq'.
 --
 -- See Note [Exceptions during serialization] about exceptions the 'Put' argument might raise.
-handleAsyncReq :: Pipe -> Get a -> (Maybe InboxId) -> (WriteReply Put %1 -> a -> IO r) -> IO r
+handleAsyncReq :: Pipe -> Get a -> (Maybe InboxId) -> (WriteReply Put %1 -> (IO () -> IO ()) -> a -> IO r) -> IO r
 handleAsyncReq pipe getit mii k = mask $ \restore -> do
   let am = pipeAsyncMngr pipe
   ack <- newEmptyMVar
@@ -274,7 +283,7 @@ handleAsyncReq pipe getit mii k = mask $ \restore -> do
       Nothing -> tryReadTQueue  $  requestsQueue am
       Just ii -> tryReadTQueue =<< getMailbox am ii
     case taken of
-      Just req -> pure (Just req)
+      Just req@(uq,_) -> fetchedRequest am uq >> pure (Just req)
       Nothing  | isClosed  -> pure Nothing -- empty and closed
                | otherwise -> retry -- wait for msg
 
@@ -282,9 +291,9 @@ handleAsyncReq pipe getit mii k = mask $ \restore -> do
     Nothing -> throwIO PipeReadClosedException -- can't expect reqs
     Just (uq, bs) -> do
       let reply p = do
-            writePipe pipe (Reply uq (bimap toSerializableException runPut p))
+            b <- atomically $ doneHandling am uq
+            when b $ writePipe pipe (Reply uq (bimap toSerializableException runPut p))
             putMVar ack ()
-
       -- Run the continuation which must reply exactly once with 'writeReply'
       case runGetOrFail getit bs of
         Left (_, _, err) -> do
@@ -292,7 +301,7 @@ handleAsyncReq pipe getit mii k = mask $ \restore -> do
           reply (Left (toException exc))
           throwIO exc
         Right (_, _, it) ->
-          restore (k (WriteReply reply) it)
+          restore (k (WriteReply reply) (setActive am uq) it)
 
             -- If there's an exception before the reply is sent, reply with an error instead.
             `catch` \(e :: SomeException) -> do
@@ -305,6 +314,7 @@ handleAsyncReq pipe getit mii k = mask $ \restore -> do
                     -- Reply with an error
                     reply (Left e)
                     throwIO e
+
 
 -- | 'handleSyncReq' failed to decode an incoming request payload using the given @'Get' a@
 newtype DecodeAsyncReqException = DecodeAsyncReqException String deriving Show
@@ -347,6 +357,28 @@ getMailbox am (InboxId ii) = do
 
 -- ** Async matching "internals" -----------------------------------------------
 
+-- | Tracks handling status of a received 'Request'. The values are states of a
+-- tiny state machine used to coordinate cancelations.
+--
+-- 'handleAsyncReq' will pop a request from the appropriate queue, setting the
+-- status to `Fetched`. Then one of two things can happen first:
+--  - we receive a 'Cancel', then status is set to `Canceling` so the cancel
+--    action will run when set.
+--  - handler sets a cancel action, then reception of a `Cancel` runs that
+--    action and deletes the RequestStatus.
+--
+-- If RequestStatus is `Canceling` or absent, then a `Reply` won't be sent.
+--
+-- The two possible transition paths:
+-- requestsQueue -> Fetched -> Active cancel -> gone
+-- requestsQueue -> Fetched -> Canceling     -> gone
+
+data RequestStatus
+  = Fetched        -- ^ 'Fetched' from a request queue, to pass to handler.
+  | Active (IO ()) -- ^ Handler set a cancel action, and has not sent a reply
+                   -- yet. The cancel action must not block.
+  | Canceling      -- ^ `Cancel` received while status is still `Fetched`.
+
 data AsyncManager = AsyncManager
   { pendingReply :: !(TVar (IntMap (TMVar (Either SomeException LB.ByteString))))
     -- ^ When a request is sent, keep track that we're expecting a reply. The
@@ -357,6 +389,9 @@ data AsyncManager = AsyncManager
     -- /without/ a specific 'InboxId', queue it here. A request handler will
     -- pop the next request from it. (Nothing except the 'drainPipe' thread
     -- should read from the pipe). Read with @'handleAsyncReq' p get Nothing@.
+  , cancelStatus :: !(TVar (IntMap RequestStatus))
+    -- ^ When a `Cancel uq` is received, we lookup `uq` in this map and call the
+    -- callback if present.
   , mailboxQueues :: !(TVar (IntMap (TQueue (CorrelationId, LB.ByteString))))
     -- ^ Requests for a specific 'InboxId' that can be read using
     -- @'handleAsyncReq' p get (Just <mailboxid>)@.
@@ -389,15 +424,21 @@ type CorrelationId = Int
 -- exclusively.
 data IddMsg  = Request !CorrelationId !(Maybe InboxId) LB.ByteString
              | Reply   !CorrelationId (Either SerializableException LB.ByteString)
+             | Cancel  !CorrelationId -- ^ Technically a Request, but no Reply
+                                      -- is expected, the CorrelationId is the
+                                      -- one of the Request being canceled.
 
 instance Binary IddMsg where
   put (Request i ii bs) = putWord8 0 >> put i >> put ii >> put bs
   put (Reply i bs)      = putWord8 1 >> put i >> put bs
+  put (Cancel i)        = putWord8 2 >> put i
+
   get = do
     b <- getWord8
     case b of
       0 -> Request <$> get <*> get <*> get
       1 -> Reply   <$> get <*> get
+      2 -> Cancel  <$> get
       _ -> fail $ "impossible: Binary IddMsg - " ++ show b
 
 newAsyncManager :: Pipe -> IO AsyncManager
@@ -405,6 +446,7 @@ newAsyncManager pipe = do
   asyncFreshId  <- newIORef 0
   pendingReply  <- newTVarIO IntMap.empty
   requestsQueue <- newTQueueIO
+  cancelStatus  <- newTVarIO IntMap.empty
   mailboxQueues <- newTVarIO IntMap.empty
   writeQueue <- newTQueueIO
 
@@ -430,40 +472,84 @@ drainPipe :: Pipe -> (forall x. IO x -> IO x) -> IO ()
 drainPipe p unmask = catch (unmask $ loop `finally` pipeCloseRead p) replyToPendings  where
   loop = do
     readPipe p >>= \case
-      -- Receive a reply to a pending notification
-      Just (Reply uq bs) -> do
-        atomically $ do
-          m <- readTVar (pendingReply am)
-          case IntMap.lookup uq m of
-            Nothing ->
-              -- the req was dropped from pending bc there was an exception, and no
-              -- one's listening any more. the reply is ignored
-              pure ()
-            Just wv -> do
-              writeTVar (pendingReply am) (IntMap.delete uq m)
-              -- signal matching request
-              putTMVar wv (bimap (toException . RemoteProcessException) id bs)
-        loop
-      -- Receive a request and queue it
-      Just (Request uq mbi bs) -> do
-        atomically $ case mbi of
-          Nothing ->
-            -- "Global" request
-            writeTQueue (requestsQueue am) (uq,bs)
-          Just ii -> do
-            -- "Specific mailbox" request
-            q <- getMailbox am ii
-            writeTQueue q (uq,bs)
+      Just msg -> do
+        handleMsg msg
         loop
       -- EOF on read handle
       Nothing -> do
         -- clean up pipe then exit loop
         replyToPendings (toException PipeReadClosedException)
         pure ()
+  handleMsg = \case
+    -- Receive a reply to a pending notification
+    Reply uq bs -> do
+      atomically $ do
+        m <- readTVar (pendingReply am)
+        case IntMap.lookup uq m of
+          Nothing ->
+            -- the req was dropped from pending bc there was an exception, and no
+            -- one's listening any more. the reply is ignored
+            pure ()
+          Just wv -> do
+            writeTVar (pendingReply am) (IntMap.delete uq m)
+            -- signal matching request
+            putTMVar wv (bimap (toException . RemoteProcessException) id bs)
+    -- Receive a request and queue it
+    Request uq mbi bs -> do
+      atomically $ case mbi of
+        Nothing ->
+          -- "Global" request
+          writeTQueue (requestsQueue am) (uq,bs)
+        Just ii -> do
+          -- "Specific mailbox" request
+          q <- getMailbox am ii
+          writeTQueue q (uq,bs)
+    Cancel uq -> cancelRequest am uq
 
   replyToPendings e = atomically $ failPendingReplies p e
 
   am = pipeAsyncMngr p
+
+cancelRequest :: AsyncManager -> CorrelationId -> IO ()
+cancelRequest am uq = join . atomically $ do
+  cs <- readTVar (cancelStatus am)
+  case IntMap.lookup uq cs of
+    Nothing -> pure (pure ())
+    Just Fetched -> writeTVar (cancelStatus am) (IntMap.insert uq Canceling cs) >> pure (pure ())
+    Just (Active cancel) -> writeTVar (cancelStatus am) (IntMap.delete uq cs) >> pure cancel
+    Just Canceling -> pure (pure ())
+
+-- | Returns @True@ when the handler should write its 'Reply'.
+doneHandling :: AsyncManager -> CorrelationId -> STM Bool
+doneHandling am uq = do
+  cs <- readTVar (cancelStatus am)
+  case IntMap.lookup uq cs of
+    Nothing -> pure False
+    Just s -> do
+      writeTVar (cancelStatus am) $ IntMap.delete uq cs
+      case s of
+        Canceling -> pure False
+        _         -> pure True
+
+setActive :: AsyncManager -> CorrelationId -> IO () -> IO ()
+setActive am uq cancel = join . atomically $ do
+  cs <- readTVar (cancelStatus am)
+  case IntMap.lookup uq cs of
+    Nothing -> pure (pure ()) -- reply already received.
+    Just Fetched -> writeTVar (cancelStatus am) (IntMap.insert uq (Active cancel) cs) >> pure (pure ())
+    Just (Active _) -> writeTVar (cancelStatus am) (IntMap.insert uq (Active cancel) cs) >> pure (pure ())
+    Just Canceling -> pure cancel
+
+fetchedRequest :: AsyncManager -> CorrelationId -> STM ()
+fetchedRequest am uq = do
+  cs <- readTVar (cancelStatus am)
+  case IntMap.lookup uq cs of
+    Nothing -> writeTVar (cancelStatus am) (IntMap.insert uq Fetched cs)
+    Just Fetched -> error "impossible"
+    Just (Active _) -> error "impossible"
+    Just Canceling -> error "impossible"
+
+
 
 {-
 Note [Exceptions during serialization]
@@ -553,7 +639,7 @@ runWriteReply (WriteReply r) = r
 (|#>) (IO fs) s = fs s
 
 (%>>=) :: (IO a) -> (a -> IO b) %1 -> IO b
-(%>>=) = \ m f -> IO (\s0 ->
+(%>>=) = \ m -> \ f -> IO (\s0 ->
         case m |#> s0 of -- unIO for linearity checking
           (# s1, x #) -> f x |#> s1)
 infixl 1 %>>=
