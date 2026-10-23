@@ -19,6 +19,8 @@
 /* Communicating with the IO manager thread (see GHC.Conc).
  */
 #if defined(THREADED_RTS)
+void initCapabilityIOManagerMIO(CapIOManager *iomgr);
+
 void ioManagerDie (void);
 void ioManagerStart (void);
 void ioManagerStartCap (/* inout */ Capability **cap);
