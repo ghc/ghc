@@ -46,7 +46,6 @@ import GHC.Driver.DynFlags
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.WiredIn.Types ( nilDataConName, oneDataConName )
-import GHC.Builtin.WiredIn.Ids( rightSectionName, leftSectionName )
 
 import GHC.Unit.Module ( isInteractiveModule )
 
@@ -327,8 +326,8 @@ rnExpr (HsHole h)
 
 -- HsOverLabel: see Note [Handling overloaded and rebindable constructs]
 rnExpr (HsOverLabel src v)
-  = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpName
-       ; let rs_table = Rebindable [(nameOccName fromLabelClassOpName, from_label)]
+  = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpOcc
+       ; let rs_table = Rebindable [(fromLabelClassOpOcc, from_label)]
        ; return (HsOverLabel (src, rs_table) v, fvs)
        }
 
@@ -353,7 +352,7 @@ rnExpr (HsOverLit x lit)
                         , fvs ) }
 
 rnExpr (HsQualLit x QualLit{..})
- = do { (funName, fvs) <- lookupNameWithQualifier fromStringName ql_mod
+ = do { (funName, fvs) <- lookupNameWithQualifier ql_mod fromStringClassOpOcc
       ; let ql_val' = case ql_val of
                         HsQualString st s -> HsQualString st s
       ; return (HsQualLit x (QualLit (L noAnn funName) ql_mod ql_val'), fvs)
@@ -401,11 +400,11 @@ rnExpr (HsGetField _ e f)
  = do { (getField, fv_getField) <- lookupSyntaxName getFieldClassOpOcc
       ; (e, fv_e) <- rnLExpr e
       ; let f' = rnDotFieldOcc <$> f
-            rs_table = Rebindable  [(nameOccName getFieldName, getField)]
+            rs_table = Rebindable  [(getFieldClassOpOcc, getField)]
       ; return (HsGetField rs_table e f', fv_e `plusFN` fv_getField) }
 
 rnExpr (HsProjection _ fs)
-  = do { (getFieldName, fv_getField) <- lookupSyntaxName getFieldName
+  = do { (getFieldName, fv_getField) <- lookupSyntaxName getFieldClassOpOcc
        ; circName <- rnLookupKnownOccName composeIdOcc
        ; let fs' = NE.map rnDotFieldOcc fs
              rs_table = Rebindable  [(nameOccName getFieldName , getFieldName), (rdrNameOcc compose_RDR, circName)]
@@ -476,7 +475,7 @@ rnExpr (ExplicitList _ exps)
           then return  (ExplicitList NoRebindable exps', fvs)
           else
     do { (from_list_n_name, fvs') <- lookupSyntaxName fromListNClassOpOcc
-       ; let rs_table = Rebindable  [(nameOccName fromListNClassOpOcc, from_list_n_name)]
+       ; let rs_table = Rebindable  [(fromListNClassOpOcc, from_list_n_name)]
              rn_list  = ExplicitList rs_table exps'
        ; return ( rn_list
                 , fvs `plusFN` fvs') } }
@@ -607,6 +606,12 @@ rnExpr (HsFunArr _ mult arg res)
       (L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) -> True
       _ -> False
     oneType = noLocA $ HsVar noExtField $ noLocA $ noUserRdr oneDataConName
+
+rnExpr (XExpr (ReSynBinds m e'))
+  =  do { traceRn "XExpr ReSynBinds" (text "module:" <+> ppr m)
+        ; rnExpr e' -- for now just return the renamed expression
+          -- TODO: Bring into scope top level environment of the module m
+        }
 
 {-
 ************************************************************************

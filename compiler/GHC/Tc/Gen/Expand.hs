@@ -19,12 +19,11 @@ import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
 
 import GHC.Types.Name
 import GHC.Types.Name.Reader
-import GHC.Types.Id.Make
-import GHC.Types.SrcLoc
+import GHC.Types.SrcLoc ( GenLocated(L), unLoc )
 import GHC.Types.SourceText ( SourceText(..) )
 
-import GHC.Builtin.Names
-
+import GHC.Builtin.KnownOccs
+import GHC.Builtin.WiredIn.Ids ( leftSectionName, rightSectionName )
 import GHC.Rename.Utils
 
 import GHC.Utils.Panic
@@ -34,6 +33,7 @@ import qualified Data.List.NonEmpty as NE ( map, head, (<|) )
 import Data.List.NonEmpty ( NonEmpty(..), init, last, tail )
 
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Builtin.KnownKeys (getFieldClassOpOcc)
 
 {- Note [Typechecking by expansion: overview]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -123,7 +123,7 @@ tcExpand :: HsExpr GhcRn -> TcM (Maybe (HsExpansion GhcRn))
 ------------------------------------------
 -- Overloaded labels
 tcExpand e@(HsOverLabel (_, Rebindable rs_table) v)
-  | Just fromLabelName <- lookup (nameOccName fromLabelClassOpName) rs_table
+  | Just fromLabelName <- lookup fromLabelClassOpOcc rs_table
   , let hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
                       HsTyLit noExtField (HsString NoSourceText v)
   = return $ Just $
@@ -178,7 +178,7 @@ tcExpand e@(HsIf (Rebindable rs_table) p b1 b2)
 -- Record dot syntax
 
 tcExpand e@(HsGetField (Rebindable rs_table) expr f)
- | Just getField <- lookup (nameOccName getFieldName) rs_table
+ | Just getField <- lookup getFieldClassOpOcc rs_table
  = return $ Just $
    HSE { hse_ctxt = ExprCtxt e
        , hse_exp = wrapGenSpan $ (mkGetField getField expr (fmap (unLoc . dfoLabel) f)) }
@@ -187,7 +187,7 @@ tcExpand e@(HsGetField (Rebindable rs_table) expr f)
                              , ppr e ])
 
 tcExpand e@(HsProjection (Rebindable rs_table) fs)
- | Just getField <- lookup (nameOccName getFieldName) rs_table
+ | Just getField <- lookup getFieldClassOpOcc rs_table
  , Just circ <- lookup (rdrNameOcc compose_RDR) rs_table
  = return $ Just $
    HSE { hse_ctxt = ExprCtxt e
@@ -200,8 +200,8 @@ tcExpand e@(HsProjection (Rebindable rs_table) fs)
 tcExpand (RecordUpd NoRebindable _ _ ) = return Nothing -- until #27160 is fixed
 
 tcExpand e@(RecordUpd (Rebindable rs_table) (L l expr) (OverloadedRecUpdFields { olRecUpdFields = us}))
- | Just getField <- lookup (nameOccName getFieldName) rs_table
- , Just setField <- lookup (nameOccName setFieldName) rs_table
+ | Just getField <- lookup getFieldClassOpOcc rs_table
+ , Just setField <- lookup setFieldClassOpOcc rs_table
  = return $ Just $
    HSE { hse_ctxt = ExprCtxt e
        , hse_exp = wrapGenSpan $ mkRecordDotUpd getField setField (L l expr) us }
@@ -235,7 +235,7 @@ tcExpand e@(SectionL _ expr op)
 tcExpand (ExplicitList NoRebindable _ )
   = return Nothing -- rebindable syntax is off
 tcExpand e@(ExplicitList (Rebindable rs_table) exps)
-  | Just from_list_n_name <- lookup (nameOccName fromListNName) rs_table
+  | Just from_list_n_name <- lookup fromListNClassOpOcc rs_table
   = do { loc <- getSrcSpanM -- See Note [Source locations for implicit function calls]
        ; let lit_n    = mkIntegralLit (length exps)
              hs_lit   = genHsIntegralLit lit_n

@@ -735,6 +735,7 @@ deriving instance Data (HsExpansion GhcTc)
 deriving instance Data a => Data (WithUserRdr a)
 
 -- -------------------------------
+deriving instance Data XXExprGhcPs
 deriving instance Data XXExprGhcTc
 deriving instance Data XXPatGhcTc
 
