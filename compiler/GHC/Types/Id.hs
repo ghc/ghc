@@ -893,7 +893,7 @@ setCaseBndrEvald str id
 -- that a case binder must not have, so we keep its Name, type, multiplicity
 -- and IdDetails, but reset its IdInfo, except that we record that it is
 -- evaluated.
--- See Note [Lambda and case binders have vanilla IdInfo] in GHC.Core
+-- See Note [Core binder IdInfo invariants] in GHC.Core
 mkCaseBndrFromLetBndr :: Id -> Id
 mkCaseBndrFromLetBndr id = id `setIdInfo` (vanillaIdInfo `setUnfoldingInfo` evaldUnfolding)
 
@@ -917,20 +917,31 @@ idCoreRules id = ruleInfoRules (idSpecialisation id)
 idHasRules :: Id -> Bool
 idHasRules id = not (isEmptyRuleInfo (idSpecialisation id))
 
--- | True <=> the Id has no (non-default) inline pragma, no RULES, and no
--- unfolding except perhaps an evaluated-ness one (OtherCon).  Lambda binders,
--- case binders, and case-alternative binders must all satisfy this.
--- See Note [Lambda and case binders have vanilla IdInfo] in GHC.Core
+-- | True <=> the Id has only the IdInfo permitted on a lambda, case, or
+-- case-alternative binder.  See the table in Note [Core binder IdInfo invariants]
+-- in GHC.Core; Core Lint checks this invariant.
+--
+-- We allow occurrence info, demand info, and one-shot info (which the table
+-- permits only on lambda binders, but a case binder may be about to become one).
+-- We also allow an `OtherCon []` unfolding; lambda binders must have no unfolding
+-- at all, but Lint checks that separately.
 lamBndrInfoOK :: Id -> Bool
 lamBndrInfoOK id
-  =  isDefaultInlinePragma (idInlinePragma id)
-  && unf_ok (realIdUnfolding id)
-  && not (idHasRules id)
+  =  isDefaultInlinePragma (inlinePragInfo info)
+  && isNopSig (dmdSigInfo info)
+  && isTopCprSig (cprSigInfo info)
+  && mayHaveCafRefs (cafInfo info)
+  && arityInfo info == unknownArity
+  && callArityInfo info == unknownArity
+  && isEmptyRuleInfo (ruleInfo info)
+  && unf_ok (realUnfoldingInfo info)
   where
+    info = idInfo id
+
     -- See Note [Evaluated-ness on case binders] in GHC.Core
-    unf_ok NoUnfolding  = True
-    unf_ok (OtherCon _) = True
-    unf_ok _            = False
+    unf_ok NoUnfolding   = True
+    unf_ok (OtherCon []) = True
+    unf_ok _             = False
 
 setIdSpecialisation :: Id -> RuleInfo -> Id
 setIdSpecialisation id spec_info = modifyIdInfo (`setRuleInfo` spec_info) id

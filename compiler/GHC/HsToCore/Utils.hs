@@ -267,7 +267,7 @@ bindMatchId new mid body
 --
 -- The case binder has the same Name (and hence Unique), type and multiplicity
 -- as `var`, but not its IdInfo: `var` may have, say, a NOINLINE pragma, but a
--- case binder must not; see Note [Lambda and case binders have vanilla IdInfo]
+-- case binder must not; see Note [Core binder IdInfo invariants]
 -- in GHC.Core, and #27965.  E.g. `res1` in GHC.Internal.Control.Monad.ST.Lazy.Imp
 -- has a NOINLINE pragma.
 seqVar :: Var -> CoreExpr -> CoreExpr

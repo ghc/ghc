@@ -1922,6 +1922,9 @@ preInlineBetaUnconditionally
 -- Like preInlineLetUnconditionally, but for a beta-redex (\bndr. body) arg
 -- The argument may or may not be already simplified (DoneEx or ContEx)
 --
+-- The binder is a lambda binder and so lacks most IdInfo;
+--   see Note [Core binder IdInfo invariants]
+--
 -- Compared to preInlineLetUnconditionally we omit some checks:
 --   * The binder is never top-level, so no need for the
 --     Note [Top-level bottoming Ids] check, nor for `early_phase`
@@ -1930,12 +1933,16 @@ preInlineBetaUnconditionally
 --   * A lambda binder never has an inline pragma, a stable unfolding, or RULES
 --     (see `lamBndrInfoOK`), so no need to check activation, nor for
 --     Note [Stable unfoldings and preInlineUnconditionally]
+--
+-- And we add one extra one
+--   * Check the let-can-float invariant, and don't inline if not
+
 preInlineBetaUnconditionally env levity bndr arg
   | assertPpr (lamBndrInfoOK bndr) (ppr bndr) $
     not pre_inline_unconditionally           = Nothing
   | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
   | not (one_occ (idOccInfo bndr))           = Nothing
-  | needs_case_binding                       = Nothing
+  | needs_case_binding                       = Nothing  -- Enforce the let-can-float invariant
   | otherwise                                = Just $! extendIdSubst env bndr arg
     -- If the arg is not yet simplified, it is a ContEx, which captures the
     --    lexical environment for us to restore in `simplInId`.
@@ -1946,24 +1953,24 @@ preInlineBetaUnconditionally env levity bndr arg
   where
     pre_inline_unconditionally = sePreInline env
 
+    needs_case_binding = needsCaseBindingL levity rhs
+    -- Ok to test an InExpr or OutExpr in needsCaseBindingL because
+    -- exprOkForSpeculation is stable under simplification
+
+    rhs :: CoreExpr   -- Can be InExpr or OutExpr, but here it does not matter
+    rhs = case arg of
+            ContEx _ e _ -> e          -- InExpr
+            DoneEx e _   -> e          -- OutExpr
+            DoneId v     -> Var v      -- OutExpr
+
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = NotInsideLam }   = True
     one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = IsInsideLam
-                  , occ_int_cxt = IsInteresting } = case arg of
-                                                      ContEx _ e _ -> canInlineInLam e
-                                                      DoneEx e _   -> canInlineInLam e
-                                                      DoneId v     -> canInlineInLam (Var v)
+                  , occ_int_cxt = IsInteresting } = canInlineInLam rhs
     one_occ _                                     = False
 
-    -- Enforce the let-can-float invariant
-    -- Ok to test an InExpr in needsCaseBinding because
-    -- exprOkForSpeculation is stable under simplification
-    needs_case_binding = case arg of
-                           ContEx _ e _ -> needsCaseBindingL levity e
-                           DoneEx e _   -> needsCaseBindingL levity e
-                           DoneId v     -> needsCaseBindingL levity (Var v)
 
 canInlineInLam :: CoreExpr -> Bool
 -- Be very careful before inlining inside a lambda, because (a) we must not

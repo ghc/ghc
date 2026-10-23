@@ -2072,7 +2072,7 @@ mkSeqs seqees res_ty rhs =
                    -- localiseId: see (SCF1) in Note [SpecConstr and strict fields]
                    -- mkCaseBndrFromLetBndr: arg_id may have IdInfo (e.g. an unfolding,
                    --   if it is a global) that a case binder must not have; see
-                   --   Note [Lambda and case binders have vanilla IdInfo] in GHC.Core
+                   --   Note [Core binder IdInfo invariants] in GHC.Core
                res_ty
                ([Alt DEFAULT [] rhs])
 

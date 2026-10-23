@@ -1372,15 +1372,7 @@ getTCvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv
 
 getFullSubst :: InScopeSet -> SimplEnv -> Subst
 getFullSubst in_scope (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
-  = mkSubst in_scope (mapVarEnv to_expr id_env) tv_env cv_env
-  where
-    to_expr :: SimplClo -> CoreExpr
-    -- A tiresome impedence-matcher
-    to_expr (DoneEx e _)       = e
-    to_expr (DoneId v)         = Var v
-    to_expr (ContEx env e mco) = mkCastMCo e' mco
-      where
-        e' = GHC.Core.Subst.substExprSC (getFullSubst in_scope env) e
+  = mkSubst in_scope (mapVarEnv (simplCloExpr in_scope) id_env) tv_env cv_env
 
 simplCloExpr :: InScopeSet -> SimplClo -> OutExpr
 -- Turn a SimplClo into an OutExpr, by applying the substitution

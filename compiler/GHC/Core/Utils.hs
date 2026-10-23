@@ -758,7 +758,7 @@ bindNonRec bndr rhs body
   where
     case_bind = mkDefaultCase rhs (mkCaseBndrFromLetBndr bndr) body
                 -- mkCaseBndrFromLetBndr: bndr may have IdInfo suitable for a
-                -- let-binder; see Note [Lambda and case binders have vanilla IdInfo]
+                -- let-binder; see Note [Core binder IdInfo invariants]
                 -- in GHC.Core
     let_bind  = Let (NonRec bndr rhs) body
 
