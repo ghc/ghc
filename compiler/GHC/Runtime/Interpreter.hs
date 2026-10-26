@@ -105,7 +105,7 @@ import GHCi.Run
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.Catch as MC (mask)
+import Control.Monad.Catch as MC (mask, handle, MonadThrow (..))
 import Data.Binary
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Short as SBS
@@ -196,14 +196,16 @@ interpCmd interp msg = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp     -> run msg -- Just run it directly
 #endif
-  ExternalInterp ext -> withExtInterp ext $ \inst ->
+  ExternalInterp ext -> withExtInterp interp ext $ \inst ->
     sendMessage inst msg
 
-withExtInterp :: ExceptionMonad m => ExtInterp -> (forall d. ExtInterpInstance d -> m a) -> m a
-withExtInterp ext action = case ext of
+withExtInterp :: ExceptionMonad m => Interp -> ExtInterp -> (forall d. ExtInterpInstance d -> m a) -> m a
+withExtInterp interp ext action = stopInterpOnPipeClosed $ case ext of
   ExtJS    i -> withJSInterp i action
   ExtWasm  i -> withWasmInterp i action
   ExtIServ i -> withIServ    i action
+  where
+    stopInterpOnPipeClosed = MC.handle $ \ (e :: PipeClosedException) -> liftIO (stopInterp interp) >> MC.throwM e
 
 withExtInterpStatus :: ExtInterp -> (forall d. ExtInterpStatusVar d -> m a) -> m a
 withExtInterpStatus ext action = case ext of
@@ -642,6 +644,9 @@ stopInterp interp = case interpInstance interp of
                else sendMessage i Shutdown
             -- We asked the server to shutdown, so we will also shutdown any communication.
             closePipe (interpPipe (instProcess i))
+            modifyMVar_ (loader_state (interpLoader interp)) (const $ pure Nothing)
+            purgeInterpSymbolCache (interpSymbolCache interp)
+            modifyMVar_ (interpStringCache interp) (const $ pure emptyFsEnv)
             pure InterpPending
 
 -- -----------------------------------------------------------------------------
