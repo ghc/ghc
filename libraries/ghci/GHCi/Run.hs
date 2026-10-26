@@ -349,7 +349,7 @@ sandboxIO opts io
           -- We only write the thread status map in two places:
           -- * When the "main" thread finishes (here)
           -- * When any thread hits a breakpoint (global break action)
-          unmask runIt >>= writeThreadEvalStatus tid
+          runIt unmask >>= writeThreadEvalStatus tid
 
         setBreakAction opts tid
         putMVar wait ()
@@ -369,14 +369,14 @@ sandboxIO opts io
       -- separate thread, so debugging is only enabled when
       -- using the sandbox.
       tid <- forkIO (pure ())
-      runIt >>= writeThreadEvalStatus tid
+      runIt id >>= writeThreadEvalStatus tid
       mkRemoteRef tid
         -- We `runIt` on the main thread, but fork a new thread to store to the
         -- result with `writeThreadEvalStatus` to fit the asynchronous API. We
         -- can't use myThreadId because if the user happens to runIt twice
         -- before awaiting, the second result will clobber the first.
   where
-    runIt = measureAlloc $ tryEval $ rethrow opts $ clearCCS io
+    runIt unmask = measureAlloc $ tryEval $ unmask $ rethrow opts $ clearCCS io
 
     -- We want to turn ^C into a break when -fbreak-on-exception is on,
     -- but it's an async exception and we only break for sync exceptions.

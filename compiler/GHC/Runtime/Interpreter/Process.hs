@@ -11,7 +11,6 @@ import GHC.Prelude
 
 import GHC.Runtime.Interpreter.Types
 import GHCi.Message
-import GHCi.RemoteTypes
 
 import GHC.Utils.Panic
 import GHC.Utils.Exception as Ex

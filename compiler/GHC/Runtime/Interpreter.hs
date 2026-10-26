@@ -528,9 +528,9 @@ handleSeqHValueStatus interp unit_env logger eval_status =
 -- redirected to a given (possibly remote) thread.
 redirectInterrupts :: Interp -> ForeignRef ThreadId -> IO a -> IO a
 redirectInterrupts interp thread wait =
-  wait `catch` \e -> do
+  wait `catch` \(e::SomeAsyncException) -> do
     withForeignRef thread $ \rtid ->
-      interpCmd interp (ThrowTo rtid (toSerializableException (e :: SomeException)))
+      interpCmd interp (ThrowTo rtid (toSerializableException (toException e)))
     wait
 
 -- -----------------------------------------------------------------------------
