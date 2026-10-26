@@ -72,6 +72,7 @@ import GHC.Unit.Module
 import GHC.Builtin.KnownKeys
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Rename.Utils (wrapGenSpan')
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Utils.Misc
@@ -1024,8 +1025,9 @@ Specifically:
 -}
 
 
--- | Use -XStrict to add a ! or remove a ~
--- See Note [decideBangHood]
+-- | Use -XStrict to add a ! or remove a ~, as per  Note [decideBangHood].
+--
+-- The inserted bang is compiler-generated: see Note [Desugaring -XStrict matches in Pmc].
 decideBangHood :: DynFlags
                -> LPat GhcTc  -- ^ Original pattern
                -> LPat GhcTc  -- Pattern with bang if necessary
@@ -1040,7 +1042,7 @@ decideBangHood dflags lpat
            ParPat x p -> L l (ParPat x (go p))
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
-           _             -> L l (BangPat noExtField lp)
+           _             -> wrapGenSpan' (locA l) (BangPat noExtField lp)
 
 isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 
