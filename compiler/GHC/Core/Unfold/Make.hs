@@ -164,10 +164,10 @@ mkInlineUnfoldingWithArity opts src arity expr
     guide = UnfWhen { ug_arity = arity
                     , ug_unsat_ok = needSaturated
                     , ug_boring_ok = boring_ok }
-    -- See Note [INLINE pragmas and boring contexts] as to why we need to look
-    -- at the arity here.
-    boring_ok | arity == 0 = True
-              | otherwise  = inlineBoringOk expr'
+    -- EXPERIMENT (#27984): inline INLINE functions even in boring contexts,
+    -- whatever their arity and size, so that
+    -- Note [INLINE pragmas and boring contexts] no longer describes this code.
+    boring_ok = True
 
 mkInlinableUnfolding :: SimpleOpts -> UnfoldingSource -> CoreExpr -> Unfolding
 mkInlinableUnfolding opts src expr
