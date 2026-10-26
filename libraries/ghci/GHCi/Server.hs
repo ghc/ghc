@@ -53,18 +53,17 @@ noCustomHandler _ _ = return Nothing
 trace :: String -> IO ()
 trace s = getProgName >>= \name -> hPrintf stderr "[%20s] %s\n" name s
 
-serv :: Bool -> MessageHook -> Pipe -> (forall a .IO a -> IO a) -> IO ()
-serv verbose hook pipe restore =
-  servWithCustom verbose hook pipe restore noCustomHandler
+serv :: Bool -> MessageHook -> Pipe -> IO ()
+serv verbose hook pipe =
+  servWithCustom verbose hook pipe noCustomHandler
 
 servWithCustom
   :: Bool
   -> MessageHook
   -> Pipe
-  -> (forall a. IO a -> IO a)
   -> CustomMessageHandler
   -> IO ()
-servWithCustom verbose hook pipe restore customHandler = do
+servWithCustom verbose hook pipe customHandler = do
   ref <- newIORef False
   withThreadManager $ \mngr -> do
     loop ref mngr `finally` closePipe pipe
@@ -74,7 +73,6 @@ servWithCustom verbose hook pipe restore customHandler = do
 
     handleRemoteCall pipe hook $ \wr setCancel (msg :: Message a) ->
 
-      discardCtrlC                                 %>>= \_ ->
       when verbose (trace ("msg: " ++ (show msg))) %>>= \_ ->
 
       case msg of
@@ -148,17 +146,6 @@ servWithCustom verbose hook pipe restore customHandler = do
        Left e -> showException e
        Right str -> return str
 
-  -- throw away any pending ^C exceptions while we're not running
-  -- interpreted code.  GHC will also get the ^C, and either ignore it
-  -- (if this is GHCi), or tell us to quit with a Shutdown message.
-  discardCtrlC = do
-    when verbose $ trace "discardCtrlC"
-    r <- try $ restore $ return ()
-    case r of
-      Left UserInterrupt -> return () >> discardCtrlC
-      Left e -> throwIO e
-      _ -> return ()
-
 -- | Default server
 #if defined(wasm32_HOST_ARCH)
 defaultServer :: Callback (JSVal -> IO ()) -> Callback (IO JSUint8Array) -> Callback (JSUint8Array -> IO ()) -> IO ()
@@ -203,12 +190,12 @@ defaultServerWithCustom customHandler = do
 
 #if defined(wasm32_HOST_ARCH)
   -- See Note [wasm ghci signal handlers] for details
-  installSignalHandlers $ js_register_signal_handler cb_sig
+  ignoreInterrupts $ js_register_signal_handler cb_sig
   pipe <- mkPipeFromContinuations (recv_buf cb_recv) (send_buf cb_send) (pure ()) (pure ())
 #else
   when verbose $
     printf "GHC iserv starting (in: %s; out: %s)\n" (show inh) (show outh)
-  installSignalHandlers
+  ignoreInterrupts
   pipe <- mkPipeFromHandles inh outh
 #endif
 
@@ -217,11 +204,9 @@ defaultServerWithCustom customHandler = do
       putStrLn "Waiting 3s"
     threadDelay 3000000
 
-  uninterruptibleMask $ \restore -> servWithCustom verbose hook pipe restore customHandler
+  servWithCustom verbose hook pipe customHandler
 
   where hook = return -- empty hook
-    -- we cannot allow any async exceptions while communicating, because
-    -- we will lose sync in the protocol, hence uninterruptibleMask.
 
 dieWithUsage :: IO a
 dieWithUsage = do
