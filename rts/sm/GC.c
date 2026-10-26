@@ -1151,7 +1151,7 @@ GarbageCollect (struct GcConfig config,
   stat_endGCWorker(cap, gct);
   stat_endGC(cap, gct, live_words, copied,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */,
-             N, n_gc_threads, gc_threads,
+             N, n_gc_threads,
              par_max_copied, par_balanced_copied,
              any_work, scav_find_work, max_n_todo_overflow);
 
@@ -1198,6 +1198,13 @@ new_gc_thread (uint32_t n, gc_thread *t)
     t->thread_index = n;
     t->free_blocks = NULL;
     t->gc_count = 0;
+
+    // Stats fields, owned by Stats.c. Zeroed for hygiene only: Stats.c
+    // sets them before it reads them (see #26169).
+    t->gc_start_cpu = 0;
+    t->gc_sync_start_elapsed = 0;
+    t->gc_start_elapsed = 0;
+    t->gc_start_faults = 0;
 
     init_gc_thread(t);
 
