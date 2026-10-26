@@ -1160,7 +1160,7 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
       runQinTcM $ sequence_ qs
 #endif
 
-    ExternalInterp ext -> withExtInterp ext $ \inst -> do
+    ExternalInterp ext -> withExtInterp interp ext $ \inst -> do
       tcg <- getGblEnv
       th_state <- readTcRef (tcg_th_remote_state tcg)
       case th_state of
@@ -1817,7 +1817,7 @@ runTH ty fhv = do
       return r
 #endif
 
-    ExternalInterp ext -> withExtInterp ext $ \inst -> do
+    ExternalInterp ext -> withExtInterp interp ext $ \inst -> do
       -- Run it on the server.  For an overview of how TH works with
       -- Remote GHCi, see Note [Remote Template Haskell] in
       -- libraries/ghci/GHCi/TH.hs.
