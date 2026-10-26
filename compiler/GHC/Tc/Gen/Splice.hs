@@ -170,6 +170,7 @@ import Data.IORef
 import GHC.Parser.HaddockLex (lexHsDoc)
 import GHC.Parser (parseIdentifier)
 import GHC.Rename.Doc (rnHsDoc)
+import GHC.Tc.Gen.Head
 
 {-
 Note [Template Haskell state diagram]
@@ -699,17 +700,36 @@ tcTypedBracket rn_expr expr res_ty
        -- brackets.
        ; let wrapper = QuoteWrapper ev_var m_var
 
+       ; traceTc "==== result type of bracket:" (ppr res_ty)
+
+       {- The issue here is as follows:
+        - res_ty is the result type of the entire bracket; but we don't yet
+        - know that the expr that is contained in the bracket is the correct
+        - type.
+        - Thus, we infer the type of the expr in the bracket. That type is a
+        - rho type, that is, it cannot have a `forall` on the outside and thus
+        - `Code m rho` cannot be an impredicative type.
+        - Wrapping into a bracket here is somewhat like a constructor application
+        - in the sense that we ~magically~ construct a type Code m a; if this
+        - was a real constructor application, we could just do quicklook impredicativity
+        - here.
+        - -}
+       ; do_ql <- do { impred <- xoptM LangExt.ImpredicativeTypes
+                     ; if impred then pure DoQL else pure NoQL }
+
        -- Typecheck expr to make sure it is valid.
-       -- The typechecked expression won't be used, so we just discard it
-       --   (See Note [The life cycle of a TH quotation] in GHC.Hs.Expr)
-       -- We'll typecheck it again when we splice it in somewhere
+       -- We'll typecheck the expression again when we splice it in somewhere
        ; (tc_expr, expr_ty) <- setThLevel (Brack cur_lvl (TcPending ps_var lie_var wrapper)) $
                                 tcScalingUsage ManyTy $
                                 -- Scale by Many, TH lifting is currently nonlinear (#18465)
-                                tcInferRhoNC expr
+                                -- tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
+                                check_bracket_poly expr res_ty
+
+       ; traceTc "==== created exp_ty" (ppr expr_ty)
        ; let rep = getRuntimeRep expr_ty
        ; meta_ty <- tcCodeTy m_var expr_ty
+       ; traceTc "==== created meta_ty in tcCodeTy" (ppr meta_ty)
        ; ps' <- readMutVar ps_var
        ; codeco <- tcLookupKnownOccId unsafeCodeCoerceOcc
        ; bracket_ty <- mkAppTy m_var <$> tcMetaKnownOccTy expTyConOcc
@@ -723,6 +743,17 @@ tcTypedBracket rn_expr expr res_ty
                                                   (nlHsTyApp codeco [rep, expr_ty]))
                                       (noLocA brack_expr)))
                        meta_ty res_ty }
+
+check_bracket_poly :: GenLocated SrcSpanAnnA (HsExpr GhcRn) -> ExpType -> TcM (LHsExpr GhcTc, TcSigmaType)
+check_bracket_poly expr res_ty
+  | Check target_ty <- res_ty = do
+     { (_coe, [_m, _rr, a_ty]) <- do
+        { codeCon <- tcLookupKnownOccTyCon codeTyConOcc
+        ; matchExpectedTyConApp codeCon target_ty }
+     ; tc_expr <- tcCheckPolyExprNC expr a_ty
+     ; pure (tc_expr, a_ty) }
+
+  | Infer {} <- res_ty = tcInferRhoNC expr
 
 -- See Note [Typechecking Overloaded Quotes]
 tcUntypedBracket rn_expr brack ps res_ty
@@ -875,12 +906,18 @@ tcUntypedSplice q splice_name (XUntypedSplice ils)
 
        ; return (PendingTcSplice splice_name res) }
 
+{- strategy:
+- 1 take apart quote wrapper
+- 2 instantiate type of expr'
+- 3 subsumption check
+- -}
 tcPendingSpliceTyped :: QuoteWrapper -> SplicePointName -> HsTypedSplice GhcRn -> ExpRhoType -> TcM PendingTcSplice
 tcPendingSpliceTyped q@(QuoteWrapper _ m_var) splice_name (HsTypedSpliceExpr _ expr) res_ty
   = do { res_ty <- expTypeToType res_ty
        ; let rep = getRuntimeRep res_ty
        ; meta_exp_ty <- tcCodeTy m_var res_ty
-       ; expr' <- tcCheckMonoExpr expr meta_exp_ty
+       ; traceTc "==== tcPendingSplictTyped; meta_exp_ty" (ppr meta_exp_ty)
+       ; expr' <- tcCheckPolyExpr expr meta_exp_ty
        ; untype_code <- tcLookupKnownOccId unTypeCodeOcc
        ; let expr'' = mkHsApp
                          (mkLHsWrap (applyQuoteWrapper q)
@@ -890,6 +927,7 @@ tcPendingSpliceTyped q splice_name (XTypedSplice ils) res_ty
   = do { let id_name = implicit_lift_lid ils
        ; res_ty <- expTypeToType res_ty
        ; let rep = getRuntimeRep res_ty
+       ; traceTc "==== tcPendingSpliceTyped other branch" (ppr res_ty)
        ; let v_expr = noLocA (HsVar noExtField id_name)
        ; v_expr' <- tcCheckMonoExpr v_expr res_ty
        -- lift :: Quote m' => a -> m' Exp
@@ -902,11 +940,11 @@ tcPendingSpliceTyped q splice_name (XTypedSplice ils) res_ty
 
 
 ---------------
--- Takes a m and tau and returns the type m (TExp tau)
+-- Takes an m and a tau and returns the type Code m tau
 tcCodeTy :: TcType -> TcType -> TcM TcType
 tcCodeTy m_ty exp_ty
-  = do { unless (isTauTy exp_ty) $ addErr $
-          TcRnTHError $ TypedTHError $ TypedTHWithPolyType exp_ty
+  = do { -- unless (isTauTy exp_ty) $ addErr $
+         --  TcRnTHError $ TypedTHError $ TypedTHWithPolyType exp_ty
        ; codeCon <- tcLookupKnownOccTyCon codeTyConOcc
        ; let rep = getRuntimeRep exp_ty
        ; return (mkTyConApp codeCon [m_ty, rep, exp_ty]) }
@@ -941,6 +979,7 @@ tcTypedSplice (HsTypedSpliceNested sp) expr res_ty
   -- The expr is checked in tcPendingSpliceTyped
   = addErrCtxt (TypedSpliceCtxt (Just sp) expr) $
     setSrcSpan loc    $ do
+      traceTc "===== typechking typed splice of type" (ppr res_ty)
       lvl <- getThLevel
       case lvl of
         Brack _ (TcPending ps_var lie_var q) -> do
@@ -977,17 +1016,42 @@ tcTopSplice :: LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcTopSplice expr res_ty
   = do { -- Typecheck the expression,
          -- making sure it has type Q (T res_ty)
-         res_ty <- expTypeToType res_ty
-       ; q_type <- tcMetaKnownOccTy qTyConOcc
-       -- Top level splices must still be of type Q (TExp a)
-       ; meta_exp_ty <- tcCodeTy q_type res_ty
-       ; q_expr <- tcTopSpliceExpr Typed $
-                   tcCheckMonoExpr expr meta_exp_ty
+         res_ty <- expTypeToType res_ty -- don't have to exp type to type here
+         -- assert that hs expr is a (typed) splice
+         -- then go ahead and infer the type of the expr
+         -- then do subsumption check for res_ty
+       -- ; q_type <- tcMetaKnownOccTy qTyConOcc
+       -- Top level splices must still be of type CodeQ a
+       -- wrap res_ty into Code: WRONG; need to unwrap target ty instead of wrapping
+       -- into code; we want subsumption for res_ty vs result of splice, not
+       -- unification of CodeQ res_ty with type before splicing
+       -- ; meta_exp_ty <- tcCodeTy q_type res_ty
+       -- ; traceTc "==== meta_exp_ty" (ppr meta_exp_ty)
+       ; (q_expr, splice_res_ty) <- do
+         { (tc_expr, bracket_ty) <-
+           -- tcTopSpliceExpr Typed $
+            tcInferExpr IIF_DeepRho expr -- instantiate expr's type
+         ; traceTc "==== we found that it has the following rho type:" (ppr bracket_ty)
+         ; codeCon <- tcLookupKnownOccTyCon codeTyConOcc
+         ; (_coe, [_m, _rr, splice_res_ty]) <- matchExpectedTyConApp codeCon bracket_ty
+         ; pure (tc_expr, splice_res_ty)
+         }
+       ; _ <- -- h(mcoe, lie) <-
+          -- checkNoErrs $
+          -- setThLevel (Splice Typed Comp) $
+          -- tryCaptureConstraints $
+          tcSubTypeSigma AppOrigin SigmaCtxt splice_res_ty res_ty
+
+       -- ; const_binds <- simplifyTop lie
+
+       -- ; traceTc "==== captured the following constraints" (ppr lie)
+       -- ; q_expr <- tcTopSpliceExpr Typed $
+       --             tcCheckMonoExpr expr meta_exp_ty
        ; lcl_env <- getLclEnv
+       -- ; let q_expr' = mkHsDictLet (EvBinds const_binds) q_expr
        ; let delayed_splice
               = DelayedSplice lcl_env expr res_ty q_expr
        ; return (HsTypedSplice delayed_splice (HsTypedSpliceExpr noExtField q_expr))
-
        }
 
 -------------------

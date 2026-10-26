@@ -430,19 +430,19 @@ data InferFRRFlag
 
   | IFRR_Any                  -- No need to check for fixed runtime-rep
 
-data InferInstFlag  -- Specifies whether the inference should return an uninstantiated
+data InferInstFlag  -- ^ Specifies whether the inference should return an uninstantiated
                     -- SigmaType, or a (possibly deeply) instantiated RhoType
                     -- See Note [Instantiation of InferResult] in GHC.Tc.Utils.Unify
 
-  = IIF_Sigma       -- Trying to infer a SigmaType
+  = IIF_Sigma       -- ^ Trying to infer a SigmaType
                     -- Don't instantiate at all, regardless of DeepSubsumption
                     -- Typically used when inferring the type of a pattern
 
-  | IIF_ShallowRho  -- Trying to infer a shallow RhoType (no foralls or => at the top)
+  | IIF_ShallowRho  -- ^ Trying to infer a shallow RhoType (no foralls or => at the top)
                     -- Top-instantiate (only, regardless of DeepSubsumption) before filling the hole
                     -- Used only for view patterns; see Note [View patterns and polymorphism]
 
-  | IIF_DeepRho     -- Trying to infer a possibly-deep RhoType (depending on DeepSubsumption)
+  | IIF_DeepRho     -- ^ Trying to infer a possibly-deep RhoType (depending on DeepSubsumption)
                     -- If DeepSubsumption is off, same as IIF_ShallowRho
                     -- If DeepSubsumption is on, instantiate deeply before filling the hole
                     -- Typically used when inferring the type of an expression
