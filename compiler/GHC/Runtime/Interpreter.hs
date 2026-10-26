@@ -463,7 +463,9 @@ seqHValue :: Interp -> UnitEnv -> Logger -> ForeignHValue -> IO (EvalResult ())
 seqHValue interp unit_env logger ref =
   withForeignRef ref $ \hval -> do
     rtid   <- interpCmd interp (Seq hval)
-    status <- interpCmd interp (WaitThreadResult rtid)
+    status <- -- TODO redirectInterrupts interp rtid $
+              interpCmd interp (WaitThreadResult rtid)
+    freeRemoteRef rtid
     handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
 
 evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
@@ -508,7 +510,8 @@ handleSeqHValueStatus interp unit_env logger eval_status =
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \rtid -> do
         interpCmd interp (ResumeSeq rtid)
-        status <- interpCmd interp (WaitThreadResult rtid)
+        status <- -- TODO: redirectInterrupts interp rtid $
+                  interpCmd interp (WaitThreadResult rtid)
         handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
     (EvalComplete _ r) -> return r
 

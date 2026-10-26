@@ -18,7 +18,7 @@ module GHCi.Run.Breakpoints
   , listOtherPausedThreads
 
   -- * Per-thread resume-ing
-  , getThreadResumeContext, ResumeContext(..)
+  , getThreadResumeContext, ResumeContext(..), ResumeThreadStatus(..)
 
   )
   where
@@ -116,10 +116,9 @@ readThreadEvalStatus tid = do
 readCtxEvalStatus :: ResumeContext -> STM (EvalStatus [HValueRef])
 readCtxEvalStatus ResumeContext{resumeEvalStatus} =
   readTVar resumeEvalStatus >>= \case
-    Just r  -> do
-      writeTVar resumeEvalStatus Nothing -- clear it
-      pure r
-    Nothing -> retry -- until someone writes the result for this thread
+    ThreadStatusStopped r -> pure r
+    ThreadStatusRunning   -> retry
+      -- until someone writes a result for this thread
 
 -- | All threads running in the interpreter will be debugger-enabled, meaning
 -- if they hit an enabled breakpoint, the 'globalBreakAction' will be
@@ -147,12 +146,11 @@ readAnyThreadEvalBreak = do
       if isolated
         then retry -- don't look at isolated threads
         else readTVar resumeEvalStatus >>= \case
-          Just (EvalPaused b) -> do
-            writeTVar resumeEvalStatus Nothing
+          ThreadStatusStopped (EvalPaused b) -> do
             pure b
-          Just EvalComplete{} ->
+          ThreadStatusStopped EvalComplete{} ->
             retry -- successes can be read with `readThreadEvalStatus`
-          Nothing ->
+          ThreadStatusRunning ->
             retry -- no status for this thread yet
 
 writeThreadEvalStatus :: ThreadId -> EvalStatus [HValueRef] -> IO ()
@@ -168,8 +166,8 @@ writeCtxEvalStatus :: ResumeContext -> EvalStatus [HValueRef] -> IO ()
 writeCtxEvalStatus ResumeContext{resumeEvalStatus} status =
   atomically $ do
     readTVar resumeEvalStatus >>= \case
-      Just{}  -> error "writeCtxEvalStatus: should be impossible"
-      Nothing -> writeTVar resumeEvalStatus (Just status)
+      ThreadStatusStopped{} -> error "writeCtxEvalStatus: should be impossible"
+      ThreadStatusRunning -> writeTVar resumeEvalStatus (ThreadStatusStopped status)
 
 
 -- ** Isolating thread breakpoints ---------------------------------------------
@@ -209,9 +207,9 @@ listOtherPausedThreads = atomically $ do
     isBreak (tid, ResumeContext{resumeEvalStatus}) = do
       status <- readTVar resumeEvalStatus
       pure (tid, case status of
-                   Just EvalBreak{}    -> True
-                   Just EvalComplete{} -> False
-                   Nothing             -> False)
+                   ThreadStatusStopped EvalBreak{}    -> True
+                   ThreadStatusStopped EvalComplete{} -> False
+                   ThreadStatusRunning                -> False)
 
 --------------------------------------------------------------------------------
 -- * Per-thread resume-ing
@@ -224,7 +222,7 @@ getThreadResumeContext tid = do
     Just ctx -> pure ctx -- common case: hence read without transaction
     Nothing  -> do
       new_ctx <- ResumeContext <$> newEmptyMVar
-                               <*> newTVarIO Nothing
+                               <*> newTVarIO ThreadStatusRunning
                                <*> newTVarIO False
       atomically $ do -- write new thread context atomically
         ctxs1 <- readTVar threadContextsVar
@@ -256,7 +254,7 @@ data ResumeContext = ResumeContext
   -- ^ A thread that hits a breakpoint blocks reading its corresponding MVar
   -- (gotten from the 'threadContextsVar').
   -- The debugger can unblock that thread by signaling its MVar.
-  , resumeEvalStatus :: !(TVar (Maybe (EvalStatus [HValueRef])))
+  , resumeEvalStatus :: !(TVar ResumeThreadStatus)
   -- ^ When a thread hits a breakpoint, the 'globalBreakAction' is run and
   -- writes an 'EvalBreak' in this @TVar@ (which was found in 'threadContextsVar').
   --
@@ -272,3 +270,17 @@ data ResumeContext = ResumeContext
   -- 'EvalBreak' can only be read with @'readThreadEvalStatus' tid@ for this
   -- thread's @tid@ directly.
   }
+
+data ResumeThreadStatus
+  -- | The thread has hit a breakpoint or completed with a result.
+  -- Concurrent reads of this value are fine, since a thread can only be
+  -- resumed from a breakpoint once (see 'ThreadStatusRunning') anyway.
+  --
+  -- That is, many threads may 'readThreadEvalStatus' this status while the
+  -- thread is stopped. As soon as 'ThreadStatusRunning', the reads will block
+  -- waiting for another stopped result.
+  = ThreadStatusStopped (EvalStatus [HValueRef])
+  -- | When resuming a thread, the 'ResumeThreadStatus' must be set to
+  -- 'ThreadStatusRunning' so that further attempts to resume from the same
+  -- breakpoint fail.
+  | ThreadStatusRunning

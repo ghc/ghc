@@ -311,6 +311,11 @@ resumeStmt opts rtid = do
   ResumeContext{..} <- getThreadResumeContext resumeThreadId
   -- See Note [TODO: all break options must be set every time]
   setBreakAction opts resumeThreadId
+  atomically $ do
+    s <- readTVar resumeEvalStatus
+    case s of
+      ThreadStatusStopped{} -> writeTVar resumeEvalStatus ThreadStatusRunning
+      ThreadStatusRunning   -> throwSTM ResumedAlreadyRunningThreadException
   putMVar resumeBreakMVar () -- this awakens the stopped thread
                              -- await the result with `WaitThreadResult` or friends
 
@@ -432,3 +437,7 @@ setBreakAction opts tid@(ThreadId tid#) = do
         else unsetIsolatedCtx ctx
 
     runIf#   pred what     = when (pred opts) (what tid#)
+
+-- | Attempted to resume a thread that was already running!
+data ResumedAlreadyRunningThreadException = ResumedAlreadyRunningThreadException deriving Show
+instance Exception ResumedAlreadyRunningThreadException
