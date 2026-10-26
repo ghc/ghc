@@ -7,7 +7,7 @@ module GHCi.Message.Async
   (
     -- * Pipes
     Pipe(..), mkPipeFromHandles, mkPipeFromContinuations
-  , closePipe, PipeReadClosedException(..)
+  , closePipe, PipeClosedException(..)
 
     -- * Interface for async bidirectional RPC
   , remoteAsyncReq, handleAsyncReq
@@ -145,13 +145,13 @@ closePipe p@Pipe{..} = do
       unless writeAlreadyClosed
         (throwTo (asyncFillTid pipeAsyncMngr) PipeWriteClosedException)
 
--- | We've closed the pipe read end on this process
-data PipeReadClosedException = PipeReadClosedException deriving Show
-instance Exception PipeReadClosedException
+data PipeClosedException
+  = PipeReadClosedException -- ^ We've closed the pipe read end on this process
 
--- | We've closed the pipe write end on this process
-data PipeWriteClosedException = PipeWriteClosedException deriving Show
-instance Exception PipeWriteClosedException
+  | PipeWriteClosedException -- ^ We've closed the pipe write end on this process
+  deriving Show
+instance Exception PipeClosedException
+
 
 --------------------------------------------------------------------------------
 -- ** Pipe thread-safe read/write
