@@ -395,6 +395,11 @@ stat_endNonmovingGcSync (void)
  * stat_{start,end}NonmovingGcSync.
  */
 
+// Thread CPU time used by the collection in progress. Every thread that
+// takes part adds its own time in stat_endGCWorker, and stat_endGC takes
+// the total. Idle GC threads never add anything (#26169).
+static Time gc_cpu_ns_acc = 0;
+
 void
 stat_startGCWorker (Capability *cap STG_UNUSED, gc_thread *gct)
 {
@@ -415,8 +420,12 @@ stat_endGCWorker (Capability *cap STG_UNUSED, gc_thread *gct)
         rtsConfig.gcDoneHook != NULL;
 
     if (stats_enabled || RtsFlags.ProfFlags.doHeapProfile) {
-        gct->gc_end_cpu = getCurrentThreadCPUTime();
-        ASSERT(gct->gc_end_cpu >= gct->gc_start_cpu);
+        Time end_cpu = getCurrentThreadCPUTime();
+        ASSERT(end_cpu >= gct->gc_start_cpu);
+        // A relaxed add is enough: a worker calls this before it stores
+        // GC_THREAD_WAITING_TO_CONTINUE, and the GC leader waits for that
+        // store in shutdown_gc_threads before it calls stat_endGC.
+        RELAXED_ADD(&gc_cpu_ns_acc, end_cpu - gct->gc_start_cpu);
     }
 }
 
@@ -464,7 +473,7 @@ stat_startGC (Capability *cap, gc_thread *gct)
 
 void
 stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ slop,
-            uint32_t gen, uint32_t par_n_threads, gc_thread **gc_threads,
+            uint32_t gen, uint32_t par_n_threads,
             W_ par_max_copied, W_ par_balanced_copied, W_ any_work,
             W_ scav_find_work, W_ max_n_todo_overflow)
 {
@@ -513,22 +522,10 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
         stats.gc.sync_elapsed_ns =
             initiating_gct->gc_start_elapsed - initiating_gct->gc_sync_start_elapsed;
         stats.gc.elapsed_ns = current_elapsed - initiating_gct->gc_start_elapsed;
-        stats.gc.cpu_ns = 0;
-        // see Note [n_gc_threads]
-        // par_n_threads is set to n_gc_threads at the single callsite of this
-        // function
-        for (unsigned int i=0; i < par_n_threads; i++) {
-            gc_thread *gct = gc_threads[i];
-            ASSERT(gct->gc_end_cpu >= gct->gc_start_cpu);
-            stats.gc.cpu_ns += gct->gc_end_cpu - gct->gc_start_cpu;
-            // Reset the start/end times to zero after the difference has been
-            // added to the global total (see #21082)
-            // Resetting the values here is the most direct way to avoid double counting
-            // because the gc_end_cpu and gc_start_cpu is not reset to zero as
-            // stat_startGC is only called on active (not idle threads).
-            gct->gc_end_cpu = 0;
-            gct->gc_start_cpu = 0;
-        }
+        stats.gc.cpu_ns = RELAXED_LOAD(&gc_cpu_ns_acc);
+        RELAXED_STORE(&gc_cpu_ns_acc, 0);
+        // The GC threads cannot have used more CPU time than the process
+        ASSERT(stats.gc.cpu_ns >= 0 && stats.gc.cpu_ns <= stats.cpu_ns);
     }
     // -------------------------------------------------
     // Update the cumulative stats

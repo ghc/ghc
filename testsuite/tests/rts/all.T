@@ -787,3 +787,9 @@ test('T27272',
      , extra_run_opts('+RTS -N3 -ki512 -kc1k -kb128 -RTS')
      ],
      multimod_compile_and_run, ['T27272', '-O -threaded -fno-prof-auto'])
+
+test('T26169',
+     [only_ways(['threaded1', 'threaded2']),
+      req_target_smp,
+      extra_run_opts('+RTS -T -qn2 -RTS')],
+     compile_and_run, [''])

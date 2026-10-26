@@ -25,7 +25,7 @@ void      stat_startGCWorker (Capability *cap, struct gc_thread_ *_gct);
 void      stat_endGCWorker (Capability *cap, struct gc_thread_ *_gct);
 void      stat_endGC  (Capability *cap, struct gc_thread_ *initiating_gct, W_ live,
                        W_ copied, W_ slop, uint32_t gen,
-                       uint32_t n_gc_threads, struct gc_thread_ **gc_threads,
+                       uint32_t n_gc_threads,
                        W_ par_max_copied, W_ par_balanced_copied,
                        W_ any_work, W_ scav_find_work, W_ max_n_todo_overflow);
 
