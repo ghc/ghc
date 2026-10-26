@@ -18,7 +18,9 @@ module GHCi.Run.Breakpoints
   , listOtherPausedThreads
 
   -- * Per-thread resume-ing
-  , getThreadResumeContext, ResumeContext(..), ResumeThreadStatus(..)
+  , getThreadResumeContext, resumeStoppedThread
+  , ResumeContext(..)
+  , ResumeThreadStatus(..), ResumedAlreadyRunningThreadException(..)
 
   )
   where
@@ -30,6 +32,7 @@ import GHCi.Message
 import GHCi.RemoteTypes
 
 import qualified Data.Map as Map
+import Control.Exception
 import Control.Concurrent
 import qualified Data.ByteString.Short.Internal as BS
 import GHC.Exts
@@ -233,6 +236,19 @@ getThreadResumeContext tid = do
             writeTVar threadContextsVar ctxs2
             pure new_ctx
 
+-- | Awaken a thread stopped on a breakpoint. Await the result with
+-- `WaitThreadResult` or friends.
+--
+-- Throws @ResumedAlreadyRunningThreadException@ if thread is already running.
+resumeStoppedThread :: ResumeContext -> IO ()
+resumeStoppedThread ResumeContext{..} = do
+  atomically $ do
+    s <- readTVar resumeEvalStatus
+    case s of
+      ThreadStatusStopped{} -> writeTVar resumeEvalStatus ThreadStatusRunning
+      ThreadStatusRunning   -> throwSTM ResumedAlreadyRunningThreadException
+  putMVar resumeBreakMVar () -- this awakens the stopped thread
+
 -- | A global mapping from threads to their per-thread state 'ResumeContext'
 -- (that e.g. contain the MVars on which they block when stopped)
 threadContextsVar :: TVar (Map.Map ThreadId ResumeContext)
@@ -284,3 +300,7 @@ data ResumeThreadStatus
   -- 'ThreadStatusRunning' so that further attempts to resume from the same
   -- breakpoint fail.
   | ThreadStatusRunning
+
+-- | Attempted to resume a thread that was already running!
+data ResumedAlreadyRunningThreadException = ResumedAlreadyRunningThreadException deriving Show
+instance Exception ResumedAlreadyRunningThreadException

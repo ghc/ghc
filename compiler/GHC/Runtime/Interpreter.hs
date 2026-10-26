@@ -465,7 +465,7 @@ seqHValue interp unit_env logger ref =
     rtid   <- interpCmd interp (Seq hval)
     status <- -- TODO redirectInterrupts interp rtid $
               interpCmd interp (WaitThreadResult rtid)
-    freeRemoteRef rtid
+    freeHValueRefs interp [castRemoteRef rtid]
     handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
 
 evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId

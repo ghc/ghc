@@ -295,10 +295,10 @@ evalOptsSeq = EvalOpts
 abandonStmt :: RemoteRef ThreadId -> IO ()
 abandonStmt hvref = do
   tid <- localRef hvref
-  ResumeContext{..} <- getThreadResumeContext tid
+  brkctx <- getThreadResumeContext tid
   setIsolatedThread tid
   killThread tid
-  putMVar resumeBreakMVar ()
+  resumeStoppedThread brkctx
   _ <- atomically $
     readThreadEvalStatus tid
   return ()
@@ -308,16 +308,10 @@ abandonStmt hvref = do
 resumeStmt :: EvalOpts -> RemoteRef ThreadId -> IO ()
 resumeStmt opts rtid = do
   resumeThreadId <- localRef rtid
-  ResumeContext{..} <- getThreadResumeContext resumeThreadId
+  brkctx <- getThreadResumeContext resumeThreadId
   -- See Note [TODO: all break options must be set every time]
   setBreakAction opts resumeThreadId
-  atomically $ do
-    s <- readTVar resumeEvalStatus
-    case s of
-      ThreadStatusStopped{} -> writeTVar resumeEvalStatus ThreadStatusRunning
-      ThreadStatusRunning   -> throwSTM ResumedAlreadyRunningThreadException
-  putMVar resumeBreakMVar () -- this awakens the stopped thread
-                             -- await the result with `WaitThreadResult` or friends
+  resumeStoppedThread brkctx
 
 -- Careful here: there may be ^C exceptions flying around, so we start the new
 -- thread blocked (forkIO inherits mask from the parent, #1048), and unblock
@@ -438,6 +432,3 @@ setBreakAction opts tid@(ThreadId tid#) = do
 
     runIf#   pred what     = when (pred opts) (what tid#)
 
--- | Attempted to resume a thread that was already running!
-data ResumedAlreadyRunningThreadException = ResumedAlreadyRunningThreadException deriving Show
-instance Exception ResumedAlreadyRunningThreadException
