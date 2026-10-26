@@ -383,12 +383,14 @@ tidyEqnInfo :: MatchId -> EquationInfo
 
 tidyEqnInfo _ eqn@(EqnDone {}) = return (idDsWrapper, eqn)
 
-tidyEqnInfo v eqn@(EqnMatch { eqn_pat = (L loc pat) }) = do
-  (wrap, pat') <- tidy1 v (not . isGoodSrcSpan . locA $ loc) pat
+tidyEqnInfo v eqn@(EqnMatch { eqn_pat = p@(L loc _) }) = do
+  (wrap, pat') <- tidyLPat v p
   return (wrap, eqn{eqn_pat = L loc pat' })
 
+tidyLPat :: MatchId -> LPat GhcTc -> DsM (DsWrapper, Pat GhcTc)
+tidyLPat v (L loc pat) = putSrcSpanDsA loc (tidy1 v pat)
+
 tidy1 :: MatchId             -- The scrutinee
-      -> Bool                -- `True` if the pattern was generated, `False` if it was user-written
       -> Pat GhcTc           -- The pattern against which it is to be matched
       -> DsM (DsWrapper,     -- Extra bindings to do before the match
               Pat GhcTc)     -- Equivalent pattern
@@ -399,21 +401,22 @@ tidy1 :: MatchId             -- The scrutinee
 -- It eliminates many pattern forms (as-patterns, variable patterns,
 -- list patterns, etc) and returns any created bindings in the wrapper.
 
-tidy1 v g (ParPat _ pat)      = tidy1 v g (unLoc pat)
-tidy1 v g (SigPat _ pat _)    = tidy1 v g (unLoc pat)
-tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
-tidy1 v g (BangPat _ (L l p)) = tidy_bang_pat v g l p
-tidy1 v g (ModifiedPat _ _ pat) = tidy1 v g (unLoc pat)
+tidy1 v (ParPat _ pat)        = tidyLPat v pat
+tidy1 v (SigPat _ pat _)      = tidyLPat v pat
+tidy1 _ (WildPat ty)          = return (idDsWrapper, WildPat ty)
+tidy1 v (BangPat _ (L l p))   = putSrcSpanDsA l $ tidy_bang_pat v l p
+tidy1 v (ModifiedPat _ _ pat) = tidyLPat v pat
 
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
-tidy1 v _ (VarPat _ (L _ var))
+tidy1 v (VarPat _ (L _ var))
   = return (bindMatchId var v, WildPat (idType var))
 
         -- case v of { x@p -> mr[] }
         -- = case v of { p -> let x=v in mr[] }
-tidy1 v g (AsPat _ (L _ var) pat)
-  = do  { (wrap, pat') <- tidy1 v g (unLoc pat)
+tidy1 v (AsPat _ (L _ var) pat)
+
+  = do  { (wrap, pat') <- tidyLPat v pat
         ; return (bindMatchId var v . wrap, pat') }
 
 {- now, here we handle lazy patterns:
@@ -427,7 +430,7 @@ tidy1 v g (AsPat _ (L _ var) pat)
     The case expr for v_i is just: match [v] [(p, [], \ x -> Var v_i)] any_expr
 -}
 
-tidy1 v _ (LazyPat _ pat)
+tidy1 v (LazyPat _ pat)
     -- This is a convenient place to check for unlifted types under a lazy pattern.
     -- Doing this check during type-checking is unsatisfactory because we may
     -- not fully know the zonked types yet. We sure do here.
@@ -441,14 +444,14 @@ tidy1 v _ (LazyPat _ pat)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
         ; return (mkCoreLets sel_binds, WildPat (matchIdType v)) }
 
-tidy1 _ _ (ListPat ty pats)
+tidy1 _ (ListPat ty pats)
   = return (idDsWrapper, unLoc list_ConPat)
   where
     list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] [ty])
                         (mkNilPat ty)
                         pats
 
-tidy1 _ _ (TuplePat tys pats boxity)
+tidy1 _ (TuplePat tys pats boxity)
   = return (idDsWrapper, unLoc tuple_ConPat)
   where
     arity = length pats
@@ -458,34 +461,37 @@ tidy1 _ _ (TuplePat tys pats boxity)
              Boxed   -> tys
            -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
 
-tidy1 _ _ (SumPat tys pat alt arity)
+tidy1 _ (SumPat tys pat alt arity)
   = return (idDsWrapper, unLoc sum_ConPat)
   where
     sum_ConPat = mkPrefixConPat (sumDataCon alt arity) [pat] (map getRuntimeRep tys ++ tys)
                  -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
-tidy1 _ g (LitPat _ lit)
-  = do { unless g $
+tidy1 _ (LitPat _ lit)
+  = do { in_gen <- inGeneratedCodeDs;
+         unless in_gen $
            warnAboutOverflowedLit lit
        ; return (idDsWrapper, tidyLitPat lit) }
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 _ g (NPat ty (L _ lit@OverLit { ol_val = v }) mb_neg eq)
-  = do { unless g $
+tidy1 _ (NPat ty (L _ lit@OverLit { ol_val = v }) mb_neg eq)
+  = do { in_gen <- inGeneratedCodeDs;
+         unless in_gen $
            let lit' | Just _ <- mb_neg = lit{ ol_val = negateOverLitVal v }
                     | otherwise = lit
            in warnAboutOverflowedOverLit lit'
        ; return (idDsWrapper, tidyNPat lit mb_neg eq ty) }
 
 -- NPlusKPat: we may want to warn about the literals
-tidy1 _ g n@(NPlusKPat _ _ (L _ lit1) lit2 _ _)
-  = do { unless g $ do
+tidy1 _ n@(NPlusKPat _ _ (L _ lit1) lit2 _ _)
+  = do { in_gen <- inGeneratedCodeDs;
+         unless in_gen $ do
            warnAboutOverflowedOverLit lit1
            warnAboutOverflowedOverLit lit2
        ; return (idDsWrapper, n) }
 
-tidy1 _ _ (OrPat ty lpats)
+tidy1 _ (OrPat ty lpats)
   -- See Note [Implementation of OrPatterns]. We desugar
   --   (1; 2; 3)
   -- to
@@ -514,44 +520,44 @@ tidy1 _ _ (OrPat ty lpats)
     single_grhs e = GRHSs emptyComments [noLocA $ GRHS noAnn [] e] (EmptyLocalBinds noExtField)
 
 -- Everything else goes through unchanged...
-tidy1 _ _ non_interesting_pat
+tidy1 _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
 
 --------------------
-tidy_bang_pat :: MatchId -> Bool -> SrcSpanAnnA -> Pat GhcTc
+tidy_bang_pat :: MatchId -> SrcSpanAnnA -> Pat GhcTc
               -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
-tidy_bang_pat v g _ (ParPat _ (L l p))   = tidy_bang_pat v g l p
-tidy_bang_pat v g _ (SigPat _ (L l p) _) = tidy_bang_pat v g l p
+tidy_bang_pat v _ (ParPat _ (L l p))   = putSrcSpanDsA l $ tidy_bang_pat v l p
+tidy_bang_pat v _ (SigPat _ (L l p) _) = putSrcSpanDsA l $ tidy_bang_pat v l p
 
 -- Push the bang-pattern inwards, in the hope that
 -- it may disappear next time
-tidy_bang_pat v g l (AsPat x v' p)
-  = tidy1 v g (AsPat x v' (L l (BangPat noExtField p)))
-tidy_bang_pat v g l (XPat (CoPat w p t))
-  = tidy1 v g (XPat $ CoPat w (BangPat noExtField (L l p)) t)
-tidy_bang_pat v g l (OrPat x (p:|ps)) -- push bang into first pat alt
-  = tidy1 v g (OrPat x (L l (BangPat noExtField p) :| ps))
+tidy_bang_pat v l (AsPat x v' p)
+  = tidy1 v (AsPat x v' (L l (BangPat noExtField p)))
+tidy_bang_pat v l (XPat (CoPat w p t))
+  = tidy1 v (XPat $ CoPat w (BangPat noExtField (L l p)) t)
+tidy_bang_pat v l (OrPat x (p:|ps)) -- push bang into first pat alt
+  = tidy1 v (OrPat x (L l (BangPat noExtField p) :| ps))
 
 -- Discard bang around strict pattern
-tidy_bang_pat v g _ p@(LitPat {})    = tidy1 v g p
-tidy_bang_pat v g _ p@(ListPat {})   = tidy1 v g p
-tidy_bang_pat v g _ p@(TuplePat {})  = tidy1 v g p
-tidy_bang_pat v g _ p@(SumPat {})    = tidy1 v g p
+tidy_bang_pat v _ p@(LitPat {})    = tidy1 v p
+tidy_bang_pat v _ p@(ListPat {})   = tidy1 v p
+tidy_bang_pat v _ p@(TuplePat {})  = tidy1 v p
+tidy_bang_pat v _ p@(SumPat {})    = tidy1 v p
 
 -- Data/newtype constructors
-tidy_bang_pat v g l p@(ConPat { pat_con = L _ (RealDataCon dc)
-                              , pat_args = args
-                              , pat_con_ext = ConPatTc
-                                { cpt_arg_tys = arg_tys
-                                }
-                              })
+tidy_bang_pat v l p@(ConPat { pat_con = L _ (RealDataCon dc)
+                            , pat_args = args
+                            , pat_con_ext = ConPatTc
+                              { cpt_arg_tys = arg_tys
+                              }
+                            })
   -- Newtypes: push bang inwards (#9844)
   =
     if isNewTyCon (dataConTyCon dc)
-      then tidy1 v g (p { pat_args = push_bang_into_newtype_arg l (scaledThing ty) args })
-      else tidy1 v g p  -- Data types: discard the bang
+      then tidy1 v (p { pat_args = push_bang_into_newtype_arg l (scaledThing ty) args })
+      else tidy1 v p  -- Data types: discard the bang
     where
       (ty:_) = dataConInstArgTys dc arg_tys
 
@@ -570,7 +576,7 @@ tidy_bang_pat v g l p@(ConPat { pat_con = L _ (RealDataCon dc)
 --
 -- NB: SigPatIn, ConPatIn should not happen
 
-tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noExtField (L l p))
+tidy_bang_pat _ l p = return (idDsWrapper, BangPat noExtField (L l p))
 
 -------------------
 push_bang_into_newtype_arg :: SrcSpanAnnA
@@ -954,7 +960,7 @@ matchSinglePatVar var mb_scrut ctx pat ty match_result
        ; ldi_nablas <-
          if  isMatchContextPmChecked_SinglePat dflags FromSource ctx pat
          then addCoreScrutTmCs (maybeToList mb_scrut) [var] $
-              pmcPatBind (DsMatchContext ctx locn) var (unLoc pat)
+              pmcPatBind (DsMatchContext ctx locn) var pat
          else getLdiNablas
 
        ; let eqn_info = EqnMatch { eqn_pat = decideBangHood dflags pat

@@ -155,11 +155,15 @@ desugarPat x pat = case pat of
   VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
   ParPat _ p   -> desugarLPat x p
   LazyPat _ _  -> pure GdEnd -- like a wildcard
-  BangPat _ p@(L l p') ->
+  BangPat _ p@(L l p') -> do
     -- Add the bang in front of the list, because it will happen before any
     -- nested stuff.
+    in_gen <- inGeneratedCodeDs
+    -- A bang inserted by -XStrict (decideBangHood) has no SrcInfo: it is
+    -- divergence-checked but never reported as redundant (#27323).
+    let pm_loc | in_gen    = Nothing
+               | otherwise = Just (SrcInfo (L (locA l) (ppr p')))
     consGrdDag (PmBang x pm_loc) <$> desugarLPat x p
-      where pm_loc = Just (SrcInfo (L (locA l) (ppr p')))
 
   -- (x@pat)   ==>   Desugar pat with x as match var and handle impedance
   --                 mismatch with incoming match var
@@ -311,11 +315,11 @@ desugarPatV pat = do
   pure (x, grds)
 
 desugarLPat :: Id -> LPat GhcTc -> DsM GrdDag
-desugarLPat x = desugarPat x . unLoc
+desugarLPat x (L loc pat) = putSrcSpanDsA loc (desugarPat x pat)
 
 -- | 'desugarLPat', but also select and return a new match var.
 desugarLPatV :: LPat GhcTc -> DsM (Id, GrdDag)
-desugarLPatV = desugarPatV . unLoc
+desugarLPatV (L loc pat) = putSrcSpanDsA loc (desugarPatV pat)
 
 -- | @desugarListPat _ x [p1, ..., pn]@ is basically
 --   @desugarConPatOut _ x $(mkListConPatOuts [p1, ..., pn]>@ without ever
@@ -374,11 +378,11 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
       -- tracePm "ConPatOut" (ppr x $$ ppr con $$ ppr arg_ids)
       pure (con_grd `consGrdDag` arg_grds)
 
-desugarPatBind :: SrcSpan -> Id -> Pat GhcTc -> DsM (PmPatBind Pre)
+desugarPatBind :: SrcSpan -> Id -> LPat GhcTc -> DsM (PmPatBind Pre)
 -- See 'GrdPatBind' for how this simply repurposes GrdGRHS.
 -- See Note [Suppress warnings in PMC desugaring]
 desugarPatBind loc var pat = discardWarningsDs $
-  PmPatBind . flip PmGRHS (SrcInfo (L loc (ppr pat))) <$> desugarPat var pat
+  PmPatBind . flip PmGRHS (SrcInfo (L loc (ppr pat))) <$> desugarLPat var pat
 
 desugarEmptyCase :: Id -> DsM PmEmptyCase
 desugarEmptyCase var = pure PmEmptyCase { pe_var = var }
@@ -633,21 +637,16 @@ Consider (#21761)
   idV :: Void -> Void
   idV v = v
 
-Without -XStrict, we would not warn here. But with -XStrict, there is an
-implicit bang on `v` and we should give an inaccessible warning for the RHS.
-The way we account for that is by calling `decideBangHood` on patterns
-in a `Match`, which inserts the implicit bang.
+With -XStrict, there is an implicit bang pattern on `v` as per
+Note [decideBangHood], so the RHS is inaccessible and we must report it as such.
 
-Making the call here actually seems redundant with the call to `decideBangHood`
-in `GHC.HsToCore.Match.matchWrapper`, which does it *after* it calls the
-pattern-match checker on the Match's patterns. It would be great if we could expect
-`matchWrapper` to pass the bang-adorned `Match` to the pattern-match checker,
-but sadly then we get worse warning messages which would print `idV` as if the
-user *had* written a bang:
+The natural way to achieve this is described in #27677: insert the bang using
+'ExpansionPat' (see Note [Handling overloaded and rebindable constructs] in
+GHC.Rename.Expr). Then the pattern-match checker sees the bang pattern, while
+warning messages display the user-written pattern.
 
-     Pattern match has inaccessible right hand side
--    In an equation for ‘idV’: idV v = ...
-+    In an equation for ‘idV’: idV !v = ...
-
-So we live with the duplication.
+This approach hasn't been implemented yet, so for the time being 'desugarMatches'
+calls 'decideBangHood' itself, duplicating the call in 'GHC.HsToCore.Match.matchWrapper'.
+'decideBangHood' gives the bangs it inserts a generated span, so that they are
+never reported as redundant (see Note [Dead bang patterns] in GHC.HsToCore.Pmc.Check).
 -}
