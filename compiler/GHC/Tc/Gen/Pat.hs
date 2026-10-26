@@ -1900,17 +1900,18 @@ tcConTyArg :: Subst -> Checker (HsTyPat GhcRn, TyVar) ()
 tcConTyArg tenv penv (rn_ty, con_tv) thing_inside
   = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsTyPat rn_ty (substTy tenv (varType con_tv))
 
-       ; case NE.nonEmpty sig_ibs of
-           Just sig_ibs_ne | inPatBind penv ->
-             addErr (TcRnCannotBindTyVarsInPatBind sig_ibs_ne)
-           _ -> pure ()
-
           -- This unification is straight from Figure 7 of
           -- "Type Variables in Patterns", Haskell'18
           -- OK to drop coercions here. These unifications are all about
           -- guiding inference based on a user-written type annotation
           -- See Note [Type applications in patterns] (W1)
        ; _ <- unifyType Nothing arg_ty (substTyVar tenv con_tv)
+
+       ; case NE.nonEmpty sig_ibs of
+           Just sig_ibs_ne | inPatBind penv -> do
+             addErr (TcRnCannotBindTyVarsInPatBind sig_ibs_ne)
+             failM
+           _ -> pure ()
 
        ; result <- tcExtendNameTyVarEnv sig_wcs $
                    tcExtendNameTyVarEnv sig_ibs $

@@ -1,0 +1,6 @@
+T28038.hs:10:7: error: [GHC-48361]
+    • Binding type variables is not allowed in pattern bindings
+    • In the pattern: A b
+      In a pattern binding: A b = a
+      In a stmt of a 'do' block: let A b = a
+
