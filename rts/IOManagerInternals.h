@@ -113,6 +113,17 @@ struct _CapIOManager {
  */
 struct _CapIOManagerShared {
 
+#if defined(IOMGR_ENABLED_POLL) \
+ || defined(IOMGR_ENABLED_SELECTBIS)
+#if defined(RTS_USER_SIGNALS)
+    /* Pipe FDs for delivering posix signals to the I/O manager.
+     * The signal number and siginfo_t are written to the write end by the
+     * low-level signal handler, and read by the I/O manager on capability 0.
+     */
+    int signal_fd_r, signal_fd_w;
+#endif
+#endif
+
 #if defined(IOMGR_ENABLED_MIO_POSIX)
     /* The timer manager control pipe (write end). This is the pipe into which
      * we will send our signals.
