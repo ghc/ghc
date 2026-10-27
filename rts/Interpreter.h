@@ -21,3 +21,9 @@ void rts_disableStopNextBreakpoint    ( StgTSO* );
 // Debugger step out
 void rts_enableStopAfterReturn        ( StgTSO* );
 void rts_disableStopAfterReturn       ( StgTSO* );
+
+// Debugger stop on exception
+void rts_enableStopOnException        ( StgTSO* );
+void rts_disableStopOnException       ( StgTSO* );
+void rts_enableStopOnExceptionAll     ( void );
+void rts_disableStopOnExceptionAll    ( void );
