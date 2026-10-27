@@ -1,0 +1,10 @@
+:l break044
+:break inWorker
+:break inMain
+main
+-- The worker hits its breakpoint during :force, so its break is not read yet.
+-- Internal evaluations (here :cmd) must not observe it
+:force slow
+:cmd return ""
+:continue
+:continue

@@ -1,0 +1,7 @@
+Breakpoint 0 activated at break043.hs:6:14-20
+Breakpoint 1 activated at break043.hs:9:12-18
+Stopped in Main.inWorker, break043.hs:6:14-20
+_result :: IO () = _
+Stopped in Main.inMain, break043.hs:9:12-18
+_result :: IO () = _
+main done

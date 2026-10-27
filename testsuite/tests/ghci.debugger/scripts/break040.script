@@ -1,0 +1,6 @@
+:l break039
+:break f
+-- The breakpoint is hit in a thread forked by main, not in the sandbox thread
+main
+:abandon
+putStrLn "after abandon"

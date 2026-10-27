@@ -1,0 +1,6 @@
+Breakpoint 0 activated at break046.hs:4:7-11
+Stopped in Main.f, break046.hs:4:7-11
+_result :: Int = _
+x :: Int = 3
+8
+4

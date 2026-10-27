@@ -1,0 +1,6 @@
+:l break039
+:break f
+main
+-- Running another statement while a forked thread is stopped must not report its breakpoint again
+1 + 1
+:continue

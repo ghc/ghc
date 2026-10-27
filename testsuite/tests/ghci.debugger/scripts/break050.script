@@ -1,0 +1,11 @@
+:l break050
+:break f
+-- Stops in the forked thread running f
+main
+:delete *
+-- Resumes the forked thread, which loops forever, and blocks waiting for main
+-- to complete. A SIGINT (from the Makefile) is then thrown to the forked
+-- thread which was resumed, rather than to main: the forked thread is killed
+-- and the :continue keeps waiting for main to complete.
+:continue
+do { a <- readIORef ticks; threadDelay 500000; b <- readIORef ticks; putStrLn (if a == b then "forked thread stopped" else "forked thread still running") }

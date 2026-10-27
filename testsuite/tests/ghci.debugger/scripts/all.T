@@ -157,4 +157,27 @@ test('T26042g', extra_files(['T26042g.hs']), ghci_script, ['T26042g.script'])
 test('T27633c', extra_files(['T27633c_obj.hs']), ghci_script, ['T27633c.script'])
 
 test('RttiSharedTyVar', extra_files(['RttiSharedTyVar.hs']), ghci_script, ['RttiSharedTyVar.script'])
+test('break032', extra_files(['break032.hs']), ghci_script, ['break032.script'])
+test('break033', extra_files(['break033.hs']), ghci_script, ['break033.script'])
+test('break034', extra_files(['break034.hs']), ghci_script, ['break034.script'])
 test('break037', extra_files(['break037.hs']), ghci_script, ['break037.script'])
+test('break040', [extra_files(['break039.hs']), expect_broken(27729)], ghci_script, ['break040.script'])
+test('break042', [extra_files(['break042.hs']), expect_broken_for(27729, ['ghci-ext'])], ghci_script, ['break042.script'])
+test('break043', extra_files(['break043.hs']), ghci_script, ['break043.script'])
+test('break045', [extra_files(['break045.hs']), when(opsys('mingw32'), skip), expect_broken(27729)], ghci_script, ['break045.script'])
+test('break046', extra_files(['break046.hs']), ghci_script, ['break046.script'])
+test('break048', extra_files(['break039.hs']), ghci_script, ['break048.script'])
+test('break049', extra_files(['break044.hs']), ghci_script, ['break049.script'])
+test('break050',
+     [when(opsys('mingw32'), skip),
+      only_ways(['normal']),
+      extra_files(['break050.hs', 'break050.script']),
+      combined_output],
+     makefile_test, [])
+test('break050ext',
+     [when(opsys('mingw32'), skip),
+      only_ways(['normal']),
+      unless(config.have_ext_interp, skip),
+      extra_files(['break050.hs', 'break050.script']),
+      combined_output],
+     makefile_test, [])

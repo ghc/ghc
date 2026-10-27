@@ -1,0 +1,9 @@
+Breakpoint 0 activated at break050.hs:(13,7)-(17,9)
+Stopped in Main.f, break050.hs:(13,7)-(17,9)
+_result :: IO () = _
+x :: Int = 0
+<interactive>: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.SomeAsyncException:
+
+user interrupt
+main was not interrupted
+forked thread stopped

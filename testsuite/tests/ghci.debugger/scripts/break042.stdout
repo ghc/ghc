@@ -1,0 +1,27 @@
+Breakpoint 0 activated at break042.hs:7:14-20
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+Stopped in Main.midpoint, break042.hs:7:14-20
+_result :: IO () = _
+all workers done
+end

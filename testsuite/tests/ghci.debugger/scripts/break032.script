@@ -1,0 +1,7 @@
+:set -XTemplateHaskell
+:l break032
+:break f
+-- Running a statement installs the debugger's breakpoint action (TODO: not rely on this.)
+print (1 :: Int)
+-- A breakpoint hit while running a splice must be ignored, not block forever
+y = $(Language.Haskell.TH.Syntax.lift (f 41))

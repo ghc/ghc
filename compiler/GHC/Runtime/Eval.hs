@@ -282,7 +282,7 @@ parseImportDecl expr = withSession $ \hsc_env -> liftIO $ hscImport hsc_env expr
 emptyHistory :: Int -> BoundedList History
 emptyHistory size = nilBL size
 
--- | Turn an 'EvalStatus_' result from interpreting Haskell into a GHCi 'ExecResult'.
+-- | Turn an 'EvalStatus' result from interpreting Haskell into a GHCi 'ExecResult'.
 --
 -- This function is responsible for resuming execution at an intermediate
 -- breakpoint if we don't care about that breakpoint (e.g. if using :steplocal
@@ -298,7 +298,7 @@ handleRunStatus :: GhcMonad m
                 -> String
                 -> ResumeBindings
                 -> [Id]
-                -> EvalStatus_ [ForeignHValue] [HValueRef]
+                -> EvalStatus [ForeignHValue]
                 -> BoundedList History
                 -> m ExecResult
 handleRunStatus step eval_opts expr bindings final_ids status history0 = do
@@ -323,16 +323,16 @@ handleRunStatus step eval_opts expr bindings final_ids status history0 = do
       return (ExecComplete (Left (fromSerializableException e)) alloc)
 
     -- Nothing case: we stopped when an exception was raised, not at a breakpoint.
-    EvalBreak apStack_ref Nothing resume_ctxt ccs -> do
-      resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
-      apStack_fhv     <- liftIO $ mkFinalizedHValue interp apStack_ref
+    EvalBreak apStack_ref Nothing resume_tid ccs -> do
+      resume_tid_fhv <- liftIO $ mkFinalizedHValue interp resume_tid
+      apStack_fhv    <- liftIO $ mkFinalizedHValue interp apStack_ref
       let span = mkGeneralSrcSpan (fsLit "<unknown>")
       (hsc_env1, break_ids) <- liftIO $
         bindLocalsAtBreakpoint hsc_env apStack_fhv span Nothing
       let
         resume = Resume
           { resumeStmt = expr
-          , resumeContext = resume_ctxt_fhv
+          , resumeContext = resume_tid_fhv
           , resumeBindings = bindings
           , resumeFinalIds = final_ids
           , resumeApStack = apStack_fhv
@@ -353,7 +353,7 @@ handleRunStatus step eval_opts expr bindings final_ids status history0 = do
     -- The interpreter yields on a breakpoint if:
     --  - the breakpoint was explicitly enabled (in @BreakArray@)
     --  - or one of the stepping options in @EvalOpts@ caused us to stop at one
-    EvalBreak apStack_ref (Just eval_break) resume_ctxt ccs -> do
+    EvalBreak apStack_ref (Just eval_break) resume_tid ccs -> do
       let ibi = evalBreakpointToId eval_break
       let hug = hsc_HUG hsc_env
       info_brks  <- liftIO $ readIModBreaks hug ibi
@@ -365,8 +365,8 @@ handleRunStatus step eval_opts expr bindings final_ids status history0 = do
         breakArray <- getBreakArray interp ibi info_brks
         breakpointStatus interp breakArray (ibi_info_index ibi)
 
-      apStack_fhv <- liftIO $ mkFinalizedHValue interp apStack_ref
-      resume_ctxt_fhv   <- liftIO $ mkFinalizedHValue interp resume_ctxt
+      apStack_fhv    <- liftIO $ mkFinalizedHValue interp apStack_ref
+      resume_tid_fhv <- liftIO $ mkFinalizedHValue interp resume_tid
 
       -- This breakpoint is enabled or we mean to break here;
       -- we want to stop instead of just logging it.
@@ -379,7 +379,7 @@ handleRunStatus step eval_opts expr bindings final_ids status history0 = do
         let
           resume = Resume
             { resumeStmt = expr
-            , resumeContext = resume_ctxt_fhv
+            , resumeContext = resume_tid_fhv
             , resumeBindings = bindings
             , resumeFinalIds = final_ids
             , resumeApStack = apStack_fhv
@@ -395,7 +395,8 @@ handleRunStatus step eval_opts expr bindings final_ids status history0 = do
         return (ExecBreak break_ids (Just ibi) resume)
       else do
         -- resume with the same step type
-        status <- liftIO $ GHCi.resumeStmt interp eval_opts resume_ctxt_fhv
+        status <- liftIO $
+          GHCi.resumeStmt interp eval_opts resume_tid_fhv
         history <- if not tracing then pure history0 else do
           history1 <- liftIO $ mkHistory hug apStack_fhv ibi
           let !history' = history1 `consBL` history0
@@ -441,7 +442,7 @@ resumeExec step mbCnt r = do
 
   case r of
     Resume { resumeStmt = expr
-           , resumeContext = fhv
+           , resumeContext = rtid
            , resumeBindings = bindings
            , resumeFinalIds = final_ids
            , resumeApStack = apStack
@@ -456,7 +457,7 @@ resumeExec step mbCnt r = do
             _ -> return ()
 
           let eval_opts = initEvalOpts dflags (enableGhcStepMode step)
-          status <- liftIO $ GHCi.resumeStmt interp eval_opts fhv
+          status <- liftIO $ GHCi.resumeStmt interp eval_opts rtid
           let prevHistoryLst = fromListBL 50 hist
               hug = hsc_HUG hsc_env
               hist' = case mb_brkpt of
@@ -1276,8 +1277,10 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
         _ -> panic "compileParsedExprRemote"
 
   updateFixityEnv fix_env
-  let eval_opts = initEvalOpts dflags EvalStepNone
-  status <- liftIO $ evalStmt interp eval_opts (EvalThis hvals_io)
+  -- Only this expression's result is expected, never another thread's break
+  let eval_opts = (initEvalOpts dflags EvalStepNone) { readAllBreaks = False }
+  status <- liftIO $
+    evalStmt interp eval_opts (EvalThis hvals_io)
   case status of
     EvalComplete _ (EvalSuccess [hval]) -> return hval
     EvalComplete _ (EvalException e) ->

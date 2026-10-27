@@ -1,0 +1,17 @@
+:l break042
+:break midpoint
+-- 4 workers each hit the breakpoint 3 times: every hit must be reported exactly once
+main
+:continue
+:continue
+:continue
+:continue
+:continue
+:continue
+:continue
+:continue
+:continue
+:continue
+:continue
+:continue
+putStrLn "end"

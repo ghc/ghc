@@ -14,14 +14,27 @@ include $(TOP)/mk/test.mk
 # 	- a ^C gets propagated to the thread evaluating the user request on the ext
 # 	interpreter so that it gets interrupted
 #
+# The nosandbox variants run the expression on the interpreter's main thread
+# (-fno-ghci-sandbox) rather than in a forked sandbox thread.
 T3171ext: T3171_OPTS = -fexternal-interpreter
-T3171 T3171ext:
+T3171nosandbox: T3171_OPTS = -fno-ghci-sandbox
+T3171extnosandbox: T3171_OPTS = -fexternal-interpreter -fno-ghci-sandbox
+T3171 T3171ext T3171nosandbox T3171extnosandbox:
 	rm -f $@.started
 	echo 'do { writeFile "$@.started" ""; (Control.Concurrent.threadDelay 100000000 >> putStrLn "threadDelay was not interrupted.") `Control.Exception.catch` \(e :: Control.Exception.SomeException) -> System.IO.hPutStrLn System.IO.stderr ("threadDelay was interrupted: " ++ show e) >> Control.Exception.throwIO e }' | \
 	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) $(T3171_OPTS) & \
 	while [ ! -e $@.started ] && kill -0 $$! 2>/dev/null; do sleep 0.1; done; \
   kids=$$(pgrep -P $$! 2>/dev/null || cat /proc/$$!/task/*/children 2>/dev/null); \
 	kill -INT $$! $$kids; wait
+
+# Like T3171, but ^C interrupts a :force rather than an expression: the
+# computation being forced must be interrupted too, not left running.
+ForceInterruptExt: ForceInterrupt_OPTS = -fexternal-interpreter
+ForceInterrupt ForceInterruptExt:
+	rm -f force.started
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) $(ForceInterrupt_OPTS) < ForceInterrupt.script & \
+	while [ ! -e force.started ] && kill -0 $$! 2>/dev/null; do sleep 0.1; done; \
+	kill -INT $$! $$(pgrep -P $$!); wait
 
 TopEnvIface:
 	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) TopEnvIface -v1 -fno-hide-source-paths -e "a" -e ":q" -fwrite-if-simplified-core -fwrite-interface

@@ -1,6 +1,6 @@
 {-# LANGUAGE RecursiveDo, GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards, CPP,
-    NamedFieldPuns, LambdaCase, TypeAbstractions, TypeApplications,
+    NamedFieldPuns, LambdaCase, TypeAbstractions, TypeApplications, PatternSynonyms,
     LinearTypes, RankNTypes, UnboxedTuples, BlockArguments, TupleSections, MagicHash #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
@@ -18,12 +18,11 @@ module GHCi.Message
   , ConInfoTable(..)
   , THMessage(..), THMsg(..)
   , QResult(..)
-  , EvalStatus_(..), EvalStatus, EvalResult(..), EvalOpts(..), EvalExpr(..)
-  , EvalBreakpoint (..)
+  , EvalStatus(..,EvalBreak), EvalResult(..), EvalOpts(..), EvalExpr(..)
+  , EvalBreak(..), EvalBreakpoint (..)
   , SerializableException(..)
   , toSerializableException, fromSerializableException
   , THResult(..), THResultType(..)
-  , ResumeContext(..)
   , QState(..)
   , getMessage, putMessage, getTHMessage, putTHMessage
 
@@ -150,12 +149,12 @@ data Message a where
   -- | Resume evaluation of a statement after a breakpoint
   ResumeStmt
    :: EvalOpts
-   -> RemoteRef (ResumeContext [HValueRef])
+   -> RemoteRef ThreadId
    -> Message (EvalStatus [HValueRef])
 
   -- | Abandon evaluation of a statement after a breakpoint
   AbandonStmt
-   :: RemoteRef (ResumeContext [HValueRef])
+   :: RemoteRef ThreadId
    -> Message ()
 
   -- | Evaluate something of type @IO String@
@@ -255,12 +254,12 @@ data Message a where
   -- | Evaluate something. This is used to support :force in GHCi.
   Seq
     :: HValueRef
-    -> Message (EvalStatus ())
+    -> Message (EvalStatus [HValueRef])
 
   -- | Resume forcing a free variable in a breakpoint (#2950)
   ResumeSeq
-    :: RemoteRef (ResumeContext ())
-    -> Message (EvalStatus ())
+    :: RemoteRef ThreadId
+    -> Message (EvalStatus [HValueRef])
 
   -- | User-defined request encoded as a tag/payload pair.  This is left
   -- uninterpreted by GHC and is meant for GHC API applications to be able to supply
@@ -345,7 +344,7 @@ resultRemoteResources msg res = case msg of
   WhereFrom{}               -> []
   FreeRemoteResources{}     -> []
   where
-    evalStatus :: (b -> [HValueRef]) -> EvalStatus_ b c -> [HValueRef]
+    evalStatus :: (b -> [HValueRef]) -> EvalStatus b -> [HValueRef]
     evalStatus f = \case
       EvalComplete _ (EvalSuccess b)   -> f b
       EvalComplete _ (EvalException _) -> []
@@ -492,16 +491,15 @@ data EvalOpts = EvalOpts
   , stepOut :: Bool
   , breakOnException :: Bool
   , breakOnError :: Bool
+  , readAllBreaks :: Bool
+    -- ^ Whether we should return an EvalBreak result if a thread other than
+    -- the main evaluation thread hits a breakpoint, or @False@ if we should
+    -- only return from the evaluation if the main thread breaks or yields a
+    -- result.
   }
   deriving (Generic, Show)
 
 instance Binary EvalOpts
-
-data ResumeContext a = ResumeContext
-  { resumeBreakMVar :: MVar ()
-  , resumeStatusMVar :: MVar (EvalStatus a)
-  , resumeThreadId :: ThreadId
-  }
 
 -- | We can pass simple expressions to EvalStmt, consisting of values
 -- and application.  This allows us to wrap the statement to be
@@ -515,18 +513,25 @@ data EvalExpr a
 
 instance Binary a => Binary (EvalExpr a)
 
-type EvalStatus a = EvalStatus_ a a
-
-data EvalStatus_ a b
+data EvalStatus a
   = EvalComplete Word64 (EvalResult a)
-  | EvalBreak
+  | EvalPaused EvalBreak
+  deriving (Generic, Show)
+
+pattern EvalBreak :: HValueRef -> (Maybe EvalBreakpoint) -> (RemoteRef ThreadId) -> (RemotePtr CostCentreStack) -> EvalStatus a
+pattern EvalBreak a b c d = EvalPaused (EvalBreak_ a b c d)
+{-# COMPLETE EvalComplete, EvalBreak #-}
+
+data EvalBreak
+  = EvalBreak_
        HValueRef{- AP_STACK -}
        (Maybe EvalBreakpoint)
-       (RemoteRef (ResumeContext b))
+       (RemoteRef ThreadId)
        (RemotePtr CostCentreStack) -- Cost centre stack
   deriving (Generic, Show)
 
-instance Binary a => Binary (EvalStatus_ a b)
+instance Binary EvalBreak
+instance Binary a => Binary (EvalStatus a)
 
 data EvalBreakpoint = EvalBreakpoint
   { eb_info_mod      :: !BS.ShortByteString -- ^ Breakpoint info module

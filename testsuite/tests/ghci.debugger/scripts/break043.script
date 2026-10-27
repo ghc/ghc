@@ -1,0 +1,7 @@
+:l break043
+:break inWorker
+:break inMain
+main
+-- Resuming the worker must wait for main to complete or for any thread to break
+:continue
+:continue

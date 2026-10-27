@@ -1,0 +1,7 @@
+:l break046
+:break f
+v <- pure $! f 3
+-- Running another statement while stopped must not change what :continue resumes
+g 4
+:continue
+v
