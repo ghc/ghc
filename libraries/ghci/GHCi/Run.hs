@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, RecordWildCards, MagicHash, ScopedTypeVariables, CPP,
-    UnboxedTuples, LambdaCase, UnliftedFFITypes #-}
+    UnboxedTuples, LambdaCase, UnliftedFFITypes, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- |
@@ -19,6 +19,7 @@ import GHCi.CreateBCO
 import GHCi.InfoTable
 #endif
 
+import GHCi.Run.Breakpoints
 import GHCi.Coverage
 import qualified GHC.InfoProv as InfoProv
 import GHCi.Debugger
@@ -30,7 +31,9 @@ import GHCi.TH
 import GHCi.BreakArray
 import GHCi.StaticPtrTable
 
+import Data.Function
 import Control.Concurrent
+import Control.Concurrent.STM
 import Control.DeepSeq
 import Control.Exception
 import Control.Monad
@@ -253,22 +256,16 @@ evalStringToString r str = do
 -- The UI process has more and therefore also can show more
 -- information about the breakpoint than the current iserv
 -- process.
-doSeq :: RemoteRef a -> IO (EvalStatus ())
+doSeq :: RemoteRef a -> IO (EvalStatus [HValueRef])
 doSeq ref = do
     sandboxIO evalOptsSeq $ do
       _ <- (void $ evaluate =<< localRef ref)
-      return ()
+      return []
 
 -- | Process a ResumeSeq message. Continue the :force processing     #2950
 -- after a breakpoint.
-resumeSeq :: RemoteRef (ResumeContext ()) -> IO (EvalStatus ())
-resumeSeq hvref = do
-    ResumeContext{..} <- localRef hvref
-    setBreakFlags evalOptsSeq resumeThreadId
-    withBreakAction resumeBreakMVar resumeStatusMVar $
-      mask_ $ do
-        putMVar resumeBreakMVar () -- this awakens the stopped thread...
-        redirectInterrupts resumeThreadId $ takeMVar resumeStatusMVar
+resumeSeq :: RemoteRef ThreadId -> IO (EvalStatus [HValueRef])
+resumeSeq = resumeStmt evalOptsSeq
 
 evalOptsSeq :: EvalOpts
 evalOptsSeq = EvalOpts
@@ -277,6 +274,7 @@ evalOptsSeq = EvalOpts
               , stepOut    = False
               , breakOnException = False
               , breakOnError = False
+              , readAllBreaks = False
               }
 
 -- When running a computation, we redirect ^C exceptions to the running
@@ -287,25 +285,35 @@ evalOptsSeq = EvalOpts
 -- Careful here: there may be ^C exceptions flying around, so we start the new
 -- thread blocked (forkIO inherits mask from the parent, #1048), and unblock
 -- only while we execute the user's code.  We can't afford to lose the final
--- putMVar, otherwise deadlock ensues. (#1583, #1922, #1946)
+-- 'writeThreadEvalStatus', otherwise deadlock ensues. (#1583, #1922, #1946)
 
-sandboxIO :: EvalOpts -> IO a -> IO (EvalStatus a)
+sandboxIO :: EvalOpts -> IO [HValueRef] -> IO (EvalStatus [HValueRef])
 sandboxIO opts io = do
-  -- We are running in uninterruptibleMask
-  breakMVar <- newEmptyMVar
-  statusMVar <- newEmptyMVar
-  withBreakAction breakMVar statusMVar $ do
+    -- Make sure the global breakpoint action is set; and that the interpreter
+    -- main thread doesn't stop at breakpoints in it.
+    -- See Note [Disable breakpoints in certain threads]
+    poke breakPointIOAction globalBreakStablePtr
+    disableThreadBreakpoints =<< myThreadId
+
+    -- We are running in uninterruptibleMask
     let runIt = measureAlloc $ tryEval $ rethrow opts $ clearCCS io
     if useSandboxThread opts
        then do
+
          tid <- forkIO $ do
            tid <- myThreadId
+           setIsolatedThread tid  -- main thread is always isolated
            setBreakFlags opts tid -- set flags on the sandbox thread
            labelThread tid "GHCi sandbox"
-           unsafeUnmask runIt >>= putMVar statusMVar
-                                -- empty: can't block
+           -- We only write the thread status map in two places:
+           -- * When the "main" thread finishes (here)
+           -- * When any thread hits a breakpoint (global break action)
+           unsafeUnmask runIt >>= writeThreadEvalStatus tid
 
-         redirectInterrupts tid $ unsafeUnmask $ takeMVar statusMVar
+         main <- mkMainThreadWithContext tid
+         atomically $ modifyTVar evaluationMainThreadGlobalVar (main :)
+         redirectInterrupts tid $ unsafeUnmask $
+           atomically $ readEvalStatus opts main
        else
           -- GLUT on OS X needs to run on the main thread. If you
           -- try to use it from another thread then you just get a
@@ -330,19 +338,28 @@ sandboxIO opts io = do
 rethrow :: EvalOpts -> IO a -> IO a
 rethrow EvalOpts{..} io =
   catchNoPropagate io $ \(ExceptionWithContext cx se) -> do
-    -- If -fbreak-on-error, we break unconditionally,
-    --  but with care of not breaking twice
     ThreadId mytid <- myThreadId
-    if breakOnError && not breakOnException
-       then rts_enableStopOnException mytid
-       else case fromException se of
-               -- If it is a "UserInterrupt" exception, we allow
-               --  a possible break by way of -fbreak-on-exception
-               Just UserInterrupt -> return ()
-               -- In any other case, we don't want to break
-               _ -> do
-                  rts_disableStopOnException mytid
-                  rts_disableStopOnExceptionAll
+    if | Just AbandonException <- fromException se
+       -- Don't ever break on :abandon
+       -> do
+        rts_disableStopOnException mytid
+        rts_disableStopOnExceptionAll
+
+       -- If -fbreak-on-error, we break unconditionally,
+       --  but with care of not breaking twice
+       | breakOnError && not breakOnException
+       -> rts_enableStopOnException mytid
+
+       -- If it is a "UserInterrupt" exception, we allow
+       --  a possible break by way of -fbreak-on-exception
+       | Just UserInterrupt <- fromException se
+       -> return ()
+
+       -- In any other case, we don't want to break
+       | otherwise -> do
+        rts_disableStopOnException mytid
+        rts_disableStopOnExceptionAll
+
     rethrowIO (ExceptionWithContext cx se)
 
 --
@@ -381,53 +398,6 @@ measureAlloc io = do
   let allocs = negate $ fromIntegral ctr
   return (EvalComplete allocs a)
 
--- This function sets up the interpreter for catching breakpoints, and
--- resets the breakpoint action when the computation has stopped running.
--- This is a not-very-good way to ensure that only the interactive
--- evaluation should generate breakpoints.
-withBreakAction :: MVar ()
-                -> MVar (EvalStatus b)
-                -> IO a -> IO a
-withBreakAction breakMVar statusMVar act
- = bracket setBreakAction resetBreakAction (\_ -> act)
- where
-   setBreakAction = do
-     stablePtr <- newStablePtr onBreak
-     poke breakPointIOAction stablePtr
-     return stablePtr
-
-   onBreak :: BreakpointCallback
-   onBreak info_mod# info_mod_uid# infox# is_exception apStack = do
-     tid <- myThreadId
-     let resume = ResumeContext
-           { resumeBreakMVar = breakMVar
-           , resumeStatusMVar = statusMVar
-           , resumeThreadId = tid }
-     resume_r <- mkRemoteRef resume
-     apStack_r <- mkRemoteRef apStack
-     ccs <- toRemotePtr <$> getCCSOf apStack
-     breakpoint <-
-       if is_exception
-       then pure Nothing
-       else do
-         info_mod <- BS.packCString (Ptr info_mod#)
-         info_mod_uid <- BS.packCString (Ptr info_mod_uid#)
-         pure (Just (EvalBreakpoint info_mod info_mod_uid (I# infox#)))
-     putMVar statusMVar $ EvalBreak apStack_r breakpoint resume_r ccs
-
-     -- Block until this thread is resumed (by the thread which took the
-     -- `ResumeContext` from the `statusMVar`).
-     --
-     -- The `onBreak` function must have been called from `rts/Interpreter.c`
-     -- when interpreting a `BRK_FUN`. After taking from the MVar, the function
-     -- returns to the continuation on the stack which is where the interpreter
-     -- was stopped.
-     takeMVar breakMVar
-
-   resetBreakAction stablePtr = do
-     poke breakPointIOAction noBreakStablePtr
-     freeStablePtr stablePtr
-
 -- | Set the single-step, step-out, and break-on-exception flags on the target
 -- thread based on the given 'EvalOpts'.
 --
@@ -459,7 +429,7 @@ In these three cases, if we musn't forget to set all breakpoint flags,
 since otherwise we'd resume execution with whatever stale state we had of the
 previous run command. A trivial example would be (tested by break037):
 
-1. `evalStmt` with { singleStep = True, breakOnError = True } would e.g. stop on
+1. `evalStmt` with { singleStep = True, breakOnException = True } would e.g. stop on
   an exception and clear TSO_STOP_ON_EXCEPTION, but TSO_STOP_NEXT_BREAKPOINT
   would still be active.
 2. `abandonStmt` if we didn't setBreakFlags again would kill the thread but
@@ -469,37 +439,55 @@ Likewise for other interactions between eval/resume/abandon.
 TL;DR: always `setBreakFlags` when running/resuming a thread
 -}
 
-resumeStmt
-  :: EvalOpts -> RemoteRef (ResumeContext [HValueRef])
-  -> IO (EvalStatus [HValueRef])
-resumeStmt opts hvref = do
-  ResumeContext{..} <- localRef hvref
-  setBreakFlags opts resumeThreadId
-  withBreakAction resumeBreakMVar resumeStatusMVar $
-    mask_ $ do
-      putMVar resumeBreakMVar () -- this awakens the stopped thread...
-      redirectInterrupts resumeThreadId $ takeMVar resumeStatusMVar
+resumeStmt :: EvalOpts -> RemoteRef ThreadId -> IO (EvalStatus [HValueRef])
+resumeStmt opts rtid = do
+  tid <- localRef rtid
+  ctx <- getThreadResumeContext tid
+  setBreakFlags opts tid
+  main:_ <- readTVarIO evaluationMainThreadGlobalVar
+  mask_ $ do
+    resumeStoppedThread ctx -- this awakens the stopped thread...
+    -- wait for the result of the main thread, not of the stopped one, but
+    -- interrupt the thread which was resumed.
+    redirectInterrupts tid $ unsafeUnmask $
+      atomically $ readEvalStatus opts main
 
--- when abandoning a computation we have to
---      (a) kill the thread with an async exception, so that the
+-- | Wait for the given main thread of an evaluation to complete or break or,
+-- if 'readAllBreaks', for any other thread to break.
+readEvalStatus :: EvalOpts -> MainThreadWithCtx -> STM (EvalStatus [HValueRef])
+readEvalStatus opts main = do
+  r <- readCtxEvalStatus (mainContext main)
+    & if readAllBreaks opts
+        then (`orElse` (EvalPaused <$> readAnyThreadEvalBreak))
+        else id
+  case r of
+    EvalComplete{} -> popMainThread main
+    EvalPaused{}   -> pure ()
+  pure r
+
+-- | When abandoning a computation we have to
+--      (a) kill the stopped thread with an async exception, so that the
 --          computation itself is stopped, and
---      (b) fill in the MVar.  This step is necessary because any
---          thunks that were under evaluation will now be updated
---          with the partial computation, which still ends in takeMVar,
---          so any attempt to evaluate one of these thunks will block
---          unless we fill in the MVar.
---      (c) wait for the thread to terminate by taking its status MVar.  This
---          step is necessary to prevent race conditions with
+--      (b) on the stopped thread (in 'globalBreakAction') catch and re-throw
+--         the kill exception *asynchronously* again. We could have been
+--         evaluating a thunk when we stopped at the breakpoint, so the async
+--         exception makes the thunk resumable from where we stopped instead of
+--         updating it with an exception (tested in break010).
+--      (c) wait for the main thread to terminate by waiting for its result.
+--          This step is necessary to prevent race conditions with
 --          -fbreak-on-exception (see #5975).
---  See test break010.
-abandonStmt :: RemoteRef (ResumeContext [HValueRef]) -> IO ()
+--  See test break010 and break034.
+abandonStmt :: RemoteRef ThreadId -> IO ()
 abandonStmt hvref = do
-  ResumeContext{..} <- localRef hvref
-  setBreakFlags evalOptsAbandon resumeThreadId
-  killThread resumeThreadId
-  putMVar resumeBreakMVar ()
-  _ <- takeMVar resumeStatusMVar
-  return ()
+  main:_ <- readTVarIO evaluationMainThreadGlobalVar
+  tid <- localRef hvref
+  setBreakFlags evalOptsAbandon tid
+  throwTo tid AbandonException -- kill stopped thread, then wait for main thread
+  atomically $
+    readCtxEvalStatus (mainContext main) >>= \case
+      -- throwTo may return before the thread is marked as running
+      EvalPaused{} -> retry
+      EvalComplete{} -> popMainThread main
   where
     -- Don't stop anywhere on abandon
     evalOptsAbandon = EvalOpts
@@ -508,11 +496,42 @@ abandonStmt hvref = do
       , stepOut    = False
       , breakOnException = False
       , breakOnError = False
+      , readAllBreaks = False
       }
 
-noBreakStablePtr :: StablePtr BreakpointCallback
-noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
+-- | An exception thrown to threads being `:abandon`ed
+data AbandonException = AbandonException deriving Show
+instance Exception AbandonException where
+  toException = asyncExceptionToException
+  fromException = asyncExceptionFromException
 
-noBreakAction :: BreakpointCallback
-noBreakAction _ _ _ False _ = putStrLn "*** Ignoring breakpoint"
-noBreakAction _ _ _ True  _ = return () -- exception: just continue
+--------------------------------------------------------------------------------
+-- To remove completely when sandboxIO/resume becomes asynchronous:
+--------------------------------------------------------------------------------
+
+-- | The main threads of the exprs being currently evaluated, the most recent
+-- first. Evaluating an expr while stopped at a breakpoint pushes its thread on
+-- top of the stopped one, until it completes.
+--
+-- FIXME: Remove this global variable. It is only needed while `resumeStmt` is
+-- synchronous, since `resumeStmt` currently tries to return the Eval result of
+-- the main thread (which is a bit non-sensical for a resume operation to do).
+-- It is only needed to preserve the previous behavior, but as soon as
+-- `evalStmt` returns the sandboxIO thread id we can wait on that explicitly
+-- instead of resuming having anything to do with waiting for the main
+-- evaluation result.
+evaluationMainThreadGlobalVar :: TVar [MainThreadWithCtx]
+evaluationMainThreadGlobalVar = unsafePerformIO $ newTVarIO []
+{-# NOINLINE evaluationMainThreadGlobalVar #-}
+
+-- | (Keep the ResumeContext to reduce allocations, triggered interpreter_steplocal regression)
+data MainThreadWithCtx = MainThreadWithCtx { mainKey :: !Word64, mainContext :: !ResumeContext }
+
+mkMainThreadWithContext :: ThreadId -> IO MainThreadWithCtx
+mkMainThreadWithContext tid = MainThreadWithCtx (fromThreadId tid) <$> getThreadResumeContext tid
+
+-- | FIXME: Kill this function, just like 'evaluationMainThreadGlobalVar' will be killed.
+popMainThread :: MainThreadWithCtx -> STM ()
+popMainThread main =
+  modifyTVar evaluationMainThreadGlobalVar (filter ((/= mainKey main) . mainKey))
+

@@ -1,0 +1,7 @@
+Breakpoint 0 activated at break050.hs:(8,7)-(11,9)
+Stopped in Main.f, break050.hs:(8,7)-(11,9)
+_result :: IO () = _
+x :: Int = 0
+forked thread: user interrupt
+main was not interrupted
+Interrupted.

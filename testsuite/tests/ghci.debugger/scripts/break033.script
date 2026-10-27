@@ -1,0 +1,8 @@
+:l break033
+:break f
+:set -fbreak-on-exception
+f 1
+-- stopped on entry, hasn't hit exception yet
+:unset -fbreak-on-exception
+-- The DivideByZero must not stop us after break-on-exception was unset
+:continue
