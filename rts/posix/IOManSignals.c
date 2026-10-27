@@ -92,76 +92,6 @@ more_handlers(int sig)
     nHandlers = sig + 1;
 }
 
-#if !defined(THREADED_RTS)
-
-#define N_PENDING_HANDLERS 16
-
-siginfo_t pending_handler_buf[N_PENDING_HANDLERS];
-siginfo_t *next_pending_handler = pending_handler_buf;
-
-static inline bool signals_pending(void) {
-    return (next_pending_handler != pending_handler_buf);
-}
-
-#endif /* THREADED_RTS */
-
-/* -----------------------------------------------------------------------------
- * Low-level signal handler
- *
- * Places the requested handler on a stack of pending handlers to be
- * started up at the next context switch.
- * -------------------------------------------------------------------------- */
-
-#if !defined(THREADED_RTS)
-void
-generic_handler(int sig USED_IF_THREADS,
-                siginfo_t *info,
-                void *p STG_UNUSED)
-{
-
-    /* Can't call allocate from here.  Probably can't call malloc
-       either.  However, we have to schedule a new thread somehow.
-
-       It's probably ok to request a context switch and allow the
-       scheduler to  start the handler thread, but how do we
-       communicate this to the scheduler?
-
-       We need some kind of locking, but with low overhead (i.e. no
-       blocking signals every time around the scheduler).
-
-       Signal Handlers are atomic (i.e. they can't be interrupted), and
-       we can make use of this.  We just need to make sure the
-       critical section of the scheduler can't be interrupted - the
-       only way to do this is to block signals.  However, we can lower
-       the overhead by only blocking signals when there are any
-       handlers to run, i.e. the set of pending handlers is
-       non-empty.
-    */
-
-    /* We use a stack to store the pending signals.  We can't
-       dynamically grow this since we can't allocate any memory from
-       within a signal handler.
-
-       Hence unfortunately we have to bomb out if the buffer
-       overflows.  It might be acceptable to carry on in certain
-       circumstances, depending on the signal.
-    */
-
-    memcpy(next_pending_handler, info, sizeof(siginfo_t));
-
-    next_pending_handler++;
-
-    // stack full?
-    if (next_pending_handler == &pending_handler_buf[N_PENDING_HANDLERS]) {
-        errorBelch("too many pending signals");
-        stg_exit(EXIT_FAILURE);
-    }
-
-    interruptCapability(&MainCapability);
-
-}
-#endif /* THREADED_RTS */
-
 /* -----------------------------------------------------------------------------
  * Blocking/Unblocking of the user signals
  * -------------------------------------------------------------------------- */
@@ -266,34 +196,6 @@ installSignalHandler(int sig, int spi, sigset_t *mask, bool nocldstop,
 /* -----------------------------------------------------------------------------
  * Creating new threads for signal handlers.
  * -------------------------------------------------------------------------- */
-
-#if !defined(THREADED_RTS)
-void
-startPendingSignalHandlers(Capability *cap)
-{
-  siginfo_t *info;
-  int sig;
-
-  if (!signals_pending()) return;
-
-  blockUserSignals();
-
-  while (next_pending_handler != pending_handler_buf) {
-
-    next_pending_handler--;
-
-    sig = next_pending_handler->si_signo;
-    if (signal_handlers[sig] == STG_SIG_DFL) {
-        continue; // handler has been changed.
-    }
-
-    info = next_pending_handler;
-    startSignalHandler(cap, sig, info);
-  }
-
-  unblockUserSignals();
-}
-#endif
 
 void startSignalHandler(Capability *cap, int sig, siginfo_t *info)
 {

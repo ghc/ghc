@@ -55,6 +55,8 @@
 #define TimeToLowResTimeRoundUp(t)   (t)
 #endif
 
+static void startPendingSignalHandlers(Capability *cap);
+
 void initCapabilityIOManagerSelect(CapIOManager *iomgr)
 {
     iomgr->blocked_queue_hd = END_TSO_QUEUE;
@@ -524,10 +526,97 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
     return !interrupt;
 }
 
+
+/* -----------------------------------------------------------------------------
+ * Low-level signal handler
+ *
+ * Places the requested handler on a stack of pending handlers to be
+ * started up at the next context switch.
+ * -------------------------------------------------------------------------- */
+
+#define N_PENDING_HANDLERS 16
+
+siginfo_t pending_handler_buf[N_PENDING_HANDLERS];
+siginfo_t *next_pending_handler = pending_handler_buf;
+
+static void
+signal_handler(int sig STG_UNUSED, siginfo_t *info, void *p STG_UNUSED)
+{
+
+    /* Can't call allocate from here.  Probably can't call malloc
+       either.  However, we have to schedule a new thread somehow.
+
+       It's probably ok to request a context switch and allow the
+       scheduler to  start the handler thread, but how do we
+       communicate this to the scheduler?
+
+       We need some kind of locking, but with low overhead (i.e. no
+       blocking signals every time around the scheduler).
+
+       Signal Handlers are atomic (i.e. they can't be interrupted), and
+       we can make use of this.  We just need to make sure the
+       critical section of the scheduler can't be interrupted - the
+       only way to do this is to block signals.  However, we can lower
+       the overhead by only blocking signals when there are any
+       handlers to run, i.e. the set of pending handlers is
+       non-empty.
+    */
+
+    /* We use a stack to store the pending signals.  We can't
+       dynamically grow this since we can't allocate any memory from
+       within a signal handler.
+
+       Hence unfortunately we have to bomb out if the buffer
+       overflows.  It might be acceptable to carry on in certain
+       circumstances, depending on the signal.
+    */
+
+    memcpy(next_pending_handler, info, sizeof(siginfo_t));
+
+    next_pending_handler++;
+
+    // stack full?
+    if (next_pending_handler == &pending_handler_buf[N_PENDING_HANDLERS]) {
+        errorBelch("too many pending signals");
+        stg_exit(EXIT_FAILURE);
+    }
+
+    interruptCapability(&MainCapability);
+
+}
+
 int installUserSignalHandlerSelect(int sig, int spi, sigset_t *mask,
                                    bool nocldstop)
 {
-    return installSignalHandler(sig, spi, mask, nocldstop, generic_handler);
+    return installSignalHandler(sig, spi, mask, nocldstop, signal_handler);
+}
+
+static void startPendingSignalHandlers(Capability *cap)
+{
+    if (next_pending_handler == pending_handler_buf) return;
+
+    // Temporarily mask all signals to stop the signal_handler from mutating
+    // next_pending_handler and pending_handler_buf while we are looking at
+    // and modifying them.
+    static sigset_t maskSignals, savedSignals;
+    sigfillset(&maskSignals);
+    pthread_sigmask(SIG_SETMASK, &maskSignals, &savedSignals);
+
+    while (next_pending_handler != pending_handler_buf) {
+
+        next_pending_handler--;
+
+        siginfo_t *info = next_pending_handler;
+        int        sig  = info->si_signo;
+        startSignalHandler(cap, sig, info);
+
+        // It's possible by the time the signal handler runs that the handler
+        // has changed: runHandlers will run whatever handler is set at the
+        // time (or none).
+    }
+
+    // Restore the signal mask.
+    pthread_sigmask(SIG_SETMASK, &savedSignals, NULL);
 }
 
 #endif /* IOMGR_ENABLED_SELECT */

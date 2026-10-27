@@ -25,16 +25,6 @@ void initUserSignals(void);
  */
 void finiUserSignals(void);
 
-#if !defined(THREADED_RTS)
-/*
- * Function: startPendingSignalHandlers()
- *
- * If there are any queued up posix signals, run the handlers
- * associated with them.
- */
-void startPendingSignalHandlers(Capability *cap);
-#endif
-
 void startSignalHandler(Capability *cap, int sig, siginfo_t *info);
 
 typedef void (*SignalHandler)(int sig, siginfo_t *info, void *p);
@@ -46,11 +36,6 @@ int installSignalHandler(int sig, int spi, sigset_t *mask, bool nocldstop,
 void newNonBlockingPipe(int *pipe_fd_r, int *pipe_fd_w);
 void writeSignalInfoToPipe (int  sig, siginfo_t *info, int fd);
 bool readSignalInfoFromPipe(int *sig, siginfo_t *info, int fd);
-
-/* Temporary */
-void generic_handler(int sig USED_IF_THREADS,
-                     siginfo_t *info,
-                     void *p STG_UNUSED);
 
 #endif
 
