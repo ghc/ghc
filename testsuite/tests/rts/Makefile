@@ -162,7 +162,20 @@ IOManager.hs: IOManager.hsc
 census_pinned:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -rtsopts -v0 census_pinned.hs -o census_pinned
 	./census_pinned +RTS -hT -i0 -RTS
-	grep -m1 '^ARR_WORDS' census_pinned.hp
+	# To get a result that is not too sensitive (just 32 vs 64bit) we
+	# subtract the baseline from the final: grab the first two ARR_WORDS
+	# lines and subtract.
+	first=""; \
+	while read arrwords num; do \
+	  if [ "$${arrwords}" = "ARR_WORDS" ]; then \
+	    second="$${num}"; \
+	    if [ -n "$${first}" ]; then \
+	      echo $$((second - first)); \
+	      exit; \
+	    fi; \
+	    first="$${second}"; \
+	  fi; \
+	done < census_pinned.hp
 
 .PHONY: T26408c
 T26408c:
