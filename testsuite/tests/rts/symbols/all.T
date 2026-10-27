@@ -4,7 +4,6 @@ test('rts-check-symbols', [
     extra_files([
         'dumpDeclaredSymbols.c',
         'Main.hs',
-        'rts-check-symbols.ignore',
         'rts-check-symbols.sh'
     ])],
     makefile_test,
