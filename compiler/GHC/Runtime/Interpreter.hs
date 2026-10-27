@@ -462,10 +462,9 @@ whereFrom interp ref =
 seqHValue :: Interp -> UnitEnv -> Logger -> ForeignHValue -> IO (EvalResult ())
 seqHValue interp unit_env logger ref =
   withForeignRef ref $ \hval -> do
-    rtid   <- interpCmd interp (Seq hval)
-    status <- -- TODO redirectInterrupts interp rtid $
-              interpCmd interp (WaitThreadResult rtid)
-    freeHValueRefs interp [castRemoteRef rtid]
+    rtid   <- interpCmd interp (Seq hval) >>= mkFinalizedHValue interp
+    status <- redirectInterrupts interp rtid $
+              waitThreadResult interp rtid
     handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
 
 evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
@@ -483,10 +482,10 @@ evalBreakpointToId eval_break =
 handleSeqHValueStatus :: Interp -> UnitEnv -> Logger -> EvalStatus () -> IO (EvalResult ())
 handleSeqHValueStatus interp unit_env logger eval_status =
   case eval_status of
-    (EvalBreak _ maybe_break resume_ctxt _) -> do
+    (EvalBreak _ maybe_break resume_thread _) -> do
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
-      resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
+      resume_thread <- liftIO $ mkFinalizedHValue interp resume_thread
       let put loc = logMsg logger MCOutput loc ("*** Ignoring breakpoint" <+> brackets (ppr loc))
       let nothing_case = put noSrcSpan
       case maybe_break of
@@ -508,11 +507,10 @@ handleSeqHValueStatus interp unit_env logger eval_status =
             Just modbreaks -> put =<< getBreakLoc (readIModModBreaks hug) ibi modbreaks
 
       -- resume the seq (:force) processing in the iserv process
-      withForeignRef resume_ctxt_fhv $ \rtid -> do
-        interpCmd interp (ResumeSeq rtid)
-        status <- -- TODO: redirectInterrupts interp rtid $
-                  interpCmd interp (WaitThreadResult rtid)
-        handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
+      withForeignRef resume_thread $ \rtid -> interpCmd interp (ResumeSeq rtid)
+      status <- redirectInterrupts interp resume_thread $
+                waitThreadResult interp resume_thread
+      handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
     (EvalComplete _ r) -> return r
 
 -- | While we're waiting for the target thread to return a result, if the
@@ -842,7 +840,7 @@ fromEvalResult :: EvalResult a -> IO a
 fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
 fromEvalResult (EvalSuccess a) = return a
 
-clearEvalStatus :: EvalStatus a -> EvalStatus ()
+clearEvalStatus :: EvalStatus_ a b -> EvalStatus ()
 clearEvalStatus = \case
   EvalComplete w (EvalException se) -> EvalComplete w (EvalException se)
   EvalComplete w (EvalSuccess _)    -> EvalComplete w (EvalSuccess ())
