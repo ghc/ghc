@@ -76,6 +76,9 @@ struct _CapIOManager {
     /* AIOP and timeout collections shared by several I/O manager impls */
     ClosureTable     aiop_table;
     StgTimeoutQueue *timeout_queue;
+
+    /* The number of special fds at the start of the aiop table. */
+    int n_special_fds;
 #endif
 
 #if defined(IOMGR_ENABLED_SELECTBIS)
@@ -83,11 +86,8 @@ struct _CapIOManager {
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)
-    /* Auxiliary table with size and indexes matching the aiop_table. This is
-     * aliased to the tail of the full poll table, which has a head entry for
-     * the wakeup_fd_r above, so we can also poll that fd.
-     */
-    struct pollfd *aiop_poll_table, *full_poll_table;
+    /* Auxiliary table with size and indexes matching the aiop_table. */
+    struct pollfd *aiop_poll_table;
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)

@@ -38,6 +38,7 @@
 
 void initCapabilityIOManagerSelectBis(CapIOManager *iomgr);
 void freeCapabilityIOManagerSelectBis(CapIOManager *iomgr);
+void startCapabilityIOManagerSelectBis(CapIOManager *iomgr);
 
 /* Synchronous I/O and timer operations */
 IOSubmitResult syncIOWaitReadySelectBis(CapIOManager *iomgr, StgTSO *tso,
