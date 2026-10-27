@@ -24,6 +24,7 @@
 
 #include "Poll.h"
 
+#include <unistd.h>
 #include <limits.h>
 #include <errno.h>
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
