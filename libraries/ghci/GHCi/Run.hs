@@ -367,7 +367,7 @@ sandboxIO opts io
       -- tracing, etc.) need the expression to be running in a
       -- separate thread, so debugging is only enabled when
       -- using the sandbox.
-      tid <- forkIO (pure ())
+      tid <- forkIO (pure ()) -- TODO doesn't work
       runIt id >>= writeThreadEvalStatus tid
       mkRemoteRef tid
         -- We `runIt` on the main thread, but fork a new thread to store to the
@@ -419,16 +419,16 @@ setBreakAction opts tid@(ThreadId tid#) = do
   where
     setBreakAction' ctx = do
 
-      runIf# singleStep rts_enableStopNextBreakpoint
-      runIf# stepOut    rts_enableStopAfterReturn
+      runIf# singleStep rts_enableStopNextBreakpoint rts_disableStopNextBreakpoint
+      runIf# stepOut    rts_enableStopAfterReturn    rts_disableStopAfterReturn
 
       -- Breaking on exceptions is not enabled by default, since it might be a
       -- bit surprising. The exception flag is turned off as soon as it is hit.
-      runIf# breakOnException rts_enableStopOnException
+      runIf# breakOnException rts_enableStopOnException rts_disableStopOnException
 
       if isolateThreadBreaks opts
         then setIsolatedCtx ctx
         else unsetIsolatedCtx ctx
 
-    runIf#   pred what     = when (pred opts) (what tid#)
+    runIf# pred what what_off = if pred opts then what tid# else what_off tid#
 
