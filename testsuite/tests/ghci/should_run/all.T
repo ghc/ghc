@@ -23,6 +23,19 @@ test('T3171ext',
       combined_output],
      makefile_test, [])
 
+test('T3171nosandbox',
+     [when(opsys('mingw32'),skip),
+      req_interp,
+      combined_output],
+     makefile_test, [])
+
+test('T3171extnosandbox',
+     [when(opsys('mingw32'),skip),
+      req_interp,
+      unless(config.have_ext_interp, skip),
+      combined_output],
+     makefile_test, [])
+
 test('ForceInterrupt',
      [when(opsys('mingw32'),skip),
       req_interp,

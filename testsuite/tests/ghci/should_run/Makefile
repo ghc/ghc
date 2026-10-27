@@ -10,8 +10,13 @@ include $(TOP)/mk/test.mk
 # 	- interrupting a remote request doesn't terminate the ext interpreter (#18852)
 # 	- a ^C gets propagated to the thread evaluating the user request on the ext
 # 	interpreter so that it gets interrupted
+#
+# The nosandbox variants run the expression on the interpreter's main thread
+# (-fno-ghci-sandbox) rather than in a forked sandbox thread.
 T3171ext: T3171_OPTS = -fexternal-interpreter
-T3171 T3171ext:
+T3171nosandbox: T3171_OPTS = -fno-ghci-sandbox
+T3171extnosandbox: T3171_OPTS = -fexternal-interpreter -fno-ghci-sandbox
+T3171 T3171ext T3171nosandbox T3171extnosandbox:
 	rm -f $@.started
 	echo 'do { writeFile "$@.started" ""; (Control.Concurrent.threadDelay 100000000 >> putStrLn "threadDelay was not interrupted.") `Control.Exception.catch` \(e :: Control.Exception.SomeException) -> System.IO.hPutStrLn System.IO.stderr ("threadDelay was interrupted: " ++ show e) >> Control.Exception.throwIO e }' | \
 	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) $(T3171_OPTS) & \
