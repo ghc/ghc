@@ -767,8 +767,11 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
   (db_stack, db_to_operate_on) <- getDatabases top_dir mb_user_conf
                                                flag_db_names final_stack top_db
 
-  let flag_db_stack = [ db | db_name <- flag_db_names,
+  let flag_db_stack' = [ db | db_name <- flag_db_names,
                         db <- db_stack, location db == db_name ]
+
+      -- make sure we don't retain the full list of `db_stack` in here
+      !flag_db_stack = length flag_db_stack' `seq` flag_db_stack'
 
   when (verbosity > Normal) $ do
     infoLn ("db stack: " ++ show (map location db_stack))
