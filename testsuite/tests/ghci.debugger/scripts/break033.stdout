@@ -1,0 +1,5 @@
+Breakpoint 0 activated at break033.hs:(6,7)-(11,31)
+Stopped in Break033.f, break033.hs:(6,7)-(11,31)
+_result :: IO Int = _
+x :: Int = 1
+1
