@@ -1,0 +1,7 @@
+:l break046
+:break f
+v <- pure $! f 3
+-- Currently stopped, running a statement should not affect what :continue continues
+g 4
+:continue
+v

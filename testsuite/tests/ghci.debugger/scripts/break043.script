@@ -1,0 +1,7 @@
+:l break043
+:break inWorker
+:break inMain
+main
+-- Resuming the worker will hit the `main` thread breakpoint or yield its result.
+:continue
+:continue

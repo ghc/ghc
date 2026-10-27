@@ -1,0 +1,12 @@
+:l break042
+:break midpoint
+-- All 4 workers reach the breakpoint on `main`.
+-- Each must be reported once as we :continue, since the program only terminates once all 4 workers finish.
+main
+:continue
+:continue
+:continue
+-- Resumes the last worker and returns when main completes
+:continue
+-- There must be nothing left to resume
+:continue

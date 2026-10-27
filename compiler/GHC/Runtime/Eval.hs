@@ -282,7 +282,7 @@ parseImportDecl expr = withSession $ \hsc_env -> liftIO $ hscImport hsc_env expr
 emptyHistory :: Int -> BoundedList History
 emptyHistory size = nilBL size
 
--- | Turn an 'EvalStatus_' result from interpreting Haskell into a GHCi 'ExecResult'.
+-- | Turn an 'EvalStatus' result from interpreting Haskell into a GHCi 'ExecResult'.
 --
 -- This function is responsible for resuming execution at an intermediate
 -- breakpoint if we don't care about that breakpoint (e.g. if using :steplocal
@@ -298,7 +298,7 @@ handleRunStatus :: GhcMonad m
                 -> String
                 -> ResumeBindings
                 -> [Id]
-                -> EvalStatus_ [ForeignHValue] [HValueRef]
+                -> EvalStatus [ForeignHValue]
                 -> BoundedList History
                 -> m ExecResult
 handleRunStatus step eval_opts expr bindings final_ids status history0 = do
@@ -1276,7 +1276,8 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
         _ -> panic "compileParsedExprRemote"
 
   updateFixityEnv fix_env
-  let eval_opts = initEvalOpts dflags EvalStepNone
+  -- Only this expression's result is expected, never another thread's break
+  let eval_opts = (initEvalOpts dflags EvalStepNone) { readAllBreaks = False }
   status <- liftIO $ evalStmt interp eval_opts (EvalThis hvals_io)
   case status of
     EvalComplete _ (EvalSuccess [hval]) -> return hval
