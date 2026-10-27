@@ -1,0 +1,6 @@
+:l break048
+:break f
+main
+-- Currently stopped in forked thread; eval'ing an expr should not report the stopped break we're at again.
+1 + 1
+:continue

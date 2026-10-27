@@ -1,0 +1,13 @@
+:l break049
+:break inWorker
+:break inMain
+-- Hit the breakpoint on `inMain`, and the worker is forked waiting for `:force slow`
+main
+-- Make the worker reach its breakpoint, but :force shouldn't observe the worker's break
+:force slow
+-- And evaluating a stmt shouldn't observe the worker's break either
+:cmd return ""
+-- Resume the main thread. We stop at the worker break next.
+:continue
+-- Resume from the worker breakpoint, and main is unblocked and finishes
+:continue

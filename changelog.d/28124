@@ -1,0 +1,24 @@
+section: ghci
+synopsis: Fix breakpoints in threads forked from the evaluated expression
+issues: #28124
+mrs: !16991
+
+description: {
+  Previously, breakpoints hit by threads forked from an evaluated expression
+  could be silently ignored or reported (and resumed) from another evaluation.
+
+  The breakpoint action is now installed once and never changed. Each thread
+  that hits a breakpoint is resumed and reports its status independently.
+  This makes debugging multi-threaded programs no longer unsound and it paves
+  the way forward for a debugger with fine-grained control over what threads
+  are paused and resumed.
+
+  In particular, the following was fixed:
+  - When an expression forks several threads that all hit a breakpoint,
+    every breakpoint is now reported, rather than only the first.
+  - Evaluating an expression while stopped (e.g. ``:force``) no longer
+    consumes or discards breakpoints hit by threads of another evaluation;
+    they are reported on the next ``:continue``.
+  - ``^C`` during ``:continue`` of a forked thread now interrupts that thread
+    with the external interpreter too.
+}
