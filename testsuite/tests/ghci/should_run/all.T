@@ -23,6 +23,21 @@ test('T3171ext',
       combined_output],
      makefile_test, [])
 
+test('ForceInterrupt',
+     [when(opsys('mingw32'),skip),
+      req_interp,
+      extra_files(['ForceInterrupt.script']),
+      combined_output],
+     makefile_test, [])
+
+test('ForceInterruptExt',
+     [when(opsys('mingw32'),skip),
+      req_interp,
+      unless(config.have_ext_interp, skip),
+      extra_files(['ForceInterrupt.script']),
+      combined_output],
+     makefile_test, [])
+
 test('ghcirun004', just_ghci, compile_and_run, [''])
 test('T8377',      just_ghci, compile_and_run, [''])
 test('T9914',      just_ghci, ghci_script, ['T9914.script'])
