@@ -14,6 +14,8 @@ test('pause_resume_via_safe_ffi_concurrent',
      [ only_ways(['threaded1', 'threaded2'])
      , req_c
      , extra_files(['pause_resume.c','pause_resume.h'])
+     # Internal watchdog is 60s; give the harness room on loaded Darwin CI.
+     , run_timeout_multiplier(2)
      ],
      multi_compile_and_run, ['pause_resume_via_safe_ffi_concurrent', [('pause_resume.c','')], ''])
 test('pause_and_use_rts_api',
