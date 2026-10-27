@@ -31,4 +31,5 @@ void dumpDeclaredSymbols(void) {
             printf("%s %s\n", lbl, type);
         }
     }
+    free((void*)declaredSyms);
 }

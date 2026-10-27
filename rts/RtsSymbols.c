@@ -1239,44 +1239,38 @@ RTS_SYMBOLS_PRIM
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
       (void*)(&(xxx)), strength, ty, MAYBE_LEADING_UNDERSCORE_STR(#xxx) },
 
-static RtsSymbolVal * rtsSyms = NULL;
-
-// Initialize and return a pointer to an array of rts symbols.
+// Allocate and return an array of rts symbols.
 // The final element marks the end of the array and has `.lbl=NULL`.
+// The caller must free the array.
 RtsSymbolVal const * getRtsSymbols(void) {
-      if (!rtsSyms) {
-            /* The address of data symbols with the dllimport attribute are not
-            * compile-time constants and so cannot be used in constant initialisers.
-            * For this reason, rtsSyms is a local variable within this function
-            * rather than a global constant (as it was historically).
-            */
-            const RtsSymbolVal _rtsSyms[] = {
-                  RTS_SYMBOLS
-                  RTS_RET_SYMBOLS
-                  RTS_POSIX_ONLY_SYMBOLS
-                  RTS_MINGW_ONLY_SYMBOLS
-                  RTS_DARWIN_ONLY_SYMBOLS
-                  RTS_OPENBSD_ONLY_SYMBOLS
-                  RTS_LIBGCC_SYMBOLS
-                  RTS_ARCH_LIBGCC_SYMBOLS
-                  RTS_FINI_ARRAY_SYMBOLS
-                  RTS_LIBFFI_SYMBOLS
-                  RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
-                  RTS_SYMBOLS_PRIM
-                  SymI_HasDataProto(nonmoving_write_barrier_enabled)
-                  { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE, NULL } /* sentinel */
-            };
+      /* The address of data symbols with the dllimport attribute are not
+      * compile-time constants and so cannot be used in constant initialisers.
+      * For this reason, rtsSyms is a local variable within this function
+      * rather than a global constant (as it was historically).
+      */
+      const RtsSymbolVal _rtsSyms[] = {
+            RTS_SYMBOLS
+            RTS_RET_SYMBOLS
+            RTS_POSIX_ONLY_SYMBOLS
+            RTS_MINGW_ONLY_SYMBOLS
+            RTS_DARWIN_ONLY_SYMBOLS
+            RTS_OPENBSD_ONLY_SYMBOLS
+            RTS_LIBGCC_SYMBOLS
+            RTS_ARCH_LIBGCC_SYMBOLS
+            RTS_FINI_ARRAY_SYMBOLS
+            RTS_LIBFFI_SYMBOLS
+            RTS_ARM_OUTLINE_ATOMIC_SYMBOLS
+            RTS_SYMBOLS_PRIM
+            SymI_HasDataProto(nonmoving_write_barrier_enabled)
+            { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE, NULL } /* sentinel */
+      };
 
-            uint32_t n = 1;
-            while (_rtsSyms[n].lbl != NULL) {
-                  n++;
-            }
-
-            rtsSyms = stgMallocBytes(n * sizeof(RtsSymbolVal), "getRtsSymbols");
-            for (uint32_t i = 0; i < n; i++) {
-                  rtsSyms[i] = _rtsSyms[i];
-            }
-      }
+      RtsSymbolVal * rtsSyms = stgMallocBytes(sizeof(_rtsSyms), "getRtsSymbols");
+      uint32_t i = 0;
+      do {
+            rtsSyms[i] = _rtsSyms[i];
+            i++;
+      } while (_rtsSyms[i-1].lbl != NULL);
 
       return rtsSyms;
 }
