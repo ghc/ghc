@@ -145,7 +145,8 @@ static void processBadFds(CapIOManager *iomgr);
 static void reportSelectError(void) STG_NORETURN;
 
 enum SpecialFd {
-    InterruptFd  /* iomgr->interrupt_fd_r for interruptIOManager */
+    InterruptFd,  /* iomgr->interrupt_fd_r for interruptIOManager */
+    SignalFd      /* iomgr->shared->signal_fd_r */
 };
 static void insertSpecialFd(CapIOManager  *iomgr,
                             enum SpecialFd special_fd_kind,
@@ -168,8 +169,8 @@ void initCapabilityIOManagerSelectBis(CapIOManager *iomgr)
     /* Would never happen in a standalone process, but could plausibly happen
      * if the RTS is used within another process that already has many open fds.
      */
-    if (iomgr->interrupt_fd_r < 0 || iomgr->interrupt_fd_r >= (int)FD_SETSIZE ||
-        iomgr->interrupt_fd_w < 0 || iomgr->interrupt_fd_w >= (int)FD_SETSIZE) {
+    if (iomgr->interrupt_fd_r >= (int)FD_SETSIZE ||
+        iomgr->interrupt_fd_w >= (int)FD_SETSIZE) {
         barf("initCapabilityIOManagerSelectBis: fds out of select range");
     }
 #endif
@@ -177,6 +178,9 @@ void initCapabilityIOManagerSelectBis(CapIOManager *iomgr)
     iomgr->n_special_fds = 0
 #if defined(HAVE_PREEMPTION)
         + 1
+#endif
+#if defined(RTS_USER_SIGNALS)
+        + (iomgr->cap->no == 0 ? 1 : 0)
 #endif
         ;
 
@@ -187,6 +191,13 @@ void initCapabilityIOManagerSelectBis(CapIOManager *iomgr)
     /* Signal handlers are shared across all caps. Only init once. */
     if (iomgr->cap->no == 0) {
         initUserSignals();
+        /* See Note [Non-racy signal handling using the self-pipe trick] */
+        newNonBlockingPipe(&iomgr->shared->signal_fd_r,
+                           &iomgr->shared->signal_fd_w);
+        if (iomgr->shared->signal_fd_r >= (int)FD_SETSIZE ||
+            iomgr->shared->signal_fd_w >= (int)FD_SETSIZE) {
+            barf("initCapabilityIOManagerSelectBis: fds out of select range");
+        }
     }
 #endif
 }
@@ -204,6 +215,12 @@ void startCapabilityIOManagerSelectBis(CapIOManager *iomgr)
 
 #if defined(HAVE_PREEMPTION)
     insertSpecialFd(iomgr, InterruptFd, iomgr->interrupt_fd_r);
+#endif
+#if defined(RTS_USER_SIGNALS)
+    if (iomgr->cap->no == 0) {
+        /* See Note [Non-racy signal handling using the self-pipe trick] */
+        insertSpecialFd(iomgr, SignalFd, iomgr->shared->signal_fd_r);
+    }
 #endif
     ASSERT(iomgr->n_special_fds == sizeClosureTable(&iomgr->aiop_table));
 }
@@ -238,6 +255,8 @@ void freeCapabilityIOManagerSelectBis(CapIOManager *iomgr)
 #if defined(RTS_USER_SIGNALS)
     if (iomgr->cap->no == 0) {
         finiUserSignals();
+        close(iomgr->shared->signal_fd_r);
+        close(iomgr->shared->signal_fd_w);
     }
 #endif
     stgFree(iomgr->rfds);
@@ -439,6 +458,17 @@ static void processSpecialFd(CapIOManager *iomgr,
             debugTrace(DEBUG_iomanager, "Received interrupt in poll I/O manager");
             break;
 #endif
+#if defined(RTS_USER_SIGNALS)
+        /* See Note [Non-racy signal handling using the self-pipe trick] */
+        case SignalFd:
+            ASSERT(fd == iomgr->shared->signal_fd_r);
+            int sig; siginfo_t info;
+            readSignalInfoFromPipe(&sig, &info, fd);
+            startSignalHandler(iomgr->cap, sig, &info);
+            debugTrace(DEBUG_iomanager,
+                       "Dispatched signal %d in I/O manager", sig);
+            break;
+#endif
     }
 }
 
@@ -483,10 +513,6 @@ void pollCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
             reportSelectError();
         }
     }
-
-#if defined(RTS_USER_SIGNALS)
-    startPendingSignalHandlers(iomgr->cap);
-#endif
 }
 
 
@@ -577,20 +603,23 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
              */
 
         } else if (errno == EINTR) {
-            /* We got interrupted by a signal. */
-
-#if defined(RTS_USER_SIGNALS)
-            /* Start any corresponding user signal handlers. If any, the run
-             * queue will become non-empty and we will drop out of the loop.
-             */
-            startPendingSignalHandlers(iomgr->cap);
-#endif
-
-            /* We can also be interrupted by the shutdown signal handler, which
-             * will set sched_state and so cause us to drop out of the loop.
+            /* We got interrupted by a signal.
              *
-             * For any other interruption (e.g. timer) we will go round the
-             * do-while loop again.
+             * Signals of note:
+             *  + signals with a user handler: these will be delivered to us
+             *    via the signal_fd_r pipe, which we handle by starting new
+             *    threads, which will terminate the loop (non-empty run queue).
+             *  + The backup ctl-c signal handler sets sched_state, and to avoid
+             *    races, it also calls interruptIOManagerPoll (which causes
+             *    interrupt_fd_r to become ready). We're in the EINTR case here
+             *    so we know the signal arrived while we were waiting, so it is
+             *    the getSchedState condition that will will terminate the loop.
+             *    (If the signal arrives before the call to poll then we will
+             *    notice interrupt_fd_r is ready and set interrupt=true, which
+             *    will terminate the loop).
+             *
+             * For any other interruption we will go round the do-while loop
+             * again.
              */
 
         } else if (errno == EBADF) {
@@ -683,11 +712,20 @@ void interruptIOManagerSelectBis(CapIOManager *iomgr USED_IF_PREEMPTION)
 }
 
 
+#if defined(RTS_USER_SIGNALS)
+static void signal_handler(int sig, siginfo_t *info, void *p STG_UNUSED)
+{
+    int signal_fd_w = getCapability(0)->iomgr->shared->signal_fd_w;
+    writeSignalInfoToPipe(sig, info, signal_fd_w);
+}
+
+
 int installUserSignalHandlerSelectBis(int sig, int spi, sigset_t *mask,
                                       bool nocldstop)
 {
-    return installSignalHandler(sig, spi, mask, nocldstop, generic_handler);
+    return installSignalHandler(sig, spi, mask, nocldstop, signal_handler);
 }
+#endif
 
 
 /* Helper function to double the size of the aiop_table.

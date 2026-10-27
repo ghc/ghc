@@ -321,6 +321,43 @@ void startSignalHandler(Capability *cap, int sig, siginfo_t *info)
     setThreadLabel(cap, t, "signal handler thread");
 }
 
+/* Note [Non-racy signal handling using the self-pipe trick]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Reliably picking up unix/posix signals promptly is surprisingly tricky!
+ * The standard problem is that there is a race between signal delivery and
+ * waiting/blocking in something like select/poll/epoll_wait. The problem is
+ * that if one checks for a signal having been delivered (e.g. by looking at a
+ * shared variable set by the signal handler) just before calling select/poll
+ * then there's a time window between that point and calling select/poll when
+ * a signal could be delivered and then not noticed until select/poll returns.
+ * Once we've called select/poll then it can return EINTR upon signal arrival,
+ * but the window before remains a problem.
+ *
+ * One solution is to use pselect/ppoll: mask signals, then do a final check
+ * for signals having been delivered, then call pselect/ppoll to unmask
+ * signals (atomically) for the duration of the wait. This is fine in a single
+ * threaded process. In a multi-threaded process, masking signals doesn't work.
+ * See Note [pthread_sigmask and the ineffectiveness of masking signals].
+ *
+ * The standard solution is the "self-pipe trick" where the low level signal
+ * handler writes the signal info into a pipe, and poll/select monitors that
+ * pipe. This neatly eliminates the window where signals could be missed. If
+ * the signal arrives before calling poll/select then the pipe is readable and
+ * poll/select will return. If the signal arrives during the poll/select call
+ * then they will return with EINTR.
+ *
+ * In the RTS context, this is done by the I/O managers: the in-RTS ones use
+ * newNonBlockingPipe on startup, have their low level signal handler use
+ * writeSignalInfoToPipe, and when the I/O manager finds the other end of the
+ * pipe is readable then it calls readSignalInfoFromPipe, and can then use
+ * startSignalHandler.
+ *
+ * The in-Haskell MIO I/O manager does essentially the same.
+ *
+ * See issue #27540.
+ */
+
 void newNonBlockingPipe(int *pipe_fd_r, int *pipe_fd_w)
 {
     int pipefd[2];
