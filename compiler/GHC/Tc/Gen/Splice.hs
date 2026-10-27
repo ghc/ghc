@@ -144,6 +144,8 @@ import qualified GHC.Boot.TH.Ppr    as TH
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import Unsafe.Coerce    ( unsafeCoerce )
+import Control.Concurrent (myThreadId)
+import GHCi.Run.Breakpoints (disableThreadBreakpoints)
 #if !MIN_VERSION_base(4,22,0)
 import GHC.Desugar ( AnnotationWrapper(..) )
 #else
@@ -1344,7 +1346,13 @@ runMeta' show_code ppr_hs run_and_convert expr
         ; either_tval <- tryAllM $
                          setSrcSpan expr_span $ -- Set the span so that qLocation can
                                                 -- see where this splice is
-             do { mb_result <- run_and_convert expr_span hval
+             do {
+#if defined(HAVE_INTERNAL_INTERPRETER)
+                  liftIO $
+                  -- See Note [Disable breakpoints in certain threads]
+                  disableThreadBreakpoints =<< myThreadId
+#endif
+                ; mb_result <- run_and_convert expr_span hval
                 ; case mb_result of
                     Left err     -> failWithTc $
                       TcRnTHError $ THSpliceFailed $ RunSpliceFailure err

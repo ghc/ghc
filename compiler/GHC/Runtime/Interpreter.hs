@@ -8,7 +8,7 @@ module GHC.Runtime.Interpreter
   ( module GHC.Runtime.Interpreter.Types
 
   -- * High-level interface to the interpreter
-  , evalStmt, EvalStatus_(..), EvalStatus, EvalResult(..), EvalExpr(..)
+  , evalStmt, EvalStatus(..), EvalResult(..), EvalExpr(..)
   , resumeStmt
   , abandonStmt
   , evalIO
@@ -310,7 +310,7 @@ evalStmt
   :: SafeInterp
   -> EvalOpts
   -> EvalExpr ForeignHValue
-  -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
+  -> IO (EvalStatus [ForeignHValue])
 evalStmt interp0 opts foreign_expr = withInterp interp0 $ \ interp -> do
   status <- withExpr foreign_expr $ \expr ->
     interpCmd interp (EvalStmt opts expr)
@@ -327,22 +327,22 @@ evalStmt interp0 opts foreign_expr = withInterp interp0 $ \ interp -> do
 resumeStmt
   :: SafeInterp
   -> EvalOpts
-  -> ForeignRef (ResumeContext [HValueRef])
-  -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
-resumeStmt interp0 opts resume_ctxt = withInterp interp0 $ \interp -> do
-  status <- withForeignRef resume_ctxt $ \rhv ->
+  -> ForeignRef ThreadId
+  -> IO (EvalStatus [ForeignHValue])
+resumeStmt interp0 opts resume_tid = withInterp interp0 $ \interp -> do
+  status <- withForeignRef resume_tid $ \rhv ->
     interpCmd interp (ResumeStmt opts rhv)
   handleEvalStatus interp status
 
-abandonStmt :: SafeInterp -> ForeignRef (ResumeContext [HValueRef]) -> IO ()
-abandonStmt interp0 resume_ctxt = withInterp interp0 $ \ interp ->
-  withForeignRef resume_ctxt $ \rhv ->
+abandonStmt :: SafeInterp -> ForeignRef ThreadId -> IO ()
+abandonStmt interp0 resume_tid = withInterp interp0 $ \ interp ->
+  withForeignRef resume_tid $ \rhv ->
     interpCmd interp (AbandonStmt rhv)
 
 handleEvalStatus
   :: Interp
   -> EvalStatus [HValueRef]
-  -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
+  -> IO (EvalStatus [ForeignHValue])
 handleEvalStatus interp status =
   case status of
     EvalBreak a b c d -> return (EvalBreak a b c d)
@@ -441,7 +441,7 @@ seqHValue :: SafeInterp -> UnitEnv -> Logger -> ForeignHValue -> IO (EvalResult 
 seqHValue interp0 unit_env logger ref = withInterp interp0 $ \ interp ->
   withForeignRef ref $ \hval -> do
     status <- interpCmd interp (Seq hval)
-    handleSeqHValueStatus interp unit_env logger status
+    handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
 
 evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
 evalBreakpointToId eval_break =
@@ -458,10 +458,10 @@ evalBreakpointToId eval_break =
 handleSeqHValueStatus :: Interp -> UnitEnv -> Logger -> EvalStatus () -> IO (EvalResult ())
 handleSeqHValueStatus interp unit_env logger eval_status =
   case eval_status of
-    (EvalBreak _ maybe_break resume_ctxt _) -> do
+    (EvalBreak _ maybe_break resume_tid _) -> do
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
-      resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
+      resume_tid_fhv <- liftIO $ mkFinalizedHValue interp resume_tid
       let put loc = logMsg logger MCOutput loc ("*** Ignoring breakpoint" <+> brackets (ppr loc))
       let nothing_case = put noSrcSpan
       case maybe_break of
@@ -483,9 +483,9 @@ handleSeqHValueStatus interp unit_env logger eval_status =
             Just modbreaks -> put =<< getBreakLoc (readIModModBreaks hug) ibi modbreaks
 
       -- resume the seq (:force) processing in the iserv process
-      withForeignRef resume_ctxt_fhv $ \hval -> do
-        status <- interpCmd interp (ResumeSeq hval)
-        handleSeqHValueStatus interp unit_env logger status
+      withForeignRef resume_tid_fhv $ \rtid -> do
+        status <- interpCmd interp (ResumeSeq rtid)
+        handleSeqHValueStatus interp unit_env logger (clearEvalStatus status)
     (EvalComplete _ r) -> return r
 
 
@@ -827,3 +827,9 @@ readIModModBreaks hug mod = imodBreaks_modBreaks . expectJust <$> readIModBreaks
 fromEvalResult :: EvalResult a -> IO a
 fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
 fromEvalResult (EvalSuccess a) = return a
+
+clearEvalStatus :: EvalStatus a -> EvalStatus ()
+clearEvalStatus = \case
+  EvalComplete w (EvalException se) -> EvalComplete w (EvalException se)
+  EvalComplete w (EvalSuccess _)    -> EvalComplete w (EvalSuccess ())
+  EvalBreak ap mb rt rccs           -> EvalBreak ap mb rt rccs

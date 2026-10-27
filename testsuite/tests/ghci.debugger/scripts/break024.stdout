@@ -1,6 +1,9 @@
 Left user error (error)
 Stopped in <exception thrown>, <unknown>
-_exception :: e = _
+_exception :: e = SomeException
+                    (GHC.Internal.IO.Exception.IOError
+                       Nothing GHC.Internal.IO.Exception.UserError [] "error" Nothing
+                       Nothing)
 _exception = SomeException
                (GHC.Internal.IO.Exception.IOError
                   Nothing GHC.Internal.IO.Exception.UserError [] "error" Nothing

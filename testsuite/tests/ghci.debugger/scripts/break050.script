@@ -1,0 +1,10 @@
+:l break050
+:break f
+-- Stops in the forked thread running f
+main
+:delete *
+-- Resumes the forked thread, which loops forever, so it basically blocks
+-- waiting for main to finish. A SIGINT (from the Makefile) is redirected
+-- (`redirectInterrupts`) to the forked thread.
+-- The forked thread should be killed and main should complete
+:continue

@@ -45,6 +45,7 @@ initEvalOpts dflags step =
     , stepOut          = stepOut
     , breakOnException = gopt Opt_BreakOnException dflags
     , breakOnError     = gopt Opt_BreakOnError dflags
+    , readAllBreaks    = True -- by default evaluation stops at any thread's breakpoints
     }
   where
     (singleStep, stepOut) = case step of
