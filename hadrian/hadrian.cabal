@@ -170,6 +170,9 @@ executable hadrian
                        , base16-bytestring    >= 0.1.1 && < 1.1.0.0
                        , ghc-platform
                        , ghc-toolchain
+    -- It seems to be impossible to build on windows otherwise.
+    if os(windows)
+        build-depends: directory >= 1.3.9.0
     ghc-options:       -Wall
                        -Wincomplete-record-updates
                        -Wredundant-constraints
