@@ -121,6 +121,17 @@ The CapIOManager structure for this I/O manager contains:
     ClosureTable     aiop_table;
     StgTimeoutQueue *timeout_queue;
     int interrupt_fd_r, interrupt_fd_w;
+    int n_special_fds;
+
+In addition to aiops, there are some special internal fds we have to monitor
+and respond to. In particular there is the interrupt_fd_r used to implement
+interruptIOManager. Whether this fd is used or not depends on configuration
+(use of interrupt_fd_r depends on HAVE_PREEMPTION). To enable multiple such
+fds and allow them to be optional we use the following scheme: we create
+special internal AsyncIOOps and put them into the aiop_table. These are
+treated much like other IOOpCodeWaitRead operations but with special handling
+for notification. The variable n_special_fds tracks how many such entries we
+have so that we can handle them specially but in a reasonably uniform manner.
 
 ******************************************************************************/
 
@@ -133,7 +144,19 @@ static int  collectFdSets(CapIOManager *iomgr);
 static void processBadFds(CapIOManager *iomgr);
 static void reportSelectError(void) STG_NORETURN;
 
+enum SpecialFd {
+    InterruptFd  /* iomgr->interrupt_fd_r for interruptIOManager */
+};
+static void insertSpecialFd(CapIOManager  *iomgr,
+                            enum SpecialFd special_fd_kind,
+                            int            special_fd);
+static void processSpecialFd(CapIOManager *iomgr,
+                             StgAsyncIOOp *aiop, bool *interrupt);
 
+
+/* Called early in RTS startup _before_ the storage manager is initialised,
+ * so this is not allowed to allocate on the GC heap.
+ */
 void initCapabilityIOManagerSelectBis(CapIOManager *iomgr)
 {
     initClosureTable(&iomgr->aiop_table, ClosureTableCompact);
@@ -151,6 +174,12 @@ void initCapabilityIOManagerSelectBis(CapIOManager *iomgr)
     }
 #endif
 
+    iomgr->n_special_fds = 0
+#if defined(HAVE_PREEMPTION)
+        + 1
+#endif
+        ;
+
     iomgr->rfds = stgMallocBytes(sizeof (fd_set), "IOManagerSelectBis");
     iomgr->wfds = stgMallocBytes(sizeof (fd_set), "IOManagerSelectBis");
 
@@ -160,6 +189,47 @@ void initCapabilityIOManagerSelectBis(CapIOManager *iomgr)
         initUserSignals();
     }
 #endif
+}
+
+
+/* Called late in RtsStartup, once heap allocation is ready. */
+void startCapabilityIOManagerSelectBis(CapIOManager *iomgr)
+{
+    /* ClosureTable allocates on the heap, so we can do it here not in init */
+    if (iomgr->n_special_fds > 0) {
+        bool ok = enlargeClosureTable(iomgr->cap, &iomgr->aiop_table,
+                                      iomgr->n_special_fds);
+        CHECK(ok);
+    }
+
+#if defined(HAVE_PREEMPTION)
+    insertSpecialFd(iomgr, InterruptFd, iomgr->interrupt_fd_r);
+#endif
+    ASSERT(iomgr->n_special_fds == sizeClosureTable(&iomgr->aiop_table));
+}
+
+
+/* For special fds, we add a dummy entry to the aiop_table and a
+ * corresponding real entry to the aiop_poll_table.
+ */
+static void insertSpecialFd(CapIOManager  *iomgr,
+                            enum SpecialFd special_fd_kind,
+                            int            special_fd)
+{
+    StgAsyncIOOp *aiop  = (StgAsyncIOOp *)allocate(iomgr->cap,
+                                                   sizeofW(StgAsyncIOOp));
+    SET_HDR(aiop, &stg_ASYNCIOOP_info, CCS_SYSTEM);
+    aiop->notify.unused = &stg_ASYNCIO_LIVE0_closure;
+    aiop->live          = &stg_ASYNCIO_LIVE0_closure;
+    aiop->capno         = iomgr->cap->no;
+    aiop->notify_type   = NotifyInternal;
+    aiop->outcome       = IOOpOutcomeInFlight;
+    aiop->operation     = IOOpCodeWaitRead;
+    aiop->fd            = special_fd;
+    aiop->internal      = special_fd_kind;
+
+    int ix = insertClosureTable(iomgr->cap, &iomgr->aiop_table, aiop);
+    aiop->index = ix;
 }
 
 
@@ -316,20 +386,9 @@ static bool processIOCompletions(CapIOManager *iomgr, int ncompletions)
     ASSERT(ncompletions > 0);
 
     bool interrupt = false;
-#if defined(HAVE_PREEMPTION)
-    /* If the interrupt_fd_r is ready, collect it */
-    if (FD_ISSET(iomgr->interrupt_fd_r, iomgr->rfds)) {
-        collectFdWakeup(iomgr->interrupt_fd_r);
-        ncompletions--;
-        interrupt = true;
-        debugTrace(DEBUG_iomanager, "Received interrupt in poll I/O manager");
-    }
-#endif
 
     int i = 0;
-    while (ncompletions > 0) {
-        ASSERT(i < sizeClosureTable(&iomgr->aiop_table));
-
+    while (ncompletions > 0 && i < sizeClosureTable(&iomgr->aiop_table)) {
         StgAsyncIOOp *aiop = indexClosureTable(&iomgr->aiop_table, i);
         int           fd   = aiop->fd;
         enum IOOpCode op   = aiop->operation;
@@ -339,11 +398,17 @@ static bool processIOCompletions(CapIOManager *iomgr, int ncompletions)
 
         if (op == IOOpCodeWaitRead ? FD_ISSET(fd, iomgr->rfds)
                                    : FD_ISSET(fd, iomgr->wfds)) {
-            aiop->outcome = IOOpOutcomeSuccess;
-            aiop->result  = 0;
-            removeFromTables(iomgr, i);
-            notifyIOCompletion(iomgr, aiop);
-            ncompletions--;
+            if (aiop->notify_type == NotifyInternal) {
+                processSpecialFd(iomgr, aiop, &interrupt);
+                ncompletions--;
+                i++;
+            } else {
+                aiop->outcome = IOOpOutcomeSuccess;
+                aiop->result  = 0;
+                removeFromTables(iomgr, i);
+                notifyIOCompletion(iomgr, aiop);
+                ncompletions--;
+            }
         } else {
             /* You'd expect incrementing the table index to be unconditional,
              * but we don't increment the index if we did process the entry,
@@ -353,7 +418,28 @@ static bool processIOCompletions(CapIOManager *iomgr, int ncompletions)
             i++;
         }
     }
+    ASSERT(ncompletions == 0);
     return interrupt;
+}
+
+
+static void processSpecialFd(CapIOManager *iomgr,
+                             StgAsyncIOOp *aiop, bool *interrupt)
+{
+    ASSERT(aiop->notify_type == NotifyInternal);
+    enum SpecialFd special_fd_kind = aiop->internal;
+    int fd = aiop->fd;
+
+    switch (special_fd_kind) {
+#if defined(HAVE_PREEMPTION)
+        case InterruptFd:
+            ASSERT(fd == iomgr->interrupt_fd_r);
+            collectFdWakeup(fd);
+            *interrupt = true;
+            debugTrace(DEBUG_iomanager, "Received interrupt in poll I/O manager");
+            break;
+#endif
+    }
 }
 
 
@@ -440,8 +526,10 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
          */
         Time timeout = timeoutWaitTime(iomgr, wait, now);
 
-        if (RTS_UNLIKELY(timeout == -1 &&
-                         isEmptyClosureTable(&iomgr->aiop_table))) {
+        int nfds    = sizeClosureTable(&iomgr->aiop_table);
+        int n_aiops = nfds - iomgr->n_special_fds;
+
+        if (RTS_UNLIKELY(timeout == -1 && n_aiops == 0)) {
             /* See Note [Deadlock detection without idle GC] */
             interrupt = notifyIdleGcDeadlock();
             if (interrupt) break;
@@ -453,7 +541,7 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
          * time, and if that timeout is reached then we schedule an idle GC
          * (see handleIdleGcTimeout below).
          */
-        bool any_pending_io = maxfd >= 0;
+        bool any_pending_io = n_aiops > 0;
         bool timeout_idlegc_delay;
         adjustTimeoutForIdleGc(any_pending_io, &timeout, &timeout_idlegc_delay);
 #endif
@@ -479,7 +567,7 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
 
         } else if (res > 0) {
             int ncompletions = res;
-            ASSERT(ncompletions <= sizeClosureTable(&iomgr->aiop_table)+1);
+            ASSERT(ncompletions <= nfds);
             interrupt = processIOCompletions(iomgr, ncompletions);
             /* We do _not_ need to check for timeouts again here. We know that
              * select() returned due to I/O being ready before the timeout. If
@@ -646,15 +734,6 @@ static int collectFdSets(CapIOManager *iomgr)
      */
     FD_ZERO(iomgr->rfds);
     FD_ZERO(iomgr->wfds);
-
-#if defined(HAVE_PREEMPTION)
-    /* We're always interested in our interrupt fd */
-    {
-        int fd = iomgr->interrupt_fd_r;
-        maxfd = (fd > maxfd) ? fd : maxfd;
-        FD_SET(fd, iomgr->rfds);
-    }
-#endif
 
     for (int ix = 0; ix < nentries; ix++) {
         StgAsyncIOOp *aiop = indexClosureTable(&iomgr->aiop_table, ix);

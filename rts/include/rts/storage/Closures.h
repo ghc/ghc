@@ -722,14 +722,16 @@ typedef struct {
    ------------------------------------------------------------------------- */
 
 union NotifyCompletion {
-    StgTSO    *tso;
-    StgMVar   *mvar;
-    StgTVar   *tvar;
+    StgTSO     *tso;
+    StgMVar    *mvar;
+    StgTVar    *tvar;
+    StgClosure *unused;
 };
 enum NotifyCompletionType {
-    NotifyTSO  = 0, // thread-synchronous I/O
-    NotifyMVar = 1, // async I/O with MVar notification
-    NotifyTVar = 2  // async I/O with TVar notification
+    NotifyTSO      = 0, // thread-synchronous I/O
+    NotifyMVar     = 1, // async I/O with MVar notification
+    NotifyTVar     = 2, // async I/O with TVar notification
+    NotifyInternal = 3  // used for special I/O manager-internal notification
 };
 
 /* A node in the leftist heap. */
@@ -873,6 +875,10 @@ typedef struct {
 
           // For failed outcomes, this is the error code.
         uint32_t error;
+
+          // For notify_type NotifyInternal, this is available for internal
+          // use by individual I/O managers.
+        uint32_t internal;
     };
 
       // Note that because we use fixed size Ctypes here then the size in words

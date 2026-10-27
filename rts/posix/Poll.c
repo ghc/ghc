@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team 2020-2023
+ * (c) The GHC Team 2020-2026
  *
  * An I/O manager based on the classic Unix poll() system call.
  *
@@ -107,9 +107,10 @@ timeout (if any) as the poll() timeout parameter.
 The CapIOManager structure for this I/O manager contains:
 
     ClosureTable     aiop_table;
-    struct pollfd   *aiop_poll_table, *full_poll_table;
+    struct pollfd   *aiop_poll_table;
     StgTimeoutQueue *timeout_queue;
     int interrupt_fd_r, interrupt_fd_w;
+    int n_special_fds;
 
 We also support the Linux-specific ppoll API which supports higher resolution
 time delays -- nanoseconds rather than milliseconds as in classic poll(). It
@@ -118,14 +119,15 @@ also allows the signal mask to be adjusted, but we do not make use of this.
    int ppoll(struct pollfd *fds, nfds_t nfds,
            const struct timespec *tmo_p, const sigset_t *sigmask);
 
-We have both aiop_poll_table and full_poll_table. This is to cope with needing
-to wait on the special extra file descriptor interrupt_fd_r. This fd is used to
-support waking the I/O manager when we are blocked in a poll call. This
-requires waiting on an extra fd that has no corresponding entry in the
-aiop_table. To manage this quirk, we alias the aiop_poll_table to be the tail
-of the full_poll_table and have the first entry of the full_poll_table be the
-interrupt_fd_r. This means the aiop_poll_table indicies match up exactly with
-the aiop_table, but still allows the full_poll_table to have an extra entry.
+In addition to aiops, there are some special internal fds we have to monitor
+and respond to. In particular there is the interrupt_fd_r used to implement
+interruptIOManager. Whether this fd is used or not depends on configuration
+(use of interrupt_fd_r depends on HAVE_PREEMPTION). To enable multiple such
+fds and allow them to be optional we use the following scheme: we create
+special internal AsyncIOOps and put them into the aiop_table. These are
+treated much like other IOOpCodeWaitRead operations but with special handling
+for notification. The variable n_special_fds tracks how many such entries we
+have so that we can handle them specially but in a reasonably uniform manner.
 
 ******************************************************************************/
 
@@ -135,7 +137,19 @@ static void notifyIOCompletion(CapIOManager *iomgr, StgAsyncIOOp *aiop);
 static void removeFromTables(CapIOManager *iomgr, int i);
 static void reportPollError(int res, nfds_t nfds) STG_NORETURN;
 
+enum SpecialFd {
+    InterruptFd  /* iomgr->interrupt_fd_r for interruptIOManager */
+};
+static void insertSpecialFd(CapIOManager  *iomgr,
+                            enum SpecialFd special_fd_kind,
+                            int            special_fd);
+static void processSpecialFd(CapIOManager *iomgr,
+                             StgAsyncIOOp *aiop, bool *interrupt);
 
+
+/* Called early in RTS startup _before_ the storage manager is initialised,
+ * so this is not allowed to allocate on the GC heap.
+ */
 void initCapabilityIOManagerPoll(CapIOManager *iomgr)
 {
     initClosureTable(&iomgr->aiop_table, ClosureTableCompact);
@@ -145,19 +159,11 @@ void initCapabilityIOManagerPoll(CapIOManager *iomgr)
     newFdWakeup(&iomgr->interrupt_fd_r, &iomgr->interrupt_fd_w);
 #endif
 
-    iomgr->full_poll_table = stgMallocBytes(sizeof(struct pollfd) /* size 1 */,
-                                            "initCapabilityIOManagerPoll");
-    iomgr->full_poll_table[0] = (struct pollfd) {
+    iomgr->n_special_fds = 0
 #if defined(HAVE_PREEMPTION)
-                                  .fd      = iomgr->interrupt_fd_r,
-                                  .events  = POLLIN,
-#else
-                                  .fd      = -1, // unused
-                                  .events  = 0,  // unused
+        + 1
 #endif
-                                  .revents = 0
-                                };
-    iomgr->aiop_poll_table = iomgr->full_poll_table+1; /* hence empty */
+        ;
 
 #if defined(RTS_USER_SIGNALS)
     /* Signal handlers are shared across all caps. Only init once. */
@@ -168,6 +174,56 @@ void initCapabilityIOManagerPoll(CapIOManager *iomgr)
 }
 
 
+/* Called late in RtsStartup, once heap allocation is ready. */
+void startCapabilityIOManagerPoll(CapIOManager *iomgr)
+{
+    /* ClosureTable allocates on the heap, so we can do it here not in init */
+    if (iomgr->n_special_fds > 0) {
+        bool ok = enlargeClosureTable(iomgr->cap, &iomgr->aiop_table,
+                                      iomgr->n_special_fds);
+        CHECK(ok);
+    }
+    iomgr->aiop_poll_table =
+        stgMallocBytes(sizeof(struct pollfd) * iomgr->n_special_fds,
+                       "initCapabilityIOManagerPoll");
+
+#if defined(HAVE_PREEMPTION)
+    insertSpecialFd(iomgr, InterruptFd, iomgr->interrupt_fd_r);
+#endif
+    ASSERT(iomgr->n_special_fds == sizeClosureTable(&iomgr->aiop_table));
+}
+
+
+/* For special fds, we add a dummy entry to the aiop_table and a
+ * corresponding real entry to the aiop_poll_table.
+ */
+static void insertSpecialFd(CapIOManager  *iomgr,
+                            enum SpecialFd special_fd_kind,
+                            int            special_fd)
+{
+    StgAsyncIOOp *aiop  = (StgAsyncIOOp *)allocate(iomgr->cap,
+                                                   sizeofW(StgAsyncIOOp));
+    SET_HDR(aiop, &stg_ASYNCIOOP_info, CCS_SYSTEM);
+    aiop->notify.unused = &stg_ASYNCIO_LIVE0_closure;
+    aiop->live          = &stg_ASYNCIO_LIVE0_closure;
+    aiop->capno         = iomgr->cap->no;
+    aiop->notify_type   = NotifyInternal;
+    aiop->outcome       = IOOpOutcomeInFlight;
+    aiop->operation     = IOOpCodeWaitRead;
+    aiop->fd            = special_fd;
+    aiop->internal      = special_fd_kind;
+
+    int ix = insertClosureTable(iomgr->cap, &iomgr->aiop_table, aiop);
+    aiop->index = ix;
+
+    iomgr->aiop_poll_table[ix] = (struct pollfd) {
+                                     .fd      = special_fd,
+                                     .events  = POLLIN,
+                                     .revents = 0
+                                 };
+}
+
+
 void freeCapabilityIOManagerPoll(CapIOManager *iomgr)
 {
 #if defined(RTS_USER_SIGNALS)
@@ -175,7 +231,7 @@ void freeCapabilityIOManagerPoll(CapIOManager *iomgr)
         finiUserSignals();
     }
 #endif
-    stgFree(iomgr->full_poll_table);
+    stgFree(iomgr->aiop_poll_table);
 #if defined(HAVE_PREEMPTION)
     closeFdWakeup(iomgr->interrupt_fd_r, iomgr->interrupt_fd_w);
 #endif
@@ -314,22 +370,10 @@ static bool processIOCompletions(CapIOManager *iomgr, int ncompletions)
     ASSERT(ncompletions > 0);
 
     bool interrupt = false;
-#if defined(HAVE_PREEMPTION)
-    /* If the interrupt_fd_r is ready, collect it */
-    if (iomgr->full_poll_table[0].revents) {
-        ASSERT(iomgr->full_poll_table[0].fd == iomgr->interrupt_fd_r);
-        collectFdWakeup(iomgr->interrupt_fd_r);
-        ncompletions--;
-        interrupt = true;
-        debugTrace(DEBUG_iomanager, "Received interrupt in poll I/O manager");
-    }
-#endif
 
     struct pollfd *aiop_poll_table = iomgr->aiop_poll_table;
     int i = 0;
-    while (ncompletions > 0) {
-        ASSERT(i < sizeClosureTable(&iomgr->aiop_table));
-
+    while (ncompletions > 0 && i < sizeClosureTable(&iomgr->aiop_table)) {
         /* Since each aiop_table entry is for a single (fd, rw) pair, we
          * just need to check if the aiop_poll_table[n].revents contains
          * anything. We don't need to distinguish read vs write.
@@ -337,26 +381,34 @@ static bool processIOCompletions(CapIOManager *iomgr, int ncompletions)
         if (aiop_poll_table[i].revents) {
             StgAsyncIOOp *aiop = indexClosureTable(&iomgr->aiop_table, i);
 
+            ASSERT(aiop->operation == IOOpCodeWaitRead ||
+                   aiop->operation == IOOpCodeWaitWrite);
             ASSERT(aiop->outcome == IOOpOutcomeInFlight);
 
-            /* We do need to handle POLLNVAL, but we do not need to do anything
-             * special for POLLERR or POLLHUP. (See man poll for details).
-             * The calling thread will typically try to do I/O after waiting
-             * for I/O readiness. Thus for POLLERR they'll discover the error
-             * when doing the I/O. And for POLLHUP, there is typically no
-             * action required anyway: it's a notification and not an error.
-             */
-            if (aiop_poll_table[i].revents & POLLNVAL) {
-                aiop->outcome = IOOpOutcomeFailed;
-                aiop->error   = EBADF;
+            if (aiop->notify_type == NotifyInternal) {
+                processSpecialFd(iomgr, aiop, &interrupt);
+                ncompletions--;
+                i++;
             } else {
-                aiop->outcome = IOOpOutcomeSuccess;
-                aiop->result  = 0;
-            }
+                /* We do need to handle POLLNVAL, but we do not need to do anything
+                 * special for POLLERR or POLLHUP. (See man poll for details).
+                 * The calling thread will typically try to do I/O after waiting
+                 * for I/O readiness. Thus for POLLERR they'll discover the error
+                 * when doing the I/O. And for POLLHUP, there is typically no
+                 * action required anyway: it's a notification and not an error.
+                 */
+                if (aiop_poll_table[i].revents & POLLNVAL) {
+                    aiop->outcome = IOOpOutcomeFailed;
+                    aiop->error   = EBADF;
+                } else {
+                    aiop->outcome = IOOpOutcomeSuccess;
+                    aiop->result  = 0;
+                }
 
-            removeFromTables(iomgr, i);
-            notifyIOCompletion(iomgr, aiop);
-            ncompletions--;
+                removeFromTables(iomgr, i);
+                notifyIOCompletion(iomgr, aiop);
+                ncompletions--;
+            }
         } else {
             /* You'd expect incrementing the table index to be unconditional,
              * but we don't increment the index if we did process the entry,
@@ -366,14 +418,33 @@ static bool processIOCompletions(CapIOManager *iomgr, int ncompletions)
             i++;
         }
     }
+    ASSERT(ncompletions == 0);
     return interrupt;
+}
+
+
+static void processSpecialFd(CapIOManager *iomgr,
+                             StgAsyncIOOp *aiop, bool *interrupt)
+{
+    ASSERT(aiop->notify_type == NotifyInternal);
+    enum SpecialFd special_fd_kind = aiop->internal;
+    int fd = aiop->fd;
+
+    switch (special_fd_kind) {
+#if defined(HAVE_PREEMPTION)
+        case InterruptFd:
+            ASSERT(fd == iomgr->interrupt_fd_r);
+            collectFdWakeup(fd);
+            *interrupt = true;
+            debugTrace(DEBUG_iomanager, "Received interrupt in poll I/O manager");
+            break;
+#endif
+    }
 }
 
 
 void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
 {
-    ASSERT(iomgr->aiop_poll_table == iomgr->full_poll_table+1);
-
     if (!isEmptyTimeoutQueue(iomgr->timeout_queue)) {
         Time now = getProcessElapsedTime();
         processTimeoutCompletions(iomgr, now);
@@ -381,29 +452,20 @@ void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
 
     if (!isEmptyClosureTable(&iomgr->aiop_table)) {
 
-        int n_aiops = sizeClosureTable(&iomgr->aiop_table);
-#if defined(HAVE_PREEMPTION)
-        /* the full_poll_table includes interrupt_fd_r */
-        nfds_t nfds = n_aiops + 1;
-        struct pollfd *poll_table = iomgr->full_poll_table;
-#else
-        /* the aiop_poll_table does not include interrupt_fd_r */
-        nfds_t nfds = n_aiops + 0;
-        struct pollfd *poll_table = iomgr->aiop_poll_table;
-#endif
+        nfds_t nfds = sizeClosureTable(&iomgr->aiop_table);
 
         /* Poll for I/O readiness, without waiting. */
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
         /* We could use poll here, since we use no timeout, but for
            consistency we use the same syscall as at the other call site. */
         struct timespec tv = (struct timespec) { .tv_sec = 0, .tv_nsec = 0 };
-        int res = ppoll(poll_table, nfds, &tv, NULL);
+        int res = ppoll(iomgr->aiop_poll_table, nfds, &tv, NULL);
 
         debugTrace(DEBUG_iomanager,
                    "ppoll(nfds = %lu, timeout = 0) = %d",
                    (unsigned long) nfds, res);
 #else
-        int res = poll(poll_table, nfds, 0);
+        int res = poll(iomgr->aiop_poll_table, nfds, 0);
 
         debugTrace(DEBUG_iomanager,
                    "poll(nfds = %lu, timeout = 0) = %d",
@@ -437,8 +499,6 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
 {
     bool interrupt = false; /* got woken up via interruptIOManager */
 
-    ASSERT(iomgr->aiop_poll_table == iomgr->full_poll_table+1);
-
     /* Loop until we've woken up some threads. This loop is needed because the
      * poll() timing isn't accurate, we sometimes sleep for a while but not
      * long enough to wake up a thread in a threadDelay. Or we may need to
@@ -461,21 +521,13 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
          */
         bool wait = emptyRunQueue(iomgr->cap);
 
-        int n_aiops = sizeClosureTable(&iomgr->aiop_table);
-#if defined(HAVE_PREEMPTION)
-        /* the full_poll_table includes interrupt_fd_r */
-        nfds_t nfds = n_aiops + 1;
-        struct pollfd *poll_table = iomgr->full_poll_table;
-#else
-        /* the aiop_poll_table does not include interrupt_fd_r */
-        nfds_t nfds = n_aiops + 0;
-        struct pollfd *poll_table = iomgr->aiop_poll_table;
-#endif
-
         /* Decide if we are going to wait if no I/O is ready, either:
          * poll only, wait indefinitely, or wait until a timeout.
          */
         Time timeout = timeoutWaitTime(iomgr, wait, now);
+
+        nfds_t nfds = sizeClosureTable(&iomgr->aiop_table);
+        int n_aiops = nfds - iomgr->n_special_fds;
 
         if (RTS_UNLIKELY(timeout == -1 && n_aiops == 0)) {
             /* See Note [Deadlock detection without idle GC] */
@@ -489,7 +541,7 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
          * time, and if that timeout is reached then we schedule an idle GC
          * (see handleIdleGcTimeout below).
          */
-        bool any_pending_io = nfds > 0;
+        bool any_pending_io = n_aiops > 0;
         bool timeout_idlegc_delay;
         adjustTimeoutForIdleGc(any_pending_io, &timeout, &timeout_idlegc_delay);
 #endif
@@ -497,14 +549,14 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
         /* Check for I/O readiness, possibly waiting. */
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
         struct timespec ts, *timeout_ns = timeoutAsTimespec(timeout, &ts);
-        int res = ppoll(poll_table, nfds, timeout_ns, NULL);
+        int res = ppoll(iomgr->aiop_poll_table, nfds, timeout_ns, NULL);
 
         debugTrace(DEBUG_iomanager,
                    "ppoll(nfds = %lu, timeout = %" FMT_Int64 " ns) = %d",
                    (unsigned long) nfds, timeout, res);
 #else
         int timeout_ms = timeoutAsPollTimeout(timeout);
-        int res = poll(poll_table, nfds, timeout_ms);
+        int res = poll(iomgr->aiop_poll_table, nfds, timeout_ms);
 
         debugTrace(DEBUG_iomanager,
                    "poll(nfds = %lu, timeout = %d ms) = %d",
@@ -602,14 +654,11 @@ static bool enlargeTables(CapIOManager *iomgr)
     bool ok = enlargeClosureTable(iomgr->cap, &iomgr->aiop_table, newcapacity);
     if (RTS_UNLIKELY(!ok)) return false;
 
-    /* Update the auxiliary aiop_poll_table to match. The full_poll_table is
-     * one bigger than the aiop_poll_table, since it has an extra entry at the
-     * front for interrupt_fd_r, with no corresponding aiop. */
-    iomgr->full_poll_table =
-        stgReallocBytes(iomgr->full_poll_table,
-                        sizeof(struct pollfd) * (newcapacity+1),
+    /* Update the auxiliary aiop_poll_table to match. */
+    iomgr->aiop_poll_table =
+        stgReallocBytes(iomgr->aiop_poll_table,
+                        sizeof(struct pollfd) * newcapacity,
                         "Poll.c: enlargeTables");
-    iomgr->aiop_poll_table = iomgr->full_poll_table+1;
 
     /* Initialise the new part of the aiop_poll_table */
     struct pollfd *aiop_poll_table = iomgr->aiop_poll_table;

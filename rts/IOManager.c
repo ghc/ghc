@@ -462,6 +462,20 @@ void startIOManager(void)
 
     switch (iomgr_type) {
 
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+            for (unsigned int i = 0; i < n_capabilities; i++) {
+                startCapabilityIOManagerSelectBis(getCapability(i)->iomgr);
+            }
+            break;
+#endif
+#if defined(IOMGR_ENABLED_POLL)
+        case IO_MANAGER_POLL:
+            for (unsigned int i = 0; i < n_capabilities; i++) {
+                startCapabilityIOManagerPoll(getCapability(i)->iomgr);
+            }
+            break;
+#endif
 #if defined(IOMGR_ENABLED_MIO_POSIX)
         case IO_MANAGER_MIO_POSIX:
             /* Posix implementation in posix/Signals.c
@@ -514,6 +528,18 @@ restartIOManager(CapIOManager *iomgr, Capability **pcap)
 {
 
     switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+            startCapabilityIOManagerSelectBis(iomgr);
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_POLL)
+        case IO_MANAGER_POLL:
+            startCapabilityIOManagerPoll(iomgr);
+            break;
+#endif
+
 #if defined(IOMGR_ENABLED_MIO_POSIX)
         case IO_MANAGER_MIO_POSIX:
             /* Posix implementation in posix/Signals.c
@@ -530,8 +556,6 @@ restartIOManager(CapIOManager *iomgr, Capability **pcap)
             break;
 #endif
         /* The IO_MANAGER_SELECT needs no initialisation */
-        /* The IO_MANAGER_SELECTBIS needs no initialisation */
-        /* The IO_MANAGER_POLL needs no initialisation */
 
         /* No impl for any of the Windows I/O managers, since no forking. */
         default:
