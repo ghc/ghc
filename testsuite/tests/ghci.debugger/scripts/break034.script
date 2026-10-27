@@ -1,0 +1,11 @@
+:l break034
+:set -fbreak-on-error
+:break f
+f 1
+-- Killing the thread stopped at the breakpoint may break again, on the
+-- ThreadKilled exception; :abandon must still clean up without errors and
+-- without blocking there.
+:abandon
+f 2
+:abandon
+putStrLn "done"

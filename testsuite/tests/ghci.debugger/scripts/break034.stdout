@@ -1,0 +1,8 @@
+Breakpoint 0 activated at break034.hs:4:7-11
+Stopped in Break034.f, break034.hs:4:7-11
+_result :: Int = _
+x :: Int = 1
+Stopped in Break034.f, break034.hs:4:7-11
+_result :: Int = _
+x :: Int = 2
+done
