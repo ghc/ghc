@@ -29,6 +29,7 @@ import GHC.Core.Ppr     ( pprCoreBindings, pprRules )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram, diffBinds, stripTicksE )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Opt.Simplify ( simplifyExpr, simplifyPgm )
+import GHC.Core.Opt.Simplify.Env ( SimplMode(..) )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.Pipeline.Types
@@ -172,6 +173,24 @@ getCoreToDo dflags hpt_rule_base extra_vars
     simpl_gently = CoreDoSimplify $ initSimplifyOpts dflags extra_vars max_iter
                                     (initGentleSimplMode dflags) hpt_rule_base
 
+    first_float_switches = FloatOutSwitches
+                { floatOutLambdas     = Just 0
+                , floatOutConstants   = True
+                , floatOutOverSatApps = False
+                , floatToTopLevelOnly = False
+                , floatJoinsToTop     = False  -- Initially, don't float join points at all
+                }
+
+    -- EXPERIMENT (#28016): before each phase, let full laziness float to top
+    -- level the constants that the unfoldings active from that phase expose,
+    -- before case-of-case moves a continuation into them, as the gentle run
+    -- does for the first float-out. See Note [Case-of-case and full laziness].
+    pre_float phase = runWhen full_laziness $ CoreDoPasses
+      [ CoreDoSimplify $ initSimplifyOpts dflags extra_vars 1
+          ((initSimplMode dflags phase "pre-float") { sm_case_case = False })
+          hpt_rule_base
+      , CoreDoFloatOutwards first_float_switches { floatToTopLevelOnly = True } ]
+
     dmd_cpr_ww = if ww_on then [CoreDoDemand True,CoreDoCpr,CoreDoWorkerWrapper]
                           else [CoreDoDemand False] -- NB: No CPR! See Note [Don't change boxity without worker/wrapper]
 
@@ -206,14 +225,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- so that overloaded functions have all their dictionary lambdas manifest
         runWhen do_specialise CoreDoSpecialising,
 
-        runWhen full_laziness
-           (CoreDoFloatOutwards $ FloatOutSwitches
-                { floatOutLambdas     = Just 0
-                , floatOutConstants   = True
-                , floatOutOverSatApps = False
-                , floatToTopLevelOnly = False
-                , floatJoinsToTop     = False  -- Initially, don't float join points at all
-                }),
+        runWhen full_laziness (CoreDoFloatOutwards first_float_switches),
                 -- I have no idea why, but not floating constants to
                 -- top level is very bad in some cases.
                 --
@@ -232,9 +244,11 @@ getCoreToDo dflags hpt_rule_base extra_vars
 
         -- Run the simplifier phases 2,1,0 to allow rewrite rules to fire
         runWhen do_simpl3
-            (CoreDoPasses $ [ simpl_phase (Phase phase) "main" max_iter
-                            | phase <- [phases, phases-1 .. 1] ] ++
-                            [ simpl_phase (Phase 0) "main" (max max_iter 3) ]),
+            (CoreDoPasses $ concat [ [ pre_float (Phase phase)
+                                     , simpl_phase (Phase phase) "main" max_iter ]
+                                   | phase <- [phases, phases-1 .. 1] ] ++
+                            [ pre_float (Phase 0)
+                            , simpl_phase (Phase 0) "main" (max max_iter 3) ]),
                 -- Phase 0: allow all Ids to be inlined now
                 -- This gets foldr inlined before strictness analysis
 
