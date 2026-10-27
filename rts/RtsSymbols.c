@@ -1224,9 +1224,9 @@ RTS_SYMBOLS_PRIM
 #define SymI_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
                     (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA, NULL },
 #define SymE_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE, NULL },
+            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE | SYM_TYPE_EXTERNAL, NULL },
 #define SymE_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA, NULL },
+            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA | SYM_TYPE_EXTERNAL, NULL },
 
 #define SymI_NeedsProto(vvv) SymI_HasProto(vvv)
 #define SymI_NeedsDataProto(vvv) SymI_HasDataProto(vvv)
@@ -1266,11 +1266,7 @@ RtsSymbolVal const * getRtsSymbols(void) {
       };
 
       RtsSymbolVal * rtsSyms = stgMallocBytes(sizeof(_rtsSyms), "getRtsSymbols");
-      uint32_t i = 0;
-      do {
-            rtsSyms[i] = _rtsSyms[i];
-            i++;
-      } while (_rtsSyms[i-1].lbl != NULL);
+      memcpy(rtsSyms, _rtsSyms, sizeof(_rtsSyms));
 
       return rtsSyms;
 }

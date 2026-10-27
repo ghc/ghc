@@ -24,6 +24,8 @@ typedef enum _SymType {
                                       however if a duplicate is found with a mismatching
                                       SymType then discard this one.  */
     SYM_TYPE_HIDDEN = 1 << 4, /* the symbol is hidden and should not be exported */
+    SYM_TYPE_EXTERNAL = 1 << 5, /* the symbol is defined externally to the RTS library. It might be linked
+                                   dynamically. This corresponds to SymE_* in RtsSymbols.c */
 } SymType;
 
 typedef enum _SymStrength {

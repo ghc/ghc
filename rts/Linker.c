@@ -232,12 +232,14 @@ static void ghciRemoveSymbolTable(StrHashTable *table, const SymbolName* key,
 static const char *
 symbolTypeString (SymType type)
 {
-    switch (type & ~(SYM_TYPE_DUP_DISCARD | SYM_TYPE_HIDDEN)) {
-        case SYM_TYPE_CODE: return "code";
-        case SYM_TYPE_DATA: return "data";
-        case SYM_TYPE_INDIRECT_DATA: return "indirect-data";
-        default: barf("symbolTypeString: unknown symbol type (%d)", type);
-    }
+    if (type & SYM_TYPE_CODE)
+        return "code";
+    if (type & SYM_TYPE_DATA)
+        return "data";
+    if (type & SYM_TYPE_INDIRECT_DATA)
+        return "indirect-data";
+
+    barf("symbolTypeString: unknown symbol type (%d)", type);
 }
 
 /* -----------------------------------------------------------------------------

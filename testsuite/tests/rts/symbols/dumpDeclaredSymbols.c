@@ -12,6 +12,9 @@ void dumpDeclaredSymbols(void) {
         // Ignore hidden
         if (sym->type & SYM_TYPE_HIDDEN) continue;
 
+        // Ignore external symbols
+        if (sym->type & SYM_TYPE_EXTERNAL) continue;
+
         char * type = NULL;
         if (sym->type & SYM_TYPE_CODE) {
             type = "code";

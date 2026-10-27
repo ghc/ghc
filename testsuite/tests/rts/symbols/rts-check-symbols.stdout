@@ -1,20 +1,6 @@
 Symbols declared in RtsSymbols.c but not observed in the DSO:
 Declared> atomic_dec Code
 Declared> dirty_TVAR Code
-Declared> ffi_call Code
-Declared> ffi_prep_cif Code
-Declared> ffi_type_double Data
-Declared> ffi_type_float Data
-Declared> ffi_type_pointer Data
-Declared> ffi_type_sint16 Data
-Declared> ffi_type_sint32 Data
-Declared> ffi_type_sint64 Data
-Declared> ffi_type_sint8 Data
-Declared> ffi_type_uint16 Data
-Declared> ffi_type_uint32 Data
-Declared> ffi_type_uint64 Data
-Declared> ffi_type_uint8 Data
-Declared> ffi_type_void Data
 Declared> signal_handlers Code
 Declared> updateRemembSetPushThunk Code
 
@@ -75,6 +61,7 @@ Observed> ap_sizeW Code
 Observed> ap_stack_sizeW Code
 Observed> arr_words_sizeW Code
 Observed> arr_words_words Code
+Observed> backtraceFree Code
 Observed> bco_sizeW Code
 Observed> broadcastCondition Code
 Observed> cas_word8 Code
@@ -163,6 +150,11 @@ Observed> itbl_to_ret_itbl Code
 Observed> itbl_to_thunk_itbl Code
 Observed> joinOSThread Code
 Observed> kernelThreadId Code
+Observed> libdwGetBacktrace Code
+Observed> libdwLookupLocation Code
+Observed> libdwPoolClear Code
+Observed> libdwPoolRelease Code
+Observed> libdwPoolTake Code
 Observed> listAllBlocks Code
 Observed> listThreads Code
 Observed> looksEmptyWSDeque Code
