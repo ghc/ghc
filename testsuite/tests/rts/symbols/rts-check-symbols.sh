@@ -4,7 +4,6 @@
 # Check the diff between symbols exported from the RTS and those listed in RtsSymbols.c
 #
 
-IGNORED_SYMBOLS=rts-check-symbols.ignore
 DECLARED_SYMBOLS=declared_symbols.txt
 OBSERVED_SYMBOLS=observed_symbols.txt
 
@@ -27,4 +26,4 @@ RTS_DYLIB_PATH=$(ldd ./Main | awk '/^[[:space:]]*libHSrts-.* => .+$/ {
 # .text section.
 readelf -W --dyn-syms "$RTS_DYLIB_PATH" > $OBSERVED_SYMBOLS
 
-./Main diff $IGNORED_SYMBOLS $DECLARED_SYMBOLS $OBSERVED_SYMBOLS
+./Main diff $DECLARED_SYMBOLS $OBSERVED_SYMBOLS
