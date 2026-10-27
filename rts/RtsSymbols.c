@@ -1224,9 +1224,9 @@ RTS_SYMBOLS_PRIM
 #define SymI_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
                     (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA, NULL },
 #define SymE_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE, NULL },
+            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE | SYM_TYPE_EXTERNAL, NULL },
 #define SymE_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA, NULL },
+            (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA | SYM_TYPE_EXTERNAL, NULL },
 
 #define SymI_NeedsProto(vvv) SymI_HasProto(vvv)
 #define SymI_NeedsDataProto(vvv) SymI_HasDataProto(vvv)
