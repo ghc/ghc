@@ -168,7 +168,10 @@ test('conc030', extra_run_opts('+RTS -K4M -RTS'), compile_and_run, [''])
 test('conc031', exit_code(1), compile_and_run, [''])
 
 test('conc032', normal, compile_and_run, [''])
-test('conc033', normal, compile_and_run, [''])
+# Also run in GHCi: the sandbox thread must still be detected as deadlocked
+test('conc033',
+     [extra_ways(['ghci'] + (['ghci-ext'] if config.have_ext_interp else []))],
+     compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
 test('conc034', [
