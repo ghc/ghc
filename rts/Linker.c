@@ -488,6 +488,7 @@ initLinker_ (int retain_cafs)
             barf("ghciInsertSymbolTable failed");
         }
     }
+    stgFree((void*)rtsSyms);
     IF_DEBUG(linker, debugBelch("done with built-in RTS symbols\n"));
 
     /* Add extra symbols. rtsExtraSyms() is a weakly defined symbol in the rts,
