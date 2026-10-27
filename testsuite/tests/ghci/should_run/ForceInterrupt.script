@@ -1,0 +1,11 @@
+import Control.Concurrent
+import Control.Monad
+import Data.IORef
+import System.IO.Unsafe
+ticks <- newIORef (0 :: Int)
+let x = unsafePerformIO (writeFile "force.started" "" >> forever (modifyIORef' ticks (+1) >> threadDelay 20000)) :: ()
+-- blocks the interpreter waiting for the expression being forced to terminate.
+-- Test that a SIGINT (from the Makefile) interrupts the :force and kills the
+-- expression which is running in a (possibly remote) thread.
+:force x
+do { a <- readIORef ticks; threadDelay 500000; b <- readIORef ticks; putStrLn (if a == b then "stopped" else "still running") }
