@@ -122,3 +122,4 @@
 [submodule "libraries/libffi-clib"]
 	path = libraries/libffi-clib
 	url = https://gitlab.haskell.org/ghc/libffi-clib.git
+	ignore = dirty
