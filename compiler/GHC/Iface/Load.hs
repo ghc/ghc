@@ -796,7 +796,7 @@ loadInterface doc_str mod from
                              liftIO $ computeInterface hsc_env doc_str hi_boot_file mod
         ; case read_result of {
             Failed err -> do
-                { let fake_iface = shrinkModIface (emptyFullModIface mod)
+                { let fake_iface = emptyRetainedModIface mod
 
                 ; updateEps_ $ \eps ->
                         eps { eps_PIT = extendModuleEnv (eps_PIT eps) (mi_module fake_iface) fake_iface }
@@ -1385,7 +1385,7 @@ ghcPrimIface
       & set_mi_warns (toIfaceWarnings ghcPrimWarns) -- See Note [GHC.Prim Deprecations] in GHC.Builtin
 
   where
-    empty_iface = emptyFullModIface gHC_PRIM
+    empty_iface = emptyModIface gHC_PRIM
 
 -- | Get gHC_PRIM interface file
 --
