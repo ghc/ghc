@@ -1,0 +1,12 @@
+section: compiler
+issues: #28002
+mrs: !16880
+synopsis:
+  Store annotations more compactly in interface files
+description:
+  Values serialized with ``GHC.Serialized.serializeWithData`` (the payload
+  of ``ANN`` pragmas) now encode numbers with LEB128 and fold the constructor
+  index into the constructor tag, instead of the fixed-width encoding of
+  ``Data.Binary``. Most constructors now take one byte, and small numbers two.
+  For example, ``[1..100] :: [Int]`` goes from 1509 bytes to 338 and
+  ``Just True`` from 18 bytes to 2.
