@@ -351,9 +351,9 @@ startPendingSignalHandlers(Capability *cap)
 #endif
 
 #else /* !RTS_USER_SIGNALS */
-StgInt
-stg_sig_install(StgInt sig STG_UNUSED,
-                StgInt spi STG_UNUSED,
+int
+stg_sig_install(int sig STG_UNUSED,
+                int spi STG_UNUSED,
                 void* mask STG_UNUSED)
 {
   //barf("User signals not supported");
@@ -587,4 +587,6 @@ resetDefaultHandlers(void)
     set_sigtstp_action(false);
 }
 
+#else
+StgInt *signal_handlers = NULL;
 #endif /* RTS_USER_SIGNALS */

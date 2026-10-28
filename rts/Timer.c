@@ -28,6 +28,7 @@
 #include "RtsSignals.h"
 #include "rts/EventLogWriter.h"
 
+#if defined(HAVE_PREEMPTION)
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
 
@@ -72,6 +73,7 @@ handle_tick(int unused STG_UNUSED)
   handleIdleGcTick();
 #endif
 }
+#endif
 
 void initTimer(void)
 {

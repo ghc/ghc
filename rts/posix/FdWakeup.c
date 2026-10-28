@@ -30,6 +30,7 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
+#if defined(HAVE_PREEMPTION)
 #include "FdWakeup.h"
 
 #include <fcntl.h>
@@ -139,3 +140,5 @@ void collectFdWakeup(int wakeup_fd_r)
         stg_exit(EXIT_FAILURE);
     }
 }
+
+#endif

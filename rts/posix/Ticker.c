@@ -103,6 +103,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#if defined(HAVE_PREEMPTION)
 
 // Forward declarations of local types and helper functions to hide the
 // difference between ppoll() and select()
@@ -371,6 +372,8 @@ static int poll_with_timeout(fdset *fds, timeout *tv)
     return select(nfds, &fds->selectfds, NULL, NULL, &tv_tmp);
 }
 #endif
+
+#endif // HAVE_PREEMPTION
 
 /* This is obsolete, but is used in the unix package for now */
 int

@@ -267,6 +267,7 @@ osThreadIsAlive(OSThreadId id STG_UNUSED)
     return true;
 }
 
+#if defined(HAVE_PREEMPTION)
 void
 initMutex(Mutex* pMut)
 {
@@ -285,6 +286,7 @@ closeMutex(Mutex* pMut)
 {
     pthread_mutex_destroy(pMut);
 }
+#endif
 
 #if defined(THREADED_RTS)
 

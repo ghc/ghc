@@ -67,7 +67,7 @@ a signal should degrade to exiting with the signal number as the exit
 code.
 */
 
-#if defined(HAVE_SIGNAL_H)
+#if defined(HAVE_PREEMPTION) && defined(HAVE_SIGNAL_H)
 #define RTS_USER_SIGNALS 1
 #endif
 
