@@ -28,13 +28,12 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Type     hiding ( getTvSubstEnv )
 import GHC.Core.Coercion hiding ( getCvSubstEnv )
-import GHC.Core.Predicate( scopedSort )
 import GHC.Core.TyCon
 import GHC.Core.Predicate( CanEqLHS(..), canEqLHS_maybe )
 import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare ( eqType, tcEqType, tcEqTyConAppArgs )
-import GHC.Core.TyCo.Subst   ( mkTvSubst )
+import GHC.Core.TyCo.Subst   ( mkTvSubst, deepSubstTy )
 import GHC.Core.Map.Type
 import GHC.Core.Multiplicity
 
@@ -1063,21 +1062,31 @@ During unification we use a TvSubstEnv/CvSubstEnv pair that is
 
 Note [Finding the substitution fixpoint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Finding the fixpoint of a non-idempotent substitution arising from a
-unification is much trickier than it looks, because of kinds.  Consider
+We want an /idempotent/ substitution, so `niFixSubst` takes a non-idempotent
+one and composes it with itself until it becomes idempotent.  Thus if the original
+is S0, we compute S1 = S0 o S0, S2 = S1 o S1, etc.
+
+A variable chain v0 :-> v1 :-> ... :-> vm therefore takes about log2(m) rounds,
+The unifier can build such chains. For example:
+    (a, a, a, ..., a)   ~   (x1, x2, x3, ..., xm)
+produces a :-> x1, x1 :-> x2, ..., x(m-1) :-> xm.
+
+Finding the fixpoint is much trickier than it looks, because of kinds.
+Consider
    T k (H k (f:k)) ~ T * (g:*)
 If we unify, we get the substitution
    [ k -> *
    , g -> H k (f:k) ]
+This isn't idempotent: it mentions `k` in the range.
+
 To make it idempotent we don't want to get just
    [ k -> *
    , g -> H * (f:k) ]
-We also want to substitute inside f's kind, to get
-   [ k -> *
-   , g -> H k (f:*) ]
-If we don't do this, we may apply the substitution to something,
-and get an ill-formed type, i.e. one where typeKind will fail.
+because (H * (f:k)) is itself ill-kinded, and `typeKind` will fail.
 This happened, for example, in #9106.
+So (yuckily) we must also substitute inside f's kind, to get
+   [ k -> *
+   , g -> H * (f:*) ]
 
 It gets worse.  In #14164 we wanted to take the fixpoint of
 this substitution
@@ -1090,84 +1099,53 @@ the invocation of F!  We don't have a function that recursively
 applies substitutions inside the kinds of variable occurrences (and
 probably rightly so).
 
-So, we work as follows:
+Ugh!  This whole thing is pretty horrible. But the solution is simple enough:
 
- 1. Start with the current substitution (which we are
-    trying to fixpoint
-       [ xs :-> F a (z :: a) (rest :: G a (z :: a))
-       , a  :-> b ]
+        Use deep substitution (deepSubstTy)
 
- 2. Take all the free vars of the range of the substitution:
-       {a, z, rest, b}
-    NB: the free variable finder closes over
-        the kinds of variable occurrences
+(deepSubst `s` (Proxy k (a::k)) applies the substitution `s` not only to
+the occurrence of `k` in the argument of `Proxy`, but also to the `k` inside
+the kind of `a`.  See Note [Deep substitution] in GHC.Core.TyCo.Subst.
 
- 3. If none are in the domain of the substitution, stop.
-    We have found a fixpoint.
+So `niFixSubst` just applies the substitution /deeply/ to the types in its
+range, until we reach a fixed point.  Easy!
 
- 4. Remove the variables that are bound by the substitution, leaving
-       {z, rest, b}
-
- 5. Do a topo-sort to put them in dependency order:
-       [ b :: *, z :: a, rest :: G a z ]
-
- 6. Apply the substitution left-to-right to the kinds of these
-    tyvars, extending it each time with a new binding, so we
-    finish up with
-       [ xs   :-> ..as before..
-       , a    :-> b
-       , b    :-> b    :: *
-       , z    :-> z    :: b
-       , rest :-> rest :: G b (z :: b) ]
-    Note that rest now has the right kind
-
- 7. Apply this extended substitution (once) to the range of the
-    /original/ substitution.  (Note that the extended substitution
-    would go on forever if you tried to find its fixpoint, because it
-    maps z to z.)
-
- 8. And go back to step 1
-
-In Step 6 we use the free vars from Step 2 as the initial
-in-scope set, because all of those variables appear in the
-range of the substitution, so they must all be in the in-scope
-set.  But NB that the type substitution engine does not look up
-variables in the in-scope set; it is used only to ensure no
-shadowing.
+Historical Note:
+  Immediately prior to this solution there was a previous, more complicated
+  `niFixSubst` which involved finding the (deep) free variables and "re-kinding"
+  them.  It accomplished essentially the same things, and it avoided the
+  potential duplication noted in Note [Deep substitution].  But it was pretty
+  subtle and this version is more obviously correct.
+End of Historical Note
 -}
 
 niFixSubst :: InScopeSet -> TvSubstEnv -> Subst
 -- Find the idempotent fixed point of the non-idempotent substitution
 -- This is surprisingly tricky:
 --   see Note [Finding the substitution fixpoint]
--- ToDo: use laziness instead of iteration?
 niFixSubst in_scope tenv
-  | not_fixpoint = niFixSubst in_scope (mapVarEnv (substTy subst) tenv)
-  | otherwise    = tenv_subst
+  | isEmptyVarEnv tenv     -- Fast path for common case
+  = mkEmptySubst in_scope
+  | otherwise
+  =  -- pprTrace "niFixSubst" (vcat [ text "In: " <+> ppr tenv
+     --                             , text "Out:" <+> ppr (S.getTvSubstEnv subst) ])
+     subst
   where
-    tenv_subst = mkTvSubst in_scope tenv   -- This is our starting point
+     subst = niFixSubst' 1 in_scope tenv
 
-    range_tvs :: [TyVar]
-    range_tvs = nonDetVarSetElems $
-                tyCoVarsOfTypes $
-                nonDetEltsUFM tenv
-          -- It's OK to use nonDetEltsUFM (twice) here because
-          -- the order of range_tvs is immaterial
+niFixSubst' :: Int -> InScopeSet -> TvSubstEnv -> Subst
+niFixSubst' n in_scope tenv_orig
+  | fixpoint_found = mkTvSubst in_scope tenv_orig
+  | otherwise      = niFixSubst' (n+1) in_scope tenv_new
+  where
+    in_dom tv = tv `elemVarEnv` tenv_orig
+    tenv_new  = mapVarEnv (deepSubstTy subst) tenv_orig
+    subst     = mkTvSubst in_scope tenv_orig
 
-    not_fixpoint  = any in_domain range_tvs
-    in_domain tv  = tv `elemVarEnv` tenv
-
-    free_tvs = scopedSort (filterOut in_domain range_tvs)
-
-    -- See Note [Finding the substitution fixpoint], Step 6
-    subst = foldl' add_free_tv tenv_subst free_tvs
-
-    add_free_tv :: Subst -> TyVar -> Subst
-    add_free_tv subst tv
-      | isTyVar tv = extendTvSubst subst tv (mkTyVarTy tv')
-      | otherwise  = subst  -- Ignore free coercion variables
-     where
-        tv' = updateTyVarKind (substTy subst) tv
+    fixpoint_found = nonDetStrictFoldUFM and_fix True tenv_orig
+    and_fix :: Type -> Bool -> Bool
+    and_fix _ False = False
+    and_fix ty _    = not (anyFreeVarsOfType in_dom ty)
 
 {-
 ************************************************************************

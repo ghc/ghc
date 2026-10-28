@@ -46,6 +46,8 @@ module GHC.Core.TyCo.Subst
         substTyCoBndr,
         substVarBndrUsing,
         checkValidSubst, isValidTCvSubst,
+
+        deepSubstTy
   ) where
 
 import GHC.Prelude
@@ -1056,3 +1058,125 @@ it is /very/ valuable to /keep/ it empty:
   If the substitution is empty, this is a no-op -- but only if it
   is empty!
 -}
+
+
+{- **********************************************************************
+%*                                                                      *
+                Deep substitution
+%*                                                                      *
+%********************************************************************* -}
+
+{- Note [Deep substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Deep substitution applies the substitution to the /kinds/ of un-substituted
+type variables.  Suppose the substitution is
+    [ k :-> Type ]
+and we apply it to the type
+    Proxy k (a :: k)
+Ordinary shallow substitution will give
+    Proxy Type (a :: k)
+which is ill-kinded.  Deep substitution will give
+    Proxy Type (a :: Type)
+
+Ordinary (shallow) substitution is usually fine, because we will substitute for
+`a` as well, but not always.  In particular, the pure unifier in GHC.Core.Unify
+uses `niFixSubst` to find a fixpoint, and we really don't want domain tyvars
+appearing in the range.  See Note [Finding the substitution fixpoint].
+
+Wrinkles:
+
+(DS1) Deep substitution risks being rather inefficient because it re-applies the
+  substitution to the kind at /each occurrence/ of a free variable.  We could
+  perhaps find the free vars, and build a re-kinding substitution, but that's a
+  bit more complicated.
+
+(DS2) Deep substitution, as implemented here, relies on invariant
+  (NoTypeShadowing); see Note [No type-shadowing in Core] in Core.hs.
+  Otherwise we may have e.g.
+     S = [r :-> LiftedRep]   in-scope = {r, x}
+     T = forall (r :: RuntimeRep). (x :: TYPE r) -> ...
+  and we would want to apply the outer substitution S to the
+  occurrence of r in the kind of x.  But we'll have removed it
+  from the subsitution when pasing the 'forall r'.
+-}
+
+deepSubstTy :: Subst -> Type -> Type
+deepSubstTy subst ty
+   = go ty
+  where
+    go (TyVarTy tv)      = deepSubstTyVar subst tv
+    go (AppTy fun arg)   = (mkAppTy $! (go fun)) $! (go arg)
+    go ty@(TyConApp tc []) = tc `seq` ty
+    go (TyConApp tc tys) = (mkTyConApp $! tc) $! strictMap go tys
+    go ty@(FunTy { ft_mult = mult, ft_arg = arg, ft_res = res })
+      = let !mult' = go mult
+            !arg' = go arg
+            !res' = go res
+        in ty { ft_mult = mult', ft_arg = arg', ft_res = res' }
+    go (ForAllTy (Bndr tv vis) ty)
+      = (ForAllTy $! ((Bndr $! tv') vis)) $! (deepSubstTy subst' ty)
+      where
+        !(subst',tv') = substVarBndrUsing deepSubstTy subst tv
+    go (LitTy n)         = LitTy $! n
+    go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (deepSubstCo subst co)
+    go (CoercionTy co)   = CoercionTy $! (deepSubstCo subst co)
+
+deepSubstCo :: Subst -> Coercion -> Coercion
+deepSubstCo subst co
+  = go co
+  where
+    go_ty :: Type -> Type
+    go_ty = deepSubstTy subst
+
+    go_mco :: MCoercion -> MCoercion
+    go_mco MRefl    = MRefl
+    go_mco (MCo co) = MCo (go co)
+
+    go :: Coercion -> Coercion
+    go (Refl ty)             = mkNomReflCo $! (go_ty ty)
+    go (GRefl r ty mco)      = (mkGReflCo r $! (go_ty ty)) $! (go_mco mco)
+    go (TyConAppCo r tc args)= mkTyConAppCo r tc $! go_cos args
+    go (AxiomCo con cos)     = mkAxiomCo con $! go_cos cos
+    go (AppCo co arg)        = (mkAppCo $! go co) $! go arg
+    go (ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
+                 , fco_kind = kind_co, fco_body = co })
+      = ((mkForAllCo $! tcv') visL visR
+           $! go_mco kind_co)
+           $! deepSubstCo subst' co
+      where
+        !(subst', tcv') = substVarBndrUsing deepSubstTy subst tcv
+    go (FunCo r afl afr w co1 co2)   = ((mkFunCo2 r afl afr $! go w) $! go co1) $! go co2
+    go (CoVarCo cv)          = deepSubstCoVar subst cv
+    go (UnivCo { uco_prov = p, uco_role = r
+               , uco_lty = t1, uco_rty = t2, uco_deps = deps })
+                             = ((((mkUnivCo $! p) $! go_cos deps) $! r) $!
+                                  (go_ty t1)) $! (go_ty t2)
+    go (SymCo co)            = mkSymCo $! (go co)
+    go (TransCo co1 co2)     = (mkTransCo $! (go co1)) $! (go co2)
+    go (SelCo d co)          = mkSelCo d $! (go co)
+    go (LRCo lr co)          = mkLRCo lr $! (go co)
+    go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg
+    go (KindCo co)           = mkKindCo $! (go co)
+    go (SubCo co)            = mkSubCo $! (go co)
+    go (HoleCo h)            = deepSubstCoHole subst h
+
+    go_cos cos = let cos' = map go cos
+                 in cos' `seqList` cos'
+
+deepSubstTyVar :: Subst -> TyVar -> Type
+deepSubstTyVar subst@(Subst _ _ tenv _) tv
+  = assert (isTyVar tv) $
+    case lookupVarEnv tenv tv of
+      Just ty -> ty
+      Nothing -> TyVarTy (updateVarType (deepSubstTy subst) tv)
+
+deepSubstCoVar :: Subst -> CoVar -> Coercion
+deepSubstCoVar subst@(Subst _ _ _ cenv) cv
+  = case lookupVarEnv cenv cv of
+      Just co -> co
+      Nothing -> CoVarCo (updateVarType (deepSubstTy subst) cv)
+
+deepSubstCoHole :: Subst -> CoercionHole -> Coercion
+-- See Note [Substituting in a coercion hole]
+deepSubstCoHole subst h@(CH { ch_co_var = cv })
+  = HoleCo (h { ch_co_var = updateVarType (deepSubstTy subst) cv })
