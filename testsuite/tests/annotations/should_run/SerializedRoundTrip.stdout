@@ -1,0 +1,37 @@
+2 bytes: 0
+2 bytes: 42
+2 bytes: 63
+3 bytes: 64
+2 bytes: -1
+2 bytes: -64
+3 bytes: -65
+11 bytes: -9223372036854775808
+11 bytes: 9223372036854775807
+3 bytes: -128
+11 bytes: 18446744073709551615
+16 bytes: 1267650600228229401496703205376
+16 bytes: -1267650600228229401496703205376
+11 bytes: -9223372036854775808
+3 bytes: 3.25
+3 bytes: -3.25
+3 bytes: 0.0
+17 bytes: 0.3333333333333333
+3 bytes: 1.5
+5 bytes: (-7) % 22
+2 bytes: 'x'
+2 bytes: '\NUL'
+2 bytes: '\DEL'
+3 bytes: '\128'
+3 bytes: '\16383'
+4 bytes: '\16384'
+4 bytes: '\1114111'
+31 bytes: "helloworld"
+44 bytes: "h\233llo w\246rld \128512"
+2 bytes: Just True
+1 bytes: Nothing
+338 bytes: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,2
+3 bytes: Left 7
+11 bytes: Right "abc"
+40 bytes: [A,B (-5),C {c1 = 12345678901234567890, c2 = [A,B 
+14 bytes: ((),(1,'c'),[[True,False]])
+all round trips OK

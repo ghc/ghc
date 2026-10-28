@@ -20,6 +20,8 @@ test('annrun01',
 # https://gitlab.haskell.org/ghc/ghc/-/merge_requests/16841#note_706770
 test('T16841', [req_th, windows_skip, extra_files(['T16841.hs'])], makefile_test, ['T16841'])
 
+test('SerializedRoundTrip', normal, compile_and_run, ['-package ghc-boot'])
+
 """"
 Helpful things to C+P:
 
