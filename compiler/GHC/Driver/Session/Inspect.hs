@@ -140,7 +140,7 @@ getHomeModuleInfo hsc_env mdl =
     Nothing  -> return Nothing
     Just hmi -> do
       let details  = hm_details hmi
-          iface    = shrinkModIface (hm_iface hmi)
+          iface    = retainedModIface (hm_iface hmi)
       return (Just (ModuleInfo {
                         minf_type_env  = md_types details,
                         minf_exports   = md_exports details,
