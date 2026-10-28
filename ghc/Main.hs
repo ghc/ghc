@@ -89,6 +89,7 @@ import System.Exit
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
+import Control.Exception (displayExceptionWithInfo, throwIO)
 import Data.List ( isPrefixOf, partition, intercalate )
 import Prelude
 import qualified Data.List.NonEmpty as NE
@@ -142,6 +143,7 @@ main = do
         Right postStartupMode ->
             -- start our GHC session
             GHC.runGhcWithSignalHandlers mbMinusB $ do
+            convertUnrecognizedExceptionToPanic $ do
 
             dflags <- GHC.getSessionDynFlags
 
@@ -282,6 +284,12 @@ main' postLoadMode units dflags0 args flagWarnings = do
        DoBackpack             -> doBackpack (map fst srcs)
 
   liftIO $ dumpFinalStats logger
+
+convertUnrecognizedExceptionToPanic :: Ghc () -> Ghc ()
+convertUnrecognizedExceptionToPanic = GHC.handleUnrecognizedException $ \ e -> do
+  v <- verbosity . hsc_dflags <$> getSession
+  if v <= 1 then liftIO $ throwIO e
+            else liftIO $ throwIO (Panic (displayExceptionWithInfo e))
 
 doRun :: [String] -> [(FilePath, Maybe Phase)] -> [Located String] -> Ghc ()
 doRun units srcs args = do

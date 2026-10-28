@@ -3,6 +3,7 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -19,6 +20,7 @@ module GHC (
         prettyPrintGhcErrors,
         withSignalHandlers,
         withCleanupSession,
+        handleUnrecognizedException,
 
         -- * GHC Monad
         Ghc, GhcT, GhcMonad(..), HscEnv,
@@ -481,6 +483,38 @@ import Foreign.C
 -- %*                                                                      *
 -- %************************************************************************
 
+-- | Represents the exception cases that 'defaultHandler' performs. This type
+-- and `handleTopException` are defined so both 'defaultHandler' and
+-- 'handleUnrecognizedException' will do the same case split.
+data TopExceptionHandlers m a = TopExceptionHandlers
+  { topHandleIOException   :: IOException   -> m (Maybe a)
+  , topHandleUserInterrupt ::                  m (Maybe a)
+  , topHandleStackOverflow ::                  m (Maybe a)
+  , topHandleHeapOverflow  ::                  m (Maybe a)
+  , topHandleExitCode      :: ExitCode      -> m (Maybe a)
+  , topHandleGhcException  :: GhcException  -> m (Maybe a)
+  , topHandleUnrecognized  :: SomeException -> m (Maybe a)
+    -- ^ fallback case, applied when the exception doesn't match the previous ones.
+  }
+
+-- | Implements the case split on exceptions and deploys the handlers. If an
+-- handler returns 'Nothing', the exception is rethrown with the original
+-- 'ExceptionContext'.
+handleTopException :: ExceptionMonad m => TopExceptionHandlers m a -> m a -> m a
+handleTopException TopExceptionHandlers{..} = do
+  MC.handle $ \case
+    e@(ExceptionWithContext _ctx exception)
+      | Just ge  <- fromException exception -> topHandle $ topHandleGhcException ge
+      | Just ioe <- fromException exception -> topHandle $ topHandleIOException ioe
+      | Just ex  <- fromException exception -> topHandle $ topHandleExitCode ex
+      | otherwise -> case fromException exception of
+        Just UserInterrupt -> topHandle topHandleUserInterrupt
+        Just StackOverflow -> topHandle topHandleStackOverflow
+        Just HeapOverflow  -> topHandle topHandleHeapOverflow
+        _ -> topHandle $ topHandleUnrecognized exception
+      where topHandle m = maybe (liftIO $ rethrowIO e) pure =<< m
+
+
 
 -- | Install some default exception handlers and run the inner computation.
 -- Unless you want to handle exceptions yourself, you should wrap this around
@@ -488,34 +522,20 @@ import Foreign.C
 -- message(s) to stderr and exit cleanly.
 defaultErrorHandler :: (ExceptionMonad m)
                     => FatalMessager -> FlushOut -> m a -> m a
-defaultErrorHandler fm (FlushOut flushOut) inner =
-  -- top-level exception handler: any unrecognised exception is a compiler bug.
-  MC.handle (\exception -> liftIO $ do
-           flushOut
-           case fromException exception of
-                -- an IO exception probably isn't our fault, so don't panic
-                Just (ioe :: IOException) ->
-                  fm (show ioe)
-                _ -> case fromException exception of
-                     Just UserInterrupt ->
+defaultErrorHandler fm (FlushOut flushOut) = handleTopException $
+  TopExceptionHandlers
+  { topHandleIOException = wrap . fm . show
+  , topHandleUserInterrupt = wrap $
                          -- Important to let this one propagate out so our
                          -- calling process knows we were interrupted by ^C
                          liftIO $ throwIO UserInterrupt
-                     Just StackOverflow ->
+  , topHandleStackOverflow = wrap $
                          fm "stack overflow: use +RTS -K<size> to increase it"
-                     Just HeapOverflow ->
+  , topHandleHeapOverflow = wrap $
                          fm "heap overflow: use +RTS -M<size> to increase maximum heap size"
-                     _ -> case fromException exception of
-                          Just (ex :: ExitCode) -> liftIO $ throwIO ex
-                          _ ->
-                              fm (show (Panic (show exception)))
-           exitWith (ExitFailure 1)
-         ) $
-
-  -- error messages propagated as exceptions
-  handleGhcException
-            (\ge -> liftIO $ do
-                flushOut
+  , topHandleExitCode = wrap . throwIO
+  , topHandleUnrecognized = \ exception -> wrap $ fm (show (Panic (show exception)))
+  , topHandleGhcException = \ge -> wrap $ do
                 case ge of
                   Signal _       -> return ()
                   ProgramError _ -> fm (show ge)
@@ -523,9 +543,22 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
                   _              -> do
                                     progName <- getProgName
                                     fm (progName ++ ": " ++ show ge)
-                exitWith (ExitFailure 1)
-            ) $
-  inner
+  }
+  where wrap m = liftIO $ flushOut >> m >> exitWith (ExitFailure 1)
+
+-- | Handles exceptions for which 'defaultHandler' does not have a specific
+--   handler (they would be displayed like a 'Panic').
+handleUnrecognizedException :: ExceptionMonad m => (SomeException -> m a) -> m a -> m a
+handleUnrecognizedException k = handleTopException $
+  TopExceptionHandlers
+  { topHandleIOException = const $ pure Nothing
+  , topHandleUserInterrupt = pure Nothing
+  , topHandleStackOverflow = pure Nothing
+  , topHandleHeapOverflow = pure Nothing
+  , topHandleExitCode = const $ pure Nothing
+  , topHandleUnrecognized = fmap Just . k
+  , topHandleGhcException = const $ pure Nothing
+  }
 
 -- | This function is no longer necessary, cleanup is now done by
 -- runGhc/runGhcT.
