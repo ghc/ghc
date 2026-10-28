@@ -81,7 +81,7 @@ stage0Packages :: Action [Package]
 stage0Packages = do
     cross <- flag CrossCompiling
     return $ [ cabalSyntax
-             , cabal
+            --  , cabal
              , compiler
              , directory -- depends on filepath, fileIo
              , filepath -- depends on os-string

@@ -26,7 +26,6 @@ Executable ghc-pkg
                    containers,
                    filepath,
                    file-io,
-                   Cabal,
                    Cabal-syntax,
                    binary,
                    ghc-boot,

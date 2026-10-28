@@ -23,6 +23,7 @@
 
 module Main (main) where
 
+import qualified GHC.Arr as Array
 import qualified GHC.Unit.Database as GhcPkg
 import GHC.Unit.Database hiding (mkMungePathUrl)
 import GHC.HandleEncoding
@@ -32,7 +33,6 @@ import GHC.Platform.Host (hostPlatformArchOS)
 import GHC.UniqueSubdir (uniqueSubdir)
 import qualified GHC.Data.ShortText as ST
 import GHC.Version ( cProjectVersion )
-import qualified Distribution.Simple.PackageIndex as PackageIndex
 import qualified Data.Graph as Graph
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.ModuleName (ModuleName)
@@ -47,7 +47,7 @@ import Distribution.Types.UnqualComponentName
 import Distribution.Types.LibraryName
 import Distribution.Types.MungedPackageName
 import Distribution.Types.MungedPackageId
-import Distribution.Simple.Utils (ignoreBOM, toUTF8BS, toUTF8LBS, fromUTF8LBS)
+import Distribution.Utils.Generic (ignoreBOM, toUTF8BS, toUTF8LBS, fromUTF8LBS)
 import qualified Data.Version as Version
 import System.OsPath as OsPath
 import qualified System.FilePath as FilePath
@@ -71,6 +71,7 @@ import Data.Maybe
 import Data.Bifunctor
 
 import Data.Char ( toLower )
+import Data.Ord ( comparing )
 import Control.Monad
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
@@ -1664,7 +1665,7 @@ showPackageDot verbosity myflags = do
       False{-use user-} True{-use cache-} False{-expand vars-} myflags
 
   let all_pkgs = allPackagesInStack flag_db_stack
-      ipix  = PackageIndex.fromList all_pkgs
+      ipix  = Map.fromList [(installedUnitId pkg, pkg) | pkg <- all_pkgs]
 
   putStrLn "digraph {"
   let quote s = '"':s ++ "\""
@@ -1672,7 +1673,7 @@ showPackageDot verbosity myflags = do
                  | p <- all_pkgs,
                    let from = display (mungedId p),
                    key <- depends p,
-                   Just dep <- [PackageIndex.lookupUnitId ipix key],
+                   Just dep <- [Map.lookup key ipix],
                    let to = display (mungedId dep)
                  ]
   putStrLn "}"
@@ -2155,7 +2156,7 @@ checkModule field_name db_stack pkg
   let definingPkgId = unDefUnitId def_uid
       mpkg = if definingPkgId == installedUnitId pkg
               then Just pkg
-              else PackageIndex.lookupUnitId ipix definingPkgId
+              else Map.lookup definingPkgId ipix
   in case mpkg of
       Nothing
            -> verror ForceAll (field_name ++ " refers to a non-existent " ++
@@ -2185,19 +2186,43 @@ checkModule field_name db_stack pkg
             _ -> return ()
   where
     all_pkgs = allPackagesInStack db_stack
-    ipix     = PackageIndex.fromList all_pkgs
+    ipix     = Map.fromList [(installedUnitId p, p) | p <- all_pkgs]
 
     isIndirectDependency pkgid = fromMaybe False $ do
       thispkg  <- graphVertex (installedUnitId pkg)
       otherpkg <- graphVertex pkgid
       return (Graph.path depgraph thispkg otherpkg)
-    (depgraph, _, graphVertex) =
-      PackageIndex.dependencyGraph (PackageIndex.insert pkg ipix)
+    (depgraph, graphVertex) =
+      dependencyGraph (Map.insert (installedUnitId pkg) pkg ipix)
 
 checkModule _ _ _ (OpenModule (IndefFullUnitId _ _) _) =
     -- TODO: add some checks here
     return ()
 
+-- This function was copy pasted from:
+-- https://hackage-content.haskell.org/package/Cabal-3.16.1.0/docs/Distribution-Simple-PackageIndex.html#v:dependencyGraph
+-- Then we removed the unused lookup table.
+dependencyGraph
+  :: Map.Map UnitId InstalledPackageInfo
+  -> ( Graph.Graph
+     , UnitId -> Maybe Graph.Vertex
+     )
+dependencyGraph index = (graph, id_to_vertex)
+  where
+    graph =
+      Array.listArray
+        bounds
+        [ [v | Just v <- map id_to_vertex (installedDepends pkg)]
+        | pkg <- pkgs
+        ]
+
+    pkgs = sortBy (comparing packageId) (Map.elems index)
+    vertices = zip (map installedUnitId pkgs) [0 ..]
+    vertex_map = Map.fromList vertices
+    id_to_vertex pid = Map.lookup pid vertex_map
+
+    topBound = length pkgs - 1
+    bounds = (0, topBound)
 
 -- ---------------------------------------------------------------------------
 -- expanding environment variables in the package configuration
