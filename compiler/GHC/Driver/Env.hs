@@ -390,7 +390,7 @@ lookupIfaceByModule
         -> IO (Maybe RetainedModIface)
 lookupIfaceByModule hug pit mod
   = HUG.lookupHugByModule mod hug >>= pure . \case
-       Just hm -> Just (shrinkModIface (hm_iface hm))
+       Just hm -> Just (retainedModIface (hm_iface hm))
        Nothing -> lookupModuleEnv pit mod
    -- If the module does come from the home package, why do we look in the PIT as well?
    -- (a) In OneShot mode, even home-package modules accumulate in the PIT

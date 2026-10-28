@@ -883,7 +883,7 @@ loadInterface doc_str mod from
                 then eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
            else
                 eps {
-                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod (shrinkModIface iface),
+                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod (retainedModIface iface),
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
                   eps_iface_bytecode = add_bytecode (eps_iface_bytecode eps),
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
@@ -913,7 +913,7 @@ loadInterface doc_str mod from
                                                    }
 
         ; res <- withPlugins (hsc_plugins hsc_env) (\p -> interfaceLoadAction p) iface
-        ; return (Succeeded (shrinkModIface res))
+        ; return (Succeeded (retainedModIface res))
     }}}}
 
 {- Note [Loading your own hi-boot file]
@@ -1377,9 +1377,6 @@ ghcPrimIface
       & set_mi_exports  ghcPrimExports
       & set_mi_decls    []
       & set_mi_fixities ghcPrimFixities
-      & set_mi_fix_fn (mkIfaceFixCache ghcPrimFixities)
-      & set_mi_decl_warn_fn (mkIfaceDeclWarnCache ghcPrimWarns)
-      & set_mi_export_warn_fn (mkIfaceExportWarnCache ghcPrimWarns)
       & set_mi_fix_fn (mkIfaceFixCache ghcPrimFixities)
       & set_mi_docs (Just ghcPrimDeclDocs) -- See Note [GHC.Prim Docs] in GHC.Builtin
       & set_mi_warns (toIfaceWarnings ghcPrimWarns) -- See Note [GHC.Prim Deprecations] in GHC.Builtin
