@@ -1,6 +1,5 @@
 
 #include "Rts.h"
-#include "rts/RtsSymbols.h"
 
 #include <stdio.h>
 
