@@ -49,7 +49,7 @@ data Format
         | II64
         | FF32
         | FF64
-        deriving (Show, Eq)
+        deriving (Show, Eq, Ord)
 
 
 -- | Get the integer format of this width.
