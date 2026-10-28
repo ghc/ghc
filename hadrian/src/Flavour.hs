@@ -86,6 +86,7 @@ flavourTransformers = M.fromList
     , "dump_stg"         =: enableDumpStg
     , "hash_unit_ids"    =: enableHashUnitIds
     , "hie_files"        =: enableHieFiles
+    , "no_preemptive_rts" =: disablePreemptiveRTS
     ]
   where (=:) = (,)
 
@@ -516,6 +517,18 @@ debugGhc ghcStage f = f
         , buildingCompilerStage' (>= ghcStage) ? pure (Set.map (<> debug) ws)
         ]
   }
+
+-- | Build the non-threaded RTS way /without/ support for preemption.
+--
+-- Some platforms, like wasm and JS, do not support preemption (no pthreads,
+-- no signals etc). This flag is for testing this no-preemption configuration
+-- on platforms that do support preemption (useful for debugging wasm RTS
+-- problems without having to use wasm).
+--
+disablePreemptiveRTS :: Flavour -> Flavour
+disablePreemptiveRTS flavour =
+    flavour { ghcRtsPreemptive = False }
+
 
 -- * CLI and <root>/hadrian.settings options
 

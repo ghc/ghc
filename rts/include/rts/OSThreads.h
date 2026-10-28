@@ -40,10 +40,7 @@
 #if defined(wasm32_HOST_ARCH)
   // See Note [No timer on wasm32]
   // To confuse matters, WASM _does_ have pthread.h but it doesnt work.
-#elif defined(HAVE_PTHREAD_H) || defined(HAVE_WINDOWS_H)
-#define HAVE_PREEMPTION
-#else
-#error Decide if this platform has threads and pre-emption or not.
+#undef HAVE_PREEMPTION
 #endif
 // And JS does all of this differently, without using this bit of the RTS.
 

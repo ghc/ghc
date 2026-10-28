@@ -302,7 +302,9 @@ defaultFlavour = Flavour
     , ghcSplitSections   = False
     , ghcDocs            = cmdDocsArgs
     , ghcHieFiles        = const False
-    , hashUnitIds        = False }
+    , hashUnitIds        = False
+    , ghcRtsPreemptive   = True
+    }
 
 -- | Default logic for determining whether to build
 --   dynamic GHC programs.

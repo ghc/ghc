@@ -14,6 +14,7 @@ import Hadrian.Haskell.Cabal.Type
 
 import Base
 import Expression
+import Flavour
 import Oracles.Flag
 import Oracles.Setting
 import Settings
@@ -70,5 +71,8 @@ wayCcArgs = do
     mconcat [ (Threaded  `wayUnit` way) ? arg "-DTHREADED_RTS"
             , (Debug     `wayUnit` way) ? arg "-DDEBUG"
             , (way == debug || way == debugDynamic) ? arg "-DTICKY_TICKY"
+            , orM
+              [ pure (Threaded `wayUnit` way)
+              , ghcRtsPreemptive <$> flavour ] ? arg "-DHAVE_PREEMPTION"
             ]
 

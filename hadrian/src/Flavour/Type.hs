@@ -56,8 +56,11 @@ data Flavour = Flavour {
 
     -- | Whether to generate .hie files
     ghcHieFiles :: Stage -- ^ stage of the /built/ compiler
-                -> Bool
+                -> Bool,
 
+    -- | Whether to build the RTS with support for preemption (default yes,
+    -- except on platforms that do not support it, defines HAVE_PREEMPTION).
+    ghcRtsPreemptive :: Bool
     }
 
 -- | A set of documentation targets
