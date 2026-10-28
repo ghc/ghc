@@ -431,6 +431,14 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
         struct timeval tv, *timeout_us;
         timeout_us = timeoutInMicroseconds(iomgr, wait, now, &tv);
 
+#if defined(RTS_USER_SIGNALS)
+        /* Final check for pending signals before calling poll. There is
+         * Still a window between here and calling poll when signals could
+         * be delivered and not noticed. See issue #27540.
+         */
+        startPendingSignalHandlers(iomgr->cap);
+#endif
+
         /* Check for I/O readiness, possibly waiting. */
         int res = select(maxfd+1, iomgr->rfds, iomgr->wfds, NULL, timeout_us);
 
