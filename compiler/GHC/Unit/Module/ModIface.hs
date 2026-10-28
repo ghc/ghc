@@ -119,7 +119,9 @@ module GHC.Unit.Module.ModIface
    , mi_orphan_hash
    , renameFreeHoles
    , emptyPartialModIface
+   , emptyModIface
    , emptyFullModIface
+   , emptyRetainedModIface
    , mkIfaceHashCache
    , emptyIfaceHashCache
    , forceModIface
@@ -838,85 +840,99 @@ instance Binary IfaceSimplifiedCore where
 emptyPartialModIface :: Module -> PartialModIface
 emptyPartialModIface mod
   = PrivateModIface
-      { mi_mod_info_    = emptyIfaceModInfo mod,
-        mi_iface_hash_  = fingerprint0,
-        mi_hi_bytes_    = Strict.Nothing,
-        mi_deps_        = noDependencies,
-        mi_public_      = emptyPublicModIface [] [] [] [] [] [] [] (),
-        mi_simplified_core_ = Nothing,
-        mi_top_env_     = IfaceTopEnv emptyDetOrdAvails [] ,
-        mi_docs_        = Nothing,
-        mi_self_recomp_ = Nothing,
-        mi_ext_fields_ = emptyExtensibleFields
+    {
+      mi_hi_bytes_        = Strict.Nothing,
+      mi_iface_hash_      = fingerprint0,
+      mi_mod_info_        = emptyIfaceModInfo mod,
+      mi_deps_            = noDependencies,
+      mi_public_          = emptyPartialIfacePublic,
+      mi_self_recomp_     = Nothing,
+      mi_simplified_core_ = Nothing,
+      mi_docs_            = Nothing,
+      mi_top_env_         = IfaceTopEnv emptyDetOrdAvails [],
+      mi_ext_fields_      = emptyExtensibleFields
+    }
+  where
 
+  emptyIfaceModInfo :: Module -> IfaceModInfo
+  emptyIfaceModInfo mod
+    = IfaceModInfo
+      {
+        mi_mod_info_module  = mod,
+        mi_mod_info_sig_of  = Nothing,
+        mi_mod_info_hsc_src = HsSrcFile
       }
 
-emptyIfaceModInfo :: Module -> IfaceModInfo
-emptyIfaceModInfo mod = IfaceModInfo
-  { mi_mod_info_module = mod
-  , mi_mod_info_sig_of = Nothing
-  , mi_mod_info_hsc_src = HsSrcFile
-  }
+  emptyPartialIfacePublic :: PartialIfacePublic
+  emptyPartialIfacePublic
+    = IfacePublic
+      {
+        mi_exports_          = [],
+        mi_fixities_         = [],
+        mi_warns_            = IfWarnSome [] [],
+        mi_anns_             = [],
+        mi_decls_            = [],
+        mi_defaults_         = [],
+        mi_insts_            = [],
+        mi_fam_insts_        = [],
+        mi_rules_            = [],
+        mi_trust_            = noIfaceTrustInfo,
+        mi_trust_pkg_        = False,
+        mi_complete_matches_ = [],
+        mi_caches_           = emptyIfaceCache,
+        mi_abi_hashes_       = ()
+      }
+    where
 
-emptyPublicModIface :: IfaceAnnotationsData phase
-                    -> IfaceDeclsData phase
-                    -> IfaceDefaultsData phase
-                    -> IfaceClsInstsData phase
-                    -> IfaceFamInstsData phase
-                    -> IfaceRulesData phase
-                    -> IfaceCompleteMatchesData phase
-                    -> IfaceAbiHashesData phase
-                    -> IfacePublic_ phase
-emptyPublicModIface anns
-                    decls
-                    defaults
-                    insts
-                    fam_insts
-                    rules
-                    complete_matches
-                    abi_hashes
-  = IfacePublic
-    { mi_exports_ = []
-    , mi_fixities_ = []
-    , mi_warns_ = IfWarnSome [] []
-    , mi_anns_ = anns
-    , mi_decls_ = decls
-    , mi_defaults_ = defaults
-    , mi_insts_ = insts
-    , mi_fam_insts_ = fam_insts
-    , mi_rules_ = rules
-    , mi_trust_ = noIfaceTrustInfo
-    , mi_trust_pkg_ = False
-    , mi_complete_matches_ = complete_matches
-    , mi_caches_ = emptyModIfaceCache
-    , mi_abi_hashes_ = abi_hashes
-    }
-
-emptyModIfaceCache :: IfaceCache
-emptyModIfaceCache = IfaceCache {
-  mi_cache_decl_warn_fn = emptyIfaceWarnCache,
-  mi_cache_export_warn_fn = emptyIfaceWarnCache,
-  mi_cache_fix_fn = emptyIfaceFixCache,
-  mi_cache_hash_fn = emptyIfaceHashCache
-}
-
-emptyIfaceBackend :: IfaceAbiHashes
-emptyIfaceBackend = IfaceAbiHashes
-        { mi_abi_mod_hash = fingerprint0,
-          mi_abi_orphan = False,
-          mi_abi_finsts = False,
-          mi_abi_export_avails_hash = fingerprint0,
-          mi_abi_orphan_like_hash = fingerprint0,
-          mi_abi_orphan_hash = fingerprint0
+    emptyIfaceCache :: IfaceCache
+    emptyIfaceCache
+      = IfaceCache
+        {
+          mi_cache_decl_warn_fn   = emptyIfaceWarnCache,
+          mi_cache_export_warn_fn = emptyIfaceWarnCache,
+          mi_cache_fix_fn         = emptyIfaceFixCache,
+          mi_cache_hash_fn        = emptyIfaceHashCache
         }
 
-emptyFullModIface :: Module -> ModIface
-emptyFullModIface mod =
-    (emptyPartialModIface mod)
-      { mi_public_ = emptyPublicModIface [] [] [] [] [] [] [] emptyIfaceBackend
-      , mi_hi_bytes_ = Strict.Nothing
-      }
+emptyModIface :: Module -> ModIface
+emptyModIface mod
+  | PrivateModIface {..} <- emptyPartialModIface mod
+  = PrivateModIface
+    {
+      mi_hi_bytes_ = Strict.Nothing,
+      mi_public_   = convertIfacePublic mi_public_,
+      ..
+    }
+  where
 
+  convertIfacePublic :: PartialIfacePublic -> IfacePublic
+  convertIfacePublic IfacePublic {..}
+    = IfacePublic
+      {
+        mi_decls_      = [],
+        mi_abi_hashes_ = emptyIfaceAbiHashes,
+        ..
+      }
+    where
+
+    emptyIfaceAbiHashes :: IfaceAbiHashes
+    emptyIfaceAbiHashes
+      = IfaceAbiHashes
+        {
+          mi_abi_mod_hash           = fingerprint0,
+          mi_abi_orphan             = False,
+          mi_abi_finsts             = False,
+          mi_abi_export_avails_hash = fingerprint0,
+          mi_abi_orphan_like_hash   = fingerprint0,
+          mi_abi_orphan_hash        = fingerprint0
+        }
+
+{-# DEPRECATED emptyFullModIface "Use the equivalent emptyModIface instead." #-}
+emptyFullModIface :: Module -> ModIface
+emptyFullModIface = emptyModIface
+
+emptyRetainedModIface :: Module -> RetainedModIface
+emptyRetainedModIface = shrinkModIface . emptyModIface
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
 mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
@@ -1086,20 +1102,21 @@ shrinkModIface PrivateModIface {..}
       mi_ext_fields_      = (),
       ..
     }
+  where
 
-shrinkIfacePublic :: IfacePublic -> RetainedIfacePublic
-shrinkIfacePublic IfacePublic {..}
-  = IfacePublic
-    {
-      mi_anns_             = (),
-      mi_decls_            = (),
-      mi_defaults_         = (),
-      mi_insts_            = (),
-      mi_fam_insts_        = (),
-      mi_rules_            = (),
-      mi_complete_matches_ = (),
-      ..
-    }
+  shrinkIfacePublic :: IfacePublic -> RetainedIfacePublic
+  shrinkIfacePublic IfacePublic {..}
+    = IfacePublic
+      {
+        mi_anns_             = (),
+        mi_decls_            = (),
+        mi_defaults_         = (),
+        mi_insts_            = (),
+        mi_fam_insts_        = (),
+        mi_rules_            = (),
+        mi_complete_matches_ = (),
+        ..
+      }
 
 set_mi_mod_info :: IfaceModInfo -> ModIface_ phase -> ModIface_ phase
 set_mi_mod_info val iface = clear_mi_hi_bytes $ iface { mi_mod_info_ = val }
