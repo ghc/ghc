@@ -483,7 +483,7 @@ expandTypeSynonyms ty
 expandTypeSynonymsX :: Subst -> Type -> Type
 expandTypeSynonymsX
   = case mapTyCo expandTypeSynonymMapper of
-      (exp_ty, _, _, _) -> \subst ty -> runSubstM (exp_ty ty) subst
+      (exp_ty, _, _, _) -> runSubstM exp_ty
 
 expandTypeSynonymMapper :: TyCoMapper SubstM
 -- Just like substitution, but treat TyConApp specially
