@@ -229,9 +229,17 @@ uniqAway' in_scope var
 -- | @unsafeGetFreshUnique in_scope@ finds a unique that is not in-scope in the
 -- given 'InScopeSet'. This must be used very carefully since one can very easily
 -- introduce non-unique 'Unique's this way. See Note [Local uniques].
+--
+-- Despite its name, there is nothing unsafe about it, provided you
+-- know that all it does is find a unique not in the in-scope set.
+-- Two calls with the same in-scope set will (of course) produce the
+-- same unique.
 unsafeGetFreshLocalUnique :: InScopeSet -> Unique
 unsafeGetFreshLocalUnique (InScope set)
   | Just (uniq,_) <- Word64Map.lookupLT (getKey maxLocalUnique) (ufmToIntMap $ getUniqSet set)
+       -- (lookupLT k m) finds the largest (key,value) in `m` such that key < k
+       -- So if we make k=maxLocalUnique we'll just get the largest key in `m`
+       -- Then all we need do is increment it, and that'll give us a fresh one
   , let uniq' = mkLocalUnique uniq
   , not $ uniq' `ltUnique` minLocalUnique
   = incrUnique uniq'
