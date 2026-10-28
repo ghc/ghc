@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+$TEST_HC $TEST_HC_OPTS      \
+    -package containers     \
+    -dynamic                \
+    dumpDeclaredSymbols.c   \
+    -I$TOP/../rts           \
+    -I$TOP/../rts/include   \
+    Main.hs                 \
+    -o Main                 \
+    > /dev/null
 #
 # Check the diff between symbols exported from the RTS and those listed in RtsSymbols.c
 #
