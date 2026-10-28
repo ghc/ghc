@@ -969,4 +969,6 @@ test('ExpansionQLIm', normal, compile, [''])
 test('T27664', normal, compile, [''])
 test('T27916', normal, compile, [''])
 test('T26543_orig', normal, compile, [''])
-
+test('T27994',  normal, compile, [''])
+test('T27994a', normal, compile, [''])
+test('T27994b', normal, compile, [''])
