@@ -413,6 +413,14 @@ bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr)
         Time now = getProcessElapsedTime();
         processTimeoutCompletions(iomgr, now);
 
+#if defined(RTS_USER_SIGNALS)
+        /* Final check for pending signals before calling poll. There is
+         * Still a window between here and calling poll when signals could
+         * be delivered and not noticed. See issue #27540.
+         */
+        startPendingSignalHandlers(iomgr->cap);
+#endif
+
         /* If we didn't wake any threads due to expiring timeouts, then we need
          * to wait on I/O. Or to put it another way, even if we did wake some
          * threads, we'll still poll (but not wait) for I/O. This is to ensure
