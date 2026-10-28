@@ -68,7 +68,6 @@ import GHC.Unit.Home
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModSummary
-import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.Deps
 
 import Control.Monad
@@ -1299,8 +1298,6 @@ addAbiHashes hsc_env info
           = iface_public
       -- And these fields of deps should be in IfacePublic, but in good time.
       Dependencies _ _ _ sig_mods trusted_pkgs boot_mods orph_mods fis_mods  = deps
-      decl_warn_fn = mkIfaceDeclWarnCache (fromIfaceWarnings warns)
-      export_warn_fn = mkIfaceExportWarnCache (fromIfaceWarnings $ warns)
       fix_fn = mkIfaceFixCache fixities
 
       this_mod = mi_mod_info_module info
@@ -1535,10 +1532,10 @@ addAbiHashes hsc_env info
       }
 
     caches = IfaceCache
-      { mi_cache_decl_warn_fn = decl_warn_fn
-      , mi_cache_export_warn_fn = export_warn_fn
+      { mi_cache_decl_warn_fn = ()
+      , mi_cache_export_warn_fn = ()
       , mi_cache_fix_fn = fix_fn
-      , mi_cache_hash_fn = lookupOccEnv local_env
+      , mi_cache_hash_fn = ()
       }
   return (final_iface_exts, caches, decls_w_hashes)
   where

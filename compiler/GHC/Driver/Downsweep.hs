@@ -898,7 +898,7 @@ readFixedModule (DownsweepEnv { ds_hsc_env = hsc_env }) key =
         -- part of the compiler.
         lookupIfaceByModuleHsc hsc_env (mnkToModule key) >>= \case
           Just iface -> return (MaybeErr.Succeeded iface)
-          Nothing    -> fmap shrinkModIface <$>
+          Nothing    -> fmap retainedModIface <$>
                         readIface (hsc_hooks hsc_env) (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule key) (ml_hi_file loc)
       return $ case read_result of
         MaybeErr.Succeeded iface -> Just (FixedModule loc (ifaceEdges (mi_deps iface)))

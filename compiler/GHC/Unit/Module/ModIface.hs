@@ -69,13 +69,13 @@ module GHC.Unit.Module.ModIface
    , set_mi_fix_fn
    , set_mi_hash_fn
    , completePartialModIface
-   , shrinkModIface
+   , retainedModIface
    , IfaceBinHandle
    , PartialModIface
    , RetainedModIface
    , IfaceAbiHashes (..)
    , IfaceSelfRecomp (..)
-   , IfaceCache (..)
+   , IfaceCache_ (..)
    , IfaceSimplifiedCore (..)
    , withSelfRecomp
    , IfaceSelfRecompData
@@ -94,6 +94,9 @@ module GHC.Unit.Module.ModIface
    , IfacePublic
    , PartialIfacePublic
    , RetainedIfacePublic
+   , IfaceCache
+   , PartialIfaceCache
+   , RetainedIfaceCache
    , IfaceModInfo(..)
    , WhetherHasOrphans
    , WhetherHasFamInst
@@ -189,6 +192,10 @@ type PartialIfacePublic = IfacePublic_ 'ModIfaceCore
 type IfacePublic = IfacePublic_ 'ModIfaceFinal
 type RetainedIfacePublic = IfacePublic_ 'ModIfaceRetained
 
+type PartialIfaceCache = IfaceCache_ 'ModIfaceCore
+type IfaceCache = IfaceCache_ 'ModIfaceFinal
+type RetainedIfaceCache = IfaceCache_ 'ModIfaceRetained
+
 -- | Extends a PartialModIface with hashes of the ABI.
 --
 -- * The mi_mod_hash is the hash of the entire ABI
@@ -214,14 +221,14 @@ data IfaceAbiHashes = IfaceAbiHashes
     -- NOT transitive
   }
 
-data IfaceCache = IfaceCache
-  { mi_cache_decl_warn_fn :: !(OccName -> Maybe (WarningTxt GhcRn))
+data IfaceCache_ phase = IfaceCache
+  { mi_cache_decl_warn_fn :: !(IfaceDeclWarningCacheData phase)
     -- ^ Cached lookup for 'mi_warns' for declaration deprecations
-  , mi_cache_export_warn_fn :: !(Name -> Maybe (WarningTxt GhcRn))
+  , mi_cache_export_warn_fn :: !(IfaceExportWarningCacheData phase)
     -- ^ Cached lookup for 'mi_warns' for export deprecations
-  , mi_cache_fix_fn :: !(OccName -> Maybe Fixity)
+  , mi_cache_fix_fn :: !(IfaceFixityCacheData phase)
     -- ^ Cached lookup for 'mi_fixities'
-  , mi_cache_hash_fn :: !(OccName -> Maybe (OccName, Fingerprint))
+  , mi_cache_hash_fn :: !(IfaceHashCacheData phase)
     -- ^ Cached lookup for 'mi_decls'. The @Nothing@ in 'mi_hash_fn' means that
     -- the thing isn't in decls. It's useful to know that when seeing if we are
     -- up to date wrt. the old interface. The 'OccName' is the parent of the
@@ -300,6 +307,26 @@ type family IfaceAbiHashesData (phase :: ModIfacePhase) where
   IfaceAbiHashesData 'ModIfaceCore     = ()
   IfaceAbiHashesData 'ModIfaceFinal    = IfaceAbiHashes
   IfaceAbiHashesData 'ModIfaceRetained = IfaceAbiHashes
+
+type family IfaceDeclWarningCacheData (phase :: ModIfacePhase) where
+  IfaceDeclWarningCacheData 'ModIfaceCore     = ()
+  IfaceDeclWarningCacheData 'ModIfaceFinal    = ()
+  IfaceDeclWarningCacheData 'ModIfaceRetained = OccName -> Maybe (WarningTxt GhcRn)
+
+type family IfaceExportWarningCacheData (phase :: ModIfacePhase) where
+  IfaceExportWarningCacheData 'ModIfaceCore     = ()
+  IfaceExportWarningCacheData 'ModIfaceFinal    = ()
+  IfaceExportWarningCacheData 'ModIfaceRetained = Name -> Maybe (WarningTxt GhcRn)
+
+type family IfaceFixityCacheData (phase :: ModIfacePhase) where
+  IfaceFixityCacheData 'ModIfaceCore     = ()
+  IfaceFixityCacheData 'ModIfaceFinal    = OccName -> Maybe Fixity
+  IfaceFixityCacheData 'ModIfaceRetained = OccName -> Maybe Fixity
+
+type family IfaceHashCacheData (phase :: ModIfacePhase) where
+  IfaceHashCacheData 'ModIfaceCore     = ()
+  IfaceHashCacheData 'ModIfaceFinal    = ()
+  IfaceHashCacheData 'ModIfaceRetained = OccName -> Maybe (OccName, Fingerprint)
 
 withSelfRecomp :: ModIface -> r -> (IfaceSelfRecomp -> r) -> r
 withSelfRecomp iface nk jk =
@@ -443,7 +470,7 @@ data IfacePublic_ phase = IfacePublic {
         mi_complete_matches_ :: IfaceCompleteMatchesData phase,
                 -- ^ {-# COMPLETE #-} declarations
 
-        mi_caches_ :: IfaceCache,
+        mi_caches_ :: IfaceCache_ phase,
                 -- ^ Cached lookups of some parts of mi_public
 
         mi_abi_hashes_ :: IfaceAbiHashesData phase
@@ -480,10 +507,10 @@ mkIfacePublic exports decls fixities warns anns defaults insts fam_insts rules t
   mi_trust_pkg_ = trust_pkg,
   mi_complete_matches_ = complete_matches,
   mi_caches_ = IfaceCache {
-    mi_cache_decl_warn_fn = mkIfaceDeclWarnCache $ fromIfaceWarnings warns,
-    mi_cache_export_warn_fn = mkIfaceExportWarnCache $ fromIfaceWarnings warns,
+    mi_cache_decl_warn_fn = (),
+    mi_cache_export_warn_fn = (),
     mi_cache_fix_fn = mkIfaceFixCache fixities,
-    mi_cache_hash_fn = mkIfaceHashCache decls
+    mi_cache_hash_fn = ()
   },
   mi_abi_hashes_ = abi_hashes
 }
@@ -879,19 +906,19 @@ emptyPartialModIface mod
         mi_trust_            = noIfaceTrustInfo,
         mi_trust_pkg_        = False,
         mi_complete_matches_ = [],
-        mi_caches_           = emptyIfaceCache,
+        mi_caches_           = emptyPartialIfaceCache,
         mi_abi_hashes_       = ()
       }
     where
 
-    emptyIfaceCache :: IfaceCache
-    emptyIfaceCache
+    emptyPartialIfaceCache :: PartialIfaceCache
+    emptyPartialIfaceCache
       = IfaceCache
         {
-          mi_cache_decl_warn_fn   = emptyIfaceWarnCache,
-          mi_cache_export_warn_fn = emptyIfaceWarnCache,
-          mi_cache_fix_fn         = emptyIfaceFixCache,
-          mi_cache_hash_fn        = emptyIfaceHashCache
+          mi_cache_decl_warn_fn   = (),
+          mi_cache_export_warn_fn = (),
+          mi_cache_fix_fn         = (),
+          mi_cache_hash_fn        = ()
         }
 
 emptyModIface :: Module -> ModIface
@@ -910,10 +937,19 @@ emptyModIface mod
     = IfacePublic
       {
         mi_decls_      = [],
+        mi_caches_     = convertIfaceCache mi_caches_,
         mi_abi_hashes_ = emptyIfaceAbiHashes,
         ..
       }
     where
+
+    convertIfaceCache :: PartialIfaceCache -> IfaceCache
+    convertIfaceCache IfaceCache {..}
+      = IfaceCache
+        {
+          mi_cache_fix_fn = emptyIfaceFixCache,
+          ..
+        }
 
     emptyIfaceAbiHashes :: IfaceAbiHashes
     emptyIfaceAbiHashes
@@ -932,7 +968,7 @@ emptyFullModIface :: Module -> ModIface
 emptyFullModIface = emptyModIface
 
 emptyRetainedModIface :: Module -> RetainedModIface
-emptyRetainedModIface = shrinkModIface . emptyModIface
+emptyRetainedModIface = retainedModIface . emptyModIface
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
 mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
@@ -1018,7 +1054,7 @@ instance ( NFData (IfaceAnnotationsData phase)
     `seq` rnf a13
     `seq` rnf a14
 
-instance NFData IfaceCache where
+instance NFData (IfaceCache_ phase) where
   rnf = rwhnf
 
 forceModIface :: ModIface -> IO ()
@@ -1091,12 +1127,12 @@ completePublicModIface decls abi_hashes cache partial = partial
   , mi_caches_ = cache
   }
 
-shrinkModIface :: ModIface -> RetainedModIface
-shrinkModIface PrivateModIface {..}
+retainedModIface :: ModIface -> RetainedModIface
+retainedModIface PrivateModIface {..}
   = PrivateModIface
     {
       mi_hi_bytes_        = Strict.Nothing,
-      mi_public_          = shrinkIfacePublic mi_public_,
+      mi_public_          = retainedIfacePublic mi_public_,
       mi_self_recomp_     = (),
       mi_simplified_core_ = (),
       mi_ext_fields_      = (),
@@ -1104,8 +1140,8 @@ shrinkModIface PrivateModIface {..}
     }
   where
 
-  shrinkIfacePublic :: IfacePublic -> RetainedIfacePublic
-  shrinkIfacePublic IfacePublic {..}
+  retainedIfacePublic :: IfacePublic -> RetainedIfacePublic
+  retainedIfacePublic IfacePublic {..}
     = IfacePublic
       {
         mi_anns_             = (),
@@ -1115,8 +1151,24 @@ shrinkModIface PrivateModIface {..}
         mi_fam_insts_        = (),
         mi_rules_            = (),
         mi_complete_matches_ = (),
+        mi_caches_           = retainedIfaceCache mi_caches_,
         ..
       }
+    where
+
+    retainedIfaceCache :: IfaceCache -> RetainedIfaceCache
+    retainedIfaceCache IfaceCache {..}
+      = IfaceCache
+        {
+          mi_cache_decl_warn_fn   = mkIfaceDeclWarnCache bare_warnings,
+          mi_cache_export_warn_fn = mkIfaceExportWarnCache bare_warnings,
+          mi_cache_hash_fn        = mkIfaceHashCache mi_decls_,
+          ..
+        }
+      where
+
+      bare_warnings :: Warnings GhcRn
+      bare_warnings = fromIfaceWarnings mi_warns_
 
 set_mi_mod_info :: IfaceModInfo -> ModIface_ phase -> ModIface_ phase
 set_mi_mod_info val iface = clear_mi_hi_bytes $ iface { mi_mod_info_ = val }
@@ -1188,19 +1240,19 @@ set_mi_abi_hashes val = set_mi_public (\iface -> iface { mi_abi_hashes_ = val })
 
 {- Setters for mi_caches interface fields -}
 
-set_mi_decl_warn_fn :: (OccName -> Maybe (WarningTxt GhcRn)) -> ModIface_ phase -> ModIface_ phase
+set_mi_decl_warn_fn :: IfaceDeclWarningCacheData phase -> ModIface_ phase -> ModIface_ phase
 set_mi_decl_warn_fn val = set_mi_public (\iface -> iface { mi_caches_ = (mi_caches_ iface) { mi_cache_decl_warn_fn = val } })
 
-set_mi_export_warn_fn :: (Name -> Maybe (WarningTxt GhcRn)) -> ModIface_ phase -> ModIface_ phase
+set_mi_export_warn_fn :: IfaceExportWarningCacheData phase -> ModIface_ phase -> ModIface_ phase
 set_mi_export_warn_fn val = set_mi_public (\iface -> iface { mi_caches_ = (mi_caches_ iface) { mi_cache_export_warn_fn = val } })
 
-set_mi_fix_fn :: (OccName -> Maybe Fixity) -> ModIface_ phase -> ModIface_ phase
+set_mi_fix_fn :: IfaceFixityCacheData phase -> ModIface_ phase -> ModIface_ phase
 set_mi_fix_fn val = set_mi_public (\iface -> iface { mi_caches_ = (mi_caches_ iface) { mi_cache_fix_fn = val } })
 
-set_mi_hash_fn :: (OccName -> Maybe (OccName, Fingerprint)) -> ModIface_ phase -> ModIface_ phase
+set_mi_hash_fn :: IfaceHashCacheData phase -> ModIface_ phase -> ModIface_ phase
 set_mi_hash_fn val = set_mi_public (\iface -> iface { mi_caches_ = (mi_caches_ iface) { mi_cache_hash_fn = val } })
 
-set_mi_caches :: IfaceCache -> ModIface_ phase -> ModIface_ phase
+set_mi_caches :: IfaceCache_ phase -> ModIface_ phase -> ModIface_ phase
 set_mi_caches val = set_mi_public (\iface -> iface { mi_caches_ = val })
 
 {-
@@ -1340,11 +1392,11 @@ pattern ModIface ::
   -> ExtensibleFieldsData phase
   -> Strict.Maybe (IfaceBinHandle phase)
   -> IfaceSelfRecompData phase
-  -> (OccName -> Maybe Fixity)
-  -> (OccName -> Maybe (OccName, Fingerprint))
-  -> (OccName -> Maybe (WarningTxt GhcRn))
-  -> (Name -> Maybe (WarningTxt GhcRn)) ->
-  ModIface_ phase
+  -> IfaceFixityCacheData phase
+  -> IfaceHashCacheData phase
+  -> IfaceDeclWarningCacheData phase
+  -> IfaceExportWarningCacheData phase
+  -> ModIface_ phase
 pattern ModIface
   { mi_mod_info
   , mi_module
