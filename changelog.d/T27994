@@ -1,0 +1,7 @@
+section: compiler
+issues: #27994
+mrs: !16842
+synopsis:
+  Fix a compiler Lint error in a heavily kind-polymorphic program
+description:
+  There was a subtle bug deep in the code for computing functional dependencies for type families.
