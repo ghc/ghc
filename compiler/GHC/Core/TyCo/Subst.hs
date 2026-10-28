@@ -48,6 +48,8 @@ module GHC.Core.TyCo.Subst
         substTyCoBndr,
         substVarBndrUsing,
         checkValidSubst, isValidTCvSubst,
+
+        deepSubstTy
   ) where
 
 import GHC.Prelude
@@ -775,9 +777,15 @@ substThetaUnchecked = substTysUnchecked
 -- building no thunks.  See Note [Specialising mappers] in GHC.Core.TyCo.Make
 type SubstM = StrictReaderT Subst StrictIdentity
 
-runSubstM :: SubstM a -> Subst -> a
-runSubstM m subst = runStrictIdentity (runStrictReaderT m subst)
+runSubstM :: forall a. (a -> SubstM a) -> Subst -> a -> a
 {-# INLINE runSubstM #-}
+runSubstM tx subst x = runStrictIdentity (runStrictReaderT (tx x) subst)
+
+subst_ty :: Subst -> Type -> Type
+subst_co :: Subst -> Coercion -> Coercion
+(subst_ty, subst_co)
+  = case mapTyCo substTyCoMapper of
+      (ms_ty, _, ms_co, _) -> (runSubstM ms_ty, runSubstM ms_co)
 
 substTyCoMapper :: TyCoMapper SubstM
 substTyCoMapper
@@ -785,8 +793,8 @@ substTyCoMapper
                , tcm_covar      = subst_cv
                , tcm_hole       = subst_ch
                , tcm_tycobinder = tcv_bndr
-               , tcm_tcapp_ty   = tcapp_ty
-               , tcm_tcapp_co   = tcapp_co
+               , tcm_tcapp_ty   = nopTcAppTy
+               , tcm_tcapp_co   = nopTcAppCo
                }
  where
    subst_tv tv = StrictReaderT $ \subst -> return (substTyVar  subst tv)
@@ -802,23 +810,15 @@ substTyCoMapper
 
    -- Avoid allocation in this very
    -- common case (E.g. Int, LiftedRep etc)
-   tcapp_ty :: Type -> TyCon -> [Type] -> SubstM Type
-   tcapp_ty ty tc tys'
-      | null tys'  = return ty
-      | otherwise  = return (mkTyConApp tc tys')
-   tcapp_co :: Coercion -> Role -> TyCon -> [Coercion] -> SubstM Coercion
-   tcapp_co co r tc cos'
-      | null cos'  = return co
-      | otherwise  = return (mkTyConAppCo r tc cos')
+nopTcAppTy :: Type -> TyCon -> [Type] -> SubstM Type
+nopTcAppTy  ty tc tys'
+  | null tys'  = return ty
+  | otherwise  = return (mkTyConApp tc tys')
 
-subst_ty :: Subst -> Type -> Type
-subst_co :: Subst -> Coercion -> Coercion
-(subst_ty, subst_co)
-  = case mapTyCo substTyCoMapper of
-      (ms_ty, _, ms_co, _) -> (run ms_ty, run ms_co)
-  where
-    run :: forall a. (a -> SubstM a) -> Subst -> a -> a
-    run ms subst x = runSubstM (ms x) subst
+nopTcAppCo :: Coercion -> Role -> TyCon -> [Coercion] -> SubstM Coercion
+nopTcAppCo co r tc cos'
+  | null cos'  = return co
+  | otherwise  = return (mkTyConAppCo r tc cos')
 
 substTyVar :: Subst -> TyVar -> Type
 substTyVar (Subst _ _ tenv _) tv
@@ -1019,3 +1019,86 @@ it is /very/ valuable to /keep/ it empty:
   If the substitution is empty, this is a no-op -- but only if it
   is empty!
 -}
+
+
+{- **********************************************************************
+%*                                                                      *
+                Deep substitution
+%*                                                                      *
+%********************************************************************* -}
+
+{- Note [Deep substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Deep substitution applies the substitution to the /kinds/ of un-substituted
+type variables.  Suppose the substitution is
+    [ k :-> Type ]
+and we apply it to the type
+    Proxy k (a :: k)
+Ordinary shallow substitution will give
+    Proxy Type (a :: k)
+which is ill-kinded.  Deep substitution will give
+    Proxy Type (a :: Type)
+
+Ordinary (shallow) substitution is usually fine, because we will substitute for
+`a` as well, but not always.  In particular, the pure unifier in GHC.Core.Unify
+uses `niFixSubst` to find a fixpoint, and we really don't want domain tyvars
+appearing in the range.  See Note [Finding the substitution fixpoint].
+
+Wrinkles:
+
+(DS1) Deep substitution risks being rather inefficient because it re-applies the
+  substitution to the kind at /each occurrence/ of a free variable.  We could
+  perhaps find the free vars, and build a re-kinding substitution, but that's a
+  bit more complicated.
+
+(DS2) Deep substitution, as implemented here, relies on invariant
+  (NoTypeShadowing); see Note [No type-shadowing in Core] in Core.hs.
+  Otherwise we may have e.g.
+     S = [r :-> LiftedRep]   in-scope = {r, x}
+     T = forall (r :: RuntimeRep). (x :: TYPE r) -> ...
+  and we would want to apply the outer substitution S to the
+  occurrence of r in the kind of x.  But we'll have removed it
+  from the subsitution when pasing the 'forall r'.
+-}
+
+deepSubstTyCoMapper :: TyCoMapper SubstM
+deepSubstTyCoMapper
+  = TyCoMapper { tcm_tyvar      = subst_tv
+               , tcm_covar      = subst_cv
+               , tcm_hole       = subst_ch
+               , tcm_tycobinder = tcv_bndr
+               , tcm_tcapp_ty   = nopTcAppTy
+               , tcm_tcapp_co   = nopTcAppCo
+               }
+ where
+   subst_tv tv = StrictReaderT $ \subst -> return (deepSubstTyVar  subst tv)
+   subst_cv cv = StrictReaderT $ \subst -> return (deepSubstCoVar  subst cv)
+   subst_ch ch = StrictReaderT $ \subst -> return (deepSubstCoHole subst ch)
+
+   tcv_bndr :: TyCoVar -> ForAllTyFlag -> (TyCoVar -> SubstM r) -> SubstM r
+   tcv_bndr tcv _vis k
+     = StrictReaderT $ \subst ->
+       let !(subst', tcv') = substVarBndrUsing deepSubstTy subst tcv
+       in runStrictReaderT (k tcv') subst'
+
+deepSubstTy :: Subst -> Type -> Type
+deepSubstTy = case mapTyCo deepSubstTyCoMapper of
+                (subst_ty, _, _, _) -> runSubstM subst_ty
+
+deepSubstTyVar :: Subst -> TyVar -> Type
+deepSubstTyVar subst@(Subst _ _ tenv _) tv
+  = assert (isTyVar tv) $
+    case lookupVarEnv tenv tv of
+      Just ty -> ty
+      Nothing -> TyVarTy (updateVarType (deepSubstTy subst) tv)
+
+deepSubstCoVar :: Subst -> CoVar -> Coercion
+deepSubstCoVar subst@(Subst _ _ _ cenv) cv
+  = case lookupVarEnv cenv cv of
+      Just co -> co
+      Nothing -> CoVarCo (updateVarType (deepSubstTy subst) cv)
+
+deepSubstCoHole :: Subst -> CoercionHole -> Coercion
+-- See Note [Substituting in a coercion hole]
+deepSubstCoHole subst h@(CH { ch_co_var = cv })
+  = HoleCo (h { ch_co_var = updateVarType (deepSubstTy subst) cv })
