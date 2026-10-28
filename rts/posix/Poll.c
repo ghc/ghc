@@ -474,6 +474,14 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
         int timeout_ms = timeoutInMilliseconds(iomgr, wait, now);
 #endif
 
+#if defined(RTS_USER_SIGNALS)
+            /* Final check for pending signals before calling poll. There is
+             * Still a window between here and calling poll when signals could
+             * be delivered and not noticed. See issue #27540.
+             */
+            startPendingSignalHandlers(iomgr->cap);
+#endif
+
         /* Check for I/O readiness, possibly waiting. */
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
         int res = ppoll(poll_table, nfds, timeout_ns, NULL);
