@@ -872,6 +872,7 @@ job arch opsys buildConfig =
         , "bash .gitlab/ci.sh configure" -- configure needs to be run because hadrian gets its config like that
         , "bash .gitlab/ci.sh test_hadrian" ]
       | otherwise
+      -- see Note [Workaround for docker permissions]
       = [ "sudo chown ghc:ghc -R ." | Linux {} <- [opsys]] ++
         [ ".gitlab/ci.sh setup"
         , ".gitlab/ci.sh configure"
@@ -886,6 +887,7 @@ job arch opsys buildConfig =
         ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
+        -- see Note [Workaround for docker permissions]
         [ "sudo chown ghc:ghc -R ." | Linux {} <- [opsys]] ++
         [ ".gitlab/ci.sh setup"
         , ".gitlab/ci.sh configure"
@@ -983,6 +985,19 @@ job arch opsys buildConfig =
           }
 
     jobAllowFailure = False
+
+{-
+Note [Workaround for docker permissions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In GHC's CI, (docker) containers try to run build and tests as the user ghc
+which is unusual. Sometimes we have files in the file tree that are owned
+by root (which is the user that containers usually run as) so we have to
+chown them.
+
+Since running as user ghc in the CI yields virtually no extra protection in
+any situation, we will remove this in the future and replace it by better
+non-filesystem-based virtualisation.
+-}
 
 ---------------------------------------------------------------------------
 -- Job Modifiers

@@ -693,6 +693,9 @@ function test_hadrian_stage1() {
 
 function test_hadrian() {
 
+   # if a bindist tar exists, the variable $bindist_tar will be set
+   # that way we can later check for its existance to find whether
+   # we are running with a bindist.
    find_bindist_tar
    dist_dir="_build/bindist"
 
@@ -777,8 +780,8 @@ function test_hadrian() {
     run_hadrian \
       test \
       --summary-junit=./junit.xml \
-      --test-compiler="${test_compiler}" \
       --test-have-intree-files \
+      --test-compiler="${test_compiler}" \
       ${TEST_WAYS[@]/#/--test-way=} \
       "runtest.opts+=${RUNTEST_ARGS:-}" \
       "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
