@@ -1372,41 +1372,35 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
 
           -- case (3): we need to push something out to free up a register
          [] ->
-           do   let inRegOrBoth (InReg _) = True
-                    inRegOrBoth (InBoth _ _) = True
-                    inRegOrBoth _ = False
-                let candidates' :: UniqFM VirtualReg Loc
-                    candidates' =
-                      flip delListFromUFM (fmap virtualRegWithFormat_reg keep) $
-                      filterUFM (inRegOrBoth . locWithFormat_loc) $
-                      assig
-                      -- This is non-deterministic but we do not
-                      -- currently support deterministic code-generation.
-                      -- See Note [Unique Determinism and code generation]
-                let candidates = nonDetUFMToList candidates'
-
-                -- the vregs we could kick out that are already in a slot
-                let compat reg'
+           do   let compat reg'
                       =  targetClassOfRealReg platform reg'
                       == regclass
-                    candidates_inBoth :: [(Unique, RealRegUsage, StackSlot)]
-                    candidates_inBoth
-                        = [ (temp, RealRegUsage reg fmt, mem)
-                          | (temp, Loc (InBoth reg mem) fmt) <- candidates
-                          , compat reg ]
-
-                -- the vregs we could kick out that are only in a reg
-                --      this would require writing the reg to a new slot before using it.
-                let candidates_inReg
-                        = [ (temp, RealRegUsage reg fmt)
-                          | (temp, Loc (InReg reg) fmt) <- candidates
-                          , compat reg ]
+                    keep_us = map (getUnique . virtualRegWithFormat_reg) keep
+                    evictable temp reg = compat reg && temp `notElem` keep_us
+                    -- the first vreg we could kick out that is already in
+                    -- a slot, and the first that is only in a reg, which
+                    -- would require writing the reg to a new slot before
+                    -- using it
+                    pick temp (Loc l fmt) acc@(both, only) = case l of
+                      InBoth reg mem
+                        | Nothing <- both, evictable temp reg
+                        -> (Just (temp, RealRegUsage reg fmt, mem), only)
+                      InReg reg
+                        | Nothing <- only, evictable temp reg
+                        -> (both, Just (temp, RealRegUsage reg fmt))
+                      _ -> acc
+                    -- This is non-deterministic but we do not
+                    -- currently support deterministic code-generation.
+                    -- See Note [Unique Determinism and code generation]
+                    !(first_inBoth, first_inReg)
+                      = nonDetStrictFoldUFM_Directly pick (Nothing, Nothing)
+                                                     assig
 
                 let result
 
                         -- we have a temporary that is in both register and mem,
                         -- just free up its register for use.
-                        | (temp, (RealRegUsage cand_reg old_fmt), slot) : _ <- candidates_inBoth
+                        | Just (temp, (RealRegUsage cand_reg old_fmt), slot) <- first_inBoth
                         = do    spills' <- loadTemp r spill_loc cand_reg spills
                                 let assig1  = addToUFM_Directly assig temp $ Loc (InMem slot) old_fmt
                                 let assig2  = addToUFM assig1 vr $! newLocation spill_loc (RealRegUsage cand_reg vrFmt)
@@ -1416,8 +1410,8 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
 
                         -- otherwise, we need to spill a temporary that currently
                         -- resides in a register.
-                        | (temp_to_push_out, RealRegUsage cand_reg old_reg_fmt) : _
-                                        <- candidates_inReg
+                        | Just (temp_to_push_out, RealRegUsage cand_reg old_reg_fmt)
+                                        <- first_inReg
                         = do
                                 -- Spill what's currently in the register, with the format of what's in the register.
                                 (spill_store, slot) <- spillR (RegWithFormat (RegReal cand_reg) old_reg_fmt) temp_to_push_out
