@@ -59,8 +59,9 @@
 --     unlikely, to a block that calls the garbage collector. Where that call
 --     returns into the procedure, as in a case alternative, control reaches the
 --     check again from the block it returns to, which closes a cycle in the CFG
---     (the TODO at lehPredicts in GHC.CmmToAsm.CFG). The check at a function's
---     or thunk's entry jumps to the garbage collector instead.
+--     (static prediction gives such a cycle no loop head: loopHeads in
+--     staticBranchPrediction, GHC.CmmToAsm.CFG). The check at a function's or
+--     thunk's entry jumps to the garbage collector instead.
 --
 -- The machine-independent parts of the NCG are this module, the CFG
 -- (GHC.CmmToAsm.CFG), block layout (GHC.CmmToAsm.BlockLayout), liveness
