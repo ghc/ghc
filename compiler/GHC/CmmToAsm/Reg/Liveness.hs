@@ -15,6 +15,7 @@ module GHC.CmmToAsm.Reg.Liveness (
         InstrSR   (..),
         LiveInstr (..),
         Liveness (..),
+        liveInstrUsage,
         LiveInfo (..),
         LiveBasicBlock,
 
@@ -208,6 +209,12 @@ data Liveness
                                      --   'regUsageOfInstr' gives them, kept so that later passes
                                      --   need not compute them again.
         }
+
+-- | The registers an instruction reads and writes, as its liveness keeps them
+--   ('liveUsage'), and none for one without liveness, a meta instruction.
+liveInstrUsage :: LiveInstr instr -> RegUsage
+liveInstrUsage (LiveInstr _ (Just live)) = liveUsage live
+liveInstrUsage _                         = noUsage
 
 
 -- | Stash regs live on entry to each basic block in the info part of the cmm code.
