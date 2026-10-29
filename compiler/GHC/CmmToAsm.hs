@@ -127,8 +127,9 @@
 --   5. cmmTopLiveness (GHC.CmmToAsm.Reg.Liveness) drops the blocks that neither
 --      the first block nor a block with an info table reaches, orders the
 --      blocks by strongly connected components, and annotates each instruction
---      with the registers that are born and that die there. Given a CFG, it
---      keeps only the blocks the CFG has. -ddump-asm-liveness.
+--      with its register usage (liveUsage), which the allocators read from
+--      there, and the registers that are born and that die there. Given a CFG,
+--      it keeps only the blocks the CFG has. -ddump-asm-liveness.
 --   6. Register allocation puts each virtual register in a machine register or
 --      a spill slot at each instruction. It uses the graph colouring allocator
 --      (GHC.CmmToAsm.Reg.Graph) under -fregs-graph or -fregs-iterative,

@@ -378,6 +378,11 @@ Questions to ask of a change, by its kind:
   and writes as the allocators are to use them (the comment on `regUsageOfInstr`
   in `GHC.CmmToAsm.Instr`)? Does `jumpDestsOfInstr` name every block it jumps
   to (step 4 of Note [Native code generator])?
+* A change that rewrites an instruction's registers after liveness. Does
+  it compute again the usage that liveness keeps (`liveUsage`
+  in `GHC.CmmToAsm.Reg.Liveness`), as `patchRegsLiveInstr` does? The allocators
+  read that usage, and on x86 it can change when two registers become equal
+  (Note [What x86's regUsageOfInstr reports] in `GHC.CmmToAsm.X86.Instr`).
 * A change that updates the CFG during or after instruction selection. Does
   it keep the CFG's edges in step with the code? `-dasm-lint` does not check
   the edges (Note [Updating the CFG during shortcutting] in `GHC.CmmToAsm.CFG`,
