@@ -731,7 +731,7 @@ linearRA block_live block_id = go [] []
                , accFixups )                    -- it doesn't matter what order the fixup blocks are returned in.
 
     go accInstr accFixups (instr:instrs) = do
-        (accInstr', new_fixups) <- raInsn block_live accInstr block_id instr
+        (accInstr', new_fixups) <- raInsn block_live accInstr block_id instr instrs
         go accInstr' (new_fixups ++ accFixups) instrs
 
 -- | Do allocation for a single instruction.
@@ -741,21 +741,22 @@ raInsn
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> BlockId                              -- ^ the id of the current block, for debugging
         -> LiveInstr instr                      -- ^ the instr to have its regs allocated, with liveness info.
+        -> [LiveInstr instr]                    -- ^ the instructions after it in the block.
         -> RegM freeRegs
                 ( [instr]                       -- new instructions
                 , [NatBasicBlock instr])        -- extra fixup blocks
 
-raInsn _     new_instrs _ (LiveInstr ii Nothing)
+raInsn _     new_instrs _ (LiveInstr ii Nothing) _
         | Just n        <- takeDeltaInstr ii
         = do    setDeltaR n
                 return (new_instrs, [])
 
-raInsn _     new_instrs _ (LiveInstr ii@(Instr i) Nothing)
+raInsn _     new_instrs _ (LiveInstr ii@(Instr i) Nothing) _
         | isMetaInstr ii
         = return (i : new_instrs, [])
 
 
-raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
+raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live)) rest
  = do
     platform <- getPlatform
     assig    <- getAssigR
@@ -795,9 +796,9 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
           -}
            return (new_instrs, [])
 
-        _ -> genRaInsn block_live new_instrs id instr live
+        _ -> genRaInsn block_live new_instrs id instr rest live
 
-raInsn _ _ _ instr
+raInsn _ _ _ instr _
         = do
             platform <- getPlatform
             let instr' = fmap (pprInstr platform) instr
@@ -830,10 +831,11 @@ genRaInsn :: forall freeRegs instr.
           -> [instr]
           -> BlockId
           -> instr
+          -> [LiveInstr instr]
           -> Liveness
           -> RegM freeRegs ([instr], [NatBasicBlock instr])
 
-genRaInsn block_live new_instrs block_id instr live = do
+genRaInsn block_live new_instrs block_id instr rest live = do
 -- pprTraceM "genRaInsn" $ ppr (block_id, instr)
   platform <- getPlatform
   case liveUsage live of { RU read written ->
@@ -871,7 +873,7 @@ genRaInsn block_live new_instrs block_id instr live = do
         allocateRegsAndSpill True{-reading-} virt_read [] [] virt_read
 
     -- (c) save any temporaries which will be clobbered by this instruction
-    clobber_saves <- saveClobberedTemps real_written r_dying
+    clobber_saves <- saveClobberedTemps real_written r_dying rest
 
     -- (d) Update block map for new destinations
     -- NB. do this before removing dead regs from the assignment, because
@@ -995,8 +997,9 @@ releaseRegs regs = do
 
 -- For each temp in a register that is going to be clobbered:
 --      - if the temp dies after this instruction, do nothing
---      - otherwise, put it somewhere safe (another reg if possible,
---              otherwise spill and record InBoth in the assignment).
+--      - otherwise, put it somewhere safe (another reg, not written
+--              before the temp's next read, if possible, otherwise spill
+--              and record InBoth in the assignment).
 --      - for allocateRegs on the temps *read*,
 --      - clobbered regs are allocatable.
 --
@@ -1010,13 +1013,14 @@ saveClobberedTemps
         => [RealReg]             -- ^ real registers clobbered by this instruction
         -> [Reg]                 -- ^ registers which are no longer live after this instruction,
                                  -- because read for the last time
+        -> [LiveInstr instr]     -- ^ the instructions after this one in the block
         -> RegM freeRegs [instr] -- return: instructions to spill any temps that will
                                  -- be clobbered.
 
-saveClobberedTemps [] _
+saveClobberedTemps [] _ _
         = return []
 
-saveClobberedTemps clobbered dying
+saveClobberedTemps clobbered dying rest
  = do
         assig   <- getAssigR
         (assig',instrs) <- nonDetStrictFoldUFM_DirectlyM maybe_spill (assig,[]) assig
@@ -1050,12 +1054,18 @@ saveClobberedTemps clobbered dying
 
             freeRegs <- getFreeRegsR
             let regclass = targetClassOfRealReg platform reg
-                freeRegs_thisClass = frGetFreeRegs regclass freeRegs
 
-            case filter (`notElem` clobbered) freeRegs_thisClass of
+            -- leaving out a register the block writes before it next reads the
+            -- value: the value would move again, or be spilled there; where
+            -- every free register is one, the value is spilled at once instead
+            -- (#26631)
+            case unwrittenBeforeRead temp rest
+                   [ r | r <- frGetFreeRegs regclass freeRegs
+                       , r `notElem` clobbered ] of
 
               -- (1) we have a free reg of the right class that isn't
-              -- clobbered by this instruction; use it to save the
+              -- clobbered by this instruction, nor written before the value is
+              -- next read; use it to save the
               -- clobbered value.
               free@(_ : _) -> do
                   my_reg <- firstFreeInOrder temp free
@@ -1067,7 +1077,7 @@ saveClobberedTemps clobbered dying
 
                   return (new_assign,(instr : instrs))
 
-              -- (2) no free registers: spill the value
+              -- (2) no such free register: spill the value
               [] -> do
 
                   (spill, slot)   <- spillR (RegWithFormat (RegReal reg) fmt) temp
@@ -1081,6 +1091,28 @@ saveClobberedTemps clobbered dying
 
 
 
+
+-- | Of the given real registers, in their order, those that the given
+-- instructions, the rest of a block, do not write before they read the
+-- virtual register with the given unique; the walk stops once none is left.
+unwrittenBeforeRead :: Unique -> [LiveInstr instr] -> [RealReg] -> [RealReg]
+unwrittenBeforeRead !u = go
+  where
+    go _ [] = []
+    go (LiveInstr _ (Just l) : is) cands
+      | any isU rs           = cands
+      | any written cands    = go is (filter (not . written) cands)
+      | otherwise            = go is cands
+      where RU rs ws = liveUsage l
+            written r = any (isReal r) ws
+    go (_ : is) cands = go is cands
+    go [] cands       = cands
+    isReal r w = case regWithFormat_reg w of
+      RegReal r' -> r' == r
+      _          -> False
+    isU r = case regWithFormat_reg r of
+      RegVirtual v -> getUnique v == u
+      _            -> False
 
 -- | Mark all these real regs as allocated,
 --      and kick out their vreg assignments.
