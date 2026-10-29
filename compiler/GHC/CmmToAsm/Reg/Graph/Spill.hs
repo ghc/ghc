@@ -189,9 +189,9 @@ regSpill_instr
         -> LiveInstr instr
         -> SpillM [LiveInstr instr]
 regSpill_instr _ _ li@(LiveInstr _ Nothing) = return [li]
-regSpill_instr platform regSlotMap (LiveInstr instr (Just _)) = do
+regSpill_instr platform regSlotMap (LiveInstr instr (Just live)) = do
   -- work out which regs are read and written in this instr
-  let RU rlRead rlWritten = regUsageOfInstr platform instr
+  let RU rlRead rlWritten = liveUsage live
 
   -- sometimes a register is listed as being read more than once,
   --      nub this so we don't end up inserting two lots of spill code.
