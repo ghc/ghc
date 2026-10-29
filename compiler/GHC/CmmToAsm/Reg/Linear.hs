@@ -216,8 +216,15 @@ regAlloc config cold (CmmProc static lbl live sccs)
                         <- linearRegAlloc config cold entry_ids block_live sccs
 
                 -- make sure the block that was first in the input list
-                --      stays at the front of the output
-                let !final_blocks' = sortOn ((/= first_id) . blockId) final_blocks
+                --      stays at the front of the output, sorted only where it
+                --      is not: sorting always made the compiler run 0.36% more
+                --      instructions and allocate 0.48% more compiling T9961 at
+                --      -O0, 0.11% and 0.14% more compiling !16269's
+                --      CmmDiamondChain at -O and 0.10% and 0.14% more at -O2,
+                --      on GHC 10.1.20261108
+                let !final_blocks' = case final_blocks of
+                      b : _ | blockId b == first_id -> final_blocks
+                      _ -> sortOn ((/= first_id) . blockId) final_blocks
 
                 let max_spill_slots = maxSpillSlots config
                     extra_stack
