@@ -121,10 +121,6 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Types
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class (RegArch (..), registerArch)
-import qualified GHC.Platform.Reg.Class.Separate  as Separate
-import qualified GHC.Platform.Reg.Class.Unified   as Unified
-import qualified GHC.Platform.Reg.Class.NoVectors as NoVectors
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
@@ -789,19 +785,7 @@ clobberRegs []
 clobberRegs clobbered
  = do   platform <- getPlatform
         freeregs <- getFreeRegsR
-
-        let allRegClasses =
-               case registerArch (platformArch platform) of
-                 Unified   ->   Unified.allRegClasses
-                 Separate  ->  Separate.allRegClasses
-                 NoVectors -> NoVectors.allRegClasses
-            allFreeRegs = foldMap (\ rc -> frGetFreeRegs rc freeregs) allRegClasses
-
-        let extra_clobbered = [ r | r <- clobbered, r `elem` allFreeRegs ]
-
-        setFreeRegsR $! foldl' (flip frAllocateReg) freeregs extra_clobbered
-
-        -- setFreeRegsR $! foldl' (flip frAllocateReg) freeregs clobbered
+        setFreeRegsR $! frClobberRegs platform clobbered freeregs
 
         assig           <- getAssigR
         setAssigR $! clobber assig (nonDetUFMToList assig)
