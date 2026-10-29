@@ -121,7 +121,6 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Types
 import GHC.Platform.Reg
-import GHC.Platform.Regs (globalRegMaybe)
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
@@ -426,7 +425,7 @@ wideMoveDests platform cold block_live sccs
     -- RV64 and LA64 those of the argument registers, R1 among them, stays a
     -- candidate here and in processBlock's move destinations, harmless but
     -- where it is the last block's and shadows a usable one or, on x86-64, is a
-    -- vreg's only preference, which firstFreeInOrder's fallback counts as one.
+    -- vreg's only preference, which frFallbackReg counts as one.
     cands = listToUFM
       [ (vr, rr) | BasicBlock bid instrs <- blocks
                  , let live = live_in bid
@@ -1263,7 +1262,9 @@ current block moves another virtual register into where it dies: a variable
 given one would keep the other from being computed in it, or have to move out of
 its way.
 
-Where none of them is free, the first free register is taken, on x86-64 in this
+Where none of them is free, 'frFallbackReg' picks a free register: by default
+the first, and on x86-64 ('GHC.CmmToAsm.Reg.Linear.X86_64.fallbackReg') the
+first in this
 order: first those no instruction writes while the virtual register is live past
 the write, such as %r14 and %rbx for a value live across a C call on System V,
 so that the value need not move out of their way; and among those, as among the
@@ -1283,17 +1284,16 @@ every such allocation.
 
 -- | Of the given free registers of a class, the one to take for the
 -- virtual register with the given unique: the first of its preferred
--- registers, best first, that is free, else the first free one in the order
+-- registers, best first, that is free, else the one
+-- 'frFallbackReg' picks, the first free one in the order
 -- Note [Register preferences in the linear allocator] gives.
-firstFreeInOrder :: Unique -> [RealReg] -> RegM freeRegs RealReg
-firstFreeInOrder _ [] = panic "firstFreeInOrder: no free register"
-firstFreeInOrder u free@(r0 : _) = do
-  platform <- getPlatform
+firstFreeInOrder :: FR freeRegs
+                 => Unique -> [RealReg] -> RegM freeRegs RealReg
+firstFreeInOrder u free = do
   bassig <- getBlockAssigR
-  RA_Context { rc_jumpLocs  = locs
-             , rc_moveDests = moves
-             , rc_wideDests = wide
-             , rc_clobbers  = clobbers } <- getContextR
+  ctx@RA_Context { rc_jumpLocs  = locs
+                 , rc_moveDests = moves
+                 , rc_wideDests = wide } <- getContextR
   let !jl = jumpLocRegs u locs
       !mv = lookupUFM_Directly moves u
       !fu = lookupFirstUsed u bassig
@@ -1309,37 +1309,13 @@ firstFreeInOrder u free@(r0 : _) = do
       free' = case filter (`notElem` others) free of
                 [] -> free
                 fs -> fs
-      r0' = case free' of
-              r : _ -> r
-              []    -> r0
       noPrefs = null jl && isNothing mv && isNothing fu && isNothing wd
       chosen = case find isFree jl of
                  Nothing -> pick mv (pick fu (pick wd Nothing))
                  found   -> found
   return $! case chosen of
-    Just r -> r
-    Nothing
-      | ArchX86_64 <- platformArch platform
-      , Just !r1 <- globalRegMaybe platform (VanillaReg 1)
-      -> let !cl = lookupWithDefaultUFM_Directly clobbers 0 u
-             kept (RealRegSingle n) = not (testBit cl n)
-             -- the free ones to choose from: for one with preferences, those
-             -- no jump target's assignment gives a virtual register if any
-             -- remain, and all of them otherwise
-             fs | noPrefs    = free'
-                | otherwise  = case filter (`notElem` reserved) free' of
-                                 []  -> free'
-                                 fs' -> fs'
-             reserved = [ r | assig <- locs, Loc loc _ <- nonDetEltsUFM assig
-                            , r <- regsOfLoc loc ]
-             -- those no instruction writes while the vreg is live past it,
-             -- then the rest, R1's last in each part
-             part p = [ r | r <- fs, r /= r1, p r ]
-                      ++ [ r1 | r1 `elem` fs, p r1 ]
-             {-# INLINE part #-}  -- so that the lists fuse
-         in fromMaybe r0' (listToMaybe (part kept ++ part (not . kept)))
-      | otherwise
-      -> r0'
+    Just r  -> r
+    Nothing -> frFallbackReg ctx noPrefs u free'
 
 -- | 'jumpLocRegs' u locs: the registers the recorded jump-target assignments
 -- locs give the virtual register with unique u, in order.
