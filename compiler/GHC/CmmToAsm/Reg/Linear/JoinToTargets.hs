@@ -123,12 +123,7 @@ joinToTargets_again
     src_assig dest_assig
 
         -- the assignments already match, no problem.
-        | equalIgnoringFormats
-            (nonDetUFMToList dest_assig)
-            (nonDetUFMToList src_assig)
-        -- This is non-deterministic but we do not
-        -- currently support deterministic code-generation.
-        -- See Note [Unique Determinism and code generation]
+        | equalIgnoringFormats dest_assig src_assig
         = joinToTargets' block_live new_blocks block_id instr dests
 
         -- assignments don't match, need fixup code
@@ -321,9 +316,10 @@ handleComponent _ _ (CyclicSCC _)
 
 -- Helper functions that use the @Ord (IgnoreFormat Loc)@ instance.
 
-equalIgnoringFormats :: [(Unique, Loc)] -> [(Unique, Loc)] -> Bool
+equalIgnoringFormats :: UniqFM Reg Loc -> UniqFM Reg Loc -> Bool
 equalIgnoringFormats =
-  coerce $ (==) @[(Unique, IgnoreFormat Loc)]
+  coerce $ (==) @(UniqFM Reg (IgnoreFormat Loc))
+
 movementGraphSCCs :: [Node Loc Unique] -> [SCC (Node Loc Unique)]
 movementGraphSCCs =
   coerce $ stronglyConnCompFromEdgedVerticesOrdR @(IgnoreFormat Loc) @Unique
