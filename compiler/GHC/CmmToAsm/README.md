@@ -31,7 +31,8 @@ Then, pass by pass, in the overview's order:
   in `GHC.CmmToAsm.Reg.Liveness`;
 * step 6, the linear allocator: the outline at the top
   of `GHC.CmmToAsm.Reg.Linear`, Note [Unique order in the linear allocator]
-  there, and Note [The first jump into a block fixes its entry assignment]
+  and Note [Register preferences in the linear allocator] there,
+  and Note [The first jump into a block fixes its entry assignment]
   in `GHC.CmmToAsm.Reg.Linear.JoinToTargets`;
 * step 9, shortcutting: Note [supporting shortcutting] in `GHC.CmmToAsm.Monad`
   and Note [Updating the CFG during shortcutting] in `GHC.CmmToAsm.CFG`;

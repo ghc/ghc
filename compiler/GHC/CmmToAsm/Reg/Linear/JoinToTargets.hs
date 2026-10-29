@@ -127,12 +127,18 @@ block's entry assignment (joinToTargets_first): where each vreg live into the
 block is, InReg, InMem or InBoth, and which registers are free. Every jump into
 the block that is processed later is made to conform to that assignment by fixup
 code (joinToTargets_again), whatever its own assignment and however often its
-edge runs. Hence:
+edge runs. So the order in which a block's predecessors are allocated decides
+where the moves run. The SCCs come in dependency order, the path into a loop
+before the loop's body, so that a loop's head takes the registers of the
+path into it, and its back edge pays for any difference at every iteration;
+firstFreeInOrder's preferences work to keep a loop's values in its head's
+registers. Hence:
 
 * TODO: where a loop head's entry assignment comes from a preheader that has
   spilled a loop-carried vreg, it records the vreg InMem. The body then reloads
   the vreg at its first read, and every back edge stores it again once the body
-  has written it.
+  has written it. Likewise where the preheader has it InBoth, every back edge
+  that holds it in a register only stores it.
 
 * TODO #27800: a return continuation is an entry block, and the allocator,
   going in SCC order, processes it before the loops it jumps into. So where the
@@ -149,9 +155,15 @@ edge runs. Hence:
   so the return block can come first and record the assignment that the hot
   path's jump into the checking block must then conform to.
 
+That first jump decides one more thing. A vreg's first-used register
+(lookupFirstUsed) is its register in the first assignment that, recorded for a
+block it is live into, holds it in a register, not the first register it was
+given, and it stands for the rest of the procedure.
+
 The assignment a jump arrives with is chosen without regard to the entry
 assignment already recorded for its target: see the TODOs in joinToTargets_first
-(#27981) and in findPrefRealReg in GHC.CmmToAsm.Reg.Linear (#27980).
+(#27981) and in Note [Register preferences in the linear allocator] in
+GHC.CmmToAsm.Reg.Linear (#27980).
 -}
 
 -- this is the first time we jumped to this block.
