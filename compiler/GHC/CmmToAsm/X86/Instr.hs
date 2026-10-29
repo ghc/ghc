@@ -784,8 +784,16 @@ regUsageOfInstr platform instr
 
     mkRU :: [RegWithFormat] -> [RegWithFormat] -> RegUsage
     mkRU src dst = src' `seq` dst' `seq` RU src' dst'
-        where src' = filter (interesting platform . regWithFormat_reg) src
-              dst' = filter (interesting platform . regWithFormat_reg) dst
+        where src' = keep src
+              dst' = keep dst
+              -- the list itself where every register is interesting, so
+              -- that it is not copied: copying it made the compiler allocate
+              -- 1.05% more and run 0.55% more instructions compiling T3294 at
+              -- -O0, and 0.40% and 0.23% more compiling !16269's
+              -- CmmDiamondChain at -O1, 0.39% and 0.22% more at -O2, on GHC
+              -- 10.1.20261108
+              keep rs | all (interesting platform . regWithFormat_reg) rs = rs
+                      | otherwise = filter (interesting platform . regWithFormat_reg) rs
 
     addrFmt = archWordFormat (target32Bit platform)
     mk :: Format -> Reg -> RegWithFormat
