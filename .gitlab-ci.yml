@@ -1163,7 +1163,7 @@ base-with-other-ghcs-linux:
     - job: release-x86_64-linux-deb13-release
       optional: true
   dependencies: null
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
+  image: null
   tags:
     - x86_64-linux
   script: .gitlab/base-ci.sh x86_64-deb13-linux 9.14.1
