@@ -32,6 +32,7 @@ import GHC.CmmToAsm.Format
 import GHC.Types.Unique.Set
 
 import Data.Coerce (coerce)
+import Data.Functor.Classes (liftEq)
 
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
@@ -123,12 +124,7 @@ joinToTargets_again
     src_assig dest_assig
 
         -- the assignments already match, no problem.
-        | equalIgnoringFormats
-            (nonDetUFMToList dest_assig)
-            (nonDetUFMToList src_assig)
-        -- This is non-deterministic but we do not
-        -- currently support deterministic code-generation.
-        -- See Note [Unique Determinism and code generation]
+        | equalIgnoringFormats dest_assig src_assig
         = joinToTargets' block_live new_blocks block_id instr dests
 
         -- assignments don't match, need fixup code
@@ -319,11 +315,14 @@ handleComponent delta instr
 handleComponent _ _ (CyclicSCC _)
  = panic "Register Allocator: handleComponent cyclic"
 
--- Helper functions that use the @Ord (IgnoreFormat Loc)@ instance.
+-- | Whether the two assignments give every vreg the same location, whatever
+-- its formats.
+equalIgnoringFormats :: RegMap Loc -> RegMap Loc -> Bool
+equalIgnoringFormats a b
+  = liftEq (\(Loc l1 _) (Loc l2 _) -> l1 == l2) (ufmToIntMap a) (ufmToIntMap b)
 
-equalIgnoringFormats :: [(Unique, Loc)] -> [(Unique, Loc)] -> Bool
-equalIgnoringFormats =
-  coerce $ (==) @[(Unique, IgnoreFormat Loc)]
+-- A helper function that uses the @Ord (IgnoreFormat Loc)@ instance.
+
 movementGraphSCCs :: [Node Loc Unique] -> [SCC (Node Loc Unique)]
 movementGraphSCCs =
   coerce $ stronglyConnCompFromEdgedVerticesOrdR @(IgnoreFormat Loc) @Unique
