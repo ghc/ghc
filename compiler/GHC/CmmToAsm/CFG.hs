@@ -1131,6 +1131,10 @@ instead, and they are to be reinvestigated together:
    returns to, after G, is missed. With the estimate, a block inserted after
    allocation would take the frequency of the edge it splits or of the block it
    continues, with no tag to copy.
+
+ * Where several blocks give a vreg different destinations, wideMoveDests in
+   GHC.CmmToAsm.Reg.Linear takes the last block's; the estimate would pick the
+   hottest block's at no extra cost.
 -}
 
 -- | Combination of target node id and information about the branch

@@ -170,6 +170,7 @@ imports only "GHC.CmmToAsm.Reg.Target".
 regAlloc
         :: Instruction instr
         => NCGConfig
+        -> LabelSet
         -> LiveCmmDecl statics instr
         -> UniqDSM ( NatCmmDecl statics instr
                    , Maybe Int  -- number of extra stack slots required,
@@ -177,27 +178,27 @@ regAlloc
                    , Maybe RegAllocStats
                    )
 {-# SPECIALISE regAlloc
-      :: NCGConfig -> LiveCmmDecl statics X86.Instr
+      :: NCGConfig -> LabelSet -> LiveCmmDecl statics X86.Instr
       -> UniqDSM (NatCmmDecl statics X86.Instr, Maybe Int, Maybe RegAllocStats)
   #-}
 
-regAlloc _ (CmmData sec d)
+regAlloc _ _ (CmmData sec d)
         = return
                 ( CmmData sec d
                 , Nothing
                 , Nothing )
 
-regAlloc _ (CmmProc (LiveInfo info _ _ _) lbl live [])
+regAlloc _ _ (CmmProc (LiveInfo info _ _ _) lbl live [])
         = return ( CmmProc info lbl live (ListGraph [])
                  , Nothing
                  , Nothing )
 
-regAlloc config (CmmProc static lbl live sccs)
+regAlloc config cold (CmmProc static lbl live sccs)
         | LiveInfo info entry_ids@(first_id:_) block_live _ <- static
         = do
                 -- do register allocation on each component.
                 !(!final_blocks, !stats, !stack_use)
-                        <- linearRegAlloc config entry_ids block_live sccs
+                        <- linearRegAlloc config cold entry_ids block_live sccs
 
                 -- make sure the block that was first in the input list
                 --      stays at the front of the output
@@ -215,7 +216,7 @@ regAlloc config (CmmProc static lbl live sccs)
                         , Just stats)
 
 -- bogus. to make non-exhaustive match warning go away.
-regAlloc _ (CmmProc _ _ _ _)
+regAlloc _ _ (CmmProc _ _ _ _)
         = panic "RegAllocLinear.regAlloc: no match"
 
 
@@ -230,6 +231,7 @@ regAlloc _ (CmmProc _ _ _ _)
 linearRegAlloc
         :: forall instr. (Instruction instr)
         => NCGConfig
+        -> LabelSet  -- ^ the blocks that follow a failed heap or stack check
         -> [BlockId] -- ^ entry points
         -> BlockMap Regs
               -- ^ live regs on entry to each basic block
@@ -237,7 +239,7 @@ linearRegAlloc
               -- ^ instructions annotated with "deaths"
         -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc config entry_ids block_live sccs
+linearRegAlloc config cold entry_ids block_live sccs
  = case platformArch platform of
       ArchX86        -> other $ (frInitFreeRegs platform :: X86.FreeRegs)
       ArchX86_64     -> go $ (frInitFreeRegs platform :: X86_64.FreeRegs)
@@ -257,7 +259,7 @@ linearRegAlloc config entry_ids block_live sccs
  where
   go :: FR regs
      => regs -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
-  go f = linearRegAlloc' config f entry_ids block_live sccs
+  go f = linearRegAlloc' config f cold entry_ids block_live sccs
   -- See Note [Specialising the linear allocator]
   other :: FR regs
         => regs -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
@@ -274,32 +276,150 @@ linearRegAlloc'
         :: RegAllocConstraint freeRegs instr
         => NCGConfig
         -> freeRegs
+        -> LabelSet                     -- ^ the blocks that follow a failed
+                                        --   heap or stack check
         -> [BlockId]                    -- ^ entry points
         -> BlockMap Regs              -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
         -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc' config initFreeRegs entry_ids block_live sccs
+linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
  = UDSM $ \us -> do
     let !(_, !stack, !stats, !blocks, us') =
             runR ctx emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
                 $ linearRA_SCCs entry_ids block_live [] sccs
+        platform = ncgPlatform config
         ctx = RA_Context
                 { rc_moveDests = emptyUFM
+                , rc_wideDests = wideMoveDests platform cold block_live sccs
                 , rc_config    = config }
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
 
--- | The moves of a block's virtual registers into real registers where they
--- die.
+-- | The moves of a block's virtual registers where they die, into real
+-- registers or other virtual registers.
 dyingMoves :: Instruction instr
-           => Platform -> [LiveInstr instr] -> [(VirtualReg, RealReg)]
+           => Platform -> [LiveInstr instr] -> [(VirtualReg, Reg)]
+{-# INLINE dyingMoves #-}  -- out of line it allocates more
 dyingMoves platform instrs
-  = [ (vr, rr) | LiveInstr (Instr instr) (Just live) <- instrs
-               , not (isEmptyUniqSet (getRegs (liveDieRead live)))
-               , Just (RegVirtual vr, RegReal rr)
-                   <- [takeRegRegMoveInstr platform instr]
-               , RegVirtual vr `elemRegs` liveDieRead live ]
+  = [ (vr, d) | LiveInstr (Instr instr) (Just live) <- instrs
+              , not (isEmptyUniqSet (getRegs (liveDieRead live)))
+              , Just (RegVirtual vr, d) <- [takeRegRegMoveInstr platform instr]
+              , RegVirtual vr `elemRegs` liveDieRead live ]
+
+-- | The real register each vreg is moved into where it dies in a block it is
+-- live into, unless the block is one of the given ones (on x86-64, those that
+-- follow a failed heap or stack check, 'checkFailures'), or that register is
+-- live together with the vreg somewhere: at a block's entry, after an
+-- instruction's writes, or where a vreg born in a block while the vreg is live
+-- is moved into that register in the same block, where the later vreg dies. A
+-- vreg that the vreg is moved into where it dies counts as the vreg in this
+-- check, where the move is in a block some vreg is live into and not one of the
+-- given ones. The walk of each block follows only those vregs and registers,
+-- taking an instruction's writes from its register usage ('liveBorn' being
+-- filled in only for the graph allocator and the liveness dump).
+wideMoveDests :: Instruction instr
+              => Platform -> LabelSet -> BlockMap Regs
+              -> [SCC (LiveBasicBlock instr)]
+              -> UniqFM VirtualReg RealReg
+wideMoveDests platform cold block_live sccs
+  | isNullUFM cands = cands
+  | otherwise       = cands `minusUFM` foldl' blk emptyUFM blocks
+  where
+    blocks = flattenSCCs sccs
+    live_in bid = mapFindWithDefault noRegs bid block_live
+    -- a block some vreg is live into, and not one of the given ones
+    warm bid live = uniqSetAny (isVirtualReg . regWithFormat_reg) (getRegs live)
+                    && not (bid `setMember` cold)
+    -- a vreg moved where it dies in a block it is live into: one computed in
+    -- the block has the block's own move destination
+    -- TODO: where several blocks give a vreg different destinations, the last
+    -- block's wins: see Note [Frequencies before register allocation] in
+    -- GHC.CmmToAsm.CFG.
+    -- A destination no allocator hands out, Sp, Hp or BaseReg, and on AArch64,
+    -- RV64 and LA64 those of the argument registers, R1 among them, stays a
+    -- candidate here and in processBlock's move destinations, harmless but
+    -- where it is the last block's and shadows a usable one.
+    cands = listToUFM
+      [ (vr, rr) | BasicBlock bid instrs <- blocks
+                 , let live = live_in bid
+                 , warm bid live
+                 , (vr, RegReal rr) <- dyingMoves platform instrs
+                 , RegVirtual vr `elemRegs` live ]
+    dests = mkUniqSet (nonDetEltsUFM cands)
+    -- each followed vreg to the candidates whose values it holds, with their
+    -- destinations: a candidate itself, and each candidate moved into the
+    -- vreg where it dies
+    follow = plusUFM_C (++) (mapUFM_Directly (\u d -> [(u, d)]) cands)
+           $ listToUFM_C (++)
+      [ (b, [(getUnique a, d)])
+      | BasicBlock bid instrs <- blocks
+      , warm bid (live_in bid)
+      , (a, RegVirtual b) <- dyingMoves platform instrs
+      , Just d <- [lookupUFM cands a] ]
+    -- bad: the candidates found live together with their destination;
+    -- vs: the followed vregs live; ds: the destinations live
+    blk bad (BasicBlock bid instrs)
+      = let (bad', vs, ds) = born (bad, emptyUniqSet, emptyUniqSet)
+                                  (live_in bid)
+            -- the vregs the block moves into a destination where they die
+            loc = listToUFM [ (vr, rr) | (vr, RegReal rr) <- dyingMoves platform instrs
+                                       , rr `elementOfUniqSet` dests ]
+        in go loc bad' vs ds instrs
+    go _ !bad !_ !_ [] = bad
+    go loc !bad !vs !ds (LiveInstr (Instr _) (Just l) : is)
+      | quiet (liveDieRead l), not (any seen ws), quiet (liveDieWrite l)
+      , isEmptyUniqSet vs || not (any (local loc) ws)
+      = go loc bad vs ds is
+      | otherwise
+      = let !(vs1, ds1)       = dies (vs, ds) (liveDieRead l)
+            bad1 | isEmptyUniqSet vs1 = bad
+                 | otherwise          = foldl' (wanted loc vs1) bad ws
+            !(bad', vs2, ds2) = foldl' (flip bear) (bad1, vs1, ds1) ws
+            !(vs3, ds3)       = dies (vs2, ds2) (liveDieWrite l)
+        in go loc bad' vs3 ds3 is
+      where ws = writes (liveUsage l)
+    go loc !bad !vs !ds (_ : is) = go loc bad vs ds is
+    local loc r = case regWithFormat_reg r of
+      RegVirtual v -> v `elemUFM` loc
+      RegReal _    -> False
+    -- a vreg born with a destination in loc: the live followed vregs'
+    -- candidates with that destination are bad, but the vreg's own, which an
+    -- update in place keeps in its register
+    wanted loc vs bad r = case regWithFormat_reg r of
+      RegVirtual v
+        | Just w <- lookupUFM loc v -> clash w bad (delOneFromUniqSet vs v)
+      _ -> bad
+    -- none of the registers names a followed vreg or a destination
+    quiet regs = not (uniqSetAny seen (getRegs regs))
+    seen r = case regWithFormat_reg r of
+      RegVirtual v -> v `elemUFM` follow
+      RegReal rr   -> rr `elementOfUniqSet` dests
+    dies acc regs = nonDetStrictFoldUniqSet die acc (getRegs regs)
+    die r acc@(!vs, !ds) = case regWithFormat_reg r of
+      RegVirtual v | v `elementOfUniqSet` vs  -> (delOneFromUniqSet vs v, ds)
+      RegReal rr   | rr `elementOfUniqSet` ds -> (vs, delOneFromUniqSet ds rr)
+      _                                       -> acc
+    born acc regs = nonDetStrictFoldUniqSet bear acc (getRegs regs)
+    bear r acc@(!bad, !vs, !ds) = case regWithFormat_reg r of
+      RegVirtual v
+        | Just cds <- lookupUFM follow v
+        -> ( mark (`elementOfUniqSet` ds) bad cds, addOneToUniqSet vs v, ds )
+      RegReal rr
+        | rr `elementOfUniqSet` dests
+        -> ( clash rr bad vs, vs, addOneToUniqSet ds rr )
+      _ -> acc
+    -- the candidates of the live followed vregs whose destination is the
+    -- register
+    clash rr bad vs
+      = nonDetStrictFoldUniqSet
+          (\v b -> case lookupUFM follow v of
+                     Just cds -> mark (== rr) b cds
+                     Nothing  -> b)
+          bad vs
+    -- a set with each candidate of a list whose destination passes p added
+    mark p = foldl' (\ !b (c, d) -> if p d then addToUFM_Directly b c () else b)
+
 
 linearRA_SCCs :: RegAllocConstraint freeRegs instr
               => [BlockId]
@@ -406,7 +526,8 @@ processBlock block_live (BasicBlock id instrs)
  = do   -- pprTraceM "processBlock" $ text "" $$ ppr (BasicBlock id instrs)
         initBlock id block_live
         platform <- getPlatform
-        setBlockContextR $ listToUFM (dyingMoves platform instrs)
+        setBlockContextR $ listToUFM
+          [ (vr, rr) | (vr, RegReal rr) <- dyingMoves platform instrs ]
 
         (instrs', fixups)
                 <- linearRA block_live id instrs
@@ -938,28 +1059,47 @@ from which 'firstFreeInOrder' takes the first that is free:
    nothing for a value the current block moves where it dies, which is live into
    no later block, hence the order.
 
+ * The real register a block the variable is live into moves it into where it
+   dies, such as R1 for a value evaluated some blocks after it is computed,
+   unless that register is live together with the variable somewhere, as
+   wideMoveDests counts it, or, on x86-64, the block follows a failed heap or
+   stack check.
+
 Preferring every register the variable was assigned to, not only the first, was
 tried and turned out to barely matter.
+
+Where none of them is free, the first free register is taken, those the current
+block moves another virtual register into where it dies coming last: a variable
+given one would keep the other from being computed in it, or have to move out of
+its way.
 -}
 
 -- | Of the given free registers of a class, the one to take for the
 -- virtual register with the given unique: the first of its preferred
--- registers, best first, that is free, else the first free one
--- (Note [Register preferences in the linear allocator]).
+-- registers, best first, that is free, else the first free one in the order
+-- Note [Register preferences in the linear allocator] gives.
 firstFreeInOrder :: Unique -> [RealReg] -> RegM freeRegs RealReg
 firstFreeInOrder _ [] = panic "firstFreeInOrder: no free register"
 firstFreeInOrder u free@(r0 : _) = do
   bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
-  RA_Context { rc_moveDests = moves } <- getContextR
+  RA_Context { rc_moveDests = moves
+             , rc_wideDests = wide } <- getContextR
   let !mv = lookupUFM_Directly moves u
       !fu = lookupFirstUsed u bassig
+      !wd = lookupUFM_Directly wide u
       isFree r = r `elem` free
       -- the preference where it is free, else the next one
       pick (Just r) _ | isFree r = Just r
       pick _        k = k
-  return $! case pick mv (pick fu Nothing) of
+      -- the registers the current block moves other vregs into where they
+      -- die: given one, the vreg would keep the other from being computed in
+      -- it, or have to move out of its way
+      others = [ r | (v, r) <- nonDetUFMToList moves, v /= u ]
+  return $! case pick mv (pick fu (pick wd Nothing)) of
     Just r -> r
-    Nothing -> r0
+    Nothing -> case filter (`notElem` others) free of
+                 r : _ -> r
+                 []    -> r0
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY

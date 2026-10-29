@@ -236,6 +236,10 @@ data RA_Context
         --   in the block being allocated
           rc_moveDests  :: UniqFM VirtualReg RealReg
 
+        -- | 'GHC.CmmToAsm.Reg.Linear.wideMoveDests' of the procedure being
+        --   allocated
+        , rc_wideDests  :: UniqFM VirtualReg RealReg
+
         -- | Native code generator configuration
         , rc_config     :: !NCGConfig
         }
