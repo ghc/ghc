@@ -81,7 +81,10 @@ updateBlockAssignment dest (freeRegs, regMap) (BlockAssignment {..}) =
         (toVRegMap regMap)
     )
   where
-    -- The blocks are processed in dependency order, so if there's already an
+    -- A vreg's first-used register is its register in the first assignment
+    -- that, recorded for a block it is live into, holds it in a register
+    -- (Note [The first jump into a block fixes its registers] in
+    -- GHC.CmmToAsm.Reg.Linear), so if there's already an
     -- entry in the map then keep that assignment rather than writing the new
     -- assignment.
     combWithExisting :: RealReg -> Loc -> Maybe RealReg
