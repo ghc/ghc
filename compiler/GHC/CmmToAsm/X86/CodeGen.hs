@@ -379,8 +379,11 @@ stmtToInstrs bid stmt = do
 
       CmmBranch id          -> return $ genBranch id
 
-      --We try to arrange blocks such that the likely branch is the fallthrough
-      --in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
+      -- GHC.Cmm.ContFlowOpt inverts a condition whose true target has one
+      -- predecessor where the condition is likely true or where the false
+      -- target has more than one (Note [Invert Cmm conditionals]), so the
+      -- condition may be likely true here; genCondBranch does not read the
+      -- likelihood.
       CmmCondBranch arg true false _ -> genCondBranch bid true false arg
       CmmSwitch arg ids -> genSwitch arg ids bid
       CmmCall { cml_target = arg
