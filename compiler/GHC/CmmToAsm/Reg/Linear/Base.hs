@@ -242,7 +242,9 @@ data RA_Context freeRegs
           rc_jumpLocs   :: [RegMap Loc]
 
         -- | the real register each vreg is moved into where it dies,
-        --   in the block being allocated
+        --   in the block being allocated, or, for one moved into another vreg
+        --   and not written again in the block, the register a recorded jump
+        --   target's assignment gives that one
         , rc_moveDests  :: UniqFM VirtualReg RealReg
 
         -- | 'GHC.CmmToAsm.Reg.Linear.wideMoveDests' of the procedure being

@@ -351,16 +351,45 @@ regClobbers platform sccs
                               _             -> False)
     ins acc _ = acc
 
+-- | The virtual register the instruction moves where it dies, and the move's
+-- destination, if it is such a move.
+dyingMove :: Instruction instr
+          => Platform -> instr -> Liveness -> Maybe (VirtualReg, Reg)
+{-# INLINE dyingMove #-}  -- out of line it runs more instructions
+dyingMove platform instr live
+  | not (isEmptyUniqSet (getRegs (liveDieRead live)))
+  , Just (RegVirtual vr, d) <- takeRegRegMoveInstr platform instr
+  , RegVirtual vr `elemRegs` liveDieRead live
+  = Just (vr, d)
+  | otherwise
+  = Nothing
+
 -- | The moves of a block's virtual registers where they die, into real
 -- registers or other virtual registers.
 dyingMoves :: Instruction instr
            => Platform -> [LiveInstr instr] -> [(VirtualReg, Reg)]
 {-# INLINE dyingMoves #-}  -- out of line it allocates more
 dyingMoves platform instrs
-  = [ (vr, d) | LiveInstr (Instr instr) (Just live) <- instrs
-              , not (isEmptyUniqSet (getRegs (liveDieRead live)))
-              , Just (RegVirtual vr, d) <- [takeRegRegMoveInstr platform instr]
-              , RegVirtual vr `elemRegs` liveDieRead live ]
+  = [ m | LiveInstr (Instr instr) (Just live) <- instrs
+        , Just m <- [dyingMove platform instr live] ]
+
+-- | 'dyingMoves' into virtual registers, without the moves of a vreg the block
+-- writes again after the move: a preference is looked up by the vreg, so such
+-- a move's preference would reach the vreg's later value.
+dyingMovesLast :: Instruction instr
+               => Platform -> [LiveInstr instr] -> [(VirtualReg, VirtualReg)]
+dyingMovesLast platform instrs = fst $ foldr step ([], emptyUniqSet) instrs
+  where
+    step (LiveInstr (Instr instr) (Just live)) (acc, written)
+      | Just (vr, RegVirtual d) <- dyingMove platform instr live
+      , not (vr `elementOfUniqSet` written)
+      = ((vr, d) : acc, written')
+      | otherwise = (acc, written')
+      where written' = foldl' add written (writes (liveUsage live))
+    step _ x = x
+    add s r = case regWithFormat_reg r of
+                RegVirtual v -> addOneToUniqSet s v
+                _            -> s
 
 -- | The real register each vreg is moved into where it dies in a block it is
 -- live into, unless the block is one of the given ones (on x86-64, those that
@@ -627,8 +656,22 @@ processBlock block_live (BasicBlock id instrs)
             !locs = foldr recorded []
               [ dest | LiveInstr (Instr instr) _ <- instrs
                      , dest <- jumpDestsOfInstr instr ]
-        setBlockContextR locs $ listToUFM
-          [ (vr, rr) | (vr, RegReal rr) <- dyingMoves platform instrs ]
+            -- the entries of 'rc_moveDests' for the vregs moved into another
+            -- vreg
+            loop_moves
+              | null locs = []
+              | otherwise
+              = [ (vr, r) | (vr, d) <- dyingMovesLast platform instrs
+                          , r : _ <- [jumpLocRegs (getUnique d) locs] ]
+        setBlockContextR locs $ listToUFM $
+          loop_moves
+          -- unlike dyingMovesLast's, these moves into real registers include
+          -- those of a vreg the block writes again after the move, its later
+          -- value then preferring that register too. As listToUFM keeps a
+          -- vreg's last entry, such a move outranks the vreg's loop move, and
+          -- where the block moves the vreg into two real registers, both its
+          -- values prefer the second
+          ++ [ (vr, rr) | (vr, RegReal rr) <- dyingMoves platform instrs ]
 
         (instrs', fixups)
                 <- linearRA block_live id instrs
@@ -734,6 +777,10 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
                 -- if src is a fixed reg, then we just map dest to this
                 -- reg in the assignment.  src must be an allocatable reg,
                 -- otherwise it wouldn't be in r_dying.
+                -- A virtual src gives dst its location, whatever dst's
+                -- preferences: firstFreeInOrder makes up for that only where
+                -- src was allocated in this block ('rc_moveDests', its moves
+                -- into vregs).
               _virt -> case lookupUFM assig src of
                          Nothing -> panic "raInsn"
                          Just loc ->
@@ -1155,7 +1202,10 @@ from which 'firstFreeInOrder' takes the first that is free:
    variable needs no fixup move at the jump (#27980).
 
  * The real register the current block moves the variable into where it dies,
-   such as R1 before an evaluation: allocated there, the variable needs no move.
+   such as R1 before an evaluation: allocated there, the variable needs no move;
+   or, where the block moves it into another variable, such as a loop variable
+   at the loop's end, and does not write it again, the register a recorded jump
+   target's assignment gives that one.
 
  * The register the variable has in the first assignment that, recorded for a
    block it is live into, holds it in a register, if any
@@ -1187,8 +1237,9 @@ there being among its preferences. This applies to the fallback only: a free
 preferred register is taken even where a recorded jump target gives it to
 another virtual register, as leaving those out too made more join fixups cyclic
 and cost containers 0.13% and vector 0.11% more instructions (nofib's puzzle
-2.7%). Leaving them out for one with no preferences too cost vector's tridiag
-3%.
+2.7%). Leaving them out for one with no preferences too gains nothing measured
+and costs compile time, the list of registers to leave out then being built for
+every such allocation.
 -}
 
 -- | Of the given free registers of a class, the one to take for the
