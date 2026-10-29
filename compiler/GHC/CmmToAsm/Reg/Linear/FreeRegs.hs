@@ -29,11 +29,13 @@ import GHC.CmmToAsm.Reg.Linear.Base (RA_Context, BlockAssignment)
 -- Here's an inefficient 'executable specification' of the FreeRegs data type:
 --
 --      type FreeRegs = [RegNo]
---      noFreeRegs = 0
+--      noFreeRegs = []
 --      releaseReg n f = if n `elem` f then f else (n : f)
 --      initFreeRegs = allocatableRegs
---      getFreeRegs cls f = filter ( (==cls) . regClass . RealReg ) f
+--      getFreeRegs cls f = filter ( (==cls) . regClass . RealReg ) (inOrder f)
 --      allocateReg f r = filter (/= r) f
+--
+--      where inOrder puts them in a fixed order of each instance's own.
 
 import qualified GHC.CmmToAsm.Reg.Linear.PPC     as PPC
 import qualified GHC.CmmToAsm.Reg.Linear.X86     as X86

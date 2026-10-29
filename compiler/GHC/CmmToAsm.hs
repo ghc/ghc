@@ -491,6 +491,11 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         -- tag instructions with register liveness information
         -- also drops dead code. We don't keep the cfg in sync on
         -- some backends, so don't use it there.
+        -- Where ncgEnableDeadCodeElimination is off, as under -finfo-table-map
+        -- (#20428), no CFG follows register allocation, so static prediction
+        -- for the layout and the chain layout of -fblock-layout-cfg are off
+        -- as well; the linear allocator's estimate, allocFreqs, is made all
+        -- the same.
         let livenessCfg = if ncgEnableDeadCodeElimination config
                                 then Just nativeCfgWeights
                                 else Nothing

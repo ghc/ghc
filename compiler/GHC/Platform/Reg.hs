@@ -72,8 +72,8 @@ data VirtualReg
 
 -- We can't derive Ord, because Unique doesn't have an Ord instance.
 -- Note nonDetCmpUnique in the implementation. See Note [No Ord for Unique].
--- This is non-deterministic but we do not currently support deterministic
--- code-generation. See Note [Unique Determinism and code generation]
+-- This compares uniques, so its order is deterministic only where they are: see
+-- Note [Unique Determinism and code generation].
 instance Ord VirtualReg where
   compare vr1 vr2 =
     case compare (I# (dataToTag# vr1)) (I# (dataToTag# vr2)) of

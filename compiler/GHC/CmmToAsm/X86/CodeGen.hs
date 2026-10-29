@@ -345,8 +345,11 @@ stmtToInstrs bid stmt = do
 
       CmmBranch id          -> return $ genBranch id
 
-      --We try to arrange blocks such that the likely branch is the fallthrough
-      --in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
+      -- GHC.Cmm.ContFlowOpt inverts a condition whose true target has one
+      -- predecessor where the condition is likely true or where the false
+      -- target has more than one (Note [Invert Cmm conditionals]), so the
+      -- condition may be likely true here; genCondBranch does not read the
+      -- likelihood.
       CmmCondBranch arg true false _ -> genCondBranch bid true false arg
       CmmSwitch arg ids -> genSwitch arg ids bid
       CmmCall { cml_target = arg
@@ -4198,6 +4201,10 @@ genCondBranch' _ bid id false bool = do
                   JXX cond id,
                   JXX ALWAYS false
                 ]
+        -- The false edge weighs 3 more, so that where the two edges would
+        -- otherwise tie, block layout places the false target next: the side
+        -- GHC.Cmm.ContFlowOpt arranges, where it can, to be the likely one, as
+        -- Note [Invert Cmm conditionals] says.
         updateCfgNat (\cfg -> adjustEdgeWeight cfg (+3) bid false)
         return (cond_code `appOL` code)
 
