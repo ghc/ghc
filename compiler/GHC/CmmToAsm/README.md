@@ -75,9 +75,10 @@ or the code that defines or uses it:
   in `GHC.CmmToAsm.Format`). Liveness records the format of each register
   (Note [Register formats in liveness analysis] in `GHC.CmmToAsm.Reg.Liveness`).
 * born, dying: what liveness records of a register at an instruction (`Liveness`
-  in `GHC.CmmToAsm.Reg.Liveness`). A register is born where it is first written.
-  It dies by a read where it is read for the last time, and dies by a write
-  where it is written and not live afterwards.
+  in `GHC.CmmToAsm.Reg.Liveness`), the born registers only for the graph
+  allocator and `-ddump-asm-liveness` (`regLivenessBorn`). A register is born
+  where it is first written. It dies by a read where it is read for the last
+  time, and dies by a write where it is written and not live afterwards.
 * spill slot: a stack slot that holds a virtual register's value while
   no register does. The C stack area the RTS reserves holds `maxSpillSlots`
   of them, and `ncgAllocMoreStack` reserves more (Note [extra spill slots]

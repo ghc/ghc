@@ -121,8 +121,9 @@
 --   5. cmmTopLiveness (GHC.CmmToAsm.Reg.Liveness) drops unreachable blocks,
 --      orders the blocks by strongly connected components, and annotates each
 --      instruction with its register usage (liveUsage), which the
---      allocators read from there, and the registers that are born and
---      that die there. Given a CFG, it keeps only the blocks the CFG has.
+--      allocators read from there, and the registers that die there; for
+--      the graph allocator and -ddump-asm-liveness, regLivenessBorn adds
+--      those born there. Given a CFG, it keeps only the blocks the CFG has.
 --      -ddump-asm-liveness.
 --   6. Register allocation puts each virtual register in a machine register or
 --      a spill slot at each instruction. It uses the graph colouring allocator
@@ -726,10 +727,13 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 runUniqueDSM usGen
                         $ mapM (cmmTopLiveness livenessCfg platform) native
 
+        -- the dump shows when registers are born, liveBorn, which the linear
+        -- allocator does not use and the graph allocator fills in itself
         putDumpFileMaybe logger
                 Opt_D_dump_asm_liveness "Liveness annotations added"
                 FormatCMM
-                (vcat $ map (pprLiveCmmDecl platform) withLiveness)
+                (vcat $ map (pprLiveCmmDecl platform . regLivenessBorn)
+                            withLiveness)
 
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear, raStats, stack_updt_blks) <-
