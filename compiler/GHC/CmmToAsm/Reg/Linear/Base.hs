@@ -24,11 +24,17 @@ module GHC.CmmToAsm.Reg.Linear.Base (
         -- the allocator monad
         RA_State(..),
         RA_Context(..),
+        DyingMoves(..),
+
+        -- liveness
+        liveInto,
 )
 
 where
 
 import GHC.Prelude
+
+import Data.Word (Word64)
 
 import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Liveness
@@ -254,6 +260,10 @@ data RA_State freeRegs
 
         }
 
+-- | A block's moves of its virtual registers into real registers where they
+--   die, and those registers as bits by register number.
+data DyingMoves = DyingMoves {-# UNPACK #-} !Word64 [(VirtualReg, RealReg)]
+
 -- | What the allocator uses, but does not update, while it allocates the
 --   instructions of a block, held in one field of 'RA_State' rather than in
 --   fields of their own, each of which costs allocation at every update of
@@ -288,15 +298,28 @@ data RA_Context
         -- | the jump targets of each block of the procedure being allocated
         , rc_succs      :: LabelMap [BlockId]
 
+        -- | the blocks that two blocks or more jump to, those that follow a
+        --   failed heap or stack check not counted
+        , rc_joins      :: LabelSet
+
         -- | the registers live on entry to each block of the procedure being
         --   allocated
         , rc_live       :: BlockMap Regs
 
         -- | the real register each vreg is moved into where it dies, in each
         --   block of the procedure being allocated
-        , rc_dying      :: LabelMap (UniqFM VirtualReg RealReg)
+        , rc_dying      :: LabelMap DyingMoves
+
+        -- | 'GHC.CmmToAsm.Reg.Linear.regClobbers' of the procedure being
+        --   allocated on x86-64, whose fallback alone uses it, and Nothing
+        --   elsewhere
+        , rc_clobbers   :: Maybe (UniqFM VirtualReg Word64)
 
         -- | Native code generator configuration
         , rc_config     :: !NCGConfig
         }
+
+-- | Whether the vreg with the given unique is live into the block.
+liveInto :: Unique -> BlockMap Regs -> BlockId -> Bool
+liveInto !u live b = elemUniqSet_Directly u (getRegs (mapFindWithDefault noRegs b live))
 

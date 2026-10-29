@@ -133,7 +133,10 @@ import GHC.Types.Unique.DSM
 import GHC.Types.Unique.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import qualified GHC.Data.Word64Map as M
 import GHC.Platform
+import qualified GHC.Platform.X86_64 as X86_64 (globalRegMaybe)
+import GHC.Exts (lazy)
 
 import Data.Containers.ListUtils
 import Data.Maybe
@@ -311,15 +314,93 @@ linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
                 , rc_wideDests = wideMoveDests platform cold block_live sccs
                 , rc_block     = panic "linearRegAlloc': rc_block read before a block"
                 , rc_succs     = js
+                  -- built where read
+                , rc_joins     = joinBlocks cold js
                 , rc_live      = block_live
-                , rc_dying     = mapFromList
-                    [ (b, listToUFM
-                            [ (vr, rr)
-                            | (vr, RegReal rr) <- dyingMoves platform instrs ])
-                    | BasicBlock b instrs <- flattenSCCs sccs ]
+                  -- only the blocks with such moves, built where first read
+                , rc_dying     = foldl' (dyingIn platform) mapEmpty (flattenSCCs sccs)
+                  -- used by x86-64's fallback alone, and elsewhere a thunk that
+                  -- would keep the SCCs alive (a plain map, the architecture
+                  -- tested where it is used, made the compiler run 0.010% more
+                  -- instructions compiling T3294 at -O0 and 0.004% and 0.003%
+                  -- more at -O and -O2, the cause unidentified, on GHC
+                  -- 10.1.20261108)
+                , rc_clobbers  = case platformArch platform of
+                    ArchX86_64 -> Just (regClobbers platform sccs)
+                    _          -> Nothing
                 , rc_config    = config }
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
+-- | For each virtual register, the real registers an instruction writes while
+-- the virtual register is live past it, as bits by register number: a C call's
+-- caller-saved registers, or R2's %r14 set for a jump, say. Given one of them,
+-- the virtual register would have to move out of it at that instruction. A move
+-- of the virtual register itself into one is no such write. The liveness pass
+-- records, at each instruction writing a real register, the registers live
+-- after it.
+--
+-- Every write counts, those in the blocks that follow a failed heap or stack
+-- check too, which run seldom.  TODO: a write could count by how often its
+-- block runs: see Note [Frequencies before register allocation] in
+-- GHC.CmmToAsm.CFG.
+regClobbers :: Instruction instr
+            => Platform -> [SCC (LiveBasicBlock instr)]
+            -> UniqFM VirtualReg Word64
+regClobbers platform sccs
+  = foldl' (\acc (hit, s) -> nonDetStrictFoldUniqSet (mark hit) acc s)
+           direct byHit
+  where
+    (direct, byHit) = foldl' (\m (BasicBlock _ instrs) -> foldl' ins m instrs)
+                             (emptyUFM, []) (flattenSCCs sccs)
+    -- each write's registers live past it: a small set marked at once, a vreg
+    -- at a time, its mask looked up; a large one, as most divisions
+    -- of !16269's CmmDiamondChain have, united with the others written with
+    -- the same mask, the masks marked at the end, which costs less than
+    -- a lookup for each vreg. Every set marked a vreg at a time, the compiler
+    -- ran 2.4% more instructions compiling CmmDiamondChain at -O0 and 2.0%
+    -- more at -O1 and -O2, but 0.12% fewer compiling T9961 at -O0; every set
+    -- united, 0.49% fewer for CmmDiamondChain at -O0 but 0.09% more for T9961,
+    -- allocating 0.29% more there, when this was added.
+    ins (!d, !m) (LiveInstr (Instr i) (Just l))
+      -- (the set is empty where the instruction writes no real register, which
+      -- the test finds sooner than the mask: the mask first, the compiler ran
+      -- 0.13% more instructions compiling T3294 at -O0 and 0.049% and 0.048%
+      -- more at -O and -O2, on GHC 10.1.20261108)
+      | not (isEmptyUniqSet (getRegs (liveAcross l)))
+      -- (the members counted only up to the threshold: sizeUniqSet, counting
+      -- them all, made the compiler run 0.29% more instructions compiling
+      -- !16269's CmmDiamondChain at -O0 and 0.24% more at -O and -O2, on GHC
+      -- 10.1.20261108; the 24, above which a set is large, is arbitrary, and
+      -- may be revised where a case needs it: with no set large, compiling a
+      -- block of 50 to 400 unsafe C calls ran 1.004 to 1.086 times the
+      -- instructions, the excess growing as N squared)
+      , hit /= 0 = if M.compareSize (ufmToIntMap (getUniqSet across)) 24 == GT
+                     then (d, add m)
+                     else (nonDetStrictFoldUniqSet (mark hit) d across, m)
+      where
+        RU rs ws = liveUsage l
+        hit  = foldl' (\b r -> case regWithFormat_reg r of
+                                 RegReal (RealRegSingle n) -> setBit b n
+                                 _                         -> b) 0 ws
+        -- live past the instruction: live after it, and not only written
+        -- by it; a move of the vreg itself into a real register is no
+        -- clobber of it
+        excl = [ v | Just (RegVirtual v, RegReal _) <- [takeRegRegMoveInstr platform i] ]
+               ++ [ v | r <- ws, RegVirtual v <- [regWithFormat_reg r], not (has v rs) ]
+        across = foldl' (\s v -> delOneFromUniqSet_Directly s (getUnique v))
+                         (getRegs (liveAcross l)) excl
+        add [] = [(hit, across)]
+        add (e@(h, s) : es)
+          | h == hit  = let !s' = unionUniqSets s across in (h, s') : es
+          | otherwise = e : add es
+        has v = any (\r -> case regWithFormat_reg r of
+                              RegVirtual v' -> v' == v
+                              _             -> False)
+    ins dm _ = dm
+    mark hit r a = case regWithFormat_reg r of
+      RegVirtual v | lookupWithDefaultUFM a 0 v .&. hit /= hit
+                   -> addToUFM_C (.|.) a v hit
+      _            -> a
 
 -- | The virtual register the instruction moves where it dies, and the move's
 -- destination, if it is such a move.
@@ -403,7 +484,8 @@ wideMoveDests platform cold block_live sccs
     -- A destination no allocator hands out, Sp, Hp or BaseReg, and on AArch64,
     -- RV64 and LA64 those of the argument registers, R1 among them, stays a
     -- candidate here and in processBlock's move destinations, harmless but
-    -- where it is the last block's and shadows a usable one.
+    -- where it is the last block's and shadows a usable one or, on x86-64, is a
+    -- vreg's only preference, which fallbackReg counts as one.
     -- One walk finds them, and the moves of a vreg into another where it dies
     -- in the same blocks, of which follow takes those of candidates: a walk
     -- for each made the compiler run 0.39% more instructions compiling
@@ -842,11 +924,37 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live)) rest
     -- then we can eliminate the instruction.
     -- (we can't eliminate it if the source register is on the stack, because
     --  we do not want to use one spill slot for different virtual registers)
+    -- Nor do we eliminate it where a jump target of the block whose assignment
+    -- is recorded has dst in a free register other than src's and another
+    -- vreg in src's: the move puts dst there, which the jump would otherwise
+    -- have to swap with that vreg. Where no target has a vreg in src's
+    -- register, the jump moves dst on its own edge, where the move here would
+    -- run on every path out of the block.
+    RA_Context { rc_jumpLocs = locs } <- getContextR
+    freeregs <- getFreeRegsR
+    let wantedElsewhere src dst
+          | null rs   = False
+          | otherwise = not (any (`elem` srcRegs) rs) && any both locs
+          where rs = jumpLocRegs (getUnique dst) locs
+                -- one recorded assignment giving dst a free register and
+                -- another vreg src's
+                both tassig = case lookupUFM_Directly tassig (getUnique dst) of
+                  Just (Loc l _) -> any isFree (regsOfLoc l) && taken tassig
+                  Nothing        -> False
+                taken = anyUFM (\ (Loc l _) -> any (`elem` srcRegs)
+                                                   (regsOfLoc l))
+                srcRegs = case src of
+                  RegReal rr -> [rr]
+                  _ | Just (Loc l _) <- lookupUFM assig src -> regsOfLoc l
+                    | otherwise -> []
+                isFree r = r `elem` frGetFreeRegs (targetClassOfRealReg platform r)
+                                                  freeregs
     case takeRegRegMoveInstr platform instr of
         Just (src,dst)  | Just fmt <- lookupReg src (liveDieRead live),
                           isVirtualReg dst,
                           not (dst `elemUFM` assig),
-                          isRealReg src || isInReg src assig -> do
+                          isRealReg src || isInReg src assig,
+                          not (wantedElsewhere src dst) -> do
            case src of
               RegReal rr -> setAssigR (addToUFM assig dst (Loc (InReg rr) fmt))
                 -- if src is a fixed reg, then we just map dest to this
@@ -1372,10 +1480,41 @@ from which 'firstFreeInOrder' takes the first that is free:
 Preferring every register the variable was assigned to, not only the first, was
 tried and turned out to barely matter.
 
-Where none of them is free, the first free register is taken, those the current
-block moves another virtual register into where it dies coming last: a variable
+The fallback below leaves out, where others remain, the free registers the
+current block moves another virtual register into where it dies: a variable
 given one would keep the other from being computed in it, or have to move out of
 its way.
+
+On x86-64 the fallback also leaves out, where others remain, the free registers
+that the blocks up to three jumps ahead that the variable is live into move
+another virtual register into where it dies, the variable's own such
+destinations excepted: given one, the variable would keep the other from
+being computed in it, or have to move out of its way there (IntMap's union
+and fromAscList in containers' benchmarks). Not for a variable live across
+a C call, which leaves its register at the call anyway: a block after the
+call, such as k-nucleotide's copy of a new key, would put it on an argument
+register that the call's own setup needs. Nor where a jump target not yet
+recorded that it is live into has other predecessors, those after a failed
+heap or stack check not counted: its register there binds them all, and
+a walk from one of them reaching a rare exit put megaparsec's manyTill
+counter on a register its hot predecessor holds.
+
+Where none of them is free, the allocator takes a free register: the first, and
+on x86-64 ('fallbackReg') the first in this order: first those no instruction
+writes while the virtual register is live past the write, such as %r14 and %rbx
+for a value live across a C call on System V, so that the value need not move
+out of their way; and among those, as among the rest, R1's register, %rbx, last,
+as an evaluation and a return write it: a value given it may have to move out of
+their way, and a loop variable given it at the loop's entry moves at every
+iteration (#27981). On x86-64, for a virtual register with preferences, the free
+registers that a jump target's recorded assignment gives any virtual register
+are left out where others remain, its own there being among its preferences.
+This applies to the fallback only: a free preferred register is taken even where
+a recorded jump target gives it to another virtual register, as leaving those
+out too made more join fixups cyclic and cost containers 0.13% and vector 0.11%
+more instructions (nofib's puzzle 2.7%). Leaving them out for one with no
+preferences too gains nothing measured and costs compile time, the list of
+registers to leave out then being built for every such allocation.
 -}
 
 -- | Of the given free registers of a class, the one to take for the
@@ -1383,18 +1522,17 @@ its way.
 -- registers, best first, that is free, else the first free one in the order
 -- Note [Register preferences in the linear allocator] gives.
 firstFreeInOrder :: Unique -> [RealReg] -> RegM freeRegs RealReg
-firstFreeInOrder _ [] = panic "firstFreeInOrder: no free register"
-firstFreeInOrder u free@(r0 : _) = do
+firstFreeInOrder u free = do
   bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
   cur <- getAssigR :: RegM freeRegs (RegMap Loc)
-  RA_Context { rc_jumpLocs  = locs
-             , rc_moveDests = moves
-             , rc_claims    = claims
-             , rc_wideDests = wide
-             , rc_block     = blk
-             , rc_succs     = succs
-             , rc_live      = live
-             , rc_dying     = dying } <- getContextR
+  ctx@RA_Context { rc_jumpLocs  = locs
+                 , rc_moveDests = moves
+                 , rc_claims    = claims
+                 , rc_wideDests = wide
+                 , rc_block     = blk
+                 , rc_succs     = succs
+                 , rc_live      = live
+                 , rc_dying     = dying } <- getContextR
   let !jl = jumpLocRegs u locs
       mv = lookupUFM_Directly moves u
       !firstUsed = lookupFirstUsed u bassig
@@ -1435,11 +1573,11 @@ firstFreeInOrder u free@(r0 : _) = do
              _ -> Nothing
       -- the first-used register, but none where stale gives a register,
       -- and reached's where it gives one
-      fu | isJust stale   = Nothing
-         | isJust reached = reached
-         | otherwise      = firstUsed
+      !fu | isJust stale   = Nothing
+          | isJust reached = reached
+          | otherwise      = firstUsed
       movesInto w b = case mapLookup b dying of
-        Just ds -> lookupUFM_Directly ds u == Just w
+        Just (DyingMoves _ ds) -> lastDest u ds == Just w
         Nothing -> False
       meets = staleMeets u live succs bassig
       succsOf b = mapFindWithDefault [] b succs
@@ -1461,6 +1599,16 @@ firstFreeInOrder u free@(r0 : _) = do
       others = nonDetStrictFoldUFM_Directly
                  (\v (RealRegSingle n) b -> if v == u then b else setBit b n)
                  (0 :: Word64) moves
+      -- (the list itself where the block moves no other vreg: filtered there
+      -- too, it made the compiler run 0.17% more instructions and allocate
+      -- 0.37% more compiling T3294 at -O0, 0.091% and 0.17% more at -O and
+      -- 0.090% and 0.17% more at -O2, on GHC 10.1.20261108)
+      free' | others == 0 = free
+            | otherwise   = case filter (\(RealRegSingle n) -> not (testBit others n)) free of
+                              [] -> free
+                              fs -> fs
+      noPrefs = null jl && isNothing mv && isNothing fu
+                && maybe True claimed (lookupUFM_Directly wide u)
       chosen = case find isFree jl of
                  Nothing -> pick mv (pick fu wdFree)
                  found   -> found
@@ -1468,15 +1616,174 @@ firstFreeInOrder u free@(r0 : _) = do
     Just w | chosen == Just w -> setBlockAssigR (markStaleFirst u bassig)
     _                         -> return ()
   return $! case chosen of
-    Just r -> r
-    -- (the first free register itself where the block moves no other vreg:
-    -- filtered there too, the free registers made the compiler run 0.15% more
-    -- instructions and allocate 0.32% more compiling T3294 at -O0 when this
-    -- was added)
-    Nothing | others == 0 -> r0
-            | otherwise   -> case filter (\(RealRegSingle n) -> not (testBit others n)) free of
-                               r : _ -> r
-                               []    -> r0
+    Just r  -> r
+    Nothing -> case rc_clobbers ctx of
+      Just clobbers -> fallbackReg ctx clobbers bassig noPrefs u free'
+      Nothing       -> case free' of
+        r : _ -> r
+        []    -> panic "firstFreeInOrder: no free register"
+
+-- | On x86-64, of the given free registers, the one 'firstFreeInOrder' takes
+-- for the virtual register with the given unique where none of its preferences
+-- is free, given regClobbers' map ('rc_clobbers'), the block assignment
+-- and whether it has none: the first in the order
+-- Note [Register preferences in the linear allocator] gives.
+fallbackReg :: RA_Context -> UniqFM VirtualReg Word64
+            -> BlockAssignment freeRegs -> Bool -> Unique -> [RealReg]
+            -> RealReg
+fallbackReg RA_Context { rc_jumpLocs = locs, rc_block = blk, rc_succs = succs
+                       , rc_joins = joins, rc_live = live, rc_dying = dying }
+            clobbers bassig noPrefs u free@(r0 : _)
+  = let !r1 = r1Reg
+        !cl = lookupWithDefaultUFM_Directly clobbers 0 u
+        kept (RealRegSingle n) = not (testBit cl n)
+        -- the free ones to choose from: for one with preferences, those no jump
+        -- target's assignment gives a virtual register if any remain, and all
+        -- of them otherwise
+        fs | noPrefs   = free
+           | otherwise = case filter unreserved free of
+                           []  -> free
+                           fs' -> fs'
+        -- and of those, the ones the blocks up to three jumps ahead do not
+        -- move another vreg into where it dies while the vreg is live into
+        -- them, if any remain: given one, the vreg would keep that one from
+        -- being computed in it, or have to move out of its way. Not for a vreg
+        -- live across a C call, which leaves its register there anyway, nor
+        -- where a jump target not yet recorded that the vreg is live into has
+        -- other predecessors, which then have to give it the same register
+        !ahead | cl .&. cCallClobbers == cCallClobbers = 0
+               | otherwise = movedAhead
+        !wanted = ahead .&. complement (ahead `shiftR` 32)
+        ok (RealRegSingle n) = not (testBit wanted n)
+        joinNext = any (\b -> b `setMember` joins && liveInto u live b
+                              && isNothing (lookupBlockAssignment b bassig))
+                       (succsOf blk)
+        -- the real registers that the blocks up to three jumps ahead of the
+        -- current one, those the vreg is live into, move vregs into where they
+        -- die, as bits by register number, and above them, shifted by 32, those
+        -- they move the vreg itself into (three jumps, bounding the walk,
+        -- is arbitrary, and may be raised where a case needs more at little
+        -- cost to the compiler: lifted to 1000, compiling 50 to 400 loops in
+        -- sequence ran 1.01 to 1.11 times the instructions, the excess growing
+        -- as N squared)
+        movedAhead :: Word64
+        movedAhead = fst (aheadWalks u live succs dying 3 0 mapEmpty
+                                     (succsOf blk))
+        succsOf b = mapFindWithDefault [] b succs
+        unreserved (RealRegSingle n) = not (testBit reserved n)
+        reserved = foldl' (\b (RealRegSingle n) -> setBit b n) (0 :: Word64)
+                     [ r | assig <- locs, Loc loc _ <- nonDetEltsUFM assig
+                         , r <- regsOfLoc loc ]
+        -- those no instruction writes while the vreg is live past it, then the
+        -- rest, R1's last in each part
+        part p = [ r | r <- fs, p r, r /= r1 ] ++ [ r1 | r1 `elem` fs, p r1 ]
+        -- INLINE so that the lists fuse: let-bound and used more than once,
+        -- part is otherwise not inlined and builds both lists, which made the
+        -- compiler allocate 0.66% more compiling T3294 at -O0, 0.22% more at -O
+        -- and 0.21% more at -O2, on GHC 10.1.20261108
+        {-# INLINE part #-}
+        -- The choice stays the list's own box, not a new one per call. So
+        -- r /= r1 comes last in part: tested first, against a literal, it
+        -- leaves the element to be rebuilt. And rd is returned under lazy:
+        -- the result being a small product, demand analysis would otherwise
+        -- unbox rd (Note [Unboxed demand on function bodies returning small
+        -- products] in GHC.Core.Opt.DmdAnal), and worker/wrapper box it anew.
+        -- Together they save 0.070% of T3294's compile allocation at -O0,
+        -- 0.023% at -O and 0.022% at -O2, on GHC 10.1.20261108; neither alone
+        -- saved any at -O0, on GHC 10.1.20261103.
+        rd = fromMaybe r0 (listToMaybe (part kept ++ part (not . kept)))
+    in if ok rd then lazy rd
+       else case listToMaybe (part (\r -> ok r && kept r)
+                              ++ part (\r -> ok r && not (kept r))) of
+              Just r | not joinNext -> r
+              _                     -> lazy rd
+fallbackReg _ _ _ _ _ [] = panic "fallbackReg: no free register"
+
+-- | R1's register on x86-64, which an evaluation and a return write.
+r1Reg :: RealReg
+r1Reg = fromMaybe (panic "r1Reg: R1 has no register")
+                  (X86_64.globalRegMaybe (VanillaReg 1))
+
+-- | The registers of x86-64 that a C call writes on both System V and Windows,
+-- rax, rcx, rdx and r8 to r11, as bits by register number: a vreg whose
+-- clobbering writes include all of them is live across a C call.
+cCallClobbers :: Word64
+cCallClobbers = foldl' setBit 0 [0, 2, 3, 8, 9, 10, 11]
+
+-- | fallbackReg's walk: from the given blocks, up to the given number
+-- of jumps, through the blocks the vreg with the given unique is live into,
+-- the registers their moves into real registers where vregs die go to, as bits
+-- by register number, and above them, shifted by 32, those of the vreg's own
+-- such moves, or'ed into the given ones. The walk keeps, beside them, for each
+-- block it walks on from with two jumps or more left, the most jumps it had
+-- left there, set before that walk, and walks on from the block again only
+-- with more: a walk with fewer jumps reaches only blocks the walk with more
+-- reaches, and or'ing is idempotent and commutative, so the result is the
+-- same, and a block is walked on from with two jumps or more left at most once
+-- for each number of them, not once for each path to it, whose number grows
+-- exponentially with the jumps. Top-level: local to fallbackReg, the walk made
+-- the compiler allocate 0.18% more compiling T3294 at -O0, 0.059% more at -O
+-- and 0.055% more at -O2, on GHC 10.1.20261108.
+aheadWalks :: Unique -> BlockMap Regs -> LabelMap [BlockId]
+           -> LabelMap DyingMoves
+           -> Int -> Word64 -> LabelMap Int -> [BlockId]
+           -> (Word64, LabelMap Int)
+aheadWalks !_ _ _ _ !_ !acc !seen [] = (acc, seen)
+aheadWalks u live succs dying d acc seen (b : bs)
+  | not (liveInto u live b) = aheadWalks u live succs dying d acc seen bs
+  | otherwise
+  = let !acc' = case mapLookup b dying of
+                  Just (DyingMoves m ds) -> acc .|. m .|. lastDestBit u ds
+                  Nothing                -> acc
+    in if d <= 1 || mapFindWithDefault 0 b seen >= d
+       then aheadWalks u live succs dying d acc' seen bs
+       else case aheadWalks u live succs dying (d - 1) acc'
+                            (if d > 2 then mapInsert b d seen else seen)
+                            (mapFindWithDefault [] b succs) of
+              (acc'', seen') -> aheadWalks u live succs dying d acc'' seen' bs
+
+-- | The blocks that two blocks or more jump to, the jumps from the given
+-- blocks not counted (on x86-64, those that follow a failed heap or stack
+-- check).
+joinBlocks :: LabelSet -> BlockMap [BlockId] -> LabelSet
+joinBlocks cold js = jumpedToTwice (\b -> not (b `setMember` cold)) js
+
+-- | The blocks that two blocks or more of those passing the test jump to
+jumpedToTwice :: (BlockId -> Bool) -> BlockMap [BlockId] -> LabelSet
+jumpedToTwice from js = case mapFoldlWithKey step (Seen setEmpty setEmpty) js of
+  Seen _ twice -> twice
+  where
+    step seen b ds
+      | from b    = targets seen [] ds
+      | otherwise = seen
+    -- each block's targets counted once, those it jumps to twice included
+    targets seen _ [] = seen
+    targets seen@(Seen once twice) prev (d : more)
+      | d `elem` prev      = targets seen prev more
+      | d `setMember` once = targets (Seen once (setInsert d twice)) (d : prev) more
+      | otherwise          = targets (Seen (setInsert d once) twice) (d : prev) more
+{-# INLINE jumpedToTwice #-}
+
+-- | The blocks jumped to by some block, and by two or more.
+data Seen = Seen !LabelSet !LabelSet
+
+-- | The block's moves into real registers where vregs die, added to the map
+-- where it has any.
+dyingIn :: Instruction instr => Platform -> LabelMap DyingMoves
+        -> LiveBasicBlock instr -> LabelMap DyingMoves
+dyingIn platform acc (BasicBlock b instrs)
+  = case [ (vr, rr) | (vr, RegReal rr) <- dyingMoves platform instrs ] of
+      []  -> acc
+      ms  -> mapInsert b (DyingMoves (foldl' (\m (_, RealRegSingle n) -> setBit m n) 0 ms) ms) acc
+
+-- | The register of the last of the moves given that moves the vreg with the
+-- given unique, as 'listToUFM' keeps a vreg's last entry.
+lastDest :: Unique -> [(VirtualReg, RealReg)] -> Maybe RealReg
+lastDest u = foldl' (\acc (v, r) -> if getUnique v == u then Just r else acc) Nothing
+
+-- | As 'lastDest', the register as a bit above 32 by its number, or 0.
+lastDestBit :: Unique -> [(VirtualReg, RealReg)] -> Word64
+lastDestBit u ds = maybe 0 (\(RealRegSingle n) -> bit (n + 32)) (lastDest u ds)
 
 -- | What 'liveWalk' does at a block: stop with a result, take the block
 -- without its successors, or take it and queue them.
@@ -1537,10 +1844,6 @@ staleMeets u live succs bassig region fb
       | b `setMember` region                              = Done True
       | b /= fb, Just _ <- lookupBlockAssignment b bassig = Skip
       | otherwise                                         = Expand
-
--- | Whether the vreg with the given unique is live into the block.
-liveInto :: Unique -> BlockMap Regs -> BlockId -> Bool
-liveInto !u live b = elemUniqSet_Directly u (getRegs (mapFindWithDefault noRegs b live))
 
 -- | 'jumpLocRegs' u locs: the registers the recorded jump-target assignments
 -- locs give the virtual register with unique u, in order.
