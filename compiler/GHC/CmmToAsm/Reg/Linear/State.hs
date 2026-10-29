@@ -23,6 +23,9 @@ module GHC.CmmToAsm.Reg.Linear.State (
         getBlockAssigR,
         setBlockAssigR,
 
+        getContextR,
+        setBlockContextR,
+
         setDeltaR,
         getDeltaR,
 
@@ -47,8 +50,10 @@ import GHC.CmmToAsm.Config
 import GHC.Cmm.BlockId
 
 import GHC.Platform
+import GHC.Platform.Reg
 import GHC.Types.Unique
 import GHC.Types.Unique.DSM
+import GHC.Types.Unique.FM
 import GHC.Exts (oneShot)
 
 import GHC.Utils.Monad.StrictState as Strict
@@ -71,14 +76,14 @@ mkRegM f = RegM (oneShot f)
 
 -- | Get native code generator configuration
 getConfig :: RegM a NCGConfig
-getConfig = mkRegM $ \s -> RA_Result s (ra_config s)
+getConfig = mkRegM $ \s -> RA_Result s (rc_config (ra_context s))
 
 -- | Get target platform from native code generator configuration
 getPlatform :: RegM a Platform
 getPlatform = ncgPlatform <$> getConfig
 
 -- | Run a computation in the RegM register allocator monad.
-runR    :: NCGConfig
+runR    :: RA_Context
         -> BlockAssignment freeRegs
         -> freeRegs
         -> RegMap Loc
@@ -87,7 +92,7 @@ runR    :: NCGConfig
         -> RegM freeRegs a
         -> (BlockAssignment freeRegs, StackMap, RegAllocStats, a, DUniqSupply)
 
-runR config block_assig freeregs assig stack us thing =
+runR ctx block_assig freeregs assig stack us thing =
   case unReg thing
         (RA_State
                 { ra_blockassig = block_assig
@@ -97,8 +102,8 @@ runR config block_assig freeregs assig stack us thing =
                 , ra_stack      = stack
                 , ra_us         = us
                 , ra_spills     = []
-                , ra_config     = config
-                , ra_fixups     = [] })
+                , ra_fixups     = []
+                , ra_context    = ctx })
    of
         RA_Result state returned_thing
          ->  (ra_blockassig state, ra_stack state, makeRAStats state, returned_thing, ra_us state)
@@ -117,7 +122,7 @@ spillR :: Instruction instr
 
 spillR reg temp = mkRegM $ \s ->
   let (stack1,slots) = getStackSlotFor (ra_stack s) (regWithFormat_format reg) temp
-      instr  = mkSpillInstr (ra_config s) reg (ra_delta s) slots
+      instr  = mkSpillInstr (rc_config (ra_context s)) reg (ra_delta s) slots
   in
   RA_Result s{ra_stack=stack1} (instr,slots)
 
@@ -126,7 +131,7 @@ loadR :: Instruction instr
       => RegWithFormat -> Int -> RegM freeRegs [instr]
 
 loadR reg slot = mkRegM $ \s ->
-  RA_Result s (mkLoadInstr (ra_config s) reg (ra_delta s) slot)
+  RA_Result s (mkLoadInstr (rc_config (ra_context s)) reg (ra_delta s) slot)
 
 getFreeRegsR :: RegM freeRegs freeRegs
 getFreeRegsR = mkRegM $ \ s@RA_State{ra_freeregs = freeregs} ->
@@ -152,6 +157,13 @@ setBlockAssigR :: BlockAssignment freeRegs -> RegM freeRegs ()
 setBlockAssigR assig = mkRegM $ \ s ->
   RA_Result s{ra_blockassig = assig} ()
 
+getContextR :: RegM freeRegs RA_Context
+getContextR = mkRegM $ \ s@RA_State{ra_context = ctx} -> RA_Result s ctx
+
+setBlockContextR :: UniqFM VirtualReg RealReg -> RegM freeRegs ()
+setBlockContextR dests = mkRegM $ \ s@RA_State{ra_context = ctx} ->
+  RA_Result s{ra_context = ctx{rc_moveDests = dests}} ()
+
 setDeltaR :: Int -> RegM freeRegs ()
 setDeltaR n = mkRegM $ \ s ->
   RA_Result s{ra_delta = n} ()
@@ -169,7 +181,7 @@ getUniqueR = mkRegM $ \s ->
 --   the statistics -ddump-asm-stats prints, the only reader of the reasons.
 recordSpill :: SpillReason -> RegM freeRegs ()
 recordSpill spill
-    = mkRegM $ \s -> if ncgDumpAsmStats (ra_config s)
+    = mkRegM $ \s -> if ncgDumpAsmStats (rc_config (ra_context s))
                        then RA_Result (s { ra_spills = spill : ra_spills s }) ()
                        else RA_Result s ()
 
