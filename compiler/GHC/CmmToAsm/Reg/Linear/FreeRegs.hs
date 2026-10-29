@@ -1,6 +1,7 @@
 module GHC.CmmToAsm.Reg.Linear.FreeRegs (
     FR(..),
     allFreeRegs,
+    allocateRealRegs,
     maxSpillSlots
 )
 where
@@ -14,6 +15,9 @@ import qualified GHC.Platform.Reg.Class.Separate  as Separate
 import qualified GHC.Platform.Reg.Class.NoVectors as NoVectors
 
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Format (RegWithFormat (..))
+import GHC.CmmToAsm.Reg.Regs (Regs (..))
+import GHC.Types.Unique.Set (nonDetStrictFoldUniqSet)
 import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique (Unique)
@@ -62,7 +66,7 @@ class Show freeRegs => FR freeRegs where
     -- its preferences is free, given the allocator's context and block
     -- assignment, the Bool being whether it has none
     -- ('GHC.CmmToAsm.Reg.Linear.firstFreeInOrder'): by default the first.
-    frFallbackReg :: RA_Context -> BlockAssignment freeRegs -> Bool -> Unique
+    frFallbackReg :: RA_Context freeRegs -> BlockAssignment -> Bool -> Unique
                   -> [RealReg] -> RealReg
     frFallbackReg _ _ _ _ (r : _) = r
     frFallbackReg _ _ _ _ []      = panic "frFallbackReg: no free register"
@@ -114,6 +118,17 @@ allFreeRegs plat fr = foldMap (\rcls -> frGetFreeRegs rcls fr) allRegClasses
         Unified   ->   Unified.allRegClasses
         Separate  ->  Separate.allRegClasses
         NoVectors -> NoVectors.allRegClasses
+
+-- | Mark the real registers among the given ones allocated, such as those
+-- live into a block.
+allocateRealRegs :: FR freeRegs => Regs -> freeRegs -> freeRegs
+allocateRealRegs regs fr
+  = nonDetStrictFoldUniqSet alloc fr (getRegs regs)
+    -- See Note [Unique Determinism and code generation]
+  where
+    alloc r acc = case regWithFormat_reg r of
+      RegReal rr -> frAllocateReg rr acc
+      _          -> acc
 
 maxSpillSlots :: NCGConfig -> Int
 maxSpillSlots config = case platformArch (ncgPlatform config) of

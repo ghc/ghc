@@ -64,7 +64,7 @@ allocateReg (RealRegSingle r) (FreeRegs f)
 -- x86-64: of the free registers, the first in the order
 -- Note [Register preferences in the linear allocator] in
 -- GHC.CmmToAsm.Reg.Linear gives.
-fallbackReg :: RA_Context -> BlockAssignment FreeRegs -> Bool -> Unique
+fallbackReg :: RA_Context FreeRegs -> BlockAssignment -> Bool -> Unique
             -> [RealReg] -> RealReg
 fallbackReg RA_Context { rc_jumpLocs = locs, rc_block = blk, rc_succs = succs
                        , rc_joins = joins, rc_live = live, rc_dying = dying
