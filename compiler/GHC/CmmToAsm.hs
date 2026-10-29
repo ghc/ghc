@@ -499,10 +499,13 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 runUniqueDSM usGen
                         $ mapM (cmmTopLiveness livenessCfg platform) native
 
+        -- the dump shows when registers are born, liveBorn, which the linear
+        -- allocator does not use and the graph allocator fills in itself
         putDumpFileMaybe logger
                 Opt_D_dump_asm_liveness "Liveness annotations added"
                 FormatCMM
-                (vcat $ map (pprLiveCmmDecl platform) withLiveness)
+                (vcat $ map (pprLiveCmmDecl platform . regLivenessBorn)
+                            withLiveness)
 
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear, raStats, stack_updt_blks) <-
