@@ -783,8 +783,12 @@ regUsageOfInstr platform instr
 
     mkRU :: [RegWithFormat] -> [RegWithFormat] -> RegUsage
     mkRU src dst = src' `seq` dst' `seq` RU src' dst'
-        where src' = filter (interesting platform . regWithFormat_reg) src
-              dst' = filter (interesting platform . regWithFormat_reg) dst
+        where src' = keep src
+              dst' = keep dst
+              -- the list itself where every register is interesting, so
+              -- that it is not copied
+              keep rs | all (interesting platform . regWithFormat_reg) rs = rs
+                      | otherwise = filter (interesting platform . regWithFormat_reg) rs
 
     addrFmt = archWordFormat (target32Bit platform)
     mk :: Format -> Reg -> RegWithFormat
