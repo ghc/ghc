@@ -108,6 +108,7 @@ import GHC.CmmToAsm.Reg.Linear.Stats
 import GHC.CmmToAsm.Reg.Linear.JoinToTargets
 import qualified GHC.CmmToAsm.Reg.Linear.PPC     as PPC
 import qualified GHC.CmmToAsm.Reg.Linear.X86     as X86
+import qualified GHC.CmmToAsm.X86.Instr          as X86 (Instr)
 import qualified GHC.CmmToAsm.Reg.Linear.X86_64  as X86_64
 import qualified GHC.CmmToAsm.Reg.Linear.AArch64 as AArch64
 import qualified GHC.CmmToAsm.Reg.Linear.RV64    as RV64
@@ -146,7 +147,41 @@ import Control.Monad
 -- -----------------------------------------------------------------------------
 -- Top level of the register allocator
 
+{- Note [Specialising the linear allocator]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The allocator is overloaded in the instructions ('Instruction') and in the free
+registers ('FR'), so on its own it calls every instruction method through a
+dictionary. On x86-64 it runs specialised to x86's instructions: 'regAlloc' has
+a SPECIALISE pragma, and the specialiser copies what it calls, down to
+'linearRegAlloc'' at x86-64's free registers. The code generator in
+"GHC.CmmToAsm" is specialised for each target, and the specialisation's rule
+fires in the copy for x86 only if 'regAlloc' is not inlined there first, hence
+its NOINLINE [0], with which the rule fires from phase 0 on. A phase on the
+SPECIALISE pragma alone does not suffice: cast worker/wrapper makes 'regAlloc'
+an alias of its body, cast to 'UniqDSM', and the alias inlines from the
+function's own phase, whatever its rules' (mkCastWrapperInlinePrag in
+"GHC.Core.Opt.Simplify.Iteration"). 'linearRegAlloc' passes the other targets'
+free registers to 'other', which is NOINLINE, so that they get no copy of the
+allocator: the specialiser does not specialise a NOINLINE function. With 'go' at
+every target, the compiler's code was 2.1 MB larger and it allocated 0.064% more
+compiling !16269's CmmDiamondChain at -O0 and 0.052% more at -O and -O2, on GHC
+10.1.20261108.
+'cmmTopLiveness', in "GHC.CmmToAsm.Reg.Liveness", is specialised to x86's
+instructions likewise. Importing "GHC.CmmToAsm.X86" for its instance makes no
+import cycle: of the register allocator's modules, the x86 code generator
+imports only "GHC.CmmToAsm.Reg.Target". Without the two SPECIALISE pragmas, the
+compiler ran 3.3% more instructions and allocated 2.0% more compiling T3294 at
+-O0, 1.2% and 0.66% more at -O and 1.2% and 0.64% more at -O2, and its code was
+516 KB smaller; without the allocator's alone, 2.5% and 1.7% more at -O0,
+0.89% and 0.55% at -O and 0.87% and 0.54% at -O2, and 455 KB, on GHC
+10.1.20261108. Without the liveness pass's alone, the compiler ran 0.87% more
+instructions and allocated 0.32% more compiling T3294 at -O0, 0.33% and 0.11%
+more at -O and 0.32% and 0.11% more at -O2, and as much with INLINABLE in its
+place, on GHC 10.1.20261108.
+-}
+
 -- Allocate registers
+{-# NOINLINE [0] regAlloc #-}  -- See Note [Specialising the linear allocator]
 regAlloc
         :: Instruction instr
         => NCGConfig
@@ -156,6 +191,10 @@ regAlloc
                                 -- beyond maxSpillSlots
                    , Maybe RegAllocStats
                    )
+{-# SPECIALISE regAlloc
+      :: NCGConfig -> LiveCmmDecl statics X86.Instr
+      -> UniqDSM (NatCmmDecl statics X86.Instr, Maybe Int, Maybe RegAllocStats)
+  #-}
 
 regAlloc _ (CmmData sec d)
         = return
@@ -215,34 +254,39 @@ linearRegAlloc
 
 linearRegAlloc config entry_ids block_live sccs
  = case platformArch platform of
-      ArchX86        -> go $ (frInitFreeRegs platform :: X86.FreeRegs)
+      ArchX86        -> other $ (frInitFreeRegs platform :: X86.FreeRegs)
       ArchX86_64     -> go $ (frInitFreeRegs platform :: X86_64.FreeRegs)
       ArchS390X      -> panic "linearRegAlloc ArchS390X"
-      ArchPPC        -> go $ (frInitFreeRegs platform :: PPC.FreeRegs)
+      ArchPPC        -> other $ (frInitFreeRegs platform :: PPC.FreeRegs)
       ArchARM _ _ _  -> panic "linearRegAlloc ArchARM"
-      ArchAArch64    -> go $ (frInitFreeRegs platform :: AArch64.FreeRegs)
-      ArchPPC_64 _   -> go $ (frInitFreeRegs platform :: PPC.FreeRegs)
+      ArchAArch64    -> other $ (frInitFreeRegs platform :: AArch64.FreeRegs)
+      ArchPPC_64 _   -> other $ (frInitFreeRegs platform :: PPC.FreeRegs)
       ArchAlpha      -> panic "linearRegAlloc ArchAlpha"
       ArchMipseb     -> panic "linearRegAlloc ArchMipseb"
       ArchMipsel     -> panic "linearRegAlloc ArchMipsel"
-      ArchRISCV64    -> go (frInitFreeRegs platform :: RV64.FreeRegs)
-      ArchLoongArch64 -> go $ (frInitFreeRegs platform :: LA64.FreeRegs)
+      ArchRISCV64    -> other (frInitFreeRegs platform :: RV64.FreeRegs)
+      ArchLoongArch64 -> other $ (frInitFreeRegs platform :: LA64.FreeRegs)
       ArchJavaScript -> panic "linearRegAlloc ArchJavaScript"
       ArchWasm32     -> panic "linearRegAlloc ArchWasm32"
       ArchUnknown    -> panic "linearRegAlloc ArchUnknown"
  where
-  go :: (FR regs, Outputable regs)
+  go :: FR regs
      => regs -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
   go f = linearRegAlloc' config f entry_ids block_live sccs
+  -- See Note [Specialising the linear allocator]
+  other :: FR regs
+        => regs -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
+  other = go
+  {-# NOINLINE other #-}
   platform = ncgPlatform config
 
--- | Constraints on the instruction instances used by the
+-- | Constraints on the free-register and instruction instances used by the
 -- linear allocator.
-type OutputableRegConstraint freeRegs instr =
-        (FR freeRegs, Outputable freeRegs, Instruction instr)
+type RegAllocConstraint freeRegs instr =
+        (FR freeRegs, Instruction instr)
 
 linearRegAlloc'
-        :: OutputableRegConstraint freeRegs instr
+        :: RegAllocConstraint freeRegs instr
         => NCGConfig
         -> freeRegs
         -> [BlockId]                    -- ^ entry points
@@ -258,7 +302,7 @@ linearRegAlloc' config initFreeRegs entry_ids block_live sccs
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
 
-linearRA_SCCs :: OutputableRegConstraint freeRegs instr
+linearRA_SCCs :: RegAllocConstraint freeRegs instr
               => [BlockId]
               -> BlockMap Regs
               -> [NatBasicBlock instr]
@@ -293,7 +337,7 @@ linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
    more sanity checking to guard against this eventuality.
 -}
 
-process :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
+process :: forall freeRegs instr. (RegAllocConstraint freeRegs instr)
         => [BlockId]
         -> BlockMap Regs
         -> [GenBasicBlock (LiveInstr instr)]
@@ -333,7 +377,7 @@ process entry_ids block_live =
 -- | Do register allocation on this basic block
 --
 processBlock
-        :: OutputableRegConstraint freeRegs instr
+        :: RegAllocConstraint freeRegs instr
         => BlockMap Regs              -- ^ live regs on entry to each basic block
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
@@ -380,7 +424,7 @@ initBlock id block_live
 
 -- | Do allocation for a sequence of instructions.
 linearRA
-        :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
+        :: forall freeRegs instr. (RegAllocConstraint freeRegs instr)
         => BlockMap Regs                      -- ^ map of what vregs are live on entry to each block.
         -> BlockId                              -- ^ id of the current block, for debugging.
         -> [LiveInstr instr]                    -- ^ liveness annotated instructions in this block.
@@ -405,7 +449,7 @@ linearRA block_live block_id = go [] []
 
 -- | Do allocation for a single instruction.
 raInsn
-        :: OutputableRegConstraint freeRegs instr
+        :: RegAllocConstraint freeRegs instr
         => BlockMap Regs                         -- ^ map of what vregs are live on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> BlockId                              -- ^ the id of the current block, for debugging
@@ -493,7 +537,7 @@ isInReg src assig
 
 
 genRaInsn :: forall freeRegs instr.
-             (OutputableRegConstraint freeRegs instr)
+             (RegAllocConstraint freeRegs instr)
           => BlockMap Regs
           -> [instr]
           -> BlockId

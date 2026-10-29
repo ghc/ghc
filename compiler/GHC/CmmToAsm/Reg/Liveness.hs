@@ -38,6 +38,8 @@ import GHC.Prelude
 
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Instr
+import qualified GHC.CmmToAsm.X86.Instr as X86 (Instr)
+import GHC.CmmToAsm.X86 ()  -- instance Instruction X86.Instr
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
@@ -680,6 +682,8 @@ patchRegsLiveInstr platform patchF li
                           -- See Note [Unique Determinism and code generation]
 
 --------------------------------------------------------------------------------
+-- NOINLINE [0] and SPECIALISE: see Note [Specialising the linear allocator]
+-- in "GHC.CmmToAsm.Reg.Linear".
 -- | Convert a NatCmmDecl to a LiveCmmDecl, with liveness information
 
 cmmTopLiveness
@@ -688,6 +692,10 @@ cmmTopLiveness
         -> Platform
         -> NatCmmDecl statics instr
         -> UniqDSM (LiveCmmDecl statics instr)
+{-# NOINLINE [0] cmmTopLiveness #-}
+{-# SPECIALISE cmmTopLiveness
+      :: Maybe CFG -> Platform -> NatCmmDecl statics X86.Instr
+      -> UniqDSM (LiveCmmDecl statics X86.Instr) #-}
 cmmTopLiveness cfg platform cmm
         = regLiveness platform $ natCmmTopToLive cfg cmm
 
