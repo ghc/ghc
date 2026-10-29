@@ -948,15 +948,15 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
           loopCount n = length $ nub . map fst . filter (setMember n . snd) $ bodies
       in  map (\n -> (n, loopCount n)) $ nodes :: [(BlockId, Int)]
 
+    -- each block but the root to the blocks dominating it, itself included
+    -- and the root left out, so that no edge into the root is a back edge
     mkDomMap :: Tree BlockId -> LabelMap LabelSet
-    mkDomMap root = mapFromList $ go setEmpty root
+    mkDomMap (Node _ kids) = foldl' (go setEmpty) mapEmpty kids
       where
-        go :: LabelSet -> Tree BlockId -> [(Label,LabelSet)]
-        -- each block with its dominators, itself included, the root left out
-        -- of every set, so that every self loop but the root's is a back edge
-        go doms (Node lbl kids)
-          = (lbl, doms)
-            : concatMap (\n -> go (setInsert (rootLabel n) doms) n) kids
+        go :: LabelSet -> LabelMap LabelSet -> Tree BlockId -> LabelMap LabelSet
+        go !parents !acc (Node lbl kids')
+          = let !doms = setInsert lbl parents
+            in  foldl' (go doms) (mapInsert lbl doms acc) kids'
 
 -- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
 newtype BlockNode (e :: Extensibility) (x :: Extensibility) = BN (BlockId,[BlockId])
