@@ -247,17 +247,24 @@ newPendingReply pipe k = do
 --
 -- See Note [Exceptions during serialization] about exceptions the 'Put' argument might raise.
 remoteAsyncReq :: Pipe -> Put -> (Maybe InboxId) -> IO (Either SomeException LB.ByteString)
-remoteAsyncReq pipe msg ii = newPendingReply pipe $ \ uq wv -> do
+remoteAsyncReq pipe msg ii = newPendingReply pipe $ \ uq wv ->
+  -- We might send a Cancel even if the request never got sent, but it will just
+  -- get ignored in that case.
+  handle (\e -> sendCancelMaybe uq e >> throwIO e) $ do
+
   -- Write request
   writePipe pipe (Request uq ii (runPut msg))
 
   -- Block waiting for reply
   atomically (takeTMVar wv)
-    `onException`
-       atomically (do
-         -- we don't wait for Cancel to be written on the pipe,
-         -- and won't get a reply: nowhere to report it anyway.
-         writePipeAsync pipe (Cancel uq))
+  where
+    sendCancelMaybe uq e
+      | Just PipeWriteClosedException <- fromException e = pure ()
+      | otherwise = sendCancel uq
+    sendCancel uq = void . atomically $ do
+      -- we don't wait for Cancel to be written on the pipe,
+      -- and won't get a reply: nowhere to report it anyway.
+      writePipeAsync pipe (Cancel uq)
 
 -- | Receive a single asynchronous request and send a matching reply
 -- asynchronously (the handler may fork a computation that eventually replies
