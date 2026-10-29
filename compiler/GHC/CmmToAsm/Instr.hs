@@ -147,6 +147,16 @@ class Instruction instr where
                 -> Reg -- ^ destination register
                 -> instr
 
+        -- | Swap two registers' values, whole, where one instruction can, or
+        --      Nothing; the format given is the first register's.
+        mkRegRegSwapInstr
+                :: NCGConfig
+                -> Format
+                -> Reg
+                -> Reg
+                -> Maybe instr
+        mkRegRegSwapInstr _ _ _ _ = Nothing
+
         -- | Take the source and destination from this reg -> reg move instruction
         --      or Nothing if it's not one
         takeRegRegMoveInstr

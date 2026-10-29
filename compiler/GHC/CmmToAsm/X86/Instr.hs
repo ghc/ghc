@@ -31,6 +31,7 @@ module GHC.CmmToAsm.X86.Instr
    , mkStackDeallocInstr
    , mkSpillInstr
    , mkRegRegMoveInstr
+   , mkRegRegSwapInstr
    , movInstr
    , jumpDestsOfInstr
    , canFallthroughTo
@@ -1306,6 +1307,14 @@ scalarMoveFormat platform fmt
   = II64
   | otherwise
   = archWordFormat (target32Bit platform)
+
+-- | Swap two general-purpose registers, whole.
+mkRegRegSwapInstr :: NCGConfig -> Format -> Reg -> Reg -> Maybe Instr
+mkRegRegSwapInstr config fmt r1 r2
+  | isIntFormat fmt
+  = Just (XCHG (scalarMoveFormat (ncgPlatform config) fmt) (OpReg r1) r2)
+  | otherwise
+  = Nothing
 
 -- | Check whether an instruction represents a reg-reg move.
 --      The register allocator attempts to eliminate reg->reg moves whenever it can,

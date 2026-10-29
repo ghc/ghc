@@ -59,6 +59,7 @@ instance Instruction X86.Instr where
    isMetaInstr             = X86.isMetaInstr
    mkRegRegMoveInstr       = X86.mkRegRegMoveInstr
    takeRegRegMoveInstr     = X86.takeRegRegMoveInstr
+   mkRegRegSwapInstr       = X86.mkRegRegSwapInstr
    mkJumpInstr             = X86.mkJumpInstr
    mkStackAllocInstr       = X86.mkStackAllocInstr
    mkStackDeallocInstr     = X86.mkStackDeallocInstr
