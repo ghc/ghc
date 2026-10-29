@@ -287,7 +287,7 @@ linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
  = UDSM $ \us -> do
     let !(_, !stack, !stats, !blocks, us') =
             runR ctx emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
-                $ linearRA_SCCs entry_ids block_live [] sccs
+                $ linearRA_SCCs cold entry_ids block_live sccs
         platform = ncgPlatform config
         ctx = RA_Context
                 { rc_moveDests = emptyUFM
@@ -421,28 +421,59 @@ wideMoveDests platform cold block_live sccs
     mark p = foldl' (\ !b (c, d) -> if p d then addToUFM_Directly b c () else b)
 
 
+-- | Allocate the SCCs in order, except that the blocks the garbage collector
+-- returns to after a heap or stack check fails (the entry blocks in the given
+-- set, those in a cycle excepted), and any SCC only they lead to, go after the
+-- others. The first jump allocated into a block records the registers it starts
+-- with, and later jumps into it move their values to match
+-- (Note [The first jump into a block fixes its registers]). Such a block jumps
+-- back to the block that made the check, which the hot path also enters;
+-- allocated first, its reloads would choose that block's registers, and the hot
+-- path would pay the moves at every iteration of a loop the check is in. An
+-- entry is allocated at its turn, even before a deferred block that jumps to
+-- it: this relies, as allocating a cyclic SCC's entries does, on no vreg being
+-- live into an entry; a vreg that was would make the allocator panic where it
+-- is read.
+--
+-- TODO: checkFailures counts as cold some blocks the hot path runs: see
+-- Note [Frequencies before register allocation] in GHC.CmmToAsm.CFG.
 linearRA_SCCs :: RegAllocConstraint freeRegs instr
-              => [BlockId]
+              => LabelSet
+              -> [BlockId]
               -> BlockMap Regs
-              -> [NatBasicBlock instr]
               -> [SCC (LiveBasicBlock instr)]
               -> RegM freeRegs [NatBasicBlock instr]
 
-linearRA_SCCs _ _ blocksAcc []
-        = return $ reverse blocksAcc
-
-linearRA_SCCs entry_ids block_live blocksAcc (AcyclicSCC block : sccs)
- = do   blocks' <- processBlock block_live block
-        linearRA_SCCs entry_ids block_live
-                ((reverse blocks') ++ blocksAcc)
-                sccs
-
-linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
- = do
-        blockss' <- process entry_ids block_live blocks
-        linearRA_SCCs entry_ids block_live
-                (reverse (concat blockss') ++ blocksAcc)
-                sccs
+linearRA_SCCs cold entry_ids block_live sccs
+ = do   let -- a block the garbage collector returns to
+            deferrable (AcyclicSCC (BasicBlock bid _))
+              = bid `setMember` cold && bid `setMember` entries
+            deferrable _ = False
+            go acc deferred [] = return (acc, reverse deferred)
+            go acc deferred (scc : rest)
+              | deferrable scc = go acc (scc : deferred) rest
+              | null deferred  = do acc' <- one acc scc
+                                    go acc' deferred rest
+              | otherwise = do
+                  -- reached unless only deferred blocks lead to it
+                  block_assig <- getBlockAssigR
+                  if any (isReached entries block_assig . blockId)
+                         (flattenSCC scc)
+                    then do acc' <- one acc scc
+                            go acc' deferred rest
+                    else go acc (scc : deferred) rest
+        (acc1, deferred) <- go [] [] sccs
+        acc2 <- foldM one acc1 deferred
+        return $ reverse acc2
+  where
+    -- looked up for every block, so a set rather than the list
+    entries = setFromList entry_ids
+    one acc (AcyclicSCC block) = do
+        blocks' <- processBlock block_live block
+        return (reverse blocks' ++ acc)
+    one acc (CyclicSCC blocks) = do
+        blockss' <- process entries block_live blocks
+        return (reverse (concat blockss') ++ acc)
 
 {- Note [The first jump into a block fixes its registers]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -454,6 +485,7 @@ run. The SCCs come in dependency order, the path into a loop before the loop's
 body, so that a loop's head takes the registers of the path into it, and its
 back edge pays for any difference at every iteration; firstFreeInOrder's
 preferences work to keep a loop's values in its head's registers.
+The SCCs linearRA_SCCs defers are allocated after the others.
 
 That first jump decides two more things. A vreg's first-used register
 (lookupFirstUsed) is its register in the first assignment that, recorded for a
@@ -478,7 +510,7 @@ iteration.
 -}
 
 process :: forall freeRegs instr. (RegAllocConstraint freeRegs instr)
-        => [BlockId]
+        => LabelSet
         -> BlockMap Regs
         -> [GenBasicBlock (LiveInstr instr)]
         -> RegM freeRegs [[NatBasicBlock instr]]
@@ -507,11 +539,17 @@ process entry_ids block_live =
     go (b@(BasicBlock id _) : blocks) next_round accum madeProgress
       = do
           block_assig <- getBlockAssigR
-          if isJust (lookupBlockAssignment id block_assig) || id `elem` entry_ids
+          if isReached entry_ids block_assig id
             then do b' <- processBlock block_live b
                     go blocks next_round (b' : accum) True
 
             else do go blocks (b : next_round) accum madeProgress
+
+-- | Whether a block can be allocated now: a jump to it has been allocated,
+-- recording the registers it starts with, or it is an entry.
+isReached :: LabelSet -> BlockAssignment freeRegs -> BlockId -> Bool
+isReached entry_ids block_assig bid
+  = isJust (lookupBlockAssignment bid block_assig) || bid `setMember` entry_ids
 
 
 -- | Do register allocation on this basic block

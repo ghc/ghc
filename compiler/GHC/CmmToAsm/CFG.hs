@@ -176,6 +176,9 @@ isHeapOrStackCheck _ = False
 -- given; for a check annotated likely or unlikely, as GHC.StgToCmm.Heap's are,
 -- the same side comes out less likely, under the default -fcfg-weights, on the
 -- native weights and on those optimizeCFG derives from them.
+--
+-- TODO: some of these blocks may run often: see
+-- Note [Frequencies before register allocation].
 checkFailures :: CFG -> LabelSet
 checkFailures cfg = mapFoldl node setEmpty cfg
   where
@@ -1135,6 +1138,15 @@ instead, and they are to be reinvestigated together:
  * Where several blocks give a vreg different destinations, wideMoveDests in
    GHC.CmmToAsm.Reg.Linear takes the last block's; the estimate would pick the
    hottest block's at no extra cost.
+
+ * checkFailures counts as cold a block the garbage collector returns to that a
+   call returns to as well, which the hot path runs, and linearRA_SCCs in
+   GHC.CmmToAsm.Reg.Linear defers it; it also counts a failure target that
+   another edge enters, and, for static prediction and the layout, the lighter
+   side of an unannotated test of a register held off BaseReg, as of CurrentTSO,
+   once favourFewerPreds has broken its tie. The estimate would give each
+   block's frequency, and its loops would give linearRA_SCCs an order taken from
+   the loops rather than the SCCs.
 -}
 
 -- | Combination of target node id and information about the branch
