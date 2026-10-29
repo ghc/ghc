@@ -204,7 +204,9 @@ regAlloc config cold (CmmProc static lbl live sccs)
 
                 -- make sure the block that was first in the input list
                 --      stays at the front of the output
-                let !final_blocks' = sortOn ((/= first_id) . blockId) final_blocks
+                let !final_blocks' = case final_blocks of
+                      b : _ | blockId b == first_id -> final_blocks
+                      _ -> sortOn ((/= first_id) . blockId) final_blocks
 
                 let max_spill_slots = maxSpillSlots config
                     extra_stack
