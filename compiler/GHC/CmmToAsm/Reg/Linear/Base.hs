@@ -283,7 +283,9 @@ data RA_Context
         = RA_Context
         {
         -- | the real register each vreg is moved into where it dies,
-        --   in the block being allocated
+        --   in the block being allocated, or, for one moved into another vreg
+        --   and not written again in the block, the first register the
+        --   assignments the block's jumps lead to give that one
           rc_moveDests  :: MoveDests
 
         -- | the uniques of the vregs the block being allocated reads or
