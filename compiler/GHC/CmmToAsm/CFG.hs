@@ -71,7 +71,7 @@ import GHC.Utils.Panic
 --import GHC.Data.OrdList
 --import GHC.Cmm.DebugBlock.Trace
 
-import Data.List (sort, nub, partition)
+import Data.List (sort, sortOn, nub, partition)
 import Data.STRef.Strict
 import Control.Monad.ST
 
@@ -1106,7 +1106,9 @@ mkGlobalWeightsWith tags root localCfg
 
     revOrder' = map toVertex revOrder
     backEdges' = map (bimap toVertex toVertex) backedges
-    bodies' = map calcBody bodies
+    -- calcFreqs takes the loops inner first; an inner loop's body is
+    -- a proper subset of an enclosing one's
+    bodies' = map calcBody (sortOn (setSize . snd) bodies)
 
     estimatedCfg = staticBranchPrediction tags root loopResults localCfg
     -- Normalize the weights to probabilities and apply heuristics
@@ -1710,12 +1712,6 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
             calcOutFreqs head block
 
     -- Loops, by nesting, inner to outer.
-    -- BUG: mkGlobalWeights passes the loops in the order of loopInfo's back
-    -- edges, which is edgeList's order, by label, not by nesting. A loop
-    -- can thus come before a loop nested in it, and its pass then reads in
-    -- edgeBackProbs the branch probabilities of the inner loop's back edges,
-    -- not the cycle probabilities the inner loop's pass would have set. This
-    -- costs only speed, on x86-64 under -fcmm-static-pred.
     forM_ loops $ \(head, body) -> do
         forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i True) -- Mark all nodes as visited.
         forM_ body (\i -> unsafeWrite visitedNodes i False) -- Mark all blocks reachable from head as not visited
