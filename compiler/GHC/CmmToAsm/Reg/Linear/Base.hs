@@ -232,9 +232,15 @@ data RA_State freeRegs
 data RA_Context
         = RA_Context
         {
+        -- | the recorded assignments of the jump targets of the block being
+        --   allocated, and for a target not yet reached those of the blocks
+        --   it jumps to, up to three jumps on, as they are when the block
+        --   starts
+          rc_jumpLocs   :: [RegMap Loc]
+
         -- | the real register each vreg is moved into where it dies,
         --   in the block being allocated
-          rc_moveDests  :: UniqFM VirtualReg RealReg
+        , rc_moveDests  :: UniqFM VirtualReg RealReg
 
         -- | Native code generator configuration
         , rc_config     :: !NCGConfig

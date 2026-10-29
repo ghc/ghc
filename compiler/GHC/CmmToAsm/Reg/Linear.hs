@@ -137,7 +137,7 @@ import GHC.Platform
 
 import Data.Containers.ListUtils
 import Data.Maybe
-import Data.List (sortOn)
+import Data.List (find, sortOn)
 import Control.Monad
 
 -- -----------------------------------------------------------------------------
@@ -283,9 +283,10 @@ linearRegAlloc' config initFreeRegs entry_ids block_live sccs
  = UDSM $ \us -> do
     let !(_, !stack, !stats, !blocks, us') =
             runR ctx emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
-                $ linearRA_SCCs entry_ids block_live [] sccs
+                $ linearRA_SCCs entry_ids (jumpSuccs sccs) block_live [] sccs
         ctx = RA_Context
-                { rc_moveDests = emptyUFM
+                { rc_jumpLocs  = []
+                , rc_moveDests = emptyUFM
                 , rc_config    = config }
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
@@ -303,24 +304,25 @@ dyingMoves platform instrs
 
 linearRA_SCCs :: RegAllocConstraint freeRegs instr
               => [BlockId]
+              -> BlockMap [BlockId]
               -> BlockMap Regs
               -> [NatBasicBlock instr]
               -> [SCC (LiveBasicBlock instr)]
               -> RegM freeRegs [NatBasicBlock instr]
 
-linearRA_SCCs _ _ blocksAcc []
+linearRA_SCCs _ _ _ blocksAcc []
         = return $ reverse blocksAcc
 
-linearRA_SCCs entry_ids block_live blocksAcc (AcyclicSCC block : sccs)
- = do   blocks' <- processBlock block_live block
-        linearRA_SCCs entry_ids block_live
+linearRA_SCCs entry_ids succs block_live blocksAcc (AcyclicSCC block : sccs)
+ = do   blocks' <- processBlock succs block_live block
+        linearRA_SCCs entry_ids succs block_live
                 ((reverse blocks') ++ blocksAcc)
                 sccs
 
-linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
+linearRA_SCCs entry_ids succs block_live blocksAcc (CyclicSCC blocks : sccs)
  = do
-        blockss' <- process entry_ids block_live blocks
-        linearRA_SCCs entry_ids block_live
+        blockss' <- process entry_ids succs block_live blocks
+        linearRA_SCCs entry_ids succs block_live
                 (reverse (concat blockss') ++ blocksAcc)
                 sccs
 
@@ -359,10 +361,11 @@ iteration.
 
 process :: forall freeRegs instr. (RegAllocConstraint freeRegs instr)
         => [BlockId]
+        -> BlockMap [BlockId]
         -> BlockMap Regs
         -> [GenBasicBlock (LiveInstr instr)]
         -> RegM freeRegs [[NatBasicBlock instr]]
-process entry_ids block_live =
+process entry_ids succs block_live =
     \blocks -> go blocks [] (return []) False
   where
     go :: [GenBasicBlock (LiveInstr instr)]
@@ -388,25 +391,43 @@ process entry_ids block_live =
       = do
           block_assig <- getBlockAssigR
           if isJust (lookupBlockAssignment id block_assig) || id `elem` entry_ids
-            then do b' <- processBlock block_live b
+            then do b' <- processBlock succs block_live b
                     go blocks next_round (b' : accum) True
 
             else do go blocks (b : next_round) accum madeProgress
 
 
+-- | Each block's jump targets.
+jumpSuccs :: Instruction instr
+          => [SCC (LiveBasicBlock instr)] -> BlockMap [BlockId]
+jumpSuccs sccs = mapFromList
+  [ (bid, [ d | LiveInstr (Instr i) _ <- instrs, d <- jumpDestsOfInstr i ])
+  | BasicBlock bid instrs <- flattenSCCs sccs ]
+
 -- | Do register allocation on this basic block
 --
 processBlock
         :: RegAllocConstraint freeRegs instr
-        => BlockMap Regs              -- ^ live regs on entry to each basic block
+        => BlockMap [BlockId]         -- ^ each block's jump targets
+        -> BlockMap Regs              -- ^ live regs on entry to each basic block
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
 
-processBlock block_live (BasicBlock id instrs)
+processBlock succs block_live (BasicBlock id instrs)
  = do   -- pprTraceM "processBlock" $ text "" $$ ppr (BasicBlock id instrs)
         initBlock id block_live
         platform <- getPlatform
-        setBlockContextR $ listToUFM (dyingMoves platform instrs)
+        bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
+        let -- a jump target's recorded assignment, or, for one not yet
+            -- reached, those of the blocks it jumps to, up to three jumps on
+            recorded :: Int -> BlockId -> [RegMap Loc] -> [RegMap Loc]
+            recorded depth dest ls
+              | Just (_, assig) <- lookupBlockAssignment dest bassig = assig : ls
+              | depth > 0, Just ds <- mapLookup dest succs
+              = foldr (recorded (depth - 1)) ls ds
+              | otherwise = ls
+            !locs = foldr (recorded 3) [] (mapFindWithDefault [] id succs)
+        setBlockContextR locs $ listToUFM (dyingMoves platform instrs)
 
         (instrs', fixups)
                 <- linearRA block_live id instrs
@@ -927,6 +948,12 @@ allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt
 The preferred registers of a virtual register, the variable below, best first,
 from which 'firstFreeInOrder' takes the first that is free:
 
+ * The registers the variable has on entry to the jump targets of the current
+   block whose assignments are already recorded, in the order of the block's
+   jumps, such as a loop header jumped to from the loop's end: there the
+   variable needs no fixup move at the jump (#27980). For a jump target not yet
+   reached, those of the blocks it jumps to are taken, up to three jumps on.
+
  * The real register the current block moves the variable into where it dies,
    such as R1 before an evaluation: allocated there, the variable needs no move.
 
@@ -950,16 +977,30 @@ firstFreeInOrder :: Unique -> [RealReg] -> RegM freeRegs RealReg
 firstFreeInOrder _ [] = panic "firstFreeInOrder: no free register"
 firstFreeInOrder u free@(r0 : _) = do
   bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
-  RA_Context { rc_moveDests = moves } <- getContextR
-  let !mv = lookupUFM_Directly moves u
+  RA_Context { rc_jumpLocs  = locs
+             , rc_moveDests = moves } <- getContextR
+  let !jl = jumpLocRegs u locs
+      !mv = lookupUFM_Directly moves u
       !fu = lookupFirstUsed u bassig
       isFree r = r `elem` free
       -- the preference where it is free, else the next one
       pick (Just r) _ | isFree r = Just r
       pick _        k = k
-  return $! case pick mv (pick fu Nothing) of
+      chosen = case find isFree jl of
+                 Nothing -> pick mv (pick fu Nothing)
+                 found   -> found
+  return $! case chosen of
     Just r -> r
     Nothing -> r0
+
+-- | 'jumpLocRegs' u locs: the registers the recorded jump-target assignments
+-- locs give the virtual register with unique u, in order.
+jumpLocRegs :: Unique -> [RegMap Loc] -> [RealReg]
+{-# INLINE jumpLocRegs #-}  -- out of line it allocates more
+jumpLocRegs u locs = foldr at [] locs
+  where at assig !rs
+          | Just (Loc loc _) <- lookupUFM_Directly assig u = regsOfLoc loc ++ rs
+          | otherwise                                       = rs
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
