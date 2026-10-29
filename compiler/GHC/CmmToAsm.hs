@@ -385,7 +385,11 @@ cmmNativeGens logger config ncgImpl h dbgMap = go
 
         -- force evaluation all this stuff to avoid space leaks
         let platform = ncgPlatform config
-        {-# SCC "seqString" #-} evaluate $ seqList (showSDocUnsafe $ vcat $ map (pprAsmLabel platform) imports) ()
+            -- the imports are emitted, and so kept, only where
+            -- needImportedSymbols holds
+            keep_imports = needImportedSymbols config
+        {-# SCC "seqString" #-} when keep_imports $
+          evaluate $ seqList (showSDocUnsafe $ vcat $ map (pprAsmLabel platform) imports) ()
 
         let !labels' = if ncgDwarfEnabled config
                        then cmmDebugLabels is_valid_label isMetaInstr native else []
@@ -399,7 +403,8 @@ cmmNativeGens logger config ncgImpl h dbgMap = go
                         then native : ngs_natives ngs else []
 
             mCon = maybe id (:)
-            ngs' = ngs{ ngs_imports     = imports : ngs_imports ngs
+            ngs' = ngs{ ngs_imports     = applyWhen keep_imports (imports :)
+                                                    (ngs_imports ngs)
                       , ngs_natives     = natives'
                       , ngs_colorStats  = colorStats `mCon` ngs_colorStats ngs
                       , ngs_linearStats = linearStats `mCon` ngs_linearStats ngs
