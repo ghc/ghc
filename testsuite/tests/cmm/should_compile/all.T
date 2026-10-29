@@ -29,3 +29,9 @@ test('cmm_fold_scaled', [cmm_src, only_ways(['optasm']),
      compile, ['-no-hs-main -ddump-cmm -dsuppress-all'])
 test('cmm_fold_elemAt', [only_ways(['optasm']), grep_errmsg(r'(\(-1\) - )', [1])],
      compile, ['-O2 -ddump-cmm -dsuppress-all'])
+# A loop whose own return continuation reloaded a variable into its first-used
+# register, not the loop header's, so that its back edge paid fixup moves
+# (joinRR and joinRM in -ddump-asm-stats, which must be 0; x86-64)
+test('T27980', [cmm_src, only_ways(['optasm']), unless(arch('x86_64'), skip),
+                grep_errmsg(r'^\(\d+, \d+, \d+, (?!0, 0,)(\d+, \d+),', [1])],
+     compile, ['-no-hs-main -ddump-asm-stats'])
