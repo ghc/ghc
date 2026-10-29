@@ -881,17 +881,17 @@ livenessSCCs
        -> ( [SCC (LiveBasicBlock instr)]
           , BlockMap Regs)
 
-livenessSCCs _ blockmap done []
+livenessSCCs _ !blockmap done []
         = (done, blockmap)
 
-livenessSCCs platform blockmap done (AcyclicSCC block : sccs)
- = let  (blockmap', block')     = livenessBlock platform blockmap block
+livenessSCCs platform !blockmap done (AcyclicSCC block : sccs)
+ = let  !(!blockmap', block')   = livenessBlock platform blockmap block
    in   livenessSCCs platform blockmap' (AcyclicSCC block' : done) sccs
 
-livenessSCCs platform blockmap done
+livenessSCCs platform !blockmap done
         (CyclicSCC blocks : sccs) =
         livenessSCCs platform blockmap' (CyclicSCC blocks':done) sccs
- where      (blockmap', blocks') = livenessCyclic platform blockmap blocks
+ where      !(!blockmap', blocks') = livenessCyclic platform blockmap blocks
 
 
 -- | Annotate the blocks of a cyclic SCC with register liveness information,
@@ -952,9 +952,10 @@ livenessBlock
         -> (BlockMap Regs, LiveBasicBlock instr)
 
 livenessBlock platform blockmap (BasicBlock block_id instrs)
- = let  (regsLiveOnEntry, instrs')
+ = let  !(!regsLiveOnEntry, instrs')
             = livenessBack platform noRegs blockmap [] (reverse instrs)
-   in   (mapInsert block_id regsLiveOnEntry blockmap, BasicBlock block_id instrs')
+        !blockmap' = mapInsert block_id regsLiveOnEntry blockmap
+   in   (blockmap', BasicBlock block_id instrs')
 
 -- | Calculate liveness going forwards,
 --   filling in when regs are born
@@ -1025,7 +1026,7 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
         = (liveregs1, LiveInstr instr (Just live))
 
         | otherwise
-        = (liveregs_br, LiveInstr instr
+        = r_dying_br `seq` (liveregs_br, LiveInstr instr
                         (Just live { liveDieRead = r_dying_br
                                    , liveAcross  = across_br }))
 
@@ -1054,13 +1055,13 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
 
             -- registers that are not live beyond this point are recorded
             -- as dying here.
-            r_dying     = mkRegsMaxFmt
+            !r_dying    = mkRegsMaxFmt
                           [ reg
                           | reg@(RegWithFormat r _) <- read
                           , not $ any (\ w -> getUnique w == getUnique r) written
                           , not $ r `elemRegs` liveregs ]
 
-            w_dying     = mkRegsMaxFmt
+            !w_dying    = mkRegsMaxFmt
                           [ reg
                           | reg@(RegWithFormat r _) <- written
                           , not $ r `elemRegs` liveregs ]
