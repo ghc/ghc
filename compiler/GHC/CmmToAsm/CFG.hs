@@ -71,7 +71,7 @@ import GHC.Utils.Panic
 --import GHC.Data.OrdList
 --import GHC.Cmm.DebugBlock.Trace
 
-import Data.List (sort, nub, partition)
+import Data.List (sort, sortOn, nub, partition)
 import Data.STRef.Strict
 import Control.Monad.ST
 
@@ -1114,7 +1114,9 @@ mkGlobalWeightsWith tags root localCfg
 
     revOrder' = map toVertex revOrder
     backEdges' = map (bimap toVertex toVertex) backedges
-    bodies' = map calcBody bodies
+    -- calcFreqs takes the loops inner first; an inner loop's body is
+    -- a proper subset of an enclosing one's
+    bodies' = map calcBody (sortOn (setSize . snd) bodies)
 
     estimatedCfg = staticBranchPrediction tags root loopResults localCfg
     -- Normalize the weights to probabilities and apply heuristics
@@ -1680,18 +1682,17 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
                     let bp_backedge = isBackEdge bp block
                     return (not bp_visited && not bp_backedge)
 
-                -- An irreducible block keeps the frequency it has, 1 where the
-                -- last pass to set it was that of a loop it heads, and 0 where
-                -- no pass has set it, as where it heads a loop whose pass has
-                -- not run yet; and passes it on to its out-edges below. TODO:
-                -- irreducible blocks are not rare in Haskell code. One arises
-                -- where a block has a self loop that loopInfo does not count
-                -- (Note [Back edges in loopInfo]). Such a block's frequency,
-                -- and those of the blocks reached only through it, can thus
-                -- be far below or above what summing its inflow would give,
-                -- and on x86-64 under -fcmm-static-pred, not under
-                -- -finfo-table-map, the layout by default ranks their edges
-                -- by numbers that do not add up: at -O1, a loop calling
+                -- An irreducible block keeps the frequency it has, 1 where
+                -- the last pass to set it was that of a loop it heads, and 0
+                -- where no pass has set it; and passes it on to its out-edges
+                -- below. TODO: irreducible blocks are not rare in Haskell
+                -- code. One arises where a block has a self loop that loopInfo
+                -- does not count (Note [Back edges in loopInfo]). Such a
+                -- block's frequency, and those of the blocks reached only
+                -- through it, can thus be far below or above what summing its
+                -- inflow would give, and on x86-64 under -fcmm-static-pred, not
+                -- under -finfo-table-map, the layout by default ranks their
+                -- edges by numbers that do not add up: at -O1, a loop calling
                 -- fetchOrIntArray# gives cmpxchg_code's retry block 0 though a
                 -- nonzero frequency flows in, and the loop's back edge after it
                 -- 0. Summing the inflow was tried on a development branch, in a
@@ -1721,13 +1722,7 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
             setVisited block
             calcOutFreqs head block
 
-    -- BUG: mkGlobalWeights passes the loops in the order of loopInfo's back
-    -- edges, which is edgeList's order, descending by label, not by nesting. A
-    -- loop can thus come before a loop nested in it, and its pass then reads in
-    -- edgeBackProbs the branch probabilities of the inner loop's back edges,
-    -- not the cycle probabilities the inner loop's pass would have set. This
-    -- costs only speed, on x86-64 under -fcmm-static-pred, not under
-    -- -finfo-table-map.
+    -- Loops, by nesting, inner to outer.
     forM_ loops $ \(head, body) -> do
         forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i True) -- Mark all nodes as visited.
         forM_ body (\i -> unsafeWrite visitedNodes i False) -- Mark all blocks reachable from head as not visited
