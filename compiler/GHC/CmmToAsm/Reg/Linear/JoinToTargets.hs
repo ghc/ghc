@@ -159,11 +159,6 @@ That first jump decides one more thing. A vreg's first-used register
 (lookupFirstUsed) is its register in the first assignment that, recorded for a
 block it is live into, holds it in a register, not the first register it was
 given, and it stands for the rest of the procedure.
-
-The assignment a jump arrives with is chosen without regard to the entry
-assignment already recorded for its target: see the TODOs in joinToTargets_first
-(#27981) and in Note [Register preferences in the linear allocator] in
-GHC.CmmToAsm.Reg.Linear (#27980).
 -}
 
 -- this is the first time we jumped to this block.

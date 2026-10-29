@@ -1,0 +1,51 @@
+#include "Cmm.h"
+
+// #27980.  The linear register allocator gave a vreg, where free, its
+// first-used register, the one it is in at the first jump that records it: for
+// a, its register in the continuation of the first call.  The continuation of
+// the second call reloads m into that register, m being used on both of its
+// branches, so setup enters the loop at check with a in another one.  Allocated
+// later, the loop's own return continuation found a's first-used register free
+// and reloaded a into it, and its edge back to check paid a fixup move at
+// every iteration.  The test checks the allocator's statistics for fixup moves
+// (joinRR and joinRM in spills-added-total), of which the continuation, now
+// reloading a into the register check has it in, needs none.
+
+helper (W_ x)
+{
+    return (x + 1);
+}
+
+pref_clash (W_ a, W_ n, W_ m)
+{
+    W_ i, x;
+
+    (W_ r) = call helper(n);
+    if (r == 0) goto early;
+    goto mid;
+
+early:
+    return (a);
+
+mid:
+    (W_ s) = call helper(r + a);
+    if (s == 5) goto other;
+    goto setup;
+
+other:
+    return (m);
+
+setup:
+    i = s + a + m;
+    goto check;
+
+check:
+    if (i >= n) goto done;
+    x = W_[a + i * 8];
+    (W_ y) = call helper(x);
+    i = i + 1;
+    goto check;
+
+done:
+    return (i);
+}

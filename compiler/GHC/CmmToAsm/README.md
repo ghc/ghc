@@ -91,7 +91,8 @@ or the code that defines or uses it:
   registers are free, as the linear allocator fixes them at the first
   of the block's incoming jumps that it processes
   (Note [The first jump into a block fixes its entry assignment]
-  in `GHC.CmmToAsm.Reg.Linear.JoinToTargets`).
+  in `GHC.CmmToAsm.Reg.Linear.JoinToTargets`). The linear allocator's comments
+  also call it the block's recorded assignment.
 * fixup block: a block the linear allocator inserts between a jump
   and its target, to move each value to where the target's entry assignment has
   it (`joinToTargets_again` in `GHC.CmmToAsm.Reg.Linear.JoinToTargets`).
