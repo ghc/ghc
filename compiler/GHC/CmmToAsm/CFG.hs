@@ -24,7 +24,7 @@ module GHC.CmmToAsm.CFG
     , checkFailures, coldBlocks, findBackEdges
 
     -- Loop Information
-    , loopMembers, loopLevels, loopInfo
+    , loopMembers, loopInfo
 
     --Construction/Misc
     , getCfg, getCfgProc, pprEdgeWeights, sanityCheckCfg
@@ -71,7 +71,7 @@ import GHC.Utils.Panic
 --import GHC.Data.OrdList
 --import GHC.Cmm.DebugBlock.Trace
 
-import Data.List (sort, sortOn, nub, partition)
+import Data.List (sort, sortOn, partition)
 import Data.STRef.Strict
 import Control.Monad.ST
 
@@ -864,19 +864,13 @@ loopMembers cfg =
     setLevel (AcyclicSCC bid) m = mapInsert bid False m
     setLevel (CyclicSCC bids) m = foldl' (\m k -> mapInsert k True m) m bids
 
-loopLevels :: CFG -> BlockId -> LabelMap Int
-loopLevels cfg root = liLevels loopInfos
-    where
-      loopInfos = loopInfo cfg root
-
 data LoopInfo = LoopInfo
   { liBackEdges :: [(Edge)] -- ^ List of back edges
-  , liLevels :: LabelMap Int -- ^ BlockId -> LoopLevel mapping
   , liLoops :: [(Edge, LabelSet)] -- ^ (backEdge, loopBody), body includes header
   }
 
 instance Outputable LoopInfo where
-    ppr (LoopInfo _ _lvls loops) =
+    ppr (LoopInfo _ loops) =
         text "Loops:(backEdge, bodyNodes)" $$
             (vcat $ map ppr loops)
 
@@ -895,13 +889,12 @@ instance Outputable LoopInfo where
  -}
 
 -- | Determine loop membership of blocks based on Dominator analysis.
---   This is slower but gives loop levels instead of just loop membership.
+--   This is slower but gives loop bodies instead of just loop membership.
 --   However it only detects natural loops. Irreducible control flow is not
 --   recognized even if it loops. But that is rare enough that we don't have
 --   to care about that special case.
 loopInfo :: HasDebugCallStack => CFG -> BlockId -> LoopInfo
 loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
-                              , liLevels = mapFromList loopCounts
                               , liLoops = loopBodies }
   where
     revCfg = reverseEdges cfg
@@ -918,8 +911,6 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
     domMap = mkDomMap tree
 
     edges = edgeList cfg :: [(BlockId, BlockId)]
-    -- We can't recompute nodes from edges, there might be blocks not connected via edges.
-    nodes = getCfgNodes cfg :: [BlockId]
 
     -- identify back edges
     isBackEdge (from,to)
@@ -950,12 +941,6 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
 
     backEdges = filter isBackEdge edges
     loopBodies = map findBody backEdges :: [(Edge, LabelSet)]
-
-    -- Block b is part of n loop bodies => loop nest level of n
-    loopCounts =
-      let bodies = map (first snd) loopBodies -- [(Header, Body)]
-          loopCount n = length $ nub . map fst . filter (setMember n . snd) $ bodies
-      in  map (\n -> (n, loopCount n)) $ nodes :: [(BlockId, Int)]
 
     -- each block but the root to the blocks dominating it, itself included
     -- and the root left out, so that no edge into the root is a back edge
@@ -1026,7 +1011,7 @@ mkGlobalWeights root localCfg
     fromVertexMap m = mapFromList . map (first fromVertex) $ IM.toList m
 
     revOrder = revPostorderFrom localCfg root :: [BlockId]
-    loopResults@(LoopInfo backedges _levels bodies) = loopInfo localCfg root
+    loopResults@(LoopInfo backedges bodies) = loopInfo localCfg root
 
     revOrder' = map toVertex revOrder
     backEdges' = map (bimap toVertex toVertex) backedges
@@ -1172,15 +1157,31 @@ type TargetNodeInfo = (BlockId, EdgeInfo)
 -- TODO: This should be combined with optimizeCFG
 {-# SCC staticBranchPrediction #-}
 staticBranchPrediction :: BlockId -> LoopInfo -> CFG -> CFG
-staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
+staticBranchPrediction _root (LoopInfo l_backEdges l_loops) cfg =
     -- pprTrace "staticEstimatesOn" (ppr (cfg)) $
     foldl' update cfg nodes
   where
     nodes = getCfgNodes cfg
     backedges = S.fromList $ l_backEdges
-    -- Loops keyed by their back edge
-    loops = M.fromList $ l_loops :: M.Map Edge LabelSet
-    loopHeads = S.fromList $ map snd $ M.keys loops
+    -- The heads of loops but those whose back edges all leave a block of
+    -- 'coldBlocks': such a back edge closes the cycle a failed heap or stack
+    -- check makes through the garbage collector, and lehPredicts says nothing
+    -- about a branch into a loop head, so it would say nothing about the test
+    -- that stays in a loop holding a check. A back edge leaving a continuation
+    -- that a call returns to as well counts the same, so a loop closed through
+    -- such a call loses its head too. The check's own branch already gets no
+    -- heuristic (isHeapOrStackCheck in update); this rule is for a branch into
+    -- the check's block. This saves cycles, not instructions: with the stay
+    -- side predicted, the layout can let it fall through, a taken jump fewer an
+    -- iteration, which an instruction count does not show, as a conditional
+    -- jump is one instruction whether taken or not.
+    loopHeads = M.keysSet headBodies
+    headBodies = M.fromListWith setUnion
+      [ (h, body) | ((from, h), body) <- l_loops, not (from `setMember` cold) ]
+    -- each block to the number of those loops whose bodies hold it
+    loopLevels = mapFromListWith (+)
+      [ (b, 1 :: Int) | body <- M.elems headBodies, b <- setElems body ]
+    cold = coldBlocks cfg
 
     update :: CFG -> BlockId -> CFG
     update cfg node

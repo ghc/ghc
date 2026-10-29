@@ -59,7 +59,7 @@ import GHC.Types.Unique.DSM (UniqDSM)
   * After we convert Cmm to Asm we run `optimizeCFG` which
     adds a few more "educated guesses" to the equation.
   * Then we run loop analysis on the CFG (`loopInfo`) which tells us
-    about loop headers, loop nesting levels and the sort.
+    about loop headers, loop bodies and the sort.
   * Based on the CFG and loop information refine the edge weights
     in the CFG and normalize them relative to the most often visited
     node. (See `mkGlobalWeights`)
