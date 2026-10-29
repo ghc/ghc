@@ -70,7 +70,7 @@ import GHC.Utils.Panic
 --import GHC.Data.OrdList
 --import GHC.Cmm.DebugBlock.Trace
 
-import Data.List (sort, nub, partition)
+import Data.List (sort, sortOn, nub, partition)
 import Data.STRef.Strict
 import Control.Monad.ST
 
@@ -960,7 +960,9 @@ mkGlobalWeights root localCfg
 
     revOrder' = map toVertex revOrder
     backEdges' = map (bimap toVertex toVertex) backedges
-    bodies' = map calcBody bodies
+    -- calcFreqs takes the loops inner first; an inner loop's body is
+    -- a proper subset of an enclosing one's
+    bodies' = map calcBody (sortOn (setSize . snd) bodies)
 
     estimatedCfg = staticBranchPrediction root loopResults localCfg
     -- Normalize the weights to probabilities and apply heuristics
