@@ -790,23 +790,26 @@ findBackEdges root cfg
 
 optimizeCFG :: Bool -> Weights -> RawCmmDecl -> CFG -> CFG
 optimizeCFG _ _ (CmmData {}) cfg = cfg
-optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg =
-  -- staticPredCfg starts from the weights optHsPatterns leaves and normalises
-  -- them, so the info table penalty, favourFewerPreds' +1 and -1 and the bonus
-  -- on findBackEdges' back edges carry into the predicted probabilities, except
-  -- where the back edge rule of Note [Static Branch Prediction] replaces the
-  -- weights.
-  (if doStaticPred then staticPredCfg (tagRegisters graph) (g_entry graph) else id) $
-    optHsPatterns weights proc $ cfg
+optimizeCFG doStaticPred weights (CmmProc info _lab _live graph) cfg
+  -- no bonus for back edges where static prediction follows: it starts each
+  -- two-way branch from optHsPatterns' weights, so that the penalties become
+  -- probabilities, and overwrites the weights of every branch with a back edge
+  -- among its targets except a heap or stack check's and one whose targets are
+  -- all back edges; the back edges are loopInfo's: one into the root is
+  -- findBackEdges' alone, and a branch with one starts from its weight with no
+  -- bonus
+  | doStaticPred = staticPredCfg (tagRegisters graph) entry $
+                     optHsPatterns [] weights info cfg
+  | otherwise    = optHsPatterns (findBackEdges entry cfg) weights info cfg
+  where entry = g_entry graph
 
 -- | Modify branch weights based on educated guess on
 -- patterns GHC tends to produce and how they affect
--- performance.
+-- performance; the back edges given get a bonus.
 --
 -- Most importantly we penalize jumps across info tables.
-optHsPatterns :: Weights -> RawCmmDecl -> CFG -> CFG
-optHsPatterns _ (CmmData {}) cfg = cfg
-optHsPatterns weights (CmmProc info _lab _live graph) cfg =
+optHsPatterns :: Edges -> Weights -> LabelMap a -> CFG -> CFG
+optHsPatterns backs weights info cfg =
     {-# SCC optHsPatterns #-}
     -- pprTrace "Initial:" (pprEdgeWeights cfg) $
     -- pprTrace "Initial:" (ppr $ mkGlobalWeights (g_entry graph) cfg) $
@@ -814,15 +817,14 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
     -- pprTrace "LoopInfo:" (ppr $ loopInfo cfg (g_entry graph)) $
     favourFewerPreds  .
     penalizeInfoTables info .
-    increaseBackEdgeWeight (g_entry graph) $ cfg
+    increaseBackEdgeWeight backs $ cfg
   where
 
-    -- Increase the weight of all backedges in the CFG
+    -- Increase the weight of the given backedges
     -- this helps to make loop jumpbacks the heaviest edges
-    increaseBackEdgeWeight :: BlockId -> CFG -> CFG
-    increaseBackEdgeWeight root cfg =
-        let backedges = findBackEdges root cfg
-            update weight
+    increaseBackEdgeWeight :: Edges -> CFG -> CFG
+    increaseBackEdgeWeight backedges cfg =
+        let update weight
               --Keep irrelevant edges irrelevant
               | weight <= 0 = 0
               | otherwise
@@ -958,8 +960,9 @@ set, and puts every other block in its own set. Hence:
   head is the entry block is not found. This costs only speed, on x86-64 under
   -fcmm-static-pred.
 
-findBackEdges, which optHsPatterns uses for the back edge bonus, classifies
-the edges by a depth-first search instead. It counts as back edges the edges
+findBackEdges, which optHsPatterns uses for the back edge bonus where static
+prediction does not follow, classifies the edges by a depth-first search
+instead. It counts as back edges the edges
 into the entry block and the back edges of irreducible cycles, and no self
 loop. TODO: the two notions of a back edge disagree on these three kinds of
 edge.
