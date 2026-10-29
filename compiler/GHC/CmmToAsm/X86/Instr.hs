@@ -791,10 +791,12 @@ regUsageOfInstr platform instr
     use_EA (ImmAddr _ _) tl = tl
     use_EA (AddrBaseIndex base index _) tl =
         use_base base $! use_index index tl
-        where use_base (EABaseReg r)  tl = mk addrFmt r : tl
+        where use_base (EABaseReg r)  tl
+                | interesting platform r = mk addrFmt r : tl
               use_base _              tl = tl
-              use_index EAIndexNone   tl = tl
-              use_index (EAIndex i _) tl = mk addrFmt i : tl
+              use_index (EAIndex i _) tl
+                | interesting platform i = mk addrFmt i : tl
+              use_index _             tl = tl
 
     mkRUR :: [RegWithFormat] -> RegUsage
     mkRUR src = mkRU src []
