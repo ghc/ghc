@@ -280,9 +280,8 @@ import GHC.Types.Unique.DSM (UniqDSM)
     loop over a tree to be unlikely (Note [Static prediction of tag tests] in
     GHC.CmmToAsm.CFG), or where several back edges share the loop's repeats, so
     that the entry would fall through into the head and every iteration pay a
-    jump back. 'optHsPatterns' adds a bonus to back edges, but static prediction
-    overwrites the weights of every branch with a back edge among its targets
-    except a heap or stack check's and one whose targets are all back edges. So
+    jump back. 'increaseBackEdgeWeight' adds a bonus to back edges, but not
+    where static prediction follows and turns the weights into frequencies. So
     we raise each back edge 'findBackEdges' finds by a little more than the
     weight of the heaviest edge into its head that is not a call, a back edge or
     a self loop, which keeps the order of several back edges into one head. The
