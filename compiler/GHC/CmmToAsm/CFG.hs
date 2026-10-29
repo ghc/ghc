@@ -711,17 +711,32 @@ getCfg platform weights graph =
     -- x86 and x86-64, at any optimisation level.
     blocks = revPostorder graph :: [CmmBlock]
 
---Find back edges by a depth-first search (classifyEdges)
-findBackEdges :: HasDebugCallStack => BlockId -> CFG -> Edges
-findBackEdges root cfg =
-    --pprTraceIt "Backedges:" $
-    map fst .
-    filter (\x -> snd x == Backward) $ typedEdges
+-- | The back edges of a depth-first search from the given block: the edges into
+-- a block still on the search's stack, but for an edge from a block to itself.
+-- They differ from loopInfo's back edges, each an edge into a block that
+-- dominates its source: an edge into the root is one here and none there, and
+-- in an irreducible region the search's order of visits picks which edges
+-- are. The search takes a block's successors in their labels' order, so in
+-- an irreducible region the labels pick which edges are back edges; under
+-- -fobject-determinism a Haskell module's labels are the same for the same
+-- inputs (Note [Norms of the NCG] in GHC.CmmToAsm).
+findBackEdges :: BlockId -> CFG -> Edges
+findBackEdges root cfg
+  = go root (getSuccessors cfg root) [] (setSingleton root) (setSingleton root)
+       []
   where
-    edges = edgeList cfg :: [(BlockId,BlockId)]
-    getSuccs = getSuccessors cfg :: BlockId -> [BlockId]
-    typedEdges =
-      classifyEdges root getSuccs edges :: [((BlockId,BlockId),EdgeType)]
+    -- the block searched from, its successors still to look at, and the
+    -- blocks below it on the stack with theirs
+    go !n [] stack !seen !onStack acc = case stack of
+      []             -> acc
+      (p, ps) : rest -> go p ps rest seen (setDelete n onStack) acc
+    go !n (s : ss) stack !seen !onStack acc
+      | s == n                = go n ss stack seen onStack acc
+      | s `setMember` seen    = if s `setMember` onStack  -- a subset of seen
+                                  then go n ss stack seen onStack ((n, s) : acc)
+                                  else go n ss stack seen onStack acc
+      | otherwise             = go s (getSuccessors cfg s) ((n, ss) : stack)
+                                   (setInsert s seen) (setInsert s onStack) acc
 
 optimizeCFG :: Bool -> Weights -> RawCmmDecl -> CFG -> CFG
 optimizeCFG _ _ (CmmData {}) cfg = cfg

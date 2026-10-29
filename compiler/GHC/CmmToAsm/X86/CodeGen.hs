@@ -4436,12 +4436,9 @@ genPrim bid (MO_Ctz width) [dst] [src]
 -- current block in turn, as a second conversion does, moves the wrong block's
 -- edges: the CFG then lacks the edges of the jumps ending the Cmm block. Where
 -- the linear allocator puts a fixup block on one of these jumps, the compiler
--- panics in addNodesBetween (#27915). Where shortcutting (never on Darwin)
--- cuts the second conversion's last block, a lone jump, and with it the CFG's
--- only edges into the first conversion's blocks, the compiler panics in
--- classifyEdges, called by findBackEdges. Both are reached on x86-64, and not
--- under -finfo-table-map. -dasm-lint does not catch the missing edges first:
--- sanityCheckCfg compares the CFG's blocks with the code's, not its edges.
+-- panics in addNodesBetween (#27915), on x86-64 but not under -finfo-table-map.
+-- -dasm-lint does not catch the missing edges first: sanityCheckCfg compares
+-- the CFG's blocks with the code's, not its edges.
 genPrim bid prim dst args
   = (,Nothing) <$> genSimplePrim bid prim dst args
 
