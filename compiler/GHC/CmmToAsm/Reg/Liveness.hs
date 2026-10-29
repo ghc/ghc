@@ -30,6 +30,7 @@ module GHC.CmmToAsm.Reg.Liveness (
         patchRegsLiveInstr,
         reverseBlocksInTops,
         regLiveness,
+        regLivenessBorn,
         cmmTopLiveness,
 
         module GHC.CmmToAsm.Reg.Regs
@@ -195,7 +196,11 @@ data LiveInstr instr
 
 data Liveness
         = Liveness
-        { liveBorn      :: Regs      -- ^ registers born in this instruction (written to for first time).
+        { liveBorn      :: Regs      -- ^ registers born in this instruction (written to for first time);
+                                     --   empty until 'regLivenessBorn' fills it
+                                     --   in, an unfilled one being
+                                     --   indistinguishable from one with no
+                                     --   register born.
         , liveDieRead   :: Regs      -- ^ registers that died because they were read for the last time.
         , liveDieWrite  :: Regs      -- ^ registers that died because they were clobbered by something.
         , liveUsage     :: RegUsage  -- ^ the registers the instruction reads and writes, as
@@ -819,6 +824,24 @@ regLiveness platform (CmmProc info lbl live sccs)
                            lbl live ann_sccs
 
 
+-- | Fill in when registers are born ('liveBorn').  Only the graph allocator
+--   and the liveness dump use it, and it costs a forward walk over every
+--   instruction, so it is a pass of its own, which the linear allocator skips.
+regLivenessBorn
+        :: LiveCmmDecl statics instr
+        -> LiveCmmDecl statics instr
+
+regLivenessBorn decl@(CmmData {})
+        = decl
+
+regLivenessBorn (CmmProc info@(LiveInfo _ _ block_live _) lbl live sccs)
+        = CmmProc info lbl live (map (fmap born) sccs)
+        where   born (BasicBlock block_id instrs)
+                 = BasicBlock block_id
+                 $ livenessForward
+                        (mapFindWithDefault noRegs block_id block_live) instrs
+
+
 -- | If we've compute liveness info for this code already we have to reverse
 --   the SCCs in each top to get them back to the right order so we can do it again.
 reverseBlocksInTops :: LiveCmmDecl statics instr -> LiveCmmDecl statics instr
@@ -923,16 +946,9 @@ livenessBlock
         -> (BlockMap Regs, LiveBasicBlock instr)
 
 livenessBlock platform blockmap (BasicBlock block_id instrs)
- = let
-        (regsLiveOnEntry, instrs1)
+ = let  (regsLiveOnEntry, instrs')
             = livenessBack platform noRegs blockmap [] (reverse instrs)
-        blockmap'       = mapInsert block_id regsLiveOnEntry blockmap
-
-        instrs2         = livenessForward regsLiveOnEntry instrs1
-
-        output          = BasicBlock block_id instrs2
-
-   in   ( blockmap', output)
+   in   (mapInsert block_id regsLiveOnEntry blockmap, BasicBlock block_id instrs')
 
 -- | Calculate liveness going forwards,
 --   filling in when regs are born
