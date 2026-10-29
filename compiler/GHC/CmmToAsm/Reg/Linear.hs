@@ -1040,10 +1040,6 @@ genRaInsn block_live new_instrs block_id instr rest live = do
   platform <- getPlatform
   case liveUsage live of { RU read written ->
     do
-    let dying = map regWithFormat_reg . nonDetEltsUniqSet . getRegs
-        -- See Note [Unique Determinism and code generation]
-        r_dying = dying (liveDieRead live)
-        w_dying = dying (liveDieWrite live)
     let real_written = [ rr                          | RegWithFormat {regWithFormat_reg = RegReal rr} <- written ]
     let virt_written = [ VirtualRegWithFormat vr fmt | RegWithFormat (RegVirtual vr) fmt              <- written ]
 
@@ -1060,8 +1056,8 @@ genRaInsn block_live new_instrs block_id instr rest live = do
 --         pprTraceM "genRaInsn"
 --                 (          text "block        = " <+> ppr block_id
 --                         $$ text "instruction  = " <+> ppr instr
---                         $$ text "r_dying      = " <+> ppr r_dying
---                         $$ text "w_dying      = " <+> ppr w_dying
+--                         $$ text "r_dying      = " <+> ppr (liveDieRead live)
+--                         $$ text "w_dying      = " <+> ppr (liveDieWrite live)
 --                         $$ text "read         = " <+> ppr real_read    <+> ppr virt_read
 --                         $$ text "written      = " <+> ppr real_written <+> ppr virt_written
 --                         $$ text "freeregs     = " <+> ppr freeregs
@@ -1072,7 +1068,7 @@ genRaInsn block_live new_instrs block_id instr rest live = do
         allocateRegsAndSpill True{-reading-} virt_read [] [] virt_read
 
     -- (c) save any temporaries which will be clobbered by this instruction
-    clobber_saves <- saveClobberedTemps real_written r_dying rest
+    clobber_saves <- saveClobberedTemps real_written (liveDieRead live) rest
 
     -- (d) Update block map for new destinations
     -- NB. do this before removing dead regs from the assignment, because
@@ -1090,7 +1086,7 @@ genRaInsn block_live new_instrs block_id instr rest live = do
 
     -- (e) Delete all register assignments for temps which are read
     --     (only) and die here.  Update the free register list.
-    releaseRegs r_dying
+    releaseRegs (liveDieRead live)
 
     -- (f) Mark regs which are clobbered as unallocatable
     clobberRegs real_written
@@ -1101,12 +1097,16 @@ genRaInsn block_live new_instrs block_id instr rest live = do
 
     -- (h) Release registers for temps which are written here and not
     -- used again.
-    releaseRegs w_dying
+    releaseRegs (liveDieWrite live)
 
     let
         -- (i) Patch the instruction
+        -- Strict: squashed_instr and reload_into both evaluate it, and a lazy
+        -- one is a thunk shared between them, built for every instruction,
+        -- which made the compiler allocate 0.53% more compiling T3294 at -O0
+        -- and 0.18% more at -O and -O2, on GHC 10.1.20261108.
         patched_instr :: instr
-        patched_instr
+        !patched_instr
                 = patchRegsOfInstr platform adjusted_instr patchLookup
 
         -- the real register of the last written pair whose vreg is x, else of
@@ -1188,24 +1188,31 @@ genRaInsn block_live new_instrs block_id instr rest live = do
 -- -----------------------------------------------------------------------------
 -- releaseRegs
 
-releaseRegs :: FR freeRegs => [Reg] -> RegM freeRegs ()
-releaseRegs regs = do
-  assig <- getAssigR
-  free <- getFreeRegsR
+releaseRegs :: FR freeRegs => Regs -> RegM freeRegs ()
+-- nothing dies: the state stays as it is, unwritten, each write building a new
+-- RA_State: written here and in saveClobberedTemps where nothing is clobbered,
+-- the compiler allocated 2.3% more compiling T3294 at -O0 and 0.79% and 0.76%
+-- more at -O and -O2, and ran 0.99%, 0.38% and 0.37% more instructions, and
+-- written here alone, it allocated 2.3%, 0.78% and 0.76% more, on GHC
+-- 10.1.20261108
+releaseRegs regs
+  | isEmptyUniqSet (getRegs regs) = return ()
+  | otherwise = do
+      assig <- getAssigR
+      free <- getFreeRegsR
 
-  let loop assig !free [] = do setAssigR assig; setFreeRegsR free; return ()
-      loop assig !free (RegReal rr : rs) = loop assig (frReleaseReg rr free) rs
-      loop assig !free (r:rs) =
-         case lookupUFM assig r of
-         Just (Loc (InBoth real _) _) ->
-           loop (delFromUFM assig r)
-                (frReleaseReg real free) rs
-         Just (Loc (InReg real) _) ->
-           loop (delFromUFM assig r)
-                (frReleaseReg real free) rs
-         _ ->
-           loop (delFromUFM assig r) free rs
-  loop assig free regs
+      -- each register is released on its own, so the fold's order does not
+      -- matter (Note [Unique Determinism and code generation])
+      let release r (assig', free') = case regWithFormat_reg r of
+            RegReal rr -> let !f = frReleaseReg rr free' in (assig', f)
+            v -> let !a = delFromUFM assig' v
+                     !f = case lookupUFM assig' v of
+                            Just (Loc (InBoth real _) _) -> frReleaseReg real free'
+                            Just (Loc (InReg real) _)    -> frReleaseReg real free'
+                            _                            -> free'
+                 in (a, f)
+      case nonDetStrictFoldUniqSet release (assig, free) (getRegs regs) of
+        (assig', free') -> do setAssigR assig'; setFreeRegsR free'
 
 -- -----------------------------------------------------------------------------
 -- Clobber real registers
@@ -1281,7 +1288,7 @@ saveClobberedTemps
         :: forall instr freeRegs.
            (Instruction instr, FR freeRegs)
         => [RealReg]             -- ^ real registers clobbered by this instruction
-        -> [Reg]                 -- ^ registers which are no longer live after this instruction,
+        -> Regs                  -- ^ registers which are no longer live after this instruction,
                                  -- because read for the last time
         -> [LiveInstr instr]     -- ^ the instructions after this one in the block
         -> RegM freeRegs [instr] -- return: instructions to spill any temps that will
@@ -1293,29 +1300,35 @@ saveClobberedTemps [] _ _
 saveClobberedTemps clobbered dying rest
  = do
         assig   <- getAssigR
-        (assig',instrs) <- nonDetStrictFoldUFM_DirectlyM maybe_spill (assig,[]) assig
-        setAssigR assig'
-        return $ -- mkComment (text "<saveClobberedTemps>") ++
-                 instrs
---              ++ mkComment (text "</saveClobberedTemps>")
+        -- saveClobberedTemps folds pick over the vregs in the order of their
+        -- uniques, so the order decides which clobbered values move to free
+        -- registers and which are spilled once those run out
+        -- (Note [Unique order in the linear allocator])
+        case nonDetStrictFoldUFM_Directly pick [] assig of
+          -- nothing clobbered: the state unwritten, as in releaseRegs (written
+          -- here alone, the compiler allocated 0.16% more compiling T9961 at
+          -- -O0, 0.021% more compiling T12707 at -O and 0.017% more compiling
+          -- !16269's CmmDiamondChain at -O2, on GHC 10.1.20261108)
+          []      -> return []
+          to_save -> do
+            -- in the order of their uniques, as the fold visits them
+            (assig', instrs)
+              <- foldM (\acc (temp, usage) -> clobber temp acc usage)
+                       (assig, []) (reverse to_save)
+            setAssigR assig'
+            return instrs
    where
      -- Unique represents the VirtualReg
      -- Here we separate the cases which we do want to spill from these we don't.
-     maybe_spill :: Unique
-                 -> (RegMap Loc,[instr])
-                 -> Loc
-                 -> RegM freeRegs (RegMap Loc,[instr])
-     maybe_spill !temp !(assig,instrs) !loc =
+     pick :: Unique -> Loc -> [(Unique, RealRegUsage)]
+          -> [(Unique, RealRegUsage)]
+     pick !temp !loc acc =
         case loc of
-                -- saveClobberedTemps folds maybe_spill over the vregs in the
-                -- order of their uniques, so the order decides which clobbered
-                -- values move to free registers and which are spilled once
-                -- those run out (Note [Unique order in the linear allocator])
                 Loc (InReg reg) fmt
                     | any (realRegsAlias reg) clobbered
-                    , temp `notElem` map getUnique dying
-                    -> clobber temp (assig,instrs) (RealRegUsage reg fmt)
-                _ -> return (assig,instrs)
+                    , not (temp `elemUniqSet_Directly` getRegs dying)
+                    -> (temp, RealRegUsage reg fmt) : acc
+                _ -> acc
 
      -- See Note [UniqFM and the register allocator]
      clobber :: Unique -> (RegMap Loc,[instr]) -> RealRegUsage -> RegM freeRegs (RegMap Loc,[instr])
