@@ -11,7 +11,7 @@ module Main where
 --
 -- The tests are enumerated in the "runTests" function--each returns a Bool
 -- and runTests simply checks that none returned False.
--- (currently the only test is testGraphNoSpills--see its comments for
+-- (currently testGraphNoSpills and testFormatWidths--see their comments for
 -- details)
 --
 -- If the tests pass it will print "All tests passed", otherwise it will
@@ -24,6 +24,10 @@ import qualified GHC.CmmToAsm.Reg.Graph.Stats as Color
 import qualified GHC.CmmToAsm.Reg.Linear.Base as Linear
 import qualified GHC.CmmToAsm.X86.Instr as X86.Instr
 import qualified GHC.CmmToAsm.X86 as X86
+import qualified GHC.CmmToAsm.Reg.Regs as Regs
+import GHC.CmmToAsm.Format ( Format(..), ScalarFormat(..), RegWithFormat(..) )
+import GHC.Platform.Reg ( Reg(..), VirtualReg(..) )
+import GHC.Types.Unique ( mkUniqueGrimily )
 import GHC.Driver.Config.Cmm.Parser
 import GHC.Driver.Config.CmmToAsm
 import GHC.Driver.Config.Cmm
@@ -184,8 +188,42 @@ noSpillsCmmFile = "no_spills.cmm"
 runTests :: Logger -> HomeUnit -> DynFlags -> UniqSupply -> IO ()
 runTests logger home_unit dflags us = do
   res <- testGraphNoSpills logger home_unit dflags noSpillsCmmFile us
-  if res then putStrLn "All tests passed."
-         else hPutStr stderr "testGraphNoSpills failed!"
+  unless res $ hPutStr stderr "testGraphNoSpills failed!"
+  unless testFormatWidths $ hPutStr stderr "testFormatWidths failed!"
+  when (res && testFormatWidths) $ putStrLn "All tests passed."
+
+-- | The liveness join ('Regs.addRegMaxFmt') and kill ('Regs.minusCoveredRegs')
+-- compare a register's formats by width (#27619). Format's derived Ord ranks
+-- a vector by its number of elements before their format, so that it puts
+-- VecFormat 16 FmtInt8 (128 bits) above VecFormat 4 FmtDouble (256 bits), and
+-- VecFormat 4 FmtFloat (128 bits) above VecFormat 4 FmtInt64 (256 bits): by
+-- that order, a register read at both was kept live at the narrower, a write
+-- at the narrower killed a value live at the wider, and a write killed no
+-- value live at a format of its width ranked above its own, as SSE2's Int32X4
+-- insertion writes at VecFormat 4 FmtInt32 registers it reads at
+-- VecFormat 4 FmtFloat. Two formats of one width join to the same format
+-- in either order.
+testFormatWidths :: Bool
+testFormatWidths =
+  and [ joined narrow wide == Just wide && joined wide narrow == Just wide
+          && survives wide narrow && not (survives narrow wide)
+      | (narrow, wide) <- [ (VecFormat 16 FmtInt8, VecFormat 4 FmtDouble)
+                          , (VecFormat 8 FmtInt16, VecFormat 4 FmtInt64)
+                          , (VecFormat 4 FmtFloat, VecFormat 4 FmtInt64) ] ]
+  && and [ not (survives f g) && not (survives g f) && joined f g == joined g f
+          | (f, g) <- [ (VecFormat 4 FmtFloat, VecFormat 4 FmtInt32)
+                      , (VecFormat 16 FmtInt8, VecFormat 8 FmtInt16)
+                      , (VecFormat 2 FmtDouble, VecFormat 4 FmtInt32) ] ]
+  where
+    v = RegVirtual (VirtualRegV128 (mkUniqueGrimily 1))
+    regs fmt = Regs.mkRegsMaxFmt [RegWithFormat v fmt]
+    -- the format v is live at when live at the first and read at the second
+    joined live rd = Regs.lookupReg v (Regs.addRegMaxFmt (regs live)
+                                                         (RegWithFormat v rd))
+    -- whether v, live at the first after a write at the second, is live
+    -- before it
+    survives live wr = Regs.elemRegs v (Regs.minusCoveredRegs (regs live)
+                                                              (regs wr))
 
 
 -- | To map an unlimited number of abstract variables to a limited number of
