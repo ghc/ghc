@@ -12,7 +12,6 @@ import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Linear.State
 import GHC.CmmToAsm.Reg.Linear.Base
-import GHC.CmmToAsm.Reg.Linear.FreeRegs
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Types
@@ -38,7 +37,7 @@ import Data.Coerce (coerce)
 --      vregs are in the correct regs for its destination.
 --
 joinToTargets
-        :: (FR freeRegs, Instruction instr)
+        :: Instruction instr
         => BlockMap Regs -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
@@ -68,7 +67,7 @@ joinToTargets block_live id instr
 
 -----
 joinToTargets'
-        :: (FR freeRegs, Instruction instr)
+        :: Instruction instr
         => BlockMap Regs -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
@@ -100,22 +99,16 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
         let still_live uniq _   = uniq `elemUniqSet_Directly` getRegs live_set
         let adjusted_assig      = filterUFM_Directly still_live assig
 
-        -- and free up those registers which are now free.
-        let to_free =
-                [ r     | (reg, Loc loc _locFmt) <- nonDetUFMToList assig
-                        -- The registers are released into a bitmap of
-                        -- free registers, so the order does not matter
-                        -- (Note [Unique Determinism and code generation])
-                        , not (elemUniqSet_Directly reg $ getRegs live_set)
-                        , r          <- regsOfLoc loc ]
-
         case lookupBlockAssignment  dest block_assig of
+         -- this is the first time we jumped to this block:
+         -- remember the current assignment on entry to it: see
+         -- Note [The first jump into a block fixes its entry assignment]
          Nothing
-          -> joinToTargets_first
-                        block_live new_blocks block_id instr dest dests
-                        block_assig adjusted_assig to_free
+          -> do setBlockAssigR
+                  (updateBlockAssignment dest adjusted_assig block_assig)
+                joinToTargets' block_live new_blocks block_id instr dests
 
-         Just (_, dest_assig)
+         Just dest_assig
           -> joinToTargets_again
                         block_live new_blocks block_id instr dest dests
                         adjusted_assig dest_assig
@@ -124,16 +117,16 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 {- Note [The first jump into a block fixes its entry assignment]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Of the jumps into a block, the first that the allocator processes records the
-block's entry assignment (joinToTargets_first): where each vreg live into the
-block is, InReg, InMem or InBoth, and which registers are free. Every jump into
-the block that is processed later is made to conform to that assignment by fixup
-code (joinToTargets_again), whatever its own assignment and however often its
-edge runs. So the order in which a block's predecessors are allocated decides
-where the moves run. The SCCs come in dependency order, the path into a loop
-before the loop's body, so that a loop's head takes the registers of the
-path into it, and its back edge pays for any difference at every iteration;
-firstFreeInOrder's preferences work to keep a loop's values in its head's
-registers. The SCCs linearRA_SCCs defers are allocated after the others. Hence:
+block's entry assignment (joinToTargets'): where each vreg live into the block
+is, InReg, InMem or InBoth. Every jump into the block that is processed later is
+made to conform to that assignment by fixup code (joinToTargets_again), whatever
+its own assignment and however often its edge runs. So the order in which a
+block's predecessors are allocated decides where the moves run. The SCCs come
+in dependency order, the path into a loop before the loop's body, so that a
+loop's head takes the registers of the path into it, and its back edge pays
+for any difference at every iteration; firstFreeInOrder's preferences work to
+keep a loop's values in its head's registers. The SCCs linearRA_SCCs defers are
+allocated after the others. Hence:
 
 * TODO: where a loop head's entry assignment comes from a preheader that has
   spilled a loop-carried vreg, it records the vreg InMem. The body then reloads
@@ -159,42 +152,8 @@ block it is live into, holds it in a register, not the first register it was
 given, and it stands for the rest of the procedure.
 -}
 
--- this is the first time we jumped to this block.
-joinToTargets_first :: (FR freeRegs, Instruction instr)
-                    => BlockMap Regs
-                    -> [NatBasicBlock instr]
-                    -> BlockId
-                    -> instr
-                    -> BlockId
-                    -> [BlockId]
-                    -> BlockAssignment freeRegs
-                    -> RegMap Loc
-                    -> [RealReg]
-                    -> RegM freeRegs ([NatBasicBlock instr], instr)
-joinToTargets_first block_live new_blocks block_id instr dest dests
-        block_assig src_assig
-        to_free
-
- = do   -- free up the regs that are not live on entry to this block.
-        -- BUG TODO #27981: to_free holds only registers that hold vregs. So
-        -- a real register still allocated at the jump, such as R1 on x86-64
-        -- where it is read after a conditional branch, stays allocated in the
-        -- free registers recorded for the block, even when it is not live into
-        -- it. This costs only speed, under the linear allocator, where an STG
-        -- register's machine register is handed out between its uses (x86-64,
-        -- PowerPC and, for XMM1 to XMM4, i386: Note [Native code generator] in
-        -- GHC.CmmToAsm).
-        freeregs        <- getFreeRegsR
-        let freeregs' = foldl' (flip frReleaseReg) freeregs to_free
-
-        -- remember the current assignment on entry to this block: see
-        -- Note [The first jump into a block fixes its entry assignment]
-        setBlockAssigR (updateBlockAssignment dest (freeregs', src_assig) block_assig)
-
-        joinToTargets' block_live new_blocks block_id instr dests
-
 -- we've jumped to this block before
-joinToTargets_again :: (Instruction instr, FR freeRegs)
+joinToTargets_again :: Instruction instr
                     => BlockMap Regs
                     -> [NatBasicBlock instr]
                     -> BlockId

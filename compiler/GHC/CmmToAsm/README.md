@@ -90,9 +90,9 @@ or uses it:
 * InReg, InMem, InBoth: where the linear allocator keeps a virtual register:
   in a register, in a spill slot, or in both (`VLoc`
   in `GHC.CmmToAsm.Reg.Linear.Base`).
-* entry assignment: where each virtual register live into a block is, and which
-  registers are free, as the linear allocator fixes them at the first
-  of the block's incoming jumps that it processes
+* entry assignment: where each virtual register live into a block is,
+  as the linear allocator fixes it at the first of the block's incoming jumps
+  that it processes
   (Note [The first jump into a block fixes its entry assignment]
   in `GHC.CmmToAsm.Reg.Linear.JoinToTargets`). The linear allocator's comments
   also call it the block's recorded assignment.

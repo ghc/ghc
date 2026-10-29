@@ -310,8 +310,8 @@ linearRegAlloc'
 
 linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
  = UDSM $ \us -> do
-    let !(_, !stack, !stats, !blocks, us') =
-            runR ctx emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
+    let !(!stack, !stats, !blocks, us') =
+            runR ctx us
                 $ linearRA_SCCs cold entry_ids js block_live sccs
         -- each block's jump targets, read by the allocation order and the
         -- context alike
@@ -333,6 +333,7 @@ linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
                 , rc_clobbers  = case platformArch platform of
                     ArchX86_64 -> Just (regClobbers platform sccs)
                     _          -> Nothing
+                , rc_initFree  = initFreeRegs
                 , rc_config    = config }
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
@@ -634,11 +635,11 @@ wideMoveDests platform cold block_live sccs
 
 -- | Allocate the SCCs in order, except that, of the entry blocks other
 -- than the procedure's first and outside any cycle, those the garbage
--- collector returns to after a heap or stack check fails (those in the given
--- set) and those that jump into a loop that calls nothing and whose entry
--- assignment is not yet recorded (#27800), and any SCC only they lead to,
--- go after the others. The first jump allocated into a block records the
--- registers it starts with, and later jumps into it move their values to
+-- collector returns to after a heap or stack check fails (those in the
+-- given set) and those that jump into a loop that calls nothing and whose
+-- entry assignment is not yet recorded (#27800), and any SCC only they lead
+-- to, go after the others. The first jump allocated into a block records
+-- where its live-in vregs are, and later jumps into it move their values to
 -- match (Note [The first jump into a block fixes its entry assignment] in
 -- GHC.CmmToAsm.Reg.Linear.JoinToTargets). Where such a block jumps back to the
 -- block that made the check, which the hot path also enters, allocating it
@@ -753,8 +754,8 @@ process entry_ids succs block_live =
             else do go blocks (b : next_round) accum madeProgress
 
 -- | Whether a block can be allocated now: a jump to it has been allocated,
--- recording the registers it starts with, or it is an entry.
-isReached :: LabelSet -> BlockAssignment freeRegs -> BlockId -> Bool
+-- recording where its live-in vregs are, or it is an entry.
+isReached :: LabelSet -> BlockAssignment -> BlockId -> Bool
 isReached entry_ids block_assig bid
   = isJust (lookupBlockAssignment bid block_assig) || bid `setMember` entry_ids
 
@@ -779,7 +780,7 @@ processBlock succs block_live (BasicBlock id instrs)
  = do   -- pprTraceM "processBlock" $ text "" $$ ppr (BasicBlock id instrs)
         initBlock id block_live
         platform <- getPlatform
-        bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
+        bassig <- getBlockAssigR
         let !dests = mapFindWithDefault [] id succs
             -- the jump targets' recorded assignments, and for one not yet
             -- reached, those of the blocks it jumps to, in the jumps' order
@@ -788,12 +789,12 @@ processBlock succs block_live (BasicBlock id instrs)
             -- CmmDiamondChain at -O and -O2, on GHC 10.1.20261108
             !locs = reverse (foldl' viaTarget [] dests)
             viaTarget ls dest
-              | Just (_, assig) <- lookupBlockAssignment dest bassig
+              | Just assig <- lookupBlockAssignment dest bassig
               = assig : ls
               | otherwise
               = foldl' recorded ls (mapFindWithDefault [] dest succs)
             recorded ls dest
-              | Just (_, assig) <- lookupBlockAssignment dest bassig
+              | Just assig <- lookupBlockAssignment dest bassig
               = assig : ls
               | otherwise = ls
             -- the entries of 'rc_moveDests' for the vregs moved into another
@@ -831,34 +832,35 @@ processBlock succs block_live (BasicBlock id instrs)
         return  $ BasicBlock id instrs' : fixups
 
 
--- | Load the freeregs and current reg assignment into the RegM state
---      for the basic block with this BlockId.
+-- | Set up the RegM state for the basic block with this BlockId: its
+--      current reg assignment, and the freeregs on entry to it.
 initBlock :: FR freeRegs
           => BlockId -> BlockMap Regs -> RegM freeRegs ()
 initBlock id block_live
- = do   platform    <- getPlatform
+ = do   init_free   <- rc_initFree <$> getContextR
         block_assig <- getBlockAssigR
-        case lookupBlockAssignment id block_assig of
-                -- no jump into this block has been allocated: it is an entry
-                -- block, or a block no allocated jump reaches. The real
-                -- registers live into it are allocated, no virtual register
-                -- is placed, and the assignment begins empty; the block is
-                -- allocated once.
-                Nothing
-                 -> do  -- pprTrace "initFreeRegs" (text $ show initFreeRegs) (return ())
-                        case mapLookup id block_live of
-                          Nothing ->
-                            setFreeRegsR    (frInitFreeRegs platform)
-                          Just live ->
-                            setFreeRegsR $ foldl' (flip frAllocateReg) (frInitFreeRegs platform)
-                                                  (nonDetEltsUniqSet $ takeRealRegs $ getRegs live)
-                            -- See Note [Unique Determinism and code generation]
-                        setAssigR       emptyRegMap
-
-                -- load info about register assignments leading into this block.
-                Just (freeregs, assig)
-                 -> do  setFreeRegsR    freeregs
-                        setAssigR       assig
+        let -- the assignment recorded on entry to this block, if a jump to
+            -- it has been allocated, and none otherwise
+            assig     = fromMaybe emptyRegMap
+                                  (lookupBlockAssignment id block_assig)
+            -- The registers free on entry to this block: every allocatable one
+            -- but the real registers live into it and those holding the vregs
+            -- of its assignment. Deriving them from the free registers of the
+            -- block that first jumped here would leave a real register still
+            -- allocated at that jump and not live into this one, R1 above all
+            -- where it is allocatable, allocated until this block writes it and
+            -- that value dies, so that a value it reloads cannot go back to
+            -- that register and the block's jumps may need fixup moves
+            -- (#27981). This relies on liveness listing in block_live every
+            -- real register live into the block: one it missed would be handed
+            -- to a vreg.
+            hold (Loc loc _) fr = foldl' (flip frAllocateReg) fr (regsOfLoc loc)
+            live_free = allocateRealRegs
+                          (mapFindWithDefault noRegs id block_live) init_free
+        setFreeRegsR $ nonDetStrictFoldUFM hold live_free assig
+                         -- in any order: each register is allocated on its own
+                         -- (Note [Unique Determinism and code generation])
+        setAssigR assig
 
 
 -- | Do allocation for a sequence of instructions.
@@ -1569,7 +1571,7 @@ in firstFreeInOrder).
 -- Note [Register preferences in the linear allocator] gives.
 firstFreeInOrder :: Unique -> [RealReg] -> RegM freeRegs RealReg
 firstFreeInOrder u free = do
-  bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
+  bassig <- getBlockAssigR
   cur <- getAssigR :: RegM freeRegs (RegMap Loc)
   ctx@RA_Context { rc_moveDests = MoveDests moves allMoved movedTwice
                  , rc_claims    = claims
@@ -1611,7 +1613,7 @@ firstFreeInOrder u free = do
              Just r0
                | isStaleFirst u bassig
                , (True, Just b, region) <- staleWalk u live succs bassig dests
-               , Just (_, assig) <- lookupBlockAssignment b bassig
+               , Just assig <- lookupBlockAssignment b bassig
                , Just (Loc l _) <- lookupUFM_Directly assig u
                , r : _ <- regsOfLoc l, r /= r0, isFree r
                , Just holders <- blocksHolding u r0 bassig
@@ -1679,7 +1681,7 @@ firstFreeInOrder u free = do
 -- a block's context holds a thunk of the block assignment and the instructions
 -- and nothing else: built in processBlock, a form of it allocated a closure
 -- for every block, those that test no claim included.
-claimsOf :: BlockAssignment freeRegs -> [LiveInstr instr] -> UniqFM RealReg [Unique]
+claimsOf :: BlockAssignment -> [LiveInstr instr] -> UniqFM RealReg [Unique]
 claimsOf bassig instrs
   = nonDetStrictFoldUFM_Directly
       (\u rr m -> addToUFM_C (\us _ -> u : us) m rr [u]) emptyUFM byVreg
@@ -1697,8 +1699,8 @@ claimsOf bassig instrs
 -- for the virtual register with the given unique where none of its preferences
 -- is free, given regClobbers' map ('rc_clobbers') and whether it has none: the
 -- first in the order Note [Register preferences in the linear allocator] gives.
-fallbackReg :: RA_Context -> UniqFM VirtualReg Word64 -> Bool -> Unique
-            -> [RealReg] -> RealReg
+fallbackReg :: RA_Context freeRegs -> UniqFM VirtualReg Word64
+            -> Bool -> Unique -> [RealReg] -> RealReg
 fallbackReg RA_Context { rc_jumpLocs = locs } clobbers noPrefs u free@(r0 : _)
   = let !r1 = r1Reg
         !cl = lookupWithDefaultUFM_Directly clobbers 0 u
@@ -1782,7 +1784,7 @@ liveWalk !u live succs atEnd atCap visit start = go (0 :: Int) setEmpty start []
 -- !16269's CmmDiamondChain at -O0 and 0.023% more at -O and -O2, on GHC
 -- 10.1.20261108.
 staleWalk :: Unique -> BlockMap Regs -> LabelMap [BlockId]
-          -> BlockAssignment freeRegs -> [BlockId] -> (Bool, Maybe BlockId, LabelSet)
+          -> BlockAssignment -> [BlockId] -> (Bool, Maybe BlockId, LabelSet)
 {-# NOINLINE staleWalk #-}
 staleWalk u live succs bassig
   = liveWalk u live succs (\seen -> (True, Nothing, seen))
@@ -1796,7 +1798,7 @@ staleWalk u live succs bassig
 -- fb reaches a block of the region, by 'liveWalk' from fb, going no further
 -- than the other recorded blocks and giving up as 'staleWalk' does.
 staleMeets :: Unique -> BlockMap Regs -> LabelMap [BlockId]
-           -> BlockAssignment freeRegs -> LabelSet -> BlockId -> Bool
+           -> BlockAssignment -> LabelSet -> BlockId -> Bool
 {-# NOINLINE staleMeets #-}
 staleMeets u live succs bassig region fb
   = liveWalk u live succs (const False) (const True) visit [fb]
