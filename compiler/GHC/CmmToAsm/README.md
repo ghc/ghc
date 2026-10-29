@@ -120,10 +120,10 @@ or uses it:
 * back edge: an edge that closes a loop, by one of two notions that disagree
   on some edges (Note [Back edges in loopInfo] in `GHC.CmmToAsm.CFG`).
   For `loopInfo`, an edge of the CFG whose target dominates its source,
-  as `mkDomMap` computes dominance: no edge into the entry block, and a self
-  loop only at a leaf of the dominator tree. For `findBackEdges`, which
-  `optHsPatterns` uses, an edge into a block still on the stack of a depth-first
-  search from the entry, and no self loop.
+  as `mkDomMap` computes dominance: no edge into the entry block, and every
+  self loop. For `findBackEdges`, which `optHsPatterns` uses, an edge into
+  a block still on the stack of a depth-first search from the entry, and no
+  self loop.
 * irreducible: said of a cycle that can be entered at more than one
   of its blocks, and of control flow that has one
   (Note [Back edges in loopInfo], `loopInfo`, `mkGlobalWeights`); and,
