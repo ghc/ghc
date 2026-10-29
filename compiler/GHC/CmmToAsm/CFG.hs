@@ -82,6 +82,7 @@ import Data.Array.Unsafe (unsafeFreeze)
 import Data.Array.Base (unsafeRead, unsafeWrite)
 
 import Control.Monad
+import GHC.Utils.Monad (anyM)
 import GHC.Data.UnionFind
 
 type Prob = Double
@@ -1387,7 +1388,7 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
     let -- calcOutFreqs :: Node -> ST s ()
         calcOutFreqs bhead block = do
           !f <- getFreq block
-          forM (successors block) $ \bi -> do
+          forM_ (successors block) $ \bi -> do
             let !prob = getProb block bi
             let !succFreq = f * prob
             setEdgeFreq block bi succFreq
@@ -1406,24 +1407,24 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
                 setFreq block 1.0 -- Loop header frequency is always 1
             else do
                 let preds = IS.elems $ predecessors block
-                irreducible <- (fmap or) $ forM preds $ \bp -> do
+                irreducible <- anyM (\bp -> do
                     !bp_visited <- visited bp
                     let bp_backedge = isBackEdge bp block
-                    return (not bp_visited && not bp_backedge)
+                    return (not bp_visited && not bp_backedge)) preds
 
                 if irreducible
                 then return () -- Rare we don't care
                 else do
                     setFreq block 0
-                    !cycleProb <- sum <$> (forM preds $ \pred -> do
+                    !cycleProb <- foldM (\ !acc pred -> do
                         if isBackEdge pred block
                             then
-                                getBackProb pred block
+                                (acc +) <$> getBackProb pred block
                             else do
                                 !f <- getFreq block
                                 !prob <- getEdgeFreq pred block
                                 setFreq block $! f + prob
-                                return 0)
+                                return acc) 0 preds
                     -- traceM $ "cycleProb:" ++ show cycleProb
                     let limit = 1 - 1/512 -- Paper uses 1 - epsilon, but this works.
                                           -- determines how large likelyhoods in loops can grow.
