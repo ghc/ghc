@@ -777,17 +777,16 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
 
         g1 = graphFromEdgedVerticesUniq nodes
 
-        reachable :: LabelSet
+        reachable :: BlockId -> Bool
         reachable
             | Just cfg <- mcfg
             -- Our CFG only contains reachable nodes by construction at this point.
-            = setFromList $ getCfgNodes cfg
+            = (`mapMember` cfg)
             | otherwise
-            = setFromList $ [ node_key node | node <- reachablesG g1 roots ]
+            = (`setMember` setFromList (map node_key (reachablesG g1 roots)))
 
         g2 = graphFromEdgedVerticesUniq [ node | node <- nodes
-                                               , node_key node
-                                                  `setMember` reachable ]
+                                               , reachable (node_key node) ]
 
         sccs = stronglyConnCompG g2
 
