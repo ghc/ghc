@@ -16,6 +16,8 @@ import qualified GHC.Platform.Reg.Class.NoVectors as NoVectors
 import GHC.CmmToAsm.Config
 import GHC.Utils.Panic
 import GHC.Platform
+import GHC.Types.Unique (Unique)
+import GHC.CmmToAsm.Reg.Linear.Base (RA_Context, BlockAssignment)
 
 -- -----------------------------------------------------------------------------
 -- The free register set
@@ -55,6 +57,15 @@ class Show freeRegs => FR freeRegs where
     frClobberRegs plat clobbered fr
       = foldl' (flip frAllocateReg) fr [ r | r <- clobbered, r `elem` free ]
       where free = allFreeRegs plat fr
+    -- | Of the given free registers of a class, the one to take
+    -- for the virtual register with the given unique where none of
+    -- its preferences is free, given the allocator's context and block
+    -- assignment, the Bool being whether it has none
+    -- ('GHC.CmmToAsm.Reg.Linear.firstFreeInOrder'): by default the first.
+    frFallbackReg :: RA_Context -> BlockAssignment freeRegs -> Bool -> Unique
+                  -> [RealReg] -> RealReg
+    frFallbackReg _ _ _ _ (r : _) = r
+    frFallbackReg _ _ _ _ []      = panic "frFallbackReg: no free register"
 
 instance FR X86.FreeRegs where
     frAllocateReg  = X86.allocateReg
@@ -69,6 +80,7 @@ instance FR X86_64.FreeRegs where
     frReleaseReg   = X86_64.releaseReg
     -- allocateReg takes an allocated register too
     frClobberRegs _ rs fr = foldl' (flip X86_64.allocateReg) fr rs
+    frFallbackReg  = X86_64.fallbackReg
 
 instance FR PPC.FreeRegs where
     frAllocateReg  = PPC.allocateReg
