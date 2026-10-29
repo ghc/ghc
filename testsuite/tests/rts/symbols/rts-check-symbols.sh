@@ -6,6 +6,7 @@ $TEST_HC $TEST_HC_OPTS      \
     dumpDeclaredSymbols.c   \
     -I$TOP/../rts           \
     -I$TOP/../rts/include   \
+    $WAY_FLAGS              \
     Main.hs                 \
     -o Main                 \
     > /dev/null

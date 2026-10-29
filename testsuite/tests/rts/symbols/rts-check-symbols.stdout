@@ -1,5 +1,4 @@
 Symbols declared in RtsSymbols.c but not observed in the DSO:
-Declared> atomic_dec Code
 Declared> dirty_TVAR Code
 Declared> signal_handlers Code
 Declared> updateRemembSetPushThunk Code
