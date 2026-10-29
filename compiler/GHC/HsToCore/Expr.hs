@@ -310,6 +310,10 @@ dsExpr e@(XExpr ext_expr_tc)
       ConLikeTc {}  -> dsApp e
 
       ExpandedThingTc (HSE _ e) -> dsLExpr e
+      ReSynBindsTc m e ->
+        do
+        tracePm "dsExpr XExpr" (ppr m)
+        dsExpr e --TODO ANI: This should never happen?
 
       -- Hpc Support
       HsTick tickish e -> do
@@ -570,7 +574,9 @@ dsExpr (RecordCon { rcon_con  = L _ con_like
 -- Template Haskell stuff
 -- See Note [The life cycle of a TH quotation]
 
-dsExpr (HsTypedBracket   bracket_tc _) = dsBracket bracket_tc
+dsExpr (HsTypedBracket   bracket_tc _) = do
+  tracePm "dsExpr:dsBracket typed bracket" empty
+  dsBracket bracket_tc
 dsExpr (HsUntypedBracket bracket_tc _) = dsBracket bracket_tc
 dsExpr (HsTypedSplice   _   s) = pprPanic "dsExpr:typed splice" (pprTypedSplice Nothing s)
 dsExpr (HsUntypedSplice ext _) = dataConCantHappen ext

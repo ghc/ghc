@@ -287,6 +287,7 @@ tcExpand e@(HsUntypedSplice splice_res _)
 
 ------------------------
 -- XExpr
+
 -- Expansions are idempotent, XExprs do not expand again
 tcExpand (XExpr (ExpandedThingRn hse))
   = return $ Just hse

@@ -639,6 +639,7 @@ exprCtOrigin (RecordUpd{})        = RecordUpdOrigin
 exprCtOrigin (HsGetField _ _ f)   = GetFieldOrigin (fmap (mkFastStringShortText . field_label) $ dfoLabel (unLoc f))
 exprCtOrigin (XExpr (ExpandedThingRn (HSE o _))) = hsCtxtCtOrigin o
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
+exprCtOrigin (XExpr (ReSynBindsRn _ e)) = exprCtOrigin e
 
 hsCtxtCtOrigin :: HsCtxt -> CtOrigin
 hsCtxtCtOrigin (ExprCtxt (ExprWithTySig _ (L _ e) _)) = exprCtOrigin e

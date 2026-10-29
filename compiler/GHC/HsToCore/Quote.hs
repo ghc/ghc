@@ -1763,6 +1763,9 @@ repE e@(XExpr (ExpandedThingRn (HSE o x)))
   | otherwise
   = notHandled (ThExpressionForm e)
 repE (XExpr (HsRecSelRn (FieldOcc _ (L _ x)))) = repE (mkHsVar (noLocA x))
+repE (XExpr (ReSynBindsRn m e)) = do
+  e' <- repE e
+  repReSynBindsE m e'
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
 repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
@@ -2612,6 +2615,16 @@ repDoE = repDoBlock doEOcc
 
 repMDoE :: Maybe HsModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
 repMDoE = repDoBlock mdoEOcc
+
+repReSynBindsE :: HsModuleName -> Core (M TH.Exp) -> MetaM (Core (M TH.Exp))
+repReSynBindsE m (MkC e) = do
+   MkC coreModName <- coreModNameM
+   krep2 resynbindEOcc [coreModName, e]
+  where
+    coreModNameM :: MetaM (Core TH.ModName)
+    coreModNameM = do
+      MkC s <- lift $ coreStringLit (moduleNameFS (hsModuleName m))
+      rep2_nw mkModNameOcc [s]
 
 repDoBlock :: KnownOcc -> Maybe HsModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
 repDoBlock doName maybeModName (MkC ss) = do
