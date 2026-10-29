@@ -34,6 +34,8 @@ import Data.Coerce ( coerce )
 -- in GHC.CmmToAsm.Reg.Liveness.
 newtype Regs = Regs { getRegs :: UniqSet RegWithFormat }
   deriving newtype (Eq, Outputable)
+  -- Eq compares the registers only, not their formats: compare the formats too
+  -- where they matter, as livenessCyclic does (#27619).
 
 maxRegWithFormat :: RegWithFormat -> RegWithFormat -> RegWithFormat
 maxRegWithFormat r1@(RegWithFormat _ fmt1) r2@(RegWithFormat _ fmt2)
