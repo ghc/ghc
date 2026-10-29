@@ -192,6 +192,7 @@ import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Home.PackageTable
+import qualified GHC.Unit.Home.Graph as HUG
 
 import GHC.Core.UsageEnv
 import GHC.Core.Coercion ( isReflCo )
@@ -2741,11 +2742,14 @@ getCompleteMatchesTcM
        ; eps <- liftIO $ hscEPS hsc_env
        ; tcg_env <- getGblEnv
        ; let tcg_comps = tcg_complete_match_env tcg_env
-       ; liftIO $ localAndImportedCompleteMatches tcg_comps eps
+       ; liftIO $ localAndImportedCompleteMatches tcg_comps (hsc_HUG hsc_env) eps
        }
 
-localAndImportedCompleteMatches :: CompleteMatches -> ExternalPackageState -> IO CompleteMatches
-localAndImportedCompleteMatches tcg_comps eps = do
+localAndImportedCompleteMatches :: CompleteMatches -> HomeUnitGraph -> ExternalPackageState -> IO CompleteMatches
+localAndImportedCompleteMatches tcg_comps hug eps = do
+  -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+  loaded_comps <- HUG.loadedCompleteSigs hug
   return $
        tcg_comps                -- from the current modulea and from the home package
+    ++ loaded_comps             -- from demand-loaded home modules (one-shot mode)
     ++ eps_complete_matches eps -- from external packages

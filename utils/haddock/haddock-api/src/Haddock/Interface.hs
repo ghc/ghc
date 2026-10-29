@@ -64,8 +64,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Pipeline (compileFile)
 import GHC.HsToCore.Docs (getMainDeclBinder)
 import GHC.Iface.Load (loadSysInterface, readFullIfaceFromDisk)
-import GHC.IfaceToCore (tcIfaceInst, tcIfaceFamInst)
-import GHC.Tc.Utils.Monad (initIfaceLoad, initIfaceLcl)
+import GHC.Tc.Utils.Monad (initIfaceLoad)
 import GHC.Tc.Utils.Env (lookupGlobal_maybe)
 import GHC.Types.Error (mkUnknownDiagnostic)
 import GHC.Types.Name.Occurrence (emptyOccEnv)
@@ -74,10 +73,13 @@ import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 import GHC.Unit.Module.Graph (ModuleGraphNode (..), ModuleNodeInfo(..))
 import GHC.Unit.Module.ModDetails
-import GHC.Unit.Module.ModIface (mi_semantic_module, mi_boot)
 import GHC.Unit.Module.ModSummary (isBootSummary)
 import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName, text, ppr)
-import GHC.Utils.Panic (pprPanic)
+import GHC.Utils.Panic (pprPanic, throwGhcExceptionIO)
+import GHC.Unit.Home.Graph (lookupHugByModule)
+import GHC.Iface.Errors.Ppr (missingInterfaceErrorDiagnostic)
+import GHC.Driver.Config.Diagnostic (initIfaceMessageOpts)
+import GHC.Driver.Ppr (showSDoc)
 import GHC.Utils.Error (withTiming)
 import GHC.Utils.Monad (mapMaybeM)
 
@@ -256,25 +258,24 @@ dropErr (Succeeded a) = Just a
 dropErr (Failed _) = Nothing
 
 loadHiFile :: HscEnv -> Outputable.SDoc -> Module -> IO (ModIface, ([ClsInst], [FamInst]))
-loadHiFile hsc_env doc theModule = initIfaceLoad hsc_env $ do
+loadHiFile hsc_env doc theModule = do
+  -- The module is a module of the home unit, so loading its interface
+  -- typechecks it into the HPT, together with its instances.
+  -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState.
+  _ <- initIfaceLoad hsc_env $ loadSysInterface doc theModule
+  details <- lookupHugByModule theModule (hsc_HUG hsc_env) >>= \case
+    Just hmi -> pure (hm_details hmi)
+    Nothing  -> pprPanic "loadHiFile: not a home module" (ppr theModule)
+  let insts = (instEnvElts (md_insts details), md_fam_insts details)
 
-  -- TODO: one-shot PIT access
-  -- 'loadSysInterface' used to hand back the ModIface kept in the PIT. The EPS
-  -- no longer keeps ModIfaces (see Note [The EPS does not keep ModIfaces]), so
-  -- we load the interface into the EPS (for the instances' environment) and
-  -- re-read the full interface from disk.
-  _ <- loadSysInterface doc theModule
-  mod_iface <- liftIO (readFullIfaceFromDisk hsc_env theModule) >>= \case
+  -- Haddock needs the declarations of the full interface, which neither the
+  -- HPT entry nor the EPS keep (see Note [The EPS does not keep ModIfaces]),
+  -- so we read the interface file once more.
+  mod_iface <- readFullIfaceFromDisk hsc_env theModule >>= \case
     Succeeded i -> pure i
-    -- POC: loadSysInterface succeeded, so this should not happen.
-    Failed _ -> pprPanic "loadHiFile: TODO: re-reading the interface failed" (ppr theModule)
-
-  insts <- initIfaceLcl (mi_semantic_module mod_iface) doc (mi_boot mod_iface) $ do
-
-    new_eps_insts     <- mapM tcIfaceInst (mi_insts mod_iface)
-    new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts mod_iface)
-
-    pure (new_eps_insts, new_eps_fam_insts)
+    Failed err  -> throwGhcExceptionIO $ ProgramError $
+      showSDoc (hsc_dflags hsc_env)
+        (missingInterfaceErrorDiagnostic (initIfaceMessageOpts (hsc_dflags hsc_env)) err)
 
   pure (mod_iface, insts)
 

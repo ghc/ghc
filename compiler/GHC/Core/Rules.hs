@@ -13,7 +13,7 @@ module GHC.Core.Rules (
 
         -- ** RuleBase, RuleEnv
         RuleBase, RuleEnv(..), mkRuleEnv, emptyRuleEnv,
-        updExternalPackageRules, addLocalRules, updLocalRules,
+        updExternalPackageRules, withLoadedHomeRules, addLocalRules, updLocalRules,
         emptyRuleBase, mkRuleBase, extendRuleBaseList,
         pprRuleBase,
 
@@ -427,6 +427,15 @@ mkRuleEnv (ModGuts { mg_module = this_mod
             , re_visible_orphs = mkModuleSet vis_orphs }
   where
     vis_orphs = this_mod : dep_orphs deps
+
+-- | Combine the rules of the external packages with those of the home modules
+-- that were demand-loaded in one-shot mode: both are kept in 're_eps_rules',
+-- as both are read (and grow) during simplification.
+-- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+withLoadedHomeRules :: RuleBase -> RuleBase -> RuleBase
+withLoadedHomeRules eps_rules loaded_rules
+  | isNullUFM loaded_rules = eps_rules
+  | otherwise              = plusUFM_C (++) eps_rules loaded_rules
 
 updExternalPackageRules :: RuleEnv -> RuleBase -> RuleEnv
 -- Completely over-ride the external rules in RuleEnv

@@ -993,6 +993,7 @@ Library
         GHC.Unit.Finder.Types
         GHC.Unit.Home
         GHC.Unit.Home.Graph
+        GHC.Unit.Home.LoadedState
         GHC.Unit.Home.ModInfo
         GHC.Unit.Home.PackageTable
         GHC.Unit.Info

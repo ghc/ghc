@@ -158,10 +158,11 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 
     get_linkable osuf mod      -- A home-package module
       = HUG.lookupHugByModule mod (ue_home_unit_graph unit_env) >>= \case
-          Just mod_info -> adjust_linkable (expectJust (homeModLinkable mod_info))
-          Nothing -> do
-           -- It's not in the HPT because we are in one shot mode,
-           -- so use the Finder to get a ModLocation...
+          Just mod_info | Just lnk <- homeModLinkable mod_info -> adjust_linkable lnk
+          _ -> do
+           -- It's not in the HPT, or in the HPT without a linkable, because we
+           -- are in one shot mode (see Note [Demand-loaded home interfaces] in
+           -- GHC.Unit.Home.LoadedState), so use the Finder to get a ModLocation...
            case ue_homeUnit unit_env of
             Nothing -> no_obj mod
             Just home_unit -> do

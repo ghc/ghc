@@ -55,6 +55,8 @@ import Data.Function ( on )
 import qualified GHC.LanguageExtensions  as LangExt
 import Data.List (sortOn)
 import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.ModInfo ( HomeModInfo(..) )
+import GHC.Unit.Module.ModDetails ( ModDetails(..) )
 
 
 {- Note [The type family instance consistency story]
@@ -404,9 +406,14 @@ getFamInsts :: ModuleEnv FamInstEnv -> Module -> TcM FamInstEnv
 getFamInsts hpt_fam_insts mod
   | Just env <- lookupModuleEnv hpt_fam_insts mod = return env
   | otherwise = do { _ <- initIfaceTcRn (loadSysInterface doc mod)
-                   ; eps <- getEps
-                   ; return (expectJust $
-                             lookupModuleEnv (eps_mod_fam_inst_env eps) mod) }
+                   ; (eps, hug) <- getEpsAndHug
+                     -- A home module is demand-loaded into the HPT in one-shot mode
+                     -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+                   ; liftIO (HUG.lookupHugByModule mod hug) >>= \case
+                       Just hmi -> return $ extendFamInstEnvList emptyFamInstEnv
+                                              (md_fam_insts (hm_details hmi))
+                       Nothing  -> return (expectJust $
+                                     lookupModuleEnv (eps_mod_fam_inst_env eps) mod) }
   where
     doc = ppr mod <+> text "is a family-instance module"
 
@@ -613,7 +620,9 @@ addLocalFamInst (home_fie, my_fis) fam_inst
            -- by the current module, rather than every instance
            -- we've ever seen. Fixing this is part of #13102.
        ; eps <- getEps
-       ; let inst_envs = (eps_fam_inst_env eps, home_fie)
+         -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+       ; loaded_fie <- liftIO . HUG.loadedFamInstEnv . hsc_HUG =<< getTopEnv
+       ; let inst_envs = (eps_fam_inst_env eps, home_fie `unionFamInstEnv` loaded_fie)
              home_fie' = extendFamInstEnv home_fie fam_inst
 
            -- Check for conflicting instance decls and injectivity violations
@@ -950,9 +959,12 @@ reportConflictInstErr fam_inst (conf_inst : _) =
 
 tcGetFamInstEnvs :: TcM FamInstEnvs
 -- Gets both the external-package inst-env
--- and the home-pkg inst env (includes module being compiled)
+-- and the home-pkg inst env (includes module being compiled,
+-- and demand-loaded home modules in one-shot mode,
+-- see Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState)
 tcGetFamInstEnvs
   = do { eps <- getEps; env <- getGblEnv
+       ; loaded_fie <- liftIO . HUG.loadedFamInstEnv . hsc_HUG =<< getTopEnv
        ; let !pkg_env  = eps_fam_inst_env eps
-             !home_env = tcg_fam_inst_env env
+             !home_env = tcg_fam_inst_env env `unionFamInstEnv` loaded_fie
        ; return (pkg_env, home_env) }

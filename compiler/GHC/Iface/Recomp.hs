@@ -91,6 +91,8 @@ import Data.Bifunctor (first)
 import GHC.Types.PkgQual
 import GHC.ByteCode.Serialize (ModuleByteCode, gbc_hash)
 import GHC.Unit.Home.Graph (lookupHugByModule)
+import GHC.Unit.Home.LoadedState
+import GHC.Unit.Home.PackageTable ( updateHptLoadedState )
 import GHC.Unit.Home.ModInfo (HomeModLinkable(..), HomeModInfo (..))
 import GHC.Linker.Types (linkableParts)
 
@@ -427,7 +429,8 @@ checkVersions hsc_env mod_summary iface self_recomp
        -- case we'll compile the module from scratch anyhow).
 
        when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
-          ; updateEps_ $ \eps  -> eps { eps_is_boot = mkModDeps $ dep_boot_mods (mi_deps iface) }
+          ; liftIO $ updateHptLoadedState (hsc_HPT hsc_env) $ \hls ->
+              hls { hls_is_boot = mkModDeps $ dep_boot_mods (mi_deps iface) }
        }
        ; recomp <- checkList [checkModUsage (hsc_FC hsc_env) u
                              | u <- mi_sr_usages self_recomp]

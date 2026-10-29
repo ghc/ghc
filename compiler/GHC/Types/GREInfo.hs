@@ -58,7 +58,7 @@ directly after loading interface files, before they are typechecked. For example
     is responsible for coughing up GlobalRdrElts (and their GREInfos) obtained
     from interfaces, but we will only typecheck the interfaces after we have
     finished processing the imports (see e.g. the logic at the start of tcRnImports
-    which sets eps_is_boot, which decides whether we should look in the boot
+    which sets hls_is_boot, which decides whether we should look in the boot
     or non-boot interface for any particular module).
   - GHC.Tc.Utils.Backpack.mergeSignatures first loads the relevant signature
     interfaces to merge them, but only later on does it typecheck them.

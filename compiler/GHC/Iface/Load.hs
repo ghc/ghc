@@ -138,7 +138,10 @@ import GHC.Unit.Module.Deps
 import GHC.Unit.State
 import GHC.Unit.Home
 import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.LoadedState
+import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
+import GHC.Unit.Module.ModDetails
 import GHC.Unit.Finder
 import GHC.Unit.Env
 
@@ -505,7 +508,7 @@ importDecl name
     do  { logger <- getLogger
         ; liftIO $ trace_if logger nd_doc
 
-        -- Load the interface, which should populate the PTE
+        -- Load the interface, which should populate the PTE (or the HPT)
         ; mb_iface <- assertPpr (isExternalName name) (ppr name) $
                       loadInterface nd_doc (nameModule name) ImportBySystem
         ; case mb_iface of
@@ -514,12 +517,19 @@ importDecl name
           ; Succeeded _ -> do
 
         -- Now look it up again; this time we should find it
-        { eps <- getEps
-        ; case lookupTypeEnv (eps_PTE eps) name of
+        { hsc_env <- getTopEnv
+        ; liftIO (lookupType hsc_env name) >>= \case
             Just thing -> return $ Succeeded thing
-            Nothing    -> return $ Failed $
-              Can'tFindNameInInterface name
-              (filter is_interesting $ nonDetNameEnvElts $ eps_PTE eps)
+            Nothing    -> do
+              { eps <- getEps
+              ; home_things <- liftIO $
+                  HUG.lookupHugByModule (nameModule name) (hsc_HUG hsc_env) >>= pure . \case
+                    Just hmi -> nonDetNameEnvElts (md_types (hm_details hmi))
+                    Nothing  -> []
+              ; return $ Failed $
+                  Can'tFindNameInInterface name
+                  (filter is_interesting $ home_things ++ nonDetNameEnvElts (eps_PTE eps))
+              }
     }}}
   where
     nd_doc = text "Need decl for" <+> ppr name
@@ -753,11 +763,14 @@ loadInterface :: SDoc -> Module -> WhereFrom
               -> IfM lcl (MaybeErr MissingInterfaceError LoadedIface)
 
 -- loadInterface looks in both the HUG and the EPS for the required interface
--- If not found, it loads it, and puts an 'ExternalIface' into the EPS (always).
--- See Note [The EPS does not keep ModIfaces] in GHC.Unit.External.Iface.
+-- If not found, it loads it, and puts it in the HPT if the module belongs to a
+-- home unit (which only happens in one-shot mode), and an 'ExternalIface' into
+-- the EPS otherwise.
+-- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState and
+-- Note [The EPS does not keep ModIfaces] in GHC.Unit.External.Iface.
 
 -- If it can't find a suitable interface file, we
---      a) modify 'eps_ext_ifaces' to have an empty entry
+--      a) modify 'eps_ext_ifaces' to have an empty entry (not for home modules)
 --              (to avoid repeated complaints)
 --      b) return (Left message)
 --
@@ -785,13 +798,20 @@ loadInterface doc_str mod from
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
         ; let mhome_unit = ue_homeUnit (hsc_unit_env hsc_env)
+              mod_uid = moduleUnitId mod
+              -- Is this a module of a home unit?  If so, its interface goes
+              -- into the HPT, not the EPS.  This only happens in one-shot mode,
+              -- see Note [Home module load error].
+              -- GHC.Prim is special, it always goes into the EPS.
+              is_home_mod = HUG.memberHugUnitId mod_uid hug && mod /= gHC_PRIM
         ; liftIO (lookupIfaceByModule hug eps mod) >>= \case {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
             _ -> do {
 
         -- READ THE MODULE IN
-        ; read_result <- case wantHiBootFile mhome_unit eps mod from of
+        ; hls <- liftIO $ HUG.readHugLoadedState mod_uid hug
+        ; read_result <- case wantHiBootFile mhome_unit (hls_is_boot hls) mod from of
                            Failed err             -> return (Failed err)
                            Succeeded hi_boot_file -> do
                              hsc_env <- getTopEnv
@@ -800,10 +820,14 @@ loadInterface doc_str mod from
             Failed err -> do
                 { let !fake_iface = emptyExternalIface mod
 
-                ; updateEps_ $ \eps ->
-                        eps { eps_ext_ifaces = extendModuleEnv (eps_ext_ifaces eps) mod fake_iface }
-                        -- Not found, so add an empty iface to
-                        -- the EPS map so that we don't look again
+                  -- Not found, so add an empty iface to
+                  -- the EPS map so that we don't look again.
+                  -- We don't do this for home modules: their interfaces never
+                  -- go into the EPS, and we must not put a bogus entry into
+                  -- the HPT.
+                ; unless is_home_mod $
+                    updateEps_ $ \eps ->
+                      eps { eps_ext_ifaces = extendModuleEnv (eps_ext_ifaces eps) mod fake_iface }
 
                 ; return (Failed err) } ;
 
@@ -822,18 +846,24 @@ loadInterface doc_str mod from
         in
         initIfaceLcl (mi_semantic_module iface) loc_doc (mi_boot iface) $
 
-        dontLeakTheHUG $ do
+        -- Home interfaces may refer to other home modules, so we must not
+        -- remove the HUG while typechecking them.
+        -- See Note [Home Unit Graph space leak]
+        (if is_home_mod then id else dontLeakTheHUG) $ do
 
-        --      Load the new ModIface into the External Package State
-        -- Even home-package interfaces loaded by loadInterface
+        --      Load the new ModIface into the External Package State,
+        -- or, for home-unit interfaces loaded by loadInterface
         --      (which only happens in OneShot mode; in Batch/Interactive
         --      mode, home-package modules are loaded one by one into the HPT)
-        -- are put in the EPS.
+        -- into the HPT.
+        -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
         --
-        -- The main thing is to add the ExternalIface to the EPS, but
+        -- The main thing is to add the ExternalIface to the EPS (or the
+        -- ModIface to the HPT), but
         -- we also take the
         --      IfaceDecls, IfaceClsInst, IfaceFamInst, IfaceRules,
-        -- out of the ModIface and put them into the big EPS pools
+        -- out of the ModIface and put them into the big EPS pools (or the
+        -- pools of the 'HomeLoadedState')
 
         -- NB: *first* we do tcIfaceDecls, so that the provenance of all the locally-defined
         ---    names is done correctly (notably, whether this is an .hi file or .hi-boot file).
@@ -844,10 +874,8 @@ loadInterface doc_str mod from
         -- If you start loading HPT modules into the EPS then you get strange errors about
         -- overlapping instances.
         ; massertPpr
-              ((isOneShot (ghcMode (hsc_dflags hsc_env)))
-                || moduleUnitId mod `notElem` hsc_all_home_unit_ids hsc_env
-                || mod == gHC_PRIM)
-                (text "Attempting to load home package interface into the EPS" $$ ppr (HUG.allUnits hug) $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
+              (not is_home_mod || isOneShot (ghcMode (hsc_dflags hsc_env)))
+                (text "Attempting to demand-load a home package interface outside of one-shot mode" $$ ppr (HUG.allUnits hug) $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
         ; new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
@@ -863,9 +891,22 @@ loadInterface doc_str mod from
         -- built from the interface they hand back.
         ; plugin_iface <- withPlugins (hsc_plugins hsc_env) (\p -> interfaceLoadAction p) iface
 
-        -- Built strictly, so that nothing retains 'iface' (and with it the
-        -- buffer of the .hi file). See Note [The EPS does not keep ModIfaces].
-        ; let !ext_iface = mkExternalIface plugin_iface
+        -- External modules: what the EPS remembers. Forced before it goes into
+        -- the EPS, so that nothing retains 'iface' (and with it the buffer of
+        -- the .hi file). See Note [The EPS does not keep ModIfaces].
+        ; let ext_iface = mkExternalIface plugin_iface
+
+        -- Home modules (one-shot mode only): the interface for the HPT.
+        -- The declarations etc. live in the 'ModDetails' and the pools of the
+        -- 'HomeLoadedState'. See Note [Demand-loaded home interfaces].
+              home_iface = plugin_iface
+                               & set_mi_decls     (panic "No mi_decls for demand-loaded home module")
+                               & set_mi_insts     (panic "No mi_insts for demand-loaded home module")
+                               & set_mi_defaults  (panic "No mi_defaults for demand-loaded home module")
+                               & set_mi_fam_insts (panic "No mi_fam_insts for demand-loaded home module")
+                               & set_mi_rules     (panic "No mi_rules for demand-loaded home module")
+                               & set_mi_anns      (panic "No mi_anns for demand-loaded home module")
+                               & set_mi_simplified_core (panic "No mi_simplified_core for demand-loaded home module")
 
         ; let bad_boot = mi_boot iface == IsBoot
                           && isJust (lookupKnotVars (if_rec_types gbl_env) mod)
@@ -885,7 +926,52 @@ loadInterface doc_str mod from
                 | otherwise
                 = old
 
-        ; warnPprTrace bad_boot "loadInterface" (ppr mod) $
+        ; if is_home_mod
+          then
+            -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+            warnPprTrace bad_boot "loadInterface" (ppr mod) $
+            if bad_boot
+              -- See Note [Loading your own hi-boot file]
+              then liftIO $ HUG.updateHugLoadedState mod_uid
+                     (\hls -> hls { hls_boot_types = addDeclsToPTE (hls_boot_types hls) new_eps_decls })
+                     hug
+              else liftIO $ HUG.lookupHugByModule mod hug >>= \case
+                -- Already loaded (mirrors the elemModuleEnv check for the EPS below)
+                Just _  -> return ()
+                Nothing -> do
+                    { let details = ModDetails
+                            { md_types            = mkNameEnv new_eps_decls
+                            , md_exports          = mi_exports iface
+                            , md_defaults         = new_eps_defaults
+                            , md_insts            = mkInstEnv new_eps_insts
+                            , md_fam_insts        = new_eps_fam_insts
+                            , md_rules            = new_eps_rules
+                            , md_anns             = new_eps_anns
+                            , md_complete_matches = new_eps_complete_matches
+                            }
+                      -- Add the module to the HPT before anybody can force the
+                      -- lazily typechecked declarations, which look up the names
+                      -- of this module in the HPT.
+                    ; HUG.addHomeModInfoToHug
+                        (HomeModInfo home_iface details emptyHomeModInfoLinkable) hug
+                    ; HUG.updateHugLoadedState mod_uid
+                        (\hls -> hls
+                          { hls_iface_bytecode   = add_bytecode (hls_iface_bytecode hls)
+                          , hls_rule_base        = extendRuleBaseList (hls_rule_base hls)
+                                                                      new_eps_rules
+                          , hls_complete_matches = hls_complete_matches hls ++ new_eps_complete_matches
+                          , hls_inst_env         = extendInstEnvList (hls_inst_env hls)
+                                                                     new_eps_insts
+                          , hls_fam_inst_env     = extendFamInstEnvList (hls_fam_inst_env hls)
+                                                                        new_eps_fam_insts
+                          , hls_ann_env          = extendAnnEnvList (hls_ann_env hls)
+                                                                    new_eps_anns
+                          })
+                        hug
+                    }
+          else
+          warnPprTrace bad_boot "loadInterface" (ppr mod) $
+          ext_iface `seq`
           updateEps_  $ \ eps ->
            if elemModuleEnv mod (eps_ext_ifaces eps) || is_external_sig mhome_unit iface
                 then eps
@@ -923,13 +1009,14 @@ loadInterface doc_str mod from
                   eps_defaults    =  extendModuleEnv (eps_defaults eps) mod new_eps_defaults
                                                    }
 
-        ; return (Succeeded (LoadedExternal ext_iface))
+        ; return $ Succeeded $
+            if is_home_mod then LoadedHome home_iface else LoadedExternal ext_iface
     }}}}
 
 {- Note [Loading your own hi-boot file]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generally speaking, when compiling module M, we should not
-load M.hi-boot into the EPS.  After all, we are very shortly
+load M.hi-boot into the HPT.  After all, we are very shortly
 going to have full information about M.  Moreover, see
 Note [Do not update EPS with your own hi-boot] in GHC.Iface.Recomp.
 
@@ -946,10 +1033,12 @@ But there is a HORRIBLE HACK here.
   data types are not yet in the type environment.
 
 But in this weird case, /all/ we need is the types. We don't need
-instances, rules etc.  And if we put the instances in the EPS
+instances, rules etc.  And if we put the instances in the HPT
 we get "duplicate instance" warnings when we compile the "real"
-instance in M itself.  Hence the strange business of just updateing
-the eps_PTE.
+instance in M itself.  Hence the strange business of just updating
+the 'hls_boot_types' of the 'HomeLoadedState' (see Note [Demand-loaded
+home interfaces] in GHC.Unit.Home.LoadedState), which 'lookupType'
+consults.
 
 This really happens in practice.  The module "GHC.Hs.Expr" gets
 "duplicate instance" errors if this hack is not present.
@@ -1148,10 +1237,13 @@ moduleFreeHolesPrecise doc_str mod
                 return (Succeeded (renameFreeHoles ifhs insts))
             Failed err -> return (Failed err)
 
-wantHiBootFile :: Maybe HomeUnit -> ExternalPackageState -> Module -> WhereFrom
+wantHiBootFile :: Maybe HomeUnit
+               -> InstalledModuleEnv ModuleNameWithIsBoot
+                  -- ^ The 'hls_is_boot' field of the home unit
+               -> Module -> WhereFrom
                -> MaybeErr MissingInterfaceError IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
-wantHiBootFile mhome_unit eps mod from
+wantHiBootFile mhome_unit is_boot_mods mod from
   = case from of
        ImportByUser usr_boot
           | usr_boot == IsBoot && notHomeModuleMaybe mhome_unit mod
@@ -1165,12 +1257,12 @@ wantHiBootFile mhome_unit eps mod from
           | notHomeModuleMaybe mhome_unit mod
           -> Succeeded NotBoot
              -- If the module to be imported is not from this package
-             -- don't look it up in eps_is_boot, because that is keyed
+             -- don't look it up in hls_is_boot, because that is keyed
              -- on the ModuleName of *home-package* modules only.
              -- We never import boot modules from other packages!
 
           | otherwise
-          -> case lookupInstalledModuleEnv (eps_is_boot eps) (toUnitId <$> mod) of
+          -> case lookupInstalledModuleEnv is_boot_mods (toUnitId <$> mod) of
                 Just (GWIB { gwib_isBoot = is_boot }) ->
                   Succeeded is_boot
                 Nothing ->

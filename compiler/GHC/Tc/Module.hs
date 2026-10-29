@@ -157,10 +157,11 @@ import GHC.Types.SourceFile
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Unit.Env as UnitEnv
-import GHC.Unit.External
 import GHC.Unit.Types
 import GHC.Unit.State
 import GHC.Unit.Home
+import GHC.Unit.Home.LoadedState
+import GHC.Unit.Home.PackageTable ( updateHptLoadedState )
 import GHC.Unit.Module
 import Language.Haskell.Syntax.Module.Name (HsModuleName)
 import GHC.Unit.Module.Warnings
@@ -173,6 +174,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps
 import GHC.Data.Bag
+import GHC.Unit.External.Iface
 import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Arrow ( second )
@@ -508,11 +510,13 @@ tcRnImports hsc_env import_decls
         ; completeSigsBelow <- liftIO $ unsafeInterleaveIO $
               hugCompleteSigsBelow hsc_env unitId mnwib
 
-          -- Record boot-file info in the EPS, so that it's
+          -- Record boot-file info in the HPT, so that it's
           -- visible to loadHiBootInterface in tcRnSrcDecls,
           -- and any other incrementally-performed imports
+          -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
         ; when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
-            updateEps_ $ \eps  -> eps { eps_is_boot = imp_boot_mods imports }
+            liftIO $ updateHptLoadedState (hsc_HPT hsc_env) $ \hls ->
+              hls { hls_is_boot = imp_boot_mods imports }
          }
 
                 -- Update the gbl env
@@ -2175,7 +2179,15 @@ runTcInteractive tcm_plugin_handling hsc_env thing_inside
                                          (renameRawPkgQual (hsc_unit_env hsc_env) (hsModuleName $ unLoc $ ideclName i) (ideclPkgQual i))
 
 
-       ; (home_insts, home_fam_insts) <- liftIO $ UnitEnv.hugAllInstances (hsc_unit_env hsc_env)
+       ; (home_insts, home_fam_insts) <-
+           -- In one-shot mode, the HPT only contains demand-loaded home
+           -- modules, whose instances 'tcGetInstEnvs' and 'tcGetFamInstEnvs'
+           -- already take from the 'HomeLoadedState'; adding them here too
+           -- would report every instance twice (e.g. haddock --no-compilation).
+           -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+           if isOneShot (ghcMode (hsc_dflags hsc_env))
+             then pure (emptyInstEnv, [])
+             else liftIO $ UnitEnv.hugAllInstances (hsc_unit_env hsc_env)
 
        ; let imports = emptyImportAvails { imp_orphs = orphs }
 

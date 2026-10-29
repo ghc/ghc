@@ -16,8 +16,8 @@ module GHC.Core.Opt.Monad (
 
     -- ** Reading from the monad
     getModule,
-    initRuleEnv, getExternalRuleBase,
-    getDynFlags, getPackageFamInstEnv,
+    initRuleEnv, getExternalRuleBase, getLoadedHomeRuleBase,
+    getDynFlags, getPackageFamInstEnv, getLoadedHomeFamInstEnv,
     getInteractiveContext,
     getUniqTag,
     getNamePprCtx, getSrcSpanM,
@@ -44,8 +44,9 @@ import GHC.Driver.Errors ( reportDiagnostic, reportError )
 import GHC.Driver.Config.Diagnostic ( initDiagOpts )
 import GHC.Driver.Env
 
-import GHC.Core.Rules     ( RuleBase, RuleEnv, mkRuleEnv )
+import GHC.Core.Rules     ( RuleBase, RuleEnv, mkRuleEnv, withLoadedHomeRules )
 import GHC.Core.Opt.Stats ( SimplCount, zeroSimplCount, plusSimplCount )
+import GHC.Core.FamInstEnv ( FamInstEnv )
 
 import GHC.Types.Annotations
 import GHC.Types.Unique.Supply
@@ -66,6 +67,7 @@ import GHC.Runtime.Context ( InteractiveContext )
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.External
+import qualified GHC.Unit.Home.Graph as HUG
 
 import Data.Bifunctor ( bimap )
 import Data.ByteString.Short ( ShortByteString )
@@ -254,10 +256,19 @@ initRuleEnv :: ModGuts -> CoreM RuleEnv
 initRuleEnv guts
   = do { hpt_rules <- getHomeRuleBase
        ; eps_rules <- getExternalRuleBase
-       ; return (mkRuleEnv guts eps_rules hpt_rules) }
+       ; loaded_rules <- getLoadedHomeRuleBase
+       ; return (mkRuleEnv guts (eps_rules `withLoadedHomeRules` loaded_rules) hpt_rules) }
 
 getExternalRuleBase :: CoreM RuleBase
 getExternalRuleBase = eps_rule_base <$> get_eps
+
+-- | The rules of the home modules that were demand-loaded in one-shot mode.
+--
+-- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+getLoadedHomeRuleBase :: CoreM RuleBase
+getLoadedHomeRuleBase = do
+    hsc_env <- getHscEnv
+    liftIO $ HUG.loadedRuleBase (hsc_HUG hsc_env)
 
 getNamePprCtx :: CoreM NamePprCtx
 getNamePprCtx = read cr_name_ppr_ctx
@@ -301,6 +312,15 @@ getInteractiveContext = hsc_IC <$> getHscEnv
 
 getPackageFamInstEnv :: CoreM PackageFamInstEnv
 getPackageFamInstEnv = eps_fam_inst_env <$> get_eps
+
+-- | The family instances of the home modules that were demand-loaded in
+-- one-shot mode.
+--
+-- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+getLoadedHomeFamInstEnv :: CoreM FamInstEnv
+getLoadedHomeFamInstEnv = do
+    hsc_env <- getHscEnv
+    liftIO $ HUG.loadedFamInstEnv (hsc_HUG hsc_env)
 
 get_eps :: CoreM ExternalPackageState
 get_eps = do

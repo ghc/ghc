@@ -133,6 +133,8 @@ import System.Win32.Info (getSystemDirectory)
 
 import GHC.Utils.Exception
 import GHC.Unit.Home.Graph (lookupHug, unitEnv_foldWithKey)
+import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.LoadedState
 import GHC.Driver.Downsweep
 import qualified GHC.Runtime.Interpreter as GHCi
 import qualified Data.IntMap.Strict as IM
@@ -667,8 +669,13 @@ findWholeCoreBindings hsc_env mod = do
       _ <- initIfaceLoad hsc_env $
              loadInterface (text "get_reachable_nodes" <+> parens (ppr mod))
                  mod ImportBySystem
-      EPS {eps_iface_bytecode} <- hscEPS hsc_env
-      sequence (lookupModuleEnv eps_iface_bytecode mod)
+      -- Home modules are demand-loaded into the HPT in one-shot mode.
+      -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+      iface_bytecode <-
+        if HUG.memberHugUnitId (moduleUnitId mod) (hsc_HUG hsc_env)
+          then hls_iface_bytecode <$> HUG.readHugLoadedState (moduleUnitId mod) (hsc_HUG hsc_env)
+          else eps_iface_bytecode <$> hscEPS hsc_env
+      sequence (lookupModuleEnv iface_bytecode mod)
 
 
 findBytecodeLinkableMaybe :: HscEnv -> ModLocation -> IO (Maybe Linkable)

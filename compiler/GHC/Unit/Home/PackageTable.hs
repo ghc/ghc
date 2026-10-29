@@ -34,6 +34,10 @@ module GHC.Unit.Home.PackageTable
   , addHomeModInfoToHpt
   , addHomeModInfosToHpt
 
+  , readHptLoadedState
+  , updateHptLoadedState
+  , hptLoadedStateRef
+
     -- * Restrict the HPT
   , restrictHpt
 
@@ -83,6 +87,7 @@ import GHC.Core.InstEnv
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Types.Unique.DFM
+import GHC.Unit.Home.LoadedState
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module
 import GHC.Unit.Module.Deps
@@ -93,7 +98,7 @@ import GHC.Types.Unique (getUnique, getKey)
 import qualified GHC.Data.Word64Set as W64
 
 -- | Helps us find information about modules in the home package
-newtype HomePackageTable = HPT {
+data HomePackageTable = HPT {
 
     table :: IORef (DModuleNameEnv HomeModInfo)
     -- ^ Domain = modules in this home unit
@@ -109,6 +114,12 @@ newtype HomePackageTable = HPT {
     -- to temporarily violate the HPT monotonicity.
     --
     -- The elements of this table may be updated (e.g. on rehydration).
+
+  , loaded_state :: IORef HomeLoadedState
+    -- ^ Instances, rules, ... of the modules in 'table' that were
+    -- demand-loaded from interface files, which only happens in one-shot mode.
+    --
+    -- See Note [Demand-loaded home interfaces] in "GHC.Unit.Home.LoadedState"
   }
 
 -- | Create a new 'HomePackageTable'.
@@ -120,7 +131,8 @@ emptyHomePackageTable :: IO HomePackageTable
 -- romes:todo: use a MutableArray directly?
 emptyHomePackageTable = do
   table <- newIORef emptyUDFM
-  return HPT{table}
+  loaded_state <- newIORef emptyHomeLoadedState
+  return HPT{table, loaded_state}
 
 --------------------------------------------------------------------------------
 -- * Lookups in the HPT
@@ -162,6 +174,23 @@ addToHpt HPT{table=hptr} mn hmi = do
   atomicModifyIORef' hptr (\hpt -> (addToUDFM hpt mn hmi, ()))
   -- If the key already existed in the map, this insertion is overwriting
   -- the HMI of a previously loaded module (likely in rehydration).
+
+-- | Read the 'HomeLoadedState' of this HPT.
+--
+-- See Note [Demand-loaded home interfaces] in "GHC.Unit.Home.LoadedState"
+-- | The mutable 'HomeLoadedState' of this HPT.
+hptLoadedStateRef :: HomePackageTable -> IORef HomeLoadedState
+hptLoadedStateRef HPT{loaded_state} = loaded_state
+
+readHptLoadedState :: HomePackageTable -> IO HomeLoadedState
+readHptLoadedState HPT{loaded_state} = readIORef loaded_state
+
+-- | Update the 'HomeLoadedState' of this HPT.
+--
+-- See Note [Demand-loaded home interfaces] in "GHC.Unit.Home.LoadedState"
+updateHptLoadedState :: HomePackageTable -> (HomeLoadedState -> HomeLoadedState) -> IO ()
+updateHptLoadedState HPT{loaded_state} f =
+  atomicModifyIORef' loaded_state (\hls -> (f hls, ()))
 
 -- | 'addHomeModInfoToHpt' for multiple module infos.
 addHomeModInfosToHpt :: HomePackageTable -> [HomeModInfo] -> IO ()
@@ -315,7 +344,9 @@ hptInternalTableRef = table
 -- Use with care, only if you can really justify going around the intended insert-only API.
 hptInternalTableFromRef :: IORef (DModuleNameEnv HomeModInfo) -> IO HomePackageTable
 hptInternalTableFromRef ref = do
+  loaded_state <- newIORef emptyHomeLoadedState
   return HPT {
-    table = ref
+    table = ref,
+    loaded_state
   }
 

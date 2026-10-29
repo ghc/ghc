@@ -395,11 +395,15 @@ lookupClsDefault hug module_env_defaults mod =
 
 tcGetInstEnvs :: TcM InstEnvs
 -- Gets both the external-package inst-env
--- and the home-pkg inst env (includes module being compiled)
+-- and the home-pkg inst env (includes module being compiled,
+-- and demand-loaded home modules in one-shot mode,
+-- see Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState)
 tcGetInstEnvs = do { eps <- getEps
                    ; env <- getGblEnv
+                   ; hug <- hsc_HUG <$> getTopEnv
+                   ; loaded_ie <- liftIO $ loadedInstEnv hug
                    ; return (InstEnvs { ie_global  = eps_inst_env eps
-                                      , ie_local   = tcg_inst_env env
+                                      , ie_local   = tcg_inst_env env `unionInstEnv` loaded_ie
                                       , ie_visible = tcVisibleOrphanMods env }) }
 
 -- Illegal term-level use of type things
