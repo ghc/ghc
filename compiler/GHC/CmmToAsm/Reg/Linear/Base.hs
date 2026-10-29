@@ -20,6 +20,7 @@ module GHC.CmmToAsm.Reg.Linear.Base (
 
         -- the allocator monad
         RA_State(..),
+        RA_Context(..),
 )
 
 where
@@ -55,9 +56,12 @@ data BlockAssignment freeRegs
 lookupBlockAssignment :: BlockId -> BlockAssignment freeRegs -> Maybe (freeRegs, RegMap Loc)
 lookupBlockAssignment bid ba = mapLookup bid (blockMap ba)
 
--- | Lookup which register a virtual register was first assigned to.
-lookupFirstUsed :: VirtualReg -> BlockAssignment freeRegs -> Maybe RealReg
-lookupFirstUsed vr ba = lookupUFM (firstUsed ba) vr
+-- | The register a virtual register has in the first assignment that,
+-- recorded for a block it is live into, holds it in a register:
+-- see Note [The first jump into a block fixes its registers] in
+-- GHC.CmmToAsm.Reg.Linear.
+lookupFirstUsed :: Unique -> BlockAssignment freeRegs -> Maybe RealReg
+lookupFirstUsed u ba = lookupUFM_Directly (firstUsed ba) u
 
 -- | An initial empty 'BlockAssignment'
 emptyBlockAssignment :: BlockAssignment freeRegs
@@ -213,11 +217,26 @@ data RA_State freeRegs
         --      We don't want to slow down the allocator if we're not going to emit the stats.
         , ra_spills     :: [SpillReason]
 
-        -- | Native code generator configuration
-        , ra_config     :: !NCGConfig
-
         -- | (from,fixup,to) : We inserted fixup code between from and to
         , ra_fixups     :: [(BlockId,BlockId,BlockId)]
 
+        -- | see 'RA_Context'
+        , ra_context    :: !RA_Context
+
+        }
+
+-- | What the allocator uses, but does not update, while it allocates the
+--   instructions of a block, held in one field of 'RA_State' rather than in
+--   fields of their own, each of which costs allocation at every update of
+--   the state.
+data RA_Context
+        = RA_Context
+        {
+        -- | the real register each vreg is moved into where it dies,
+        --   in the block being allocated
+          rc_moveDests  :: UniqFM VirtualReg RealReg
+
+        -- | Native code generator configuration
+        , rc_config     :: !NCGConfig
         }
 
