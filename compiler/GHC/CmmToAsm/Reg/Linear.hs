@@ -500,16 +500,23 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
           -}
            return (new_instrs, [])
 
-        _ -> genRaInsn block_live new_instrs id instr
-                        (map regWithFormat_reg $ nonDetEltsUniqSet $ getRegs $ liveDieRead live)
-                        (map regWithFormat_reg $ nonDetEltsUniqSet $ getRegs $ liveDieWrite live)
-                        -- See Note [Unique Determinism and code generation]
+        _ -> genRaInsn block_live new_instrs id instr live
 
 raInsn _ _ _ instr
         = do
             platform <- getPlatform
             let instr' = fmap (pprInstr platform) instr
             pprPanic "raInsn" (text "no match for:" <> ppr instr')
+
+-- | The given real registers from the one paired with the last of the given
+-- vregs whose unique is the given one, the pairs as zip makes them, or none.
+lastPaired :: Unique -> [VirtualRegWithFormat] -> [RealReg] -> [RealReg]
+lastPaired !u = go []
+  where
+    go !found (v : vs) rs@(_ : rs')
+      | getUnique (virtualRegWithFormat_reg v) == u = go rs vs rs'
+      | otherwise                                    = go found vs rs'
+    go found _ _ = found
 
 -- ToDo: what can we do about
 --
@@ -538,23 +545,34 @@ genRaInsn :: forall freeRegs instr.
           -> [instr]
           -> BlockId
           -> instr
-          -> [Reg]
-          -> [Reg]
+          -> Liveness
           -> RegM freeRegs ([instr], [NatBasicBlock instr])
 
-genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
+genRaInsn block_live new_instrs block_id instr live = do
 -- pprTraceM "genRaInsn" $ ppr (block_id, instr)
   platform <- getPlatform
-  case regUsageOfInstr platform instr of { RU read written ->
+  case liveUsage live of { RU read written ->
     do
+    let dying = map regWithFormat_reg . nonDetEltsUniqSet . getRegs
+        -- See Note [Unique Determinism and code generation]
+        r_dying = dying (liveDieRead live)
+        w_dying = dying (liveDieWrite live)
     let real_written = [ rr                          | RegWithFormat {regWithFormat_reg = RegReal rr} <- written ]
     let virt_written = [ VirtualRegWithFormat vr fmt | RegWithFormat (RegVirtual vr) fmt              <- written ]
 
     -- we don't need to do anything with real registers that are
-    -- only read by this instr.  (the list is typically ~2 elements,
-    -- so using nub isn't a problem).
+    -- only read by this instr.
     let virt_read :: [VirtualRegWithFormat]
-        virt_read = nubOrdOn virtualRegWithFormat_reg [ VirtualRegWithFormat vr fmt | RegWithFormat (RegVirtual vr) fmt <- read ]
+        virt_read = case [ VirtualRegWithFormat vr fmt | RegWithFormat (RegVirtual vr) fmt <- read ] of
+          -- the list itself where it holds at most two registers, distinct:
+          -- nubOrdOn always, master's, made the compiler run 0.46% more
+          -- instructions and allocate 0.89% more compiling T3294 at -O0, 0.17%
+          -- and 0.29% more at -O and 0.16% and 0.28% more at -O2, on GHC
+          -- 10.1.20261108
+          vs@[]  -> vs
+          vs@[_] -> vs
+          vs@[a, b] | virtualRegWithFormat_reg a /= virtualRegWithFormat_reg b -> vs
+          vs -> nubOrdOn virtualRegWithFormat_reg vs
 
 --     do
 --         let real_read       = nub [ rr      | (RegReal rr) <- read]
@@ -609,24 +627,21 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
 
     let
         -- (i) Patch the instruction
-        patch_map :: UniqFM Reg Reg
-        patch_map
-                = toRegMap $ -- Cast key from VirtualReg to Reg
-                             -- See Note [UniqFM and the register allocator]
-                  listToUFM
-                        [ (virtualRegWithFormat_reg vr, RegReal rr)
-                        | (vr, rr) <- zip virt_read    r_allocd
-                                   ++ zip virt_written w_allocd ]
-
         patched_instr :: instr
         patched_instr
                 = patchRegsOfInstr platform adjusted_instr patchLookup
 
+        -- the real register of the last pair whose vreg is x, the written
+        -- pairs after the read ones, as listToUFM keeps a key's last entry;
+        -- x where none is
         patchLookup :: Reg -> Reg
         patchLookup x
-                = case lookupUFM patch_map x of
-                        Nothing -> x
-                        Just y  -> y
+          = let !u = getUnique x
+            in case lastPaired u virt_written w_allocd of
+                 r : _ -> RegReal r
+                 []    -> case lastPaired u virt_read r_allocd of
+                            r : _ -> RegReal r
+                            []    -> x
 
     -- (j) free up stack slots for dead spilled regs
     -- TODO (can't be bothered right now)
