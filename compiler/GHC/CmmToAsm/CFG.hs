@@ -737,9 +737,31 @@ findBackEdges root cfg
 
 optimizeCFG :: Bool -> Weights -> RawCmmDecl -> CFG -> CFG
 optimizeCFG _ _ (CmmData {}) cfg = cfg
-optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg =
-  (if doStaticPred then staticPredCfg (g_entry graph) else id) $
-    optHsPatterns weights proc $ cfg
+optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg
+  -- no bonus for back edges where static prediction follows: it starts each
+  -- two-way branch from optHsPatterns' weights, so that the penalties become
+  -- probabilities, and overwrites the weights of every branch with a back edge
+  -- among its targets except a heap or stack check's and one whose targets are
+  -- all back edges; the back edges are loopInfo's: one into the root is
+  -- findBackEdges' alone, and a branch with one starts from its weight with no
+  -- bonus
+  | doStaticPred = staticPredCfg entry $ optHsPatterns weights proc cfg
+  | otherwise    = optHsPatterns weights proc
+                     (increaseBackEdgeWeight weights entry cfg)
+  where entry = g_entry graph
+
+-- Increase the weight of all backedges in the CFG
+-- this helps to make loop jumpbacks the heaviest edges
+increaseBackEdgeWeight :: Weights -> BlockId -> CFG -> CFG
+increaseBackEdgeWeight weights root cfg =
+    let backedges = findBackEdges root cfg
+        update weight
+          --Keep irrelevant edges irrelevant
+          | weight <= 0 = 0
+          | otherwise
+          = weight + fromIntegral (backEdgeBonus weights)
+    in  foldl'  (\cfg edge -> updateEdgeWeight update edge cfg)
+                cfg backedges
 
 -- | Modify branch weights based on educated guess on
 -- patterns GHC tends to produce and how they affect
@@ -748,29 +770,15 @@ optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg =
 -- Most importantly we penalize jumps across info tables.
 optHsPatterns :: Weights -> RawCmmDecl -> CFG -> CFG
 optHsPatterns _ (CmmData {}) cfg = cfg
-optHsPatterns weights (CmmProc info _lab _live graph) cfg =
+optHsPatterns weights (CmmProc info _lab _live _graph) cfg =
     {-# SCC optHsPatterns #-}
     -- pprTrace "Initial:" (pprEdgeWeights cfg) $
-    -- pprTrace "Initial:" (ppr $ mkGlobalWeights (g_entry graph) cfg) $
+    -- pprTrace "Initial:" (ppr $ mkGlobalWeights (g_entry _graph) cfg) $
 
-    -- pprTrace "LoopInfo:" (ppr $ loopInfo cfg (g_entry graph)) $
+    -- pprTrace "LoopInfo:" (ppr $ loopInfo cfg (g_entry _graph)) $
     favourFewerPreds  .
-    penalizeInfoTables info .
-    increaseBackEdgeWeight (g_entry graph) $ cfg
+    penalizeInfoTables info $ cfg
   where
-
-    -- Increase the weight of all backedges in the CFG
-    -- this helps to make loop jumpbacks the heaviest edges
-    increaseBackEdgeWeight :: BlockId -> CFG -> CFG
-    increaseBackEdgeWeight root cfg =
-        let backedges = findBackEdges root cfg
-            update weight
-              --Keep irrelevant edges irrelevant
-              | weight <= 0 = 0
-              | otherwise
-              = weight + fromIntegral (backEdgeBonus weights)
-        in  foldl'  (\cfg edge -> updateEdgeWeight update edge cfg)
-                    cfg backedges
 
     -- Since we cant fall through info tables we penalize these.
     penalizeInfoTables :: LabelMap a -> CFG -> CFG
