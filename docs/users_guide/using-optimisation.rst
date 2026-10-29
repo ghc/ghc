@@ -322,7 +322,8 @@ as such you shouldn't need to set any of them explicitly. A flag
     be traced back to obviously bad code layout please open a ticket.
 
 .. ghc-flag:: -fblock-layout-weights
-    :shortdesc: Sets edge weights used by the new code layout algorithm.
+    :shortdesc: Sets edge weights used by the new code layout algorithm and,
+        on x86-64, by the linear register allocator.
     :type: dynamic
     :category:
 

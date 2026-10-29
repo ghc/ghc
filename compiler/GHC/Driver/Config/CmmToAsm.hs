@@ -55,7 +55,8 @@ initNCGConfig dflags this_mod = NCGConfig
                                      -- TODO #20428: off under -finfo-table-map
                                      -- since 55a6377a5d, and with it every use
                                      -- of the CFG from the liveness pass on
-                                     -- (see livenessCfg in GHC.CmmToAsm)
+                                     -- but the linear allocator's (see
+                                     -- livenessCfg in GHC.CmmToAsm)
                                      && backendMaintainsCfg (targetPlatform dflags)
                                      -- Enable if the platform maintains the CFG
    }

@@ -21,11 +21,15 @@ module GHC.CmmToAsm.Reg.Linear.Base (
         -- the allocator monad
         RA_State(..),
         RA_Context(..),
+        MoveDests(..),
+        mkMoveDests,
 )
 
 where
 
 import GHC.Prelude
+
+import Data.Word (Word64)
 
 import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Liveness
@@ -33,6 +37,7 @@ import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSM
@@ -235,9 +240,50 @@ data RA_Context
         {
         -- | the real register each vreg is moved into where it dies,
         --   in the block being allocated
-          rc_moveDests  :: UniqFM VirtualReg RealReg
+          rc_moveDests  :: MoveDests
+
+        -- | the uniques of the vregs the block being allocated reads or
+        --   writes, by their first-used registers
+        , rc_claims     :: UniqFM RealReg [Unique]
+
+        -- | 'GHC.CmmToAsm.Reg.Linear.wideMoveDests' of the procedure being
+        --   allocated
+        , rc_wideDests  :: UniqFM VirtualReg RealReg
 
         -- | Native code generator configuration
         , rc_config     :: !NCGConfig
         }
+
+-- | The map of 'rc_moveDests', with the registers, by number,
+--   it holds and those it holds for two or more vregs, for
+--   'GHC.CmmToAsm.Reg.Linear.firstFreeInOrder' (one value, shared where the map
+--   is empty: the masks held as a pair in a field of 'RA_Context' of their own
+--   made the compiler allocate 0.076% more compiling T9961 at -O0, and so did
+--   this value while 'mkMoveDests' took the block's list of moves; given the
+--   map, it cost 0.016%, and nothing once OPAQUE as well, on GHC 10.1.20261109)
+data MoveDests
+        = MoveDests !(UniqFM VirtualReg RealReg)
+                    {-# UNPACK #-} !Word64 {-# UNPACK #-} !Word64
+
+-- (given the map, not the list: given the list, the block's dying moves
+-- no longer fused into the map, a thunk an instruction, and the compiler
+-- ran 0.13% more instructions and allocated 0.27% more compiling T3294
+-- at -O0; OPAQUE: its worker and wrapper allocated a MoveDests for each
+-- block, the empty one too, and the compiler 0.016% more compiling T9961
+-- at -O0)
+mkMoveDests :: UniqFM VirtualReg RealReg -> MoveDests
+{-# OPAQUE mkMoveDests #-}
+mkMoveDests m
+  | isNullUFM m = noMoveDests
+  | otherwise   = nonDetStrictFoldUFM add (MoveDests m 0 0) m
+    -- Setting bits commutes, so the fold's order does not matter
+    -- (Note [Unique Determinism and code generation])
+  where
+    add :: RealReg -> MoveDests -> MoveDests
+    add (RealRegSingle n) (MoveDests d a t)
+      | testBit a n = MoveDests d a (setBit t n)
+      | otherwise   = assertPpr (n < 64) (ppr n) $ MoveDests d (setBit a n) t
+
+noMoveDests :: MoveDests
+noMoveDests = MoveDests emptyUFM 0 0
 
