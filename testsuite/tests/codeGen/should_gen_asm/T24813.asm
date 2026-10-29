@@ -1,10 +1,8 @@
 popcnt8:
         movzbl
         popcnt
-        movq
         jmp
 popcnt16:
         movzwl
         popcnt
-        movq
         jmp
