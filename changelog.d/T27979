@@ -1,0 +1,10 @@
+
+section: compiler
+issues: #27979
+mrs: !16873
+synopsis:
+  Avoid performance regressions when evaluating values whose types are
+  polymorphic
+description:
+  Evaluating a value of a type such as ``forall a. D a`` for a datatype ``D``
+  again uses fast inline code instead of a slower fallback in the RTS.

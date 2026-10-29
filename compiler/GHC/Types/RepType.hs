@@ -32,7 +32,6 @@ import GHC.Types.Basic (Arity, RepArity)
 import GHC.Core.DataCon
 import GHC.Core.Coercion
 import GHC.Core.TyCon
-import GHC.Core.TyCon.Set
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
@@ -80,13 +79,21 @@ isNvUnaryRep :: [PrimRep] -> Bool
 isNvUnaryRep [_] = True
 isNvUnaryRep _ = False
 
--- | Gets rid of the stuff that prevents us from understanding the
--- runtime representation of a type. Including:
---   1. Casts
---   2. Newtypes
---   3. Foralls
---   4. Synonyms
--- But not type/data families, because we don't have the envs to hand.
+-- | Look through casts, foralls, type synonyms, newtypes and unary classes
+-- at the top-level of a type.
+--
+-- Does /not/ reduce type family applications nor peel off data family instance
+-- newtypes.
+--
+-- Use this function to try to discover the 'TyCon' used to represent values
+-- of a type at runtime:
+--
+--   * the function arrow: the values are functions;
+--   * a data type: the values are built from its data constructors;
+--   * a primitive type constructor (e.g. @Int#@, @ByteArray#@).
+--
+-- __Warning__: do __not__ use this function to compute the runtime
+-- representation of a type (#26695). That's what 'typePrimRep' is for.
 unwrapType :: Type -> Type
 unwrapType ty
   | Just (_, unwrapped)
@@ -105,12 +112,20 @@ unwrapType ty
     -- cf. GHC.Core.Coercion.unwrapNewTypeStepper
     stepper :: RecTcChecker -> TyCon -> [Type] -> NormaliseStepResult ()
     stepper rec_nts tc tys
+      -- Unwrap newtypes.
       | Just (ty', _) <- instNewTyCon_maybe tc tys
-      = case checkRecTc rec_nts tc of
-          Just rec_nts' -> NS_Step rec_nts' (go ty') ()
-          Nothing       -> NS_Abort  -- infinite newtypes
+      = step ty'
+      -- Look through unary classes.
+      | Just (_cls, dc) <- isUnaryClassTyCon_maybe tc
+      , [Scaled _ ty'] <- dataConInstArgTys dc tys
+      = step ty'
       | otherwise
       = NS_Done
+      where
+        step ty' =
+          case checkRecTc rec_nts tc of
+            Just rec_nts' -> NS_Step rec_nts' (go ty') ()
+            Nothing       -> NS_Abort -- fell into a loop (e.g. recursive newtypes)
 
 -- | Count the arity of a function post-unarisation, including zero-width arguments.
 --
@@ -711,7 +726,7 @@ primRepToType = anyTypeOfKind . mkTYPEapp . primRepToRuntimeRep
 --------------
 mightBeFunTy :: Type -> Bool
 -- ^ Might this type be a function type, including after looking through
--- newtypes and reducing type family applications?
+-- newtypes, unary classes, and reducing type family applications?
 --
 -- In particular, returns @True@ for @IO a@: after unwrapping the newtype,
 -- we get @State# RealWorld -> (# State# RealWorld, a #)@, which is indeed a
@@ -734,26 +749,9 @@ mightBeFunTy ty
   -- definitely not a function type.
   | definitelyUnliftedType ty
   = False
-  | Just tc <- tyConAppTyCon_maybe (unwrap_type ty)
+  | Just tc <- tyConAppTyCon_maybe (unwrapType ty)
   -- A proper datatype (such as 'Int' or 'Maybe Bool') is definitely not
   -- a function type. (This does not include newtypes nor type families.)
   = not $ isBoxedDataTyCon tc
   | otherwise
   = True
-
-  where
-    -- Use 'unwrapType' to look through casts, newtypes and foralls.
-    -- Separately, look through unary classes (supposed to be transparent as per
-    -- Note [Unary class magic] in GHC.Core.TyCon). We don't try to reduce type
-    -- family applications, as we don't have a FamInstEnv to hand.
-    unwrap_type = go emptyTyConSet
-      where
-        go seen_tcs ty
-          | Just (tc, tys) <- splitTyConApp_maybe (unwrapType ty)
-          , Just (_cls, unary_dc) <- isUnaryClassTyCon_maybe tc
-          , [inst_meth_ty] <- map scaledThing (dataConInstArgTys unary_dc tys)
-          = if tc `elemTyConSet` seen_tcs
-            then ty -- cycle detected: bail out
-            else go (seen_tcs `extendTyConSet` tc) inst_meth_ty
-          | otherwise
-          = ty
