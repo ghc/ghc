@@ -91,6 +91,9 @@ slurpSpillCostInfo platform cfg cmm
                 $ flattenSCCs sccs
             where
                 LiveInfo _ entries _ _ = info
+                -- the frequencies scale only the counts of uses and
+                -- definitions, on which no spill choice depends: chooseSpill
+                -- uses spillCost_length, a function of the lifetimes alone
                 freqMap = (fst . mkGlobalWeights (head entries)) <$> cfg
 
         -- Lookup the regs that are live on entry to this block in
@@ -122,9 +125,9 @@ slurpSpillCostInfo platform cfg cmm
          = do
                 -- Increment the lifetime counts for regs live on entry to this instr.
                 mapM_ incLifetime $ nonDetEltsUniqSet rsLiveEntry
-                    -- This is non-deterministic but we do not
-                    -- currently support deterministic code-generation.
-                    -- See Note [Unique Determinism and code generation]
+                    -- Each vreg's lifetime is counted on
+                    -- its own, so the order does not matter
+                    -- (Note [Unique Determinism and code generation])
 
                 -- Increment counts for what regs were read/written from.
                 let (RU read written)   = liveUsage live

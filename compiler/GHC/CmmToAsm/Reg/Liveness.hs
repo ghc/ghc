@@ -202,6 +202,8 @@ data Liveness
                                      --   indistinguishable from one with no
                                      --   register born.
         , liveDieRead   :: Regs      -- ^ registers that died because they were read for the last time.
+                                     --   At a branch, also those live into its
+                                     --   targets only.
         , liveDieWrite  :: Regs      -- ^ registers that died because they were clobbered by something.
         , liveUsage     :: RegUsage  -- ^ the registers the instruction reads and writes, as
                                      --   'regUsageOfInstr' gives them, kept so that later passes
@@ -520,9 +522,9 @@ slurpReloadCoalesce live
                 = listToUFM_Directly
                 $ [ (k, r1)
                   | (k, r1) <- nonDetUFMToList map1
-                  -- This is non-deterministic but we do not
-                  -- currently support deterministic code-generation.
-                  -- See Note [Unique Determinism and code generation]
+                  -- Each entry is kept or dropped on its own and the list
+                  -- becomes a map again, so its order does not matter
+                  -- (Note [Unique Determinism and code generation])
                   , case lookupUFM_Directly map2 k of
                           Nothing -> False
                           Just r2 -> r1 == r2 ]
@@ -866,7 +868,10 @@ seedCyclic = foldl' (\m b -> mapInsert (blockId b) noRegs m)
 -- | Computing liveness
 --
 --  On entry, the SCCs must be in "reverse" order: later blocks may transfer
---  control to earlier ones only, else `panic`.
+--  control to earlier ones only, else `panic`. Every block must end in jumps
+--  that name all its successors ('jumpDestsOfInstr'), none falling through:
+--  a block's walk adds the registers live into each target at its jump, so
+--  a register live into a block it fell into would count as dead at its end.
 --
 --  The SCCs returned are in the *opposite* order, which is exactly what we
 --  want for the next pass.

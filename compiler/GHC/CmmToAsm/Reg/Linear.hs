@@ -1009,6 +1009,33 @@ releaseRegs regs = do
 --        - clobbered regs are not allocatable.
 --
 
+{- Note [Unique order in the linear allocator]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Folds over the assignment visit its vregs in the order of their uniques. A vreg
+named in a Haskell module's Cmm keeps its local register's unique, tagged 'c',
+or 'Q' after -fobject-determinism's renaming, which numbers registers in the
+order it visits them; the instruction selector's temporaries are tagged 'n', so
+there the Cmm's vregs come first. Not every vreg ranks so: a temporary the Cmm
+pipeline makes, as for a safe foreign call, is tagged 'n' in a Haskell module
+and 'u', after every 'n', in a .cmm file; -fcmm-thread-sanitizer's are tagged
+'T' and come from a supply -fobject-determinism leaves alone; and on i386 the
+high half of a 64-bit value is tagged 'H', before every other vreg. With
+-fobject-determinism the order is deterministic but for those sanitizer
+temporaries (Note [Unique Determinism and code generation] in GHC.Types.Unique).
+Nothing in the allocator chose it, but two decisions take it as a ranking:
+allocRegsAndSpill_spill evicts the first vreg it visits that is in both a
+register and its slot, else the first in a register only, whatever their next
+uses, preferences or the x86-64 order of free registers, so that a Cmm vreg is
+mostly evicted before a temporary, and one numbered first before a later one
+(evicting the last instead about doubles the reloads compiling perf/compiler's
+T3294 at -O0); and saveClobberedTemps finds new registers for the values an
+instruction clobbers in that order, so that, of the values a free register would
+suit, the later ones are spilled once those run out. makeRegMovementGraph lists
+a jump's moves in that order too, which decides the order of joinToTargets'
+fixup moves and which move of a cycle is made first, by a swap or through the
+stack. The other folds over the assignment do not depend on it.
+-}
+
 saveClobberedTemps
         :: forall instr freeRegs.
            (Instruction instr, FR freeRegs)
@@ -1025,9 +1052,8 @@ saveClobberedTemps [] _ _
 saveClobberedTemps clobbered dying rest
  = do
         assig   <- getAssigR
-        -- This is non-deterministic but we do not
-        -- currently support deterministic code-generation.
-        -- See Note [Unique Determinism and code generation]
+        -- The fold's order decides which values are spilled: see
+        -- Note [Unique order in the linear allocator]
         case nonDetStrictFoldUFM_Directly pick [] assig of
           []      -> return []
           to_save -> do
@@ -1133,9 +1159,8 @@ clobberRegs clobbered
 
         assig           <- getAssigR
         setAssigR $! nonDetStrictFoldUFM_Directly clobber assig assig
-          -- This is non-deterministic but we do not
-          -- currently support deterministic code-generation.
-          -- See Note [Unique Determinism and code generation]
+          -- Each vreg is updated on its own, so the fold's order does
+          -- not matter (Note [Unique Determinism and code generation])
 
    where
         -- if the temp was InReg and clobbered, then we will have
@@ -1366,9 +1391,8 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
                         | Nothing <- only, evictable temp reg
                         -> (both, Just (temp, RealRegUsage reg fmt))
                       _ -> acc
-                    -- This is non-deterministic but we do not
-                    -- currently support deterministic code-generation.
-                    -- See Note [Unique Determinism and code generation]
+                    -- The fold's order picks the victim: see
+                    -- Note [Unique order in the linear allocator]
                     !(first_inBoth, first_inReg)
                       = nonDetStrictFoldUFM_Directly pick (Nothing, Nothing)
                                                      assig

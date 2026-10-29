@@ -122,7 +122,10 @@ instance Eq CfgEdge where
   (==) (CfgEdge from1 to1 _) (CfgEdge from2 to2 _)
     = from1 == from2 && to1 == to2
 
--- | Edges are sorted ascending pointwise by weight, source and destination
+-- | Edges are sorted ascending pointwise by weight, source and destination,
+-- so that equal weights fall back on label order, which means nothing:
+-- sequenceChain, sorting edges descending, fuses equal ones from the larger
+-- label down.
 instance Ord CfgEdge where
   compare (CfgEdge from1 to1 (EdgeInfo {edgeWeight = weight1}))
           (CfgEdge from2 to2 (EdgeInfo {edgeWeight = weight2}))
@@ -333,6 +336,10 @@ Then it redirects all jump instructions to these blocks using the
 built up mapping.
 This function (shortcutWeightMap) takes the same mapping and
 applies the mapping to the CFG in the way laid out above.
+
+Where a redirected edge A -> C meets one already there, or two redirected
+edges meet, one keeps its EdgeInfo, by the order of the fold over A's targets
+(update_from_edge); their weights are not summed.
 
 -}
 shortcutWeightMap :: LabelMap (Maybe BlockId) -> CFG -> CFG
@@ -611,28 +618,38 @@ addNodesBetween weights m updates =
   * Unconditional Control Transfer - They will always
     transfer control to their target. Unless there is a info table
     we can turn the jump into a fallthrough as well.
-    We use 20k as default, so it's easy to spot if values have been
-    modified but unlikely that we run into issues with overflow.
+    We use 1000 as default ('defaultWeights' in GHC.CmmToAsm.CFG.Weight).
   * If branches (likely) - We assume branches marked as likely
     are taken more than 80% of the time.
     By ranking them below unconditional jumps we make sure we
     prefer the unconditional if there is a conditional and
     unconditional edge towards a block.
-  * If branches (regular) - The false branch can potentially be turned
-    into a fallthrough so we prefer it slightly over the true branch.
+  * If branches (regular) - Both sides get the same weight; where they are still
+    equal after the other adjustments, optHsPatterns' favourFewerPreds raises by
+    one the side with fewer predecessors that could fall through into it and
+    lowers the other by one.
   * Unlikely branches - These can be assumed to be taken less than 20%
     of the time. So we given them one of the lowest priorities.
   * Switches - Switches at this level are implemented as jump tables
     so have a larger number of successors. So without more information
     we can only say that each individual successor is unlikely to be
     jumped to and we rank them accordingly.
-  * Calls - We currently ignore calls completely:
+  * Calls - A call's edge to its continuation gets callWeight. The
+    layout leaves such edges out when it builds chains (directEdges in
+    GHC.CmmToAsm.BlockLayout) and divides their weight by 64 when it merges the
+    chains at the end:
         * By the time we return from a call there is a good chance
           that the address we return to has already been evicted from
           cache eliminating a main advantage sequential placement brings.
         * Calls always require a info table in front of their return
           address. This reduces the chance that we return to the same
           cache line further.
+
+  Under -fcmm-static-pred, on at -O1 and -O2, static prediction turns these
+  weights into estimated frequencies before the layout uses them
+  (Note [Static Branch Prediction]), and those are what
+  Note [Layout relevant edge weights] in GHC.CmmToAsm.BlockLayout calls
+  frequencies.
 
 -}
 -- | Generate weights for a Cmm proc based on some simple heuristics.

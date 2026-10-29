@@ -207,9 +207,10 @@ joinToTargets_again
 makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [Node Loc Unique]
 makeRegMovementGraph adjusted_assig dest_assig
  = [ node       | (vreg, src) <- nonDetUFMToList adjusted_assig
-                    -- This is non-deterministic but we do not
-                    -- currently support deterministic code-generation.
-                    -- See Note [Unique Determinism and code generation]
+                    -- The list's order decides the order of the fixup moves and
+                    -- which move of a cycle is made first: see
+                    -- Note [Unique order in the linear allocator] in
+                    -- GHC.CmmToAsm.Reg.Linear
                     -- source reg might not be needed at the dest:
                 , Just loc <- [lookupUFM_Directly dest_assig vreg]
                 , node <- expandNode vreg src loc ]
@@ -296,7 +297,10 @@ handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
 --      Note that we can not have cycles that involve memory locations as
 --      sources as single destination because memory locations (stack slots)
 --      are allocated exclusively for a virtual register and therefore can not
---      require a fixup.
+--      require a fixup. A virtual register does get a new slot where its format
+--      outgrows the old one (getStackSlotFor, #26668), and a jump made while
+--      the virtual register is in memory only, in another slot than the
+--      target's recorded assignment, would make makeMove panic.
 --
 handleComponent delta instr
         (CyclicSCC ((DigraphNode vreg src@(Loc (InReg sreg) scls) ((Loc (InReg dreg) dcls: more))) : rest))
