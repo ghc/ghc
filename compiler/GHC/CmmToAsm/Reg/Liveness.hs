@@ -53,6 +53,7 @@ import GHC.Cmm
 
 import GHC.Data.Graph.Directed
 import GHC.Data.OrdList
+import GHC.Data.Maybe (expectJust)
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -64,9 +65,11 @@ import GHC.Types.Unique.DSM
 import GHC.Data.Bag
 import GHC.Utils.Monad.StrictState
 
-import Data.List (mapAccumL, sortOn)
+import Data.List (sortOn)
 import Data.Maybe
 import Data.IntSet              (IntSet)
+import qualified Data.IntSet as IntSet
+import Data.Array (listArray, (!))
 import GHC.Utils.Misc
 
 -----------------------------------------------------------------------------
@@ -860,36 +863,51 @@ livenessSCCs platform blockmap done (AcyclicSCC block : sccs)
 livenessSCCs platform blockmap done
         (CyclicSCC blocks : sccs) =
         livenessSCCs platform blockmap' (CyclicSCC blocks':done) sccs
- where      (blockmap', blocks')
-                = iterateUntilUnchanged linearLiveness equalBlockMaps
-                                      (seedCyclic blockmap blocks) blocks
+ where      !(!blockmap', blocks') = livenessCyclic platform blockmap blocks
 
-            iterateUntilUnchanged
-                :: (a -> b -> (a,c)) -> (a -> a -> Bool)
-                -> a -> b
-                -> (a,c)
 
-            iterateUntilUnchanged f eq aa b = go aa
-              where
-                go a = if eq a a' then ac else go a'
-                  where
-                    ac@(a', _) = f a b
+-- | Annotate the blocks of a cyclic SCC with register liveness information,
+--   walking a block again only when the registers live on entry to one of
+--   its successors in the SCC, or their formats, have changed since its last
+--   walk, until none have.  The blocks come back in their order.
+livenessCyclic
+        :: Instruction instr
+        => Platform
+        -> BlockMap Regs
+        -> [LiveBasicBlock instr]
+        -> (BlockMap Regs, [LiveBasicBlock instr])
 
-            linearLiveness
-                :: Instruction instr
-                => BlockMap Regs -> [LiveBasicBlock instr]
-                -> (BlockMap Regs, [LiveBasicBlock instr])
+livenessCyclic platform blockmap0 blocks
+ = go (seedCyclic blockmap0 blocks) mapEmpty everyPos
+ where
+        ids     = map blockId blocks
+        n       = length blocks
+        everyPos = IntSet.fromDistinctAscList [0 .. n - 1]
+        byPos   = listArray (0, n - 1) blocks
+        inScc   = setFromList ids
+        -- the positions of the blocks of the SCC jumping to each of its blocks
+        preds   = mapFromListWith IntSet.union
+                    [ (dest, IntSet.singleton p)
+                    | (p, BasicBlock _ instrs) <- zip [0 ..] blocks
+                    , LiveInstr instr _ <- instrs
+                    , dest <- jumpDestsOfInstr instr
+                    , dest `setMember` inScc ]
+        get m i = expectJust (mapLookup i m)
 
-            linearLiveness = mapAccumL (livenessBlock platform)
-
-                -- probably the least efficient way to compare two
-                -- BlockMaps for equality.
-            equalBlockMaps :: BlockMap Regs -> BlockMap Regs -> Bool
-            equalBlockMaps a b
-                = a' == b'
-              where a' = mapToList a
-                    b' = mapToList b
-                    -- See Note [Unique Determinism and code generation]
+        -- the positions of the blocks to walk, the highest taken first: live
+        -- sets flow backwards, and the SCC's order is a depth-first preorder
+        -- along the jumps, a block before the blocks below it
+        go !bm !out !queued = case IntSet.maxView queued of
+          Nothing -> (bm, map (get out) ids)
+          Just (p, queued1)
+           -> let b@(BasicBlock i _) = byPos ! p
+                  (bm', block')      = livenessBlock platform bm b
+                  queued'
+                    | get bm i /= get bm' i
+                    = IntSet.union queued1 (mapFindWithDefault mempty i preds)
+                    | otherwise
+                    = queued1
+              in  go bm' (mapInsert i block' out) queued'
 
 
 
@@ -1116,4 +1134,16 @@ The forwards analysis is a bit simpler:
     be dead. This might cause us to unnecessarily spill/reload an entire vector
     register to avoid its lower bits getting clobbered even though later
     instructions might only care about its upper bits.
+
+The backwards analysis of a cyclic SCC iterates to a fixpoint:
+
+  (FmtFix) The walk order of a cyclic SCC does not matter.
+
+    The fixpoint livenessCyclic finds does not depend on the order its blocks
+    are walked in, because (FmtBwd1) and (FmtBwd2) are monotone: live sets and
+    their formats only grow ('unionRegsMaxFmt', 'addRegsMaxFmt'), and a larger
+    format is killed by no more writes ('minusCoveredRegs'). A change that let
+    a format shrink would make the result depend on that order. Larger means
+    later in 'compareFormats' (GHC.CmmToAsm.Reg.Regs), a total order in which
+    the wider of two formats of one register is the larger (#27619).
 -}
