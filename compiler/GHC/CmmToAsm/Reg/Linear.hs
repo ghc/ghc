@@ -489,10 +489,7 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
           -}
            return (new_instrs, [])
 
-        _ -> genRaInsn block_live new_instrs id instr
-                        (map regWithFormat_reg $ nonDetEltsUniqSet $ getRegs $ liveDieRead live)
-                        (map regWithFormat_reg $ nonDetEltsUniqSet $ getRegs $ liveDieWrite live)
-                        -- See Note [Unique Determinism and code generation]
+        _ -> genRaInsn block_live new_instrs id instr live
 
 raInsn _ _ _ instr
         = do
@@ -527,15 +524,18 @@ genRaInsn :: forall freeRegs instr.
           -> [instr]
           -> BlockId
           -> instr
-          -> [Reg]
-          -> [Reg]
+          -> Liveness
           -> RegM freeRegs ([instr], [NatBasicBlock instr])
 
-genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
+genRaInsn block_live new_instrs block_id instr live = do
 -- pprTraceM "genRaInsn" $ ppr (block_id, instr)
   platform <- getPlatform
-  case regUsageOfInstr platform instr of { RU read written ->
+  case liveUsage live of { RU read written ->
     do
+    let dying = map regWithFormat_reg . nonDetEltsUniqSet . getRegs
+        -- See Note [Unique Determinism and code generation]
+        r_dying = dying (liveDieRead live)
+        w_dying = dying (liveDieWrite live)
     let real_written = [ rr                          | RegWithFormat {regWithFormat_reg = RegReal rr} <- written ]
     let virt_written = [ VirtualRegWithFormat vr fmt | RegWithFormat (RegVirtual vr) fmt              <- written ]
 
