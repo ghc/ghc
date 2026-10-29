@@ -1147,6 +1147,10 @@ instead, and they are to be reinvestigated together:
    once favourFewerPreds has broken its tie. The estimate would give each
    block's frequency, and its loops would give linearRA_SCCs an order taken from
    the loops rather than the SCCs.
+
+ * regClobbers in GHC.CmmToAsm.Reg.Linear counts every write, those in the
+   blocks that follow a failed heap or stack check too; with the estimate a
+   write could count by how often its block runs.
 -}
 
 -- | Combination of target node id and information about the branch

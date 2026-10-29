@@ -206,6 +206,11 @@ data Liveness
         , liveUsage     :: RegUsage  -- ^ the registers the instruction reads and writes, as
                                      --   'regUsageOfInstr' gives them, kept so that later passes
                                      --   need not compute them again.
+        , liveAcross    :: Regs      -- ^ where the instruction writes an allocatable real register, the
+                                     --   registers live after it (empty elsewhere), so that the
+                                     --   linear allocator can find the virtual registers live across
+                                     --   such a write; the graph allocator's patching renames it but
+                                     --   does not compute it again.
         }
 
 
@@ -694,7 +699,8 @@ patchRegsLiveInstr platform patchF li
                           -- depend on whether its registers are equal
                           -- (Note [What x86's regUsageOfInstr reports] in
                           -- GHC.CmmToAsm.X86.Instr)
-                        , liveUsage     = regUsageOfInstr platform instr' })
+                        , liveUsage     = regUsageOfInstr platform instr'
+                        , liveAcross    = mapRegs patchF $ liveAcross live })
                           -- See Note [Unique Determinism and code generation]
 
 --------------------------------------------------------------------------------
@@ -1020,15 +1026,25 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
 
         | otherwise
         = (liveregs_br, LiveInstr instr
-                        (Just live { liveDieRead = r_dying_br }))
+                        (Just live { liveDieRead = r_dying_br
+                                   , liveAcross  = across_br }))
 
         where
             live = Liveness
                 { liveBorn      = noRegs
                 , liveDieRead   = r_dying
                 , liveDieWrite  = w_dying
-                , liveUsage     = usage }
+                , liveUsage     = usage
+                , liveAcross    = across }
             !usage@(RU read written) = regUsageOfInstr platform instr
+
+            -- the registers live after this instruction, where it writes a
+            -- real register
+            writesReal  = any (isRealReg . regWithFormat_reg) written
+            !across     | writesReal = liveregs
+                        | otherwise  = noRegs
+            across_br   | writesReal = liveregs `unionRegsMaxFmt` live_from_branch
+                        | otherwise  = noRegs
 
             -- registers that were written here are dead going backwards.
             -- registers that were read here are live going backwards.

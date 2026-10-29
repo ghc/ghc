@@ -121,6 +121,7 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Types
 import GHC.Platform.Reg
+import GHC.Platform.Regs (globalRegMaybe)
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
@@ -138,6 +139,7 @@ import GHC.Platform
 import Data.Containers.ListUtils
 import Data.Maybe
 import Data.List (find, sortOn)
+import Data.Word (Word64)
 import Control.Monad
 
 -- -----------------------------------------------------------------------------
@@ -293,9 +295,60 @@ linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
                 { rc_jumpLocs  = []
                 , rc_moveDests = emptyUFM
                 , rc_wideDests = wideMoveDests platform cold block_live sccs
+                  -- used by x86-64's fallback alone, and elsewhere a thunk
+                  -- that would keep the SCCs alive
+                , rc_clobbers  = case platformArch platform of
+                    ArchX86_64 -> regClobbers platform sccs
+                    _          -> emptyUFM
                 , rc_config    = config }
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
+-- | For each virtual register, the real registers an instruction writes while
+-- the virtual register is live past it, as bits by register number: a C call's
+-- caller-saved registers, or R2's %r14 set for a jump, say. Given one of them,
+-- the virtual register would have to move out of it at that instruction. A move
+-- of the virtual register itself into one is no such write. The liveness pass
+-- records, at each instruction writing a real register, the registers live
+-- after it.
+--
+-- Every write counts, those in the blocks that follow a failed heap or stack
+-- check too, which run seldom.  TODO: a write could count by how often its
+-- block runs: see Note [Frequencies before register allocation] in
+-- GHC.CmmToAsm.CFG.
+regClobbers :: Instruction instr
+            => Platform -> [SCC (LiveBasicBlock instr)]
+            -> UniqFM VirtualReg Word64
+regClobbers platform sccs
+  = foldl' (\acc (BasicBlock _ instrs) -> foldl' ins acc instrs)
+           emptyUFM (flattenSCCs sccs)
+  where
+    ins acc (LiveInstr (Instr i) (Just l))
+      | hit /= 0
+      = nonDetStrictFoldUniqSet clash acc (getRegs (liveAcross l))
+      where
+        RU rs ws = liveUsage l
+        hit  = foldl' (\b r -> case regWithFormat_reg r of
+                                 RegReal (RealRegSingle n) -> setBit b n
+                                 _                         -> b) 0 ws
+        src  = case takeRegRegMoveInstr platform i of
+                 Just (RegVirtual v, RegReal _) -> Just v
+                 _                              -> Nothing
+        -- live past the instruction: live after it, and not only written
+        -- by it
+        clash r a = case regWithFormat_reg r of
+          RegVirtual v
+            | not (moved v)
+            , not (has v ws) || has v rs
+            , lookupWithDefaultUFM a 0 v .&. hit /= hit
+            -> addToUFM_C (.|.) a v hit
+          _ -> a
+        moved v = case src of
+          Just s  -> s == v
+          Nothing -> False
+        has v = any (\r -> case regWithFormat_reg r of
+                              RegVirtual v' -> v' == v
+                              _             -> False)
+    ins acc _ = acc
 
 -- | The moves of a block's virtual registers where they die, into real
 -- registers or other virtual registers.
@@ -340,7 +393,8 @@ wideMoveDests platform cold block_live sccs
     -- A destination no allocator hands out, Sp, Hp or BaseReg, and on AArch64,
     -- RV64 and LA64 those of the argument registers, R1 among them, stays a
     -- candidate here and in processBlock's move destinations, harmless but
-    -- where it is the last block's and shadows a usable one.
+    -- where it is the last block's and shadows a usable one or, on x86-64, is a
+    -- vreg's only preference, which firstFreeInOrder's fallback counts as one.
     cands = listToUFM
       [ (vr, rr) | BasicBlock bid instrs <- blocks
                  , let live = live_in bid
@@ -1118,19 +1172,38 @@ from which 'firstFreeInOrder' takes the first that is free:
 
 Preferring every register the variable was assigned to, not only the first, was
 tried and turned out to barely matter.
+
+Where none of them is free, the first free register is taken, on x86-64 in this
+order: first those no instruction writes while the virtual register is live past
+the write, such as %r14 and %rbx for a value live across a C call on System V,
+so that the value need not move out of their way; and among those, as among the
+rest, R1's register, %rbx, last, as an evaluation and a return write it: a value
+given it may have to move out of their way, and a loop variable given it at the
+loop's entry moves at every iteration (#27981). On x86-64, for a virtual
+register with preferences, the free registers that a jump target's recorded
+assignment gives any virtual register are left out where others remain, its own
+there being among its preferences. This applies to the fallback only: a free
+preferred register is taken even where a recorded jump target gives it to
+another virtual register, as leaving those out too made more join fixups cyclic
+and cost containers 0.13% and vector 0.11% more instructions (nofib's puzzle
+2.7%). Leaving them out for one with no preferences too cost vector's tridiag
+3%.
 -}
 
 -- | Of the given free registers of a class, the one to take for the
 -- virtual register with the given unique: the first of its preferred
--- registers, best first, that is free, else the first free one
--- (Note [Register preferences in the linear allocator]).
+-- registers, best first, that is free, else on x86-64 the first free one in the
+-- order Note [Register preferences in the linear allocator] gives, and
+-- elsewhere the first free one.
 firstFreeInOrder :: Unique -> [RealReg] -> RegM freeRegs RealReg
 firstFreeInOrder _ [] = panic "firstFreeInOrder: no free register"
 firstFreeInOrder u free@(r0 : _) = do
+  platform <- getPlatform
   bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
   RA_Context { rc_jumpLocs  = locs
              , rc_moveDests = moves
-             , rc_wideDests = wide } <- getContextR
+             , rc_wideDests = wide
+             , rc_clobbers  = clobbers } <- getContextR
   let !jl = jumpLocRegs u locs
       !mv = lookupUFM_Directly moves u
       !fu = lookupFirstUsed u bassig
@@ -1139,12 +1212,34 @@ firstFreeInOrder u free@(r0 : _) = do
       -- the preference where it is free, else the next one
       pick (Just r) _ | isFree r = Just r
       pick _        k = k
+      noPrefs = null jl && isNothing mv && isNothing fu && isNothing wd
       chosen = case find isFree jl of
                  Nothing -> pick mv (pick fu (pick wd Nothing))
                  found   -> found
   return $! case chosen of
     Just r -> r
-    Nothing -> r0
+    Nothing
+      | ArchX86_64 <- platformArch platform
+      , Just !r1 <- globalRegMaybe platform (VanillaReg 1)
+      -> let !cl = lookupWithDefaultUFM_Directly clobbers 0 u
+             kept (RealRegSingle n) = not (testBit cl n)
+             -- the free ones to choose from: for one with preferences, those
+             -- no jump target's assignment gives a virtual register if any
+             -- remain, and all of them otherwise
+             fs | noPrefs    = free
+                | otherwise  = case filter (`notElem` reserved) free of
+                                 []  -> free
+                                 fs' -> fs'
+             reserved = [ r | assig <- locs, Loc loc _ <- nonDetEltsUFM assig
+                            , r <- regsOfLoc loc ]
+             -- those no instruction writes while the vreg is live past it,
+             -- then the rest, R1's last in each part
+             part p = [ r | r <- fs, r /= r1, p r ]
+                      ++ [ r1 | r1 `elem` fs, p r1 ]
+             {-# INLINE part #-}  -- so that the lists fuse
+         in fromMaybe r0 (listToMaybe (part kept ++ part (not . kept)))
+      | otherwise
+      -> r0
 
 -- | 'jumpLocRegs' u locs: the registers the recorded jump-target assignments
 -- locs give the virtual register with unique u, in order.

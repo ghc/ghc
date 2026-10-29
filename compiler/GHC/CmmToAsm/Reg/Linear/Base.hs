@@ -27,6 +27,8 @@ where
 
 import GHC.Prelude
 
+import Data.Word (Word64)
+
 import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Config
@@ -246,6 +248,11 @@ data RA_Context
         -- | 'GHC.CmmToAsm.Reg.Linear.wideMoveDests' of the procedure being
         --   allocated
         , rc_wideDests  :: UniqFM VirtualReg RealReg
+
+        -- | 'GHC.CmmToAsm.Reg.Linear.regClobbers' of the procedure being
+        --   allocated on x86-64, whose fallback alone uses it, and empty
+        --   elsewhere
+        , rc_clobbers   :: UniqFM VirtualReg Word64
 
         -- | Native code generator configuration
         , rc_config     :: !NCGConfig
