@@ -270,8 +270,39 @@ import GHC.Types.Unique.DSM (UniqDSM)
     Considering these hardly helped with performance and ignoring
     them helps quite a bit to improve compiler performance.
 
-  So we perform a preprocessing step where we apply a multiplicator
-  to these kinds of edges.
+  * A loop's back edge counts more, while the chains are built, than any edge
+    into the loop's head that is not a call, a back edge or a self loop, unless
+    it leaves a jump table, which cannot fall through.
+
+    The frequencies static prediction estimates (-fcmm-static-pred) often make a
+    back edge lighter than the loop's entry: where staying in the loop is
+    estimated at even odds or worse, as when ohPredicts predicts staying in a
+    loop over a tree to be unlikely (Note [Static prediction of tag tests] in
+    GHC.CmmToAsm.CFG), or where several back edges share the loop's repeats, so
+    that the entry would fall through into the head and every iteration pay a
+    jump back. 'optHsPatterns' adds a bonus to back edges, but static prediction
+    overwrites the weights of every branch with a back edge among its targets
+    except a heap or stack check's and one whose targets are all back edges. So
+    we raise each back edge 'findBackEdges' finds by a little more than the
+    weight of the heaviest edge into its head that is not a call, a back edge or
+    a self loop, which keeps the order of several back edges into one head. The
+    garbage collector's return to the block that made a heap or stack check is
+    no such loop: a back edge leaving a block that follows a failed check
+    ('checkFailures'), or leaving a block that follows such a block and whose
+    one out-edge has the code generator as its source, such as one the register
+    allocator puts there, stays as it is. Nor is a back edge into the one
+    successor of the procedure's entry block raised: the entry would then jump
+    to that block at every call, which a loop that seldom iterates, such as the
+    retry loops of the RTS's entry code (stg_BLACKHOLE_info), does not win back;
+    static prediction predicts that retry to be likely, the back edge rule
+    superseding ohPredicts there (the same Note). Where the code generator split
+    the entry block, as allocMoreStack does, and the block holding the rest of
+    its code has one successor, that successor stands in for the entry's. A back
+    edge of weight 0 or less stays as it is, as do the back edges into a head
+    that only calls, back edges, self loops and edges of weight 0 or less enter.
+
+  So we perform a preprocessing step where we adjust the weights of
+  these kinds of edges.
 
   -}
 
@@ -654,7 +685,7 @@ sequenceChain _info _weights    [] = []
 sequenceChain _info _weights    [x] = [x]
 sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
     let directEdges :: [CfgEdge]
-        directEdges = sortBy (flip compare) $ mapMaybe relevantWeight (infoEdgeList weights)
+        directEdges = sortBy (flip compare) $ preferBackEdges $ mapMaybe relevantWeight (infoEdgeList weights)
           where
             -- Apply modifiers to turn edge frequencies into useable weights
             -- for computing code layout.
@@ -681,6 +712,55 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
                   cantEliminate CmmCondBranch {} = True
                   cantEliminate CmmSwitch {} = True
                   cantEliminate _ = False
+
+            -- See Note [Layout relevant edge weights]
+            preferBackEdges :: [CfgEdge] -> [CfgEdge]
+            preferBackEdges es
+              | mapNull backs = es
+              | otherwise     = map raise es
+              where
+                cold = coldBlocks weights
+                allBacks = findBackEdges entry weights
+                -- each loop head but entryNext, to the blocks outside the cold
+                -- set that its back edges leave
+                backs = mapFromListWith setUnion
+                  [ (t, setSingleton f) | (f, t) <- allBacks
+                                        , not (f `setMember` cold)
+                                        , Just t /= entryNext ]
+                -- each loop head to the blocks all its back edges leave
+                anyBacks = mapFromListWith setUnion
+                  [ (t, setSingleton f) | (f, t) <- allBacks ]
+                -- the entry block's one successor, or, where the code generator
+                -- split the entry, as allocMoreStack does, the one successor of
+                -- the block holding the rest of its code, where it has one
+                entryNext
+                  = case getSuccessorEdges weights entry of
+                      [(t, EdgeInfo { transitionSource = AsmCodeGen })]
+                        | [u] <- getSuccessors weights t -> Just u
+                      [(t, _)] -> Just t
+                      _        -> Nothing
+                isBack = inBacks backs
+                inBacks m f t = maybe False (setMember f) (mapLookup t m)
+                -- the heaviest edge into each head that is neither a back edge
+                -- nor a self loop
+                entryMax = mapFromListWith max
+                  [ (t, edgeWeight i) | CfgEdge f t i <- es
+                                      , f /= t
+                                      , t `mapMember` backs
+                                      , not (inBacks anyBacks f t) ]
+                -- an edge of weight 0 or less stays as it is, and so does one
+                -- out of a jump table, which cannot fall through
+                raise e@(CfgEdge f t i)
+                  | isBack f t
+                  , edgeWeight i > 0
+                  , not (isSwitch i)
+                  , Just m <- mapLookup t entryMax
+                  , m > 0
+                  = CfgEdge f t i { edgeWeight = edgeWeight i + m * 1.001 }
+                  | otherwise = e
+                isSwitch (EdgeInfo CmmSource { trans_cmmNode = n } _)
+                  | CmmSwitch {} <- n = True
+                isSwitch _ = False
 
         blockMap :: LabelMap (GenBasicBlock i)
         blockMap

@@ -21,6 +21,7 @@ module GHC.CmmToAsm.CFG
     , getSuccEdgesSorted
     , getEdgeInfo
     , getCfgNodes, hasNode
+    , checkFailures, coldBlocks, findBackEdges
 
     -- Loop Information
     , loopMembers, loopLevels, loopInfo
@@ -162,6 +163,48 @@ instance Outputable BranchInfo where
 isHeapOrStackCheck :: TransitionSource -> Bool
 isHeapOrStackCheck (CmmSource { trans_info = HeapStackCheck}) = True
 isHeapOrStackCheck _ = False
+
+-- | The blocks that follow a failed heap or stack check: those the check's less
+-- likely branch enters, such as one calling the garbage collector, and their
+-- successors, such as the block the garbage collector returns to, which can be
+-- a continuation that a call returns to as well. A heap or stack check is a
+-- branch 'getCfg' tags 'HeapStackCheck', one whose condition reads SpLim, HpLim
+-- or BaseReg after fixStgRegisters, which has turned every global register
+-- without a machine register into a load off BaseReg: on x86-64, where HpLim
+-- has none, a heap check reads BaseReg, and so does a test of CurrentTSO or
+-- CurrentNursery. Which side is less likely is read off the weights of the CFG
+-- given; for a check annotated likely or unlikely, as GHC.StgToCmm.Heap's are,
+-- the same side comes out less likely, under the default -fcfg-weights, on the
+-- native weights and on those optimizeCFG derives from them.
+checkFailures :: CFG -> LabelSet
+checkFailures cfg = mapFoldl node setEmpty cfg
+  where
+    node acc outs = mapFoldlWithKey (edge outs) acc outs
+    edge outs acc to e
+      | isHeapOrStackCheck (transitionSource e)
+      , edgeWeight e < mapFoldl (\w e' -> max w (edgeWeight e')) 0 outs
+      = mapFoldlWithKey (\a s _ -> setInsert s a) (setInsert to acc)
+                        (mapFindWithDefault mapEmpty to cfg)
+      | otherwise
+      = acc
+
+-- | The blocks that follow a failed heap or stack check ('checkFailures'),
+-- and the blocks that follow one of them and whose one out-edge has the code
+-- generator as its source, such as those the register allocator puts there.
+--
+-- TODO: two shapes escape this: see
+-- Note [Frequencies before register allocation].
+coldBlocks :: CFG -> LabelSet
+coldBlocks cfg = setUnion gc $ setFromList
+    [ s | b <- setElems gc, Just outs <- [mapLookup b cfg], s <- mapKeys outs
+        , inserted s ]
+  where
+    gc = checkFailures cfg
+    inserted b
+      | Just outs <- mapLookup b cfg
+      , [EdgeInfo { transitionSource = AsmCodeGen }] <- mapElems outs
+      = True
+      | otherwise = False
 
 -- | Information about edges
 data EdgeInfo
@@ -1032,6 +1075,64 @@ TODO:
   - Requires refactoring `loopInfo` to work on both, Cmm Graphs and the backend CFG.
 -}
 
+{- Note [Static prediction of tag tests]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ohPredicts predicts that a comparison with a constant comes out unequal, giving
+the equal side 0.3. A case on a pointer tag compares the tag with a
+constructor's, as in `(x & 7) == 1`, and tags follow the order in which a type
+declares its constructors (Note [Constructor tag allocation] in GHC.Core.TyCon),
+so whether the equal side is the likely one depends on the type, which the CFG
+does not record. A list declares [] first, so in a loop over a list the test for
+tag 1 is the loop's exit, and the prediction is right. The trees of Data.Map,
+Data.Set and Data.IntMap declare Bin first, so in a lookup the test for tag 1 is
+the step down the tree, and the prediction calls the side that stays in the loop
+the unlikely one. ohPredicts matches only an equality, and the control-flow
+optimisation may have inverted a test so that its true side falls through
+(Note [Invert Cmm conditionals] in GHC.Cmm.ContFlowOpt), so whether a tag test
+is predicted at all depends on how it came out spelt.
+
+Telling the two apart needs the constructors' numbers of arguments, or which one
+recurses, carried down to the CFG, which takes many changes, so the heuristic
+stays as it is, lists being common; and as leaning on the estimate more would
+hand loops over such trees its misprediction, code that sets it aside or damps
+its effect says so and points here.
+
+The back edge rule of Note [Static Branch Prediction] supersedes it on a branch
+that has a back edge, as it does every other heuristic and the branch's likely
+annotation; that is wrong where a rare retry compares with a constant: the RTS's
+stg_BLACKHOLE_info retries where an indirectee's info pointer equals
+stg_IND_info, and its loop is estimated to repeat. Whatever the estimate, the
+layout raises a loop's back edge above its entry, so that a loop over a tree,
+whose back edge the estimate can make lighter than its entry, still has its back
+edge fall through into its head. Note [Layout relevant edge weights] in
+GHC.CmmToAsm.BlockLayout lists the exceptions, as where the loop's head is the
+entry block's one successor.
+-}
+
+{- Note [Frequencies before register allocation]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Static prediction estimates block frequencies for the layout only under
+-fcmm-static-pred and only after register allocation
+(Note [Static Branch Prediction]); the graph allocator's spill costs hold
+mkGlobalWeights' estimate whatever the flag, but as a thunk no spill choice
+forces (GHC.CmmToAsm.Reg.Graph.SpillCost). So the code that depends on how often
+a block runs uses stand-ins, each marked by a TODO pointing here. Once the
+estimate is computed in a Cmm pass, as that Note proposes, these could use it
+instead, and they are to be reinvestigated together:
+
+ * coldBlocks misses two shapes. In a procedure needing more stack than
+   maxSpillSlots, allocMoreStack splits each entry block into a stack allocation
+   jumping to a new block that holds the old code, so where the garbage
+   collector returns to such a block, the back edge leaving it now leaves the
+   new block, whose out-edges are the old block's, not the code generator's. And
+   a fixup block F on a check's failure edge H -> G gets that edge's
+   HeapStackCheck tag on H -> F (addNodesBetween), so that F counts as the
+   failure target and G as its successor, and the block the garbage collector
+   returns to, after G, is missed. With the estimate, a block inserted after
+   allocation would take the frequency of the edge it splits or of the block it
+   continues, with no tag to copy.
+-}
+
 -- | Combination of target node id and information about the branch
 --   we are looking at.
 type TargetNodeInfo = (BlockId, EdgeInfo)
@@ -1059,6 +1160,8 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
 
         -- Mix of backedges and others:
         -- Always predict the backedges.
+        -- This supersedes ohPredicts, wrongly for a rare retry: see
+        -- Note [Static prediction of tag tests].
         | not (null m) && length m < length successors
         -- Heap/Stack checks "loop", but only once.
         -- So we simply exclude any case involving them.
@@ -1160,6 +1263,8 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
                 s2Level = mapLookup s2 loopLevels
 
         -- Comparing to a constant is unlikely to be equal.
+        -- Wrong for a tag test where the likely constructor is declared first:
+        -- see Note [Static prediction of tag tests].
         ohPredicts (s1,_s2)
             | CmmSource { trans_cmmNode = src1 } <- getTransitionSource node (fst s1) cfg
             , CmmCondBranch cond ltrue _lfalse likely <- src1
