@@ -421,8 +421,26 @@ data Operand
 -- NB: As of 2023 we only use the FMA213 permutation.
 data FMAPermutation = FMA132 | FMA213 | FMA231
 
+{- Note [What x86's regUsageOfInstr reports]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+regUsageOfInstr reports the registers an instruction reads and writes as the
+liveness pass and the register allocators need them, which is not always what
+the processor does. An XOR or PXOR of a register with itself, or a VXOR or VPXOR
+of a register with itself into itself, reads nothing, as it only zeroes the
+register at its format, so an instruction's usage depends on whether its
+registers are equal and can change when allocation makes them so; the liveness
+pass computes it again where it patches registers (patchRegsLiveInstr). A
+MOVHLPS's usage has its destination written whole, though the instruction keeps
+the destination's upper half. A CALL writes every caller-saved register, the
+float and vector ones at FF64 although the call clobbers them whole. A JMP or
+CALL reads the registers that carry its arguments, which the instruction itself
+does not. And a register the allocators do not allocate is left out altogether
+('interesting').
+-}
+
 -- | Returns which registers are read and written as a (read, written)
 -- pair.
+-- See Note [What x86's regUsageOfInstr reports].
 regUsageOfInstr :: Platform -> Instr -> RegUsage
 regUsageOfInstr platform instr
  = case instr of

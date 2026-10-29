@@ -49,7 +49,10 @@ class Instruction instr where
 
         -- | Get the registers that are being used by this instruction.
         --      regUsage doesn't need to do any trickery for jumps and such.
-        --      Just state precisely the regs read and written by that insn.
+        --      Just state the regs read and written by that insn, as
+        --      precisely as register allocation needs; x86's approximates
+        --      on purpose (Note [What x86's regUsageOfInstr reports] in
+        --      GHC.CmmToAsm.X86.Instr).
         --      The consequences of control flow transfers, as far as register
         --      allocation goes, are taken care of by the register allocator.
         --
