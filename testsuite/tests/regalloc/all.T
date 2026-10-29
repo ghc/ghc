@@ -17,3 +17,17 @@ test('T27619',
        grep_errmsg(r'%vV128_\S+ :: FF64') ],
      compile,
      ['-O -fno-cse -ddump-asm-liveness'])
+
+# A value live across a C call, saved on the C stack: spilled at once from
+# %xmm0, where the previous call returned it, not moved to %xmm1 and then to
+# %xmm2 first, as the moves of the next call's arguments write each (#26631;
+# x86-64 assembly, the register of the module's only vector spill; skipped on
+# Windows, whose calls leave %xmm6 to %xmm15 alone)
+test('T26631',
+     [ unless(arch('x86_64'), skip),
+       when(opsys('mingw32'), skip),
+       when(not have_ncg(), skip),
+       only_ways(['optasm']),
+       grep_errmsg(r'(movupd %xmm\d+),\d+\(%rsp\)', [1]) ],
+     compile,
+     ['-ddump-asm'])
