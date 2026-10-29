@@ -78,11 +78,13 @@
 --
 --   * a CFG kept up to date through instruction selection and
 --     register allocation: x86-64 alone (backendMaintainsCfg in
---     GHC.CmmToAsm.BlockLayout), and not there under -finfo-table-map (the TODO
---     #20428 at livenessCfg in cmmNativeGen). Static branch prediction, the
---     chain layout of -fblock-layout-cfg and invertCondBranches need it; the
---     linear allocator reads the blocks that follow failed heap or stack checks
---     off the CFG of step 4, under -finfo-table-map too.
+--     GHC.CmmToAsm.BlockLayout), and, under -finfo-table-map, kept only
+--     through instruction selection (the TODO #20428 at livenessCfg
+--     in cmmNativeGen). Static branch prediction, the chain layout
+--     of -fblock-layout-cfg and invertCondBranches need it, and so do
+--     the linear allocator's order of blocks and some of its register
+--     preferences (step 6; Note [Frequencies before register allocation] in
+--     GHC.CmmToAsm.CFG), which take it from step 4 under -finfo-table-map too.
 --   * the machine registers of STG's argument registers (R1 and up, F, D, XMM)
 --     handed out between their uses: x86-64, PowerPC and, for XMM1 to XMM4,
 --     i386, which maps R1 to esi and reserves it; AArch64, RISC-V and LoongArch
@@ -130,7 +132,10 @@
 --   6. Register allocation puts each virtual register in a machine register or
 --      a spill slot at each instruction. It uses the graph colouring allocator
 --      (GHC.CmmToAsm.Reg.Graph) under -fregs-graph or -fregs-iterative, and
---      the linear allocator (GHC.CmmToAsm.Reg.Linear) otherwise. Where the
+--      the linear allocator (GHC.CmmToAsm.Reg.Linear) otherwise. On x86-64, the
+--      linear allocator allocates last the blocks the garbage collector returns
+--      to after a failed heap or stack check, reading them off the CFG of step
+--      4 (the first item of the list above, and linearRA_SCCs). Where the
 --      allocator uses more spill slots than maxSpillSlots, ncgAllocMoreStack
 --      reserves stack for the extra slots, or, after the graph allocator,
 --      for all of them (the BUG at needStack in GHC.CmmToAsm.Reg.Graph).
@@ -727,7 +732,8 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                                 then Just nativeCfgWeights
                                 else Nothing
         -- the blocks that follow a failed heap or stack check, which
-        -- the linear allocator takes no wide move destination from, read off
+        -- the linear allocator takes no wide move destination from and
+        -- allocates last where the garbage collector returns to them, read off
         -- the CFG wherever the backend maintains it, -finfo-table-map or not
         let allocCold = if backendMaintainsCfg platform
                           then checkFailures nativeCfgWeights
