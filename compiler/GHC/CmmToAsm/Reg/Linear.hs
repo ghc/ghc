@@ -137,7 +137,7 @@ import GHC.Platform
 
 import Data.Containers.ListUtils
 import Data.Maybe
-import Data.List (sortOn)
+import Data.List (find, sortOn)
 import Control.Monad
 
 -- -----------------------------------------------------------------------------
@@ -290,7 +290,8 @@ linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
                 $ linearRA_SCCs cold entry_ids block_live sccs
         platform = ncgPlatform config
         ctx = RA_Context
-                { rc_moveDests = emptyUFM
+                { rc_jumpLocs  = []
+                , rc_moveDests = emptyUFM
                 , rc_wideDests = wideMoveDests platform cold block_live sccs
                 , rc_config    = config }
      in DUniqResult (blocks, stats, getStackUse stack) us'
@@ -564,7 +565,14 @@ processBlock block_live (BasicBlock id instrs)
  = do   -- pprTraceM "processBlock" $ text "" $$ ppr (BasicBlock id instrs)
         initBlock id block_live
         platform <- getPlatform
-        setBlockContextR $ listToUFM
+        bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
+        let recorded dest !ls
+              | Just (_, assig) <- lookupBlockAssignment dest bassig = assig : ls
+              | otherwise = ls
+            !locs = foldr recorded []
+              [ dest | LiveInstr (Instr instr) _ <- instrs
+                     , dest <- jumpDestsOfInstr instr ]
+        setBlockContextR locs $ listToUFM
           [ (vr, rr) | (vr, RegReal rr) <- dyingMoves platform instrs ]
 
         (instrs', fixups)
@@ -1086,6 +1094,11 @@ allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt
 The preferred registers of a virtual register, the variable below, best first,
 from which 'firstFreeInOrder' takes the first that is free:
 
+ * The registers the variable has on entry to the jump targets of the current
+   block whose assignments are already recorded, in the order of the block's
+   jumps, such as a loop header jumped to from the loop's end: there the
+   variable needs no fixup move at the jump (#27980).
+
  * The real register the current block moves the variable into where it dies,
    such as R1 before an evaluation: allocated there, the variable needs no move.
 
@@ -1115,18 +1128,32 @@ firstFreeInOrder :: Unique -> [RealReg] -> RegM freeRegs RealReg
 firstFreeInOrder _ [] = panic "firstFreeInOrder: no free register"
 firstFreeInOrder u free@(r0 : _) = do
   bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
-  RA_Context { rc_moveDests = moves
+  RA_Context { rc_jumpLocs  = locs
+             , rc_moveDests = moves
              , rc_wideDests = wide } <- getContextR
-  let !mv = lookupUFM_Directly moves u
+  let !jl = jumpLocRegs u locs
+      !mv = lookupUFM_Directly moves u
       !fu = lookupFirstUsed u bassig
       !wd = lookupUFM_Directly wide u
       isFree r = r `elem` free
       -- the preference where it is free, else the next one
       pick (Just r) _ | isFree r = Just r
       pick _        k = k
-  return $! case pick mv (pick fu (pick wd Nothing)) of
+      chosen = case find isFree jl of
+                 Nothing -> pick mv (pick fu (pick wd Nothing))
+                 found   -> found
+  return $! case chosen of
     Just r -> r
     Nothing -> r0
+
+-- | 'jumpLocRegs' u locs: the registers the recorded jump-target assignments
+-- locs give the virtual register with unique u, in order.
+jumpLocRegs :: Unique -> [RegMap Loc] -> [RealReg]
+{-# INLINE jumpLocRegs #-}  -- out of line it allocates more
+jumpLocRegs u locs = foldr at [] locs
+  where at assig !rs
+          | Just (Loc loc _) <- lookupUFM_Directly assig u = regsOfLoc loc ++ rs
+          | otherwise                                       = rs
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
