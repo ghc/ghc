@@ -1,0 +1,4 @@
+!! The Cmm must not contain a call to the RTS's "stg_ap_0" fast entry point
+!! (generic evaluation of an unknown closure).
+!!
+!! See #27979.
