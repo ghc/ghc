@@ -32,6 +32,7 @@ import GHC.CmmToAsm.Format
 import GHC.Types.Unique.Set
 
 import Data.Coerce (coerce)
+import GHC.Data.Word64Map.Strict (isSubmapOfBy)
 
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
@@ -111,7 +112,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
          Just dest_assig
           -> joinToTargets_again
                         block_live new_blocks block_id instr dest dests
-                        adjusted_assig dest_assig
+                        assig dest_assig
 
 
 {- Note [The first jump into a block fixes its entry assignment]
@@ -167,13 +168,8 @@ joinToTargets_again
     block_live new_blocks block_id instr dest dests
     src_assig dest_assig
 
-        -- the assignments already match, no problem.
-        | equalIgnoringFormats
-            (nonDetUFMToList dest_assig)
-            (nonDetUFMToList src_assig)
-        -- Both lists are in the order of the uniques, so
-        -- the comparison does not depend on that order
-        -- (Note [Unique Determinism and code generation])
+        -- every vreg of the recorded assignment is where it records it
+        | recordedLocsHold dest_assig src_assig
         = joinToTargets' block_live new_blocks block_id instr dests
 
         -- assignments don't match, need fixup code
@@ -281,7 +277,8 @@ makeRegMovementGraph adjusted_assig dest_assig
                     -- fixup moves and which move of a cycle goes through the
                     -- stack: see Note [Unique order in the linear allocator] in
                     -- GHC.CmmToAsm.Reg.Linear
-                    -- source reg might not be needed at the dest:
+                    -- source reg might not be needed at the dest,
+                    -- adjusted_assig being the whole assignment at the jump:
                 , Just loc <- [lookupUFM_Directly dest_assig vreg]
                 , node <- expandNode vreg src loc ]
 
@@ -404,11 +401,15 @@ handleComponent delta instr
 handleComponent _ _ (CyclicSCC _)
  = panic "Register Allocator: handleComponent cyclic"
 
--- Helper functions that use the @Ord (IgnoreFormat Loc)@ instance.
+-- | Whether the second assignment has every vreg of the first at the first's
+-- location, whatever its formats.
+recordedLocsHold :: RegMap Loc -> RegMap Loc -> Bool
+recordedLocsHold dest src
+  = isSubmapOfBy (\(Loc l1 _) (Loc l2 _) -> l1 == l2)
+                 (ufmToIntMap dest) (ufmToIntMap src)
 
-equalIgnoringFormats :: [(Unique, Loc)] -> [(Unique, Loc)] -> Bool
-equalIgnoringFormats =
-  coerce $ (==) @[(Unique, IgnoreFormat Loc)]
+-- A helper function that uses the @Ord (IgnoreFormat Loc)@ instance.
+
 movementGraphSCCs :: [Node Loc Unique] -> [SCC (Node Loc Unique)]
 movementGraphSCCs =
   coerce $ stronglyConnCompFromEdgedVerticesOrdR @(IgnoreFormat Loc) @Unique

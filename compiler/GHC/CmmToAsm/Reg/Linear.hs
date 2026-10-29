@@ -42,8 +42,7 @@ The algorithm is roughly:
                 If the temporary is live after this instruction,
                     Move the temporary to another (non-clobbered & free) reg,
                     or spill it to memory.  Mark the temporary as residing
-                    in both memory and a register if it was spilled (it might
-                    need to be read by this instruction).
+                    in memory only if it was spilled or was in memory too.
 
             (ToDo: this is wrong for jump instructions?)
 
@@ -70,9 +69,7 @@ The algorithm is roughly:
         (e) Delete all register assignments for temps which are read
             (only) and die here.  Update the free register list.
 
-        (f) Mark all registers clobbered by this instruction as not free,
-            and mark temporaries which have been spilled due to clobbering
-            as in memory (step (a) marks then as in both mem & reg).
+        (f) Mark all registers clobbered by this instruction as not free.
 
         (g) For each temporary *written* by this instruction:
             Allocate a real register as for (b), spilling something
@@ -1221,7 +1218,8 @@ releaseRegs regs
 --      - if the temp dies after this instruction, do nothing
 --      - otherwise, put it somewhere safe (another reg, not written
 --              before the temp's next read, if possible, otherwise spill
---              and record InBoth in the assignment).
+--              and record InMem in the assignment).
+--      - a temp in its stack slot too is recorded InMem there.
 --      - for allocateRegs on the temps *read*,
 --      - clobbered regs are allocatable.
 --
@@ -1313,26 +1311,29 @@ saveClobberedTemps clobbered dying rest
           to_save -> do
             -- in the order of their uniques, as the fold visits them
             (assig', instrs)
-              <- foldM (\acc (temp, usage) -> clobber temp acc usage)
+              <- foldM (\acc (temp, loc) -> clobber temp acc loc)
                        (assig, []) (reverse to_save)
             setAssigR assig'
             return instrs
    where
      -- Unique represents the VirtualReg
      -- Here we separate the cases which we do want to spill from these we don't.
-     pick :: Unique -> Loc -> [(Unique, RealRegUsage)]
-          -> [(Unique, RealRegUsage)]
+     pick :: Unique -> Loc -> [(Unique, Loc)] -> [(Unique, Loc)]
      pick !temp !loc acc =
         case loc of
-                Loc (InReg reg) fmt
+                Loc (InReg reg) _
                     | any (realRegsAlias reg) clobbered
                     , not (temp `elemUniqSet_Directly` getRegs dying)
-                    -> (temp, RealRegUsage reg fmt) : acc
+                    -> (temp, loc) : acc
+                Loc (InBoth reg _) _
+                    | any (realRegsAlias reg) clobbered
+                    , not (temp `elemUniqSet_Directly` getRegs dying)
+                    -> (temp, loc) : acc
                 _ -> acc
 
      -- See Note [UniqFM and the register allocator]
-     clobber :: Unique -> (RegMap Loc,[instr]) -> RealRegUsage -> RegM freeRegs (RegMap Loc,[instr])
-     clobber temp (assig,instrs) (RealRegUsage reg fmt)
+     clobber :: Unique -> (RegMap Loc,[instr]) -> Loc -> RegM freeRegs (RegMap Loc,[instr])
+     clobber temp (assig,instrs) (Loc (InReg reg) fmt)
        = do config <- getConfig
             platform <- getPlatform
 
@@ -1369,9 +1370,12 @@ saveClobberedTemps clobbered dying rest
                   -- record why this reg was spilled for profiling
                   recordSpill (SpillClobber temp)
 
-                  let new_assign  = addToUFM_Directly assig temp (Loc (InBoth reg slot) fmt)
+                  let new_assign  = addToUFM_Directly assig temp (Loc (InMem slot) fmt)
 
                   return (new_assign, (spill ++ instrs))
+     clobber temp (assig,instrs) (Loc (InBoth _ slot) fmt)
+       = return (addToUFM_Directly assig temp (Loc (InMem slot) fmt), instrs)
+     clobber _ acc (Loc (InMem _) _) = return acc  -- pick gives none
 
 
 
@@ -1398,8 +1402,7 @@ unwrittenBeforeRead !u = go
       RegVirtual v -> getUnique v == u
       _            -> False
 
--- | Mark all these real regs as allocated,
---      and kick out their vreg assignments.
+-- | Mark all these real regs as allocated.
 --
 clobberRegs :: FR freeRegs => [RealReg] -> RegM freeRegs ()
 clobberRegs []
@@ -1409,29 +1412,6 @@ clobberRegs clobbered
  = do   platform <- getPlatform
         freeregs <- getFreeRegsR
         setFreeRegsR $! frClobberRegs platform clobbered freeregs
-
-        assig           <- getAssigR
-        setAssigR $! clobber assig (nonDetUFMToList assig)
-          -- Each vreg is updated on its own, so the list's order does
-          -- not matter (Note [Unique Determinism and code generation])
-
-   where
-        -- if the temp was InReg and clobbered, then we will have
-        -- saved it in saveClobberedTemps above.  So the only case
-        -- we have to worry about here is InBoth.  Note that this
-        -- also catches temps which were loaded up during allocation
-        -- of read registers, not just those saved in saveClobberedTemps.
-
-        clobber :: RegMap Loc -> [(Unique,Loc)] -> RegMap Loc
-        clobber assig []
-                = assig
-
-        clobber assig ((temp, Loc (InBoth reg slot) regFmt) : rest)
-                | any (realRegsAlias reg) clobbered
-                = clobber (addToUFM_Directly assig temp (Loc (InMem slot) regFmt)) rest
-
-        clobber assig (_:rest)
-                = clobber assig rest
 
 -- -----------------------------------------------------------------------------
 -- allocateRegsAndSpill
