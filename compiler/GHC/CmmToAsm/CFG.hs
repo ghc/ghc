@@ -659,17 +659,29 @@ getCfg platform weights graph =
 
     blocks = revPostorder graph :: [CmmBlock]
 
---Find back edges by BFS
-findBackEdges :: HasDebugCallStack => BlockId -> CFG -> Edges
-findBackEdges root cfg =
-    --pprTraceIt "Backedges:" $
-    map fst .
-    filter (\x -> snd x == Backward) $ typedEdges
+-- | The back edges of a depth-first search from the given block: the edges into
+-- a block still on the search's stack, but for an edge from a block to itself.
+-- They differ from loopInfo's back edges, each an edge into a block that
+-- dominates its source: an edge into the root is one here and none there, and
+-- in an irreducible region the search's order of visits picks which edges are.
+findBackEdges :: BlockId -> CFG -> Edges
+findBackEdges root cfg
+  = go root (succs root) [] (setSingleton root) (setSingleton root) []
   where
-    edges = edgeList cfg :: [(BlockId,BlockId)]
-    getSuccs = getSuccessors cfg :: BlockId -> [BlockId]
-    typedEdges =
-      classifyEdges root getSuccs edges :: [((BlockId,BlockId),EdgeType)]
+    succs b = case mapLookup b cfg of
+      Just outs -> mapKeys outs
+      Nothing   -> pprPanic "findBackEdges: block not in the CFG" (ppr b)
+    -- the block searched from, its successors still to look at, and the
+    -- blocks below it on the stack with theirs
+    go !n [] stack !seen !onStack acc = case stack of
+      []             -> acc
+      (p, ps) : rest -> go p ps rest seen (setDelete n onStack) acc
+    go !n (s : ss) stack !seen !onStack acc
+      | s == n                = go n ss stack seen onStack acc
+      | s `setMember` onStack = go n ss stack seen onStack ((n, s) : acc)
+      | s `setMember` seen    = go n ss stack seen onStack acc
+      | otherwise             = go s (succs s) ((n, ss) : stack)
+                                   (setInsert s seen) (setInsert s onStack) acc
 
 optimizeCFG :: Bool -> Weights -> RawCmmDecl -> CFG -> CFG
 optimizeCFG _ _ (CmmData {}) cfg = cfg

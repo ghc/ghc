@@ -21,10 +21,7 @@ module GHC.Data.Graph.Directed (
         stronglyConnCompFromEdgedVerticesOrd,
         stronglyConnCompFromEdgedVerticesOrdR,
         stronglyConnCompFromEdgedVerticesUniq,
-        stronglyConnCompFromEdgedVerticesUniqR,
-
-        -- Simple way to classify edges
-        EdgeType(..), classifyEdges
+        stronglyConnCompFromEdgedVerticesUniqR
         ) where
 
 ------------------------------------------------------------------------------
@@ -45,7 +42,6 @@ import GHC.Prelude
 
 import GHC.Utils.Misc ( sortWith, count )
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Data.Maybe ( expectJust )
 
 -- std interfaces
@@ -374,95 +370,6 @@ graphEmpty :: G.Graph -> Bool
 graphEmpty g = lo > hi
   where (lo, hi) = bounds g
 
-
-{-
-************************************************************************
-*                                                                      *
-*                         Classify Edge Types
-*                                                                      *
-************************************************************************
--}
-
--- Remark: While we could generalize this algorithm this comes at a runtime
--- cost and with no advantages. If you find yourself using this with graphs
--- not easily represented using Int nodes please consider rewriting this
--- using the more general Graph type.
-
--- | Edge direction based on DFS Classification
-data EdgeType
-  = Forward
-  | Cross
-  | Backward -- ^ Loop back towards the root node.
-             -- Eg backjumps in loops
-  | SelfLoop -- ^ v -> v
-   deriving (Eq,Ord)
-
-instance Outputable EdgeType where
-  ppr Forward = text "Forward"
-  ppr Cross = text "Cross"
-  ppr Backward = text "Backward"
-  ppr SelfLoop = text "SelfLoop"
-
-newtype Time = Time Int deriving (Eq,Ord,Num,Outputable)
-
---Allow for specialization
-{-# INLINEABLE classifyEdges #-}
-
--- | Given a start vertex, a way to get successors from a node
--- and a list of (directed) edges classify the types of edges.
-classifyEdges :: forall key. Uniquable key => key -> (key -> [key])
-              -> [(key,key)] -> [((key, key), EdgeType)]
-classifyEdges root getSucc edges =
-    --let uqe (from,to) = (getUnique from, getUnique to)
-    --in pprTrace "Edges:" (ppr $ map uqe edges) $
-    zip edges $ map classify edges
-  where
-    (_time, starts, ends) = addTimes (0,emptyUFM,emptyUFM) root
-    classify :: (key,key) -> EdgeType
-    classify (from,to)
-      | startFrom < startTo
-      , endFrom   > endTo
-      = Forward
-      | startFrom > startTo
-      , endFrom   < endTo
-      = Backward
-      | startFrom > startTo
-      , endFrom   > endTo
-      = Cross
-      | getUnique from == getUnique to
-      = SelfLoop
-      | otherwise
-      = pprPanic "Failed to classify edge of Graph"
-                 (ppr (getUnique from, getUnique to))
-
-      where
-        getTime event node
-          | Just time <- lookupUFM event node
-          = time
-          | otherwise
-          = pprPanic "Failed to classify edge of CFG - not not timed"
-            (text "edges" <> ppr (getUnique from, getUnique to)
-                          <+> ppr starts <+> ppr ends )
-        startFrom = getTime starts from
-        startTo   = getTime starts to
-        endFrom   = getTime ends   from
-        endTo     = getTime ends   to
-
-    addTimes :: (Time, UniqFM key Time, UniqFM key Time) -> key
-             -> (Time, UniqFM key Time, UniqFM key Time)
-    addTimes (time,starts,ends) n
-      --Dont reenter nodes
-      | elemUFM n starts
-      = (time,starts,ends)
-      | otherwise =
-        let
-          starts' = addToUFM starts n time
-          time' = time + 1
-          succs = getSucc n :: [key]
-          (time'',starts'',ends') = foldl' addTimes (time',starts',ends) succs
-          ends'' = addToUFM ends' n time''
-        in
-        (time'' + 1, starts'', ends'')
 
 graphFromVerticesAndAdjacency
         :: Ord key
