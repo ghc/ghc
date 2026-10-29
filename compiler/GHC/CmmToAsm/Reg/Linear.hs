@@ -1298,8 +1298,8 @@ the first two taking it as a ranking:
   prefers, and once the free registers that would suit them run out, the later
   values are spilled.
 * makeRegMovementGraph lists a jump's moves in the order, which decides the
-  order of joinToTargets' fixup moves and which move of a cycle goes through the
-  stack.
+  order of joinToTargets' fixup moves and which move of a cycle is made first,
+  by a swap or through the stack.
 
 No other fold over the assignment depends on the order.
 -}
