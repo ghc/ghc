@@ -899,14 +899,14 @@ livenessSCCs
        -> ( [SCC (LiveBasicBlock instr)]
           , BlockMap Regs)
 
-livenessSCCs _ blockmap done []
+livenessSCCs _ !blockmap done []
         = (done, blockmap)
 
-livenessSCCs platform blockmap done (AcyclicSCC block : sccs)
- = let  (blockmap', block')     = livenessBlock platform blockmap block
+livenessSCCs platform !blockmap done (AcyclicSCC block : sccs)
+ = let  !(!blockmap', block')   = livenessBlock platform blockmap block
    in   livenessSCCs platform blockmap' (AcyclicSCC block' : done) sccs
 
-livenessSCCs platform blockmap done
+livenessSCCs platform !blockmap done
         (CyclicSCC blocks : sccs) =
         livenessSCCs platform blockmap' (CyclicSCC blocks':done) sccs
  where      !(!blockmap', blocks') = livenessCyclic platform blockmap blocks
@@ -1110,14 +1110,19 @@ liveness1U !usage@(RU read written) liveregs blockmap instr
                                     `addRegsMaxFmt` read                     -- (FmtBwd1)
 
             -- registers that are not live beyond this point are recorded
-            -- as dying here.
-            r_dying     = mkRegsMaxFmt
+            -- as dying here. Strict, as is w_dying: lazy, they made the
+            -- compiler allocate more compiling T3294. r_dying_br stays lazy:
+            -- livenessCyclic walks a block again whenever a successor's live-in
+            -- set has changed and keeps only its last walk, and forcing
+            -- live_branch_only, whose cost grows with that set, at every walk
+            -- made compiling nested loops grow faster than the loops.
+            !r_dying    = mkRegsMaxFmt
                           [ reg
                           | reg@(RegWithFormat r _) <- read
                           , not $ any (\ w -> getUnique w == getUnique r) written
                           , not $ r `elemRegs` liveregs ]
 
-            w_dying     = mkRegsMaxFmt
+            !w_dying    = mkRegsMaxFmt
                           [ reg
                           | reg@(RegWithFormat r _) <- written
                           , not $ r `elemRegs` liveregs ]
