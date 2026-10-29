@@ -7,6 +7,9 @@ module GHC.CmmToAsm.Reg.Linear.Base (
         BlockAssignment,
         lookupBlockAssignment,
         lookupFirstUsed,
+        blocksHolding,
+        markStaleFirst,
+        isStaleFirst,
         emptyBlockAssignment,
         updateBlockAssignment,
 
@@ -35,6 +38,7 @@ import GHC.Platform.Reg
 import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set (UniqSet, addOneToUniqSet, elemUniqSet_Directly)
 import GHC.Types.Unique.DSM
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
@@ -50,7 +54,10 @@ data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
 --
 data BlockAssignment freeRegs
         = BlockAssignment { blockMap :: !(BlockMap (freeRegs, RegMap Loc))
-                          , firstUsed :: !(UniqFM VirtualReg RealReg) }
+                          , firstUsed :: !(UniqFM VirtualReg RealReg)
+                            -- | the vregs whose first-used register a block
+                            -- found to be another value's
+                          , staleFirst :: !(UniqSet Unique) }
 
 -- | Find the register mapping for a specific BlockId.
 lookupBlockAssignment :: BlockId -> BlockAssignment freeRegs -> Maybe (freeRegs, RegMap Loc)
@@ -63,9 +70,27 @@ lookupBlockAssignment bid ba = mapLookup bid (blockMap ba)
 lookupFirstUsed :: Unique -> BlockAssignment freeRegs -> Maybe RealReg
 lookupFirstUsed u ba = lookupUFM_Directly (firstUsed ba) u
 
+-- | The blocks whose recorded assignment holds the virtual register with the
+-- given unique in the given register.
+blocksHolding :: Unique -> RealReg -> BlockAssignment freeRegs -> [BlockId]
+blocksHolding !u r ba
+  = [ b | (b, (_, assig)) <- mapToList (blockMap ba)
+        , Just (Loc l _) <- [lookupUFM_Directly assig u]
+        , r `elem` regsOfLoc l ]
+
+-- | Record that a block found the first-used register of the virtual register
+-- with the given unique to be another value's.
+markStaleFirst :: Unique -> BlockAssignment freeRegs -> BlockAssignment freeRegs
+markStaleFirst u ba = ba { staleFirst = addOneToUniqSet (staleFirst ba) u }
+
+-- | Whether a block found the first-used register of the virtual register with
+-- the given unique to be another value's.
+isStaleFirst :: Unique -> BlockAssignment freeRegs -> Bool
+isStaleFirst u ba = elemUniqSet_Directly u (staleFirst ba)
+
 -- | An initial empty 'BlockAssignment'
 emptyBlockAssignment :: BlockAssignment freeRegs
-emptyBlockAssignment = BlockAssignment mapEmpty mempty
+emptyBlockAssignment = BlockAssignment mapEmpty mempty mempty
 
 -- | Add new register mappings for a specific block.
 updateBlockAssignment :: BlockId
@@ -80,8 +105,12 @@ updateBlockAssignment dest (freeRegs, regMap) (BlockAssignment {..}) =
         firstUsed
         (toVRegMap regMap)
     )
+    staleFirst
   where
-    -- The blocks are processed in dependency order, so if there's already an
+    -- A vreg's first-used register is its register in the first assignment
+    -- that, recorded for a block it is live into, holds it in a register
+    -- (Note [The first jump into a block fixes its registers] in
+    -- GHC.CmmToAsm.Reg.Linear), so if there's already an
     -- entry in the map then keep that assignment rather than writing the new
     -- assignment.
     combWithExisting :: RealReg -> Loc -> Maybe RealReg
@@ -250,6 +279,20 @@ data RA_Context
         -- | 'GHC.CmmToAsm.Reg.Linear.wideMoveDests' of the procedure being
         --   allocated
         , rc_wideDests  :: UniqFM VirtualReg RealReg
+
+        -- | the block being allocated
+        , rc_block      :: BlockId
+
+        -- | the jump targets of each block of the procedure being allocated
+        , rc_succs      :: LabelMap [BlockId]
+
+        -- | the registers live on entry to each block of the procedure being
+        --   allocated
+        , rc_live       :: BlockMap Regs
+
+        -- | the real register each vreg is moved into where it dies, in each
+        --   block of the procedure being allocated
+        , rc_dying      :: LabelMap (UniqFM VirtualReg RealReg)
 
         -- | Native code generator configuration
         , rc_config     :: !NCGConfig

@@ -299,13 +299,24 @@ linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
  = UDSM $ \us -> do
     let !(_, !stack, !stats, !blocks, us') =
             runR ctx emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
-                $ linearRA_SCCs entry_ids (jumpSuccs sccs) block_live [] sccs
+                $ linearRA_SCCs cold entry_ids js block_live sccs
+        -- each block's jump targets, read by the allocation order and the
+        -- context alike
+        js = jumpSuccs sccs
         platform = ncgPlatform config
         ctx = RA_Context
                 { rc_jumpLocs  = []
                 , rc_moveDests = emptyUFM
                 , rc_claims    = []
                 , rc_wideDests = wideMoveDests platform cold block_live sccs
+                , rc_block     = panic "linearRegAlloc': rc_block read before a block"
+                , rc_succs     = js
+                , rc_live      = block_live
+                , rc_dying     = mapFromList
+                    [ (b, listToUFM
+                            [ (vr, rr)
+                            | (vr, RegReal rr) <- dyingMoves platform instrs ])
+                    | BasicBlock b instrs <- flattenSCCs sccs ]
                 , rc_config    = config }
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
@@ -464,29 +475,62 @@ wideMoveDests platform cold block_live sccs
     mark p = foldl' (\ !b (c, d) -> if p d then addToUFM_Directly b c () else b)
 
 
+-- | Allocate the SCCs in order, except that the blocks the garbage collector
+-- returns to after a heap or stack check fails (the entry blocks in the given
+-- set, those in a cycle excepted), and any SCC only they lead to, go after the
+-- others. The first jump allocated into a block records the registers it starts
+-- with, and later jumps into it move their values to match
+-- (Note [The first jump into a block fixes its registers]). Such a block jumps
+-- back to the block that made the check, which the hot path also enters;
+-- allocated first, its reloads would choose that block's registers, and the hot
+-- path would pay the moves at every iteration of a loop the check is in. An
+-- entry is allocated at its turn, even before a deferred block that jumps to
+-- it: this relies, as allocating a cyclic SCC's entries does, on no vreg being
+-- live into an entry; a vreg that was would make the allocator panic where it
+-- is read.
+--
+-- TODO: checkFailures counts as cold some blocks the hot path runs: see
+-- Note [Frequencies before register allocation] in GHC.CmmToAsm.CFG.
 linearRA_SCCs :: RegAllocConstraint freeRegs instr
-              => [BlockId]
+              => LabelSet
+              -> [BlockId]
               -> BlockMap [BlockId]
               -> BlockMap Regs
-              -> [NatBasicBlock instr]
               -> [SCC (LiveBasicBlock instr)]
               -> RegM freeRegs [NatBasicBlock instr]
 
-linearRA_SCCs _ _ _ blocksAcc []
-        = return $ reverse blocksAcc
-
-linearRA_SCCs entry_ids succs block_live blocksAcc (AcyclicSCC block : sccs)
- = do   blocks' <- processBlock succs block_live block
-        linearRA_SCCs entry_ids succs block_live
-                ((reverse blocks') ++ blocksAcc)
-                sccs
-
-linearRA_SCCs entry_ids succs block_live blocksAcc (CyclicSCC blocks : sccs)
- = do
-        blockss' <- process entry_ids succs block_live blocks
-        linearRA_SCCs entry_ids succs block_live
-                (reverse (concat blockss') ++ blocksAcc)
-                sccs
+linearRA_SCCs cold entry_ids succs block_live sccs
+ = do   let -- a block the garbage collector returns to
+            deferrable (AcyclicSCC (BasicBlock bid _))
+              = bid `setMember` cold && bid `setMember` entries
+            deferrable _ = False
+            go acc deferred [] = return (acc, reverse deferred)
+            go acc deferred (scc : rest) = do
+              block_assig <- getBlockAssigR
+              if deferrable scc
+                then go acc (scc : deferred) rest
+                -- reached unless only deferred blocks lead to it
+                else if null deferred
+                        || any (isReached entries block_assig . blockId)
+                               (flattenSCC scc)
+                  then do acc' <- one acc scc
+                          go acc' deferred rest
+                  else go acc (scc : deferred) rest
+        (acc1, deferred) <- go [] [] sccs
+        acc2 <- foldM one acc1 deferred
+        return $ reverse acc2
+  where
+    -- looked up for every block, so a set rather than the list: with `elem` on
+    -- the list the compiler ran 33% more instructions compiling T783 at -O0,
+    -- 0.33% and 0.32% more compiling T3294 at -O and -O2, and 0.58% more
+    -- compiling nofib's puzzle at -O2, on GHC 10.1.20261108
+    entries = setFromList entry_ids
+    one acc (AcyclicSCC block) = do
+        blocks' <- processBlock succs block_live block
+        return (reverse blocks' ++ acc)
+    one acc (CyclicSCC blocks) = do
+        blockss' <- process entries succs block_live blocks
+        return (reverse (concat blockss') ++ acc)
 
 {- Note [The first jump into a block fixes its registers]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -498,6 +542,7 @@ run. The SCCs come in dependency order, the path into a loop before the loop's
 body, so that a loop's head takes the registers of the path into it, and its
 back edge pays for any difference at every iteration; firstFreeInOrder's
 preferences work to keep a loop's values in its head's registers.
+The SCCs linearRA_SCCs defers are allocated after the others.
 
 That first jump decides two more things. A vreg's first-used register
 (lookupFirstUsed) is its register in the first assignment that, recorded for a
@@ -522,7 +567,7 @@ iteration.
 -}
 
 process :: forall freeRegs instr. (RegAllocConstraint freeRegs instr)
-        => [BlockId]
+        => LabelSet
         -> BlockMap [BlockId]
         -> BlockMap Regs
         -> [GenBasicBlock (LiveInstr instr)]
@@ -552,11 +597,17 @@ process entry_ids succs block_live =
     go (b@(BasicBlock id _) : blocks) next_round accum madeProgress
       = do
           block_assig <- getBlockAssigR
-          if isJust (lookupBlockAssignment id block_assig) || id `elem` entry_ids
+          if isReached entry_ids block_assig id
             then do b' <- processBlock succs block_live b
                     go blocks next_round (b' : accum) True
 
             else do go blocks (b : next_round) accum madeProgress
+
+-- | Whether a block can be allocated now: a jump to it has been allocated,
+-- recording the registers it starts with, or it is an entry.
+isReached :: LabelSet -> BlockAssignment freeRegs -> BlockId -> Bool
+isReached entry_ids block_assig bid
+  = isJust (lookupBlockAssignment bid block_assig) || bid `setMember` entry_ids
 
 
 -- | Each block's jump targets.
@@ -627,7 +678,7 @@ processBlock succs block_live (BasicBlock id instrs)
                                , RegVirtual v <- [regWithFormat_reg r]
                                , let u = getUnique v
                                , Just rr <- [lookupFirstUsed u bassig] ]
-        setBlockContextR locs claims $ listToUFM
+        setBlockContextR id locs claims $ listToUFM
           [ (vr, rr) | (vr, RegReal rr) <- dyingMoves platform instrs ]
 
         (instrs', fixups)
@@ -902,6 +953,27 @@ genRaInsn block_live new_instrs block_id instr live = do
                                  | src == dst   -> []
                                 _               -> [patched_instr]
 
+    -- A vreg reloaded, in one instruction, only to be moved where it dies into
+    -- a register that is free by then (one another vreg held until the clobber
+    -- saves above, or one the move's destination vreg took without evicting
+    -- another): reloaded straight into the move's destination, as where that
+    -- register is free at the reload, and the move goes.  Nothing else
+    -- changes, the register the reload took being freed with the vreg.
+    -- (the reload and spill lists first: most instructions have neither; with
+    -- the move first the compiler ran 0.11% and 0.075% more instructions
+    -- compiling T9961 and T12707 at -O0 and 0.020% and 0.018% more compiling
+    -- T12707 at -O and -O2, but 0.062% fewer compiling T3294 at -O0 and 0.014%
+    -- and 0.015% fewer at -O and -O2, its allocation within 0.002%, on GHC
+    -- 10.1.20261108)
+    let reload_into = case (r_spills, w_spills, r_allocd, takeRegRegMoveInstr platform instr) of
+          ([ld], [], [ry], Just (src@(RegVirtual _), _))
+            | src `elemRegs` liveDieRead live
+            , Just (RegReal ry', RegReal rx) <- takeRegRegMoveInstr platform patched_instr
+            , ry' == ry, ry /= rx
+            -> Just [patchRegsOfInstr platform ld
+                       (\r -> if r == RegReal ry then RegReal rx else r)]
+          _ -> Nothing
+
     -- On the use of @reverse@ below.
     -- Since we can have spills and reloads produce multiple instructions
     -- we need to ensure they are emitted in the correct order.  We used to only
@@ -917,11 +989,11 @@ genRaInsn block_live new_instrs block_id instr live = do
     -- u <- getUniqueR
     let code = concat [ --  mkComment (text "<genRaInsn(" <> ppr u <> text ")>")
                         -- ,mkComment (text "<genRaInsn(" <> ppr u <> text "):squashed>")]
-                        squashed_instr
+                        maybe squashed_instr (const []) reload_into
                         -- ,mkComment (text "<genRaInsn(" <> ppr u <> text "):w_spills>")
                       , reverse w_spills
                         -- ,mkComment (text "<genRaInsn(" <> ppr u <> text "):r_spills>")
-                      , reverse r_spills
+                      , maybe (reverse r_spills) reverse reload_into
                         -- ,mkComment (text "<genRaInsn(" <> ppr u <> text "):clobber_saves>")
                       , reverse clobber_saves
                         -- ,mkComment (text "<genRaInsn(" <> ppr u <> text "):new_instrs>")
@@ -1179,7 +1251,11 @@ from which 'firstFreeInOrder' takes the first that is free:
    allocate for a loop, variables are likely to end up in the same registers at
    the end and start of the loop, avoiding redundant reg-reg moves. That buys
    nothing for a value the current block moves where it dies, which is live into
-   no later block, hence the order.
+   no later block, hence the order. Nor does it for a value that reaches no block
+   whose assignment is recorded, such as a reload into a variable that the code
+   generator also uses for another value, live into the loop's head, where the
+   value live into the block that recorded it reaches none of the blocks this
+   value reaches either: there it comes after the wide destination.
 
  * The real register a block the variable is live into moves it into where it
    dies, such as R1 for a value evaluated some blocks after it is computed,
@@ -1209,23 +1285,67 @@ firstFreeInOrder u free@(r0 : _) = do
   RA_Context { rc_jumpLocs  = locs
              , rc_moveDests = moves
              , rc_claims    = claims
-             , rc_wideDests = wide } <- getContextR
+             , rc_wideDests = wide
+             , rc_block     = blk
+             , rc_succs     = succs
+             , rc_live      = live
+             , rc_dying     = dying } <- getContextR
   let !jl = jumpLocRegs u locs
-      !mv = lookupUFM_Directly moves u
-      !fu = lookupFirstUsed u bassig
+      mv = lookupUFM_Directly moves u
+      !firstUsed = lookupFirstUsed u bassig
+      -- the wide destination, where it and the first-used register differ,
+      -- both are free and no other vreg of the block claims it (claimed),
+      -- and a walk from the current block's jump targets through the blocks
+      -- the vreg is live into, stopping at those whose assignment is
+      -- recorded, ends without reaching one but reaches a block that moves
+      -- the vreg into the wide destination where it dies, while the value
+      -- live into a block recorded with the vreg in the first-used register
+      -- reaches none of the blocks the walk reached: then the two are other
+      -- values, and the wide destination is this value's own
+      stale = case firstUsed of
+             Just r0
+               | Just w <- lookupUFM_Directly wide u, w /= r0, isFree w, isFree r0
+               , not (claimed w)
+               , (True, Nothing, region) <- staleWalk u live succs bassig (succsOf blk)
+               , any (movesInto w) (setElems region)
+               , not (any (meets region) (blocksHolding u r0 bassig))
+               -> Just w
+             _ -> Nothing
+      -- for a vreg an earlier allocation gave stale's register
+      -- (isStaleFirst), where the walk reaches a recorded block holding
+      -- the vreg in another free register and the value live into a block
+      -- recorded with the vreg in the first-used register reaches neither
+      -- that block nor the blocks the walk passed, such as a reload of
+      -- a stack slot in another continuation that reaches a join an earlier
+      -- one recorded, that block's register
+      reached = case firstUsed of
+             Just r0
+               | isStaleFirst u bassig
+               , (True, Just b, region) <- staleWalk u live succs bassig (succsOf blk)
+               , Just (_, assig) <- lookupBlockAssignment b bassig
+               , Just (Loc l _) <- lookupUFM_Directly assig u
+               , r : _ <- regsOfLoc l, r /= r0, isFree r
+               , not (any (meets (setInsert b region)) (blocksHolding u r0 bassig))
+               -> Just r
+             _ -> Nothing
+      -- the first-used register, but none where stale gives a register,
+      -- and reached's where it gives one
+      fu | isJust stale   = Nothing
+         | isJust reached = reached
+         | otherwise      = firstUsed
+      movesInto w b = case mapLookup b dying of
+        Just ds -> lookupUFM_Directly ds u == Just w
+        Nothing -> False
+      meets = staleMeets u live succs bassig
+      succsOf b = mapFindWithDefault [] b succs
       -- a vreg already given a location
       assigned v = isJust (lookupUFM_Directly cur v)
       -- a wide destination another vreg of the block has as its first-used
       -- register is left out
-      -- (lazy: claims are walked only where no earlier preference is free,
-      -- and the wide destination is: walked before the test, they made the
-      -- compiler run 0.38% more instructions compiling !16269's
-      -- CmmDiamondChain at -O0 when this was added)
-      wd = case lookupUFM_Directly wide u of
-              Just r | isFree r
-                     , not (any (\(r', v) -> r' == r && v /= u && not (assigned v)) claims)
-                     -> Just r
-              _ -> Nothing
+      claimed r = any (\(r', v) -> r' == r && v /= u && not (assigned v)) claims
+      wdFree = case lookupUFM_Directly wide u of
+                 Just r | isFree r, not (claimed r) -> Just r
+                 _                                  -> Nothing
       isFree r = r `elem` free
       -- the preference where it is free, else the next one
       pick (Just r) _ | isFree r = Just r
@@ -1237,8 +1357,11 @@ firstFreeInOrder u free@(r0 : _) = do
                  (\v (RealRegSingle n) b -> if v == u then b else setBit b n)
                  (0 :: Word64) moves
       chosen = case find isFree jl of
-                 Nothing -> pick mv (pick fu (pick wd Nothing))
+                 Nothing -> pick mv (pick fu wdFree)
                  found   -> found
+  case stale of
+    Just w | chosen == Just w -> setBlockAssigR (markStaleFirst u bassig)
+    _                         -> return ()
   return $! case chosen of
     Just r -> r
     -- (the first free register itself where the block moves no other vreg:
@@ -1249,6 +1372,70 @@ firstFreeInOrder u free@(r0 : _) = do
             | otherwise   -> case filter (\(RealRegSingle n) -> not (testBit others n)) free of
                                r : _ -> r
                                []    -> r0
+
+-- | What 'liveWalk' does at a block: stop with a result, take the block
+-- without its successors, or take it and queue them.
+data Step r = Done r | Skip | Expand
+
+-- | The walk of 'staleWalk' and 'staleMeets': breadth first from the given
+-- blocks through the blocks the vreg with the given unique is live into, each
+-- once, the step given at each, and giving up after 64; the results at the
+-- walk's end and at that cap given the blocks visited. The 64, bounding the
+-- walk, is arbitrary, and may be raised where a case needs more at little
+-- cost to the compiler: lifted to 1000, it changed the compile cost and code
+-- of programs of 50 to 400 loops, calls, cases or diamonds by under 0.1%.
+liveWalk :: Unique -> BlockMap Regs -> LabelMap [BlockId]
+         -> (LabelSet -> r) -> (LabelSet -> r)
+         -> (BlockId -> LabelSet -> Step r) -> [BlockId] -> r
+{-# INLINE liveWalk #-}
+liveWalk !u live succs atEnd atCap visit start = go (0 :: Int) setEmpty start []
+  where
+    go !_ !seen [] [] = atEnd seen
+    go n seen [] later = go n seen (reverse later) []
+    go n seen (b : bs) later
+      | n >= 64 = atCap seen
+      | b `setMember` seen || not (liveInto u live b) = go n seen bs later
+      | otherwise = case visit b seen of
+          Done r -> r
+          Skip   -> go (n + 1) (setInsert b seen) bs later
+          Expand -> go (n + 1) (setInsert b seen) bs
+                       (reverse (mapFindWithDefault [] b succs) ++ later)
+
+-- | firstFreeInOrder's walk: from the given blocks through the blocks the vreg
+-- with the given unique is live into, stopping at those whose assignment is
+-- recorded; whether the walk ended, the recorded block it reached if any, and
+-- the blocks it visited. Out of line, as firstFreeInOrder rarely takes it:
+-- inlined, with staleMeets, it made the compiler allocate 0.028% more compiling
+-- !16269's CmmDiamondChain at -O0 and 0.023% more at -O and -O2, on GHC
+-- 10.1.20261108.
+staleWalk :: Unique -> BlockMap Regs -> LabelMap [BlockId]
+          -> BlockAssignment freeRegs -> [BlockId] -> (Bool, Maybe BlockId, LabelSet)
+{-# NOINLINE staleWalk #-}
+staleWalk u live succs bassig
+  = liveWalk u live succs (\seen -> (True, Nothing, seen))
+                          (\seen -> (False, Nothing, seen)) visit
+  where
+    visit b seen
+      | Just _ <- lookupBlockAssignment b bassig = Done (True, Just b, seen)
+      | otherwise                                = Expand
+
+-- | firstFreeInOrder's test of whether the value live into the recorded block
+-- fb reaches a block of the region, by 'liveWalk' from fb, going no further
+-- than the other recorded blocks and giving up as 'staleWalk' does.
+staleMeets :: Unique -> BlockMap Regs -> LabelMap [BlockId]
+           -> BlockAssignment freeRegs -> LabelSet -> BlockId -> Bool
+{-# NOINLINE staleMeets #-}
+staleMeets u live succs bassig region fb
+  = liveWalk u live succs (const False) (const True) visit [fb]
+  where
+    visit b _
+      | b `setMember` region                              = Done True
+      | b /= fb, Just _ <- lookupBlockAssignment b bassig = Skip
+      | otherwise                                         = Expand
+
+-- | Whether the vreg with the given unique is live into the block.
+liveInto :: Unique -> BlockMap Regs -> BlockId -> Bool
+liveInto !u live b = elemUniqSet_Directly u (getRegs (mapFindWithDefault noRegs b live))
 
 -- | 'jumpLocRegs' u locs: the registers the recorded jump-target assignments
 -- locs give the virtual register with unique u, in order.

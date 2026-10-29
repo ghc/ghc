@@ -495,7 +495,8 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                                 then Just nativeCfgWeights
                                 else Nothing
         -- the blocks that follow a failed heap or stack check, which
-        -- the linear allocator takes no wide move destination from, read off
+        -- the linear allocator takes no wide move destination from and
+        -- allocates last where the garbage collector returns to them, read off
         -- the CFG wherever the backend maintains it, -finfo-table-map or not
         let allocCold = if backendMaintainsCfg platform
                           then checkFailures nativeCfgWeights
