@@ -287,8 +287,8 @@ linearRegAlloc'
 
 linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
  = UDSM $ \us -> do
-    let !(_, !stack, !stats, !blocks, us') =
-            runR ctx emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
+    let !(!stack, !stats, !blocks, us') =
+            runR ctx us
                 $ linearRA_SCCs cold entry_ids block_live sccs
         platform = ncgPlatform config
         ctx = RA_Context
@@ -300,6 +300,7 @@ linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
                 , rc_clobbers  = case platformArch platform of
                     ArchX86_64 -> regClobbers platform sccs
                     _          -> emptyUFM
+                , rc_initFree  = initFreeRegs
                 , rc_config    = config }
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
@@ -479,8 +480,8 @@ wideMoveDests platform cold block_live sccs
 -- | Allocate the SCCs in order, except that the blocks the garbage collector
 -- returns to after a heap or stack check fails (the entry blocks in the given
 -- set, those in a cycle excepted), and any SCC only they lead to, go after the
--- others. The first jump allocated into a block records the registers it starts
--- with, and later jumps into it move their values to match
+-- others. The first jump allocated into a block records where its live-in vregs
+-- are, and later jumps into it move their values to match
 -- (Note [The first jump into a block fixes its registers]). Such a block jumps
 -- back to the block that made the check, which the hot path also enters;
 -- allocated first, its reloads would choose that block's registers, and the hot
@@ -601,8 +602,8 @@ process entry_ids block_live =
             else do go blocks (b : next_round) accum madeProgress
 
 -- | Whether a block can be allocated now: a jump to it has been allocated,
--- recording the registers it starts with, or it is an entry.
-isReached :: LabelSet -> BlockAssignment freeRegs -> BlockId -> Bool
+-- recording where its live-in vregs are, or it is an entry.
+isReached :: LabelSet -> BlockAssignment -> BlockId -> Bool
 isReached entry_ids block_assig bid
   = isJust (lookupBlockAssignment bid block_assig) || bid `setMember` entry_ids
 
@@ -619,9 +620,9 @@ processBlock block_live (BasicBlock id instrs)
  = do   -- pprTraceM "processBlock" $ text "" $$ ppr (BasicBlock id instrs)
         initBlock id block_live
         platform <- getPlatform
-        bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
+        bassig <- getBlockAssigR
         let recorded dest !ls
-              | Just (_, assig) <- lookupBlockAssignment dest bassig = assig : ls
+              | Just assig <- lookupBlockAssignment dest bassig = assig : ls
               | otherwise = ls
             !locs = foldr recorded []
               [ dest | LiveInstr (Instr instr) _ <- instrs
@@ -635,34 +636,34 @@ processBlock block_live (BasicBlock id instrs)
         return  $ BasicBlock id instrs' : fixups
 
 
--- | Load the freeregs and current reg assignment into the RegM state
---      for the basic block with this BlockId.
+-- | Set up the RegM state for the basic block with this BlockId: its
+--      current reg assignment, and the freeregs on entry to it.
 initBlock :: FR freeRegs
           => BlockId -> BlockMap Regs -> RegM freeRegs ()
 initBlock id block_live
- = do   platform    <- getPlatform
+ = do   init_free   <- rc_initFree <$> getContextR
         block_assig <- getBlockAssigR
-        case lookupBlockAssignment id block_assig of
-                -- no prior info about this block: we must consider
-                -- any fixed regs to be allocated, but we can ignore
-                -- virtual regs (presumably this is part of a loop,
-                -- and we'll iterate again).  The assignment begins
-                -- empty.
-                Nothing
-                 -> do  -- pprTrace "initFreeRegs" (text $ show initFreeRegs) (return ())
-                        case mapLookup id block_live of
-                          Nothing ->
-                            setFreeRegsR    (frInitFreeRegs platform)
-                          Just live ->
-                            setFreeRegsR $ foldl' (flip frAllocateReg) (frInitFreeRegs platform)
-                                                  (nonDetEltsUniqSet $ takeRealRegs $ getRegs live)
-                            -- See Note [Unique Determinism and code generation]
-                        setAssigR       emptyRegMap
-
-                -- load info about register assignments leading into this block.
-                Just (freeregs, assig)
-                 -> do  setFreeRegsR    freeregs
-                        setAssigR       assig
+        let -- the assignment recorded on entry to this block, if a jump to
+            -- it has been allocated, and none otherwise
+            assig     = fromMaybe emptyRegMap
+                                  (lookupBlockAssignment id block_assig)
+            -- The registers free on entry to this block: every allocatable one
+            -- but the real registers live into it and those holding the vregs
+            -- of its assignment. Deriving them from the free registers of the
+            -- block that first jumped here would leave a real register still
+            -- allocated at that jump and not live into this one, R1 above all
+            -- where it is allocatable, allocated until this block writes it and
+            -- that value dies, so that a value it reloads cannot go back to
+            -- that register and the block's jumps may need fixup moves
+            -- (#27981). This relies on liveness listing in block_live every
+            -- real register live into the block: one it missed would be handed
+            -- to a vreg.
+            hold (Loc loc _) fr = foldl' (flip frAllocateReg) fr (regsOfLoc loc)
+            live_free = allocateRealRegs
+                          (mapFindWithDefault noRegs id block_live) init_free
+        setFreeRegsR $ nonDetStrictFoldUFM hold live_free assig
+                         -- See Note [Unique Determinism and code generation]
+        setAssigR assig
 
 
 -- | Do allocation for a sequence of instructions.
@@ -1199,7 +1200,7 @@ firstFreeInOrder :: Unique -> [RealReg] -> RegM freeRegs RealReg
 firstFreeInOrder _ [] = panic "firstFreeInOrder: no free register"
 firstFreeInOrder u free@(r0 : _) = do
   platform <- getPlatform
-  bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
+  bassig <- getBlockAssigR
   RA_Context { rc_jumpLocs  = locs
              , rc_moveDests = moves
              , rc_wideDests = wide
