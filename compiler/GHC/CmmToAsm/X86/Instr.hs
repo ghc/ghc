@@ -1325,6 +1325,11 @@ takeRegRegMoveInstr
         :: Platform
         -> Instr
         -> Maybe (Reg,Reg)
+-- INLINE so that most call sites build no Just: out of line it made the
+-- compiler allocate 0.11% more and run 0.24% more instructions compiling T9961
+-- at -O0, and allocate 0.033% more and run 0.10% more compiling !16269's
+-- CmmDiamondChain at -O1 and -O2, on GHC 10.1.20261108.
+{-# INLINE takeRegRegMoveInstr #-}
 
 takeRegRegMoveInstr platform = \case
   MOV fmt (OpReg r1) (OpReg r2)
