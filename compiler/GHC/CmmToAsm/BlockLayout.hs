@@ -36,12 +36,10 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
-import Data.Containers.ListUtils (nubOrd)
 import Data.List (sortOn, sortBy, nub)
 import Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Foldable (toList)
-import qualified Data.Set as Set
 import Data.STRef
 import Control.Monad.ST.Strict
 import Control.Monad (foldM, unless)
@@ -430,18 +428,32 @@ takeL n (BlockChain blks) =
 -- So instead we just rank by the strength of the edge and use the first pair we
 -- find.
 
+-- | A set of edges: each block to the blocks its edges in the set enter. As
+-- master's set of the edges' pairs, each lookup comparing pairs, the sets made
+-- the compiler run 0.22% more instructions and allocate 0.039% more compiling
+-- !16269's CmmDiamondChain at -O1 and -O2, and nothing more at -O0, where
+-- the chain layout does not run, on GHC 10.1.20261108.
+type EdgeSet = LabelMap LabelSet
+
+insertEdge :: BlockId -> BlockId -> EdgeSet -> EdgeSet
+insertEdge from to =
+  mapAlter (Just . maybe (setSingleton to) (setInsert to)) from
+
+memberEdge :: BlockId -> BlockId -> EdgeSet -> Bool
+memberEdge from to s = maybe False (setMember to) (mapLookup from s)
+
 -- | For a given list of chains and edges try to combine chains with strong
 --   edges between them.
 combineNeighbourhood  :: [CfgEdge] -- ^ Edges to consider
                       -> [BlockChain] -- ^ Current chains of blocks
-                      -> ([BlockChain], Set.Set (BlockId,BlockId))
+                      -> ([BlockChain], EdgeSet)
                       -- ^ Resulting list of block chains, and a set of edges which
                       -- were used to fuse chains and as such no longer need to be
                       -- considered.
 combineNeighbourhood edges chains
     = -- pprTraceIt "Neighbours" $
     --   pprTrace "combineNeighbours" (ppr edges) $
-      applyEdges edges endFrontier startFrontier (Set.empty)
+      applyEdges edges endFrontier startFrontier mapEmpty
     where
         --Build maps from chain ends to chains
         endFrontier, startFrontier :: FrontierMap
@@ -455,10 +467,17 @@ combineNeighbourhood edges chains
                                 let front = getFronts chain
                                     entry = (front,chain)
                                 in map (\x -> (x,entry)) front) chains
-        applyEdges :: [CfgEdge] -> FrontierMap -> FrontierMap -> Set.Set (BlockId, BlockId)
-                   -> ([BlockChain], Set.Set (BlockId,BlockId))
+        applyEdges :: [CfgEdge] -> FrontierMap -> FrontierMap -> EdgeSet
+                   -> ([BlockChain], EdgeSet)
         applyEdges [] chainEnds _chainFronts combined =
-            (nubOrd $ map snd $ mapElems chainEnds, combined)
+            -- each chain once, at the lowest of its ends, the first place
+            -- in the map's order that holds it: by master's nubOrd, which
+            -- compares chains block by block, the compiler ran 0.30% more
+            -- instructions and allocated 0.094% and 0.093% more compiling
+            -- !16269's CmmDiamondChain at -O1 and -O2, and nothing more at
+            -- -O0, where the chain layout does not run, on GHC 10.1.20261108
+            ([ c | (k, (ends, c)) <- mapToList chainEnds, all (k <=) ends ]
+            , combined)
         applyEdges ((CfgEdge from to _w):edges) chainEnds chainFronts combined
             | Just (c1_e,c1) <- mapLookup from chainEnds
             , Just (c2_f,c2) <- mapLookup to chainFronts
@@ -496,7 +515,7 @@ combineNeighbourhood edges chains
                 --   text "fronts" <+> ppr newFronts $$
                 --   text "ends" <+> ppr newEnds
                 --   )
-                 applyEdges edges newEnds newFronts (Set.insert (from,to) combined)
+                 applyEdges edges newEnds newFronts (insertEdge from to combined)
             | otherwise
             = applyEdges edges chainEnds chainFronts combined
 
@@ -553,9 +572,9 @@ mergeChains edges chains
 -- We say these edges are already linked
 buildChains :: [CfgEdge] -> [BlockId]
             -> ( LabelMap BlockChain  -- Resulting chains, indexed by end if chain.
-               , Set.Set (BlockId, BlockId)) --List of fused edges.
+               , EdgeSet) --List of fused edges.
 buildChains edges blocks
-  = runST $ buildNext setEmpty mapEmpty mapEmpty edges Set.empty
+  = runST $ buildNext setEmpty mapEmpty mapEmpty edges mapEmpty
   where
     -- buildNext builds up chains from edges one at a time.
 
@@ -568,9 +587,9 @@ buildChains edges blocks
               -> LabelMap (STRef s BlockChain) -- Map from end of chain to chain.
               -> LabelMap (STRef s BlockChain) -- Map from start of chain to chain.
               -> [CfgEdge] -- Edges to check - ordered by decreasing weight
-              -> Set.Set (BlockId, BlockId) -- Used edges
+              -> EdgeSet -- Used edges
               -> ST s   ( LabelMap BlockChain -- Chains by end
-                        , Set.Set (BlockId, BlockId) --List of fused edges
+                        , EdgeSet --List of fused edges
                         )
     buildNext placed _chainStarts chainEnds  [] linked = do
         ends' <- sequence $ mapMap readSTRef chainEnds :: ST s (LabelMap BlockChain)
@@ -582,7 +601,7 @@ buildChains edges blocks
     buildNext placed chainStarts chainEnds (edge:todo) linked
         | from == to
         -- We skip self edges
-        = buildNext placed chainStarts chainEnds todo (Set.insert (from,to) linked)
+        = buildNext placed chainStarts chainEnds todo (insertEdge from to linked)
         | not (alreadyPlaced from) &&
           not (alreadyPlaced to)
         = do
@@ -593,7 +612,7 @@ buildChains edges blocks
                 (mapInsert from chain' chainStarts)
                 (mapInsert to chain' chainEnds)
                 todo
-                (Set.insert (from,to) linked)
+                (insertEdge from to linked)
 
         | (alreadyPlaced from) &&
           (alreadyPlaced to)
@@ -616,7 +635,7 @@ buildChains edges blocks
         -- Combine two chains into a single one.
         fuseChain :: STRef s BlockChain -> STRef s BlockChain
                   -> ST s   ( LabelMap BlockChain -- Chains by end
-                            , Set.Set (BlockId, BlockId) --List of fused edges
+                            , EdgeSet --List of fused edges
                             )
         fuseChain fromRef toRef = do
             fromChain <- readSTRef fromRef
@@ -632,12 +651,12 @@ buildChains edges blocks
                 (mapInsert start ref $ mapDelete to $ chainStarts)
                 (mapInsert end ref $ mapDelete from $ chainEnds)
                 todo
-                (Set.insert (from,to) linked)
+                (insertEdge from to linked)
 
 
         --Add the block to a existing chain or creates a new chain
         findChain :: ST s   ( LabelMap BlockChain -- Chains by end
-                            , Set.Set (BlockId, BlockId) --List of fused edges
+                            , EdgeSet --List of fused edges
                             )
         findChain
           -- We can attach the block to the end of a chain
@@ -650,7 +669,7 @@ buildChains edges blocks
             let chainEnds' = mapInsert to predChain $ mapDelete from chainEnds
             -- chains <- sequence $ mapMap readSTRef chainStarts
             -- pprTraceM "from chains:" $ ppr chains
-            buildNext (setInsert to placed) chainStarts chainEnds' todo (Set.insert (from,to) linked)
+            buildNext (setInsert to placed) chainStarts chainEnds' todo (insertEdge from to linked)
           -- We can attack it to the front of a chain
           | alreadyPlaced to
           , Just succChain <- mapLookup to chainStarts
@@ -661,7 +680,7 @@ buildChains edges blocks
             let chainStarts' = mapInsert from succChain $ mapDelete to chainStarts
             -- chains <- sequence $ mapMap readSTRef chainStarts'
             -- pprTraceM "to chains:" $ ppr chains
-            buildNext (setInsert from placed) chainStarts' chainEnds todo (Set.insert (from,to) linked)
+            buildNext (setInsert from placed) chainStarts' chainEnds todo (insertEdge from to linked)
           -- The placed end of the edge is part of a chain already and not an end.
           | otherwise
           = do
@@ -684,8 +703,9 @@ sequenceChain :: forall a i. Instruction i
 sequenceChain _info _weights    [] = []
 sequenceChain _info _weights    [x] = [x]
 sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
-    let directEdges :: [CfgEdge]
-        directEdges = sortBy (flip compare) $ preferBackEdges $ mapMaybe relevantWeight (infoEdgeList weights)
+    let edges = infoEdgeList weights
+        directEdges :: [CfgEdge]
+        directEdges = sortBy (flip compare) $ preferBackEdges $ mapMaybe relevantWeight edges
           where
             -- Apply modifiers to turn edge frequencies into useable weights
             -- for computing code layout.
@@ -786,7 +806,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
         rankedEdges :: [CfgEdge]
         -- Sort descending by weight, remove fused edges
         rankedEdges =
-            filter (\edge -> not (Set.member (edgeFrom edge,edgeTo edge) builtEdges)) $
+            filter (\edge -> not (memberEdge (edgeFrom edge) (edgeTo edge) builtEdges)) $
             directEdges
 
         (neighbourChains, combined)
@@ -798,10 +818,11 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
 
         allEdges :: [CfgEdge]
         allEdges = {-# SCC allEdges #-}
-                   sortOn (relevantWeight) $ filter (not . deadEdge) $ (infoEdgeList weights)
+                   sortOn (relevantWeight) $ filter (not . deadEdge) $ edges
           where
             deadEdge :: CfgEdge -> Bool
-            deadEdge (CfgEdge from to _) = let e = (from,to) in Set.member e combined || Set.member e builtEdges
+            deadEdge (CfgEdge from to _) = memberEdge from to combined
+                                        || memberEdge from to builtEdges
             relevantWeight :: CfgEdge -> EdgeWeight
             relevantWeight (CfgEdge _ _ edgeInfo)
                 | EdgeInfo (CmmSource { trans_cmmNode = CmmCall {}}) _ <- edgeInfo
