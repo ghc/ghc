@@ -269,7 +269,9 @@ data RA_Context
           rc_jumpLocs   :: [RegMap Loc]
 
         -- | the real register each vreg is moved into where it dies,
-        --   in the block being allocated
+        --   in the block being allocated, or, for one moved into another vreg
+        --   and not written again in the block, the register a recorded jump
+        --   target's assignment gives that one
         , rc_moveDests  :: UniqFM VirtualReg RealReg
 
         -- | the first-used registers of the vregs the block being allocated

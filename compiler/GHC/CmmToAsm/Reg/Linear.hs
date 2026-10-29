@@ -321,6 +321,26 @@ linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
 
+-- | The virtual register the instruction moves where it dies, and the move's
+-- destination, if it is such a move.
+dyingMove :: Instruction instr
+          => Platform -> instr -> Liveness -> Maybe (VirtualReg, Reg)
+-- INLINE: out of line it made the compiler run 0.11% more instructions
+-- compiling T3294 at -O0 and 0.040% and 0.039% more at -O and -O2, on GHC
+-- 10.1.20261108.
+{-# INLINE dyingMove #-}
+dyingMove platform instr live
+  -- (the emptiness test first, most instructions killing no register they read:
+  -- without it the compiler ran 0.036% more instructions compiling T3294 at -O0
+  -- and 0.020% more compiling !16269's CmmDiamondChain at -O and -O2, on GHC
+  -- 10.1.20261108)
+  | not (isEmptyUniqSet (getRegs (liveDieRead live)))
+  , Just (RegVirtual vr, d) <- takeRegRegMoveInstr platform instr
+  , RegVirtual vr `elemRegs` liveDieRead live
+  = Just (vr, d)
+  | otherwise
+  = Nothing
+
 -- | The moves of a block's virtual registers where they die, into real
 -- registers or other virtual registers.
 dyingMoves :: Instruction instr
@@ -330,10 +350,26 @@ dyingMoves :: Instruction instr
 -- 0.13% more instructions, on GHC 10.1.20261108.
 {-# INLINE dyingMoves #-}
 dyingMoves platform instrs
-  = [ (vr, d) | LiveInstr (Instr instr) (Just live) <- instrs
-              , not (isEmptyUniqSet (getRegs (liveDieRead live)))
-              , Just (RegVirtual vr, d) <- [takeRegRegMoveInstr platform instr]
-              , RegVirtual vr `elemRegs` liveDieRead live ]
+  = [ m | LiveInstr (Instr instr) (Just live) <- instrs
+        , Just m <- [dyingMove platform instr live] ]
+
+-- | 'dyingMoves' into virtual registers, without the moves of a vreg the block
+-- writes again after the move: a preference is looked up by the vreg, so such
+-- a move's preference would reach the vreg's later value.
+dyingMovesLast :: Instruction instr
+               => Platform -> [LiveInstr instr] -> [(VirtualReg, VirtualReg)]
+dyingMovesLast platform instrs = fst $ foldr step ([], emptyUniqSet) instrs
+  where
+    step (LiveInstr (Instr instr) (Just live)) (acc, written)
+      | Just (vr, RegVirtual d) <- dyingMove platform instr live
+      , not (vr `elementOfUniqSet` written)
+      = ((vr, d) : acc, written')
+      | otherwise = (acc, written')
+      where written' = foldl' add written (writes (liveUsage live))
+    step _ x = x
+    add s r = case regWithFormat_reg r of
+                RegVirtual v -> addOneToUniqSet s v
+                _            -> s
 
 -- | The real register each vreg is moved into where it dies in a block it is
 -- live into, unless the block is one of the given ones (on x86-64, those that
@@ -678,6 +714,18 @@ processBlock succs block_live (BasicBlock id instrs)
             !locs = case recorded 3 mapEmpty []
                                   (mapFindWithDefault [] id succs) of
                       (_, ls) -> reverse ls
+            -- the entries of 'rc_moveDests' for the vregs moved into another
+            -- vreg
+            loop_moves
+              -- (none without a recorded target, the block's moves unwalked:
+              -- walking them anyway made the compiler run 0.44% more
+              -- instructions and allocate 0.30% more compiling T3294 at -O0,
+              -- 0.16% and 0.10% more at -O and 0.16% and 0.097% more at -O2, on
+              -- GHC 10.1.20261108)
+              | null locs = []
+              | otherwise
+              = [ (vr, r) | (vr, d) <- dyingMovesLast platform instrs
+                          , r : _ <- [jumpLocRegs (getUnique d) locs] ]
             -- the first-used registers of the vregs the block reads or writes
             -- (the usage liveness keeps, 'liveInstrUsage':
             -- computed again, it made the compiler run 0.28% more instructions
@@ -689,8 +737,15 @@ processBlock succs block_live (BasicBlock id instrs)
                                , RegVirtual v <- [regWithFormat_reg r]
                                , let u = getUnique v
                                , Just rr <- [lookupFirstUsed u bassig] ]
-        setBlockContextR id locs claims $ listToUFM
-          [ (vr, rr) | (vr, RegReal rr) <- dyingMoves platform instrs ]
+        setBlockContextR id locs claims $ listToUFM $
+          loop_moves
+          -- unlike dyingMovesLast's, these moves into real registers include
+          -- those of a vreg the block writes again after the move, its later
+          -- value then preferring that register too. As listToUFM keeps a
+          -- vreg's last entry, such a move outranks the vreg's loop move, and
+          -- where the block moves the vreg into two real registers, both its
+          -- values prefer the second
+          ++ [ (vr, rr) | (vr, RegReal rr) <- dyingMoves platform instrs ]
 
         (instrs', fixups)
                 <- linearRA block_live id instrs
@@ -797,6 +852,10 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live)) rest
                 -- if src is a fixed reg, then we just map dest to this
                 -- reg in the assignment.  src must be an allocatable reg,
                 -- otherwise it wouldn't be in r_dying.
+                -- A virtual src gives dst its location, whatever dst's
+                -- preferences: firstFreeInOrder makes up for that only where
+                -- src was allocated in this block ('rc_moveDests', its moves
+                -- into vregs).
               _virt -> case lookupUFM assig src of
                          Nothing -> panic "raInsn"
                          Just loc ->
@@ -1286,7 +1345,10 @@ from which 'firstFreeInOrder' takes the first that is free:
    reached, those of the blocks it jumps to are taken, up to three jumps on.
 
  * The real register the current block moves the variable into where it dies,
-   such as R1 before an evaluation: allocated there, the variable needs no move.
+   such as R1 before an evaluation: allocated there, the variable needs no move;
+   or, where the block moves it into another variable, such as a loop variable
+   at the loop's end, and does not write it again, the register a recorded jump
+   target's assignment gives that one.
 
  * The register the variable has in the first assignment that, recorded for a
    block it is live into, holds it in a register, if any
