@@ -12,7 +12,6 @@ import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Linear.State
 import GHC.CmmToAsm.Reg.Linear.Base
-import GHC.CmmToAsm.Reg.Linear.FreeRegs
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Types
@@ -38,7 +37,7 @@ import Data.Coerce (coerce)
 --      vregs are in the correct regs for its destination.
 --
 joinToTargets
-        :: (FR freeRegs, Instruction instr)
+        :: Instruction instr
         => BlockMap Regs -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
@@ -62,7 +61,7 @@ joinToTargets block_live id instr
 
 -----
 joinToTargets'
-        :: (FR freeRegs, Instruction instr)
+        :: Instruction instr
         => BlockMap Regs -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
@@ -94,54 +93,22 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
         let still_live uniq _   = uniq `elemUniqSet_Directly` getRegs live_set
         let adjusted_assig      = filterUFM_Directly still_live assig
 
-        -- and free up those registers which are now free.
-        let to_free =
-                [ r     | (reg, Loc loc _locFmt) <- nonDetUFMToList assig
-                        -- This is non-deterministic but we do not
-                        -- currently support deterministic code-generation.
-                        -- See Note [Unique Determinism and code generation]
-                        , not (elemUniqSet_Directly reg $ getRegs live_set)
-                        , r          <- regsOfLoc loc ]
-
         case lookupBlockAssignment  dest block_assig of
+         -- this is the first time we jumped to this block: remember the
+         -- current assignment on entry to it
          Nothing
-          -> joinToTargets_first
-                        block_live new_blocks block_id instr dest dests
-                        block_assig adjusted_assig to_free
+          -> do setBlockAssigR
+                  (updateBlockAssignment dest adjusted_assig block_assig)
+                joinToTargets' block_live new_blocks block_id instr dests
 
-         Just (_, dest_assig)
+         Just dest_assig
           -> joinToTargets_again
                         block_live new_blocks block_id instr dest dests
                         adjusted_assig dest_assig
 
 
--- this is the first time we jumped to this block.
-joinToTargets_first :: (FR freeRegs, Instruction instr)
-                    => BlockMap Regs
-                    -> [NatBasicBlock instr]
-                    -> BlockId
-                    -> instr
-                    -> BlockId
-                    -> [BlockId]
-                    -> BlockAssignment freeRegs
-                    -> RegMap Loc
-                    -> [RealReg]
-                    -> RegM freeRegs ([NatBasicBlock instr], instr)
-joinToTargets_first block_live new_blocks block_id instr dest dests
-        block_assig src_assig
-        to_free
-
- = do   -- free up the regs that are not live on entry to this block.
-        freeregs        <- getFreeRegsR
-        let freeregs' = foldl' (flip frReleaseReg) freeregs to_free
-
-        -- remember the current assignment on entry to this block.
-        setBlockAssigR (updateBlockAssignment dest (freeregs', src_assig) block_assig)
-
-        joinToTargets' block_live new_blocks block_id instr dests
-
 -- we've jumped to this block before
-joinToTargets_again :: (Instruction instr, FR freeRegs)
+joinToTargets_again :: Instruction instr
                     => BlockMap Regs
                     -> [NatBasicBlock instr]
                     -> BlockId
