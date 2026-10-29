@@ -110,9 +110,12 @@ regAlloc_spin
                   , Int                  -- Slots in use
                   , Color.Graph VirtualReg RegClass RealReg)
 
-regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGraphs code cfg
+regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGraphs code_in cfg
  = do
         let platform = ncgPlatform config
+            -- when registers are born, which slurpConflicts, slurpSpillCostInfo
+            -- and patchEraseLive use and the stage and stats dumps print
+            code     = map regLivenessBorn code_in
 
         -- If any of these dump flags are turned on we want to hang on to
         -- intermediate structures in the allocator - otherwise tell the
