@@ -389,6 +389,11 @@ Questions to ask of a change, by its kind:
   conform to the entry assignment that the first one recorded
   (Note [The first jump into a block fixes its entry assignment]
   in `GHC.CmmToAsm.Reg.Linear.JoinToTargets`)?
+* A change to the entry points of the linear allocator or the liveness pass,
+  their types or their pragmas. Does the code generator for x86-64 still call
+  their copies specialised to x86's instructions
+  (Note [Specialising the linear allocator] in `GHC.CmmToAsm.Reg.Linear`)?
+  Without them the code is the same and only the compiler is slower.
 * A change to static prediction or block layout. Does it keep the trade-offs
   that Note [Where a branch's likely side is known] in `GHC.CmmToAsm.CFG` lists,
   or, where it revisits one, does it answer the reason the Note gives for it?
