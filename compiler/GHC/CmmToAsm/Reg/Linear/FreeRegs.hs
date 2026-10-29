@@ -49,6 +49,12 @@ class Show freeRegs => FR freeRegs where
     -- [Aarch64 Register x18 at Darwin and Windows].
     frInitFreeRegs :: Platform -> freeRegs
     frReleaseReg :: RealReg -> freeRegs -> freeRegs
+    -- | Mark the registers allocated, free or not: by default those of them
+    -- that are free, as 'frAllocateReg' may panic on an allocated one.
+    frClobberRegs :: Platform -> [RealReg] -> freeRegs -> freeRegs
+    frClobberRegs plat clobbered fr
+      = foldl' (flip frAllocateReg) fr [ r | r <- clobbered, r `elem` free ]
+      where free = allFreeRegs plat fr
 
 instance FR X86.FreeRegs where
     frAllocateReg  = X86.allocateReg
@@ -61,6 +67,8 @@ instance FR X86_64.FreeRegs where
     frGetFreeRegs  = X86_64.getFreeRegs
     frInitFreeRegs = X86_64.initFreeRegs
     frReleaseReg   = X86_64.releaseReg
+    -- allocateReg takes an allocated register too
+    frClobberRegs _ rs fr = foldl' (flip X86_64.allocateReg) fr rs
 
 instance FR PPC.FreeRegs where
     frAllocateReg  = PPC.allocateReg
