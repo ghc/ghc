@@ -1934,7 +1934,9 @@ async def makefile_test( name, way, target=None ):
     if target is None:
         target = name
 
-    cmd = '$MAKE -s --no-print-directory {target}'.format(target=target)
+    way_flags = '"' + ' '.join(config.way_flags[way]).replace('"', '\\"') + '"'
+
+    cmd = '$MAKE -s --no-print-directory WAY_FLAGS={way_flags} {target}'.format(target=target, way_flags=way_flags)
     return await run_command(name, way, cmd)
 
 # -----------------------------------------------------------------------------
