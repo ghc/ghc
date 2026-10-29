@@ -708,7 +708,9 @@ getCfg platform weights graph =
             -- its offset from BaseReg. So on x86-64 a test of CurrentTSO
             -- or CurrentNursery, such as `if (v == CurrentTSO)` in
             -- rts/Updates.cmm, is tagged HeapStackCheck too. This costs only
-            -- speed, under -fcmm-static-pred or -fblock-layout-cfg.
+            -- speed, on x86-64: under -fcmm-static-pred or -fblock-layout-cfg,
+            -- and, for an annotated test such as that one, in the linear
+            -- allocator's cold blocks at any optimisation level.
             branchInfo =
               foldRegsUsed
                 (panic "GHC.CmmToAsm.CFG.getCfg: foldRegsUsed")
@@ -1277,6 +1279,10 @@ instead, and they are to be reinvestigated together:
    the garbage collector returns to, after G, is missed. With the estimate,
    a block inserted after allocation would take the frequency of the edge it
    splits or of the block it continues, with no tag to copy.
+
+ * Where several blocks give a vreg different destinations, wideMoveDests in
+   GHC.CmmToAsm.Reg.Linear takes the last block's; the estimate would pick the
+   hottest block's at no extra cost.
 -}
 
 -- | Combination of target node id and information about the branch

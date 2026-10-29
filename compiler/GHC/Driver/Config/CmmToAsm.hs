@@ -53,8 +53,9 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgComputeUnwinding    = debugLevel dflags > 0
    , ncgEnableDeadCodeElimination = not (gopt Opt_InfoTableMap dflags)
                                      -- TODO #20428: off under -finfo-table-map,
-                                     -- and with it every use of the CFG from
-                                     -- the liveness pass on (see livenessCfg in
+                                     -- and with it every use of the CFG
+                                     -- from the liveness pass on but the
+                                     -- linear allocator's (see livenessCfg in
                                      -- GHC.CmmToAsm)
                                      && backendMaintainsCfg (targetPlatform dflags)
                                      -- Enable if the platform maintains the CFG

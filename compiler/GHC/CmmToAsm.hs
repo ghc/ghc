@@ -80,7 +80,9 @@
 --     register allocation: x86-64 alone (backendMaintainsCfg in
 --     GHC.CmmToAsm.BlockLayout), and not there under -finfo-table-map (the TODO
 --     #20428 at livenessCfg in cmmNativeGen). Static branch prediction, the
---     chain layout of -fblock-layout-cfg and invertCondBranches need it.
+--     chain layout of -fblock-layout-cfg and invertCondBranches need it; the
+--     linear allocator reads the blocks that follow failed heap or stack checks
+--     off the CFG of step 4, under -finfo-table-map too.
 --   * the machine registers of STG's argument registers (R1 and up, F, D, XMM)
 --     handed out between their uses: x86-64, PowerPC and, for XMM1 to XMM4,
 --     i386, which maps R1 to esi and reserves it; AArch64, RISC-V and LoongArch
@@ -717,11 +719,19 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         -- some backends, so don't use it there.
         -- TODO #20428: ncgEnableDeadCodeElimination is off under
         -- -finfo-table-map too. Where it is off, no pass from here on gets a
-        -- CFG, so the layout has neither static prediction nor the chains of
-        -- -fblock-layout-cfg: sequenceTop lays the blocks out without weights.
+        -- CFG but the linear allocator, which reads the blocks after failed
+        -- heap or stack checks off nativeCfgWeights, so the layout has neither
+        -- static prediction nor the chains of -fblock-layout-cfg: sequenceTop
+        -- lays the blocks out without weights.
         let livenessCfg = if ncgEnableDeadCodeElimination config
                                 then Just nativeCfgWeights
                                 else Nothing
+        -- the blocks that follow a failed heap or stack check, which
+        -- the linear allocator takes no wide move destination from, read off
+        -- the CFG wherever the backend maintains it, -finfo-table-map or not
+        let allocCold = if backendMaintainsCfg platform
+                          then checkFailures nativeCfgWeights
+                          else setEmpty
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
                 runUniqueDSM usGen
@@ -799,7 +809,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 -- do linear register allocation
                 let reg_alloc proc = do
                        (alloced, maybe_more_stack, ra_stats) <-
-                               Linear.regAlloc config proc
+                               Linear.regAlloc config allocCold proc
                        case maybe_more_stack of
                          Nothing -> return ( alloced, ra_stats, [] )
                          Just amount -> do
