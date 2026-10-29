@@ -26,6 +26,9 @@ module GHC.CmmToAsm.Reg.Linear.Base (
         RA_Context(..),
         MoveDests(..),
         mkMoveDests,
+
+        -- liveness
+        liveInto,
 )
 
 where
@@ -282,11 +285,16 @@ data RA_State freeRegs
 data RA_Context
         = RA_Context
         {
+        -- | the recorded assignments of the jump targets of the block being
+        --   allocated, and for a target not yet reached those of the blocks
+        --   it jumps to, as they are when the block starts
+          rc_jumpLocs   :: [RegMap Loc]
+
         -- | the real register each vreg is moved into where it dies,
         --   in the block being allocated, or, for one moved into another vreg
         --   and not written again in the block, the first register the
-        --   assignments the block's jumps lead to give that one
-          rc_moveDests  :: MoveDests
+        --   assignments in rc_jumpLocs give that one
+        , rc_moveDests  :: MoveDests
 
         -- | the uniques of the vregs the block being allocated reads or
         --   writes, by their first-used registers
@@ -309,6 +317,11 @@ data RA_Context
         -- | the real register each vreg is moved into where it dies, in each
         --   block of the procedure being allocated
         , rc_dying      :: LabelMap (UniqFM VirtualReg RealReg)
+
+        -- | 'GHC.CmmToAsm.Reg.Linear.regClobbers' of the procedure being
+        --   allocated on x86-64, whose fallback alone uses it, and Nothing
+        --   elsewhere
+        , rc_clobbers   :: Maybe (UniqFM VirtualReg Word64)
 
         -- | Native code generator configuration
         , rc_config     :: !NCGConfig
@@ -346,4 +359,8 @@ mkMoveDests m
 
 noMoveDests :: MoveDests
 noMoveDests = MoveDests emptyUFM 0 0
+
+-- | Whether the vreg with the given unique is live into the block.
+liveInto :: Unique -> BlockMap Regs -> BlockId -> Bool
+liveInto !u live b = elemUniqSet_Directly u (getRegs (mapFindWithDefault noRegs b live))
 

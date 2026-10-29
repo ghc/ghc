@@ -7,9 +7,8 @@
 // allocates; allocated before the loop, the continuation decided body's, and
 // the hot edges check -> body and body -> check paid for it at every
 // iteration, swapping registers or moving them through a spill slot.  The
-// loop's edges now carry neither, the fixup being on the cold edge out of
-// the continuation, where it is a swap through a spill slot: the two lines
-// T27800.stderr expects.
+// test checks the assembly for neither, the fixup now being on the cold edge
+// out of the continuation.
 
 helper (W_ x)
 {
