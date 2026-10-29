@@ -133,7 +133,7 @@ where the moves run. The SCCs come in dependency order, the path into a loop
 before the loop's body, so that a loop's head takes the registers of the
 path into it, and its back edge pays for any difference at every iteration;
 firstFreeInOrder's preferences work to keep a loop's values in its head's
-registers. Hence:
+registers. The SCCs linearRA_SCCs defers are allocated after the others. Hence:
 
 * TODO: where a loop head's entry assignment comes from a preheader that has
   spilled a loop-carried vreg, it records the vreg InMem. The body then reloads
@@ -150,13 +150,6 @@ registers. Hence:
   but wasm32. Taking the entry first and then, after each SCC, an SCC holding a
   block whose entry assignment is recorded, a cyclic one first, was tried on a
   development branch and showed no gain.
-
-* TODO: where a failed heap or stack check returns from the garbage collector
-  to a block of its own (GHC.StgToCmm.Heap), that block is an entry block that
-  jumps back into the checking block. The order in which the allocator takes the
-  blocks, from sccBlocks in GHC.CmmToAsm.Reg.Liveness, depends on no frequency,
-  so the return block can come first and record the assignment that the hot
-  path's jump into the checking block must then conform to.
 
 That first jump decides one more thing. A vreg's first-used register
 (lookupFirstUsed) is its register in the first assignment that, recorded for a
