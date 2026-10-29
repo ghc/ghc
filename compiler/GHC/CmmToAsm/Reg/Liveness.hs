@@ -802,53 +802,10 @@ regLiveness _ (CmmProc info lbl live [])
 
 regLiveness platform (CmmProc info lbl live sccs)
         | LiveInfo static mFirst _ liveSlotsOnEntry     <- info
-        = let   (ann_sccs, block_live)  = computeLiveness platform sccs
+        = let   (ann_sccs, block_live)  = livenessSCCs platform mapEmpty [] sccs
 
           in    return $ CmmProc (LiveInfo static mFirst block_live liveSlotsOnEntry)
                            lbl live ann_sccs
-
-
--- -----------------------------------------------------------------------------
--- | Check ordering of Blocks
---   The computeLiveness function requires SCCs to be in reverse
---   dependent order.  If they're not the liveness information will be
---   wrong, and we'll get a bad allocation.  Better to check for this
---   precondition explicitly or some other poor sucker will waste a
---   day staring at bad assembly code..
---
-checkIsReverseDependent
-        :: Instruction instr
-        => [SCC (LiveBasicBlock instr)]         -- ^ SCCs of blocks that we're about to run the liveness determinator on.
-        -> Maybe BlockId                        -- ^ BlockIds that fail the test (if any)
-
-checkIsReverseDependent sccs'
- = go emptyUniqSet sccs'
-
- where  go _ []
-         = Nothing
-
-        go blocksSeen (AcyclicSCC block : sccs)
-         = let  dests           = slurpJumpDestsOfBlock block
-                blocksSeen'     = unionUniqSets blocksSeen $ mkUniqSet [blockId block]
-                badDests        = dests `minusUniqSet` blocksSeen'
-           in   case nonDetEltsUniqSet badDests of
-                 -- See Note [Unique Determinism and code generation]
-                 []             -> go blocksSeen' sccs
-                 bad : _        -> Just bad
-
-        go blocksSeen (CyclicSCC blocks : sccs)
-         = let  dests           = unionManyUniqSets $ map slurpJumpDestsOfBlock blocks
-                blocksSeen'     = unionUniqSets blocksSeen $ mkUniqSet $ map blockId blocks
-                badDests        = dests `minusUniqSet` blocksSeen'
-           in   case nonDetEltsUniqSet badDests of
-                 -- See Note [Unique Determinism and code generation]
-                 []             -> go blocksSeen' sccs
-                 bad : _        -> Just bad
-
-        slurpJumpDestsOfBlock (BasicBlock _ instrs)
-                = unionManyUniqSets
-                $ map (mkUniqSet . jumpDestsOfInstr)
-                        [ i | LiveInstr i _ <- instrs]
 
 
 -- | If we've compute liveness info for this code already we have to reverse
@@ -860,6 +817,13 @@ reverseBlocksInTops top
         CmmProc info lbl live sccs      -> CmmProc info lbl live (reverse sccs)
 
 
+-- | The block map with every block of a cyclic SCC in it, no register live
+--   into it, as before the SCC's first walk: a jump target missing from the
+--   map is then one the SCCs are out of order for, or one the CFG lacks
+--   (liveness1).
+seedCyclic :: BlockMap Regs -> [LiveBasicBlock instr] -> BlockMap Regs
+seedCyclic = foldl' (\m b -> mapInsert (blockId b) noRegs m)
+
 -- | Computing liveness
 --
 --  On entry, the SCCs must be in "reverse" order: later blocks may transfer
@@ -868,24 +832,6 @@ reverseBlocksInTops top
 --  The SCCs returned are in the *opposite* order, which is exactly what we
 --  want for the next pass.
 --
-computeLiveness
-        :: Instruction instr
-        => Platform
-        -> [SCC (LiveBasicBlock instr)]
-        -> ([SCC (LiveBasicBlock instr)],       -- instructions annotated with list of registers
-                                                -- which are "dead after this instruction".
-               BlockMap Regs)               -- blocks annotated with set of live registers
-                                                -- on entry to the block.
-
-computeLiveness platform sccs
- = case checkIsReverseDependent sccs of
-        Nothing         -> livenessSCCs platform mapEmpty [] sccs
-        Just bad        -> let sccs' = fmap (fmap (fmap (fmap (pprInstr platform)))) sccs
-                           in pprPanic "RegAlloc.Liveness.computeLiveness"
-                                (vcat   [ text "SCCs aren't in reverse dependent order"
-                                        , text "bad blockId" <+> ppr bad
-                                        , ppr sccs'])
-
 livenessSCCs
        :: Instruction instr
        => Platform
@@ -907,7 +853,7 @@ livenessSCCs platform blockmap done
         livenessSCCs platform blockmap' (CyclicSCC blocks':done) sccs
  where      (blockmap', blocks')
                 = iterateUntilUnchanged linearLiveness equalBlockMaps
-                                      blockmap blocks
+                                      (seedCyclic blockmap blocks) blocks
 
             iterateUntilUnchanged
                 :: (a -> b -> (a,c)) -> (a -> a -> Bool)
@@ -1067,10 +1013,18 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             targets      = jumpDestsOfInstr instr -- where we go from here
             not_a_branch = null targets
 
+            -- the map has every jump target: a block of an SCC walked before,
+            -- or one of a cyclic SCC's (seedCyclic); a target missing means
+            -- the SCCs are out of order, or, where the CFG gave the reachable
+            -- blocks (sccBlocks), that it lacks a block a reachable one jumps
+            -- to; the liveness would be wrong
             targetLiveRegs target
                   = case mapLookup target blockmap of
                                 Just ra -> ra
-                                Nothing -> noRegs
+                                Nothing -> pprPanic "RegAlloc.Liveness.liveness1"
+                                             (text "SCCs aren't in reverse dependent order,"
+                                              <+> text "or the CFG lacks the block of"
+                                              <+> text "a jump to" <+> ppr target)
 
             -- registers that are live only in the branch targets should
             -- be listed as dying here.
