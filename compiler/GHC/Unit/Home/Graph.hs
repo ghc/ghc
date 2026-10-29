@@ -47,6 +47,17 @@ module GHC.Unit.Home.Graph
   , allAnns
   , allCompleteSigs
 
+  -- * Demand-loaded home interfaces
+  , readHugLoadedState
+  , updateHugLoadedState
+  , loadedInstEnv
+  , loadedFamInstEnv
+  , loadedRuleBase
+  , loadedAnnEnv
+  , loadedCompleteSigs
+  , hugMayHaveLoadedState
+  , hugLoadedStateRefs
+
   -- * Utilities
   , hugSCCs
   , hugFromList
@@ -73,6 +84,7 @@ import GHC.Prelude
 
 import GHC.Driver.DynFlags
 import GHC.Unit.Home
+import GHC.Unit.Home.LoadedState
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 import GHC.Unit.Module
@@ -83,9 +95,12 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Core.FamInstEnv
+import GHC.Core.Rules ( RuleBase, emptyRuleBase )
+import GHC.Types.Unique.FM ( plusUFM_C )
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.IORef ( IORef )
 import qualified Data.Set as Set
 import GHC.Data.Maybe
 import GHC.Data.Graph.Directed
@@ -119,6 +134,75 @@ allAnns hug = foldr go (pure emptyAnnEnv) hug where
   go hue = liftA2 plusAnnEnv (hptAllAnnotations (homeUnitEnv_hpt hue))
 
 --------------------------------------------------------------------------------
+-- Demand-loaded home interfaces
+--------------------------------------------------------------------------------
+
+-- | Read the 'HomeLoadedState' of the given home unit.
+--
+-- Returns 'emptyHomeLoadedState' if the unit is not a home unit.
+--
+-- See Note [Demand-loaded home interfaces] in "GHC.Unit.Home.LoadedState"
+readHugLoadedState :: UnitId -> HomeUnitGraph -> IO HomeLoadedState
+readHugLoadedState uid hug = case lookupHugUnitId uid hug of
+  Nothing  -> pure emptyHomeLoadedState
+  Just hue -> readHptLoadedState (homeUnitEnv_hpt hue)
+
+-- | Update the 'HomeLoadedState' of the given home unit.
+--
+-- See Note [Demand-loaded home interfaces] in "GHC.Unit.Home.LoadedState"
+updateHugLoadedState :: UnitId -> (HomeLoadedState -> HomeLoadedState) -> HomeUnitGraph -> IO ()
+updateHugLoadedState uid f hug = case lookupHugUnitId uid hug of
+  Nothing  -> pprPanic "updateHugLoadedState" (ppr uid)
+  Just hue -> updateHptLoadedState (homeUnitEnv_hpt hue) f
+
+-- | Fold over the 'HomeLoadedState' of all home units.
+--
+-- Home modules are only demand-loaded in one-shot mode, so we skip the units
+-- that are not in one-shot mode: these folds are on hot paths (e.g.
+-- 'GHC.Tc.Utils.Env.tcGetInstEnvs').
+foldLoadedState :: (HomeLoadedState -> a -> a) -> a -> HomeUnitGraph -> IO a
+foldLoadedState f z hug
+  | hugMayHaveLoadedState hug = foldr go (pure z) hug
+  | otherwise                 = pure z
+  where
+    go hue acc = f <$> readHptLoadedState (homeUnitEnv_hpt hue) <*> acc
+
+-- | Can a 'HomeLoadedState' of this HUG be non-empty? Home modules are only
+-- demand-loaded in one-shot mode.
+-- See Note [Demand-loaded home interfaces] in "GHC.Unit.Home.LoadedState"
+hugMayHaveLoadedState :: HomeUnitGraph -> Bool
+hugMayHaveLoadedState = any (isOneShot . ghcMode . homeUnitEnv_dflags)
+
+-- | The 'HomeLoadedState's of the home units that may have demand-loaded
+-- modules. For code that reads them very often (e.g. the simplifier, on every
+-- rule lookup): get the references once, so that reading them does not
+-- allocate (see 'GHC.Core.Opt.Simplify.readRuleEnv').
+hugLoadedStateRefs :: HomeUnitGraph -> [IORef HomeLoadedState]
+hugLoadedStateRefs hug
+  | hugMayHaveLoadedState hug = map (hptLoadedStateRef . homeUnitEnv_hpt) (Map.elems (unitEnv_graph hug))
+  | otherwise                 = []
+
+-- | The class instances of all demand-loaded home modules across all home units.
+loadedInstEnv :: HomeUnitGraph -> IO InstEnv
+loadedInstEnv = foldLoadedState (unionInstEnv . hls_inst_env) emptyInstEnv
+
+-- | The family instances of all demand-loaded home modules across all home units.
+loadedFamInstEnv :: HomeUnitGraph -> IO FamInstEnv
+loadedFamInstEnv = foldLoadedState (unionFamInstEnv . hls_fam_inst_env) emptyFamInstEnv
+
+-- | The rules of all demand-loaded home modules across all home units.
+loadedRuleBase :: HomeUnitGraph -> IO RuleBase
+loadedRuleBase = foldLoadedState (plusUFM_C (++) . hls_rule_base) emptyRuleBase
+
+-- | The annotations of all demand-loaded home modules across all home units.
+loadedAnnEnv :: HomeUnitGraph -> IO AnnEnv
+loadedAnnEnv = foldLoadedState (plusAnnEnv . hls_ann_env) emptyAnnEnv
+
+-- | The COMPLETE pragmas of all demand-loaded home modules across all home units.
+loadedCompleteSigs :: HomeUnitGraph -> IO CompleteMatches
+loadedCompleteSigs = foldLoadedState ((++) . hls_complete_matches) []
+
+--------------------------------------------------------------------------------
 -- HomeUnitGraph (HUG)
 --------------------------------------------------------------------------------
 
@@ -134,11 +218,9 @@ data HomeUnitEnv = HomeUnitEnv
     -- ^ The home package table describes already-compiled
     -- home-package modules, /excluding/ the module we
     -- are compiling right now.
-    -- (In one-shot mode the current module is the only
-    -- home-package module, so homeUnitEnv_hpt is empty.  All other
-    -- modules count as \"external-package\" modules.
-    -- However, even in GHCi mode, hi-boot interfaces are
-    -- demand-loaded into the external-package table.)
+    -- (In one-shot mode the HPT contains the home-package modules
+    -- whose interfaces were demand-loaded, see
+    -- Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState.)
     --
     -- 'homeUnitEnv_hpt' is not mutable because we only demand-load
     -- external packages; the home package is eagerly

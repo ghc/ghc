@@ -30,7 +30,9 @@ import GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
 
-import GHC.Unit.Env ( UnitEnv, ueEPS )
+import GHC.Unit.Env ( UnitEnv, ueEPS, ue_home_unit_graph )
+import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.LoadedState ( HomeLoadedState(..) )
 import GHC.Unit.External
 import GHC.Unit.Module.ModGuts
 
@@ -44,6 +46,7 @@ import GHC.Types.Unique.FM
 
 import Control.Monad
 import Data.Foldable ( for_ )
+import Data.IORef ( IORef, readIORef )
 
 {-
 ************************************************************************
@@ -62,26 +65,28 @@ data SimplifyExprOpts = SimplifyExprOpts
   }
 
 simplifyExpr :: Logger
-             -> ExternalUnitCache
+             -> UnitEnv
              -> SimplifyExprOpts
              -> CoreExpr
              -> IO CoreExpr
 -- ^ Simplify an expression using 'simplExprGently'.
 --
 -- See 'simplExprGently' for details.
-simplifyExpr logger euc opts expr
+simplifyExpr logger unit_env opts expr
   = withTiming logger (text "Simplify [expr]") (const ()) $
-    do  { eps <- eucEPS euc ;
+    do  { eps <- ueEPS unit_env ;
+          -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+        ; loaded_fam_env <- HUG.loadedFamInstEnv (ue_home_unit_graph unit_env)
         ; let fam_envs = ( eps_fam_inst_env eps
-                         , extendFamInstEnvList emptyFamInstEnv $ se_fam_inst opts
+                         , extendFamInstEnvList loaded_fam_env $ se_fam_inst opts
                          )
               -- See Note [Seed the in-scope set for open expressions]
               simpl_env = setInScopeSet base_env
                             (getInScope base_env `extendInScopeSetSet` exprFreeVars expr)
               base_env  = mkSimplEnv (se_mode opts) fam_envs
               top_env_cfg = se_top_env_cfg opts
-              read_eps_rules = eps_rule_base <$> eucEPS euc
-              read_ruleenv = updExternalPackageRules emptyRuleEnv <$> read_eps_rules
+              !loaded_refs = HUG.hugLoadedStateRefs (ue_home_unit_graph unit_env)
+              read_ruleenv = readRuleEnv loaded_refs unit_env emptyRuleEnv
 
         ; let sz = exprSize expr
 
@@ -97,6 +102,30 @@ simplifyExpr logger euc opts expr
 
         ; return expr'
         }
+
+-- | Read the current rules of the external packages and of the demand-loaded
+-- home modules into the given 'RuleEnv'.
+--
+-- Both can grow during simplification, so we read them regularly.
+-- See `GHC.Core.Opt.Simplify.Monad.getSimplRules`.
+--
+-- The resulting action is run every time the simplifier looks for a rule
+-- (also in one-shot mode, i.e. for every @ghc -c@), so it must be cheap: the
+-- caller gets the references to the 'HomeLoadedState's once (the first
+-- argument, see 'HUG.hugLoadedStateRefs'), and in the common case (one home
+-- unit, no demand-loaded rules) we allocate nothing but the 'RuleEnv'.
+readRuleEnv :: [IORef HomeLoadedState] -> UnitEnv -> RuleEnv -> IO RuleEnv
+readRuleEnv loaded_refs unit_env rule_env = do
+    eps_rules <- eps_rule_base <$> ueEPS unit_env
+    -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+    case loaded_refs of
+      []    -> return $! updExternalPackageRules rule_env eps_rules
+      [ref] -> do { hls <- readIORef ref
+                  ; return $! updExternalPackageRules rule_env
+                      (eps_rules `withLoadedHomeRules` hls_rule_base hls) }
+      refs  -> do { hlss <- mapM readIORef refs
+                  ; return $! updExternalPackageRules rule_env
+                      (foldr (flip withLoadedHomeRules . hls_rule_base) eps_rules hlss) }
 
 {- Note [Seed the in-scope set for open expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -218,8 +247,9 @@ simplifyPgm logger unit_env name_ppr_ctx opts
 
     hpt_rule_env :: RuleEnv
     hpt_rule_env = mkRuleEnv guts emptyRuleBase (so_hpt_rules opts)
-                   -- emptyRuleBase: no EPS rules yet; we will update
-                   -- them on each iteration to pick up the most up to date set
+                   -- emptyRuleBase: no EPS rules and no rules of demand-loaded
+                   -- home modules yet; we will update them on each iteration
+                   -- to pick up the most up to date set
 
     do_iteration :: Int -- Counts iterations
                  -> [SimplCount] -- Counts from earlier iterations, reversed
@@ -275,6 +305,8 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                 -- value (via read_rule_env) and then combine it with the existing rule base.
                 -- See `GHC.Core.Opt.Simplify.Monad.getSimplRules`.
           eps <- ueEPS unit_env ;
+          -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+          loaded_fam_env <- HUG.loadedFamInstEnv (ue_home_unit_graph unit_env) ;
            let  { -- base_rule_env contains
                   --    (a) home package rules, fixed across all iterations
                   --    (b) local rules (substituted) from `local_rules` arg to do_iteration
@@ -282,13 +314,11 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                   -- Not doing so results in +25.6% allocations of LargeRecord.
                 ; !base_rule_env = updLocalRules hpt_rule_env local_rules
 
-                ; read_eps_rules :: IO PackageRuleBase
-                ; read_eps_rules = eps_rule_base <$> ueEPS unit_env
-
                 ; read_rule_env :: IO RuleEnv
-                ; read_rule_env = updExternalPackageRules base_rule_env <$> read_eps_rules
+                ; !loaded_refs = HUG.hugLoadedStateRefs (ue_home_unit_graph unit_env)
+                ; read_rule_env = readRuleEnv loaded_refs unit_env base_rule_env
 
-                ; fam_envs = (eps_fam_inst_env eps, fam_inst_env)
+                ; fam_envs = (eps_fam_inst_env eps, fam_inst_env `unionFamInstEnv` loaded_fam_env)
                 ; simpl_env = mkSimplEnv mode fam_envs } ;
 
                 -- Simplify the program

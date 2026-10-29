@@ -99,6 +99,7 @@ import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.Deps
 import qualified GHC.Unit.Home.Graph as HUG
@@ -893,16 +894,16 @@ readFixedModule (DownsweepEnv { ds_hsc_env = hsc_env }) key =
       -- MP: TODO, we should just read the dependency info from the interface rather than either
       -- a. Loading the whole thing into the EPS (this might never nececssary and causes lots of things to be permanently loaded into memory)
       -- b. Loading the whole interface into a buffer before discarding it. (wasted allocation and deserialisation)
-      -- TODO: one-shot PIT access
-      -- This used to first check whether the interface was already loaded into
-      -- the PIT. The EPS no longer keeps ModIfaces (see Note [The EPS does not
-      -- keep ModIfaces]); we could consult the 'ExternalIface' for its deps,
-      -- but in one-shot mode home modules should not live in the EPS at all,
-      -- so we simply read the interface from disk.
       read_result <-
-        readIface (hsc_hooks hsc_env) (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule key) (ml_hi_file loc)
+        -- 1. Check if the interface is already loaded by some other part of the
+        -- compiler: in the HPT (home modules, also demand-loaded ones in one-shot
+        -- mode, see Note [Demand-loaded home interfaces]) or the EPS.
+        lookupIfaceByModuleHsc hsc_env (mnkToModule key) >>= \case
+          Just iface -> return (MaybeErr.Succeeded (li_deps iface))
+          Nothing -> fmap mi_deps <$>
+            readIface (hsc_hooks hsc_env) (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule key) (ml_hi_file loc)
       return $ case read_result of
-        MaybeErr.Succeeded iface -> Just (FixedModule loc (ifaceEdges (mi_deps iface)))
+        MaybeErr.Succeeded deps -> Just (FixedModule loc (ifaceEdges deps))
         -- Skip any failure, we might try to read a .hi-boot file for
         -- example, even if there is not one.
         MaybeErr.Failed {} -> Nothing

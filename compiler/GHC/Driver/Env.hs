@@ -64,6 +64,7 @@ import GHC.Unit.External.Index
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
+import GHC.Unit.Home.LoadedState
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 import GHC.Unit.Home.Graph
@@ -95,6 +96,7 @@ import GHC.Core.FamInstEnv
 
 import GHC.Builtin.Modules( gHC_PRIM )
 
+import Control.Applicative ((<|>))
 import Data.IORef
 import qualified Data.Set as Set
 import GHC.Types.Name.Reader (ExactRdrName(..))
@@ -344,9 +346,17 @@ prepareAnnotations hsc_env mb_guts = do
         -- Extract dependencies of the module if we are supplied one,
         -- otherwise load annotations from all home package table
         -- entries regardless of dependency ordering.
+        --
+        -- In one-shot mode, 'hugAnnsBelow' returns nothing, and we use the
+        -- annotations of the demand-loaded home modules instead.
+        -- These are in the HPT, so 'hugAllAnns' already includes them.
+        -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
         get_mod mg = (moduleUnitId (mg_module mg), GWIB (moduleName (mg_module mg)) NotBoot)
+        anns_below (uid, mn) =
+          plusAnnEnv <$> hugAnnsBelow hsc_env uid mn
+                     <*> HUG.loadedAnnEnv (hsc_HUG hsc_env)
     home_pkg_anns  <- fromMaybe (hugAllAnns (hsc_unit_env hsc_env))
-                      $ uncurry (hugAnnsBelow hsc_env)
+                      $ anns_below
                       . get_mod <$> mb_guts
     let
         other_pkg_anns = eps_ann_env eps
@@ -374,12 +384,19 @@ lookupTypeInPTE hsc_env pte name = ty
             then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
             else nameModule name
 
-    ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
-            -- in one-shot, we don't use the HPT
-            then return $! lookupNameEnv pte name
-            else HUG.lookupHugByModule mod hpt >>= \case
+    -- In one-shot mode, the HPT contains the demand-loaded home modules.
+    -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+    ty = HUG.lookupHugByModule mod hpt >>= \case
              Just hm -> pure $! lookupNameEnv (md_types (hm_details hm)) name
-             Nothing -> pure $! lookupNameEnv pte name
+             Nothing
+               -- See Note [Loading your own hi-boot file] in GHC.Iface.Load;
+               -- this only happens in one-shot mode. This lookup is hot, so
+               -- don't read the HomeLoadedState otherwise.
+               | isOneShot (ghcMode (hsc_dflags hsc_env)) -> do
+                   hls <- HUG.readHugLoadedState (moduleUnitId mod) hpt
+                   pure $! lookupNameEnv (hls_boot_types hls) name
+                       <|> lookupNameEnv pte name
+               | otherwise -> pure $! lookupNameEnv pte name
 
 -- | Find the interface of a 'Module', searching in both the loaded home
 -- modules (HUG) and the interfaces loaded into the EPS.
@@ -394,10 +411,10 @@ lookupIfaceByModule hug eps mod
        Just hm -> Just (LoadedHome (hm_iface hm))
        Nothing -> LoadedExternal <$> lookupExternalIface eps mod
    -- If the module does come from the home package, why do we look in the EPS as well?
-   -- (a) In OneShot mode, even home-package modules accumulate in the EPS
-   --     TODO: one-shot PIT access
-   -- (b) Even in Batch (--make) mode, there is *one* case where a home-package
-   --     module is in the EPS, namely GHC.Prim when compiling the base package.
+   -- There is *one* case where a home-package module is in the EPS, namely
+   -- GHC.Prim when compiling the base package.  Demand-loaded home modules in
+   -- OneShot mode are in the HUG (see Note [Demand-loaded home interfaces] in
+   -- GHC.Unit.Home.LoadedState).
    -- We could eliminate (b) if we wanted, by making GHC.Prim belong to a package
    -- of its own, but it doesn't seem worth the bother.
 

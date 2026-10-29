@@ -453,6 +453,8 @@ familyNameInstances (pkg_fie, home_fie) fam_nm
 
 -- | Makes no particular effort to detect conflicts.
 unionFamInstEnv :: FamInstEnv -> FamInstEnv -> FamInstEnv
+unionFamInstEnv env (FamIE 0 _) = env  -- Fast paths: the home inst-env is often
+unionFamInstEnv (FamIE 0 _) env = env  -- unioned with an empty one
 unionFamInstEnv (FamIE sa a) (FamIE sb b) = FamIE (sa + sb) (a `unionRM` b)
 
 extendFamInstEnvList :: FamInstEnv -> [FamInst] -> FamInstEnv

@@ -101,7 +101,7 @@ data Dependencies = Deps
    , dep_boot_mods_ :: Set (UnitId, ModuleNameWithIsBoot)
       -- ^ All modules which have boot files below this one, and whether we
       -- should use the boot file or not.
-      -- This information is only used to populate the 'eps_is_boot' field.
+      -- This information is only used to populate the 'hls_is_boot' field.
       -- See Note [Structure of dep_boot_mods]
 
    , dep_orphs_ :: [Module]
@@ -644,7 +644,7 @@ Some features of the compiler require transitive information about what is curre
 being compiled, so that is explicitly stored separately in the form they need.
 
 * dep_trusted_pkgs - Only used for the -fpackage-trust feature
-* dep_boot_mods  - Only used to populate eps_is_boot in -c mode
+* dep_boot_mods  - Only used to populate hls_is_boot in -c mode
 * dep_orphs        - Modules with orphan instances
 * dep_finsts       - Modules with type family instances
 
@@ -741,7 +741,7 @@ data ImportAvails
         imp_boot_mods :: InstalledModuleEnv ModuleNameWithIsBoot,
           -- ^ Domain is all modules which have hs-boot files, and whether
           -- we should import the boot version of interface file. Only used
-          -- in one-shot mode to populate eps_is_boot.
+          -- in one-shot mode to populate hls_is_boot.
 
         imp_sig_mods :: [ModuleName],
           -- ^ Signature modules below this one

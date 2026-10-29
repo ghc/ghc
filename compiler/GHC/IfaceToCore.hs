@@ -82,6 +82,7 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Home.ModInfo
 import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.Home.LoadedState
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -627,12 +628,13 @@ tcHiBootIface hsc_src mod
         -- There was no hi-boot file. But if there is circularity in
         -- the module graph, there really should have been one.
         -- Since we've read all the direct imports by now,
-        -- eps_is_boot will record if any of our imports mention the
+        -- hls_is_boot will record if any of our imports mention the
         -- current module, which either means a module loop (not
         -- a SOURCE import) or that our hi-boot file has mysteriously
         -- disappeared.
-    do  { eps <- getEps
-        ; case lookupInstalledModuleEnv (eps_is_boot eps) (toUnitId <$> mod) of
+    do  { (_, hug) <- getEpsAndHug
+        ; hls <- liftIO $ HUG.readHugLoadedState (moduleUnitId mod) hug
+        ; case lookupInstalledModuleEnv (hls_is_boot hls) (toUnitId <$> mod) of
             -- The typical case
             Nothing -> return NoSelfBoot
             -- error cases

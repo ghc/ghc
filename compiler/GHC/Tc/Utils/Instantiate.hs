@@ -39,6 +39,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Env
+import qualified GHC.Unit.Home.Graph as HUG
 
 import GHC.Builtin.KnownOccs( rationalTyConOcc )
 import GHC.Builtin.WiredIn.Types( integerTy )
@@ -923,6 +924,8 @@ addLocalInst (home_ie, my_insts) ispec
          ; isGHCi <- getIsGHCi
          ; eps    <- getEps
          ; tcg_env <- getGblEnv
+           -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState
+         ; loaded_ie <- liftIO . HUG.loadedInstEnv . hsc_HUG =<< getTopEnv
 
            -- In GHCi, we *override* any identical instances
            -- that are also defined in the interactive context
@@ -933,7 +936,7 @@ addLocalInst (home_ie, my_insts) ispec
 
                global_ie = eps_inst_env eps
                inst_envs = InstEnvs { ie_global  = global_ie
-                                    , ie_local   = home_ie'
+                                    , ie_local   = home_ie' `unionInstEnv` loaded_ie
                                     , ie_visible = tcVisibleOrphanMods tcg_env }
 
              -- Check for inconsistent functional dependencies

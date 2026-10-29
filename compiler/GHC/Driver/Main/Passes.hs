@@ -125,7 +125,6 @@ import GHC.Stg.Pipeline ( stg2stg, StgCgInfos )
 import GHC.Builtin.Modules( gHC_PRIM, mkInteractiveModule )
 
 import GHC.Unit
-import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
@@ -1547,7 +1546,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   let unit_env = hsc_unit_env hsc_env
   let simplify_expr_opts = initSimplifyExprOpts dflags ic
 
-  simpl_expr <- simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr
+  simpl_expr <- simplifyExpr logger unit_env simplify_expr_opts ds_expr
 
   -- Create a unique temporary binding
   --
