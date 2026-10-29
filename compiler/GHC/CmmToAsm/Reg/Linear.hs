@@ -1131,7 +1131,7 @@ clobberRegs clobbered
         setFreeRegsR $! frClobberRegs platform clobbered freeregs
 
         assig           <- getAssigR
-        setAssigR $! clobber assig (nonDetUFMToList assig)
+        setAssigR $! nonDetStrictFoldUFM_Directly clobber assig assig
           -- This is non-deterministic but we do not
           -- currently support deterministic code-generation.
           -- See Note [Unique Determinism and code generation]
@@ -1143,16 +1143,12 @@ clobberRegs clobbered
         -- also catches temps which were loaded up during allocation
         -- of read registers, not just those saved in saveClobberedTemps.
 
-        clobber :: RegMap Loc -> [(Unique,Loc)] -> RegMap Loc
-        clobber assig []
-                = assig
-
-        clobber assig ((temp, Loc (InBoth reg slot) regFmt) : rest)
+        clobber :: Unique -> Loc -> RegMap Loc -> RegMap Loc
+        clobber temp (Loc (InBoth reg slot) regFmt) assig
                 | any (realRegsAlias reg) clobbered
-                = clobber (addToUFM_Directly assig temp (Loc (InMem slot) regFmt)) rest
-
-        clobber assig (_:rest)
-                = clobber assig rest
+                = addToUFM_Directly assig temp (Loc (InMem slot) regFmt)
+        clobber _ _ assig
+                = assig
 
 -- -----------------------------------------------------------------------------
 -- allocateRegsAndSpill
