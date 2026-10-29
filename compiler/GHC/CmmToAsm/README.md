@@ -111,7 +111,7 @@ or the code that defines or uses it:
 * back edge: an edge into a block still on the stack of a depth-first search
   from the entry (`findBackEdges`, which counts no self loop); `loopInfo` takes
   such an edge for a loop's back edge where the block dominates the edge's
-  source. Note [Back edges in loopInfo] in `GHC.CmmToAsm.CFG` names two kinds
+  source. Note [Back edges in loopInfo] in `GHC.CmmToAsm.CFG` names one kind
   of such edge that it misses.
 * irreducible: said of a block that has, when `calcFreqs` reaches it,
   a predecessor not yet visited whose edge into it is not one of `loopInfo`'s

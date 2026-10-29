@@ -149,6 +149,10 @@ data TransitionSource
   = CmmSource { trans_cmmNode :: (CmmNode O C)
               , trans_info :: BranchInfo }
   | AsmCodeGen
+  -- | An edge the code generator adds for an operation's retry, as
+  -- cmpxchg_code's: static prediction's rule that a back edge is more likely
+  -- than any other edge leaves it out.
+  | AsmCodeGenRetry
   deriving (Eq)
 
 data BranchInfo = NoInfo         -- ^ Unknown, but not heap or stack check.
@@ -755,7 +759,8 @@ getCfg platform weights graph =
 -- They differ from loopInfo's back edges, each an edge into a block that
 -- dominates its source: an edge into the root is one here and none there, and
 -- in an irreducible region the search's order of visits picks which edges
--- are. The search takes a block's successors in their labels' order, so in
+-- are. A self loop at a block other than the root is one there and none
+-- here. The search takes a block's successors in their labels' order, so in
 -- an irreducible region the labels pick which edges are back edges; under
 -- -fobject-determinism a Haskell module's labels are the same for the same
 -- inputs (Note [Norms of the NCG] in GHC.CmmToAsm).
@@ -867,6 +872,7 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
         fallthroughTarget to (EdgeInfo source _weight)
           | mapMember to info = False
           | AsmCodeGen <- source = True
+          | AsmCodeGenRetry <- source = True
           | CmmSource { trans_cmmNode = CmmBranch {} } <- source = True
           | CmmSource { trans_cmmNode = CmmCondBranch {} } <- source = True
           | otherwise = False
@@ -940,16 +946,11 @@ instance Outputable LoopInfo where
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 loopInfo takes an edge for a back edge where its target is in its source's set
 of dominators, as mkDomMap computes them. mkDomMap leaves the root out of every
-set, and puts a block in its own set only where the block is a leaf of the
-dominator tree. Hence:
+set, and puts every other block in its own set. Hence:
 
 * BUG #28083: an edge into the entry block is never a back edge, so a loop whose
   head is the entry block is not found. This costs only speed, on x86-64 under
   -fcmm-static-pred.
-* BUG #28093: a self loop is a back edge only where its block dominates no
-  other block. So a block that jumps to itself and to an exit it dominates,
-  as cmpxchg_code's retry loop in GHC.CmmToAsm.X86.CodeGen does, is not a
-  loop. This costs only speed, on x86-64 under -fcmm-static-pred.
 
 findBackEdges, which optHsPatterns uses for the back edge bonus, classifies
 the edges by a depth-first search instead. It counts as back edges the edges
@@ -1021,18 +1022,15 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
           loopCount n = length $ nub . map fst . filter (setMember n . snd) $ bodies
       in  map (\n -> (n, loopCount n)) $ nodes :: [(BlockId, Int)]
 
+    -- each block but the root to the blocks dominating it, itself included
+    -- and the root left out, so that no edge into the root is a back edge
     mkDomMap :: Tree BlockId -> LabelMap LabelSet
-    mkDomMap root = mapFromList $ go setEmpty root
+    mkDomMap (Node _ kids) = foldl' (go setEmpty) mapEmpty kids
       where
-        go :: LabelSet -> Tree BlockId -> [(Label,LabelSet)]
-        go parents (Node lbl [])
-          =  [(lbl, parents)]
-        go parents (Node _ leaves)
-          = let nodes = map rootLabel leaves
-                entries = map (\x -> (x,parents)) nodes
-            in  entries ++ concatMap
-                            (\n -> go (setInsert (rootLabel n) parents) n)
-                            leaves
+        go :: LabelSet -> LabelMap LabelSet -> Tree BlockId -> LabelMap LabelSet
+        go !parents !acc (Node lbl kids')
+          = let !doms = setInsert lbl parents
+            in  foldl' (go doms) (mapInsert lbl doms acc) kids'
 
 -- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
 newtype BlockNode (e :: Extensibility) (x :: Extensibility) = BN (BlockId,[BlockId])
@@ -1185,12 +1183,13 @@ check we do not apply any of the heuristics.
 The reason is simple: They look like loops in the control flow graph
 but are usually never entered, and if at most once.
 
-Three heuristics are implemented: that we do not exit loops (lehPredicts), that
-an equality test (MO_Eq) with a literal and no likelihood annotation is false
-and such an inequality test (MO_Ne) true unless an operand is bits under a mask
-(MO_And) or a constructor tag (ohPredicts), and that a back edge is more likely
-than any other edge. WIP: the paper's other heuristics are stubs (phPredicts
-and the rest), so a two-way branch to which none of the three applies keeps the
+Three heuristics are implemented: that we do not exit loops (lehPredicts),
+that an equality test (MO_Eq) with a literal and no likelihood annotation is
+false and such an inequality test (MO_Ne) true unless an operand is bits under
+a mask (MO_And) or a constructor tag (ohPredicts), and that a back edge is
+more likely than any other edge, but for the retries the code generator adds
+(AsmCodeGenRetry). WIP: the paper's other heuristics are stubs (phPredicts and
+the rest), so a two-way branch to which none of the three applies keeps the
 CFG's weights, normalised.
 
 The back edge case is special as it supersedes any other heuristic if it
@@ -1295,7 +1294,13 @@ staticBranchPrediction tags _root (LoopInfo l_backEdges loopLevels l_loops) cfg 
     foldl' update cfg nodes
   where
     nodes = getCfgNodes cfg
-    backedges = S.fromList $ l_backEdges
+    -- each block to the blocks its back edges enter, looked up once a node:
+    -- as master's set of the edges' pairs, looked up at each successor, they
+    -- made the compiler run 0.047% more instructions and allocate 0.012% more
+    -- compiling !16269's CmmDiamondChain at -O1 and -O2, and nothing more
+    -- at -O0, where static prediction does not run, on GHC 10.1.20261108
+    backedges = mapFromListWith setUnion
+      [ (from, setSingleton to) | (from, to) <- l_backEdges ]
     -- Loops keyed by their back edge
     loops = M.fromList $ l_loops :: M.Map Edge LabelSet
     loopHeads = S.fromList $ map snd $ M.keys loops
@@ -1381,8 +1386,12 @@ staticBranchPrediction tags _root (LoopInfo l_backEdges loopLevels l_loops) cfg 
         pred_LBH = 0.875
         -- successors
         successors = getSuccessorEdges cfg node
-        -- backedges
-        (m,not_m) = partition (\succ -> S.member (node, fst succ) backedges) successors
+        -- backedges, but a retry the code generator adds, as cmpxchg_code's of
+        -- an emulated atomic operation
+        !backs = mapFindWithDefault setEmpty node backedges
+        (m,not_m) = partition (\succ -> setMember (fst succ) backs
+                                        && transitionSource (snd succ)
+                                           /= AsmCodeGenRetry) successors
 
         -- Heuristics return nothing if they don't say anything about this branch
         -- or Just (prob_s1) where prob_s1 is the likelihood for s1 to be the
@@ -1672,17 +1681,13 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
                 -- An irreducible block keeps the frequency it has, 1 where
                 -- it heads one of loopInfo's loops (that loop's pass set it)
                 -- and else 0, and passes it on to its out-edges below. TODO:
-                -- irreducible blocks are not rare in Haskell code. One arises
-                -- where a block has a self loop that loopInfo does not count
-                -- (Note [Back edges in loopInfo]). Such a block's frequency,
-                -- and those of the blocks reached only through it, can thus
-                -- be far below or above what summing its inflow would give,
-                -- and on x86-64 under -fcmm-static-pred the layout by default
-                -- ranks their edges by numbers that do not add up: at -O1, a
-                -- loop calling fetchOrIntArray# gives cmpxchg_code's retry
-                -- block 0 though a nonzero frequency flows in, and the loop's
-                -- back edge after it 0. Summing the inflow was tried on a
-                -- development branch, in a replacement of this function:
+                -- irreducible blocks are not rare in Haskell code. Such a
+                -- block's frequency, and those of the blocks reached only
+                -- through it, can thus be far below or above what summing its
+                -- inflow would give, and on x86-64 under -fcmm-static-pred
+                -- the layout by default ranks their edges by numbers that do
+                -- not add up. Summing the inflow was tried
+                -- on a development branch, in a replacement of this function:
                 -- nofib's mkhprog ran 0.53% more instructions at -O2, eliza
                 -- 0.20% and megaparsec's many and skipMany 0.72% to 1.06% fewer
                 -- at -O1.
