@@ -273,9 +273,10 @@ joinToTargets_again
 makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [Node Loc Unique]
 makeRegMovementGraph adjusted_assig dest_assig
  = [ node       | (vreg, src) <- nonDetUFMToList adjusted_assig
-                    -- The list's order, by unique, decides the order of the
-                    -- fixup moves and which move of a cycle goes through the
-                    -- stack: see Note [Unique order in the linear allocator] in
+                    -- The list's order, by unique, decides the order
+                    -- of the fixup moves and which move of a cycle is
+                    -- made first, by a swap or through the stack: see
+                    -- Note [Unique order in the linear allocator] in
                     -- GHC.CmmToAsm.Reg.Linear
                     -- source reg might not be needed at the dest,
                     -- adjusted_assig being the whole assignment at the jump:
@@ -357,10 +358,14 @@ handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
 --          (vreg1, InReg r1,    [InReg r2])
 --          (vreg2, InReg r2,    [InReg r1])
 --
---      To avoid needing a temp register, we spill the first move's source
---      reg into its vreg's slot, do the other moves (handling any cycle left
---      among them the same way), and reload the slot into the first move's
---      destination reg last.
+--      Where one instruction swaps two registers of the format, we swap the
+--      first source with its destination: the value the destination held,
+--      the source of another move of the cycle, is then in the source
+--      register, so the remaining moves are a cycle one shorter, until
+--      the last swap places two values.  Otherwise, to avoid needing a temp
+--      register, we spill the first move's source reg into its vreg's slot,
+--      do the other moves (handling any cycle left among them the same way),
+--      and reload the slot into the first move's destination reg last.
 --
 --      There can be no cycle through a memory location, as a stack slot is
 --      allocated for one virtual register only. But since #26668 a vreg can
@@ -374,16 +379,34 @@ handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
 --      generators take vectors; a program reaches it on x86-64 at -O0, -O1 and
 --      -O2.
 --
---      BUG: where the first move goes to an InBoth destination, the pattern
---      below leaves out the destination's slot, which is then written only
---      if it is the slot spillR picks; otherwise the slot can keep a stale
+--      BUG: where the first move goes to an InBoth destination and no one
+--      instruction swaps two registers of the format (a floating-point or
+--      vector format on x86 and x86-64, any format on the other targets), the
+--      pattern below leaves out the destination's slot, which is then written
+--      only if it is the slot spillR picks; otherwise the slot can keep a stale
 --      value, which is wrong code where it is reloaded, on the same targets. No
 --      program is known to leave a stale slot.
 --
 handleComponent delta instr
-        (CyclicSCC ((DigraphNode vreg (Loc (InReg sreg) scls) ((Loc (InReg dreg) dcls: _))) : rest))
+        (CyclicSCC ((DigraphNode vreg src@(Loc (InReg sreg) scls) ((Loc (InReg dreg) dcls: more))) : rest))
         -- dest list may have more than one element, if the reg is also InMem.
  = do
+    config <- getConfig
+    case mkRegRegSwapInstr config scls (RegReal sreg) (RegReal dreg) of
+      Just swap -> do
+        stores <- concatMapM (makeMove delta vreg src) more
+        recordSpill (SpillJoinRR vreg)
+        -- the value dreg held is now in sreg, so it needs no move into sreg
+        let moved (DigraphNode v (Loc (InReg r) fmt) ds)
+              | r == dreg = DigraphNode v (Loc (InReg sreg) fmt)
+                                        (filter (not . inSreg) ds)
+            moved n = n
+            inSreg (Loc (InReg r) _) = r == sreg
+            inSreg _                 = False
+        remainingFixUps <- mapM (handleComponent delta instr)
+                                (movementGraphSCCs (map moved rest))
+        return (stores ++ swap : concat remainingFixUps)
+      Nothing -> do
         -- spill the source into its slot
         (instrSpill, slot)
                         <- spillR (RegWithFormat (RegReal sreg) scls) vreg
