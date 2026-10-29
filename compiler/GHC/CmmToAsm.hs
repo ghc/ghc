@@ -494,6 +494,12 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         let livenessCfg = if ncgEnableDeadCodeElimination config
                                 then Just nativeCfgWeights
                                 else Nothing
+        -- the blocks that follow a failed heap or stack check, which
+        -- the linear allocator takes no wide move destination from, read off
+        -- the CFG wherever the backend maintains it, -finfo-table-map or not
+        let allocCold = if backendMaintainsCfg platform
+                          then checkFailures nativeCfgWeights
+                          else setEmpty
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
                 runUniqueDSM usGen
@@ -571,7 +577,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 -- do linear register allocation
                 let reg_alloc proc = do
                        (alloced, maybe_more_stack, ra_stats) <-
-                               Linear.regAlloc config proc
+                               Linear.regAlloc config allocCold proc
                        case maybe_more_stack of
                          Nothing -> return ( alloced, ra_stats, [] )
                          Just amount -> do

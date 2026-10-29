@@ -170,6 +170,7 @@ imports only "GHC.CmmToAsm.Reg.Target".
 regAlloc
         :: Instruction instr
         => NCGConfig
+        -> LabelSet
         -> LiveCmmDecl statics instr
         -> UniqDSM ( NatCmmDecl statics instr
                    , Maybe Int  -- number of extra stack slots required,
@@ -177,27 +178,27 @@ regAlloc
                    , Maybe RegAllocStats
                    )
 {-# SPECIALISE regAlloc
-      :: NCGConfig -> LiveCmmDecl statics X86.Instr
+      :: NCGConfig -> LabelSet -> LiveCmmDecl statics X86.Instr
       -> UniqDSM (NatCmmDecl statics X86.Instr, Maybe Int, Maybe RegAllocStats)
   #-}
 
-regAlloc _ (CmmData sec d)
+regAlloc _ _ (CmmData sec d)
         = return
                 ( CmmData sec d
                 , Nothing
                 , Nothing )
 
-regAlloc _ (CmmProc (LiveInfo info _ _ _) lbl live [])
+regAlloc _ _ (CmmProc (LiveInfo info _ _ _) lbl live [])
         = return ( CmmProc info lbl live (ListGraph [])
                  , Nothing
                  , Nothing )
 
-regAlloc config (CmmProc static lbl live sccs)
+regAlloc config cold (CmmProc static lbl live sccs)
         | LiveInfo info entry_ids@(first_id:_) block_live _ <- static
         = do
                 -- do register allocation on each component.
                 !(!final_blocks, !stats, !stack_use)
-                        <- linearRegAlloc config entry_ids block_live sccs
+                        <- linearRegAlloc config cold entry_ids block_live sccs
 
                 -- make sure the block that was first in the input list
                 --      stays at the front of the output
@@ -215,7 +216,7 @@ regAlloc config (CmmProc static lbl live sccs)
                         , Just stats)
 
 -- bogus. to make non-exhaustive match warning go away.
-regAlloc _ (CmmProc _ _ _ _)
+regAlloc _ _ (CmmProc _ _ _ _)
         = panic "RegAllocLinear.regAlloc: no match"
 
 
@@ -230,6 +231,7 @@ regAlloc _ (CmmProc _ _ _ _)
 linearRegAlloc
         :: forall instr. (Instruction instr)
         => NCGConfig
+        -> LabelSet  -- ^ the blocks that follow a failed heap or stack check
         -> [BlockId] -- ^ entry points
         -> BlockMap Regs
               -- ^ live regs on entry to each basic block
@@ -237,7 +239,7 @@ linearRegAlloc
               -- ^ instructions annotated with "deaths"
         -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc config entry_ids block_live sccs
+linearRegAlloc config cold entry_ids block_live sccs
  = case platformArch platform of
       ArchX86        -> other $ (frInitFreeRegs platform :: X86.FreeRegs)
       ArchX86_64     -> go $ (frInitFreeRegs platform :: X86_64.FreeRegs)
@@ -257,7 +259,7 @@ linearRegAlloc config entry_ids block_live sccs
  where
   go :: FR regs
      => regs -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
-  go f = linearRegAlloc' config f entry_ids block_live sccs
+  go f = linearRegAlloc' config f cold entry_ids block_live sccs
   -- See Note [Specialising the linear allocator]
   other :: FR regs
         => regs -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
@@ -274,12 +276,14 @@ linearRegAlloc'
         :: RegAllocConstraint freeRegs instr
         => NCGConfig
         -> freeRegs
+        -> LabelSet                     -- ^ the blocks that follow a failed
+                                        --   heap or stack check
         -> [BlockId]                    -- ^ entry points
         -> BlockMap Regs              -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
         -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc' config initFreeRegs entry_ids block_live sccs
+linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
  = UDSM $ \us -> do
     let !(_, !stack, !stats, !blocks, us') =
             runR ctx emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
@@ -287,7 +291,7 @@ linearRegAlloc' config initFreeRegs entry_ids block_live sccs
         platform = ncgPlatform config
         ctx = RA_Context
                 { rc_moveDests = emptyUFM
-                , rc_wideDests = wideMoveDests platform block_live sccs
+                , rc_wideDests = wideMoveDests platform cold block_live sccs
                 , rc_config    = config }
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
@@ -304,26 +308,29 @@ dyingMoves platform instrs
               , RegVirtual vr `elemRegs` liveDieRead live ]
 
 -- | The real register each vreg is moved into where it dies in a block it is
--- live into, unless that register is live together with the vreg somewhere: at
--- a block's entry, after an instruction's writes, or where a vreg born in a
--- block while the vreg is live is moved into that register in the same block,
--- where the later vreg dies. A vreg that the vreg is moved into where it dies
--- counts as the vreg in this check, where the move is in a block some vreg is
--- live into. The walk of each block follows only those vregs and registers,
+-- live into, unless the block is one of the given ones (on x86-64, those that
+-- follow a failed heap or stack check, 'checkFailures'), or that register is
+-- live together with the vreg somewhere: at a block's entry, after an
+-- instruction's writes, or where a vreg born in a block while the vreg is live
+-- is moved into that register in the same block, where the later vreg dies. A
+-- vreg that the vreg is moved into where it dies counts as the vreg in this
+-- check, where the move is in a block some vreg is live into and not one of the
+-- given ones. The walk of each block follows only those vregs and registers,
 -- taking an instruction's writes from its register usage ('liveBorn' being
 -- filled in only for the graph allocator and the liveness dump).
 wideMoveDests :: Instruction instr
-              => Platform -> BlockMap Regs
+              => Platform -> LabelSet -> BlockMap Regs
               -> [SCC (LiveBasicBlock instr)]
               -> UniqFM VirtualReg RealReg
-wideMoveDests platform block_live sccs
+wideMoveDests platform cold block_live sccs
   | isNullUFM cands = cands
   | otherwise       = cands `minusUFM` foldl' blk emptyUFM blocks
   where
     blocks = flattenSCCs sccs
     live_in bid = mapFindWithDefault noRegs bid block_live
-    -- a block some vreg is live into
-    warm live = uniqSetAny (isVirtualReg . regWithFormat_reg) (getRegs live)
+    -- a block some vreg is live into, and not one of the given ones
+    warm bid live = uniqSetAny (isVirtualReg . regWithFormat_reg) (getRegs live)
+                    && not (bid `setMember` cold)
     -- a vreg moved where it dies in a block it is live into: one computed in
     -- the block has the block's own move destination
     -- TODO: where several blocks give a vreg different destinations, the last
@@ -336,7 +343,7 @@ wideMoveDests platform block_live sccs
     cands = listToUFM
       [ (vr, rr) | BasicBlock bid instrs <- blocks
                  , let live = live_in bid
-                 , warm live
+                 , warm bid live
                  , (vr, RegReal rr) <- dyingMoves platform instrs
                  , RegVirtual vr `elemRegs` live ]
     dests = mkUniqSet (nonDetEltsUFM cands)
@@ -347,7 +354,7 @@ wideMoveDests platform block_live sccs
            $ listToUFM_C (++)
       [ (b, [(getUnique a, d)])
       | BasicBlock bid instrs <- blocks
-      , warm (live_in bid)
+      , warm bid (live_in bid)
       , (a, RegVirtual b) <- dyingMoves platform instrs
       , Just d <- [lookupUFM cands a] ]
     -- bad: the candidates found live together with their destination;
@@ -1055,7 +1062,8 @@ from which 'firstFreeInOrder' takes the first that is free:
  * The real register a block the variable is live into moves it into where it
    dies, such as R1 for a value evaluated some blocks after it is computed,
    unless that register is live together with the variable somewhere, as
-   wideMoveDests counts it.
+   wideMoveDests counts it, or, on x86-64, the block follows a failed heap or
+   stack check.
 
 Preferring every register the variable was assigned to, not only the first, was
 tried and turned out to barely matter.
