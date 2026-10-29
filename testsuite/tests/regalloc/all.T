@@ -17,3 +17,14 @@ test('T27619',
        grep_errmsg(r'%vV128_\S+ :: FF64') ],
      compile,
      ['-O -fno-cse -ddump-asm-liveness'])
+
+# A loop whose own return continuation started with R1 allocated, though R1
+# is not live into it, so that its back edge paid fixup moves (joinRR and
+# joinRM in -ddump-asm-stats, which must be 0; x86-64)
+test('T27981',
+     [ unless(arch('x86_64'), skip),
+       when(not have_ncg(), skip),
+       only_ways(['normal']),
+       grep_errmsg(r'^\(\d+, \d+, \d+, (?!0, 0,)(\d+, \d+),', [1]) ],
+     compile,
+     ['-O -ddump-asm-stats'])

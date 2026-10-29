@@ -61,22 +61,22 @@ data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
 --      target a particular label. We have to insert fixup code to make
 --      the register assignments from the different sources match up.
 --
-data BlockAssignment freeRegs
-        = BlockAssignment { blockMap :: !(BlockMap (freeRegs, RegMap Loc))
+data BlockAssignment
+        = BlockAssignment { blockMap :: !(BlockMap (RegMap Loc))
                           , firstUsed :: !(UniqFM VirtualReg RealReg)
                             -- | the vregs whose first-used register a block
                             -- found to be another value's
                           , staleFirst :: !(UniqSet Unique) }
 
 -- | Find the register mapping for a specific BlockId.
-lookupBlockAssignment :: BlockId -> BlockAssignment freeRegs -> Maybe (freeRegs, RegMap Loc)
+lookupBlockAssignment :: BlockId -> BlockAssignment -> Maybe (RegMap Loc)
 lookupBlockAssignment bid ba = mapLookup bid (blockMap ba)
 
 -- | The register a virtual register has in the first assignment that,
 -- recorded for a block it is live into, holds it in a register:
 -- see Note [The first jump into a block fixes its entry assignment] in
 -- GHC.CmmToAsm.Reg.Linear.JoinToTargets.
-lookupFirstUsed :: Unique -> BlockAssignment freeRegs -> Maybe RealReg
+lookupFirstUsed :: Unique -> BlockAssignment -> Maybe RealReg
 lookupFirstUsed u ba = lookupUFM_Directly (firstUsed ba) u
 
 -- | The blocks whose recorded assignment holds the virtual register with the
@@ -92,10 +92,10 @@ lookupFirstUsed u ba = lookupUFM_Directly (firstUsed ba) u
 -- index of the holders, each recorded assignment adding a thunk to it, made
 -- the compiler allocate 0.068% more compiling T9961 at -O0 and 0.048% more
 -- compiling T783 at -O0.)
-blocksHolding :: Unique -> RealReg -> BlockAssignment freeRegs -> Maybe [BlockId]
+blocksHolding :: Unique -> RealReg -> BlockAssignment -> Maybe [BlockId]
 blocksHolding !u r ba
   | null (drop 256 recorded)
-  = Just [ b | (b, (_, assig)) <- recorded
+  = Just [ b | (b, assig) <- recorded
              , Just (Loc l _) <- [lookupUFM_Directly assig u]
              , r `elem` regsOfLoc l ]
   | otherwise = Nothing
@@ -104,26 +104,26 @@ blocksHolding !u r ba
 
 -- | Record that a block found the first-used register of the virtual register
 -- with the given unique to be another value's.
-markStaleFirst :: Unique -> BlockAssignment freeRegs -> BlockAssignment freeRegs
+markStaleFirst :: Unique -> BlockAssignment -> BlockAssignment
 markStaleFirst u ba = ba { staleFirst = addOneToUniqSet (staleFirst ba) u }
 
 -- | Whether a block found the first-used register of the virtual register with
 -- the given unique to be another value's.
-isStaleFirst :: Unique -> BlockAssignment freeRegs -> Bool
+isStaleFirst :: Unique -> BlockAssignment -> Bool
 isStaleFirst u ba = elemUniqSet_Directly u (staleFirst ba)
 
 -- | An initial empty 'BlockAssignment'
-emptyBlockAssignment :: BlockAssignment freeRegs
+emptyBlockAssignment :: BlockAssignment
 emptyBlockAssignment = BlockAssignment mapEmpty mempty mempty
 
 -- | Add new register mappings for a specific block.
 updateBlockAssignment :: BlockId
-  -> (freeRegs, RegMap Loc)
-  -> BlockAssignment freeRegs
-  -> BlockAssignment freeRegs
-updateBlockAssignment dest (freeRegs, regMap) (BlockAssignment {..}) =
+  -> RegMap Loc
+  -> BlockAssignment
+  -> BlockAssignment
+updateBlockAssignment dest regMap (BlockAssignment {..}) =
   BlockAssignment
-    (mapInsert dest (freeRegs, regMap) blockMap)
+    (mapInsert dest regMap blockMap)
     (mergeUFM combWithExisting id
         (mapMaybeUFM (fromVLoc . locWithFormat_loc))
         firstUsed
@@ -248,7 +248,7 @@ data RA_State freeRegs
         {
         -- | the current mapping from basic blocks to
         --      the register assignments at the beginning of that block.
-          ra_blockassig :: BlockAssignment freeRegs
+          ra_blockassig :: BlockAssignment
 
         -- | free machine registers
         , ra_freeregs   :: !freeRegs
@@ -274,7 +274,7 @@ data RA_State freeRegs
         , ra_fixups     :: [(BlockId,BlockId,BlockId)]
 
         -- | see 'RA_Context'
-        , ra_context    :: !RA_Context
+        , ra_context    :: !(RA_Context freeRegs)
 
         }
 
@@ -287,7 +287,7 @@ data DyingMoves = DyingMoves {-# UNPACK #-} !Word64 [(VirtualReg, RealReg)]
 --   fields of their own, each of which costs allocation at every update of
 --   the state: an unused one alone made the compiler allocate 0.3% more
 --   compiling T3294 at -O0 when this was added.
-data RA_Context
+data RA_Context freeRegs
         = RA_Context
         {
         -- | the recorded assignments of the jump targets of the block being
@@ -332,6 +332,10 @@ data RA_Context
         --   allocated on x86-64, whose fallback alone uses it, and Nothing
         --   elsewhere
         , rc_clobbers   :: Maybe (UniqFM VirtualReg Word64)
+
+        -- | every allocatable register, from which each block's free
+        --   registers on entry are derived
+        , rc_initFree   :: freeRegs
 
         -- | Native code generator configuration
         , rc_config     :: !NCGConfig
