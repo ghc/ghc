@@ -152,3 +152,4 @@ test('T20298b', normal, compile, ['-O2 -dno-bignum-rules -ddump-simpl -dno-typea
 test('T20298c', normal, compile, ['-O2 -dno-builtin-rules -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
 
 test('T27368', normal, compile, ['-O'])
+test('T27979', [req_cmm, check_errmsg('stg_ap_0_fast')], compile, ['-O -ddump-cmm -dno-typeable-binds -dsuppress-uniques'])
