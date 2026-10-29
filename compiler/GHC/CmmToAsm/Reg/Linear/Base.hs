@@ -242,6 +242,14 @@ data RA_Context
         --   in the block being allocated
         , rc_moveDests  :: UniqFM VirtualReg RealReg
 
+        -- | the first-used registers of the vregs the block being allocated
+        --   reads or writes, with the vregs' uniques
+        , rc_claims     :: [(RealReg, Unique)]
+
+        -- | 'GHC.CmmToAsm.Reg.Linear.wideMoveDests' of the procedure being
+        --   allocated
+        , rc_wideDests  :: UniqFM VirtualReg RealReg
+
         -- | Native code generator configuration
         , rc_config     :: !NCGConfig
         }
