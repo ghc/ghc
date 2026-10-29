@@ -118,7 +118,7 @@ slurpSpillCostInfo platform cfg cmm
                 = pprPanic "RegSpillCost.slurpSpillCostInfo"
                 $ text "no liveness information on instruction " <> pprInstr platform instr
 
-        countLIs scale rsLiveEntry (LiveInstr instr (Just live) : lis)
+        countLIs scale rsLiveEntry (LiveInstr _ (Just live) : lis)
          = do
                 -- Increment the lifetime counts for regs live on entry to this instr.
                 mapM_ incLifetime $ nonDetEltsUniqSet rsLiveEntry
@@ -127,7 +127,7 @@ slurpSpillCostInfo platform cfg cmm
                     -- See Note [Unique Determinism and code generation]
 
                 -- Increment counts for what regs were read/written from.
-                let (RU read written)   = regUsageOfInstr platform instr
+                let (RU read written)   = liveUsage live
                 mapM_ (incUses scale) $ nub $ mapMaybe (takeVirtualReg . regWithFormat_reg) read
                 mapM_ (incDefs scale) $ nub $ mapMaybe (takeVirtualReg . regWithFormat_reg) written
 

@@ -195,7 +195,11 @@ data Liveness
         = Liveness
         { liveBorn      :: Regs      -- ^ registers born in this instruction (written to for first time).
         , liveDieRead   :: Regs      -- ^ registers that died because they were read for the last time.
-        , liveDieWrite  :: Regs }    -- ^ registers that died because they were clobbered by something.
+        , liveDieWrite  :: Regs      -- ^ registers that died because they were clobbered by something.
+        , liveUsage     :: RegUsage  -- ^ the registers the instruction reads and writes, as
+                                     --   'regUsageOfInstr' gives them, kept so that later passes
+                                     --   need not compute them again.
+        }
 
 
 -- | Stash regs live on entry to each basic block in the info part of the cmm code.
@@ -672,13 +676,18 @@ patchRegsLiveInstr platform patchF li
          -> LiveInstr (patchRegsOfInstr platform instr patchF) Nothing
 
         LiveInstr instr (Just live)
-         -> LiveInstr
-                (patchRegsOfInstr platform instr patchF)
+         -> let instr' = patchRegsOfInstr platform instr patchF
+            in  LiveInstr instr'
                 (Just live
                         { -- WARNING: have to go via lists here because patchF changes the uniq in the Reg
                           liveBorn      = mapRegs patchF $ liveBorn live
                         , liveDieRead   = mapRegs patchF $ liveDieRead live
-                        , liveDieWrite  = mapRegs patchF $ liveDieWrite live })
+                        , liveDieWrite  = mapRegs patchF $ liveDieWrite live
+                          -- computed again: an instruction's usage can
+                          -- depend on whether its registers are equal
+                          -- (Note [What x86's regUsageOfInstr reports] in
+                          -- GHC.CmmToAsm.X86.Instr)
+                        , liveUsage     = regUsageOfInstr platform instr' })
                           -- See Note [Unique Determinism and code generation]
 
 --------------------------------------------------------------------------------
@@ -899,7 +908,7 @@ livenessBlock platform blockmap (BasicBlock block_id instrs)
             = livenessBack platform noRegs blockmap [] (reverse instrs)
         blockmap'       = mapInsert block_id regsLiveOnEntry blockmap
 
-        instrs2         = livenessForward platform regsLiveOnEntry instrs1
+        instrs2         = livenessForward regsLiveOnEntry instrs1
 
         output          = BasicBlock block_id instrs2
 
@@ -909,16 +918,14 @@ livenessBlock platform blockmap (BasicBlock block_id instrs)
 --   filling in when regs are born
 
 livenessForward
-        :: Instruction instr
-        => Platform
-        -> Regs -- regs live on this instr
+        :: Regs -- regs live on this instr
         -> [LiveInstr instr] -> [LiveInstr instr]
 
-livenessForward _        _           []  = []
-livenessForward platform rsLiveEntry (li@(LiveInstr instr mLive) : lis)
+livenessForward _           []  = []
+livenessForward rsLiveEntry (li@(LiveInstr instr mLive) : lis)
         | Just live <- mLive
         = let
-                RU _ rsWritten  = regUsageOfInstr platform instr
+                RU _ rsWritten  = liveUsage live
                 -- Regs that are written to but weren't live on entry to this instruction
                 --      are recorded as being born here.
                 rsBorn          = mkRegsMaxFmt
@@ -933,10 +940,10 @@ livenessForward platform rsLiveEntry (li@(LiveInstr instr mLive) : lis)
                                         `minusRegs` (liveDieWrite live) -- (FmtFwd2)
 
         in LiveInstr instr (Just live { liveBorn = rsBorn })
-                : livenessForward platform rsLiveNext lis
+                : livenessForward rsLiveNext lis
 
         | otherwise
-        = li : livenessForward platform rsLiveEntry lis
+        = li : livenessForward rsLiveEntry lis
 
 
 -- | Calculate liveness going backwards,
@@ -973,21 +980,19 @@ liveness1 _ liveregs _ (LiveInstr instr _)
 liveness1 platform liveregs blockmap (LiveInstr instr _)
 
         | not_a_branch
-        = (liveregs1, LiveInstr instr
-                        (Just $ Liveness
-                        { liveBorn      = noRegs
-                        , liveDieRead   = r_dying
-                        , liveDieWrite  = w_dying }))
+        = (liveregs1, LiveInstr instr (Just live))
 
         | otherwise
         = (liveregs_br, LiveInstr instr
-                        (Just $ Liveness
-                        { liveBorn      = noRegs
-                        , liveDieRead   = r_dying_br
-                        , liveDieWrite  = w_dying }))
+                        (Just live { liveDieRead = r_dying_br }))
 
         where
-            !(RU read written) = regUsageOfInstr platform instr
+            live = Liveness
+                { liveBorn      = noRegs
+                , liveDieRead   = r_dying
+                , liveDieWrite  = w_dying
+                , liveUsage     = usage }
+            !usage@(RU read written) = regUsageOfInstr platform instr
 
             -- registers that were written here are dead going backwards.
             -- registers that were read here are live going backwards.
