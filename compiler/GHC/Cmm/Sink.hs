@@ -87,6 +87,9 @@ Algorithm:
        assignments that are not dead at the successor, we will therefore
        eliminate all assignments dead at this point. Thus analysis of a
        join-point will always begin with an empty list of assignments.
+     * the assignments dropped there go into the block in their order, except
+       that the movable assignments of literals go after the others
+       (literalsLast).
 
 As a result of above algorithm, sinking deletes some dead assignments
 (transitively, even).  This isn't as good as removeDeadAssignments,
@@ -215,7 +218,8 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
             live_rhs = foldRegsUsed platform (flip insertLRegSet) emptyLRegSet rhs
 
-      final_middle = foldl' blockSnoc middle' dropped_last
+      final_middle = foldl' blockSnoc middle'
+                            (literalsLast platform dropped_last)
 
       sunk' = mapUnion sunk $
                  mapFromList [ (l, filterAssignments platform (getLive l) assigs'')
@@ -413,6 +417,45 @@ noOpAssignment node
 
 toNode :: Assignment -> CmmNode O O
 toNode (r,rhs,_) = CmmAssign (CmmLocal r) rhs
+
+-- | The assignments a block ends with, in their order but with the movable
+-- assignments of literals to local registers put after the others, still in
+-- their order. An assignment of a literal is movable where each later
+-- assignment assigns, to another local register, a literal or the result of a
+-- machine operation that reads neither that register nor the literal's; an
+-- offset from a register, which constant folding makes of y + n, is not such a
+-- result. Set first, a constant can take the register that a later value is to
+-- be in at the block's end, such as a join variable's register in the join's
+-- recorded assignment (the linear register allocator's), while the value's
+-- operands still hold the register the constant is to be in, and the join's
+-- fixup then swaps the two. Copies and updates in place keep the constant
+-- before them: moved past them, it can change the registers of a join's or a
+-- loop head's recorded assignment, so that their other predecessors pay a move.
+-- A literal reads neither memory nor a register, and none of the assignments it
+-- passes reads or writes its register, so every value stays the same.
+literalsLast :: Platform -> [CmmNode O O] -> [CmmNode O O]
+literalsLast platform nodes
+  -- tested first, so that a block in which no literal but the last can move
+  -- keeps its list
+  | movable nodes = others ++ lits
+  | otherwise     = nodes
+  where
+    movable (n : rest@(_ : _)) = moves n rest || movable rest
+    movable _                  = False
+    moves (CmmAssign (CmmLocal r) (CmmLit _)) rest = all (passable r) rest
+    moves _ _ = False
+    (others, lits) = go nodes
+    go [] = ([], [])
+    go (n : rest)
+      | moves n rest = (os, n : ls)
+      | otherwise    = (n : os, ls)
+      where (os, ls) = go rest
+    passable r (CmmAssign (CmmLocal r') e) = r' /= r && case e of
+      CmmLit _      -> True
+      CmmMachOp _ _ -> not (regUsedIn platform (CmmLocal r) e)
+                         && not (regUsedIn platform (CmmLocal r') e)
+      _             -> False
+    passable _ _ = False
 
 dropAssignmentsSimple :: Platform -> (Assignment -> Bool) -> Assignments
                       -> ([CmmNode O O], Assignments)
