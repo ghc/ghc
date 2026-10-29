@@ -303,10 +303,24 @@ linearRegAlloc'
 linearRegAlloc' config initFreeRegs entry_ids block_live sccs
  = UDSM $ \us -> do
     let !(_, !stack, !stats, !blocks, us') =
-            runR config emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
+            runR ctx emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
                 $ linearRA_SCCs entry_ids block_live [] sccs
+        ctx = RA_Context
+                { rc_moveDests = emptyUFM
+                , rc_config    = config }
      in DUniqResult (blocks, stats, getStackUse stack) us'
 
+
+-- | The moves of a block's virtual registers into real registers where they
+-- die.
+dyingMoves :: Instruction instr
+           => Platform -> [LiveInstr instr] -> [(VirtualReg, RealReg)]
+dyingMoves platform instrs
+  = [ (vr, rr) | LiveInstr (Instr instr) (Just live) <- instrs
+               , not (isEmptyUniqSet (getRegs (liveDieRead live)))
+               , Just (RegVirtual vr, RegReal rr)
+                   <- [takeRegRegMoveInstr platform instr]
+               , RegVirtual vr `elemRegs` liveDieRead live ]
 
 linearRA_SCCs :: RegAllocConstraint freeRegs instr
               => [BlockId]
@@ -394,6 +408,8 @@ processBlock
 processBlock block_live (BasicBlock id instrs)
  = do   -- pprTraceM "processBlock" $ text "" $$ ppr (BasicBlock id instrs)
         initBlock id block_live
+        platform <- getPlatform
+        setBlockContextR $ listToUFM (dyingMoves platform instrs)
 
         (instrs', fixups)
                 <- linearRA block_live id instrs
@@ -777,8 +793,9 @@ the first two taking it as a ranking:
   are none, of those in a register only, whatever its next use (the ToDo of step
   (a) in the outline at the top of this module).
 * saveClobberedTemps finds new registers for the values an instruction clobbers
-  in the order, so once the free registers that would suit them run out, the
-  later values are spilled.
+  in the order, so an earlier value can take a free register that a later one
+  prefers, and once the free registers that would suit them run out, the later
+  values are spilled.
 * makeRegMovementGraph lists a jump's moves in the order, which decides the
   order of joinToTargets' fixup moves and which move of a cycle goes through the
   stack.
@@ -840,18 +857,19 @@ saveClobberedTemps clobbered dying
               -- (1) we have a free reg of the right class that isn't
               -- clobbered by this instruction; use it to save the
               -- clobbered value.
-              -- BUG TODO #26631: my_reg is the first such register, chosen
-              -- without regard to what the instructions before the value's
-              -- next read do to it. Where they write it too, as the moves of
-              -- a C call's arguments into their registers do, the value is
-              -- moved from register to register, and where the call clobbers
-              -- every register of the value's class, as on x86-64 a C call
-              -- clobbers every floating-point register except on Windows, the
-              -- call then spills it all the same. This costs only speed, under
-              -- the linear allocator, on every target but wasm32. Handing out
-              -- the floating-point registers in descending order was tried on a
+              -- BUG TODO #26631: my_reg is chosen by firstFreeInOrder without
+              -- regard to what the instructions before the value's next read
+              -- do to it. Where they write it too, as the moves of a C call's
+              -- arguments into their registers do, the value is moved from
+              -- register to register, and where the call clobbers every
+              -- register of the value's class, as on x86-64 a C call clobbers
+              -- every floating-point register except on Windows, the call
+              -- then spills it all the same. This costs only speed, under the
+              -- linear allocator, on every target but wasm32. Handing out the
+              -- floating-point registers in descending order was tried on a
               -- development branch and showed no gain.
-              (my_reg : _) -> do
+              free@(_ : _) -> do
+                  my_reg <- firstFreeInOrder temp free
                   setFreeRegsR (frAllocateReg my_reg freeRegs)
 
                   let new_assign = addToUFM_Directly assig temp (Loc (InReg my_reg) fmt)
@@ -983,28 +1001,51 @@ allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt
 
                         | otherwise -> doSpill WriteNew
 
--- | Given a virtual reg find a preferred real register.
--- A block's entry assignment is recorded at the first jump into it, and the
--- preferred register is the variable's register in the first entry assignment,
--- in allocation order, that maps it to a register ('updateBlockAssignment'
--- keeps the first). That need not be the first register the variable was
--- assigned to, and a variable that no entry assignment maps to a register has
--- none.
--- This way when we allocate for a loop
--- variables are likely to end up in the same registers at the
--- end and start of the loop, avoiding redundant reg-reg moves.
--- Note: I tried returning a list of past assignments, but that
--- turned out to barely matter.
---
--- TODO: the preference is keyed by virtual register, and a Cmm local is one
--- virtual register over its whole procedure, however many live ranges it
--- has. So the register taken for one live range becomes the preference of
--- another. Stack layout makes such ranges: it reloads a local that is live
--- across a call into the same local in the call's continuation.
-findPrefRealReg :: VirtualReg -> RegM freeRegs (Maybe RealReg)
-findPrefRealReg vreg = do
+{- Note [Register preferences in the linear allocator]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The preferred registers of a virtual register, the variable below, best first,
+from which 'firstFreeInOrder' takes the first that is free:
+
+ * The real register the current block moves the variable into where it dies,
+   such as R1 before an evaluation: allocated there, the variable needs no move.
+
+ * The register the variable has in the first assignment that, recorded
+   for a block it is live into, holds it in a register, if any
+   (Note [The first jump into a block fixes its entry assignment] in
+   GHC.CmmToAsm.Reg.Linear.JoinToTargets). This way, when we allocate for a
+   loop, variables are likely to end up in the same registers at the end and
+   start of the loop, avoiding redundant reg-reg moves. That buys nothing for
+   a value the current block moves where it dies, which is live into no later
+   block, hence the order.
+
+Preferring every register the variable was assigned to, not only the first, was
+tried and turned out to barely matter.
+
+TODO: the first-used preference is keyed by virtual register, and a Cmm local
+is one virtual register over its whole procedure, however many live ranges
+it has. So the register taken for one live range becomes the preference of
+another. Stack layout makes such ranges: it reloads a local that is live across
+a call into the same local in the call's continuation.
+-}
+
+-- | Of the given free registers of a class, the one to take for the
+-- virtual register with the given unique: the first of its preferred
+-- registers, best first, that is free, else the first free one
+-- (Note [Register preferences in the linear allocator]).
+firstFreeInOrder :: Unique -> [RealReg] -> RegM freeRegs RealReg
+firstFreeInOrder _ [] = panic "firstFreeInOrder: no free register"
+firstFreeInOrder u free@(r0 : _) = do
   bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
-  return $ lookupFirstUsed vreg bassig
+  RA_Context { rc_moveDests = moves } <- getContextR
+  let !mv = lookupUFM_Directly moves u
+      !fu = lookupFirstUsed u bassig
+      isFree r = r `elem` free
+      -- the preference where it is free, else the next one
+      pick (Just r) _ | isFree r = Just r
+      pick _        k = k
+  return $! case pick mv (pick fu Nothing) of
+    Just r -> r
+    Nothing -> r0
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
@@ -1024,18 +1065,10 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
         let regclass = classOfVirtualReg (platformArch platform) vr
             freeRegs_thisClass = frGetFreeRegs regclass freeRegs :: [RealReg]
 
-        -- Can we put the variable into a register it already was?
-        pref_reg <- findPrefRealReg vr
-
         case freeRegs_thisClass of
          -- case (2): we have a free register
-         (first_free : _) ->
-           do   let !final_reg
-                        | Just reg <- pref_reg
-                        , reg `elem` freeRegs_thisClass
-                        = reg
-                        | otherwise
-                        = first_free
+         _ : _ ->
+           do   final_reg <- firstFreeInOrder (getUnique vr) freeRegs_thisClass
 
                 spills'   <- loadTemp r spill_loc final_reg spills
 
