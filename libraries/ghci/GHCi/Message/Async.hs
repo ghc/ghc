@@ -164,13 +164,15 @@ writePipe p msg = do
   var <- atomically $ writePipeAsync p msg
   either throwIO pure =<< atomically (takeTMVar var)
 
+-- | Enqueues the message for writing.
+--
+-- The returned TMVar can be checked for the outcome.
 writePipeAsync :: Pipe -> IddMsg -> STM (TMVar (Either SomeException ()))
 writePipeAsync Pipe{..} msg = do
     var <- newEmptyTMVar
     readTVar pipeWriteClosed >>= \case
-      True -> throwSTM PipeWriteClosedException
-      False -> pure ()
-    writeTQueue (writeQueue pipeAsyncMngr) (msg, var)
+      True -> putTMVar var (Left $ toException PipeWriteClosedException)
+      False -> writeTQueue (writeQueue pipeAsyncMngr) (msg, var)
     pure var
 
 
@@ -217,11 +219,12 @@ withLock Pipe{..} = bracket (takeMVar pipeLock) (putMVar pipeLock) . const
 -- * Matching requests with async replies
 --------------------------------------------------------------------------------
 
--- | Send an asynchronous request and block waiting for a matching reply
+-- | Allocates a new 'pendingReply' and takes care of deallocation if the
+--   continuation throws an exception.
 --
--- See Note [Exceptions during serialization] about exceptions the 'Put' argument might raise.
-remoteAsyncReq :: Pipe -> Put -> (Maybe InboxId) -> IO (Either SomeException LB.ByteString)
-remoteAsyncReq pipe msg ii = do
+--  Will throw 'PipeReadClosedException' if that is the case.
+newPendingReply :: Pipe -> (Int -> TMVar (Either SomeException LB.ByteString) -> IO b) -> (IO b)
+newPendingReply pipe k = do
 
   let pendingReplies = pendingReply (pipeAsyncMngr pipe)
 
@@ -229,30 +232,29 @@ remoteAsyncReq pipe msg ii = do
   uq <- freshId (pipeAsyncMngr pipe)
   wv <- newEmptyTMVarIO
 
-  isClosed <- atomically $ do
-    isClosed <- readTVar (pipeReadClosed pipe)
-                -- don't send the req if we won't get a reply.
-    if isClosed
-      then pure True
-      else do
-        modifyTVar pendingReplies (IntMap.insert uq wv)
-        pure False
+  bracketOnError
+    (atomically $ do
+      readTVar (pipeReadClosed pipe) >>= \case
+        -- don't set a reply as pending if we won't receive it.
+        True  -> throwSTM PipeReadClosedException
+        False -> modifyTVar pendingReplies (IntMap.insert uq wv))
 
-  when isClosed $ do
-    throwIO PipeReadClosedException
+    (const $ atomically $ modifyTVar pendingReplies (IntMap.delete uq))
 
+    (const $ k uq wv)
+
+-- | Send an asynchronous request and block waiting for a matching reply
+--
+-- See Note [Exceptions during serialization] about exceptions the 'Put' argument might raise.
+remoteAsyncReq :: Pipe -> Put -> (Maybe InboxId) -> IO (Either SomeException LB.ByteString)
+remoteAsyncReq pipe msg ii = newPendingReply pipe $ \ uq wv -> do
   -- Write request
   writePipe pipe (Request uq ii (runPut msg))
-    `onException`
-        -- the req wasn't done, or no one will be reading the reply:
-        -- in either case, drop it from the pending map.
-        atomically (modifyTVar pendingReplies (IntMap.delete uq))
 
   -- Block waiting for reply
   atomically (takeTMVar wv)
     `onException`
        atomically (do
-         modifyTVar pendingReplies (IntMap.delete uq)
          -- we don't wait for Cancel to be written on the pipe,
          -- and won't get a reply: nowhere to report it anyway.
          writePipeAsync pipe (Cancel uq))
