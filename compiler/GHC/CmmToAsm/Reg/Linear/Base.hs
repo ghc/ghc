@@ -153,7 +153,7 @@ regsOfLoc (InBoth r _) = [r]
 regsOfLoc (InMem _)    = []
 
 -- | Reasons why instructions might be inserted by the spiller.
---      Used when generating stats for -ddrop-asm-stats.
+--      Used when generating stats for -ddump-asm-stats.
 --
 data SpillReason
         -- | vreg was spilled to a slot so we could use its
@@ -208,7 +208,7 @@ data RA_State freeRegs
         -- | unique supply for generating names for join point fixup blocks.
         , ra_us         :: DUniqSupply
 
-        -- | Record why things were spilled, for -ddrop-asm-stats.
+        -- | Record why things were spilled, for -ddump-asm-stats.
         --      Just keep a list here instead of a map of regs -> reasons.
         --      We don't want to slow down the allocator if we're not going to emit the stats.
         , ra_spills     :: [SpillReason]

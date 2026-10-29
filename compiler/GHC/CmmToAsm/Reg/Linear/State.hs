@@ -165,10 +165,13 @@ getUniqueR = mkRegM $ \s ->
     (uniq, us) -> RA_Result s{ra_us = us} uniq
 
 
--- | Record that a spill instruction was inserted, for profiling.
+-- | Record that a spill instruction was inserted, for profiling: only for
+--   the statistics -ddump-asm-stats prints, the only reader of the reasons.
 recordSpill :: SpillReason -> RegM freeRegs ()
 recordSpill spill
-    = mkRegM $ \s -> RA_Result (s { ra_spills = spill : ra_spills s }) ()
+    = mkRegM $ \s -> if ncgDumpAsmStats (ra_config s)
+                       then RA_Result (s { ra_spills = spill : ra_spills s }) ()
+                       else RA_Result s ()
 
 -- | Record a created fixup block
 recordFixupBlock :: BlockId -> BlockId -> BlockId -> RegM freeRegs ()
