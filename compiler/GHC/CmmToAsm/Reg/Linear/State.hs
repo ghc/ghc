@@ -83,30 +83,26 @@ getPlatform :: RegM a Platform
 getPlatform = ncgPlatform <$> getConfig
 
 -- | Run a computation in the RegM register allocator monad.
-runR    :: RA_Context
-        -> BlockAssignment freeRegs
-        -> freeRegs
-        -> RegMap Loc
-        -> StackMap
+runR    :: RA_Context freeRegs
         -> DUniqSupply
         -> RegM freeRegs a
-        -> (BlockAssignment freeRegs, StackMap, RegAllocStats, a, DUniqSupply)
+        -> (StackMap, RegAllocStats, a, DUniqSupply)
 
-runR ctx block_assig freeregs assig stack us thing =
+runR ctx us thing =
   case unReg thing
         (RA_State
-                { ra_blockassig = block_assig
-                , ra_freeregs   = freeregs
-                , ra_assig      = assig
+                { ra_blockassig = emptyBlockAssignment
+                , ra_freeregs   = rc_initFree ctx
+                , ra_assig      = emptyRegMap
                 , ra_delta      = 0{-???-}
-                , ra_stack      = stack
+                , ra_stack      = emptyStackMap
                 , ra_us         = us
                 , ra_spills     = []
                 , ra_fixups     = []
                 , ra_context    = ctx })
    of
         RA_Result state returned_thing
-         ->  (ra_blockassig state, ra_stack state, makeRAStats state, returned_thing, ra_us state)
+         ->  (ra_stack state, makeRAStats state, returned_thing, ra_us state)
 
 
 -- | Make register allocator stats from its final state.
@@ -149,15 +145,15 @@ setAssigR :: RegMap Loc -> RegM freeRegs ()
 setAssigR assig = mkRegM $ \ s ->
   RA_Result s{ra_assig=assig} ()
 
-getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
+getBlockAssigR :: RegM freeRegs BlockAssignment
 getBlockAssigR = mkRegM $ \ s@RA_State{ra_blockassig = assig} ->
   RA_Result s assig
 
-setBlockAssigR :: BlockAssignment freeRegs -> RegM freeRegs ()
+setBlockAssigR :: BlockAssignment -> RegM freeRegs ()
 setBlockAssigR assig = mkRegM $ \ s ->
   RA_Result s{ra_blockassig = assig} ()
 
-getContextR :: RegM freeRegs RA_Context
+getContextR :: RegM freeRegs (RA_Context freeRegs)
 getContextR = mkRegM $ \ s@RA_State{ra_context = ctx} -> RA_Result s ctx
 
 setBlockContextR :: [RegMap Loc] -> UniqFM VirtualReg RealReg -> RegM freeRegs ()
