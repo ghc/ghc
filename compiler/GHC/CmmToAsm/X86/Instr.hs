@@ -788,14 +788,20 @@ regUsageOfInstr platform instr
     use_R _   (OpImm _)    tl = tl
     use_R _   (OpAddr ea)  tl = use_EA ea tl
 
-    -- Registers used to compute an effective address.
+    -- Registers used to compute an effective address, only those mkRU keeps:
+    -- added too, those it drops made it copy the list, and the compiler
+    -- allocate 0.78% more and run 0.79% more instructions compiling T3294
+    -- at -O0, 0.27% and 0.30% more at -O, and 0.26% and 0.29% more at -O2,
+    -- on GHC 10.1.20261108.
     use_EA (ImmAddr _ _) tl = tl
     use_EA (AddrBaseIndex base index _) tl =
         use_base base $! use_index index tl
-        where use_base (EABaseReg r)  tl = mk addrFmt r : tl
+        where use_base (EABaseReg r)  tl
+                | interesting platform r = mk addrFmt r : tl
               use_base _              tl = tl
-              use_index EAIndexNone   tl = tl
-              use_index (EAIndex i _) tl = mk addrFmt i : tl
+              use_index (EAIndex i _) tl
+                | interesting platform i = mk addrFmt i : tl
+              use_index _             tl = tl
 
     mkRUR :: [RegWithFormat] -> RegUsage
     mkRUR src = mkRU src []
