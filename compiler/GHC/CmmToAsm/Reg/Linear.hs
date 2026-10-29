@@ -1107,8 +1107,12 @@ genRaInsn block_live new_instrs block_id instr rest live = do
 
     let
         -- (i) Patch the instruction
+        -- Strict: squashed_instr and reload_into both evaluate it, and a lazy
+        -- one is a thunk shared between them, built for every instruction,
+        -- which made the compiler allocate 0.53% more compiling T3294 at -O0
+        -- and 0.18% more at -O and -O2, on GHC 10.1.20261108.
         patched_instr :: instr
-        patched_instr
+        !patched_instr
                 = patchRegsOfInstr platform adjusted_instr patchLookup
 
         -- the real register of the last pair whose vreg is x, the written
@@ -1193,6 +1197,13 @@ genRaInsn block_live new_instrs block_id instr rest live = do
 -- releaseRegs
 
 releaseRegs :: FR freeRegs => [Reg] -> RegM freeRegs ()
+-- nothing dies: the state stays as it is, unwritten, each write building a new
+-- RA_State: written here and in saveClobberedTemps where nothing is clobbered,
+-- the compiler allocated 2.3% more compiling T3294 at -O0 and 0.79% and 0.76%
+-- more at -O and -O2, and ran 0.99%, 0.38% and 0.37% more instructions, and
+-- written here alone, it allocated 2.3%, 0.78% and 0.76% more, on GHC
+-- 10.1.20261108
+releaseRegs [] = return ()
 releaseRegs regs = do
   assig <- getAssigR
   free <- getFreeRegsR
@@ -1242,28 +1253,35 @@ saveClobberedTemps [] _ _
 saveClobberedTemps clobbered dying rest
  = do
         assig   <- getAssigR
-        (assig',instrs) <- nonDetStrictFoldUFM_DirectlyM maybe_spill (assig,[]) assig
-        setAssigR assig'
-        return $ -- mkComment (text "<saveClobberedTemps>") ++
-                 instrs
---              ++ mkComment (text "</saveClobberedTemps>")
+        -- This is non-deterministic but we do not
+        -- currently support deterministic code-generation.
+        -- See Note [Unique Determinism and code generation]
+        case nonDetStrictFoldUFM_Directly pick [] assig of
+          -- nothing clobbered: the state unwritten, as in releaseRegs (written
+          -- here alone, the compiler allocated 0.16% more compiling T9961 at
+          -- -O0, 0.021% more compiling T12707 at -O and 0.017% more compiling
+          -- !16269's CmmDiamondChain at -O2, on GHC 10.1.20261108)
+          []      -> return []
+          to_save -> do
+            -- in the order of their uniques, as the fold visits them
+            (assig', instrs)
+              <- foldM (\acc (temp, usage) -> clobber temp acc usage)
+                       (assig, []) (reverse to_save)
+            setAssigR assig'
+            return instrs
    where
      -- Unique represents the VirtualReg
      -- Here we separate the cases which we do want to spill from these we don't.
-     maybe_spill :: Unique
-                 -> (RegMap Loc,[instr])
-                 -> Loc
-                 -> RegM freeRegs (RegMap Loc,[instr])
-     maybe_spill !temp !(assig,instrs) !loc =
+     dying_us = map getUnique dying
+     pick :: Unique -> Loc -> [(Unique, RealRegUsage)]
+          -> [(Unique, RealRegUsage)]
+     pick !temp !loc acc =
         case loc of
-                -- This is non-deterministic but we do not
-                -- currently support deterministic code-generation.
-                -- See Note [Unique Determinism and code generation]
                 Loc (InReg reg) fmt
                     | any (realRegsAlias reg) clobbered
-                    , temp `notElem` map getUnique dying
-                    -> clobber temp (assig,instrs) (RealRegUsage reg fmt)
-                _ -> return (assig,instrs)
+                    , temp `notElem` dying_us
+                    -> (temp, RealRegUsage reg fmt) : acc
+                _ -> acc
 
      -- See Note [UniqFM and the register allocator]
      clobber :: Unique -> (RegMap Loc,[instr]) -> RealRegUsage -> RegM freeRegs (RegMap Loc,[instr])
