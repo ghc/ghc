@@ -438,6 +438,8 @@ forallVisE tvars body = ForallVisE <$> sequenceA tvars <*> body
 constrainedE :: Quote m => [m Exp] -> m Exp -> m Exp
 constrainedE ctx body = ConstrainedE <$> sequenceA ctx <*> body
 
+reSynBindsE :: Quote m => ModName -> m Exp -> m Exp
+reSynBindsE m e = ReSynBindsE m <$> e
 -------------------------------------------------------------------------------
 -- *   Dec
 

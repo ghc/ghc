@@ -1096,6 +1096,10 @@ zonkExpr (XExpr (HsRecSelTc (FieldOcc occ (L l v))))
   = do { v' <- zonkIdOcc v
        ; return (XExpr (HsRecSelTc (FieldOcc occ (L l v')))) }
 
+zonkExpr (XExpr (ReSynBindsTc m e))
+  = do e' <- zonkExpr e
+       return $ (XExpr (ReSynBindsTc m e'))
+
 zonkExpr (RecordUpd x _ _)  = dataConCantHappen x
 zonkExpr (HsGetField x _ _) = dataConCantHappen x
 zonkExpr (HsProjection x _) = dataConCantHappen x

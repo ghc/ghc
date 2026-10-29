@@ -108,7 +108,7 @@ varEOcc, conEOcc, litEOcc, appEOcc, appTypeEOcc, infixAppOcc, sectionLOcc,
   unboxedSumEOcc, condEOcc, multiIfEOcc, letEOcc, caseEOcc, doEOcc, mdoEOcc,
   compEOcc, staticEOcc, unboundVarEOcc, labelEOcc, implicitParamVarEOcc,
   getFieldEOcc, projectionEOcc, typeEOcc, forallEOcc, forallVisEOcc,
-  constrainedEOcc :: KnownOcc
+  constrainedEOcc, resynbindEOcc :: KnownOcc
 varEOcc              = mkVarOcc "varE"
 conEOcc              = mkVarOcc "conE"
 litEOcc              = mkVarOcc "litE"
@@ -152,7 +152,7 @@ typeEOcc             = mkVarOcc "typeE"
 forallEOcc           = mkVarOcc "forallE"
 forallVisEOcc        = mkVarOcc "forallVisE"
 constrainedEOcc      = mkVarOcc "constrainedE"
-
+resynbindEOcc        = mkVarOcc "reSynBindsE"
 -- type FieldExp = ...
 fieldExpOcc :: KnownOcc
 fieldExpOcc = mkVarOcc "fieldExp"

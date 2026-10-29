@@ -767,7 +767,10 @@ tcExprNoExpand (ArithSeq _ witness seq) res_ty
 tcExprNoExpand (HsTypedSplice ext splice)   res_ty = tcTypedSplice ext splice res_ty
 tcExprNoExpand e@(HsTypedBracket _ext body) res_ty = tcTypedBracket e body res_ty
 tcExprNoExpand e@(HsUntypedBracket ps body) res_ty = tcUntypedBracket e body ps res_ty
-
+tcExprNoExpand (XExpr (ReSynBindsRn m e))   res_ty
+  = do { e' <- tcExpr e res_ty
+       ; return $ XExpr (ReSynBindsTc m e')
+       }
 {-
 ************************************************************************
 *                                                                      *

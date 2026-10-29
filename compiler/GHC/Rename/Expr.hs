@@ -607,10 +607,10 @@ rnExpr (HsFunArr _ mult arg res)
       _ -> False
     oneType = noLocA $ HsVar noExtField $ noLocA $ noUserRdr oneDataConName
 
-rnExpr (XExpr (ReSynBinds m e'))
+rnExpr (XExpr (ReSynBindsPs m e))
   =  do { traceRn "XExpr ReSynBinds" (text "module:" <+> ppr m)
-        ; rnExpr e' -- for now just return the renamed expression
-          -- TODO: Bring into scope top level environment of the module m
+        ; (e', fvs) <- rnExpr e
+        ; return (XExpr (ReSynBindsRn m e'), fvs)
         }
 
 {-

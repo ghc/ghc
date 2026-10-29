@@ -713,6 +713,12 @@ tcTypedBracket rn_expr expr res_ty
        ; ps' <- readMutVar ps_var
        ; codeco <- tcLookupKnownOccId unsafeCodeCoerceOcc
        ; bracket_ty <- mkAppTy m_var <$> tcMetaKnownOccTy expTyConOcc
+       -- wrap the expression with ReSynBinds if rebindable syntax is on in this module
+       ; isRebindableSyntaxOn <- xoptM LangExt.RebindableSyntax
+       ; mname <- moduleName <$> getModule
+       ; let expr = if isRebindableSyntaxOn
+                    then case expr of { L loc expr -> L loc (XExpr $ ReSynBindsRn (toHsModuleName mname) expr) }
+                    else expr
        ; let brack_tc = HsBracketTc { hsb_quote = ExpBr noExtField expr, hsb_ty = bracket_ty
                                     , hsb_wrap  = Just wrapper, hsb_splices = ps' }
              -- The tc_expr is stored here so that the expression can be used in HIE files.

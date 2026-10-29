@@ -666,7 +666,7 @@ type instance XXExpr GhcTc = XXExprGhcTc
 ********************************************************************* -}
 
 data XXExprGhcPs
-  = ReSynBinds HsModuleName (HsExpr GhcPs)
+  = ReSynBindsPs HsModuleName (HsExpr GhcPs)
 
 
 -- See Note [Rebindable syntax and XXExprGhcRn]
@@ -684,6 +684,7 @@ data XXExprGhcRn
   | HsRecSelRn  (FieldOcc GhcRn)   -- ^ Variable pointing to record selector
                            -- See Note [Non-overloaded record field selectors] and
                            -- Note [Record selectors in the AST]
+  | ReSynBindsRn HsModuleName (HsExpr GhcRn)
 
 
 data XXExprGhcTc
@@ -714,6 +715,7 @@ data XXExprGhcTc
   | HsRecSelTc  (FieldOcc GhcTc) -- ^ Variable pointing to record selector
                              -- See Note [Non-overloaded record field selectors] and
                              -- Note [Record selectors in the AST]
+  | ReSynBindsTc HsModuleName (HsExpr GhcTc)
 
 {- *********************************************************************
 *                                                                      *
@@ -1039,7 +1041,7 @@ ppr_expr (XExpr x) = case ghcPass @p of
   GhcTc -> ppr x
 
 instance Outputable XXExprGhcPs where
-  ppr (ReSynBinds m e) = text "{{" <+> ppr m <+> text "}}" <+> ppr e
+  ppr (ReSynBindsPs m e) = text "{{" <+> ppr m <+> text "}}" <+> ppr e
 
 ppr_hse :: forall p. (IsPass p) => HsExpansion (GhcPass p) -> SDoc
 ppr_hse hse
@@ -1061,6 +1063,7 @@ ppr_hse hse
 instance Outputable XXExprGhcRn where
   ppr (HsRecSelRn f)        = pprPrefixOcc f
   ppr (ExpandedThingRn hse) = ppr_hse hse
+  ppr (ReSynBindsRn m e)      = text "{{" <+> ppr m <+> text "}}" <+> ppr e
 
 
 instance Outputable XXExprGhcTc where
@@ -1088,6 +1091,8 @@ instance Outputable XXExprGhcTc where
             ppr exp, text ")"]
   ppr (HsRecSelTc f)      = pprPrefixOcc f
 
+  ppr (ReSynBindsTc m e)    = text "{{" <+> ppr m <+> text "}}" <+> ppr e
+
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
 ppr_infix_expr (HsHole x) = Just $ pprInfixOcc $ case (ghcPass @p, x) of
@@ -1102,11 +1107,12 @@ ppr_infix_expr (XExpr x)            = case ghcPass @p of
 ppr_infix_expr _ = Nothing
 
 ppr_infix_expr_ps :: XXExprGhcPs -> Maybe SDoc
-ppr_infix_expr_ps (ReSynBinds{}) = Nothing
+ppr_infix_expr_ps (ReSynBindsPs{}) = Nothing
 
 ppr_infix_expr_rn :: XXExprGhcRn -> Maybe SDoc
 ppr_infix_expr_rn (ExpandedThingRn (HSE thing _)) = ppr_infix_hs_expansion thing
 ppr_infix_expr_rn (HsRecSelRn f)            = Just (pprInfixOcc f)
+ppr_infix_expr_rn (ReSynBindsRn _ e)          = ppr_infix_expr e
 
 ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
 ppr_infix_expr_tc (WrapExpr _ e)    = ppr_infix_expr e
@@ -1115,6 +1121,7 @@ ppr_infix_expr_tc (ConLikeTc con)            = Just (pprInfixOcc (conLikeName co
 ppr_infix_expr_tc (HsTick {})                = Nothing
 ppr_infix_expr_tc (HsBinTick {})             = Nothing
 ppr_infix_expr_tc (HsRecSelTc f)            = Just (pprInfixOcc f)
+ppr_infix_expr_tc (ReSynBindsTc _ e)          = ppr_infix_expr e
 
 ppr_infix_hs_expansion :: HsCtxt -> Maybe SDoc
 ppr_infix_hs_expansion (ExprCtxt e) = ppr_infix_expr e
@@ -1199,7 +1206,7 @@ hsExprNeedsParens prec = go
                      GhcRn -> go_x_rn x
 
     go_x_ps :: XXExprGhcPs -> Bool
-    go_x_ps (ReSynBinds _ e) = hsExprNeedsParens prec e
+    go_x_ps (ReSynBindsPs _ e) = hsExprNeedsParens prec e
 
     go_x_tc :: XXExprGhcTc -> Bool
     go_x_tc (WrapExpr _ e)                   = hsExprNeedsParens prec e
@@ -1208,10 +1215,12 @@ hsExprNeedsParens prec = go
     go_x_tc (HsTick _ (L _ e))               = hsExprNeedsParens prec e
     go_x_tc (HsBinTick _ _ (L _ e))          = hsExprNeedsParens prec e
     go_x_tc (HsRecSelTc{})                   = False
+    go_x_tc (ReSynBindsTc _ e)               = hsExprNeedsParens prec e
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn (HSE thing _))  = hsExpandedNeedsParens thing
     go_x_rn (HsRecSelRn{})               = False
+    go_x_rn (ReSynBindsRn _ e)               = hsExprNeedsParens prec e
 
     hsExpandedNeedsParens :: HsCtxt -> Bool
     hsExpandedNeedsParens (ExprCtxt e) = hsExprNeedsParens prec e
@@ -1260,10 +1269,12 @@ isAtomicHsExpr (XExpr x)
     go_x_tc (HsTick {})               = False
     go_x_tc (HsBinTick {})            = False
     go_x_tc (HsRecSelTc{})            = True
+    go_x_tc (ReSynBindsTc _ e)          = isAtomicHsExpr e
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn (HSE thing _))   = isAtomicExpandedThingRn thing
     go_x_rn (HsRecSelRn{})              = True
+    go_x_rn (ReSynBindsRn _ e)            = isAtomicHsExpr e
 
     isAtomicExpandedThingRn :: HsCtxt -> Bool
     isAtomicExpandedThingRn (ExprCtxt e) = isAtomicHsExpr e
@@ -2388,7 +2399,7 @@ type instance XTypBr  GhcPs       = (EpToken "[t|", EpUniToken "|]" "⟧")
 type instance XVarBr  GhcPs       = EpaLocation
 type instance XXQuote GhcPs       = DataConCantHappen
 
-type instance XExpBr  GhcRn       = NoExtField
+type instance XExpBr  GhcRn       = NoExtField -- TODO ANI: What if we add the module name here?
 type instance XPatBr  GhcRn       = NoExtField
 type instance XDecBrL GhcRn       = NoExtField
 type instance XDecBrG GhcRn       = NoExtField

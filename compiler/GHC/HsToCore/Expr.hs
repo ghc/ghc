@@ -310,6 +310,7 @@ dsExpr e@(XExpr ext_expr_tc)
       ConLikeTc {}  -> dsApp e
 
       ExpandedThingTc (HSE _ e) -> dsLExpr e
+      ReSynBindsTc _ _ -> pprPanic "dsExpr:ReSynBindsTc"  (ppr e) --TODO: This should never happen?
 
       -- Hpc Support
       HsTick tickish e -> do

@@ -708,6 +708,9 @@ addTickHsExpr (XExpr (HsBinTick t0 t1 e)) =
         liftM (XExpr . HsBinTick t0 t1) (addTickLHsExprNever e)
 
 addTickHsExpr e@(XExpr (HsRecSelTc (FieldOcc _ id)))   = do freeVar (unLoc id); return e
+addTickHsExpr (XExpr (ReSynBindsTc m e)) =
+        liftM (XExpr . ReSynBindsTc m) (addTickHsExpr e)
+
 
 addTickHsExpr (HsDo srcloc cxt (L l stmts))
   = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())

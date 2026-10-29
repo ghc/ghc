@@ -1377,6 +1377,8 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
           HsBinTick _ _ expr
             -> [ toHie expr
                ]
+          ReSynBindsTc _ _
+            -> []
           HsRecSelTc fld
             -> [ toHie $ RFC RecFieldOcc Nothing (L mspan fld)
                ]
