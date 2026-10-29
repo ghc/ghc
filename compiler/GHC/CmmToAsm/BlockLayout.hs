@@ -684,8 +684,9 @@ sequenceChain :: forall a i. Instruction i
 sequenceChain _info _weights    [] = []
 sequenceChain _info _weights    [x] = [x]
 sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
-    let directEdges :: [CfgEdge]
-        directEdges = sortBy (flip compare) $ preferBackEdges $ mapMaybe relevantWeight (infoEdgeList weights)
+    let edges = infoEdgeList weights
+        directEdges :: [CfgEdge]
+        directEdges = sortBy (flip compare) $ preferBackEdges $ mapMaybe relevantWeight edges
           where
             -- Apply modifiers to turn edge frequencies into useable weights
             -- for computing code layout.
@@ -789,7 +790,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
 
         allEdges :: [CfgEdge]
         allEdges = {-# SCC allEdges #-}
-                   sortOn (relevantWeight) $ filter (not . deadEdge) $ (infoEdgeList weights)
+                   sortOn (relevantWeight) $ filter (not . deadEdge) $ edges
           where
             deadEdge :: CfgEdge -> Bool
             deadEdge (CfgEdge from to _) = let e = (from,to) in Set.member e combined || Set.member e builtEdges
