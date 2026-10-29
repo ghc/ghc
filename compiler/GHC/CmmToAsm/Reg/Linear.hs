@@ -987,8 +987,11 @@ genRaInsn block_live new_instrs block_id instr rest live = do
                         | (vr, rr) <- zip virt_read    r_allocd
                                    ++ zip virt_written w_allocd ]
 
+        -- Strict: squashed_instr and reload_into both evaluate it, and
+        -- a lazy one is a thunk shared between them, built for every
+        -- instruction.
         patched_instr :: instr
-        patched_instr
+        !patched_instr
                 = patchRegsOfInstr platform adjusted_instr patchLookup
 
         patchLookup :: Reg -> Reg
@@ -1062,6 +1065,7 @@ genRaInsn block_live new_instrs block_id instr rest live = do
 -- releaseRegs
 
 releaseRegs :: FR freeRegs => [Reg] -> RegM freeRegs ()
+releaseRegs [] = return ()  -- nothing dies: the state stays as it is
 releaseRegs regs = do
   assig <- getAssigR
   free <- getFreeRegsR
@@ -1111,28 +1115,31 @@ saveClobberedTemps [] _ _
 saveClobberedTemps clobbered dying rest
  = do
         assig   <- getAssigR
-        (assig',instrs) <- nonDetStrictFoldUFM_DirectlyM maybe_spill (assig,[]) assig
-        setAssigR assig'
-        return $ -- mkComment (text "<saveClobberedTemps>") ++
-                 instrs
---              ++ mkComment (text "</saveClobberedTemps>")
+        -- This is non-deterministic but we do not
+        -- currently support deterministic code-generation.
+        -- See Note [Unique Determinism and code generation]
+        case nonDetStrictFoldUFM_Directly pick [] assig of
+          []      -> return []
+          to_save -> do
+            -- in the order of their uniques, as the fold visits them
+            (assig', instrs)
+              <- foldM (\acc (temp, usage) -> clobber temp acc usage)
+                       (assig, []) (reverse to_save)
+            setAssigR assig'
+            return instrs
    where
      -- Unique represents the VirtualReg
      -- Here we separate the cases which we do want to spill from these we don't.
-     maybe_spill :: Unique
-                 -> (RegMap Loc,[instr])
-                 -> Loc
-                 -> RegM freeRegs (RegMap Loc,[instr])
-     maybe_spill !temp !(assig,instrs) !loc =
+     dying_us = map getUnique dying
+     pick :: Unique -> Loc -> [(Unique, RealRegUsage)]
+          -> [(Unique, RealRegUsage)]
+     pick !temp !loc acc =
         case loc of
-                -- This is non-deterministic but we do not
-                -- currently support deterministic code-generation.
-                -- See Note [Unique Determinism and code generation]
                 Loc (InReg reg) fmt
                     | any (realRegsAlias reg) clobbered
-                    , temp `notElem` map getUnique dying
-                    -> clobber temp (assig,instrs) (RealRegUsage reg fmt)
-                _ -> return (assig,instrs)
+                    , temp `notElem` dying_us
+                    -> (temp, RealRegUsage reg fmt) : acc
+                _ -> acc
 
      -- See Note [UniqFM and the register allocator]
      clobber :: Unique -> (RegMap Loc,[instr]) -> RealRegUsage -> RegM freeRegs (RegMap Loc,[instr])
