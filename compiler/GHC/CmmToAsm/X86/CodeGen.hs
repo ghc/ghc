@@ -6331,7 +6331,7 @@ genAtomicRMW bid width amop dst addr n = do
             --  with a self loop on A'.
             addImmediateSuccessorNat bid lbl1
             addImmediateSuccessorNat lbl1 lbl2
-            updateCfgNat (addWeightEdge lbl1 lbl1 0)
+            updateCfgNat (addEdge lbl1 lbl1 (EdgeInfo AsmCodeGenRetry 0))
 
             return $ (toOL
                 [ MOV format (OpAddr amode) (OpReg eax)
