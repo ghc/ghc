@@ -1315,6 +1315,7 @@ takeRegRegMoveInstr
         :: Platform
         -> Instr
         -> Maybe (Reg,Reg)
+{-# INLINE takeRegRegMoveInstr #-}  -- so that most call sites build no Just
 
 takeRegRegMoveInstr platform = \case
   MOV fmt (OpReg r1) (OpReg r2)
