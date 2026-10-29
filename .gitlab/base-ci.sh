@@ -2,7 +2,7 @@
 
 # This script supports testing the compatibility of the in-tree `base` with
 # different non-in-tree GHCs. We deliberately use a script separate from
-# `.gitlab/ci.sh` for this purspose, because such support is supposed to become
+# `.gitlab/ci.sh` for this purpose, because such support is supposed to become
 # part of the CI infrastructure of a separately maintained `base`.
 #
 # Currently, this script can only test that the in-tree `base` can be *built*
