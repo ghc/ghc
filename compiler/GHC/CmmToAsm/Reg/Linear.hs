@@ -88,7 +88,7 @@ The algorithm is roughly:
         (i) Rewrite the instruction with the new mapping.
 
         (j) For each spilled reg known to be now dead, re-add its stack slot
-            to the free list.
+            to the free list (not done: a StackMap never frees a slot).
 
 -}
 
@@ -270,7 +270,7 @@ regAlloc _ _ _ (CmmProc _ _ _ _)
 
 -- | Do register allocation on some basic blocks.
 --   But be careful to allocate a block in an SCC only if it has
---   an entry in the block map or it is the first block.
+--   an entry in the block map or it is an entry block of the procedure.
 --
 linearRegAlloc
         :: forall instr. (Instruction instr)
@@ -1125,11 +1125,10 @@ iteration.
    before allocating one of its predecessors, which could lead to
    inconsistent allocations. Make it so a block is only allocated
    if a predecessor has set the "incoming" assignments for the block, or
-   if it's the procedure's entry block.
+   if it is one of the procedure's entry blocks.
 
-   BL 2009/02: Careful. If the assignment for a block doesn't get set for
-   some reason then this function will loop. We should probably do some
-   more sanity checking to guard against this eventuality.
+   A block whose assignment never gets set is dropped: process stops after
+   a round in which it allocates no block.
 -}
 
 process :: forall freeRegs instr. (RegAllocConstraint freeRegs instr)
@@ -1681,6 +1680,34 @@ releaseRegs regs = do
 --        - clobbered regs are not allocatable.
 --
 
+{- Note [Unique order in the linear allocator]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Folds over the assignment visit its vregs in the order of their uniques. A vreg
+named in a Haskell module's Cmm keeps its local register's unique, tagged 'c',
+or 'Q' after -fobject-determinism's renaming, which numbers registers in the
+order it visits them; the instruction selector's temporaries are tagged 'n', so
+there the Cmm's vregs come first. Not every vreg ranks so: a temporary the Cmm
+pipeline makes, as for a safe foreign call, is tagged 'n' in a Haskell module
+and 'u', after every 'n', in a .cmm file; -fcmm-thread-sanitizer's are tagged
+'T' and come from a supply -fobject-determinism leaves alone; and on i386 the
+high half of a 64-bit value is tagged 'H', before every other vreg. With
+-fobject-determinism the order is deterministic but for those sanitizer
+temporaries (Note [Unique Determinism and code generation] in GHC.Types.Unique).
+Nothing in the allocator chose it, but two decisions take it as a ranking:
+allocRegsAndSpill_spill evicts, of the vregs in both a register and their slot,
+else of those in a register only, the first it visits that it counts as read no
+more in the block, else the first it visits, whatever their preferences or the
+x86-64 order of free registers, so that a Cmm vreg is mostly evicted before
+a temporary, and one numbered first before a later one (evicting the last
+instead about doubles the reloads compiling perf/compiler's T3294 at -O0); and
+saveClobberedTemps finds new registers for the values an instruction clobbers in
+that order, so that, of the values a free register would suit, the later ones
+are spilled once those run out. makeRegMovementGraph lists a jump's moves in
+that order too, which decides the order of joinToTargets' fixup moves and which
+move of a cycle is made first, by a swap or through the stack. The other folds
+over the assignment do not depend on it.
+-}
+
 saveClobberedTemps
         :: forall instr freeRegs.
            (Instruction instr, FR freeRegs)
@@ -1697,9 +1724,8 @@ saveClobberedTemps [] _ _
 saveClobberedTemps clobbered dying rest
  = do
         assig   <- getAssigR
-        -- This is non-deterministic but we do not
-        -- currently support deterministic code-generation.
-        -- See Note [Unique Determinism and code generation]
+        -- The fold's order decides which values are spilled: see
+        -- Note [Unique order in the linear allocator]
         case nonDetStrictFoldUFM_Directly pick [] assig of
           -- nothing clobbered: the state unwritten, as in releaseRegs (written
           -- here alone, the compiler allocated 0.16% more compiling T9961 at
@@ -1810,9 +1836,8 @@ clobberRegs clobbered
 
         assig           <- getAssigR
         setAssigR $! nonDetStrictFoldUFM_Directly clobber assig assig
-          -- This is non-deterministic but we do not
-          -- currently support deterministic code-generation.
-          -- See Note [Unique Determinism and code generation]
+          -- Each vreg is updated on its own, so the fold's order does
+          -- not matter (Note [Unique Determinism and code generation])
 
    where
         -- if the temp was InReg and clobbered, then we will have
@@ -2477,12 +2502,16 @@ allocRegsAndSpill_spill reading !pos keep spills alloc r@(VirtualRegWithFormat v
                           -> (both, ReadNoMore (temp, RealRegUsage reg fmt))
                         _ -> acc
                       _ -> acc
-                    -- This is non-deterministic but we do not
-                    -- currently support deterministic code-generation.
-                    -- See Note [Unique Determinism and code generation].
-                    -- Only a vreg live out of the block can be read no more
-                    -- in it, so where none of the class is, the first of each
-                    -- kind is chosen, by `pick`.
+                    -- The fold's order picks the victim: see
+                    -- Note [Unique order in the linear allocator]. Only a vreg
+                    -- live out of the block can be read no more in it, so
+                    -- where none of the class is, the first of each kind is
+                    -- chosen, by `pick`, which does not build the map of
+                    -- last-read positions in the block's LastReads: by pickRead
+                    -- there too, the compiler ran 3.7% more instructions and
+                    -- allocated 0.21% more compiling T3294 at -O0, 1.8% and
+                    -- 0.11% more at -O and 1.8% and 0.10% more at -O2, on GHC
+                    -- 10.1.20261108.
                     (victim_inBoth, victim_inReg)
                       | lo
                       , (cand_inBoth, cand_inReg)

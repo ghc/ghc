@@ -61,6 +61,8 @@ import GHC.Types.Unique.DSM (UniqDSM)
   * Based on the CFG and loop information refine the edge weights
     in the CFG and normalize them relative to the most often visited
     node. (See `staticPredCfg`)
+    This step and the loop analysis run for the layout only under
+    -fcmm-static-pred, on at -O1 and -O2.
   * On x86-64, copy each small loop head that ends in a conditional branch over
     the jumps to it, adding the copies' edges to the CFG (`copyLoopHeads`,
     Note [Copying loop heads] in GHC.CmmToAsm.X86.CodeGen).
@@ -266,7 +268,8 @@ import GHC.Types.Unique.DSM (UniqDSM)
     We apply a small modifier to them to ensure edges for which we can
     eliminate the overhead completely are considered first. See also #18053.
 
-  * Edges constituted by a call are ignored.
+  * Edges constituted by a call are ignored while the chains are built, and
+    count a 64th of their weight when the chains are merged at the end.
 
     Considering these hardly helped with performance and ignoring
     them helps quite a bit to improve compiler performance.
@@ -861,6 +864,10 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
             deadEdge :: CfgEdge -> Bool
             deadEdge (CfgEdge from to _) = memberEdge from to combined
                                         || memberEdge from to builtEdges
+            -- unlike directEdges' relevantWeight, which drops calls, lowers an
+            -- edge into an info table and a conditional or switch edge, and
+            -- some of whose back edges preferBackEdges then raises, this one
+            -- only divides a call's weight by 64
             relevantWeight :: CfgEdge -> EdgeWeight
             relevantWeight (CfgEdge _ _ edgeInfo)
                 | EdgeInfo (CmmSource { trans_cmmNode = CmmCall {}}) _ <- edgeInfo

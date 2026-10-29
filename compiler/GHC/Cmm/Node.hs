@@ -894,8 +894,8 @@ instance Eq CmmTickScope where
     -- This is still deterministic because
     -- the order is the same for equal lists
 
--- This is non-deterministic but we do not currently support deterministic
--- code-generation. See Note [Unique Determinism and code generation]
+-- This compares uniques, so its order is deterministic only where they are: see
+-- Note [Unique Determinism and code generation].
 -- See Note [No Ord for Unique]
 instance Ord CmmTickScope where
   compare GlobalScope    GlobalScope     = EQ

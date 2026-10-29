@@ -134,9 +134,8 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
            $$ text "regsFree    = " <> (hcat $ punctuate space $ map ppr
                                              $ nonDetEltsUniqSet $ unionManyUniqSets
                                              $ nonDetEltsUFM regsFree)
-              -- This is non-deterministic but we do not
-              -- currently support deterministic code-generation.
-              -- See Note [Unique Determinism and code generation]
+              -- The order decides only how the panic message lists the free
+              -- registers (Note [Unique Determinism and code generation])
            $$ text "slotsFree   = " <> ppr (sizeUniqSet slotsFree))
 
         -- Build the register conflict graph from the cmm code.

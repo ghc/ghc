@@ -207,9 +207,10 @@ joinToTargets_again
 makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [Node Loc Unique]
 makeRegMovementGraph adjusted_assig dest_assig
  = [ node       | (vreg, src) <- nonDetUFMToList adjusted_assig
-                    -- This is non-deterministic but we do not
-                    -- currently support deterministic code-generation.
-                    -- See Note [Unique Determinism and code generation]
+                    -- The list's order decides the order of the fixup moves and
+                    -- which move of a cycle is made first: see
+                    -- Note [Unique order in the linear allocator] in
+                    -- GHC.CmmToAsm.Reg.Linear
                     -- source reg might not be needed at the dest:
                 , Just loc <- [lookupUFM_Directly dest_assig vreg]
                 , node <- expandNode vreg src loc ]

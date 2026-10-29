@@ -226,9 +226,9 @@ allMachRegNos platform = intregnos (platformWordSize platform) ++ floatregnos pl
 {-# INLINE classOfRealReg #-}
 classOfRealReg :: Platform -> RealReg -> RegClass
 -- On x86, we might want to have an 8-bit RegClass, which would
--- contain just regs 1-4 (the others don't have 8-bit versions).
+-- contain just regs 0-3 (the others don't have 8-bit versions).
 -- However, we can get away without this at the moment because the
--- only allocatable integer regs are also 8-bit compatible (1, 3, 4).
+-- only allocatable integer regs are also 8-bit compatible (0, 2, 3).
 classOfRealReg platform reg
     = case reg of
         RealRegSingle i
