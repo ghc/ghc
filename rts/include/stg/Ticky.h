@@ -26,8 +26,8 @@
    file from STG code; hence IN_STG_CODE */
 
 #if IN_STG_CODE
-extern W_ ticky_entry_ctrs[];
-extern W_ top_ct[];
+extern RTS_PUBLIC W_ ticky_entry_ctrs[];
+extern RTS_PUBLIC W_ top_ct[];
 #endif
 
 /* The rest are not explicitly declared in rts/Ticky.c.  Instead
@@ -37,10 +37,10 @@ extern W_ top_ct[];
    TICKY_C is defined only in rts/Ticky.c */
 #if defined(TICKY_C)
 #define INIT(ializer) = ializer
-#define EXTERN
+#define EXTERN RTS_PUBLIC
 #else
 #define INIT(ializer)
-#define EXTERN extern
+#define EXTERN extern RTS_PUBLIC
 #endif
 
 EXTERN StgInt ENT_VIA_NODE_ctr INIT(0);

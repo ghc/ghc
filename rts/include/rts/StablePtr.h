@@ -13,8 +13,8 @@
 
 #pragma once
 
-ATTR_ALWAYS_INLINE EXTERN_INLINE StgPtr deRefStablePtr (StgStablePtr stable_ptr);
-StgStablePtr getStablePtr  (StgPtr p);
+ATTR_ALWAYS_INLINE RTS_PUBLIC_EXTERN_INLINE StgPtr deRefStablePtr (StgStablePtr stable_ptr);
+RTS_PUBLIC StgStablePtr getStablePtr  (StgPtr p);
 
 /* -----------------------------------------------------------------------------
    PRIVATE from here.
@@ -26,7 +26,7 @@ typedef struct {
                          // otherwise.
 } spEntry;
 
-extern spEntry *stable_ptr_table;
+extern RTS_PUBLIC spEntry *stable_ptr_table;
 
 ATTR_ALWAYS_INLINE EXTERN_INLINE
 StgPtr deRefStablePtr(StgStablePtr sp)

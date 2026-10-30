@@ -198,7 +198,7 @@ initStats0(void)
    initStats1() can be called after setupRtsFlags()
    ------------------------------------------------------------------------ */
 
-void initGenerationStats(void);
+RTS_PUBLIC void initGenerationStats(void);
 
 void
 initStats1 (void)

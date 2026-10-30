@@ -164,7 +164,7 @@ typedef struct {
     MBlockMapLine lines[MBLOCK_MAP_ENTRIES];
 } MBlockMap;
 
-extern W_ mpc_misses;
+extern RTS_PUBLIC W_ mpc_misses;
 
 StgBool HEAP_ALLOCED_miss(StgWord mblock, const void *p);
 

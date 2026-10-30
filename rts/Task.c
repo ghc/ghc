@@ -33,7 +33,7 @@ Task *all_tasks = NULL;
 // Locks required: all_tasks_mutex.
 uint32_t taskCount;
 uint32_t workerCount;
-uint32_t currentWorkerCount;
+RTS_PUBLIC uint32_t currentWorkerCount;
 uint32_t peakWorkerCount;
 
 static int tasksInitialized = 0;

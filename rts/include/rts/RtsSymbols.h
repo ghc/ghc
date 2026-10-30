@@ -44,4 +44,4 @@ typedef struct _RtsSymbolVal {
     const SymbolName* lbl_redirect_target;
 } RtsSymbolVal;
 
-RtsSymbolVal const * getRtsSymbols(void);
+RTS_PUBLIC RtsSymbolVal const * getRtsSymbols(void);

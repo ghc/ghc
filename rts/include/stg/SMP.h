@@ -62,8 +62,8 @@ EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
  *    return r;
  * }
  */
-EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
-EXTERN_INLINE StgWord8 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n);
+RTS_PUBLIC_EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
+RTS_PUBLIC_EXTERN_INLINE StgWord8 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n);
 
 /*
  * Compare-and-swap
@@ -79,7 +79,7 @@ EXTERN_INLINE StgWord cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n
  *   return ((*p) += n);
  * }
  */
-EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p, StgWord n);
+RTS_PUBLIC_EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p, StgWord n);
 
 /*
  * Atomic subtraction by the provided quantity.
@@ -600,7 +600,7 @@ xchg(StgPtr p, StgWord w)
     return old;
 }
 
-EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
+RTS_PUBLIC_EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
 EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
@@ -612,7 +612,7 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
     return result;
 }
 
-EXTERN_INLINE StgWord8 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n);
+RTS_PUBLIC_EXTERN_INLINE StgWord8 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n);
 EXTERN_INLINE StgWord8
 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
 {
@@ -624,7 +624,7 @@ cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
     return result;
 }
 
-EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p, StgWord incr);
+RTS_PUBLIC_EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p, StgWord incr);
 EXTERN_INLINE StgWord
 atomic_inc(StgVolatilePtr p, StgWord incr)
 {

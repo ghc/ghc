@@ -583,7 +583,7 @@ static void nonmovingBumpEpoch(void) {
 memcount nonmoving_segment_live_words = 0;
 
 // See Note [Sync phase marking budget].
-MarkBudget sync_phase_marking_budget = 200000;
+RTS_PUBLIC MarkBudget sync_phase_marking_budget = 200000;
 
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads, bool concurrent);
 static void nonmovingInitAllocator(struct NonmovingAllocator* alloc, uint16_t block_size);

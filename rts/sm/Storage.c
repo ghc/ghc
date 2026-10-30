@@ -63,7 +63,7 @@ StgIndStatic  *dyn_caf_list        = NULL;
 StgIndStatic  *debug_caf_list      = NULL;
 StgIndStatic  *revertible_caf_list = NULL;
 bool           keepCAFs;
-bool           highMemDynamic;
+RTS_PUBLIC bool           highMemDynamic;
 
 W_ large_alloc_lim;    /* GC if n_large_blocks in any nursery
                         * reaches this. */
@@ -99,7 +99,7 @@ uint32_t n_nurseries;
  * When we are using nursery chunks, we need a separate next_nursery
  * pointer for each NUMA node.
  */
-volatile StgWord next_nursery[MAX_NUMA_NODES];
+RTS_PUBLIC volatile StgWord next_nursery[MAX_NUMA_NODES];
 
 #if defined(THREADED_RTS)
 /*

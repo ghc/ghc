@@ -17,7 +17,7 @@
 #include <sys/mman.h>
 #endif
 
-void printLoadedObjects(void);
+RTS_PUBLIC void printLoadedObjects(void);
 
 /* Which object file format are we targeting? */
 #if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) \
@@ -379,7 +379,7 @@ struct _ObjectCode {
  * is valid return value of get_shndx_table. Thus SHNDX_TABLE_UNINIT is defined
  * as the address of global variable shndx_table_uninit_label, defined in
  * rts/linker/Elf.c, which is definitely unequal to any heap-allocated address */
-extern Elf_Word shndx_table_uninit_label;
+extern RTS_PUBLIC Elf_Word shndx_table_uninit_label;
 #define SHNDX_TABLE_UNINIT (&shndx_table_uninit_label)
 #endif
 

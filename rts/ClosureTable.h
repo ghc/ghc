@@ -37,6 +37,7 @@
 #include "Capability.h"
 
 #include "BeginPrivate.h"
+#include "RtsPublic.h"
 
 
 /* The ClosureTable can be used in two different modes:

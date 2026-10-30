@@ -10,9 +10,9 @@
 
 #define StackSnapshot_constructor_closure ghc_hs_iface->StackSnapshot_closure
 
-StgStack* cloneStack(Capability* capability, const StgStack* stack);
+RTS_PUBLIC StgStack* cloneStack(Capability* capability, const StgStack* stack);
 
-void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar);
+RTS_PUBLIC void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar);
 
 #include "BeginPrivate.h"
 

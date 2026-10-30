@@ -140,13 +140,13 @@ restore_locale( void )
  * When era reaches max_era, the profiling stops because a closure can
  * store only up to (max_era - 1) as its creation or last use time.
  * -------------------------------------------------------------------------- */
-unsigned int era;
+RTS_PUBLIC unsigned int era;
 
 #if defined(PROFILING)
 static uint32_t max_era;
 #endif
 
-StgWord user_era;
+RTS_PUBLIC StgWord user_era;
 
 void
 setUserEra (StgWord w){

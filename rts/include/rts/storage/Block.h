@@ -191,7 +191,7 @@ typedef struct bdescr_ {
 
 #else
 
-EXTERN_INLINE bdescr *Bdescr(StgPtr p);
+RTS_PUBLIC_EXTERN_INLINE bdescr *Bdescr(StgPtr p);
 EXTERN_INLINE bdescr *Bdescr(StgPtr p)
 {
   ASSERT(HEAP_ALLOCED_GC(p));
@@ -324,52 +324,52 @@ block_get_flags(bdescr *bd)
 
 /* Initialisation ---------------------------------------------------------- */
 
-extern void initBlockAllocator(void);
+extern RTS_PUBLIC void initBlockAllocator(void);
 
 /* Allocation -------------------------------------------------------------- */
 
-bdescr *allocGroup(W_ n);
+RTS_PUBLIC bdescr *allocGroup(W_ n);
 
-EXTERN_INLINE bdescr* allocBlock(void);
+RTS_PUBLIC_EXTERN_INLINE bdescr* allocBlock(void);
 EXTERN_INLINE bdescr* allocBlock(void)
 {
     return allocGroup(1);
 }
 
-bdescr *allocGroupOnNode(uint32_t node, W_ n);
+RTS_PUBLIC bdescr *allocGroupOnNode(uint32_t node, W_ n);
 
 // Allocate n blocks, aligned at n-block boundary. The returned bdescr will
 // have this invariant
 //
 //     bdescr->start % BLOCK_SIZE*n == 0
 //
-bdescr *allocAlignedGroupOnNode(uint32_t node, W_ n);
+RTS_PUBLIC bdescr *allocAlignedGroupOnNode(uint32_t node, W_ n);
 
 // Allocate a MBlock worth of `n` block sized chunks aligned at `n`-block boundry.
 // This returns a linked list of `bdescr` of length `BLOCKS_PER_MBLOCK / n`.
-bdescr *allocMBlockAlignedGroupOnNode(uint32_t node, W_ n);
+RTS_PUBLIC bdescr *allocMBlockAlignedGroupOnNode(uint32_t node, W_ n);
 
-EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node);
+RTS_PUBLIC_EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node);
 EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node)
 {
     return allocGroupOnNode(node,1);
 }
 
 // versions that take the storage manager lock for you:
-bdescr *allocGroup_lock(W_ n);
-bdescr *allocBlock_lock(void);
+RTS_PUBLIC bdescr *allocGroup_lock(W_ n);
+RTS_PUBLIC bdescr *allocBlock_lock(void);
 
-bdescr *allocGroupOnNode_lock(uint32_t node, W_ n);
-bdescr *allocBlockOnNode_lock(uint32_t node);
+RTS_PUBLIC bdescr *allocGroupOnNode_lock(uint32_t node, W_ n);
+RTS_PUBLIC bdescr *allocBlockOnNode_lock(uint32_t node);
 
 /* De-Allocation ----------------------------------------------------------- */
 
-void freeGroup(bdescr *p);
-void freeChain(bdescr *p);
+RTS_PUBLIC void freeGroup(bdescr *p);
+RTS_PUBLIC void freeChain(bdescr *p);
 
 // versions that take the storage manager lock for you:
-void freeGroup_lock(bdescr *p);
-void freeChain_lock(bdescr *p);
+RTS_PUBLIC void freeGroup_lock(bdescr *p);
+RTS_PUBLIC void freeChain_lock(bdescr *p);
 
 /* Round a value to megablocks --------------------------------------------- */
 
