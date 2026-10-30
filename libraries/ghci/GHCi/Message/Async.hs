@@ -314,9 +314,9 @@ handleAsyncReq pipe getit mii k = mask $ \restore -> do
       Nothing -> tryReadTQueue  $  requestsQueue am
       Just ii -> tryReadTQueue =<< getMailbox am ii
     case taken of
-      Just req@(uq,_) -> fetchedRequest am uq >> pure (Just req)
-      Nothing  | isClosed  -> pure Nothing -- empty and closed
-               | otherwise -> retry -- wait for msg
+      Just req@(uq,_)      -> pure (Just req)
+      Nothing  | isClosed  -> pure Nothing    -- empty and closed
+               | otherwise -> retry           -- wait for msg
 
   case mbreq of
     Nothing -> throwIO PipeReadClosedException -- can't expect reqs
@@ -394,8 +394,8 @@ getMailbox am (InboxId ii) = do
 -- | Tracks handling status of a received 'Request'. The values are states of a
 -- tiny state machine used to coordinate cancelations.
 --
--- 'handleAsyncReq' will pop a request from the appropriate queue, setting the
--- status to `Fetched`. Then one of two things can happen first:
+-- 'drainPipe' will push a request to the appropriate queue, and set the
+-- status to `Received`. Then one of two things can happen first:
 --  - we receive a 'Cancel', then status is set to `Canceling` so the cancel
 --    action will run when set.
 --  - handler sets a cancel action, then reception of a `Cancel` runs that
@@ -404,14 +404,14 @@ getMailbox am (InboxId ii) = do
 -- If RequestStatus is `Canceling` or absent, then a `Reply` won't be sent.
 --
 -- The two possible transition paths:
--- requestsQueue -> Fetched -> Active cancel -> gone
--- requestsQueue -> Fetched -> Canceling     -> gone
+-- readPipe -> Received -> Active cancel -> gone
+-- readPipe -> Received -> Canceling     -> gone
 
 data RequestStatus
-  = Fetched        -- ^ 'Fetched' from a request queue, to pass to handler.
-  | Active (IO ()) -- ^ Handler set a cancel action, and has not sent a reply
+  = Received       -- ^ 'Received' from the 'Pipe'.
+  | Active (IO ()) -- ^ Handler has set a cancel action, and has not sent a reply
                    -- yet. The cancel action must not block.
-  | Canceling      -- ^ `Cancel` received while status is still `Fetched`.
+  | Canceling      -- ^ `Cancel` received while status is still `Received`.
 
 data AsyncManager = AsyncManager
   { pendingReply :: !(TVar (IntMap (TMVar (Either SomeException LB.ByteString))))
@@ -530,7 +530,7 @@ drainPipe p unmask = catch (unmask $ loop `finally` pipeCloseRead p) replyToPend
             putTMVar wv (bimap (toException . RemoteProcessException) id bs)
     -- Receive a request and queue it
     Request uq mbi bs -> do
-      atomically $ case mbi of
+      atomically $ receivedRequest am uq >> case mbi of
         Nothing ->
           -- "Global" request
           writeTQueue (requestsQueue am) (uq,bs)
@@ -548,10 +548,10 @@ cancelRequest :: AsyncManager -> CorrelationId -> IO ()
 cancelRequest am uq = join . atomically $ do
   cs <- readTVar (cancelStatus am)
   case IntMap.lookup uq cs of
-    Nothing -> pure (pure ())
-    Just Fetched -> writeTVar (cancelStatus am) (IntMap.insert uq Canceling cs) >> pure (pure ())
+    Nothing              -> pure (pure ())
+    Just Received        -> writeTVar (cancelStatus am) (IntMap.insert uq Canceling cs) >> pure (pure ())
     Just (Active cancel) -> writeTVar (cancelStatus am) (IntMap.delete uq cs) >> pure cancel
-    Just Canceling -> pure (pure ())
+    Just Canceling       -> pure (pure ())
 
 -- | Returns @True@ when the handler should write its 'Reply'.
 doneHandling :: AsyncManager -> CorrelationId -> STM Bool
@@ -569,19 +569,19 @@ setActive :: AsyncManager -> CorrelationId -> IO () -> IO ()
 setActive am uq cancel = join . atomically $ do
   cs <- readTVar (cancelStatus am)
   case IntMap.lookup uq cs of
-    Nothing -> pure (pure ()) -- reply already received.
-    Just Fetched -> writeTVar (cancelStatus am) (IntMap.insert uq (Active cancel) cs) >> pure (pure ())
+    Nothing         -> pure (pure ()) -- reply already sent.
+    Just Received   -> writeTVar (cancelStatus am) (IntMap.insert uq (Active cancel) cs) >> pure (pure ())
     Just (Active _) -> writeTVar (cancelStatus am) (IntMap.insert uq (Active cancel) cs) >> pure (pure ())
-    Just Canceling -> pure cancel
+    Just Canceling  -> pure cancel
 
-fetchedRequest :: AsyncManager -> CorrelationId -> STM ()
-fetchedRequest am uq = do
+receivedRequest :: AsyncManager -> CorrelationId -> STM ()
+receivedRequest am uq = do
   cs <- readTVar (cancelStatus am)
   case IntMap.lookup uq cs of
-    Nothing -> writeTVar (cancelStatus am) (IntMap.insert uq Fetched cs)
-    Just Fetched -> error "impossible"
+    Nothing         -> writeTVar (cancelStatus am) (IntMap.insert uq Received cs)
+    Just Received   -> error "impossible"
     Just (Active _) -> error "impossible"
-    Just Canceling -> error "impossible"
+    Just Canceling  -> error "impossible"
 
 
 
