@@ -193,10 +193,7 @@ tag functions as tag inference currently doesn't rely on those being properly ta
    In practice we're unlikely to have interpreted frames that low on the stack.
  */
 #define IS_UNDERFLOW_FRAME(info) \
-    ((info) == &stg_stack_underflow_frame_d_info ||   \
-     (info) == &stg_stack_underflow_frame_v16_info || \
-     (info) == &stg_stack_underflow_frame_v32_info || \
-     (info) == &stg_stack_underflow_frame_v64_info)
+    ((info) == &stg_stack_underflow_frame_info)
 
 #define W64_TO_WDS(n) ((n * sizeof(StgWord64) / sizeof(StgWord)))
 
@@ -436,8 +433,6 @@ slow_spw(void *Sp, StgStack *cur_stack, StgWord offset_words){
     if( IS_UNDERFLOW_FRAME(frame->info) )
     {
 
-      INTERP_TICK(it_underflow_lookups);
-
       new_stack = (StgStack*)frame->next_chunk;
 
       // How many words were on the stack
@@ -450,7 +445,7 @@ slow_spw(void *Sp, StgStack *cur_stack, StgWord offset_words){
     }
     // 2b. Access the element if there is no underflow frame, it must be right
     // at the top of the stack.
-    else if(Sp_plusW(offset_words) < (StgPtr)(cur_stack->stack + cur_stack->stack_size)) {
+    else if((StgPtr) Sp_plusW(offset_words) < (StgPtr)(cur_stack->stack + cur_stack->stack_size)) {
         // Still inside the stack chunk
         return Sp_plusW(offset_words);
     } else {
@@ -572,7 +567,6 @@ eval:
 
 eval_obj:
     obj = UNTAG_CLOSURE(tagged_obj);
-    INTERP_TICK(it_total_evals);
 
     IF_DEBUG(interpreter,
              debugBelch(
@@ -1811,7 +1805,7 @@ run_BCO:
                     threadStackUnderflow(cap, cap->r.rCurrentTSO);
                     LOAD_STACK_POINTERS;
                     by -= sp_to_uf;
-                } else if (Sp_plusW(by) < (StgPtr)(stk->stack + stk->stack_size)) {
+                } else if ((StgPtr) Sp_plusW(by) < (StgPtr)(stk->stack + stk->stack_size)) {
                     // we're within the first stack chunk, this chunk has
                     // no underflow frame
                     break;
@@ -1937,7 +1931,7 @@ run_BCO:
                                                itbl->layout.payload.nptrs );
             StgClosure* con = (StgClosure*)allocate_NONUPD(cap,request);
             ASSERT( itbl->layout.payload.ptrs + itbl->layout.payload.nptrs > 0);
-            for (W_ i = 0; i < n_words; i++) {
+            for (i = 0; i < n_words; i++) {
                 con->payload[i] = (StgClosure*)SpW(i);
             }
             Sp_addW(n_words);
