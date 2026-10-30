@@ -485,7 +485,7 @@ dumpSDocWithStyle dumps log_action sty logflags flag hdr doc =
                         let d = timeStamp
                                 $$ blankLine
                                 $$ doc
-                        return $ mkDumpDoc hdr d
+                        return $ mkDumpDoc herald d
         -- When we dump to files we use UTF8. Which allows ascii spaces.
         defaultLogActionHPrintDoc logflags True handle (withPprStyle sty doc')
 
@@ -493,9 +493,15 @@ dumpSDocWithStyle dumps log_action sty logflags flag hdr doc =
     writeDump Nothing = do
         let (doc', msg_class)
               | null hdr  = (doc, MCOutput)
-              | otherwise = (mkDumpDoc hdr doc, MCDump)
+              | otherwise = (mkDumpDoc herald doc, MCDump)
         log_action logflags msg_class noSrcSpan (withPprStyle sty doc')
 
+    -- We use a different herald for some dumps, so that we
+    --o can more easily skip the high-volume ones
+    herald = line <+> text hdr <+> line
+    line = case flag of
+             Opt_D_dump_simpl_trace -> text "-------"
+             _                      -> text "===================="
 
 -- | Run an action with the handle of a 'DumpFlag' if we are outputting to a
 -- file, otherwise 'Nothing'.
@@ -600,18 +606,17 @@ logTraceMsg logger hdr doc a = putTraceMsg logger (logFlags logger) hdr doc a
 
 -- | Log a dump message (not a dump file)
 logDumpMsg :: Logger -> String -> SDoc -> IO ()
-logDumpMsg logger hdr doc = logMsg logger MCDump noSrcSpan
-  (withPprStyle defaultDumpStyle
-  (mkDumpDoc hdr doc))
+logDumpMsg logger hdr doc
+  = logMsg logger MCDump noSrcSpan
+           (withPprStyle defaultDumpStyle
+           (mkDumpDoc herald doc))
+  where
+    herald = text "------" <+> text hdr <+> text "------"
 
-mkDumpDoc :: String -> SDoc -> SDoc
-mkDumpDoc hdr doc
-   = vcat [blankLine,
-           line <+> text hdr <+> line,
-           doc,
-           blankLine]
-     where
-        line = text "===================="
+mkDumpDoc :: SDoc  -- Herald
+          -> SDoc  -- Payload
+          -> SDoc
+mkDumpDoc herald doc = vcat [blankLine, herald, doc, blankLine]
 
 
 -- | Dump if the given DumpFlag is set
