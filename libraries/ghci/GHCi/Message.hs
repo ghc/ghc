@@ -25,13 +25,12 @@ module GHCi.Message
   , getMessage, putMessage, getTHMessage, putTHMessage
 
   , Pipe(..), mkPipeFromHandles, mkPipeFromContinuations, closePipe
-  , remoteCall, remoteTHCall
+  , remoteCall, remoteCallWithResponse, remoteTHCall
   , handleRemoteCall, handleRemoteTHCall, writeReply
   , RemoteProcessException(..), PipeClosedException(..)
 
   , InboxId(..)
-  , newMailbox
-  , closeMailbox
+  , withNewMailbox
 
   , BreakModule
   , BreakUnitId
@@ -660,8 +659,12 @@ serializeBCOs rbcos = parMap doChunk (chunkList 100 rbcos)
 -- | Send a 'Message' request to and wait for a reply from the interpreter
 -- (blocks on the calling side, doesn't necessarily block the interpreter)
 remoteCall :: Binary a => Pipe -> Message a -> IO a
-remoteCall pipe msg = either throwIO (pure . runGet get)
-                  =<< remoteAsyncReq pipe (putMessage msg) Nothing
+remoteCall pipe msg = remoteCallWithResponse pipe msg id
+
+remoteCallWithResponse :: Binary a => Pipe -> Message a -> (IO a -> IO b) -> IO b
+remoteCallWithResponse pipe msg k =
+  remoteAsyncReqWithResponse pipe (putMessage msg) Nothing $ \ m ->
+    k $ either throwIO (pure . runGet get) =<< m
 
 -- | Handle a single 'Message' request on the interpreter and reply to the host
 handleRemoteCall :: Pipe
