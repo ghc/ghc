@@ -2158,8 +2158,9 @@ tryEtaExpandRhs :: SimplEnv -> BindContext -> OutId -> OutExpr
 tryEtaExpandRhs env bind_cxt bndr rhs
   | seEtaExpand env         -- If Eta-expansion is on
   , wantEtaExpansion rhs    -- and we'd like to eta-expand e
-  , do_eta_expand           -- and e's manifest arity is lower than
-                            --     what it could be
+  , do_eta_expand           -- and arity analysis finds a greater arity
+                            --     than (exprArity e); NB: not manifestArity
+                            --     See Note [Do not eta-expand PAPs]
                             --     (never true for join points)
   =                         -- Do eta-expansion.
     assertPpr( not (isJoinBC bind_cxt) ) (ppr bndr) $
@@ -2178,7 +2179,8 @@ tryEtaExpandRhs env bind_cxt bndr rhs
     (do_eta_expand, arity_type) = findRhsArity arity_opts is_rec bndr rhs
 
 wantEtaExpansion :: CoreExpr -> Bool
--- Mostly True; but False of PAPs which will immediately eta-reduce again
+-- Mostly True; but False of trivial RHSs, and of PAPs at the top of the RHS
+-- (PAPs under value lambdas are dealt with by findRhsArity)
 -- See Note [Which RHSs do we eta-expand?]
 wantEtaExpansion (Cast e _)             = wantEtaExpansion e
 wantEtaExpansion (Tick _ e)             = wantEtaExpansion e
@@ -2234,7 +2236,22 @@ seems like a Good idea.
 
 Note [Do not eta-expand PAPs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We used to have old_arity = manifestArity rhs, which meant that we
+We do not eta-expand a RHS that is a partial application (PAP).  This
+is achieved in two places:
+
+(DEP1) A PAP at the top of the RHS, such as
+          f = g d       -- g has arity 2
+       is rejected by `wantEtaExpansion`.
+
+(DEP2) A PAP under value lambdas, such as
+          f = \x. g x   -- g has arity 3
+       is not eta-expanded because `findRhsArity` asks for eta-expansion
+       only if the arity it finds is greater than (exprArity rhs), and
+       `exprArity` takes account of PAPs: here (exprArity rhs) = 3.
+       Using `manifestArity` (which is 1 here) instead would eta-expand
+       to f = \x y z. g x y z.
+
+Up to 2014 we used old_arity = manifestArity rhs, which meant that we
 would eta-expand even PAPs.  But this gives no particular advantage,
 and can lead to a massive blow-up in code size, exhibited by #9020.
 Suppose we have a PAP
@@ -2249,6 +2266,15 @@ But there is really no point in doing this, and it generates masses of
 coercions and whatnot that eventually disappear again. For T9020, GHC
 allocated 6.6G before, and 0.8G afterwards; and residency dropped from
 1.8G to 45M.
+
+#27212 tried switching (DEP2) back to manifestArity, with these results:
+* T13960: bytestring's
+      cstring1 = \(a::Addr#) @r. cstring2 @r a     -- cstring2 has arity 4
+  was eta-expanded to (\a @r k br s. cstring2 @r a k br s).  That bigger
+  unfolding is inlined at every string literal, adding 6 terms per
+  literal; compile-time allocation went up by 9%.
+* T13056: a derived-instance method (\ @a d. lvl @a), where `lvl` is
+  bottoming, was eta-expanded, and then needlessly worker/wrappered.
 
 Moreover, if we eta expand
         f = g d  ==>  f = \x. g d x

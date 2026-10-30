@@ -888,6 +888,9 @@ findRhsArity :: ArityOpts -> RecFlag -> Id -> CoreExpr
 --
 -- The Bool is True if the returned arity is greater than (exprArity rhs)
 --     so the caller should do eta-expansion
+-- NB: exprArity, not manifestArity: a PAP such as (\x. f x), where f has
+--     arity 3, has exprArity 3, so we do not eta-expand it to (\x y z. f x y z)
+--     See Note [Do not eta-expand PAPs] in GHC.Core.Opt.Simplify.Utils
 -- That Bool is never True for join points, which are never eta-expanded
 --
 -- Returns an SafeArityType that is guaranteed trimmed to typeArity of 'bndr'
@@ -903,10 +906,11 @@ findRhsArity opts is_rec bndr rhs
 
   | otherwise
   = (arity_increased, non_join_arity_type)
-    -- arity_increased: eta-expand if we'll get more lambdas
-    -- to the top of the RHS
+    -- arity_increased: eta-expand if the analysis finds a greater arity
+    -- than exprArity, which already takes account of PAPs
   where
-    manifest_arity = manifestArity rhs
+    old_arity = exprArity rhs   -- See Note [Do not eta-expand PAPs]
+                                -- in GHC.Core.Opt.Simplify.Utils
 
     init_env :: ArityEnv
     init_env = findRhsArityEnv opts (isJoinId bndr)
@@ -915,7 +919,7 @@ findRhsArity opts is_rec bndr rhs
     non_join_arity_type = case is_rec of
                              Recursive    -> go 0 botArityType
                              NonRecursive -> step init_env
-    arity_increased = arityTypeArity non_join_arity_type > manifest_arity
+    arity_increased = arityTypeArity non_join_arity_type > old_arity
 
     -- Join-points only
     -- See Note [Arity for non-recursive join bindings]
@@ -939,15 +943,15 @@ findRhsArity opts is_rec bndr rhs
 
     -- The fixpoint iteration (go), done for recursive bindings. We
     -- always do one step, but usually that produces a result equal
-    -- to manifest_arity, and then we stop right away, because manifest_arity
+    -- to old_arity, and then we stop right away, because old_arity
     -- is assumed to be sound. In other words, arities should never
     -- decrease.  Result: the common case is that there is just one
     -- iteration
     go :: Int -> SafeArityType -> SafeArityType
     go !n cur_at@(AT lams div)
-      | not (isDeadEndDiv div)        -- The "stop right away" case
-      , length lams <= manifest_arity = cur_at -- from above
-      | next_at == cur_at             = cur_at
+      | not (isDeadEndDiv div)           -- the "stop right away" case
+      , length lams <= old_arity = cur_at -- from above
+      | next_at == cur_at        = cur_at
       | otherwise
          -- Warn if more than 2 iterations. Why 2? See Note [Exciting arity]
       = warnPprTrace (debugIsOn && n > 2)
