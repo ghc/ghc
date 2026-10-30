@@ -26,7 +26,7 @@ module GHC.Core.Opt.Simplify.Utils (
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs, contIsRhs, mkBottomCont,
-        hasArgs, countArgs, contOutArgs, dropContArgs,
+        hasArgs, hasImmediateArg, countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext, splitContArgs,
 
@@ -493,6 +493,7 @@ contIsStop :: SimplCont -> Bool
 contIsStop (Stop {}) = True
 contIsStop _         = False
 
+-------------------
 contIsDupable :: SimplCont -> Bool
 contIsDupable (Stop {})                    = True
 contIsDupable (ApplyToTy  { sc_cont = k }) = contIsDupable k
@@ -612,14 +613,21 @@ contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
 contHoleScaling (TickIt _ k) = contHoleScaling k
 
 -------------------
+hasImmediateArg :: SimplCont -> Bool
+-- There is is an argument right at the front
+hasImmediateArg (ApplyToTy {})  = True
+hasImmediateArg (ApplyToVal {}) = True
+hasImmediateArg _               = False
+
 hasArgs :: SimplCont -> Bool
--- True <=> some leading arguments
-hasArgs (ApplyToTy {})  = True
-hasArgs (ApplyToVal {}) = True
-hasArgs _               = False
+-- True <=> some leading arguments, skipping casts
+hasArgs (ApplyToTy {})             = True
+hasArgs (ApplyToVal {})            = True
+hasArgs (CastIt { sc_cont = cont}) = hasArgs cont
+hasArgs _                          = False
 
 countArgs :: SimplCont -> Int
--- Count all arguments, including types, coercions,
+-- Count leading arguments, including types, coercions,
 -- and other values; skipping over casts.
 countArgs (ApplyToTy  { sc_cont = cont }) = 1 + countArgs cont
 countArgs (ApplyToVal { sc_cont = cont }) = 1 + countArgs cont
@@ -678,7 +686,8 @@ contOutArgs env cont
 
 splitContArgs :: SimplCont -> Maybe (SimplCont, SimplCont)
 -- Splits `cont` into (inner, outer), where `inner` has only
--- applications and casts, and `outer` is non-trivial
+--    applications and casts.
+-- Returns Nothing if `outer` is trivial
 -- A cast goes in `inner` only if it is followed by an application;
 -- see Note [Do not push a cast inwards unnecessarily]
 splitContArgs cont@(ApplyToTy { sc_cont = cont1 })

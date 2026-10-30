@@ -3543,7 +3543,7 @@ Some tricky corners:
       cloning to get a no-shadowing situation, the care-when-shadowing
       behaviour above isn't needed for long.
 
-(BS4) The domain of occ_bs_env can include GlobaIds.  Eg
+(BS4) The domain of occ_bs_env can include GlobalIds.  Eg
          case M.foo of b { alts }
       We extend occ_bs_env with [M.foo :-> b].  That's fine.
 
