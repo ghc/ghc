@@ -987,9 +987,9 @@ extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
 
 #endif /* USING_LIBBFD */
 
-void findPtr(P_ p, int);                /* keep gcc -Wall happy */
+RTS_PUBLIC void findPtr(P_ p, int);                /* keep gcc -Wall happy */
 
-int searched = 0;
+RTS_PUBLIC int searched = 0;
 
 static int
 findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)

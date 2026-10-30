@@ -13,5 +13,5 @@
 
 #pragma once
 
-void registerCcList(CostCentre **cc_list);
-void registerCcsList(CostCentreStack **cc_list);
+RTS_PUBLIC void registerCcList(CostCentre **cc_list);
+RTS_PUBLIC void registerCcsList(CostCentreStack **cc_list);

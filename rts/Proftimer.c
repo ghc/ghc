@@ -113,7 +113,7 @@ initProfTimer( void )
     }
 }
 
-uint32_t total_ticks = 0;
+RTS_PUBLIC uint32_t total_ticks = 0;
 
 void
 handleProfTick(void)

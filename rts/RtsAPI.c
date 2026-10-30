@@ -626,7 +626,7 @@ rts_getSchedStatus (Capability *cap)
 // It's possible to remove this and instead define the pausing task as whichever
 // task owns all capabilities, but using `rts_pausing_task` leads to marginally
 // cleaner code/API and better error messages.
-Task * rts_pausing_task = NULL;
+RTS_PUBLIC Task * rts_pausing_task = NULL;
 #endif
 
 Capability *

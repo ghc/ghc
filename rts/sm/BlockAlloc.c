@@ -182,7 +182,7 @@ static bdescr *deferred_free_mblock_list[MAX_NUMA_NODES];
 W_ n_alloc_blocks;   // currently allocated blocks
 W_ hw_alloc_blocks;  // high-water allocated blocks
 
-W_ n_alloc_blocks_by_node[MAX_NUMA_NODES];
+RTS_PUBLIC W_ n_alloc_blocks_by_node[MAX_NUMA_NODES];
 
 
 static bdescr* splitDeferredList(bdescr* head);

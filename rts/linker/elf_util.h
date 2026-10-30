@@ -4,10 +4,10 @@
 
 #if defined(OBJFORMAT_ELF)
 
-ElfSymbolTable * findSymbolTable(ObjectCode * oc,
+RTS_PUBLIC ElfSymbolTable * findSymbolTable(ObjectCode * oc,
                                  unsigned symbolTableIndex);
 
-ElfSymbol * findSymbol(ObjectCode * oc,
+RTS_PUBLIC ElfSymbol * findSymbol(ObjectCode * oc,
                        unsigned symbolTableIndex,
                        unsigned long symbolIndex);
 

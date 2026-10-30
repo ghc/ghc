@@ -13,4 +13,4 @@
 #pragma once
 
 /* Alternate to raise(3) for threaded rts, for BSD-based OSes */
-int genericRaise(int sig);
+RTS_PUBLIC int genericRaise(int sig);

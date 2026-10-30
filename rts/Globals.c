@@ -40,7 +40,7 @@ typedef enum {
 } StoreKey;
 
 #if defined(THREADED_RTS)
-Mutex globalStoreLock;
+RTS_PUBLIC Mutex globalStoreLock;
 #endif
 
 static StgStablePtr store[MaxStoreKey];
@@ -91,6 +91,7 @@ static StgStablePtr getOrSetKey(StoreKey key, StgStablePtr ptr)
 }
 
 #define mkStoreAccessor(name) \
+    RTS_PUBLIC \
     StgStablePtr \
     getOrSet##name(StgStablePtr ptr) \
     { return getOrSetKey(name, ptr); }

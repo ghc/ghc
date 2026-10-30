@@ -38,7 +38,7 @@
    Forward decls.
    -------------------------------------------------------------------------- */
 
-int   isHeapAlloced       ( StgPtr p);
+RTS_PUBLIC int   isHeapAlloced       ( StgPtr p);
 static void  checkSmallBitmap    ( StgPtr payload, StgWord bitmap, uint32_t );
 static void  checkLargeBitmap    ( StgPtr payload, StgLargeBitmap*, uint32_t );
 static void  checkClosureShallow ( const StgClosure * );
@@ -1204,7 +1204,7 @@ checkRunQueue(Capability *cap)
    -------------------------------------------------------------------------- */
 
 // Useful for finding partially full blocks in gdb
-void findSlop(bdescr *bd);
+RTS_PUBLIC void findSlop(bdescr *bd);
 void findSlop(bdescr *bd)
 {
     W_ slop;

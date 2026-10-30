@@ -101,7 +101,7 @@ typedef pthread_t       OSThreadId;
   } }
 
 // Returns zero if the lock was acquired.
-EXTERN_INLINE int OS_TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex);
+RTS_PUBLIC_EXTERN_INLINE int OS_TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex);
 EXTERN_INLINE int OS_TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex)
 {
     LOCK_DEBUG_BELCH("TRY_ACQUIRE_LOCK", mutex);
@@ -220,32 +220,32 @@ typedef void* OSThreadId;
 //
 // General thread operations
 //
-extern OSThreadId osThreadId      ( void );
-extern void shutdownThread        ( void )   STG_NORETURN;
-extern void yieldThread           ( void );
+extern RTS_PUBLIC OSThreadId osThreadId      ( void );
+extern RTS_PUBLIC void shutdownThread        ( void )   STG_NORETURN;
+extern RTS_PUBLIC void yieldThread           ( void );
 
 typedef void* OSThreadProcAttr OSThreadProc(void *);
 
-extern int  createOSThread        ( OSThreadId* tid, const char *name,
+extern RTS_PUBLIC int  createOSThread        ( OSThreadId* tid, const char *name,
                                     OSThreadProc *startProc, void *param);
 #if !defined(mingw32_HOST_OS)
-extern int  createAttachedOSThread( OSThreadId *tid, const char *name,
+extern RTS_PUBLIC int  createAttachedOSThread( OSThreadId *tid, const char *name,
                                     OSThreadProc *startProc, void *param);
 #endif
-extern bool osThreadIsAlive       ( OSThreadId id );
-extern void interruptOSThread     ( OSThreadId id );
-extern void joinOSThread          ( OSThreadId id );
+extern RTS_PUBLIC bool osThreadIsAlive       ( OSThreadId id );
+extern RTS_PUBLIC void interruptOSThread     ( OSThreadId id );
+extern RTS_PUBLIC void joinOSThread          ( OSThreadId id );
 
 //
 // Condition Variables
 //
-extern void initCondition         ( Condition* pCond );
-extern void closeCondition        ( Condition* pCond );
-extern void broadcastCondition    ( Condition* pCond );
-extern void signalCondition       ( Condition* pCond );
-extern void waitCondition         ( Condition* pCond, Mutex* pMut );
+extern RTS_PUBLIC void initCondition         ( Condition* pCond );
+extern RTS_PUBLIC void closeCondition        ( Condition* pCond );
+extern RTS_PUBLIC void broadcastCondition    ( Condition* pCond );
+extern RTS_PUBLIC void signalCondition       ( Condition* pCond );
+extern RTS_PUBLIC void waitCondition         ( Condition* pCond, Mutex* pMut );
 // Returns false on timeout, true otherwise.
-extern bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout);
+extern RTS_PUBLIC bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout);
 
 //
 // Mutexes
@@ -255,8 +255,8 @@ extern bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout)
 // In particular we need locks for the data shared between the timer/ticker
 // thread and the thread running the main capability.
 #if defined(HAVE_PREEMPTION)
-extern void initMutex             ( Mutex* pMut );
-extern void closeMutex            ( Mutex* pMut );
+extern RTS_PUBLIC void initMutex             ( Mutex* pMut );
+extern RTS_PUBLIC void closeMutex            ( Mutex* pMut );
 
 // The "always" variants do locking in the threaded and non-threaded RTS.
 // The normal variants below are no-ops in the non-threaded RTS.
@@ -274,9 +274,9 @@ extern void closeMutex            ( Mutex* pMut );
 #endif
 
 // Processors and affinity
-void setThreadAffinity (uint32_t n, uint32_t m);
-void setThreadNode (uint32_t node);
-void releaseThreadNode (void);
+RTS_PUBLIC void setThreadAffinity (uint32_t n, uint32_t m);
+RTS_PUBLIC void setThreadNode (uint32_t node);
+RTS_PUBLIC void releaseThreadNode (void);
 #endif // !CMINUSMINUS
 
 #if defined(THREADED_RTS)
@@ -301,17 +301,17 @@ void releaseThreadNode (void);
 // Support for forkOS (defined regardless of THREADED_RTS, but does
 // nothing when !THREADED_RTS).
 //
-int forkOS_createThread ( HsStablePtr entry );
+RTS_PUBLIC int forkOS_createThread ( HsStablePtr entry );
 
 //
 // Free any global resources created in OSThreads.
 //
-void freeThreadingResources(void);
+RTS_PUBLIC void freeThreadingResources(void);
 
 //
 // Returns the number of processor cores in the machine
 //
-uint32_t getNumberOfProcessors (void);
+RTS_PUBLIC uint32_t getNumberOfProcessors (void);
 
 //
 // Support for getting at the kernel thread Id for tracing/profiling.
@@ -333,6 +333,6 @@ uint32_t getNumberOfProcessors (void);
 typedef StgWord64 KernelThreadId;
 
 // Get the current kernel thread id
-KernelThreadId kernelThreadId (void);
+RTS_PUBLIC KernelThreadId kernelThreadId (void);
 
 #endif /* CMINUSMINUS */

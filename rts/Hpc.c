@@ -41,7 +41,7 @@ static int tix_ch;                      // current char
 
 static StrHashTable * moduleHash = NULL;   // module name -> HpcModuleInfo
 
-HpcModuleInfo *modules = 0;
+RTS_PUBLIC HpcModuleInfo *modules = 0;
 
 static char *tixFilename = NULL;
 

@@ -118,10 +118,16 @@
 #define STATIC_INLINE static inline
 
 // See comment in rts/Inlines.c for explanation.
+// RTS_PUBLIC_EXTERN_INLINE is EXTERN_INLINE but additionally exports the
+// symbol compiled in Inlines.c from the RTS shared library. Visibility
+// attributes are ignored (with a warning) on static functions, so only apply
+// RTS_PUBLIC when KEEP_INLINES is set.
 # if defined(KEEP_INLINES)
 #  define EXTERN_INLINE extern inline
+#  define RTS_PUBLIC_EXTERN_INLINE RTS_PUBLIC extern inline
 # else
 #  define EXTERN_INLINE static inline
+#  define RTS_PUBLIC_EXTERN_INLINE static inline
 # endif
 
 /*
@@ -222,6 +228,8 @@
 #else
 # define STG_RETURNS_NONNULL
 #endif
+
+#include "RtsPublic.h"
 
 /* -----------------------------------------------------------------------------
    Suppressing C warnings

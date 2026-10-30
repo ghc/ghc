@@ -8,6 +8,11 @@
 
 #pragma once
 
+#if !defined(CMINUSMINUS) && defined(THREADED_RTS) && defined(PROF_SPIN)
+extern RTS_PUBLIC volatile StgWord64 whitehole_lockClosure_spin;
+extern RTS_PUBLIC volatile StgWord64 whitehole_lockClosure_yield;
+#endif
+
 #include "BeginPrivate.h"
 
 #if defined(CMINUSMINUS)
@@ -38,11 +43,6 @@ EXTERN_INLINE StgInfoTable *tryLockClosure(StgClosure *p);
 EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info);
 
 #if defined(THREADED_RTS)
-
-#if defined(PROF_SPIN)
-extern volatile StgWord64 whitehole_lockClosure_spin;
-extern volatile StgWord64 whitehole_lockClosure_yield;
-#endif
 
 /* -----------------------------------------------------------------------------
  * Locking/unlocking closures

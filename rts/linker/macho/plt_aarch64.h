@@ -15,9 +15,9 @@
 #include "../MachOTypes.h"
 
 
-extern const size_t stubSizeAarch64;
-bool needStubForRelAarch64(MachORelocationInfo * rel);
-bool makeStubAarch64(Stub * s);
+extern RTS_PUBLIC const size_t stubSizeAarch64;
+RTS_PUBLIC bool needStubForRelAarch64(MachORelocationInfo * rel);
+RTS_PUBLIC bool makeStubAarch64(Stub * s);
 
 #endif
 

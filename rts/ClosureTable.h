@@ -34,6 +34,7 @@
 
 #pragma once
 
+#include "RtsPublic.h"
 #include "Capability.h"
 
 #include "BeginPrivate.h"

@@ -438,8 +438,8 @@ static int linker_init_done = 0 ;
 
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 static void *dl_prog_handle;
-regex_t re_invalid;
-regex_t re_realso;
+RTS_PUBLIC regex_t re_invalid;
+RTS_PUBLIC regex_t re_realso;
 #endif
 
 void initLinker (void)
@@ -1010,7 +1010,7 @@ SymbolAddr* lookupSymbol( SymbolName* lbl )
  * within DELTA bytes of the specified address, and show their names.
  */
 #if defined(DEBUG)
-void ghci_enquire ( SymbolAddr* addr );
+RTS_PUBLIC void ghci_enquire ( SymbolAddr* addr );
 
 void ghci_enquire(SymbolAddr* addr)
 {

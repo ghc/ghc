@@ -6,9 +6,9 @@
 #include <linker/ElfTypes.h>
 
 #if defined(OBJFORMAT_ELF)
-bool needGotSlot(Elf_Sym * symbol);
-bool makeGot(ObjectCode * oc);
-bool fillGot(ObjectCode * oc);
-bool verifyGot(ObjectCode * oc);
-void freeGot(ObjectCode * oc);
+RTS_PUBLIC bool needGotSlot(Elf_Sym * symbol);
+RTS_PUBLIC bool makeGot(ObjectCode * oc);
+RTS_PUBLIC bool fillGot(ObjectCode * oc);
+RTS_PUBLIC bool verifyGot(ObjectCode * oc);
+RTS_PUBLIC void freeGot(ObjectCode * oc);
 #endif

@@ -168,7 +168,7 @@ static struct node* const g_tests[] = {
 
 static traverseState state;
 
-void traverseHeapRunTests(void);
+RTS_PUBLIC void traverseHeapRunTests(void);
 void traverseHeapRunTests(void)
 {
     traverseState *ts = &state;

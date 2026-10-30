@@ -1,3 +1,4 @@
+#include "RtsPublic.h"
 
 // Global variable that records which vector registers are supported
 // (conservative estimate).
@@ -6,7 +7,7 @@
 // 1: support for 128-bit vector registers
 // 2: support for 256-bit vector registers
 // 3: support for 512-bit vector registers
-extern int vectorSupportGlobalVar;
+extern RTS_PUBLIC int vectorSupportGlobalVar;
 
-int checkVectorSupport(void);
-void setVectorSupport(void);
+RTS_PUBLIC int checkVectorSupport(void);
+RTS_PUBLIC void setVectorSupport(void);

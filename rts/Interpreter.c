@@ -388,7 +388,7 @@ is_ret_bco_frame(const StgPtr frame_head) {
       );
 }
 
-int rts_stop_on_exception = 0;
+RTS_PUBLIC int rts_stop_on_exception = 0;
 
 /* ---------------------------------------------------------------------------
  * Enabling and disabling global single step mode
@@ -398,7 +398,7 @@ int rts_stop_on_exception = 0;
  * Unlike `TSO_STOP_NEXT_BREAKPOINT`, which sets single-step mode per-thread,
  * `rts_stop_next_breakpoint` globally enables single-step mode. If enabled, we
  * will stop at the immediate next breakpoint regardless of what thread it is in. */
-int rts_stop_next_breakpoint = 0;
+RTS_PUBLIC int rts_stop_next_breakpoint = 0;
 
 void rts_enableStopNextBreakpointAll(void)
 {
@@ -674,7 +674,7 @@ static StgWord app_ptrs_itbl[] = {
     (W_)&stg_ap_pppppp_info,
 };
 
-HsStablePtr rts_breakpoint_io_action; // points to the IO action which is executed on a breakpoint
+RTS_PUBLIC HsStablePtr rts_breakpoint_io_action; // points to the IO action which is executed on a breakpoint
                                       // it is set in ghci/GHCi/Run.hs:withBreakAction
 
 Capability *

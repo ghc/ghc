@@ -330,10 +330,10 @@ static inline void swap(StgTimeoutQueue **a, StgTimeoutQueue **b)
 /* Algorithmic performance counters. Used to count the number of loop
  * iterations we do, to assess algorithmic optimisations. */
 #if defined(DEBUG)
-int insert_down_count;
-int merge_down_count;
-int leftify_up_to_count;
-int leftify_up_shortcut_count;
+RTS_PUBLIC int insert_down_count;
+RTS_PUBLIC int merge_down_count;
+RTS_PUBLIC int leftify_up_to_count;
+RTS_PUBLIC int leftify_up_shortcut_count;
 #endif
 
 

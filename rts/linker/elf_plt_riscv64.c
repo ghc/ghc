@@ -11,7 +11,7 @@
 
 #if defined(OBJFORMAT_ELF)
 
-const size_t instSizeRISCV64 = 4;
+RTS_PUBLIC const size_t instSizeRISCV64 = 4;
 const size_t stubSizeRISCV64 = 3 * instSizeRISCV64;
 
 bool needStubForRelRISCV64(Elf_Rel *rel) {

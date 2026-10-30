@@ -43,7 +43,7 @@
  * to POSIX.1 to control whether or not to include SA_NOCLDSTOP when
  * installing a SIGCHLD handler.
  */
-HsInt nocldstop = 0;
+RTS_PUBLIC HsInt nocldstop = 0;
 
 /* -----------------------------------------------------------------------------
  * The table of signal handlers

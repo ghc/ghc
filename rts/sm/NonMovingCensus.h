@@ -19,11 +19,11 @@ struct NonmovingAllocCensus {
 };
 
 
-struct NonmovingAllocCensus
+RTS_PUBLIC struct NonmovingAllocCensus
 nonmovingAllocatorCensusWithWords(uint32_t alloc_idx);
 
-struct NonmovingAllocCensus
+RTS_PUBLIC struct NonmovingAllocCensus
 nonmovingAllocatorCensus(uint32_t alloc_idx);
 
-void nonmovingPrintAllocatorCensus(bool collect_live_words);
-void nonmovingTraceAllocatorCensus(void);
+RTS_PUBLIC void nonmovingPrintAllocatorCensus(bool collect_live_words);
+RTS_PUBLIC void nonmovingTraceAllocatorCensus(void);

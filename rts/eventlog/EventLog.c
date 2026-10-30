@@ -29,7 +29,7 @@
 
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 
-Mutex state_change_mutex;
+RTS_PUBLIC Mutex state_change_mutex;
 bool eventlog_enabled; // protected by state_change_mutex to ensure
                        // serialisation of calls to
                        // startEventLogging/endEventLogging
