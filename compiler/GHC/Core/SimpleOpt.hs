@@ -11,7 +11,7 @@ module GHC.Core.SimpleOpt (
         simpleOptPgm, simpleOptExpr, simpleOptExprNoInline, simpleOptExprWith,
 
         -- ** Join points
-        joinPointBinding_maybe, joinPointBindings_maybe,
+        joinPointBinding_maybe, joinPointBindings_maybe, joinPointBind_maybe,
 
         -- ** Predicates on expressions
         exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
@@ -1200,6 +1200,18 @@ joinPointBindings_maybe :: [(InBndr, InExpr)] -> Maybe [(InBndr, InExpr)]
 joinPointBindings_maybe bndrs
   = mapM (uncurry joinPointBinding_maybe) bndrs
 
+joinPointBind_maybe :: InBind -> Maybe InBind
+joinPointBind_maybe (NonRec bndr rhs)
+  | Just (bndr', rhs') <- joinPointBinding_maybe bndr rhs
+  = Just (NonRec bndr' rhs')
+
+joinPointBind_maybe (Rec pairs)
+  | Just pairs' <- joinPointBindings_maybe pairs
+  = Just (Rec pairs')
+
+joinPointBind_maybe _other
+  = Nothing
+
 {- Note [JoinId vs TailCallInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Occurrence information is /fundamentally fragile/; that is, it may
@@ -1543,7 +1555,8 @@ exprIsConApp_maybe :: HasDebugCallStack
                    => InScopeEnv -> CoreExpr
                    -> Maybe (InScopeSet, FloatBinds, DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
-  = go (Left in_scope) emptyFloatBinds expr (CC [] MRefl)
+  = -- pprTrace "exprIsConApp" (ppr expr) $
+    go (Left in_scope) emptyFloatBinds expr (CC [] MRefl)
   where
     go :: Either InScopeSet Subst
              -- Left in-scope  means "empty substitution"
@@ -1608,7 +1621,9 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
        = let
           (subst', b')     = subst_bndr subst b
           (subst'', vars') = subst_bndrs subst' vars
-          float            = FloatCase scrut' b' con vars'
+          float            = mkFloatCase scrut' b' con vars'
+                             -- mkFloatCase: makes a let-float if it can
+                             -- See Note [The FloatCase invariant] in GHC.Core
          in
            go subst'' (floats `snocOL` float) expr cont
        where
@@ -1656,7 +1671,8 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         | idArity fun == 0
         , Just rhs <- expandUnfolding_maybe unfolding
         , let in_scope' = extend_in_scope (exprFreeVars rhs)
-        = go (Left in_scope') floats rhs cont
+        = -- pprTrace "exprIsConApp:unf" (ppr fun <+> ppr rhs) $
+          go (Left in_scope') floats rhs cont
 
         -- See Note [exprIsConApp_maybe on literal strings]
         | (fun `hasKey` unpackCStringIdKey) ||
@@ -1698,15 +1714,17 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     subst_expr (Left {}) e = e
     subst_expr (Right s) e = substExpr s e
 
-    subst_bndr msubst bndr
+    subst_bndrs subst bs = mapAccumL subst_bndr subst bs
+
+    subst_bndr (Left in_scope) bndr
+      | bndr `elemInScopeSet` in_scope = subst_bndr1 (mkEmptySubst in_scope) bndr
+      | otherwise                      = (Left (in_scope `extendInScopeSet` bndr), bndr)
+    subst_bndr (Right subst) bndr = subst_bndr1 subst bndr
+
+    subst_bndr1 subst bndr
       = (Right subst', bndr')
       where
         (subst', bndr') = substBndr subst bndr
-        subst = case msubst of
-                  Left in_scope -> mkEmptySubst in_scope
-                  Right subst   -> subst
-
-    subst_bndrs subst bs = mapAccumL subst_bndr subst bs
 
     extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
     extend (Right s)       v e = Right (extendSubst s v e)
@@ -1738,6 +1756,10 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         do_one (str, arg) (in_scope,floats,args)
           | NotMarkedStrict <- str   = no_seq
           | exprIsHNF arg            = no_seq
+          | isUnliftedType (exprType arg)    -- A strict unlifted field needs no
+          , exprOkForSpeculation arg = no_seq   -- seq if arg is ok-for-speculation
+                                     -- These two tests are those of doCaseToLet;
+                                     -- see Note [The FloatCase invariant] in GHC.Core
           | otherwise                = (in_scope', float `consOL` floats, Var bndr:args)
           where
             no_seq = (in_scope, floats, arg:args)

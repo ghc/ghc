@@ -13,6 +13,7 @@ module GHC.Core.Utils (
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
         mkTickCpe,
         bindNonRec, needsCaseBinding, needsCaseBindingL,
+        doCaseToLet, mkFloatCase, okFloatCase,
         mkAltExpr, mkDefaultCase, mkSingleAltCase,
 
         -- * Taking expressions apart
@@ -775,6 +776,50 @@ needsCaseBindingL :: Levity -> CoreExpr -> Bool
 needsCaseBindingL Lifted   _rhs = False
 needsCaseBindingL Unlifted rhs = not (exprOkForSpeculation rhs)
 
+doCaseToLet :: CoreExpr         -- Scrutinee
+            -> Id               -- Case binder
+            -> Bool
+-- The situation is         case scrut of b { DEFAULT -> body }
+-- Can we transform thus?   let { b = scrut } in body
+-- See also Note [The FloatCase invariant] in GHC.Core
+doCaseToLet scrut case_bndr
+  | isTyCoVar case_bndr    -- Respect GHC.Core
+  = isTyCoArg scrut        -- Note [Core type and coercion invariant]
+
+  | isUnliftedType (exprType scrut)
+    -- We can call isUnliftedType here: scrutinees always have a fixed RuntimeRep (see FRRCase).
+    -- Note however that we must check 'scrut' and not 'case_bndr', which may be an
+    -- un-substituted InId in the Simplifier: see Note [Dark corner with representation
+    -- polymorphism] in GHC.Core.Opt.Simplify.Iteration.
+    -- Using `exprType` is typically cheap because `scrut` is typically a variable.
+    -- We could instead use mightBeUnliftedType (idType case_bndr), but that hurts
+    -- the brain more.  Consider that if this test ever turns out to be a perf
+    -- problem (which seems unlikely).
+  = exprOkForSpeculation scrut
+
+  | otherwise  -- Scrut has a lifted type
+  = exprIsHNF scrut
+       --    || isStrUsedDmd (idDemandInfo case_bndr)
+       -- We no longer look at the demand on the case binder
+       -- See Note [Case-to-let for strictly-used binders] in GHC.Core.Opt.Simplify.Iteration
+
+mkFloatCase :: CoreExpr -> Id -> AltCon -> [Var] -> FloatBind
+-- Make a float for  case scrut of bndr { con bndrs -> <hole> }
+-- but make a let-float instead if that is possible,
+-- to maintain Note [The FloatCase invariant] in GHC.Core
+mkFloatCase scrut bndr con bndrs
+  | DEFAULT <- con
+  , doCaseToLet scrut bndr
+  = FloatLet (NonRec bndr scrut)
+  | otherwise
+  = FloatCase scrut bndr con bndrs
+
+okFloatCase :: FloatBind -> Bool
+-- Checks Note [The FloatCase invariant] in GHC.Core
+-- Used only in assertions
+okFloatCase (FloatCase scrut b DEFAULT _) = not (doCaseToLet scrut b)
+okFloatCase _                             = True
+
 mkAltExpr :: AltCon     -- ^ Case alternative constructor
           -> [CoreBndr] -- ^ Things bound by the pattern match
           -> [Type]     -- ^ The type arguments to the case alternative
@@ -804,6 +849,9 @@ mkSingleAltCase scrut case_bndr con bndrs body
     body_ty = exprType body
 
     case_ty -- See Note [Care with the type of a case expression]
+      | not (any isTyCoVar bndrs)   -- Fast path: only TyCoVars can occur in body_ty
+      = body_ty
+
       | Just body_ty' <- occCheckExpand bndrs body_ty
       = body_ty'
 

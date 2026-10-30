@@ -3318,31 +3318,6 @@ rebuildCase (saf,env) scrut case_bndr alts cont
   | otherwise
   = reallyRebuildCase (saf,env) scrut case_bndr alts cont
 
-doCaseToLet :: OutExpr          -- Scrutinee
-            -> InId             -- Case binder
-            -> Bool
--- The situation is         case scrut of b { DEFAULT -> body }
--- Can we transform thus?   let { b = scrut } in body
-doCaseToLet scrut case_bndr
-  | isTyCoVar case_bndr    -- Respect GHC.Core
-  = isTyCoArg scrut        -- Note [Core type and coercion invariant]
-
-  | isUnliftedType (exprType scrut)
-    -- We can call isUnliftedType here: scrutinees always have a fixed RuntimeRep (see FRRCase).
-    -- Note however that we must check 'scrut' (which is an 'OutExpr') and not 'case_bndr'
-    -- (which is an 'InId'): see Note [Dark corner with representation polymorphism].
-    -- Using `exprType` is typically cheap because `scrut` is typically a variable.
-    -- We could instead use mightBeUnliftedType (idType case_bndr), but that hurts
-    -- the brain more.  Consider that if this test ever turns out to be a perf
-    -- problem (which seems unlikely).
-  = exprOkForSpeculation scrut
-
-  | otherwise  -- Scrut has a lifted type
-  = exprIsHNF scrut
-       --    || isStrUsedDmd (idDemandInfo case_bndr)
-       -- We no longer look at the demand on the case binder
-       -- See Note [Case-to-let for strictly-used binders]
-
 --------------------------------------------------
 --      3. Catch-all case
 --------------------------------------------------
