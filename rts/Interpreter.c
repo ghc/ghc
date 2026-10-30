@@ -486,7 +486,7 @@ call (i.e. a tail call returns directly to its caller's first non-tail caller).
    in thread forked by the main debuggee thead: we can only toggle TSO_STOP_ON_EXCEPTION
    on threads we control, and those forked by the debuggee we don't.
  */
-int rts_stop_on_exception = 0;
+RTS_PUBLIC int rts_stop_on_exception = 0;
 
 void rts_enableStopOnExceptionAll(void)
 {
@@ -715,7 +715,7 @@ static StgWord app_ptrs_itbl[] = {
     (W_)&stg_ap_pppppp_info,
 };
 
-HsStablePtr rts_breakpoint_io_action; // points to the IO action which is executed on a breakpoint
+RTS_PUBLIC HsStablePtr rts_breakpoint_io_action; // points to the IO action which is executed on a breakpoint
                                       // it is set in ghci/GHCi/Run.hs:withBreakAction
 
 Capability *

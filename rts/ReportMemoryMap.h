@@ -9,5 +9,5 @@
  *
  * ---------------------------------------------------------------------------*/
 
-void reportMemoryMap(void);
+RTS_PUBLIC void reportMemoryMap(void);
 

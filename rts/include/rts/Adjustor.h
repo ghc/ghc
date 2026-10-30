@@ -14,8 +14,8 @@
 #pragma once
 
 /* Creating and destroying an adjustor thunk */
-void* createAdjustor (StgStablePtr hptr,
+RTS_PUBLIC void* createAdjustor (StgStablePtr hptr,
                       StgFunPtr wptr,
                       char *typeString);
 
-void freeHaskellFunctionPtr (void* ptr);
+RTS_PUBLIC void freeHaskellFunctionPtr (void* ptr);

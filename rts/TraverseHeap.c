@@ -35,7 +35,7 @@ bool isTravDataValid(const traverseState *ts, const StgClosure *c)
 }
 
 #if defined(DEBUG)
-unsigned int g_traversalDebugLevel = 0;
+RTS_PUBLIC unsigned int g_traversalDebugLevel = 0;
 static void debug(const char *s, ...)
 {
     va_list ap;

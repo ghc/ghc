@@ -1,4 +1,4 @@
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(_WIN32)
     //  Microsoft
     #define EXPORT __declspec(dllexport)
 #elif defined(_GCC)

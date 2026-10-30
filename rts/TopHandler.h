@@ -27,4 +27,4 @@ StgTSO *getTopHandlerThread(void);
 #include <EndPrivate.h>
 
 // Called from Haskell
-void rts_setMainThread(StgWeak *ptr);
+RTS_PUBLIC void rts_setMainThread(StgWeak *ptr);

@@ -9,7 +9,7 @@
 // global, and reading from wasm globals from C requires calling a
 // getter function implemented in assembly, which is totally not worth
 // the effort.
-StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg)
+RTS_PUBLIC StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg)
 {
     while (f) {
         f = (StgFunPtr) (f)();

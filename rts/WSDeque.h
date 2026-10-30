@@ -60,38 +60,38 @@ typedef struct WSDeque_ {
  * -------------------------------------------------------------------------- */
 
 // Allocation, deallocation
-WSDeque * newWSDeque  (uint32_t size);
-void      freeWSDeque (WSDeque *q);
+RTS_PUBLIC WSDeque * newWSDeque  (uint32_t size);
+RTS_PUBLIC void      freeWSDeque (WSDeque *q);
 
 // (owner-only) Take an element from the "write" end of the pool.  Can be called
 // by the pool owner only.
-void* popWSDeque (WSDeque *q);
+RTS_PUBLIC void* popWSDeque (WSDeque *q);
 
 // (owner-only) Push onto the "write" end of the pool.  Return true if the push
 // succeeded, or false if the deque is full.
-bool pushWSDeque (WSDeque *q, void *elem);
+RTS_PUBLIC bool pushWSDeque (WSDeque *q, void *elem);
 
 // (owner-only) Removes all elements from the deque.
-EXTERN_INLINE void discardElements (WSDeque *q);
+RTS_PUBLIC_EXTERN_INLINE void discardElements (WSDeque *q);
 
 // Removes an element of the deque from the "read" end, or returns
 // NULL if the pool is empty, or if there was a collision with another
 // thief.
-void * stealWSDeque_ (WSDeque *q);
+RTS_PUBLIC void * stealWSDeque_ (WSDeque *q);
 
 // Removes an element of the deque from the "read" end, or returns
 // NULL if the pool is empty.
-void * stealWSDeque (WSDeque *q);
+RTS_PUBLIC void * stealWSDeque (WSDeque *q);
 
 // "guesses" whether a deque is empty. Can return false negatives in
 // presence of concurrent steal() calls, and false positives in
 // presence of a concurrent pushBottom().
-EXTERN_INLINE bool looksEmptyWSDeque (WSDeque* q);
+RTS_PUBLIC_EXTERN_INLINE bool looksEmptyWSDeque (WSDeque* q);
 
 // "guesses" how many elements are present on the deque. Like
 // looksEmptyWSDeque, this may suggest that the deque is empty when it's not
 // and vice-versa.
-EXTERN_INLINE StgInt dequeElements   (WSDeque *q);
+RTS_PUBLIC_EXTERN_INLINE StgInt dequeElements   (WSDeque *q);
 
 /* -----------------------------------------------------------------------------
  * PRIVATE below here

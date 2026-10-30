@@ -16,14 +16,14 @@
 
 typedef uint64_t addr_t;
 
-bool isBranch(addr_t p);
-bool isBranchLink(addr_t p);
-bool isAdrp(addr_t p);
-bool isLoadStore(addr_t p);
-bool isAddSub(addr_t p);
-bool isVectorOp(addr_t p);
-int64_t decodeAddendAarch64(Section * section, Elf_Rel * rel) STG_NORETURN;
-bool encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend);
+RTS_PUBLIC bool isBranch(addr_t p);
+RTS_PUBLIC bool isBranchLink(addr_t p);
+RTS_PUBLIC bool isAdrp(addr_t p);
+RTS_PUBLIC bool isLoadStore(addr_t p);
+RTS_PUBLIC bool isAddSub(addr_t p);
+RTS_PUBLIC bool isVectorOp(addr_t p);
+RTS_PUBLIC int64_t decodeAddendAarch64(Section * section, Elf_Rel * rel) STG_NORETURN;
+RTS_PUBLIC bool encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend);
 
 bool isBranch(addr_t p) {
     return (*(addr_t*)p & 0xFC000000) == 0x14000000;

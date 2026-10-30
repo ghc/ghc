@@ -23,11 +23,11 @@ typedef struct _SymbolInfo {
     SymbolKind kind;
 } SymbolInfo;
 
-bool isSymbolWeak(ObjectCode *owner, const void *label);
-bool isSymbolImport(ObjectCode *owner, const void *label);
-void setWeakSymbol(ObjectCode *owner, const void *label);
-void setImportSymbol(ObjectCode *owner, const void *label);
-void clearImportSymbol(ObjectCode *owner, const void *label);
+RTS_PUBLIC bool isSymbolWeak(ObjectCode *owner, const void *label);
+RTS_PUBLIC bool isSymbolImport(ObjectCode *owner, const void *label);
+RTS_PUBLIC void setWeakSymbol(ObjectCode *owner, const void *label);
+RTS_PUBLIC void setImportSymbol(ObjectCode *owner, const void *label);
+RTS_PUBLIC void clearImportSymbol(ObjectCode *owner, const void *label);
 
 typedef void (*symbolUpdater)(SymbolInfo*);
-void setSymbolInfo(ObjectCode *owner, const void *label, symbolUpdater updater);
+RTS_PUBLIC void setSymbolInfo(ObjectCode *owner, const void *label, symbolUpdater updater);

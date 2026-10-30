@@ -13,4 +13,4 @@
 
 #pragma once
 
-StgWord64 getMonotonicNSec (void);
+RTS_PUBLIC StgWord64 getMonotonicNSec (void);

@@ -273,9 +273,9 @@ struct m32_allocator_t {
  *
  * We keep a small pool of free pages around to avoid fragmentation.
  */
-struct m32_page_t *m32_free_page_pool = NULL;
+RTS_PUBLIC struct m32_page_t *m32_free_page_pool = NULL;
 /** Number of pages in free page pool */
-unsigned int m32_free_page_pool_size = 0;
+RTS_PUBLIC unsigned int m32_free_page_pool_size = 0;
 
 /**
  * Free a filled page or, if possible, place it in the free page pool.

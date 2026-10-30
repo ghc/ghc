@@ -23,6 +23,14 @@
 #define FS_L(p, n) FS_FULL(p, n)
 #define FS(name) FS_L(prefix, name)
 
+/* Symbols that must be exported from the RTS shared library. */
+#if defined(COMPILING_RTS)
+#include "RtsPublic.h"
+#define FS_PUBLIC RTS_PUBLIC
+#else
+#define FS_PUBLIC
+#endif
+
 #if defined(_WIN32)
 #include <wchar.h>
 // N.B. <sys/stat.h> defines some macro rewrites to, e.g., turn _wstat into
@@ -38,7 +46,7 @@ int FS(swopen) (const wchar_t* filename, int oflag,
 int FS(sopen) (const char* filename, int oflag,
                int shflag, int pmode);
 FILE *FS(fwopen) (const wchar_t* filename, const wchar_t* mode);
-FILE *FS(fopen) (const char* filename, const char* mode);
+FS_PUBLIC FILE *FS(fopen) (const char* filename, const char* mode);
 int FS(_stat) (const char *path, struct _stat *buffer);
 int FS(_stat64) (const char *path, struct __stat64 *buffer);
 int FS(_wstat) (const wchar_t *path, struct _stat *buffer);
@@ -51,5 +59,5 @@ int FS(_wunlink) (const wchar_t *filename);
 int FS(remove) (const char *path);
 int FS(_wremove) (const wchar_t *path);
 #else
-FILE *FS(fopen) (const char* filename, const char* mode);
+FS_PUBLIC FILE *FS(fopen) (const char* filename, const char* mode);
 #endif

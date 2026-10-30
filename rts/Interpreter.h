@@ -9,8 +9,8 @@
 #pragma once
 
 RTS_PRIVATE Capability *interpretBCO (Capability* cap);
-void interp_startup ( void );
-void interp_shutdown ( void );
+RTS_PUBLIC void interp_startup ( void );
+RTS_PUBLIC void interp_shutdown ( void );
 
 // The following debugger functions are exported from here, but not from the
 // RTS public api (RtsApi.h). They are used by the `ghci` library to implement
@@ -18,17 +18,17 @@ void interp_shutdown ( void );
 // break-on-exception.
 
 // Debugger single step
-void rts_enableStopNextBreakpointAll  ( void );
-void rts_disableStopNextBreakpointAll ( void );
-void rts_enableStopNextBreakpoint     ( StgTSO* );
-void rts_disableStopNextBreakpoint    ( StgTSO* );
+RTS_PUBLIC void rts_enableStopNextBreakpointAll  ( void );
+RTS_PUBLIC void rts_disableStopNextBreakpointAll ( void );
+RTS_PUBLIC void rts_enableStopNextBreakpoint     ( StgTSO* );
+RTS_PUBLIC void rts_disableStopNextBreakpoint    ( StgTSO* );
 
 // Debugger step out
-void rts_enableStopAfterReturn        ( StgTSO* );
-void rts_disableStopAfterReturn       ( StgTSO* );
+RTS_PUBLIC void rts_enableStopAfterReturn        ( StgTSO* );
+RTS_PUBLIC void rts_disableStopAfterReturn       ( StgTSO* );
 
 // Debugger stop on exception
-void rts_enableStopOnException        ( StgTSO* );
-void rts_disableStopOnException       ( StgTSO* );
-void rts_enableStopOnExceptionAll     ( void );
-void rts_disableStopOnExceptionAll    ( void );
+RTS_PUBLIC void rts_enableStopOnException        ( StgTSO* );
+RTS_PUBLIC void rts_disableStopOnException       ( StgTSO* );
+RTS_PUBLIC void rts_enableStopOnExceptionAll     ( void );
+RTS_PUBLIC void rts_disableStopOnExceptionAll    ( void );

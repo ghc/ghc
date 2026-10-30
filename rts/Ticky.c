@@ -15,14 +15,14 @@
 /* Catch-all top-level counter struct.  Allocations from CAFs will go
  * here.
  */
-StgEntCounter top_ct
+RTS_PUBLIC StgEntCounter top_ct
         = { 0, 0, 0,
             "TOP", "", "",NULL,
             0, 0, NULL };
 
 /* Data structure used in ``registering'' one of these counters. */
 
-StgEntCounter *ticky_entry_ctrs = NULL; /* root of list of them */
+RTS_PUBLIC StgEntCounter *ticky_entry_ctrs = NULL; /* root of list of them */
 
 /* We want Haskell code compiled with -ticky to be linkable with any
  * version of the RTS, so we have to make sure all the symbols that

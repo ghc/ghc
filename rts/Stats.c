@@ -28,7 +28,7 @@
 
 #if defined(THREADED_RTS)
 // Protects all statistics below
-Mutex stats_mutex;
+RTS_PUBLIC Mutex stats_mutex;
 #endif
 
 static Time
@@ -49,10 +49,10 @@ static Time HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 #endif
 
 #if defined(PROF_SPIN)
-volatile StgWord64 whitehole_lockClosure_spin = 0;
-volatile StgWord64 whitehole_lockClosure_yield = 0;
-volatile StgWord64 whitehole_threadPaused_spin = 0;
-volatile StgWord64 whitehole_executeMessage_spin = 0;
+RTS_PUBLIC volatile StgWord64 whitehole_lockClosure_spin = 0;
+RTS_PUBLIC volatile StgWord64 whitehole_lockClosure_yield = 0;
+RTS_PUBLIC volatile StgWord64 whitehole_threadPaused_spin = 0;
+RTS_PUBLIC volatile StgWord64 whitehole_executeMessage_spin = 0;
 #endif
 
 //
@@ -198,7 +198,7 @@ initStats0(void)
    initStats1() can be called after setupRtsFlags()
    ------------------------------------------------------------------------ */
 
-void initGenerationStats(void);
+RTS_PUBLIC void initGenerationStats(void);
 
 void
 initStats1 (void)

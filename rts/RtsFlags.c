@@ -46,12 +46,12 @@ RTS_FLAGS RtsFlags;
  */
 int     prog_argc = 0;    /* an "int" so as to match normal "argc" */
 char  **prog_argv = NULL;
-int     full_prog_argc = 0;    /* an "int" so as to match normal "argc" */
-char  **full_prog_argv = NULL;
+RTS_PUBLIC int     full_prog_argc = 0;    /* an "int" so as to match normal "argc" */
+RTS_PUBLIC char  **full_prog_argv = NULL;
 char   *prog_name = NULL; /* 'basename' of prog_argv[0] */
 int     rts_argc = 0;  /* ditto */
 char  **rts_argv = NULL;
-int     rts_argv_size = 0;
+RTS_PUBLIC int     rts_argv_size = 0;
 #if defined(mingw32_HOST_OS)
 // On Windows hs_main uses GetCommandLineW to get Unicode arguments and
 // passes them along UTF8 encoded as argv. We store them here in order to
