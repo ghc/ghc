@@ -374,6 +374,14 @@ test('plugins-external',
       when(opsys('mingw32') or (opsys('linux') and not ghc_dynamic()), fragile(20706))],
      makefile_test, [])
 
+test('static-plugin-interp-panic',
+     [extra_files(['static-plugin-interp-panic-module.hs']),
+      unless(config.have_RTS_linker, skip),
+      extra_run_opts('"' + config.libdir + '"'),
+      req_th],
+     compile_and_run,
+     ['-package ghc -j1'])
+
 test('test-phase-hooks-plugin',
      [extra_files(['hooks-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C hooks-plugin package.test-phase-hooks-plugin TOP={top}'),

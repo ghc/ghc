@@ -1,0 +1,19 @@
+static-plugin-interp-panic-module.hs:12:5: error: [GHC-87897]
+    • Exception when trying to run compile-time code:
+        panic! (the 'impossible' happened)
+  GHC version 10.1.20261027:
+	static-plugin-interp-panic: panic loading GHC.Internal.Real
+
+Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug
+
+      Code: (do _ <- reifyModule
+                       (Module (PkgName "ghc-internal") (ModName "GHC.Internal.Real"))
+                litE (integerL 42))
+    • In the untyped splice:
+        $(do _ <- reifyModule
+                    (Module (PkgName "ghc-internal") (ModName "GHC.Internal.Real"))
+             litE (integerL 42))
+   |
+12 | x = $(do _ <- reifyModule (Module (PkgName "ghc-internal")
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...
+
