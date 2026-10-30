@@ -80,8 +80,8 @@ typedef struct CostCentreStack_ {
  * See the module GHC.Profiling.
  * ---------------------------------------------------------------------------*/
 
-void stopProfTimer      ( void );
-void startProfTimer     ( void );
+RTS_PUBLIC void stopProfTimer      ( void );
+RTS_PUBLIC void startProfTimer     ( void );
 
 /* -----------------------------------------------------------------------------
  * The rest is PROFILING only...
@@ -127,58 +127,58 @@ typedef struct IndexTable_ {
 
 #if IN_STG_CODE
 
-extern StgWord CC_MAIN[];
-extern StgWord CCS_MAIN[];      // Top CCS
+extern RTS_PUBLIC StgWord CC_MAIN[];
+extern RTS_PUBLIC StgWord CCS_MAIN[];      // Top CCS
 
-extern StgWord CC_SYSTEM[];
-extern StgWord CCS_SYSTEM[];    // RTS costs
+extern RTS_PUBLIC StgWord CC_SYSTEM[];
+extern RTS_PUBLIC StgWord CCS_SYSTEM[];    // RTS costs
 
-extern StgWord CC_GC[];
-extern StgWord CCS_GC[];         // Garbage collector costs
+extern RTS_PUBLIC StgWord CC_GC[];
+extern RTS_PUBLIC StgWord CCS_GC[];         // Garbage collector costs
 
-extern StgWord CC_OVERHEAD[];
-extern StgWord CCS_OVERHEAD[];   // Profiling overhead
+extern RTS_PUBLIC StgWord CC_OVERHEAD[];
+extern RTS_PUBLIC StgWord CCS_OVERHEAD[];   // Profiling overhead
 
-extern StgWord CC_DONT_CARE[];
-extern StgWord CCS_DONT_CARE[];  // CCS attached to static constructors
+extern RTS_PUBLIC StgWord CC_DONT_CARE[];
+extern RTS_PUBLIC StgWord CCS_DONT_CARE[];  // CCS attached to static constructors
 
 #else
 
-extern CostCentre      CC_MAIN[];
-extern CostCentreStack CCS_MAIN[];      // Top CCS
+extern RTS_PUBLIC CostCentre      CC_MAIN[];
+extern RTS_PUBLIC CostCentreStack CCS_MAIN[];      // Top CCS
 
-extern CostCentre      CC_SYSTEM[];
-extern CostCentreStack CCS_SYSTEM[];    // RTS costs
+extern RTS_PUBLIC CostCentre      CC_SYSTEM[];
+extern RTS_PUBLIC CostCentreStack CCS_SYSTEM[];    // RTS costs
 
-extern CostCentre      CC_GC[];
-extern CostCentreStack CCS_GC[];         // Garbage collector costs
+extern RTS_PUBLIC CostCentre      CC_GC[];
+extern RTS_PUBLIC CostCentreStack CCS_GC[];         // Garbage collector costs
 
-extern CostCentre      CC_OVERHEAD[];
-extern CostCentreStack CCS_OVERHEAD[];   // Profiling overhead
+extern RTS_PUBLIC CostCentre      CC_OVERHEAD[];
+extern RTS_PUBLIC CostCentreStack CCS_OVERHEAD[];   // Profiling overhead
 
-extern CostCentre      CC_DONT_CARE[];
-extern CostCentreStack CCS_DONT_CARE[];  // shouldn't ever get set
+extern RTS_PUBLIC CostCentre      CC_DONT_CARE[];
+extern RTS_PUBLIC CostCentreStack CCS_DONT_CARE[];  // shouldn't ever get set
 
-extern CostCentre      CC_PINNED[];
-extern CostCentreStack CCS_PINNED[];     // pinned memory
+extern RTS_PUBLIC CostCentre      CC_PINNED[];
+extern RTS_PUBLIC CostCentreStack CCS_PINNED[];     // pinned memory
 
-extern CostCentre      CC_IDLE[];
-extern CostCentreStack CCS_IDLE[];       // capability is idle
+extern RTS_PUBLIC CostCentre      CC_IDLE[];
+extern RTS_PUBLIC CostCentreStack CCS_IDLE[];       // capability is idle
 
 #endif /* IN_STG_CODE */
 
-extern unsigned int RTS_VAR(era);
-extern StgWord RTS_VAR(user_era);
+extern RTS_PUBLIC unsigned int RTS_VAR(era);
+extern RTS_PUBLIC StgWord RTS_VAR(user_era);
 
 /* -----------------------------------------------------------------------------
  * Functions
  * ---------------------------------------------------------------------------*/
 
-CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
-void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
-CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
+RTS_PUBLIC CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
+RTS_PUBLIC void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
+RTS_PUBLIC CostCentre *mkCostCentre (char *label, char *module, char *srcloc);
 
-extern CostCentre * RTS_VAR(CC_LIST);               // registered CC list
+extern RTS_PUBLIC CostCentre * RTS_VAR(CC_LIST);               // registered CC list
 
 /* -----------------------------------------------------------------------------
  * Declaring Cost Centres & Cost Centre Stacks.

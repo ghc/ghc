@@ -9,8 +9,8 @@
 
 #if defined(__wasm_reference_types__)
 
-extern HsBool rts_JSFFI_flag;
-extern HsStablePtr rts_threadDelay_impl;
+extern RTS_PUBLIC HsBool rts_JSFFI_flag;
+extern RTS_PUBLIC HsStablePtr rts_threadDelay_impl;
 
 __attribute__((__weak__))
 int __main_argc_argv(int argc, char *argv[]);
@@ -79,7 +79,7 @@ static void __init_ghc_hs_iface_jsffi(void) {
 // dyld, after at least rts & ghc-internal has been loaded.
 
 #if defined(__PIC__)
-__attribute__((export_name("__ghc_wasm_jsffi_init"))) void __ghc_wasm_jsffi_init(void);
+__attribute__((export_name("__ghc_wasm_jsffi_init"))) RTS_PUBLIC void __ghc_wasm_jsffi_init(void);
 #else
 __attribute__((constructor(102))) static void __ghc_wasm_jsffi_init(void);
 #endif
@@ -170,7 +170,7 @@ static void __wrapped_freeJSVal(JSValKey k) {
   __imported_freeJSVal(k);
 }
 
-HaskellObj rts_mkJSVal(Capability*, HsJSVal);
+RTS_PUBLIC HaskellObj rts_mkJSVal(Capability*, HsJSVal);
 HaskellObj rts_mkJSVal(Capability *cap, HsJSVal v) {
   JSValKey k = __imported_newJSVal(v);
 
@@ -216,7 +216,7 @@ STATIC_INLINE HsJSVal rts_getJSValzh(HaskellObj p) {
   return __imported_getJSVal((JSValKey)p->payload[1]);
 }
 
-HsJSVal rts_getJSVal(HaskellObj);
+RTS_PUBLIC HsJSVal rts_getJSVal(HaskellObj);
 HsJSVal rts_getJSVal(HaskellObj box) {
   ASSERT(UNTAG_CLOSURE(box)->header.info == ghc_hs_iface->JSVal_con_info);
   return rts_getJSValzh(UNTAG_CLOSURE(box)->payload[0]);
@@ -235,13 +235,13 @@ extern const StgInfoTable stg_scheduler_loop_info;
 __attribute__((import_module("ghc_wasm_jsffi"), import_name("scheduleWork")))
 void __imported_scheduleWork(void);
 
-void rts_scheduleWork(void);
+RTS_PUBLIC void rts_scheduleWork(void);
 void rts_scheduleWork(void) {
   __imported_scheduleWork();
 }
 
 __attribute__((export_name("rts_schedulerLoop")))
-void rts_schedulerLoop(void);
+RTS_PUBLIC void rts_schedulerLoop(void);
 void rts_schedulerLoop(void) {
   Capability *cap = rts_lock();
   StgTSO *tso = createThread(cap, RESERVED_STACK_WORDS);
@@ -260,12 +260,12 @@ void rts_schedulerLoop(void) {
 
 #define mk_rtsPromiseResolve(T)                            \
   __attribute__((export_name("rts_promiseResolve"#T)))     \
-  void rts_promiseResolve##T(HsStablePtr, Hs##T);          \
+  RTS_PUBLIC void rts_promiseResolve##T(HsStablePtr, Hs##T); \
   void rts_promiseResolve##T(HsStablePtr sp, Hs##T js_res) \
   mk_rtsPromiseCallback(rts_mk##T(cap, js_res))
 
 __attribute__((export_name("rts_promiseResolveUnit")))
-void rts_promiseResolveUnit(HsStablePtr);
+RTS_PUBLIC void rts_promiseResolveUnit(HsStablePtr);
 void rts_promiseResolveUnit(HsStablePtr sp)
   mk_rtsPromiseCallback(TAG_CLOSURE(1, Unit_closure))
 
@@ -289,12 +289,12 @@ mk_rtsPromiseResolve(StablePtr)
 mk_rtsPromiseResolve(Bool)
 
 __attribute__((export_name("rts_promiseReject")))
-void rts_promiseReject(HsStablePtr, HsJSVal);
+RTS_PUBLIC void rts_promiseReject(HsStablePtr, HsJSVal);
 void rts_promiseReject(HsStablePtr sp, HsJSVal js_err)
   mk_rtsPromiseCallback(rts_apply(cap, ghc_hs_iface->raiseJSException_closure, rts_mkJSVal(cap, js_err)))
 
 __attribute__((export_name("rts_promiseThrowTo")))
-void rts_promiseThrowTo(HsStablePtr, HsJSVal);
+RTS_PUBLIC void rts_promiseThrowTo(HsStablePtr, HsJSVal);
 void rts_promiseThrowTo(HsStablePtr sp, HsJSVal js_err) {
   Capability *cap = &MainCapability;
   StgWeak *w = (StgWeak *)deRefStablePtr(sp);
@@ -315,7 +315,7 @@ void rts_promiseThrowTo(HsStablePtr sp, HsJSVal js_err) {
 }
 
 __attribute__((export_name("rts_freeStablePtr")))
-void rts_freeStablePtr(HsStablePtr);
+RTS_PUBLIC void rts_freeStablePtr(HsStablePtr);
 void rts_freeStablePtr(HsStablePtr sp) {
   hs_free_stable_ptr(sp);
 }

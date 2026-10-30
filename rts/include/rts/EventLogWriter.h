@@ -41,12 +41,12 @@ typedef struct {
  * An EventLogWriter which writes eventlogs to
  * a file `program.eventlog`.
  */
-extern const EventLogWriter FileEventLogWriter;
+extern RTS_PUBLIC const EventLogWriter FileEventLogWriter;
 
 /*
  * An EventLogWriter which does nothing.
  */
-extern const EventLogWriter NullEventLogWriter;
+extern RTS_PUBLIC const EventLogWriter NullEventLogWriter;
 
 enum EventLogStatus {
   /* The runtime system wasn't compiled with eventlog support. */
@@ -60,24 +60,24 @@ enum EventLogStatus {
 /*
  * Query whether the current runtime system supports eventlogging.
  */
-enum EventLogStatus eventLogStatus(void);
+RTS_PUBLIC enum EventLogStatus eventLogStatus(void);
 
 /*
  * Initialize event logging using the given EventLogWriter.
  * Returns true on success or false if an EventLogWriter is already configured
  * or eventlogging isn't supported by the runtime.
  */
-bool startEventLogging(const EventLogWriter *writer);
+RTS_PUBLIC bool startEventLogging(const EventLogWriter *writer);
 
 /*
  * Stop event logging and destroy the current EventLogWriter.
  */
-void endEventLogging(void);
+RTS_PUBLIC void endEventLogging(void);
 
 /*
  * Flush the eventlog. cap can be NULL if one is not held.
  */
-void flushEventLog(Capability **cap);
+RTS_PUBLIC void flushEventLog(Capability **cap);
 
 /*
  * An enumeration for the runtime trace flags.
@@ -100,7 +100,7 @@ typedef enum {
  * RTS never writes to these values, but concurrently using getTraceFlag and
  * setTraceFlag for the same flag is a race condition.
  */
-bool getTraceFlag(RUNTIME_TRACE_FLAG flag);
+RTS_PUBLIC bool getTraceFlag(RUNTIME_TRACE_FLAG flag);
 
 /*
  * Set the value of the given runtime trace flag.
@@ -109,4 +109,4 @@ bool getTraceFlag(RUNTIME_TRACE_FLAG flag);
  * RTS never writes to these values. However, inconsistent reads may lead to
  * incorrect tracing for a short time after setting a trace flag.
  */
-void setTraceFlag(RUNTIME_TRACE_FLAG flag, bool value);
+RTS_PUBLIC void setTraceFlag(RUNTIME_TRACE_FLAG flag, bool value);

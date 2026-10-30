@@ -13,4 +13,4 @@
 
 #pragma once
 
-StgInt newSpark (StgRegTable *reg, StgClosure *p);
+RTS_PUBLIC StgInt newSpark (StgRegTable *reg, StgClosure *p);

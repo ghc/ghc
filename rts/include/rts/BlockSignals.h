@@ -24,11 +24,11 @@
  * when emptying the queue by running the handlers.
  *
  */
-void blockUserSignals(void);
+RTS_PUBLIC void blockUserSignals(void);
 
 /*
  * Function: unblockUserSignals()
  *
  * The inverse of blockUserSignals(); re-enable the deliver of console events.
  */
-void unblockUserSignals(void);
+RTS_PUBLIC void unblockUserSignals(void);

@@ -22,17 +22,17 @@ typedef struct {
     struct _ProddableBlock *data;
 } ProddableBlockSet;
 
-void initProddableBlockSet ( ProddableBlockSet* set );
+RTS_PUBLIC void initProddableBlockSet ( ProddableBlockSet* set );
 
 // Insert an interval.
-void addProddableBlock ( ProddableBlockSet* set, void* start, size_t size );
+RTS_PUBLIC void addProddableBlock ( ProddableBlockSet* set, void* start, size_t size );
 
 // Check that an address belongs to the set.
-void checkProddableBlock (const ProddableBlockSet *set, void *addr, size_t size );
+RTS_PUBLIC void checkProddableBlock (const ProddableBlockSet *set, void *addr, size_t size );
 
 
 // Free a set.
-void freeProddableBlocks (ProddableBlockSet *set);
+RTS_PUBLIC void freeProddableBlocks (ProddableBlockSet *set);
 
 // For testing.
-bool containsSpan ( const ProddableBlockSet *set, uintptr_t start, uintptr_t end );
+RTS_PUBLIC bool containsSpan ( const ProddableBlockSet *set, uintptr_t start, uintptr_t end );

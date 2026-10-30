@@ -9,7 +9,7 @@
 #if defined(OBJFORMAT_ELF)
 
 /* five 4 byte instructions */
-const size_t instSizeAarch64 = 4;
+RTS_PUBLIC const size_t instSizeAarch64 = 4;
 const size_t stubSizeAarch64 = 5 * 4;
 
 /*

@@ -68,4 +68,4 @@ typedef struct {
 #endif
 } HsIface;
 
-extern HsIface *ghc_hs_iface;
+extern RTS_PUBLIC HsIface *ghc_hs_iface;

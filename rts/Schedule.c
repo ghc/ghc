@@ -74,7 +74,7 @@
 
 // Bytes allocated since the last time a HeapOverflow exception was thrown by
 // the RTS
-uint64_t allocated_bytes_at_heapoverflow = 0;
+RTS_PUBLIC uint64_t allocated_bytes_at_heapoverflow = 0;
 
 /* Set to true when the latest garbage collection failed to reclaim enough
  * space, and the runtime should proceed to shut itself down in an orderly
@@ -97,8 +97,8 @@ StgWord recent_activity = ACTIVITY_YES;
 StgWord sched_state = SCHED_RUNNING;
 
 
-bool allocLimitKill = true;
-bool allocLimitRunHook = false;
+RTS_PUBLIC bool allocLimitKill = true;
+RTS_PUBLIC bool allocLimitRunHook = false;
 
 /*
  * This mutex protects most of the global scheduler data in

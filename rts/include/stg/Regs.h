@@ -423,7 +423,7 @@ struct PartCapability_ {
  * its own Capability.
  */
 #if IN_STG_CODE && !(defined(THREADED_RTS) && !defined(NOSMP))
-extern W_ MainCapability[];
+extern RTS_PUBLIC W_ MainCapability[];
 #endif
 
 /*

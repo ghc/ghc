@@ -23,40 +23,40 @@ typedef void (*free_thing_fn)(void *);
 typedef struct Pool_ Pool;
 
 /* Create a pool of things. */
-Pool *poolInit(uint32_t max_size, uint32_t desired_size,
+RTS_PUBLIC Pool *poolInit(uint32_t max_size, uint32_t desired_size,
                alloc_thing_fn alloc_fn, free_thing_fn free_fn);
 
 /* Free a pool. Returns 0 on success or 1 on failure due to things
  * belonging to the pool currently being claimed. */
-int poolFree(Pool *pool);
+RTS_PUBLIC int poolFree(Pool *pool);
 
 /* Set the maximum size of a pool (0 indicates unbounded). desired_size will be
  * lowered if necessary. */
-void poolSetMaxSize(Pool *pool, uint32_t size);
+RTS_PUBLIC void poolSetMaxSize(Pool *pool, uint32_t size);
 
 /* Get the maximum size of a pool */
-uint32_t poolGetMaxSize(Pool *pool);
+RTS_PUBLIC uint32_t poolGetMaxSize(Pool *pool);
 
 /* Set the desired size of a pool */
-void poolSetDesiredSize(Pool *pool, uint32_t size);
+RTS_PUBLIC void poolSetDesiredSize(Pool *pool, uint32_t size);
 
 /* Get the desired size of a pool */
-uint32_t poolGetDesiredSize(Pool *pool);
+RTS_PUBLIC uint32_t poolGetDesiredSize(Pool *pool);
 
 /* Try to grab an available thing from a pool, returning NULL if no things
  * are available.
  */
-void *poolTryTake(Pool *pool);
+RTS_PUBLIC void *poolTryTake(Pool *pool);
 
 /* Grab an available thing from a pool. This will block if no elements are
  * available in the case of a threaded runtime or abort in a single-threaded
  * environment.
  */
-void *poolTake(Pool *pool);
+RTS_PUBLIC void *poolTake(Pool *pool);
 
 /* Release a thing back to the pool from which it was taken */
-void poolRelease(Pool *pool, void *thing);
+RTS_PUBLIC void poolRelease(Pool *pool, void *thing);
 
 /* Invalidate all currently allocated resources. Things which are currently
  * taken will be freed upon release instead of being returned to the pool. */
-void poolFlush(Pool *pool);
+RTS_PUBLIC void poolFlush(Pool *pool);

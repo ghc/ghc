@@ -15,5 +15,5 @@ RTS_PRIVATE void threadPaused ( Capability *cap, StgTSO * );
 #include "EndPrivate.h"
 
 #if defined(THREADED_RTS) && defined(PROF_SPIN)
-extern volatile StgWord64 whitehole_threadPaused_spin;
+extern RTS_PUBLIC volatile StgWord64 whitehole_threadPaused_spin;
 #endif

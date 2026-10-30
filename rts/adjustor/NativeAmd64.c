@@ -5,16 +5,17 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
+#include "RtsPublic.h"
 #include "RtsUtils.h"
 #include "StablePtr.h"
 #include "Adjustor.h"
 #include "AdjustorPool.h"
 
 #define DECLARE_ADJUSTOR_TEMPLATE(NAME) \
-    extern uint8_t NAME ## _adjustor; \
-    extern uint8_t NAME ## _adjustor_context; \
-    extern uint8_t NAME ## _adjustor_end; \
-    const struct AdjustorTemplate NAME ## _adjustor_template = { \
+    extern RTS_PUBLIC uint8_t NAME ## _adjustor; \
+    extern RTS_PUBLIC uint8_t NAME ## _adjustor_context; \
+    extern RTS_PUBLIC uint8_t NAME ## _adjustor_end; \
+    RTS_PUBLIC const struct AdjustorTemplate NAME ## _adjustor_template = { \
         .code_start = (uint8_t *) &NAME ## _adjustor, \
         .code_end = (uint8_t *) &NAME ## _adjustor_end, \
         .context_ptr = (const struct AdjustorContext **) &NAME ## _adjustor_context, \
