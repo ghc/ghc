@@ -80,7 +80,7 @@ import GHC.IO           ( catchException, unsafePerformIO )
 import GHC.IO.Exception (IOErrorType(InappropriateType))
 import GHC.Stack.Types (HasCallStack)
 import Data.List ( group, sort, sortBy, nub, partition, find
-                 , intersperse, unfoldr
+                 , intercalate, intersperse, unfoldr
                  , isInfixOf, isSuffixOf, isPrefixOf, stripPrefix )
 import Control.Concurrent
 import qualified Data.Foldable as F
@@ -101,7 +101,6 @@ import qualified System.Info(os)
 #endif
 
 import GHC.Toolchain.Target
-import Data.ByteString.Builder
 
 -- | Short-circuit 'any' with a \"monadic predicate\".
 anyM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
@@ -1723,19 +1722,14 @@ doDump :: Bool -> [(InstalledPackageInfo, OsPath)] -> IO ()
 doDump expand_pkgroot pkgs = do
   -- fix the encoding to UTF-8, since this is an interchange format
   hSetEncoding stdout utf8
-  hPutBuilder stdout $
-    go
-      [ if expand_pkgroot
-          then showInstalledPackageInfoBuilder pkg
-          else showInstalledPackageInfoBuilder pkg <> pkgrootField
-      | (pkg, pkgloc) <- pkgs
-      , let pkgroot      = takeDirectory pkgloc
-            pkgrootField = stringUtf8 $ "pkgroot: " ++ show pkgroot ++ "\n" ]
-      <> char7 '\n'
-    where
-      go [] = mempty
-      go [l] = l
-      go (l:ls) = l <> string7 "---\n" <> go ls
+  putStrLn $
+    intercalate "---\n"
+    [ if expand_pkgroot
+        then showInstalledPackageInfo pkg
+        else showInstalledPackageInfo pkg ++ pkgrootField
+    | (pkg, pkgloc) <- pkgs
+    , let pkgroot      = takeDirectory pkgloc
+          pkgrootField = "pkgroot: " ++ show pkgroot ++ "\n" ]
 
 -- PackageId is can have globVersion for the version
 findPackages :: PackageDBStack -> PackageArg -> IO [InstalledPackageInfo]
