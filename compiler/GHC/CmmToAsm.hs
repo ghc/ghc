@@ -169,10 +169,10 @@
 --      ncgMakeFarBranches. On PowerPC, AArch64, RISC-V and LoongArch, this
 --      rewrites the branches that may be out of range; on x86 and x86-64 it
 --      does nothing.
---  12. On x86-64, invertCondBranches swaps the targets of an integer
---      comparison's jump to the next block and of the jump after it, inverting
---      the condition, and drops the jump now to the next block, unless that has
---      an info table: then it swaps only if the CFG weighs the other edge more.
+--  12. On x86-64, invertCondBranches swaps the targets of a comparison's jump
+--      to the next block and of the jump after it, inverting the condition, and
+--      drops the jump now to the next block, unless that has an info table:
+--      then it swaps only if the CFG weighs the other edge more.
 --  13. Under -g, computeUnwinding collects the unwinding points
 --      (Note [Unwinding information in the NCG]). The procedure is then printed
 --      (Note [pprNatCmmDeclS and pprNatCmmDeclH] in GHC.CmmToAsm.Monad). At the
