@@ -39,7 +39,7 @@
 RtsMsgFunction *fatalInternalErrorFn = rtsFatalInternalErrorFn;
 RtsMsgFunctionRetLen *debugMsgFn           = rtsDebugMsgFn;
 RtsMsgFunction *errorMsgFn           = rtsErrorMsgFn;
-RtsMsgFunction *sysErrorMsgFn        = rtsSysErrorMsgFn;
+RTS_PUBLIC RtsMsgFunction *sysErrorMsgFn        = rtsSysErrorMsgFn;
 
 void
 barf(const char*s, ...)

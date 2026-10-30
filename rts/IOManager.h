@@ -28,7 +28,7 @@
  * of I/O manager we are using: one that uses the Windows native API HANDLEs,
  * or one that uses Posix style fds.
  */
-extern bool rts_IOManagerIsWin32Native;
+extern RTS_PUBLIC bool rts_IOManagerIsWin32Native;
 #endif
 
 #include "BeginPrivate.h"

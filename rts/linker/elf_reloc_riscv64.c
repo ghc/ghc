@@ -26,28 +26,28 @@ typedef uint16_t cinst_t;
 
 // TODO: These instances could be static. They are not yet, because we might
 // need their debugging symbols.
-char *relocationTypeToString(Elf64_Xword type);
-int32_t decodeAddendRISCV64(Section *section, Elf_Rel *rel);
-bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int32_t addend);
-void write8le(uint8_t *p, uint8_t v);
-uint8_t read8le(const uint8_t *P);
-void write16le(cinst_t *p, uint16_t v);
-uint16_t read16le(const cinst_t *P);
-uint32_t read32le(const inst_t *P);
-void write32le(inst_t *p, uint32_t v);
-uint64_t read64le(const uint64_t *P);
-void write64le(uint64_t *p, uint64_t v);
-uint32_t extractBits(uint64_t v, uint32_t begin, uint32_t end);
-void setCJType(cinst_t *loc, uint32_t val);
-void setCBType(cinst_t *loc, uint32_t val);
-void setBType(inst_t *loc, uint32_t val);
-void setSType(inst_t *loc, uint32_t val);
-int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *rel, ElfSymbol *symbol,
+RTS_PUBLIC char *relocationTypeToString(Elf64_Xword type);
+RTS_PUBLIC int32_t decodeAddendRISCV64(Section *section, Elf_Rel *rel);
+RTS_PUBLIC bool encodeAddendRISCV64(Section *section, Elf_Rel *rel, int32_t addend);
+RTS_PUBLIC void write8le(uint8_t *p, uint8_t v);
+RTS_PUBLIC uint8_t read8le(const uint8_t *P);
+RTS_PUBLIC void write16le(cinst_t *p, uint16_t v);
+RTS_PUBLIC uint16_t read16le(const cinst_t *P);
+RTS_PUBLIC uint32_t read32le(const inst_t *P);
+RTS_PUBLIC void write32le(inst_t *p, uint32_t v);
+RTS_PUBLIC uint64_t read64le(const uint64_t *P);
+RTS_PUBLIC void write64le(uint64_t *p, uint64_t v);
+RTS_PUBLIC uint32_t extractBits(uint64_t v, uint32_t begin, uint32_t end);
+RTS_PUBLIC void setCJType(cinst_t *loc, uint32_t val);
+RTS_PUBLIC void setCBType(cinst_t *loc, uint32_t val);
+RTS_PUBLIC void setBType(inst_t *loc, uint32_t val);
+RTS_PUBLIC void setSType(inst_t *loc, uint32_t val);
+RTS_PUBLIC int32_t computeAddend(ElfRelocationATable * relaTab, unsigned relNo, Elf_Rel *rel, ElfSymbol *symbol,
                       int64_t addend, ObjectCode *oc);
-void setJType(inst_t *loc, uint32_t val);
-void setIType(inst_t *loc, int32_t val);
-void checkInt(inst_t *loc, int32_t v, int n);
-void setUType(inst_t *loc, int32_t val);
+RTS_PUBLIC void setJType(inst_t *loc, uint32_t val);
+RTS_PUBLIC void setIType(inst_t *loc, int32_t val);
+RTS_PUBLIC void checkInt(inst_t *loc, int32_t v, int n);
+RTS_PUBLIC void setUType(inst_t *loc, int32_t val);
 
 
 char *relocationTypeToString(Elf64_Xword type) {

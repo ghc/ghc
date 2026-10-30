@@ -685,7 +685,7 @@ static void revert_ownership(Capability *cap STG_UNUSED,
 /*......................................................................*/
 
 // validate_optimistic()
-StgBool validate_trec_optimistic (Capability *cap, StgTRecHeader *trec);
+RTS_PUBLIC StgBool validate_trec_optimistic (Capability *cap, StgTRecHeader *trec);
 
 StgBool validate_trec_optimistic (Capability *cap, StgTRecHeader *trec) {
   StgBool result;

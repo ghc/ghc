@@ -107,6 +107,7 @@ library
     -- expects the unit-id to be
     -- set without version
     ghc-options: -this-unit-id rts
+    cc-options: -fvisibility=hidden
 
     exposed: True
     exposed-modules:

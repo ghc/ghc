@@ -4,8 +4,8 @@
 
 #if defined(OBJFORMAT_ELF)
 
-bool
+RTS_PUBLIC bool
 relocateObjectCodeRISCV64(ObjectCode * oc);
 
-void flushInstructionCacheRISCV64(ObjectCode *oc);
+RTS_PUBLIC void flushInstructionCacheRISCV64(ObjectCode *oc);
 #endif /* OBJETFORMAT_ELF */

@@ -583,7 +583,7 @@ static void nonmovingBumpEpoch(void) {
 memcount nonmoving_segment_live_words = 0;
 
 // See Note [Sync phase marking budget].
-MarkBudget sync_phase_marking_budget = 200000;
+RTS_PUBLIC MarkBudget sync_phase_marking_budget = 200000;
 
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads, bool concurrent);
 static void nonmovingInitAllocator(struct NonmovingAllocator* alloc, uint16_t block_size);
@@ -1012,13 +1012,13 @@ enum ConcurrentWorkerState {
     CONCURRENT_WORKER_STOPPED,
 };
 
-Mutex concurrent_coll_lock;
-MarkQueue *concurrent_mark_roots;
-Condition start_concurrent_mark_cond;
-Condition concurrent_coll_finished_cond;
-enum ConcurrentWorkerState concurrent_worker_state;
-bool stop_concurrent_worker;
-OSThreadId concurrent_worker_thread;
+RTS_PUBLIC Mutex concurrent_coll_lock;
+RTS_PUBLIC MarkQueue *concurrent_mark_roots;
+RTS_PUBLIC Condition start_concurrent_mark_cond;
+RTS_PUBLIC Condition concurrent_coll_finished_cond;
+RTS_PUBLIC enum ConcurrentWorkerState concurrent_worker_state;
+RTS_PUBLIC bool stop_concurrent_worker;
+RTS_PUBLIC OSThreadId concurrent_worker_thread;
 
 static void* nonmovingConcurrentMarkWorker(void *data STG_UNUSED)
 {

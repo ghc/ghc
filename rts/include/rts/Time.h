@@ -42,4 +42,4 @@ INLINE_HEADER Time fsecondsToTime (double t)
     return (Time)(t * TIME_RESOLUTION);
 }
 
-Time getProcessElapsedTime (void);
+RTS_PUBLIC Time getProcessElapsedTime (void);

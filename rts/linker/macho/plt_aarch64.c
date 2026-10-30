@@ -14,7 +14,7 @@
 #include <mach-o/reloc.h>
 
 /* five 4 byte instructions */
-const size_t instSizeAarch64 = 4;
+RTS_PUBLIC const size_t instSizeAarch64 = 4;
 const size_t stubSizeAarch64 = 5 * 4;
 
 bool needStubForRelAarch64(MachORelocationInfo * rel) {

@@ -32,14 +32,14 @@
 #define EVAL(x,y) PASTE(x,y)
 #define ADD_SUFFIX(x) EVAL(PASTE(x,),__suffix__)
 
-unsigned  numberOfStubsForSection( ObjectCode *oc, unsigned sectionIndex);
+RTS_PUBLIC unsigned  numberOfStubsForSection( ObjectCode *oc, unsigned sectionIndex);
 
 #define STUB_SIZE          ADD_SUFFIX(stubSize)
 
-bool findStub(Section * section, void* * addr, uint8_t flags);
-bool makeStub(Section * section, void* * addr, void* got_addr, uint8_t flags);
+RTS_PUBLIC bool findStub(Section * section, void* * addr, uint8_t flags);
+RTS_PUBLIC bool makeStub(Section * section, void* * addr, void* got_addr, uint8_t flags);
 
-void freeStubs(Section * section);
+RTS_PUBLIC void freeStubs(Section * section);
 
 #endif // OBJECTFORMAT_ELF
 

@@ -17,6 +17,7 @@
 #pragma once
 
 #define mkStoreAccessorPrototype(name)                                  \
+    RTS_PUBLIC                                                             \
     StgStablePtr                                                        \
     getOrSet##name(StgStablePtr ptr);
 
@@ -32,5 +33,5 @@ mkStoreAccessorPrototype(LibHSghcFastStringTable)
 mkStoreAccessorPrototype(LibHSghcGlobalHasPprDebug)
 mkStoreAccessorPrototype(LibHSghcGlobalHasNoDebugOutput)
 mkStoreAccessorPrototype(LibHSghcGlobalHasNoStateHack)
-extern HsWord64 ghc_unique_counter64;
-extern HsInt ghc_unique_inc;
+extern RTS_PUBLIC HsWord64 ghc_unique_counter64;
+extern RTS_PUBLIC HsInt ghc_unique_inc;

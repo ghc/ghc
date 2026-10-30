@@ -4,6 +4,8 @@
 
 #pragma once
 
-int totalArgumentSize(const char *typeString);
+#include "RtsPublic.h"
 
-void initAdjustors(void);
+RTS_PUBLIC int totalArgumentSize(const char *typeString);
+
+RTS_PUBLIC void initAdjustors(void);
