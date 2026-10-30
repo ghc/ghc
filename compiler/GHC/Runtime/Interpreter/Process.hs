@@ -4,6 +4,7 @@ module GHC.Runtime.Interpreter.Process
     Message(..)
   , sendMessage
   , sendTHComputation
+  , sendMessageWithResponse
   )
 where
 
@@ -16,9 +17,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Exception as Ex
 
 import Data.Binary
-import Control.Concurrent
 import Data.IORef
-import Control.Concurrent.STM
 
 -- -----------------------------------------------------------------------------
 -- Top-level Message API
@@ -34,29 +33,27 @@ sendMessage i msg =
   where
     proc = instProcess i
 
+sendMessageWithResponse :: Binary a => ExtInterpInstance c -> Message a -> (IO a -> IO b) -> IO b
+sendMessageWithResponse i msg k =
+  remoteCallWithResponse (interpPipe proc) msg k
+  where
+    proc = instProcess i
+
 -- | Send a message with a TH computation to the ext. interpreter (like
 -- 'RunTH', or 'RunModFinalizers') and handle 'THMessage' requests from the
--- ext. interpreter to us in the meantime.
---
--- This function blocks until the TH computation returns a value, but spawns in
--- the background a thread to handle the 'THMessage's until the TH computation
--- is fully done.
+-- ext. interpreter to us until done, then wait for the response.
 sendTHComputation
   :: Binary a
   => ExtInterpInstance d
   -> (InboxId -> Message a)
   -> (forall b. Binary b => THMessage b -> IO (Bool, b))
   -- ^ Handle one message. Return True to end the loop.
-  -- This handler must never uninterrutibly mask an expression which may get
-  -- stuck. If it does, then 'sendTHComputation' will also get uninterruptibly stuck.
   -> IO a
-sendTHComputation i msg reqHandler = mask $ \restore -> do
-  -- inline "withAsync/wait"
-  var  <- newEmptyTMVarIO
-  mbox <- newMailbox (pipeAsyncMngr (interpPipe proc))
-  ht   <- forkFinally (restore (handlerLoop mbox)) (atomically . putTMVar var)
-  restore (sendMessage i (msg mbox) <* atomically (readTMVar var))
-    `onException` uninterruptibleMask_ (throwTo ht CancelTHHandler)
+sendTHComputation i msg reqHandler =
+  withNewMailbox (pipeAsyncMngr (interpPipe proc)) $ \ mbox ->
+    sendMessageWithResponse i (msg mbox) $ \ waitRes -> do
+      handlerLoop mbox
+      waitRes
   where
     proc = instProcess i
     handleOne mbox doneRef = do
