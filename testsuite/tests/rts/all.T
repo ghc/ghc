@@ -785,3 +785,15 @@ test('T27272',
      , extra_run_opts('+RTS -N3 -ki512 -kc1k -kb128 -RTS')
      ],
      multimod_compile_and_run, ['T27272', '-O -threaded -fno-prof-auto'])
+
+# A finalizer run soon after the GC that finds its weak pointer dead, at the
+# next block boundary of the running thread, and not left for the next context
+# switch, which +RTS -C1 puts up to a second away (#28060). The threaded ways
+# are left out: there the RTS before the fix, too, ran the finalizer before
+# the loop's first iteration in some runs.
+test('T28060',
+     [ omit_ways(threaded_ways)
+     , js_skip
+     , extra_run_opts('+RTS -C1 -RTS')
+     ],
+     compile_and_run, [''])
