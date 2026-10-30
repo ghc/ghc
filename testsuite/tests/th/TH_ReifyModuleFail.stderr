@@ -1,0 +1,12 @@
+TH_ReifyModuleFail.hs:13:5: error: [GHC-87897]
+    • Exception when trying to run compile-time code:
+        Failed to load interface for ‘No.Such.Module’.
+no unit id matching ‘no-such-package-0’ was found
+      Code: (do _ <- reifyModule
+                       (Module (PkgName "no-such-package-0") (ModName "No.Such.Module"))
+                litE (integerL 1))
+    • In the untyped splice:
+        $(do _ <- reifyModule
+                    (Module (PkgName "no-such-package-0") (ModName "No.Such.Module"))
+             litE (integerL 1))
+
