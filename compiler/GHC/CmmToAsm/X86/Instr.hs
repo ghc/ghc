@@ -65,6 +65,7 @@ import GHC.Utils.Constants ( debugIsOn )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
+import GHC.Platform.CpuFeatures
 
 import GHC.Cmm.CLabel
 import GHC.Types.Unique.Set
@@ -1182,9 +1183,10 @@ movInstr config fmt =
       = f
 
     plat    = ncgPlatform config
-    avx     = ncgSseAvxVersion config >= Just AVX1
-    avx2    = ncgSseAvxVersion config >= Just AVX2
-    avx512f = ncgAvx512fEnabled config
+    feats   = ncgX86Features config
+    avx     = x86AvxEnabled feats
+    avx2    = x86Avx2Enabled feats
+    avx512f = x86Avx512FEnabled feats
     avx_move sFmt =
       if isFloatScalarFormat sFmt
       then assertCompatibleRegs $

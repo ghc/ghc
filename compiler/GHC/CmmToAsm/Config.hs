@@ -1,6 +1,7 @@
 -- | Native code generator configuration
 module GHC.CmmToAsm.Config
    ( NCGConfig(..)
+   , ncgX86Features
    , ncgWordWidth
    , ncgSpillPreallocSize
    , platformWordWidth
@@ -9,10 +10,12 @@ where
 
 import GHC.Prelude
 import GHC.Platform
+import GHC.Platform.CpuFeatures
 import GHC.Cmm.Type (Width(..))
 import GHC.CmmToAsm.CFG.Weight
 import GHC.Unit.Module (Module)
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -- | Native code generator configuration
 data NCGConfig = NCGConfig
@@ -29,12 +32,7 @@ data NCGConfig = NCGConfig
    , ncgRegsGraph             :: !Bool
    , ncgAsmLinting            :: !Bool            -- ^ Perform ASM linting pass
    , ncgDoConstantFolding     :: !Bool            -- ^ Perform CMM constant folding
-   , ncgSseAvxVersion         :: Maybe SseAvxVersion -- ^ (x86) SSE and AVX instructions
-   , ncgAvx512fEnabled        :: !Bool
-   , ncgAvx512vlEnabled       :: !Bool
-   , ncgAvx512bwEnabled       :: !Bool
-   , ncgAvx512dqEnabled       :: !Bool
-   , ncgBmiVersion            :: Maybe BmiVersion -- ^ (x86) BMI instructions
+   , ncgCpuFeatures           :: !CpuFeatures     -- ^ Enabled CPU features
    , ncgDumpRegAllocStages    :: !Bool
    , ncgDumpAsmStats          :: !Bool
    , ncgDumpAsmConflicts      :: !Bool
@@ -53,6 +51,13 @@ data NCGConfig = NCGConfig
    , ncgEnableDeadCodeElimination :: !Bool        -- ^ Whether to enable the dead-code elimination
    , ncgLa664Enabled          :: !Bool            -- ^ la664 is equal to isav1.1
    }
+
+-- | X86 only: enabled x86 CPU features.
+ncgX86Features :: NCGConfig -> X86Features
+ncgX86Features config =
+  case ncgCpuFeatures config of
+    X86CpuFeatures feats -> feats
+    _ -> panic "ncgX86Features: not an x86 target"
 
 -- | Return Word size
 ncgWordWidth :: NCGConfig -> Width

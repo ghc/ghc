@@ -260,12 +260,12 @@ discussion about portable pdep/pext intrinsics.
 -}
 genCall (PrimTarget op@(MO_Pdep w)) [dst] args = do
     cfg <- getConfig
-    if  llvmCgBmiVersion cfg >= Just BMI2
+    if  llvmCgBmi2Enabled cfg
         then genCallMinimumTruncationCast W32 w op dst args
         else genCallSimpleCast w op dst args
 genCall (PrimTarget op@(MO_Pext w)) [dst] args = do
     cfg <- getConfig
-    if  llvmCgBmiVersion cfg >= Just BMI2
+    if  llvmCgBmi2Enabled cfg
         then genCallMinimumTruncationCast W32 w op dst args
         else genCallSimpleCast w op dst args
 
@@ -852,7 +852,7 @@ cmmPrimOpFunctions :: CallishMachOp -> LlvmM LMString
 cmmPrimOpFunctions mop = do
   cfg      <- getConfig
   platform <- getPlatform
-  let !isBmi2Enabled = llvmCgBmiVersion cfg >= Just BMI2
+  let !isBmi2Enabled = llvmCgBmi2Enabled cfg
       !is32bit       = platformWordSize platform == PW4
       unsupported = panic ("cmmPrimOpFunctions: " ++ show mop
                         ++ " not supported here")

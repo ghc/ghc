@@ -204,24 +204,8 @@ module GHC.Driver.Session (
 
         setUnsafeGlobalDynFlags,
 
-        -- * SSE and AVX
-        isSse3Enabled,
-        isSsse3Enabled,
-        isSse4_1Enabled,
-        isSse4_2Enabled,
-        isBmiEnabled,
-        isBmi2Enabled,
-        isAvxEnabled,
-        isAvx2Enabled,
-        isAvx512bwEnabled,
-        isAvx512cdEnabled,
-        isAvx512dqEnabled,
-        isAvx512erEnabled,
-        isAvx512fEnabled,
-        isAvx512pfEnabled,
-        isAvx512vlEnabled,
-        isFmaEnabled,
-        isGfniEnabled,
+        -- * CPU features
+        targetCpuFeatures,
 
         -- LoongArch: ISA version: la664, la464(default)
         isLa664Enabled,
@@ -241,6 +225,7 @@ module GHC.Driver.Session (
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Platform.CpuFeatures
 import GHC.Platform.Ways
 import GHC.Platform.Profile
 import GHC.Platform.ArchOS
@@ -1724,40 +1709,6 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_faststrings)
 
         ------ Machine dependent (-m<blah>) stuff ---------------------------
-        -- See Note [Implications between X86 CPU feature flags]
-
-  , make_ord_flag defGhcFlag "msse"         (noArg (\d ->
-                                                  d { sseAvxVersion = max (Just SSE1) (sseAvxVersion d) }))
-  , make_ord_flag defGhcFlag "msse2"        (noArg (\d ->
-                                                  d { sseAvxVersion = max (Just SSE2) (sseAvxVersion d) }))
-  , make_ord_flag defGhcFlag "msse3"        (noArg (\d ->
-                                                  d { sseAvxVersion = max (Just SSE3) (sseAvxVersion d) }))
-  , make_ord_flag defGhcFlag "mssse3"       (noArg (\d ->
-                                                  d { sseAvxVersion = max (Just SSSE3) (sseAvxVersion d) }))
-  , make_ord_flag defGhcFlag "msse4"        (noArg (\d ->
-                                                  d { sseAvxVersion = max (Just SSE4) (sseAvxVersion d) }))
-  , make_ord_flag defGhcFlag "msse4.2"      (noArg (\d ->
-                                                 d { sseAvxVersion = max (Just SSE42) (sseAvxVersion d) }))
-  , make_ord_flag defGhcFlag "mbmi"         (noArg (\d ->
-                                                 d { bmiVersion = max (Just BMI1) (bmiVersion d) }))
-  , make_ord_flag defGhcFlag "mbmi2"        (noArg (\d ->
-                                                 d { bmiVersion = Just BMI2 }))
-  , make_ord_flag defGhcFlag "mavx"         (noArg (\d ->
-                                                 d { sseAvxVersion = max (Just AVX1) (sseAvxVersion d) }))
-  , make_ord_flag defGhcFlag "mavx2"        (noArg (\d ->
-                                                 d { sseAvxVersion = max (Just AVX2) (sseAvxVersion d) }))
-  , make_ord_flag defGhcFlag "mavx512bw"    (noArg (\d -> d { avx512bw = True }))
-  , make_ord_flag defGhcFlag "mavx512cd"    (noArg (\d -> d { avx512cd = True }))
-  , make_ord_flag defGhcFlag "mavx512dq"    (noArg (\d -> d { avx512dq = True }))
-  , make_dep_flag defGhcFlag "mavx512er"    (noArg (\d -> d { avx512er = True }))
-        "AVX-512ER was only available on Xeon Phi"
-  , make_ord_flag defGhcFlag "mavx512f"     (noArg (\d -> d { avx512f = True }))
-  , make_dep_flag defGhcFlag "mavx512pf"    (noArg (\d -> d { avx512pf = True }))
-        "AVX-512PF was only available on Xeon Phi"
-  , make_ord_flag defGhcFlag "mavx512vl"    (noArg (\d -> d { avx512vl = True }))
-  , make_ord_flag defGhcFlag "mfma"         (noArg (\d -> d { fma = True }))
-  , make_ord_flag defGhcFlag "mgfni"        (noArg (\d -> d { gfni = True }))
-
 
   , make_ord_flag defGhcFlag "mla664"       (noArg (\d -> d { la664 = True }))
 
@@ -2021,6 +1972,11 @@ dynamic_flags_deps = [
          ------ Debugging flags ----------------------------------------------
   , make_ord_flag defGhcFlag "g"             (OptIntSuffix setDebugLevel)
  ]
+         ------ CPU features -------------------------------------------------
+ ++ map cpuFeatureFlagDep [minBound .. maxBound]
+
+         ------ Negation -----------------------------------------------------
+
  ++ map (mkFlag turnOn  ""          setGeneralFlag    ) negatableFlagsDeps
  ++ map (mkFlag turnOff "no-"       unSetGeneralFlag  ) negatableFlagsDeps
  ++ map (mkFlag turnOn  "d"         setGeneralFlag    ) dFlagsDeps
@@ -2974,6 +2930,18 @@ optIntSuffixM fn = OptIntSuffix (\mi -> updM (fn mi))
 
 setDumpFlag :: DumpFlag -> OptKind (CmdLineP DynFlags)
 setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
+
+setCpuFeature :: CpuFeature -> DynFlags -> DynFlags
+setCpuFeature feat dflags = dflags { cpuFeatures = EnumSet.insert feat (cpuFeatures dflags) }
+
+-- | The @-m\<feature\>@ flag for a 'CpuFeature'.
+cpuFeatureFlagDep :: CpuFeature -> (Deprecation, Flag (CmdLineP DynFlags))
+cpuFeatureFlagDep feat =
+  case cpuFeatureFlag feat of
+    (name, Nothing ) -> make_ord_flag defGhcFlag ('m' : name) set
+    (name, Just msg) -> make_dep_flag defGhcFlag ('m' : name) set msg
+  where
+    set = noArg (setCpuFeature feat)
 
 --------------------------
 addWayDynP :: Way -> DynP ()

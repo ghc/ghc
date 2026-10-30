@@ -39,37 +39,8 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgDumpRegAllocStages    = dopt Opt_D_dump_asm_regalloc_stages dflags
    , ncgDumpAsmStats          = dopt Opt_D_dump_asm_stats dflags
    , ncgDumpAsmConflicts      = dopt Opt_D_dump_asm_conflicts dflags
-   , ncgBmiVersion            = case platformArch (targetPlatform dflags) of
-                                 ArchX86_64 -> bmiVersion dflags
-                                 ArchX86    -> bmiVersion dflags
-                                 _          -> Nothing
-
-     -- We assume  SSE1 and SSE2 operations are available on both
-     -- x86 and x86_64. Historically we didn't default to SSE2 and
-     -- SSE1 on x86, which results in defacto nondeterminism for how
-     -- rounding behaves in the associated x87 floating point instructions
-     -- because variations in the spill/fpu stack placement of arguments for
-     -- operations would change the precision and final result of what
-     -- would otherwise be the same expressions with respect to single or
-     -- double precision IEEE floating point computations.
-
-     -- ncgSseAvxVersion is set to the actual SSE/AVX version.
-     -- For example, -mfma does not set DynFlags's sseAvxVersion, but makes ncgSseAvxVersion >= AVX1.
-     -- See also Note [Implications between X86 CPU feature flags]
-   , ncgSseAvxVersion =
-      let v | isAvx2Enabled dflags = Just AVX2 -- -mavx512f does not set sseAvxVersion, but makes isAvx2Enabled true
-            | isAvxEnabled dflags  = Just AVX1 -- -mfma does not set sseAvxVersion, but makes isAvxEnabled true
-            | otherwise            = max (Just SSE2) (sseAvxVersion dflags)
-      in case platformArch (targetPlatform dflags) of
-            ArchX86_64 -> v
-            ArchX86    -> v
-            _          -> Nothing
-   , ncgAvx512fEnabled = isAvx512fEnabled dflags
-   , ncgAvx512vlEnabled = isAvx512vlEnabled dflags
-   , ncgAvx512bwEnabled = isAvx512bwEnabled dflags
-   , ncgAvx512dqEnabled = isAvx512dqEnabled dflags
-
-   , ncgLa664Enabled = isLa664Enabled dflags
+   , ncgCpuFeatures           = targetCpuFeatures dflags
+   , ncgLa664Enabled          = isLa664Enabled dflags
 
    , ncgDwarfEnabled        = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0 && platformArch (targetPlatform dflags) /= ArchAArch64
    , ncgDwarfUnwindings     = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0

@@ -23,10 +23,7 @@ initLlvmCgConfig logger config_cache dflags = do
     , llvmCgContext              = initSDocContext dflags PprCode
     , llvmCgFillUndefWithGarbage = gopt Opt_LlvmFillUndefWithGarbage dflags
     , llvmCgSplitSection         = gopt Opt_SplitSections dflags
-    , llvmCgBmiVersion           = case platformArch (targetPlatform dflags) of
-                                      ArchX86_64 -> bmiVersion dflags
-                                      ArchX86    -> bmiVersion dflags
-                                      _          -> Nothing
+    , llvmCgCpuFeatures          = targetCpuFeatures dflags
     , llvmCgLlvmVersion          = version
     , llvmCgDoWarn               = wopt Opt_WarnUnsupportedLlvmVersion dflags
     , llvmCgLlvmTarget           = platformMisc_llvmTarget $! platformMisc dflags

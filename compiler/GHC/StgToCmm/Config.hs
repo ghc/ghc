@@ -7,6 +7,7 @@ module GHC.StgToCmm.Config
 
 import GHC.Platform.Profile
 import GHC.Platform
+import GHC.Platform.CpuFeatures
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.TmpFs
@@ -76,16 +77,9 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmUseStdApThunk             :: !Bool   -- ^ Use precomputed standard AP thunks in the RTS.
   , stgToCmmSaveFCallTargetToLocal    :: !Bool   -- ^ Save a foreign call target to a Cmm local, see
                                                  -- Note [Saving foreign call target to local] for details
-  ------------------------------ SIMD flags ------------------------------------
-  -- Each of these flags checks vector compatibility with the backend requested
-  -- during compilation. In essence, this means checking for @-fllvm@ which is
-  -- the only backend that currently allows SIMD instructions, see
-  -- Ghc.StgToCmm.Prim.checkVecCompatibility for these flags only call site.
   , stgToCmmVecInstrsErr   :: Maybe String       -- ^ Error (if any) to raise when vector instructions are
                                                  -- used, see @StgToCmm.Prim.checkVecCompatibility@
-  , stgToCmmAvx            :: !Bool              -- ^ check for Advanced Vector Extensions
-  , stgToCmmAvx2           :: !Bool              -- ^ check for Advanced Vector Extensions 2
-  , stgToCmmAvx512f        :: !Bool              -- ^ check for Advanced Vector 512-bit Extensions
+  , stgToCmmCpuFeatures    :: !CpuFeatures       -- ^ Enabled CPU features
   }
 
 

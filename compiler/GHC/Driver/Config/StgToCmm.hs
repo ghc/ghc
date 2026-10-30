@@ -12,6 +12,7 @@ import GHC.Cmm.MachOp ( FMASign(..))
 import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Platform
+import GHC.Platform.CpuFeatures
 import GHC.Platform.Profile
 import GHC.Platform.Regs
 import GHC.Utils.Error
@@ -63,7 +64,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmAllowExtendedAddSubInstrs = (ncg && (x86ish || ppc)) || llvm
   , stgToCmmAllowFMAInstr =
       if
-        | not (isFmaEnabled dflags)
+        | not (cpuFmaEnabled cpu_feats)
         || not (ncg || llvm)
         -- If we're not using the native code generator or LLVM,
         -- fall back to the generic implementation.
@@ -81,12 +82,10 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
 
   , stgToCmmAllowIntMul2Instr         = (ncg && (x86ish || aarch64)) || llvm
   , stgToCmmAllowWordMul2Instr        = (ncg && (x86ish || ppc || aarch64)) || llvm
-  , stgToCmmAllowIntWord64X2MinMax    = (ncg && ((x86ish && isSse4_2Enabled dflags) || aarch64)) || llvm
+  , stgToCmmAllowIntWord64X2MinMax    = (ncg && (sse4_2 || aarch64)) || llvm
   -- SIMD flags
   , stgToCmmVecInstrsErr  = vec_err
-  , stgToCmmAvx           = isAvxEnabled                   dflags
-  , stgToCmmAvx2          = isAvx2Enabled                  dflags
-  , stgToCmmAvx512f       = isAvx512fEnabled               dflags
+  , stgToCmmCpuFeatures   = cpu_feats
   , stgToCmmUseStdApThunk = not $ gopt Opt_Ticky_AP dflags
   -- See Note [Saving foreign call target to local]
   , stgToCmmSaveFCallTargetToLocal = any (callerSaves platform) $ activeStgRegs platform
@@ -111,6 +110,10 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
                       ArchPPC      -> True
                       ArchPPC_64 _ -> True
                       _            -> False
+          cpu_feats = targetCpuFeatures dflags
+          sse4_2 = case cpu_feats of
+                     X86CpuFeatures feats -> x86Sse4_2Enabled feats
+                     _                    -> False
           vec_err = case backendSimdValidity (backend dflags) of
                       IsValid -> Nothing
                       NotValid msg -> Just msg

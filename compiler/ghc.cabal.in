@@ -689,6 +689,7 @@ Library
         GHC.Platform.ARM
         GHC.Platform.AArch64
         GHC.Platform.Constants
+        GHC.Platform.CpuFeatures
         GHC.Platform.LA64
         GHC.Platform.NoRegs
         GHC.Platform.PPC

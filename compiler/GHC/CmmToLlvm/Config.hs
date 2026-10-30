@@ -1,6 +1,7 @@
 -- | Llvm code generator configuration
 module GHC.CmmToLlvm.Config
   ( LlvmCgConfig(..)
+  , llvmCgBmi2Enabled
   , LlvmConfig(..)
   , LlvmTarget(..)
   , initLlvmConfig
@@ -9,6 +10,7 @@ where
 
 import GHC.Prelude
 import GHC.Platform
+import GHC.Platform.CpuFeatures
 
 import GHC.Utils.Outputable
 import GHC.Settings.Utils
@@ -22,13 +24,20 @@ data LlvmCgConfig = LlvmCgConfig
   , llvmCgContext           :: !SDocContext  -- ^ Context for LLVM code generation
   , llvmCgFillUndefWithGarbage :: !Bool      -- ^ Fill undefined literals with garbage values
   , llvmCgSplitSection      :: !Bool         -- ^ Split sections
-  , llvmCgBmiVersion        :: Maybe BmiVersion  -- ^ (x86) BMI instructions
+  , llvmCgCpuFeatures       :: !CpuFeatures  -- ^ Enabled CPU features
   , llvmCgLlvmVersion       :: Maybe LlvmVersion -- ^ version of Llvm we're using
   , llvmCgDoWarn            :: !Bool         -- ^ True ==> warn unsupported Llvm version
   , llvmCgLlvmTarget        :: !String       -- ^ target triple passed to LLVM
   , llvmCgLlvmConfig        :: !LlvmConfig   -- ^ Supported LLVM configurations.
                                              -- see Note [LLVM configuration]
   }
+
+-- | Whether BMI2 instructions are enabled (x86 only).
+llvmCgBmi2Enabled :: LlvmCgConfig -> Bool
+llvmCgBmi2Enabled cfg =
+  case llvmCgCpuFeatures cfg of
+    X86CpuFeatures feats -> x86Bmi2Enabled feats
+    _                    -> False
 
 data LlvmTarget = LlvmTarget
   { lDataLayout :: String

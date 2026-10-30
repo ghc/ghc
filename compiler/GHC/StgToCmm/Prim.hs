@@ -18,6 +18,7 @@ module GHC.StgToCmm.Prim (
 import GHC.Prelude hiding ((<*>))
 
 import GHC.Platform
+import GHC.Platform.CpuFeatures
 import GHC.Platform.Profile
 
 import GHC.StgToCmm.Config
@@ -2688,45 +2689,44 @@ vecCmmCat FloatVec = cmmFloat
 --    it may very well be a design perspective that helps guide improving the NCG.
 
 
+-- | Give up if the backend or the enabled CPU features do not support
+-- operations on vectors of the given category, length and element width.
 checkVecCompatibility :: StgToCmmConfig -> PrimOpVecCat -> Length -> Width -> FCode ()
 checkVecCompatibility cfg vcat l w =
-  case stgToCmmVecInstrsErr cfg of
-    Nothing | isX86 -> checkX86 vecWidth vcat l w
-            | platformArch platform == ArchAArch64 -> checkAArch64 vecWidth
-            | otherwise -> sorry "SIMD vector instructions are not supported on this architecture."
-    Just err -> sorry err  -- incompatible backend, do panic
+  case unsupported of
+    Nothing     -> return ()
+    Just reason -> sorry reason
   where
-    platform = stgToCmmPlatform cfg
-    isX86 = case platformArch platform of
-      ArchX86_64 -> True
-      ArchX86 -> True
-      _ -> False
-    checkX86 :: Width -> PrimOpVecCat -> Length -> Width -> FCode ()
-    checkX86 W128 FloatVec 4 W32 | isSseEnabled platform = return ()
-                                 | otherwise =
-        sorry $ "128-bit wide single-precision floating point " ++
-                "SIMD vector instructions require at least -msse."
-    checkX86 W128 _ _ _ | not (isSse2Enabled platform) =
-        sorry $ "128-bit wide integer and double precision " ++
-                "SIMD vector instructions require at least -msse2."
-    checkX86 W256 FloatVec _ _ | stgToCmmAvx cfg = return ()
-                               | otherwise =
-        sorry $ "256-bit wide floating point " ++
-                "SIMD vector instructions require at least -mavx."
-    checkX86 W256 _ _ _ | not (stgToCmmAvx2 cfg) =
-        sorry $ "256-bit wide integer " ++
-                "SIMD vector instructions require at least -mavx2."
-    checkX86 W512 _ _ _ | not (stgToCmmAvx512f cfg) =
-        sorry $ "512-bit wide " ++
-                "SIMD vector instructions require -mavx512f."
-    checkX86 _ _ _ _ = return ()
-
-    checkAArch64 :: Width -> FCode ()
-    checkAArch64 W256 = sorry $ "256-bit wide SIMD vector instructions are not supported."
-    checkAArch64 W512 = sorry $ "512-bit wide SIMD vector instructions are not supported."
-    checkAArch64 _ = return ()
+    unsupported :: Maybe String
+    unsupported
+      -- The backend does not support vector instructions at all.
+      | Just err <- stgToCmmVecInstrsErr cfg
+      = Just err
+      | otherwise
+      = case stgToCmmCpuFeatures cfg of
+          X86CpuFeatures feats
+            | x86SseAvx feats `sseAvxVersionIncludes` required
+            -> Nothing
+            | otherwise
+            -> Just $ bits ++ "-bit wide " ++ category ++ " SIMD vector instructions require at least "
+                   ++ unwords (sseAvxVersionFlags required) ++ "."
+            where required = sseAvxVectorRequirement floatElems (widthInBits vecWidth)
+          _ | platformArch (stgToCmmPlatform cfg) == ArchAArch64
+            -> case vecWidth of
+                 W128 -> Nothing
+                 _    -> Just $ bits ++ "-bit wide SIMD vector instructions are not supported."
+            | otherwise
+            -> Just "SIMD vector instructions are not supported on this architecture."
 
     vecWidth = typeWidth (vecCmmType vcat l w)
+    bits = show (widthInBits vecWidth)
+    floatElems = case vcat of
+      FloatVec -> True
+      IntVec   -> False
+      WordVec  -> False
+    category
+      | floatElems = "floating-point"
+      | otherwise  = "integer"
 
 ------------------------------------------------------------------------------
 -- Helpers for translating vector packing and unpacking.

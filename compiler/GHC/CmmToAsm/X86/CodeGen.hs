@@ -56,6 +56,7 @@ import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Reg.Target (targetClassOfReg)
 import GHC.Platform
+import GHC.Platform.CpuFeatures
 import GHC.Platform.Reg.Class.Unified (RegClass(..))
 
 -- Our intermediate code:
@@ -99,43 +100,7 @@ import Data.Word
 
 import qualified Data.Map as Map
 
-is32BitPlatform :: NatM Bool
-is32BitPlatform = do
-    platform <- getPlatform
-    return $ target32Bit platform
-
--- These flags may be implied by other flags like -mfma or -mavx512f.
--- See Note [Implications between X86 CPU feature flags] for details.
-ssse3Enabled :: NatM Bool
-ssse3Enabled = do
-  config <- getConfig
-  return (ncgSseAvxVersion config >= Just SSSE3)
-
-sse4_1Enabled :: NatM Bool
-sse4_1Enabled = do
-  config <- getConfig
-  return (ncgSseAvxVersion config >= Just SSE4)
-
-sse4_2Enabled :: NatM Bool
-sse4_2Enabled = do
-  config <- getConfig
-  return (ncgSseAvxVersion config >= Just SSE42)
-
-avxEnabled :: NatM Bool
-avxEnabled = do
-  config <- getConfig
-  return (ncgSseAvxVersion config >= Just AVX1)
-
-avx2Enabled :: NatM Bool
-avx2Enabled = do
-  config <- getConfig
-  return (ncgSseAvxVersion config >= Just AVX2)
-
-avx512vlEnabled :: NatM Bool
-avx512vlEnabled = ncgAvx512vlEnabled <$> getConfig
-
-avx512dqEnabled :: NatM Bool
-avx512dqEnabled = ncgAvx512dqEnabled <$> getConfig
+--------------------------------------------------------------------------------
 
 cmmTopCodeGen
         :: RawCmmDecl
@@ -426,7 +391,9 @@ swizzleRegisterRep (Any _ codefn)     format = Any   format codefn
 
 getLocalRegReg :: LocalReg -> Reg
 getLocalRegReg (LocalReg u ty)
-  = -- by assuming SSE2, Int, Word, Float, Double and vectors all can be register allocated
+  = -- Int, Word, Float, Double and vectors can all be register allocated, as the
+    -- baseline instruction set includes SSE2: see 'x86BaselineSseAvx' in
+    -- GHC.Platform.CpuFeatures.
     RegVirtual (mkVirtualReg u (cmmTypeFormat ty))
 
 -- | Grab the Reg for a CmmReg
@@ -494,6 +461,20 @@ is32BitInteger :: Integer -> Bool
 is32BitInteger i = i64 <= 0x7fffffff && i64 >= -0x80000000
   where i64 = fromIntegral i :: Int64
 
+
+-- -----------------------------------------------------------------------------
+-- NCG configuration options (e.g. enabled X86 CPU features)
+
+is32BitPlatform :: NatM Bool
+is32BitPlatform = do
+    platform <- getPlatform
+    return $ target32Bit platform
+
+-- | Whether an x86 instruction set is enabled, e.g. @x86Feature x86AvxEnabled@.
+--
+-- See Note [CPU features] for the implication structure of X86 features.
+x86Feature :: (X86Features -> res) -> NatM res
+x86Feature f = f . ncgX86Features <$> getConfig
 
 -- -----------------------------------------------------------------------------
 -- General things for putting together code sequences
@@ -976,11 +957,11 @@ getRegister' _ _ (CmmMachOp mop []) =
   pprPanic "getRegister(x86): nullary MachOp" (text $ show mop)
 
 getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
-    sse42   <- sse4_2Enabled
-    ssse3    <- ssse3Enabled
-    avx     <- avxEnabled
-    avx2    <- avx2Enabled
-    avx512vl <- avx512vlEnabled
+    sse42    <- x86Feature x86Sse4_2Enabled
+    ssse3    <- x86Feature x86Ssse3Enabled
+    avx      <- x86Feature x86AvxEnabled
+    avx2     <- x86Feature x86Avx2Enabled
+    avx512vl <- x86Feature x86Avx512VLEnabled
     case mop of
       MO_F_Neg w  -> sse2NegCode w x
 
@@ -1459,11 +1440,11 @@ getRegister' platform is32Bit (CmmMachOp (MO_Xor w) [x, y])
   = genBitTestCode (intFormat w) BTC opnd ix
 
 getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
-  sse4_1 <- sse4_1Enabled
-  sse4_2 <- sse4_2Enabled
-  avx <- avxEnabled
-  avx512vl <- avx512vlEnabled
-  avx512dq <- avx512dqEnabled
+  sse4_1 <- x86Feature x86Sse4_1Enabled
+  sse4_2 <- x86Feature x86Sse4_2Enabled
+  avx <- x86Feature x86AvxEnabled
+  avx512vl <- x86Feature x86Avx512VLEnabled
+  avx512dq <- x86Feature x86Avx512DQEnabled
   case mop of
       MO_F_Eq _ -> condFltReg is32Bit EQQ x y
       MO_F_Ne _ -> condFltReg is32Bit NE  x y
@@ -2607,7 +2588,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
 
         -- PALIGNR (SSSE3) or PSLLDQ + PSRLDQ: is == [i,i+1,...,n-2,n-1;n,n+1,...,n+i-1]
         | (js, ks) <- span (< n) is, and (zipWith (==) (reverse js) [n-1,n-2..]), and (zipWith (==) ks [n..]) -> Just $ do
-          ssse3 <- ssse3Enabled
+          ssse3 <- x86Feature x86Ssse3Enabled
           let amountInBytes = widthInBytes * length ks
           if ssse3
             then vector_op_sse (`PALIGNR` (ImmInt amountInBytes)) fmt v2 v1
@@ -2624,7 +2605,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
 
         -- PALIGNR (SSSE3) or PSLLDQ + PSRLDQ: is == [n+i,n+i+1,...,2n-2,2n-1;0,1,...,i-1]
         | (js, ks) <- span (>= n) is, and (zipWith (==) (reverse js) [2*n-1,2*n-2..]), and (zipWith (==) ks [0..]) -> Just $ do
-          ssse3 <- ssse3Enabled
+          ssse3 <- x86Feature x86Ssse3Enabled
           let amountInBytes = widthInBytes * length ks
           if ssse3
             then vector_op_sse (`PALIGNR` (ImmInt amountInBytes)) fmt v1 v2
@@ -2663,7 +2644,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
     vector_shuffle_int8x16 sse4_1 v1 v2 is
       | Just commonCase <- vector_shuffle_int128_common sse4_1 fmt v1 v2 is = commonCase
       | otherwise = do
-        ssse3 <- ssse3Enabled
+        ssse3 <- x86Feature x86Ssse3Enabled
         let fmtInt16X8 = VecFormat 8 FmtInt16
             v1IsZero = isZeroVecLit v1
             v2IsZero = isZeroVecLit v2
@@ -3021,8 +3002,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
 
 
 getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
-  avx    <- avxEnabled
-  sse4_1 <- sse4_1Enabled
+  avx    <- x86Feature x86AvxEnabled
+  sse4_1 <- x86Feature x86Sse4_1Enabled
   case mop of
       -- Floating point fused multiply-add operations @ ± x*y ± z@
       MO_FMA var l w
@@ -3325,7 +3306,7 @@ getRegister' platform is32Bit (CmmLit lit)
     is_label _                    = False
 
 getRegister' platform is32Bit (CmmLit lit) = do
-  avx <- avxEnabled
+  avx <- x86Feature x86AvxEnabled
 
   -- NB: it is important that the code produced here (to load a literal into
   -- a register) doesn't clobber any registers other than the destination
@@ -4764,7 +4745,8 @@ genCCall32 addr _conv dest_regs args = do
               | isVecType ty
               = unitOL (mkRegRegMoveInstr config (cmmTypeFormat ty) xmm0 r_dest)
               | isFloatType ty =
-                  -- we assume SSE2
+                  -- SSE2 is in the baseline instruction set: see 'x86BaselineSseAvx'
+                  -- in GHC.Platform.CpuFeatures.
                   let tmp_amode = AddrBaseIndex (EABaseReg esp)
                                                        EAIndexNone
                                                        (ImmInt 0)
@@ -6418,7 +6400,7 @@ genCtzGeneric width dst src = do
   config <- getConfig
   let bw = widthInBits width
   let dst_r = getLocalRegReg dst
-  if ncgBmiVersion config >= Just BMI2
+  if x86Bmi2Enabled (ncgX86Features config)
   then do
       src_r <- getNewRegNat (intFormat width)
       let instrs = appOL (code_src src_r) $ case width of
@@ -6735,7 +6717,7 @@ genPopCnt bid width dst src = do
     platform = ncgPlatform config
     format = intFormat width
 
-  sse4_2Enabled >>= \case
+  x86Feature x86Sse4_2Enabled >>= \case
 
     True -> do
       code_src <- getAnyReg src
@@ -6771,7 +6753,7 @@ genPdep bid width dst src mask = do
     platform = ncgPlatform config
     format = intFormat width
 
-  if ncgBmiVersion config >= Just BMI2
+  if x86Bmi2Enabled (ncgX86Features config)
     then do
       code_src  <- getAnyReg src
       code_mask <- getAnyReg mask
@@ -6798,7 +6780,7 @@ genPdep bid width dst src mask = do
 genPext :: BlockId -> Width -> LocalReg -> CmmExpr -> CmmExpr -> NatM InstrBlock
 genPext bid width dst src mask = do
   config <- getConfig
-  if ncgBmiVersion config >= Just BMI2
+  if x86Bmi2Enabled (ncgX86Features config)
     then do
       let format   = intFormat width
       let dst_r    = getLocalRegReg dst
@@ -6835,7 +6817,7 @@ genClz bid width dst src = do
     else do
       code_src <- getAnyReg src
       let dst_r = getLocalRegReg dst
-      if ncgBmiVersion config >= Just BMI2
+      if x86Bmi2Enabled (ncgX86Features config)
         then do
           src_r <- getNewRegNat (intFormat width)
           return $ appOL (code_src src_r) $ case width of

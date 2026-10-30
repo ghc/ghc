@@ -18,6 +18,7 @@ import GHC.Driver.Backend
 import GHC.CmmToLlvm.Version
 import GHC.Platform
 import GHC.Platform.ArchOS
+import GHC.Platform.CpuFeatures
 
 import GHC.SysTools
 
@@ -151,30 +152,30 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
           [ "-D__IO_MANAGER_WINIO__=2" | isWindows ] ++
           [ "-D__IO_MANAGER_MIO__=1"               ]
 
-    let sse_defs =
-          [ "-D__SSE__"      | isSseEnabled      platform ] ++
-          [ "-D__SSE2__"     | isSse2Enabled     platform ] ++
-          [ "-D__SSE3__"     | isSse3Enabled     dflags ] ++
-          [ "-D__SSSE3__"    | isSsse3Enabled    dflags ] ++
-          [ "-D__SSE4_1__"   | isSse4_1Enabled   dflags ] ++
-          [ "-D__SSE4_2__"   | isSse4_2Enabled   dflags ]
-
-    let fma_def =
-         [ "-D__FMA__"       | isFmaEnabled dflags ]
-
-    let avx_defs =
-          [ "-D__AVX__"      | isAvxEnabled      dflags ] ++
-          [ "-D__AVX2__"     | isAvx2Enabled     dflags ] ++
-          [ "-D__AVX512BW__" | isAvx512bwEnabled dflags ] ++
-          [ "-D__AVX512CD__" | isAvx512cdEnabled dflags ] ++
-          [ "-D__AVX512DQ__" | isAvx512dqEnabled dflags ] ++
-          [ "-D__AVX512ER__" | isAvx512erEnabled dflags ] ++
-          [ "-D__AVX512F__"  | isAvx512fEnabled  dflags ] ++
-          [ "-D__AVX512PF__" | isAvx512pfEnabled dflags ] ++
-          [ "-D__AVX512VL__" | isAvx512vlEnabled dflags ]
-
-    let gfni_def =
-          [ "-D__GFNI__"     | isGfniEnabled dflags ]
+    let cpu_feats = targetCpuFeatures dflags
+        cpu_defs =
+          [ "-D__FMA__" | cpuFmaEnabled cpu_feats ] ++
+          case cpu_feats of
+            X86CpuFeatures feats@(X86Features { x86SseAvx = sseAvx, x86Gfni = gfni }) ->
+              let sse    = x86SseVersion sseAvx
+                  avx512 = x86Avx512Exts sseAvx
+              in [ "-D__SSE__"      | sse >= SSE1  ] ++
+                 [ "-D__SSE2__"     | sse >= SSE2  ] ++
+                 [ "-D__SSE3__"     | sse >= SSE3  ] ++
+                 [ "-D__SSSE3__"    | sse >= SSSE3 ] ++
+                 [ "-D__SSE4_1__"   | sse >= SSE4  ] ++
+                 [ "-D__SSE4_2__"   | sse >= SSE42 ] ++
+                 [ "-D__AVX__"      | x86AvxEnabled feats ] ++
+                 [ "-D__AVX2__"     | x86Avx2Enabled feats ] ++
+                 [ "-D__AVX512F__"  | isJust avx512 ] ++
+                 [ "-D__AVX512BW__" | maybe False avx512bw avx512 ] ++
+                 [ "-D__AVX512CD__" | maybe False avx512cd avx512 ] ++
+                 [ "-D__AVX512DQ__" | maybe False avx512dq avx512 ] ++
+                 [ "-D__AVX512ER__" | maybe False avx512er avx512 ] ++
+                 [ "-D__AVX512PF__" | maybe False avx512pf avx512 ] ++
+                 [ "-D__AVX512VL__" | maybe False avx512vl avx512 ] ++
+                 [ "-D__GFNI__"     | gfni ]
+            GenericCpuFeatures {} -> []
 
     backend_defs <- applyCDefs (backendCDefs $ backend dflags) logger dflags
 
@@ -212,10 +213,7 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
                     ++ map GHC.SysTools.Option th_defs
                     ++ map GHC.SysTools.Option asserts_def
                     ++ map GHC.SysTools.Option hscpp_opts
-                    ++ map GHC.SysTools.Option sse_defs
-                    ++ map GHC.SysTools.Option fma_def
-                    ++ map GHC.SysTools.Option avx_defs
-                    ++ map GHC.SysTools.Option gfni_def
+                    ++ map GHC.SysTools.Option cpu_defs
                     ++ map GHC.SysTools.Option io_manager_defs
                     ++ mb_macro_include
                     ++ line_pragmas

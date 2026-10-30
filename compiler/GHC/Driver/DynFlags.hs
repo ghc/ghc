@@ -78,23 +78,7 @@ module GHC.Driver.DynFlags (
         initPromotionTickContext,
 
         -- * Platform features
-        isSse3Enabled,
-        isSsse3Enabled,
-        isSse4_1Enabled,
-        isSse4_2Enabled,
-        isAvxEnabled,
-        isAvx2Enabled,
-        isAvx512bwEnabled,
-        isAvx512cdEnabled,
-        isAvx512dqEnabled,
-        isAvx512erEnabled,
-        isAvx512fEnabled,
-        isAvx512pfEnabled,
-        isAvx512vlEnabled,
-        isFmaEnabled,
-        isGfniEnabled,
-        isBmiEnabled,
-        isBmi2Enabled,
+        targetCpuFeatures,
         -- For LoongArch platform
         isLa664Enabled
 ) where
@@ -102,6 +86,7 @@ module GHC.Driver.DynFlags (
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Platform.CpuFeatures
 import GHC.Platform.Ways
 import GHC.Platform.Profile
 
@@ -460,18 +445,9 @@ data DynFlags = DynFlags {
 
   interactivePrint      :: Maybe String,
 
-  -- | Machine dependent flags (-m\<blah> stuff)
-  sseAvxVersion         :: Maybe SseAvxVersion,
-  bmiVersion            :: Maybe BmiVersion,
-  avx512bw              :: Bool, -- ^ Enable AVX-512BW Instructions.
-  avx512cd              :: Bool, -- ^ Enable AVX-512 Conflict Detection Instructions.
-  avx512dq              :: Bool, -- ^ Enable AVX-512DQ Instructions.
-  avx512er              :: Bool, -- ^ Enable AVX-512 Exponential and Reciprocal Instructions.
-  avx512f               :: Bool, -- ^ Enable AVX-512 instructions.
-  avx512pf              :: Bool, -- ^ Enable AVX-512 PreFetch Instructions.
-  avx512vl              :: Bool, -- ^ Enable AVX-512VL Instructions.
-  fma                   :: Bool, -- ^ Enable FMA instructions.
-  gfni                  :: Bool, -- ^ Enable GFNI Instructions.
+  -- Machine dependent flags (-m\<blah> stuff)
+  cpuFeatures           :: EnumSet CpuFeature, -- ^ The @-m\<feature\>@ flags that were passed.
+                                               -- See Note [CPU features] in GHC.Platform.CpuFeatures.
   la664                 :: Bool, -- ^ Enable LA664 instructions
 
   -- Constants used to control the amount of optimization done.
@@ -751,18 +727,7 @@ defaultDynFlags mySettings =
         profAuto = NoProfAuto,
         callerCcFilters = [],
         interactivePrint = Nothing,
-        sseAvxVersion = Nothing,
-        bmiVersion = Nothing,
-        avx512bw = False,
-        avx512cd = False,
-        avx512dq = False,
-        avx512er = False,
-        avx512f = False,
-        avx512pf = False,
-        avx512vl = False,
-        -- Use FMA by default on AArch64
-        fma = (platformArch . sTargetPlatform $ mySettings) == ArchAArch64,
-        gfni = False,
+        cpuFeatures = EnumSet.empty,
         -- For LoongArch, la464 is used by default.
         la664 = False,
 
@@ -1621,111 +1586,16 @@ initPromotionTickContext dflags =
   }
 
 -- -----------------------------------------------------------------------------
--- SSE, AVX, FMA
+-- CPU features
 
-isSse3Enabled :: DynFlags -> Bool
-isSse3Enabled dflags = sseAvxVersion dflags >= Just SSE3 || isAvxEnabled dflags
-
-isSsse3Enabled :: DynFlags -> Bool
-isSsse3Enabled dflags = sseAvxVersion dflags >= Just SSSE3 || isAvxEnabled dflags
-
-isSse4_1Enabled :: DynFlags -> Bool
-isSse4_1Enabled dflags = sseAvxVersion dflags >= Just SSE4 || isAvxEnabled dflags
-
-isSse4_2Enabled :: DynFlags -> Bool
-isSse4_2Enabled dflags = sseAvxVersion dflags >= Just SSE42 || isAvxEnabled dflags
-
-isAvxEnabled :: DynFlags -> Bool
-isAvxEnabled dflags = sseAvxVersion dflags >= Just AVX1 || (isX86 && fma dflags) || isAvx512fEnabled dflags
-  where
-    -- -mfma can be used on multiple platforms, but -mavx is x86-only
-    isX86 = case platformArch (targetPlatform dflags) of
-      ArchX86_64 -> True
-      ArchX86    -> True
-      _          -> False
-
-isAvx2Enabled :: DynFlags -> Bool
-isAvx2Enabled dflags = sseAvxVersion dflags >= Just AVX2 || isAvx512fEnabled dflags
-
-isAvx512bwEnabled :: DynFlags -> Bool
-isAvx512bwEnabled dflags = avx512bw dflags
-
-isAvx512cdEnabled :: DynFlags -> Bool
-isAvx512cdEnabled dflags = avx512cd dflags
-
-isAvx512dqEnabled :: DynFlags -> Bool
-isAvx512dqEnabled dflags = avx512dq dflags
-
-isAvx512erEnabled :: DynFlags -> Bool
-isAvx512erEnabled dflags = avx512er dflags
-
-isAvx512fEnabled :: DynFlags -> Bool
-isAvx512fEnabled dflags = avx512f dflags || avx512bw dflags || avx512cd dflags || avx512dq dflags || avx512er dflags || avx512pf dflags || avx512vl dflags
-
-isAvx512pfEnabled :: DynFlags -> Bool
-isAvx512pfEnabled dflags = avx512pf dflags
-
-isAvx512vlEnabled :: DynFlags -> Bool
-isAvx512vlEnabled dflags = avx512vl dflags
-
-isFmaEnabled :: DynFlags -> Bool
-isFmaEnabled dflags = fma dflags || (isX86 && isAvx512fEnabled dflags)
-  where
-    -- -mfma is used on multiple platforms, but -mavx512f is x86-only
-    isX86 = case platformArch (targetPlatform dflags) of
-      ArchX86_64 -> True
-      ArchX86    -> True
-      _          -> False
-
-isGfniEnabled :: DynFlags -> Bool
-isGfniEnabled dflags = gfni dflags
-
-{- Note [Implications between X86 CPU feature flags]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Many X86 CPU feature flags (such as -mavx, -mfma or -msse4) imply other
-feature flags. In particular, there are straightforward linear implication
-structures:
-
-  1. AVX2 -> AVX -> SSE4.2 -> SSE4 -> SSSE3 -> SSE3 -> SSE2 -> SSE1
-  2. BMI2 -> BMI1
-
-together with other implications such as
-
-  3. FMA -> AVX
-  4. AVX512{BW,CD,DQ,ER,PF,VL} -> AVX512F -> AVX2
-
-
-We handle this as follows:
-
-  A. When parsing command line options into `DynFlags`, we record:
-    - an `SseAvxVersion` which gives the SSE/AVX level supported in
-      the total order (1),
-    - a `BmiVersion` for (2),
-    - whether FMA is enabled,
-    - various AVX512 flags saying which AVX512 extensions are supported
-
-  B. When converting these "raw" `DynFlags` into a `CmmConfig` for use
-     in code generator backends, we handle the remaining implications (3) (4),
-     e.g. if the user passed -mavx512f then we also set the `SseAvxVersion`
-     to `AVX2`.
--}
+-- | The CPU features enabled for the target.
+--
+-- See Note [CPU features] in GHC.Platform.CpuFeatures.
+targetCpuFeatures :: DynFlags -> CpuFeatures
+targetCpuFeatures dflags
+  = initCpuFeatures (platformArch (targetPlatform dflags)) (cpuFeatures dflags)
 
 -- -----------------------------------------------------------------------------
 -- LA664
 isLa664Enabled :: DynFlags -> Bool
 isLa664Enabled dflags = la664 dflags
-
--- -----------------------------------------------------------------------------
--- BMI2
-
-isBmiEnabled :: DynFlags -> Bool
-isBmiEnabled dflags = case platformArch (targetPlatform dflags) of
-    ArchX86_64 -> bmiVersion dflags >= Just BMI1
-    ArchX86    -> bmiVersion dflags >= Just BMI1
-    _          -> False
-
-isBmi2Enabled :: DynFlags -> Bool
-isBmi2Enabled dflags = case platformArch (targetPlatform dflags) of
-    ArchX86_64 -> bmiVersion dflags >= Just BMI2
-    ArchX86    -> bmiVersion dflags >= Just BMI2
-    _          -> False

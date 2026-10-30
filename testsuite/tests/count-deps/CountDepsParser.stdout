@@ -150,6 +150,7 @@ GHC.Parser.String
 GHC.Parser.Types
 GHC.Platform
 GHC.Platform.Constants
+GHC.Platform.CpuFeatures
 GHC.Platform.Profile
 GHC.Platform.Tag
 GHC.Platform.Ways
