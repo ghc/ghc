@@ -1604,7 +1604,10 @@ repE (HsLam _ LamCase (MG { mg_alts = L _ ms }))
                         ; repLamCase core_ms }
 repE (HsLam _ LamCases (MG { mg_alts = (L _ ms) }))
                    = do { ms' <- mapM repClauseTup ms
-                        ; core_ms <- coreListM matchTyConOcc ms'
+                          -- Safety: \cases has an invariant that `mg_alts` is
+                          -- non-empty, so calling `nonEmptyCoreList` below is
+                          -- always safe.
+                        ; let core_ms = nonEmptyCoreList ms'
                         ; repLamCases core_ms }
 repE (HsApp _ x y)   = do {a <- repLE x; b <- repLE y; repApp a b}
 repE (HsAppType _ e t) = do { a <- repLE e
