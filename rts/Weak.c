@@ -177,6 +177,11 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
         );
 
     scheduleThread(cap,t);
+    // Run the finalizers soon, at the next block boundary of whatever thread
+    // runs next: otherwise, under the RTS timer, the thread that caused the
+    // GC keeps the capability until the next context switch, and what the
+    // finalizers would free (a closed Handle's buffers) stays live until then.
+    RELAXED_STORE(&cap->context_switch, 1);
 }
 
 /* -----------------------------------------------------------------------------
