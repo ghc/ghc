@@ -59,135 +59,133 @@ objects:
     arity: 0
     literals: label ‘_hpc_tickboxes_Example_hpc’
     used items: named item ‘primes’
-  object ‘primes2_@name_suffix@’:
-    arity: 0
-    literals: label ‘_hpc_tickboxes_Example_hpc’
-    used items:
-      object ‘primes2_sat_@name_suffix@’:
-        arity: 0
-        literals: label ‘_hpc_tickboxes_Example_hpc’
-        used items:
-          object ‘primes2_sat_@name_suffix@’:
-            arity: 0
-            literals:
-              label ‘_hpc_tickboxes_Example_hpc’
-              word 3
-              info table of ‘IS’
-            used items:
-              named item ‘$fNumNatural’
-              named item ‘fromInteger’
-          named item ‘$fEnumNatural’
-          named item ‘enumFrom’
-      object ‘primes2_sat_@name_suffix@’:
-        arity: 0
-        literals: label ‘_hpc_tickboxes_Example_hpc’
-        used items: named item ‘isPrime_@name_suffix@’
-      named item ‘filter’
-  object ‘isPrime_@name_suffix@’:
-    arity: 1
-    literals:
-      label ‘_hpc_tickboxes_Example_hpc’
-    used items:
-      object ‘isPrime_sat_@name_suffix@’:
-        arity: 1
-        literals: label ‘_hpc_tickboxes_Example_hpc’
-        used items:
-          object ‘isPrime_sat_@name_suffix@’:
-            arity: 1
-            literals: label ‘_hpc_tickboxes_Example_hpc’
-            used items:
-              object ‘isPrime_sat_@name_suffix@’:
-                arity: 0
-                literals: label ‘_hpc_tickboxes_Example_hpc’
-                used items: named item ‘primes’
-              object ‘isPrime_sat_@name_suffix@’:
-                arity: 1
-                literals: label ‘_hpc_tickboxes_Example_hpc’
-                used items:
-                  object ‘isPrime_sat_@name_suffix@’:
-                    arity: 0
-                    literals: label ‘_hpc_tickboxes_Example_hpc’
-                    used items:
-                      object ‘v_@name_suffix@’:
-                        arity: 0
-                        literals: label ‘_hpc_tickboxes_Example_hpc’
-                        used items:
-                          named item ‘$fIntegralInteger’
-                          named item ‘$fNumNatural’
-                          named item ‘(^)’
-                      object ‘v1_@name_suffix@’:
-                        arity: 0
-                        literals:
-                          label ‘_hpc_tickboxes_Example_hpc’
-                          word 2
-                          info table of ‘IS’
-                        used items: <none>
-                      object ‘pap_@name_suffix@’:
-                        arity: 3
-                        literals: <none>
-                        used items: <none>
-                  object ‘isPrime_sat_@name_suffix@’:
-                    arity: 1
-                    literals: label ‘_hpc_tickboxes_Example_hpc’
-                    used items:
-                      object ‘v_@name_suffix@’:
-                        arity: 0
-                        literals: label ‘_hpc_tickboxes_Example_hpc’
-                        used items:
-                          named item ‘$fOrdNatural’
-                          named item ‘(<=)’
-                      object ‘v1_@name_suffix@’:
-                        arity: 1
-                        literals: label ‘_hpc_tickboxes_Example_hpc’
-                        used items: <none>
-                      object ‘pap_@name_suffix@’:
-                        arity: 3
-                        literals: <none>
-                        used items: <none>
-                  named item ‘(.)’
-              named item ‘takeWhile’
-          object ‘isPrime_sat_@name_suffix@’:
-            arity: 1
-            literals: label ‘_hpc_tickboxes_Example_hpc’
-            used items:
-              object ‘v_@name_suffix@’:
-                arity: 0
-                literals: label ‘_hpc_tickboxes_Example_hpc’
-                used items:
-                  object ‘pap_@name_suffix@’:
-                    arity: 2
-                    literals: <none>
-                    used items:
-                      named item ‘$fIntegralNatural’
-                      named item ‘divides’
-              object ‘v1_@name_suffix@’:
-                arity: 1
-                literals: label ‘_hpc_tickboxes_Example_hpc’
-                used items: <none>
-              object ‘pap_@name_suffix@’:
-                arity: 3
-                literals: <none>
-                used items: <none>
-          named item ‘$fFoldableList’
-          named item ‘any’
-      named item ‘not’
   object ‘primes’:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
       info table of ‘(:)’
     used items:
-      named item ‘primes2_@name_suffix@’
-      named item ‘primes1_@name_suffix@’
-  object ‘primes1_@name_suffix@’:
-    arity: 0
-    literals:
-      label ‘_hpc_tickboxes_Example_hpc’
-      word 2
-      info table of ‘IS’
-    used items:
-      named item ‘$fNumNatural’
-      named item ‘fromInteger’
+      object ‘isPrime_@name_suffix@’:
+        arity: 1
+        literals:
+          label ‘_hpc_tickboxes_Example_hpc’
+        used items:
+          object ‘isPrime_primes_sat_@name_suffix@’:
+            arity: 1
+            literals: label ‘_hpc_tickboxes_Example_hpc’
+            used items:
+              object ‘isPrime_primes_sat_@name_suffix@’:
+                arity: 1
+                literals: label ‘_hpc_tickboxes_Example_hpc’
+                used items:
+                  object ‘isPrime_primes_sat_@name_suffix@’:
+                    arity: 0
+                    literals: label ‘_hpc_tickboxes_Example_hpc’
+                    used items: named item ‘primes’
+                  object ‘isPrime_primes_sat_@name_suffix@’:
+                    arity: 1
+                    literals: label ‘_hpc_tickboxes_Example_hpc’
+                    used items:
+                      object ‘isPrime_primes_sat_@name_suffix@’:
+                        arity: 0
+                        literals: label ‘_hpc_tickboxes_Example_hpc’
+                        used items:
+                          object ‘v_@name_suffix@’:
+                            arity: 0
+                            literals: label ‘_hpc_tickboxes_Example_hpc’
+                            used items:
+                              named item ‘$fIntegralInteger’
+                              named item ‘$fNumNatural’
+                              named item ‘(^)’
+                          object ‘v1_@name_suffix@’:
+                            arity: 0
+                            literals:
+                              label ‘_hpc_tickboxes_Example_hpc’
+                              word 2
+                              info table of ‘IS’
+                            used items: <none>
+                          object ‘pap_@name_suffix@’:
+                            arity: 3
+                            literals: <none>
+                            used items: <none>
+                      object ‘isPrime_primes_sat_@name_suffix@’:
+                        arity: 1
+                        literals: label ‘_hpc_tickboxes_Example_hpc’
+                        used items:
+                          object ‘v_@name_suffix@’:
+                            arity: 0
+                            literals: label ‘_hpc_tickboxes_Example_hpc’
+                            used items:
+                              named item ‘$fOrdNatural’
+                              named item ‘(<=)’
+                          object ‘v1_@name_suffix@’:
+                            arity: 1
+                            literals: label ‘_hpc_tickboxes_Example_hpc’
+                            used items: <none>
+                          object ‘pap_@name_suffix@’:
+                            arity: 3
+                            literals: <none>
+                            used items: <none>
+                      named item ‘(.)’
+                  named item ‘takeWhile’
+              object ‘isPrime_primes_sat_@name_suffix@’:
+                arity: 1
+                literals: label ‘_hpc_tickboxes_Example_hpc’
+                used items:
+                  object ‘v_@name_suffix@’:
+                    arity: 0
+                    literals: label ‘_hpc_tickboxes_Example_hpc’
+                    used items:
+                      object ‘pap_@name_suffix@’:
+                        arity: 2
+                        literals: <none>
+                        used items:
+                          named item ‘$fIntegralNatural’
+                          named item ‘divides’
+                  object ‘v1_@name_suffix@’:
+                    arity: 1
+                    literals: label ‘_hpc_tickboxes_Example_hpc’
+                    used items: <none>
+                  object ‘pap_@name_suffix@’:
+                    arity: 3
+                    literals: <none>
+                    used items: <none>
+              named item ‘$fFoldableList’
+              named item ‘any’
+          named item ‘not’
+      object ‘primes_sat_@name_suffix@’:
+        arity: 1
+        literals: label ‘_hpc_tickboxes_Example_hpc’
+        used items:
+          object ‘primes_sat_@name_suffix@’:
+            arity: 0
+            literals: label ‘_hpc_tickboxes_Example_hpc’
+            used items:
+              object ‘primes_sat_@name_suffix@’:
+                arity: 0
+                literals:
+                  label ‘_hpc_tickboxes_Example_hpc’
+                  word 3
+                  info table of ‘IS’
+                used items:
+                  named item ‘$fNumNatural’
+                  named item ‘fromInteger’
+              named item ‘$fEnumNatural’
+              named item ‘enumFrom’
+          object ‘primes_sat_@name_suffix@’:
+            arity: 1
+            literals: label ‘_hpc_tickboxes_Example_hpc’
+            used items: <none>
+          named item ‘filter’
+      object ‘primes_sat_@name_suffix@’:
+        arity: 0
+        literals:
+          label ‘_hpc_tickboxes_Example_hpc’
+          word 2
+          info table of ‘IS’
+        used items:
+          named item ‘$fNumNatural’
+          named item ‘fromInteger’
   object ‘fibonaccisPtr’:
     arity: 0
     literals:
@@ -245,63 +243,59 @@ objects:
     arity: 0
     literals: label ‘_hpc_tickboxes_Example_hpc’
     used items: named item ‘fibonaccis’
-  object ‘positiveFibonaccis1_@name_suffix@’:
-    arity: 0
-    literals:
-      label ‘_hpc_tickboxes_Example_hpc’
-      info table of ‘(:)’
-    used items:
-      named item ‘positiveFibonaccis2_@name_suffix@’
-      named item ‘positiveFibonaccis_@name_suffix@’
-  object ‘positiveFibonaccis2_@name_suffix@’:
-    arity: 0
-    literals: label ‘_hpc_tickboxes_Example_hpc’
-    used items:
-      object ‘positiveFibonaccis2_sat_@name_suffix@’:
-        arity: 0
-        literals: label ‘_hpc_tickboxes_Example_hpc’
-        used items: named item ‘positiveFibonaccis1_@name_suffix@’
-      object ‘positiveFibonaccis2_sat_@name_suffix@’:
-        arity: 0
-        literals: label ‘_hpc_tickboxes_Example_hpc’
-        used items: named item ‘fibonaccis’
-      object ‘positiveFibonaccis2_sat_@name_suffix@’:
-        arity: 0
-        literals: label ‘_hpc_tickboxes_Example_hpc’
-        used items:
-          named item ‘$fNumNatural’
-          named item ‘(+)’
-      named item ‘zipWith’
   object ‘fibonaccis’:
     arity: 0
     literals:
       label ‘_hpc_tickboxes_Example_hpc’
       info table of ‘(:)’
     used items:
-      named item ‘fibonaccis2_@name_suffix@’
-      named item ‘fibonaccis1_@name_suffix@’
-  object ‘fibonaccis2_@name_suffix@’:
-    arity: 0
-    literals: label ‘_hpc_tickboxes_Example_hpc’
-    used items: named item ‘positiveFibonaccis1_@name_suffix@’
-  object ‘positiveFibonaccis_@name_suffix@’:
-    arity: 0
-    literals:
-      label ‘_hpc_tickboxes_Example_hpc’
-      word 1
-      info table of ‘IS’
-    used items:
-      named item ‘$fNumNatural’
-      named item ‘fromInteger’
-  object ‘fibonaccis1_@name_suffix@’:
-    arity: 0
-    literals:
-      label ‘_hpc_tickboxes_Example_hpc’
-      word 0
-      info table of ‘IS’
-    used items:
-      named item ‘$fNumNatural’
-      named item ‘fromInteger’
+      object ‘positiveFibonaccis_@name_suffix@’:
+        arity: 1
+        literals:
+          label ‘_hpc_tickboxes_Example_hpc’
+          info table of ‘(:)’
+        used items:
+          object ‘positiveFibonaccis_fibonaccis_sat_@name_suffix@’:
+            arity: 1
+            literals: label ‘_hpc_tickboxes_Example_hpc’
+            used items:
+              object ‘positiveFibonaccis_fibonaccis_sat_@name_suffix@’:
+                arity: 1
+                literals: label ‘_hpc_tickboxes_Example_hpc’
+                used items: <none>
+              object ‘positiveFibonaccis_fibonaccis_sat_@name_suffix@’:
+                arity: 0
+                literals: label ‘_hpc_tickboxes_Example_hpc’
+                used items: named item ‘fibonaccis’
+              object ‘positiveFibonaccis_fibonaccis_sat_@name_suffix@’:
+                arity: 0
+                literals: label ‘_hpc_tickboxes_Example_hpc’
+                used items:
+                  named item ‘$fNumNatural’
+                  named item ‘(+)’
+              named item ‘zipWith’
+          object ‘positiveFibonaccis_fibonaccis_sat_@name_suffix@’:
+            arity: 0
+            literals:
+              label ‘_hpc_tickboxes_Example_hpc’
+              word 1
+              info table of ‘IS’
+            used items:
+              named item ‘$fNumNatural’
+              named item ‘fromInteger’
+      object ‘fibonaccis_sat_@name_suffix@’:
+        arity: 1
+        literals: label ‘_hpc_tickboxes_Example_hpc’
+        used items: <none>
+      object ‘fibonaccis_sat_@name_suffix@’:
+        arity: 0
+        literals:
+          label ‘_hpc_tickboxes_Example_hpc’
+          word 0
+          info table of ‘IS’
+        used items:
+          named item ‘$fNumNatural’
+          named item ‘fromInteger’
   object ‘$dTypeable2_@name_suffix@’:
     arity: 0
     literals: <none>

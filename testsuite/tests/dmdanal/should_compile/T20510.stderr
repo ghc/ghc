@@ -1,7 +1,7 @@
 
 ==================== Exitification transformation ====================
 Result size of Exitification transformation
-  = {terms: 50, types: 22, coercions: 0, joins: 2/2}
+  = {terms: 33, types: 15, coercions: 0, joins: 2/2}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl :: Int
@@ -11,7 +11,7 @@ lvl :: Int
          Guidance=IF_ARGS [] 10 10}]
 lvl = GHC.Internal.Types.I# 0#
 
--- RHS size: {terms: 32, types: 14, coercions: 0, joins: 2/2}
+-- RHS size: {terms: 29, types: 12, coercions: 0, joins: 2/2}
 small :: Int -> Int
 [LclIdX,
  Arity=1,
@@ -22,7 +22,7 @@ small :: Int -> Int
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Dmd=S!P(SL)] :: Int) ->
                  joinrec {
-                   go [InlPrag=[2], Occ=T[2], Dmd=LC(S,C(1,!P(L)))]
+                   go [InlPrag=[2], Occ=Many(T[2]), Dmd=LC(S,C(1,!P(L)))]
                      :: Int -> Int -> Int
                    [LclId[JoinId(2)(Nothing)],
                     Arity=2,
@@ -54,11 +54,11 @@ small :: Int -> Int
                             Guidance=IF_ARGS [0 51] 63 10}]
                    $wgo (ww [Occ=Once2] :: GHC.Internal.Prim.Int#)
                         (ww [Occ=Once1!, Dmd=SL] :: GHC.Internal.Prim.Int#)
-                     = case ww of ds {
+                     = case ww of wild {
                          __DEFAULT ->
                            jump go
-                             (GHC.Internal.Types.I# (GHC.Internal.Prim.+# ww ds))
-                             (GHC.Internal.Types.I# (GHC.Internal.Prim.-# ds 1#));
+                             (GHC.Internal.Types.I# (GHC.Internal.Prim.+# ww wild))
+                             (GHC.Internal.Types.I# (GHC.Internal.Prim.-# wild 1#));
                          0# ->
                            case x of { GHC.Internal.Types.I# y [Occ=Once1] ->
                            GHC.Internal.Types.I# (GHC.Internal.Prim.*# ww y)
@@ -67,13 +67,12 @@ small :: Int -> Int
                  jump go lvl x}]
 small
   = \ (x [Dmd=S!P(SL)] :: Int) ->
+      case x of { GHC.Internal.Types.I# ww [Dmd=SL] ->
       join {
         exit :: GHC.Internal.Prim.Int# -> Int
         [LclId[JoinId(1)(Nothing)]]
         exit (ww :: GHC.Internal.Prim.Int#)
-          = case x of { GHC.Internal.Types.I# y ->
-            GHC.Internal.Types.I# (GHC.Internal.Prim.*# ww y)
-            } } in
+          = GHC.Internal.Types.I# (GHC.Internal.Prim.*# ww ww) } in
       joinrec {
         $wgo [InlPrag=[2], Occ=LoopBreaker]
           :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> Int
@@ -82,56 +81,17 @@ small
          Str=<L><SL>,
          Unf=Unf{Src=<vanilla>, TopLvl=False,
                  Value=True, ConLike=True, WorkFree=True, Expandable=True,
-                 Guidance=IF_ARGS [0 32] 43 10}]
+                 Guidance=IF_ARGS [0 32] 33 10}]
         $wgo (ww :: GHC.Internal.Prim.Int#)
              (ww [Dmd=SL] :: GHC.Internal.Prim.Int#)
-          = case ww of ds {
+          = case ww of wild {
               __DEFAULT ->
                 jump $wgo
-                  (GHC.Internal.Prim.+# ww ds) (GHC.Internal.Prim.-# ds 1#);
+                  (GHC.Internal.Prim.+# ww wild) (GHC.Internal.Prim.-# wild 1#);
               0# -> jump exit ww
             }; } in
-      case x of { GHC.Internal.Types.I# ww [Dmd=SL] -> jump $wgo 0# ww }
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$trModule :: GHC.Internal.Prim.Addr#
-[LclId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 20 0}]
-$trModule = "main"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$trModule :: GHC.Internal.Types.TrName
-[LclId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-$trModule = GHC.Internal.Types.TrNameS $trModule
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$trModule :: GHC.Internal.Prim.Addr#
-[LclId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-$trModule = "T20510"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$trModule :: GHC.Internal.Types.TrName
-[LclId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-$trModule = GHC.Internal.Types.TrNameS $trModule
-
--- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T20510.$trModule :: GHC.Internal.Types.Module
-[LclIdX,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T20510.$trModule = GHC.Internal.Types.Module $trModule $trModule
+      jump $wgo 0# ww
+      }
 
 
 
