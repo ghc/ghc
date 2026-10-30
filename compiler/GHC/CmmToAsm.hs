@@ -186,10 +186,10 @@
 --      on RISC-V, the unconditional B too; on all four it can leave a branch
 --      out of range (the BUG at each one's makeFarBranches); on x86 and x86-64
 --      it does nothing.
---  12. On x86-64, invertCondBranches swaps the targets of an integer
---      comparison's jump to the next block and of the jump after it, inverting
---      the condition, and drops the jump now to the next block, unless that has
---      an info table: then it swaps only if the CFG weighs the other edge more.
+--  12. On x86-64, invertCondBranches swaps the targets of a comparison's jump
+--      to the next block and of the jump after it, inverting the condition, and
+--      drops the jump now to the next block, unless that has an info table:
+--      then it swaps only if the CFG weighs the other edge more.
 --  13. Under -g, computeUnwinding collects the unwinding points,
 --      which extractUnwindPoints returns on x86 and x86-64 alone
 --      (Note [Unwinding information in the NCG]). cmmNativeGens then
