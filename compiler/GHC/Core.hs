@@ -1712,18 +1712,79 @@ setRuleIdName nm rule
 
 type FloatBinds = OrdList FloatBind
 
+data FloatBind
+  = FloatLet  CoreBind
+      -- let(rec) x = e
+      -- Invariant: satisfies the let-can-float invariant
+
+  | FloatCase CoreExpr CoreBndr AltCon [CoreBndr]
+      -- case e of y { C ys -> ... }
+      -- See Note [Floating single-alternative cases] in GHC.Core.Opt.SetLevels
+      -- Invariant: if the AltCon is DEFAULT, then not (doCaseToLet e y);
+      --            otherwise we use (FloatLet (NonRec y e)) instead.
+      --   This invariant is nice to have, not essential for correctness.
+      --   See Note [The FloatCase invariant]
+
+  | FloatTick CoreTickish
+      -- tick<t> ...
+      -- Invariant: the tick is always soft-scoped (tickishHasSoftScope holds)
+      -- Why? We are floating these FloatBinds outwards, bringing more code under
+      -- the bindigns; that is only OK for soft-scoped ticks.
+      -- See Note [Scoping ticks and counting ticks] in GHC.Types.Tickish
+
+{- Note [The FloatCase invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Invariant: a DEFAULT case-float
+     FloatCase e y DEFAULT []
+never has a scrutinee for which (doCaseToLet e y) holds.  If it does, we use the
+let-float (FloatLet (NonRec y e)) instead, which satisfies the let-can-float
+invariant.  The smart constructor GHC.Core.Utils.mkFloatCase does this for you.
+
+doCaseToLet (in GHC.Core.Utils) is the same test that the Simplifier uses to turn
+a case into a let: roughly, the scrutinee is ok-for-speculation (if unlifted) or
+a HNF (if lifted).  But it says No if `y` is a coercion variable, because a
+coercion variable can be let-bound only to a Coercion (see
+Note [Core type and coercion invariant]); so
+     FloatCase (eq_sel @k @t1 @t2 d) co DEFAULT []
+is fine.
+
+This invariant is /nice to have/, not essential for correctness: such a
+FloatCase means just the same as the corresponding let-float, because evaluating
+`e` early cannot fail or diverge (and if it is a HNF there is nothing to
+evaluate).  But the let-float is better, for two reasons:
+  * A let-bound variable can be inlined or substituted, whereas a case binder
+    is treated less freely.
+  * The Simplifier never floats a FloatCase out of the RHS of a let-binding, and
+    a single FloatCase in a group of floats stops /any/ of them from floating;
+    see Note [doFloatFromRhs] in GHC.Core.Opt.Simplify.Env.  So a needless
+    FloatCase can block the floating of many let-bindings.
+Still, we check the invariant with an assertion (GHC.Core.Utils.okFloatCase), so
+that we notice if some producer of FloatCases forgets about it.
+
+The invariant is only about DEFAULT case-floats.  A case-float with pattern
+binders, such as
+     FloatCase (addIntC# x y) b (# r, c #) [r, c]
+cannot be a let-float even if its scrutinee is ok-for-speculation.
+
+How the producers of FloatCases maintain the invariant:
+  * GHC.Core.Opt.FloatOut floats only cases with a DataAlt.
+  * GHC.Core.SimpleOpt.exprIsConApp_maybe uses mkFloatCase when it looks through
+    a single-alternative case; and otherwise makes a DEFAULT case-float only
+    for an unlifted argument that needsCaseBinding, or for a strict field whose
+    argument is not a HNF and, if unlifted, not ok-for-speculation
+    (mkFieldSeqFloats).  (A strict field of unlifted type can arise from
+    unpacking a sum: e.g. in containers,
+        data MoveResult a = MoveResult {-# UNPACK #-} !(Maybe a) !(BStack a)
+    the worker's first field is a strict (# (# #) | a #).)
+  * The Simplifier's addCaseFloat uses mkFloatCase; and addLetFloat makes a
+    FloatCase only for a binding that needsCaseBinding (see #27910).
+-}
+
 emptyFloatBinds :: FloatBinds
 emptyFloatBinds = nilOL
 
 isEmptyFloatBinds :: FloatBinds -> Bool
 isEmptyFloatBinds = isNilOL
-
-data FloatBind
-  = FloatLet  CoreBind
-  | FloatCase CoreExpr CoreBndr AltCon [CoreBndr]
-      -- case e of y { C ys -> ... }
-      -- See Note [Floating single-alternative cases] in GHC.Core.Opt.SetLevels
-  | FloatTick CoreTickish
 
 floatsBinders :: FloatBinds -> [Var]
 floatsBinders fs = foldr ((++) . floatBinders) [] fs

@@ -14,7 +14,7 @@ module GHC.Data.OrdList (
         OrdList, pattern NilOL, pattern ConsOL, pattern SnocOL,
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL, lastOL,
         headOL,
-        mapOL, mapOL', fromOL, toOL, foldrOL, foldlOL,
+        mapOL, mapOL', fromOL, toOL, foldrOL, foldlOL, allOL,
         partitionOL, reverseOL, fromOLReverse, strictlyEqOL, strictlyOrdOL
 ) where
 
@@ -199,6 +199,16 @@ mapOL' f (Two b1 b2) = let !b1' = mapOL' f b1
 mapOL' f (Many (x :| xs)) = let !x1 = f x
                                 !xs1 = strictMap f xs
                             in Many (x1 :| xs1)
+
+allOL :: (a->Bool) -> OrdList a -> Bool
+-- We could use the overloaded `all` but that goes via foldrOL, so
+-- I'm guessing that this specialised version is a bit more efficient
+allOL _ None        = True
+allOL p (One x)     = p x
+allOL p (Cons x xs) = p x && allOL p xs
+allOL p (Snoc xs x) = allOL p xs && p x
+allOL p (Two b1 b2) = allOL p b1 && allOL p b2
+allOL p (Many xs)   = all p xs
 
 foldrOL :: (a->b->b) -> b -> OrdList a -> b
 foldrOL _ z None        = z
