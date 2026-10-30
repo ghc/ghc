@@ -38,14 +38,12 @@ module GHC.Core.Opt.Simplify.Env (
 
         -- * Floats
         SimplFloats(..), emptyFloats, isEmptyFloats, mkRecFloats,
-        mkFloatBind, addLetFloats, addJoinFloats, addFloats,
-        extendFloats, wrapFloats,
-        isEmptyJoinFloats, isEmptyLetFloats,
+        mkFloatBind, addLetFloat, addLetFloats, addCaseFloat,
+        addJoinFloats, addFloats, addFloatBindsF,
+        isEmptyJoinFloats,
         doFloatFromRhs, getTopFloatBinds,
 
-        -- * LetFloats
-        LetFloats, FloatEnable(..), letFloatBinds, emptyLetFloats, unitLetFloat,
-        addLetFlts,  mapLetFloats,
+        FloatEnable(..), mapLetFloats,
 
         -- * JoinFloats
         JoinFloat, JoinFloats, emptyJoinFloats,
@@ -65,7 +63,7 @@ import GHC.Core.Subst( substExprSC )
 import GHC.Core.Unfold
 import GHC.Core.TyCo.Subst (emptyIdSubstEnv, mkSubst)
 import GHC.Core.Multiplicity( Scaled(..), mkMultMul )
-import GHC.Core.Make            ( mkWildValBinder, mkCoreLet )
+import GHC.Core.Make            ( mkWildValBinder )
 import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, substCo
                                 , extendTvSubst, extendCvSubst )
 import qualified GHC.Core.Coercion as Coercion
@@ -73,11 +71,13 @@ import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
 import qualified GHC.Core.Type as Type
 
 import GHC.Types.Var
+import GHC.Types.Demand( isStrUsedDmd )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Id as Id
 import GHC.Types.InlinePragma ( ActivationGhc, CompilerPhase, isActiveInPhase )
 import GHC.Types.Basic
+import GHC.Types.Tickish ( tickishHasSoftScope )
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
 import GHC.Data.OrdList
@@ -418,42 +418,41 @@ see GHC.Core.Opt.FloatOut.
 
 data SimplFloats
   = SimplFloats
-      { -- Ordinary let bindings
-        sfLetFloats  :: LetFloats
-                -- See Note [LetFloats]
+      { -- Ordinary let bindings, case-floats and tick-floats
+        sfBinds  :: FloatBinds -- See Note [Using FloatBinds in SimplFloats]
 
         -- Join points
-      , sfJoinFloats :: JoinFloats
+      , sfJoins :: JoinFloats
                 -- Handled separately; they don't go very far
-                -- We consider these to be /inside/ sfLetFloats
+                -- We consider these to be /inside/ sfBinds
                 -- because join points can refer to ordinary bindings,
                 -- but not vice versa
 
-        -- Includes all variables bound by sfLetFloats and
-        -- sfJoinFloats, plus at least whatever is in scope where
+        -- Includes all variables bound by sfBinds and
+        -- sfJoins, plus at least whatever is in scope where
         -- these bindings land up.
       , sfInScope :: InScopeSet  -- All OutVars
       }
 
 instance Outputable SimplFloats where
-  ppr (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf, sfInScope = is })
+  ppr (SimplFloats { sfBinds = lf, sfJoins = jf, sfInScope = is })
     = text "SimplFloats"
-      <+> braces (vcat [ text "lets: " <+> ppr lf
+      <+> braces (vcat [ text "lets: " <+> ppr (fromOL lf)
                        , text "joins:" <+> ppr jf
                        , text "in_scope:" <+> ppr is ])
 
 emptyFloats :: SimplEnvIS -> SimplFloats
 emptyFloats env
-  = SimplFloats { sfLetFloats  = emptyLetFloats
-                , sfJoinFloats = emptyJoinFloats
-                , sfInScope    = seInScope env }
+  = SimplFloats { sfBinds   = emptyFloatBinds
+                , sfJoins   = emptyJoinFloats
+                , sfInScope = seInScope env }
 
 isEmptyFloats :: SimplFloats -> Bool
--- Precondition: used only when sfJoinFloats is empty
-isEmptyFloats (SimplFloats { sfLetFloats  = LetFloats fs _
-                           , sfJoinFloats = js })
-  = assertPpr (isNilOL js) (ppr js ) $
-    isNilOL fs
+-- Precondition: used only when sfJoins is empty
+isEmptyFloats (SimplFloats { sfBinds = fs
+                           , sfJoins = js })
+  = assertPpr (isEmptyJoinFloats js) (ppr js ) $
+    isEmptyFloatBinds fs
 
 pprSimplEnv :: SimplEnv -> SDoc
 -- Used for debugging; selective
@@ -738,95 +737,118 @@ setSubstEnv env tvs cvs ids = env { seTvSubst = tvs, seCvSubst = cvs, seIdSubst 
 {-
 ************************************************************************
 *                                                                      *
-\subsection{LetFloats}
+\subsection{Floats}
 *                                                                      *
 ************************************************************************
 
-Note [LetFloats]
-~~~~~~~~~~~~~~~~
-The LetFloats is a bunch of bindings, classified by a FloatFlag.
+Note [Using FloatBinds in SimplFloats]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The `sfBinds :: FloatBinds` field of SimplFloats gives a bunch of bindings
+that are floating outwards. Why do we we use `sfBinds :: FloatBinds`,
+rather than, say just a list of CoreBind?  Answer: mainly so we can have
+FloatCase, which is useful for two reasons:
 
-The `FloatFlag` contains summary information about the bindings, see the data
-type declaration of `FloatFlag`
+(LF1) exprIsConApp_maybe looks through single-alternative cases (and lets
+  and ticks) and returns what it looked through as a `[FloatBind]`.  The
+  case-of-known-constructor code wants to add these straight to the
+  Simplifier's floats, so the floats must be able to hold a case.
 
-Examples
+(LF2) A single-alternative case is returned as a FloatCase by
+  `rebuildSingleAltCase` rather than as an expression, so that the lets in
+  its alternative are not trapped inside it.  Example, with case-of-case
+  switched off (e.g. in the Gentle phase):
+     case (case f x s of (# s1, a #) ->
+           let b = g a in
+           let c = h b in
+           (# s1, c #))
+     of (# s2, r #) -> body
+  We simplify the inner case with an empty continuation (see
+  splitContForNoCaseCase), and get back
+     floats: [case f x s of (# s1, a #), b = g a, c = h b]
+     result: (# s1, c #)
+  Now rebuildWithFloats can do case-of-known-constructor on the result
+  directly, giving
+     case f x s of (# s1, a #) ->
+     let b = g a in
+     let c = h b in
+     body[s1/s2, c/r]
 
-  NonRec x (y:ys)       FltLifted
-  Rec [(x,rhs)]         FltLifted
+  If instead the inner case came back as a single expression, then exprIsConApp_maybe
+  would have to walk down through the case and all the lets to find the (# s1, c #).
+  With a long chain of such nested binds (e.g. state-passing code, as in T18223)
+  the scrutinee at each level contains all the lets from the levels
+  inside it, so the repeated walks are quadratic (#27737).
 
-  NonRec x* (p:q)       FltOKSpec   -- RHS is WHNF.  Question: why not FltLifted?
-  NonRec x# (y +# 3)    FltOkSpec   -- Unboxed, but ok-for-spec'n
+  See Note [Floating single-alternative cases] in GHC.Core.Opt.Simplify.Iteration.
 
-  NonRec x* (f y)       FltCareful  -- Strict binding; might fail or diverge
-  NonRec x# (a /# b)    FltCareful  -- Might fail; does not satisfy let-can-float invariant
-  NonRec x# (f y)       FltCareful  -- Might diverge; does not satisfy let-can-float invariant
--}
+(LF3) A DEFAULT case-float never has a scrutinee for which doCaseToLet holds;
+  we use a let-float instead.  This is a global invariant of FloatCase:
+  see Note [The FloatCase invariant] in GHC.Core.  The Simplifier maintains it
+  by using GHC.Core.Utils.mkFloatCase in addCaseFloat.
 
-data LetFloats = LetFloats (OrdList OutBind) FloatFlag
-                 -- See Note [LetFloats]
+Note [doFloatFromRhs]
+~~~~~~~~~~~~~~~~~~~~~
+Given a binding
+   x = let rhs_floats in rhs
+the function `doFloatFromRhs` decides whether to
+float `rhs_floats` out of RHS of the x-binding.  Here is the plan:
 
-type JoinFloat  = OutBind
-type JoinFloats = OrdList JoinFloat
+* We check that /every/ binding is floatable; see (FFL1-4).
+* If so, we float them; if not we don't
 
-data FloatFlag
-  = FltLifted   -- All bindings are lifted and lazy *or*
-                --     consist of a single primitive string literal
-                -- Hence ok to float to top level, or recursive
-                -- NB: consequence: all bindings satisfy let-can-float invariant
+This is a bit brutal: what if some are floatable and some are not?
+See Note [Floating a prefix of the floats].
 
-  | FltOkSpec   -- All bindings are FltLifted *or*
-                --      strict (perhaps because unlifted,
-                --      perhaps because of a strict binder),
-                --        *and* ok-for-speculation
-                -- Hence ok to float out of the RHS
-                -- of a lazy non-recursive let binding
-                -- (but not to top level, or into a rec group)
-                -- NB: consequence: all bindings satisfy let-can-float invariant
+Some specifics:
 
-  | FltCareful  -- At least one binding is strict (or unlifted)
-                --      and not guaranteed cheap
-                -- Do not float these bindings out of a lazy let!
-                -- NB: some bindings may not satisfy let-can-float
+(FFL1) Do not float a strict lifted binding out of a RHS
+      x = let y! = blah in rhs  ===>  y = blah; x = rhs   -- NO!
+   The demand info on `y` would have to be zapped, and we might well
+   end up building a thunk for it when the original would not.
 
-instance Outputable LetFloats where
-  ppr (LetFloats binds ff) = ppr ff $$ ppr (fromOL binds)
+   But we /can and should/ float if the RHS is ok-for-speculation:
+      x = let y! = Just z in rhs  ==>  y = Just z; x = rhs  -- YES!
+   We definitely want to float the y-binding.
 
-instance Outputable FloatFlag where
-  ppr FltLifted  = text "FltLifted"
-  ppr FltOkSpec  = text "FltOkSpec"
-  ppr FltCareful = text "FltCareful"
+   We should really switch off the demand-flag, but it's inconvenient to do so, and
+   it doesn't really matter since the RHS is cheap.  (We could also use exprIsCheap
+   or exprIsHNF.)
 
-andFF :: FloatFlag -> FloatFlag -> FloatFlag
-andFF FltCareful _          = FltCareful
-andFF FltOkSpec  FltCareful = FltCareful
-andFF FltOkSpec  _          = FltOkSpec
-andFF FltLifted  flt        = flt
+(FFL2) A literal-string binding can be floated unconditionally, including
+  to top level.  See Note [Core top-level string literals] in GHC.Core.
 
+(FFL3) An unlifted binding must be ok-for-speculation because every FloatLet
+  satisfies the let-can-float invariant.  So we just need to check whether
+  the enclosing scope can accommodate it; that is, not at top level, and not
+  in a Rec.
 
-doFloatFromRhs :: FloatEnable -> TopLevelFlag -> RecFlag -> Bool -> SimplFloats -> OutExpr -> Bool
--- If you change this function look also at FloatIn.noFloatIntoRhs
-doFloatFromRhs fe lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
-  = floatEnabled lvl fe
-      && not (isNilOL fs)
-      && want_to_float
-      && can_float
-  where
-     want_to_float = isTopLevel lvl || exprIsExpandable rhs
-                     -- See Note [Float when expandable]
+(FFL4) We never float out FloatCase or FloatTick. Doing so would be unsound for a
+  lazy binding, and if the binding is strict we'll use StrictBind (provided
+  case-of-case is swiched on) and that'll float them in a different way.
 
-     can_float = case ff of
-                   FltLifted  -> True
-                   FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
-                   FltCareful -> isNotTopLevel lvl && isNonRec rec && strict_bind
+  FloatCase would pose real problems for `abstractFloats`, so that's another
+  reason not to float them.  See also (FFL6).
 
-     -- Whether any floating is allowed by flags.
-     floatEnabled :: TopLevelFlag -> FloatEnable -> Bool
-     floatEnabled _ FloatDisabled = False
-     floatEnabled lvl FloatNestedOnly = not (isTopLevel lvl)
-     floatEnabled _ FloatEnabled = True
+(FFL5) sfBinds can contain a FloatTick for soft-scoped ticks (only -- see
+  the invariant on FloatTick in GHC.Core).
 
-{- Note [Float when expandable]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Like a case-float, a tick-float never floats out of the RHS of a let-binding.
+  For a /counting/ tick (e.g.  an HPC tick) that is essential: floating it out
+  of a lazy RHS would change when (and how often) it is counted, namely when the
+  let is executed rather than when the binder is evaluated.  For a /non-counting/
+  tick (e.g. a source note) it would be fine, but we don't bother.
+
+(FFL6) Lost opportunity.  Consider
+     x = case addIntC# a b of (# r, c #) -> K r c
+  The scrutinee is ok-for-speculation, so we /could/ float the case-float out,
+  to get
+     case addIntC# a b of (# r, c #) -> let x = K r c in ...
+  Now x is bound to a value, so case-of-known-constructor can see through it.
+  But floating the case contradicts (FFL4) and the complexity of doing something
+  more general does not seem worth it
+
+Note [Float when expandable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We float when that would leave us with a RHS that is /expandable/ (#26854).
 The whole purpose of the local-let-floating is to end up with
    let x = rhs
@@ -834,7 +856,6 @@ where rhs has an expandable unfolding, so that `exprIsConApp_maybe` will look
 inside `x`.
 
 Historical aside:
-
     In the long-distant (2011) past, we made `want_to_float` true if
       EITHER exprIsExpandable OR exprIsCheap
     But that seems wrong: there is no point in floating for expressions that are
@@ -846,15 +867,88 @@ Historical aside:
       - cheap things that are not expandable (eg \x. expensive)
       - expandable things that are not cheap (eg (f b) where b is CONLIKE)
     But that's not true: (\x.expensive) is certainly expandable.
-
 End of historial aside
+
+
+Note [Floating a prefix of the floats]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`doFloatFromRhs` floats /all/ of the floats from a RHS, or none of them.  It floats
+none if any of them is a case-float or tick-float; see Note [doFloatFromRhs].
+This is a bit conservative.   Consider (T5321FD)
+     x = let v1 = \ds -> ... in
+         ...
+         let v200 = \ds -> ... in
+         case sampleData of (a :* b) -> ...
+where the single-alternative case has become a FloatCase; see
+Note [Floating single-alternative cases] in GHC.Core.Opt.Simplify.Iteration.
+Because of the FloatCase, none of these floats go to top level, even though the
+lets in front of the case are all floatable.
+
+Opportunity: when the group cannot float as a whole, float the longest prefix of
+let-bindings that can, and wrap the rest back around the RHS.  We tried this
+(#27737).  It did restore the top-level floating in T5321FD, but made little
+difference to compile time, so we did not keep it.
 -}
 
-emptyLetFloats :: LetFloats
-emptyLetFloats = LetFloats nilOL FltLifted
+type JoinFloat  = OutBind
+type JoinFloats = OrdList JoinFloat
 
-isEmptyLetFloats :: LetFloats -> Bool
-isEmptyLetFloats (LetFloats fs _) = isNilOL fs
+doFloatFromRhs :: SimplEnv -> TopLevelFlag -> RecFlag
+               -> SimplFloats
+               -> OrdList OutBind  -- Let-bindings only (from prepareRhs); they
+                                   -- satisfy the let-can-float invariant
+               -> OutExpr
+               -> Maybe SimplFloats   -- Contains let-bindings only
+-- See Note [doFloatFromRhs]
+-- Postcondition: returns a SimplFloats that contains only let-bindings;
+--                see Note [doFloatFromRhs]
+--
+-- If you change this function look also at FloatIn.noFloatIntoRhs
+doFloatFromRhs env lvl rec floats anf_lets rhs
+  | isNilOL fs, isNilOL anf_lets = Nothing  -- Short cut only
+  | not float_enabled            = Nothing
+  | not want_to_float            = Nothing
+  | not can_float                = Nothing
+  | otherwise                    = Just new_floats
+  where
+    !(SimplFloats { sfBinds = fs, sfJoins = jfs, sfInScope = in_scope }) = floats
+    new_floats = assertPpr (isNilOL jfs) (ppr jfs) $
+                 SimplFloats { sfBinds   = fs `appOL` fmap FloatLet anf_lets
+                             , sfJoins   = emptyJoinFloats
+                             , sfInScope = in_scope' }
+    in_scope' = foldlOL extendInScopeSetBind in_scope anf_lets
+
+    want_to_float = isTopLevel lvl || exprIsExpandable rhs
+                    -- See Note [Float when expandable]
+
+    can_float = allOL ok_float fs      -- All FloatLet, and that let is floatable
+             && allOL ok_let anf_lets  -- All floatable lets
+
+    ok_float :: FloatBind -> Bool
+    ok_float (FloatLet b)   = ok_let b
+    ok_float (FloatCase {}) = False      -- Do not float cases; see (FFL4)
+    ok_float (FloatTick {}) = False      -- Do not float ticks; see (FFL5)
+
+    ok_let :: CoreBind -> Bool
+    -- Precondition: this binding satisfies the let-can-float invariant
+    ok_let (Rec {}) = True
+    ok_let bind@(NonRec bndr rhs)
+      | is_lit_string = True    -- See (FFL2)
+      | is_unlifted   = assertPpr ok_for_spec (ppr bind)
+                        isNotTopLevel lvl && isNonRec rec  -- See (FFL3)
+      | is_demanded   = ok_for_spec   -- See (FFL1)
+      | otherwise     = True
+      where
+        is_lit_string = exprIsTickedString rhs
+        is_unlifted   = isUnliftedType (idType bndr)
+        is_demanded   = isStrUsedDmd (idDemandInfo bndr)
+        ok_for_spec   = exprOkForSpeculation rhs
+
+    -- Whether any floating is allowed by flags.
+    float_enabled = case seFloatEnable env of
+                       FloatDisabled   -> False
+                       FloatNestedOnly -> not (isTopLevel lvl)
+                       FloatEnabled    -> True
 
 emptyJoinFloats :: JoinFloats
 emptyJoinFloats = nilOL
@@ -862,19 +956,45 @@ emptyJoinFloats = nilOL
 isEmptyJoinFloats :: JoinFloats -> Bool
 isEmptyJoinFloats = isNilOL
 
-unitLetFloat :: OutBind -> LetFloats
--- This key function constructs a singleton float with the right form
-unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
-                    LetFloats (unitOL bind) (flag bind)
-  where
-    flag (Rec {})                = FltLifted
-    flag (NonRec bndr rhs)
-      | not (isStrictId bndr)    = FltLifted
-      | exprIsTickedString rhs   = FltLifted
-          -- String literals can be floated freely.
-          -- See Note [Core top-level string literals] in GHC.Core.
-      | exprOkForSpeculation rhs = FltOkSpec  -- Unlifted, and lifted but ok-for-spec (eg HNF)
-      | otherwise                = FltCareful
+addLetFloat :: SimplFloats -> OutBind -> SimplFloats
+-- Add a non-join binding to the let-floats, and extend the in-scope set.
+-- If the binding does not satisfy the let-can-float invariant, it
+-- makes a FloatCase.
+-- See Note [Using FloatBinds in SimplFloats]
+addLetFloat floats bind
+  = assert (all (not . isJoinId) (bindersOf bind)) $
+    add_float floats (mkLetFloat bind)
+
+mkLetFloat :: OutBind -> FloatBind
+mkLetFloat bind
+  | NonRec bndr rhs <- bind
+  , needsCaseBinding (idType bndr) rhs
+  = -- This should never happen, but currently does because of #27910
+    FloatCase rhs bndr DEFAULT []
+  | otherwise
+  = FloatLet bind
+
+addCaseFloat :: SimplFloats -> OutExpr -> OutId -> AltCon -> [OutVar] -> SimplFloats
+-- Add a single-alternative case float
+--   case scrut of bndr { con bndrs -> <hole> }
+-- and extend the in-scope set.
+-- See Note [Using FloatBinds in SimplFloats]a
+addCaseFloat floats scrut bndr con bndrs
+  = add_float floats (mkFloatCase scrut bndr con bndrs)
+    -- mkFloatCase: makes a let-float if it can;
+    -- see Note [The FloatCase invariant] in GHC.Core
+
+add_float :: SimplFloats -> FloatBind -> SimplFloats
+-- Add the float /inside/ the existing let-floats
+add_float floats@(SimplFloats { sfBinds = fs, sfInScope = in_scope }) flt
+  = floats { sfBinds   = fs `snocOL` flt
+           , sfInScope = in_scope `extendInScopeFromFB` unitOL flt }
+
+okLetFloat :: OutBind -> Bool
+-- Checks the let-can-float invariant; used only in assertions
+okLetFloat (NonRec b r)
+  | isId b, not (isCoVar b) = not (needsCaseBinding (idType b) r)
+okLetFloat _                = True
 
 unitJoinFloat :: OutBind -> JoinFloats
 unitJoinFloat bind = assert (all isJoinId (bindersOf bind)) $
@@ -885,55 +1005,62 @@ mkFloatBind :: SimplEnv -> OutBind -> (SimplFloats, SimplEnv)
 -- extend the incoming SimplEnv's in-scope set with its binders
 -- These binders may already be in the in-scope set,
 -- but may have by now been augmented with more IdInfo
+-- Works for join-points as well as ordinary let-bindings
 mkFloatBind env bind
   = (floats, env { seInScope = in_scope' })
   where
-    floats
-      | isJoinBind bind
-      = SimplFloats { sfLetFloats  = emptyLetFloats
-                    , sfJoinFloats = unitJoinFloat bind
-                    , sfInScope    = in_scope' }
-      | otherwise
-      = SimplFloats { sfLetFloats  = unitLetFloat bind
-                    , sfJoinFloats = emptyJoinFloats
-                    , sfInScope    = in_scope' }
-    -- See Note [Bangs in the Simplifier]
-    !in_scope' = seInScope env `extendInScopeSetBind` bind
-
-extendFloats :: SimplFloats -> OutBind -> SimplFloats
--- Add this binding to the floats, and extend the in-scope env too
-extendFloats (SimplFloats { sfLetFloats  = floats
-                          , sfJoinFloats = jfloats
-                          , sfInScope    = in_scope })
-             bind
-  | isJoinBind bind
-  = SimplFloats { sfInScope    = in_scope'
-                , sfLetFloats  = floats
-                , sfJoinFloats = jfloats' }
-  | otherwise
-  = SimplFloats { sfInScope    = in_scope'
-                , sfLetFloats  = floats'
-                , sfJoinFloats = jfloats }
-  where
+    in_scope  = seInScope env
     in_scope' = in_scope `extendInScopeSetBind` bind
-    floats'   = floats  `addLetFlts`  unitLetFloat bind
-    jfloats'  = jfloats `addJoinFlts` unitJoinFloat bind
+    -- See Note [Bangs in the Simplifier]
+    !floats | isJoinBind bind
+            = SimplFloats { sfBinds   = emptyFloatBinds
+                          , sfJoins   = unitJoinFloat bind
+                          , sfInScope = in_scope' }
+            | otherwise
+            = SimplFloats { sfBinds   = unitOL (mkLetFloat bind)
+                          , sfJoins   = emptyJoinFloats
+                          , sfInScope = in_scope' }
 
-addLetFloats :: SimplFloats -> LetFloats -> SimplFloats
--- Add the let-floats for env2 to env1;
--- *plus* the in-scope set for env2, which is bigger
--- than that for env1
-addLetFloats floats let_floats
-  = floats { sfLetFloats = sfLetFloats floats `addLetFlts` let_floats
-           , sfInScope   = sfInScope floats `extendInScopeFromLF` let_floats }
+addLetFloats :: SimplFloats -> OrdList OutBind -> SimplFloats
+-- Add the let-bindings /inside/ the existing floats,
+-- and extend the in-scope set
+-- Precondition: the bindings satisfy the let-can-float invariant,
+-- so there is no need for addLetFloat's needsCaseBinding test
+addLetFloats floats binds = foldlOL add floats binds
+  where
+    add fs bind = assertPpr (okLetFloat bind) (ppr bind) $
+                  add_float fs (FloatLet bind)
 
-extendInScopeFromLF :: InScopeSet -> LetFloats -> InScopeSet
-extendInScopeFromLF in_scope (LetFloats binds _)
-  = foldlOL extendInScopeSetBind in_scope binds
+addFloatBindsF :: FloatBinds -> SimplFloats -> SimplFloats
+-- (addFloatBindsF new_fbs floats) adds `new_fbs` /outside/ `floats`;
+-- i.e. `new_fbs` scope over `floats`
+-- Precondition: every FloatLet in `new_fbs` satisfies the let-can-float invariant
+-- (see the FloatBind declaration in GHC.Core), so we can add them directly
+-- See Note [Using FloatBinds in SimplFloats]
+addFloatBindsF new_fbs floats@(SimplFloats { sfBinds = lf_fbs, sfInScope = in_scope })
+  | isNilOL new_fbs
+  = floats
+  | otherwise
+  = assertPpr (all ok_float new_fbs) (ppr new_fbs) $
+    floats { sfBinds   = new_fbs `appOL` lf_fbs
+           , sfInScope = in_scope `extendInScopeFromFB` new_fbs }
+  where
+    -- Check the invariants on FloatBind; see its declaration in GHC.Core
+    ok_float (FloatLet bind)    = okLetFloat bind
+    ok_float (FloatTick t)      = tickishHasSoftScope t
+    ok_float flt@(FloatCase {}) = okFloatCase flt  -- Note [The FloatCase invariant] in GHC.Core
+
+extendInScopeFromFB :: InScopeSet -> FloatBinds -> InScopeSet
+extendInScopeFromFB in_scope binds
+  = foldlOL extend in_scope binds
+  where
+    extend in_scope (FloatLet bind)        = in_scope `extendInScopeSetBind` bind
+    extend in_scope (FloatCase _ b _ bs)   = in_scope `extendInScopeSetList` (b:bs)
+    extend in_scope (FloatTick {})         = in_scope
 
 addJoinFloats :: SimplFloats -> JoinFloats -> SimplFloats
 addJoinFloats floats join_floats
-  = floats { sfJoinFloats = sfJoinFloats floats `addJoinFlts` join_floats
+  = floats { sfJoins = sfJoins floats `addJoinFlts` join_floats
            , sfInScope    = foldlOL extendInScopeSetBind
                                     (sfInScope floats) join_floats }
 
@@ -941,77 +1068,68 @@ addFloats :: SimplFloats -> SimplFloats -> SimplFloats
 -- Add both let-floats and join-floats for env2 to env1;
 -- *plus* the in-scope set for env2, which is bigger
 -- than that for env1
-addFloats (SimplFloats { sfLetFloats = lf1, sfJoinFloats = jf1 })
-          (SimplFloats { sfLetFloats = lf2, sfJoinFloats = jf2, sfInScope = in_scope })
-  = SimplFloats { sfLetFloats  = lf1 `addLetFlts` lf2
-                , sfJoinFloats = jf1 `addJoinFlts` jf2
-                , sfInScope    = in_scope }
+addFloats (SimplFloats { sfBinds = lf1, sfJoins = jf1 })
+          (SimplFloats { sfBinds = lf2, sfJoins = jf2, sfInScope = in_scope })
+  = SimplFloats { sfBinds   = lf1 `appOL` lf2
+                , sfJoins   = jf1 `addJoinFlts` jf2
+                , sfInScope = in_scope }
 
-addLetFlts :: LetFloats -> LetFloats -> LetFloats
-addLetFlts (LetFloats bs1 l1) (LetFloats bs2 l2)
-  = LetFloats (bs1 `appOL` bs2) (l1 `andFF` l2)
-
-letFloatBinds :: LetFloats -> [CoreBind]
-letFloatBinds (LetFloats bs _) = fromOL bs
+letFloatBinds :: SimplFloats -> [OutBind]
+-- The let-floats, as bindings
+-- Precondition: there are no case-floats or tick-floats; true, for example,
+--               for floats that have come out of a recursive or top-level RHS
+--               (see Note [doFloatFromRhs])
+letFloatBinds (SimplFloats { sfBinds = fs }) = map get_bind (fromOL fs)
+  where
+    get_bind (FloatLet bind) = bind
+    get_bind flt             = pprPanic "letFloatBinds" (ppr flt)
 
 addJoinFlts :: JoinFloats -> JoinFloats -> JoinFloats
 addJoinFlts = appOL
 
 mkRecFloats :: SimplFloats -> SimplFloats
 -- Flattens the floats into a single Rec group,
--- They must either all be lifted LetFloats or all JoinFloats
-mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs _ff
-                                , sfJoinFloats = jbs
-                                , sfInScope    = in_scope })
+-- They must either all be lifted let-floats or all JoinFloats
+mkRecFloats floats@(SimplFloats { sfBinds   = bs
+                                , sfJoins   = jbs
+                                , sfInScope = in_scope })
   = assertPpr (isNilOL bs || isNilOL jbs) (ppr floats) $
-    SimplFloats { sfLetFloats  = floats'
-                , sfJoinFloats = jfloats'
-                , sfInScope    = in_scope }
+    SimplFloats { sfBinds   = floats'
+                , sfJoins   = jfloats'
+                , sfInScope = in_scope }
   where
     -- See Note [Bangs in the Simplifier]
-    !floats'  | isNilOL bs  = emptyLetFloats
-              | otherwise   = unitLetFloat (Rec (flattenBinds (fromOL bs)))
+    !floats'  | isNilOL bs  = nilOL
+              | otherwise   = unitOL (FloatLet (Rec (flattenBinds (letFloatBinds floats))))
     !jfloats' | isNilOL jbs = emptyJoinFloats
               | otherwise   = unitJoinFloat (Rec (flattenBinds (fromOL jbs)))
 
-wrapFloats :: SimplFloats -> OutExpr -> OutExpr
--- Wrap the floats around the expression
-wrapFloats (SimplFloats { sfLetFloats  = LetFloats bs flag
-                        , sfJoinFloats = jbs }) body
-  = foldrOL mk_let (wrapJoinFloats jbs body) bs
-     -- Note: Always safe to put the joins on the inside
-     -- since the values can't refer to them
-  where
-    mk_let | FltCareful <- flag = mkCoreLet -- need to enforce let-can-float-invariant
-           | otherwise          = Let       -- let-can-float invariant hold
-
 wrapJoinFloatsX :: SimplFloats -> OutExpr -> (SimplFloats, OutExpr)
--- Wrap the sfJoinFloats of the env around the expression,
+-- Wrap the sfJoins of the env around the expression,
 -- and take them out of the SimplEnv
 wrapJoinFloatsX floats body
-  = ( floats { sfJoinFloats = emptyJoinFloats }
-    , wrapJoinFloats (sfJoinFloats floats) body )
+  = ( floats { sfJoins = emptyJoinFloats }
+    , wrapJoinFloats (sfJoins floats) body )
 
 wrapJoinFloats :: JoinFloats -> OutExpr -> OutExpr
--- Wrap the sfJoinFloats of the env around the expression,
+-- Wrap the sfJoins of the env around the expression,
 -- and take them out of the SimplEnv
 wrapJoinFloats join_floats body
   = foldrOL Let body join_floats
 
 getTopFloatBinds :: SimplFloats -> [CoreBind]
-getTopFloatBinds (SimplFloats { sfLetFloats  = lbs
-                              , sfJoinFloats = jbs})
+getTopFloatBinds floats@(SimplFloats { sfJoins = jbs })
   = assert (isNilOL jbs) $  -- Can't be any top-level join bindings
-    letFloatBinds lbs
+    letFloatBinds floats
 
 {-# INLINE mapLetFloats #-}
-mapLetFloats :: LetFloats -> ((Id,CoreExpr) -> (Id,CoreExpr)) -> LetFloats
-mapLetFloats (LetFloats fs ff) fun
-   = LetFloats fs1 ff
+mapLetFloats :: OrdList OutBind -> ((Id,CoreExpr) -> (Id,CoreExpr)) -> OrdList OutBind
+mapLetFloats binds fun
+   = binds1
    where
     app (NonRec b e) = case fun (b,e) of (b',e') -> NonRec b' e'
     app (Rec bs)     = Rec (strictMap fun bs)
-    !fs1 = (mapOL' app fs) -- See Note [Bangs in the Simplifier]
+    !binds1 = mapOL' app binds -- See Note [Bangs in the Simplifier]
 
 {-
 ************************************************************************
