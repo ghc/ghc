@@ -6245,9 +6245,12 @@ invertCondBranches (Just cfg) keep bs =
       , transitionSource edgeInfo1 == transitionSource edgeInfo2
       , CmmSource {trans_cmmNode = cmmCondBranch} <- transitionSource edgeInfo1
 
-      --Int comparisons are invertable
+      -- Comparisons are invertible, floating-point ones too: maybeInvertCond
+      -- complements the condition on the flags, which nothing between the
+      -- two jumps changes, so the swapped jumps take the same path for
+      -- every outcome, an unordered one included
       , CmmCondBranch (CmmMachOp op _args) _ _ _ <- cmmCondBranch
-      , Just _ <- maybeIntComparison op
+      , isComparisonMachOp op
       , Just invCond <- maybeInvertCond cond1
 
       --Swap the last two jumps, invert the conditional jumps condition.
