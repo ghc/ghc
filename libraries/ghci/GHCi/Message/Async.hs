@@ -11,12 +11,14 @@ module GHCi.Message.Async
 
     -- * Interface for async bidirectional RPC
   , remoteAsyncReq, handleAsyncReq
+  , remoteAsyncReqWithResponse
   , RemoteProcessException(..), DecodeAsyncReqException(..)
 
     -- ** Mailboxes
   , InboxId(..)
   , newMailbox
   , closeMailbox
+  , withNewMailbox
 
     -- ** Async matching internals
   , AsyncManager(..), CorrelationId
@@ -247,24 +249,44 @@ newPendingReply pipe k = do
 --
 -- See Note [Exceptions during serialization] about exceptions the 'Put' argument might raise.
 remoteAsyncReq :: Pipe -> Put -> (Maybe InboxId) -> IO (Either SomeException LB.ByteString)
-remoteAsyncReq pipe msg ii = newPendingReply pipe $ \ uq wv ->
+remoteAsyncReq pipe msg ii = remoteAsyncReqWithResponse pipe msg ii id
+
+
+remoteAsyncReqWithResponse :: Pipe
+                           -> Put
+                           -> Maybe InboxId
+                           -> (IO (Either SomeException LB.ByteString) -> IO b)
+                           -> IO b
+remoteAsyncReqWithResponse pipe msg ii k = newPendingReply pipe $ \ uq wv -> do
+  -- We use an MVar to only Cancel the request if the response did not get read by `k`.
+  readRes <- newEmptyMVar
   -- We might send a Cancel even if the request never got sent, but it will just
   -- get ignored in that case.
-  handle (\e -> sendCancelMaybe uq e >> throwIO e) $ do
+  --
+  -- Waiting for confirmation that the request got sent before "arming" the
+  -- cancelation requires more collaboration from `fillPipe`, because
+  -- writePipe's takeMVar is interruptible. Could be done if we generalize the
+  -- type of `writeQueue` to `TQueue (IddMsg, (Either SomeException ()) -> STM ())`.
+  cancelOnErrorMaybe uq readRes $ do
+    -- Write request
+    writePipe pipe (Request uq ii (runPut msg))
 
-  -- Write request
-  writePipe pipe (Request uq ii (runPut msg))
-
-  -- Block waiting for reply
-  atomically (takeTMVar wv)
+    k $ do
+      -- Block waiting for reply
+      atomically (takeTMVar wv) <* putMVar readRes ()
   where
-    sendCancelMaybe uq e
-      | Just PipeWriteClosedException <- fromException e = pure ()
-      | otherwise = sendCancel uq
-    sendCancel uq = void . atomically $ do
-      -- we don't wait for Cancel to be written on the pipe,
-      -- and won't get a reply: nowhere to report it anyway.
-      writePipeAsync pipe (Cancel uq)
+    cancelOnErrorMaybe :: CorrelationId -> MVar () -> IO a -> IO a
+    cancelOnErrorMaybe uq readRes = handle (\ e -> sendCancelMaybe e >> throwIO e) where
+      sendCancelMaybe = \case
+        e | Just PipeWriteClosedException <- fromException e ->
+          pure ()
+          | otherwise ->
+          tryTakeMVar readRes >>= \case
+            Just () -> pure ()
+            Nothing -> void . atomically $ do
+              -- we don't wait for Cancel to be written on the pipe,
+              -- and won't get a reply: nowhere to report it anyway.
+              writePipeAsync pipe (Cancel uq)
 
 -- | Receive a single asynchronous request and send a matching reply
 -- asynchronously (the handler may fork a computation that eventually replies
@@ -282,47 +304,46 @@ handleAsyncReq pipe getit mii k = mask $ \restore -> do
   ack <- newEmptyMVar
 
   -- Block waiting for request
-  mbreq <- atomically $ do
+  (uq,bs) <- atomically $ do
     readTVar (pipeWriteClosed pipe) >>= \case
       -- We will not be able to write the reply, so no point in continuiting.
       True -> throwSTM PipeWriteClosedException
       False -> pure ()
-    isClosed <- readTVar (pipeReadClosed pipe)
     taken <- case mii of
       Nothing -> tryReadTQueue  $  requestsQueue am
       Just ii -> tryReadTQueue =<< getMailbox am ii
     case taken of
-      Just req@(uq,_)      -> pure (Just req)
-      Nothing  | isClosed  -> pure Nothing    -- empty and closed
-               | otherwise -> retry           -- wait for msg
+      Just req            -> pure req
+      Nothing  -> readTVar (pipeReadClosed pipe) >>= \case
+        True  -> throwSTM PipeReadClosedException -- can't expect reqs
+        False -> retry
 
-  case mbreq of
-    Nothing -> throwIO PipeReadClosedException -- can't expect reqs
-    Just (uq, bs) -> do
-      let reply p = do
-            b <- atomically $ doneHandling am uq
-            when b $ writePipe pipe (Reply uq (bimap toSerializableException runPut p))
-            putMVar ack ()
-      -- Run the continuation which must reply exactly once with 'writeReply'
-      case runGetOrFail getit bs of
-        Left (_, _, err) -> do
-          let exc = DecodeAsyncReqException err
-          reply (Left (toException exc))
-          throwIO exc
-        Right (_, _, it) ->
-          restore (k (WriteReply reply) (setActive am uq) it)
+  let
+    reply p = do
+      b <- atomically $ doneHandling am uq
+      when b $ writePipe pipe (Reply uq (bimap toSerializableException runPut p))
+      putMVar ack ()
 
-            -- If there's an exception before the reply is sent, reply with an error instead.
-            `catch` \(e :: SomeException) -> do
+  -- Run the continuation which must reply exactly once with 'writeReply'
+  case runGetOrFail getit bs of
+    Left (_, _, err) -> do
+      let exc = DecodeAsyncReqException err
+      reply (Left (toException exc))
+      throwIO exc
+    Right (_, _, it) ->
+      restore (k (WriteReply reply) (setActive am uq) it)
 
-                tryTakeMVar ack >>= \case
-                  Just () ->
-                    -- Already replied
-                    throwIO e
-                  Nothing -> do
-                    -- Reply with an error
-                    reply (Left e)
-                    throwIO e
+        -- If there's an exception before the reply is sent, reply with an error instead.
+        `catch` \(e :: SomeException) -> do
+
+            tryTakeMVar ack >>= \case
+              Just () ->
+                -- Already replied
+                throwIO e
+              Nothing -> do
+                -- Reply with an error
+                reply (Left e)
+                throwIO e
 
 
 -- | 'handleSyncReq' failed to decode an incoming request payload using the given @'Get' a@
@@ -351,6 +372,9 @@ newMailbox am = InboxId <$> freshId am
 closeMailbox :: AsyncManager -> InboxId -> IO ()
 closeMailbox AsyncManager{..} (InboxId ii) =
   atomically (modifyTVar mailboxQueues (IntMap.delete ii))
+
+withNewMailbox :: AsyncManager -> (InboxId -> IO a) -> IO a
+withNewMailbox am = bracket (newMailbox am) (closeMailbox am)
 
 -- | Get or create a new mailbox for this 'InboxId'
 getMailbox :: AsyncManager -> InboxId -> STM (TQueue (CorrelationId, LB.ByteString))
