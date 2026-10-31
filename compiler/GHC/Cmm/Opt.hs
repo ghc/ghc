@@ -244,18 +244,28 @@ cmmMachOpFoldM platform op [x@(CmmLit _), y]
 -- Also don't do it if arg1 is PicBaseReg, so that we don't separate the
 -- PicBaseReg from the corresponding label (or label difference).
 --
+-- Turn (a+b)-c into a+(b-c) only where c is a literal: otherwise b-c folds
+-- nothing, and with a literal b it puts that literal on the left of a
+-- subtraction, as the special case below explains.
+--
 cmmMachOpFoldM platform mop1 [CmmMachOp mop2 [arg1,arg2], arg3]
    | mop2 `associates_with` mop1
      && not (isLit arg1) && not (isPicReg arg1)
+     && (not (isSub mop1) || isLit arg3)
    = Just $! (cmmMachOpFold platform mop2 [arg1, cmmMachOpFold platform mop1 [arg2,arg3]])
    where
      MO_Add{} `associates_with` MO_Sub{} = True
      mop1 `associates_with` mop2 =
         mop1 == mop2 && isAssociativeMachOp mop1
+     isSub MO_Sub{} = True
+     isSub _        = False
 
--- special case: (a - b) + c  ==>  a + (c - b)
+-- special case: (a - b) + c  ==>  a + (c - b), where b and c are literals,
+-- so that c - b folds.  Otherwise it folds nothing, and with a literal c it
+-- puts that literal on the left of a subtraction: (x - y) + (-1) would become
+-- x + ((-1) - y), which costs x86 one instruction more.
 cmmMachOpFoldM platform mop1@(MO_Add{}) [CmmMachOp mop2@(MO_Sub{}) [arg1,arg2], arg3]
-   | not (isLit arg1) && not (isPicReg arg1)
+   | not (isLit arg1) && not (isPicReg arg1) && isLit arg2 && isLit arg3
    = Just $! (cmmMachOpFold platform mop1 [arg1, cmmMachOpFold platform mop2 [arg3,arg2]])
 
 -- special case: (PicBaseReg + lit) + N  ==>  PicBaseReg + (lit+N)
@@ -318,35 +328,19 @@ cmmMachOpFoldM platform cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
     i == narrow_fn rep i
         -- then we can do the comparison at the smaller size
   = Just $! (cmmMachOpFold platform narrow_cmp [x, CmmLit (CmmInt i rep)])
- where
-    maybe_conversion (MO_UU_Conv from to)
-        | to > from
-        = Just (from, False, narrowU)
-    maybe_conversion (MO_SS_Conv from to)
-        | to > from
-        = Just (from, True, narrowS)
 
-        -- don't attempt to apply this optimisation when the source
-        -- is a float; see #1916
-    maybe_conversion _ = Nothing
+-- Comparison of two operands widened alike, from the same width and both
+-- signed or both unsigned: perform the comparison at the smaller width.
+-- A widening keeps its operands' equality and unsigned order, and a sign
+-- extension their signed order too, so a signed comparison of zero-extended
+-- operands becomes an unsigned one, as with a literal (#2080).
 
-        -- careful (#2080): if the original comparison was signed, but
-        -- we were doing an unsigned widen, then we must do an
-        -- unsigned comparison at the smaller size.
-    maybe_comparison (MO_U_Gt _) rep _     = Just (MO_U_Gt rep)
-    maybe_comparison (MO_U_Ge _) rep _     = Just (MO_U_Ge rep)
-    maybe_comparison (MO_U_Lt _) rep _     = Just (MO_U_Lt rep)
-    maybe_comparison (MO_U_Le _) rep _     = Just (MO_U_Le rep)
-    maybe_comparison (MO_Eq   _) rep _     = Just (MO_Eq   rep)
-    maybe_comparison (MO_S_Gt _) rep True  = Just (MO_S_Gt rep)
-    maybe_comparison (MO_S_Ge _) rep True  = Just (MO_S_Ge rep)
-    maybe_comparison (MO_S_Lt _) rep True  = Just (MO_S_Lt rep)
-    maybe_comparison (MO_S_Le _) rep True  = Just (MO_S_Le rep)
-    maybe_comparison (MO_S_Gt _) rep False = Just (MO_U_Gt rep)
-    maybe_comparison (MO_S_Ge _) rep False = Just (MO_U_Ge rep)
-    maybe_comparison (MO_S_Lt _) rep False = Just (MO_U_Lt rep)
-    maybe_comparison (MO_S_Le _) rep False = Just (MO_U_Le rep)
-    maybe_comparison _ _ _ = Nothing
+cmmMachOpFoldM platform cmp [CmmMachOp conv1 [x], CmmMachOp conv2 [y]]
+  | Just (rep1, signed1, _) <- maybe_conversion conv1,
+    Just (rep2, signed2, _) <- maybe_conversion conv2,
+    rep1 == rep2, signed1 == signed2,
+    Just narrow_cmp <- maybe_comparison cmp rep1 signed1
+  = Just $! (cmmMachOpFold platform narrow_cmp [x, y])
 
 -- We can often do something with constants of 0 and 1 ...
 -- See Note [Comparison operators]
@@ -547,6 +541,41 @@ cmmMachOpFoldM plat op [v1, v2]
 -- Anything else is just too hard.
 
 cmmMachOpFoldM _ _ _ = Nothing
+
+-- The conversions the comparisons above can see through: a widening, its
+-- source width, whether it extends the sign, and how a literal is narrowed
+-- to that width.
+maybe_conversion :: MachOp -> Maybe (Width, Bool, Width -> Integer -> Integer)
+maybe_conversion (MO_UU_Conv from to)
+    | to > from
+    = Just (from, False, narrowU)
+maybe_conversion (MO_SS_Conv from to)
+    | to > from
+    = Just (from, True, narrowS)
+
+    -- don't attempt to apply this optimisation when the source
+    -- is a float; see #1916
+maybe_conversion _ = Nothing
+
+    -- careful (#2080): if the original comparison was signed, but
+    -- we were doing an unsigned widen, then we must do an
+    -- unsigned comparison at the smaller size.
+maybe_comparison :: MachOp -> Width -> Bool -> Maybe MachOp
+maybe_comparison (MO_U_Gt _) rep _     = Just (MO_U_Gt rep)
+maybe_comparison (MO_U_Ge _) rep _     = Just (MO_U_Ge rep)
+maybe_comparison (MO_U_Lt _) rep _     = Just (MO_U_Lt rep)
+maybe_comparison (MO_U_Le _) rep _     = Just (MO_U_Le rep)
+maybe_comparison (MO_Eq   _) rep _     = Just (MO_Eq   rep)
+maybe_comparison (MO_Ne   _) rep _     = Just (MO_Ne   rep)
+maybe_comparison (MO_S_Gt _) rep True  = Just (MO_S_Gt rep)
+maybe_comparison (MO_S_Ge _) rep True  = Just (MO_S_Ge rep)
+maybe_comparison (MO_S_Lt _) rep True  = Just (MO_S_Lt rep)
+maybe_comparison (MO_S_Le _) rep True  = Just (MO_S_Le rep)
+maybe_comparison (MO_S_Gt _) rep False = Just (MO_U_Gt rep)
+maybe_comparison (MO_S_Ge _) rep False = Just (MO_U_Ge rep)
+maybe_comparison (MO_S_Lt _) rep False = Just (MO_U_Lt rep)
+maybe_comparison (MO_S_Le _) rep False = Just (MO_U_Le rep)
+maybe_comparison _ _ _ = Nothing
 
 -- | Check that a literal width is compatible with the host word size used to
 -- store offsets. This should be fixed properly (using larger types to store
