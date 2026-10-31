@@ -861,15 +861,22 @@ getRegister' platform is32Bit (CmmReg reg)
               reg_fmt = cmmTypeFormat ty
           in return $ Fixed reg_fmt (getRegisterReg platform reg) nilOL
 
--- BUG: neither mangleIndexTree nor add_int, which add_code takes for the sum
--- where n fits in 32 bits, narrows n to r's width, and cmmMachOpFoldM in
--- GHC.Cmm.Opt folds a sub-word register plus literals into a CmmRegOff whose
--- n can lie outside the width. At W16 add_int's LEA is printed as an ADD of
--- an immediate where its result takes r's register, and the assembler
--- shortens an immediate outside 16 bits with a warning, to the value meant.
--- This costs only the warning, on x86 and x86-64.
+-- r + n as add_int makes it of mangleIndexTree r n, without building the sum
+-- and without narrowing n to r's width, which a 32-bit n exceeds only at W8
+-- and W16. At W16 the assembler warns of such an n in the ADD the LEA can be
+-- printed as, so there the sum is built, and add_int narrows n.
 getRegister' platform is32Bit (CmmRegOff r n)
+  | not (isPicReg (CmmReg r))
+  , width > W16 -- LEA doesn't support byte size (#18614); W16 as said above
+  , is32BitInteger (fromIntegral n)
+  = return (Any format (\dst -> unitOL $
+      LEA format (OpAddr (AddrBaseIndex (EABaseReg (getRegisterReg platform r))
+                                        EAIndexNone (ImmInt n)))
+                 (OpReg dst)))
+  | otherwise
   = getRegister' platform is32Bit $ mangleIndexTree r n
+  where width  = typeWidth (cmmRegType r)
+        format = intFormat width
 
 getRegister' platform is32Bit (CmmMachOp (MO_RelaxedRead w) [e])
   = getRegister' platform is32Bit (CmmLoad e (cmmBits w) NaturallyAligned)
@@ -1805,8 +1812,6 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
         = add_int rep x y
     add_code rep x y = trivialCode rep (ADD format) (Just (ADD format)) x y
       where format = intFormat rep
-    -- TODO: There are other interesting patterns we want to replace
-    --     with a LEA, e.g. `(x + offset) + (y << shift)`.
 
     --------------------
     sub_code :: Width -> CmmExpr -> CmmExpr -> NatM Register
@@ -1816,19 +1821,20 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
         = add_int rep x (-y)
     sub_code rep x y = trivialCode rep (SUB (intFormat rep)) Nothing x y
 
-    -- our three-operand add instruction:
-    add_int width x y = do
-        (x_reg, x_code) <- getSomeReg x
-        let
-            format = intFormat width
-            imm = ImmInt (fromInteger y)
-            code dst
-               = x_code `snocOL`
-                 LEA format
-                        (OpAddr (AddrBaseIndex (EABaseReg x_reg) EAIndexNone imm))
-                        (OpReg dst)
-        --
-        return (Any format code)
+    -- our three-operand add instruction, x + y for a 32-bit y.  An x of
+    -- (a + b) or (a + (b << shift)) goes into the same LEA as an address of
+    -- that form would (Note [Additive normal form] in GHC.Cmm.Opt), and
+    -- (a - b) + y is computed as (a + y) - b, the LEA taking the place of
+    -- the move of a into the destination.
+    add_int width !x y = case x of
+      CmmMachOp (MO_Sub _) [a, b]
+        -> trivialCode width (SUB format) Nothing
+             (CmmMachOp (MO_Add width) [a, CmmLit (CmmInt y width)]) b
+      _ -> do
+        Amode addr addr_code <- x86_offset_amode x (CmmInt y width)
+        return (Any format (\dst -> addr_code `snocOL`
+                                    LEA format (OpAddr addr) (OpReg dst)))
+      where format = intFormat width
 
     ----------------------
 
@@ -3506,21 +3512,15 @@ getAmode e = do
       -- what mangleIndexTree has just done.
       -- BUG #28105: for i = -2^31 the displacement -i does not fit in 32 bits,
       -- and the x86-64 assembler rejects the module.
-      CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)]
+      CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i w)]
          | is32BitLit platform lit
          -- assert (rep == II32)???
-         -> do
-            (x_reg, x_code) <- getSomeReg x
-            let off = ImmInt (-(fromInteger i))
-            return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
+         -> x86_offset_amode x (CmmInt (negate i) w)
 
       CmmMachOp (MO_Add _rep) [x, CmmLit lit]
          | is32BitLit platform lit
          -- assert (rep == II32)???
-         -> do
-            (x_reg, x_code) <- getSomeReg x
-            let off = litToImm lit
-            return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
+         -> x86_offset_amode x lit
 
       -- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be
       -- recognised by the next rule.
@@ -3607,6 +3607,33 @@ getSimpleAmode addr = is32BitPlatform >>= \case
     addr_r <- getNewRegNat (intFormat (ncgWordWidth config))
     let amode = AddrBaseIndex (EABaseReg addr_r) EAIndexNone (ImmInt 0)
     return $! Amode amode (addr_code addr_r)
+
+-- | The mode of x + lit, for a lit that a displacement holds: (b + (i <<
+-- shift)) + lit and (b + i) + lit, the additive normal form of these addresses
+-- (Note [Additive normal form] in GHC.Cmm.Opt), else x's register with the
+-- displacement lit. x is evaluated once by the bang, the default alternative
+-- taking its value.
+x86_offset_amode :: CmmExpr -> CmmLit -> NatM Amode
+x86_offset_amode !x lit = case x of
+  CmmMachOp (MO_Add _) [b, CmmMachOp (MO_Shl _) [i, CmmLit (CmmInt shift _)]]
+    | shift == 0 || shift == 1 || shift == 2 || shift == 3
+    , CmmInt offset _ <- lit
+    , is32BitInteger offset
+    -> x86_complex_amode b i shift offset
+  CmmMachOp (MO_Add _) [b, i]
+    | not (isLit i)
+    , CmmInt offset _ <- lit
+    , is32BitInteger offset
+    -> x86_complex_amode b i 0 offset
+  _ -> do
+    (x_reg, x_code) <- getSomeReg x
+    return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone (dispOf lit))
+                  x_code)
+  where
+    -- an integer as ImmInt: the printer writes add_int's LEA as inc or dec
+    -- only for ImmInt 1 and ImmInt (-1)
+    dispOf (CmmInt i w) = ImmInt (fromInteger (narrowS w i))
+    dispOf l            = litToImm l
 
 x86_complex_amode :: CmmExpr -> CmmExpr -> Integer -> Integer -> NatM Amode
 x86_complex_amode base index shift offset

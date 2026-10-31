@@ -72,3 +72,12 @@ test('cmm_regoff',
      ],
      multi_compile_and_run,
      ['cmm_regoff', [('cmm_regoff_cmm.cmm', '')], ''])
+
+test('cmm_addnf',
+     [ req_cmm
+     , when(wordsize(32), skip)
+     , extra_ways(['optasm'])
+     , when(have_llvm(), extra_ways(['optasm', 'optllvm']))
+     ],
+     multi_compile_and_run,
+     ['cmm_addnf', [('cmm_addnf_cmm.cmm', '')], ''])

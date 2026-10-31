@@ -1,0 +1,26 @@
+#include "Cmm.h"
+
+// A 16-bit register plus three constants whose sum does not fit 16 bits. x is
+// stored first, so that it stays a register and dies at the sum: constant
+// folding makes the sum a register plus 90000, and the instruction computing
+// it in x's register is printed as an ADD of an immediate. The displacement
+// went into the instruction unnarrowed, and the assembler warned that it
+// shortened the immediate: the warning, on stderr, fails the test (x86-64).
+
+ro16w (W_ p)
+{
+    bits16 x;
+    x = bits16[p];
+    bits16[p + 2] = x;
+    return (%zx64(((x + (30000::bits16)) + (30000::bits16)) + (30000::bits16)));
+}
+
+ro16s (W_ p)
+{
+    bits16 x;
+    x = bits16[p];
+    bits16[p + 2] = x;
+    x = ((x + (30000::bits16)) + (30000::bits16)) + (30000::bits16);
+    bits16[p + 4] = x;
+    return (%zx64(x));
+}
