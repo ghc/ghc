@@ -1,0 +1,23 @@
+#include "Cmm.h"
+
+// The loop assigns s on its back edge, and only the copy t = s, which nothing
+// reads, reads it.  Sinking computes liveness before it drops the copy, so
+// sinking alone keeps the assignments to s (#8327); the constant must not
+// appear in the Cmm.
+loop (W_ n)
+{
+    W_ i, s, t;
+    i = 0;
+    s = 1234567;
+    goto head;
+
+head:
+    t = s;
+    if (i >= n) { goto done; }
+    i = i + 1;
+    s = 1234567;
+    goto head;
+
+done:
+    return (i);
+}

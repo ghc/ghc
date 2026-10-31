@@ -29,3 +29,5 @@ test('cmm_fold_elemAt', [only_ways(['optasm']), grep_errmsg(r'(\(-1\) - )', [1])
 test('T27800', [cmm_src, only_ways(['optasm']), unless(arch('x86_64'), skip),
                 grep_errmsg(r'(xchg|\(%rsp\))', [1])],
      compile, ['-no-hs-main -ddump-asm'])
+test('T8327', [cmm_src, only_ways(['optasm']), grep_errmsg(r'(1234567)', [1])],
+     compile, ['-no-hs-main -ddump-cmm'])

@@ -12,6 +12,7 @@ import GHC.Cmm.Liveness
 import GHC.Cmm.LRegSet
 import GHC.Cmm.Utils
 import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dataflow (TransferFun, analyzeCmmBwd, foldNodesBwdOO, joinOutFacts)
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Graph
 import GHC.Platform.Regs
@@ -150,8 +151,13 @@ type Assignments = [Assignment]
   --     x = e1
 
 cmmSink :: Platform -> CmmGraph -> CmmGraph
-cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
+cmmSink platform graph
+  | dead_read = dropDeadAssignments platform sunk
+  | otherwise = sunk
   where
+  (blocks', dead_read) = sink mapEmpty blocks [] False
+  sunk = ofBlockList (g_entry graph) blocks'
+
   liveness = cmmLocalLivenessL platform graph
   getLive l = mapFindWithDefault emptyLRegSet l liveness
 
@@ -159,11 +165,15 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
   join_pts = findJoinPoints blocks
 
-  sink :: LabelMap Assignments -> [CmmBlock] -> [CmmBlock]
-  sink _ [] = []
-  sink sunk (b:bs) =
+  -- the blocks, and whether a walk discards a dead assignment that reads a
+  -- register, after which an assignment that it alone read may be dead too
+  sink :: LabelMap Assignments -> [CmmBlock] -> [CmmBlock] -> Bool
+       -> ([CmmBlock], Bool)
+  sink _ [] acc !d = (reverse acc, d)
+  sink sunk (b:bs) acc !d =
     -- pprTrace "sink" (ppr lbl) $
-    blockJoin first final_middle final_last : sink sunk' bs
+    sink sunk' bs (blockJoin first final_middle final_last : acc)
+         (d || dead_read)
     where
       lbl = entryLabel b
       (first, middle, last) = blockSplit b
@@ -178,7 +188,8 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       ann_middles = annotate platform live_middle (blockToList middle)
 
       -- Now sink and inline in this block
-      (middle', assigs) = walk platform ann_middles (mapFindWithDefault [] lbl sunk)
+      !(middle', assigs, dead_read)
+        = walk platform ann_middles (mapFindWithDefault [] lbl sunk)
       fold_last = constantFoldNode platform last
       (final_last, assigs') = tryToInline platform live fold_last assigs
 
@@ -224,6 +235,44 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       sunk' = mapUnion sunk $
                  mapFromList [ (l, filterAssignments platform (getLive l) assigs'')
                              | l <- succs ]
+
+-- | Drop the assignments to local registers whose values nothing needs, by
+-- liveness in which an assignment makes the registers it reads live only where
+-- its own register is live, so that a chain of assignments that only one
+-- another read goes in one pass, across blocks and loops.  Sinking computes
+-- liveness before its walk, so where the walk discards a dead assignment, such
+-- as a copy, it keeps the assignments that only that one read (GHC #8327).
+-- Nothing is folded or inlined again.
+dropDeadAssignments :: Platform -> CmmGraph -> CmmGraph
+dropDeadAssignments platform graph =
+  ofBlockList (g_entry graph) (map dropIn (toBlockList graph))
+  where
+  needed = analyzeCmmBwd liveLatticeL xfer graph mapEmpty
+  getNeeded l = mapFindWithDefault emptyLRegSet l needed
+  xfer :: TransferFun LRegSet
+  xfer (BlockCC eNode middle xNode) fBase =
+    let !out = gen_killL platform xNode $! joinOutFacts liveLatticeL xNode fBase
+    in mapSingleton (entryLabel eNode) (foldNodesBwdOO step middle out)
+  -- a dead assignment reads nothing
+  step :: CmmNode O O -> LRegSet -> LRegSet
+  step n live
+    | dead n live = live
+    | otherwise = gen_killL platform n live
+  dead :: CmmNode O O -> LRegSet -> Bool
+  dead n live
+    | CmmAssign (CmmLocal r) _ <- n = not (r `elemLRegSet` live)
+    | otherwise = False
+  dropIn b = blockJoin first (blockFromList kept) last
+    where
+      (first, middle, last) = blockSplit b
+      out = gen_killL platform last
+              (unionsLRegSet (map getNeeded (successors last)))
+      kept = go out (reverse (blockToList middle)) []
+  go :: LRegSet -> [CmmNode O O] -> [CmmNode O O] -> [CmmNode O O]
+  go _ [] acc = acc
+  go live (n : ns) acc
+    | dead n live = go live ns acc
+    | otherwise = go (gen_killL platform n live) ns (n : acc)
 
 {- TODO: enable this later, when we have some good tests in place to
    measure the effect and tune it.
@@ -311,21 +360,23 @@ walk :: Platform
 
      -> ( Block CmmNode O O             -- The new block
         , Assignments                   -- Assignments to sink further
+        , Bool                          -- Whether it discards a dead
+                                        -- assignment that reads a register
         )
 
-walk platform nodes assigs = go nodes emptyBlock assigs
+walk platform nodes assigs = go nodes emptyBlock assigs False
  where
-   go []               block as = (block, as)
-   go ((live,node):ns) block as
+   go []               block as !d = (block, as, d)
+   go ((live,node):ns) block as !d
     -- discard nodes representing dead assignment
-    | shouldDiscard node live             = go ns block as
+    | shouldDiscard node live             = go ns block as (d || deadRead)
     -- sometimes only after simplification we can tell we can discard the node.
     -- See Note [Discard simplified nodes]
-    | noOpAssignment node2                = go ns block as
+    | noOpAssignment node2                = go ns block as d
     -- Pick up interesting assignments
-    | Just a <- shouldSink platform node2 = go ns block (a : as1)
+    | Just a <- shouldSink platform node2 = go ns block (a : as1) d
     -- Try inlining, drop assignments and move on
-    | otherwise                           = go ns block' as'
+    | otherwise                           = go ns block' as' d
     where
       -- Simplify node
       node1 = constantFoldNode platform node
@@ -339,6 +390,14 @@ walk platform nodes assigs = go nodes emptyBlock assigs
 
       -- Walk over the rest of the block. Includes dropped assignments
       block' = foldl' blockSnoc block dropped `blockSnoc` node2
+
+      -- a dead assignment that reads a register (cmmSink)
+      deadRead
+        | CmmAssign (CmmLocal r) rhs <- node
+        = not (r `elemLRegSet` live)
+            && not (nullLRegSet (foldRegsUsed platform (flip insertLRegSet)
+                                              emptyLRegSet rhs))
+        | otherwise = False
 
 {- Note [Discard simplified nodes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
