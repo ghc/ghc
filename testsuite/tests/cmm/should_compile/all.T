@@ -42,4 +42,7 @@ test('cmm_fold_scaled', [cmm_src, only_ways(['optasm']), when(wordsize(32), skip
      compile, ['-no-hs-main -ddump-cmm -dsuppress-all'])
 test('cmm_fold_elemAt', [only_ways(['optasm']), grep_errmsg(r'(\(-1\) - )', [1])],
      compile, ['-O2 -ddump-cmm -dsuppress-all'])
+test('T27800', [cmm_src, only_ways(['optasm']), unless(arch('x86_64'), skip),
+                grep_errmsg(r'(xchg|\(%rsp\))', [1])],
+     compile, ['-no-hs-main -ddump-asm'])
 test('CmmRegOffW16', [cmm_src, only_ways(['optasm']), unless(arch('x86_64'), skip)], compile, ['-no-hs-main'])

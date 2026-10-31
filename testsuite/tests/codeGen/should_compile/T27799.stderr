@@ -1,0 +1,8 @@
+.LQ1y:
+	movsd (%r8,%rdi,8),%xmm0
+	movsd %xmm0,(%rdx,%rsi,8)
+	addq %rcx,%rdi
+	incq %rsi
+.LQ1u:
+	cmpq %rax,%rsi
+	jl .LQ1y

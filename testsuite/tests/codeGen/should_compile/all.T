@@ -173,3 +173,34 @@ test('T20298c', normal, compile, ['-O2 -dno-builtin-rules -ddump-simpl -dno-type
 
 test('T27368', normal, compile, ['-O'])
 test('T27979', [req_cmm, check_errmsg('stg_ap_0_fast')], compile, ['-O -ddump-cmm -dno-typeable-binds -dsuppress-uniques'])
+
+# The latch of the shortest back edge in the assembly, the innermost loop's:
+# 'fused' where it is a conditional jump back, 'split' where it is
+# an unconditional jump back right after a conditional jump out
+def innermost_latch(s):
+  insns, labels = [], {}
+  for l in s.splitlines():
+    m = re.match(r'(\.?L[^\s:]*):', l)
+    if m:
+      labels[m.group(1)] = len(insns)
+    elif re.match(r'\s+[a-z]', l):
+      insns.append(l.split())
+  inner = None
+  for i, ins in enumerate(insns):
+    if ins[0].startswith('j') and len(ins) > 1 and labels.get(ins[1], i + 1) <= i:
+      if ins[0] != 'jmp':
+        shape = 'fused'
+      elif i and insns[i - 1][0].startswith('j') and insns[i - 1][0] != 'jmp':
+        shape = 'split'
+      else:
+        shape = 'jmp'
+      if inner is None or i - labels[ins[1]] < inner[0]:
+        inner = (i - labels[ins[1]], shape)
+  return inner[1] if inner else 'no loop'
+
+# The innermost loop's latch, which the block layout made a conditional jump
+# out and an unconditional jump back where the order of uniques fell one way
+# (#27799), must be a conditional jump back (x86-64 assembly)
+test('T27799', [only_ways(['optasm']), unless(arch('x86_64'), skip),
+                normalise_errmsg_fun(innermost_latch)],
+     compile, ['-O2 -fobject-determinism -ddump-asm'])

@@ -310,7 +310,8 @@ linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
     let !(_, !stack, !stats, !blocks, us') =
             runR ctx emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
                 $ linearRA_SCCs cold entry_ids js block_live sccs
-        -- each block's jump targets, read through the allocator's context
+        -- each block's jump targets, read by the allocation order and the
+        -- context alike
         js = jumpSuccs sccs
         platform = ncgPlatform config
         ctx = RA_Context
@@ -496,9 +497,11 @@ wideMoveDests platform cold block_live sccs
     mark p = foldl' (\ !b (c, d) -> if p d then addToUFM_Directly b c () else b)
 
 
--- | Allocate the SCCs in order, except that the blocks the garbage collector
--- returns to after a heap or stack check fails (the entry blocks in the
--- given set, those in a cycle excepted), and any SCC only they lead to,
+-- | Allocate the SCCs in order, except that, of the entry blocks other
+-- than the procedure's first and outside any cycle, those the garbage
+-- collector returns to after a heap or stack check fails (those in the given
+-- set) and those that jump into a loop that calls nothing and whose entry
+-- assignment is not yet recorded (#27800), and any SCC only they lead to,
 -- go after the others. The first jump allocated into a block records the
 -- registers it starts with, and later jumps into it move their values to
 -- match (Note [The first jump into a block fixes its entry assignment] in
@@ -521,22 +524,26 @@ linearRA_SCCs :: RegAllocConstraint freeRegs instr
               -> RegM freeRegs [NatBasicBlock instr]
 
 linearRA_SCCs cold entry_ids succs block_live sccs
- = do   let -- a block the garbage collector returns to
-            deferrable (AcyclicSCC (BasicBlock bid _))
-              = bid `setMember` cold && bid `setMember` entries
-            deferrable _ = False
+ = do   let -- a block the garbage collector returns to, or a return
+            -- continuation that jumps into a loop with no call (#27800)
+            deferrable assig (AcyclicSCC (BasicBlock bid _))
+              = bid `setMember` entries && bid /= first_id
+                && (bid `setMember` cold
+                    || any (\d -> d `setMember` no_call_loops
+                                  && isNothing (lookupBlockAssignment d assig))
+                           (mapFindWithDefault [] bid succs))
+            deferrable _ _ = False
             go acc deferred [] = return (acc, reverse deferred)
             go acc deferred (scc : rest) = do
               block_assig <- getBlockAssigR
-              if deferrable scc
-                then go acc (scc : deferred) rest
-                -- reached unless only deferred blocks lead to it
-                else if null deferred
-                        || any (isReached entries block_assig . blockId)
-                               (flattenSCC scc)
-                  then do acc' <- one acc scc
-                          go acc' deferred rest
-                  else go acc (scc : deferred) rest
+              -- reached unless only deferred blocks lead to it
+              if not (deferrable block_assig scc)
+                 && (null deferred
+                     || any (isReached entries block_assig . blockId)
+                            (flattenSCC scc))
+                then do acc' <- one acc scc
+                        go acc' deferred rest
+                else go acc (scc : deferred) rest
         (acc1, deferred) <- go [] [] sccs
         acc2 <- foldM one acc1 deferred
         return $ reverse acc2
@@ -546,6 +553,12 @@ linearRA_SCCs cold entry_ids succs block_live sccs
     -- 0.33% and 0.32% more compiling T3294 at -O and -O2, and 0.58% more
     -- compiling nofib's puzzle at -O2, on GHC 10.1.20261108
     entries = setFromList entry_ids
+    first_id = case entry_ids of { b : _ -> b; [] -> panic "linearRA_SCCs" }
+    no_call_loops = setFromList
+      [ b | CyclicSCC bs <- sccs, not (any calls bs), BasicBlock b _ <- bs ]
+    calls (BasicBlock _ is) = any clobbersMany is
+    clobbersMany li
+      = length [ () | RegWithFormat (RegReal _) _ <- writes (liveInstrUsage li) ] > 4
     one acc (AcyclicSCC block) = do
         blocks' <- processBlock succs block_live block
         return (reverse blocks' ++ acc)
