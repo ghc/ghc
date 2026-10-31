@@ -150,8 +150,13 @@ type Assignments = [Assignment]
   --     x = e1
 
 cmmSink :: Platform -> CmmGraph -> CmmGraph
-cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
+cmmSink platform graph
+  | or dead_reads = dropDeadAssignments platform sunk
+  | otherwise = sunk
   where
+  (blocks', dead_reads) = unzip $ sink mapEmpty $ blocks
+  sunk = ofBlockList (g_entry graph) blocks'
+
   liveness = cmmLocalLivenessL platform graph
   getLive l = mapFindWithDefault emptyLRegSet l liveness
 
@@ -159,11 +164,14 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
   join_pts = findJoinPoints blocks
 
-  sink :: LabelMap Assignments -> [CmmBlock] -> [CmmBlock]
+  -- each block, and whether its walk discards a dead assignment that reads a
+  -- register, after which an assignment that it alone read may be dead too
+  sink :: LabelMap Assignments -> [CmmBlock] -> [(CmmBlock, Bool)]
   sink _ [] = []
   sink sunk (b:bs) =
     -- pprTrace "sink" (ppr lbl) $
-    blockJoin first final_middle final_last : sink sunk' bs
+    (blockJoin first final_middle final_last, any deadRead ann_middles)
+      : sink sunk' bs
     where
       lbl = entryLabel b
       (first, middle, last) = blockSplit b
@@ -224,6 +232,35 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       sunk' = mapUnion sunk $
                  mapFromList [ (l, filterAssignments platform (getLive l) assigs'')
                              | l <- succs ]
+
+  deadRead :: (LRegSet, CmmNode O O) -> Bool
+  deadRead (live, CmmAssign (CmmLocal r) rhs) =
+    not (r `elemLRegSet` live)
+      && not (nullLRegSet (foldRegsUsed platform (flip insertLRegSet) emptyLRegSet rhs))
+  deadRead _ = False
+
+-- | Drop the assignments to local registers that are dead by liveness computed
+-- afresh, until none is.  Sinking computes liveness before its walk, so where
+-- the walk discards a dead assignment, such as a copy, it keeps the assignments
+-- that only that one read (GHC #8327).  Nothing is folded or inlined again.
+dropDeadAssignments :: Platform -> CmmGraph -> CmmGraph
+dropDeadAssignments platform graph
+  | or dropped = dropDeadAssignments platform (ofBlockList (g_entry graph) blocks')
+  | otherwise = graph
+  where
+  liveness = cmmLocalLivenessL platform graph
+  getLive l = mapFindWithDefault emptyLRegSet l liveness
+  (blocks', dropped) = unzip (map dropIn (toBlockList graph))
+  dropIn b = (blockJoin first (blockFromList kept) last, any_dropped)
+    where
+      (first, middle, last) = blockSplit b
+      live = gen_killL platform last (unionsLRegSet (map getLive (successors last)))
+      (kept, any_dropped) = go live (reverse (blockToList middle)) [] False
+  go :: LRegSet -> [CmmNode O O] -> [CmmNode O O] -> Bool -> ([CmmNode O O], Bool)
+  go _ [] acc d = (acc, d)
+  go live (n : ns) acc d
+    | CmmAssign (CmmLocal r) _ <- n, not (r `elemLRegSet` live) = go live ns acc True
+    | otherwise = go (gen_killL platform n live) ns (n : acc) d
 
 {- TODO: enable this later, when we have some good tests in place to
    measure the effect and tune it.

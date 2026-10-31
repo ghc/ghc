@@ -21,3 +21,5 @@ test('T24474-cmm-opt-order', cmm_src, compile, ['-optc-DFOO '
                                                 '-optCmmP-UFOO '
                                                 '-optCmmP-UBAR '
                                                 '-optc-DBAR'])
+test('T8327', [cmm_src, only_ways(['optasm']), grep_errmsg(r'(1234567)', [1])],
+     compile, ['-no-hs-main -ddump-cmm'])
