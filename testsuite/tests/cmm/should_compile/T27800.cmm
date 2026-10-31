@@ -1,0 +1,41 @@
+#include "Cmm.h"
+
+// #27800, the Cmm of !16673's T27800.cmm.  The loop check -> body -> check
+// is entered from outside twice: the procedure's entry goes to check, and the
+// continuation of the call in slow goes to body.  The linear register
+// allocator gives a block the assignment of the first jump into it that it
+// allocates; allocated before the loop, the continuation decided body's, and
+// the hot edges check -> body and body -> check paid for it at every
+// iteration, swapping registers or moving them through a spill slot.  The
+// test checks the assembly for neither, the fixup now being on the cold edge
+// out of the continuation.
+
+helper (W_ x)
+{
+    return (x + 1);
+}
+
+loop_entry (W_ k, W_ n)
+{
+    W_ acc;
+    acc = 0;
+    goto check;
+
+check:
+    if (n == 12345678) { goto slow; }
+    goto body;
+
+body:
+    acc = acc + n;
+    n = n - k;
+    if (n == 0) { goto done; }
+    goto check;
+
+slow:
+    (W_ r) = call helper(acc);
+    acc = r;
+    goto body;
+
+done:
+    return (acc);
+}
