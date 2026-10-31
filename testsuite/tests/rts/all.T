@@ -776,3 +776,12 @@ test('T23160',
      , unless(slow(), skip)
      ],
      compile_and_run, [''])
+
+test('T27272',
+     [ req_target_smp
+     , omit_ghci
+     , omit_ways(['hpc'])
+     , pre_cmd('$PYTHON T27272_gen.py 200 > T27272_Lits.hs')
+     , extra_run_opts('+RTS -N3 -ki512 -kc1k -kb128 -RTS')
+     ],
+     multimod_compile_and_run, ['T27272', '-O -threaded -fno-prof-auto'])
