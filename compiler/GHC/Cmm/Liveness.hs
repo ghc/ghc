@@ -2,6 +2,7 @@ module GHC.Cmm.Liveness
     ( CmmLocalLive
     , cmmLocalLiveness
     , cmmLocalLivenessL
+    , noLiveOnEntryL
     , cmmGlobalLiveness
     , liveLattice
     , liveLatticeL
