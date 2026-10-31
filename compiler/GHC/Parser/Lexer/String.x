@@ -73,8 +73,8 @@ $hexit     = [$decdigit A-F a-f]
        | "DC1" | "DC2" | "DC3" | "DC4" | "NAK" | "SYN" | "ETB" | "CAN"
        | "EM" | "SUB" | "ESC" | "FS" | "GS" | "RS" | "US" | "SP" | "DEL"
 @escape     = \\ ( $charesc      | @ascii | @decimal | o @octal | x @hexadecimal )
-@stringchar = ($graphic # [\\ \"])         | $space | @escape     | @gap
-@stringinterchar = ($graphic # [\\ \" \$]) | $space | @escape     | @gap
+@stringchar = ($graphic # [\\ \"])         | $space | @escape         | @gap
+@stringinterchar = ($graphic # [\\ \" \$]) | $space | @escape | \\ \$ | @gap
 
 :-
 
@@ -91,7 +91,6 @@ $hexit     = [$decdigit A-F a-f]
 
 -- Note [Lexing interpolated strings]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Lexing interpolated strings will do the following steps:
 --
 -- 1. Lex `s"` => push `string_inter_content` lex state
@@ -123,6 +122,7 @@ $hexit     = [$decdigit A-F a-f]
   (\" | \"\") / ([\n .] # \")   { StringInterContentRaw }
 
   \$ \{                         { StringInterContentExpOpen }
+  \$                            { StringInterContentRaw }
   \" \" \"                      { StringInterContentEnd }
 }
 

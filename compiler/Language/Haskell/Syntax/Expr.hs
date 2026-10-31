@@ -21,7 +21,6 @@ import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
-import Language.Haskell.Syntax.StringMeta (StringMeta)
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -345,7 +344,7 @@ data HsExpr p
   | -- | See Note [Parsing interpolated strings]
     HsInterString
       (XInterString p)
-      StringMeta
+      (Maybe HsModuleName)
       [HsInterStringPart p]
 
   -- | Lambda, Lambda-case, and Lambda-cases
@@ -591,6 +590,7 @@ data HsLamVariant
 data HsInterStringPart p
   = HsInterStringRaw (XInterStringRaw p) HText
   | HsInterStringExpr (XInterStringExpr p) (LHsExpr p)
+  | XHsInterStringPart !(XXInterStringPart p)
 
 {-
 Note [Parens in HsSyn]

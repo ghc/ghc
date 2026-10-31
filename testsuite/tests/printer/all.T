@@ -226,3 +226,4 @@ test('PprQualifiedStrings', [ignore_stderr,req_ppr_deps], makefile_test, ['PprQu
 test('Haddock1', [ignore_stderr,req_ppr_deps], makefile_test, ['Haddock1'])
 test('T27423c', [ignore_stderr,req_ppr_deps], makefile_test, ['T27423c'])
 test('PprStringNoSourceText', normal, compile, [''])
+test('PprStringInterpolation', [ignore_stderr,req_ppr_deps], makefile_test, ['PprStringInterpolation'])

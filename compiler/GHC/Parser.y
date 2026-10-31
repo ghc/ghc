@@ -4419,9 +4419,18 @@ processStringInter ::
 processStringInter tokBegin parts tokEnd = do
   parts' <- mapM mkInterStringPartPV $ processRawLexedStrings parts
   ams1 (L (comb2 tokBegin tokEnd) ()) $
-    HsInterString noExtField meta parts'
+    HsInterString ann (strMetaQualified meta) parts'
   where
     L _ (ITstringInterBegin meta) = tokBegin
+    ann =
+      AnnInterString
+        { ais_delim =
+            if strMetaMultiline meta
+              then AnnInterStringMulti
+              else AnnInterStringSingle
+        , ais_open = glR tokBegin
+        , ais_close = glR tokEnd
+        }
 
     processRawLexedStrings ::
       [Either (SourceText, RawLexedString) ECP] ->

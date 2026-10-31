@@ -933,6 +933,11 @@ PprQualifiedStrings:
 	$(CHECK_PPR)   $(LIBDIR) PprQualifiedStrings.hs
 	$(CHECK_EXACT) $(LIBDIR) PprQualifiedStrings.hs
 
+.PHONY: PprStringInterpolation
+PprStringInterpolation:
+	$(CHECK_PPR)   $(LIBDIR) PprStringInterpolation.hs
+	$(CHECK_EXACT) $(LIBDIR) PprStringInterpolation.hs
+
 .PHONY: Haddock1
 Haddock1:
 	# $(CHECK_PPR)   $(LIBDIR) Haddock1.hs

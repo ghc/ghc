@@ -379,9 +379,9 @@ rnExpr (HsOverLit x lit)
                  return (HsApp noExtField (noLocA neg) (noLocA (HsOverLit x lit'))
                         , fvs ) }
 
-rnExpr (HsInterString _ meta parts) = do
+rnExpr (HsInterString _ mQual parts) = do
   (parts', fvs1) <- unzip <$> mapM rnInterStringPart parts
-  (expr, fvs2) <- rewriteInterString meta parts'
+  (expr, fvs2) <- rewriteInterString mQual parts'
   pure (expr, plusFNs fvs1 `plusFN` fvs2)
   where
     rnInterStringPart = \case

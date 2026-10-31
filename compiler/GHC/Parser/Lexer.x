@@ -2236,7 +2236,7 @@ tok_string_inter_begin meta span _ _ _ = do
 
 tok_string_inter_qual_begin :: StringMeta -> Action
 tok_string_inter_qual_begin meta span buf len buf2 = do
-  let modName = ModuleName $ lexemeToFastString buf modNameLen
+  let modName = HsModuleName $ lexemeToText buf modNameLen
   let meta' = meta{strMetaQualified = Just modName}
   tok_string_inter_begin meta' span buf len buf2
   where

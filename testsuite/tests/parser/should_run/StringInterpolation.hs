@@ -46,6 +46,14 @@ allTests =
       , expression =
           let s = "world" in s ++ s" hello ${s}"
       }
+  , TestCase -- dollars
+      { label =
+          """
+          "$foo \\$foo \\${foo}"
+          """
+      , expression =
+          "$foo \$foo \${foo}"
+      }
   , TestCase -- curly brace Char
       { label =
           """
@@ -53,6 +61,36 @@ allTests =
           """
       , expression =
           s"a ${'}'} b"
+      }
+  , TestCase -- interpolated multiline expression
+      { label =
+          """
+          let a = s"example ${fromMaybe
+                                (0 :: Int)
+                                (Just 10)} value"
+              b = s"example ${fromMaybe
+                False (Just True)} value"
+          in a ++ b
+          """
+      , expression =
+          let a = s"example ${fromMaybe
+                                (0 :: Int)
+                                (Just 10)} value"
+              b = s"example ${fromMaybe
+                False (Just True)} value"
+          in a ++ b
+      }
+  , TestCase -- interpolated expression blocks
+      { label =
+          """
+          let a = s"${case True of True -> 1; False -> 2 :: Int}"
+              b = s"${do True}"
+          in a ++ b
+          """
+      , expression =
+          let a = s"${case True of True -> 1; False -> 2 :: Int}"
+              b = s"${do True}"
+          in a ++ b
       }
   , TestCase -- interpolated expression with comment
       { label =
@@ -146,7 +184,24 @@ allTests =
       , expression =
           let x = "test" in s"a “${x}” b"
       }
-  -- TODO(bchinn): interpolated multiline strings
+  , TestCase -- interpolated multiline strings
+      { label =
+          """
+          let x = "test" in
+            s\"""
+            line one
+            ${x}
+            a "quoted value"
+            \"""
+          """
+      , expression =
+          let x = "test" in
+            s"""
+            line one
+            ${x}
+            a "quoted value"
+            """
+      }
   ]
 
 {----- Types for tests -----}

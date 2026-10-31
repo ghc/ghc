@@ -27,7 +27,6 @@ import GHC.Hs.Pat
 import GHC.Hs.Lit
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-import Language.Haskell.Syntax.StringMeta (StringMeta (..))
 import Language.Haskell.Syntax.Text
 import Language.Haskell.Syntax.Module.Name
 import GHC.Hs.Extension
@@ -239,12 +238,12 @@ type instance XQualLitE      (GhcPass _) = NoExtField
 type instance XLam           (GhcPass _) = EpAnnLam
 type instance XApp           (GhcPass _) = NoExtField
 
-type instance XInterString GhcPs = NoExtField
-type instance XInterString GhcRn = NoExtField
+type instance XInterString GhcPs = AnnInterString
+type instance XInterString GhcRn = AnnInterString
 type instance XInterString GhcTc = DataConCantHappen
--- | Note: does not contain any delimiters
-type instance XInterStringRaw  (GhcPass _) = SourceText
-type instance XInterStringExpr (GhcPass _) = NoExtField
+type instance XInterStringRaw   (GhcPass _) = SourceText -- Note: does not contain any delimiters
+type instance XInterStringExpr  (GhcPass _) = NoExtField
+type instance XXInterStringPart (GhcPass _) = DataConCantHappen
 
 type instance XAppTypeE      GhcPs = EpToken "@"
 type instance XAppTypeE      GhcRn = NoExtField
@@ -623,6 +622,18 @@ data AnnFunRhs
 instance NoAnn AnnFunRhs where
   noAnn = AnnFunRhs noAnn noAnn noAnn
 
+data AnnInterString = AnnInterString
+  { ais_delim :: !AnnInterStringDelim
+  , ais_open  :: !EpaLocation -- ^ @s"@ or @s"""@, including any @M.@ prefix
+  , ais_close :: !EpaLocation -- ^ @"@ or @"""@
+  }
+  deriving (Data, Show, Eq)
+
+data AnnInterStringDelim
+  = AnnInterStringSingle -- ^ @s"..."@
+  | AnnInterStringMulti  -- ^ @s"""..."""@
+  deriving (Data, Show, Eq)
+
 -- ---------------------------------------------------------------------
 
 type instance XSCC           (GhcPass _) = (AnnPragSCC, SourceText)
@@ -821,21 +832,26 @@ ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
 ppr_expr (HsQualLit _ lit)   = ppr lit
 
-ppr_expr (HsInterString _ meta parts) =
+ppr_expr (HsInterString x _ parts) =
   char 's' <> delim <> hcat (map pprInterPart parts) <> delim
   where
+    isMultiline =
+      case (ghcPass @p, x) of
+        (GhcPs, AnnInterString{ais_delim = AnnInterStringMulti}) -> True
+        (GhcRn, AnnInterString{ais_delim = AnnInterStringMulti}) -> True
+        _ -> False
     delim
-      | strMetaMultiline meta = text "\"\"\""
+      | isMultiline = text "\"\"\""
       | otherwise = char '"'
     pprInterPart = \case
       HsInterStringExpr _ expr -> text "${" <> ppr_lexpr expr <> text "}"
       HsInterStringRaw st s ->
         case st of
           SourceText src
-            | strMetaMultiline meta -> vcat $ map text $ split '\n' (unpackFS src)
+            | isMultiline -> vcat $ map text $ split '\n' (unpackFS src)
             | otherwise -> ftext src
           NoSourceText
-            | strMetaMultiline meta -> pprHsStringMulti' (unpackHText s)
+            | isMultiline -> pprHsStringMulti' (unpackHText s)
             | otherwise -> pprHsString' (unpackHText s)
 
 ppr_expr (HsHole x) = case (ghcPass @p, x) of

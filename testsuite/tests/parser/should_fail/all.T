@@ -269,6 +269,7 @@ test('StringInterpolationInPat', normal, compile_fail, [''])
 test('StringInterpolationInType', normal, compile_fail, [''])
 test('StringInterpolationLineComment', normal, compile_fail, [''])
 test('StringInterpolationSmartQuotes', normal, compile_fail, [''])
+test('StringInterpolationLessIndent', normal, compile_fail, [''])
 
 # ---------- END OF FILE ---------- #
 # Don't just place tests at the end here; put in correct section

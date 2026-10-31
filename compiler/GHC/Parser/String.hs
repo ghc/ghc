@@ -32,6 +32,7 @@ import qualified Data.Foldable1 as Foldable1
 import Data.Functor.Identity (Identity (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (listToMaybe, mapMaybe)
+import GHC.Data.Maybe (rightToMaybe)
 import GHC.Data.OrdList (fromOL, nilOL, snocOL)
 import GHC.Data.StringBuffer (StringBuffer)
 import qualified GHC.Data.StringBuffer as StringBuffer
@@ -51,7 +52,7 @@ data StringLexError = StringLexError LexErr BufPos
   deriving (Show, Eq)
 
 lexString :: Int -> StringBuffer -> Either StringLexError String
-lexString = lexStringWith (fromRight . processCharsSingle)
+lexString = lexStringWith (rightToMaybe . processCharsSingle)
 
 -- -----------------------------------------------------------------------------
 -- Lexing interface
@@ -194,7 +195,7 @@ resolveEscapes = go nilOL
       c : cs -> go (acc `snocOL` c) cs
 
 resolveEscapesMaybe :: HasChar c => [c] -> Maybe [c]
-resolveEscapesMaybe = fromRight . resolveEscapes
+resolveEscapesMaybe = rightToMaybe . resolveEscapes
 
 -- -----------------------------------------------------------------------------
 -- Escape characters
@@ -221,6 +222,8 @@ resolveEscapeChar = \case
   Char '^' : Char c : cs -> pure (chr $ ord c - ord '@', cs)
   -- long form escapes (e.g. '\NUL')
   cs | Just (esc, cs') <- parseLongEscape cs -> pure (esc, cs')
+  -- string interpolation
+  Char '$' : cs -> pure ('$', cs)
   -- shouldn't happen
   Char c : _ -> panic $ "found unexpected escape character: " ++ show c
   [] -> panic "escape character unexpectedly ended"
@@ -626,9 +629,3 @@ It's more precisely defined with the following algorithm:
     * Lines with only whitespace characters
 3. Calculate the longest prefix of whitespace shared by all lines in the remaining list
 -}
-
--- -----------------------------------------------------------------------------
--- Other utilities
-
-fromRight :: Either e a -> Maybe a
-fromRight = either (const Nothing) Just

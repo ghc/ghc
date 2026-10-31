@@ -14,14 +14,14 @@ import GHC.Rename.Env (lookupNameWithQualifier, lookupSyntaxExpr, lookupSyntaxNa
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Set (FreeNames, emptyFNs, plusFNs)
 import GHC.Types.SrcLoc (unLoc)
-import Language.Haskell.Syntax.StringMeta (StringMeta (..))
+import Language.Haskell.Syntax.Module.Name (HsModuleName)
 
 {- Note [Desugaring interpolated strings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Cross-references:
-* Note [Parsing interpolated strings]
-* Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
+  * Note [Parsing interpolated strings]
+  * Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
 
 Interpolated strings are represented with the following HsExpr tree:
 
@@ -52,10 +52,10 @@ can be typechecked as usual, without any additional work.
 -- have already been renamed, but handles renaming of overloaded strings, if
 -- necessary.
 rewriteInterString ::
-  StringMeta ->
+  Maybe HsModuleName ->
   [HsInterStringPart GhcRn] ->
   RnM (HsExpr GhcRn, FreeNames)
-rewriteInterString meta parts = do
+rewriteInterString mQual parts = do
   (mkOverloaded, fns1) <- get_mkOverloaded
   (rawName, fns2) <- lookupName KnownOccs.interpolateRawIdOcc
   (convertName, fns3) <- lookupName KnownOccs.interpolateValueIdOcc
@@ -73,7 +73,7 @@ rewriteInterString meta parts = do
   pure (expr, plusFNs [fns1, fns2, fns3, fns4, fns5, fns6])
   where
     lookupName =
-      case strMetaQualified meta of
+      case mQual of
         Just mod -> lookupNameWithQualifier mod
         Nothing -> lookupSyntaxName
 
@@ -84,7 +84,7 @@ rewriteInterString meta parts = do
     -- Handle -XOverloadedStrings
     get_mkOverloaded = do
       overloaded <- xoptM LangExt.OverloadedStrings
-      if overloaded && isNothing (strMetaQualified meta)
+      if overloaded && isNothing mQual
         then do
           (fromStringExpr, fns) <- lookupSyntaxExpr KnownOccs.fromStringClassOpOcc
           pure (nlHsApp (noLocA fromStringExpr), fns)

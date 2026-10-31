@@ -584,8 +584,8 @@ addTickHsExpr e@(HsLit {})              = return e
 addTickHsExpr e@(HsQualLit {})          = return e
 addTickHsExpr (HsInterString x ty parts) = do
   parts' <- forM parts $ \case
-    part@(HsInterStringRaw {}) -> return part
     HsInterStringExpr x e -> HsInterStringExpr x <$> addTickLHsExpr e
+    p -> return p
   return $ HsInterString x ty parts'
 addTickHsExpr e@(HsEmbTy {})            = return e
 addTickHsExpr e@(HsStar {})             = return e
