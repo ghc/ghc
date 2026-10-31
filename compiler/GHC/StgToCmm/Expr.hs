@@ -30,6 +30,7 @@ import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 
 import GHC.Stg.Syntax
+import GHC.Types.Var.Set ( elemDVarSet )
 
 import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
@@ -597,6 +598,14 @@ cgCase scrut bndr _alt_type [GenStgAlt { alt_rhs = rhs}]
   , v == bndr
   = cgExpr scrut
 
+cgCase (StgApp v []) bndr _ [GenStgAlt { alt_con = DEFAULT, alt_rhs = rhs }]
+  -- probe for GHC #8327: x evaluated, b unused, so no copy of x into b
+  | not (mentions bndr rhs)
+  , Just sig <- idTagSig_maybe v
+  , isTaggedSig sig
+  , not (mightBeFunTy (idType v))
+  = cgExpr rhs
+
 cgCase scrut bndr alt_type alts
   = -- the general case
     do { platform <- getPlatform
@@ -650,6 +659,24 @@ If shouldInlinePrimOp returns True when called from GHC.StgToCmm.Expr for the
 purpose of heap check placement, we *must* inline the primop later in
 GHC.StgToCmm.Prim. If we don't things will go wrong.
 -}
+
+-- | Whether the expression mentions the variable (probe for GHC #8327)
+mentions :: Id -> CgStgExpr -> Bool
+mentions x = go
+  where
+    go (StgApp f as) = f == x || any arg as
+    go (StgLit _) = False
+    go (StgConApp _ _ as _) = any arg as
+    go (StgOpApp _ as _) = any arg as
+    go (StgCase e _ _ alts) = go e || any (go . alt_rhs) alts
+    go (StgLet _ b e) = bind b || go e
+    go (StgLetNoEscape _ b e) = bind b || go e
+    go (StgTick _ e) = go e
+    arg (StgVarArg y) = y == x
+    arg _ = False
+    bind (StgNonRec _ r) = inRhs r
+    bind (StgRec ps) = any (inRhs . snd) ps
+    inRhs r = x `elemDVarSet` freeVarsOfRhs r
 
 -----------------
 maybeSaveCostCentre :: Bool -> FCode (Maybe LocalReg)

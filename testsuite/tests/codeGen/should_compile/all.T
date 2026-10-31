@@ -152,3 +152,5 @@ test('T20298b', normal, compile, ['-O2 -dno-bignum-rules -ddump-simpl -dno-typea
 test('T20298c', normal, compile, ['-O2 -dno-builtin-rules -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
 
 test('T27368', normal, compile, ['-O'])
+test('T8327a', [only_ways(['normal']), grep_errmsg(r'(SPEC_closure)', [1])],
+     compile, ['-O -ddump-cmm -dno-typeable-binds'])
