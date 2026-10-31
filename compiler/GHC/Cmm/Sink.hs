@@ -46,7 +46,10 @@ we really want to push the x1..x3 assignments into the L2 branch.
 
 Algorithm:
 
- * Start by doing liveness analysis.
+ * Start by doing liveness analysis, in which an assignment to a dead register
+   uses nothing (faintStep).  A dead assignment, i.e. an assignment to a local
+   register that is not used after it, is left out of the nodes the walk below
+   gets (annotate).
 
  * Keep a list of assignments A; earlier ones may refer to later ones.
    Currently we only sink assignments to local registers, because we don't
@@ -54,8 +57,7 @@ Algorithm:
 
  * Walk forwards through the graph, look at each node N:
 
-   * If it is a dead assignment, i.e. assignment to a register that is
-     not used after N, discard it.
+   * If it assigns a register to itself, discard it.
 
    * Try to inline based on current list of assignments
      * If any assignments in A (1) occur only once in N, and (2) are
@@ -91,9 +93,6 @@ Algorithm:
      * the assignments dropped there go into the block in their order, except
        that the movable assignments of literals go after the others
        (literalsLast).
-
-As a result of above algorithm, sinking deletes some dead assignments
-(transitively, even), though not every one.
 -}
 
 -- -----------------------------------------------------------------------------
@@ -150,20 +149,25 @@ type Assignments = [Assignment]
   --     x = e1
 
 cmmSink :: Platform -> CmmGraph -> CmmGraph
-cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
+cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty blocks []
   where
-  liveness = cmmLocalLivenessL platform graph
+  liveness = localLivenessBy (faintStep platform) platform graph
   getLive l = mapFindWithDefault emptyLRegSet l liveness
 
   blocks = revPostorder graph
 
   join_pts = findJoinPoints blocks
 
-  sink :: LabelMap Assignments -> [CmmBlock] -> [CmmBlock]
-  sink _ [] = []
-  sink sunk (b:bs) =
+  -- the blocks accumulated and reversed at the end, and walk's result bound
+  -- strictly: built lazily, they made the compiler run 0.04% more instructions
+  -- and allocate 0.088% more compiling T12707 at -O, 0.069% more and 0.11% more
+  -- compiling nofib's puzzle at -O2, and nothing more at -O0, where sinking
+  -- does not run, on GHC 10.1.20261108
+  sink :: LabelMap Assignments -> [CmmBlock] -> [CmmBlock] -> [CmmBlock]
+  sink _ [] acc = reverse acc
+  sink sunk (b:bs) acc =
     -- pprTrace "sink" (ppr lbl) $
-    blockJoin first final_middle final_last : sink sunk' bs
+    sink sunk' bs (blockJoin first final_middle final_last : acc)
     where
       lbl = entryLabel b
       (first, middle, last) = blockSplit b
@@ -178,7 +182,7 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       ann_middles = annotate platform live_middle (blockToList middle)
 
       -- Now sink and inline in this block
-      (middle', assigs) = walk platform ann_middles (mapFindWithDefault [] lbl sunk)
+      !(middle', assigs) = walk platform ann_middles (mapFindWithDefault [] lbl sunk)
       fold_last = constantFoldNode platform last
       (final_last, assigs') = tryToInline platform live fold_last assigs
 
@@ -225,6 +229,18 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
                  mapFromList [ (l, filterAssignments platform (getLive l) assigs'')
                              | l <- succs ]
 
+-- | The local registers live before a node, given those live after it, where
+-- an assignment to a dead register uses nothing: a register that only such
+-- assignments read is dead too.  'annotate' leaves out every assignment to a
+-- register dead after it, so a chain of assignments that only one another
+-- read goes in one pass, across blocks and loops; by liveness in which every
+-- assignment uses its operands, sinking, discarding a dead copy, kept the
+-- assignments that only the copy read (#8327).
+faintStep :: Platform -> CmmNode O O -> LRegSet -> LRegSet
+faintStep platform n live
+  | CmmAssign (CmmLocal r) _ <- n, not (r `elemLRegSet` live) = live
+  | otherwise = gen_killL platform n live
+
 {- TODO: enable this later, when we have some good tests in place to
    measure the effect and tune it.
 
@@ -252,11 +268,19 @@ isTrivial _ (CmmLit _) = True
 isTrivial _ _          = False
 
 --
--- annotate each node with the set of registers live *after* the node
+-- annotate each node with the set of registers live *after* the node,
+-- leaving out the assignments to registers dead after them
 --
 annotate :: Platform -> LRegSet -> [CmmNode O O] -> [(LRegSet, CmmNode O O)]
 annotate platform live nodes = snd $ foldr ann (live,[]) nodes
-  where ann n (live,nodes) = (gen_killL platform n live, (live,n) : nodes)
+  where ann n (live,nodes)
+          | CmmAssign (CmmLocal r) _ <- n, not (r `elemLRegSet` live)
+          = (live, nodes)
+          -- faintStep, which here does what gen_killL does: with gen_killL, the
+          -- compiler ran 0.048% more instructions and allocated 0.039% more
+          -- compiling T3294 at -O, and 0.018% more and 0.014% more compiling
+          -- ManyBasicBlocks.cmm at -O1, on GHC 10.1.20261111
+          | otherwise = (faintStep platform n live, (live,n) : nodes)
 
 --
 -- Find the blocks that have multiple successors (join points)
@@ -317,8 +341,8 @@ walk platform nodes assigs = go nodes emptyBlock assigs
  where
    go []               block as = (block, as)
    go ((live,node):ns) block as
-    -- discard nodes representing dead assignment
-    | shouldDiscard node live             = go ns block as
+    -- discard r = r
+    | noOpAssignment node                 = go ns block as
     -- sometimes only after simplification we can tell we can discard the node.
     -- See Note [Discard simplified nodes]
     | noOpAssignment node2                = go ns block as
@@ -366,7 +390,7 @@ them. We could only do it after as well, but I assume doing it early might save
 some work.
 
 That is if we process a assignment node we now:
-    * Check if it can be discarded (because it's dead or a no-op)
+    * Check if it can be discarded (because it's a no-op)
     * Simplify the rhs of the assignment.
     * New: Check again if it might be a no-op now.
     * ...
@@ -388,24 +412,15 @@ shouldSink platform (CmmAssign (CmmLocal r) e) | no_local_regs = Just (r, e, exp
 shouldSink _ _other = Nothing
 
 --
--- discard dead assignments.  This does not get all the dead code, but it
--- catches the common case of superfluous reloads from the stack that the stack
--- allocator leaves behind.
---
--- Also we catch "r = r" here.  You might think it would fall
+-- We catch "r = r" here.  You might think it would fall
 -- out of inlining, but the inliner will see that r is live
 -- after the instruction and choose not to inline r in the rhs.
 --
-shouldDiscard :: CmmNode e x -> LRegSet -> Bool
-shouldDiscard node live
-   = case node of
-       -- r = r
-       CmmAssign r (CmmReg r') | r == r' -> True
-       -- r = e, r is dead after assignment
-       CmmAssign (CmmLocal r) _ -> not (r `elemLRegSet` live)
-       _otherwise -> False
-
 noOpAssignment :: CmmNode e x -> Bool
+-- inlined at both its uses in walk: called out of line, the compiler ran
+-- 0.045% more instructions compiling T3294 at -O and 0.030% more compiling
+-- ManyBasicBlocks.cmm at -O1, allocating no more, on GHC 10.1.20261111
+{-# INLINE noOpAssignment #-}
 noOpAssignment node
    = case node of
        -- r = r
