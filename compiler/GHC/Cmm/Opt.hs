@@ -244,19 +244,20 @@ cmmMachOpFoldM platform op [x@(CmmLit _), y]
 -- Also don't do it if arg1 is PicBaseReg, so that we don't separate the
 -- PicBaseReg from the corresponding label (or label difference).
 --
+-- An addition with a literal c is left alone: its literal stays last, as
+-- Note [Additive normal form] puts it.  An addition is reassociated by
+-- reassocAdd, which builds the steps that fold nothing as they stand.
+--
 cmmMachOpFoldM platform mop1 [CmmMachOp mop2 [arg1,arg2], arg3]
-   | mop2 `associates_with` mop1
+   | mop1 == mop2 && isAssociativeMachOp mop1
      && not (isLit arg1) && not (isPicReg arg1)
-   = Just $! (cmmMachOpFold platform mop2 [arg1, cmmMachOpFold platform mop1 [arg2,arg3]])
+     && not (isAdd mop1 && isLit arg3)
+   = Just $! case mop1 of
+       MO_Add w -> reassocAdd platform mop1 w arg1 arg2 arg3
+       _        -> cmmMachOpFold platform mop2 [arg1, cmmMachOpFold platform mop1 [arg2,arg3]]
    where
-     MO_Add{} `associates_with` MO_Sub{} = True
-     mop1 `associates_with` mop2 =
-        mop1 == mop2 && isAssociativeMachOp mop1
-
--- special case: (a - b) + c  ==>  a + (c - b)
-cmmMachOpFoldM platform mop1@(MO_Add{}) [CmmMachOp mop2@(MO_Sub{}) [arg1,arg2], arg3]
-   | not (isLit arg1) && not (isPicReg arg1)
-   = Just $! (cmmMachOpFold platform mop1 [arg1, cmmMachOpFold platform mop2 [arg3,arg2]])
+     isAdd MO_Add{} = True
+     isAdd _        = False
 
 -- special case: (PicBaseReg + lit) + N  ==>  PicBaseReg + (lit+N)
 --
@@ -301,6 +302,14 @@ cmmMachOpFoldM _ (MO_Sub _) [CmmLit lit, CmmLit (CmmInt i rep)]
   | validOffsetRep rep
   = Just $! CmmLit (cmmOffsetLit lit (fromIntegral (negate (narrowU rep i))))
 
+-- Additions and subtractions: see Note [Additive normal form].
+cmmMachOpFoldM platform (MO_Add w) [x, y]
+   | Just e <- addNormalise platform w False x y
+   = Just $! e
+cmmMachOpFoldM platform (MO_Sub w) [x, y]
+   | Just e <- addNormalise platform w True x y
+   = Just $! e
+
 
 -- Comparison of literal with widened operand: perform the comparison
 -- at the smaller width, as long as the literal is within range.
@@ -318,35 +327,18 @@ cmmMachOpFoldM platform cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
     i == narrow_fn rep i
         -- then we can do the comparison at the smaller size
   = Just $! (cmmMachOpFold platform narrow_cmp [x, CmmLit (CmmInt i rep)])
- where
-    maybe_conversion (MO_UU_Conv from to)
-        | to > from
-        = Just (from, False, narrowU)
-    maybe_conversion (MO_SS_Conv from to)
-        | to > from
-        = Just (from, True, narrowS)
 
-        -- don't attempt to apply this optimisation when the source
-        -- is a float; see #1916
-    maybe_conversion _ = Nothing
+-- Comparison of two operands widened alike, from the same width and both
+-- signed or both unsigned: perform the comparison at the smaller width.
+-- A widening keeps its operands' equality and unsigned order, and a sign
+-- extension their signed order too, so a signed comparison of zero-extended
+-- operands becomes an unsigned one, as with a literal (#2080).
 
-        -- careful (#2080): if the original comparison was signed, but
-        -- we were doing an unsigned widen, then we must do an
-        -- unsigned comparison at the smaller size.
-    maybe_comparison (MO_U_Gt _) rep _     = Just (MO_U_Gt rep)
-    maybe_comparison (MO_U_Ge _) rep _     = Just (MO_U_Ge rep)
-    maybe_comparison (MO_U_Lt _) rep _     = Just (MO_U_Lt rep)
-    maybe_comparison (MO_U_Le _) rep _     = Just (MO_U_Le rep)
-    maybe_comparison (MO_Eq   _) rep _     = Just (MO_Eq   rep)
-    maybe_comparison (MO_S_Gt _) rep True  = Just (MO_S_Gt rep)
-    maybe_comparison (MO_S_Ge _) rep True  = Just (MO_S_Ge rep)
-    maybe_comparison (MO_S_Lt _) rep True  = Just (MO_S_Lt rep)
-    maybe_comparison (MO_S_Le _) rep True  = Just (MO_S_Le rep)
-    maybe_comparison (MO_S_Gt _) rep False = Just (MO_U_Gt rep)
-    maybe_comparison (MO_S_Ge _) rep False = Just (MO_U_Ge rep)
-    maybe_comparison (MO_S_Lt _) rep False = Just (MO_U_Lt rep)
-    maybe_comparison (MO_S_Le _) rep False = Just (MO_U_Le rep)
-    maybe_comparison _ _ _ = Nothing
+cmmMachOpFoldM platform cmp [CmmMachOp conv1 [x], CmmMachOp conv2 [y]]
+  | conv1 == conv2,
+    Just (rep, signed, _) <- maybe_conversion conv1,
+    Just narrow_cmp <- maybe_comparison cmp rep signed
+  = Just $! (cmmMachOpFold platform narrow_cmp [x, y])
 
 -- We can often do something with constants of 0 and 1 ...
 -- See Note [Comparison operators]
@@ -547,6 +539,213 @@ cmmMachOpFoldM plat op [v1, v2]
 -- Anything else is just too hard.
 
 cmmMachOpFoldM _ _ _ = Nothing
+
+{- Note [Additive normal form]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An addition or subtraction at width w is put into one of these forms, its
+literals summed into one constant k /= 0:
+
+    e + k   e having no literal among the operands of its additions and
+            subtractions at w, a CmmRegOff counting as an addition; a CmmReg
+            r for e makes it the CmmRegOff r k
+    k - e   where every other term is subtracted: -e + k would cost x86
+            a negation
+    e       where the literals cancel
+
+k is an integer literal, a sum built here adding it even when negative, or
+a label literal with its offset; e - k is left as it is where e has no
+constant, the x86 backend emitting as many instructions for it as for
+e + (-k).  So (a - b) + 1, (a + 1) - b and a - (b - 1) all become
+(a - b) + 1, a + (b + 1) and (a + 1) + b become (a + b) + 1, and (a + 1) - 2
+becomes a + (-1).  Cmm's integer arithmetic wraps at its width, so that any
+rearrangement of the terms is an identity of the integers modulo 2^w; the
+constant is summed in Integer and narrowed once.  Each step looks only at the
+top of its two operands, which folding bottom-up has already put in this form.
+A label added to PicBaseReg stays with it (see the special case below), and
+a sum with two labels, or a label subtracted, is left alone.
+
+This replaces the reassociations (a + b) - c ==> a + (b - c) and
+(a - b) + c ==> a + (c - b), which put a literal b on the left of
+a subtraction or folded nothing: (x * y + 1) - w became x * y + (1 - w),
+(i - s) + (-1) became i + ((-1) - s), x86 paying an instruction for either;
+and the reassociation (a + b) + c ==> a + (b + c) no longer moves a literal c
+from the top.
+-}
+
+-- | An operand of an addition or subtraction at some width: no term, a term
+-- added or a term subtracted, ...
+data AddTerm = NoTerm | Plus !CmmExpr | Minus !CmmExpr
+
+-- | ... and the constant added: an integer, or a label literal with its offset.
+data AddConst = KInt !Integer | KLab !CmmLit
+
+-- | What addView finds in an operand: a term alone, a constant alone, or both.
+data AddShape = TermOnly | ConstOnly | TermConst
+
+addShape :: Width -> CmmExpr -> AddShape
+{-# INLINE addShape #-}
+addShape w e = case addView w e of
+  Nothing             -> TermOnly
+  Just (NoTerm, _)    -> ConstOnly
+  Just _              -> TermConst
+
+-- | The term and the constant of an operand at width w in the additive normal
+-- form, or Nothing where the operand is a term alone.
+addView :: Width -> CmmExpr -> Maybe (AddTerm, AddConst)
+addView w e = case e of
+  CmmLit (CmmInt i _)                     -> Just (NoTerm, KInt i)
+  CmmLit l | isLabelLit l                 -> Just (NoTerm, KLab l)
+  CmmMachOp (MO_Add w') [a, CmmLit l] | w' == w -> case l of
+    CmmInt i _                            -> Just (Plus a, KInt i)
+    _ | isLabelLit l, not (isPicReg a)    -> Just (Plus a, KLab l)
+    _                                     -> Nothing
+  CmmMachOp (MO_Sub w') [a, CmmLit (CmmInt i _)]
+    | w' == w                             -> Just (Plus a, KInt (negate i))
+  CmmMachOp (MO_Sub w') [CmmLit (CmmInt i _), a]
+    | w' == w                             -> Just (Minus a, KInt i)
+  CmmRegOff r o
+    | typeWidth (cmmRegType r) == w       -> Just (Plus (CmmReg r), KInt (toInteger o))
+  _                                       -> Nothing
+
+isLabelLit :: CmmLit -> Bool
+isLabelLit CmmLabel{}    = True
+isLabelLit CmmLabelOff{} = True
+isLabelLit _             = False
+
+-- | x + y (or x - y, if the flag is set) at width w in the additive normal
+-- form, given x and y in it; Nothing where it is that already, or where it
+-- cannot be (two labels, or a label subtracted).
+addNormalise :: Platform -> Width -> Bool -> CmmExpr -> CmmExpr -> Maybe CmmExpr
+addNormalise platform w sub x y = case (addShape w x, addShape w y) of
+  (TermOnly, TermOnly)              -> Nothing  -- no literal
+  (TermOnly, ConstOnly)             -> Nothing  -- e + k, e - k
+  (ConstOnly, TermOnly)
+    | sub                           -> Nothing  -- k - e
+  _ -> do
+    let !(tx, kx) = fromMaybe (Plus x, KInt 0) (addView w x)
+        !(ty, ky) = fromMaybe (Plus y, KInt 0) (addView w y)
+    k <- if sub then constSub kx ky else constAdd kx ky
+    Just $! build (combine tx ty) k
+  where
+    combine NoTerm    t         = if sub then negT t else t
+    combine t         NoTerm    = t
+    combine (Plus a)  (Plus b)  = Plus (op2 sub a b)
+    combine (Plus a)  (Minus b) = Plus (op2 (not sub) a b)
+    combine (Minus a) (Plus b)
+      | sub                     = Minus (op2 False a b)
+      | otherwise               = Plus (op2 True b a)
+    combine (Minus a) (Minus b)
+      | sub                     = Plus (op2 True b a)
+      | otherwise               = Minus (op2 False a b)
+
+    negT NoTerm    = NoTerm
+    negT (Plus a)  = Minus a
+    negT (Minus a) = Plus a
+
+    op2 s a b = cmmMachOpFold platform (if s then MO_Sub w else MO_Add w) [a, b]
+
+    constAdd (KInt a) (KInt b) = Just (KInt (a + b))
+    constAdd (KLab l) (KInt b) = labOff l b
+    constAdd (KInt a) (KLab l) = labOff l a
+    constAdd _        _        = Nothing
+    constSub k (KInt b) = constAdd k (KInt (negate b))
+    constSub _ _        = Nothing
+    labOff l i
+      | validOffsetRep w = Just (KLab (cmmOffsetLit l (fromInteger (narrowS w i))))
+      | otherwise        = Nothing
+
+    build NoTerm    (KInt i) = CmmLit (CmmInt (narrowS w i) w)
+    build NoTerm    (KLab l) = CmmLit l
+    -- e + k folds further only where e is a literal, a register, a register
+    -- offset, a sum (with PicBaseReg, or not in this form) or a difference
+    -- with a constant; else it is built as it stands
+    build (Plus e)  (KInt i)
+      | k == 0               = e
+      | CmmReg r <- e
+      , validOffsetRep w     = cmmRegOff r (fromInteger k)
+      | folds e              = cmmMachOpFold platform (MO_Add w) [e, CmmLit (CmmInt k w)]
+      | otherwise            = CmmMachOp (MO_Add w) [e, CmmLit (CmmInt k w)]
+      where k = narrowS w i
+            folds CmmLit{}               = True
+            folds CmmReg{}               = True
+            folds CmmRegOff{}            = True
+            folds (CmmMachOp MO_Add{} _) = True
+            folds e'                     = case addShape w e' of
+                                             TermOnly -> False
+                                             _        -> True
+    build (Plus e)  (KLab l) = CmmMachOp (MO_Add w) [e, CmmLit l]
+    build (Minus e) (KInt i) = CmmMachOp (MO_Sub w) [CmmLit (CmmInt (narrowS w i) w), e]
+    build (Minus e) (KLab l) = CmmMachOp (MO_Sub w) [CmmLit l, e]
+
+-- | The reassociation (a + b) + c ==> a + (b + c) of the addition op at width
+-- w, a being neither a literal nor PicBaseReg and c no literal: cmmMachOpFold
+-- of a + cmmMachOpFold (b + c), the inner fold reassociating again where b is
+-- such a sum.  Where a is neither a literal, a register offset nor a MachOp
+-- and the inner result is a sum at w whose right operand is no literal,
+-- neither operand has a constant (Note [Additive normal form]) and no other
+-- clause matches, so that the fold returns the sum as it stands: it is built
+-- so, and is then known to be such a sum one step up.  Folded, each of
+-- the n(n-1)/2 steps that turn a left-nested sum of n terms right-nested
+-- tested both of its operands for a constant.
+reassocAdd :: Platform -> MachOp -> Width -> CmmExpr -> CmmExpr -> CmmExpr
+           -> CmmExpr
+reassocAdd platform op w a0 b0 c = case go a0 b0 of Reassoc e _ -> e
+  where
+    go a b = case inner of
+        Reassoc bc True | plain a -> Reassoc (CmmMachOp op [a, bc]) True
+        Reassoc bc _              -> folded (cmmMachOpFold platform op [a, bc])
+      where
+        inner = case b of
+          CmmMachOp (MO_Add w') [p, q]
+            | w' == w, not (isLit p), not (isPicReg p) -> go p q
+          _ -> folded (cmmMachOpFold platform op [b, c])
+    -- e, and whether it is a sum at w whose right operand is no literal
+    folded e = Reassoc e $ case e of
+      CmmMachOp (MO_Add w') [_, y] -> w' == w && not (isLit y)
+      _                            -> False
+    plain CmmLit{}    = False
+    plain CmmRegOff{} = False
+    plain CmmMachOp{} = False
+    plain _           = True
+
+-- | A result of reassocAdd's steps, and whether it is a sum at its width whose
+-- right operand is no literal.
+data Reassoc = Reassoc !CmmExpr !Bool
+
+-- For a widening conversion, which the comparison folds above remove: its
+-- source width, whether it extends the sign, and how a literal is narrowed to
+-- that width.
+maybe_conversion :: MachOp -> Maybe (Width, Bool, Width -> Integer -> Integer)
+maybe_conversion (MO_UU_Conv from to)
+    | to > from
+    = Just (from, False, narrowU)
+maybe_conversion (MO_SS_Conv from to)
+    | to > from
+    = Just (from, True, narrowS)
+
+    -- don't attempt to apply this optimisation when the source
+    -- is a float; see #1916
+maybe_conversion _ = Nothing
+
+    -- careful (#2080): if the original comparison was signed, but
+    -- we were doing an unsigned widen, then we must do an
+    -- unsigned comparison at the smaller size.
+maybe_comparison :: MachOp -> Width -> Bool -> Maybe MachOp
+maybe_comparison (MO_U_Gt _) rep _     = Just (MO_U_Gt rep)
+maybe_comparison (MO_U_Ge _) rep _     = Just (MO_U_Ge rep)
+maybe_comparison (MO_U_Lt _) rep _     = Just (MO_U_Lt rep)
+maybe_comparison (MO_U_Le _) rep _     = Just (MO_U_Le rep)
+maybe_comparison (MO_Eq   _) rep _     = Just (MO_Eq   rep)
+maybe_comparison (MO_Ne   _) rep _     = Just (MO_Ne   rep)
+maybe_comparison (MO_S_Gt _) rep True  = Just (MO_S_Gt rep)
+maybe_comparison (MO_S_Ge _) rep True  = Just (MO_S_Ge rep)
+maybe_comparison (MO_S_Lt _) rep True  = Just (MO_S_Lt rep)
+maybe_comparison (MO_S_Le _) rep True  = Just (MO_S_Le rep)
+maybe_comparison (MO_S_Gt _) rep False = Just (MO_U_Gt rep)
+maybe_comparison (MO_S_Ge _) rep False = Just (MO_U_Ge rep)
+maybe_comparison (MO_S_Lt _) rep False = Just (MO_U_Lt rep)
+maybe_comparison (MO_S_Le _) rep False = Just (MO_U_Le rep)
+maybe_comparison _ _ _ = Nothing
 
 -- | Check that a literal width is compatible with the host word size used to
 -- store offsets. This should be fixed properly (using larger types to store

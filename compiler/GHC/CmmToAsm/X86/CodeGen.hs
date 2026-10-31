@@ -1790,8 +1790,6 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
         = add_int rep x y
     add_code rep x y = trivialCode rep (ADD format) (Just (ADD format)) x y
       where format = intFormat rep
-    -- TODO: There are other interesting patterns we want to replace
-    --     with a LEA, e.g. `(x + offset) + (y << shift)`.
 
     --------------------
     sub_code :: Width -> CmmExpr -> CmmExpr -> NatM Register
@@ -1801,11 +1799,26 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
         = add_int rep x (-y)
     sub_code rep x y = trivialCode rep (SUB (intFormat rep)) Nothing x y
 
-    -- our three-operand add instruction:
-    add_int width x y = do
+    -- our three-operand add instruction, x + y for a 32-bit y.  An x of
+    -- (a + b) or (a + (b << shift)) goes into the same LEA as an address of
+    -- that form would (Note [Additive normal form] in GHC.Cmm.Opt), and
+    -- (a - b) + y is computed as (a + y) - b, the LEA taking the place of
+    -- the move of a into the destination.
+    -- x is evaluated once by the bang, the default alternative taking the
+    -- value rather than a thunk it would evaluate again.
+    add_int width !x y = case x of
+      CmmMachOp (MO_Add _) [_, b]
+        | not (isLit b)
+        -> do Amode addr addr_code <- getAmode (CmmMachOp (MO_Add width)
+                                                 [x, CmmLit (CmmInt y width)])
+              return (Any format (\dst -> addr_code `snocOL`
+                                          LEA format (OpAddr addr) (OpReg dst)))
+      CmmMachOp (MO_Sub _) [a, b]
+        -> trivialCode width (SUB format) Nothing
+             (CmmMachOp (MO_Add width) [a, CmmLit (CmmInt y width)]) b
+      _ -> do
         (x_reg, x_code) <- getSomeReg x
         let
-            format = intFormat width
             imm = ImmInt (fromInteger y)
             code dst
                = x_code `snocOL`
@@ -1814,6 +1827,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                         (OpReg dst)
         --
         return (Any format code)
+      where format = intFormat width
 
     ----------------------
 
@@ -3495,18 +3509,44 @@ getAmode e = do
       CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)]
          | is32BitLit platform lit
          -- assert (rep == II32)???
-         -> do
-            (x_reg, x_code) <- getSomeReg x
-            let off = ImmInt (-(fromInteger i))
-            return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
+         -> let !x' = x in case x' of
+              -- (b + (i << shift)) - offset and (b + i) - offset, as for
+              -- x + lit below
+              CmmMachOp (MO_Add _) [b, CmmMachOp (MO_Shl _) [j, CmmLit (CmmInt shift _)]]
+                | shift == 0 || shift == 1 || shift == 2 || shift == 3
+                , is32BitInteger (negate i)
+                -> x86_complex_amode b j shift (negate i)
+              CmmMachOp (MO_Add _) [b, j]
+                | not (isLit j)
+                , is32BitInteger (negate i)
+                -> x86_complex_amode b j 0 (negate i)
+              _ -> do
+                (x_reg, x_code) <- getSomeReg x'
+                let off = ImmInt (-(fromInteger i))
+                return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
       CmmMachOp (MO_Add _rep) [x, CmmLit lit]
          | is32BitLit platform lit
          -- assert (rep == II32)???
-         -> do
-            (x_reg, x_code) <- getSomeReg x
-            let off = litToImm lit
-            return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
+         -> let !x' = x in case x' of
+              -- (b + (i << shift)) + offset and (b + i) + offset, the
+              -- additive normal form of these addresses (Note [Additive
+              -- normal form] in GHC.Cmm.Opt), tested here so that x is
+              -- evaluated once, the default alternative taking its value x'
+              CmmMachOp (MO_Add _) [b, CmmMachOp (MO_Shl _) [i, CmmLit (CmmInt shift _)]]
+                | shift == 0 || shift == 1 || shift == 2 || shift == 3
+                , CmmInt offset _ <- lit
+                , is32BitInteger offset
+                -> x86_complex_amode b i shift offset
+              CmmMachOp (MO_Add _) [b, i]
+                | not (isLit i)
+                , CmmInt offset _ <- lit
+                , is32BitInteger offset
+                -> x86_complex_amode b i 0 offset
+              _ -> do
+                (x_reg, x_code) <- getSomeReg x'
+                let off = litToImm lit
+                return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
       -- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be
       -- recognised by the next rule.

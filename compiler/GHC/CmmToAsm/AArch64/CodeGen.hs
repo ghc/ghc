@@ -904,7 +904,7 @@ getRegister' config plat expr
               format = cmmTypeFormat rep
           return (Any format (\dst -> imm_code `snocOL` (annExpr expr $ LDR format (OpReg (formatToWidth format) dst) op)))
 
-        CmmLabelOff _lbl off | isNbitEncodeable 12 (fromIntegral off) -> do
+        CmmLabelOff _lbl off | isNbitEncodeable 12 (fromIntegral off), off >= 0 -> do
           (op, imm_code) <- litToImm' lit
           let rep = cmmLitType plat lit
               format = cmmTypeFormat rep
