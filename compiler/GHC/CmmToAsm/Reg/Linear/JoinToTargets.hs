@@ -140,13 +140,15 @@ registers. The SCCs linearRA_SCCs defers are allocated after the others. Hence:
   has written it. Likewise where the preheader has it InBoth, every back edge
   that holds it in a register only stores it.
 
-* TODO #27800: a return continuation is an entry block, and the allocator,
-  going in SCC order, processes it before the loops it jumps into. So where the
-  procedure's entry and such a continuation enter one loop at two different
-  blocks, the two record incompatible assignments, and the loop's own edges get
-  fixup code that runs on every iteration. Taking the entry first and then,
-  after each SCC, an SCC holding a block whose entry assignment is recorded was
-  tried on a development branch and showed no gain.
+* TODO #27800: a return continuation is an entry block, and the allocator, going
+  in SCC order, processes it before a loop it jumps into where the loop calls
+  something (linearRA_SCCs defers one that jumps into a loop that calls nothing
+  and whose entry assignment is not yet recorded). So where the procedure's
+  entry and such a continuation enter one loop at two different blocks, the
+  two record incompatible assignments, and the loop's own edges get fixup code
+  that runs on every iteration. Taking the entry first and then, after each
+  SCC, an SCC holding a block whose entry assignment is recorded was tried on a
+  development branch and showed no gain.
 
 That first jump decides one more thing. A vreg's first-used register
 (lookupFirstUsed) is its register in the first assignment that, recorded for a
