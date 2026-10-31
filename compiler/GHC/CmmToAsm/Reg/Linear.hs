@@ -500,14 +500,19 @@ linearRA_SCCs :: RegAllocConstraint freeRegs instr
               -> RegM freeRegs [NatBasicBlock instr]
 
 linearRA_SCCs cold entry_ids succs block_live sccs
- = do   let -- a block the garbage collector returns to
-            deferrable (AcyclicSCC (BasicBlock bid _))
-              = bid `setMember` cold && bid `setMember` entries
-            deferrable _ = False
+ = do   let -- a block the garbage collector returns to, or a return
+            -- continuation that jumps into a loop with no call (GHC #27800)
+            deferrable assig (AcyclicSCC (BasicBlock bid _))
+              = bid `setMember` entries && bid /= first_id
+                && (bid `setMember` cold
+                    || any (\d -> d `setMember` no_call_loops
+                                  && isNothing (lookupBlockAssignment d assig))
+                           (mapFindWithDefault [] bid succs))
+            deferrable _ _ = False
             go acc deferred [] = return (acc, reverse deferred)
             go acc deferred (scc : rest) = do
               block_assig <- getBlockAssigR
-              if deferrable scc
+              if deferrable block_assig scc
                 then go acc (scc : deferred) rest
                 -- reached unless only deferred blocks lead to it
                 else if null deferred
@@ -525,6 +530,12 @@ linearRA_SCCs cold entry_ids succs block_live sccs
     -- 0.33% and 0.32% more compiling T3294 at -O and -O2, and 0.58% more
     -- compiling nofib's puzzle at -O2, on GHC 10.1.20261108
     entries = setFromList entry_ids
+    first_id = case entry_ids of { b : _ -> b; [] -> panic "linearRA_SCCs" }
+    no_call_loops = setFromList
+      [ b | CyclicSCC bs <- sccs, not (any calls bs), BasicBlock b _ <- bs ]
+    calls (BasicBlock _ is) = any clobbersMany is
+    clobbersMany li
+      = length [ () | RegWithFormat (RegReal _) _ <- writes (liveInstrUsage li) ] > 4
     one acc (AcyclicSCC block) = do
         blocks' <- processBlock succs block_live block
         return (reverse blocks' ++ acc)
