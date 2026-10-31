@@ -448,7 +448,7 @@ cannedGCReturnsTo checkYield cont_on_stack gc regs lret off code
       -- alternative and hence the [LocalReg] was passed to us in the
       -- NativeReturn convention.
     gc_call profile label sp
-      | cont_on_stack
+      | False && cont_on_stack
       = mkJumpReturnsTo profile label NativeReturn reg_exprs lret off sp
       | otherwise
       = mkCallReturnsTo profile label NativeReturn reg_exprs lret off sp []

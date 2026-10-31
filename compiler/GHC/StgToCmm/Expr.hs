@@ -1277,13 +1277,24 @@ emitEnter fun = do
              entry = entryCode platform (closureInfoPtr platform align_check node)
              the_call = toCall entry (Just lret) updfr_off off outArgs regs
        ; tscope <- getTickScope
-       ; emit $
-           copyout <*>
-           mkCbranch (cmmIsTagged platform node)
-                     lret lcall Nothing <*>
-           outOfLine lcall (the_call,tscope) <*>
-           mkLabel lret tscope <*>
-           copyin
+       ; case res_regs of
+           [res_reg] -> do
+             { lcont <- newBlockId
+             ; emit $
+                 mkAssign (CmmLocal res_reg) fun <*>
+                 mkCbranch (cmmIsTagged platform (CmmReg (CmmLocal res_reg)))
+                           lcont lcall Nothing <*>
+                 outOfLine lcall (copyout <*> the_call,tscope) <*>
+                 mkLabel lret tscope <*>
+                 copyin <*>
+                 mkLabel lcont tscope }
+           _ -> emit $
+                  copyout <*>
+                  mkCbranch (cmmIsTagged platform node)
+                            lret lcall Nothing <*>
+                  outOfLine lcall (the_call,tscope) <*>
+                  mkLabel lret tscope <*>
+                  copyin
        ; return (ReturnedTo lret off)
        }
   }
