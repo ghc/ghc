@@ -1,0 +1,20 @@
+#include "Cmm.h"
+
+// The constant folder (GHC.Cmm.Opt) must leave alone what it cannot fold:
+// (x * y + 1) - w must not become x * y + (1 - w), which costs x86 one
+// instruction more.  And it must compare a byte widened to a word with
+// a literal at the byte's width for != as it does for ==.
+addsub (W_ x, W_ y, W_ w)
+{
+    W_ z;
+    z = x * y + 1;
+    return (z - w);
+}
+
+nenarrow (W_ p)
+{
+    W_ c;
+    c = %zx64(bits8[p]);
+    if (c != 10) { return (1); }
+    return (0);
+}

@@ -23,3 +23,8 @@ test('T24474-cmm-opt-order', cmm_src, compile, ['-optc-DFOO '
                                                 '-optc-DBAR'])
 test('T8327', [cmm_src, only_ways(['optasm']), grep_errmsg(r'(1234567)', [1])],
      compile, ['-no-hs-main -ddump-cmm'])
+test('cmm_fold_lit', [cmm_src, only_ways(['optasm']),
+                      grep_errmsg(r'(\(1 - |MO_UU_Conv_W8_W64)', [1])],
+     compile, ['-no-hs-main -ddump-cmm -dsuppress-all'])
+test('cmm_fold_elemAt', [only_ways(['optasm']), grep_errmsg(r'(\(-1\) - )', [1])],
+     compile, ['-O2 -ddump-cmm -dsuppress-all'])

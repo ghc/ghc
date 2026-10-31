@@ -244,18 +244,28 @@ cmmMachOpFoldM platform op [x@(CmmLit _), y]
 -- Also don't do it if arg1 is PicBaseReg, so that we don't separate the
 -- PicBaseReg from the corresponding label (or label difference).
 --
+-- Turn (a+b)-c into a+(b-c) only where c is a literal: otherwise b-c folds
+-- nothing, and with a literal b it puts that literal on the left of a
+-- subtraction, as the special case below explains.
+--
 cmmMachOpFoldM platform mop1 [CmmMachOp mop2 [arg1,arg2], arg3]
    | mop2 `associates_with` mop1
      && not (isLit arg1) && not (isPicReg arg1)
+     && (not (isSub mop1) || isLit arg3)
    = Just $! (cmmMachOpFold platform mop2 [arg1, cmmMachOpFold platform mop1 [arg2,arg3]])
    where
      MO_Add{} `associates_with` MO_Sub{} = True
      mop1 `associates_with` mop2 =
         mop1 == mop2 && isAssociativeMachOp mop1
+     isSub MO_Sub{} = True
+     isSub _        = False
 
--- special case: (a - b) + c  ==>  a + (c - b)
+-- special case: (a - b) + c  ==>  a + (c - b), where b and c are literals,
+-- so that c - b folds.  Otherwise it folds nothing, and with a literal c it
+-- puts that literal on the left of a subtraction: (x - y) + (-1) would become
+-- x + ((-1) - y), which costs x86 one instruction more.
 cmmMachOpFoldM platform mop1@(MO_Add{}) [CmmMachOp mop2@(MO_Sub{}) [arg1,arg2], arg3]
-   | not (isLit arg1) && not (isPicReg arg1)
+   | not (isLit arg1) && not (isPicReg arg1) && isLit arg2 && isLit arg3
    = Just $! (cmmMachOpFold platform mop1 [arg1, cmmMachOpFold platform mop2 [arg3,arg2]])
 
 -- special case: (PicBaseReg + lit) + N  ==>  PicBaseReg + (lit+N)
@@ -338,6 +348,7 @@ cmmMachOpFoldM platform cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
     maybe_comparison (MO_U_Lt _) rep _     = Just (MO_U_Lt rep)
     maybe_comparison (MO_U_Le _) rep _     = Just (MO_U_Le rep)
     maybe_comparison (MO_Eq   _) rep _     = Just (MO_Eq   rep)
+    maybe_comparison (MO_Ne   _) rep _     = Just (MO_Ne   rep)
     maybe_comparison (MO_S_Gt _) rep True  = Just (MO_S_Gt rep)
     maybe_comparison (MO_S_Ge _) rep True  = Just (MO_S_Ge rep)
     maybe_comparison (MO_S_Lt _) rep True  = Just (MO_S_Lt rep)
