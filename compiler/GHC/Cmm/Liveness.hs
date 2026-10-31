@@ -2,6 +2,7 @@ module GHC.Cmm.Liveness
     ( CmmLocalLive
     , cmmLocalLiveness
     , cmmLocalLivenessL
+    , localLivenessBy
     , cmmGlobalLiveness
     , liveLattice
     , liveLatticeL
@@ -114,7 +115,16 @@ liveLatticeL = DataflowLattice emptyLRegSet add
 
 cmmLocalLivenessL :: Platform -> CmmGraph -> BlockEntryLivenessL
 cmmLocalLivenessL platform graph =
-    check $ analyzeCmmBwd liveLatticeL (xferLiveL platform) graph mapEmpty
+    localLivenessBy (gen_killL platform) platform graph
+
+-- | The local registers live on entry to each block, by the given step over
+-- a block's middle nodes; it panics where a register is live on entry to the
+-- graph ('noLiveOnEntryL').
+localLivenessBy :: (CmmNode O O -> LRegSet -> LRegSet) -> Platform -> CmmGraph
+                -> BlockEntryLivenessL
+{-# INLINE localLivenessBy #-}
+localLivenessBy step platform graph =
+    check $ analyzeCmmBwd liveLatticeL (xferLiveL step platform) graph mapEmpty
   where
     entry = g_entry graph
     check facts =
@@ -141,15 +151,11 @@ gen_killL platform node set =
     in foldRegsUsed platform (flip insertLRegSet) afterKill node
 {-# INLINE gen_killL #-}
 
-xferLiveL
-    :: ( UserOfRegs LocalReg (CmmNode O O)
-       , DefinerOfRegs LocalReg (CmmNode O O)
-       , UserOfRegs LocalReg (CmmNode O C)
-       , DefinerOfRegs LocalReg (CmmNode O C)
-       )
-    => Platform -> TransferFun LRegSet
-xferLiveL platform (BlockCC eNode middle xNode) fBase =
+xferLiveL :: (CmmNode O O -> LRegSet -> LRegSet) -> Platform
+          -> TransferFun LRegSet
+{-# INLINE xferLiveL #-}
+xferLiveL step platform = \(BlockCC eNode middle xNode) fBase ->
     let joined = gen_killL platform xNode $! joinOutFacts liveLatticeL xNode fBase
-        !result = foldNodesBwdOO (gen_killL platform) middle joined
+        !result = foldNodesBwdOO step middle joined
     in mapSingleton (entryLabel eNode) result
 
