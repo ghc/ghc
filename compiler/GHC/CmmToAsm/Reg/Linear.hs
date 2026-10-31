@@ -462,14 +462,21 @@ linearRA_SCCs :: RegAllocConstraint freeRegs instr
               -> RegM freeRegs [NatBasicBlock instr]
 
 linearRA_SCCs cold entry_ids succs block_live sccs
- = do   let -- a block the garbage collector returns to
-            deferrable (AcyclicSCC (BasicBlock bid _))
-              = bid `setMember` cold && bid `setMember` entries
-            deferrable _ = False
+ = do   platform <- getPlatform
+        let no_call_loops = callFreeLoops platform
+            -- a block the garbage collector returns to, or a return
+            -- continuation that jumps into a loop with no call (GHC #27800)
+            deferrable assig (AcyclicSCC (BasicBlock bid instrs))
+              = bid `setMember` entries && bid /= first_id
+                && (bid `setMember` cold
+                    || any (\d -> d `setMember` no_call_loops
+                                  && isNothing (lookupBlockAssignment d assig))
+                           (dests instrs))
+            deferrable _ _ = False
             go acc deferred [] = return (acc, reverse deferred)
             go acc deferred (scc : rest) = do
               block_assig <- getBlockAssigR
-              if deferrable scc
+              if deferrable block_assig scc
                 then go acc (scc : deferred) rest
                 -- reached unless only deferred blocks lead to it
                 else if null deferred
@@ -484,6 +491,14 @@ linearRA_SCCs cold entry_ids succs block_live sccs
   where
     -- looked up for every block, so a set rather than the list
     entries = setFromList entry_ids
+    first_id = case entry_ids of { b : _ -> b; [] -> panic "linearRA_SCCs" }
+    dests instrs = [ d | LiveInstr i _ <- instrs, d <- jumpDestsOfInstr i ]
+    callFreeLoops platform = setFromList
+      [ b | CyclicSCC bs <- sccs, not (any (calls platform) bs)
+          , BasicBlock b _ <- bs ]
+    calls platform (BasicBlock _ is) = any (clobbersMany platform) is
+    clobbersMany platform (LiveInstr i _)
+      = length [ () | RegWithFormat (RegReal _) _ <- writes (regUsageOfInstr platform i) ] > 4
     one acc (AcyclicSCC block) = do
         blocks' <- processBlock succs block_live block
         return (reverse blocks' ++ acc)
