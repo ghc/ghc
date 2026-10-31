@@ -21,3 +21,9 @@ test('T24474-cmm-opt-order', cmm_src, compile, ['-optc-DFOO '
                                                 '-optCmmP-UFOO '
                                                 '-optCmmP-UBAR '
                                                 '-optc-DBAR'])
+test('cmm_fold_lit', [cmm_src, only_ways(['optasm']), when(wordsize(32), skip),
+                      grep_errmsg(r'(\(1 - |MO_[US][US]_Conv_W8_W64)', [1])],
+     compile, ['-no-hs-main -ddump-cmm -dsuppress-all'])
+test('cmm_fold_elemAt', [only_ways(['optasm']), grep_errmsg(r'(\(-1\) - )', [1])],
+     compile, ['-O2 -ddump-cmm -dsuppress-all'])
+test('CmmRegOffW16', [cmm_src, only_ways(['optasm']), unless(arch('x86_64'), skip)], compile, ['-no-hs-main'])
