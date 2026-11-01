@@ -69,8 +69,9 @@ Here we used the ``-g`` option to inform GHC that it should add debugging
 information in the produced binary. There are three levels of debugging
 output: ``-g0`` (no debugging information, the default), ``-g1`` (sufficient for
 basic backtraces), ``-g2`` (or just ``-g`` for short; emitting everything GHC knows).
-Note that this debugging information does not affect the optimizations performed
-by GHC.
+Note that this debugging information does not affect the optimizations
+that GHC attempts to perform; but it can affect how successful it is in
+performing them (see #21471, #27687)
 
 .. tip::
    Under Mac OS X debug information is kept apart from the executable. After

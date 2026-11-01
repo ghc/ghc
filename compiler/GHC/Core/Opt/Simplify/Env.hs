@@ -355,12 +355,18 @@ This simplifier phase is stored in the sm_phase field of SimplMode, usin
 the 'SimplPhase' constructor. This allows us to determine which rules/inlinings
 are active.
 
-When we invoke the simplifier on the RHS of a rule, such as 'rhs' above, instead
-of setting the simplifier mode to a single phase, we use a phase range
-corresponding to the range of phases in which the rule is active, with the
-'SimplPhaseRange' constructor. This allows us to check whether other rules or
-inlinings are active throughout the whole activation of the rule.
-See Note [What is active in the RHS of a RULE or unfolding?] in GHC.Core.Opt.Simplify.Utils.
+Wrinkles
+
+(SP1) InitialPhase: see Note [The InitialPhase of the Simplifier]
+    in GHC.Core.Opt.Pipeline.
+
+(SP2) Phase ranges.  When we invoke the simplifier on the RHS of a rule, such as
+    `rhs` above, instead of setting the simplifier mode to a single phase, we use a
+    phase /range/ corresponding to the range of phases in which the rule is active,
+    with the 'SimplPhaseRange' constructor. This allows us to check whether other
+    rules or inlinings are active throughout the whole activation of the rule.  See
+    Note [What is active in the RHS of a RULE or unfolding?]  in
+    GHC.Core.Opt.Simplify.Utils.
 -}
 
 instance Outputable SimplMode where

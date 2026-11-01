@@ -352,8 +352,25 @@ runMaybe :: Maybe a -> (a -> CoreToDo) -> CoreToDo
 runMaybe (Just x) f = f x
 runMaybe Nothing  _ = CoreDoNothing
 
-{- Note [Inline in InitialPhase]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [The InitialPhase of the Simplifier]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The first run of the simplifier, historically called "gentle" simplification,
+has phase=InitialPhase, which does a number of things:
+
+* Usually sm_case_case is switched off in this phase; see
+  Note [Case-of-case and full laziness] and `initGentleSimplMode`
+
+* Inlining, however, is not switched off in InitialPhase.
+  See Note [Inline in InitialPhase]
+
+* Rules can run in InitialPhase
+  Note [RULEs enabled in InitialPhase]
+
+* Lint is a little agressive about loop-breaker warnings in InitialPhase.
+  See `check_lbs` in `GHC.Core.Lint.perPassFlags`.
+
+Note [Inline in InitialPhase]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In GHC 8 and earlier we did not inline anything in the InitialPhase. But that is
 confusing for users because when they say INLINE they expect the function to inline
 right away.
