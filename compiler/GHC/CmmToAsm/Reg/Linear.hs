@@ -1592,11 +1592,12 @@ TODO: the first-used preference is keyed by virtual register, and a Cmm local
 is one virtual register over its whole procedure, however many live ranges
 it has. So the register taken for one live range becomes the preference of
 another. Stack layout makes such ranges: it reloads a local that is live across
-a call into the same local in the call's continuation. Where a walk from the
-block finds that the value live into the block recorded with that register
-reaches none of the blocks this value reaches, the vreg's free wide destination,
-or the register of a recorded block it reaches, is taken first (stale, reached
-in firstFreeInOrder).
+a call into the same local after the call (Note [Native code generator] in
+GHC.CmmToAsm). Where a walk from the block finds that the value live into
+the block recorded with that register reaches none of the blocks this value
+reaches, the first-used register is passed over, the vreg's free wide
+destination keeping its place (stale), or gives its place to the register of
+a recorded block the walk reaches (reached, in firstFreeInOrder).
 -}
 
 -- | Of the given free registers of a class, the one to take for the

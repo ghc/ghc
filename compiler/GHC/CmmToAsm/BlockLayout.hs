@@ -265,12 +265,6 @@ import GHC.Types.Unique.DSM (UniqDSM)
     We apply a small modifier to them to ensure edges for which we can
     eliminate the overhead completely are considered first. See also #18053.
 
-    TODO #27799: where buildChains skips the branch's other edge because
-    it would close a cycle, as it can skip a loop latch's back edge, not
-    fusing this edge leaves an unconditional jump as well. The modifier then
-    under-prices this edge, and an unconditional edge of nearly equal weight
-    from another predecessor can be fused with the target first.
-
   * Edges constituted by a call are ignored while the chains are built and while
     neighbouring chains are combined, and count a 64th of their weight when the
     chains are merged at the end.
@@ -315,6 +309,24 @@ import GHC.Types.Unique.DSM (UniqDSM)
 
   So we perform a preprocessing step where we adjust the weights of
   these kinds of edges.
+
+
+  Note [Latch edges after a cycle]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  A loop whose test is at its bottom, the latch, ends in a conditional branch
+  to the loop's body and to its exit. 'buildChains' fuses the body into a chain
+  ending at the latch and then drops the latch's edge to the body, which would
+  close a cycle. The latch's other edge, to the exit, still carries the small
+  modifier of Note [Layout relevant edge weights], which assumes that a
+  conditional branch costs its jump whatever falls through. That no longer
+  holds: unless the exit falls through, the latch ends in a conditional jump
+  to the exit and a jump back to the body, which runs at every iteration. So
+  where 'buildChains' drops a conditional edge out of a chain's end into that
+  chain's start, it gives the branch's other edge, if still to be considered,
+  the dropped edge's weight where that is more and the edge's target, unplaced
+  or starting a chain, has no info table, which no block falls through into,
+  so that the exit falls through from the latch rather than from another
+  predecessor that the frequencies make as likely (#27799).
 
   -}
 
@@ -584,12 +596,16 @@ mergeChains edges chains
 -- to be complete - it's only used to speed up the process.
 -- An Edge is irrelevant if the ends are part of the same chain.
 -- We say these edges are already linked
-buildChains :: [CfgEdge] -> [BlockId]
+buildChains :: LabelMap a -> CFG -> [CfgEdge] -> [BlockId]
             -> ( LabelMap BlockChain  -- Resulting chains, indexed by end if chain.
                , EdgeSet) --List of fused edges.
-buildChains edges blocks
+buildChains info cfg edges blocks
   = runST $ buildNext setEmpty mapEmpty mapEmpty edges mapEmpty
   where
+    isCondBranch (CfgEdge _ _ (EdgeInfo CmmSource { trans_cmmNode = CmmCondBranch {} } _))
+      = True
+    isCondBranch _ = False
+
     -- buildNext builds up chains from edges one at a time.
 
     -- We keep a map from the ends of chains to the chains.
@@ -632,8 +648,9 @@ buildChains edges blocks
           (alreadyPlaced to)
         , Just predChain <- mapLookup from chainEnds
         , Just succChain <- mapLookup to chainStarts
-        , predChain /= succChain -- Otherwise we try to create a cycle.
-          = fuseChain predChain succChain
+          = if predChain /= succChain -- Otherwise we try to create a cycle.
+              then fuseChain predChain succChain
+              else buildNext placed chainStarts chainEnds latchSibling linked
 
         | (alreadyPlaced from) &&
           (alreadyPlaced to)
@@ -645,6 +662,35 @@ buildChains edges blocks
         from = edgeFrom edge
         to   = edgeTo   edge
         alreadyPlaced blkId = (setMember blkId placed)
+
+        -- The edges still to check once edge, which would close a cycle, is
+        -- dropped. See Note [Latch edges after a cycle]
+        latchSibling
+          | isCondBranch edge
+          , [sibTo] <- filter (/= to) (getSuccessors cfg from)
+          -- placed and starting no chain, it can follow no chain's end, and
+          -- with an info table, it is jumped to wherever it is placed
+          , not (alreadyPlaced sibTo) || mapMember sibTo chainStarts
+          , not (mapMember sibTo info)
+          , Just sib <- findSib sibTo
+          , isCondBranch sib
+          , edgeWeight (edgeInfo sib) < edgeWeight (edgeInfo edge)
+          = let sib' = sib { edgeInfo = (edgeInfo sib)
+                                          { edgeWeight = edgeWeight (edgeInfo edge) } }
+                -- sib' outranks every edge of todo, each below edge, by weight
+                -- or by source, and joins from, a chain's end, to sibTo,
+                -- unplaced or starting another chain; sib, left in todo, then
+                -- joins two placed blocks, from ending no chain, and is passed
+                -- over
+            in sib' : todo
+          | otherwise
+          = todo
+        -- the edge from from to sibTo as edges holds it: the CFG's under
+        -- relevantWeight, preferBackEdges raising only an edge out of
+        -- a block with one successor, and from has two; lighter than edge,
+        -- it is still in todo
+        findSib sibTo =
+          getEdgeInfo from sibTo cfg >>= relevantWeight info . CfgEdge from sibTo
 
         -- Combine two chains into a single one.
         fuseChain :: STRef s BlockChain -> STRef s BlockChain
@@ -707,6 +753,32 @@ buildChains edges blocks
             where
               alreadyPlaced blkId = (setMember blkId placed)
 
+-- | Apply modifiers to turn edge frequencies into useable weights
+-- for computing code layout, given the blocks with an info table.
+-- See also Note [Layout relevant edge weights]
+relevantWeight :: LabelMap a -> CfgEdge -> Maybe CfgEdge
+relevantWeight info edge@(CfgEdge from to edgeInfo)
+    | (EdgeInfo CmmSource { trans_cmmNode = CmmCall {} } _) <- edgeInfo
+    -- Ignore edges across calls.
+    = Nothing
+    | mapMember to info
+    , w <- edgeWeight edgeInfo
+    -- The payoff is quite small if we jump over an info table
+    = Just (CfgEdge from to edgeInfo { edgeWeight = w/8 })
+    | (EdgeInfo CmmSource { trans_cmmNode = exitNode } _) <- edgeInfo
+    , cantEliminate exitNode
+    , w <- edgeWeight edgeInfo
+    -- A small penalty to edge types which
+    -- we can't optimize away by layout.
+    -- w * 0.96875 == w - w/32
+    = Just (CfgEdge from to edgeInfo { edgeWeight = w * 0.96875 })
+    | otherwise
+    = Just edge
+    where
+      cantEliminate CmmCondBranch {} = True
+      cantEliminate CmmSwitch {} = True
+      cantEliminate _ = False
+
 -- | Place basic blocks based on the given CFG.
 -- See Note [Chain based CFG serialization]
 sequenceChain :: forall a i. Instruction i
@@ -719,34 +791,9 @@ sequenceChain _info _weights    [x] = [x]
 sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
     let edges = infoEdgeList weights
         directEdges :: [CfgEdge]
-        directEdges = sortBy (flip compare) $ preferBackEdges $ mapMaybe relevantWeight edges
+        directEdges = sortBy (flip compare) $ preferBackEdges $
+                        mapMaybe (relevantWeight info) edges
           where
-            -- Apply modifiers to turn edge frequencies into useable weights
-            -- for computing code layout.
-            -- See also Note [Layout relevant edge weights]
-            relevantWeight :: CfgEdge -> Maybe CfgEdge
-            relevantWeight edge@(CfgEdge from to edgeInfo)
-                | (EdgeInfo CmmSource { trans_cmmNode = CmmCall {} } _) <- edgeInfo
-                -- Ignore edges across calls.
-                = Nothing
-                | mapMember to info
-                , w <- edgeWeight edgeInfo
-                -- The payoff is quite small if we jump over an info table
-                = Just (CfgEdge from to edgeInfo { edgeWeight = w/8 })
-                | (EdgeInfo CmmSource { trans_cmmNode = exitNode } _) <- edgeInfo
-                , cantEliminate exitNode
-                , w <- edgeWeight edgeInfo
-                -- A small penalty to edge types which
-                -- we can't optimize away by layout.
-                -- w * 0.96875 == w - w/32
-                = Just (CfgEdge from to edgeInfo { edgeWeight = w * 0.96875 })
-                | otherwise
-                = Just edge
-                where
-                  cantEliminate CmmCondBranch {} = True
-                  cantEliminate CmmSwitch {} = True
-                  cantEliminate _ = False
-
             -- See Note [Layout relevant edge weights]
             preferBackEdges :: [CfgEdge] -> [CfgEdge]
             preferBackEdges es
@@ -814,7 +861,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
             = {-# SCC "buildChains" #-}
               --pprTraceIt "generatedChains" $
               --pprTrace "blocks" (ppr (mapKeys blockMap)) $
-              buildChains directEdges (mapKeys blockMap)
+              buildChains info weights directEdges (mapKeys blockMap)
 
         rankedEdges :: [CfgEdge]
         -- Sort descending by weight, remove fused edges

@@ -28,8 +28,9 @@
 -- The Cmm pipeline (cmmPipeline in GHC.Cmm.Pipeline) hands over Cmm in which:
 --
 --   * stack layout (GHC.Cmm.LayoutStack) has made Sp explicit, saved each local
---     that is live across a call and reloaded it into the same local in the
---     call's continuation, and turned safe foreign calls into unsafe ones;
+--     that is live across a call and reloaded it into the same local after the
+--     call (Note [Tagged path skips the reloads]), and turned safe foreign
+--     calls into unsafe ones;
 --   * switches are comparisons and dense jump tables
 --     (GHC.Cmm.Switch.Implement);
 --   * where tables are next to code, proc points are not split, so the

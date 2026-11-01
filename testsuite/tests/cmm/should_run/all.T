@@ -108,3 +108,15 @@ test('cmm_swoff',
      ],
      multi_compile_and_run,
      ['cmm_swoff', [('cmm_swoff_cmm.cmm', '')], ''])
+
+# A loop whose back edges arrive deeper than its one continuation that is not
+# cold, with a variable in one slot on each: the stack map its head was seeded
+# with named a slot below its Sp, and the compiler died setting up the next
+# frame (any target, any level)
+test('cmm_reserved_seed',
+     [ req_cmm
+     , extra_ways(['optasm'])
+     , when(have_llvm(), extra_ways(['optasm', 'optllvm']))
+     ],
+     multi_compile_and_run,
+     ['cmm_reserved_seed', [('cmm_reserved_seed_cmm.cmm', '')], ''])

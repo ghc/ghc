@@ -1,0 +1,46 @@
+#include "Cmm.h"
+
+// A loop whose two back edges arrive at different depths, each from a block
+// that took its stack map from the continuation of a call only an unlikely
+// branch reaches, both deeper than the frame of the loop's one other call.
+// Both have a in one slot, deeper than that frame: the stack map the loop's
+// head was seeded with (Note [Reserved frames in loops] in
+// GHC.Cmm.LayoutStack) named a slot below its Sp, and the compiler died
+// setting up the next frame.
+
+rs_g (W_ a) {
+    return (a + 1);
+}
+
+rs_w (W_ a) {
+    return (a + 2);
+}
+
+rs_loop (W_ n0) {
+    W_ n, acc, x, a, t1, t2, t3, t4;
+    n = n0; acc = 0; a = n0 + 100;
+  head:
+    if (n == 0) { return (acc + a); }
+    t1 = n + 1; t2 = n + 2; t3 = n + 3; t4 = n + 4;
+    if ((n & 1) != 0) (likely: False) { goto c1; }
+    if ((n & 2) != 0) (likely: False) { goto c2; }
+    (W_ r0) = call rs_w(a);
+    acc = acc + r0;
+    if ((n & 4) != 0) { goto j1; } else { goto j2; }
+  c1:
+    (W_ r1) = call rs_g(a);
+    acc = acc + r1 + t1 + t2 + t3 + t4;
+    goto j1;
+  c2:
+    x = n * 3;
+    (W_ r2) = call rs_g(a);
+    acc = acc + r2 + t1 + t2 + t3 + t4 + x;
+    goto j2;
+  j1:
+    n = n - 1;
+    goto head;
+  j2:
+    acc = acc + 7;
+    n = n - 1;
+    goto head;
+}

@@ -3,6 +3,8 @@ module GHC.Cmm.ContFlowOpt
     , cmmCfgOptsProc
     , removeUnreachableBlocksProc
     , replaceLabels
+    , callContinuation_maybe
+    , splice
     )
 where
 
@@ -372,6 +374,7 @@ splice head rest = entry `blockJoinHead` code0 `blockAppend` code1
   where (CmmEntry lbl sc0, code0) = blockSplitHead head
         (CmmEntry _   sc1, code1) = blockSplitHead rest
         entry = CmmEntry lbl (combineTickScopes sc0 sc1)
+{-# INLINE splice #-}
 
 -- If node is a call with continuation call return Just label of that
 -- continuation. Otherwise return Nothing.

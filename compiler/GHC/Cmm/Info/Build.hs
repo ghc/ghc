@@ -593,12 +593,35 @@ cafAnal
                 -- that will get RET info tables.  These labels will
                 -- get their own SRTs, so we don't aggregate CAFs from
                 -- references to these labels, we just use the label.
+  -> LabelMap Label
+                -- ^ The bodies stack layout split off continuations, each
+                -- with its continuation: a jump into one from elsewhere
+                -- refers to the continuation's SRT, which covers the body
   -> CLabel     -- ^ The top label of the proc
   -> CmmGraph
   -> CAFEnv
-cafAnal platform contLbls topLbl cmmGraph =
-  analyzeCmmBwd cafLattice
-    (cafTransfers platform contLbls (g_entry cmmGraph) topLbl) cmmGraph mapEmpty
+cafAnal platform contLbls bodies topLbl cmmGraph
+  | mapNull bodies || null lost = env
+  | otherwise = pprPanic "cafAnal" (text "split bodies reached without their"
+                                    <+> text "continuations:" <+> ppr lost)
+  where
+    env = analyzeCmmBwd cafLattice
+            (cafTransfers platform contLbls bodies (g_entry cmmGraph) topLbl)
+            cmmGraph mapEmpty
+    -- The bodies reached, each with its continuation, whose continuations are
+    -- not: none. For a jump into a body cafTransfers names its continuation's
+    -- info label, and that label needs its table when the SRTs are built,
+    -- which a block not reached here loses (resolveCAF would make up
+    -- a closure's label for it). Stack layout splits a body off a
+    -- continuation only where a call it lays out returns there, and leaves
+    -- that call reached; the one pass between it and this analysis (cpsTop in
+    -- GHC.Cmm.Pipeline), cmmSink, drops the blocks layout left unreached and
+    -- changes no block's successors. The analysis has a fact for the blocks
+    -- reached and no other. The test is made only where a body was split:
+    -- made for every procedure, the compiler ran 0.0066% more instructions
+    -- compiling T9961 at -O0, on GHC 10.1.20261111.
+    lost = [ (s, c) | (s, c) <- mapToList bodies
+                    , s `mapMember` env, not (c `mapMember` env) ]
 
 
 cafLattice :: DataflowLattice CAFSet
@@ -609,8 +632,9 @@ cafLattice = DataflowLattice Set.empty add
         in changedIf (Set.size new' > Set.size old) new'
 
 
-cafTransfers :: Platform -> LabelSet -> Label -> CLabel -> TransferFun CAFSet
-cafTransfers platform contLbls entry topLbl
+cafTransfers :: Platform -> LabelSet -> LabelMap Label -> Label -> CLabel
+             -> TransferFun CAFSet
+cafTransfers platform contLbls bodies entry topLbl
   block@(BlockCC eNode middle xNode) fBase =
     let joined :: CAFSet
         joined = cafsInNode xNode $! live'
@@ -633,6 +657,15 @@ cafTransfers platform contLbls entry topLbl
           -- SRT for the continuation's info table
           | s `setMember` contLbls
           = Just (Set.singleton (mkCAFfyLabel platform (infoTblLbl s)))
+          -- A body split off a continuation, entered from elsewhere than
+          -- the continuation: the continuation's SRT covers it. The
+          -- continuation is in contLbls: stack layout (GHC.Cmm.LayoutStack)
+          -- splits a body off only the continuation of a diamond it records,
+          -- and records one only at a call's continuation (layout's
+          -- cont_info), which callProcPoints puts in contLbls
+          | Just c <- mapLookup s bodies, c /= entryLabel block
+          = assertPpr (c `setMember` contLbls) (ppr s <+> ppr c) $
+            Just (Set.singleton (mkCAFfyLabel platform (infoTblLbl c)))
           -- Otherwise, takes the CAF references from the destination
           | otherwise
           = lookupFact s fBase
