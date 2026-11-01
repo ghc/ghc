@@ -126,11 +126,6 @@ activeUnfolding mode id
   | otherwise
   =  isActive (sm_phase mode) (idInlineActivation id)
   && sm_inline mode
-      -- `or` isStableUnfolding (realIdUnfolding id)
-      -- Inline things when
-      --  (a) they are active
-      --  (b) sm_inline says so, except that for stable unfoldings
-      --                         (ie pragmas) we inline anyway
 
 -- | Report the inlining of an identifier's RHS to the user, if requested.
 traceInline :: Logger -> UnfoldingOpts -> Id -> String -> SDoc -> a -> a

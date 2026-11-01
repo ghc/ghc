@@ -77,6 +77,7 @@ initSimplMode dflags phase name = SimplMode
   }
 
 initGentleSimplMode :: DynFlags -> SimplMode
+-- See Note [The InitialPhase of the Simplifier] in GHC.Core.Opt.Pipeline
 initGentleSimplMode dflags = (initSimplMode dflags InitialPhase "Gentle")
   { -- Don't do case-of-case transformations.
     -- This makes full laziness work better

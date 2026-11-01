@@ -4959,7 +4959,7 @@ eta-expand the stable unfolding to arity N too. Simple and consistent.
 
 Wrinkles
 
-* See Historical-note [Eta-expansion in stable unfoldings] in
+* See Note [Eta expansion in stable unfoldings and rules]
   GHC.Core.Opt.Simplify.Utils
 
 * Don't eta-expand a trivial expr, else each pass will eta-reduce it,
