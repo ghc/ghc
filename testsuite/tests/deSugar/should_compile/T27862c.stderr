@@ -1,0 +1,5 @@
+T27862c.hs:8:5: error: [GHC-17879]
+    A lazy (~) pattern cannot bind variables of unlifted type.
+    Unlifted variables:
+      x :: Int#
+
