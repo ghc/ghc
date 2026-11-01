@@ -581,8 +581,9 @@ tidyNPat (OverLit (OverLitTc False _ ty) val) mb_neg _eq outer_ty
 
     mk_con_pat :: DataCon -> HsLit GhcTc -> Pat GhcTc
     mk_con_pat con lit
-      -- Mark the generated literal to avoid duplicate -Woverflowed-literals.
       = unLoc (mkPrefixConPat con [wrapGenSpan $ LitPat noExtField lit] [])
+        -- wrapGenSpan: mark the generated literal to avoid duplicate
+        -- -Woverflowed-literals. See (TP2) in Note [Tidying patterns]
 
     mb_int_lit :: Maybe Integer
     mb_int_lit = case (mb_neg, val) of

@@ -143,10 +143,8 @@ pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) =
     let combined_loc = foldl1 combineSrcSpans (NE.map getLocA grhss)
         ctxt = DsMatchContext hs_ctxt combined_loc
     matches  <- dontDoPmc $ desugarGRHSs combined_loc empty guards
-    tracePm "pmcGRHSs" (hang (vcat [ppr ctxt
-                                  , text "Guards:"])
-                                  2
-                                  (pprGRHSs hs_ctxt guards $$ ppr missing))
+    tracePm "pmcGRHSs" (hang (vcat [ppr ctxt, text "Guards:"])
+                           2 (pprGRHSs hs_ctxt guards $$ ppr missing))
     result <- unCA (checkGRHSs matches) missing
     tracePm "}: " (ppr (cr_uncov result))
     formatReportWarnings ReportGRHSs ctxt [] result

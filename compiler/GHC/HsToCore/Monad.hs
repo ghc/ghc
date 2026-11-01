@@ -16,7 +16,7 @@ module GHC.HsToCore.Monad (
         newSysLocalMDs, newSysLocalsMDs, newFailLocalMDs,
         newUniqueId, newPredVarDs, newStaticId,
         getSrcSpanDs, inGeneratedCodeDs, putSrcSpanDs, putSrcSpanDsA,
-        mkNamePprCtxDs,
+        unlessInGenCode, mkNamePprCtxDs,
         newUnique,
         UniqSupply, newUniqueSupply,
         getGhcModeDs, dsGetFamInstEnvs, dsGetGlobalRdrEnv,
@@ -151,7 +151,7 @@ data EquationInfo
   = EqnMatch  { eqn_pat :: LPat GhcTc
                 -- ^ The first pattern of the equation
                 --
-                -- NB: The location info is used to determine whether the
+                -- NB: The location info is used only to determine whether the
                 -- pattern is generated or not.
                 -- This helps us avoid warnings on patterns that GHC elaborated.
                 --
@@ -680,6 +680,13 @@ getSrcSpanDs = do { env <- getLclEnv
 -- | See 'dsl_in_generated_code'
 inGeneratedCodeDs :: DsM Bool
 inGeneratedCodeDs = dsl_in_generated_code <$> getLclEnv
+
+unlessInGenCode :: EpAnn ann -> DsM () -> DsM ()
+unlessInGenCode ann do_warn
+  | isGeneratedSrcSpan span = return ()
+  | otherwise               = putSrcSpanDs span $ do_warn
+  where
+    span = locA ann
 
 putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
 putSrcSpanDs (RealSrcSpan real_span _) thing_inside

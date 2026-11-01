@@ -32,6 +32,9 @@ import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
+
+import GHC.Rename.Utils (wrapGenSpan)
+
 import GHC.HsToCore.Pmc
 import GHC.HsToCore.Pmc.Utils
 import GHC.HsToCore.Types ( LdiNablas )
@@ -164,6 +167,57 @@ applying ``the mixture rule'' (SLPJ, p.~88) [which really {\em
 un}mixes the equations], producing a list of equation-info
 blocks, each block having as its first column patterns compatible with each other.
 
+
+Note [Grouping equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Given a bunch of equations, `groupEquations` makes groups of consecutive equations,
+in which the first patern of each member of a group shares the same `PatGroup`
+category.
+   groupEquations :: [EquationInfoNE] -> [NonEmpty (PatGroup, EquationInfoNE)]
+Generally, in each NonEmpty (PatGroup, EquationInfoNE) element of the result list,
+all the PatGroup's will be the same (e.g. all PgCon or all PgAny). But see (GE1)
+for an exception.
+
+We will match each group in turn, with failure falling through into the
+next group.  For example
+   f x           0 = ...  -- (E1)
+   f !y          1 = ...  -- (E2)
+   f y           2 = ...  -- (E3)
+   f (Just True) _ = ...  -- (E4)
+   f Nothing     _ = ...  -- (E5)
+   f x           4 = ...  -- (E6)
+   f _           5 = ...  -- (E7)
+
+The initial groups are
+   [E1]
+   [E2,E3, .. E7]
+because the bang dominates all the the equations that follow; see (GE1) below.   Once we
+get inside the bang we'll again do a `groupEquations` and get groups
+   [E2,E3]   -- PgAny
+   [E4,E5]   -- PgCon
+   [E6,E7]   -- PgAny
+
+Wrinkles
+
+(GE1) A bang pattern captures all the equations that follow.  For example, given
+    g !x   (p,True)  = ...(E1)...
+    g x    (p,False) = ...(E2)...
+    g True v         = ...(E3)...
+  we want to get the (p,True) and (p,False) patterns in a single group so we can share
+  the matching on the pair, and we can't do that if we make two groups for the top
+  level match.  See #27862.  So we want these groups:
+
+       Group 1:   !x (p,True)  -> ..E1..
+                  x  (p,False) -> ..E2..
+
+       Group 2:   True v       -> ..E3..
+
+  A consequence is that in a group with a `PgBang` category, such as Group 1 above,
+  the second and subsequent equations may not be headed with a bang-pattern; indeed
+  their PatGroup classifiers may differ from each other.  Hence in `matchBangs`, the
+  function `getBangPat` is not surprised to see a non-bang pattern.
+
+(GE2) Overloaded literals: see Note [Grouping overloaded literal patterns]
 -}
 
 match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
@@ -176,17 +230,25 @@ match [] ty eqns = maybe (assertPprPanic (ppr ty)) combineEqnRhss $ nonEmpty eqn
 match (v:vs) ty eqns    -- Eqns can be empty, but each equation is nonempty
   = assertPpr (all (isInternalName . idName . matchId) vars) (ppr vars) $
     do  { dflags <- getDynFlags
+
+        -- Tidy the first pattern, to remove unnecessary diversity,
+        -- generating auxiliary bindings if necessary
+        -- See Note [Tidying patterns]
         ; let platform = targetPlatform dflags
-                -- Tidy the first pattern, generating
-                -- auxiliary bindings if necessary
         ; (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
-                -- Group the equations and match each group in turn
-        ; let grouped = groupEquations platform tidy_eqns
 
-         -- print the view patterns that are commoned up to help debug
-        ; whenDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
+        -- Group the equations and match each group in turn
+        -- See Note [Grouping equations]
+        ; let grouped ::  [NonEmpty (PatGroup, EquationInfoNE)]
+              grouped = groupEquations platform tidy_eqns
 
+         -- Print the view patterns that are commoned up to help debug
+        ; whenDOptM Opt_D_dump_view_pattern_commoning (debugViewPats grouped)
+
+        -- Match each group separately
         ; match_results <- match_groups grouped
+
+        -- And combine the results
         ; return $ foldr (.) id aux_binds <$>
             foldr1 combineMatchResults match_results
         }
@@ -197,10 +259,11 @@ match (v:vs) ty eqns    -- Eqns can be empty, but each equation is nonempty
     dropGroup = fmap snd
 
     match_groups :: [NonEmpty (PatGroup,EquationInfoNE)] -> DsM (NonEmpty (MatchResult CoreExpr))
-    match_groups [] = matchEmpty v ty
+    match_groups []     = matchEmpty v ty
     match_groups (g:gs) = mapM match_group $ g :| gs
 
     match_group :: NonEmpty (PatGroup,EquationInfoNE) -> DsM (MatchResult CoreExpr)
+    -- See Note [Grouping equations]
     match_group eqns@((group,_) :| _)
         = case group of
             PgCon {}  -> matchConFamily  vars ty (ne $ subGroupUniq [(c,e) | (PgCon c, e) <- eqns'])
@@ -218,19 +281,23 @@ match (v:vs) ty eqns    -- Eqns can be empty, but each equation is nonempty
               Just nel -> nel
               Nothing -> pprPanic "match match_group" $ text "Empty result should be impossible since input was non-empty"
 
-    -- FIXME: we should also warn about view patterns that should be
-    -- commoned up but are not
 
-    -- print some stuff to see what's getting grouped
-    -- use -dppr-debug to see the resolution of overloaded literals
-    debug eqns =
-        let gs = map (\group -> foldr (\ (p,_) -> \acc ->
-                                           case p of PgView e _ -> e:acc
-                                                     _ -> acc) [] group) eqns
-            maybeWarn [] = return ()
-            maybeWarn l  = diagnosticDs (DsAggregatedViewExpressions l)
-        in
-          maybeWarn $ filter (not . null) gs
+debugViewPats :: [NonEmpty (PatGroup, EquationInfoNE)] -> DsM ()
+-- print some stuff to see what's getting grouped
+-- use -dppr-debug to see the resolution of overloaded literals
+--
+-- FIXME: we should also warn about view patterns that should be
+-- commoned up but are not
+debugViewPats eqns
+  | null gs   = return ()
+  | otherwise = diagnosticDs (DsAggregatedViewExpressions gs)
+  where
+    gs :: [[LHsExpr GhcTc]]
+    gs = mapMaybe gather_views eqns
+
+    gather_views :: NonEmpty (PatGroup, EquationInfoNE) -> Maybe [LHsExpr GhcTc]
+    gather_views ((PgView e _, _) :| vs) = Just (e : [ e' | (PgView e' _, _) <- vs ])
+    gather_views _                       = Nothing
 
 matchEmpty :: MatchId -> Type -> DsM (NonEmpty (MatchResult CoreExpr))
 -- See Note [Empty case alternatives]
@@ -246,6 +313,7 @@ matchVariables :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (Ma
 matchVariables (_ :| vars) ty eqns = match vars ty $ NE.toList $ shiftEqns eqns
 
 matchBangs :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
+-- See (GE1) in Note [Grouping equations]
 matchBangs (var :| vars) ty eqns
   = do  { match_result <- match (var:vars) ty $ NE.toList $
             decomposeFirstPat getBangPat <$> eqns
@@ -290,13 +358,20 @@ decomposeFirstPat :: (Pat GhcTc -> Pat GhcTc) -> EquationInfoNE -> EquationInfoN
 decomposeFirstPat extract eqn@(EqnMatch { eqn_pat = pat }) = eqn{eqn_pat = fmap extract pat}
 decomposeFirstPat _ (EqnDone {}) = panic "decomposeFirstPat"
 
-getCoPat, getBangPat, getViewPat :: Pat GhcTc -> Pat GhcTc
+getCoPat :: Pat GhcTc -> Pat GhcTc
 getCoPat (XPat (CoPat _ pat _)) = pat
 getCoPat _                   = panic "getCoPat"
-getBangPat (BangPat _ pat  ) = unLoc pat
-getBangPat _                 = panic "getBangPat"
+
+getViewPat :: Pat GhcTc -> Pat GhcTc
 getViewPat (TcViewPat _ pat) = pat
 getViewPat _                 = panic "getViewPat"
+
+getBangPat :: Pat GhcTc -> Pat GhcTc
+-- See (GE1) in Note [Grouping equations] for why it's expected
+-- that `getBangPat` may return a non-bang pattern.
+getBangPat (BangPat _ pat  ) = unLoc pat
+getBangPat pat               = pat
+
 
 -- | Use this pattern synonym to match on a 'ViewPat'.
 --
@@ -334,41 +409,46 @@ See also the "lifted case" discussion in Note [Case elimination] in GHC.Core.Opt
 *                                                                      *
 ************************************************************************
 
-Tidy up the leftmost pattern in an @EquationInfo@, given the variable @v@
-which will be scrutinised.
-
-This makes desugaring the pattern match simpler by transforming some of
-the patterns to simpler forms. (Tuples to Constructor Patterns)
+Note [Tidying patterns]
+~~~~~~~~~~~~~~~~~~~~~~~
+`tidyEqninfo` tidies up the leftmost pattern in an `EquationInfo`, given the
+variable `v` which will be scrutinised. This makes desugaring the pattern match
+simpler by transforming some of the patterns to simpler forms. (Tuples to
+Constructor Patterns)
 
 Among other things in the resulting Pattern:
 * Variables and irrefutable(lazy) patterns are replaced by Wildcards
 * As patterns are replaced by the patterns they wrap.
 
 The bindings created by the above patterns are put into the returned wrapper
-instead.
-
-This means a definition of the form:
+instead.  This means a definition of the form:
   f x = rhs
 when called with v get's desugared to the equivalent of:
   let x = v
   in
   f _ = rhs
 
-The same principle holds for as patterns (@) and
-irrefutable/lazy patterns (~).
-In the case of irrefutable patterns the irrefutable pattern is pushed into
-the binding.
+The same principle holds for as patterns (@) and irrefutable/lazy patterns (~).  In
+the case of irrefutable patterns the irrefutable pattern is pushed into the binding.
 
-Pattern Constructors which only represent syntactic sugar are converted into
-their desugared representation.
-This usually means converting them to Constructor patterns but for some
-depends on enabled extensions. (Eg OverloadedLists)
+Pattern Constructors which only represent syntactic sugar are converted into their
+desugared representation.  This usually means converting them to Constructor
+patterns but for some depends on enabled extensions. (Eg OverloadedLists)
 
 GHC also tries to convert overloaded Literals into regular ones.
 
 The result of this tidying is that the column of patterns will include
 only these which can be assigned a PatternGroup (see patGroup).
 
+(TP1) We may call `tidyPat` on the same pattern more than once, principally because
+   of the treatment of bang-patterns; see (GE1) in Note [Grouping equations].
+   So (slightly hackily) we wrap tidied patterns in GeneratedSrcSpan to signal this.
+   See `wrapGenSpan` in `tidyLPat`.
+
+(TP2) Tidying is a convenient place to warn about overflowed literal values. We
+  can't do it in the typechecker because the types are not settled.  See the
+  `tidyPat1` equations for `LitPat`, `NPat`, `NPlusKPat`.  But we only want to
+  want /once/; hence the `unlessInGenCode` check, in turn relying on (TP1).
 -}
 
 tidyEqnInfo :: MatchId -> EquationInfo
@@ -383,14 +463,19 @@ tidyEqnInfo :: MatchId -> EquationInfo
 
 tidyEqnInfo _ eqn@(EqnDone {}) = return (idDsWrapper, eqn)
 
-tidyEqnInfo v eqn@(EqnMatch { eqn_pat = p@(L loc _) }) = do
-  (wrap, pat') <- tidyLPat v p
-  return (wrap, eqn{eqn_pat = L loc pat' })
+tidyEqnInfo v eqn@(EqnMatch { eqn_pat = pat })
+  = do { (wrap, pat') <- tidyLPat v pat
+         -- Always return a patten wrapped in `generatedSrcSpan`,
+         -- which simply records that this pattern has been tidied,
+         -- and perhaps transformed from its original source form
+         -- See (TP1) in Note [Tidying patterns]
+       ; return (wrap, eqn{ eqn_pat =  wrapGenSpan pat' }) }
 
 tidyLPat :: MatchId -> LPat GhcTc -> DsM (DsWrapper, Pat GhcTc)
-tidyLPat v (L loc pat) = putSrcSpanDsA loc (tidy1 v pat)
+tidyLPat v (L loc pat) = tidy1 v loc pat
 
 tidy1 :: MatchId             -- The scrutinee
+      -> SrcSpanAnnA
       -> Pat GhcTc           -- The pattern against which it is to be matched
       -> DsM (DsWrapper,     -- Extra bindings to do before the match
               Pat GhcTc)     -- Equivalent pattern
@@ -401,21 +486,20 @@ tidy1 :: MatchId             -- The scrutinee
 -- It eliminates many pattern forms (as-patterns, variable patterns,
 -- list patterns, etc) and returns any created bindings in the wrapper.
 
-tidy1 v (ParPat _ pat)        = tidyLPat v pat
-tidy1 v (SigPat _ pat _)      = tidyLPat v pat
-tidy1 _ (WildPat ty)          = return (idDsWrapper, WildPat ty)
-tidy1 v (BangPat _ (L l p))   = putSrcSpanDsA l $ tidy_bang_pat v l p
-tidy1 v (ModifiedPat _ _ pat) = tidyLPat v pat
+tidy1 v _ (ParPat _ pat)        = tidyLPat v pat
+tidy1 v _ (SigPat _ pat _)      = tidyLPat v pat
+tidy1 _ _ (WildPat ty)          = return (idDsWrapper, WildPat ty)
+tidy1 v _ (BangPat _ (L l p))   = tidy_bang_pat v l p
+tidy1 v _ (ModifiedPat _ _ pat) = tidyLPat v pat
 
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
-tidy1 v (VarPat _ (L _ var))
+tidy1 v _ (VarPat _ (L _ var))
   = return (bindMatchId var v, WildPat (idType var))
 
         -- case v of { x@p -> mr[] }
         -- = case v of { p -> let x=v in mr[] }
-tidy1 v (AsPat _ (L _ var) pat)
-
+tidy1 v _ (AsPat _ (L _ var) pat)
   = do  { (wrap, pat') <- tidyLPat v pat
         ; return (bindMatchId var v . wrap, pat') }
 
@@ -430,28 +514,30 @@ tidy1 v (AsPat _ (L _ var) pat)
     The case expr for v_i is just: match [v] [(p, [], \ x -> Var v_i)] any_expr
 -}
 
-tidy1 v (LazyPat _ pat)
+tidy1 v loc (LazyPat _ lpat)
     -- This is a convenient place to check for unlifted types under a lazy pattern.
     -- Doing this check during type-checking is unsatisfactory because we may
     -- not fully know the zonked types yet. We sure do here.
-  = putSrcSpanDs (getLocA pat) $
-    do  { let unlifted_bndrs = filter (isUnliftedType . idType) (collectPatBinders CollNoDictBinders pat)
-            -- NB: the binders can't be representation-polymorphic, so we're OK to call isUnliftedType
+  = putSrcSpanDsA loc $
+    do  { let unlifted_bndrs = filter (isUnliftedType . idType) $
+                               collectPatBinders CollNoDictBinders lpat
+            -- NB: the binders can't be representation-polymorphic,
+            --     so we're OK to call isUnliftedType
         ; unless (null unlifted_bndrs) $
           diagnosticDs (DsLazyPatCantBindVarsOfUnliftedType unlifted_bndrs)
 
-        ; (_,sel_prs) <- mkSelectorBinds [] pat LazyPatCtx (matchIdExpr v)
+        ; (_,sel_prs) <- mkSelectorBinds [] lpat LazyPatCtx (matchIdExpr v)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
         ; return (mkCoreLets sel_binds, WildPat (matchIdType v)) }
 
-tidy1 _ (ListPat ty pats)
+tidy1 _ _ (ListPat ty pats)
   = return (idDsWrapper, unLoc list_ConPat)
   where
     list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] [ty])
                         (mkNilPat ty)
                         pats
 
-tidy1 _ (TuplePat tys pats boxity)
+tidy1 _ _ (TuplePat tys pats boxity)
   = return (idDsWrapper, unLoc tuple_ConPat)
   where
     arity = length pats
@@ -461,45 +547,46 @@ tidy1 _ (TuplePat tys pats boxity)
              Boxed   -> tys
            -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
 
-tidy1 _ (SumPat tys pat alt arity)
+tidy1 _ _ (SumPat tys pat alt arity)
   = return (idDsWrapper, unLoc sum_ConPat)
   where
     sum_ConPat = mkPrefixConPat (sumDataCon alt arity) [pat] (map getRuntimeRep tys ++ tys)
                  -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
-tidy1 _ (LitPat _ lit)
-  = do { in_gen <- inGeneratedCodeDs;
-         unless in_gen $
-           warnAboutOverflowedLit lit
+tidy1 _ loc (LitPat _ lit)
+  = do { unlessInGenCode loc $ warnAboutOverflowedLit lit
+            -- Overflow warnings: see (TP2) in Note [Tidying patterns]
        ; return (idDsWrapper, tidyLitPat lit) }
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 _ (NPat ty (L _ lit@OverLit { ol_val = v }) mb_neg eq)
-  = do { in_gen <- inGeneratedCodeDs;
-         unless in_gen $
-           let lit' | Just _ <- mb_neg = lit{ ol_val = negateOverLitVal v }
-                    | otherwise = lit
-           in warnAboutOverflowedOverLit lit'
+tidy1 _ loc (NPat ty (L _ lit@OverLit { ol_val = v }) mb_neg eq)
+  = do { unlessInGenCode loc $ warnAboutOverflowedOverLit lit'
+            -- Overflow warnings: see (TP2) in Note [Tidying patterns]
        ; return (idDsWrapper, tidyNPat lit mb_neg eq ty) }
+  where
+    lit' | Just _ <- mb_neg = lit{ ol_val = negateOverLitVal v }
+         | otherwise        = lit
 
 -- NPlusKPat: we may want to warn about the literals
-tidy1 _ n@(NPlusKPat _ _ (L _ lit1) lit2 _ _)
-  = do { in_gen <- inGeneratedCodeDs;
-         unless in_gen $ do
-           warnAboutOverflowedOverLit lit1
-           warnAboutOverflowedOverLit lit2
+tidy1 _ loc n@(NPlusKPat _ _ (L _ lit1) lit2 _ _)
+  = do { unlessInGenCode loc $
+         do { warnAboutOverflowedOverLit lit1
+            ; warnAboutOverflowedOverLit lit2 }
+            -- Overflow warnings: see (TP2) in Note [Tidying patterns]
        ; return (idDsWrapper, n) }
 
-tidy1 _ (OrPat ty lpats)
+tidy1 _ _ (OrPat ty lpats)
   -- See Note [Implementation of OrPatterns]. We desugar
   --   (1; 2; 3)
   -- to
   --   ((\case 1 -> True; 2 -> True; 3 -> True; _ -> False) -> True)
-  = return (idDsWrapper, ViewPat ty (noLocA (HsLam noAnn LamCase mg)) (mkPrefixConPat trueDataCon [] []))
+  = return (idDsWrapper, ViewPat ty (noLocA (HsLam noAnn LamCase mg))
+                                    (mkPrefixConPat trueDataCon [] []))
   where
     mg :: MatchGroup GhcTc (LHsExpr GhcTc)
-    mg = MG mgtc (noLocA (map match_true (NE.toList lpats) ++ [match_false (noLocA $ WildPat ty)]))
+    mg = MG mgtc (noLocA (map match_true (NE.toList lpats)
+                          ++ [match_false (noLocA $ WildPat ty)]))
     mgtc = MatchGroupTc
        { mg_arg_tys = [tymult ty]
        , mg_res_ty = boolTy
@@ -520,31 +607,38 @@ tidy1 _ (OrPat ty lpats)
     single_grhs e = GRHSs emptyComments [noLocA $ GRHS noAnn [] e] (EmptyLocalBinds noExtField)
 
 -- Everything else goes through unchanged...
-tidy1 _ non_interesting_pat
+tidy1 _ _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
 
 --------------------
 tidy_bang_pat :: MatchId -> SrcSpanAnnA -> Pat GhcTc
               -> DsM (DsWrapper, Pat GhcTc)
 
--- Discard par/sig under a bang
-tidy_bang_pat v _ (ParPat _ (L l p))   = putSrcSpanDsA l $ tidy_bang_pat v l p
-tidy_bang_pat v _ (SigPat _ (L l p) _) = putSrcSpanDsA l $ tidy_bang_pat v l p
-
--- Push the bang-pattern inwards, in the hope that
--- it may disappear next time
+-- Push the bang-pattern inwards, in the hope that it may disappear next time
+--   AsPat  !(x@p)     -->  x@(!p)
+--   CoPat  !(p |> co) -->  (!p) |> co
+--   OrPat  !(p || q)  -->  (!p || !q)
 tidy_bang_pat v l (AsPat x v' p)
-  = tidy1 v (AsPat x v' (L l (BangPat noExtField p)))
+  = tidy1 v l (AsPat x v' (L l (BangPat noExtField p)))
 tidy_bang_pat v l (XPat (CoPat w p t))
-  = tidy1 v (XPat $ CoPat w (BangPat noExtField (L l p)) t)
+  = tidy1 v l (XPat $ CoPat w (BangPat noExtField (L l p)) t)
 tidy_bang_pat v l (OrPat x (p:|ps)) -- push bang into first pat alt
-  = tidy1 v (OrPat x (L l (BangPat noExtField p) :| ps))
+  = tidy1 v l (OrPat x (L l (BangPat noExtField p) :| ps))
+
+-- Discard par/sig/bang under a bang
+--    !(p)      -->   !p
+--    !(p::ty)  -->   !p
+--    !(!p)     -->   !p
+tidy_bang_pat v _ (ParPat _ (L l p))   = tidy_bang_pat v l p
+tidy_bang_pat v _ (SigPat _ (L l p) _) = tidy_bang_pat v l p
+tidy_bang_pat v _ (BangPat _ (L l p))  = tidy_bang_pat v l p
 
 -- Discard bang around strict pattern
-tidy_bang_pat v _ p@(LitPat {})    = tidy1 v p
-tidy_bang_pat v _ p@(ListPat {})   = tidy1 v p
-tidy_bang_pat v _ p@(TuplePat {})  = tidy1 v p
-tidy_bang_pat v _ p@(SumPat {})    = tidy1 v p
+--    e.g.  !(Just p)  -->  Just p
+tidy_bang_pat v l p@(LitPat {})    = tidy1 v l p
+tidy_bang_pat v l p@(ListPat {})   = tidy1 v l p
+tidy_bang_pat v l p@(TuplePat {})  = tidy1 v l p
+tidy_bang_pat v l p@(SumPat {})    = tidy1 v l p
 
 -- Data/newtype constructors
 tidy_bang_pat v l p@(ConPat { pat_con = L _ (RealDataCon dc)
@@ -554,12 +648,13 @@ tidy_bang_pat v l p@(ConPat { pat_con = L _ (RealDataCon dc)
                               }
                             })
   -- Newtypes: push bang inwards (#9844)
-  =
-    if isNewTyCon (dataConTyCon dc)
-      then tidy1 v (p { pat_args = push_bang_into_newtype_arg l (scaledThing ty) args })
-      else tidy1 v p  -- Data types: discard the bang
-    where
-      (ty:_) = dataConInstArgTys dc arg_tys
+  | isNewTyCon (dataConTyCon dc)
+  , (ty:_) <- dataConInstArgTys dc arg_tys
+  = tidy1 v l (p { pat_args = push_bang_into_newtype_arg l (scaledThing ty) args })
+
+  -- Discard bang around non-newtype data constructors
+  | otherwise
+  = tidy1 v l p
 
 -------------------
 -- Default case, leave the bang there:
@@ -1033,14 +1128,25 @@ for overloaded strings.
 groupEquations :: Platform -> [EquationInfoNE] -> [NonEmpty (PatGroup, EquationInfoNE)]
 -- If the result is of form [g1, g2, g3],
 -- (a) all the (pg,eq) pairs in g1 have the same pg
+--     with the exception documented in (GE1) of Note [Grouping equations]
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
 groupEquations platform eqns
-  = NE.groupBy same_gp $ [(patGroup platform (firstPat eqn), eqn) | eqn <- eqns]
-  -- comprehension on NonEmpty
+  = group_eqns $ map add_gp eqns
   where
-    same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
-    (pg1,_) `same_gp` (pg2,_) = pg1 `sameGroup` pg2
+    add_gp :: EquationInfoNE -> (PatGroup, EquationInfoNE)
+    add_gp eqn = (patGroup platform (firstPat eqn), eqn)
+
+    group_eqns :: [(PatGroup,EquationInfoNE)] -> [NonEmpty (PatGroup, EquationInfoNE)]
+    -- See Note [Grouping equations]
+    group_eqns [] = []
+    group_eqns ((PgBang,e) : pges) = [ (PgBang,e) :| pges ]  -- See (GE1)
+    group_eqns ((pg1,e)    : pges) = ((pg1,e) :| pges1) : group_eqns pges2
+      where
+        (pges1, pges2) = span same_gp pges
+
+        same_gp :: (PatGroup,EquationInfo) -> Bool
+        same_gp (pg2,_) = pg1 `sameGroup` pg2
 
 -- TODO Make subGroup1 using a NonEmptyMap
 subGroup :: (m -> [NonEmpty EquationInfo]) -- Map.elems

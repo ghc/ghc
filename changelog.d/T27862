@@ -1,0 +1,8 @@
+section: compiler
+issues: #27862
+mrs: !16899
+synopsis:
+  Improve desugaring for pattern matching involving bang patterns.
+description:
+  We were generating poor code for pattern matching that used bang-patterns.
+  There should be no user-visible changes except more efficient code.
