@@ -674,7 +674,7 @@ findBackEdges root cfg =
 optimizeCFG :: Bool -> Weights -> RawCmmDecl -> CFG -> CFG
 optimizeCFG _ _ (CmmData {}) cfg = cfg
 optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg =
-  (if doStaticPred then staticPredCfg (g_entry graph) else id) $
+  (if doStaticPred then staticPredCfg (tagRegisters graph) (g_entry graph) else id) $
     optHsPatterns weights proc $ cfg
 
 -- | Modify branch weights based on educated guess on
@@ -761,11 +761,11 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
           | otherwise = False
 
 -- | Convert block-local branch weights to global weights.
-staticPredCfg :: BlockId -> CFG -> CFG
-staticPredCfg entry cfg = cfg'
+staticPredCfg :: S.Set LocalReg -> BlockId -> CFG -> CFG
+staticPredCfg tags entry cfg = cfg'
   where
     (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-}
-                             mkGlobalWeights entry cfg
+                             mkGlobalWeightsWith tags entry cfg
     cfg' = {-# SCC rewriteEdges #-}
             mapFoldlWithKey
                 (\cfg from m ->
@@ -939,10 +939,19 @@ revPostorderFrom cfg root =
 --   For blocks it's the expected number of executions and
 --   for edges is the number of traversals.
 
-{-# NOINLINE mkGlobalWeights #-}
-{-# SCC mkGlobalWeights #-}
 mkGlobalWeights :: HasDebugCallStack => BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
-mkGlobalWeights root localCfg
+mkGlobalWeights = mkGlobalWeightsWith S.empty
+
+-- No pragma: with NOINLINE, which master had on mkGlobalWeights, whose body
+-- this is, the compiler's code differed only in this not being inlined, and
+-- its instructions and allocation moved by under 0.001% compiling T3294, T783,
+-- T9961, T12707, !16269's CmmDiamondChain and nofib's puzzle at -O0, -O and
+-- -O2, on GHC 10.1.20261108.
+-- | 'mkGlobalWeights', told which local registers hold a constructor tag
+-- (see 'tagRegisters').
+{-# SCC mkGlobalWeightsWith #-}
+mkGlobalWeightsWith :: HasDebugCallStack => S.Set LocalReg -> BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
+mkGlobalWeightsWith tags root localCfg
   | null localCfg = panic "Error - Empty CFG"
   | otherwise
   = (blockFreqs', edgeFreqs')
@@ -962,7 +971,7 @@ mkGlobalWeights root localCfg
     backEdges' = map (bimap toVertex toVertex) backedges
     bodies' = map calcBody bodies
 
-    estimatedCfg = staticBranchPrediction root loopResults localCfg
+    estimatedCfg = staticBranchPrediction tags root loopResults localCfg
     -- Normalize the weights to probabilities and apply heuristics
     nodeProbs = cfgEdgeProbabilities estimatedCfg toVertex
 
@@ -1014,6 +1023,32 @@ TODO:
   - Requires refactoring `loopInfo` to work on both, Cmm Graphs and the backend CFG.
 -}
 
+{- Note [Static prediction of tag tests]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ohPredicts predicts that a comparison with a constant comes out unequal,
+giving the equal side 0.3. A case on a pointer tag compares the tag with a
+constructor's, as in `(x & 7) == 1`, and tags follow the order in which a type
+declares its constructors (Note [Constructor tag allocation] in GHC.Core.TyCon),
+so whether the equal side is the likely one depends on the type, which the
+CFG does not record; and so it does where a type has more constructors than a
+pointer tag tells apart, the case comparing the tag its constructor's info table
+holds (Note [Tagging big families] in GHC.StgToCmm.Expr). A list declares []
+first, so in a loop over a list the test for tag 1 is the loop's exit, and the
+prediction is right. The trees of Data.Map, Data.Set and Data.IntMap declare
+Bin first, so in a lookup the test for tag 1 is the step down the tree, and the
+prediction calls the side that stays in the loop the unlikely one. ohPredicts
+matches an equality, but an inequality only where it tests neither bits under
+a mask nor a constructor tag, one read from an info table, an unboxed sum's or
+one in a local register every assignment to which is a tag, and the control-flow
+optimisation may have inverted a test so that its true side falls through (Note
+[Invert Cmm conditionals] in GHC.Cmm.ContFlowOpt), so whether a tag test is
+predicted at all depends on how it came out spelt.
+
+Telling the two apart needs the constructors' numbers of arguments, or which one
+recurses, carried down to the CFG, which takes many changes, so the heuristic
+stays as it is, lists being common.
+-}
+
 -- | Combination of target node id and information about the branch
 --   we are looking at.
 type TargetNodeInfo = (BlockId, EdgeInfo)
@@ -1023,8 +1058,8 @@ type TargetNodeInfo = (BlockId, EdgeInfo)
 -- See Note [Static Branch Prediction]
 -- TODO: This should be combined with optimizeCFG
 {-# SCC staticBranchPrediction #-}
-staticBranchPrediction :: BlockId -> LoopInfo -> CFG -> CFG
-staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
+staticBranchPrediction :: S.Set LocalReg -> BlockId -> LoopInfo -> CFG -> CFG
+staticBranchPrediction tags _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
     -- pprTrace "staticEstimatesOn" (ppr (cfg)) $
     foldl' update cfg nodes
   where
@@ -1138,18 +1173,34 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
                 s1Level = mapLookup s1 loopLevels
                 s2Level = mapLookup s2 loopLevels
 
-        -- Comparing to a constant is unlikely to be equal.
+        -- Comparing to a constant is unlikely to be equal, whichever way the
+        -- comparison is spelt: the control-flow optimisation may have turned
+        -- an equality into an inequality (Note [Invert Cmm conditionals]).
+        -- Wrong for a tag test where the likely constructor is declared first,
+        -- so an inequality on bits under a mask, a tag's or a bitmap's, is left
+        -- out, as is one on a constructor tag read from an info table, an
+        -- unboxed sum's tag or a register holding a tag: see Note [Static
+        -- prediction of tag tests].
         ohPredicts (s1,_s2)
             | CmmSource { trans_cmmNode = src1 } <- getTransitionSource node (fst s1) cfg
             , CmmCondBranch cond ltrue _lfalse likely <- src1
             , likely == Nothing
             , CmmMachOp mop args <- cond
-            , MO_Eq {} <- mop
+            , Just trueProb <- case mop of
+                                 MO_Eq {} -> Just 0.3
+                                 MO_Ne {} | any isLit args
+                                          , not (any isMask args)
+                                          , not (any isConTag args) -> Just 0.7
+                                 _        -> Nothing
             , not (null [x | x@CmmLit{} <- args])
-            = if fst s1 == ltrue then Just 0.3 else Just 0.7
+            = if fst s1 == ltrue then Just trueProb else Just (1 - trueProb)
 
             | otherwise
             = Nothing
+        isConTag (CmmReg (CmmLocal r)) = r `S.member` tags
+        isConTag e = isConTagExpr e
+        isLit CmmLit{} = True
+        isLit _ = False
 
         -- TODO: These are all the other heuristics from the paper.
         -- Not all will apply, for now we just stub them out as Nothing.
@@ -1159,6 +1210,59 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         chPredicts = const Nothing
         shPredicts = const Nothing
         rhPredicts = const Nothing
+
+-- | Bits under a mask, a tag's or a bitmap's.
+isMask :: CmmExpr -> Bool
+isMask (CmmMachOp (MO_And _) _) = True
+isMask _ = False
+
+-- | A constructor tag read from an info table, a half word just below the info
+-- pointer (Note [Tagging big families] in GHC.StgToCmm.Expr), widened or not;
+-- or an unboxed sum's tag, narrowed to a byte from the register it is returned
+-- in.
+isConTagExpr :: CmmExpr -> Bool
+isConTagExpr (CmmMachOp (MO_UU_Conv _ _) [e]) = isInfoTag e
+isConTagExpr (CmmMachOp (MO_XX_Conv _ W8) [CmmReg _]) = True
+isConTagExpr e = isInfoTag e
+
+isInfoTag :: CmmExpr -> Bool
+isInfoTag (CmmLoad addr ty _)
+  | w <- typeWidth ty, w == W32 || w == W16
+  = offsetOf addr == Just (negate (toInteger (widthInBytes w)))
+  where
+    offsetOf (CmmMachOp (MO_Add _) [_, CmmLit (CmmInt n _)]) = Just n
+    offsetOf (CmmMachOp (MO_Sub _) [_, CmmLit (CmmInt n _)]) = Just (negate n)
+    offsetOf (CmmRegOff _ n) = Just (toInteger n)
+    offsetOf _ = Nothing
+isInfoTag _ = False
+
+-- | The local registers every assignment to which is a constructor tag:
+-- a pointer's bits under a mask ('isMask'), one less than a tag
+-- register (dataToTag#'s pointer side), 'isConTagExpr', or a copy of a tag
+-- register.  A switch on a tag that is not a register gets one of these
+-- (GHC.Cmm.Switch.Implement), as does dataToTag#'s join.
+tagRegisters :: CmmGraph -> S.Set LocalReg
+tagRegisters graph = M.keysSet (go (foldl' (flip M.delete) cands untagged))
+  where
+    assigns =
+      [ (r, e) | b <- toBlockList graph
+               , let (_, mid, _) = blockSplit b
+               , CmmAssign (CmmLocal r) e <- blockToList mid ]
+    -- the registers some assignment to which is a tag if every register holds
+    -- one, to those assignments' right-hand sides, and those of them assigned
+    -- an expression that is not
+    cands = M.fromListWith (++)
+      [ (r, [e]) | (r, e) <- assigns, isTagExpr (const True) e ]
+    untagged = [ r | (r, e) <- assigns, r `M.member` cands
+                   , not (isTagExpr (const True) e) ]
+    go cs | M.size cs' == M.size cs = cs
+          | otherwise               = go cs'
+      where cs' = M.filter (all (isTagExpr (`M.member` cs))) cs
+    isTagExpr isTag e = isMask e || case e of
+      CmmMachOp (MO_Sub _) [CmmReg (CmmLocal r), CmmLit (CmmInt 1 _)] -> isTag r
+      CmmMachOp (MO_Add _) [CmmReg (CmmLocal r), CmmLit (CmmInt (-1) _)] -> isTag r
+      CmmReg (CmmLocal r) -> isTag r
+      _ -> isConTagExpr e
 
 -- We normalize all edge weights as probabilities between 0 and 1.
 -- Ignoring rounding errors all outgoing edges sum up to 1.
