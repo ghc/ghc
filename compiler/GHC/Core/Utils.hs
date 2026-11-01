@@ -3295,17 +3295,16 @@ Now
    the caller guarantees to pass an EPT argument (see Note [EPT enforcement] in
    GHC.Core.Stg.EnforceEpt)
 
- * The code generator will discard that "extra eval" case, because $wfoo is
-   CBV.
+ * The code generator will discard that "extra eval" case, because $wfoo is CBV.
 
 See also Note [CBV Function Ids: overview].
 
-In tihs case the argument is known to be properly tagged at the call site so there is
+In this case the argument is known to be properly tagged at the call site so there is
 no additional work for the caller and the worker can be more efficient since it can
 assume the presence of a tag.
 
 This is especially true for recursive functions like this:
-    -- myPred expect it's argument properly tagged
+    -- myPred expects its argument properly tagged
     -- The EnforceEPT pass has made it a CBV function
     myPred !x = ...
 
@@ -3414,16 +3413,17 @@ This note deals with the second part.
 There are multiple reasons why we might not want to insert a seq in the rhs to
 strictify a functions argument:
 
-1) The argument doesn't exist at runtime.
-   For zero width types (like Types) there is no benefit as we don't operate on them
-   at runtime at all. This includes things like void#, coercions and state tokens.
+(WIS1) The argument doesn't exist at runtime: types are erased.
 
-2) The argument is a unlifted type.
+(WIS2) For zero width types there is no benefit as we don't operate on them at
+   runtime at all. This includes things like void#, coercions and state tokens.
+
+(WIS3) The argument is a unlifted type.
    If the argument is a unlifted type the calling convention already is explicitly
    cbv. This means inserting a seq on this argument wouldn't do anything as the seq
    would be a no-op *and* it wouldn't affect the calling convention.
 
-3) The argument is absent.
+(WIS4) The argument is absent.
    If the argument is absent in the body there is no advantage to it being passed as
    cbv to the function. The function won't ever look at it so we don't save any work.
 
@@ -3445,7 +3445,7 @@ strictify a functions argument:
    Note [Absent fillers] has an example of this. However this is so rare it's not worth
    caring about here.
 
-5) Functions
+(WIS5) Functions
    Functions are tricky (see Note [TagInfo of functions] in EnforceEpt).
    But the gist of it even if we make a higher order function argument strict
    we can't avoid the tag check when it's used later in the body.
@@ -3453,7 +3453,7 @@ strictify a functions argument:
 
 Wrinkles:
 
-(WIS1) You might have thought that we can omit the eval if the argument is used
+(WIS6) You might have thought that we can omit the eval if the argument is used
    strictly demanded in the body.  But you'd be wrong. Consider this code:
           data T = MkT ![Int]
           f t = case t of MkT xs{Dmd=STR} -> reverse xs
@@ -3509,25 +3509,30 @@ Wrinkles:
 wantCbvForId :: Var -> Bool
 wantCbvForId v
   -- Must be a runtime var.
-  -- See Note [Which Ids should be strictified] point 1)
-  | isId v
-  , not $ isZeroBitTy ty
+  -- See (WIS1) in Note [Which Ids should be strictified]
+  | not (isRuntimeVar v) = False
+
+  -- Not zero-width value
+  -- See (WIS2) in Note [Which Ids should be strictified]
+  | isZeroBitTy ty = False
+
   -- Unlifted things don't need special measures to be treated as cbv
-  -- See Note [Which Ids should be strictified] point 2)
-  , mightBeLiftedType ty
+  -- See (WIS3) in Note [Which Ids should be strictified]
+  | definitelyUnliftedType ty = False
+
+  -- If the var is absent, don't add a seq
+  -- See (WIS4) in Note [Which Ids should be strictified]
+  | isAbsDmd (idDemandInfo v) = False
+
   -- Functions sometimes get a zero tag so we can't eliminate the tag check.
   -- See Note [TagInfo of functions] in EnforceEpt.
-  -- See Note [Which Ids should be strictified] point 5)
-  , not $ isFunTy ty
-  -- If the var is strict already a seq is redundant.
-  -- See Note [Which Ids should be strictified] point 4)
-  , not (isAbsDmd dmd)
-  = True
-  | otherwise
-  = False
+  -- See (WIS5) in Note [Which Ids should be strictified]
+  | isFunTy ty = False
+
+  -- Finally!  We should add a `seq`
+  | otherwise = True
   where
     ty = idType v
-    dmd = idDemandInfo v
 
 {- *********************************************************************
 *                                                                      *

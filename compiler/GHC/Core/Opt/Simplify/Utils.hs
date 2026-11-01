@@ -1319,43 +1319,6 @@ But this old note is no longer relevant because the specialiser has
 improved: see Note [Account for casts in binding] in
 GHC.Core.Opt.Specialise.  So we seem to have a free choice.
 
-Note [Inlining in gentle mode]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Something is inlined if
-   (i)   the sm_inline flag is on, AND
-   (ii)  the thing has an INLINE pragma, AND
-   (iii) the thing is inlinable in the earliest phase.
-
-Example of why (iii) is important:
-  {-# INLINE [~1] g #-}
-  g = ...
-
-  {-# INLINE f #-}
-  f x = g (g x)
-
-If we were to inline g into f's inlining, then an importing module would
-never be able to do
-        f e --> g (g e) ---> RULE fires
-because the stable unfolding for f has had g inlined into it.
-
-On the other hand, it is bad not to do ANY inlining into an
-stable unfolding, because then recursive knots in instance declarations
-don't get unravelled.
-
-However, *sometimes* SimplGently must do no call-site inlining at all
-(hence sm_inline = False).  Before full laziness we must be careful
-not to inline wrappers, because doing so inhibits floating
-    e.g. ...(case f x of ...)...
-    ==> ...(case (case x of I# x# -> fw x#) of ...)...
-    ==> ...(case x of I# x# -> case fw x# of ...)...
-and now the redex (f x) isn't floatable any more.
-
-The no-inlining thing is also important for Template Haskell.  You might be
-compiling in one-shot mode with -O2; but when TH compiles a splice before
-running it, we don't want to use -O2.  Indeed, we don't want to inline
-anything, because the byte-code interpreter might get confused about
-unboxed tuples and suchlike.
-
 Note [What is active in the RHS of a RULE or unfolding?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have either a RULE or a stable unfolding with an explicit activation:
@@ -1448,7 +1411,7 @@ First, consider the following example
 Now, if that's the ONLY occurrence of f, it might be inlined inside g,
 and thence copied multiple times when g is inlined. HENCE we treat
 any occurrence in a stable unfolding as a multiple occurrence, not a single
-one; see OccurAnal.addRuleUsage.
+one; see Note [Occurrences in stable unfoldings and RULES] in GHC.Core.opt.OccurAnal.
 
 Second, we must be careful when simplifying the RHS that we do not apply RULES
 which are not active over the whole active range of the stable unfolding.
@@ -1477,17 +1440,6 @@ strictness wrapper get activation (ActiveAfter 0).  So the strictness
 wrepper fails the test and won't be inlined into f's stable unfolding. That
 means f can inline, expose the specialised call to g, so the specialisation
 rules can fire.
-
-A note about wrappers
-~~~~~~~~~~~~~~~~~~~~~
-It's also important not to inline a worker back into a wrapper.
-A wrapper looks like
-        wraper = inline_me (\x -> ...worker... )
-Normally, the inline_me prevents the worker getting inlined into
-the wrapper (initially, the worker's only call site!).  But,
-if the wrapper is sure to be called, the strictness analyser will
-mark it 'demanded', so when the RHS is simplified, it'll get an ArgOf
-continuation.
 -}
 
 getUnfoldingInRuleMatch :: SimplEnv -> InScopeEnv
@@ -2195,24 +2147,6 @@ We now eta expand at let-bindings, which is where the payoff comes.
 The most significant thing is that we can do a simple arity analysis
 (in GHC.Core.Opt.Arity.findRhsArity), which we can't do for free-floating lambdas
 
-One useful consequence of not eta-expanding lambdas is this example:
-   genMap :: C a => ...
-   {-# INLINE genMap #-}
-   genMap f xs = ...
-
-   myMap :: D a => ...
-   {-# INLINE myMap #-}
-   myMap = genMap
-
-Notice that 'genMap' should only inline if applied to two arguments.
-In the stable unfolding for myMap we'll have the unfolding
-    (\d -> genMap Int (..d..))
-We do not want to eta-expand to
-    (\d f xs -> genMap Int (..d..) f xs)
-because then 'genMap' will inline, and it really shouldn't: at least
-as far as the programmer is concerned, it's not applied to two
-arguments!
-
 Note [Which RHSs do we eta-expand?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We don't eta-expand:
@@ -2260,6 +2194,24 @@ But note that this won't eta-expand, say
   f = \g -> map g
 Does it matter not eta-expanding such functions?  I'm not sure.  Perhaps
 strictness analysis will have less to bite on?
+
+One useful consequence of not eta-expanding PAPs is this example:
+   genMap :: C a => ...
+   {-# INLINE genMap #-}
+   genMap f xs = ...
+
+   myMap :: D a => ...
+   {-# INLINE myMap #-}
+   myMap = genMap
+
+Notice that 'genMap' should only inline if applied to two arguments.
+In the stable unfolding for myMap we'll have the unfolding
+    (\d -> genMap Int (..d..))
+We do not want to eta-expand to
+    (\d f xs -> genMap Int (..d..) f xs)
+because then 'genMap' will inline, and it really shouldn't: at least
+as far as the programmer is concerned, it's not applied to two
+arguments!
 
 
 ************************************************************************

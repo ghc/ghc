@@ -3345,7 +3345,7 @@ pair_fvs :: (Id, CoreExpr) -> VarSet
 pair_fvs (bndr, rhs) = exprSomeFreeVars interesting rhs
                        `unionVarSet` bndrFreeVars bndr
         -- bndrFreeVars: don't forget variables mentioned in
-        -- the rules of the bndr.  C.f. OccAnal.addRuleUsage
+        -- the rules or unfolding of the bndr.
         -- Also tyvars mentioned in its type; they may not appear
         -- in the RHS
         --      type T a = Int
