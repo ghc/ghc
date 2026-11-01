@@ -98,4 +98,22 @@ pattern A n <- (read -> n) where -- comment20
 data ClassTag (tag :: Nat) where
   ExtDescrTag :: (forall (n :: Nat) . (0x6A <= n, n <= 0xFE) =>  ClassTag n)
 
+
+-- Check layout spans
+a = x where
+     p = 1
+     q = 2
+
+c = case x of
+  ; p -> q
+  r -> s
+d = let ?x = 1
+        ?y = 2 in ?x
+e = [d| |]
+e2 = [d| f = 1 |]
+f = if | x -> y
+       | z -> w
+pattern P x <- Just x where
+  P x = Just x
+
 -- eof
