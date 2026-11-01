@@ -98,4 +98,9 @@ pattern A n <- (read -> n) where -- comment20
 data ClassTag (tag :: Nat) where
   ExtDescrTag :: (forall (n :: Nat) . (0x6A <= n, n <= 0xFE) =>  ClassTag n)
 
+
+a = x where
+     p = 1
+     q = 2
+
 -- eof
