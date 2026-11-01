@@ -37,8 +37,8 @@ Then, pass by pass, in the overview's order:
 * step 9, shortcutting: Note [supporting shortcutting] in `GHC.CmmToAsm.Monad`
   and Note [Updating the CFG during shortcutting] in `GHC.CmmToAsm.CFG`;
 * step 10, static prediction: Note [Static Branch Prediction],
-  Note [Back edges in loopInfo] and Note [Where a branch's likely side is known]
-  in `GHC.CmmToAsm.CFG`;
+  Note [Back edges in loopInfo], Note [Static prediction of tag tests]
+  and Note [Where a branch's likely side is known] in `GHC.CmmToAsm.CFG`;
 * step 11, block layout: Note [CFG based code layout],
   Note [Chain based CFG serialization] and Note [Layout relevant edge weights]
   in `GHC.CmmToAsm.BlockLayout`;
@@ -133,6 +133,11 @@ or uses it:
 * chain: a sequence of blocks that the layout places one after another, built
   along heavy edges (Note [Chain based CFG serialization]
   in `GHC.CmmToAsm.BlockLayout`).
+* tag test: a test of a pointer's tag: whether it is tagged, the closure
+  it points to then being evaluated (Note [diamond proc point]
+  in `GHC.Cmm.LayoutStack`), or whether it, or its closure's info table, holds
+  a given constructor's tag (Note [Static prediction of tag tests]
+  in `GHC.CmmToAsm.CFG`).
 
 Finding the pass at fault
 -------------------------

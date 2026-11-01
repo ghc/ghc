@@ -731,7 +731,7 @@ optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg =
   -- on findBackEdges' back edges carry into the predicted probabilities, except
   -- where the back edge rule of Note [Static Branch Prediction] replaces the
   -- weights.
-  (if doStaticPred then staticPredCfg (g_entry graph) else id) $
+  (if doStaticPred then staticPredCfg (tagRegisters graph) (g_entry graph) else id) $
     optHsPatterns weights proc $ cfg
 
 -- | Modify branch weights based on educated guess on
@@ -818,11 +818,11 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
           | otherwise = False
 
 -- | Convert block-local branch weights to global weights.
-staticPredCfg :: BlockId -> CFG -> CFG
-staticPredCfg entry cfg = cfg'
+staticPredCfg :: S.Set LocalReg -> BlockId -> CFG -> CFG
+staticPredCfg tags entry cfg = cfg'
   where
     (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-}
-                             mkGlobalWeights entry cfg
+                             mkGlobalWeightsWith tags entry cfg
     cfg' = {-# SCC rewriteEdges #-}
             mapFoldlWithKey
                 (\cfg from m ->
@@ -1023,10 +1023,19 @@ revPostorderFrom cfg root =
 --   For blocks it's the expected number of executions and
 --   for edges is the number of traversals.
 
-{-# NOINLINE mkGlobalWeights #-}
-{-# SCC mkGlobalWeights #-}
 mkGlobalWeights :: HasDebugCallStack => BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
-mkGlobalWeights root localCfg
+mkGlobalWeights = mkGlobalWeightsWith S.empty
+
+-- No pragma: with NOINLINE, which master had on mkGlobalWeights, whose body
+-- this is, the compiler's code differed only in this not being inlined, and
+-- its instructions and allocation moved by under 0.001% compiling T3294, T783,
+-- T9961, T12707, !16269's CmmDiamondChain and nofib's puzzle at -O0, -O and
+-- -O2, on GHC 10.1.20261108.
+-- | 'mkGlobalWeights', told which local registers hold a constructor tag
+-- (see 'tagRegisters').
+{-# SCC mkGlobalWeightsWith #-}
+mkGlobalWeightsWith :: HasDebugCallStack => S.Set LocalReg -> BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
+mkGlobalWeightsWith tags root localCfg
   | null localCfg = panic "Error - Empty CFG"
   | otherwise
   = (blockFreqs', edgeFreqs')
@@ -1046,7 +1055,7 @@ mkGlobalWeights root localCfg
     backEdges' = map (bimap toVertex toVertex) backedges
     bodies' = map calcBody bodies
 
-    estimatedCfg = staticBranchPrediction root loopResults localCfg
+    estimatedCfg = staticBranchPrediction tags root loopResults localCfg
     -- Normalize the weights to probabilities and apply heuristics
     nodeProbs = cfgEdgeProbabilities estimatedCfg toVertex
 
@@ -1088,15 +1097,17 @@ places, and the code generator treats each case differently:
   test selects, but the test that chooses a case alternative carries no
   annotation: cgAlts in GHC.StgToCmm.Expr makes it a CmmSwitch, which
   GHC.Cmm.Switch.Implement turns into CmmCondBranches without one, or into a
-  jump table. So ohPredicts treats it like any comparison with a constant (a
-  BUG TODO there).
+  jump table. So ohPredicts treats it like any comparison with a constant where
+  it is spelt as an equality (the BUG TODO there), and leaves it out where it
+  is spelt as an inequality (the TODO there).
 
-* Nowhere. Under -fcmm-static-pred, where the CFG is kept (x86-64, not
-  under -finfo-table-map), staticBranchPrediction applies its heuristics
-  to every other two-way branch not on a heap or stack check and without two
-  back edges: a loop is not left (lehPredicts), an equality test (MO_Eq) with a
-  literal and no likelihood annotation is false (ohPredicts), and a back edge is
-  taken (Note [Static Branch Prediction]).
+* Nowhere. Under -fcmm-static-pred, where the CFG is kept (x86-64, not under
+  -finfo-table-map), staticBranchPrediction applies its heuristics to every
+  other two-way branch not on a heap or stack check and without two back
+  edges: a loop is not left (lehPredicts), an equality test (MO_Eq) with
+  a literal and no likelihood annotation is false and such an inequality test
+  (MO_Ne) true unless an operand is bits under a mask (MO_And) or a constructor
+  tag (ohPredicts), and a back edge is taken (Note [Static Branch Prediction]).
 
 The code generator keeps these trade-offs with that knowledge, each for the
 reason given:
@@ -1123,10 +1134,12 @@ but are usually never entered, and if at most once.
 
 Three heuristics are implemented: that we do not exit loops (lehPredicts), that
 an equality test (MO_Eq) with a literal and no likelihood annotation is false
-(ohPredicts), and that a branch with back edges and other edges takes a back
-edge. WIP: the paper's other heuristics are stubs (phPredicts and the rest), so
-a two-way branch to which none of the three applies keeps the CFG's weights,
-normalised where neither edge is a back edge or a heap or stack check's.
+and such an inequality test (MO_Ne) true unless an operand is bits under a mask
+(MO_And) or a constructor tag (ohPredicts), and that a branch with back edges
+and other edges takes a back edge. WIP: the paper's other heuristics are stubs
+(phPredicts and the rest), so a two-way branch to which none of the three
+applies keeps the CFG's weights, normalised where neither edge is a back edge
+or a heap or stack check's.
 
 The back edge case is special as it supersedes any other heuristic if it
 applies. BUG: it supersedes a likely annotation in the Cmm as well: a branch
@@ -1151,6 +1164,33 @@ TODO:
   - Requires refactoring `loopInfo` to work on both, Cmm Graphs and the backend CFG.
 -}
 
+{- Note [Static prediction of tag tests]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ohPredicts predicts that a comparison with a constant comes out unequal,
+giving the equal side 0.3. A case on a pointer tag compares the tag with a
+constructor's, as in `(x & 7) == 1`, and tags follow the order in which a type
+declares its constructors (Note [Constructor tag allocation] in GHC.Core.TyCon),
+so whether the equal side is the likely one depends on the type, which the
+CFG does not record; and so it does where a type has more constructors than a
+pointer tag tells apart, the case comparing the tag its constructor's info table
+holds (Note [Tagging big families] in GHC.StgToCmm.Expr). Where the test for
+tag 1 is spelt as an equality, the prediction is right if the test is a loop's
+exit and wrong if it is the step down a tree: the trees of Data.Map and Data.Set
+declare Bin first, so in a lookup the prediction calls the side that stays in
+the loop the unlikely one (the BUG TODO at ohPredicts). ohPredicts matches an
+equality, but an inequality only where it tests neither bits under a mask nor a
+constructor tag, one read from an info table, an unboxed sum's, one in a local
+register every assignment to which is a tag or one less than such a register,
+and the control-flow optimisation may have inverted a test so that its true
+side falls through (Note [Invert Cmm conditionals] in GHC.Cmm.ContFlowOpt), so
+whether a tag test is predicted at all depends on how it came out spelt (the
+TODO at ohPredicts).
+
+Telling the two apart needs the constructors' numbers of arguments, or which one
+recurses, carried down to the CFG, which takes many changes, so the heuristic
+stays as it is for now.
+-}
+
 -- | Combination of target node id and information about the branch
 --   we are looking at.
 type TargetNodeInfo = (BlockId, EdgeInfo)
@@ -1160,8 +1200,8 @@ type TargetNodeInfo = (BlockId, EdgeInfo)
 -- See Note [Static Branch Prediction]
 -- TODO: This should be combined with optimizeCFG
 {-# SCC staticBranchPrediction #-}
-staticBranchPrediction :: BlockId -> LoopInfo -> CFG -> CFG
-staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
+staticBranchPrediction :: S.Set LocalReg -> BlockId -> LoopInfo -> CFG -> CFG
+staticBranchPrediction tags _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
     -- pprTrace "staticEstimatesOn" (ppr (cfg)) $
     foldl' update cfg nodes
   where
@@ -1289,20 +1329,28 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
                 s1Level = mapLookup s1 loopLevels
                 s2Level = mapLookup s2 loopLevels
 
-        -- Comparing to a constant is unlikely to be equal.
-        -- TODO: only MO_Eq is read, so whether a test is predicted
-        -- depends on how GHC.Cmm.ContFlowOpt leaves it spelt
-        -- (Note [Invert Cmm conditionals]). Predicting a pointer-tag test spelt
-        -- with MO_Ne, such as x & 7 != 0, as its MO_Eq spelling is predicted
-        -- (the evaluated side likely) was tried on a development branch and
-        -- cost nofib 0.36% more instructions at -O2.
-        -- BUG TODO: a constructor-tag test is predicted like any other
-        -- comparison, though which side is likely depends on the order of
-        -- the type's constructors. The prediction is wrong for the trees of
-        -- Data.Map and Data.Set, which declare Bin first, where the test is
-        -- left spelt as an equality, as in Data.Map's lookup: the side that
-        -- stays in the loop is predicted unlikely. This costs only speed, on
-        -- x86-64 under -fcmm-static-pred, not under -finfo-table-map.
+        -- Comparing to a constant is unlikely to be equal, whichever way the
+        -- comparison is spelt: the control-flow optimisation may have turned
+        -- an equality into an inequality (Note [Invert Cmm conditionals]).
+        -- Wrong for a tag test where the likely constructor is declared first,
+        -- so an inequality on bits under a mask, a tag's or a bitmap's, is left
+        -- out, as is one on a constructor tag read from an info table, an
+        -- unboxed sum's tag, a register holding a tag or one less than such a
+        -- register: see Note [Static prediction of tag tests].
+        -- TODO: the exception goes by an operand's form, not by what decides
+        -- the test: a parity test, its mask inside arithmetic, is predicted,
+        -- and an evaluation test, (x & 7) != 0, is left out with the tag tests.
+        -- Predicting a pointer-tag test spelt with MO_Ne, such as (x & 7) != 0,
+        -- as its MO_Eq spelling is predicted (the evaluated side likely) was
+        -- tried on a development branch and cost nofib 0.36% more
+        -- instructions at -O2.
+        -- BUG TODO: a constructor-tag test spelt as an equality is
+        -- predicted like any other comparison, its equal side unlikely,
+        -- though which side is likely depends on the order of the
+        -- type's constructors: wrong for the trees of Data.Map and Data.Set
+        -- (Note [Static prediction of tag tests]). This
+        -- costs only speed, on x86-64 under -fcmm-static-pred, not under
+        -- -finfo-table-map.
         -- BUG: ohPredicts treats s1 as the true side only where it is ltrue,
         -- the label the branch was made with, which an edge no longer ends
         -- at once the linear allocator's fixup block (addNodesBetween) or
@@ -1315,12 +1363,17 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
             , CmmCondBranch cond ltrue _lfalse likely <- src1
             , likely == Nothing
             , CmmMachOp mop args <- cond
-            , MO_Eq {} <- mop
+            , Just trueProb <- case mop of
+                                 MO_Eq {} -> Just 0.3
+                                 MO_Ne {} | any isLit args
+                                          , not (any isConTag args) -> Just 0.7
+                                 _        -> Nothing
             , not (null [x | x@CmmLit{} <- args])
-            = if fst s1 == ltrue then Just 0.3 else Just 0.7
+            = if fst s1 == ltrue then Just trueProb else Just (1 - trueProb)
 
             | otherwise
             = Nothing
+        isConTag = isTagExpr (`S.member` tags)
 
         -- TODO: These are all the other heuristics from the paper.
         -- Not all will apply, for now we just stub them out as Nothing.
@@ -1330,6 +1383,89 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         chPredicts = const Nothing
         shPredicts = const Nothing
         rhPredicts = const Nothing
+
+-- | Bits under a mask, a tag's or a bitmap's.
+isMask :: CmmExpr -> Bool
+isMask (CmmMachOp (MO_And _) _) = True
+isMask _ = False
+
+-- | A constructor tag read from an info table, a half word just below the info
+-- pointer (Note [Tagging big families] in GHC.StgToCmm.Expr), widened or not;
+-- or an unboxed sum's tag, narrowed to a byte from the register it is returned
+-- in.
+isConTagExpr :: CmmExpr -> Bool
+isConTagExpr (CmmMachOp (MO_UU_Conv _ _) [e]) = isInfoTag e
+isConTagExpr (CmmMachOp (MO_XX_Conv _ W8) [CmmReg _]) = True
+isConTagExpr e = isInfoTag e
+
+isInfoTag :: CmmExpr -> Bool
+isInfoTag (CmmLoad addr ty _)
+  | w <- typeWidth ty, w == W32 || w == W16
+  = offsetOf addr == Just (negate (toInteger (widthInBytes w)))
+  where
+    offsetOf (CmmMachOp (MO_Add _) [_, CmmLit (CmmInt n _)]) = Just n
+    offsetOf (CmmMachOp (MO_Sub _) [_, CmmLit (CmmInt n _)]) = Just (negate n)
+    offsetOf (CmmRegOff _ n) = Just (toInteger n)
+    offsetOf _ = Nothing
+isInfoTag _ = False
+
+-- | The local registers every assignment to which is a constructor tag:
+-- a pointer's bits under a mask ('isMask'), one less than a tag
+-- register (dataToTag#'s pointer side), 'isConTagExpr', or a copy of a tag
+-- register.  A switch on a tag that is not a register gets one of these
+-- (GHC.Cmm.Switch.Implement), as does dataToTag#'s join.
+tagRegisters :: CmmGraph -> S.Set LocalReg
+tagRegisters graph = M.keysSet (foldl' discard cands1 lost)
+  where
+    assigns =
+      [ (r, e) | b <- toBlockList graph
+               , let (_, mid, _) = blockSplit b
+               , CmmAssign (CmmLocal r) e <- blockToList mid ]
+    -- the registers some assignment to which is a tag if every register holds
+    -- one, to those assignments' right-hand sides, and those of them assigned
+    -- an expression that is not
+    cands = M.fromListWith (++)
+      [ (r, [e]) | (r, e) <- assigns, isTagExpr (const True) e ]
+    untagged = [ r | (r, e) <- assigns, r `M.member` cands
+                   , not (isTagExpr (const True) e) ]
+    -- the results of unsafe foreign calls, the one other node that assigns
+    -- a local register here: a safe call is lowered to unsafe ones before
+    -- (lowerSafeForeignCall in GHC.Cmm.LayoutStack)
+    called
+      | M.null cands = []
+      | otherwise    = [ r | b <- toBlockList graph
+                           , let (_, mid, _) = blockSplit b
+                           , CmmUnsafeForeignCall _ rs _ <- blockToList mid
+                           , r <- rs ]
+    cands1 = foldl' (flip M.delete) cands (untagged ++ called)
+    -- the candidates assigned a copy of a register that is none, or one less;
+    -- each is dropped, and with it the candidates assigned from it in turn,
+    -- every candidate at most once: a pass over all of them for each one
+    -- dropped took time quadratic in the length of a chain of copies
+    lost = [ r | (r, es) <- M.toList cands1
+               , not (all (isTagExpr (`M.member` cands1)) es) ]
+    discard cs r
+      | r `M.member` cs
+      = foldl' discard (M.delete r cs) (M.findWithDefault [] r from)
+      | otherwise
+      = cs
+    from = M.fromListWith (++)
+      [ (s, [r]) | (r, es) <- M.toList cands1, e <- es
+                 , Just s <- [tagSource e] ]
+
+-- | A constructor tag in one of the forms 'tagRegisters' lists, given which
+-- local registers hold one.
+isTagExpr :: (LocalReg -> Bool) -> CmmExpr -> Bool
+isTagExpr isTag e
+  = isMask e || maybe (isConTagExpr e) isTag (tagSource e)
+
+-- | The local register that an expression copies or is one less than.
+tagSource :: CmmExpr -> Maybe LocalReg
+tagSource e = case e of
+  CmmRegOff (CmmLocal r) (-1) -> Just r
+  CmmMachOp (MO_Sub _) [CmmReg (CmmLocal r), CmmLit (CmmInt 1 _)] -> Just r
+  CmmReg (CmmLocal r) -> Just r
+  _ -> Nothing
 
 -- We normalize all edge weights as probabilities between 0 and 1.
 -- Ignoring rounding errors all outgoing edges sum up to 1.
