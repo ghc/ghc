@@ -593,12 +593,16 @@ cafAnal
                 -- that will get RET info tables.  These labels will
                 -- get their own SRTs, so we don't aggregate CAFs from
                 -- references to these labels, we just use the label.
+  -> LabelMap Label
+                -- ^ The bodies stack layout split off continuations, each
+                -- with its continuation: a jump into one from elsewhere
+                -- refers to the continuation's SRT, which covers the body
   -> CLabel     -- ^ The top label of the proc
   -> CmmGraph
   -> CAFEnv
-cafAnal platform contLbls topLbl cmmGraph =
+cafAnal platform contLbls bodies topLbl cmmGraph =
   analyzeCmmBwd cafLattice
-    (cafTransfers platform contLbls (g_entry cmmGraph) topLbl) cmmGraph mapEmpty
+    (cafTransfers platform contLbls bodies (g_entry cmmGraph) topLbl) cmmGraph mapEmpty
 
 
 cafLattice :: DataflowLattice CAFSet
@@ -609,8 +613,9 @@ cafLattice = DataflowLattice Set.empty add
         in changedIf (Set.size new' > Set.size old) new'
 
 
-cafTransfers :: Platform -> LabelSet -> Label -> CLabel -> TransferFun CAFSet
-cafTransfers platform contLbls entry topLbl
+cafTransfers :: Platform -> LabelSet -> LabelMap Label -> Label -> CLabel
+             -> TransferFun CAFSet
+cafTransfers platform contLbls bodies entry topLbl
   block@(BlockCC eNode middle xNode) fBase =
     let joined :: CAFSet
         joined = cafsInNode xNode $! live'
@@ -633,6 +638,11 @@ cafTransfers platform contLbls entry topLbl
           -- SRT for the continuation's info table
           | s `setMember` contLbls
           = Just (Set.singleton (mkCAFfyLabel platform (infoTblLbl s)))
+          -- A body split off a continuation, entered from elsewhere than
+          -- the continuation: the continuation's SRT covers it
+          | Just c <- mapLookup s bodies, c `setMember` contLbls
+          , c /= entryLabel block
+          = Just (Set.singleton (mkCAFfyLabel platform (infoTblLbl c)))
           -- Otherwise, takes the CAF references from the destination
           | otherwise
           = lookupFact s fBase

@@ -153,3 +153,12 @@ test('T20298c', normal, compile, ['-O2 -dno-builtin-rules -ddump-simpl -dno-type
 
 test('T27368', normal, compile, ['-O'])
 test('T27979', [req_cmm, check_errmsg('stg_ap_0_fast')], compile, ['-O -ddump-cmm -dno-typeable-binds -dsuppress-uniques'])
+
+# Return addresses stored below Sp, which stack layout no longer emits
+# in these loops (x86-64 assembly)
+test('StackLayoutTagLoop', [only_ways(['optasm']), unless(arch('x86_64'), skip),
+                            grep_errmsg(r'(movq \$\.L\w+_info,-\d+\(%rbp\))', [1])],
+     compile, ['-ddump-asm'])
+test('StackLayoutCallLoop', [only_ways(['optasm']), unless(arch('x86_64'), skip),
+                             grep_errmsg(r'(movq \$\.L\w+_info,-\d+\(%rbp\))', [1])],
+     compile, ['-ddump-asm'])

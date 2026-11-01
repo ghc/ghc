@@ -20,6 +20,8 @@ import GHC.Cmm.ProcPoint
 import GHC.Cmm.Sink
 import GHC.Cmm.Switch.Implement
 import GHC.Cmm.ThreadSanitizer
+import GHC.Cmm.Dataflow.Block ( lastNode )
+import GHC.Runtime.Heap.Layout ( isThunkRep )
 
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DSM
@@ -33,6 +35,9 @@ import GHC.Platform
 
 import Control.Monad
 import GHC.Utils.Monad (mapAccumLM)
+import qualified Data.Set as Set
+import qualified Data.Map.Strict as Map
+import qualified GHC.Data.Graph.Directed as G
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -53,7 +58,30 @@ cmmPipeline logger cmm_config srtInfo prog dus0 = do
   let forceRes ((info, group), us) = info `seq` us `seq` foldr seq () group
   let platform = cmmPlatform cmm_config
   withTimingSilent logger (text "Cmm pipeline") forceRes $ do
-     (dus1, prog')  <- {-# SCC "tops" #-} mapAccumLM (cpsTop logger platform cmm_config) dus0 prog
+     -- the info labels the group's thunks call; see Note [Diamond frames
+     -- keep their depth] in GHC.Cmm.LayoutStack
+     let reentered = Set.fromList
+           [ lbl | CmmProc h _ _ g <- prog
+                 , Just info <- [mapLookup (g_entry g) (info_tbls h)]
+                 , isThunkRep (cit_rep info)
+                 , b <- toBlockList g
+                 , CmmCall{ cml_target = CmmLit (CmmLabel lbl) } <- [lastNode b] ]
+         -- each procedure's recursion: the group's procedures that call
+         -- one another, by the labels their calls and jumps target; see
+         -- Note [Tagged path skips the stores] in GHC.Cmm.LayoutStack
+         recs = Map.fromList
+           [ (x, Set.fromList xs)
+           | scc <- G.stronglyConnCompFromEdgedVerticesOrd
+                      [ G.DigraphNode lbl lbl
+                          [ t | b <- toBlockList g
+                              , CmmCall{ cml_target = CmmLit (CmmLabel t) }
+                                  <- [lastNode b] ]
+                      | CmmProc h _ _ g <- prog
+                      , Just info <- [mapLookup (g_entry g) (info_tbls h)]
+                      , let lbl = cit_lbl info ]
+           , let xs = G.flattenSCC scc
+           , x <- xs ]
+     (dus1, prog')  <- {-# SCC "tops" #-} mapAccumLM (cpsTop logger platform cmm_config reentered recs) dus0 prog
      let (procs, data_) = partitionWith id prog'
      (srtInfo, dus, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmm_config srtInfo dus1 procs data_
      dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
@@ -68,10 +96,11 @@ cmmPipeline logger cmm_config srtInfo prog dus0 = do
 --     [SRTs].
 --
 --   - in the case of a `CmmData`, the unmodified 'CmmDecl' and a 'CAFSet' containing
-cpsTop :: Logger -> Platform -> CmmConfig -> DUniqSupply -> CmmDecl -> IO (DUniqSupply, Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDataDecl))
-cpsTop _logger platform _ dus (CmmData section statics) =
+cpsTop :: Logger -> Platform -> CmmConfig -> Set.Set CLabel
+       -> Map.Map CLabel (Set.Set CLabel) -> DUniqSupply -> CmmDecl -> IO (DUniqSupply, Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDataDecl))
+cpsTop _logger platform _ _ _ dus (CmmData section statics) =
   return (dus, Right (cafAnalData platform statics, CmmData section statics))
-cpsTop logger platform cfg dus proc =
+cpsTop logger platform cfg reentered recs dus proc =
     do
       ----------- Control-flow optimisations ----------------------------------
 
@@ -130,11 +159,25 @@ cpsTop logger platform cfg dus proc =
               return (call_pps, dus)
 
       ----------- Layout the stack and manifest Sp ----------------------------
-      ((g, stackmaps), dus) <- pure $
+      -- the procedure's own info label, which its recursive calls target
+      let self_lbl = cit_lbl <$> mapLookup (g_entry g) (info_tbls h)
+          -- and the info labels of the procedures in its recursion
+          rec_lbls = case self_lbl of
+            Just lbl -> Map.findWithDefault (Set.singleton lbl) lbl recs
+            Nothing  -> Set.empty
+          -- in a procedure a thunk of its group calls, frames on loops are
+          -- trimmed too, and in a thunk those the size rule admits: see Note
+          -- [Diamond frames keep their depth] in GHC.Cmm.LayoutStack
+          lift_frames
+            | maybe False (`Set.member` reentered) self_lbl = LiftAll
+            | maybe False (isThunkRep . cit_rep)
+                    (mapLookup (g_entry g) (info_tbls h)) = LiftSized
+            | otherwise = LiftOffLoop
+      ((g, stackmaps, split_bodies), dus) <- pure $
          {-# SCC "layoutStack" #-}
          if do_layout
-            then runUniqueDSM dus $ cmmLayoutStack cfg proc_points entry_off g
-            else ((g, mapEmpty), dus)
+            then runUniqueDSM dus $ cmmLayoutStack cfg self_lbl rec_lbls lift_frames proc_points entry_off g
+            else ((g, mapEmpty, mapEmpty), dus)
       dump Opt_D_dump_cmm_sp "Layout Stack" l g
 
       ----------- Sink and inline assignments  --------------------------------
@@ -143,7 +186,7 @@ cpsTop logger platform cfg dus proc =
                     Opt_D_dump_cmm_sink "Sink assignments"
 
       ------------- CAF analysis ----------------------------------------------
-      let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform call_pps l g
+      let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform call_pps split_bodies l g
       dumpWith logger Opt_D_dump_cmm_caf "CAFEnv" FormatText (pdoc platform cafEnv)
 
       (g, dus) <- if splitting_proc_points
