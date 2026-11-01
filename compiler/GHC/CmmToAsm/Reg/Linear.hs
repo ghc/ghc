@@ -140,6 +140,25 @@ import Data.Maybe
 import Data.List (find, sortOn)
 import Data.Word (Word64)
 import Control.Monad
+import System.IO.Unsafe ( unsafePerformIO )
+import System.Environment ( lookupEnv )
+
+-- | Probe switch: GHC_MW_VARIANT holds the word ra1.
+{-# NOINLINE raWords #-}
+raWords :: [String]
+raWords = unsafePerformIO $
+  maybe ["g8","ra4","ch8","lv12","lo","lor","mr","lo2","ln32","rfa"] (words . map (\c -> if c == ',' then ' ' else c))
+    <$> lookupEnv "GHC_MW_VARIANT"
+
+raVia, raVia2, raVia3, raVia4 :: Bool
+raVia = "ra1" `elem` raWords || raVia2
+-- ra2: through such a block into any loop, one that calls included
+raVia2 = "ra2" `elem` raWords || raVia4
+-- ra3: through every block only the continuation reaches, into any loop
+raVia3 = "ra3" `elem` raWords
+-- ra4: ra2, and through every block only the continuation reaches into
+-- a loop with no call
+raVia4 = "ra4" `elem` raWords
 
 -- -----------------------------------------------------------------------------
 -- Top level of the register allocator
@@ -540,7 +559,16 @@ linearRA_SCCs cold entry_ids block_live sccs
                 && (bid `setMember` cold
                     || any (\d -> d `setMember` no_call_loops
                                   && isNothing (lookupBlockAssignment d assig))
-                           (dests instrs))
+                           (dests instrs ++ via instrs)
+                    || (raVia2 && any (\d -> d `setMember` all_loops
+                                  && isNothing (lookupBlockAssignment d assig))
+                                      (via instrs))
+                    || (raVia3 && any (\d -> d `setMember` all_loops
+                                  && isNothing (lookupBlockAssignment d assig))
+                                      (viaOwned bid))
+                    || (raVia4 && any (\d -> d `setMember` no_call_loops
+                                  && isNothing (lookupBlockAssignment d assig))
+                                      (viaOwned bid)))
             deferrable _ _ = False
             go acc deferred [] = return (acc, reverse deferred)
             go acc deferred (scc : rest) = do
@@ -561,6 +589,31 @@ linearRA_SCCs cold entry_ids block_live sccs
     -- looked up for every block, so a set rather than the list
     entries = setFromList entry_ids
     first_id = case entry_ids of { b : _ -> b; [] -> panic "linearRA_SCCs" }
+    -- the jumps of a block that only this one jumps to (probe, ra1)
+    via instrs
+      | not raVia = []
+      | otherwise = [ d' | d <- dests instrs, not (d `setMember` entries)
+                         , mapFindWithDefault 0 d npreds == (1 :: Int)
+                         , Just is' <- [mapLookup d bmap]
+                         , d' <- dests is' ]
+    bmap = mapFromList [ (b, is) | BasicBlock b is <- flattenSCCs sccs ]
+    all_loops = setFromList [ b | CyclicSCC bs <- sccs, BasicBlock b _ <- bs ]
+    bpreds = mapFromListWith (++) [ (d, [b]) | BasicBlock b is <- flattenSCCs sccs
+                                             , d <- dests is ]
+    -- the jumps out of the blocks that only e reaches (probe, ra3)
+    viaOwned e = [ d | x <- setElems (owned e), Just is <- [mapLookup x bmap]
+                     , d <- dests is ]
+    owned e = grow (setSingleton e) [e]
+      where
+        grow set [] = set
+        grow set (x : xs) =
+          let new = nubOrd
+                [ d | Just is <- [mapLookup x bmap], d <- dests is
+                , not (d `setMember` set), not (d `setMember` entries)
+                , all (`setMember` set) (mapFindWithDefault [] d bpreds) ]
+          in grow (foldl' (flip setInsert) set new) (new ++ xs)
+    npreds = mapFromListWith (+) [ (d, 1) | BasicBlock _ is <- flattenSCCs sccs
+                                          , d <- dests is ]
     dests instrs = [ d | LiveInstr i _ <- instrs, d <- jumpDestsOfInstr i ]
     callFreeLoops platform = setFromList
       [ b | CyclicSCC bs <- sccs, not (any (calls platform) bs)

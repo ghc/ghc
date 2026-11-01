@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module GHC.Cmm.LayoutStack (
-       cmmLayoutStack, setInfoTableStackMap
+       cmmLayoutStack, setInfoTableStackMap, mwHas, isGcTarget
   ) where
 
 import GHC.Prelude hiding ((<*>))
@@ -16,6 +16,9 @@ import GHC.Cmm
 import GHC.Cmm.Info
 import GHC.Cmm.BlockId
 import GHC.Cmm.Config
+import GHC.Cmm.CLabel ( CLabel, mkCmmCodeLabel )
+import GHC.Unit.Types ( rtsUnitId )
+import GHC.Data.FastString ( fsLit )
 import GHC.Cmm.Utils
 import GHC.Cmm.Graph
 import GHC.Cmm.Liveness
@@ -26,6 +29,8 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Data.Maybe
+import GHC.Data.Graph.Directed ( Node(..), flattenSCC
+                               , stronglyConnCompFromEdgedVerticesUniq )
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSM
 import GHC.Utils.Misc
@@ -33,10 +38,23 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( isEmpty )
 import GHC.Utils.Panic
 import qualified Data.Set as Set
+import qualified Data.Map.Strict as Map
 import Control.Monad.Fix
 import Data.Array as Array
-import Data.List (nub)
+import Data.List (nub, partition, sortOn)
 import Data.List.NonEmpty ( NonEmpty (..) )
+import System.IO.Unsafe ( unsafePerformIO )
+import System.Environment ( lookupEnv )
+
+-- | Probe switch: the comma-separated words of GHC_MW_VARIANT.
+{-# NOINLINE mwVariant #-}
+mwVariant :: [String]
+mwVariant = unsafePerformIO $
+  words . map (\c -> if c == ',' then ' ' else c) . fromMaybe "g8,ra4,ch8,lv12,lo,lor,mr,lo2,ln32,rfa"
+    <$> lookupEnv "GHC_MW_VARIANT"
+
+mwHas :: String -> Bool
+mwHas w = w `elem` mwVariant
 
 {- Note [Stack Layout]
    ~~~~~~~~~~~~~~~~~~~
@@ -235,27 +253,89 @@ instance Outputable StackMap where
      text "sm_regs = " <> pprUFM sm_regs ppr
 
 
-cmmLayoutStack :: CmmConfig -> ProcPointSet -> ByteOff -> CmmGraph
-               -> UniqDSM (CmmGraph, LabelMap StackMap)
-cmmLayoutStack cfg procpoints entry_args
+cmmLayoutStack :: CmmConfig -> Maybe CLabel -> ProcPointSet -> ByteOff
+               -> LabelMap Label
+               -> CmmGraph -> UniqDSM (CmmGraph, LabelMap StackMap)
+cmmLayoutStack cfg self_lbl procpoints entry_args after
                graph@(CmmGraph { g_entry = entry })
   = do
     -- We need liveness info. Dead assignments are removed later
     -- by the sinking pass.
     let liveness = cmmLocalLiveness platform graph
-        blocks   = revPostorder graph
+        blocks   = layoutOrder entry after (revPostorder graph)
         profile  = cmmProfile   cfg
         platform = profilePlatform profile
-
-    (final_stackmaps, _final_high_sp, new_blocks) <-
-          mfix $ \ ~(rec_stackmaps, rec_high_sp, _new_blocks) ->
-            layout cfg procpoints liveness entry entry_args
+        run seeds keeps =
+          mfix $ \ ~(rec_stackmaps, rec_high_sp, _new_blocks, _props, _dias) ->
+            layout cfg procpoints liveness entry entry_args seeds keeps
                    rec_stackmaps rec_high_sp blocks
+
+    -- See Note [Loop head stack maps]
+    r1@(stackmaps1, _, _, props1, dias1) <- run mapEmpty setEmpty
+    let seeds0 = loopHeadSeeds self_lbl entry procpoints stackmaps1 props1
+                  [ b | (b, _, _) <- dias1 ] blocks
+        -- (probe, rf) See Note [Reserved frames in loops]
+        (seeds, keeps)
+          | mwHas "rf" || mwHas "rfx" || mwHas "rfi" || mwHas "rfa" = reservedSeeds platform self_lbl entry procpoints liveness
+                           stackmaps1 props1 [ b | (b, _, _) <- dias1 ]
+                           blocks seeds0
+          | otherwise  = (seeds0, setEmpty)
+    (final_stackmaps0, _final_high_sp, new_blocks0, _, diamonds) <-
+        if mapNull seeds then return r1 else do
+          r2@(_, _, _, props2, _) <- run seeds keeps
+          if seedsHold seeds props2 then return r2
+          -- (probe, rf) reserved seeds that do not hold do not take
+          -- loopHeadSeeds' own with them
+          else if mapNull seeds0 || mapSize seeds0 == mapSize seeds
+            then return r1
+          else do
+            r3@(_, _, _, props3, _) <- run seeds0 setEmpty
+            return $ if seedsHold seeds0 props3 then r3 else r1
+
+    -- See Note [Tagged path skips the reloads]
+    (final_stackmaps, new_blocks) <-
+        if cmmSplitProcPoints cfg
+          then return (final_stackmaps0, new_blocks0)
+          else tagSkip platform procpoints entry final_stackmaps0 diamonds
+                       new_blocks0
 
     blocks_with_reloads <-
         insertReloadsAsNeeded platform procpoints final_stackmaps entry new_blocks
     new_blocks' <- mapM (lowerSafeForeignCall profile) blocks_with_reloads
     return (ofBlockList entry new_blocks', final_stackmaps)
+
+-- | The order in which layout visits the blocks: reverse postorder, but
+-- a block named in @after@ only once the block it names is visited, and
+-- every block only once one of its predecessors is (probe; GHC_MW_VARIANT
+-- dup, see Note [Copies of chained tag tests] in GHC.Cmm.Pipeline).
+layoutOrder :: BlockId -> LabelMap Label -> [CmmBlock] -> [CmmBlock]
+layoutOrder entry after blocks
+  | mapNull after = blocks
+  | otherwise = go setEmpty blocks
+  where
+    preds = mapFromListWith (++) [ (s, [entryLabel b]) | b <- blocks
+                                                       , s <- successors b ]
+    ready done strict b =
+      let l = entryLabel b
+      in (l == entry || any (`setMember` done) (mapFindWithDefault [] l preds))
+         && (not strict || maybe True (`setMember` done) (mapLookup l after))
+    go _ [] = []
+    go done bs = case break (ready done True) bs of
+      (pre, b : post) -> b : go (setInsert (entryLabel b) done) (pre ++ post)
+      (_, []) -> case break (ready done False) bs of
+        (pre, b : post) -> b : go (setInsert (entryLabel b) done) (pre ++ post)
+        (_, []) -> bs
+
+
+-- | A call of one of the canned GC entry points (GHC.StgToCmm.Heap).
+isGcTarget :: CmmExpr -> Bool
+isGcTarget (CmmLit (CmmLabel l)) = l `elem` gcLabels
+  where gcLabels = map (mkCmmCodeLabel rtsUnitId . fsLit)
+          [ "stg_gc_noregs", "stg_gc_unpt_r1", "stg_gc_f1", "stg_gc_d1"
+          , "stg_gc_unbx_r1", "stg_gc_l1", "stg_gc_pp", "stg_gc_pi"
+          , "stg_gc_ip", "stg_gc_ii", "stg_gc_ppp", "stg_gc_bpp"
+          , "stg_gc_pppp", "stg_gc_ppppp" ]
+isGcTarget _ = False
 
 -- -----------------------------------------------------------------------------
 -- Pass 1
@@ -266,6 +346,9 @@ layout :: CmmConfig
        -> LabelMap CmmLocalLive         -- liveness
        -> BlockId                       -- entry
        -> ByteOff                       -- stack args on entry
+       -> LabelMap StackMap             -- loop heads' stack maps, given
+       -> LabelSet                      -- continuations whose frames keep
+                                        -- the stack's depth
 
        -> LabelMap StackMap             -- [final] stack maps
        -> ByteOff                       -- [final] Sp high water mark
@@ -276,12 +359,53 @@ layout :: CmmConfig
           ( LabelMap StackMap           -- [out] stack maps
           , ByteOff                     -- [out] Sp high water mark
           , [CmmBlock]                  -- [out] new blocks
+          , LabelMap [Maybe StackMap]   -- [out] stack maps on back edges
+          , [(BlockId, BlockId, Maybe BlockId)]
+            -- [out] diamonds: block, continuation, the call's edge block
+            -- if it holds stores the tagged path skips
           )
 
-layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high blocks
-  = go blocks init_stackmap entry_args []
+layout cfg procpoints liveness entry entry_args seeds keeps final_stackmaps final_sp_high blocks
+  = go blocks (mapUnion init_stackmap seeds) entry_args [] setEmpty mapEmpty []
+       mapEmpty
   where
+    -- See Note [Tagged path skips the stores]
+    need = laterSaves liveness entry blocks
+    lazy_ok = not (cmmSplitProcPoints cfg)
+
     (updfr, cont_info)  = collectContInfo blocks
+
+    -- the blocks by label, and how many blocks return to each continuation
+    blockmap = mapFromList [ (entryLabel b, b) | b <- blocks ]
+    cont_callers = foldl' (\m l -> mapInsertWith (+) l (1 :: Int) m) mapEmpty
+                     [ l | b <- blocks, Just l <- [contOf (lastNode b)]
+                         -- (probe, mr) a call storing its own return
+                         -- address does not rely on the diamond's
+                         , not (mwHas "mr"
+                                && any (isRetStore l)
+                                       (case blockSplit b of (_, m, _) -> blockToList m)) ]
+    -- See Note [Loop head stack maps]: the blocks reached only through
+    -- an unlikely branch, as a heap or stack check's call to the GC and its
+    -- continuation are, each the only successor of the one before
+    preds = foldl' (\m l -> mapInsertWith (+) l (1 :: Int) m) mapEmpty
+              [ s | b <- blocks, s <- successors (lastNode b) ]
+    cold = coldFrom setEmpty
+             [ u | b <- blocks
+                 , CmmCondBranch{ cml_true = t, cml_false = f
+                                , cml_likely = Just lk } <- [lastNode b]
+                 , let u = if lk then f else t
+                 , mapLookup u preds == Just 1 ]
+    coldFrom seen [] = seen
+    coldFrom seen (x : xs)
+      | x `setMember` seen = coldFrom seen xs
+      | otherwise = coldFrom (setInsert x seen)
+          ([ s | Just blk <- [mapLookup x blockmap]
+               , s <- successors (lastNode blk)
+               , mapLookup s preds == Just 1 ] ++ xs)
+    contOf :: CmmNode O C -> Maybe BlockId
+    contOf CmmCall{ cml_cont = Just l } = Just l
+    contOf CmmForeignCall{ succ = l }   = Just l
+    contOf _                            = Nothing
 
     init_stackmap = mapSingleton entry
                       StackMap{ sm_sp   = entry_args
@@ -294,16 +418,28 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
        -> LabelMap StackMap
        -> StackLoc
        -> [CmmBlock]
-       -> UniqDSM (LabelMap StackMap, StackLoc, [CmmBlock])
-    go [] acc_stackmaps acc_hwm acc_blocks
-      = return (acc_stackmaps, acc_hwm, acc_blocks)
+       -> LabelSet
+       -> LabelMap [Maybe StackMap]
+       -> [(BlockId, BlockId, Maybe BlockId)]
+       -> LabelMap [LocalReg]
+       -> UniqDSM ( LabelMap StackMap, StackLoc, [CmmBlock]
+                  , LabelMap [Maybe StackMap]
+                  , [(BlockId, BlockId, Maybe BlockId)] )
+    go [] acc_stackmaps acc_hwm acc_blocks _done acc_props acc_dias _lazies
+      = return (acc_stackmaps, acc_hwm, acc_blocks, acc_props, acc_dias)
 
-    go (b0 : bs) acc_stackmaps acc_hwm acc_blocks
+    go (b0 : bs) acc_stackmaps acc_hwm acc_blocks done acc_props acc_dias
+       lazies
       = do
        let (entry0@(CmmEntry entry_lbl tscope), middle0, last0) = blockSplit b0
 
+       -- a continuation whose diamond stores some variables only on the
+       -- call's path: its body cannot assume them in their slots
        let stack0@StackMap { sm_sp = sp0 }
-               = mapFindWithDefault
+               = (case mapLookup entry_lbl lazies of
+                    Nothing -> id
+                    Just rs -> \sm -> sm { sm_regs = delListFromUFM (sm_regs sm) rs })
+               $ mapFindWithDefault
                      (pprPanic "no stack map for" (ppr entry_lbl))
                      entry_lbl acc_stackmaps
 
@@ -316,9 +452,10 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
        --     variables, adjust Sp, and construct the StackMaps for
        --     each of the successor blocks.  See handleLastNode for
        --     details.
-       (middle1, sp_off, last1, fixup_blocks, out)
-           <- handleLastNode cfg procpoints liveness cont_info
-                             acc_stackmaps stack1 tscope middle0 last0
+       (middle1, sp_off, last1, fixup_blocks, out, mb_dia)
+           <- handleLastNode cfg procpoints liveness cont_info keeps cont_callers
+                             blockmap need lazy_ok acc_stackmaps stack1 tscope
+                             middle0 last0
 
        -- (c) Manifest Sp: run over the nodes in the block and replace
        --     CmmStackSlot with CmmLoad from Sp with a concrete offset.
@@ -329,7 +466,35 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
        --    Sp = Sp + sp_off -- Sp adjustment goes here
        --    last1            -- the last node
        --
-       let middle_pre = blockToList $ foldl' blockSnoc middle0 middle1
+       -- less the return address store a diamond moved to the call's edge
+       let middle0' = case mb_dia of
+             Just (l, True, _, _) -> filter (not . isRetStore l) (blockToList middle0)
+             _              -> blockToList middle0
+           middle_pre = middle0' ++ middle1
+
+       -- See Note [Loop head stack maps]
+       let done' = setInsert entry_lbl done
+           back  = [ l | isBranchNode last0
+                       , not (entry_lbl `setMember` cold)
+                       , l <- successors last0
+                       , l `setMember` done' ]
+           prop l
+             | isJust mb_dia = Nothing
+             | otherwise     = Just stack1 { sm_regs = filterUFM is_live
+                                                         (sm_regs stack1) }
+             where live = mapFindWithDefault emptyRegSet l liveness
+                   is_live (r,_) = r `elemRegSet` live
+           acc_props' = foldl' (\m l -> mapInsertWith (++) l [prop l] m)
+                               acc_props back
+           acc_dias' = case mb_dia of
+             Just (l, _, _, mb_c) | mapFindWithDefault 0 l cont_info
+                                      == platformWordSizeInBytes (cmmPlatform cfg)
+                                  -> (entry_lbl, l, mb_c) : acc_dias
+             _ -> acc_dias
+           lazies' = case mb_dia of
+             -- several diamonds may share a continuation
+             Just (l, _, rs@(_:_), _) -> mapInsertWith (++) l rs lazies
+             _ -> lazies
 
        let final_blocks =
                manifestSp cfg final_stackmaps stack0 sp0 final_sp_high
@@ -350,6 +515,212 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
            hwm' = maximum (acc_hwm :| this_sp_hwm : map sm_sp (mapElems out))
 
        go bs acc_stackmaps' hwm' (final_blocks ++ acc_blocks)
+          done' acc_props' acc_dias' lazies'
+
+isBranchNode :: CmmNode O C -> Bool
+isBranchNode CmmBranch{}     = True
+isBranchNode CmmCondBranch{} = True
+isBranchNode CmmSwitch{}     = True
+isBranchNode _               = False
+
+-- | The store of continuation @l@'s return address
+isRetStore :: BlockId -> CmmNode O O -> Bool
+isRetStore l (CmmStore (CmmStackSlot (Young l1) _) (CmmLit (CmmBlock l2)) _)
+  = l1 == l && l2 == l
+isRetStore _ _ = False
+
+{- Note [Loop head stack maps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A block takes the stack map of the first of its predecessors that layout
+visits, and every later edge into it gets a fixup making the stack look
+the same. For a loop head that is the edge into the loop, so where the loop's
+body sets up a frame, say for a case's continuation (Note [diamond proc
+point]), the back edge pops it and every iteration stores the loop's
+invariants and moves Sp twice.
+
+So layout runs twice where that happens: the second run gives each loop head
+(not a proc point) the stack map common to its back edges in the first run
+(their Sp, and the variables each has in the same slot), and the edge into
+the loop pays the difference once. A back edge from a block reached only
+through an unlikely branch, as a GC call's continuation returning to a heap
+or stack check is, proposes nothing: seeded from it, the stack check of
+stg_decodeDouble_Int64# had every call store its argument and move Sp
+twice. And a head is not seeded where its loop makes a non-tail call to its
+own procedure and holds no diamond: the seed's cost is paid on each entry
+and exit, which in a recursion whose loop rarely turns (nofib's tak, a self
+tail call around three calls of itself, entered three times an iteration)
+costs more than it saves; a loop over data, or calling other code
+(fannkuch-redux's), turns many times an entry. The second run is kept only if its back
+edges then need no fixup; otherwise the first is.
+-}
+
+loopHeadSeeds :: Maybe CLabel -> BlockId -> ProcPointSet -> LabelMap StackMap
+              -> LabelMap [Maybe StackMap] -> [BlockId] -> [CmmBlock]
+              -> LabelMap StackMap
+loopHeadSeeds self_lbl entry procpoints stackmaps props dia_blocks blocks
+  = mapFoldlWithKey add mapEmpty props
+  where
+    blockmap = mapFromList [ (entryLabel b, b) | b <- blocks ]
+    -- a non-tail call of the procedure itself
+    selfCall x = case mapLookup x blockmap of
+      Just blk | CmmCall{ cml_target = CmmLit (CmmLabel lbl)
+                        , cml_cont = Just _ } <- lastNode blk
+               -> Just lbl == self_lbl
+      _ -> False
+    -- a loop holding a diamond, or one not recursing into its procedure:
+    -- a head's loop is its strongly connected component (the blocks
+    -- the head reaches that reach it), computed once for all heads
+    dias = setFromList dia_blocks
+    loopOk = mapFromList
+      [ (x, ok) | scc <- stronglyConnCompFromEdgedVerticesUniq
+                           [ DigraphNode l l (successors (lastNode b))
+                           | b <- blocks, let l = entryLabel b ]
+                , let xs = flattenSCC scc
+                      ok = any (`setMember` dias) xs || not (any selfCall xs)
+                , x <- xs ]
+    inLoop l = mapFindWithDefault False l loopOk
+    add acc l ps
+      | l /= entry
+      , not (l `setMember` procpoints)
+      , Just (p : rest) <- sequence ps
+      , all ((== sm_sp p) . sm_sp) rest
+      , Just old <- mapLookup l stackmaps
+      , let seed = p { sm_regs = foldl' commonRegs (sm_regs p)
+                                        (map sm_regs rest) }
+      , any (needsFixup old) (p : rest)
+      , inLoop l
+      = mapInsert l seed acc
+      | otherwise = acc
+
+{- Note [Reserved frames in loops] (probe, GHC_MW_VARIANT rf)
+In a loop that loopHeadSeeds does not seed, as where its back edges need no
+fixup or differ in depth, a call returning into the loop moves Sp twice an
+iteration where its return path joins a path that made no call, as emitEnter's
+sequence (MW) does at its join: down at the call, up at the join. So the second
+run gives such a loop's head the depth of the deepest continuation in its loop,
+with the loop's invariants (live at the head, assigned nowhere in the loop) in
+the slots that continuation's frame gave them, and the calls returning into
+the loop keep the stack's depth (Note [Diamond frames keep their depth]):
+the frame is reserved, and the edge into the loop pays the Sp move and the
+invariants' stores once. The join then takes the depth from the path that made
+no call, and the registers it has in slots. The second run is kept only if its
+seeds hold (Note [Loop head stack maps]); where they do not and loopHeadSeeds
+seeded some head, a third run tries its seeds alone. rfa reserves only in a
+loop that advances a variable live at its head: one that only permutes them, as
+integerAdd's swap of its arguments, turns at most a few times an entry, and pays
+the Sp moves on the edge in and at each exit every time its procedure is called.
+-}
+
+reservedSeeds :: Platform -> Maybe CLabel -> BlockId -> ProcPointSet
+              -> LabelMap CmmLocalLive -> LabelMap StackMap
+              -> LabelMap [Maybe StackMap] -> [BlockId] -> [CmmBlock]
+              -> LabelMap StackMap -> (LabelMap StackMap, LabelSet)
+reservedSeeds platform self_lbl entry procpoints liveness stackmaps props
+              dia_blocks blocks seeds0
+  = ( foldl' (\m (l, sd, _) -> mapInsert l sd m) seeds0 found
+    , setUnions [ ks | (_, _, ks) <- found ] )
+  where
+    blockmap = mapFromList [ (entryLabel b, b) | b <- blocks ]
+    selfCall x = case mapLookup x blockmap of
+      Just blk | CmmCall{ cml_target = CmmLit (CmmLabel lbl)
+                        , cml_cont = Just _ } <- lastNode blk
+               -> Just lbl == self_lbl
+      _ -> False
+    dias = setFromList dia_blocks
+    sccs = zip [0 :: Int ..]
+             [ flattenSCC scc | scc <- stronglyConnCompFromEdgedVerticesUniq
+                                  [ DigraphNode l l (successors (lastNode b))
+                                  | b <- blocks, let l = entryLabel b ] ]
+    sccOf = mapFromList [ (x, xs) | (_, xs) <- sccs, x <- xs ]
+    assignedIn xs = Set.fromList
+      [ r | x <- xs, Just blk <- [mapLookup x blockmap]
+          , let (_, mid, _) = blockSplit blk
+          , n <- blockToList mid
+          , r <- case n of
+                   CmmAssign (CmmLocal r) e | e /= CmmReg (CmmLocal r) -> [r]
+                   CmmUnsafeForeignCall _ res _ -> res
+                   _ -> [] ]
+    -- the variables a loop assigns from something other than a copy of
+    -- a variable (a load, arithmetic, a literal, a foreign call's result),
+    -- or from a copy of such a variable; an assignment from a global
+    -- register (a return's R1) counts as neither
+    advancedIn xs =
+      let asgs = [ (r, e) | x <- xs, Just blk <- [mapLookup x blockmap]
+                          , let (_, mid, _) = blockSplit blk
+                          , CmmAssign (CmmLocal r) e <- blockToList mid ]
+          fcres = [ r | x <- xs, Just blk <- [mapLookup x blockmap]
+                      , let (_, mid, _) = blockSplit blk
+                      , CmmUnsafeForeignCall _ res _ <- blockToList mid, r <- res ]
+          base = Set.fromList (fcres ++ [ r | (r, e) <- asgs, fresh e ])
+          fresh (CmmReg (CmmLocal _)) = False
+          fresh (CmmReg (CmmGlobal _)) = False
+          fresh _ = True
+          copies = [ (r', r) | (r, CmmReg (CmmLocal r')) <- asgs, r /= r' ]
+          grow s0 = let s1 = foldl' (\acc (a, b) -> if a `Set.member` acc
+                                                      then Set.insert b acc
+                                                      else acc) s0 copies
+                    in if Set.size s1 == Set.size s0 then s0 else grow s1
+      in grow base
+    wordsOf (r, off) = [ off, off - platformWordSizeInBytes platform
+                         .. off - localRegBytes platform r + 1 ]
+    found =
+      [ (l, seed, setFromList conts)
+      | (l, ps) <- mapToList props
+      , not (mapMember l seeds0)
+      , l /= entry
+      , not (l `setMember` procpoints)
+      , Just (p : rest) <- [sequence ps]
+      , Just old <- [mapLookup l stackmaps]
+        -- (probe, rfx) only where a back edge needs a fixup in the first run
+      , not (mwHas "rfx") || any (needsFixup old) (p : rest)
+      , Just xs <- [mapLookup l sccOf]
+      , any (`setMember` dias) xs || not (any selfCall xs)
+      , let conts = [ k | k <- xs, k `setMember` procpoints ]
+            deep = [ sm | k <- conts, Just sm <- [mapLookup k stackmaps] ]
+      , smk : _ <- [ sortOn (negate . sm_sp) deep ]
+      , sm_sp smk > sm_sp old
+      , let common = foldl' commonRegs (sm_regs p) (map sm_regs rest)
+            live = mapFindWithDefault emptyRegSet l liveness
+            assigned = assignedIn xs
+            occupied = Set.fromList (concatMap wordsOf (nonDetEltsUFM common))
+            inv = [ (v, (v, off)) | (v, off) <- nonDetEltsUFM (sm_regs smk)
+                                  , v `elemRegSet` live
+                                  , not (v `Set.member` assigned)
+                                  , not (v `elemUFM` common)
+                                  , not (any (`Set.member` occupied)
+                                             (wordsOf (v, off))) ]
+            seed = old { sm_sp = sm_sp smk, sm_regs = addListToUFM common inv }
+        -- (probe, rfi) only in a loop with an invariant: one that permutes
+        -- its variables, as integerAdd's swap of its arguments, turns at
+        -- most a few times an entry
+      , not (mwHas "rfi") || any (\v -> v `elemRegSet` live && not (v `Set.member` assigned))
+                                 (map fst (nonDetEltsUFM (sm_regs smk)))
+        -- (probe, rfa) only in a loop that advances a variable live at its
+        -- head: one that only permutes them, as integerAdd's swap of its
+        -- arguments, turns at most a few times an entry
+      , not (mwHas "rfa") || any (\v -> v `elemRegSet` live) (Set.toList (advancedIn xs))
+      ]
+
+seedsHold :: LabelMap StackMap -> LabelMap [Maybe StackMap] -> Bool
+seedsHold seeds props = and
+  [ maybe False (not . needsFixup seed) mp
+  | (l, seed) <- mapToList seeds
+  , mp <- mapFindWithDefault [] l props ]
+
+-- | The variables in the same slot in both
+commonRegs :: UniqFM LocalReg (LocalReg, StackLoc)
+           -> UniqFM LocalReg (LocalReg, StackLoc)
+           -> UniqFM LocalReg (LocalReg, StackLoc)
+commonRegs a b = filterUFM same a
+  where same (r, off) = case lookupUFM b r of
+                          Just (_, off') -> off == off'
+                          Nothing        -> False
+
+-- | Whether a jump with stack map @from@ to a block with stack map @to@
+-- needs a fixup
+needsFixup :: StackMap -> StackMap -> Bool
+needsFixup to from
+  = sm_sp to /= sm_sp from || not (null (fixupStack from to))
 
 
 -- -----------------------------------------------------------------------------
@@ -406,6 +777,10 @@ procMiddle stackmaps node sm
      CmmAssign (CmmLocal r) (CmmLoad (CmmStackSlot area off) _ _)
        -> sm { sm_regs = addToUFM (sm_regs sm) r (r,loc) }
         where loc = getStackLoc area off stackmaps
+     -- r = r, as a self-recursive call passes an argument unchanged,
+     -- leaves r's slot valid
+     CmmAssign (CmmLocal r) (CmmReg (CmmLocal r')) | r == r'
+       -> sm
      CmmAssign (CmmLocal r) _other
        -> sm { sm_regs = delFromUFM (sm_regs sm) r }
      CmmUnsafeForeignCall _ results _
@@ -442,6 +817,8 @@ getStackLoc (Young l) n stackmaps =
 
 handleLastNode
    :: CmmConfig -> ProcPointSet -> LabelMap CmmLocalLive -> LabelMap ByteOff
+   -> LabelSet -> LabelMap Int -> LabelMap CmmBlock
+   -> LabelMap (Map.Map LocalReg Int) -> Bool
    -> LabelMap StackMap -> StackMap -> CmmTickScope
    -> Block CmmNode O O
    -> CmmNode O C
@@ -451,9 +828,14 @@ handleLastNode
       , CmmNode O C        -- new last node
       , [CmmBlock]         -- new blocks
       , LabelMap StackMap  -- stackmaps for the continuations
+      , Maybe (BlockId, Bool, [LocalReg], Maybe BlockId)
+        -- a diamond's continuation, whether its return address store
+        -- moved to the call's edge, the variables stored there only,
+        -- and that edge's block if it holds them
       )
 
-handleLastNode cfg procpoints liveness cont_info stackmaps
+handleLastNode cfg procpoints liveness cont_info keeps cont_callers blockmap need
+               lazy_ok stackmaps
                stack0@StackMap { sm_sp = sp0 } tscp middle last
   = case last of
       --  At each return / tail call,
@@ -461,7 +843,7 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
       --  is cml_args, after popping any other junk from the stack.
       CmmCall{ cml_cont = Nothing, .. } -> do
         let sp_off = sp0 - cml_args
-        return ([], sp_off, last, [], mapEmpty)
+        return ([], sp_off, last, [], mapEmpty, Nothing)
 
       --  At each CmmCall with a continuation:
       CmmCall{ cml_cont = Just cont_lbl, .. } ->
@@ -483,18 +865,21 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
                  , CmmNode O C
                  , [CmmBlock]
                  , LabelMap StackMap
+                 , Maybe (BlockId, Bool, [LocalReg], Maybe BlockId)
                  )
      lastCall lbl cml_args cml_ret_args cml_ret_off
       =  ( assignments
          , spOffsetForCall sp0 cont_stack cml_args
          , last
          , [] -- no new blocks
-         , mapSingleton lbl cont_stack )
+         , mapSingleton lbl cont_stack
+         , Nothing )
       where
-         (assignments, cont_stack) = prepareStack lbl cml_ret_args cml_ret_off
+         (assignments, cont_stack) = prepareStack (lbl `setMember` keeps) lbl
+                                                  cml_ret_args cml_ret_off
 
 
-     prepareStack lbl cml_ret_args cml_ret_off
+     prepareStack keep lbl cml_ret_args cml_ret_off
        | Just cont_stack <- mapLookup lbl stackmaps
              -- If we have already seen this continuation before, then
              -- we just have to make the stack look the same:
@@ -504,7 +889,7 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
        = (save_assignments, new_cont_stack)
        where
         (new_cont_stack, save_assignments)
-           = setupStackFrame platform lbl liveness cml_ret_off cml_ret_args stack0
+           = setupStackFrame platform keep lbl liveness cml_ret_off cml_ret_args stack0
 
 
      -- For other last nodes (branches), if any of the targets is a
@@ -515,7 +900,8 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
                                 , ByteOff
                                 , CmmNode O C
                                 , [CmmBlock]
-                                , LabelMap StackMap )
+                                , LabelMap StackMap
+                                , Maybe (BlockId, Bool, [LocalReg], Maybe BlockId) )
 
      handleBranches
          -- See Note [diamond proc point]
@@ -523,14 +909,43 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
        , (nub $ filter (`setMember` procpoints) $ successors last) == [l]
        = do
          let cont_args = mapFindWithDefault 0 l cont_info
-             (assigs, cont_stack) = prepareStack l cont_args (sm_ret_off stack0)
+             -- See Note [Diamond frames keep their depth]
+             (assigs, cont_stack) = prepareStack True l cont_args (sm_ret_off stack0)
              out = mapFromList [ (l', cont_stack)
                                | l' <- successors last ]
-         return ( assigs
-                , spOffsetForCall sp0 cont_stack (platformWordSizeInBytes platform)
-                , last
-                , []
-                , out)
+             sp_off = spOffsetForCall sp0 cont_stack (platformWordSizeInBytes platform)
+             -- The return address is needed only by the call, if it is
+             -- the only block returning to l: no jump to the canned GC
+             -- routine in l's alternatives relies on it. See Note
+             -- [Tagged path skips the reloads]
+             move_ret = case [ c | c <- successors last, c /= l ] of
+               [c] | Just cb <- mapLookup c blockmap
+                   , CmmCall{ cml_cont = Just l2 } <- lastNode cb
+                   , l2 == l
+                   , mapLookup l cont_callers == Just 1
+                   , [st] <- filter (isRetStore l) (blockToList middle)
+                   -> Just (c, st)
+               _ -> Nothing
+             -- See Note [Tagged path skips the stores]
+             later = mapFindWithDefault Map.empty l need
+             lazy_store (CmmStore _ (CmmReg (CmmLocal r)) _)
+               = lazy_ok && cont_args == platformWordSizeInBytes platform
+                 && Map.findWithDefault 0 r later <= 1
+             lazy_store _ = False
+             (lazy_assigs, eager_assigs) = partition lazy_store assigs
+             lazy_regs = [ r | CmmStore _ (CmmReg (CmmLocal r)) _ <- lazy_assigs ]
+         case move_ret of
+           Nothing ->
+             return (assigs, sp_off, last, [], out, Just (l, False, [], Nothing))
+           Just (c, st) -> do
+             tmp <- newBlockId
+             let blk = blockJoin (CmmEntry tmp tscp)
+                                 (blockFromList (st : lazy_assigs))
+                                 (CmmBranch c)
+                 last' = mapSuccessors (\x -> if x == c then tmp else x) last
+             return ( eager_assigs, sp_off, last', [blk], out
+                    , Just (l, True, lazy_regs
+                           , if null lazy_regs then Nothing else Just tmp) )
 
         | otherwise = do
           pps <- mapM handleBranch (successors last)
@@ -541,7 +956,8 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
                  , 0
                  , mapSuccessors fix_lbl last
                  , concat [ blk | (_,_,_,blk) <- pps ]
-                 , mapFromList [ (l, sm) | (l,_,sm,_) <- pps ] )
+                 , mapFromList [ (l, sm) | (l,_,sm,_) <- pps ]
+                 , Nothing )
 
      -- For each successor of this block
      handleBranch :: BlockId -> UniqDSM (BlockId, BlockId, StackMap, [CmmBlock])
@@ -561,7 +977,7 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
         = do
              let cont_args = mapFindWithDefault 0 l cont_info
                  (stack2, assigs) =
-                      setupStackFrame platform l liveness (sm_ret_off stack0)
+                      setupStackFrame platform False l liveness (sm_ret_off stack0)
                                                         cont_args stack0
              (tmp_lbl, block) <- makeFixupBlock cfg sp0 l stack2 tscp assigs
              return (l, tmp_lbl, stack2, block)
@@ -620,6 +1036,7 @@ fixupStack old_stack new_stack = concatMap move new_locs
 
 setupStackFrame
              :: Platform
+             -> Bool                    -- keep the stack's depth
              -> BlockId                 -- label of continuation
              -> LabelMap CmmLocalLive   -- liveness
              -> ByteOff      -- updfr
@@ -627,7 +1044,7 @@ setupStackFrame
              -> StackMap     -- current StackMap
              -> (StackMap, [CmmNode O O])
 
-setupStackFrame platform lbl liveness updfr_off ret_args stack0
+setupStackFrame platform keep lbl liveness updfr_off ret_args stack0
   = (cont_stack, assignments)
   where
       -- get the set of LocalRegs live in the continuation
@@ -643,7 +1060,7 @@ setupStackFrame platform lbl liveness updfr_off ret_args stack0
 
       -- everything up to updfr_off is off-limits
       -- stack1 contains updfr_off, plus everything we need to save
-      (stack1, assignments) = allocate platform updfr_off live stack0
+      (stack1, assignments) = allocate platform keep updfr_off live stack0
 
       -- And the Sp at the continuation is:
       --   sm_sp stack1 + ret_args
@@ -723,9 +1140,9 @@ futureContinuation middle = foldBlockNodesB f middle Nothing
 -- on the stack and return the new StackMap and the assignments to do
 -- the saving.
 --
-allocate :: Platform -> ByteOff -> LocalRegSet -> StackMap
+allocate :: Platform -> Bool -> ByteOff -> LocalRegSet -> StackMap
          -> (StackMap, [CmmNode O O])
-allocate platform ret_off live stackmap@StackMap{ sm_sp = sp0
+allocate platform keep ret_off live stackmap@StackMap{ sm_sp = sp0
                                               , sm_regs = regs0 }
  =
    -- we only have to save regs that are not already in a slot
@@ -800,6 +1217,8 @@ allocate platform ret_off live stackmap@StackMap{ sm_sp = sp0
 
        trim_sp
           | not (null push_regs) = push_sp
+          | keep  -- trim at most the word the return address takes
+          = plusW platform n (- min 1 (length (takeWhile isEmpty save_stack)))
           | otherwise
           = plusW platform n (- length (takeWhile isEmpty save_stack))
 
@@ -1045,6 +1464,193 @@ stackMapToLiveness platform StackMap{..} =
                    | (r,off) <- nonDetEltsUFM sm_regs
                    , isGcPtrType (localRegType r) ]
                    -- See Note [Unique Determinism and code generation]
+
+-- -----------------------------------------------------------------------------
+-- Between the passes: the tagged path into a continuation
+-- -----------------------------------------------------------------------------
+
+{- Note [Tagged path skips the reloads]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a diamond (Note [diamond proc point]) the frame is set up before the tag
+test, so the tagged path reaches the continuation L with every live variable
+both in its slot and in its register; only the call's return clobbers the
+registers. Yet L reloads them all (Pass 2) on either path. So, where proc
+points are not split, L's body moves to a new block L', L becomes its reloads
+and a jump to L', and the tagged path jumps to L'.
+
+That makes what L' needs live at the tag test, and so possibly at an earlier
+proc point, where Pass 2 would then reload it too: in a chain of evaluations
+(#3294) every continuation would reload everything live. So the diamonds are
+rewritten only where the reloads this adds at proc points total at most two
+a diamond; failing that, those whose tag test follows no proc point whose
+reloads grow; failing that, none. In a loop whose continuation leads back to
+the tag test nothing grows.
+
+The return address store moves off the tagged path too (to the edge into the
+call) where the call is the only block returning to L: a canned GC routine
+jumped to from L's alternatives returns through it.
+-}
+
+tagSkip :: Platform -> ProcPointSet -> BlockId -> LabelMap StackMap
+        -> [(BlockId, BlockId, Maybe BlockId)] -> [CmmBlock]
+        -> UniqDSM (LabelMap StackMap, [CmmBlock])
+tagSkip _ _ _ stackmaps [] blocks = return (stackmaps, blocks)
+tagSkip platform procpoints entry stackmaps dias0 blocks = do
+    -- one body label for each continuation, which several diamonds may share
+    -- once common block elimination has merged their continuations
+    bodies <- mapM (\l -> do { l' <- newBlockId; return (l, l') })
+                   (setElems (setFromList [ l | (_, l, _) <- dias0 ]))
+    let body_of = mapFromList bodies
+        cands = [ (b, l, mapFindWithDefault l l body_of) | (b, l, _) <- dias0 ]
+    let reloads0 = reloadSets blocks
+        -- the proc points whose reloads grow, and by how many variables
+        grown cs = [ (p, n) | (p, s) <- mapToList (reloadSets (apply cs))
+                            , let n = Set.size (s `Set.difference`
+                                    mapFindWithDefault Set.empty p reloads0)
+                            , n > 0 ]
+        -- at most two reloads more for each diamond rewritten
+        cheap cs g = sum (map snd g) <= 2 * length cs
+        grown_all = grown cands
+        -- the blocks reached from a proc point before any other one
+        region p = go (setSingleton p) [p]
+          where go seen [] = seen
+                go seen (x : xs) =
+                  let new = [ s | Just blk <- [mapLookup x blockmap]
+                                , s <- successors (lastNode blk)
+                                , not (s `setMember` procpoints)
+                                , not (s `setMember` seen) ]
+                  in go (foldr setInsert seen new) (new ++ xs)
+        accepted
+          | cheap cands grown_all = cands
+          | otherwise =
+              let bad = setUnions (map (region . fst) grown_all)
+                  cs' = [ c | c@(b, _, _) <- cands, not (b `setMember` bad) ]
+              in if cheap cs' (grown cs') then cs' else []
+        stackmaps' = foldl' (\m (_, l, l') -> case mapLookup l m of
+                                Just sm -> mapInsert l' sm m
+                                Nothing -> m) stackmaps accepted
+        taken = setFromList [ b | (b, _, _) <- accepted ]
+        -- the block holding a test block's last node once a diamond whose
+        -- continuation it is has been rewritten
+        holder b = mapFindWithDefault b b
+                     (mapFromList [ (l, l') | (_, l, l') <- accepted ])
+    -- a diamond left out stores on its tagged path too what it stores only
+    -- on the call's: see Note [Tagged path skips the stores]
+    refused <- sequence [ do { t <- newBlockId; return (b, l, c, t) }
+                        | (b, l, Just c) <- dias0, not (b `setMember` taken) ]
+    return (stackmaps', storeTagged holder refused (apply accepted))
+  where
+    storeTagged _ [] bs = bs
+    storeTagged holder refused bs = new ++ map retarget bs
+      where
+        tests = mapFromList [ (holder b, (l, t)) | (b, l, _, t) <- refused ]
+        new = [ blockJoin (CmmEntry t tscp) (blockFromList stores) (CmmBranch l)
+              | (_, l, c, t) <- refused
+              , Just cblk <- [mapLookup c blockmap]
+              , let (CmmEntry _ tscp, cmid, _) = blockSplit cblk
+                    stores = [ n | n@(CmmStore _ (CmmReg _) _) <- blockToList cmid ] ]
+        retarget blk
+          | Just (l, t) <- mapLookup (entryLabel blk) tests
+          , (e, middle, last) <- blockSplit blk
+          = blockJoin e middle (mapSuccessors (\x -> if x == l then t else x) last)
+          | otherwise = blk
+
+    blockmap = mapFromList [ (entryLabel b, b) | b <- blocks ]
+
+    apply cs = concatMap one blocks
+      where
+        conts = mapFromList [ (l, l') | (_, l, l') <- cs ]
+        tests = mapFromList [ (b, (l, l')) | (b, l, l') <- cs ]
+        one blk = case mapLookup lbl conts of
+            Just l' -> [ blockJoin (CmmEntry lbl tscp) emptyBlock (CmmBranch l')
+                       , blockJoin (CmmEntry l' tscp) middle last' ]
+            Nothing | mapMember lbl tests -> [ blockJoin e middle last' ]
+                    | otherwise           -> [blk]
+          where
+            lbl = entryLabel blk
+            (e@(CmmEntry _ tscp), middle, last) = blockSplit blk
+            -- a continuation's body may hold the next diamond's tag test
+            last' = case mapLookup lbl tests of
+              Just (l, l') -> mapSuccessors (\x -> if x == l then l' else x) last
+              Nothing      -> last
+
+    -- what Pass 2 reloads at each proc point
+    reloadSets :: [CmmBlock] -> LabelMap CmmLocalLive
+    reloadSets bs = mapFromList [ (entryLabel blk, atMiddle blk facts)
+                                | blk <- bs
+                                , entryLabel blk `setMember` procpoints ]
+      where
+        facts = analyzeCmmBwd liveLattice xfer (ofBlockList entry bs) mapEmpty
+        xfer blk fb = mapSingleton (entryLabel blk) $!
+          if entryLabel blk `setMember` procpoints then emptyRegSet
+                                                   else atMiddle blk fb
+
+    atMiddle :: CmmBlock -> FactBase CmmLocalLive -> CmmLocalLive
+    atMiddle blk fb =
+      let (_, middle, last) = blockSplit blk
+          joined = gen_kill platform last $! joinOutFacts liveLattice last fb
+      in foldNodesBwdOO (gen_kill platform) middle joined
+
+{- Note [Diamond frames keep their depth]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A diamond's frame (Note [diamond proc point]) is set up before the tag test,
+Sp moved on both paths. Trimmed to its live variables, as a call's frame is,
+it moves Sp whenever two diamonds in a loop differ in depth, on the evaluated
+path too: up at one, down at the next. So a diamond's frame keeps the stack's
+depth, trimming at most the word its return address takes, and the dead
+slots stay as holes, described as non-pointers.
+-}
+
+{- Note [Tagged path skips the stores]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A diamond (Note [diamond proc point]) stores the variables live in its
+continuation L before the tag test. A variable that at most one later call
+needs in a slot before it is redefined, such as a loop's index, is stored
+on the call's edge only, where the call is the only block returning to L
+(as the return address is, Note [Tagged path skips the reloads]). L's body
+then does not assume it in its slot, so that one later call stores it on its
+own path. A variable more later calls need is stored before the test as
+before, so that they share the store (#3294's chain of evaluations).
+A diamond whose tagged path still goes to L, whose reloads read every slot,
+stores on that path too. Not where proc points are split.
+-}
+
+-- | For each block, the variables that calls after its entry need in a slot
+-- before they are redefined, with how many such calls: 1, or 2 for more.
+isLitTarget :: CmmExpr -> Bool
+isLitTarget (CmmLit _) = True
+isLitTarget _ = False
+
+laterSaves :: LabelMap CmmLocalLive -> BlockId -> [CmmBlock]
+           -> LabelMap (Map.Map LocalReg Int)
+laterSaves liveness entry blocks
+  = analyzeCmmBwd lattice xfer (ofBlockList entry blocks) mapEmpty
+  where
+    lattice = DataflowLattice Map.empty joinF
+    joinF (OldFact old) (NewFact new) =
+      let !j = Map.unionWith max old new
+      in if j == old then NotChanged old else Changed j
+    xfer blk fb = mapSingleton (entryLabel blk) $!
+        foldNodesBwdOO mid middle (atLast last)
+      where
+        (_, middle, last) = blockSplit blk
+        fact l = mapFindWithDefault Map.empty l fb
+        atLast :: CmmNode O C -> Map.Map LocalReg Int
+        atLast n = case n of
+          -- an evaluation's call (probe, nev): not counted
+          CmmCall{ cml_cont = Just k, cml_target = t }
+            | mwHas "nev", not (isLitTarget t) -> fact k
+          CmmCall{ cml_cont = Just k } -> atCall k
+          CmmForeignCall{ succ = k }   -> atCall k
+          _ -> Map.unionsWith max (map fact (successors n))
+        atCall k =
+          Map.fromSet (\r -> min 2 (1 + Map.findWithDefault 0 r (fact k)))
+                      (mapFindWithDefault Set.empty k liveness)
+        mid :: CmmNode O O -> Map.Map LocalReg Int -> Map.Map LocalReg Int
+        mid (CmmAssign (CmmLocal r) e) f
+          | e /= CmmReg (CmmLocal r) = Map.delete r f
+        mid (CmmUnsafeForeignCall _ res _) f = foldl' (flip Map.delete) f res
+        mid _ f = f
 
 -- -----------------------------------------------------------------------------
 -- Pass 2
