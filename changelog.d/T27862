@@ -1,0 +1,7 @@
+section: compiler
+issues: #27862
+mrs: !16899
+synopsis:
+  Improve desugaring for pattern matching involving bang-patterns
+description:
+  GHC was generating poor code for pattern matching that used bang-patterns

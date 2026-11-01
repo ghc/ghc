@@ -121,3 +121,13 @@ test('T27383',
      [collect_compiler_stats('bytes allocated', 10)],
      compile,
      ['-Wincomplete-patterns'])
+
+# T27862.  Expecting to see
+#   allBangs = lastLazy, and firstBang = lastLazy,
+# so they have identical code
+test('T27862', [grep_errmsg(' lastLazy')], compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
+test('T27862a', normal, compile, [''])
+test('T27862b', normal, compile, [''])
+test('T27862c', normal, compile_fail, [''])
+test('T27862d', normal, compile, [''])
+test('T28137', normal, compile, [''])
