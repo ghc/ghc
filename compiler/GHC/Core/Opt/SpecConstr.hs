@@ -684,7 +684,7 @@ But regardless, SpecConstr can and should!  It's easy:
 Wrinkles:
 
 * This should all work perfectly fine for newtype classes.  Mind you,
-  currently newtype classes are inlined fairly agressively, but we
+  currently newtype classes are inlined fairly aggressively, but we
   may change that. And it would take extra code to exclude them, as
   well as being unnecessary.
 
