@@ -2884,7 +2884,7 @@
                    (FromSource)
                    (AnnList
                     (EpVirtualBraces
-                     (EpaSpan { DumpSemis.hs:(48,6)-(53,13) }))
+                     (EpaSpan { DumpSemis.hs:48:6 }))
                     [(EpTok
                       (EpaSpan { DumpSemis.hs:48:6 }))
                     ,(EpTok
@@ -3414,7 +3414,7 @@
                     (ValBinds
                      (AnnList
                       (EpVirtualBraces
-                       (EpaSpan { DumpSemis.hs:(57,9)-(58,15) }))
+                       (EpaSpan { DumpSemis.hs:57:9 }))
                       [(EpTok
                         (EpaSpan { DumpSemis.hs:57:9 }))])
                      [(VbBind
@@ -3877,7 +3877,7 @@
                (ValBinds
                 (AnnList
                  (EpVirtualBraces
-                  (EpaSpan { DumpSemis.hs:63:9-16 }))
+                  (EpaSpan { DumpSemis.hs:63:9 }))
                  [(EpTok
                    (EpaSpan { DumpSemis.hs:63:9 }))
                  ,(EpTok

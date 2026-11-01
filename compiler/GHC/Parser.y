@@ -1796,12 +1796,12 @@ cvars1 :: { [RecordPatSynField GhcPs] }
                                             ; return ((RecordPatSynField (mkFieldOcc h) h) : $3 )}}
 
 where_decls :: { Located (Located (OrdList (LHsDecl GhcPs)), EpToken "where", AnnList) }
-        : 'where' '{' decls '}'       { sLL $1 $> (sL1 $3 (thdOf3 $ unLoc $3),
+        : 'where' '{' decls '}'       { sLL $1 $> (sL1 $3 (snd $ unLoc $3),
                                                   epTok $1,
-                                                  AnnList (EpExplicitBraces (epTok $2) (epTok $4)) (sndOf3 $ unLoc $3)) }
-        | 'where' vocurly decls close { sLL $1 $3 (sLL $2 $3 (thdOf3 $ unLoc $3),
+                                                  AnnList (EpExplicitBraces (epTok $2) (epTok $4)) (fst $ unLoc $3)) }
+        | 'where' vocurly decls close { sLL $1 $3 (sLL $2 $3 (snd $ unLoc $3),
                                                   epTok $1,
-                                                  pal $ AnnList (epVirtualBraces (glR $3) $3) (sndOf3 $ unLoc $3)) }
+                                                  pal $ AnnList (epVirtualBraces (glR $2) $3) (fst $ unLoc $3)) }
 
 pattern_synonym_sig :: { LSig GhcPs }
         : 'pattern' con_list '::' sigtype
@@ -1916,36 +1916,37 @@ where_inst :: { Located ((EpToken "where", AnnList)
 
 -- Declarations in binding groups other than classes and instances
 --
-decls   :: { Located (EpaLocation, [EpToken ";"], OrdList (LHsDecl GhcPs)) }
-        : decls ';' decl    {% if isNilOL (thdOf3 $ unLoc $1)
-                                 then return (sLL $2 $> (glR $3, (sndOf3 $ unLoc $1) ++ (msemiA $2)
+decls   :: { Located ([EpToken ";"], OrdList (LHsDecl GhcPs)) }
+        : decls ';' decl    {% if isNilOL (snd $ unLoc $1)
+                                 then return (sLL $2 $> ((fst $ unLoc $1) ++ (msemiA $2)
                                                         , unitOL $3))
-                                 else case (thdOf3 $ unLoc $1) of
+                                 else case (snd $ unLoc $1) of
                                    SnocOL hs t -> do
                                       t' <- addTrailingSemiA t (epTok $2)
                                       let { this = unitOL $3;
                                             rest = snocOL hs t';
                                             these = rest `appOL` this }
                                       return (rest `seq` this `seq` these `seq`
-                                                 (sLL $1 $> (glEE (fstOf3 $ unLoc $1) $3, sndOf3 $ unLoc $1, these))) }
-        | decls ';'          {% if isNilOL (thdOf3 $ unLoc $1)
-                                  then return (sLZ $1 $> (glR $2, (sndOf3 $ unLoc $1) ++ (msemiA $2)
-                                                          ,thdOf3 $ unLoc $1))
-                                  else case (thdOf3 $ unLoc $1) of
+                                                 (sLL $1 $> (fst $ unLoc $1, these))) }
+        | decls ';'          {% if isNilOL (snd $ unLoc $1)
+                                  then return (sLZ $1 $> ((fst $ unLoc $1) ++ (msemiA $2)
+                                                          ,snd $ unLoc $1))
+                                  else case (snd $ unLoc $1) of
                                     SnocOL hs t -> do
                                        t' <- addTrailingSemiA t (epTok $2)
-                                       return (sLZ $1 $> (glEEz $1 $2, sndOf3 $ unLoc $1, snocOL hs t')) }
-        | decl                          { sL1 $1 (glR $1,  [], unitOL $1) }
-        | {- empty -}                   { noLoc (noAnn, [],nilOL) }
+                                       return (sLZ $1 $> (fst $ unLoc $1, snocOL hs t')) }
+        | decl                          { sL1 $1 ([], unitOL $1) }
+        | {- empty -}                   { noLoc ([],nilOL) }
 
-decllist :: { Located (AnnList,Located (OrdList (LHsDecl GhcPs))) }
-        : '{'            decls '}'     { sLL $1 $> (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) (sndOf3 $ unLoc $2)
-                                                   ,sL1 $2 $ thdOf3 $ unLoc $2) }
-        |     vocurly    decls close   { if null (sndOf3 $ unLoc $2) && isNilOL (thdOf3 $ unLoc $2)
-                                            then noLoc (pal $ AnnList (epVirtualBraces (fstOf3 $ unLoc $2) $2) (sndOf3 $ unLoc $2)
-                                                       ,sL1 $2 $ thdOf3 $ unLoc $2)
-                                            else sLL $1 $2 (pal $ AnnList (epVirtualBraces (fstOf3 $ unLoc $2) $2) (sndOf3 $ unLoc $2)
-                                                           ,sL1 $2 $ thdOf3 $ unLoc $2) }
+decllist :: { Located (AnnList, Located (OrdList (LHsDecl GhcPs))) }
+        : '{'            decls '}'     { sLL $1 $> (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) (fst $ unLoc $2)
+                                                   ,sL1 $2 $ snd $ unLoc $2) }
+        |     vocurly    decls close   { let { L l (anns, decls) = $2
+                                             ; epv = epVirtualBraces (glR $1) $2
+                                             ; loc = if isGoodSrcSpan (getHasLoc $2)
+                                                       then comb2 $1 $2
+                                                       else noSrcSpan }
+                                            in L loc (pal $ AnnList epv anns, sL1 $2 decls) }
 
 -- Binding groups other than those of class and instance declarations
 --
@@ -1961,7 +1962,7 @@ binds   ::  { LHsLocalBinds GhcPs }
                                              $ HsIPBinds noEpTok (L (noAnnSrcSpan $ gl $1) (IPBinds (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) []) (reverse $ unLoc $2)))) }
 
         |     vocurly    dbinds close   {% amsA' (sLL $1 $2
-                                             $ HsIPBinds noEpTok (L (noAnnSrcSpan $ gl $1) (IPBinds (pal $ AnnList (epVirtualBraces (glR $2) $2) []) (reverse $ unLoc $2)))) }
+                                             $ HsIPBinds noEpTok (L (noAnnSrcSpan $ gl $1) (IPBinds (pal $ AnnList (epVirtualBraces (glR $1) $2) []) (reverse $ unLoc $2)))) }
 
 
 wherebinds :: { Maybe (LHsLocalBinds GhcPs) }
@@ -3552,7 +3553,7 @@ altslist(PATS) :: { forall b. DisambECP b => PV (LocatedA ([LMatch GhcPs (Locate
                                            (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) (fst $ unLoc $2)))) }
         | vocurly    alts(PATS)  close { $2 >>= \ $2 -> amsA'
                                            (L (getLoc $2) (reverse (snd $ unLoc $2),
-                                           (pal $ AnnList (epVirtualBraces (glR $2) $2) (fst $ unLoc $2)))) }
+                                           (pal $ AnnList (epVirtualBraces (glR $1) $2) (fst $ unLoc $2)))) }
         | '{'              '}'   { amsA' (sLL $1 $> ([], (AnnList (EpExplicitBraces (epTok $1) (epTok $2)) []))) }
         | vocurly          close { return $ noLocA ([], pal $ AnnList EpNoLayout []) }
 
