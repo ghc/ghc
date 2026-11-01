@@ -1,8 +1,8 @@
 dsrun008: Uncaught exception ghc-internal:GHC.Internal.Control.Exception.Base.PatternMatchFail:
 
-dsrun008.hs:2:32-36: Non-exhaustive patterns in (2, x)
+dsrun008.hs:2:31-36: Non-exhaustive patterns in (2, x)
 
 
 HasCallStack backtrace:
-  throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:434:30 in ghc-internal:GHC.Internal.Control.Exception.Base
+  throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:438:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 

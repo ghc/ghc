@@ -1,0 +1,10 @@
+section: compiler
+issues: #28137
+mrs: !16899
+synopsis:
+  Refactor desugaring for pattern matching
+description:
+  Fix a missing warning for an overflowed literal in
+  pattern matching, when using ``-XStrict``.  We get the extra
+  warning, and a minor change in column numbers for lazy-pattern
+  warnings.
