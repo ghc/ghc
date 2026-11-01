@@ -124,11 +124,15 @@ Note [inl_inline and inl_act]
   INLINABLE, OPAQUE, or nothing at all
 
 * inl_act says in what phases the unfolding is active or inactive
-  E.g  If you write INLINE[1]    then inl_act will be set to ActiveAfter 1
-       If you write NOINLINE[1]  then inl_act will be set to ActiveBefore 1
-       If you write NOINLINE[~1] then inl_act will be set to ActiveAfter 1
-  So note that inl_act does not say what pragma you wrote: it just
-  expresses its consequences
+  E.g  If you write        then inl_act will be set to
+           INLINE           AlwaysActive
+           INLINE[1]        ActiveAfter 1
+           INLINE[~1]       ActiveBefore 1
+           NOINLINE[1]      ActiveAfter 1
+           NOINLINE[~1]     ActiveBefore 1
+           NOINLINE         NeverActive
+  So note that inl_act does not say what pragma you wrote:
+  it just expresses its consequences
 
 * inl_act just says when the unfolding is active; it doesn't say what
   to inline.  If you say INLINE f, then f's inl_act will be AlwaysActive,

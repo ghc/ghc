@@ -2227,7 +2227,7 @@ lambda and casts, e.g.
 
 * Why do we take care to account for intervening casts? Answer:
   currently we don't do eta-expansion and cast-swizzling in a stable
-  unfolding (see Historical-note [Eta-expansion in stable unfoldings]).
+  unfolding (see Note [Eta expansion in stable unfoldings and rules])
   So we can get
     f = \x. ((\y. ...x...y...) |> co)
   Now, since the lambdas aren't together, the occurrence analyser will

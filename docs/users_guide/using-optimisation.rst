@@ -1817,7 +1817,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     :type: dynamic
     :category:
 
-    :default: 80
+    :default: 90
 
     .. index::
        single: inlining, controlling
