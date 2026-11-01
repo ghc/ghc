@@ -204,3 +204,26 @@ def innermost_latch(s):
 test('T27799', [only_ways(['optasm']), unless(arch('x86_64'), skip),
                 normalise_errmsg_fun(innermost_latch)],
      compile, ['-O2 -fobject-determinism -ddump-asm'])
+
+# The moves of Sp, which stack layout no longer makes inside this loop: one
+# where the loop is entered and one at each of its two exits (x86-64 assembly)
+test('StackLayoutTagLoop',
+     [only_ways(['optasm']), unless(arch('x86_64'), skip),
+      grep_errmsg(r'((?:addq|subq) \$-?\d+,%rbp|leaq -?\d+\(%rbp\),%rbp)',
+                  [1])],
+     compile, ['-ddump-asm'])
+
+# A return address stored below Sp, which stack layout no longer emits
+# in this loop (x86-64 assembly; skipped on Windows and where code is
+# position-independent by default, a label being no immediate operand there)
+test('StackLayoutCallLoop', [only_ways(['optasm']), unless(arch('x86_64'), skip),
+                             when(opsys('mingw32') or opsys('darwin')
+                                  or opsys('openbsd'), skip),
+                             grep_errmsg(r'(movq \$\.L\w+_info,-\d+\(%rbp\))', [1])],
+     compile, ['-ddump-asm'])
+
+# Stores of a self-recursive loop's stack arguments, which stack layout
+# no longer emits at the loop's iterations (x86-64 assembly)
+test('T27991', [only_ways(['optasm']), unless(arch('x86_64'), skip),
+                grep_errmsg(r'(movq %\w+,-?\d*\(%rbp\))', [1])],
+     compile, ['-ddump-asm'])

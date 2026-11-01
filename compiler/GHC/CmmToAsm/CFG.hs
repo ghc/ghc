@@ -1123,8 +1123,9 @@ places, and the code generator treats each case differently:
   case's heuristics, two reach any other annotated branch without two back
   edges: lehPredicts combines its prediction with the weights the branch has by
   then, and the back edge rule replaces them where the branch has both a back
-  edge and another edge (the BUG in Note [Static Branch Prediction]). ohPredicts
-  skips an annotated branch.
+  edge and another edge (the BUG in Note [Static Branch Prediction]).
+  ohPredicts skips an annotated branch. Stack layout reads the annotation too,
+  in unlikelyOnlyBlocks and gcRetryCopies (GHC.Cmm.LayoutStack).
 
 * Upstream, and not carried down. Core and STG name the constructor a tag
   test selects, but the test that chooses a case alternative carries no
@@ -1154,6 +1155,10 @@ reason given:
   combines neighbouring chains (directEdges in GHC.CmmToAsm.BlockLayout):
   control returns from a call to its continuation through the continuation's
   info table, not by falling through.
+* Stack layout copies a heap or stack check that a body split off a continuation
+  also enters, for the garbage collector's retry, under the conditions of
+  Note [Retries copy their checks] in GHC.Cmm.LayoutStack: the copies cost code,
+  and the hot check loses the retry's way in.
 -}
 
 {- Note [Static Branch Prediction]
@@ -1274,7 +1279,10 @@ instead, and they are to be reinvestigated together:
    side of an unannotated test of a register held off BaseReg, as of CurrentTSO,
    once favourFewerPreds has broken its tie. The estimate would give each
    block's frequency, and its loops would give linearRA_SCCs an order taken from
-   the loops rather than the SCCs.
+   the loops rather than the SCCs. GHC.Cmm.LayoutStack's unlikelyOnlyBlocks
+   computes the candidate cold set: it takes the likelihood where a branch is
+   made, from cml_likely and literal conditions, and leaves warm a block a warm
+   edge also enters.
 
  * regClobbers in GHC.CmmToAsm.Reg.Linear counts every write, those in the
    blocks that follow a failed heap or stack check too; with the estimate a

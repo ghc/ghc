@@ -150,9 +150,11 @@ First confirm the wrong result against an oracle:
 * the LLVM back end (`-fllvm`, where LLVM is installed), which runs none
   of the NCG's passes but step 1's `fixStgRegisters`. Its Cmm pipeline differs
   from the NCG's in two settings only: it always splits proc points,
-  and it leaves switches to LLVM rather than to switch plans. For a Haskell
-  module, StgToCmm's output differs too, as some of its settings depend
-  on the back end (`initStgToCmmConfig` in `GHC.Driver.Config.StgToCmm`).
+  so that stack layout splits no body off a tag test's continuation
+  (Note [Tagged path skips the reloads] in `GHC.Cmm.LayoutStack`), and it leaves
+  switches to LLVM rather than to switch plans. For a Haskell module,
+  StgToCmm's output differs too, as some of its settings depend on the back end
+  (`initStgToCmmConfig` in `GHC.Driver.Config.StgToCmm`).
 * GHCi, for a Haskell program: its bytecode starts from STG.
 * `-O0`, which turns off at once every pass below that has a `-fno-` flag
   and turns on step 2's constant folding. For a Haskell module it changes

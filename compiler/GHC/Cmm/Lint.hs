@@ -68,7 +68,7 @@ lintCmmGraph g = do
    let
       blocks = toBlockList g
       labels = setFromList (map entryLabel blocks)
-   cmmLocalLiveness platform g `seq` mapM_ (lintCmmBlock labels) blocks
+   cmmLocalLivenessL platform g `seq` mapM_ (lintCmmBlock labels) blocks
    -- cmmLiveness throws an error if there are registers
    -- live on entry to the graph (i.e. undefined
    -- variables)
