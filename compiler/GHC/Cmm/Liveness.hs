@@ -1,6 +1,5 @@
 module GHC.Cmm.Liveness
     ( CmmLocalLive
-    , cmmLocalLiveness
     , cmmLocalLivenessL
     , noLiveOnEntryL
     , cmmGlobalLiveness
@@ -20,6 +19,7 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.LRegSet
+import GHC.Types.Unique.Set ( isSubsetOfUniqueSet )
 
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
@@ -31,11 +31,10 @@ import GHC.Utils.Panic
 
 -- | The variables live on entry to a block
 type CmmLive r = RegSet r
-type CmmLocalLive = CmmLive LocalReg
+type CmmLocalLive = LRegSet
 
 -- | The dataflow lattice
 liveLattice :: Ord r => DataflowLattice (CmmLive r)
-{-# SPECIALIZE liveLattice :: DataflowLattice (CmmLive LocalReg) #-}
 {-# SPECIALIZE liveLattice :: DataflowLattice (CmmLive GlobalReg) #-}
 liveLattice = DataflowLattice emptyRegSet add
   where
@@ -50,25 +49,9 @@ type BlockEntryLiveness r = LabelMap (CmmLive r)
 -- | Calculated liveness info for a CmmGraph
 -----------------------------------------------------------------------------
 
-cmmLocalLiveness :: Platform -> CmmGraph -> BlockEntryLiveness LocalReg
-cmmLocalLiveness platform graph =
-    check $ analyzeCmmBwd liveLattice (xferLive platform) graph mapEmpty
-  where
-    entry = g_entry graph
-    check facts =
-        noLiveOnEntry entry (expectJust $ mapLookup entry facts) facts
-
 cmmGlobalLiveness :: Platform -> CmmGraph -> BlockEntryLiveness GlobalRegUse
 cmmGlobalLiveness platform graph =
     analyzeCmmBwd liveLattice (xferLive platform) graph mapEmpty
-
--- | On entry to the procedure, there had better not be any LocalReg's live-in.
--- If you see this error it most likely means you are trying to use a variable
--- without it being defined, or initialized, in the given scope.
-noLiveOnEntry :: BlockId -> CmmLive LocalReg -> a -> a
-noLiveOnEntry bid in_fact x =
-  if nullRegSet in_fact then x
-  else pprPanic "LocalReg's live-in to graph" (ppr bid <+> ppr in_fact)
 
 gen_kill
     :: (DefinerOfRegs r n, UserOfRegs r n)
@@ -90,7 +73,6 @@ xferLive platform (BlockCC eNode middle xNode) fBase =
     let joined = gen_kill platform xNode $! joinOutFacts liveLattice xNode fBase
         !result = foldNodesBwdOO (gen_kill platform) middle joined
     in mapSingleton (entryLabel eNode) result
-{-# SPECIALIZE xferLive :: Platform -> TransferFun (CmmLive LocalReg) #-}
 {-# SPECIALIZE xferLive :: Platform -> TransferFun (CmmLive GlobalRegUse) #-}
 
 -----------------------------------------------------------------------------
@@ -108,9 +90,10 @@ type BlockEntryLivenessL  = LabelMap LRegSet
 liveLatticeL :: DataflowLattice LRegSet
 liveLatticeL = DataflowLattice emptyLRegSet add
   where
-    add (OldFact old) (NewFact new) =
-        let !join = unionLRegSet old new
-        in changedIf (sizeLRegSet join > sizeLRegSet old) join
+    -- by inclusion, not size, which a Word64Set counts leaf by leaf
+    add (OldFact old) (NewFact new)
+      | new `isSubsetOfUniqueSet` old = NotChanged old
+      | otherwise = Changed $! unionLRegSet old new
 
 
 cmmLocalLivenessL :: Platform -> CmmGraph -> BlockEntryLivenessL

@@ -1138,7 +1138,10 @@ instead, and they are to be reinvestigated together:
    side of an unannotated test of a register held off BaseReg, as of CurrentTSO,
    once favourFewerPreds has broken its tie. The estimate would give each
    block's frequency, and its loops would give linearRA_SCCs an order taken from
-   the loops rather than the SCCs.
+   the loops rather than the SCCs. GHC.Cmm.LayoutStack's unlikelyOnlyBlocks
+   computes the candidate cold set: it takes the likelihood where a branch is
+   made, from cml_likely and literal conditions, and leaves warm a block a warm
+   edge also enters.
 
  * regClobbers in GHC.CmmToAsm.Reg.Linear counts every write, those in the
    blocks that follow a failed heap or stack check too; with the estimate a

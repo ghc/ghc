@@ -468,7 +468,7 @@
 // MAYBE_GC() in the same proc as STK_CHK_GEN().
 //
 #define MAYBE_GC(retry)                         \
-    if (CHECK_GC()) {                           \
+    if (CHECK_GC()) (likely: False) {           \
         HpAlloc = 0;                            \
         goto __L__;                             \
   __L__:                                        \

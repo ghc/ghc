@@ -3,6 +3,7 @@ module GHC.Cmm.ContFlowOpt
     , cmmCfgOptsProc
     , removeUnreachableBlocksProc
     , replaceLabels
+    , callContinuation_maybe
     )
 where
 

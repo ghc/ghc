@@ -356,12 +356,14 @@ type Stmt = (LocalReg, CmmExpr) -- r := e
 --              s1 assigns to something s2 uses
 --        that is, if s1 should *follow* s2 in the final order
 
-emitMultiAssign []    []    = return ()
-emitMultiAssign [reg] [rhs] = emitAssign (CmmLocal reg) rhs
-emitMultiAssign regs rhss   = do
+emitMultiAssign regs rhss = do
   platform <- getPlatform
   assertPpr (equalLength regs rhss) (ppr regs $$ pdoc platform rhss) $
-    unscramble platform ([1..] `zip` (regs `zip` rhss))
+    -- an argument passed unchanged needs no assignment
+    case [ p | p@(r, e) <- regs `zip` rhss, e /= CmmReg (CmmLocal r) ] of
+      []         -> return ()
+      [(r, rhs)] -> emitAssign (CmmLocal r) rhs
+      ps         -> unscramble platform ([1..] `zip` ps)
 
 unscramble :: Platform -> [Vrtx] -> FCode ()
 unscramble platform vertices = mapM_ do_component components
