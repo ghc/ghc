@@ -90,7 +90,7 @@ slurpSpillCostInfo platform cmm
         -- Lookup the regs that are live on entry to this block in
         --      the info table from the CmmProc.
         countBlock info (BasicBlock blockId instrs)
-                | LiveInfo _ _ blockLive _ <- info
+                | LiveInfo _ _ blockLive _ _ <- info
                 , Just rsLiveEntry  <- mapLookup blockId blockLive
                 , rsLiveEntry_virt  <- takeVirtualRegs $ getRegs rsLiveEntry
                 = countLIs rsLiveEntry_virt instrs

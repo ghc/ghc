@@ -116,7 +116,7 @@ regSpill_top platform regSlotMap cmm
          -> return cmm
 
         CmmProc info label live sccs
-         |  LiveInfo static firstId liveVRegsOnEntry liveSlotsOnEntry <- info
+         |  LiveInfo static firstId liveVRegsOnEntry liveSlotsOnEntry succs <- info
          -> do
                 -- The liveVRegsOnEntry contains the set of vregs that are live
                 -- on entry to each basic block. If we spill one of those vregs
@@ -133,6 +133,7 @@ regSpill_top platform regSlotMap cmm
                         = LiveInfo static firstId
                                 liveVRegsOnEntry
                                 liveSlotsOnEntry'
+                                succs
 
                 -- Apply the spiller to all the basic blocks in the CmmProc.
                 sccs'   <- mapM (mapSCCM (regSpill_block platform regSlotMap)) sccs

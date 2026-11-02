@@ -277,8 +277,8 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                 -- NOTE: we have to reverse the SCCs here to get them back into
                 --       the reverse-dependency order required by regLiveness.
                 --       If they're not in the correct order that function will panic.
-                code_relive     <- mapM (regLiveness platform . reverseBlocksInTops)
-                                        code_spilled
+                let code_relive = map (regLiveness platform . reverseBlocksInTops)
+                                      code_spilled
 
                 -- Record what happened in this stage for debugging.
                 let stat        =
