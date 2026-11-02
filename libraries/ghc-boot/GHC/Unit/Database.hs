@@ -60,6 +60,7 @@ module GHC.Unit.Database
    , isDbOpenReadMode
    , readPackageDbForGhc
    , readPackageDbForGhcPkg
+   , foldPackageDbForGhcPkg
    , writePackageDb
    -- * Locking
    , PackageDbLock
@@ -430,6 +431,18 @@ readPackageDbForGhcPkg file mode =
       ghcPkgPart  <- get
       return ghcPkgPart
 
+foldPackageDbForGhcPkg :: Binary pkg => OsPath -> DbOpenMode mode t -> (acc -> pkg -> IO acc) -> acc -> IO (acc, DbOpenMode mode PackageDbLock)
+foldPackageDbForGhcPkg file mode k c =
+    streamFromFile file mode getDbForGhcPkg get k c
+  where
+    getDbForGhcPkg = do
+      _version    <- getHeader
+      -- skip over the ghc part
+      ghcPartLen  <- get :: Get Word32
+      _ghcPart    <- skip (fromIntegral ghcPartLen)
+      -- Read the number of elements
+      get
+
 -- | Write the whole of the package DB, both parts.
 --
 writePackageDb :: Binary pkgs => OsPath -> [DbUnitInfo] -> pkgs -> IO ()
@@ -537,6 +550,55 @@ decodeFromFile file mode decoder = case mode of
         err = mkIOError InappropriateType loc Nothing (Just $ unsafeDecodeUtf file)
               `ioeSetErrorString` msg
         loc = "GHC.Unit.Database.readPackageDb"
+
+streamFromFile :: OsPath -> DbOpenMode mode t -> Get Int -> Get pkg -> (acc -> pkg -> IO acc) -> acc -> IO (acc, DbOpenMode mode PackageDbLock)
+streamFromFile file mode header decoder k acc = case mode of
+  DbOpenReadOnly -> do
+  -- Note [Locking package database on Windows]
+  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  -- When we open the package db in read only mode, there is no need to acquire
+  -- shared lock on non-Windows platform because we update the database with an
+  -- atomic rename, so readers will always see the database in a consistent
+  -- state.
+#if defined(mingw32_HOST_OS)
+    bracket (lockPackageDbWith SharedLock file) unlockPackageDb $ \_ -> do
+#endif
+      (,DbOpenReadOnly) <$> decodeFileContents
+  DbOpenReadWrite{} -> do
+    -- When we open the package db in read/write mode, acquire an exclusive lock
+    -- on the database and return it so we can keep it for the duration of the
+    -- update.
+    bracketOnError (lockPackageDb file) unlockPackageDb $ \lock -> do
+      (,DbOpenReadWrite lock) <$> decodeFileContents
+  where
+    decodeFileContents = FileIO.withBinaryFile file ReadMode $ \hnd ->
+      streamList hnd header decoder k acc
+
+feedOne :: Handle -> Get a -> BS.ByteString -> IO (a, BS.ByteString)
+feedOne hnd g leftover = go start
+  where
+    start
+      | BS.null leftover = runGetIncremental g
+      | otherwise        = runGetIncremental g `pushChunk` leftover
+
+    go (Done rest _ x) = pure (x, rest)
+    go (Partial k) = do
+      chunk <- BS.hGet hnd BS.Lazy.defaultChunkSize
+      if BS.null chunk
+        then go (k Nothing)
+        else go (k (Just chunk))
+    go (Fail _ _ err) = ioError (userError ("decode failed: " ++ err))
+
+streamList :: forall acc pkg . Handle -> Get Int -> Get pkg -> (acc -> pkg -> IO acc) -> acc -> IO acc
+streamList h getHeader getPkg yield acc = do
+  (n, rest) <- feedOne h getHeader BS.empty
+  let loop :: acc -> Int -> BS.ByteString -> IO acc
+      loop acc 0 _ = pure acc
+      loop acc !i bs = do
+        (x, bs') <- feedOne h getPkg bs
+        acc' <- yield acc x
+        loop acc' (i - 1) bs'
+  loop acc n rest
 
 -- Copied from Cabal's Distribution.Simple.Utils.
 writeFileAtomic :: OsPath -> BS.Lazy.ByteString -> IO ()
