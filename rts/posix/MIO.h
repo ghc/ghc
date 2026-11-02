@@ -25,6 +25,7 @@ void ioManagerDie (void);
 void ioManagerStart (void);
 void ioManagerStartCap (/* inout */ Capability **cap);
 
+void interruptIOManagerFromSignalMIO(void);
 int installUserSignalHandlerMIO(int sig, int spi, sigset_t *mask,
                                 bool nocldstop);
 #endif
