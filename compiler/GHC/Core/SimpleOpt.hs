@@ -30,6 +30,8 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Make
 import GHC.Core.Opt.OccurAnal( OccurAnalOpts(..), occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
+import GHC.Core.Class( classSCSelIds, classTyVars, classTyCon )
+import GHC.Core.TyCon( isNewTyCon )
 import GHC.Core.Coercion.Opt ( optCoercion, optTransCo, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
@@ -59,7 +61,7 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
 import GHC.Data.OrdList
 import GHC.Data.Graph.UnVar
-import Data.List (mapAccumL)
+import Data.List (mapAccumL, elemIndex)
 import qualified Data.ByteString as BS
 
 {-
@@ -1629,6 +1631,20 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
         = succeedWith in_scope' (floats `appOL` seq_floats) $
           pushCoDataCon con args' mco
 
+        -- Look through a superclass selection applied to a known dictionary
+        -- See Note [Superclass selection in exprIsConApp_maybe]
+        | isSuperclassSelector fun
+        , Just cls <- isClassOpId_maybe fun
+        , Just sc_ix <- elemIndex fun (classSCSelIds cls)
+        , not (isNewTyCon (classTyCon cls))
+        , MRefl <- mco
+        , (dict_arg : []) <- dropList (classTyVars cls) args
+        , Just (in_scope1, dict_floats, _, _, dict_fields) <-
+              exprIsConApp_maybe (ISE in_scope id_unf) dict_arg
+        , sc_ix < length dict_fields
+        = go (Left in_scope1) (floats `appOL` dict_floats)
+             (dict_fields !! sc_ix) (CC [] MRefl)
+
         -- Look through data constructor wrappers: they inline late (See Note
         -- [Activation for data constructor wrappers]) but we want to do
         -- case-of-known-constructor optimisation eagerly (see Note
@@ -1767,6 +1783,24 @@ dealWithStringLiteral fun str mco =
       in pushCoDataCon consDataCon [Type charTy, char_expr, rest] mco
 
 {-
+Note [Superclass selection in exprIsConApp_maybe]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (op ($p1Ord dOrdInt) arg1 .. argn), where $p1Ord is a superclass
+selector and dOrdInt is a known dictionary.  In the simplifier we'd like to
+fire op's built-in class-op RULE (see Plan (BEFORE) in Note [tryRules: plan
+(BEFORE)]) /without/ simplifying arg1..argn first, so that the resulting lambda
+can preInlineUnconditionally them.  But the class-op RULE uses
+exprIsConApp_maybe on `$p1Ord dOrdInt`, which is not a constructor application.
+(#28062)
+
+So exprIsConApp_maybe looks through a /superclass/ selector applied to a
+dictionary that is itself a known constructor application, selecting the
+superclass field and carrying on.  This also handles nested selections
+`$p1 ($p2 d)`.  We do this only for superclass selectors, not for method
+selectors: a method selection yields a function, not a dictionary, and
+exprIsConApp_maybe is interested in constructor applications.  We also skip
+single-method-style "newtype" classes, whose dictionaries are casts.
+
 Note [Case elim in exprIsConApp_maybe]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
