@@ -58,7 +58,7 @@ module GHC.Core.TyCo.Make (
     , mkAxInstCo
     , mkTransCo, mkTransMCo, mkTransMCoL, mkTransMCoR
     , mkProofIrrelCo
-    , coToMCo, kindCoToMKindCo
+    , coToMCo, kindCoToMKindCo, mCoToCo
     , mkCoherenceLeftCo, mkCoherenceRightCo, mkCoherenceRightMCo
     , toPhantomCo, mkPhantomCo
     , isReflCo, isReflMCo, isReflKindCo, isReflKindMCo, isReflCo_maybe
@@ -860,7 +860,7 @@ mkHomoForAllCos vs orig_co
   = foldr go orig_co vs
   where
     go :: ForAllTyBinder -> Coercion -> Coercion
-    go (Bndr var vis) co = mk_forall_co var vis vis MRefl co
+    go (Bndr var vis) co = mkForAllCoNonRefl var vis vis MRefl co
 
 mkHomoForAllCo :: TyVar -> Coercion -> Coercion
 -- Specialised for a single TyVar,
@@ -869,7 +869,7 @@ mkHomoForAllCo tv orig_co
   | Just (ty, r) <- isReflCo_maybe orig_co
   = mkReflCo r (mkForAllTy (Bndr tv vis) ty)
   | otherwise
-  = mk_forall_co tv vis vis MRefl orig_co
+  = mkForAllCoNonRefl tv vis vis MRefl orig_co
   where
     vis  = coreTyLamForAllTyFlag
 
@@ -892,15 +892,15 @@ mkForAllCo v visL visR kind_co co
   | Just refl_co <- isReflForAllCo v visL visR kind_co co
   = refl_co
   | otherwise
-  = mk_forall_co v visL visR kind_co co
+  = mkForAllCoNonRefl v visL visR kind_co co
 
--- | `mk_forall_co` just builds a ForAllCo.
+-- | `mkForAllCoNonRefl` just builds a ForAllCo.
 -- With debug on, it checks invariants (e.g. he kind of the tycovar should
 --   be the left-hand kind of the kind coercion).
 -- Callers should have done any isReflCo short-cutting.
-mk_forall_co :: TyCoVar -> ForAllTyFlag -> ForAllTyFlag
-             -> KindMCoercion -> Coercion -> Coercion
-mk_forall_co tcv visL visR kind_co co
+mkForAllCoNonRefl :: TyCoVar -> ForAllTyFlag -> ForAllTyFlag
+                  -> KindMCoercion -> Coercion -> Coercion
+mkForAllCoNonRefl tcv visL visR kind_co co
   = assertGoodForAllCo tcv visL visR kind_co co $
     assertPpr (not (isReflCo co && isReflMCo kind_co && visL `eqForAllVis` visR)) (ppr co) $
     ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
@@ -1283,6 +1283,10 @@ coToMCo :: Coercion -> MCoercion
 --    See #19815 for a bit of data and discussion on this point
 coToMCo co | isReflCo co = MRefl
            | otherwise   = MCo co
+
+mCoToCo :: Role -> Type -> MCoercion -> Coercion
+mCoToCo role ty MRefl    = mkReflCo role ty
+mCoToCo _    _  (MCo co) = co
 
 kindCoToMKindCo :: KindCoercion -> KindMCoercion
 -- Convert a KindCoercion to a KindMCoercion,

@@ -42,7 +42,6 @@ import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
 import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
 import GHC.Core.Type
-import GHC.Core.TyCo.FVs    ( tyCoVarsOfMCo )
 
 import GHC.Data.Maybe( orElse )
 import GHC.Data.Graph.Directed ( SCC(..), Node(..)

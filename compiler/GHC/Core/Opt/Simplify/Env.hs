@@ -1234,6 +1234,8 @@ out_id so that its arity is visible in its RHS. Examples:
     Example: `f = \x. f x`. See Note [Eta reduction in recursive RHSs] for how
     we prevent that.
 
+c.f. (EtaA) in Note [Eta reduction soundness] in GHC.Core.Opt.Arity.
+
 Note [Robust OccInfo]
 ~~~~~~~~~~~~~~~~~~~~~
 It's important that we *do* retain the loop-breaker OccInfo, because

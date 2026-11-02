@@ -886,8 +886,14 @@ findRhsArity :: ArityOpts -> RecFlag -> Id -> CoreExpr
 -- This implements the fixpoint loop for arity analysis
 -- See Note [Arity analysis]
 --
--- The Bool is True if the returned arity is greater than (exprArity rhs)
---     so the caller should do eta-expansion
+-- The Bool is True if
+--            the returned arity is greater than (exprArity rhs)
+-- so the caller should do eta-expansion
+-- NB: `exprArity`, not `manifestArity`:
+--     a PAP such as (\x. f x), where f has arity 3, has exprArity 3,
+--     so we do not eta-expand it to (\x y z. f x y z)
+--     See Note [Do not eta-expand PAPs] in GHC.Core.Opt.Simplify.Utils
+--
 -- That Bool is never True for join points, which are never eta-expanded
 --
 -- Returns an SafeArityType that is guaranteed trimmed to typeArity of 'bndr'
@@ -903,10 +909,11 @@ findRhsArity opts is_rec bndr rhs
 
   | otherwise
   = (arity_increased, non_join_arity_type)
-    -- arity_increased: eta-expand if we'll get more lambdas
-    -- to the top of the RHS
+    -- arity_increased: eta-expand if the analysis finds a greater arity
+    -- than exprArity, which already takes account of PAPs
   where
-    old_arity = exprArity rhs
+    old_arity = exprArity rhs   -- See Note [Do not eta-expand PAPs]
+                                -- in GHC.Core.Opt.Simplify.Utils
 
     init_env :: ArityEnv
     init_env = findRhsArityEnv opts (isJoinId bndr)
@@ -2380,6 +2387,7 @@ mkEtaForAllMCo (Bndr tcv vis) ty mco
     -- and is SymCo'd in `etaInfoAbs`.  Hence the orientation of the visibility
     -- flags.  A bit of a brain-strain (#27557).
 
+
 {-
 ************************************************************************
 *                                                                      *
@@ -2444,16 +2452,20 @@ perform eta reduction on an expression with n leading lambdas `\xs. e xs`
 (checked in 'is_eta_reduction_sound' in 'tryEtaReduce', which focuses on the
 case where `e` is trivial):
 
-(A) It is sound to eta-reduce n arguments as long as n does not exceed the
-    `exprArity` of `e`. (Needs Arity analysis.)
-    This criterion exploits information about how `e` is *defined*.
+(EtaA) It is sound to eta-reduce n arguments as long as n does not exceed the
+    `exprArity` of `e`. (Needs Arity analysis.) This criterion exploits information
+    about how `e` is *defined*.  For example:
+      f = \xy. g x y   ===>    f = g
+    This eta-reduction is good only if `g` has arity at least 2, otherwise
+    f's arity will decrease from 2 to 1.
+    c.f. Note [Arity robustness] in GHC.Core.Opt.Simplify.Env.
 
-    Example: If `e = \x. bot` then we know it won't diverge until it is called
-    with one argument. Hence it is safe to eta-reduce `\x. e x` to `e`.
+    Another example: If `e = \x. bot` then we know it won't diverge until it
+    is called with one argument. Hence it is safe to eta-reduce `\x. e x` to `e`.
     By contrast, it would be *unsound* to eta-reduce 2 args, `\x y. e x y` to `e`:
     `e 42` diverges when `(\x y. e x y) 42` does not.
 
-(S) It is sound to eta-reduce n arguments in an evaluation context in which all
+(EtaS) It is sound to eta-reduce n arguments in an evaluation context in which all
     calls happen with at least n arguments. (Needs Strictness analysis.)
     NB: This treats evaluations like a call with 0 args.
     NB: This criterion exploits information about how `e` is *used*.
@@ -2480,26 +2492,22 @@ case where `e` is trivial):
     See Note [Eta reduction based on evaluation context] for the implementation
     details. This criterion is tested extensively in T21261.
 
-(R) Note [Eta reduction in recursive RHSs] tells us that we should not
+(EtaR) Note [Eta reduction in recursive RHSs] tells us that we should not
     eta-reduce `f` in its own RHS and describes our fix.
     There we have `f = \x. f x` and we should not eta-reduce to `f=f`. Which
     might change a terminating program (think @f `seq` e@) to a non-terminating
     one.
 
-(E) (See fun_arity in tryEtaReduce.) As a perhaps special case on the
-    boundary of (A) and (S), when we know that a fun binder `f` is in
+(EtaE) (See fun_arity in tryEtaReduce.) As a perhaps special case on the
+    boundary of (EtaA) and (EtaS), when we know that a fun binder `f` is in
     WHNF, we simply assume it has arity 1 and apply (A).  Example:
        g f = f `seq` \x. f x
     Here it's sound eta-reduce `\x. f x` to `f`, because `f` can't be bottom
     after the `seq`. This turned up in #7542.
 
- T. If the binders are all type arguments, it's always safe to eta-reduce,
-    regardless of the arity of f.
-       /\a b. f @a @b  --> f
-
-2. Type and dictionary abstraction. Regardless of whether 'f' is a value, it
+(EtaT) Type and dictionary abstraction. Regardless of whether 'f' is a value, it
    is always sound to reduce /type lambdas/, thus:
-        (/\a -> f a)  -->   f
+        (/\a -> f @a)  -->   f
    Moreover, we always want to, because it makes RULEs apply more often:
       This RULE:    `forall g. foldr (build (/\a -> g a))`
       should match  `foldr (build (/\b -> ...something complex...))`
@@ -2515,18 +2523,25 @@ case where `e` is trivial):
 And here are a few more technical criteria for when it is *not* sound to
 eta-reduce that are specific to Core and GHC:
 
-(J) We may not undersaturate join points.
+(EtaJ) We may not undersaturate join points.
     See Note [Invariants on join points] in GHC.Core, and #20599.
 
-(B) We may not undersaturate functions with no binding.
+(EtaB) We may not undersaturate functions with no binding.
     See Note [Eta expanding primops].
 
-(W) We may not undersaturate StrictWorkerIds.
+(EtaW) We may not undersaturate StrictWorkerIds.
     See Note [CBV Function Ids: overview] in GHC.Types.Id.Info.
 
-Here is a list of historic accidents surrounding unsound eta-reduction:
 
-* Consider
+Here is a list of historic notes surrounding unsound eta-reduction:
+
+(EtaMult) We used to disable eta-reduction if performing it would change multiplicity.
+  For example:
+      (\x. K x) :: Int -> T    but    K :: Int %1 -> T
+  But that (a) inhibits beneficial eta-reduction (b) costs extra work to check, and
+  now we don't even try. See Note [Linting linearity] in GHC.Core.Lint, esp EXAMPLE 4
+
+(EtaBot) Consider
         f = \x.f x
         h y = case (case y of { True -> f `seq` True; False -> False }) of
                 True -> ...; False -> ...
@@ -2539,16 +2554,6 @@ Here is a list of historic accidents surrounding unsound eta-reduction:
   terminate after all.
   Result: seg-fault because the boolean case actually gets a function value.
   See #1947.
-
-* Never *reduce* arity. For example
-      f = \xy. g x y
-  Then if h has arity 1 we don't want to eta-reduce because then
-  f's arity would decrease, and that is bad
-  [SG in 2022: I don't understand this point. There is no `h`, perhaps that
-   should have been `g`. Even then, this proposed eta-reduction is invalid by
-   criterion (A), which might actually be the point this anecdote is trying to
-   make. Perhaps the "no arity decrease" idea is also related to
-   Note [Arity robustness]?]
 
 Note [Do not eta reduce PAPs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2705,13 +2710,13 @@ tryEtaReduce :: UnVarSet -> [Var] -> CoreExpr -> SubDemand -> Maybe CoreExpr
 -- and Note [Eta reduction makes sense] when that is the case.
 -- and Note [Eta reduction based on evaluation context] for the `eval_sd` arg
 tryEtaReduce rec_ids bndrs body eval_sd
-  = go (reverse bndrs) body (mkRepReflCo (exprType body))
+  = go (reverse bndrs) body MRefl
   where
-    incoming_arity = count isId bndrs -- See Note [Eta reduction makes sense], point (2)
+    incoming_arity = count isId bndrs -- See (EtaA) in Note [Eta reduction soundness]
 
     go :: [Var]            -- Binders, innermost first, types [a3,a2,a1]
        -> CoreExpr         -- Of type tr
-       -> Coercion         -- Of type tr ~ ts
+       -> MCoercion         -- Of type tr ~ ts
        -> Maybe CoreExpr   -- Of type a1 -> a2 -> a3 -> ts
     -- See Note [Eta reduction with casted arguments]
     -- for why we have an accumulating coercion
@@ -2721,19 +2726,30 @@ tryEtaReduce rec_ids bndrs body eval_sd
 
     -- See Note [Eta reduction with casted function]
     go bs (Cast e co1) co2
-      = go bs e (co1 `mkTransCo` co2)
+      = go bs e (co1 `mkTransMCoR` co2)
 
     go bs (Tick t e) co
       | tickishFloatable t
       = fmap (Tick t) $ go bs e co
       -- Float app ticks: \x -> Tick t (e x) ==> Tick t e
 
-    go (b : bs) (App fun arg) co
-      | Just (co', ticks) <- ok_arg b arg co (exprType fun)
-      = fmap (flip (foldr mkTick) ticks) $ go bs fun co'
-            -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
+    go all_bs@(b : bs) all_e@(App fun (Type arg_ty)) co
+      = case ok_ty_arg b fun arg_ty co of
+           Just co' -> go bs fun co'
+           Nothing  -> go_finish all_bs all_e co
+                       -- Want to go to the finish case; see the call
+                       -- to (all isTyVar remaining_bndrs) there
 
-    go remaining_bndrs fun co
+    go (b : bs) (App fun val_arg) co
+      = case ok_val_arg b fun val_arg co of
+           Nothing           -> Nothing
+           Just (co', ticks) -> fmap (flip (foldr mkTick) ticks) $
+                                go bs fun co'
+               -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
+
+    go bs fun co = go_finish bs fun co
+
+    go_finish remaining_bndrs fun co
       | all isTyVar remaining_bndrs
             -- If all the remaining_bnrs are tyvars, then the etad_exp
             --    will be trivial, which is what we want.
@@ -2744,7 +2760,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
       , remaining_bndrs `ltLength` bndrs
             -- Only reply Just if /something/ has happened
       , ok_fun fun
-      , let used_vars     = exprFreeVars fun `unionVarSet` tyCoVarsOfCo co
+      , let used_vars     = exprFreeVars fun `unionVarSet` tyCoVarsOfMCo co
             reduced_bndrs = mkVarSet (dropList remaining_bndrs bndrs)
             -- reduced_bndrs are the ones we are eta-reducing away
       , used_vars `disjointVarSet` reduced_bndrs
@@ -2753,10 +2769,10 @@ tryEtaReduce rec_ids bndrs body eval_sd
           -- See Note [Eta reduction makes sense], intro and point (1)
           -- NB: don't compute used_vars from exprFreeVars (mkCast fun co)
           --     because the latter may be ill formed if the guard fails (#21801)
-      = Just (mkLams (reverse remaining_bndrs) (mkCast fun co))
+      = Just (mkLams (reverse remaining_bndrs) (mkCastMCo fun co))
 
-    go _remaining_bndrs _fun  _  = -- pprTrace "tER fail" (ppr _fun $$ ppr _remaining_bndrs) $
-                                   Nothing
+      | otherwise
+      = Nothing
 
     ---------------
     -- See Note [Eta reduction makes sense], point (1)
@@ -2769,18 +2785,18 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ---------------
     -- See Note [Eta reduction soundness], this is THE place to check soundness!
     is_eta_reduction_sound fun
-      | fun `elemUnVarSet` rec_ids          -- Criterion (R)
+      | fun `elemUnVarSet` rec_ids          -- Criterion (EtaR)
       = False -- Don't eta-reduce in fun in its own recursive RHSs
 
-      | cantEtaReduceFun fun                -- Criteria (J), (W), (B)
+      | cantEtaReduceFun fun                -- Criteria (EtaJ), (EtaW), (EtaB)
       = False -- Function can't be eta reduced to arity 0
               -- without violating invariants of Core and GHC
 
       | otherwise
       = -- Check that eta-reduction won't make the program stricter...
-        fun_arity fun >= incoming_arity          -- Criterion (A) and (E)
-        || all_calls_with_arity incoming_arity   -- Criterion (S)
-        || all ok_lam bndrs                      -- Criterion (T)
+        fun_arity fun >= incoming_arity          -- Criterion (EtaA) and (EtaE)
+        || all_calls_with_arity incoming_arity   -- Criterion (EtaS)
+        || all ok_lam bndrs                      -- Criterion (EtaT)
 
     all_calls_with_arity n = isStrict (fst $ peelManyCalls n eval_sd)
        -- See Note [Eta reduction based on evaluation context]
@@ -2789,57 +2805,85 @@ tryEtaReduce rec_ids bndrs body eval_sd
     fun_arity fun
        | arity > 0                           = arity
        | isEvaldUnfolding (idUnfolding fun)  = 1
-           -- See Note [Eta reduction soundness], criterion (E)
+           -- See Note [Eta reduction soundness], criterion (EtaE)
        | otherwise                           = 0
        where
          arity = idArity fun
 
     ---------------
     ok_lam v = isTyVar v || isEvId v
-    -- See Note [Eta reduction makes sense], point (2)
+    -- See Note [Eta reduction soundness], point (EtaT)
 
     ---------------
-    ok_arg :: Var              -- Of type bndr_t
-           -> CoreExpr         -- Of type arg_t
-           -> Coercion         -- Of kind (t1~t2)
-           -> Type             -- Type (arg_t -> t1) of the function
-                               --      to which the argument is supplied
-           -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
-                               --   (and similarly for tyvars, coercion args)
-                    , [CoreTickish])
-    -- See Note [Eta reduction with casted arguments]
-    ok_arg bndr (Type arg_ty) co fun_ty
-       | Just tv <- getTyVar_maybe arg_ty
-       , bndr == tv  = case splitForAllForAllTyBinder_maybe fun_ty of
-           Just (Bndr _ vis, _) -> Just (fco, [])
-             where !fco = mkForAllCo tv vis coreTyLamForAllTyFlag MRefl co
-                   -- The lambda we are eta-reducing always has visibility
-                   -- 'coreTyLamForAllTyFlag' which may or may not match
-                   -- the visibility on the inner function (#24014)
-           Nothing -> pprPanic "tryEtaReduce: type arg to non-forall type"
-                               (text "fun:" <+> ppr bndr
-                                $$ text "arg:" <+> ppr arg_ty
-                                $$ text "fun_ty:" <+> ppr fun_ty)
-    ok_arg bndr (Var v) co fun_ty
-       | bndr == v
-       , let mult = idMult bndr
-       , Just (_af, fun_mult, _, _) <- splitFunTy_maybe fun_ty
-       , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
-       = Just (mkFunResCo Representational bndr co, [])
-    ok_arg bndr (Cast e co_arg) co fun_ty
-       | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (_, fun_mult, _, _) <- splitFunTy_maybe fun_ty
-       , bndr == v
-       , fun_mult `eqType` idMult bndr
-       = Just (mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
-       -- The simplifier combines multiple casts into one,
-       -- so we can have a simple-minded pattern match here
-    ok_arg bndr (Tick t arg) co fun_ty
-       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty
-       = Just (co', t:ticks)
+    ok_ty_arg :: TyVar -> CoreExpr -> Type -> MCoercion -> Maybe MCoercion
+    ok_ty_arg bndr fun arg_ty mco
+      | Just tv <- getTyVar_maybe arg_ty
+      , bndr == tv
+      = mkEtaReduceForAllMCo (exprType fun) tv mco
+      | otherwise
+      = Nothing
 
-    ok_arg _ _ _ _ = Nothing
+    ---------------
+    ok_val_arg :: Id               -- Of type bndr_ty
+               -> CoreExpr         -- Function, of type (arg_ty -> res_ty)
+               -> CoreExpr         -- Argument, of type arg_ty
+               -> MCoercion        -- Of kind (res_ty ~ res_ty')
+               -> Maybe ( MCoercion  -- Of type (arg_ty -> res_ty ~  bndr_ty -> res_ty')
+                                     --   (and similarly for tyvars, coercion args)
+                        , [CoreTickish])
+         -- See Note [Eta reduction with casted arguments]
 
+    ok_val_arg bndr fun arg res_mco
+      | Just (arg_mco, arg_ticks) <- go arg
+      = case (arg_mco, res_mco) of
+          (MRefl, MRefl) -> Just (MRefl, arg_ticks)  -- Very common
+          _ | Just (ftf, mult, arg_ty, res_ty) <- splitFunTy_maybe (exprType fun)
+            , let arg_co  = mCoToCo Representational arg_ty arg_mco
+                  res_co  = mCoToCo Representational res_ty res_mco
+                  mult_co = multToCo mult
+                  fun_co  = mkFunCo Representational ftf mult_co (mkSymCo arg_co) res_co
+                            -- ftf: assumes no change of FunTyFlag, looks fine
+            -> Just (MCo fun_co, arg_ticks)
+            | otherwise
+            -> Nothing
+      | otherwise
+      = Nothing
+
+      where
+        go :: CoreExpr -> Maybe (MCoercion, [CoreTickish])
+        -- (go e) returns (Just (co,ts))
+        -- if `e` looks like (Tick ts (bndr |> co)) and ts are floatable
+        -- So  co :: bndr_ty ~ arg_ty
+        go (Var v)
+           | bndr == v    -- See Historical note (EtaMult)
+           = Just (MRefl, [])
+
+        go (Cast e co_outer)
+           = do { (mco_inner, ticks) <- go e
+                ; return (mco_inner `mkTransMCoL` co_outer, ticks) }
+
+        go (Tick t arg)
+           | tickishFloatable t
+           = do { (co, ticks) <- go arg; return (co, t:ticks) }
+
+        go _ = Nothing
+
+mkEtaReduceForAllMCo :: Type -> TyVar -> MCoercion -> Maybe MCoercion
+-- Very similar to mkEtaForAllMCo, but with
+-- the visibilities the other way around.  Tiresome.
+mkEtaReduceForAllMCo fun_ty tv mco
+  | Just (Bndr _ vis, fun_ty_body) <- splitForAllForAllTyBinder_maybe fun_ty
+  , let mk_fco co = Just $ MCo $
+                    mkForAllCo tv vis coreTyLamForAllTyFlag MRefl co
+                    -- The lambda we are eta-reducing always has visibility
+                    -- 'coreTyLamForAllTyFlag' which may or may not match the
+                    -- visibility on the inner function (#24014)
+  = case mco of
+      MRefl | isCoreTyLamForAllTyFlag vis -> Just MRefl
+            | otherwise                   -> mk_fco (mkRepReflCo fun_ty_body)
+      MCo co                              -> mk_fco co
+  | otherwise
+  = Nothing
 
 {- *********************************************************************
 *                                                                      *
