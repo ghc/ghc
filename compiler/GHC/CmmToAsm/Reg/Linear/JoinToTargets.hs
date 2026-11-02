@@ -230,6 +230,16 @@ expandNode
         -> Loc -- ^ source of move
         -> Loc -- ^ destination of move
         -> [Node Loc a]
+-- a destination slot that is the source's holds the value already: only the
+-- destination's register, if any, is written
+expandNode vreg src@(Loc srcLoc _) (Loc dstLoc dstFmt)
+        | Just m <- slotOf srcLoc, InMem dstMem <- dstLoc, dstMem == m
+        = []
+        | Just m <- slotOf srcLoc, InBoth dstReg dstMem <- dstLoc, dstMem == m
+        = expandNode vreg src (Loc (InReg dstReg) dstFmt)
+        where slotOf (InMem s)    = Just s
+              slotOf (InBoth _ s) = Just s
+              slotOf (InReg _)    = Nothing
 expandNode vreg src@(Loc srcLoc srcFmt) dst@(Loc dstLoc dstFmt) =
   case (srcLoc, dstLoc) of
     (InReg srcReg, InBoth dstReg dstMem)
@@ -238,15 +248,9 @@ expandNode vreg src@(Loc srcLoc srcFmt) dst@(Loc dstLoc dstFmt) =
         | otherwise
         -> [DigraphNode vreg src [Loc (InReg dstReg) dstFmt
                                  ,Loc (InMem dstMem) dstFmt]]
-    (InMem srcMem, InBoth dstReg dstMem)
-        | srcMem == dstMem
-        -> [DigraphNode vreg src [Loc (InReg dstReg) dstFmt]]
-        | otherwise
+    (InMem _, InBoth dstReg dstMem)
         -> [DigraphNode vreg src [Loc (InReg dstReg) dstFmt
                                  ,Loc (InMem dstMem) dstFmt]]
-    (InBoth _ srcMem, InMem dstMem)
-        | srcMem == dstMem
-        -> [] -- guaranteed to be true
     (InBoth srcReg _, InReg dstReg)
         | srcReg == dstReg
         -> []
