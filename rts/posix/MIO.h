@@ -25,6 +25,8 @@ void ioManagerDie (void);
 void ioManagerStart (void);
 void ioManagerStartCap (/* inout */ Capability **cap);
 
+void interruptIOManagerFromSignalMIO(void);
+
 #if defined(RTS_USER_SIGNALS)
 int installUserSignalHandlerMIO(int sig, int spi, sigset_t *mask,
                                 bool nocldstop);

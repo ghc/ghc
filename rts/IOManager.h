@@ -454,4 +454,19 @@ bool awaitCompletedTimeoutsOrIO(CapIOManager *iomgr);
  */
 void interruptIOManager(CapIOManager *iomgr);
 
+
+#if defined(RTS_USER_SIGNALS) && !defined(mingw32_HOST_OS)
+/* This is much like interruptIOManager in that it reliably arranges to return
+ * control to the scheduler, but it is called from a posix signal handler. The
+ * signal handler context does not inherently have access to any particular
+ * capability, so any required access needs to be obtained (safely).
+ *
+ * The implementation is required to be signal safe, i.e. only do things and
+ * call functions that are themselves safe to use in a signal handler.
+ *
+ * TODO: Perhaps we do not need this at all. See issue #28066.
+ */
+void interruptIOManagerFromSignal(void);
+#endif
+
 #include "EndPrivate.h"

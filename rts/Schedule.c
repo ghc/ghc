@@ -2750,39 +2750,6 @@ performDeadlockDetection(void)
                false /*nonconcurrent*/);
 }
 
-/* ---------------------------------------------------------------------------
-   Interrupt execution in response to ctl-c.
-   On posix, ctl-c is a signal, while on Win32 it is a console event.
-   ------------------------------------------------------------------------ */
-
-void
-interruptStgRts(void)
-{
-    ASSERT(getSchedState() != SCHED_SHUTTING_DOWN);
-    setSchedState(SCHED_INTERRUPTING);
-    interruptAllCapabilities();
-#if defined(THREADED_RTS)
-    /* It may be that all capabilities are idle. If so, we must wake one up. */
-#if defined(mingw32_HOST_OS)
-    /* On win32, console handlers are invoked in a proper thread, so we can
-     * directly call wakeUpRts. Although it is an OS thread, it is not one
-     * we created or control necessarily, so it may have no associated Task.
-     */
-    wakeUpRts();
-#else
-    /* On posix on the other hand, signal handlers are very limited in what
-     * they can do. We cannot directly call wakeUpRts below because it is not
-     * signal safe (it uses cond vars to wake up a task). So instead we proxy
-     * it: we interrupt the ticker thread and ask the ticker thread to call
-     * wakeUpRts below. The ticker thread is a proper thread and so can call
-     * wakeUpRts. We can interrupt the ticker thread from signal handler
-     * context safely because it only involves writing to a pipe/eventfd.
-     */
-    wakeUpRtsViaTicker();
-#endif
-#endif
-}
-
 /* -----------------------------------------------------------------------------
    Wake up the RTS
 
@@ -2792,7 +2759,10 @@ interruptStgRts(void)
    It is invoked:
    1. as part of the idle GC scheme: when the RTS has been idle for long enough
       and it is time to go back to the scheduler which will invoke idle GC; or
-   2. when a ctl-c occurs (posix sigint signal or win32 console event)
+   2. on win32 when a ctl-c console event occurs
+
+   In both cases, there is a calling thread (i.e. it's not a posix signal
+   handler) but it has no associated Task. This is (required to be) ok.
 
    In the single-threaded RTS, the RTS may be blocked waiting on I/O (or be
    about to block). So we notify the I/O manager (in a non-racy way) that it
@@ -2804,10 +2774,6 @@ interruptStgRts(void)
 void wakeUpRts(void)
 {
 #if defined(THREADED_RTS)
-    /* Our current thread may not have a Task, in particular it will not when
-     * called from interruptStgRts or via wakeUpRtsViaTicker. This is ok,
-     * prodOneCapability does not require one.
-     */
     prodOneCapability();
 #else
     interruptIOManager(MainCapability.iomgr);
