@@ -878,6 +878,46 @@ void interruptIOManager(CapIOManager *iomgr)
 }
 
 
+#if defined(RTS_USER_SIGNALS) && !defined(mingw32_HOST_OS)
+void interruptIOManagerFromSignal(void)
+{
+    /* Must not trace from signal context */
+    switch (iomgr_type) {
+
+        /* The in-RTS posix I/O managers all reuse their interrupt operation
+         * on capability 0.
+         */
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+            interruptIOManagerSelect(MainCapability.iomgr);
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_SELECTBIS)
+        case IO_MANAGER_SELECTBIS:
+            interruptIOManagerSelectBis(getCapability(0)->iomgr);
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_POLL)
+        case IO_MANAGER_POLL:
+            interruptIOManagerPoll(getCapability(0)->iomgr);
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MANAGER_MIO_POSIX:
+            interruptIOManagerFromSignalMIO();
+            break;
+#endif
+
+        default:
+            break;
+    }
+}
+#endif
+
+
 /* CMM primop. Result is true on success, or false on allocation failure. */
 IOSubmitResult syncIOWaitReady(CapIOManager      *iomgr,
                                StgTSO            *tso,

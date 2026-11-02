@@ -72,19 +72,29 @@
  *
  * We like to shutdown nicely after receiving a SIGINT, write out the
  * stats, write profiling info, close open files and flush buffers etc.
+ *
+ * This SIGINT handler is duplicated (and overridden) by runMainIO which
+ * installs its own handler. So perhaps we do not need this at all.
+ * See issue #28066.
+ * It would let us remove this handler and interruptIOManagerFromSignal.
  * -------------------------------------------------------------------------- */
 static void
 shutdown_handler(int sig STG_UNUSED)
 {
-    // If we're already trying to interrupt the RTS, terminate with
-    // extreme prejudice.  So the first ^C tries to exit the program
-    // cleanly, and the second one just kills it.
+    /* If we're already trying to interrupt the RTS, terminate with
+     * extreme prejudice.  So the first ^C tries to exit the program
+     * cleanly, and the second one just kills it.
+     */
     if (getSchedState() >= SCHED_INTERRUPTING) {
         // N.B. we cannot use stg_exit() here as it calls exit() which is not
         // signal-safe. See #23417.
         _exit(EXIT_INTERRUPTED);
     } else {
-        interruptStgRts();
+        setSchedState(SCHED_INTERRUPTING);
+        interruptAllCapabilities();
+        /* It may be that all capabilities are idle. If so, we must wake one up.
+         */
+        interruptIOManagerFromSignal();
     }
 }
 

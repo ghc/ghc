@@ -127,13 +127,6 @@ static Time ticker_interval = DEFAULT_TICK_INTERVAL;
 // acknowledgement.
 static bool pause_request;
 
-#if defined(THREADED_RTS)
-// Atomic variable used by the ctl-c handler (posix signal handler) to
-// communicate that the ticker thread should wake up the rts. This
-// communication is one-way, with no acknowledgement.
-static bool interrupt_request;
-#endif
-
 // Atomic variable used by other threads to communicate that they want the
 // ticker thread to exit.
 static bool exit_request;
@@ -185,12 +178,6 @@ static void *ticker_thread_func(void *_handle_tick)
             paused = ACQUIRE_LOAD_ALWAYS(&pause_request);
             exit   = RELAXED_LOAD_ALWAYS(&exit_request);
 
-#if defined(THREADED_RTS)
-            if (RELAXED_LOAD_ALWAYS(&interrupt_request)) {
-                RELEASE_STORE_ALWAYS(&interrupt_request, false);
-                wakeUpRts();
-            }
-#endif
         } else if (errno != EINTR) {
             // While the RTS attempts to mask signals, some foreign libraries
             // that rely on signal delivery may unmask them. Consequently we
@@ -275,14 +262,6 @@ void pauseTicker(void)
     RELEASE_STORE_ALWAYS(&pause_request, true);
     sendFdWakeup(notifyfd_w);
 }
-
-#if defined(THREADED_RTS)
-void wakeUpRtsViaTicker(void)
-{
-    RELAXED_STORE_ALWAYS(&interrupt_request, true);
-    sendFdWakeup(notifyfd_w);
-}
-#endif
 
 /* Synchronous. Not idempotent.
  * The ticker is guaranteed stopped after this.

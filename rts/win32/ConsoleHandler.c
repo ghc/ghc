@@ -91,7 +91,14 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
         if (getSchedState() >= SCHED_INTERRUPTING) {
             stg_exit(EXIT_INTERRUPTED);
         } else {
-            interruptStgRts();
+            setSchedState(SCHED_INTERRUPTING);
+            interruptAllCapabilities();
+            /* It may be that all capabilities are idle. If so, we must wake
+             * one up. On win32, console handlers are invoked in a proper
+             * thread, but is not one we created or control, so it has no
+             * associated Task. That's ok for wakeUpRts().
+             */
+            wakeUpRts();
         }
         return true;
 

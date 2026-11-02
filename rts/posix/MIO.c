@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define IO_MANAGER_WAKEUP 0xff
 #define IO_MANAGER_DIE    0xfe
 
 void initCapabilityIOManagerMIO(CapIOManager *iomgr)
@@ -47,6 +48,19 @@ void setTimerManagerControlFd(int fd) {
     int *timer_manager_control_wr_fd =
             &getCapability(0)->iomgr->shared->timer_manager_control_wr_fd;
     RELAXED_STORE(timer_manager_control_wr_fd, fd);
+}
+
+void interruptIOManagerFromSignalMIO(void)
+{
+    int *timer_manager_control_wr_fd =
+            &getCapability(0)->iomgr->shared->timer_manager_control_wr_fd;
+    int timer_control_fd = RELAXED_LOAD(timer_manager_control_wr_fd);
+    if (0 <= timer_control_fd)
+    {
+        StgWord8 byte = IO_MANAGER_WAKEUP;
+        int ret STG_UNUSED; // nothing we can do if it fails
+        ret = write(timer_control_fd, &byte, 1);
+    }
 }
 
 static void signal_handler(int sig, siginfo_t *info, void *p STG_UNUSED)
