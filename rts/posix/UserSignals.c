@@ -19,6 +19,7 @@
 #include "ThreadLabels.h"
 #include "Libdw.h"
 #include "MIO.h"
+#include "AllocArray.h"
 
 #if defined(HAVE_PIPE2)
 #define _GNU_SOURCE 1
@@ -204,28 +205,26 @@ installSignalHandler(int sig, int spi, sigset_t *mask, bool nocldstop,
 
 void startSignalHandler(Capability *cap, int sig, siginfo_t *info)
 {
-    /* Allocate a copy. This is freed by runHandler. */
-    // TODO: this could be improved to use a GC'd pinned byte array, but this
-    // would need coordination with the unix library.
-    siginfo_t *info_copy = stgMallocBytes(sizeof(siginfo_t), "startSignalHandler");
-    *info_copy = *info;
+    debugTrace(DEBUG_iomanager, "Handling pending signal, no %d", sig);
 
-    /* The info structure can be zero on solaris. So at least set the signo. */
-    info_copy->si_signo = sig;
-
-    debugTrace(DEBUG_iomanager,
-               "Handling pending signal, no %d", info_copy->si_signo);
+    /* Allocate a copy on the heap */
+    StgArrBytes *info_copy = allocateArrBytesPinned(cap, sizeof(siginfo_t), 1,
+                                                    CCS_SYSTEM_OR_NULL);
+    *(siginfo_t *)(info_copy->payload) = *info;
 
     StgTSO *t =
         createIOThread(cap,
                        RtsFlags.GcFlags.initialStkSize,
                        rts_apply(cap,
                                  rts_apply(cap,
-                                           runHandlersPtr_closure,
-                                           rts_mkPtr(cap, info_copy)),
-                                 rts_mkInt(cap, info_copy->si_signo)));
-    scheduleThread(cap, t);
-    setThreadLabel(cap, t, "signal handler thread");
+                                           runHandlerPtr_closure,
+                                           (StgClosure *) info_copy),
+                                 rts_mkInt(cap, sig)));
+    setThreadLabel(cap, t, "signal handler");
+    /* Schedule the handler thread first, like we do for other I/O completions.
+     * This also addresses issue #28067.
+     */
+    scheduleThreadNow(cap, t);
 }
 
 /* Note [Non-racy signal handling using the self-pipe trick]

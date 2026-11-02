@@ -41,7 +41,7 @@ extern StgClosure ZCMain_main_closure;
 #define ensureIOManagerIsRunning_closure ghc_hs_iface->ensureIOManagerIsRunning_closure
 #define interruptIOManager_closure ghc_hs_iface->interruptIOManager_closure
 #define ioManagerCapabilitiesChanged_closure ghc_hs_iface->ioManagerCapabilitiesChanged_closure
-#define runHandlersPtr_closure       ghc_hs_iface->runHandlersPtr_closure
+#define runHandlerPtr_closure       ghc_hs_iface->runHandlerPtr_closure
 #if defined(mingw32_HOST_OS)
 #define processRemoteCompletion_closure ghc_hs_iface->processRemoteCompletion_closure
 #endif
