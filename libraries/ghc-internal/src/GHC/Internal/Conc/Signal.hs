@@ -1,20 +1,27 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE MagicHash #-}
 
 module GHC.Internal.Conc.Signal
         ( Signal
         , HandlerFun
         , setHandler
+        , runHandler
+        , runHandlerPtr
+          -- * Deprecated
         , runHandlers
         , runHandlersPtr
         ) where
 
 import GHC.Internal.Base
+import GHC.Internal.Prim (RealWorld, seq,
+                          MutableByteArray#, mutableByteArrayContents#)
 import GHC.Internal.Control.Concurrent.MVar (MVar, newMVar, withMVar)
 import GHC.Internal.Data.Dynamic (Dynamic)
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Foreign.C.Types (CInt)
-import GHC.Internal.Foreign.ForeignPtr (ForeignPtr, newForeignPtr)
+import GHC.Internal.ForeignPtr (ForeignPtr(..), ForeignPtrContents(..))
+import GHC.Internal.Foreign.ForeignPtr (newForeignPtr)
 import GHC.Internal.Foreign.StablePtr (castPtrToStablePtr, castStablePtrToPtr,
                           deRefStablePtr, freeStablePtr, newStablePtr)
 import GHC.Internal.Foreign.Ptr (Ptr, castPtr)
@@ -63,27 +70,39 @@ setHandler sig handler = do
               unsafeWriteIOArray arr int handler
               return old
 
+{-# DEPRECATED runHandlers "Internal (unused) GHC machinery. Do not use." #-}
 runHandlers :: ForeignPtr Word8 -> Signal -> IO ()
 runHandlers p_info sig = do
-  let int = fromIntegral sig
-  withMVar signal_handlers $ \arr ->
-    if not (inRange (boundsIOArray arr) int)
-      then return ()
-      else do handler <- unsafeReadIOArray arr int
-              case handler of
-                Nothing -> return ()
-                Just (f,_)  -> do _ <- forkIO $ do
-                                    tid <- myThreadId
-                                    labelThread tid "signal handler"
-                                    f p_info
-                                  return ()
+  _ <- forkIO $ do
+          tid <- myThreadId
+          labelThread tid "signal handler"
+          runHandler p_info sig
+  return ()
 
--- It is our responsibility to free the memory buffer, so we create a
--- foreignPtr.
+{-# DEPRECATED runHandlersPtr "Internal (unused) GHC machinery. Do not use." #-}
 runHandlersPtr :: Ptr Word8 -> Signal -> IO ()
 runHandlersPtr p s = do
   fp <- newForeignPtr finalizerFree p
   runHandlers fp s
+
+runHandler :: ForeignPtr Word8 -> Signal -> IO ()
+runHandler p_info sig = do
+  let int = fromIntegral sig
+  handler <- withMVar signal_handlers $ \arr ->
+    if not (inRange (boundsIOArray arr) int)
+      then return Nothing
+      else unsafeReadIOArray arr int
+  case handler of
+    Nothing    -> return ()
+    Just (f,_) -> f p_info
+
+-- | Used by in-RTS I\/O managers to execute signal handlers.
+--
+runHandlerPtr :: MutableByteArray# RealWorld -> Signal -> IO ()
+runHandlerPtr mbarr# s =
+  let fp = ForeignPtr (mutableByteArrayContents# mbarr#)
+                      (PlainPtr mbarr#)
+   in fp `seq` runHandler fp s
 
 -- Machinery needed to ensure that we only have one copy of certain
 -- CAFs in this module even when the base package is present twice, as

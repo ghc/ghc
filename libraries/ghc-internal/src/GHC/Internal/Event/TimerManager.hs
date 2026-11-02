@@ -60,7 +60,8 @@ import GHC.Internal.Prim (casMutVar#, readMutVar#)
 import GHC.Internal.STRef (STRef(..))
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Clock (getMonotonicTimeNSec)
-import GHC.Internal.Conc.Signal (runHandlers)
+import GHC.Internal.Conc.Signal as Signal (runHandler)
+import GHC.Internal.Conc.Sync (myThreadId, labelThread, forkIO)
 import GHC.Internal.Enum (maxBound)
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num (Num(..))
@@ -111,7 +112,13 @@ handleControlEvent mgr fd _evt = do
   case msg of
     CMsgWakeup      -> return ()
     CMsgDie         -> writeIORef (emState mgr) Finished
-    CMsgSignal fp s -> runHandlers fp s
+    CMsgSignal fp s -> do
+      _ <- forkIO $ do
+             -- Execute user signal handlers in their own thread.
+             tid <- myThreadId
+             labelThread tid "signal handler"
+             Signal.runHandler fp s
+      return ()
 
 newDefaultBackend :: IO Backend
 #if defined(HAVE_POLL)

@@ -33,7 +33,7 @@ typedef struct {
     StgClosure *ensureIOManagerIsRunning_closure;  // GHC.Internal.Conc.IO.ensureIOManagerIsRunning_closure
     StgClosure *interruptIOManager_closure;  // GHC.Internal.Conc.IO.interruptIOManager_closure
     StgClosure *ioManagerCapabilitiesChanged_closure;  // GHC.Internal.Conc.IO.ioManagerCapabilitiesChanged_closure
-    StgClosure *runHandlersPtr_closure;  // GHC.Internal.Conc.Signal.runHandlersPtr_closure
+    StgClosure *runHandlerPtr_closure;  // GHC.Internal.Conc.Signal.runHandlerPtr_closure
     StgClosure *flushStdHandles_closure;  // GHC.Internal.TopHandler.flushStdHandles_closure
     StgClosure *runMainIO_closure;  // GHC.Internal.TopHandler.runMainIO_closure
     const StgInfoTable *Czh_con_info;  // GHC.Internal.Types.Czh_con_info
