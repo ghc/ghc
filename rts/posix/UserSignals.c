@@ -286,6 +286,9 @@ void newNonBlockingPipe(int *pipe_fd_r, int *pipe_fd_w)
 
 /* Write the signal number and siginfo into the given fd (which is
  * typically a pipe in non-blocking mode).
+ *
+ * This must be safe to call from posix signal handlers, which means only using
+ * other signal safe functions.
  */
 void writeSignalInfoToPipe(int sig, siginfo_t *info, int fd)
 {

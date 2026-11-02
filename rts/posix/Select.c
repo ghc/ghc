@@ -579,8 +579,12 @@ signal_handler(int sig STG_UNUSED, siginfo_t *info, void *p STG_UNUSED)
 
     // stack full?
     if (next_pending_handler == &pending_handler_buf[N_PENDING_HANDLERS]) {
-        errorBelch("too many pending signals");
-        stg_exit(EXIT_FAILURE);
+        /* Everything here must be signal safe. Hence low level style of
+         * printing error message and use of _exit over stg_exit.
+         */
+        char * msg = "too many pending signals\n";
+        int r STG_UNUSED = write(2, msg, strlen(msg));
+        _exit(EXIT_FAILURE);
     }
 
     interruptCapability(&MainCapability);
