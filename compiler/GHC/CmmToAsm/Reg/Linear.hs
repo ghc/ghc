@@ -219,13 +219,13 @@ regAlloc _ _ _ (CmmData sec d)
                 , Nothing
                 , Nothing )
 
-regAlloc _ _ _ (CmmProc (LiveInfo info _ _ _) lbl live [])
+regAlloc _ _ _ (CmmProc (LiveInfo info _ _ _ _) lbl live [])
         = return ( CmmProc info lbl live (ListGraph [])
                  , Nothing
                  , Nothing )
 
 regAlloc config cold freqsFrom (CmmProc static lbl live sccs)
-        | LiveInfo info entry_ids@(first_id:_) block_live _ <- static
+        | LiveInfo info entry_ids@(first_id:_) block_live _ succs <- static
         -- lazy: banged, so that at -O0 it was the static noBlockFreqs and no
         -- thunk a procedure, it made the compiler run 0.015% and 0.010% more
         -- instructions compiling T9961 and T12707 at -O0, and moved no figure
@@ -235,7 +235,7 @@ regAlloc config cold freqsFrom (CmmProc static lbl live sccs)
                 -- do register allocation on each component.
                 !(!final_blocks, !stats, !stack_use)
                         <- linearRegAlloc config cold freqs entry_ids block_live
-                                          sccs
+                                          succs sccs
 
                 -- make sure the block that was first in the input list
                 --      stays at the front of the output, sorted only where it
@@ -280,11 +280,13 @@ linearRegAlloc
         -> [BlockId] -- ^ entry points
         -> BlockMap Regs
               -- ^ live regs on entry to each basic block
+        -> BlockMap [BlockId]
+              -- ^ each block's jump targets
         -> [SCC (LiveBasicBlock instr)]
               -- ^ instructions annotated with "deaths"
         -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc config cold freqs entry_ids block_live sccs
+linearRegAlloc config cold freqs entry_ids block_live js sccs
  = case platformArch platform of
       ArchX86        -> other $ (frInitFreeRegs platform :: X86.FreeRegs)
       ArchX86_64     -> go $ (frInitFreeRegs platform :: X86_64.FreeRegs)
@@ -304,7 +306,7 @@ linearRegAlloc config cold freqs entry_ids block_live sccs
  where
   go :: FR regs
      => regs -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
-  go f = linearRegAlloc' config f cold freqs entry_ids block_live sccs
+  go f = linearRegAlloc' config f cold freqs entry_ids block_live js sccs
   -- See Note [Specialising the linear allocator]
   other :: FR regs
         => regs -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
@@ -326,17 +328,17 @@ linearRegAlloc'
         -> BlockFreqs                   -- ^ each block's estimated frequency
         -> [BlockId]                    -- ^ entry points
         -> BlockMap Regs              -- ^ live regs on entry to each basic block
+        -> BlockMap [BlockId]           -- ^ each block's jump targets, read by
+                                        --   the allocation order and the
+                                        --   context alike
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
         -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc' config initFreeRegs cold !freqs entry_ids block_live sccs
+linearRegAlloc' config initFreeRegs cold !freqs entry_ids block_live js sccs
  = UDSM $ \us -> do
     let !(!stack, !stats, !blocks, us') =
             runR ctx us
                 $ linearRA_SCCs cold freqs entry_ids js block_live sccs
-        -- each block's jump targets, read by the allocation order and the
-        -- context alike
-        js = jumpSuccs sccs
         platform = ncgPlatform config
         wv = wideMoveDests platform cold freqs block_live sccs
         ctx = RA_Context
@@ -1173,13 +1175,6 @@ isReached :: LabelSet -> BlockAssignment -> BlockId -> Bool
 isReached entry_ids block_assig bid
   = isJust (lookupBlockAssignment bid block_assig) || bid `setMember` entry_ids
 
-
--- | Each block's jump targets.
-jumpSuccs :: Instruction instr
-          => [SCC (LiveBasicBlock instr)] -> BlockMap [BlockId]
-jumpSuccs sccs = mapFromList
-  [ (bid, [ d | LiveInstr (Instr i) _ <- instrs, d <- jumpDestsOfInstr i ])
-  | BasicBlock bid instrs <- flattenSCCs sccs ]
 
 -- | Do register allocation on this basic block
 --

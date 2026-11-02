@@ -230,6 +230,7 @@ data LiveInfo
                                           -- entry point for the proc).
                 (BlockMap Regs)       -- argument locals live on entry to this block
                 (BlockMap IntSet)         -- stack slots live on entry to this block
+                (BlockMap [BlockId])      -- each block's jump targets
 
 
 -- | A basic block with liveness information.
@@ -284,7 +285,7 @@ instance OutputableP env instr => OutputableP env (LiveInstr instr) where
    pdoc env i = ppr (fmap (pdoc env) i)
 
 instance OutputableP Platform LiveInfo where
-    pdoc env (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
+    pdoc env (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry _)
         =  (pdoc env mb_static)
         $$ text "# entryIds         = " <> ppr entryIds
         $$ text "# liveVRegsOnEntry = " <> ppr liveVRegsOnEntry
@@ -374,7 +375,7 @@ slurpConflicts platform live
                 = foldl'  (slurpBlock info) rs bs
 
         slurpBlock info rs (BasicBlock blockId instrs)
-                | LiveInfo _ _ blockLive _        <- info
+                | LiveInfo _ _ blockLive _ _      <- info
                 , Just rsLiveEntry                <- mapLookup blockId blockLive
                 , (conflicts, moves)              <- slurpLIs rsLiveEntry rs instrs
                 = (consBag rsLiveEntry conflicts, moves)
@@ -549,7 +550,7 @@ stripLive config live
  where  stripCmm :: (OutputableP Platform statics, Instruction instr)
                  => LiveCmmDecl statics instr -> NatCmmDecl statics instr
         stripCmm (CmmData sec ds)       = CmmData sec ds
-        stripCmm (CmmProc (LiveInfo info (first_id:_) _ _) label live sccs)
+        stripCmm (CmmProc (LiveInfo info (first_id:_) _ _ _) label live sccs)
          = let  final_blocks    = flattenSCCs sccs
 
                 -- make sure the block that was first in the input list
@@ -643,12 +644,12 @@ patchEraseLive platform patchF cmm
         patchCmm cmm@CmmData{}  = cmm
 
         patchCmm (CmmProc info label live sccs)
-         | LiveInfo static id blockMap mLiveSlots <- info
+         | LiveInfo static id blockMap mLiveSlots succs <- info
          = let
                   -- See Note [Unique Determinism and code generation]
                 blockMap'       = mapMap (mapRegs patchF) blockMap
 
-                info'           = LiveInfo static id blockMap' mLiveSlots
+                info'           = LiveInfo static id blockMap' mLiveSlots succs
            in   CmmProc info' label live $ map patchSCC sccs
 
         patchSCC (AcyclicSCC b)  = AcyclicSCC (patchBlock b)
@@ -726,29 +727,28 @@ cmmTopLiveness
       :: Maybe CFG -> Platform -> NatCmmDecl statics X86.Instr
       -> UniqDSM (LiveCmmDecl statics X86.Instr) #-}
 cmmTopLiveness cfg platform cmm
-        = regLiveness platform $ natCmmTopToLive cfg cmm
+        = regLivenessOf Instr platform $ natCmmTopToLive cfg cmm
 
+-- | A procedure's blocks in SCCs, its instructions as the code generator
+--   gave them: the first liveness walk wraps each as it annotates it.
 natCmmTopToLive
         :: Instruction instr
         => Maybe CFG -> NatCmmDecl statics instr
-        -> LiveCmmDecl statics instr
+        -> GenCmmDecl statics LiveInfo [SCC (NatBasicBlock instr)]
 
 natCmmTopToLive _ (CmmData i d)
         = CmmData i d
 
 natCmmTopToLive _ (CmmProc info lbl live (ListGraph []))
-        = CmmProc (LiveInfo info [] mapEmpty mapEmpty) lbl live []
+        = CmmProc (LiveInfo info [] mapEmpty mapEmpty mapEmpty) lbl live []
 
 natCmmTopToLive mCfg proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
-        = CmmProc (LiveInfo info' (first_id : entry_ids) mapEmpty mapEmpty)
-                lbl live sccsLive
+        = CmmProc (LiveInfo info' (first_id : entry_ids) mapEmpty mapEmpty succs)
+                lbl live sccs
    where
         first_id        = blockId first
         all_entry_ids   = entryBlocks proc
-        sccs            = sccBlocks blocks all_entry_ids mCfg
-        sccsLive        = map (fmap (\(BasicBlock l instrs) ->
-                                       BasicBlock l (map (\i -> LiveInstr (Instr i) Nothing) instrs)))
-                        $ sccs
+        (sccs, succs)   = sccBlocks blocks all_entry_ids mCfg
 
         entry_ids       = filter (reachable_node) .
                           filter (/= first_id) $ all_entry_ids
@@ -774,9 +774,9 @@ sccBlocks
         => [NatBasicBlock instr]
         -> [BlockId]
         -> Maybe CFG
-        -> [SCC (NatBasicBlock instr)]
+        -> ([SCC (NatBasicBlock instr)], BlockMap [BlockId])
 
-sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
+sccBlocks blocks entries mcfg = (map (fmap node_payload) sccs, succs)
   where
         nodes :: [ Node BlockId (NatBasicBlock instr) ]
         nodes = [ DigraphNode block id (getOutEdges instrs)
@@ -797,6 +797,9 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
 
         sccs = stronglyConnCompG g2
 
+        -- each block's jump targets
+        succs = mapFromList [ (b, ds) | DigraphNode _ b ds <- nodes ]
+
         getOutEdges :: Instruction instr => [instr] -> [BlockId]
         getOutEdges instrs = concatMap jumpDestsOfInstr instrs
 
@@ -813,26 +816,52 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
 -- Annotate code with register liveness information
 --
 
+-- No pragma: with INLINE, the compiler ran from 0.001% fewer to 0.005% more
+-- instructions and allocated from 0.002% less to 0.001% more compiling T3294,
+-- T783, T9961, T12707, !16269's CmmDiamondChain and nofib's puzzle at -O0,
+-- -O and -O2 under -fregs-graph, the graph allocator being regLiveness's one
+-- caller, on GHC 10.1.20261108.
 regLiveness
         :: Instruction instr
         => Platform
         -> LiveCmmDecl statics instr
         -> UniqDSM (LiveCmmDecl statics instr)
 
-regLiveness _ (CmmData i d)
+regLiveness = regLivenessOf (\(LiveInstr instr _) -> instr)
+
+-- | Annotate the blocks of a procedure, given each element's 'InstrSR':
+--   LiveInstrs walked again ('regLiveness'), or on the first walk the
+--   instructions as the code generator gave them ('cmmTopLiveness'), so
+--   that they are not first wrapped in LiveInstrs only to be dropped.
+regLivenessOf
+        :: Instruction instr
+        => (a -> InstrSR instr)
+        -> Platform
+        -> GenCmmDecl statics LiveInfo [SCC (GenBasicBlock a)]
+        -> UniqDSM (LiveCmmDecl statics instr)
+-- INLINE, so that cmmTopLiveness's copy for x86 does not build the procedure
+-- natCmmTopToLive returns only to take it apart, and has the accessor constant
+-- in the loops of livenessSCCs and livenessCyclic: out of line, regLivenessOf
+-- made the compiler run 0.12% more instructions and allocate 0.13% more
+-- compiling T9961 at -O0, 0.045% and 0.044% more at -O, and 0.035% and 0.032%
+-- more at -O2, on GHC 10.1.20261108.
+{-# INLINE regLivenessOf #-}
+
+regLivenessOf _ _ (CmmData i d)
         = return $ CmmData i d
 
-regLiveness _ (CmmProc info lbl live [])
-        | LiveInfo static mFirst _ _    <- info
+regLivenessOf _ _ (CmmProc info lbl live [])
+        | LiveInfo static mFirst _ _ succs <- info
         = return $ CmmProc
-                        (LiveInfo static mFirst mapEmpty mapEmpty)
+                        (LiveInfo static mFirst mapEmpty mapEmpty succs)
                         lbl live []
 
-regLiveness platform (CmmProc info lbl live sccs)
-        | LiveInfo static mFirst _ liveSlotsOnEntry     <- info
-        = let   (ann_sccs, block_live)  = livenessSCCs platform mapEmpty [] sccs
+regLivenessOf inst platform (CmmProc info lbl live sccs)
+        | LiveInfo static mFirst _ liveSlotsOnEntry succs <- info
+        = let   (ann_sccs, block_live)
+                        = livenessSCCs inst platform succs mapEmpty [] sccs
 
-          in    return $ CmmProc (LiveInfo static mFirst block_live liveSlotsOnEntry)
+          in    return $ CmmProc (LiveInfo static mFirst block_live liveSlotsOnEntry succs)
                            lbl live ann_sccs
 
 
@@ -846,7 +875,7 @@ regLivenessBorn
 regLivenessBorn decl@(CmmData {})
         = decl
 
-regLivenessBorn (CmmProc info@(LiveInfo _ _ block_live _) lbl live sccs)
+regLivenessBorn (CmmProc info@(LiveInfo _ _ block_live _ _) lbl live sccs)
         = CmmProc info lbl live (map (fmap born) sccs)
         where   born (BasicBlock block_id instrs)
                  = BasicBlock block_id
@@ -867,9 +896,12 @@ reverseBlocksInTops top
 --   into it, as before the SCC's first walk: a jump target missing from the
 --   map is then one the SCCs are out of order for, or one the CFG lacks
 --   (liveness1).
-seedCyclic :: BlockMap Regs -> [LiveBasicBlock instr] -> BlockMap Regs
+seedCyclic :: BlockMap Regs -> [GenBasicBlock a] -> BlockMap Regs
 seedCyclic = foldl' (\m b -> mapInsert (blockId b) noRegs m)
 
+-- No pragma: with INLINE, the compiler's instructions and allocation moved by
+-- under 0.001% compiling T3294, T783, T9961, T12707, !16269's CmmDiamondChain
+-- and nofib's puzzle at -O0, -O and -O2, on GHC 10.1.20261108.
 -- | Computing liveness
 --
 --  On entry, the SCCs must be in "reverse" order: later blocks may transfer
@@ -880,38 +912,55 @@ seedCyclic = foldl' (\m b -> mapInsert (blockId b) noRegs m)
 --
 livenessSCCs
        :: Instruction instr
-       => Platform
+       => (a -> InstrSR instr)
+       -> Platform
+       -> BlockMap [BlockId]                    -- each block's jump targets
        -> BlockMap Regs
        -> [SCC (LiveBasicBlock instr)]          -- accum
-       -> [SCC (LiveBasicBlock instr)]
+       -> [SCC (GenBasicBlock a)]
        -> ( [SCC (LiveBasicBlock instr)]
           , BlockMap Regs)
 
-livenessSCCs _ !blockmap done []
+-- A wrapper around a local loop, the static argument transformation, which GHC
+-- does not run at any level (-fstatic-argument-transformation), done by hand,
+-- so that the loop, and livenessCyclic's, inline into cmmTopLiveness's copy
+-- for x86 with the accessor a constant rather than an argument: as a plain
+-- recursive function it made the compiler run 0.006% more instructions
+-- compiling T9961 at -O0, and 0.002% more compiling T12707 at -O and nofib's
+-- puzzle at -O2, allocating within 0.003% of it, on GHC 10.1.20261108.
+livenessSCCs inst platform succs = go
+ where
+  go !blockmap done []
         = (done, blockmap)
 
-livenessSCCs platform !blockmap done (AcyclicSCC block : sccs)
- = let  !(!blockmap', block')   = livenessBlock platform blockmap block
-   in   livenessSCCs platform blockmap' (AcyclicSCC block' : done) sccs
+  go !blockmap done (AcyclicSCC block : sccs)
+   = let  !(!blockmap', block')   = livenessBlock inst platform blockmap block
+     in   go blockmap' (AcyclicSCC block' : done) sccs
 
-livenessSCCs platform !blockmap done
+  go !blockmap done
         (CyclicSCC blocks : sccs) =
-        livenessSCCs platform blockmap' (CyclicSCC blocks':done) sccs
- where      !(!blockmap', blocks') = livenessCyclic platform blockmap blocks
+        go blockmap' (CyclicSCC blocks':done) sccs
+   where    !(!blockmap', blocks')
+                = livenessCyclic inst platform succs blockmap blocks
 
 
+-- No pragma: with INLINE, the compiler's instructions and allocation moved by
+-- under 0.001% compiling T3294, T783, T9961, T12707, !16269's CmmDiamondChain
+-- and nofib's puzzle at -O0, -O and -O2, on GHC 10.1.20261108.
 -- | Annotate the blocks of a cyclic SCC with register liveness information,
 --   walking a block again only when the registers live on entry to one of
 --   its successors in the SCC, or their formats, have changed since its last
 --   walk, until none have.  The blocks come back in their order.
 livenessCyclic
         :: Instruction instr
-        => Platform
+        => (a -> InstrSR instr)
+        -> Platform
+        -> BlockMap [BlockId]   -- each block's jump targets
         -> BlockMap Regs
-        -> [LiveBasicBlock instr]
+        -> [GenBasicBlock a]
         -> (BlockMap Regs, [LiveBasicBlock instr])
 
-livenessCyclic platform blockmap0 blocks
+livenessCyclic inst platform succs blockmap0 blocks
  = go (seedCyclic blockmap0 blocks) mapEmpty everyPos
  where
         ids     = map blockId blocks
@@ -922,9 +971,8 @@ livenessCyclic platform blockmap0 blocks
         -- the positions of the blocks of the SCC jumping to each of its blocks
         preds   = mapFromListWith IntSet.union
                     [ (dest, IntSet.singleton p)
-                    | (p, BasicBlock _ instrs) <- zip [0 ..] blocks
-                    , LiveInstr instr _ <- instrs
-                    , dest <- jumpDestsOfInstr instr
+                    | (p, i) <- zip [0 ..] ids
+                    , dest <- mapFindWithDefault [] i succs
                     , dest `setMember` inScc ]
         get m i = expectJust (mapLookup i m)
 
@@ -935,7 +983,7 @@ livenessCyclic platform blockmap0 blocks
           Nothing -> (bm, map (get out) ids)
           Just (p, queued1)
            -> let b@(BasicBlock i _) = byPos ! p
-                  (bm', block')      = livenessBlock platform bm b
+                  (bm', block')      = livenessBlock inst platform bm b
                   queued'
                     | get bm i /= get bm' i
                     = IntSet.union queued1 (mapFindWithDefault mempty i preds)
@@ -945,18 +993,22 @@ livenessCyclic platform blockmap0 blocks
 
 
 
+-- No pragma: with INLINE, the compiler ran 0.047% more instructions compiling
+-- T3294 at -O0 and 0.018% and 0.017% more at -O and -O2, allocating the same,
+-- on GHC 10.1.20261108.
 -- | Annotate a basic block with register liveness information.
 --
 livenessBlock
         :: Instruction instr
-        => Platform
+        => (a -> InstrSR instr)
+        -> Platform
         -> BlockMap Regs
-        -> LiveBasicBlock instr
+        -> GenBasicBlock a
         -> (BlockMap Regs, LiveBasicBlock instr)
 
-livenessBlock platform blockmap (BasicBlock block_id instrs)
+livenessBlock inst platform blockmap (BasicBlock block_id instrs)
  = let  !(!regsLiveOnEntry, instrs')
-            = livenessBack platform noRegs blockmap [] (reverse instrs)
+            = livenessBack inst platform noRegs blockmap [] (reverse instrs)
         !blockmap' = mapInsert block_id regsLiveOnEntry blockmap
    in   (blockmap', BasicBlock block_id instrs')
 
@@ -992,38 +1044,54 @@ livenessForward rsLiveEntry (li@(LiveInstr instr mLive) : lis)
         = li : livenessForward rsLiveEntry lis
 
 
+-- No pragma: with INLINE, the compiler's instructions and allocation moved by
+-- under 0.001% compiling T3294, T783, T9961, T12707, !16269's CmmDiamondChain
+-- and nofib's puzzle at -O0, -O and -O2, on GHC 10.1.20261108.
 -- | Calculate liveness going backwards,
 --   filling in when regs die, and what regs are live across each instruction
 
 livenessBack
         :: Instruction instr
-        => Platform
+        => (a -> InstrSR instr)
+        -> Platform
         -> Regs           -- ^ regs live on this instr
         -> BlockMap Regs  -- ^ regs live on entry to other BBs
         -> [LiveInstr instr]  -- ^ instructions (accum)
-        -> [LiveInstr instr]  -- ^ instructions
+        -> [a]            -- ^ instructions
         -> (Regs, [LiveInstr instr])
 
-livenessBack _        liveregs _        done []  = (liveregs, done)
+-- A wrapper around a local loop, the static argument transformation, which GHC
+-- does not run at any level (-fstatic-argument-transformation), done by hand:
+-- as a plain recursive function, passing the accessor, the platform and
+-- the block map again at each instruction, it made the compiler run 0.038%
+-- more instructions compiling T3294 at -O0, and 0.014% more at -O and -O2, its
+-- allocation unchanged, on GHC 10.1.20261108.
+livenessBack inst platform liveregs0 blockmap = go liveregs0
+ where
+  go liveregs done []  = (liveregs, done)
 
-livenessBack platform liveregs blockmap acc (instr : instrs)
- = let  !(!liveregs', instr')     = liveness1 platform liveregs blockmap instr
-   in   livenessBack platform liveregs' blockmap (instr' : acc) instrs
+  go liveregs acc (instr : instrs)
+   = let  !(!liveregs', instr')
+                = liveness1 platform liveregs blockmap (inst instr)
+     in   go liveregs' (instr' : acc) instrs
 
+-- No pragma: with INLINABLE, the compiler's instructions moved by under 0.001%
+-- compiling T3294, T783, T9961, T12707, !16269's CmmDiamondChain and nofib's
+-- puzzle at -O0, -O and -O2, its allocation unchanged, on GHC 10.1.20261108.
 -- don't bother tagging comments or deltas with liveness
 liveness1
         :: Instruction instr
         => Platform
         -> Regs
         -> BlockMap Regs
-        -> LiveInstr instr
+        -> InstrSR instr
         -> (Regs, LiveInstr instr)
 
-liveness1 _ liveregs _ (LiveInstr instr _)
+liveness1 _ liveregs _ instr
         | isMetaInstr instr
         = (liveregs, LiveInstr instr Nothing)
 
-liveness1 platform liveregs blockmap (LiveInstr instr _)
+liveness1 platform liveregs blockmap instr
 
         | not_a_branch
         = (liveregs1, LiveInstr instr (Just live))

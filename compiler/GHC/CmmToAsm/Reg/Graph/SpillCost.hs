@@ -90,14 +90,14 @@ slurpSpillCostInfo platform cfg cmm
                 = mapM_ (countBlock info freqMap)
                 $ flattenSCCs sccs
             where
-                LiveInfo _ entries _ _ = info
+                LiveInfo _ entries _ _ _ = info
                 freqMap = (\c -> blockFrequencies Set.empty (checkFailures c)
                                                    (head entries) c) <$> cfg
 
         -- Lookup the regs that are live on entry to this block in
         --      the info table from the CmmProc.
         countBlock info freqMap (BasicBlock blockId instrs)
-                | LiveInfo _ _ blockLive _ <- info
+                | LiveInfo _ _ blockLive _ _ <- info
                 , Just rsLiveEntry  <- mapLookup blockId blockLive
                 , rsLiveEntry_virt  <- takeVirtualRegs $ getRegs rsLiveEntry
                 = countLIs (ceiling $ weightOf freqMap blockId) rsLiveEntry_virt instrs
