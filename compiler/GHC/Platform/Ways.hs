@@ -169,7 +169,7 @@ wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
 wayUnsetGeneralFlags _ (WayCustom {}) = []
 wayUnsetGeneralFlags _ WayThreaded = []
 wayUnsetGeneralFlags _ WayDebug    = []
-wayUnsetGeneralFlags _ WayDyn      = [Opt_SplitSections]
+wayUnsetGeneralFlags _ WayDyn      = []
    -- There's no point splitting when we're going to be dynamically linking.
    -- Plus it breaks compilation on OSX x86.
 wayUnsetGeneralFlags _ WayProf     = []
