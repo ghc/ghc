@@ -2,6 +2,8 @@
 
 $TEST_HC $TEST_HC_OPTS      \
     -package containers     \
+    -package directory      \
+    -package filepath       \
     -dynamic                \
     dumpDeclaredSymbols.c   \
     -I$TOP/../rts           \
@@ -37,3 +39,19 @@ RTS_DYLIB_PATH=$(ldd ./Main | awk '/^[[:space:]]*libHSrts-.* => .+$/ {
 readelf -W --dyn-syms "$RTS_DYLIB_PATH" > $OBSERVED_SYMBOLS
 
 ./Main diff $DECLARED_SYMBOLS $OBSERVED_SYMBOLS
+
+
+#
+# Full dump/diff
+#
+
+DUMP=$CI_JOB_NAME-$(basename $RTS_DYLIB_PATH).dump
+./Main full-dump $OBSERVED_SYMBOLS > $DUMP
+if [ -f "expected/$DUMP" ]; then
+    diff "$DUMP" "expected/$DUMP"
+else
+    echo "# No expected dump file: expected/$DUMP"
+    echo ""
+    cat "$DUMP"
+fi
+

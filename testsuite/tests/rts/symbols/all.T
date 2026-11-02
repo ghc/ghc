@@ -10,7 +10,8 @@ test('rts-check-symbols', [
     extra_files([
         'dumpDeclaredSymbols.c',
         'Main.hs',
-        'rts-check-symbols.sh'
+        'rts-check-symbols.sh',
+        'expected/'
     ])],
     makefile_test,
     []

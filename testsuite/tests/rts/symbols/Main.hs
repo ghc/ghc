@@ -3,6 +3,8 @@ import qualified Data.Set as S
 import Data.List (isSuffixOf, stripPrefix)
 import Data.Maybe (mapMaybe)
 import System.Environment (getArgs)
+import System.FilePath
+import System.Directory
 
 -- Symbols to be ignored. These are symbols that are gated on CPP ant not correctly
 -- specified in RtsSymbols.c. This means the symbol will sometimes appear in the
@@ -153,6 +155,12 @@ main = do
          let diffStr = diff declaredSymbols observedSymbols
          -- writeFile "<ghc root>/testsuite/tests/rts/symbols/rts-check-symbols.stdout"
          putStrLn diffStr
+
+      -- Formats all symbols from readelf output
+      ["full-dump", observedSymbolsFile] -> do
+         observedSymbolsStr <- readFile observedSymbolsFile
+         let observedSymbols = parseReadelf observedSymbolsStr
+         putStrLn $ unlines [symbol ++ " " ++ show codeOrData | (symbol, codeOrData) <- M.toList observedSymbols]
 
       _ -> fail ("Unexpected arguments: " ++ show args)
 
