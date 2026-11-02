@@ -1,0 +1,18 @@
+section: rts
+synopsis: Fix numerous minor issues in posix signal handling
+description:
+  Many uses of posix signal masks were wrong or usless, especially in the
+  threaded RTS. This may fix a number of issues noticed on macOS where signal
+  masks got messed up, including when creating child processes.
+
+  Signal delivery was racy in the non-threaded RTS which could allow signals
+  to not be delivered for extended periods of time.
+
+  Signal handlers were also calling functions which were not guaranteed to be
+  safe to use from signal handlers (which in principle can lead to lockups or
+  data corruption). Unfortunately the SIGQUIT handler that dumps a DWARF-based
+  stack trace has had to be disabled, until we can figure out how to do this
+  safely from a signal handler. See issue #28071.
+mrs: !16845
+issues: #10686 #27968 #27540 #19205 #27086 #28067
+
