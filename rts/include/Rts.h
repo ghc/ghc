@@ -326,11 +326,11 @@ RTS_PUBLIC int rts_isTracing(void);
 
 #if defined(DEBUG)
 #define TICK_VAR(arity) \
-  extern StgInt SLOW_CALLS_##arity; \
-  extern StgInt RIGHT_ARITY_##arity; \
-  extern StgInt TAGGED_PTR_##arity;
+  extern RTS_PUBLIC StgInt SLOW_CALLS_##arity; \
+  extern RTS_PUBLIC StgInt RIGHT_ARITY_##arity; \
+  extern RTS_PUBLIC StgInt TAGGED_PTR_##arity;
 
-extern StgInt TOTAL_CALLS;
+extern RTS_PUBLIC StgInt TOTAL_CALLS;
 
 TICK_VAR(1)
 TICK_VAR(2)

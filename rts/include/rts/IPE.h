@@ -130,5 +130,5 @@ RTS_PUBLIC bool lookupIPE(const StgInfoTable *info, InfoProvEnt *out);
 RTS_PUBLIC uint64_t lookupIPEId(const StgInfoTable *info);
 
 #if defined(DEBUG)
-void printIPE(const StgInfoTable *info);
+RTS_PUBLIC void printIPE(const StgInfoTable *info);
 #endif

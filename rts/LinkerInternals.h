@@ -10,6 +10,7 @@
 
 #include "Rts.h"
 #include "Hash.h"
+#include "RtsPublic.h"
 #include "linker/M32Alloc.h"
 #include "linker/ProddableBlocks.h"
 
@@ -397,7 +398,7 @@ extern RTS_PUBLIC Elf_Word shndx_table_uninit_label;
 
 
 #if defined(THREADED_RTS)
-extern Mutex linker_mutex;
+extern RTS_PUBLIC Mutex linker_mutex;
 #endif /* THREADED_RTS */
 
 /* Type of an initializer */

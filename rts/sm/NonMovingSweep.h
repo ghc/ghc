@@ -26,5 +26,5 @@ RTS_PUBLIC void nonmovingSweepStableNameTable(void);
 
 #if defined(DEBUG)
 // The non-moving equivalent of the moving collector's gcCAFs.
-void nonmovingGcCafs(void);
+RTS_PUBLIC void nonmovingGcCafs(void);
 #endif

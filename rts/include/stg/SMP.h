@@ -51,7 +51,7 @@ void arm_atomic_spin_unlock(void);
  * Used for locking closures during updates (see lockClosure()
  * in rts/include/rts/storage/SMPClosureOps.h) and the MVar primops.
  */
-EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
+RTS_PUBLIC_EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
 
 /*
  * Compare-and-swap.  Atomically does this:
@@ -69,7 +69,7 @@ RTS_PUBLIC_EXTERN_INLINE StgWord8 cas_word8(StgWord8 *volatile p, StgWord8 o, St
  * Compare-and-swap
  * this uses a seq_cst success memory order and a relaxed failure memory order
  */
-EXTERN_INLINE StgWord cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n);
+RTS_PUBLIC_EXTERN_INLINE StgWord cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n);
 
 
 /*
@@ -88,14 +88,14 @@ RTS_PUBLIC_EXTERN_INLINE StgWord atomic_inc(StgVolatilePtr p, StgWord n);
  *   return ((*p) -= n);
  * }
  */
-EXTERN_INLINE StgWord atomic_dec(StgVolatilePtr p, StgWord n);
+RTS_PUBLIC_EXTERN_INLINE StgWord atomic_dec(StgVolatilePtr p, StgWord n);
 
 /*
  * Busy-wait nop: this is a hint to the CPU that we are currently in a
  * busy-wait loop waiting for another CPU to change something.  On a
  * hyperthreaded CPU it should yield to another thread, for example.
  */
-EXTERN_INLINE void busy_wait_nop(void);
+RTS_PUBLIC_EXTERN_INLINE void busy_wait_nop(void);
 
 #endif // !IN_STG_CODE
 
@@ -438,7 +438,7 @@ EXTERN_INLINE void busy_wait_nop(void);
  * for a lock operation because corresponding unlock operation issues a
  * store-store barrier (release-store) immediately before releasing the lock.
  */
-EXTERN_INLINE StgWord
+RTS_PUBLIC_EXTERN_INLINE StgWord
 xchg(StgPtr p, StgWord w)
 {
     return __atomic_exchange_n(p, w, __ATOMIC_SEQ_CST);
@@ -448,21 +448,21 @@ xchg(StgPtr p, StgWord w)
  * CMPXCHG - the single-word atomic compare-and-exchange instruction.  Used
  * in the STM implementation.
  */
-EXTERN_INLINE StgWord
+RTS_PUBLIC_EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
     __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     return o;
 }
 
-EXTERN_INLINE StgWord8
+RTS_PUBLIC_EXTERN_INLINE StgWord8
 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
 {
     __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     return o;
 }
 
-EXTERN_INLINE StgWord
+RTS_PUBLIC_EXTERN_INLINE StgWord
 cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n) {
     __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED);
     return o;
@@ -471,13 +471,13 @@ cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n) {
 // RRN: Generalized to arbitrary increments to enable fetch-and-add in
 // Haskell code (fetchAddIntArray#).
 // PT: add-and-fetch, returns new value
-EXTERN_INLINE StgWord
+RTS_PUBLIC_EXTERN_INLINE StgWord
 atomic_inc(StgVolatilePtr p, StgWord incr)
 {
     return __atomic_add_fetch(p, incr, __ATOMIC_SEQ_CST);
 }
 
-EXTERN_INLINE StgWord
+RTS_PUBLIC_EXTERN_INLINE StgWord
 atomic_dec(StgVolatilePtr p, StgWord decr)
 {
     return __atomic_sub_fetch(p, decr, __ATOMIC_SEQ_CST);
@@ -488,7 +488,7 @@ atomic_dec(StgVolatilePtr p, StgWord decr)
  * busy-wait loop, and the processor should look for something else to
  * do (such as run another hardware thread).
  */
-EXTERN_INLINE void
+RTS_PUBLIC_EXTERN_INLINE void
 busy_wait_nop(void)
 {
 #if defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
