@@ -157,3 +157,9 @@ HSC2HS_OPTS = --cc="$(TEST_CC)" $(addprefix --cflag=,$(TEST_CC_OPTS)) --ld=$(TES
 
 IOManager.hs: IOManager.hsc
 	'$(HSC2HS)' $(HSC2HS_OPTS) $<
+
+.PHONY: census_pinned
+census_pinned:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -rtsopts -v0 census_pinned.hs -o census_pinned
+	./census_pinned +RTS -hT -i0 -RTS
+	grep -m1 '^ARR_WORDS' census_pinned.hp

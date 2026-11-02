@@ -1275,6 +1275,13 @@ reasons for this:
    allocated by foreign libraries, and data allocated by the RTS), and
    ``mmap()``\'d memory are not counted in the heap profile.
 
+-  Small pinned objects (for example the payloads of ``ByteString`` values)
+   are allocated in blocks that the garbage collector keeps or frees as a
+   whole (see :ghc-ticket:`28005`). The heap profiler counts every object in
+   these blocks, so dead pinned objects are included in the profile until
+   the garbage collector frees their block. This also applies to the block
+   that each capability is currently filling with new pinned objects.
+
 For more discussion about understanding how understanding process residency see
 :ref:`hints-os-memory`.
 

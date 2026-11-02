@@ -735,6 +735,8 @@ test('T19048',
      ],
      compile_and_run, ['-O -rtsopts'])
 
+test('census_pinned', [js_skip], makefile_test, [])
+
 test('T27585',
      [ omit_ghci
      , no_check_hp
