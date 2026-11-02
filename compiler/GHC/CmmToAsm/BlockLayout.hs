@@ -763,18 +763,26 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
 
 {-# SCC dropJumps #-}
 -- | Remove redundant jumps between blocks when we can rely on
--- fall through.
+-- fall through, past the blocks between that are empty or that this
+-- leaves empty.
 dropJumps :: forall a i. Instruction i => LabelMap a -> [GenBasicBlock i]
           -> [GenBasicBlock i]
 dropJumps _    [] = []
 dropJumps info (BasicBlock lbl ins:todo)
     | Just ins <- nonEmpty ins --This can happen because of shortcutting
-    , BasicBlock nextLbl _ : _ <- todo
-    , canFallthroughTo (NE.last ins) nextLbl
-    , not (mapMember nextLbl info)
+    , fallsTo (NE.last ins) todo
     = BasicBlock lbl (NE.init ins) : dropJumps info todo
     | otherwise
     = BasicBlock lbl ins : dropJumps info todo
+  where
+    fallsTo jmp (BasicBlock l is : more)
+      | mapMember l info       = False
+      | canFallthroughTo jmp l = True
+      | otherwise              = case is of
+          []  -> fallsTo jmp more
+          [i] -> fallsTo i more && fallsTo jmp more
+          _   -> False
+    fallsTo _ [] = False
 
 
 -- -----------------------------------------------------------------------------
