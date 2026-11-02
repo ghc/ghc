@@ -1752,6 +1752,11 @@ mk_strict_superclasses _ _ _ _ _ cls _
 
 mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar })) tvs theta cls tys
   = -- Given case
+    -- We have   [G] forall tvs. theta => C ty1 ty2
+    -- where class (SC1 a b, S2 a b) => C a b
+    -- We want to make new Givens [G] forall tvs theta => SC1 ty1 ty2
+    --                            [G] forall tvs theta => SC2 ty1 ty2
+    -- `do_one_given` does that for one of the superclasses SCi
     do { traceTcS "mk_strict" (ppr ev $$ ppr (ctLocOrigin loc))
        ; concatMapM do_one_given (classSCSelIds cls) }
   where
@@ -1759,13 +1764,18 @@ mk_strict_superclasses fuel rec_clss ev@(CtGiven (GivenCt { ctev_evar = evar }))
     dict_ids  = mkTemplateLocals theta
     this_size = pSizeClassPred cls tys
 
+    -- Stop if we have a /quantified/ constraint where unlifted types
+    -- or type families in the head, are involved
     do_one_given sel_id
-      | isUnliftedType sc_pred
-         -- NB: class superclasses are never representation-polymorphic,
-         -- so isUnliftedType is OK here.
-      , not (null tvs && null theta)
-      = -- See Note [Equality superclasses in quantified constraints]
-        return []
+      | not (null tvs && null theta)   -- A /quantified/ superclass
+      , (isUnliftedType sc_pred        -- No unboxed quantified constraints
+              -- See Note [Equality superclasses in quantified constraints]
+              -- NB: class superclasses are never representation-polymorphic,
+              -- so isUnliftedType is OK here.
+         || not (isFamFreeTy sc_pred)  -- No type families in head
+        )
+      = return []
+
       | otherwise
       = do { given_ev <- newGivenEv sc_loc $
                          mk_given_desc sel_id sc_pred
