@@ -2953,9 +2953,7 @@ addWay' w dflags0 =
        dflags1 = dflags0 { targetWays_ = addWay w (targetWays_ dflags0) }
        dflags2 = foldr setGeneralFlag' dflags1
                        (wayGeneralFlags platform w)
-       dflags3 = foldr unSetGeneralFlag' dflags2
-                       (wayUnsetGeneralFlags platform w)
-   in dflags3
+   in dflags2
 
 removeWayDynP :: Way -> DynP ()
 removeWayDynP w = upd (\dfs -> dfs { targetWays_ = removeWay w (targetWays_ dfs) })
@@ -3774,6 +3772,20 @@ In the checks and fixes performed by `makeDynFlagsConsistent`, the choice
 between the two does not seem uniform. TODO: Make this choice more evident and uniform.
 -}
 
+{- Note [Split sections are not supported on Darwin]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+On Darwin, split sections are either ignored by the backends (NCG, C) or would
+cause errors (LLVM, see split-sections-darwin test).
+
+The `.subsections_via_symbols` feature of Mach-O is used instead (see Note
+[Subsections Via Symbols]). This works on x86_64, but not yet on aarch64 (c.f
+#24962 #23672).
+
+`makeDynFlagsConsistent` then disables split-sections on darwin unconditionally.
+This is redundant on x86_64, because of the `platformHasSubsectionsViaSymbols`
+check, but harmless.
+-}
+
 -- | Resolve any internal inconsistencies in a set of 'DynFlags'.
 -- Returns the consistent 'DynFlags' as well as a list of warnings
 -- to report to the user, and a list of verbose info msgs.
@@ -3801,6 +3813,13 @@ makeDynFlagsConsistent dflags
     = let dflags' = gopt_unset dflags Opt_SplitSections
           warn = "-fsplit-sections is not useful on this platform " ++
                  "since it uses subsections-via-symbols. Ignoring."
+      in loop dflags' warn
+
+   -- See Note [Split sections are not supported on Darwin]
+ | gopt Opt_SplitSections dflags
+ , os == OSDarwin
+    = let dflags' = gopt_unset dflags Opt_SplitSections
+          warn = "-fsplit-sections is not supported on Mach-O. Ignoring."
       in loop dflags' warn
 
    -- Via-C backend only supports unregisterised ABI. Switch to a backend
@@ -3918,10 +3937,7 @@ makeDynFlagsConsistent dflags
             dflags_b = foldl gopt_set dflags_a
                      $ concatMap (wayGeneralFlags platform)
                                  hostFullWays
-            dflags_c = foldl gopt_unset dflags_b
-                     $ concatMap (wayUnsetGeneralFlags platform)
-                                 hostFullWays
-        in dflags_c
+        in dflags_b
 
  | gopt Opt_InfoTableMap dflags
  , NotValid msg <- backendInfoTableMapValidity (backend dflags)
