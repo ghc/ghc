@@ -291,6 +291,9 @@ void newNonBlockingPipe(int *pipe_fd_r, int *pipe_fd_w)
 
 /* Write the signal number and siginfo into the given fd (which is
  * typically a pipe in non-blocking mode).
+ *
+ * This must be safe to call from posix signal handlers, which means only using
+ * other signal safe functions.
  */
 void writeSignalInfoToPipe(int sig, siginfo_t *info, int fd)
 {
@@ -304,10 +307,11 @@ void writeSignalInfoToPipe(int sig, siginfo_t *info, int fd)
         memset(buf+1, 0, sizeof(siginfo_t));
     }
 
-    int r = write(fd, buf, sizeof(siginfo_t)+1);
-    if (r == -1 && errno == EAGAIN) {
-        errorBelch("lost signal due to full pipe: %d\n", sig);
-    }
+    int r STG_UNUSED = write(fd, buf, sizeof(siginfo_t)+1);
+    // Ignore write failure. There's nothing we can do, and in a signal handler
+    // context we can't call any of our logging functions like errorBelch.
+    // If the pipe were full it means we're getting signals faster than the
+    // I/O manager can process them, or the I/O manager is stalled somehow.
 }
 
 bool readSignalInfoFromPipe(int *sig, siginfo_t *info, int fd)
