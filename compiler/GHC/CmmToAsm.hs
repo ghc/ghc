@@ -825,10 +825,12 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                                       nativeCfgWeights
                    , tags )
               _ -> (noBlockFreqs, mempty)
-        let (withLiveness, usLive) =
+        -- strictMap, not map: with map the compiler ran 0.022% more
+        -- instructions and allocated 0.055% more compiling T9961 at -O0, on
+        -- GHC 10.1.20261111
+        let withLiveness =
                 {-# SCC "regLiveness" #-}
-                runUniqueDSM usGen
-                        $ mapM (cmmTopLiveness livenessCfg platform) native
+                strictMap (cmmTopLiveness livenessCfg platform) native
 
         -- the dump shows when registers are born, liveBorn, which the linear
         -- allocator does not use and the graph allocator fills in itself
@@ -852,7 +854,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 -- do the graph coloring register allocation
                 let ((alloced, maybe_more_stack, regAllocStats), usAlloc)
                         = {-# SCC "RegAlloc-color" #-}
-                          runUniqueDSM usLive
+                          runUniqueDSM usGen
                           $ Color.regAlloc
                                 config
                                 alloc_regs
@@ -911,7 +913,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
 
                 let ((alloced, regAllocStats, stack_updt_blks), usAlloc)
                         = {-# SCC "RegAlloc-linear" #-}
-                          runUniqueDSM usLive
+                          runUniqueDSM usGen
                           $ liftM unzip3
                           $ mapM reg_alloc withLiveness
 
