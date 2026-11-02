@@ -1638,10 +1638,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph = do
             dflags_b = foldl gopt_set dflags_a
                      $ concatMap (wayGeneralFlags platform)
                                  hostFullWays
-            dflags_c = foldl gopt_unset dflags_b
-                     $ concatMap (wayUnsetGeneralFlags platform)
-                                 hostFullWays
-        in dflags_c
+        in dflags_b
 
 {- Note [-fno-code mode]
 ~~~~~~~~~~~~~~~~~~~~~~~~

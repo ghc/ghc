@@ -11,6 +11,22 @@ test('bytearray-memset-unroll', is_amd64_codegen, compile_grep_asm, ['hs', True,
 test('bytearray-memcpy-unroll', is_amd64_codegen, compile_grep_asm, ['hs', True, ''])
 test('T18137', [when(opsys('darwin'), skip), only_ways(llvm_ways)], compile_grep_asm, ['hs', False, '-fllvm -split-sections'])
 
+# -fsplit-sections used to be silently unset by -dynamic, but only when it
+# appeared before -dynamic on the command line. Check that both orders split.
+# Mach-O has no split sections at all, and COFF names subsections with '$'.
+split_sections_dynamic = [
+    unless(have_dynamic(), skip),
+    when(opsys('darwin'), skip),
+    when(opsys('mingw32'), skip),
+    when(unregisterised(), skip),
+    only_ways(['normal']),
+]
+
+test('split-sections-dynamic1', split_sections_dynamic, compile_grep_asm,
+     ['hs', False, '-fsplit-sections -dynamic'])
+test('split-sections-dynamic2', split_sections_dynamic, compile_grep_asm,
+     ['hs', False, '-dynamic -fsplit-sections'])
+
 test('T24941', [only_ways(['optasm'])], compile, ['-fregs-graph'])
 
 test('msse-option-order', [unless(arch('x86_64') or arch('i386'), skip),

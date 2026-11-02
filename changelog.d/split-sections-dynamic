@@ -1,0 +1,14 @@
+section: compiler
+synopsis: ``-fsplit-sections`` is no longer disabled by ``-dynamic``
+description:
+  ``-dynamic`` used to unset ``-fsplit-sections``, but only when
+  ``-fsplit-sections`` appeared earlier on the command line, so the flag meant
+  different things depending on the order of the two. Both orders now split
+  sections, as do the dynamic outputs of ``-dynamic-too``.
+
+  On Darwin, ``-fsplit-sections`` is now always ignored with a warning: Mach-O
+  has poor support for split sections and instead offers
+  ``.subsections_via_symbols``, which GHC uses where it's able to.
+
+mrs: !16915
+issues: #28061

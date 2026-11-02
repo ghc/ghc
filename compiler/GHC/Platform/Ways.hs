@@ -28,7 +28,6 @@ module GHC.Platform.Ways
    , removeWay
    , allowed_combination
    , wayGeneralFlags
-   , wayUnsetGeneralFlags
    , wayOptc
    , wayOptcxx
    , wayOptl
@@ -163,16 +162,6 @@ wayGeneralFlags platform WayProf
      - if we stop supporting binutils 2.44 / GCC 14.2
      - https://gitlab.haskell.org/ghc/ghc/-/issues/26994 -}
 wayGeneralFlags _ WayProf     = []
-
--- | Turn these flags off when enabling this way
-wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
-wayUnsetGeneralFlags _ (WayCustom {}) = []
-wayUnsetGeneralFlags _ WayThreaded = []
-wayUnsetGeneralFlags _ WayDebug    = []
-wayUnsetGeneralFlags _ WayDyn      = [Opt_SplitSections]
-   -- There's no point splitting when we're going to be dynamically linking.
-   -- Plus it breaks compilation on OSX x86.
-wayUnsetGeneralFlags _ WayProf     = []
 
 -- | Pass these options to the C compiler when enabling this way
 wayOptc :: Platform -> Way -> [String]

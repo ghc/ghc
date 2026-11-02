@@ -1,0 +1,1 @@
+\.section\s+\.text\.SplitSectionsDyn_

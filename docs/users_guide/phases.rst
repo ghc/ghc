@@ -1063,6 +1063,10 @@ for example).
     When linking, the linker can automatically remove all unreferenced sections
     and thus produce smaller executables.
 
+    This flag is ignored on Darwin as the Mach-O object format is not suitable
+    for split sections. The ``.subsections_via_symbols`` directive and the
+    linker's ``-dead_strip`` are used where supported, regardless of this flag.
+
 .. ghc-flag:: -static
     :shortdesc: Use static Haskell libraries
     :type: dynamic

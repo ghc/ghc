@@ -1044,16 +1044,13 @@ dopt_unset dfs f = dfs{ dumpFlags = EnumSet.delete f (dumpFlags dfs) }
 -- | Test whether a 'GeneralFlag' is set
 --
 -- Note that `dynamicNow` (i.e., dynamic objects built with `-dynamic-too`)
--- always implicitly enables Opt_PIC, Opt_ExternalDynamicRefs, and disables
--- Opt_SplitSections.
+-- always implicitly enables Opt_PIC and Opt_ExternalDynamicRefs.
 --
 gopt :: GeneralFlag -> DynFlags -> Bool
 gopt Opt_PIC dflags
    | dynamicNow dflags = True
 gopt Opt_ExternalDynamicRefs dflags
    | dynamicNow dflags = True
-gopt Opt_SplitSections dflags
-   | dynamicNow dflags = False
 gopt f dflags = f `EnumSet.member` generalFlags dflags
 
 -- | Set a 'GeneralFlag'
