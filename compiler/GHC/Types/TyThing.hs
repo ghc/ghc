@@ -260,7 +260,7 @@ tyThingParent_maybe (AnId id)     = case idDetails id of
                                           Just (ATyCon tc)
                                       RecSelId { sel_tycon = RecSelPatSyn ps } ->
                                           Just (AConLike (PatSynCon ps))
-                                      ClassOpId cls _  ->
+                                      DictSelId { dsi_clas = cls } ->
                                           Just (ATyCon (classTyCon cls))
                                       _other           -> Nothing
 tyThingParent_maybe _other = Nothing

@@ -85,8 +85,8 @@ data Class
 --  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
 type FunDep a = ([a],[a])
 
-type ClassOpItem = ( Id           -- Dictionary selector function
-                                  -- See Note [Dictionary selectors]
+type ClassOpItem = ( DictSelId    -- Dictionary selector function
+                                  -- See Note [DictSelId: dictionary selectors]
                    , DefMethInfo) -- Default-method info
 
 type DefMethInfo = Maybe (Name, DefMethSpec Type)
@@ -146,9 +146,9 @@ data ClassBody
         -- Superclasses: eg: (F a ~ b, F b ~ G a, Eq a, Show b)
         -- We need value-level selectors for both the dictionary
         -- superclasses and the equality superclasses
-        cls_sc_theta :: [PredType],     -- Immediate superclasses,
-        cls_sc_sel_ids :: [Id],          -- Selector functions to extract the
-                                        --   superclasses from a
+        cls_sc_theta   :: [PredType],   -- Immediate superclasses,
+        cls_sc_sel_ids :: [DictSelId],  -- Selector functions to extract the
+                                        --   immediate superclasses from a
                                         --   dictionary of this class
         -- Associated types
         cls_ats :: [ClassATItem],  -- Associated type families
@@ -165,9 +165,12 @@ classMinimalDef :: Class -> ClassMinimalDef
 classMinimalDef Class{ classBody = ConcreteClass{ cls_min_def = d } } = d
 classMinimalDef _ = mkTrue -- TODO: make sure this is the right direction
 
-{- Note [Dictionary selectors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Each `ClassOpItem` stores a dictionary selector `Id`:
+{- Note [DictSelId: dictionary selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A `DictSelId` is a dictionary selector `Id`: it is just a selector function
+that picks one field out of a dictionary.
+
+* It can be a superclass selector or a method selector.
 
 * The type of the selector is always closed, and has form
       forall a1..an. C a1 .. an => blah

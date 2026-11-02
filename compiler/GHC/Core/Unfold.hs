@@ -709,7 +709,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
            FCallId _                     -> sizeN (callSize (length val_args) voids)
            DataConWorkId dc              -> conSize    dc (length val_args)
            PrimOpId op _                 -> primOpSize op (length val_args)
-           ClassOpId cls _               -> classOpSize opts cls top_args val_args
+           DictSelId { dsi_clas = cls }  -> classOpSize opts cls top_args val_args
            _ | fun `hasKey` buildIdKey   -> buildSize
              | fun `hasKey` augmentIdKey -> augmentSize
              | otherwise                 -> funSize opts top_args fun (length val_args) voids

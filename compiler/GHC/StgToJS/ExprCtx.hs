@@ -154,7 +154,7 @@ ctxIsEvaluated i =
 
       -- DataConWorkId {} -> True
 
-      -- ClassOpId {} -> False
+      -- DictSelId {} -> False
       --   -- suppose an argument, and we don't have one
 
       -- PrimOpId op _ -> primop_ok op

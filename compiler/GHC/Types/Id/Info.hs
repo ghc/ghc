@@ -159,12 +159,16 @@ data IdDetails
                                 --  b) when desugaring a RecordCon we can get
                                 --     from the Id back to the data con]
 
-  | ClassOpId                   -- ^ The 'Id' is a superclass selector or class operation
-      Class                     --    for this class
-      Bool                      --   True <=> given a non-bottom dictionary, the class op will
+  | DictSelId                   -- ^ The 'Id' is a DictSelId (superclass selector or
+                                --   class operation)
+      { dsi_clas :: Class       --   for this class
+      , dsi_is_sc :: Bool       --   True <=> a superclass selector
+                                --            False <=> a method selector
+      , dsi_terminates :: Bool  --   True <=> given a non-bottom dictionary, the class op will
                                 --            definitely return a non-bottom result
                                 --   and Note [exprOkForSpeculation and type classes]
                                 --       in GHC.Core.Utils
+      }
 
   -- | A representation-polymorphic pseudo-op.
   | RepPolyId
@@ -435,7 +439,7 @@ pprIdDetails other     = brackets (pp other)
    pp (WorkerLikeId dmds)     = text "StrictWorker" <> parens (ppr dmds)
    pp (DataConWorkId _)       = text "DataCon"
    pp (DataConWrapId _)       = text "DataConWrapper"
-   pp (ClassOpId {})          = text "ClassOp"
+   pp (DictSelId {})          = text "DictSelId"
    pp (RepPolyId {})          = text "RepPolyId"
    pp (PrimOpId {})           = text "PrimOp"
    pp (FCallId _)             = text "ForeignCall"

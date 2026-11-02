@@ -3161,7 +3161,7 @@ ppr_types debug type_env
                          VanillaId              -> True
                          WorkerLikeId {}        -> True
                          RecSelId {}            -> True
-                         ClassOpId {}           -> True
+                         DictSelId {}           -> True
                          FCallId {}             -> True
                          _                      -> False
              -- Data cons (workers and wrappers), pattern synonyms,

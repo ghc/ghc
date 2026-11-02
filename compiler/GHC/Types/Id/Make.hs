@@ -366,24 +366,30 @@ Therefore there is no loss of generality if we make all selectors unrestricted.
 
 mkDictSelId :: Name          -- Name of one of the *value* selectors
                              -- (dictionary superclass or method)
-            -> Class -> Id
--- See Note [Dictionary selectors]
+            -> Class -> DictSelId
+-- See Note [DictSelId: dictionary selectors]
 mkDictSelId name clas
-  = mkGlobalId (ClassOpId clas terminating) name sel_ty info
+  = mkGlobalId (DictSelId { dsi_clas       = clas
+                          , dsi_is_sc      = is_sc
+                          , dsi_terminates = terminating })
+               name sel_ty info
   where
-    tycon          = classTyCon clas
-    sel_names      = map idName (classAllSelIds clas)
-    [data_con]     = tyConDataCons tycon
-    tyvars         = dataConUserTyVarBinders data_con
-    n_ty_args      = length tyvars
-    arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
-    val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
+    tycon      = classTyCon clas
+    sel_names  = map idName (classAllSelIds clas)
+    [data_con] = tyConDataCons tycon
+    tyvars     = dataConUserTyVarBinders data_con
+    n_ty_args  = length tyvars
+    arg_tys    = dataConRepArgTys data_con  -- Includes the dictionary superclasses
+    val_index  = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
     pred_ty = mkClassPred clas (mkTyVarTys (binderVars tyvars))
     res_ty  = scaledThing (getNth arg_tys val_index)
     sel_ty  = mkForAllTys tyvars $
               mkFunctionType ManyTy pred_ty res_ty
              -- See Note [Type classes and linear types]
+
+    is_sc = val_index < length (classSCTheta clas)
+            -- Superclass selectors come first; see classAllSelIds
 
     terminating = isTerminatingType res_ty || definitelyUnliftedType res_ty
                   -- If the field is unlifted, it can't be bottom

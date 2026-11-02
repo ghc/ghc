@@ -27,7 +27,7 @@
 
 module GHC.Types.Id (
         -- * The main types
-        Var, Id, isId,
+        Var, Id, DictSelId, isId,
 
         -- * In and Out variants
         InVar,  InId,
@@ -66,7 +66,7 @@ module GHC.Types.Id (
         isRecordSelector, isNaughtyRecordSelector,
         isPatSynRecordSelector,
         isDataConRecordSelector,
-        isClassOpId,
+        isClassOpId, isSuperclassSelector,
         isClassOpId_maybe, isDFunId,
         isPrimOpId, isPrimOpId_maybe,
         isFCallId, isFCallId_maybe,
@@ -133,7 +133,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Basic
 
 -- Imported and re-exported
-import GHC.Types.Var( Id, CoVar, JoinId,
+import GHC.Types.Var( Id, DictSelId, CoVar, JoinId,
             InId,  InVar,
             OutId, OutVar,
             idInfo, idDetails, setIdDetails, globaliseId, idMult,
@@ -474,6 +474,7 @@ isDataConWorkId         :: Id -> Bool
 isDataConWrapId         :: Id -> Bool
 isDFunId                :: Id -> Bool
 isClassOpId             :: Id -> Bool
+isSuperclassSelector    :: Id -> Bool
 
 isClassOpId_maybe       :: Id -> Maybe Class
 isPrimOpId_maybe        :: Id -> Maybe PrimOp
@@ -498,11 +499,15 @@ isNaughtyRecordSelector id = case Var.idDetails id of
                         _                            -> False
 
 isClassOpId id = case Var.idDetails id of
-                        ClassOpId {} -> True
+                        DictSelId {} -> True
                         _other       -> False
 
+isSuperclassSelector id = case Var.idDetails id of
+                        DictSelId { dsi_is_sc = is_sc } -> is_sc
+                        _other                          -> False
+
 isClassOpId_maybe id = case Var.idDetails id of
-                        ClassOpId cls _ -> Just cls
+                        DictSelId { dsi_clas = cls } -> Just cls
                         _other          -> Nothing
 
 isPrimOpId id = case Var.idDetails id of
@@ -635,7 +640,7 @@ isImplicitId :: Id -> Bool
 isImplicitId id
   = case Var.idDetails id of
         FCallId {}       -> True
-        ClassOpId {}     -> True
+        DictSelId {}     -> True
         PrimOpId {}      -> True
         DataConWorkId {} -> True
         DataConWrapId {} -> True

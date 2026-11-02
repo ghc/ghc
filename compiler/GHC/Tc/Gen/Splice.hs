@@ -2199,7 +2199,7 @@ reifyThing (AGlobal (AnId id))
   = do  { ty <- reifyType (idType id)
         ; let v = reifyName id
         ; case idDetails id of
-            ClassOpId cls _ -> return (TH.ClassOpI v ty (reifyName cls))
+            DictSelId { dsi_clas = cls } -> return (TH.ClassOpI v ty (reifyName cls))
             _               -> return (TH.VarI     v ty Nothing)
     }
 

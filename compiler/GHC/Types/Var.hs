@@ -35,7 +35,8 @@
 
 module GHC.Types.Var (
         -- * The main data type and synonyms
-        Var, CoVar, Id, NcId, DictId, DFunId, EvVar, EqVar, EvId, IpId, JoinId,
+        Var, CoVar, Id, NcId, DictId, DFunId, DictSelId,
+        EvVar, EqVar, EvId, IpId, JoinId,
         TyVar, TcTyVar, TypeVar, KindVar, TKVar, TyCoVar,
 
         -- * In and Out variants
@@ -183,6 +184,10 @@ type EvVar  = EvId      -- ...historical name for EvId
 
 -- | Dictionary Function Identifier
 type DFunId = Id        -- A dictionary function
+
+-- | Class-op Function Identifier
+type DictSelId = Id     -- A superclass selector /or/ a method selector
+                        -- See Note [DictSelId: dictionary selectors]
 
 -- | Dictionary Identifier
 type DictId = EvId      -- A dictionary variable

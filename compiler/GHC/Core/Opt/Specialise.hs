@@ -1867,7 +1867,7 @@ the specialised Id correct:
   allows unboxing of all previous CBV args, in which case sticking to
   VanillaIds was the only correct choice to begin with.
 
-* RecSelId, DataCon*Id, ClassOpId, PrimOpId, FCallId, CoVarId:
+* RecSelId, DataCon*Id, DictSelId, PrimOpId, FCallId, CoVarId:
   Never specialised.
 
 Note [Specialisation Must Preserve Sharing]
@@ -3063,7 +3063,7 @@ wantCallsFor _env f
       RecSelId {}      -> False
       DataConWorkId {} -> False
       DataConWrapId {} -> False
-      ClassOpId {}     -> False
+      DictSelId {}     -> False
       PrimOpId {}      -> False
       FCallId {}       -> False
       CoVarId {}       -> False
@@ -3134,7 +3134,7 @@ Note [wantCallsFor]
 function `f`; other thing being equal, the fewer calls we collect the better. It
 is False for things we can't specialise:
 
-* ClassOpId: never inline and we don't have a defn to specialise; we specialise
+* DictSelId: never inline and we don't have a defn to specialise; we specialise
   them through fireRewriteRules.
 * PrimOpId: are never overloaded
 * Data constructors: we never specialise them

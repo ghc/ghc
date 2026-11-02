@@ -495,7 +495,7 @@ toIfaceIdDetails _ (RecSelId { sel_naughty = n
   --     pattern match warning telling them to update this code. See also #23785.
 
 toIfaceIdDetails _ (PrimOpId {})  = IfVanillaId -- Only reachable via 'pprTyThing'
-toIfaceIdDetails _ (ClassOpId {}) = IfVanillaId --   (e.g. GHCi :browse!)
+toIfaceIdDetails _ (DictSelId {}) = IfVanillaId --   (e.g. GHCi :browse!)
 toIfaceIdDetails _ (RepPolyId {}) = IfVanillaId
   -- Reachable via 'pprTyThing', but also with 'unsafeCoerce#' due to the
   -- specific way it is wired-in. Otherwise we should never hit this, because

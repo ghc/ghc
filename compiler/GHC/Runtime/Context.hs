@@ -489,7 +489,7 @@ icExtendGblRdrEnv drop_only_qualified env tythings
     -- parent (#10520)
     is_sub_bndr (AnId f) = case idDetails f of
                              RecSelId {}  -> True
-                             ClassOpId {} -> True
+                             DictSelId {} -> True
                              _            -> False
     is_sub_bndr _ = False
 

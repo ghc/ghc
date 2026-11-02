@@ -1969,7 +1969,7 @@ isCheapApp fn n_val_args
   = case idDetails fn of
       -- DataConWorkId {} -> _  -- Handled by isWorkFreeApp
       RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
-      ClassOpId {}     -> n_val_args == 1
+      DictSelId {}     -> n_val_args == 1
       PrimOpId op _    -> primOpIsCheap op
       _                -> False
         -- In principle we should worry about primops
@@ -1984,7 +1984,7 @@ isExpandableApp fn n_val_args
   = case idDetails fn of
       -- DataConWorkId {} -> _  -- Handled by isWorkFreeApp
       RecSelId {}  -> n_val_args == 1  -- See Note [Record selection]
-      ClassOpId {} -> n_val_args == 1
+      DictSelId {} -> n_val_args == 1
       PrimOpId {}  -> False
       _ | isDeadEndId fn     -> False
           -- See Note [isExpandableApp: bottoming functions]
@@ -2281,7 +2281,7 @@ app_ok fun_ok primop_ok fun val_args
         | otherwise
         -> fields_ok (dataConRepStrictness dc)
 
-      ClassOpId _ is_terminating_result
+      DictSelId { dsi_terminates = is_terminating_result }
         | is_terminating_result -- See Note [exprOkForSpeculation and type classes]
         -> assertPpr (n_val_args == 1) (ppr fun $$ ppr val_args) $
            True
@@ -2456,7 +2456,7 @@ We know that
 
 So we can treat (eq_sel (sc_sel d)) as ok-for-speculation.  We must check
 
-a) That the function is a class-op, with IdDetails of ClassOpId
+a) That the function is a class-op, with IdDetails of DictSelId
 
 b) That the result type of the class-op is terminating or unlifted.  E.g. for
      class C a => D a where ...
@@ -2465,7 +2465,7 @@ b) That the result type of the class-op is terminating or unlifted.  E.g. for
    not be terminating.
 
 Rather than repeatedly test if the result of the class-op is a
-terminating/unlifted type, we cache it as a field of ClassOpId. See
+terminating/unlifted type, we cache it as a field of DictSelId. See
 GHC.Types.Id.Make.mkDictSelId for where this field is initialised.
 
 Note [exprOkForSpeculation: case expressions]
