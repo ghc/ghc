@@ -719,12 +719,14 @@ cmmTopLiveness
       -- See Note [Specialising the linear allocator] in
       -- "GHC.CmmToAsm.Reg.Linear"
 cmmTopLiveness cfg platform cmm
-        = regLiveness platform $ natCmmTopToLive cfg cmm
+        = regLivenessOf Instr platform $ natCmmTopToLive cfg cmm
 
+-- | A procedure's blocks in SCCs, its instructions as the code generator
+--   gave them: the first liveness walk wraps each as it annotates it.
 natCmmTopToLive
         :: Instruction instr
         => Maybe CFG -> NatCmmDecl statics instr
-        -> LiveCmmDecl statics instr
+        -> GenCmmDecl statics LiveInfo [SCC (NatBasicBlock instr)]
 
 natCmmTopToLive _ (CmmData i d)
         = CmmData i d
@@ -734,14 +736,11 @@ natCmmTopToLive _ (CmmProc info lbl live (ListGraph []))
 
 natCmmTopToLive mCfg proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
         = CmmProc (LiveInfo info' (first_id : entry_ids) mapEmpty mapEmpty)
-                lbl live sccsLive
+                lbl live sccs
    where
         first_id        = blockId first
         all_entry_ids   = entryBlocks proc
         sccs            = sccBlocks blocks all_entry_ids mCfg
-        sccsLive        = map (fmap (\(BasicBlock l instrs) ->
-                                       BasicBlock l (map (\i -> LiveInstr (Instr i) Nothing) instrs)))
-                        $ sccs
 
         entry_ids       = filter (reachable_node) .
                           filter (/= first_id) $ all_entry_ids
@@ -812,18 +811,33 @@ regLiveness
         -> LiveCmmDecl statics instr
         -> UniqDSM (LiveCmmDecl statics instr)
 
-regLiveness _ (CmmData i d)
+regLiveness = regLivenessOf (\(LiveInstr instr _) -> instr)
+
+-- | Annotate the blocks of a procedure, given each element's 'InstrSR':
+--   LiveInstrs walked again ('regLiveness'), or on the first walk the
+--   instructions as the code generator gave them ('cmmTopLiveness'), so
+--   that they are not first wrapped in LiveInstrs only to be dropped.
+regLivenessOf
+        :: Instruction instr
+        => (a -> InstrSR instr)
+        -> Platform
+        -> GenCmmDecl statics LiveInfo [SCC (GenBasicBlock a)]
+        -> UniqDSM (LiveCmmDecl statics instr)
+{-# INLINE regLivenessOf #-}
+
+regLivenessOf _ _ (CmmData i d)
         = return $ CmmData i d
 
-regLiveness _ (CmmProc info lbl live [])
+regLivenessOf _ _ (CmmProc info lbl live [])
         | LiveInfo static mFirst _ _    <- info
         = return $ CmmProc
                         (LiveInfo static mFirst mapEmpty mapEmpty)
                         lbl live []
 
-regLiveness platform (CmmProc info lbl live sccs)
+regLivenessOf inst platform (CmmProc info lbl live sccs)
         | LiveInfo static mFirst _ liveSlotsOnEntry     <- info
-        = let   (ann_sccs, block_live)  = livenessSCCs platform mapEmpty [] sccs
+        = let   (ann_sccs, block_live)
+                        = livenessSCCs inst platform mapEmpty [] sccs
 
           in    return $ CmmProc (LiveInfo static mFirst block_live liveSlotsOnEntry)
                            lbl live ann_sccs
@@ -860,7 +874,7 @@ reverseBlocksInTops top
 --   into it, as before the SCC's first walk: a jump target missing from the
 --   map is then one the SCCs are out of order for, or one the CFG lacks
 --   (liveness1).
-seedCyclic :: BlockMap Regs -> [LiveBasicBlock instr] -> BlockMap Regs
+seedCyclic :: BlockMap Regs -> [GenBasicBlock a] -> BlockMap Regs
 seedCyclic = foldl' (\m b -> mapInsert (blockId b) noRegs m)
 
 -- | Computing liveness
@@ -873,24 +887,29 @@ seedCyclic = foldl' (\m b -> mapInsert (blockId b) noRegs m)
 --
 livenessSCCs
        :: Instruction instr
-       => Platform
+       => (a -> InstrSR instr)
+       -> Platform
        -> BlockMap Regs
        -> [SCC (LiveBasicBlock instr)]          -- accum
-       -> [SCC (LiveBasicBlock instr)]
+       -> [SCC (GenBasicBlock a)]
        -> ( [SCC (LiveBasicBlock instr)]
           , BlockMap Regs)
+{-# INLINE livenessSCCs #-}
 
-livenessSCCs _ !blockmap done []
+livenessSCCs inst platform = go
+ where
+  go !blockmap done []
         = (done, blockmap)
 
-livenessSCCs platform !blockmap done (AcyclicSCC block : sccs)
- = let  !(!blockmap', block')   = livenessBlock platform blockmap block
-   in   livenessSCCs platform blockmap' (AcyclicSCC block' : done) sccs
+  go !blockmap done (AcyclicSCC block : sccs)
+   = let  !(!blockmap', block')   = livenessBlock inst platform blockmap block
+     in   go blockmap' (AcyclicSCC block' : done) sccs
 
-livenessSCCs platform !blockmap done
+  go !blockmap done
         (CyclicSCC blocks : sccs) =
-        livenessSCCs platform blockmap' (CyclicSCC blocks':done) sccs
- where      !(!blockmap', blocks') = livenessCyclic platform blockmap blocks
+        go blockmap' (CyclicSCC blocks':done) sccs
+   where    !(!blockmap', blocks')
+                = livenessCyclic inst platform blockmap blocks
 
 
 -- | Annotate the blocks of a cyclic SCC with register liveness information,
@@ -899,12 +918,14 @@ livenessSCCs platform !blockmap done
 --   walk, until none have.  The blocks come back in their order.
 livenessCyclic
         :: Instruction instr
-        => Platform
+        => (a -> InstrSR instr)
+        -> Platform
         -> BlockMap Regs
-        -> [LiveBasicBlock instr]
+        -> [GenBasicBlock a]
         -> (BlockMap Regs, [LiveBasicBlock instr])
+{-# INLINE livenessCyclic #-}
 
-livenessCyclic platform blockmap0 blocks
+livenessCyclic inst platform blockmap0 blocks
  = go (seedCyclic blockmap0 blocks) mapEmpty (setFromList ids) ids []
  where
         ids     = map blockId blocks
@@ -913,8 +934,8 @@ livenessCyclic platform blockmap0 blocks
         preds   = mapFromListWith (++)
                     [ (dest, [blockId b])
                     | b@(BasicBlock _ instrs) <- blocks
-                    , LiveInstr instr _ <- instrs
-                    , dest <- jumpDestsOfInstr instr
+                    , instr <- instrs
+                    , dest <- jumpDestsOfInstr (inst instr)
                     , dest `mapMember` byId ]
         get m i = expectJust (mapLookup i m)
         -- the registers live on entry changed, or their formats ('Regs''
@@ -927,7 +948,7 @@ livenessCyclic platform blockmap0 blocks
         go !bm !out _       []          []   = (bm, map (get out) ids)
         go !bm !out !queued []          back = go bm out queued (reverse back) []
         go !bm !out !queued (i : front) back
-         = let  (bm', block')   = livenessBlock platform bm (get byId i)
+         = let  (bm', block')   = livenessBlock inst platform bm (get byId i)
                 queued1         = setDelete i queued
                 push (q, bk) p
                   | p `setMember` q = (q, bk)
@@ -945,14 +966,16 @@ livenessCyclic platform blockmap0 blocks
 --
 livenessBlock
         :: Instruction instr
-        => Platform
+        => (a -> InstrSR instr)
+        -> Platform
         -> BlockMap Regs
-        -> LiveBasicBlock instr
+        -> GenBasicBlock a
         -> (BlockMap Regs, LiveBasicBlock instr)
+{-# INLINE livenessBlock #-}
 
-livenessBlock platform blockmap (BasicBlock block_id instrs)
+livenessBlock inst platform blockmap (BasicBlock block_id instrs)
  = let  !(!regsLiveOnEntry, instrs')
-            = livenessBack platform noRegs blockmap [] (reverse instrs)
+            = livenessBack inst platform noRegs blockmap [] (reverse instrs)
         !blockmap' = mapInsert block_id regsLiveOnEntry blockmap
    in   (blockmap', BasicBlock block_id instrs')
 
@@ -993,18 +1016,23 @@ livenessForward rsLiveEntry (li@(LiveInstr instr mLive) : lis)
 
 livenessBack
         :: Instruction instr
-        => Platform
+        => (a -> InstrSR instr)
+        -> Platform
         -> Regs           -- ^ regs live on this instr
         -> BlockMap Regs  -- ^ regs live on entry to other BBs
         -> [LiveInstr instr]  -- ^ instructions (accum)
-        -> [LiveInstr instr]  -- ^ instructions
+        -> [a]            -- ^ instructions
         -> (Regs, [LiveInstr instr])
+{-# INLINE livenessBack #-}
 
-livenessBack _        liveregs _        done []  = (liveregs, done)
+livenessBack inst platform liveregs0 blockmap = go liveregs0
+ where
+  go liveregs done []  = (liveregs, done)
 
-livenessBack platform liveregs blockmap acc (instr : instrs)
- = let  !(!liveregs', instr')     = liveness1 platform liveregs blockmap instr
-   in   livenessBack platform liveregs' blockmap (instr' : acc) instrs
+  go liveregs acc (instr : instrs)
+   = let  !(!liveregs', instr')
+                = liveness1 platform liveregs blockmap (inst instr)
+     in   go liveregs' (instr' : acc) instrs
 
 -- don't bother tagging comments or deltas with liveness
 liveness1
@@ -1012,14 +1040,14 @@ liveness1
         => Platform
         -> Regs
         -> BlockMap Regs
-        -> LiveInstr instr
+        -> InstrSR instr
         -> (Regs, LiveInstr instr)
 
-liveness1 _ liveregs _ (LiveInstr instr _)
+liveness1 _ liveregs _ instr
         | isMetaInstr instr
         = (liveregs, LiveInstr instr Nothing)
 
-liveness1 platform liveregs blockmap (LiveInstr instr _)
+liveness1 platform liveregs blockmap instr
 
         | not_a_branch
         = (liveregs1, LiveInstr instr (Just live))
