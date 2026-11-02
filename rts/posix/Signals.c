@@ -107,6 +107,10 @@ shutdown_handler(int sig STG_UNUSED)
 static void
 backtrace_handler(int sig STG_UNUSED)
 {
+// TODO: We cannot currently use libdw functions in a signal handler, since
+// they use malloc/free, which cannot be used from a signal handler.
+// See issue #28071 about re-enabling this feature.
+#if 0
 #if USE_LIBDW
     LibdwSession *session = libdwInit();
     Backtrace *bt = libdwGetBacktrace(session);
@@ -116,6 +120,7 @@ backtrace_handler(int sig STG_UNUSED)
     libdwFree(session);
 #else
     fprintf(stderr, "This build does not support backtraces.\n");
+#endif
 #endif
 }
 
