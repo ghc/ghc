@@ -249,6 +249,9 @@ expandNode vreg src@(Loc srcLoc srcFmt) dst@(Loc dstLoc dstFmt) =
     (InBoth srcReg _, InReg dstReg)
         | srcReg == dstReg
         -> []
+    (InBoth srcReg srcMem, InBoth dstReg dstMem)
+        | srcMem == dstMem  -- the slot holds the value already
+        -> expandNode vreg (Loc (InReg srcReg) srcFmt) (Loc (InReg dstReg) dstFmt)
     (InBoth srcReg _, _)
         -> expandNode vreg (Loc (InReg srcReg) srcFmt) dst
     _
