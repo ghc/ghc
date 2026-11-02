@@ -1,0 +1,8 @@
+section: compiler
+synopsis: Tiny change in -drule-check output
+issues: #27212
+mrs: !15954
+description: {
+  The formatting of the heading for the output of ``-drule-check``
+  has changed slightly.
+}
