@@ -300,37 +300,26 @@ expandNode
         -> Loc -- ^ source of move
         -> Loc -- ^ destination of move
         -> [Node Loc a]
-expandNode vreg src@(Loc srcLoc srcFmt) dst@(Loc dstLoc dstFmt) =
-  case (srcLoc, dstLoc) of
-    (InReg srcReg, InBoth dstReg dstMem)
-        | srcReg == dstReg
-        -> [DigraphNode vreg src [Loc (InMem dstMem) dstFmt]]
-        | otherwise
-        -> [DigraphNode vreg src [Loc (InReg dstReg) dstFmt
-                                 ,Loc (InMem dstMem) dstFmt]]
-    (InMem srcMem, InBoth dstReg dstMem)
-        | srcMem == dstMem
-        -> [DigraphNode vreg src [Loc (InReg dstReg) dstFmt]]
-        | otherwise
-        -> [DigraphNode vreg src [Loc (InReg dstReg) dstFmt
-                                 ,Loc (InMem dstMem) dstFmt]]
-    (InBoth _ srcMem, InMem dstMem)
-        | srcMem == dstMem
-        -> [] -- the guard fails only where the vreg has several slots (#26668)
-    (InBoth srcReg _, InReg dstReg)
-        | srcReg == dstReg
-        -> []
-    -- BUG TODO: where dst is InBoth with the source's slot, as when a vreg is
-    -- InBoth at both ends of the jump, this stores the value into a slot that
-    -- already holds it. This costs only speed and code size, under the linear
-    -- allocator, on every target but wasm32.
-    (InBoth srcReg _, _)
-        -> expandNode vreg (Loc (InReg srcReg) srcFmt) dst
-    _
-      | srcLoc == dstLoc
-      -> []
-      | otherwise
-      -> [DigraphNode vreg src [dst]]
+expandNode vreg (Loc srcLoc srcFmt) (Loc dstLoc dstFmt)
+  | srcLoc == dstLoc = []
+  | otherwise
+  = case toReg ++ toMem of
+      []   -> []
+      dsts -> [DigraphNode vreg (Loc from srcFmt) dsts]
+  where
+    -- the value is moved from the source's register where it has one
+    from = case srcLoc of
+      InBoth r _ -> InReg r
+      _          -> srcLoc
+    -- a destination register or slot that is the source's holds the value
+    -- already
+    toReg = [ Loc (InReg r) dstFmt | r <- regsOfLoc dstLoc
+                                   , r `notElem` regsOfLoc srcLoc ]
+    toMem = [ Loc (InMem m) dstFmt | Just m <- [slotOf dstLoc]
+                                   , slotOf srcLoc /= Just m ]
+    slotOf (InMem s)    = Just s
+    slotOf (InBoth _ s) = Just s
+    slotOf (InReg _)    = Nothing
 
 
 -- | Generate fixup code for a particular component in the move graph
