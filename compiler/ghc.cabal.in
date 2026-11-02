@@ -472,7 +472,6 @@ Library
         GHC.Data.OrdList
         GHC.Data.OsPath
         GHC.Data.Pair
-        GHC.Data.Stream
         GHC.Data.Strict
         GHC.Data.StringBuffer
         GHC.Data.StringTrie
