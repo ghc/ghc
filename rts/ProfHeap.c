@@ -1444,23 +1444,6 @@ static void
 heapCensusChain( Census *census, bdescr *bd )
 {
     for (; bd != NULL; bd = bd->link) {
-        // When we shrink a large ARR_WORDS, we do not adjust the free pointer
-        // of the associated block descriptor, thus introducing slop at the end
-        // of the object.  This slop remains after GC, violating the assumption
-        // of the loop below that all slop has been eliminated (#11627).
-        // Consequently, we handle large ARR_WORDS objects as a special case.
-        if (bd->flags & BF_LARGE) {
-            StgPtr p = bd->start;
-            // There may be some initial zeros due to object alignment.
-            while (p < bd->free && !*p) p++;
-            if (get_itbl((StgClosure *)p)->type == ARR_WORDS) {
-                size_t size = arr_words_sizeW((StgArrBytes *)p);
-                bool prim = true;
-                heapProfObject(census, (StgClosure *)p, size, prim);
-                continue;
-            }
-        }
-
         heapCensusBlock(census, bd);
     }
 }
@@ -1502,6 +1485,17 @@ void heapCensus (Time t)
           heapCensusChain(census, ws->todo_bd);
           heapCensusChain(census, ws->part_list);
           heapCensusChain(census, ws->scavd_list);
+      }
+  }
+
+  // The block that each capability is filling with small pinned objects is
+  // on no generation list until it is full (see allocatePinned), but its
+  // objects are part of the heap. A pinned block is kept or freed as a
+  // whole, so counting every object in it is consistent with the full ones.
+  for (n = 0; n < getNumCapabilities(); n++) {
+      bdescr *bd = getCapability(n)->pinned_object_block;
+      if (bd != NULL) {
+          heapCensusBlock(census, bd);
       }
   }
 
