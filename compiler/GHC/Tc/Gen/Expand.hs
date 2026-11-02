@@ -288,9 +288,30 @@ tcExpand e@(HsUntypedSplice splice_res _)
 ------------------------
 -- XExpr
 
+tcExpand e@(XExpr (ReSynBindsRn _ inner_e))
+  = do { -- set environment variable to be in rebindable syntax
+         -- add the required rebindable syntax binding names into the environment
+         -- try expanding inner_e
+         traceTc "tcExpand: ReSynBindsRn" (ppr e)
+       ; e' <- tcExpand inner_e
+       ; let expr = case e' of
+                      Just (HSE {hse_exp = expanded_e}) ->
+                        expanded_e
+                      Nothing ->
+                        -- likely that inner_e does not contain anything expandable
+                        -- so we just return inner_e
+                        wrapGenSpan inner_e
+       ; return $ Just $
+           HSE { hse_ctxt = ExprCtxt e
+               , hse_exp = expr }
+       }
+
+
 -- Expansions are idempotent, XExprs do not expand again
 tcExpand (XExpr (ExpandedThingRn hse))
   = return $ Just hse
+
+
 
 tcExpand _ = return $ Nothing
 

@@ -310,10 +310,6 @@ dsExpr e@(XExpr ext_expr_tc)
       ConLikeTc {}  -> dsApp e
 
       ExpandedThingTc (HSE _ e) -> dsLExpr e
-      ReSynBindsTc m e ->
-        do
-        tracePm "dsExpr XExpr" (ppr m)
-        dsExpr e --TODO ANI: This should never happen?
 
       -- Hpc Support
       HsTick tickish e -> do

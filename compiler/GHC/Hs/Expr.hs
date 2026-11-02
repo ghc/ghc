@@ -715,7 +715,6 @@ data XXExprGhcTc
   | HsRecSelTc  (FieldOcc GhcTc) -- ^ Variable pointing to record selector
                              -- See Note [Non-overloaded record field selectors] and
                              -- Note [Record selectors in the AST]
-  | ReSynBindsTc HsModuleName (HsExpr GhcTc)
 
 {- *********************************************************************
 *                                                                      *
@@ -1091,8 +1090,6 @@ instance Outputable XXExprGhcTc where
             ppr exp, text ")"]
   ppr (HsRecSelTc f)      = pprPrefixOcc f
 
-  ppr (ReSynBindsTc m e)    = text "{{" <+> ppr m <+> text "}}" <+> ppr e
-
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
 ppr_infix_expr (HsHole x) = Just $ pprInfixOcc $ case (ghcPass @p, x) of
@@ -1121,7 +1118,6 @@ ppr_infix_expr_tc (ConLikeTc con)            = Just (pprInfixOcc (conLikeName co
 ppr_infix_expr_tc (HsTick {})                = Nothing
 ppr_infix_expr_tc (HsBinTick {})             = Nothing
 ppr_infix_expr_tc (HsRecSelTc f)            = Just (pprInfixOcc f)
-ppr_infix_expr_tc (ReSynBindsTc _ e)          = ppr_infix_expr e
 
 ppr_infix_hs_expansion :: HsCtxt -> Maybe SDoc
 ppr_infix_hs_expansion (ExprCtxt e) = ppr_infix_expr e
@@ -1215,7 +1211,6 @@ hsExprNeedsParens prec = go
     go_x_tc (HsTick _ (L _ e))               = hsExprNeedsParens prec e
     go_x_tc (HsBinTick _ _ (L _ e))          = hsExprNeedsParens prec e
     go_x_tc (HsRecSelTc{})                   = False
-    go_x_tc (ReSynBindsTc _ e)               = hsExprNeedsParens prec e
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn (HSE thing _))  = hsExpandedNeedsParens thing
@@ -1269,7 +1264,6 @@ isAtomicHsExpr (XExpr x)
     go_x_tc (HsTick {})               = False
     go_x_tc (HsBinTick {})            = False
     go_x_tc (HsRecSelTc{})            = True
-    go_x_tc (ReSynBindsTc _ e)          = isAtomicHsExpr e
 
     go_x_rn :: XXExprGhcRn -> Bool
     go_x_rn (ExpandedThingRn (HSE thing _))   = isAtomicExpandedThingRn thing

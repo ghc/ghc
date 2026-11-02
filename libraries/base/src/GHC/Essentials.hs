@@ -227,7 +227,7 @@ module GHC.Essentials
          , lamE, lamCaseE, lamCasesE, tupE, unboxedTupE, unboxedSumE, condE, multiIfE
          , letE, caseE, doE, mdoE, compE, fromE, fromThenE, fromToE, fromThenToE
          , listE, sigE, recConE, recUpdE, staticE, unboundVarE, labelE, implicitParamVarE
-         , getFieldE, projectionE, typeE, forallE, forallVisE, constrainedE
+         , getFieldE, projectionE, typeE, forallE, forallVisE, constrainedE, reSynBindsE
     , TH.cxt
     , TH.noSourceUnpackedness, TH.sourceNoUnpack, TH.sourceUnpack
     , TH.noSourceStrictness, TH.sourceLazy, TH.sourceStrict

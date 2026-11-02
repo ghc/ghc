@@ -610,7 +610,7 @@ rnExpr (HsFunArr _ mult arg res)
 rnExpr (XExpr (ReSynBindsPs m e))
   =  do { traceRn "XExpr ReSynBinds" (text "module:" <+> ppr m)
         ; (e', fvs) <- rnExpr e
-        ; return (e', fvs)
+        ; return (XExpr (ReSynBindsRn m e'), fvs)
         }
 
 {-
