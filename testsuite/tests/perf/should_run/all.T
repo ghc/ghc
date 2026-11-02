@@ -448,3 +448,11 @@ test('SpecTyFamRun', [ grep_errmsg(r'foo')
                     , collect_stats('bytes allocated', 5)],
      multimod_compile_and_run,
      ['SpecTyFamRun', '-O2'])
+
+test('T27231',
+     [collect_stats('bytes allocated', 5),
+      only_ways(['normal']),
+      when(have_fast_bignum(), skip)
+      ],
+     compile_and_run,
+     ['-O'])

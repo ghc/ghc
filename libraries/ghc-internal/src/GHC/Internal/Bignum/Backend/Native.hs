@@ -490,22 +490,30 @@ bignat_and_not mwa wa wb = Ubx.do
       !szA = wordArraySize# wa
       !szB = wordArraySize# wb
 
--- | QuotRem of two non-zero BigNat
+-- | QuotRem of two non-zero BigNat: A `quotRem` B
 --
 -- Result quotient and remainder are to be stored in the MutableWordArray#.
 -- The first one (quotient) has size: size(A)-size(B)+1
--- The second one (remainder) has size: size(b)
+-- The second one (remainder) has size: size(B)
 --
 -- The potential 0 most-significant Words will be removed by the caller if it is
 -- not already done by the backend.
 bignat_quotrem
-   :: MutableWordArray# s -- ^ Quotient
-   -> MutableWordArray# s -- ^ Remainder
-   -> WordArray#
-   -> WordArray#
+   :: MutableWordArray# s -- ^ Quotient (output)
+   -> MutableWordArray# s -- ^ Remainder (output)
+   -> WordArray#          -- ^ Dividend A
+   -> WordArray#          -- ^ Divisor B
    -> State# s
    -> State# s
-bignat_quotrem mwq mwr uwa uwb = Ubx.do
+bignat_quotrem mwq mwr uwa uwb
+   -- 1-word divisor: 'bignat_quotrem_normalized' requires at least 2 words
+   -- (see Note [Knuth division loop]), so use the word division instead.
+   -- mwq has size size(A)-1+1 = size(A) as required by 'bignat_quotrem_word'.
+   | isTrue# (wordArraySize# uwb ==# 1#) = Ubx.do
+      r <- bignat_quotrem_word mwq uwa (indexWordArray# uwb 0#)
+      mwaWrite# mwr 0# r
+
+   | True = Ubx.do
    -- Normalization consists in left-shifting bits in B and A so that the
    -- most-significant bit of the most-significant word of B is 1. It makes
    -- quotient prediction much more efficient as we only use the two most
@@ -587,21 +595,80 @@ bignat_rem mwr wa wb = Ubx.do
    szB = wordArraySize# wb
    szQ = 1# +# szA -# szB
 
--- | Perform quotRem on normalized inputs:
---    * highest bit of B is set
---    * A is trimmed
---    * A >= B
---    * B > 1
-bignat_quotrem_normalized
-   :: MutableWordArray# s
-   -> MutableWordArray# s
-   -> WordArray#
-   -> State# s
-   -> State# s
-bignat_quotrem_normalized mwq mwa b = Ubx.do
+-- Note [Knuth division loop]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- bignat_quotrem_normalized implements Knuth's Algorithm D (TAOCP vol. 2,
+-- section 4.3.1). B = 2^WORD_SIZE, n = size of the divisor V, m+n = size of
+-- the dividend A. For j from m-1 down to 0:
+--
+--   D3. Estimate qj_est with a 2/1 division of (a_{j+n}, a_{j+n-1}) by v_{n-1},
+--       then refine it with the 3/2 test against v_{n-2} (refine_3by2).
+--       Afterwards qj_est is qj or qj+1 (Knuth Theorem B).
+--   D4. A_{j..j+n} := A_{j..j+n} - qj_est*V, in one fused pass
+--       (mul_sub_inplace_word, see Note [Fused multiply-subtract for long
+--       division]). The pass reports whether the top word underflowed: this
+--       is Knuth's "result is negative" test.
+--   D5/D6. On underflow, qj_est was too large by 1: decrement it and add V back
+--       to A_{j..j+n} (add_inplace_array_wrap). The carry-out of the add-back
+--       cancels the borrow-out that D4 dropped, so both are discarded.
+--
+-- No BigNat is allocated in the loop: qj_est*V is never materialized.
+--
+-- Precondition: n >= 2, so that v_{n-2} exists and the read of A at index
+-- n+j-2 >= 0 is in bounds. bignat_quotrem dispatches the n == 1 case to
+-- bignat_quotrem_word (bigNatQuotRem#, bigNatQuot and bigNatRem in
+-- GHC.Internal.Bignum.BigNat also do it before calling the backend).
 
-   -- n is the size of B
-   let !n = wordArraySize# b
+-- Note [Fused multiply-subtract for long division]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- mul_sub_inplace_word performs step D4 of Note [Knuth division loop]:
+--    A_{j..j+n} := A_{j..j+n} - q*V
+-- in a single pass, without materializing q*V.
+--
+-- For each i in 0..n-1 it computes the 2-word value
+--    (mh, ml) = q * v_i + mul_carry
+-- which fits because (B-1)^2 + (B-1) = B*(B-1) < B^2, subtracts ml and the
+-- pending borrow from a_{j+i}, and passes mh as the next mul_carry.
+--
+-- The borrow stays in {0,1}: if a_i - ml underflows, the wrapped result is
+-- at least B - ml >= 1, so subtracting a borrow in {0,1} from it cannot
+-- underflow again.
+--
+-- At i = n it subtracts mul_carry + borrow from a_{j+n} and returns
+-- whether that subtraction underflowed. The borrow is NOT propagated
+-- further: the caller uses it as the "result is negative" signal and undoes
+-- the excess with add_inplace_array_wrap, whose carry-out at the top cancels
+-- the dropped borrow.
+
+-- | QuotRem of two non-zero BigNat on normalized inputs: A `quotRem` V
+--
+-- The dividend A is passed in a MutableWordArray#: it is overwritten in
+-- place and holds the remainder on return (not trimmed). The divisor V is
+-- read-only. The quotient is written into the first MutableWordArray#,
+-- whose size is size(A)-size(V)+1 (see 'bignat_quotrem').
+--
+-- Preconditions:
+--    * highest bit of V is set
+--    * A is trimmed
+--    * A >= V
+--    * size of V is >= 2 words ('bignat_quotrem' dispatches the 1-word case
+--      to 'bignat_quotrem_word'; see Note [Knuth division loop])
+bignat_quotrem_normalized
+   :: MutableWordArray# s -- ^ Quotient (output)
+   -> MutableWordArray# s -- ^ Dividend A (input), remainder (output)
+   -> WordArray#          -- ^ Divisor V
+   -> State# s
+   -> State# s
+bignat_quotrem_normalized mwq mwa v
+   -- Guard the precondition n >= 2 (see Note [Knuth division loop]): with
+   -- n == 1 the loop below would read A at index -1. 'bignat_quotrem' (the
+   -- only caller) dispatches the 1-word case to 'bignat_quotrem_word', so
+   -- this branch is unreachable. If it is reached, raise as for any other
+   -- broken invariant, see Note [ghc-bignum exceptions] in
+   -- GHC.Internal.Bignum.Primitives.
+   | isTrue# (n <# 2#) = case unexpectedValue of { !_ -> Ubx.nop }
+
+   | True = Ubx.do
 
    -- m+n is the size of A (m >= 0)
    szA <- mwaSize# mwa
@@ -611,50 +678,48 @@ bignat_quotrem_normalized mwq mwa b = Ubx.do
    --    MSW(x) is the most-significant word of x
    --    MSB(x) the most-significant bit of x
 
-   -- We first compute MSW(Q).  Thanks to the normalization of B, MSW(Q) can
+   -- We first compute MSW(Q).  Thanks to the normalization of V, MSW(Q) can
    -- only be 0 or 1 so we only have to perform a prefix comparison to compute
    -- MSW(Q).
    --
    --    Proof MSW(Q) < 2:
-   --       * MSB(MSW(B)) = 1 thanks to normalization.
-   --       * MSW(B) * MSW(Q) <= MSW(A) by definition
+   --       * MSB(MSW(V)) = 1 thanks to normalization.
+   --       * MSW(V) * MSW(Q) <= MSW(A) by definition
    --       * suppose MSW(Q) >= 2:
-   --          MSW(B) * MSW(Q) >= MSW(B) << 1    { MSW(Q) >= 2              }
-   --                          >  MAX_WORD_VALUE { MSB(MSW(B)) = 1          }
+   --          MSW(V) * MSW(Q) >= MSW(V) << 1    { MSW(Q) >= 2              }
+   --                          >  MAX_WORD_VALUE { MSB(MSW(V)) = 1          }
    --                          >  MSW(A)         { MSW(A) <= MAX_WORD_VALUE }
    --          contradiction.
    --
-   -- If A >= (B << m words)
+   -- If A >= (V << m words)
    --    then Qm = 1
-   --         A := A - (B << m words)
+   --         A := A - (V << m words)
    --    else Qm = 0
    --         A unchanged
    let computeQm = Ubx.do
-         c <- mwaTrimCompare m mwa b
+         c <- mwaTrimCompare m mwa v
          case c of
             LT -> Ubx.pure 0##
             _  -> Ubx.pure 1##
 
-       updateQj j qj qjb = Ubx.do
-         mwaWrite# mwq j qj -- write Qj
-         case qj of
-            0## -> Ubx.nop
-            _   -> Ubx.void (mwaSubInplaceArray mwa j qjb) -- subtract (qjB << j words)
-
-       -- update the highest word of Q
+       -- update the highest word of Q (qm). As qm is 0 or 1, qm*V is 0 or V:
+       -- nothing to multiply, we just subtract V when qm is 1.
        updateQm = Ubx.do
          qm <- computeQm
-         updateQj m qm b
+         mwaWrite# mwq m qm
+         case qm of
+            0## -> Ubx.nop
+            _   -> Ubx.void (mwaSubInplaceArray mwa m v) -- subtract (V << m words)
 
-       -- the size of Q is szA+szB+1 BEFORE normalization. Normalization may add
+       -- the size of Q is szA-n+1 BEFORE normalization. Normalization may add
        -- an additional higher word to A.
        --   * If A has an additional limb:
-       --      * MSW(A) < MSW(B). Because MSB(MSW(A)) can't be set (it would
+       --      * MSW(A) < MSW(V). Because MSB(MSW(A)) can't be set (it would
        --        mean that we shifted a whole word, which we didn't)
        --      * hence MSW(Q) = 0 but we don't have to write it (and we mustn't)
        --        because of the size of Q
        --   * If A has no additional limb:
-       --      * We have to check if MSW(A) >= MSW(B) and to adjust A and MSW(Q)
+       --      * We have to check if MSW(A) >= MSW(V) and to adjust A and MSW(Q)
        --        accordingly
        --
        -- We detect if A has an additional limb by comparing the size of Q with m
@@ -666,51 +731,112 @@ bignat_quotrem_normalized mwq mwa b = Ubx.do
 
    updateQmMaybe
 
+   -- main loop: for j from (m-1) downto 0. See Note [Knuth division loop].
+   let vmsw  = indexWordArray# v (n -# 1#)          -- v_{n-1}
+       vmsw2 = indexWordArray# v (n -# 2#)          -- v_{n-2}
 
-   -- main loop: for j from (m-1) downto 0
-   --    We estimate a one Word quotient qj:
-   --       e1e0 <- a(n+j)a(n+j-1) `div` b(n-1)
-   --       qj | e1 == 0   = e0
-   --          | otherwise = maxBound
-   --    We loop until we find the real quotient:
-   --       while (A < ((qj*B) << j words)) qj--
-   --    We update A and Qj:
-   --       Qj := qj
-   --       A  := A - (qj*B << j words)
+       -- Knuth's 3/2 test: while qj_est*v_{n-2} > r*B + a0, decrement
+       -- qj_est and add v_{n-1} to r. Stops when r >= B (the test cannot
+       -- then hold).
+       -- Runs at most twice (Knuth Theorem A); typically zero times.
+       refine_3by2 qj_est r a0
+         | (# qh, ql #) <- timesWord2# qj_est vmsw2
+         , too_big <- (qh `gtWord#` r)
+                      ||# ((qh `eqWord#` r) &&# (ql `gtWord#` a0))
+         , isTrue# too_big
+         = let !(# rc, r' #) = plusWord2# r vmsw
+               !qj_est'      = qj_est `minusWord#` 1##
+           in case rc of
+                0## -> refine_3by2 qj_est' r' a0
+                _   -> qj_est' -- r' >= B: the test cannot hold any more
 
-   let bmsw = wordArrayLast# b -- most significant word of B
+         | True
+         = qj_est
 
        estimateQj j = Ubx.do
-         a1 <- mwaRead# mwa (n +# j)
-         a0 <- mwaRead# mwa (n +# j -# 1#)
-         case quotRemWord3# (# a1, a0 #) bmsw of
-            (# (# 0##, qj #), _ #) -> Ubx.pure qj
-            (# (#   _,  _ #), _ #) -> Ubx.pure WORD_MAXBOUND##
+         a2 <- mwaRead# mwa (n +# j)
+         a1 <- mwaRead# mwa (n +# j -# 1#)
+         a0 <- mwaRead# mwa (n +# j -# 2#)
+         let !(# (# q1, q0 #), r0 #) = quotRemWord3# (# a2, a1 #) vmsw
+         case q1 of
+           0## -> Ubx.pure (refine_3by2 q0 r0 a0)
+           _   ->
+              -- a2 >= vmsw: saturate qj_est to MAX_WORD = B-1. Compute the
+              -- corresponding remainder r = a2*B + a1 - (B-1)*vmsw
+              --                          = (a2 - vmsw)*B + (a1 + vmsw)
+              -- as a 2-word value (rhi, rlo). If rhi /= 0 (r >= B) the
+              -- refinement test cannot hold, so skip it.
+              let !(# c, rlo #) = plusWord2# a1 vmsw
+                  !rhi          = (a2 `minusWord#` vmsw) `plusWord#` c
+              in if isTrue# (rhi `eqWord#` 0##)
+                    then Ubx.pure (refine_3by2 WORD_MAXBOUND## rlo a0)
+                    else Ubx.pure WORD_MAXBOUND##
 
-       -- we perform the qj*B multiplication once and then we subtract B from
-       -- qj*B as much as needed until (qj'*B << j words) <= A
-       findRealQj j qj = findRealQj' j qj (bigNatMulWord# b qj)
+       -- Fused multiply-subtract, in a single pass:
+       --    A_{j..j+n} := A_{j..j+n} - q*V
+       --
+       -- Returns 1# if the top word underflowed; the borrow is NOT propagated
+       -- past a_{j+n}. See Note [Fused multiply-subtract for long division].
+       mul_sub_inplace_word j q = go 0# 0## 0##
+         where
+           go i borrow mul_carry
+             | isTrue# (i ==# n) = Ubx.do
+                ai <- mwaRead# mwa (j +# i)
+                let !(# l1, c1 #) = subWordC# ai mul_carry
+                    !(# l2, c2 #) = subWordC# l1 borrow
+                mwaWrite# mwa (j +# i) l2
+                Ubx.pure (c1 `orI#` c2) -- 1# = underflow
+             | True = Ubx.do
+                ai <- mwaRead# mwa (j +# i)
+                let !(# mh, ml  #) = timesWord2# q (indexWordArray# v i)
+                    !(# mh',ml' #) = plusWord12# mul_carry (# mh, ml #)
+                    !(# l1, c1  #) = subWordC# ai ml'
+                    !(# l2, c2  #) = subWordC# l1 borrow
+                mwaWrite# mwa (j +# i) l2
+                go (i +# 1#) (int2Word# (c1 `orI#` c2)) mh'
 
-       findRealQj' j qj qjB = Ubx.do
-         c <- mwaTrimCompare j mwa qjB
-         case c of
-            LT -> findRealQj' j (qj `minusWord#` 1##) (bigNatSubUnsafe qjB b)
-                                                            -- TODO: we could do the sub inplace to
-                                                            -- reduce allocations
-            _  -> Ubx.pure (# qj, qjB #)
+       -- Like 'mwaAddInplaceArray' but the final carry is added to a_{j+n}
+       -- without further propagation. Used by the add-back step: the carry-out
+       -- at the top cancels the borrow-out dropped by 'mul_sub_inplace_word'.
+       -- See Note [Knuth division loop].
+       add_inplace_array_wrap j = go 0# 0##
+         where
+           go i c
+             | isTrue# (i ==# n) = Ubx.do
+                ai <- mwaRead# mwa (j +# i)
+                mwaWrite# mwa (j +# i) (ai `plusWord#` c)
+             | True = Ubx.do
+                ai <- mwaRead# mwa (j +# i)
+                let !(# c', ai' #) = plusWord3# ai (indexWordArray# v i) c
+                mwaWrite# mwa (j +# i) ai'
+                go (i +# 1#) c'
+
+       -- Subtract qj_est*V from A_{j..j+n} via a fused pass; on underflow,
+       -- decrement qj_est and add V back. Writes the final qj_est into mwq.
+       updateQj j qj_est
+         | 0## <- qj_est = mwaWrite# mwq j 0##
+         | True = Ubx.do
+            underflow <- mul_sub_inplace_word j qj_est
+            case underflow of
+               0# -> mwaWrite# mwq j qj_est
+               _  -> Ubx.do
+                  add_inplace_array_wrap j
+                  mwaWrite# mwq j (qj_est `minusWord#` 1##)
 
        loop j = Ubx.do
-         qj <- estimateQj j
-         (# qj', qjB #) <- findRealQj j qj
-         updateQj j qj' qjB
+         qj_est <- estimateQj j
+         updateQj j qj_est
          case j of
             0# -> Ubx.nop
             _  -> loop (j -# 1#)
 
-
    case m of
       0# -> Ubx.nop
       _  -> loop (m -# 1#)
+
+   where
+      -- n is the size of V
+      !n = wordArraySize# v
 
 -- | QuotRem of a non-zero BigNat and a non-zero Word
 --

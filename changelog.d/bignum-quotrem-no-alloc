@@ -1,0 +1,9 @@
+section: ghc-internal
+synopsis: Avoid unnecessary allocations in bignum division in the Haskell (native) backend
+issues: #27231
+mrs: !15998
+description:
+    The long-division loop of the Haskell (native) bignum backend now
+    subtracts the partial product in place, so ``bigNatQuotRem#``,
+    ``bigNatQuot`` and ``bigNatRem`` no longer allocate a temporary BigNat
+    per quotient word.
