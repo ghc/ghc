@@ -160,8 +160,8 @@ readControlMessage ctrl fd
                 c_read (fromIntegral fd) p 1
             s <- peek p
             case s of
-                -- Wakeup messages shouldn't be sent on the control
-                -- file descriptor but we handle them anyway.
+                -- Wakeup messages are sent on the control file descriptor by
+                -- the low level RTS ctl-c signal handler. But see #28066.
                 _ | s == io_MANAGER_WAKEUP -> return CMsgWakeup
                 _ | s == io_MANAGER_DIE    -> return CMsgDie
                 _ -> do  -- Signal
