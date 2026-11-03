@@ -1,0 +1,8 @@
+-- The debugger is an ordinary program; it is built with the system GHC
+-- (ghcup default), not with the compiler under test. ghc-debug-client has no
+-- RTS-version-specific code, so this works against the in-tree GHC.
+packages:
+  .
+  ../../../../ghc-debug/common
+  ../../../../ghc-debug/client
+  ../../../../ghc-debug/convention
