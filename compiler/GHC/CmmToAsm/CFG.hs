@@ -22,6 +22,7 @@ module GHC.CmmToAsm.CFG
     , getEdgeInfo
     , getCfgNodes, hasNode
     , checkFailures, coldBlocks, findBackEdges
+    , layoutEntryNext, raisedBackWeight
 
     -- Loop Information
     , loopInfo
@@ -743,9 +744,36 @@ findBackEdges root cfg
       | otherwise             = go s (succs s) ((n, ss) : stack)
                                    (setInsert s seen) (setInsert s onStack) acc
 
-optimizeCFG :: Bool -> Weights -> RawCmmDecl -> CFG -> CFG
-optimizeCFG _ _ (CmmData {}) cfg = cfg
-optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg
+-- | The entry block's one successor, or, where the code generator split the
+-- entry, as allocMoreStack does, the one successor of the block holding the
+-- rest of its code, where it has one: block layout raises no back edge into
+-- it (Note [Layout relevant edge weights] in GHC.CmmToAsm.BlockLayout).
+layoutEntryNext :: CFG -> BlockId -> Maybe BlockId
+layoutEntryNext cfg entry = case getSuccessorEdges cfg entry of
+  [(t, EdgeInfo { transitionSource = AsmCodeGen })]
+    | [u] <- getSuccessors cfg t -> Just u
+  [(t, _)] -> Just t
+  _        -> Nothing
+
+-- | A back edge's weight raised by block layout above the heaviest edge
+-- into its loop head that is not a call, a back edge or a self loop, given
+-- both, where both are positive (Note [Layout relevant edge weights] in
+-- GHC.CmmToAsm.BlockLayout).
+raisedBackWeight :: EdgeWeight -> EdgeWeight -> Maybe EdgeWeight
+raisedBackWeight w m
+  | w > 0, m > 0 = Just (w + m * 1.001)
+  | otherwise    = Nothing
+
+-- | The CFG with its final weights and its back edges: where static prediction
+-- estimated the weights, those of the loops it found ('loopInfo'), with
+-- the back edges of 'findBackEdges'' search that are none of theirs and
+-- not into the root, which only an irreducible region has ('calcFreqs'),
+-- else 'findBackEdges'' with none; given the registers holding tags
+-- ('tagRegisters').
+optimizeCFG :: Bool -> S.Set LocalReg -> Weights -> RawCmmDecl -> CFG
+            -> (CFG, Edges, Edges)
+optimizeCFG _ _ _ (CmmData {}) cfg = (cfg, [], [])
+optimizeCFG doStaticPred tags weights proc@(CmmProc _info _lab _live graph) cfg
   -- no bonus for back edges where static prediction follows: it starts each
   -- two-way branch from optHsPatterns' weights, so that the penalties become
   -- probabilities, and overwrites the weights of every branch with a back edge
@@ -753,9 +781,10 @@ optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg
   -- all back edges; the back edges are loopInfo's: one into the root is
   -- findBackEdges' alone, and a branch with one starts from its weight with no
   -- bonus
-  | doStaticPred = staticPredCfg (tagRegisters graph) entry $
-                     optHsPatterns [] weights proc cfg
-  | otherwise    = optHsPatterns (findBackEdges entry cfg) weights proc cfg
+  | doStaticPred
+  = staticPredCfg tags entry $ optHsPatterns [] weights proc cfg
+  | !backs <- findBackEdges entry cfg
+  = (optHsPatterns backs weights proc cfg, backs, [])
   where entry = g_entry graph
 
 -- | Modify branch weights based on educated guess on
@@ -841,12 +870,14 @@ optHsPatterns backs weights (CmmProc info _lab _live _graph) cfg =
           | CmmSource { trans_cmmNode = CmmCondBranch {} } <- source = True
           | otherwise = False
 
--- | Convert block-local branch weights to global weights.
-staticPredCfg :: S.Set LocalReg -> BlockId -> CFG -> CFG
-staticPredCfg tags entry cfg = cfg'
+-- | Convert block-local branch weights to global weights, with the back edges
+-- of 'loopInfo' and the other back edges of 'findBackEdges'' search that
+-- 'calcFreqs' returns.
+staticPredCfg :: S.Set LocalReg -> BlockId -> CFG -> (CFG, Edges, Edges)
+staticPredCfg tags entry cfg = (cfg', backs, searchBacks)
   where
-    (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-}
-                             mkGlobalWeightsWith tags entry cfg
+    (_, globalEdgeWeights, backs, searchBacks) = {-# SCC mkGlobalWeights #-}
+                                    mkGlobalWeightsWith tags entry cfg
     cfg' = {-# SCC rewriteEdges #-}
             mapFoldlWithKey
                 (\cfg from m ->
@@ -987,7 +1018,9 @@ revPostorderFrom cfg root =
 --   for edges is the number of traversals.
 
 mkGlobalWeights :: HasDebugCallStack => BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
-mkGlobalWeights = mkGlobalWeightsWith S.empty
+mkGlobalWeights root cfg
+  | (blockFreqs, edgeFreqs, _, _) <- mkGlobalWeightsWith S.empty root cfg
+  = (blockFreqs, edgeFreqs)
 
 -- No pragma: with NOINLINE, which master had on mkGlobalWeights, whose body
 -- this is, the compiler's code differed only in this not being inlined, and
@@ -995,16 +1028,22 @@ mkGlobalWeights = mkGlobalWeightsWith S.empty
 -- T9961, T12707, !16269's CmmDiamondChain and nofib's puzzle at -O0, -O and
 -- -O2, on GHC 10.1.20261108.
 -- | 'mkGlobalWeights', told which local registers hold a constructor tag
--- (see 'tagRegisters').
+-- (see 'tagRegisters'), with the back edges of 'loopInfo' and those
+-- of a depth-first search from the root that are none of theirs, but those
+-- into the root ('calcFreqs').
 {-# SCC mkGlobalWeightsWith #-}
-mkGlobalWeightsWith :: HasDebugCallStack => S.Set LocalReg -> BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
+mkGlobalWeightsWith :: HasDebugCallStack => S.Set LocalReg -> BlockId -> CFG
+                    -> (LabelMap Double, LabelMap (LabelMap Double), Edges,
+                        Edges)
 mkGlobalWeightsWith tags root localCfg
   | null localCfg = panic "Error - Empty CFG"
   | otherwise
-  = (blockFreqs', edgeFreqs')
+  = (blockFreqs', edgeFreqs', backedges, searchBacks)
   where
     -- Calculate fixpoints
-    (blockFreqs, edgeFreqs) = calcFreqs nodeProbs backEdges' bodies' revOrder'
+    (blockFreqs, edgeFreqs, searchBacks') =
+      calcFreqs nodeProbs backEdges' bodies' revOrder'
+    searchBacks = map (bimap fromVertex fromVertex) searchBacks'
     blockFreqs' = mapFromList $ map (first fromVertex) (assocs blockFreqs) :: LabelMap Double
     edgeFreqs' = fmap fromVertexMap $ fromVertexMap edgeFreqs
 
@@ -1824,13 +1863,21 @@ cfgEdgeProbabilities cfg toVertex
 -- This is the fixpoint algorithm from
 --   "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus
 -- The adaption to Haskell is my own.
+--
+-- It returns with the frequencies the edges into a block other than the
+-- root from a block not before it in the reverse postorder given, the back
+-- edges given left out: given 'loopInfo''s back edges and the order of
+-- 'revPostorderFrom', whose search visits the blocks as 'findBackEdges'' does,
+-- those are the back edges of 'findBackEdges'' that are none of the loops' and
+-- not into the root, which only an irreducible region has.
 calcFreqs :: IM.IntMap (IM.IntMap Prob) -> [(Int,Int)] -> [(Int, [Int])] -> [Int]
-          -> (Array Int Double, IM.IntMap (IM.IntMap Prob))
+          -> (Array Int Double, IM.IntMap (IM.IntMap Prob), [(Int, Int)])
 calcFreqs graph backEdges loops revPostOrder = runST $ do
     visitedNodes <- newArray (0,nodeCount-1) False :: ST s (STUArray s Int Bool)
     blockFreqs <- newArray (0,nodeCount-1) 0.0 :: ST s (STUArray s Int Double)
     edgeProbs <- newSTRef graph
     edgeBackProbs <- newSTRef graph
+    searchBacks <- newSTRef []
 
     -- let traceArray a = do
     --       vs <- forM [0..nodeCount-1] $ \i -> readArray a i >>= (\v -> return (i,v))
@@ -1892,13 +1939,19 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
                 setFreq block 1.0 -- Loop header frequency is always 1
             else do
                 let preds = IS.elems $ predecessors block
-                irreducible <- anyM (\bp -> do
-                    !bp_visited <- visited bp
-                    let bp_backedge = isBackEdge bp block
-                    return (not bp_visited && not bp_backedge)) preds
+                    irreducibleFrom bp = do
+                      !bp_visited <- visited bp
+                      let bp_backedge = isBackEdge bp block
+                      return (not bp_visited && not bp_backedge)
+                irreducible <- anyM irreducibleFrom preds
 
                 if irreducible
-                then return () -- Rare we don't care
+                then -- Rare we don't care, but for the edges in the last pass,
+                     -- the one from the root, which is no loop's head
+                     when (head == root) $ do
+                       bps <- filterM irreducibleFrom preds
+                       modifySTRef' searchBacks
+                                    (map (\bp -> (bp, block)) bps ++)
                 else do
                     setFreq block 0
                     !cycleProb <- foldM (\ !acc pred -> do
@@ -1930,7 +1983,7 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
 
     -- After dealing with all loops, deal with non-looping parts of the CFG
     forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i False) -- Everything in revPostOrder is reachable
-    forM_ revPostOrder $ \block -> propFreq block (head revPostOrder)
+    forM_ revPostOrder $ \block -> propFreq block root
 
     -- trace ("Final freqs:") $ return ()
     -- let freqString = pprFreqs freqs
@@ -1938,9 +1991,11 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
     -- trace (pprFre) $ return ()
     graph' <- readSTRef edgeProbs
     freqs' <- unsafeFreeze  blockFreqs
+    searchBacks' <- readSTRef searchBacks
 
-    return (freqs', graph')
+    return (freqs', graph', searchBacks')
   where
+    root = head revPostOrder
     -- How can these lookups fail? Consider the CFG [A -> B]
     predecessors :: Int -> IS.IntSet
     predecessors b = fromMaybe IS.empty $ IM.lookup b revGraph

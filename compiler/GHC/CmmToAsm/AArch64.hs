@@ -37,6 +37,7 @@ ncgAArch64 config
        ,ncgMakeFarBranches        = AArch64.makeFarBranches
        ,extractUnwindPoints       = const []
        ,invertCondBranches        = \_ _ blocks -> blocks
+       ,copyLoopHeads             = \_ _ _ _ _ -> Nothing
   }
     where
       platform = ncgPlatform config

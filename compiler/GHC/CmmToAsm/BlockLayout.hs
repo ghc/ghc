@@ -7,7 +7,7 @@
 --
 
 module GHC.CmmToAsm.BlockLayout
-    ( sequenceTop, backendMaintainsCfg)
+    ( sequenceTop, backendMaintainsCfg, relevantWeight)
 where
 
 import GHC.Prelude hiding (head, init, last, tail)
@@ -61,6 +61,9 @@ import GHC.Types.Unique.DSM (UniqDSM)
   * Based on the CFG and loop information refine the edge weights
     in the CFG and normalize them relative to the most often visited
     node. (See `mkGlobalWeights`)
+  * On x86-64, copy each small loop head that ends in a conditional branch over
+    the jumps to it, adding the copies' edges to the CFG (`copyLoopHeads`,
+    Note [Copying loop heads] in GHC.CmmToAsm.X86.CodeGen).
   * Feed this CFG into the block layout code (`sequenceTop`) in this
     module. Which will then produce a code layout based on the input weights.
 
@@ -736,6 +739,32 @@ buildChains info cfg edges blocks
             where
               alreadyPlaced blkId = (setMember blkId placed)
 
+-- | Apply modifiers to turn edge frequencies into useable weights
+-- for computing code layout, given the blocks with an info table.
+-- See also Note [Layout relevant edge weights]
+relevantWeight :: LabelMap a -> CfgEdge -> Maybe CfgEdge
+relevantWeight info edge@(CfgEdge from to edgeInfo)
+    | (EdgeInfo CmmSource { trans_cmmNode = CmmCall {} } _) <- edgeInfo
+    -- Ignore edges across calls.
+    = Nothing
+    | mapMember to info
+    , w <- edgeWeight edgeInfo
+    -- The payoff is quite small if we jump over an info table
+    = Just (CfgEdge from to edgeInfo { edgeWeight = w/8 })
+    | (EdgeInfo CmmSource { trans_cmmNode = exitNode } _) <- edgeInfo
+    , cantEliminate exitNode
+    , w <- edgeWeight edgeInfo
+    -- A small penalty to edge types which
+    -- we can't optimize away by layout.
+    -- w * 0.96875 == w - w/32
+    = Just (CfgEdge from to edgeInfo { edgeWeight = w * 0.96875 })
+    | otherwise
+    = Just edge
+    where
+      cantEliminate CmmCondBranch {} = True
+      cantEliminate CmmSwitch {} = True
+      cantEliminate _ = False
+
 -- | Place basic blocks based on the given CFG.
 -- See Note [Chain based CFG serialization]
 sequenceChain :: forall a i. Instruction i
@@ -748,34 +777,9 @@ sequenceChain _info _weights    [x] = [x]
 sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
     let edges = infoEdgeList weights
         directEdges :: [CfgEdge]
-        directEdges = sortBy (flip compare) $ preferBackEdges $ mapMaybe relevantWeight edges
+        directEdges = sortBy (flip compare) $ preferBackEdges $
+                        mapMaybe (relevantWeight info) edges
           where
-            -- Apply modifiers to turn edge frequencies into useable weights
-            -- for computing code layout.
-            -- See also Note [Layout relevant edge weights]
-            relevantWeight :: CfgEdge -> Maybe CfgEdge
-            relevantWeight edge@(CfgEdge from to edgeInfo)
-                | (EdgeInfo CmmSource { trans_cmmNode = CmmCall {} } _) <- edgeInfo
-                -- Ignore edges across calls.
-                = Nothing
-                | mapMember to info
-                , w <- edgeWeight edgeInfo
-                -- The payoff is quite small if we jump over an info table
-                = Just (CfgEdge from to edgeInfo { edgeWeight = w/8 })
-                | (EdgeInfo CmmSource { trans_cmmNode = exitNode } _) <- edgeInfo
-                , cantEliminate exitNode
-                , w <- edgeWeight edgeInfo
-                -- A small penalty to edge types which
-                -- we can't optimize away by layout.
-                -- w * 0.96875 == w - w/32
-                = Just (CfgEdge from to edgeInfo { edgeWeight = w * 0.96875 })
-                | otherwise
-                = Just edge
-                where
-                  cantEliminate CmmCondBranch {} = True
-                  cantEliminate CmmSwitch {} = True
-                  cantEliminate _ = False
-
             -- See Note [Layout relevant edge weights]
             preferBackEdges :: [CfgEdge] -> [CfgEdge]
             preferBackEdges es
@@ -799,15 +803,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
                 -- each loop head to the blocks all its back edges leave
                 anyBacks = mapFromListWith setUnion
                   [ (t, setSingleton f) | (f, t) <- allBacks ]
-                -- the entry block's one successor, or, where the code generator
-                -- split the entry, as allocMoreStack does, the one successor of
-                -- the block holding the rest of its code, where it has one
-                entryNext
-                  = case getSuccessorEdges weights entry of
-                      [(t, EdgeInfo { transitionSource = AsmCodeGen })]
-                        | [u] <- getSuccessors weights t -> Just u
-                      [(t, _)] -> Just t
-                      _        -> Nothing
+                entryNext = layoutEntryNext weights entry
                 isBack = inBacks backs
                 inBacks m f t = maybe False (setMember f) (mapLookup t m)
                 -- the heaviest edge into each head that is neither a back edge
@@ -823,12 +819,11 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
                 -- whichever successor falls through
                 raise e@(CfgEdge f t i)
                   | isBack f t
-                  , edgeWeight i > 0
                   , not (isSwitch i)
                   , getSuccessors weights f == [t]
                   , Just m <- mapLookup t entryMax
-                  , m > 0
-                  = CfgEdge f t i { edgeWeight = edgeWeight i + m * 1.001 }
+                  , Just w <- raisedBackWeight (edgeWeight i) m
+                  = CfgEdge f t i { edgeWeight = w }
                   | otherwise = e
                 isSwitch (EdgeInfo CmmSource { trans_cmmNode = n } _)
                   | CmmSwitch {} <- n = True
