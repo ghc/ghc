@@ -136,6 +136,7 @@ run m = case m of
     freeRes (RemoteHValueRef href) = freeRemoteRef href
     freeRes (RemoteRemotePtr rptr) = free $ fromRemotePtr rptr
     freeRes (RemoteFFI p) = freeForeignCallInfo (fromRemotePtr p)
+    freeRes (RemoteLibrarySearchPath p) = void $ removeLibrarySearchPath $ fromRemotePtr p
 
 unexpectedMessage :: Message a -> b
 unexpectedMessage m = error ("GHCi.Run.Run: unexpected message: " ++ show m)

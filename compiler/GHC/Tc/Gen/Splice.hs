@@ -126,7 +126,7 @@ import GHC.Utils.Panic as Panic
 import GHC.Utils.Lexeme
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
-import GHC.Utils.Exception (throwIO, ErrorCall(..))
+import GHC.Utils.Exception (throwIO, ErrorCall(..), mask_)
 
 import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
 
@@ -1922,7 +1922,8 @@ getTHState inst = do
     th_state <- readIORef th_state_var
     case th_state of
       Just rhv -> return rhv
-      Nothing -> do
+      -- masked so 'rref' will get a finalizer.
+      Nothing -> mask_ $ do
         rref <- sendMessage inst StartTH
         fhv <- mkForeignRef rref (freeReallyRemoteRef inst rref)
         writeIORef th_state_var (Just fhv)

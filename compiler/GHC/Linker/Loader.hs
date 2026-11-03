@@ -250,7 +250,7 @@ loadName interp hsc_env name = do
                      do let sym_to_find = IClosureSymbol name
                         m <- lookupClosure interp sym_to_find
                         r <- case m of
-                          Just hvref -> mkFinalizedHValue interp hvref
+                          Just fhv -> return fhv
                           Nothing -> linkFail "GHC.Linker.Loader.loadName"
                                        (ppr sym_to_find)
                         return (pls,(r, links, pkgs))
