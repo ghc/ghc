@@ -35,7 +35,7 @@ module GHC.CmmToAsm.CFG
 
     -- Block frequencies before register allocation
     , BlockFreqs, blockFrequencies, blockFreq, noBlockFreqs, nullBlockFreqs
-    , tagRegisters
+    , blockIndex, blockCount, tagRegisters
 
      )
 where
@@ -1070,6 +1070,15 @@ blockFreq (BlockFreqs ks fs) b
   | otherwise = 0
   where i = uniqueIndex ks (lblToUnique b)
 
+-- | A block's index in the estimate, from 0 to 'blockCount' - 1, or -1 for
+-- one the estimate does not hold.
+blockIndex :: BlockFreqs -> BlockId -> Int
+blockIndex (BlockFreqs ks _) b = uniqueIndex ks (lblToUnique b)
+
+-- | The number of blocks the estimate holds.
+blockCount :: BlockFreqs -> Int
+blockCount (BlockFreqs ks _) = snd (bounds ks) + 1
+
 -- | A unique's index in an ascending array of uniques, -1 where absent.
 uniqueIndex :: UArray Int Word64 -> Word64 -> Int
 uniqueIndex ks !k = go 0 (snd (bounds ks))
@@ -1491,12 +1500,17 @@ entry block's one successor.
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Static prediction estimates block frequencies for the layout only under
 -fcmm-static-pred and only after register allocation
-(Note [Static Branch Prediction]); the graph allocator's spill costs hold
+(Note [Static Branch Prediction]); blockFrequencies makes the estimate for the
+linear allocator before it allocates, under the same flag, from the CFG as
+instruction selection gives it, which static prediction sees only after
+shortcutting and optHsPatterns' adjustments, and
+linearRA_SCCs orders the SCCs by it; the graph allocator's spill costs hold
 mkGlobalWeights' estimate whatever the flag, but as a thunk no spill choice
 forces (GHC.CmmToAsm.Reg.Graph.SpillCost). So the code that depends on how often
-a block runs uses stand-ins, each marked by a TODO pointing here. Once the
-estimate is computed in a Cmm pass, as that Note proposes, these could use it
-instead, and they are to be reinvestigated together:
+a block runs uses stand-ins, at -O0 and elsewhere, each marked by a TODO
+pointing here. Once the estimate is computed in a Cmm pass, as that Note
+proposes, these could use it instead, and they are to be reinvestigated
+together:
 
  * coldBlocks misses two shapes. In a procedure needing more stack than
    maxSpillSlots, allocMoreStack splits each entry block into a stack allocation
@@ -1516,7 +1530,7 @@ instead, and they are to be reinvestigated together:
 
  * checkFailures counts as cold a block the garbage collector returns to that a
    call returns to as well, which the hot path runs, and linearRA_SCCs in
-   GHC.CmmToAsm.Reg.Linear defers it; it also counts a failure target that
+   GHC.CmmToAsm.Reg.Linear, where it has no estimate, defers it; it also counts a failure target that
    another edge enters, and, for static prediction and the layout, the lighter
    side of an unannotated test of a register held off BaseReg, as of CurrentTSO,
    once favourFewerPreds has broken its tie. The estimate would give each

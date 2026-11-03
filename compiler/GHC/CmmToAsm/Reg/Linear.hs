@@ -138,9 +138,17 @@ import GHC.Platform
 import Data.Containers.ListUtils
 import Data.Maybe
 import Data.List (find, sortOn)
+import Data.Array.IArray (Array, listArray, (!))
+import Data.Array.Unboxed (UArray)
+import Data.Array.ST (STUArray, newArray)
+import Data.Array.Base (unsafeRead, unsafeWrite, unsafeAt)
+import qualified Data.IntMap.Strict as IM
+import Data.STRef (newSTRef, readSTRef, writeSTRef)
+import Control.Monad.ST (ST, runST)
 import Data.Word (Word64)
 import Control.Monad
-import GHC.CmmToAsm.CFG (BlockFreqs)
+import GHC.CmmToAsm.CFG (BlockFreqs, nullBlockFreqs, blockFreq, blockIndex,
+                          blockCount)
 
 -- -----------------------------------------------------------------------------
 -- Top level of the register allocator
@@ -199,7 +207,7 @@ regAlloc _ _ _ (CmmProc (LiveInfo info _ _ _) lbl live [])
 
 regAlloc config cold freqsFrom (CmmProc static lbl live sccs)
         | LiveInfo info entry_ids@(first_id:_) block_live _ <- static
-        , let freqs = freqsFrom first_id
+        , let !freqs = freqsFrom first_id
         = do
                 -- do register allocation on each component.
                 !(!final_blocks, !stats, !stack_use)
@@ -293,11 +301,11 @@ linearRegAlloc'
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
         -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc' config initFreeRegs cold !_freqs entry_ids block_live sccs
+linearRegAlloc' config initFreeRegs cold !freqs entry_ids block_live sccs
  = UDSM $ \us -> do
     let !(!stack, !stats, !blocks, us') =
             runR ctx us
-                $ linearRA_SCCs cold entry_ids js block_live sccs
+                $ linearRA_SCCs cold freqs entry_ids js block_live sccs
         -- each block's jump targets, read by the allocation order and the
         -- context alike
         js = jumpSuccs sccs
@@ -544,17 +552,38 @@ wideMoveDests platform cold block_live sccs
 -- live into an entry; a vreg that was would make the allocator panic where it
 -- is read.
 --
--- TODO: checkFailures counts as cold some blocks the hot path runs: see
--- Note [Frequencies before register allocation] in GHC.CmmToAsm.CFG.
+-- Where the blocks' frequencies are estimated (on x86-64, under
+-- -fcmm-static-pred), the SCCs go in 'hotFirst''s order instead: the
+-- procedure's first block first, then hotter first among those that can be
+-- allocated, another entry as hot as the hottest of itself and the blocks it
+-- jumps to, estimates counted in factors of 1.2 (the floor of their logarithm
+-- to that base);
+-- and an entry other than the procedure's first block
+-- set aside while a block it jumps to, not yet reached, runs more than 1.2
+-- times as often as the entry, other paths bringing it at least a sixth of its
+-- runs: allocated first, the entry would choose the registers of a block
+-- those paths run, as a block the garbage collector returns to or
+-- a continuation entering a loop would (GHC #27800). The estimate of a tag
+-- test is static prediction's (Note [Static prediction of tag tests]), which
+-- leaves an unannotated test of a pointer's tag at 50/50; the factor damps
+-- what that makes of the paths around an evaluation.
+--
+-- TODO: without the estimate, checkFailures counts as cold some blocks the hot
+-- path runs: see Note [Frequencies before register allocation] in
+-- GHC.CmmToAsm.CFG.
 linearRA_SCCs :: RegAllocConstraint freeRegs instr
               => LabelSet
+              -> BlockFreqs
               -> [BlockId]
               -> BlockMap [BlockId]
               -> BlockMap Regs
               -> [SCC (LiveBasicBlock instr)]
               -> RegM freeRegs [NatBasicBlock instr]
 
-linearRA_SCCs cold entry_ids succs block_live sccs
+linearRA_SCCs cold freqs entry_ids succs block_live sccs
+ | not (nullBlockFreqs freqs)
+ = reverse <$> foldM one [] (hotFirst freqs entries first_id succs waits sccs)
+ | otherwise
  = do   platform <- getPlatform
         let no_call_loops = callFreeLoops platform
             -- a block the garbage collector returns to, or a return
@@ -582,6 +611,11 @@ linearRA_SCCs cold entry_ids succs block_live sccs
         acc2 <- foldM one acc1 deferred
         return $ reverse acc2
   where
+    -- an entry jumping to a block not yet reached that runs more than 1.2
+    -- times as often as it waits
+    waits bid ds
+      = any (\(d, reached) -> not reached
+                             && blockFreq freqs d > 1.2 * blockFreq freqs bid) ds
     -- looked up for every block, so a set rather than the list
     entries = setFromList entry_ids
     first_id = case entry_ids of { b : _ -> b; [] -> panic "linearRA_SCCs" }
@@ -598,6 +632,210 @@ linearRA_SCCs cold entry_ids succs block_live sccs
     one acc (CyclicSCC blocks) = do
         blockss' <- process entries succs block_live blocks
         return (reverse (concat blockss') ++ acc)
+
+-- | The SCCs in the order linearRA_SCCs allocates them where it has the
+-- blocks' estimated frequencies: hotter first among those it can allocate,
+-- an entry, or an SCC a jump from an allocated one reaches, an SCC's heat
+-- being its hottest block's estimate in factors of 1.2 (the floor of its
+-- logarithm to that base), and ties going to the earlier in the given order
+-- (dependency order, Note [The first jump into a block fixes its registers]).
+-- Static prediction leaves an unannotated test of a pointer's tag 50/50 (Note
+-- [Static prediction of tag tests]), so the paths around an evaluation come
+-- out about as hot, and the given order decides between them, as it did
+-- without the estimate: Data.IntSet's fromAscList loop otherwise took its
+-- head's registers from the procedure's entry path, the arguments' (0.75),
+-- before the join of its evaluations' continuations (0.716), and paid two
+-- moves an element on its back edge. The procedure's first block, where no
+-- loop holds it, counts as
+-- hotter than any other: it jumps with the arguments where the calling
+-- convention puts them, which a loop calling a function again takes again,
+-- where a continuation's values are where its evaluation left them (Data.Tree's
+-- and Data.Map's folds paid three instructions a node when the continuation
+-- went first). An entry other than the first block, where no loop holds it,
+-- counts as hot as the
+-- hottest of itself and the blocks it jumps to: a continuation reloads its
+-- values, and the block it jumps to takes its registers, which may be a path's
+-- that the estimate calls hotter but where those values are spilled, as where
+-- a loop's every iteration calls (nofib's fannkuch-redux at -O1 stored eight
+-- values on its edge an iteration when the path went first); ranked above
+-- every SCC but the first block, the entries cost Data.IntSet's mapMonotonic at
+-- -O2 two instructions an element, its loop's continuation going after colder
+-- ones. An entry other than the first block is set aside
+-- while the given test says it waits, given whether a block is reached, its
+-- label and its jump targets, and tested again whenever one of its targets is
+-- reached. Where nothing can be allocated, the entry set aside that the
+-- estimate calls hottest is, ties to the earlier, or where none is, the
+-- earliest SCC left: two continuations joining wait for each other, and the
+-- hotter's registers are the join's (Data.IntMap's mapKeysMonotonic at -O1
+-- paid an instruction an element when the colder went first). The order
+-- depends on the jumps alone, not on what allocation records, so it is computed
+-- before allocation. NOINLINE: inlined, its local thunks are allocated for
+-- every procedure, at -O0 too, where it is not called.
+{-# NOINLINE hotFirst #-}
+hotFirst :: forall b. BlockFreqs -> LabelSet -> BlockId -> BlockMap [BlockId]
+         -> (BlockId -> [(BlockId, Bool)] -> Bool)
+         -> [SCC (GenBasicBlock b)] -> [SCC (GenBasicBlock b)]
+hotFirst freqs entries first_id succs waits sccs
+  | k <= 1    = sccs
+  | otherwise = runST $ do
+      -- each block's SCC, twice its index, plus 1 once a jump reaches it
+      blockScc <- newArray (0, max 0 (nb - 1)) (-2) :: ST s (STUArray s Int Int)
+      known <- foldM (\ok (i, scc) ->
+                        foldM (\ok' blk -> case blockIndex freqs (blockId blk) of
+                                  j | j < 0     -> return False
+                                    | otherwise -> unsafeWrite blockScc j (2 * i)
+                                                   >> return ok')
+                              ok (flattenSCC scc))
+                     True (zip [0 ..] sccs)
+      if not known then return sccs  -- not expected: the CFG holds every block
+      else do
+        -- 0 not yet seen, 1 in the heap, 2 allocated, 3 set aside; the heap's
+        -- size at k
+        status <- newArray (0, k) (0 :: Int) :: ST s (STUArray s Int Int)
+        heap <- newArray (0, k - 1) 0 :: ST s (STUArray s Int Int)
+        -- the set-aside entries to test again when a block is reached
+        waitOn <- newSTRef (IM.empty :: IM.IntMap [Int])
+        asideRef <- newSTRef ([] :: [Int])
+        let better i j = let hi = unsafeAt heat i; hj = unsafeAt heat j
+                         in hi > hj || (hi == hj && i < j)
+            swap a c = do x <- unsafeRead heap a
+                          y <- unsafeRead heap c
+                          unsafeWrite heap a y
+                          unsafeWrite heap c x
+            up 0 = return ()
+            up c = do let p = (c - 1) `quot` 2
+                      x <- unsafeRead heap c
+                      y <- unsafeRead heap p
+                      when (better x y) $ swap c p >> up p
+            down n p = do
+              let l = 2 * p + 1
+                  r = l + 1
+              if l >= n then return () else do
+                x <- unsafeRead heap l
+                c <- if r < n then do y <- unsafeRead heap r
+                                      return (if better y x then r else l)
+                              else return l
+                cv <- unsafeRead heap c
+                pv <- unsafeRead heap p
+                when (better cv pv) $ swap c p >> down n c
+            push i = do
+              unsafeWrite status i 1
+              n <- unsafeRead status k
+              unsafeWrite heap n i
+              unsafeWrite status k (n + 1)
+              up n
+            pop = do
+              n <- unsafeRead status k
+              top <- unsafeRead heap 0
+              unsafeRead heap (n - 1) >>= unsafeWrite heap 0
+              unsafeWrite status k (n - 1)
+              down (n - 1) 0
+              return top
+            isReached' d = case blockIndex freqs d of
+              j | j < 0     -> return False
+                | otherwise -> odd <$> unsafeRead blockScc j
+            -- whether an SCC is an entry set aside now
+            waitsNow i = case sccArr ! i of
+              AcyclicSCC (BasicBlock bid _)
+                | bid `setMember` entries, bid /= first_id
+                -> do let ds = mapFindWithDefault [] bid succs
+                      rs <- mapM isReached' ds
+                      return (waits bid (zip ds rs))
+              _ -> return False
+            setAside i = do
+              unsafeWrite status i 3
+              readSTRef asideRef >>= writeSTRef asideRef . (i :)
+              forM_ (mapFindWithDefault [] (sccBlockId i) succs) $ \d -> do
+                let j = blockIndex freqs d
+                when (j >= 0) $ do
+                  v <- unsafeRead blockScc j
+                  when (even v) $ readSTRef waitOn
+                                  >>= writeSTRef waitOn . IM.insertWith (++) j [i]
+            allocate i = do
+              unsafeWrite status i 2
+              forM_ (flattenSCC (sccArr ! i)) $ \blk ->
+                forM_ (mapFindWithDefault [] (blockId blk) succs) $ \d -> do
+                  let j = blockIndex freqs d
+                  when (j >= 0) $ do
+                    v <- unsafeRead blockScc j
+                    when (even v) $ do
+                      unsafeWrite blockScc j (v + 1)
+                      let s = v `quot` 2
+                      when (s >= 0) $ do
+                        st <- unsafeRead status s
+                        when (st == 0) $ push s
+                      wm <- readSTRef waitOn
+                      case IM.lookup j wm of
+                        Nothing -> return ()
+                        Just ws -> do
+                          writeSTRef waitOn (IM.delete j wm)
+                          forM_ ws $ \w -> do
+                            st <- unsafeRead status w
+                            when (st == 3) $ do
+                              stillWaits <- waitsNow w
+                              unless stillWaits $ push w
+            -- the earliest SCC not yet seen, from a cursor that only advances,
+            -- as an SCC's status never returns to 0
+            unseen c | c >= k    = return Nothing
+                     | otherwise = do st <- unsafeRead status c
+                                      if st == 0 then return (Just c)
+                                                 else unseen (c + 1)
+            go out cur = do
+              n <- unsafeRead status k
+              if n > 0 then do
+                i <- pop
+                w <- waitsNow i
+                if w then setAside i >> go out cur
+                     else allocate i >> go (sccArr ! i : out) cur
+              else do
+                u <- unseen cur
+                aside <- filterM (\i -> (== 3) <$> unsafeRead status i) =<< readSTRef asideRef
+                writeSTRef asideRef aside
+                let hotter j i = blockFreq freqs (sccBlockId j)
+                                 > blockFreq freqs (sccBlockId i)
+                    -- the hotter, ties to the earlier
+                    pref i j | hotter j i || (not (hotter i j) && j < i) = j
+                             | otherwise                                = i
+                    pick = case aside of
+                      a : as -> Just (foldl' pref a as)
+                      []     -> u
+                case pick of
+                  Just i  -> do allocate i
+                                go (sccArr ! i : out) (maybe cur id u)
+                  Nothing -> return (reverse out)
+        forM_ (setElems entries) $ \e -> do
+          let j = blockIndex freqs e
+          when (j >= 0) $ do
+            v <- unsafeRead blockScc j
+            let s = v `quot` 2
+            when (s >= 0) $ do st <- unsafeRead status s
+                               when (st == 0) $ push s
+        go [] 0
+  where
+    k = length sccs
+    nb = blockCount freqs
+    sccArr = listArray (0, k - 1) sccs :: Array Int (SCC (GenBasicBlock b))
+    sccBlockId i = case flattenSCC (sccArr ! i) of
+      blk : _ -> blockId blk
+      []      -> panic "hotFirst: an empty SCC"
+    -- the first block hotter than any other, another entry by the hottest of
+    -- itself and its jump targets, the others by their hottest block's
+    -- estimate, in factors of 1.2
+    heat :: UArray Int Int
+    heat = listArray (0, k - 1)
+      [ case scc of
+          AcyclicSCC blk
+            | blockId blk == first_id           -> maxBound
+            | blockId blk `setMember` entries
+            -> bucket $ foldl' (\a d -> max a (blockFreq freqs d))
+                               (blockFreq freqs (blockId blk))
+                               (mapFindWithDefault [] (blockId blk) succs)
+          _ -> bucket $ foldl' (\a blk -> max a (blockFreq freqs (blockId blk)))
+                               0 (flattenSCC scc)
+      | scc <- sccs ]
+    bucket :: Double -> Int
+    bucket h | h > 0     = floor (log h / log 1.2)
+             | otherwise = minBound
 
 {- Note [The first jump into a block fixes its registers]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
