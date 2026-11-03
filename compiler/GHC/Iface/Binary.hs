@@ -171,10 +171,16 @@ readBinIface
   -> NameCache
   -> CheckHiWay
   -> TraceBinIFace
+  -> Bool
+  -- ^ Copy the lazily read parts of the interface out of the buffer of the
+  -- file? Do this for interfaces that are kept for a long time without the
+  -- 'ModIface' (external interfaces in the EPS).
+  -- See Note [Copying lazily read slices] in "GHC.Utils.Binary".
   -> FilePath
   -> IO ModIface
-readBinIface profile name_cache checkHiWay traceBinIface hi_path = do
-    bh <- readBinIfaceHeader profile name_cache checkHiWay traceBinIface hi_path
+readBinIface profile name_cache checkHiWay traceBinIface copy_lazily hi_path = do
+    bh <- setCopyLazily copy_lazily <$>
+            readBinIfaceHeader profile name_cache checkHiWay traceBinIface hi_path
 
     mod_iface <- getIfaceWithExtFields name_cache bh
 
@@ -221,6 +227,15 @@ getTables name_cache bh = do
     nameReaderTable <- initNameReaderTable name_cache
     ifaceTypeReaderTable <- initReadIfaceTypeTable ud
 
+    -- Locate the IfaceType table: see Note [Copying the IfaceType table]
+    tables_start <- tellBinReader bh
+    _fs_ptr <- getRelBin bh
+    name_ptr <- getRelBin bh
+    ifaceType_ptr <- getRelBin bh
+    seekBinReader bh tables_start
+    let ifaceType_start = makeAbsoluteBin ifaceType_ptr
+        ifaceType_end   = castBin (makeAbsoluteBin name_ptr)
+
     let -- For any 'ReaderTable', we decode the table that is found at the location
         -- the forward reference points to.
         -- After decoding the table, we create a 'BinaryReader' and immediately
@@ -231,6 +246,16 @@ getTables name_cache bh = do
           let binaryReader = mkReaderFromTable tbl table
           pure $ addReaderToUserData binaryReader bh0
 
+        -- Like 'decodeReaderTable', but decode the table from a copy of its
+        -- bytes. See Note [Copying the IfaceType table]
+        decodeCopiedReaderTable :: Typeable a => ReaderTable a -> ReadBinHandle -> IO ReadBinHandle
+        decodeCopiedReaderTable tbl bh0 = do
+          _ <- getRelBin bh -- skip the forward reference, as forwardGetRel would
+          slice <- thawBinHandle =<< copyBinReaderSlice bh0 ifaceType_start ifaceType_end
+          table <- getTable tbl slice
+          let binaryReader = mkReaderFromTable tbl table
+          pure $ addReaderToUserData binaryReader bh0
+
     -- Decode all the tables and populate the 'ReaderUserData'.
     bhFinal <- foldM (\bh0 act -> act bh0) bh
       -- The order of these deserialisation matters!
@@ -238,11 +263,37 @@ getTables name_cache bh = do
       -- See Note [Order of deduplication tables during iface binary serialisation] for details.
       [ decodeReaderTable fsReaderTable
       , decodeReaderTable nameReaderTable
-      , decodeReaderTable ifaceTypeReaderTable
+      , if copiesLazily bh
+          then decodeCopiedReaderTable ifaceTypeReaderTable
+          else decodeReaderTable ifaceTypeReaderTable
       ]
 
     writeIORef bhRef (getReaderUserData bhFinal)
     pure bhFinal
+
+{- Note [Copying the IfaceType table]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The entries of the IfaceType deduplication table are deserialised lazily
+(see Note [Lazy ReaderUserData during IfaceType serialisation]): each one is a
+thunk holding a 'ReadBinHandle'. Every lazily deserialised part of the
+interface holds the 'ReaderUserData', hence the table, hence -- if we read the
+table from the buffer of the whole .hi file -- the whole buffer. Interfaces
+loaded into the EPS live for the whole session, so this retained every .hi file
+that was ever read (see Note [The EPS does not keep ModIfaces]).
+
+We therefore copy the bytes of the IfaceType table into a buffer of its own
+and deserialise the table from there. Its location is known from the layout
+written by 'putAllTables' for [FastString, Name, IfaceType] tables:
+
+    [ptr FS] [ptr Name] [ptr IfaceType] payload [IfaceType table] [Name table] [FS table]
+
+so the IfaceType table occupies the bytes from the target of the IfaceType
+pointer to the target of the Name pointer. The FastString and Name tables are
+deserialised eagerly and do not retain the buffer.
+
+Other lazily deserialised fields are copied with 'lazyGetCopy' (e.g. the parts
+of a 'ModIface', and the details of an 'IfaceId').
+-}
 
 -- | Write an interface file.
 --

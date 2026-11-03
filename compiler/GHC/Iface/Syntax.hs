@@ -2402,8 +2402,11 @@ instance Binary IfaceDecl where
         h <- getByte bh
         case h of
             0 -> do name <- get bh
-                    ~(ty, details, idinfo) <- lazyGet bh
+                    ~(ty, details, idinfo) <- lazyGetCopy bh
                     -- See Note [Lazy deserialization of IfaceId]
+                    -- lazyGetCopy: an unforced Id (e.g. in the EPS) retains
+                    -- only its own bytes, not the buffer of the whole
+                    -- interface; see Note [Copying the IfaceType table].
                     return (IfaceId name ty details idinfo)
             1 -> error "Binary.get(TyClDecl): ForeignType"
             2 -> do a1  <- getIfaceTopBndr bh

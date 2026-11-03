@@ -213,16 +213,19 @@ loadIfaceByteCode ::
   TypeEnv ->
   Maybe (IO Linkable)
 loadIfaceByteCode hsc_env iface location type_env =
-  compile <$> iface_core_bindings iface location
+  -- Force the module now: the IO action lives in the EPS and must not retain
+  -- the whole ModIface (see Note [The EPS does not keep ModIfaces]).
+  let !this_mod = mi_module iface in
+  compile this_mod <$> iface_core_bindings iface location
   where
-    compile decls = do
+    compile this_mod decls = do
       bco <- compileWholeCoreBindings hsc_env type_env decls
-      linkable $ pure $ DotGBC bco
+      linkable this_mod $ pure $ DotGBC bco
 
-    linkable parts = do
+    linkable this_mod parts = do
       if_time <- modificationTimeIfExists (ml_hi_file_ospath location)
       time <- maybe getCurrentTime pure if_time
-      return $! Linkable time (mi_module iface) parts
+      return $! Linkable time this_mod parts
 
 loadIfaceByteCodeLazy ::
   HscEnv ->
