@@ -1255,11 +1255,16 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
   case mb_found of
       InstalledFound loc -> do
           -- See Note [Home module load error]
-          if HUG.memberHugUnitId (moduleUnit mod) (hsc_HUG hsc_env)
-              && not (isOneShot (ghcMode dflags))
+          let is_home_mod = HUG.memberHugUnitId (moduleUnit mod) (hsc_HUG hsc_env)
+          if is_home_mod && not (isOneShot (ghcMode dflags))
             then return (Failed (HomeModError mod loc))
             else do
-                r <- read_file hooks logger name_cache dflags wanted_mod (ml_hi_file loc)
+                -- Only external interfaces outlive their 'ModIface' (in the
+                -- EPS), so only their lazily read parts are copied out of
+                -- the buffer of the file.
+                -- See Note [Copying lazily read slices] in GHC.Utils.Binary
+                r <- read_file hooks logger name_cache dflags (not is_home_mod)
+                       wanted_mod (ml_hi_file loc)
                 case r of
                   Failed err
                     -> return (Failed $ BadIfaceFile err)
@@ -1294,7 +1299,7 @@ load_dynamic_too :: Hooks -> Logger -> NameCache -> DynFlags
                  -> Module -> ModIface -> ModLocation
                  -> IO (MaybeErr MissingInterfaceError ())
 load_dynamic_too hooks logger name_cache dflags wanted_mod iface loc = do
-  read_file hooks logger name_cache dflags wanted_mod (ml_dyn_hi_file loc) >>= \case
+  read_file hooks logger name_cache dflags False wanted_mod (ml_dyn_hi_file loc) >>= \case
     Succeeded (dynIface, _)
      | mi_mod_hash iface == mi_mod_hash dynIface
      -> return (Succeeded ())
@@ -1309,9 +1314,10 @@ load_dynamic_too hooks logger name_cache dflags wanted_mod iface loc = do
 
 
 read_file :: Hooks -> Logger -> NameCache -> DynFlags
+          -> Bool -- ^ copy lazily read parts, see 'readBinIface'
           -> Module -> FilePath
           -> IO (MaybeErr ReadInterfaceError (ModIface, FilePath))
-read_file hooks logger name_cache dflags wanted_mod file_path = do
+read_file hooks logger name_cache dflags copy_lazily wanted_mod file_path = do
 
   -- Figure out what is recorded in mi_module.  If this is
   -- a fully definite interface, it'll match exactly, but
@@ -1322,7 +1328,7 @@ read_file hooks logger name_cache dflags wanted_mod file_path = do
             (_, Just indef_mod) ->
               instModuleToModule
                 (uninstantiateInstantiatedModule indef_mod)
-  read_result <- readIface hooks logger dflags name_cache wanted_mod' file_path
+  read_result <- readIfaceCopying copy_lazily hooks logger dflags name_cache wanted_mod' file_path
   case read_result of
     Failed err      -> return (Failed err)
     Succeeded iface -> return (Succeeded (iface, file_path))
@@ -1356,10 +1362,23 @@ readIface
   -> Module
   -> FilePath
   -> IO (MaybeErr ReadInterfaceError ModIface)
-readIface hooks logger dflags name_cache wanted_mod file_path = do
+readIface = readIfaceCopying False
+
+-- | 'readIface', optionally copying the lazily read parts of the interface out
+-- of the buffer of the file (see 'readBinIface').
+readIfaceCopying
+  :: Bool
+  -> Hooks
+  -> Logger
+  -> DynFlags
+  -> NameCache
+  -> Module
+  -> FilePath
+  -> IO (MaybeErr ReadInterfaceError ModIface)
+readIfaceCopying copy_lazily hooks logger dflags name_cache wanted_mod file_path = do
   trace_if logger (text "readIFace" <+> text file_path)
   let profile = targetProfile dflags
-  res <- tryMost $ readBinIface profile name_cache CheckHiWay QuietBinIFace file_path
+  res <- tryMost $ readBinIface profile name_cache CheckHiWay QuietBinIFace copy_lazily file_path
   case res of
     Right iface
         -- NB: This check is NOT just a sanity check, it is
@@ -1563,7 +1582,7 @@ showIface logger dflags unit_state name_cache filename = do
 
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
-   iface <- readBinIface profile name_cache IgnoreHiWay (TraceBinIFace printer) filename
+   iface <- readBinIface profile name_cache IgnoreHiWay (TraceBinIFace printer) False filename
 
    let -- See Note [Name qualification with --show-iface]
        qualifyImportedNames mod _user_qual _

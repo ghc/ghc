@@ -193,16 +193,18 @@ initModDetails hsc_env iface =
 -- | Assemble 'WholeCoreBindings' if the interface contains Core bindings.
 iface_core_bindings :: ModIface -> ModLocation -> Maybe WholeCoreBindings
 iface_core_bindings iface wcb_mod_location =
-  mi_simplified_core <&> \(IfaceSimplifiedCore bindings mbreaks foreign') ->
-    WholeCoreBindings {
-      wcb_bindings = bindings,
-      wcb_modBreaks = mbreaks,
-      wcb_module = mi_module,
-      wcb_mod_location,
-      wcb_foreign = foreign'
-    }
-  where
-    ModIface {mi_module, mi_simplified_core} = iface
+  -- Strict match: a lazy pattern binding would leave selector thunks that
+  -- retain the whole ModIface.
+  case iface of
+    ModIface {mi_module = !this_mod, mi_simplified_core = core} ->
+      core <&> \(IfaceSimplifiedCore bindings mbreaks foreign') ->
+        WholeCoreBindings {
+          wcb_bindings = bindings,
+          wcb_modBreaks = mbreaks,
+          wcb_module = this_mod,
+          wcb_mod_location,
+          wcb_foreign = foreign'
+        }
 
 -- | log warning in the monad, and if there are errors then
 -- throw a SourceError exception.
