@@ -1120,6 +1120,37 @@ linkITbls interp = foldlM $ \env (nm, itbl) -> do
 
   ********************************************************************* -}
 
+{- Note [LoaderState may lag the interpreter]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Since the external interpreter stopped dying on exceptions, a command can take
+effect in the interpreter and still have its result rolled back here: every
+caller runs under modifyLoaderState, which restores the pre-command state when
+the action throws.
+
+That is safe in the loading direction, because the LoaderState then describes
+*less* than is actually loaded and the load commands are idempotent, so redoing
+them converges:
+
+  - loadObj_ and loadArchive_ both ignore a repeated load of a path, via
+    isAlreadyLoaded.
+  - loadNativeObj_POSIX returns the handle of an already-loaded object, and
+    addDLL_PEi386 does the same from loaded_dll_cache, see Note [Avoiding
+    repeated DLL loading]
+  - the wasm dyld dedups by soname in its downsweep, and loadObj, loadArchive
+    and unloadObj are unsupported there in any case
+  - initLinker_ is guarded by linker_init_done, and wasm's initObjLinker and
+    resolveObjs do nothing at all
+
+What we need to avoid is having more in the 'LoaderState' than is actually
+loaded. This can only happen while unloading, which is why purge the symbol cache
+before the unload.
+
+We should also make sure the emptied out loader state returned from unload_wkr
+gets actually written to the loader state, the failure to do so is tracked by
+#28104.
+
+-}
+
 -- ---------------------------------------------------------------------------
 -- | Unloading old objects ready for a new compilation sweep.
 --   * compilation artifacts for home modules that we might be about to recompile
@@ -1156,13 +1187,17 @@ unload_wkr interp pls@LoaderState{..}  = do
 
   let linkables_to_unload = moduleEnvElts objs_loaded ++ moduleEnvElts bcos_loaded
 
-  mapM_ unloadObjs linkables_to_unload
-
   -- If we unloaded any object files at all, we need to purge the cache
   -- of lookupSymbol results.
+  -- We do so before actually unloading, so the cache is never stale.
+  --
+  -- See Note [LoaderState may lag the interpreter]
   when (not (null (filter (not . null . linkableUsageObjs) linkables_to_unload))) $
     purgeLookupSymbolCache interp
 
+  mapM_ unloadObjs linkables_to_unload
+
+  -- FIXME: this emptied state should be committed even on exceptions, see #28104
   let !new_pls = pls { bco_loader_state = modifyHomePackageBytecodeState bco_loader_state $ \_ -> emptyBytecodeState,
                        -- NB: we don't unload the external package
                        bcos_loaded   = emptyModuleEnv,
