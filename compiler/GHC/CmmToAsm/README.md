@@ -32,8 +32,10 @@ Then, pass by pass, in the overview's order:
 * step 6, the linear allocator: the outline at the top
   of `GHC.CmmToAsm.Reg.Linear`, Note [Unique order in the linear allocator]
   and Note [Register preferences in the linear allocator] there,
-  and Note [The first jump into a block fixes its entry assignment]
-  in `GHC.CmmToAsm.Reg.Linear.JoinToTargets`;
+  Note [The first jump into a block fixes its entry assignment]
+  in `GHC.CmmToAsm.Reg.Linear.JoinToTargets`, and, for the order in which
+  it allocates the blocks, Note [Frequencies before register allocation]
+  in `GHC.CmmToAsm.CFG`;
 * step 9, shortcutting: Note [supporting shortcutting] in `GHC.CmmToAsm.Monad`
   and Note [Updating the CFG during shortcutting] in `GHC.CmmToAsm.CFG`;
 * step 10, static prediction: Note [Static Branch Prediction],
@@ -149,7 +151,8 @@ and the latest first:
 * step 11: `-fno-block-layout-cfg`, which lays the blocks out
   by `sequenceBlocks`, with the CFG's weights, or without them
   if `-fblock-layout-weightless` is given too;
-* step 10: `-fno-cmm-static-pred`;
+* step 10: `-fno-cmm-static-pred`, which also takes from step 6 the linear
+  allocator's estimate of block frequencies;
 * step 9: `-fno-asm-shortcutting`;
 * step 6: `-fregs-graph` or `-fregs-iterative` in place of the linear allocator;
 * in the Cmm pipeline: `-fno-cmm-sink`, which also stops stack layout loading

@@ -1,0 +1,43 @@
+#include "Cmm.h"
+
+// The loop of cmm/should_compile/T27800.cmm, and a call behind a branch on
+// a constant. cmmToCmm turns the branch into a jump, so the call's block and
+// its continuation are unreachable and the native CFG lacks them (#28088),
+// while under -finfo-table-map, where the native code generator drops no
+// dead code, liveness keeps the continuation, an entry. The linear allocator
+// then has no estimate for a block of the procedure.
+
+helper (W_ x)
+{
+    return (x + 1);
+}
+
+loop_entry (W_ k, W_ n)
+{
+    W_ acc;
+    acc = 0;
+    if (0 == 1) { goto dead; }
+    goto check;
+
+check:
+    if (n == 12345678) { goto slow; }
+    goto body;
+
+body:
+    acc = acc + n;
+    n = n - k;
+    if (n == 0) { goto done; }
+    goto check;
+
+slow:
+    (W_ r) = call helper(acc);
+    acc = r;
+    goto body;
+
+dead:
+    (W_ d) = call helper(k);
+    return (d);
+
+done:
+    return (acc);
+}
