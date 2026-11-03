@@ -128,6 +128,7 @@ module Language.Haskell.TH where
     | ForallE [TyVarBndr Specificity] Exp
     | ForallVisE [TyVarBndr ()] Exp
     | ConstrainedE [Exp] Exp
+    | ReSynBindsE GHC.Internal.TH.Syntax.ModName Exp
   type ExpQ :: *
   type ExpQ = Q Exp
   type Extension :: *
@@ -1487,6 +1488,7 @@ module Language.Haskell.TH.Syntax where
     | ForallE [TyVarBndr Specificity] Exp
     | ForallVisE [TyVarBndr ()] Exp
     | ConstrainedE [Exp] Exp
+    | ReSynBindsE ModName Exp
   type Extension :: *
   data Extension
     = Cpp
@@ -1914,6 +1916,7 @@ instance forall a. GHC.Boot.TH.Ppr.Ppr a => GHC.Boot.TH.Ppr.Ppr [a] -- Defined i
 instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Boot.TH.Ppr’
 instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Boot.TH.Ppr’
 instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Match -- Defined in ‘GHC.Boot.TH.Ppr’
+instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.ModName -- Defined in ‘GHC.Boot.TH.Ppr’
 instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Module -- Defined in ‘GHC.Boot.TH.Ppr’
 instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.ModuleInfo -- Defined in ‘GHC.Boot.TH.Ppr’
 instance GHC.Boot.TH.Ppr.Ppr GHC.Internal.TH.Syntax.Name -- Defined in ‘GHC.Boot.TH.Ppr’

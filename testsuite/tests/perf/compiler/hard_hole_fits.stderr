@@ -621,10 +621,6 @@ hard_hole_fits.hs:45:27: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Enum’))
 
-hard_hole_fits.hs:46:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In an equation for ‘testMe’: testMe (XExpr xe) = ...
-
 hard_hole_fits.hs:46:21: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (XExpr xe) = _
