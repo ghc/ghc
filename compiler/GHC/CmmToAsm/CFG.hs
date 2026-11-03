@@ -797,7 +797,7 @@ loopLevels cfg root = liLevels loopInfos
       loopInfos = loopInfo cfg root
 
 data LoopInfo = LoopInfo
-  { liBackEdges :: [(Edge)] -- ^ List of back edges
+  { liBackEdges :: [(Edge)] -- ^ The edges whose target dominates their source
   , liLevels :: LabelMap Int -- ^ BlockId -> LoopLevel mapping
   , liLoops :: [(Edge, LabelSet)] -- ^ (backEdge, loopBody), body includes header
   }
@@ -840,7 +840,7 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
     rooted = coerce (root, graph)
     tree = coerce (Dom.domTree rooted) :: Tree BlockId
 
-    -- Map from Nodes to their dominators
+    -- The dominators of each block, including the block itself.
     domMap :: LabelMap LabelSet
     domMap = mkDomMap tree
 
@@ -848,7 +848,6 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
     -- We can't recompute nodes from edges, there might be blocks not connected via edges.
     nodes = getCfgNodes cfg :: [BlockId]
 
-    -- identify back edges
     isBackEdge (from,to)
       | Just doms <- mapLookup from domMap
       , setMember to doms
@@ -885,17 +884,12 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
       in  map (\n -> (n, loopCount n)) $ nodes :: [(BlockId, Int)]
 
     mkDomMap :: Tree BlockId -> LabelMap LabelSet
-    mkDomMap root = mapFromList $ go setEmpty root
+    mkDomMap = go setEmpty mapEmpty
       where
-        go :: LabelSet -> Tree BlockId -> [(Label,LabelSet)]
-        go parents (Node lbl [])
-          =  [(lbl, parents)]
-        go parents (Node _ leaves)
-          = let nodes = map rootLabel leaves
-                entries = map (\x -> (x,parents)) nodes
-            in  entries ++ concatMap
-                            (\n -> go (setInsert (rootLabel n) parents) n)
-                            leaves
+        go :: LabelSet -> LabelMap LabelSet -> Tree BlockId -> LabelMap LabelSet
+        go doms acc (Node lbl children)
+          = let !doms' = setInsert lbl doms
+            in  foldl' (go doms') (mapInsert lbl doms' acc) children
 
 -- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
 newtype BlockNode (e :: Extensibility) (x :: Extensibility) = BN (BlockId,[BlockId])

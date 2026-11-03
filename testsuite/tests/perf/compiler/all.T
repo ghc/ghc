@@ -38,6 +38,17 @@ test('T3294',
      compile,
      [''])
 
+test('CmmDiamondChain',
+     [ only_ways(['optasm']),
+       unless(have_ncg(), skip),
+       cmm_src,
+       collect_compiler_stats('bytes allocated', 2),
+       pre_cmd('./genCmmDiamondChain'),
+       extra_files(['genCmmDiamondChain']),
+     ],
+     compile,
+     ['-O2 -v0'])
+
 test('T4801',
      [collect_compiler_runtime(2),
       only_ways(['normal']),
