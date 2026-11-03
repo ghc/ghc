@@ -165,7 +165,6 @@ import GHC.Unit.Module
 import Language.Haskell.Syntax.Module.Name (HsModuleName)
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModSummary
-import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Deps
 import GHC.Driver.Downsweep
@@ -2163,11 +2162,11 @@ runTcInteractive tcm_plugin_handling hsc_env thing_inside
 
        ; let getOrphansForModuleName m mb_pkg = do
               iface <- loadSrcInterface (text "runTcInteractive") LookupUser m NotBoot mb_pkg
-              pure $ mi_module iface : dep_orphs (mi_deps iface)
+              pure $ li_module iface : dep_orphs (li_deps iface)
 
              getOrphansForModule m = do
               iface <- loadModuleInterface (text "runTcInteractive") m
-              pure $ mi_module iface : dep_orphs (mi_deps iface)
+              pure $ li_module iface : dep_orphs (li_deps iface)
 
        ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
             case i of                   -- force above: see #15111
@@ -2968,7 +2967,7 @@ externaliseAndTidyId this_mod id
 -- a package module with an interface on disk.  If neither of these is
 -- true, then the result will be an error indicating the interface
 -- could not be found.
-getModuleInterface :: HscEnv -> Module -> IO (Messages TcRnMessage, Maybe ModIface)
+getModuleInterface :: HscEnv -> Module -> IO (Messages TcRnMessage, Maybe LoadedIface)
 getModuleInterface hsc_env mod
   = runTcInteractive NoTcMPlugins hsc_env $
     loadModuleInterface (text "getModuleInterface") mod

@@ -43,6 +43,7 @@ module GHC.Iface.Load (
 
         pprModIfaceSimple,
         ifaceStats, pprModIface, showIface,
+        readFullIfaceFromDisk,
 
         getGhcPrimIface,
 
@@ -308,7 +309,7 @@ loadKnownKeyOccMaps
     known_key_maps :: Module -> IfM lcl KnownKeyNameMaps
     known_key_maps mod
       = do { iface <- loadInterfaceWithException doc mod ImportBySystem
-           ; let !abi_hash = mi_mod_hash iface
+           ; let !abi_hash = li_mod_hash iface
            ; eps <- getEps
            ; case lookupModuleEnv (eps_known_keys eps) mod of
                Just (cached_hash, kk_maps)
@@ -321,19 +322,19 @@ loadKnownKeyOccMaps
                                      (abi_hash, kk_maps) }
                        ; return kk_maps } }
 
-    build_maps :: ModIface -> KnownKeyNameMaps
+    build_maps :: LoadedIface -> KnownKeyNameMaps
     build_maps iface = (kk_map, occ_map)
       where
         kk_map :: UniqFM KnownKey Name
         -- Domain is just the KnownKeys in the knownKeyTable
         kk_map  = listToUFM [ (getUnique nm, nm)
-                            | avail <- mi_exports iface
+                            | avail <- li_exports iface
                             , nm <- availNames avail
                             , let uniq = getUnique nm
                             , uniq `elemUFM` knownKeyUniqMap ]
         occ_map :: OccEnv Name
         occ_map = mkOccEnv [ (nameOccName nm, nm)
-                           | avail <- mi_exports iface
+                           | avail <- li_exports iface
                            , nm <- availNames avail ]
 
 lookupKnownKeysMap :: UniqFM KnownKey Name -> KnownKey -> MaybeErr IfaceMessage Name
@@ -628,7 +629,7 @@ loadSrcInterface :: SDoc
                  -> ModuleName
                  -> IsBootInterface     -- {-# SOURCE #-} ?
                  -> PkgQual             -- "package", if any
-                 -> RnM ModIface
+                 -> RnM LoadedIface
 
 loadSrcInterface doc scope mod want_boot maybe_pkg
   = do { res <- loadSrcInterface_maybe doc scope mod want_boot maybe_pkg
@@ -648,7 +649,7 @@ loadSrcInterface_maybe :: SDoc
                        -> ModuleName
                        -> IsBootInterface     -- {-# SOURCE #-} ?
                        -> PkgQual             -- "package", if any
-                       -> RnM (MaybeErr MissingInterfaceError ModIface)
+                       -> RnM (MaybeErr MissingInterfaceError LoadedIface)
 
 loadSrcInterface_maybe doc scope mod want_boot maybe_pkg
   -- We must first find which Module this import refers to.  This involves
@@ -667,7 +668,7 @@ loadSrcInterface_maybe doc scope mod want_boot maybe_pkg
 -- rare operation, but in particular it is used to load orphan modules
 -- in order to pull their instances into the global package table and to
 -- handle some operations in GHCi).
-loadModuleInterface :: SDoc -> Module -> TcM ModIface
+loadModuleInterface :: SDoc -> Module -> TcM LoadedIface
 loadModuleInterface doc mod = initIfaceTcRn (loadSysInterface doc mod)
 
 -- | Load interfaces for a collection of modules.
@@ -681,7 +682,7 @@ loadModuleInterfaces doc mods
 -- | Loads the interface for a given Name.
 -- Should only be called for an imported name;
 -- otherwise loadSysInterface may not find the interface
-loadInterfaceForName :: SDoc -> Name -> TcRn ModIface
+loadInterfaceForName :: SDoc -> Name -> TcRn LoadedIface
 loadInterfaceForName doc name
   = do { when debugIsOn $  -- Check pre-condition
          do { this_mod <- getModule
@@ -690,7 +691,7 @@ loadInterfaceForName doc name
         initIfaceTcRn $ loadSysInterface doc (nameModule name) }
 
 -- | Loads the interface for a given Module.
-loadInterfaceForModule :: SDoc -> Module -> TcRn ModIface
+loadInterfaceForModule :: SDoc -> Module -> TcRn LoadedIface
 loadInterfaceForModule doc m
   = do
     -- Should not be called with this module
@@ -724,23 +725,23 @@ loadWiredInHomeIface name
 
 ------------------
 -- | Loads a system interface and throws an exception if it fails
-loadSysInterface :: SDoc -> Module -> IfM lcl ModIface
+loadSysInterface :: SDoc -> Module -> IfM lcl LoadedIface
 loadSysInterface doc mod_name = loadInterfaceWithException doc mod_name ImportBySystem
 
 ------------------
 -- | Loads a user interface and throws an exception if it fails. The first parameter indicates
 -- whether we should import the boot variant of the module
-loadUserInterface :: IsBootInterface -> SDoc -> Module -> IfM lcl ModIface
+loadUserInterface :: IsBootInterface -> SDoc -> Module -> IfM lcl LoadedIface
 loadUserInterface is_boot doc mod_name
   = loadInterfaceWithException doc mod_name (ImportByUser is_boot)
 
-loadPluginInterface :: SDoc -> Module -> IfM lcl ModIface
+loadPluginInterface :: SDoc -> Module -> IfM lcl LoadedIface
 loadPluginInterface doc mod_name
   = loadInterfaceWithException doc mod_name ImportByPlugin
 
 ------------------
 -- | A wrapper for 'loadInterface' that throws an exception if it fails
-loadInterfaceWithException :: SDoc -> Module -> WhereFrom -> IfM lcl ModIface
+loadInterfaceWithException :: SDoc -> Module -> WhereFrom -> IfM lcl LoadedIface
 loadInterfaceWithException doc mod_name where_from
   = do
     dflags <- getDynFlags
@@ -749,13 +750,14 @@ loadInterfaceWithException doc mod_name where_from
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
-              -> IfM lcl (MaybeErr MissingInterfaceError ModIface)
+              -> IfM lcl (MaybeErr MissingInterfaceError LoadedIface)
 
--- loadInterface looks in both the HPT and PIT for the required interface
--- If not found, it loads it, and puts it in the PIT (always).
+-- loadInterface looks in both the HUG and the EPS for the required interface
+-- If not found, it loads it, and puts an 'ExternalIface' into the EPS (always).
+-- See Note [The EPS does not keep ModIfaces] in GHC.Unit.External.Iface.
 
 -- If it can't find a suitable interface file, we
---      a) modify the PackageIfaceTable to have an empty entry
+--      a) modify 'eps_ext_ifaces' to have an empty entry
 --              (to avoid repeated complaints)
 --      b) return (Left message)
 --
@@ -783,7 +785,7 @@ loadInterface doc_str mod from
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
         ; let mhome_unit = ue_homeUnit (hsc_unit_env hsc_env)
-        ; liftIO (lookupIfaceByModule hug (eps_PIT eps) mod) >>= \case {
+        ; liftIO (lookupIfaceByModule hug eps mod) >>= \case {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
             _ -> do {
@@ -796,10 +798,10 @@ loadInterface doc_str mod from
                              liftIO $ computeInterface hsc_env doc_str hi_boot_file mod
         ; case read_result of {
             Failed err -> do
-                { let fake_iface = emptyFullModIface mod
+                { let !fake_iface = emptyExternalIface mod
 
                 ; updateEps_ $ \eps ->
-                        eps { eps_PIT = extendModuleEnv (eps_PIT eps) (mi_module fake_iface) fake_iface }
+                        eps { eps_ext_ifaces = extendModuleEnv (eps_ext_ifaces eps) mod fake_iface }
                         -- Not found, so add an empty iface to
                         -- the EPS map so that we don't look again
 
@@ -828,7 +830,7 @@ loadInterface doc_str mod from
         --      mode, home-package modules are loaded one by one into the HPT)
         -- are put in the EPS.
         --
-        -- The main thing is to add the ModIface to the PIT, but
+        -- The main thing is to add the ExternalIface to the EPS, but
         -- we also take the
         --      IfaceDecls, IfaceClsInst, IfaceFamInst, IfaceRules,
         -- out of the ModIface and put them into the big EPS pools
@@ -856,16 +858,16 @@ loadInterface doc_str mod from
         ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
         ; purged_hsc_env <- getTopEnv
 
-        ; let final_iface = iface
-                               & set_mi_decls     (panic "No mi_decls in PIT")
-                               & set_mi_insts     (panic "No mi_insts in PIT")
-                               & set_mi_defaults  (panic "No mi_defaults in PIT")
-                               & set_mi_fam_insts (panic "No mi_fam_insts in PIT")
-                               & set_mi_rules     (panic "No mi_rules in PIT")
-                               & set_mi_anns      (panic "No mi_anns in PIT")
-                               & set_mi_simplified_core (panic "No mi_simplified_core in PIT")
+        -- Invoke plugins with the *full* interface, so that they have access
+        -- to declarations etc.; what we remember in the EPS (and return) is
+        -- built from the interface they hand back.
+        ; plugin_iface <- withPlugins (hsc_plugins hsc_env) (\p -> interfaceLoadAction p) iface
 
-              bad_boot = mi_boot iface == IsBoot
+        -- Built strictly, so that nothing retains 'iface' (and with it the
+        -- buffer of the .hi file). See Note [The EPS does not keep ModIfaces].
+        ; let !ext_iface = mkExternalIface plugin_iface
+
+        ; let bad_boot = mi_boot iface == IsBoot
                           && isJust (lookupKnotVars (if_rec_types gbl_env) mod)
                             -- Warn against an EPS-updating import
                             -- of one's own boot file! (one-shot only)
@@ -885,14 +887,14 @@ loadInterface doc_str mod from
 
         ; warnPprTrace bad_boot "loadInterface" (ppr mod) $
           updateEps_  $ \ eps ->
-           if elemModuleEnv mod (eps_PIT eps) || is_external_sig mhome_unit iface
+           if elemModuleEnv mod (eps_ext_ifaces eps) || is_external_sig mhome_unit iface
                 then eps
            else if bad_boot
                 -- See Note [Loading your own hi-boot file]
                 then eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
            else
                 eps {
-                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
+                  eps_ext_ifaces   = extendModuleEnv (eps_ext_ifaces eps) mod ext_iface,
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
                   eps_iface_bytecode = add_bytecode (eps_iface_bytecode eps),
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
@@ -921,10 +923,7 @@ loadInterface doc_str mod from
                   eps_defaults    =  extendModuleEnv (eps_defaults eps) mod new_eps_defaults
                                                    }
 
-        ; -- invoke plugins with *full* interface, not final_iface, to ensure
-          -- that plugins have access to declarations, etc.
-          res <- withPlugins (hsc_plugins hsc_env) (\p -> interfaceLoadAction p) iface
-        ; return (Succeeded res)
+        ; return (Succeeded (LoadedExternal ext_iface))
     }}}}
 
 {- Note [Loading your own hi-boot file]
@@ -1057,6 +1056,13 @@ is_external_sig mhome_unit iface =
     -- and it's not from the local package
     notHomeModuleMaybe mhome_unit (mi_module iface)
 
+-- | Read the full 'ModIface' of a module from disk, without touching the EPS.
+-- Used by the few consumers (GHC API, GHCi) that need a field which the EPS no
+-- longer keeps. See Note [The EPS does not keep ModIfaces].
+readFullIfaceFromDisk :: HscEnv -> Module -> IO (MaybeErr MissingInterfaceError ModIface)
+readFullIfaceFromDisk hsc_env mod =
+  fmap fst <$> computeInterface hsc_env (text "readFullIfaceFromDisk") NotBoot mod
+
 -- | This is an improved version of 'findAndReadIface' which can also
 -- handle the case when a user requests @p[A=<B>]:M@ but we only
 -- have an interface for @p[A=<A>]:M@ (the indefinite interface.
@@ -1123,7 +1129,7 @@ moduleFreeHolesPrecise doc_str mod
     (_, Nothing) -> return (Succeeded emptyUniqDSet)
   where
     tryEpsAndHpt eps hpt =
-        fmap mi_free_holes <$> liftIO (lookupIfaceByModule hpt (eps_PIT eps) mod)
+        fmap li_free_holes <$> liftIO (lookupIfaceByModule hpt eps mod)
     tryDepsCache eps imod insts =
         case lookupInstalledModuleEnv (eps_free_holes eps) imod of
             Just ifhs  -> Just (renameFreeHoles ifhs insts)

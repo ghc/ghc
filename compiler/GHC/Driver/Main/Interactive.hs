@@ -82,7 +82,7 @@ import GHC.Tc.Zonk.Env ( ZonkFlexi (DefaultFlexi) )
 import GHC.Unit
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
-import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.Unit.Module.Deps
 
 import GHC.Types.Id
@@ -148,7 +148,7 @@ hscIsGHCiMonad :: HscEnv -> String -> IO Name
 hscIsGHCiMonad hsc_env name
   = runHsc hsc_env $ ioMsgMaybe $ hoistTcRnMessage $ isGHCiMonad hsc_env name
 
-hscGetModuleInterface :: HscEnv -> Module -> IO ModIface
+hscGetModuleInterface :: HscEnv -> Module -> IO LoadedIface
 hscGetModuleInterface hsc_env0 mod = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
   ioMsgMaybe $ hoistTcRnMessage $ getModuleInterface hsc_env mod
@@ -218,14 +218,14 @@ hscCheckSafe' m l = do
 
             -- got iface, check trust
             Just iface' ->
-                let trust = getSafeMode $ mi_trust iface'
-                    trust_own_pkg = mi_trust_pkg iface'
+                let trust = getSafeMode $ li_trust iface'
+                    trust_own_pkg = li_trust_pkg iface'
                     -- check module is trusted
                     safeM = trust `elem` [Sf_Safe, Sf_SafeInferred, Sf_Trustworthy]
                     -- check package is trusted
                     safeP = packageTrusted dflags (hsc_units hsc_env) home_unit trust trust_own_pkg m
                     -- pkg trust reqs
-                    pkgRs = dep_trusted_pkgs $ mi_deps iface'
+                    pkgRs = dep_trusted_pkgs $ li_deps iface'
                     -- warn if Safe module imports Safe-Inferred module.
                     warns = if wopt Opt_WarnInferredSafeImports dflags
                                 && safeLanguageOn dflags
@@ -270,7 +270,7 @@ hscCheckSafe' m l = do
             _ | isHomeModule home_unit mod      -> True
             _ -> isUnitTrusted unit_state (moduleUnit m)
 
-    lookup' :: Module -> Hsc (Maybe ModIface)
+    lookup' :: Module -> Hsc (Maybe LoadedIface)
     lookup' m = do
         hsc_env <- getHscEnv
         iface <- liftIO $ lookupIfaceByModuleHsc hsc_env m

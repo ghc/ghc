@@ -238,6 +238,7 @@ GHC.Types.Var.FV
 GHC.Types.Var.Set
 GHC.Unit
 GHC.Unit.External.Database
+GHC.Unit.External.Iface
 GHC.Unit.External.Index
 GHC.Unit.External.ModuleOrigin
 GHC.Unit.External.Providers

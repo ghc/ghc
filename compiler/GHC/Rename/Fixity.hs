@@ -22,7 +22,7 @@ import GHC.Hs
 import GHC.Tc.Utils.Monad
 
 import GHC.Unit.Module
-import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 
 import GHC.Types.Fixity.Env
 import GHC.Types.Name
@@ -185,7 +185,7 @@ lookupFixityRn_help name
       -- loadInterfaceForName will find B.hi even if B is a hidden module,
       -- and that's what we want.
       = do { iface <- loadInterfaceForName doc name
-           ; let mb_fix = mi_fix_fn iface occ
+           ; let mb_fix = li_fix_fn iface occ
            ; let msg = case mb_fix of
                             Nothing ->
                                   text "looking up name" <+> ppr name

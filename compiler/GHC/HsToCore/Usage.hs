@@ -26,7 +26,7 @@ import GHC.Types.Unique.Set
 import GHC.Unit
 import GHC.Unit.Env
 import GHC.Unit.Module.Imported
-import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.Unit.Module.Deps
 
 import GHC.Data.Maybe
@@ -276,7 +276,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports imp_decls u
     --  a) we used something from it; has something in used_names
     --  b) we imported it, even if we used nothing from it
     --     (need to recompile if its export list changes: export_fprint)
-    mkUsage :: Module -> ModIface -> Maybe Usage
+    mkUsage :: Module -> LoadedIface -> Maybe Usage
     mkUsage mod iface
       | toUnitId (moduleUnit mod) `Set.notMember` home_unit_ids
       = Just $ UsagePackageModule{ usg_mod      = mod,
@@ -302,9 +302,9 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports imp_decls u
                       usg_entities = Map.toList ent_hashs,
                       usg_safe     = imp_safe }
       where
-        finsts_mod = mi_finsts iface
-        hash_env   = mi_hash_fn iface
-        mod_hash   = mi_mod_hash iface
+        finsts_mod = li_finsts iface
+        hash_env   = li_hash_fn iface
+        mod_hash   = li_mod_hash iface
         imported_exports
           = if not depend_on_exports
             then Nothing
@@ -312,9 +312,9 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports imp_decls u
               Just $
                 HomeModImport
                  { hmiu_orphanLikeHash
-                     = mi_orphan_like_hash iface
+                     = li_orphan_like_hash iface
                  , hmiu_importedAvails
-                     = moduleImportedAvails mod (mi_export_avails_hash iface) imp_decls
+                     = moduleImportedAvails mod (li_export_avails_hash iface) imp_decls
                  }
 
         by_is_safe (ImportedByUser imv) = imv_is_safe imv

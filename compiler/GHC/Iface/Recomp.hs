@@ -707,7 +707,7 @@ checkDependencies hsc_env summary iface
         return $ needsRecompileBecause $ ModulePackageChanged new_name
 
 
-needInterface :: Module -> (ModIface -> IO RecompileRequired)
+needInterface :: Module -> (LoadedIface -> IO RecompileRequired)
              -> IfG RecompileRequired
 needInterface mod continue
   = do
@@ -727,7 +727,7 @@ needBytecode mod continue
         Nothing -> return $ NeedsRecompile MustCompile
         Just mbc -> liftIO $ continue mbc
 
-tryGetModIface :: String -> Module -> IfG (Maybe ModIface)
+tryGetModIface :: String -> Module -> IfG (Maybe LoadedIface)
 tryGetModIface doc_msg mod
   = do  -- Load the imported interface if possible
     logger <- getLogger
@@ -779,7 +779,7 @@ checkModUsage _ UsagePackageModule{
   logger <- getLogger
   needInterface mod $ \iface -> do
     let reason = ModuleChanged (moduleName mod)
-    checkModuleFingerprint logger reason old_mod_hash (mi_mod_hash iface)
+    checkModuleFingerprint logger reason old_mod_hash (li_mod_hash iface)
         -- We only track the ABI hash of package modules, rather than
         -- individual entity usages, so if the ABI hash changes we must
         -- recompile.  This is safe but may entail more recompilation when
@@ -789,7 +789,7 @@ checkModUsage _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_ha
   logger <- getLogger
   needInterface mod $ \iface -> do
     let reason = ModuleChangedRaw (moduleName mod)
-    checkModuleFingerprint logger reason old_mod_hash (mi_mod_hash iface)
+    checkModuleFingerprint logger reason old_mod_hash (li_mod_hash iface)
 checkModUsage _  UsageHomeModuleBytecode{ usg_mod_name = mod_name
                                                  , usg_unit_id = uid
                                                  , usg_bytecode_hash = old_bytecode_hash } = do
@@ -810,8 +810,8 @@ checkModUsage _ UsageHomeModule{
     logger <- getLogger
     needInterface mod $ \iface -> do
      let
-         new_mod_hash    = mi_mod_hash iface
-         new_decl_hash   = mi_hash_fn  iface
+         new_mod_hash    = li_mod_hash iface
+         new_decl_hash   = li_hash_fn  iface
          reason = ModuleChanged (moduleName mod)
 
      liftIO $ do
@@ -864,7 +864,7 @@ checkModUsage fc UsageDirectory{ usg_dir_path = dir,
 -- Does this require recompilation?
 --
 -- See Note [When to recompile when export lists change?]
-checkHomeModImport :: Logger -> RecompReason -> Maybe HomeModImport -> ModIface -> IO RecompileRequired
+checkHomeModImport :: Logger -> RecompReason -> Maybe HomeModImport -> LoadedIface -> IO RecompileRequired
 checkHomeModImport _ _ Nothing _ = return UpToDate
 checkHomeModImport logger reason
   (Just (HomeModImport old_orphan_like_hash old_avails))
@@ -901,9 +901,9 @@ checkHomeModImport logger reason
                       2 (ppr changes)
                  return $ needsRecompileBecause reason
   where
-    new_orphan_like_hash = mi_orphan_like_hash iface
-    new_avails_hash      = mi_export_avails_hash iface
-    new_exports          = mi_exports iface
+    new_orphan_like_hash = li_orphan_like_hash iface
+    new_avails_hash      = li_export_avails_hash iface
+    new_exports          = li_exports iface
 
 -- | The exported avails of a module have changed. Should this cause recompilation
 -- of a module that imports it?
@@ -1617,7 +1617,7 @@ getOrphanHashes hsc_env mods = do
     get_orph_hash mod = do
           iface <- initIfaceLoad hsc_env . withIfaceErr ctx
                             $ loadInterface (text "getOrphanHashes") mod ImportBySystem
-          return (mi_orphan_hash iface)
+          return (li_orphan_hash iface)
 
   mapM get_orph_hash mods
 
@@ -1926,13 +1926,12 @@ mkHashFun hsc_env eps name
       home_unit = hsc_home_unit hsc_env
       dflags = hsc_dflags hsc_env
       hpt = hsc_HUG hsc_env
-      pit = eps_PIT eps
       ctx = initSDocContext dflags defaultUserStyle
       occ = nameOccName name
       orig_mod = nameModule name
       lookup mod = do
         massertPpr (isExternalName name) (ppr name)
-        iface <- lookupIfaceByModule hpt pit mod >>= \case
+        iface <- lookupIfaceByModule hpt eps mod >>= \case
                   Just iface -> return iface
                   Nothing ->
                       -- This can occur when we're writing out ifaces for
@@ -1953,7 +1952,7 @@ mkHashFun hsc_env eps name
                             -- just one of the many horrible hacks in the backpack
                             -- implementation.
                           $ loadInterface (text "lookupVers2") mod ImportBySystem
-        return $ snd (mi_hash_fn iface occ `orElse`
+        return $ snd (li_hash_fn iface occ `orElse`
                   pprPanic "lookupVers1" (ppr mod <+> ppr occ))
 
 {- Note [Fingerprinting complete matches]

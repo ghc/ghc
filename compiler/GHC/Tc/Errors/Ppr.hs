@@ -45,7 +45,7 @@ import GHC.Builtin.WiredIn.Types( boxedRepDataConTyCon, tYPETyCon, pretendNameIs
 import GHC.Builtin.KnownKeys -- A bunch of keys
 
 import GHC.Types.Name.Reader
-import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.Unit.Module.Warnings
 
 import GHC.Core.Coercion
@@ -6400,9 +6400,9 @@ pprImportLookup :: ImportLookupReason -> SDoc
 pprImportLookup = \case
   ImportLookupBad k iface decl_spec ie _exts ->
     let
-      pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
+      pprImpDeclSpec :: LoadedIface -> ImpDeclSpec -> SDoc
       pprImpDeclSpec iface decl_spec =
-        quotes (ppr (moduleName $ is_mod decl_spec)) <+> case mi_boot iface of
+        quotes (ppr (moduleName $ is_mod decl_spec)) <+> case li_boot iface of
             IsBoot  -> text "(hi-boot interface)"
             NotBoot -> empty
       withContext msgs =

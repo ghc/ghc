@@ -26,6 +26,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.TyThing
 import GHC.Types.TypeEnv
 import GHC.Unit.External
+import GHC.Iface.Load ( readFullIfaceFromDisk )
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module
 import GHC.Unit.Module.Graph
@@ -105,8 +106,16 @@ getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getPackageModuleInfo hsc_env mdl
   = do  eps <- hscEPS hsc_env
         iface <- hscGetModuleInterface hsc_env mdl
+        -- The EPS does not keep the full ModIface of package modules
+        -- (see Note [The EPS does not keep ModIfaces]); API users of
+        -- 'modInfoIface' get it re-read from disk.
+        full_iface <- case loadedFullIface iface of
+          Just i  -> pure (Just i)
+          Nothing -> readFullIfaceFromDisk hsc_env mdl >>= \case
+            Succeeded i -> pure (Just i)
+            Failed _    -> pure Nothing
         let
-            avails = mi_exports iface
+            avails = li_exports iface
             pte    = eps_PTE eps
             tys    = [ ty | name <- concatMap availNames avails,
                             Just ty <- [lookupTypeEnv pte name] ]
@@ -115,8 +124,8 @@ getPackageModuleInfo hsc_env mdl
                         minf_type_env  = mkTypeEnv tys,
                         minf_exports   = avails,
                         minf_instances = error "getModuleInfo: instances for package module unimplemented",
-                        minf_iface     = Just iface,
-                        minf_safe      = getSafeMode $ mi_trust iface,
+                        minf_iface     = full_iface,
+                        minf_safe      = getSafeMode $ li_trust iface,
                         minf_modBreaks = Nothing
                 }))
 

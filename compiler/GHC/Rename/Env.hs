@@ -80,7 +80,7 @@ import GHC.Builtin.Modules( rOOT_MAIN )
 import GHC.Builtin( knownKeyOccMap )
 
 import GHC.Unit.Module
-import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -2039,13 +2039,13 @@ lookupQualifiedNameGHCi fos rdr_name
                   -> do { hsc_env <- getTopEnv
                         ; let gres =
                                 [ gre
-                                | avail <- mi_exports iface
+                                | avail <- li_exports iface
                                 , gname <- availNames avail
                                 , let lk_occ = occName gname
                                       lk_ns  = occNameSpace lk_occ
                                 , occNameFS occ == occNameFS lk_occ
                                 , ns == lk_ns || (ns == varName && isFieldNameSpace lk_ns)
-                                , let mod = mi_module iface
+                                , let mod = li_module iface
                                       gre = lookupGRE_PTE mod hsc_env gname
                                 , allowGRE fos gre
                                   -- Include a field if it has a selector or we are looking for all fields;

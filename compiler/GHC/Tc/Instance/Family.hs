@@ -35,7 +35,6 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Unit.External
 import GHC.Unit.Module
-import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
 import GHC.Types.SrcLoc as SrcLoc
@@ -294,7 +293,7 @@ checkFamInstConsistency directlyImpMods
        ; let { -- Fetch the iface of a given module.  Must succeed as
                -- all directly imported modules must already have been loaded.
                modIface mod = liftIO $
-                 lookupIfaceByModule hug (eps_PIT eps) mod >>= \case
+                 lookupIfaceByModule hug eps mod >>= \case
                    Nothing    -> panicDoc "FamInst.checkFamInstConsistency"
                                           (ppr mod $$ ppr (HUG.allUnits hug))
                    Just iface -> pure iface
@@ -307,9 +306,9 @@ checkFamInstConsistency directlyImpMods
              ; modConsistent :: Module -> TcM [Module]
              ; modConsistent mod = do
                  ifc <- modIface mod
-                 deps <- dep_finsts . mi_deps <$> modIface mod
+                 deps <- dep_finsts . li_deps <$> modIface mod
                  pure $
-                   if mi_finsts ifc
+                   if li_finsts ifc
                       then mod:deps
                       else deps
 
