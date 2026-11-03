@@ -2,9 +2,9 @@ module GHC.Runtime.Interpreter.Process
   (
   -- * Message API
     Message(..)
+  , RemoteResource(..)
   , sendMessage
   , sendTHComputation
-  , sendMessageWithResponse
   )
 where
 
@@ -13,9 +13,9 @@ import GHC.Prelude
 import GHC.Runtime.Interpreter.Types
 import GHCi.Message
 
-import GHC.Utils.Panic
 import GHC.Utils.Exception as Ex
 
+import Control.Concurrent
 import Data.Binary
 import Data.IORef
 
@@ -29,15 +29,17 @@ import Data.IORef
 -- wait for the asynchronous response to arrive.
 sendMessage :: Binary a => ExtInterpInstance d -> Message a -> IO a
 sendMessage i msg =
-  remoteCall (interpPipe proc) msg
+  remoteCall (interpPipe proc) msg (disposeMessageResults i msg)
   where
     proc = instProcess i
 
-sendMessageWithResponse :: Binary a => ExtInterpInstance c -> Message a -> (IO a -> IO b) -> IO b
-sendMessageWithResponse i msg k =
-  remoteCallWithResponse (interpPipe proc) msg k
-  where
-    proc = instProcess i
+-- | Reclaim the resources in a reply that arrived after the request was
+-- canceled, so nobody is going to take ownership of them.
+disposeMessageResults :: ExtInterpInstance d -> Message a -> a -> IO ()
+disposeMessageResults i msg result = do
+  -- TODO: seqList this
+  let ress = resultRemoteResources msg result
+  modifyMVar_ (instPendingFrees i) (pure . (ress ++))
 
 -- | Send a message with a TH computation to the ext. interpreter (like
 -- 'RunTH', or 'RunModFinalizers') and handle 'THMessage' requests from the
@@ -49,12 +51,27 @@ sendTHComputation
   -> (forall b. Binary b => THMessage b -> IO (Bool, b))
   -- ^ Handle one message. Return True to end the loop.
   -> IO a
-sendTHComputation i msg reqHandler =
-  withNewMailbox (pipeAsyncMngr (interpPipe proc)) $ \ mbox ->
-    sendMessageWithResponse i (msg mbox) $ \ waitRes -> do
-      handlerLoop mbox
-      waitRes
+sendTHComputation i mkMsg reqHandler = mask $ \ restore -> do
+  mbox <- newMailbox (pipeAsyncMngr (interpPipe proc))
+  let msg = mkMsg mbox
+  res <- remoteCallInterleaving (interpPipe proc) msg
+     -- handle reverse requests until done
+     (restore $ handlerLoop mbox)
+     (dispose msg mbox)
+  disposeMailbox mbox
+  either throwIO pure res
   where
+    disposeMailbox mbox = do
+      -- non-blocking
+      -- ext. interp. will cleanup on error response, so we don't need reqs.
+      _reqs <- closeMailbox (interpPipe proc) mbox
+      pure ()
+    dispose msg mbox res = do
+      disposeMailbox mbox
+      case res of
+        -- rethrown elsewhere where relevant.
+        Left _   -> pure ()
+        Right r -> disposeMessageResults i msg r
     proc = instProcess i
     handleOne mbox doneRef = do
       handleRemoteTHCall (interpPipe proc) mbox $ \_setCancel req -> do
@@ -69,8 +86,3 @@ sendTHComputation i msg reqHandler =
             if isDone then return ()
                       else loop
        in loop
-
-data CancelTHHandler = CancelTHHandler deriving Show
-instance Exception CancelTHHandler where
-  fromException = asyncExceptionFromException
-  toException = asyncExceptionToException
