@@ -154,6 +154,57 @@ notSupportedJS :: Message a -> b
 notSupportedJS m = error ("Message not supported with the JavaScript interpreter: " ++ show m)
 #endif
 
+-- Malloc and copy the bytes.  We don't have any way to monitor the
+-- lifetime of this memory, so it just leaks.
+mkString :: ByteString -> IO (RemotePtr ())
+mkString bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
+  ptr <- mallocBytes len
+  copyBytes ptr cstr len
+  return (castRemotePtr (toRemotePtr ptr))
+
+mkString0 :: ByteString -> IO (RemotePtr ())
+mkString0 bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
+  ptr <- mallocBytes (len+1)
+  copyBytes ptr cstr len
+  pokeElemOff (ptr :: Ptr CChar) len 0
+  return (castRemotePtr (toRemotePtr ptr))
+
+mkCostCentres :: RemotePtr () -> [(BS.ShortByteString, BS.ShortByteString)] -> IO [RemotePtr CostCentre]
+#if defined(PROFILING)
+mkCostCentres mod ccs = do
+  let c_module = fromRemotePtr $ castRemotePtr mod
+  mapM (mk_one c_module) ccs
+ where
+  mk_one c_module (decl_path,srcspan) = do
+    c_name <- newCStringFromSBS decl_path
+    c_srcspan <- newCStringFromSBS srcspan
+    toRemotePtr <$> c_mkCostCentre c_name c_module c_srcspan
+
+foreign import ccall unsafe "mkCostCentre"
+  c_mkCostCentre :: Ptr CChar -> Ptr CChar -> Ptr CChar -> IO (Ptr CostCentre)
+#else
+mkCostCentres _ _ = return []
+#endif
+
+getIdValFromApStack :: HValue -> Int -> IO (Maybe HValue)
+getIdValFromApStack apStack (I# stackDepth) = do
+   case getApStackVal# apStack stackDepth of
+        (# ok, result #) ->
+            case ok of
+              0# -> return Nothing -- AP_STACK not found
+              _  -> return (Just (unsafeCoerce# result))
+
+-- Exceptions can't be marshaled because they're dynamically typed, so
+-- everything becomes a String.
+tryEval :: IO a -> IO (EvalResult a)
+tryEval io = do
+  e <- try io
+  case e of
+    Left ex -> return (EvalException (toSerializableException ex))
+    Right a -> return (EvalSuccess a)
+
+--------------------------------------------------------------------------------
+
 evalStmt :: EvalOpts -> EvalExpr HValueRef -> IO (EvalStatus [HValueRef])
 evalStmt opts expr = do
   io <- mkIO expr
@@ -185,6 +236,9 @@ evalStringToString r str = do
   tryEval $ do
     r <- (unsafeCoerce io :: String -> IO String) str
     evaluate (force r)
+
+
+--------------------------------------------------------------------------------
 
 -- | Process the Seq message to force a value.                       #2950
 -- If during this processing a breakpoint is hit, return
@@ -318,15 +372,6 @@ measureAlloc io = do
   let allocs = negate $ fromIntegral ctr
   return (EvalComplete allocs a)
 
--- Exceptions can't be marshaled because they're dynamically typed, so
--- everything becomes a String.
-tryEval :: IO a -> IO (EvalResult a)
-tryEval io = do
-  e <- try io
-  case e of
-    Left ex -> return (EvalException (toSerializableException ex))
-    Right a -> return (EvalSuccess a)
-
 -- This function sets up the interpreter for catching breakpoints, and
 -- resets everything when the computation has stopped running.  This
 -- is a not-very-good way to ensure that only the interactive
@@ -432,43 +477,3 @@ noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
 noBreakAction :: BreakpointCallback
 noBreakAction _ _ _ False _ = putStrLn "*** Ignoring breakpoint"
 noBreakAction _ _ _ True  _ = return () -- exception: just continue
-
--- Malloc and copy the bytes.  We don't have any way to monitor the
--- lifetime of this memory, so it just leaks.
-mkString :: ByteString -> IO (RemotePtr ())
-mkString bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
-  ptr <- mallocBytes len
-  copyBytes ptr cstr len
-  return (castRemotePtr (toRemotePtr ptr))
-
-mkString0 :: ByteString -> IO (RemotePtr ())
-mkString0 bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
-  ptr <- mallocBytes (len+1)
-  copyBytes ptr cstr len
-  pokeElemOff (ptr :: Ptr CChar) len 0
-  return (castRemotePtr (toRemotePtr ptr))
-
-mkCostCentres :: RemotePtr () -> [(BS.ShortByteString, BS.ShortByteString)] -> IO [RemotePtr CostCentre]
-#if defined(PROFILING)
-mkCostCentres mod ccs = do
-  let c_module = fromRemotePtr $ castRemotePtr mod
-  mapM (mk_one c_module) ccs
- where
-  mk_one c_module (decl_path,srcspan) = do
-    c_name <- newCStringFromSBS decl_path
-    c_srcspan <- newCStringFromSBS srcspan
-    toRemotePtr <$> c_mkCostCentre c_name c_module c_srcspan
-
-foreign import ccall unsafe "mkCostCentre"
-  c_mkCostCentre :: Ptr CChar -> Ptr CChar -> Ptr CChar -> IO (Ptr CostCentre)
-#else
-mkCostCentres _ _ = return []
-#endif
-
-getIdValFromApStack :: HValue -> Int -> IO (Maybe HValue)
-getIdValFromApStack apStack (I# stackDepth) = do
-   case getApStackVal# apStack stackDepth of
-        (# ok, result #) ->
-            case ok of
-              0# -> return Nothing -- AP_STACK not found
-              _  -> return (Just (unsafeCoerce# result))
