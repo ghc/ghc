@@ -258,7 +258,8 @@ doSeq ref = do
 resumeSeq :: RemoteRef (ResumeContext ()) -> IO (EvalStatus ())
 resumeSeq hvref = do
     ResumeContext{..} <- localRef hvref
-    withBreakAction evalOptsSeq resumeBreakMVar resumeStatusMVar (Just resumeThreadId) $
+    setBreakFlags evalOptsSeq resumeThreadId
+    withBreakAction resumeBreakMVar resumeStatusMVar $
       mask_ $ do
         putMVar resumeBreakMVar () -- this awakens the stopped thread...
         redirectInterrupts resumeThreadId $ takeMVar resumeStatusMVar
@@ -287,15 +288,17 @@ sandboxIO opts io = do
   -- We are running in uninterruptibleMask
   breakMVar <- newEmptyMVar
   statusMVar <- newEmptyMVar
-  withBreakAction opts breakMVar statusMVar Nothing $ do
+  withBreakAction breakMVar statusMVar $ do
     let runIt = measureAlloc $ tryEval $ rethrow opts $ clearCCS io
     if useSandboxThread opts
        then do
          tid <- forkIO $ do
            tid <- myThreadId
+           setBreakFlags opts tid -- set flags on the sandbox thread
            labelThread tid "GHCi sandbox"
            unsafeUnmask runIt >>= putMVar statusMVar
                                 -- empty: can't block
+
          redirectInterrupts tid $ unsafeUnmask $ takeMVar statusMVar
        else
           -- GLUT on OS X needs to run on the main thread. If you
@@ -373,34 +376,19 @@ measureAlloc io = do
   return (EvalComplete allocs a)
 
 -- This function sets up the interpreter for catching breakpoints, and
--- resets everything when the computation has stopped running.  This
--- is a not-very-good way to ensure that only the interactive
+-- resets the breakpoint action when the computation has stopped running.
+-- This is a not-very-good way to ensure that only the interactive
 -- evaluation should generate breakpoints.
-withBreakAction :: EvalOpts -> MVar ()
+withBreakAction :: MVar ()
                 -> MVar (EvalStatus b)
-                -> Maybe ThreadId -- ^ If resuming, the current threadId
                 -> IO a -> IO a
-withBreakAction opts breakMVar statusMVar mtid act
+withBreakAction breakMVar statusMVar act
  = bracket setBreakAction resetBreakAction (\_ -> act)
  where
    setBreakAction = do
      stablePtr <- newStablePtr onBreak
      poke breakPointIOAction stablePtr
-     when (breakOnException opts) $ do
-      case mtid of
-        Nothing -> rts_enableStopOnExceptionAll
-        Just (ThreadId tid) -> do
-          rts_enableStopOnException tid
-     when (singleStep opts) rts_enableStopNextBreakpointAll
-     when (stepOut opts) $ do
-      case mtid of
-        Nothing -> rts_enableStopNextBreakpointAll -- just enable single-step when no thread is stopped
-        Just (ThreadId tid) -> do
-          rts_enableStopAfterReturn tid
      return stablePtr
-        -- Breaking on exceptions is not enabled by default, since it
-        -- might be a bit surprising.  The exception flag is turned off
-        -- as soon as it is hit, or in resetBreakAction below.
 
    onBreak :: BreakpointCallback
    onBreak info_mod# info_mod_uid# infox# is_exception apStack = do
@@ -432,21 +420,56 @@ withBreakAction opts breakMVar statusMVar mtid act
 
    resetBreakAction stablePtr = do
      poke breakPointIOAction noBreakStablePtr
-     case mtid of
-      Just (ThreadId tid) -> rts_disableStopOnException tid
-      _                   -> rts_disableStopOnExceptionAll
-     rts_disableStopNextBreakpointAll
-     case mtid of
-      Just (ThreadId tid) -> rts_disableStopAfterReturn tid
-      _                   -> pure ()
      freeStablePtr stablePtr
+
+-- | Set the single-step, step-out, and break-on-exception flags on the target
+-- thread based on the given 'EvalOpts'.
+--
+-- Breaking on exceptions is not enabled by default, since it might be a
+-- bit surprising. The exception flag is turned off as soon as it is hit.
+--
+-- See Note [Always setBreakFlags on running thread]
+setBreakFlags :: EvalOpts -> ThreadId -> IO ()
+setBreakFlags opts (ThreadId tid#) = do
+  setFlag# breakOnException rts_enableStopOnException    rts_disableStopOnException
+  setFlag# singleStep       rts_enableStopNextBreakpoint rts_disableStopNextBreakpoint
+  setFlag# stepOut          rts_enableStopAfterReturn    rts_disableStopAfterReturn
+  where
+    setFlag# pred on off = if pred opts then on tid# else off tid#
+
+{-
+Note [Always setBreakFlags on running thread]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Whenever we run a expression in the interpreter or unblock a paused thread we
+must make sure all breakpoint-flags for that thread are set according to the
+given options. There are three scenarios in which we set something running:
+
+- `evalStmt`, forks a thread to evaluate the given expression
+- `resumeStmt`, unblocks a given thread to resume execution
+- `abandonStmt`, kills a given thread to terminate execution (but the thread
+- will resume to handle the exception)
+
+In these three cases, if we musn't forget to set all breakpoint flags,
+since otherwise we'd resume execution with whatever stale state we had of the
+previous run command. A trivial example would be (tested by break037):
+
+1. `evalStmt` with { singleStep = True, breakOnError = True } would e.g. stop on
+  an exception and clear TSO_STOP_ON_EXCEPTION, but TSO_STOP_NEXT_BREAKPOINT
+  would still be active.
+2. `abandonStmt` if we didn't setBreakFlags again would kill the thread but
+  hit the next breakpoint bc TSO_STOP_NEXT_BREAKPOINT would still be active.
+
+Likewise for other interactions between eval/resume/abandon.
+TL;DR: always `setBreakFlags` when running/resuming a thread
+-}
 
 resumeStmt
   :: EvalOpts -> RemoteRef (ResumeContext [HValueRef])
   -> IO (EvalStatus [HValueRef])
 resumeStmt opts hvref = do
   ResumeContext{..} <- localRef hvref
-  withBreakAction opts resumeBreakMVar resumeStatusMVar (Just resumeThreadId) $
+  setBreakFlags opts resumeThreadId
+  withBreakAction resumeBreakMVar resumeStatusMVar $
     mask_ $ do
       putMVar resumeBreakMVar () -- this awakens the stopped thread...
       redirectInterrupts resumeThreadId $ takeMVar resumeStatusMVar
@@ -466,10 +489,20 @@ resumeStmt opts hvref = do
 abandonStmt :: RemoteRef (ResumeContext [HValueRef]) -> IO ()
 abandonStmt hvref = do
   ResumeContext{..} <- localRef hvref
+  setBreakFlags evalOptsAbandon resumeThreadId
   killThread resumeThreadId
   putMVar resumeBreakMVar ()
   _ <- takeMVar resumeStatusMVar
   return ()
+  where
+    -- Don't stop anywhere on abandon
+    evalOptsAbandon = EvalOpts
+      { useSandboxThread = True
+      , singleStep = False
+      , stepOut    = False
+      , breakOnException = False
+      , breakOnError = False
+      }
 
 noBreakStablePtr :: StablePtr BreakpointCallback
 noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
