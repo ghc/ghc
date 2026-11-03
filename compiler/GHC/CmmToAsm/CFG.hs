@@ -33,6 +33,10 @@ module GHC.CmmToAsm.CFG
     , optimizeCFG
     , mkGlobalWeights
 
+    -- Block frequencies before register allocation
+    , BlockFreqs, blockFrequencies, blockFreq, noBlockFreqs
+    , tagRegisters
+
      )
 where
 
@@ -78,7 +82,12 @@ import Data.Array.MArray
 import Data.Array.ST
 import Data.Array.IArray
 import Data.Array.Unsafe (unsafeFreeze)
-import Data.Array.Base (unsafeRead, unsafeWrite)
+import Data.Array.Base (unsafeRead, unsafeWrite, unsafeAt)
+import Data.Int (Int32)
+import qualified GHC.Data.Word64Map.Strict as WM
+import qualified GHC.Data.Word64Map.Internal as WMI
+import Data.Array.Unboxed (UArray)
+import Data.Word (Word64)
 
 import Control.Monad
 import GHC.Utils.Monad (anyM)
@@ -198,11 +207,14 @@ checkFailures cfg = mapFoldl node setEmpty cfg
 -- TODO: two shapes escape this: see
 -- Note [Frequencies before register allocation].
 coldBlocks :: CFG -> LabelSet
-coldBlocks cfg = setUnion gc $ setFromList
+coldBlocks cfg = coldBlocksOf (checkFailures cfg) cfg
+
+-- | 'coldBlocks', given the CFG's 'checkFailures'.
+coldBlocksOf :: LabelSet -> CFG -> LabelSet
+coldBlocksOf gc cfg = setUnion gc $ setFromList
     [ s | b <- setElems gc, Just outs <- [mapLookup b cfg], s <- mapKeys outs
         , inserted s ]
   where
-    gc = checkFailures cfg
     inserted b
       | Just outs <- mapLookup b cfg
       , [EdgeInfo { transitionSource = AsmCodeGen }] <- mapElems outs
@@ -453,11 +465,7 @@ getEdgeInfo from to m
     | otherwise
     = Nothing
 
-getEdgeWeight :: CFG -> BlockId -> BlockId -> EdgeWeight
-getEdgeWeight cfg from to = edgeWeight $ expectJust $ getEdgeInfo from to cfg
 
-getTransitionSource :: BlockId -> BlockId -> CFG -> TransitionSource
-getTransitionSource from to cfg = transitionSource $ expectJust $ getEdgeInfo from to cfg
 
 reverseEdges :: CFG -> CFG
 reverseEdges cfg = mapFoldlWithKey (\cfg from toMap -> go (addNode cfg from) from toMap) mapEmpty cfg
@@ -1031,6 +1039,375 @@ mkGlobalWeightsWith tags root localCfg
     fromVertex :: Int -> BlockId
     fromVertex vertex   = blockMapping ! vertex
 
+-- | Each block's estimated frequency: see 'blockFrequencies'. The labels'
+-- uniques in ascending order, and each one's frequency at its index.
+data BlockFreqs = BlockFreqs !(UArray Int Word64) !(UArray Int Double)
+
+-- | The estimate holding no block.
+noBlockFreqs :: BlockFreqs
+noBlockFreqs = BlockFreqs (listArray (0, -1) []) (listArray (0, -1) [])
+
+-- | A block's estimated frequency, 0 for one the estimate does not hold.
+blockFreq :: BlockFreqs -> BlockId -> Double
+blockFreq (BlockFreqs ks fs) b
+  | i >= 0    = unsafeAt fs i
+  | otherwise = 0
+  where i = uniqueIndex ks (lblToUnique b)
+
+-- | A unique's index in an ascending array of uniques, -1 where absent.
+uniqueIndex :: UArray Int Word64 -> Word64 -> Int
+uniqueIndex ks !k = go 0 (snd (bounds ks))
+  where
+    go !lo !hi
+      | lo > hi   = -1
+      | otherwise = case compare (unsafeAt ks mid) k of
+          LT -> go (mid + 1) hi
+          GT -> go lo (mid - 1)
+          EQ -> mid
+      where mid = (lo + hi) `quot` 2
+
+-- INLINE: rdI and wrI both, which GHC inlines without it as well, the
+-- compiler's code unchanged, on GHC 10.1.20261108.
+rdI :: STUArray s Int Int32 -> Int -> ST s Int
+rdI a i = fromIntegral <$> unsafeRead a i
+{-# INLINE rdI #-}
+
+-- INLINE: see rdI.
+wrI :: STUArray s Int Int32 -> Int -> Int -> ST s ()
+wrI a i x = unsafeWrite a i (fromIntegral x)
+{-# INLINE wrI #-}
+
+-- | Run the action on each element of a label map with its label's unique,
+-- in their order, and its index counted from the given one; the index after
+-- the last.
+forMapST :: (Word64 -> a -> Int -> ST s ()) -> LabelMap a -> Int -> ST s Int
+forMapST f (LM m0) = go m0
+  where
+    go WMI.Nil          !i = return i
+    go (WMI.Tip k x)    !i = f k x i >> return (i + 1)
+    go (WMI.Bin _ _ l r) !i = go l i >>= go r
+{-# INLINE forMapST #-}
+
+-- | Each block's estimated frequency, how many times it runs each time the
+-- procedure runs from the given block: mkGlobalWeights' estimate, made for
+-- the register allocator before it allocates, from the CFG as instruction
+-- selection gives it, given the procedure's 'tagRegisters' and the CFG's
+-- checkFailures, in time linear in the CFG but for its loops' nesting and in
+-- two arrays. Static prediction (Note [Static Branch Prediction]) gives the
+-- edges their probabilities as staticBranchPrediction gives them, and the
+-- fixpoint is calcFreqs', but a loop's blocks are walked alone and the back
+-- edges into one block taken as one loop. A back edge is an edge into a block
+-- still on the stack of a depth-first search from the given block, but one
+-- into that block, and the loop's blocks are those reached backwards from the
+-- edges' sources without passing the head; where one comes before the head in
+-- the search's reverse postorder, the head does not dominate it, and the loop,
+-- in an irreducible region, is left out, as loopInfo leaves it out. A loop
+-- counts for static prediction's loop heads and loop levels where one of its
+-- back edges leaves a block not in 'coldBlocks'. A block the given one does not
+-- reach runs 0 times.
+--
+-- The estimate inherits static prediction's errors on tag tests: a lookup's
+-- loop down one of Data.Map's trees comes out as rarely repeated (Note [Static
+-- prediction of tag tests]).
+blockFrequencies :: S.Set LocalReg -> LabelSet -> BlockId -> CFG -> BlockFreqs
+blockFrequencies tags failed root cfg@(LM cm)
+  | n == 0    = noBlockFreqs
+  | otherwise = runST $ do
+    ks <- newArray (0, n - 1) 0 :: ST s (STUArray s Int Word64)
+    _ <- forMapST (\k _ i -> unsafeWrite ks i k) cfg 0
+    keys <- unsafeFreeze ks
+    let rootV = uniqueIndex keys (lblToUnique root)
+    if rootV < 0 then return noBlockFreqs else estimate keys rootV
+  where
+    n = WM.size cm
+    m = WM.foldl' (\a (LM om) -> a + WM.size om) 0 cm
+    cold = coldBlocksOf failed cfg
+    estimate :: UArray Int Word64 -> Int -> ST s BlockFreqs
+    estimate keys rootV = do
+        let vtx = uniqueIndex keys
+        -- the Int32 array ia: each block's successors, the elements off + i ..
+        -- off + i + 1 - 1 of tgt for block i, in their labels' order, -1 for one
+        -- the CFG has no node for, -2 - j for a back edge into block j, with
+        -- each edge's flags in ef, 1 for a heap or stack check and 2 for
+        -- a retry; each block's predecessors that are reached, the elements
+        -- pof + i .. pof + i + 1 - 1 of prd; rpo, each block's position in
+        -- the search's reverse postorder, -1 for one not reached and -2 for one
+        -- on its stack; ord, the blocks by position; stk, the search's stack
+        -- and then the walk's tags; nxt, each stacked block's next edge, then
+        -- cursors and the walk's blocks; hd, 1 for a back edge's target, 2 for
+        -- a loop's head, 3 for one counting for prediction, plus 4 times its
+        -- loop level and then its count of forward edges in a loop still to
+        -- visit; que, the loop's queue
+        let oOff = 0; oTgt = n + 1; oEf = oTgt + m; oPrd = oEf + m
+            oPof = oPrd + m; oRpo = oPof + n + 1; oOrd = oRpo + n
+            oStk = oOrd + n; oNxt = oStk + n; oHd = oNxt + n; oQue = oHd + n
+        ia <- newArray (0, oQue + n) 0 :: ST s (STUArray s Int Int32)
+        -- hd's state, whether a loop's head, what is counted above the state,
+        -- and the unit it is counted in
+        let hdState, hdAbove :: Int -> Int
+            hdState f = f .&. 3
+            hdHead f = hdState f >= 2
+            hdAbove f = f `shiftR` 2
+            hdUnit = 4 :: Int
+        -- the Double array da: frequencies, multipliers, inflows, each block's
+        -- at its index, and each edge's weight and then probability at its
+        let oF = 0; oMul = n; oAcc = 2 * n; oPr = 3 * n
+        da <- newArray (0, oPr + m) 0 :: ST s (STUArray s Int Double)
+        _ <- forMapST (\_ outs v -> do
+               s <- rdI ia (oOff + v)
+               e' <- forMapST (\t info e -> do
+                       wrI ia (oTgt + e) (vtx t)
+                       let src = transitionSource info
+                       wrI ia (oEf + e) ((if isHeapOrStackCheck src then 1 else 0)
+                                         + (if src == AsmCodeGenRetry then 2 else 0))
+                       unsafeWrite da (oPr + e) (weightToDouble (edgeWeight info)))
+                     outs s
+               wrI ia (oOff + v + 1) e')
+             cfg 0
+        forM_ [0 .. n - 1] $ \i -> do
+          wrI ia (oRpo + i) (-1)
+          unsafeWrite da (oMul + i) 1
+        let dec x = if x < -1 then -2 - x else x
+            -- each edge out of block v: its index, its target, whether a back
+            -- edge
+            edges v f = do
+              s <- rdI ia (oOff + v)
+              t <- rdI ia (oOff + v + 1)
+              let go !e | e == t    = return ()
+                        | otherwise = do
+                            x <- rdI ia (oTgt + e)
+                            when (x /= -1) $ f e (dec x) (x < -1)
+                            go (e + 1)
+              go s
+            push sp v = do
+              wrI ia (oRpo + v) (-2)
+              rdI ia (oOff + v) >>= wrI ia (oNxt + v)
+              wrI ia (oStk + sp) v
+            dfs !sp !k
+              | sp == 0 = return k
+              | otherwise = do
+                  v <- rdI ia (oStk + sp - 1)
+                  e <- rdI ia (oNxt + v)
+                  end <- rdI ia (oOff + v + 1)
+                  if e == end
+                    then do wrI ia (oRpo + v) (k - 1)
+                            wrI ia (oOrd + k - 1) v
+                            dfs (sp - 1) (k - 1)
+                    else do
+                      wrI ia (oNxt + v) (e + 1)
+                      t <- rdI ia (oTgt + e)
+                      st <- if t < 0 || t == rootV then return 0
+                                                   else rdI ia (oRpo + t)
+                      case st of
+                        -2 -> wrI ia (oTgt + e) (-2 - t) >> dfs sp k
+                        -1 -> push sp t >> dfs (sp + 1) k
+                        _  -> dfs sp k
+        push 0 rootV
+        first <- dfs 1 n
+        let reached f = let go !r | r == n    = return ()
+                                  | otherwise = rdI ia (oOrd + r) >>= f >> go (r + 1)
+                        in go first
+            bump i d = rdI ia i >>= wrI ia i . (+ d)
+        reached $ \v -> edges v $ \_ t b -> do
+          bump (oPof + t + 1) 1
+          when b $ do h <- rdI ia (oHd + t)
+                      when (h == 0) $ wrI ia (oHd + t) 1
+        forM_ [1 .. n] $ \i -> rdI ia (oPof + i - 1) >>= bump (oPof + i)
+        forM_ [0 .. n - 1] $ \i -> rdI ia (oPof + i) >>= wrI ia (oNxt + i)
+        reached $ \v -> edges v $ \_ t _ -> do
+          c <- rdI ia (oNxt + t)
+          wrI ia (oPrd + c) v
+          wrI ia (oNxt + t) (c + 1)
+        forM_ [0 .. n - 1] $ \i -> wrI ia (oStk + i) (-1)
+        -- the walk from a head's back edges' sources, marking each block it
+        -- reaches with the tag in stk and listing it in nxt, the head first:
+        -- the number of the loop's blocks, or -1 where it reaches a block
+        -- before the head in reverse postorder
+        let walk h tag = do
+              wrI ia (oStk + h) tag
+              wrI ia oNxt h
+              rh <- rdI ia (oRpo + h)
+              ps <- rdI ia (oPof + h)
+              pe <- rdI ia (oPof + h + 1)
+              let tails !i !len
+                    | i == pe = return len
+                    | otherwise = do
+                        p <- rdI ia (oPrd + i)
+                        rp <- rdI ia (oRpo + p)
+                        sp <- rdI ia (oStk + p)
+                        if rp >= rh && sp /= tag
+                          then do wrI ia (oStk + p) tag
+                                  wrI ia (oNxt + len) p
+                                  tails (i + 1) (len + 1)
+                          else tails (i + 1) len
+                  go !j !len
+                    | j == len = return len
+                    | otherwise = do
+                        u <- rdI ia (oNxt + j)
+                        us <- rdI ia (oPof + u)
+                        ue <- rdI ia (oPof + u + 1)
+                        let ins !i !l
+                              | i == ue = go (j + 1) l
+                              | otherwise = do
+                                  p <- rdI ia (oPrd + i)
+                                  rp <- rdI ia (oRpo + p)
+                                  sp <- rdI ia (oStk + p)
+                                  if rp < 0 || sp == tag then ins (i + 1) l
+                                  else if rp < rh then return (-1)
+                                  else do wrI ia (oStk + p) tag
+                                          wrI ia (oNxt + l) p
+                                          ins (i + 1) (l + 1)
+                        ins us len
+              len0 <- tails ps 1
+              go 1 len0
+        reached $ \h -> do
+          f <- rdI ia (oHd + h)
+          when (hdState f == 1) $ do
+            len <- walk h h
+            if len < 0 then wrI ia (oHd + h) (f - 1) else do
+              ps <- rdI ia (oPof + h)
+              pe <- rdI ia (oPof + h + 1)
+              rh <- rdI ia (oRpo + h)
+              let warm !i
+                    | i == pe = return False
+                    | otherwise = do
+                        p <- rdI ia (oPrd + i)
+                        rp <- rdI ia (oRpo + p)
+                        if rp >= rh && not (mkHooplLabel (unsafeAt keys p) `setMember` cold)
+                          then return True else warm (i + 1)
+              w <- warm ps
+              wrI ia (oHd + h) (f + if w then 2 else 1)
+              when w $ forM_ [0 .. len - 1] $ \j -> do
+                u <- rdI ia (oNxt + j)
+                bump (oHd + u) hdUnit
+        -- each edge's probability: static prediction's weight, normalised as
+        -- cfgEdgeProbabilities normalises it
+        let kept x = if x < -1 then hdHead <$> rdI ia (oHd + dec x)
+                               else return False
+            normalise s e1 = do
+              let total !e !a | e == e1   = return a
+                              | otherwise = do w <- unsafeRead da (oPr + e)
+                                               total (e + 1) (a + max 0 w)
+              tw <- total s 0
+              forM_ [s .. e1 - 1] $ \e -> do
+                w <- unsafeRead da (oPr + e)
+                unsafeWrite da (oPr + e)
+                  (if tw == 0 then 1 / fromIntegral (e1 - s) else max 0 w / tw)
+        reached $ \v -> do
+          s <- rdI ia (oOff + v)
+          e1 <- rdI ia (oOff + v + 1)
+          let cnt = e1 - s
+          if cnt == 1 then unsafeWrite da (oPr + s) 1 else when (cnt > 1) $ do
+            -- the back edges into a loop's head, but a retry's, and the heap
+            -- or stack checks
+            let count !e !nb !hc
+                  | e == e1 = return (nb, hc)
+                  | otherwise = do
+                      x <- rdI ia (oTgt + e)
+                      fl <- rdI ia (oEf + e)
+                      k <- kept x
+                      count (e + 1) (if k && fl .&. 2 == 0 then nb + 1 else nb)
+                                    (hc + fl .&. 1)
+            (nb, hc) <- count s (0 :: Int) (0 :: Int)
+            if nb > 0 && nb < cnt && hc == 0
+              then forM_ [s .. e1 - 1] $ \e -> do
+                     x <- rdI ia (oTgt + e)
+                     fl <- rdI ia (oEf + e)
+                     k <- kept x
+                     unsafeWrite da (oPr + e)
+                       (if k && fl .&. 2 == 0
+                          then weightToDouble pred_LBH / fromIntegral nb
+                          else (1 - weightToDouble pred_LBH) / fromIntegral (cnt - nb))
+              else when (cnt == 2 && nb == 0 && hc == 0) $
+                case mapLookup (mkHooplLabel (unsafeAt keys v)) cfg of
+                  Just (LM (WMI.Bin _ _ (WMI.Tip k1 i1) (WMI.Tip _ i2))) -> do
+                    t1 <- dec <$> rdI ia (oTgt + s)
+                    t2 <- dec <$> rdI ia (oTgt + s + 1)
+                    let fact t | t < 0 = return (False, 0)
+                               | otherwise = do
+                                   f <- rdI ia (oHd + t)
+                                   return (hdState f == 3, hdAbove f)
+                    (h1, l1) <- fact t1
+                    (h2, l2) <- fact t2
+                    let (p1, p2) = predictBranch tags h1 l1 (mkHooplLabel k1) i1 h2 l2 i2
+                    unsafeWrite da (oPr + s) (weightToDouble p1)
+                    unsafeWrite da (oPr + s + 1) (weightToDouble p2)
+                  _ -> return ()
+            normalise s e1
+        -- the fixpoint, inner loops first: a loop's head runs once, every
+        -- other block of it as often as the forward edges into it lead there,
+        -- times its multiplier where it heads a loop itself, and the head's
+        -- multiplier is 1 / (1 - p), p the probability of returning to it
+        forM_ [0 .. n - 1] $ \i -> rdI ia (oHd + i) >>= wrI ia (oHd + i) . hdState
+        let limit = 1 - 1 / 512  -- calcFreqs'
+            fwd u f = do
+              ru <- rdI ia (oRpo + u)
+              edges u $ \e t _ -> do
+                rt <- rdI ia (oRpo + t)
+                when (rt > ru) $ f e t
+            addAcc t x = unsafeRead da (oAcc + t) >>= unsafeWrite da (oAcc + t) . (+ x)
+            inflow v = do
+              a <- unsafeRead da (oAcc + v)
+              x <- unsafeRead da (oMul + v)
+              return (a * x)
+            loops !r
+              | r < first = return ()
+              | otherwise = do
+                  h <- rdI ia (oOrd + r)
+                  hf <- rdI ia (oHd + h)
+                  when (hdHead hf) $ do
+                    let tag = h + n
+                    len <- walk h tag
+                    forM_ [0 .. len - 1] $ \j -> do
+                      u <- rdI ia (oNxt + j)
+                      unsafeWrite da (oAcc + u) 0
+                    forM_ [0 .. len - 1] $ \j -> do
+                      u <- rdI ia (oNxt + j)
+                      fwd u $ \_ t -> do
+                        st <- rdI ia (oStk + t)
+                        when (st == tag) $ bump (oHd + t) hdUnit
+                    wrI ia oQue h
+                    let kahn !qh !qt !cyc
+                          | qh == qt = return cyc
+                          | otherwise = do
+                              u <- rdI ia (oQue + qh)
+                              fu <- if u == h then return 1 else inflow u
+                              unsafeWrite da (oF + u) fu
+                              ru <- rdI ia (oRpo + u)
+                              s <- rdI ia (oOff + u)
+                              t' <- rdI ia (oOff + u + 1)
+                              let out !e !qt' !c
+                                    | e == t' = kahn (qh + 1) qt' c
+                                    | otherwise = do
+                                        t <- dec <$> rdI ia (oTgt + e)
+                                        if t < 0 then out (e + 1) qt' c else do
+                                          p <- unsafeRead da (oPr + e)
+                                          if t == h then out (e + 1) qt' (c + fu * p) else do
+                                            st <- rdI ia (oStk + t)
+                                            rt <- rdI ia (oRpo + t)
+                                            if st /= tag || rt <= ru then out (e + 1) qt' c else do
+                                              addAcc t (fu * p)
+                                              d <- subtract hdUnit <$> rdI ia (oHd + t)
+                                              wrI ia (oHd + t) d
+                                              if hdAbove d == 0
+                                                then wrI ia (oQue + qt') t >> out (e + 1) (qt' + 1) c
+                                                else out (e + 1) qt' c
+                              out s qt cyc
+                    cyc <- kahn 0 1 0
+                    unsafeWrite da (oMul + h) (1 / (1 - min cyc limit))
+                  loops (r - 1)
+        loops (n - 1)
+        -- the whole procedure, in reverse postorder
+        forM_ [0 .. n - 1] $ \i -> unsafeWrite da (oAcc + i) 0
+        reached $ \v -> do
+          fv <- if v == rootV then return 1 else inflow v
+          unsafeWrite da (oF + v) fv
+          fwd v $ \e t -> do
+            p <- unsafeRead da (oPr + e)
+            addAcc t (fv * p)
+        fs <- unsafeFreeze da
+        return (BlockFreqs keys fs)
+
 {- Note [Static Branch Prediction]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The work here has been based on the paper
@@ -1148,9 +1525,6 @@ instead, and they are to be reinvestigated together:
    write could count by how often its block runs.
 -}
 
--- | Combination of target node id and information about the branch
---   we are looking at.
-type TargetNodeInfo = (BlockId, EdgeInfo)
 
 
 -- | Update branch weights based on certain heuristics.
@@ -1220,53 +1594,15 @@ staticBranchPrediction tags _root (LoopInfo l_backEdges l_loops) cfg =
         -- A regular binary branch, we can plug addition predictors in here.
         | [(s1,s1_info),(s2,s2_info)] <- successors
         , not $ any (isHeapOrStackCheck  . transitionSource . snd) successors
-        = -- Normalize weights to total of 1
-            let !w1 = max (edgeWeight s1_info) (0)
-                !w2 = max (edgeWeight s2_info) (0)
-                -- Of both weights are <= 0 we set both to 0.5
-                normalizeWeight w = if w1 + w2 == 0 then 0.5 else w/(w1+w2)
-                !cfg'  = setEdgeWeight cfg  (normalizeWeight w1) node s1
-                !cfg'' = setEdgeWeight cfg' (normalizeWeight w2) node s2
-
-                -- Figure out which heuristics apply to these successors
-                heuristics = map ($ ((s1,s1_info),(s2,s2_info)))
-                            [lehPredicts, phPredicts, ohPredicts, ghPredicts, lhhPredicts, chPredicts
-                            , shPredicts, rhPredicts]
-                -- Apply result of a heuristic. Argument is the likelihood
-                -- predicted for s1.
-                applyHeuristic :: CFG -> Maybe Prob -> CFG
-                applyHeuristic cfg Nothing = cfg
-                applyHeuristic cfg (Just (s1_pred :: Double))
-                  | s1_old == 0 || s2_old == 0 ||
-                    isHeapOrStackCheck (transitionSource s1_info) ||
-                    isHeapOrStackCheck (transitionSource s2_info)
-                  = cfg
-                  | otherwise =
-                    let -- Predictions from heuristic
-                        s1_prob = EdgeWeight s1_pred :: EdgeWeight
-                        s2_prob = 1.0 - s1_prob
-                        -- Update
-                        d = (s1_old * s1_prob) + (s2_old * s2_prob) :: EdgeWeight
-                        s1_prob' = s1_old * s1_prob / d
-                        !s2_prob' = s2_old * s2_prob / d
-                        !cfg_s1 = setEdgeWeight cfg    s1_prob' node s1
-                    in  -- pprTrace "Applying heuristic!" (ppr (node,s1,s2) $$ ppr (s1_prob', s2_prob')) $
-                        setEdgeWeight cfg_s1 s2_prob' node s2
-                  where
-                    -- Old weights
-                    s1_old = getEdgeWeight cfg node s1
-                    s2_old = getEdgeWeight cfg node s2
-
-            in
-            -- pprTraceIt "RegularCfgResult" $
-            foldl' applyHeuristic cfg'' heuristics
+        , (p1, p2) <- predictBranch tags (s1 `S.member` loopHeads) (level s1)
+                                    s1 s1_info
+                                    (s2 `S.member` loopHeads) (level s2) s2_info
+        = setEdgeWeight (setEdgeWeight cfg p1 node s1) p2 node s2
 
         -- Branch on heap/stack check
         | otherwise = cfg
 
       where
-        -- Chance that loops are taken.
-        pred_LBH = 0.875
         -- successors
         successors = getSuccessorEdges cfg node
         -- backedges, but a retry the code generator adds, as cmpxchg_code's of
@@ -1275,68 +1611,98 @@ staticBranchPrediction tags _root (LoopInfo l_backEdges l_loops) cfg =
         (m,not_m) = partition (\succ -> setMember (fst succ) backs
                                         && transitionSource (snd succ)
                                            /= AsmCodeGenRetry) successors
+        level s = mapFindWithDefault 0 s loopLevels
 
-        -- Heuristics return nothing if they don't say anything about this branch
-        -- or Just (prob_s1) where prob_s1 is the likelihood for s1 to be the
-        -- taken branch. s1 is the branch in the true case.
+-- | Chance that loops are taken.
+pred_LBH :: EdgeWeight
+pred_LBH = 0.875
 
-        -- Loop exit heuristic.
-        -- We are unlikely to leave a loop unless it's to enter another one.
-        pred_LEH = 0.75
-        -- If and only if no successor is a loopheader,
-        -- then we will likely not exit the current loop body.
-        lehPredicts :: (TargetNodeInfo,TargetNodeInfo) -> Maybe Prob
-        lehPredicts ((s1,_s1_info),(s2,_s2_info))
-          | S.member s1 loopHeads || S.member s2 loopHeads
-          = Nothing
+-- | The weights static prediction gives the two edges of a two-way branch that
+-- is neither a heap or stack check nor has a back edge: the edges' weights made
+-- probabilities, then lehPredicts' and ohPredicts' predictions applied in turn.
+-- Each target comes with whether it is a loop head and the number of loops
+-- holding it.
+predictBranch :: S.Set LocalReg -> Bool -> Int -> BlockId -> EdgeInfo
+              -> Bool -> Int -> EdgeInfo -> (EdgeWeight, EdgeWeight)
+predictBranch tags h1 l1 s1 s1_info h2 l2 s2_info
+  = applyHeuristic (applyHeuristic (n1, n2) lehPredicts) ohPredicts
+  where
+    -- Normalize weights to total of 1
+    !w1 = max (edgeWeight s1_info) (0)
+    !w2 = max (edgeWeight s2_info) (0)
+    -- Of both weights are <= 0 we set both to 0.5
+    normalizeWeight w = if w1 + w2 == 0 then 0.5 else w/(w1+w2)
+    !n1 = normalizeWeight w1
+    !n2 = normalizeWeight w2
 
-          | otherwise
-          = --pprTrace "lehPredict:" (ppr $ compare s1Level s2Level) $
-            case compare s1Level s2Level of
-                EQ -> Nothing
-                LT -> Just (1-pred_LEH) --s1 exits to a shallower loop level (exits loop)
-                GT -> Just (pred_LEH)   --s1 exits to a deeper loop level
-            where
-                s1Level = mapLookup s1 loopLevels
-                s2Level = mapLookup s2 loopLevels
+    -- Apply result of a heuristic. Argument is the likelihood
+    -- predicted for s1.
+    applyHeuristic :: (EdgeWeight, EdgeWeight) -> Maybe Prob
+                   -> (EdgeWeight, EdgeWeight)
+    applyHeuristic old Nothing = old
+    applyHeuristic old@(s1_old, s2_old) (Just (s1_pred :: Double))
+      | s1_old == 0 || s2_old == 0
+      = old
+      | otherwise =
+        let -- Predictions from heuristic
+            s1_prob = EdgeWeight s1_pred :: EdgeWeight
+            s2_prob = 1.0 - s1_prob
+            -- Update
+            d = (s1_old * s1_prob) + (s2_old * s2_prob) :: EdgeWeight
+            !s1_prob' = s1_old * s1_prob / d
+            !s2_prob' = s2_old * s2_prob / d
+        in  (s1_prob', s2_prob')
 
-        -- Comparing to a constant is unlikely to be equal, whichever way the
-        -- comparison is spelt: the control-flow optimisation may have turned
-        -- an equality into an inequality (Note [Invert Cmm conditionals]).
-        -- Wrong for a tag test where the likely constructor is declared first,
-        -- so an inequality on bits under a mask, a tag's or a bitmap's, is left
-        -- out, as is one on a constructor tag read from an info table, an
-        -- unboxed sum's tag or a register holding a tag: see Note [Static
-        -- prediction of tag tests].
-        ohPredicts (s1,_s2)
-            | CmmSource { trans_cmmNode = src1 } <- getTransitionSource node (fst s1) cfg
-            , CmmCondBranch cond ltrue _lfalse likely <- src1
-            , likely == Nothing
-            , CmmMachOp mop args <- cond
-            , Just trueProb <- case mop of
-                                 MO_Eq {} -> Just 0.3
-                                 MO_Ne {} | any isLit args
-                                          , not (any isMask args)
-                                          , not (any isConTag args) -> Just 0.7
-                                 _        -> Nothing
-            , not (null [x | x@CmmLit{} <- args])
-            = if fst s1 == ltrue then Just trueProb else Just (1 - trueProb)
+    -- Heuristics return nothing if they don't say anything about this branch
+    -- or Just (prob_s1) where prob_s1 is the likelihood for s1 to be the
+    -- taken branch. s1 is the branch in the true case.
+    -- The other heuristics from the paper, phPredicts, ghPredicts,
+    -- lhhPredicts, chPredicts, shPredicts and rhPredicts, are not implemented.
 
-            | otherwise
-            = Nothing
-        isConTag (CmmReg (CmmLocal r)) = r `S.member` tags
-        isConTag e = isConTagExpr e
-        isLit CmmLit{} = True
-        isLit _ = False
+    -- Loop exit heuristic.
+    -- We are unlikely to leave a loop unless it's to enter another one.
+    pred_LEH = 0.75
+    -- If and only if no successor is a loopheader,
+    -- then we will likely not exit the current loop body.
+    lehPredicts :: Maybe Prob
+    lehPredicts
+      | h1 || h2
+      = Nothing
 
-        -- TODO: These are all the other heuristics from the paper.
-        -- Not all will apply, for now we just stub them out as Nothing.
-        phPredicts = const Nothing
-        ghPredicts = const Nothing
-        lhhPredicts = const Nothing
-        chPredicts = const Nothing
-        shPredicts = const Nothing
-        rhPredicts = const Nothing
+      | otherwise
+      = case compare l1 l2 of
+            EQ -> Nothing
+            LT -> Just (1-pred_LEH) --s1 exits to a shallower loop level (exits loop)
+            GT -> Just (pred_LEH)   --s1 exits to a deeper loop level
+
+    -- Comparing to a constant is unlikely to be equal, whichever way the
+    -- comparison is spelt: the control-flow optimisation may have turned
+    -- an equality into an inequality (Note [Invert Cmm conditionals]).
+    -- Wrong for a tag test where the likely constructor is declared first,
+    -- so an inequality on bits under a mask, a tag's or a bitmap's, is left
+    -- out, as is one on a constructor tag read from an info table, an
+    -- unboxed sum's tag or a register holding a tag: see Note [Static
+    -- prediction of tag tests].
+    ohPredicts
+        | CmmSource { trans_cmmNode = src1 } <- transitionSource s1_info
+        , CmmCondBranch cond ltrue _lfalse likely <- src1
+        , likely == Nothing
+        , CmmMachOp mop args <- cond
+        , Just trueProb <- case mop of
+                             MO_Eq {} -> Just 0.3
+                             MO_Ne {} | any isLit args
+                                      , not (any isMask args)
+                                      , not (any isConTag args) -> Just 0.7
+                             _        -> Nothing
+        , not (null [x | x@CmmLit{} <- args])
+        = if s1 == ltrue then Just trueProb else Just (1 - trueProb)
+
+        | otherwise
+        = Nothing
+    isConTag (CmmReg (CmmLocal r)) = r `S.member` tags
+    isConTag e = isConTagExpr e
+    isLit CmmLit{} = True
+    isLit _ = False
 
 -- | Bits under a mask, a tag's or a bitmap's.
 isMask :: CmmExpr -> Bool
