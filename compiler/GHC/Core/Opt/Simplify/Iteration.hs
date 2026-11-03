@@ -2375,28 +2375,26 @@ simplOutId env fun cont
 simplOutId env noinline_fun cont
   | isNoinlineId noinline_fun
   , ApplyToTy  { sc_cont = cont1 } <- cont
-  , ApplyToTy  { sc_cont = cont2 } <- cont1
-  , ApplyToVal { sc_cont = cont3, sc_arg = the_call, sc_cast = arg_mco
+  , ApplyToTy  { sc_cont = cont2, sc_arg_ty = call_ty } <- cont1
+  , ApplyToVal { sc_cont = cont3, sc_arg = the_call, sc_cast = call_mco
                , sc_env = UnSimplified arg_se } <- cont2
   , let -- encl_app_cont collects any /arguments/ from `cont3`
         (encl_app_cont, rest_cont) = splitContArgs cont3
         new_call_ty                = contHoleType rest_cont
-  , typeHasFixedRuntimeRep new_call_ty  -- See (NOI6) in Note [noinlineId magic]
-  = do { -- Push any arguments in `the_call` onto `encl_app_cont`
-         let push_args :: InExpr -> SimplCont -> SimplM (InExpr, SimplCont)
-             -- push_args just pushes multiple arguments onto the continuation
-             push_args (Cast f co) cont = do { cont' <- pushInCast arg_se co cont
-                                             ; push_args f cont' }
-             push_args (App f a)   cont = do { cont' <- pushAppCont arg_se f a cont
-                                             ; push_args f cont' }
-             push_args fun         cont = return (fun, cont)
-       ;  (inner_fun, call_cont) <- push_args the_call $
-                                    addCastMCo arg_mco $
-                                    encl_app_cont
+  = do { (inner_fun, call_cont, outer_cont)
+             <- -- See Note [noinlineId magic]...
+                if var_at_head the_call &&             -- (NOI7)
+                   typeHasFixedRuntimeRep new_call_ty  -- (NOI6)
+                then do { (inner_fun, call_cont) <- push_args arg_se the_call $
+                                                    addCastMCo call_mco       $
+                                                    encl_app_cont
+                        ; return (inner_fun, call_cont, rest_cont) }
+                else do { let call_stop = addCastMCo call_mco (mkBoringStop call_ty)
+                        ; return (the_call, call_stop, cont3) }
 
-       -- Now simplify the function itself, crucially setting sm_inline = False
-       -- The /arguments/, in `call_cont` will be simplified with their own
-       -- flags, captured in `arg_se`
+       -- Now simplify the function itself, in call_cont, crucially setting
+       -- sm_inline = False. The /arguments/ in `call_cont` will be simplified
+       -- with their own flags, captured in `arg_se`
        ; let call_env = updMode updModeForNoInline $
                         arg_se `setInScopeFromE` env
        ; (floats1, call1) <- wrapJoinFloatsX $
@@ -2404,16 +2402,29 @@ simplOutId env noinline_fun cont
              -- wrapJoinFloatsX: any floating join bindings must stay
              --                  around the call, not be floated out
 
-       -- Now `rebuild` does the rest
+       -- Now `rebuild` does the rest, wrapping in outer_cont
        ; let (new_noinline_fun, rep) = getNoinlineId new_call_ty
              noinline_expr = Var new_noinline_fun
                              `App` Type rep
                              `App` Type new_call_ty
                              `App` call1
        ; (floats2, res) <- rebuild (env `setInScopeFromF` floats1)
-                                   noinline_expr rest_cont
+                                   noinline_expr outer_cont
        ; return (floats1 `addFloats` floats2 , res) }
   where
+    var_at_head :: CoreExpr -> Bool
+    var_at_head (Var {})   = True
+    var_at_head (App f _)  = var_at_head f
+    var_at_head (Cast f _) = var_at_head f
+    var_at_head _          = False
+
+    push_args :: SimplEnv -> InExpr -> SimplCont -> SimplM (InExpr, SimplCont)
+    -- push_args just pushes multiple arguments onto the continuation
+    push_args arg_se (Cast f co) cont = do { cont' <- pushInCast arg_se co cont
+                                           ; push_args arg_se f cont' }
+    push_args arg_se (App f a)   cont = do { cont' <- pushAppCont arg_se f a cont
+                                           ; push_args arg_se f cont' }
+    push_args _      fun         cont = return (fun, cont)
 
 -----------------------
 -- General fall-through case for (f e1 .. en)

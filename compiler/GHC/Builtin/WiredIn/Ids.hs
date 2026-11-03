@@ -602,7 +602,13 @@ Note [noinlineId magic]
 'noinline' is used to make sure that a function f is never inlined, e.g
    noinline f x
    noinline (f x)
-Both of these will work.  Here are the moving parts:
+Both of these will work.  The specification is this:
+   - Given (noinline (f e1 .. en)) where `f` is a variable, we do not
+     inline f, but we optimise e1..en freely.
+   - If instead we have (noinline e) where `e` is not an application headed
+     by a variable, we switch off inlining throughout `e`.
+
+Here are the moving parts:
 
 * `noinline` is magic Id (see Note [magicIds]), whose wired-in behaviour is
   defined in this module,  GHC.Builtin.WiredIn.Ids.
@@ -678,6 +684,19 @@ Wrinkles
    application here at all.  But it seems like extra work for a rather exotic case,
    so for now we simply disable (NOI1) magic if pushing arguments inward would result
    in an argument that doesn't have a fixed runtime rep.
+
+(NOI7) Consider
+            noinline (case x of ...) arg
+            noinline (let .. in ..)  arg
+  We switch off inlining throughout the let/case, but we do not want to move
+  `arg` under the `noinline` because then we'll end up switching off inlining in
+  `arg` too.  So don't move anything inside the `noinline`.
+
+  Less happily, the same happens for SCC ticks:
+     noinline ({-# SCC "foo" #-} f arg1) arg2
+  The bit inside the `noinline` isn't a plain variable-headed application, so
+  we just simplify the whole `noinline` argument with inlining switched off,
+  like let/case.
 
 Note [nospecId magic]
 ~~~~~~~~~~~~~~~~~~~~~
