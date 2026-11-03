@@ -6198,7 +6198,8 @@ invalidConversion from to =
 
 -- | This works on the invariant that all jumps in the given blocks are required.
 --   Starting from there we try to make a few more jumps redundant by reordering
---   them.
+--   them, and turn a conditional jump to a likely false comparison's true
+--   target, where neither jump falls through, into one to its false target.
 --   We depend on the information in the CFG to do so so without a given CFG
 --   we do nothing.
 invertCondBranches :: Maybe CFG  -- ^ CFG if present
@@ -6210,18 +6211,29 @@ invertCondBranches (Just cfg) keep bs =
     invert bs
   where
     invert :: [NatBasicBlock Instr] -> [NatBasicBlock Instr]
-    invert (BasicBlock lbl1 ins:b2@(BasicBlock lbl2 _):bs)
+    invert (BasicBlock lbl1 ins:bs)
       | --pprTrace "Block" (ppr lbl1) True,
         Just (jmp1,jmp2) <- last2 ins
       , JXX cond1 target1 <- jmp1
-      , target1 == lbl2
-      --, pprTrace "CutChance" (ppr b1) True
       , JXX ALWAYS target2 <- jmp2
+      , Just jumps <- if startsWith target1 bs
+                        then fallThrough lbl1 cond1 target1 target2 jmp1 jmp2
+                        else likelyFirst lbl1 cond1 target1 target2
+      = --pprTrace "Cutable" (ppr [jmp1,jmp2] <+> text "=>" <+> ppr jumps) $
+        BasicBlock lbl1 (dropTail 2 ins ++ jumps) : invert bs
+    invert (b:bs) = b : invert bs
+    invert [] = []
+
+    startsWith lbl (BasicBlock lbl' _ : _) = lbl == lbl'
+    startsWith _   []                      = False
+
+    -- The conditional jump's target comes next.
+    fallThrough lbl1 cond1 target1 target2 jmp1 jmp2
       -- We have enough information to check if we can perform the inversion
       -- TODO: We could also check for the last asm instruction which sets
       -- status flags instead. Which I suspect is worse in terms of compiler
       -- performance, but might be applicable to more cases
-      , Just edgeInfo1 <- getEdgeInfo lbl1 target1 cfg
+      | Just edgeInfo1 <- getEdgeInfo lbl1 target1 cfg
       , Just edgeInfo2 <- getEdgeInfo lbl1 target2 cfg
       -- Both jumps come from the same cmm statement
       , transitionSource edgeInfo1 == transitionSource edgeInfo2
@@ -6236,8 +6248,7 @@ invertCondBranches (Just cfg) keep bs =
       , Just invCond <- maybeInvertCond cond1
 
       --Swap the last two jumps, invert the conditional jumps condition.
-      = let jumps =
-              case () of
+      = Just $ case () of
                 -- We are free the eliminate the jmp. So we do so.
                 _ | not (mapMember target1 keep)
                     -> [JXX invCond target2]
@@ -6248,12 +6259,24 @@ invertCondBranches (Just cfg) keep bs =
                 -- Keep things as-is otherwise
                   | otherwise
                     -> [jmp1, jmp2]
-        in --pprTrace "Cutable" (ppr [jmp1,jmp2] <+> text "=>" <+> ppr jumps) $
-           (BasicBlock lbl1
-            (dropTail 2 ins ++ jumps))
-            : invert (b2:bs)
-    invert (b:bs) = b : invert bs
-    invert [] = []
+      | otherwise = Nothing
+
+    -- The conditional jump's target does not come next, and dropJumps has
+    -- left the jump after it, so neither falls through.  genCondBranch jumps
+    -- to the true target conditionally and to the false one after; where the
+    -- comparison is one cml_likely calls false, the conditional jump is the
+    -- shorter way to its target, so it goes to the false target; integer
+    -- comparisons only, as ContFlowOpt inverts.
+    likelyFirst lbl1 cond1 target1 target2
+      | Just edgeInfo1 <- getEdgeInfo lbl1 target1 cfg
+      , CmmSource {trans_cmmNode = cmmCondBranch} <- transitionSource edgeInfo1
+      , CmmCondBranch (CmmMachOp op _args) _ _ (Just False) <- cmmCondBranch
+      , isJust (maybeInvertComparison op)
+      , Just edgeInfo2 <- getEdgeInfo lbl1 target2 cfg
+      , transitionSource edgeInfo1 == transitionSource edgeInfo2
+      , Just invCond <- maybeInvertCond cond1
+      = Just [JXX invCond target2, JXX ALWAYS target1]
+      | otherwise = Nothing
 
 genAtomicRMW
   :: BlockId
