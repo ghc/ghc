@@ -268,7 +268,8 @@ as such you shouldn't need to set any of them explicitly. A flag
     This enables static control flow prediction in the native code generator
     for x86-64. If enabled GHC will apply certain heuristics to identify loops
     and hot code paths, and use this information to order the blocks the linear
-    register allocator allocates and, after register allocation and unless
+    register allocator allocates and to choose some of the registers it
+    prefers, and, after register allocation and unless
     :ghc-flag:`-finfo-table-map` is on, to lay out the code and to order the
     jumps of some conditional branches. On other architectures the flag has no
     effect: the linear register allocator and the layout use the prediction on
