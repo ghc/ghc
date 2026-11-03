@@ -195,7 +195,7 @@ regAlloc
         :: Instruction instr
         => NCGConfig
         -> LabelSet
-        -> (BlockId -> BlockFreqs)
+        -> BlockFreqs
         -> LiveCmmDecl statics instr
         -> UniqDSM ( NatCmmDecl statics instr
                    , Maybe Int  -- number of extra stack slots required,
@@ -203,7 +203,7 @@ regAlloc
                    , Maybe RegAllocStats
                    )
 {-# SPECIALISE regAlloc
-      :: NCGConfig -> LabelSet -> (BlockId -> BlockFreqs)
+      :: NCGConfig -> LabelSet -> BlockFreqs
       -> LiveCmmDecl statics X86.Instr
       -> UniqDSM (NatCmmDecl statics X86.Instr, Maybe Int, Maybe RegAllocStats)
   #-}
@@ -219,13 +219,8 @@ regAlloc _ _ _ (CmmProc (LiveInfo info _ _ _) lbl live [])
                  , Nothing
                  , Nothing )
 
-regAlloc config cold freqsFrom (CmmProc static lbl live sccs)
+regAlloc config cold freqs (CmmProc static lbl live sccs)
         | LiveInfo info entry_ids@(first_id:_) block_live _ <- static
-        -- lazy: banged, so that at -O0 it was the static noBlockFreqs and no
-        -- thunk a procedure, it made the compiler run 0.015% and 0.010% more
-        -- instructions compiling T9961 and T12707 at -O0, and moved no figure
-        -- by 0.005% at -O or -O2, on GHC 10.1.20261108
-        , let freqs = freqsFrom first_id
         = do
                 -- do register allocation on each component.
                 !(!final_blocks, !stats, !stack_use)

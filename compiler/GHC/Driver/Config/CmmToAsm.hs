@@ -49,6 +49,7 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgExposeInternalSymbols = gopt Opt_ExposeInternalSymbols dflags
    , ncgCmmStaticPred       = gopt Opt_CmmStaticPred dflags
    , ncgEnableShortcutting  = gopt Opt_AsmShortcutting dflags
+   , ncgCopyLoopHeads       = gopt Opt_AsmCopyLoopHeads dflags
    , ncgEnableInterModuleFarJumps = gopt Opt_InterModuleFarJumps dflags
    , ncgComputeUnwinding    = debugLevel dflags > 0
    , ncgEnableDeadCodeElimination = not (gopt Opt_InfoTableMap dflags)

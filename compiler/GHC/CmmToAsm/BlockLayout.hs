@@ -66,6 +66,9 @@ import GHC.Types.Unique.DSM (UniqDSM)
     -fcmm-static-pred, on at -O1 and -O2.
   * Feed this CFG into the block layout code (`sequenceTop`) in this
     module. Which will then produce a code layout based on the input weights.
+  * On x86-64, copy each small loop head that ends in a conditional branch over
+    the jumps to it that the layout left (`copyLoopHeads`,
+    Note [Copying loop heads] in GHC.CmmToAsm.X86.CodeGen).
 
 
   Note [Chain based CFG serialization]
@@ -780,16 +783,36 @@ relevantWeight info edge@(CfgEdge from to edgeInfo)
       cantEliminate CmmSwitch {} = True
       cantEliminate _ = False
 
+-- | The entry block's one successor, or, where the code generator split the
+-- entry, as allocMoreStack does, the one successor of the block holding the
+-- rest of its code, where it has one: block layout raises no back edge into
+-- it (Note [Layout relevant edge weights]).
+layoutEntryNext :: CFG -> BlockId -> Maybe BlockId
+layoutEntryNext cfg entry = case getSuccessorEdges cfg entry of
+  [(t, EdgeInfo { transitionSource = AsmCodeGen })]
+    | [u] <- getSuccessors cfg t -> Just u
+  [(t, _)] -> Just t
+  _        -> Nothing
+
+-- | A back edge's weight raised by block layout above the heaviest edge
+-- into its loop head that is not a call, a back edge or a self loop, given
+-- both, where both are positive (Note [Layout relevant edge weights]).
+raisedBackWeight :: EdgeWeight -> EdgeWeight -> Maybe EdgeWeight
+raisedBackWeight w m
+  | w > 0, m > 0 = Just (w + m * 1.001)
+  | otherwise    = Nothing
+
 -- | Place basic blocks based on the given CFG.
 -- See Note [Chain based CFG serialization]
 sequenceChain :: forall a i. Instruction i
               => LabelMap a -- ^ Keys indicate an info table on the block.
               -> CFG -- ^ Control flow graph and some meta data.
+              -> Bool -- ^ Whether a back edge may be raised (cmmNativeGen).
               -> [GenBasicBlock i] -- ^ List of basic blocks to be placed.
               -> [GenBasicBlock i] -- ^ Blocks placed in sequence.
-sequenceChain _info _weights    [] = []
-sequenceChain _info _weights    [x] = [x]
-sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
+sequenceChain _info _weights _        [] = []
+sequenceChain _info _weights _        [x] = [x]
+sequenceChain  info weights  hasBacks blocks@((BasicBlock entry _):_) =
     let edges = infoEdgeList weights
         directEdges :: [CfgEdge]
         directEdges = sortBy (flip compare) $ preferBackEdges $
@@ -804,7 +827,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
               -- T12707 at -O, 0.028% and 0.034% more at -O2, and nothing more
               -- at -O0, where the chain layout does not run, on GHC
               -- 10.1.20261108
-              | mapNull backs = es
+              | not hasBacks || mapNull backs = es
               | otherwise     = map raise es
               where
                 cold = coldBlocks weights
@@ -821,15 +844,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
                 -- each loop head to the blocks all its back edges leave
                 anyBacks = mapFromListWith setUnion
                   [ (t, setSingleton f) | (f, t) <- allBacks ]
-                -- the entry block's one successor, or, where the code generator
-                -- split the entry, as allocMoreStack does, the one successor of
-                -- the block holding the rest of its code, where it has one
-                entryNext
-                  = case getSuccessorEdges weights entry of
-                      [(t, EdgeInfo { transitionSource = AsmCodeGen })]
-                        | [u] <- getSuccessors weights t -> Just u
-                      [(t, _)] -> Just t
-                      _        -> Nothing
+                entryNext = layoutEntryNext weights entry
                 isBack f t = memberEdge t f backs
                 -- the heaviest edge into each head that is neither a back edge
                 -- nor a self loop
@@ -842,11 +857,10 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
                 -- out of a jump table, which cannot fall through
                 raise e@(CfgEdge f t i)
                   | isBack f t
-                  , edgeWeight i > 0
                   , not (isSwitch i)
                   , Just m <- mapLookup t entryMax
-                  , m > 0
-                  = CfgEdge f t i { edgeWeight = edgeWeight i + m * 1.001 }
+                  , Just w <- raisedBackWeight (edgeWeight i) m
+                  = CfgEdge f t i { edgeWeight = w }
                   | otherwise = e
                 isSwitch (EdgeInfo CmmSource { trans_cmmNode = n } _)
                   | CmmSwitch {} <- n = True
@@ -1002,12 +1016,14 @@ fallsTo isMeta info p = go
 sequenceTop
     :: Instruction instr
     => NcgImpl statics instr jumpDest
+    -> Bool -- ^ Whether a back edge may be raised (cmmNativeGen).
     -> Maybe CFG -- ^ CFG if we have one.
     -> NatCmmDecl statics instr -- ^ Function to serialize
     -> UniqDSM (NatCmmDecl statics instr)
 
-sequenceTop _       _           top@(CmmData _ _) = pure top
-sequenceTop ncgImpl edgeWeights (CmmProc info lbl live (ListGraph blocks)) = do
+sequenceTop _       _        _           top@(CmmData _ _) = pure top
+sequenceTop ncgImpl hasBacks edgeWeights
+            (CmmProc info lbl live (ListGraph blocks)) = do
     let config     = ncgConfig ncgImpl
         platform   = ncgPlatform config
 
@@ -1016,7 +1032,8 @@ sequenceTop ncgImpl edgeWeights (CmmProc info lbl live (ListGraph blocks)) = do
                       | ncgCfgBlockLayout config
                       , backendMaintainsCfg platform
                       , Just cfg <- edgeWeights
-                      -> {-# SCC layoutBlocks #-} sequenceChain info cfg blocks
+                      -> {-# SCC layoutBlocks #-}
+                         sequenceChain info cfg hasBacks blocks
 
                       -- Old algorithm without edge weights
                       | ncgCfgWeightlessLayout config

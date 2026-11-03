@@ -39,12 +39,15 @@ Then, pass by pass, in the overview's order:
   in `GHC.CmmToAsm.CFG`;
 * step 9, shortcutting: Note [supporting shortcutting] in `GHC.CmmToAsm.Monad`
   and Note [Updating the CFG during shortcutting] in `GHC.CmmToAsm.CFG`;
-* step 10, static prediction: Note [Static Branch Prediction],
-  Note [Back edges in loopInfo], Note [Static prediction of tag tests]
+* step 10, static prediction:
+  Note [Static Branch Prediction], Note [Back edges in loopInfo],
+  Note [Static prediction of tag tests]
   and Note [Where a branch's likely side is known] in `GHC.CmmToAsm.CFG`;
-* step 11, block layout: Note [CFG based code layout],
+* step 11, block layout and the copying of loop heads:
+  Note [CFG based code layout],
   Note [Chain based CFG serialization] and Note [Layout relevant edge weights]
-  in `GHC.CmmToAsm.BlockLayout`;
+  in `GHC.CmmToAsm.BlockLayout`,
+  and Note [Copying loop heads] in `GHC.CmmToAsm.X86.CodeGen`;
 * step 13, under `-g`: Note [Unwinding information in the NCG]
   in `GHC.CmmToAsm`.
 
@@ -135,6 +138,9 @@ or uses it:
   in `calcFreqs`, of a block that has, when `calcFreqs` reaches it,
   a predecessor not yet visited whose edge into it is not one of `loopInfo`'s
   back edges.
+* loop head: the block that a loop's back edges enter. Static prediction's loop
+  heads and those of the layout's back edges can differ
+  (Note [Back edges in loopInfo] in `GHC.CmmToAsm.CFG`).
 * chain: a sequence of blocks that the layout places one after another, built
   along heavy edges (Note [Chain based CFG serialization]
   in `GHC.CmmToAsm.BlockLayout`).
@@ -166,9 +172,10 @@ Then switch off or swap the passes that have a flag, one at a time
 and the latest first:
 
 * step 11, where the CFG is kept (x86-64, not under `-finfo-table-map`):
-  `-fno-block-layout-cfg`, which lays the blocks out by `sequenceBlocks`,
-  with the CFG's weights, or without them if `-fblock-layout-weightless`
-  is given too;
+  `-fno-asm-copy-loop-heads`, then `-fno-block-layout-cfg`, which also stops
+  the copying of loop heads, and lays the blocks out by `sequenceBlocks`, with
+  the CFG's weights, or without them if `-fblock-layout-weightless` is given
+  too;
 * step 10's prediction, there too: `-fno-cmm-static-pred` (the rest of step 10
   still runs), which on x86-64 also takes from step 6 the linear allocator's
   estimate of block frequencies;
@@ -415,6 +422,11 @@ Questions to ask of a change, by its kind:
 * A change to static prediction or block layout. Does it keep the trade-offs
   that Note [Where a branch's likely side is known] in `GHC.CmmToAsm.CFG` lists,
   or, where it revisits one, does it answer the reason the Note gives for it?
+* A change to what a loop head may hold, or to the code after register
+  allocation. Is a head still copied only into a block whose unwinding
+  information in force at the jump is the head's, and whose registers and stack
+  at the jump are those the head starts with (Note [Copying loop heads]
+  in `GHC.CmmToAsm.X86.CodeGen`)?
 * A change to code that a labelled statement describes. Does it remove
   or rewrite the statement, and each statement that cites it? Does a new
   statement carry the label its kind calls for (Note [Labels in NCG comments])?

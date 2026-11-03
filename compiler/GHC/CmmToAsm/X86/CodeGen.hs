@@ -20,6 +20,7 @@ module GHC.CmmToAsm.X86.CodeGen (
         generateJumpTableForInstr,
         extractUnwindPoints,
         invertCondBranches,
+        copyLoopHeads,
         InstrBlock
 )
 
@@ -6358,6 +6359,378 @@ invertCondBranches (Just cfg) keep bs =
             : invert bs
     invert (b:bs) = b : invert bs
     invert [] = []
+
+-- | Copy each small loop head that ends in a conditional branch over the jumps
+-- to it that block layout left, or Nothing where no head is copied: Note
+-- [Copying loop heads]. The loop heads are the targets of the back edges given;
+-- the blocks are given before layout, each head ending in its jump, and as
+-- layout placed them.
+copyLoopHeads :: CFG -> [(BlockId, BlockId)] -> LabelMap a
+              -> [NatBasicBlock Instr] -> [NatBasicBlock Instr]
+              -> Maybe ([NatBasicBlock Instr], CFG)
+copyLoopHeads _   _     _    []                              _      = Nothing
+copyLoopHeads cfg backs info blocks@(BasicBlock entry _ : _) placed
+  | null jumps0    = Nothing
+  | mapNull small  = Nothing
+  | mapNull copies = Nothing
+  | otherwise      =
+      Just (orient (pullRuns (copyBlocks (mapSize copies) placed)), cfg')
+  where
+    -- whether a block is a loop head: a target of the back edges given,
+    -- looked up in a set: looked up in the list, they made the compiler run
+    -- 0.978% and 0.975% more instructions compiling !16269's CmmDiamondChain,
+    -- of 128 loops, at -O1 and -O2, and nothing more at -O0, where
+    -- copyLoopHeads does not run, on GHC 10.1.20261108; and 0.46% more
+    -- compiling nofib's reptile at -O2, on GHC 10.1.20261107
+    isHead :: BlockId -> Bool
+    isHead = let hs = setFromList (map snd backs) in \h -> setMember h hs
+    -- the blocks that layout left ending in a jump to another block that may
+    -- be a loop head, with their instructions
+    jumps0 :: [(BlockId, BlockId, [Instr])]
+    jumps0 = [ (lbl, h, ins) | BasicBlock lbl ins <- placed
+                             , Just (JXX ALWAYS h) <- [lastMaybe ins]
+                             , h /= lbl
+                             , isHead h ]
+    -- the loop heads that may be copied, with their instructions, neither the
+    -- entry nor a block with an info table; only loop heads are tested for
+    -- copying: testing every block made the compiler run 0.056% and 0.053% more
+    -- instructions compiling !16269's CmmDiamondChain at -O1 and -O2, allocate
+    -- 0.007% and 0.010% more compiling nofib's puzzle there, and nothing more
+    -- at -O0, where copyLoopHeads does not run, on GHC 10.1.20261108; and
+    -- allocate 0.025% more compiling reptile at -O2, on GHC 10.1.20261107
+    small :: LabelMap [Instr]
+    small = mapFromList [ (lbl, ins) | BasicBlock lbl ins <- blocks
+                                     , isHead lbl
+                                     , lbl /= entry
+                                     , not (mapMember lbl info)
+                                     , copyableHead ins ]
+    -- each block that takes a copy, to the head it copies: a block whose one
+    -- successor is such a head, which it jumps to, and that does not follow a
+    -- failed heap or stack check; under -g, where the head states unwinding
+    -- rules ahead of its first instruction, which a copy drops ('copiedHead'),
+    -- only one whose rules at its jump are the head's, for each register
+    -- whose rule both state
+    copies :: LabelMap BlockId
+    copies = mapFromList [ (p, h) | (p, h, ins) <- jumps0
+                                  , Just hins <- [mapLookup h small]
+                                  , getSuccessors cfg p == [h]
+                                  , not (p `setMember` cold)
+                                  , unwinds hins ins ]
+    cold = coldBlocks cfg
+    unwinds hins ins =
+      let lead = rules (takeWhile isMetaInstr hins)
+      in Map.null lead || and (Map.intersectionWith (==) lead (rules ins))
+    -- the unwinding rules in force after these instructions: an UNWIND states
+    -- the rules of the registers it names, from there on, and the one that
+    -- follows a C call's DELTA names MachSp alone
+    rules ins = foldl' (flip Map.union) Map.empty [ t | UNWIND _ t <- ins ]
+
+    -- each copy's edges, the head's, which invertCondBranches looks up
+    cfg' = mapFoldlWithKey
+             (\g p h -> mapInsert p (expectJust (mapLookup h cfg)) g)
+             cfg copies
+
+    -- the blocks, those that take a copy ending in the head's instructions
+    -- in place of their jump, the list after the last of them shared: by map,
+    -- which rebuilds all of it, the compiler allocated 0.009% and 0.012% more
+    -- and ran 0.006% and 0.009% more instructions compiling nofib's puzzle at
+    -- -O1 and -O2, with the rest lazy allocated 0.004% and 0.007% more and ran
+    -- 0.001% and 0.004% more, and with dropTail 1 ins ++ hins for replaceLast
+    -- allocated 0.004% and 0.009% more and ran 0.003% and 0.007% more, and none
+    -- of the three moved anything at -O0, where copyLoopHeads does not run, on
+    -- GHC 10.1.20261108
+    copyBlocks :: Int -> [NatBasicBlock Instr] -> [NatBasicBlock Instr]
+    copyBlocks 0 bs = bs
+    copyBlocks _ [] = []
+    copyBlocks n (b@(BasicBlock lbl ins) : bs)
+      | Just h <- mapLookup lbl copies
+      , Just hins <- mapLookup h small
+      , let !rest = copyBlocks (n - 1) bs
+      = BasicBlock lbl (replaceLast ins (copiedHead hins) rest) : rest
+      | otherwise
+      , let !rest = copyBlocks n bs
+      = b : rest
+    replaceLast [_] ys rest      = dropFall ys rest
+    replaceLast (x : xs) ys rest = x : replaceLast xs ys rest
+    replaceLast [] ys rest       = dropFall ys rest
+    -- the copy's last jump dropped where its target is placed next, past
+    -- the blocks between that hold no code, as dropJumps drops a jump
+    dropFall [JXX ALWAYS t] rest
+      | not (mapMember t info), fallsTo isMetaInstr info (== t) rest = []
+    dropFall (y : ys) rest = y : dropFall ys rest
+    dropFall [] _ = []
+    -- whether a block holds no code: no instructions, or only meta ones, as
+    -- the unwinding information that -g puts in a block whose jump layout
+    -- dropped, so that the runs are the same with -g as without, as fallsTo
+    -- makes the copies
+    codeless = all isMetaInstr
+    weight h t = maybe 0 edgeWeight (getEdgeInfo h t cfg)
+
+    -- the blocks, each copy that ends in a jump and falls into no block
+    -- followed by the run of blocks that one of its successors starts,
+    -- the likelier first, where the run is not the first, starts with no info
+    -- table, ends in a block that cannot fall through and holds no block
+    -- the copy follows
+    pullRuns :: [NatBasicBlock Instr] -> [NatBasicBlock Instr]
+    pullRuns bs
+      | not (any jumping bs) = bs
+      | mapNull after        = bs
+      | otherwise            = concatMap emit [ r | (s, r) <- rs
+                                                  , not (mapMember s pulled) ]
+      where
+        jumping (BasicBlock p ins) = mapMember p copies && isJust (lastJump ins)
+        lastJump ins = case lastMaybe ins of
+          Just (JXX ALWAYS b) -> Just b
+          _                   -> Nothing
+        -- the runs, each with its first block's label
+        rs = [ (l, r) | r@(BasicBlock l _ : _) <- runs bs ]
+        runs [] = []
+        runs (b : more) = let (r, rest) = run b more in r : runs rest
+        run b (c : cs) | not (endsRun b c) = let (r, rest) = run c cs
+                                             in (b : r, rest)
+        run b cs = ([b], cs)
+        -- whether no path falls from b into c, placed after it: b ends in
+        -- a jump that cannot fall through, after no conditional jump that
+        -- invertCondBranches could make fall into c, or past it where it
+        -- holds no code; nothing falls into or past a block with an info
+        -- table, as the continuation that returns into a loop's head is
+        endsRun (BasicBlock _ ins) (BasicBlock c cins)
+          | stops ins = case last2 ins of
+              Just (JXX cc t, JXX ALWAYS _)
+                | cc /= ALWAYS -> not (codeless cins) && t /= c
+                                  || mapMember c info
+              _                -> True
+          | otherwise = False
+        -- whether no path falls off the end of these instructions: the last
+        -- transfers control unconditionally
+        stops ins = case lastMaybe ins of
+          Just (JXX ALWAYS _)     -> True
+          Just JMP{}              -> True
+          Just JMP_TBL{}          -> True
+          Just (JXX_GBL ALWAYS _) -> True
+          _                       -> False
+        -- each label by which a jump falls into a run that may move, to that
+        -- run's first block: the first block's own and, while they hold no
+        -- code, those of the blocks after it; a run moves only if no path
+        -- falls off its last block, which endsRun ensures of every run but
+        -- the last
+        -- TODO: the test of the last block can go if the code generator keeps
+        -- ending every block in a control transfer, as it does, and that is
+        -- made binding: verifyBasicBlock, in a DEBUG compiler, after
+        -- instruction selection, checks only that no other instruction
+        -- follows a jump.
+        leadOf :: LabelMap BlockId
+        leadOf = mapFromList [ (l, s) | (s, r) <- drop 1 rs
+                                      , BasicBlock _ ins <- [last r]
+                                      , stops ins
+                                      , l <- leads r ]
+        leads (BasicBlock l is : more)
+          | mapMember l info = []
+          | codeless is      = l : leads more
+          | otherwise        = [l]
+        leads [] = []
+        -- each run, by its first block, to the run moved after it, and back
+        (after, pulled) =
+          case foldl' decide (mapEmpty, mapEmpty, mapEmpty, mapEmpty) rs of
+            (af, pl, _, _) -> (af, pl)
+        -- A chain is a run and the runs moved after it, one after another.
+        -- firstOf has the first run of each chain of several runs by its
+        -- last, and lastOf the last by the first: a run that decides has
+        -- moved none, so it is its chain's last, and a run not yet moved is
+        -- its chain's first; a run does not move to the end of its own
+        -- chain.  An entry is not removed when its key stops being a last
+        -- or a first run: a run decides once, and a moved run moves no more,
+        -- so neither map is asked for it again.  Walking up the chain
+        -- instead made copyLoopHeads' cost quadratic in the loops of a
+        -- procedure whose moves chain through it.
+        decide acc@(af, pl, !firstOf, !lastOf) (s0, r)
+          | BasicBlock p ins <- last r
+          , Just h <- mapLookup p copies
+          , Just b <- lastJump ins
+          , let s1 = mapFindWithDefault s0 s0 firstOf
+          , s : _ <- [ s | t <- likelier h b ins
+                         , Just s <- [mapLookup t leadOf]
+                         , not (mapMember s pl)
+                         , s /= s1 ]
+          , let sn = mapFindWithDefault s s lastOf
+          = ( mapInsert s0 s af, mapInsert s s0 pl
+            , mapInsert sn s1 firstOf, mapInsert s1 sn lastOf )
+          | otherwise = acc
+        -- the copy's last jump's target and its conditional jump's, by the
+        -- weight of the head's edges, the heavier first
+        likelier h b ins = case last2 ins of
+          Just (JXX cc a, _) | cc /= ALWAYS, weight h a > weight h b -> [a, b]
+                             | cc /= ALWAYS                          -> [b, a]
+          _ -> [b]
+        byStart = mapFromList [ (s, r) | (s, r) <- rs, mapMember s pulled ]
+        emit r@(BasicBlock s0 _ : _)
+          | Just s <- mapLookup s0 after
+          , Just r' <- mapLookup s byStart
+          , BasicBlock p ins <- last r
+          = init r ++ BasicBlock p (dropFall ins r') : emit r'
+        emit r = r
+
+    -- the blocks, each copy that still ends in a conditional jump and a jump,
+    -- the first not to the block placed next, jumping conditionally to the
+    -- head's likelier successor, where the head's branch says nothing of its
+    -- likely side (cml_likely), which invertCondBranches goes by, and the
+    -- head's edge to that successor weighs over a tenth more than its other
+    -- edge: the path to the likelier successor then executes one jump, as it
+    -- would had a run moved, and the other path the two that it executes
+    -- through the jump to the head; weights closer than that state no
+    -- likelihood, and neither does the lighter weight of an edge into a block
+    -- with an info table, which optHsPatterns lowers because nothing falls
+    -- into such a block (Note [Copying loop heads])
+    orient :: [NatBasicBlock Instr] -> [NatBasicBlock Instr]
+    orient (BasicBlock p ins : rest)
+      | Just h <- mapLookup p copies
+      , Just (JXX cc a, JXX ALWAYS b) <- last2 ins
+      , not (mapMember a info)
+      , Just e <- getEdgeInfo h a cfg
+      , CmmSource { trans_cmmNode = CmmCondBranch _ _ _ Nothing }
+          <- transitionSource e
+      , weight h b * 10 > weight h a * 11
+      , Just cc' <- maybeInvertCond cc
+      , not (fallsTo isMetaInstr info (== a) rest)
+      = BasicBlock p (dropTail 2 ins ++ [JXX cc' b, JXX ALWAYS a]) : orient rest
+    orient (b : rest) = b : orient rest
+    orient [] = []
+
+{- Note [Copying loop heads]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Block layout lets one edge into a block fall through and makes the others jump.
+A loop head has at least two: the loop's entry and its back edges. sequenceChain
+lets one of them fall through, a back edge where it can (Note [Layout relevant
+edge weights] in GHC.CmmToAsm.BlockLayout), so that the entry jumps, once a run
+of the loop, and so does every other back edge, once an iteration. Where
+the head is a few instructions ending in a conditional branch, as a loop's test
+is, copyLoopHeads copies it, after layout, over the jumps that layout left:
+a block whose one successor is the head, and which still ends in a jump to it,
+ends in the head's instructions instead and goes straight on to whichever
+successor of the head the test picks, falling through where that successor
+is placed next. A copy into the loop's entry saves the jump into the loop;
+a copy into the source of a back edge rotates the loop for that edge, its
+iterations branching back from the bottom.
+
+No path through a copy executes more instructions than through the jump it
+replaces: the copy's branches stand for the jump and the head's own, so the
+path that takes a conditional branch saves the jump, and the path that goes on
+to the head's last jump saves it too where its target is placed next, and
+otherwise executes as many. The block that layout lets fall through into the
+head takes no copy, and layout places the blocks as it does under
+-fno-asm-copy-loop-heads, without the copies' edges. A block that follows
+a failed heap or stack check ('coldBlocks') takes no copy: it seldom runs (but
+see the TODO at checkFailures in GHC.CmmToAsm.CFG).
+
+So layout places neither of the head's successors after a copy unless the
+order it chose for the head does, and the copy then ends in a conditional jump
+and a jump. Where one of the two starts a run of blocks that no block falls
+into, the run moves to after the copy, the head's likelier successor tried
+first: the copy then falls into it, or invertCondBranches makes it do so,
+and the path to its other successor saves the jump. The move costs no
+fall-through, as neither the copy, nor the block before the run, nor the run's
+last block fell into the block after it. The run that moves is not the first,
+which holds the entry, nor one that starts with an info table or whose last
+block can fall through, nor one after which the copy's own run has already
+moved.
+
+Where no run moves, the copy still ends in a conditional jump and a jump,
+neither to the block placed next, and the path through the last jump executes
+two jumps. Where the head's branch says nothing of its likely side (cml_likely)
+and the head's edge to the last jump's target weighs over a tenth more than its
+other edge, the two jumps swap ('orient'), so that the likelier path executes
+one. The margin leaves out the pairs that static prediction weighs equal, which
+only a tie-break tells apart: optimizeCFG's favourFewerPreds tilts the two
+edges of an evaluatedness test, of equal weight, toward the successor with
+fewer predecessors, and oriented by any difference in weight nofib's queens ran
+0.5% more instructions at -O1, on GHC 10.1.20261111. A pair whose conditional
+jump goes to a block with an info table stays as it is too: optHsPatterns'
+penalizeInfoTables lowers the weight of an edge into such a block, which
+no block falls into, and static prediction starts from the lowered weight, so
+that the edge weighs less without being less likely. The evaluated side of
+an evaluatedness test is such an edge where it goes straight to the
+continuation that the evaluation returns to.
+
+A loop head is a target of a back edge of static prediction's loops (loopInfo
+in GHC.CmmToAsm.CFG), or of 'findBackEdges'' where static prediction does
+not run; a heap check that the garbage collector returns to is one, and several
+blocks can jump to it. A head has at most 'maxCopiedHead' instructions before
+its branches: most heads copied in the benchmarks of containers, vector
+and megaparsec hold one to three; nubInt's loops (Data.Containers.ListUtils)
+have heads of six, without which its benchmark issue1202_repeat keeps a third
+of its gain; and the loops of (^) (GHC.Real's powImpl) have heads of eight,
+without which nofib's x2n1 ran 0.86% more instructions, on GHC 10.1.20261107.
+
+It runs after register allocation, so that the copies need no allocation of
+their own: a block that jumps to the head ends with the registers and stack that
+the head starts with. A head is neither the procedure's entry nor a block with
+an info table, and holds no jump, call or meta instruction but a comment, a
+location, a delta or, ahead of its first instruction, the unwinding information
+that -g puts there. A copy drops that information, whose label it would define
+a second time, and is made only into a block whose rules at the jump it
+replaces are the head's, for each register whose rule both state: an UNWIND
+states the rules of the registers it names, from there on, so that the one
+a C call leaves in a block, which names MachSp alone, leaves the block's rule
+for Sp in force. The copy then runs under the rules in force where the block's
+code does. Where the block states no rule for a register, as a fixup block
+of register allocation states none at all, those can differ from the head's
+own: the copy is then unwound, as the block's own code already is, by the rules
+of the code before the block. BUG: the DWARF printer takes an UNWIND that does
+not name Sp to state the rule Sp has at the procedure's entry
+(addDefaultUnwindings in GHC.CmmToAsm.Dwarf), so that after a C call it unwinds
+the rest of a block's code, a copy at its end included, by that rule; this
+leads only to wrong unwinding information. Under -g, a head that holds
+unwinding information after an instruction, as one that adjusts Sp does, is not
+copied. copyLoopHeads runs only under the chain layout (-fblock-layout-cfg, on
+at -O1 and -O2), before invertCondBranches, which reads a copy's edges, the
+head's, from the CFG.
+
+Which jumps layout leaves follows the edge weights, which are static
+prediction's estimate where it runs (-fcmm-static-pred), so that the copies
+inherit its errors on tag tests as layout does (the BUG TODO at ohPredicts,
+Note [Static prediction of tag tests] in GHC.CmmToAsm.CFG).
+-}
+
+-- | Whether copyLoopHeads may copy a block of these instructions: at most
+-- 'maxCopiedHead' of them, comments, locations and deltas aside and
+-- the unwinding information ahead of the first, none of them a jump, a call
+-- or another meta instruction, followed by one or more conditional jumps
+-- and a jump.
+copyableHead :: [Instr] -> Bool
+copyableHead = body (0 :: Int)
+  where
+    body !n (i : is) = case i of
+      JXX ALWAYS _ -> False
+      JXX _ _      -> branches is
+      COMMENT{}    -> body n is
+      LOCATION{}   -> body n is
+      DELTA{}      -> body n is
+      UNWIND{} | n == 0 -> body n is
+      _ | isJumpishInstr i || isMetaInstr i -> False
+        | n < maxCopiedHead -> body (n + 1) is
+        | otherwise -> False
+    body _ [] = False
+    branches [JXX ALWAYS _] = True
+    branches (JXX c _ : is) | c /= ALWAYS = branches is
+    branches _ = False
+
+-- | A loop head's instructions as copyLoopHeads copies them: without the
+-- unwinding information ahead of its first instruction, which states the rules
+-- the jumping block has at its jump where that block states any, and whose
+-- label a copy would define a second time.
+copiedHead :: [Instr] -> [Instr]
+copiedHead (UNWIND{} : is)          = copiedHead is
+copiedHead (i : is) | isMetaInstr i = i : copiedHead is
+copiedHead is                       = is
+
+-- | The most instructions a loop head that copyLoopHeads copies holds before
+-- its branches: Note [Copying loop heads]. Eight, as many as the heads of
+-- (^)'s loops hold, is otherwise arbitrary, and may be raised where a case
+-- needs more at little cost to the compiler: lifted to 1000, it changed the
+-- compile cost and code of programs of 50 to 400 loops, calls, cases or
+-- diamonds by under 0.1%.
+maxCopiedHead :: Int
+maxCopiedHead = 8
 
 genAtomicRMW
   :: BlockId
