@@ -1,0 +1,16 @@
+section: ghci
+synopsis: ``evalStmt <expr>`` break flags apply only to the main expression thread
+issues: #28080 #26064
+mrs: !16922
+
+description: {
+  The per-thread debugger flags (single-step, step-out and break-on-exception)
+  are now set only on the sandbox thread forked to evaluate a new expression,
+  rather than globally on all threads.
+
+  As a consequence, ``:step <expr>``, where ``<expr>`` forks a thread, now stops
+  at the next breakpoint in the thread evaluating ``<expr>``, not at a
+  breakpoint in any forked thread. A forked thread may still stop at a
+  breakpoint that was explicitly enabled, and ``:step``-ing from there enables
+  stepping for that thread.
+}

@@ -1,0 +1,8 @@
+Stopped in Main.f, break037.hs:6:8-48
+_result :: IO () = _
+Stopped in Main.f, break037.hs:6:8-33
+_result :: IO () = _
+Stopped in <exception thrown>, <unknown>
+_exception :: e = _
+cleanup
+after abandon
