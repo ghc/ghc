@@ -63,7 +63,7 @@ import GHC.Driver.Session hiding (verbosity)
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline (compileFile)
 import GHC.HsToCore.Docs (getMainDeclBinder)
-import GHC.Iface.Load (loadSysInterface)
+import GHC.Iface.Load (loadSysInterface, readFullIfaceFromDisk)
 import GHC.IfaceToCore (tcIfaceInst, tcIfaceFamInst)
 import GHC.Tc.Utils.Monad (initIfaceLoad, initIfaceLcl)
 import GHC.Tc.Utils.Env (lookupGlobal_maybe)
@@ -76,7 +76,8 @@ import GHC.Unit.Module.Graph (ModuleGraphNode (..), ModuleNodeInfo(..))
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface (mi_semantic_module, mi_boot)
 import GHC.Unit.Module.ModSummary (isBootSummary)
-import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName, text)
+import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName, text, ppr)
+import GHC.Utils.Panic (pprPanic)
 import GHC.Utils.Error (withTiming)
 import GHC.Utils.Monad (mapMaybeM)
 
@@ -257,7 +258,16 @@ dropErr (Failed _) = Nothing
 loadHiFile :: HscEnv -> Outputable.SDoc -> Module -> IO (ModIface, ([ClsInst], [FamInst]))
 loadHiFile hsc_env doc theModule = initIfaceLoad hsc_env $ do
 
-  mod_iface <- loadSysInterface doc theModule
+  -- TODO: one-shot PIT access
+  -- 'loadSysInterface' used to hand back the ModIface kept in the PIT. The EPS
+  -- no longer keeps ModIfaces (see Note [The EPS does not keep ModIfaces]), so
+  -- we load the interface into the EPS (for the instances' environment) and
+  -- re-read the full interface from disk.
+  _ <- loadSysInterface doc theModule
+  mod_iface <- liftIO (readFullIfaceFromDisk hsc_env theModule) >>= \case
+    Succeeded i -> pure i
+    -- POC: loadSysInterface succeeded, so this should not happen.
+    Failed _ -> pprPanic "loadHiFile: TODO: re-reading the interface failed" (ppr theModule)
 
   insts <- initIfaceLcl (mi_semantic_module mod_iface) doc (mi_boot mod_iface) $ do
 

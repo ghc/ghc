@@ -84,6 +84,7 @@ import GHC.HsToCore.Usage
 import GHC.Unit
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModSummary
@@ -247,7 +248,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program mb_modBreaks
           let deps = mkDependencies home_unit
                                     (tcg_mod tc_result)
                                     (tcg_imports tc_result)
-                                    (map mi_module pluginModules)
+                                    (map li_module pluginModules)
 
           usage <- mkRecompUsageInfo hsc_env tc_result
           docs  <- extractDocs dflags tc_result

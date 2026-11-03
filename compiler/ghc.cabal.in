@@ -978,6 +978,7 @@ Library
         GHC.Unit
         GHC.Unit.Env
         GHC.Unit.External
+        GHC.Unit.External.Iface
         GHC.Unit.External.Database
         GHC.Unit.External.Index
         GHC.Unit.External.ModuleOrigin

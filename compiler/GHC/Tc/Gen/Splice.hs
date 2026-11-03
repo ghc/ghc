@@ -78,6 +78,7 @@ import GHC.HsToCore.Docs
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Monad
 import GHC.Iface.Load
+import GHC.Iface.Errors.Types ( IfaceMessage(..), InterfaceLookingFor(..) )
 
 import GHCi.Message
 import GHCi.RemoteTypes
@@ -119,6 +120,7 @@ import GHC.Serialized
 import GHC.Unit.Finder
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.IfaceToCore ( tcIfaceImport )
 
 import GHC.Utils.Misc
@@ -1671,7 +1673,7 @@ lookupDeclDoc nm = do
       mIface <- getExternalModIface nm
       case mIface of
         Just iface
-          | Just Docs{docs_decls = dmap} <- mi_docs iface ->
+          | Just Docs{docs_decls = dmap} <- li_docs iface ->
           pure $ renderHsDocStrings . map hsDocString <$> lookupUniqMap dmap nm
         _ -> pure Nothing
 
@@ -1688,12 +1690,12 @@ lookupArgDoc i nm = do
       mIface <- getExternalModIface nm
       case mIface of
         Just iface
-          | Just Docs{docs_args = amap} <- mi_docs iface->
+          | Just Docs{docs_args = amap} <- li_docs iface->
           pure $ renderHsDocString . hsDocString <$> (lookupUniqMap amap nm >>= IntMap.lookup i)
         _ -> pure Nothing
 
 -- | Returns the module a Name belongs to, if it is isn't local.
-getExternalModIface :: Name -> TcM (Maybe ModIface)
+getExternalModIface :: Name -> TcM (Maybe LoadedIface)
 getExternalModIface nm = do
   isLocal <- nameIsLocalOrFrom <$> getModule <*> pure nm
   if isLocal
@@ -3008,7 +3010,18 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
 
       reifyFromIface reifMod = do
         iface <- loadInterfaceForModule (text "reifying module from TH for" <+> ppr reifMod) reifMod
-        let IfaceTopEnv _ imports = mi_top_env iface
+        -- The EPS does not keep mi_top_env (see Note [The EPS does not keep
+        -- ModIfaces]): for an external module, re-read the interface.
+        full_iface <- case loadedFullIface iface of
+          Just i  -> pure i
+          Nothing -> do
+            hsc_env <- getTopEnv
+            liftIO (readFullIfaceFromDisk hsc_env (li_module iface)) >>= \case
+              Succeeded i -> pure i
+              Failed err  -> failWithTc $ TcRnInterfaceError $
+                               Can'tFindInterface err $
+                               LookingForModule (moduleName reifMod) NotBoot
+        let IfaceTopEnv _ imports = mi_top_env full_iface
         return $ TH.ModuleInfo (thImportedModules (map tcIfaceImport imports))
 
 -- | The modules imported by a module, as reported to Template Haskell:

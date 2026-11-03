@@ -8,19 +8,19 @@ module GHC.Unit.External
    , EpsStats(..)
    , addEpsInStats
    , PackageTypeEnv
-   , PackageIfaceTable
    , PackageInstEnv
    , PackageFamInstEnv
    , PackageRuleBase
    , PackageCompleteMatches
-   , emptyPackageIfaceTable
+   , lookupExternalIface
+   , module GHC.Unit.External.Iface
    )
 where
 
 import GHC.Prelude
 
 import GHC.Unit
-import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv ( InstEnv, emptyInstEnv )
@@ -48,13 +48,10 @@ type PackageFamInstEnv       = FamInstEnv
 type PackageAnnEnv           = AnnEnv
 type PackageCompleteMatches  = CompleteMatches
 
--- | Helps us find information about modules in the imported packages
-type PackageIfaceTable = ModuleEnv ModIface
-        -- Domain = modules in the imported packages
-
--- | Constructs an empty PackageIfaceTable
-emptyPackageIfaceTable :: PackageIfaceTable
-emptyPackageIfaceTable = emptyModuleEnv
+-- | Look up the slim interface of a module loaded into the EPS.
+-- See Note [The EPS does not keep ModIfaces].
+lookupExternalIface :: ExternalPackageState -> Module -> Maybe ExternalIface
+lookupExternalIface eps mod = lookupModuleEnv (eps_ext_ifaces eps) mod
 
 -- | Information about the currently loaded external packages.
 -- This is mutable because packages will be demand-loaded during
@@ -72,7 +69,7 @@ eucEPS = readIORef . euc_eps
 initExternalPackageState :: ExternalPackageState
 initExternalPackageState = EPS
   { eps_is_boot          = emptyInstalledModuleEnv
-  , eps_PIT              = emptyPackageIfaceTable
+  , eps_ext_ifaces       = emptyModuleEnv
   , eps_free_holes       = emptyInstalledModuleEnv
   , eps_PTE              = emptyTypeEnv
   , eps_iface_bytecode   = emptyModuleEnv
@@ -114,34 +111,25 @@ data ExternalPackageState
                 -- debug prints, and it's convenient because this field comes
                 -- direct from 'GHC.Tc.Utils.imp_dep_mods'
 
-        eps_PIT :: !PackageIfaceTable,
-                -- ^ The 'ModIface's for modules in external packages
-                -- whose interfaces we have opened.
+        eps_ext_ifaces :: !(ModuleEnv ExternalIface),
+                -- ^ What we remember of the interfaces of modules in
+                -- external packages that we have opened (exports, fixities,
+                -- warnings, hashes, ...). This replaces the former Package
+                -- Interface Table of full 'ModIface's.
+                -- See Note [The EPS does not keep ModIfaces].
+                --
                 -- The declarations in these interface files are held in the
-                -- 'eps_decls', 'eps_inst_env', 'eps_fam_inst_env' and 'eps_rules'
-                -- fields of this record, not in the 'mi_decls' fields of the
-                -- interface we have sucked in.
-                --
-                -- What /is/ in the PIT is:
-                --
-                -- * The Module
-                --
-                -- * Fingerprint info
-                --
-                -- * Its exports
-                --
-                -- * Fixities
-                --
-                -- * Deprecations and warnings
+                -- 'eps_PTE', 'eps_inst_env', 'eps_fam_inst_env' and 'eps_rules'
+                -- fields of this record.
 
         eps_free_holes :: InstalledModuleEnv (UniqDSet ModuleName),
                 -- ^ Cache for 'mi_free_holes'.  Ordinarily, we can rely on
-                -- the 'eps_PIT' for this information, EXCEPT that when
+                -- the 'eps_ext_ifaces' for this information, EXCEPT that when
                 -- we do dependency analysis, we need to look at the
                 -- 'Dependencies' of our imports to determine what their
                 -- precise free holes are ('moduleFreeHolesPrecise').  We
                 -- don't want to repeatedly reread in the interface
-                -- for every import, so cache it here.  When the PIT
+                -- for every import, so cache it here.  When 'eps_ext_ifaces'
                 -- gets filled in we can drop these entries.
 
         eps_PTE :: !PackageTypeEnv,

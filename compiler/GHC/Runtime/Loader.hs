@@ -60,7 +60,7 @@ import GHC.Types.Unique.DFM
 import GHC.Unit.Finder ( FindResult(..), runFinderM, findPluginModule )
 import GHC.Driver.Config.Diagnostic ( initIfaceMessageOpts )
 import GHC.Unit.Module   ( Module, ModuleName, thisGhcUnit, GenModule(moduleUnit), IsBootInterface(NotBoot) )
-import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.Unit.Env
 
 import GHC.Utils.Panic
@@ -190,7 +190,7 @@ checkExternalInterpreter hsc_env = case interpInstance <$> hsc_interp hsc_env of
     -> throwIO (InstallationError "Plugins require -fno-external-interpreter")
   _ -> pure ()
 
-loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface, [LinkableUsage], PkgsLoaded)
+loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, LoadedIface, [LinkableUsage], PkgsLoaded)
 loadPlugin' occ_name plugin_name hsc_env mod_name
   = do { let plugin_rdr_name = mkRdrQual mod_name occ_name
              dflags = hsc_dflags hsc_env
@@ -341,7 +341,7 @@ lessUnsafeCoerce logger context what = do
 -- Need the module as well to record information in the interface file
 lookupRdrNameInModuleForPlugins :: HasDebugCallStack
                                 => HscEnv -> ModuleName -> RdrName
-                                -> IO (Maybe (Name, ModIface))
+                                -> IO (Maybe (Name, LoadedIface))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     let dflags     = hsc_dflags hsc_env
     -- First find the unit the module resides in by searching exposed units and home modules
@@ -359,7 +359,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                                                 , is_qual = False, is_dloc = noSrcSpan, is_isboot = NotBoot, is_level = SpliceLevel }
                         imp_spec = ImpSpec decl_spec ImpAll
                         env = mkGlobalRdrEnv
-                            $ gresFromAvails hsc_env (Just imp_spec) (mi_exports iface)
+                            $ gresFromAvails hsc_env (Just imp_spec) (li_exports iface)
                     case lookupGRE env (LookupRdrName rdr_name (RelevantGREsFOS WantNormal)) of
                         [gre] -> return (Just (greName gre, iface))
                         []    -> return Nothing

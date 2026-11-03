@@ -77,6 +77,7 @@ import GHC.Driver.Plugins.External
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.Unit.Module.ModSummary
 
 import GHC.Parser.Errors.Types (PsWarning, PsError)
@@ -224,7 +225,7 @@ data PluginWithArgs = PluginWithArgs
 data LoadedPlugin = LoadedPlugin
   { lpPlugin :: PluginWithArgs
   -- ^ the actual plugin together with its commandline arguments
-  , lpModule :: ModIface
+  , lpModule :: LoadedIface
   -- ^ the module containing the plugin
   }
 
@@ -246,7 +247,7 @@ data StaticPlugin = StaticPlugin
   }
 
 lpModuleName :: LoadedPlugin -> ModuleName
-lpModuleName = moduleName . mi_module . lpModule
+lpModuleName = moduleName . li_module . lpModule
 
 pluginRecompile' :: PluginWithArgs -> IO PluginRecompile
 pluginRecompile' (PluginWithArgs plugin args) = pluginRecompile plugin args

@@ -56,7 +56,7 @@ import GHC.Core.Type
 import GHC.Hs
 import GHC.Driver.Session
 import GHC.Unit.Module (getModule)
-import GHC.Unit.Module.ModIface (mi_fix)
+import GHC.Unit.External.Iface
 
 import GHC.Iface.Load   (loadInterfaceForName)
 
@@ -845,7 +845,7 @@ getDataConFixityFun tc
                  ; return (lookupFixity fix_env) }
          else do { iface <- loadInterfaceForName doc name
                             -- Should already be loaded!
-                 ; return (mi_fix iface . nameOccName) } }
+                 ; return (li_fix iface . nameOccName) } }
   where
     name = tyConName tc
     doc = text "Data con fixities for" <+> ppr name

@@ -130,6 +130,7 @@ import GHC.Unit.Finder
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.Imported
@@ -1283,14 +1284,14 @@ hscCheckSafe' m l = do
 
             -- got iface, check trust
             Just iface' ->
-                let trust = getSafeMode $ mi_trust iface'
-                    trust_own_pkg = mi_trust_pkg iface'
+                let trust = getSafeMode $ li_trust iface'
+                    trust_own_pkg = li_trust_pkg iface'
                     -- check module is trusted
                     safeM = trust `elem` [Sf_Safe, Sf_SafeInferred, Sf_Trustworthy]
                     -- check package is trusted
                     safeP = packageTrusted dflags (hsc_units hsc_env) home_unit trust trust_own_pkg m
                     -- pkg trust reqs
-                    pkgRs = dep_trusted_pkgs $ mi_deps iface'
+                    pkgRs = dep_trusted_pkgs $ li_deps iface'
                     -- warn if Safe module imports Safe-Inferred module.
                     warns = if wopt Opt_WarnInferredSafeImports dflags
                                 && safeLanguageOn dflags
@@ -1335,7 +1336,7 @@ hscCheckSafe' m l = do
             _ | isHomeModule home_unit mod      -> True
             _ -> isUnitTrusted unit_state (moduleUnit m)
 
-    lookup' :: Module -> Hsc (Maybe ModIface)
+    lookup' :: Module -> Hsc (Maybe LoadedIface)
     lookup' m = do
         hsc_env <- getHscEnv
         iface <- liftIO $ lookupIfaceByModuleHsc hsc_env m

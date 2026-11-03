@@ -22,6 +22,7 @@ import {-# SOURCE #-} GHC.Iface.Load -- a bit vexing
 
 import GHC.Unit
 import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.Unit.Module.Deps
 
 import GHC.Tc.Errors.Types
@@ -169,7 +170,7 @@ rnDepModules sel mods = do
         if isHoleModule mod
           then do iface <- liftIO . initIfaceCheck (text "rnDepModule") hsc_env
                                   $ loadSysInterface (text "rnDepModule") mod'
-                  return (mod' : sel (mi_deps iface))
+                  return (mod' : sel (li_deps iface))
           else return [mod']
 
 {-
@@ -343,7 +344,7 @@ rnIfaceGlobal n = do
                         else m'
             iface <- liftIO . initIfaceCheck (text "rnIfaceGlobal") hsc_env
                             $ loadSysInterface (text "rnIfaceGlobal") m''
-            let nsubst = mkNameShape (moduleName m) (mi_exports iface)
+            let nsubst = mkNameShape (moduleName m) (li_exports iface)
             case maybeSubstNameShape nsubst n of
                 -- NB: report m' because it's more user-friendly
                 Nothing -> failWithRn $ TcRnIdNotExportedFromModuleSig n m'

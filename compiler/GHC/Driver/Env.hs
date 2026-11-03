@@ -381,28 +381,30 @@ lookupTypeInPTE hsc_env pte name = ty
              Just hm -> pure $! lookupNameEnv (md_types (hm_details hm)) name
              Nothing -> pure $! lookupNameEnv pte name
 
--- | Find the 'ModIface' for a 'Module', searching in both the loaded home
--- and external package module information
+-- | Find the interface of a 'Module', searching in both the loaded home
+-- modules (HUG) and the interfaces loaded into the EPS.
+-- See Note [The EPS does not keep ModIfaces].
 lookupIfaceByModule
         :: HomeUnitGraph
-        -> PackageIfaceTable
+        -> ExternalPackageState
         -> Module
-        -> IO (Maybe ModIface)
-lookupIfaceByModule hug pit mod
+        -> IO (Maybe LoadedIface)
+lookupIfaceByModule hug eps mod
   = HUG.lookupHugByModule mod hug >>= pure . \case
-       Just hm -> Just (hm_iface hm)
-       Nothing -> lookupModuleEnv pit mod
-   -- If the module does come from the home package, why do we look in the PIT as well?
-   -- (a) In OneShot mode, even home-package modules accumulate in the PIT
+       Just hm -> Just (LoadedHome (hm_iface hm))
+       Nothing -> LoadedExternal <$> lookupExternalIface eps mod
+   -- If the module does come from the home package, why do we look in the EPS as well?
+   -- (a) In OneShot mode, even home-package modules accumulate in the EPS
+   --     TODO: one-shot PIT access
    -- (b) Even in Batch (--make) mode, there is *one* case where a home-package
-   --     module is in the PIT, namely GHC.Prim when compiling the base package.
+   --     module is in the EPS, namely GHC.Prim when compiling the base package.
    -- We could eliminate (b) if we wanted, by making GHC.Prim belong to a package
    -- of its own, but it doesn't seem worth the bother.
 
-lookupIfaceByModuleHsc :: HscEnv -> Module -> IO (Maybe ModIface)
+lookupIfaceByModuleHsc :: HscEnv -> Module -> IO (Maybe LoadedIface)
 lookupIfaceByModuleHsc hsc_env mod = do
   eps <- hscEPS hsc_env
-  lookupIfaceByModule (hsc_HUG hsc_env) (eps_PIT eps) mod
+  lookupIfaceByModule (hsc_HUG hsc_env) eps mod
 
 mainModIs :: HomeUnitEnv -> Module
 mainModIs hue = mkHomeModule (expectJust $ homeUnitEnv_home_unit hue) (mainModuleNameIs (homeUnitEnv_dflags hue))

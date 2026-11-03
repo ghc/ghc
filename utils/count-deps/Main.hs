@@ -12,6 +12,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import System.Environment
 import GHC.Unit.Module.Deps
+import GHC.Unit.External.Iface (LoadedIface, li_deps)
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 
@@ -79,5 +80,5 @@ calcDeps modName libdir =
     mkModule :: String -> ModuleName -> Module
     mkModule ghcUnitId = Module (stringToUnit ghcUnitId)
 
-    modDeps :: ModIface -> [ModuleName]
-    modDeps mi = map (gwib_mod . (\(_, _, mn) -> mn)) $ Set.toList $ dep_direct_mods (mi_deps mi)
+    modDeps :: LoadedIface -> [ModuleName]
+    modDeps mi = map (gwib_mod . (\(_, _, mn) -> mn)) $ Set.toList $ dep_direct_mods (li_deps mi)

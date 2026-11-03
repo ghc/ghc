@@ -105,7 +105,7 @@ import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
-import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.Unit.Module.Deps
 
 import Data.List (partition)
@@ -234,7 +234,7 @@ deSugar hsc_env
         ; let deps = mkDependencies home_unit
                                     (tcg_mod tcg_env)
                                     (tcg_imports tcg_env)
-                                    (map mi_module pluginModules)
+                                    (map li_module pluginModules)
 
         ; safe_mode <- finalSafeMode dflags tcg_env
 

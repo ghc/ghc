@@ -117,6 +117,7 @@ import GHC.Types.Avail
 import GHC.Unit
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface
 import GHC.Unit.Home.ModInfo
 
 import GHC.Tc.Module ( runTcInteractive, tcRnTypeSkolemising, loadUnqualIfaces )
@@ -979,7 +980,7 @@ getDocs name =
            then pure (Left InteractiveName)
            else do
              iface <- liftIO $ hscGetModuleInterface hsc_env mod
-             case mi_docs iface of
+             case li_docs iface of
                Nothing -> pure (Left (NoDocsInIface mod compiled))
                Just Docs { docs_decls = decls
                          , docs_args = args

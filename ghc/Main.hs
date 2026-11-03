@@ -43,7 +43,7 @@ import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings
 import GHC.Runtime.Loader   ( loadFrontendPlugin, initializeSessionPlugins )
 
 import GHC.Unit.Module ( ModuleName, mkModuleName )
-import GHC.Unit.Module.ModIface
+import GHC.Unit.External.Iface ( li_mod_hash )
 import GHC.Unit.State  ( pprUnits, pprUnitsSimple )
 import GHC.Unit.Finder ( findImportedModule, runFinderM, FindResult(..) )
 import GHC.Unit.Types  ( IsBootInterface(..) )
@@ -515,7 +515,7 @@ abiHash strs = do
   put_ bh hiVersion
     -- package hashes change when the compiler version changes (for now)
     -- see #5328
-  mapM_ (put_ bh . mi_mod_hash) ifaces
+  mapM_ (put_ bh . li_mod_hash) ifaces
   f <- fingerprintBinMem bh
 
   putStrLn (showPpr dflags f)
