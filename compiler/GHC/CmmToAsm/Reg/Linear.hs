@@ -140,6 +140,7 @@ import Data.Maybe
 import Data.List (find, sortOn)
 import Data.Word (Word64)
 import Control.Monad
+import GHC.CmmToAsm.CFG (BlockFreqs)
 
 -- -----------------------------------------------------------------------------
 -- Top level of the register allocator
@@ -172,6 +173,7 @@ regAlloc
         :: Instruction instr
         => NCGConfig
         -> LabelSet
+        -> (BlockId -> BlockFreqs)
         -> LiveCmmDecl statics instr
         -> UniqDSM ( NatCmmDecl statics instr
                    , Maybe Int  -- number of extra stack slots required,
@@ -179,27 +181,30 @@ regAlloc
                    , Maybe RegAllocStats
                    )
 {-# SPECIALISE regAlloc
-      :: NCGConfig -> LabelSet -> LiveCmmDecl statics X86.Instr
+      :: NCGConfig -> LabelSet -> (BlockId -> BlockFreqs)
+      -> LiveCmmDecl statics X86.Instr
       -> UniqDSM (NatCmmDecl statics X86.Instr, Maybe Int, Maybe RegAllocStats)
   #-}
 
-regAlloc _ _ (CmmData sec d)
+regAlloc _ _ _ (CmmData sec d)
         = return
                 ( CmmData sec d
                 , Nothing
                 , Nothing )
 
-regAlloc _ _ (CmmProc (LiveInfo info _ _ _) lbl live [])
+regAlloc _ _ _ (CmmProc (LiveInfo info _ _ _) lbl live [])
         = return ( CmmProc info lbl live (ListGraph [])
                  , Nothing
                  , Nothing )
 
-regAlloc config cold (CmmProc static lbl live sccs)
+regAlloc config cold freqsFrom (CmmProc static lbl live sccs)
         | LiveInfo info entry_ids@(first_id:_) block_live _ <- static
+        , let freqs = freqsFrom first_id
         = do
                 -- do register allocation on each component.
                 !(!final_blocks, !stats, !stack_use)
-                        <- linearRegAlloc config cold entry_ids block_live sccs
+                        <- linearRegAlloc config cold freqs entry_ids block_live
+                                          sccs
 
                 -- make sure the block that was first in the input list
                 --      stays at the front of the output
@@ -219,7 +224,7 @@ regAlloc config cold (CmmProc static lbl live sccs)
                         , Just stats)
 
 -- bogus. to make non-exhaustive match warning go away.
-regAlloc _ _ (CmmProc _ _ _ _)
+regAlloc _ _ _ (CmmProc _ _ _ _)
         = panic "RegAllocLinear.regAlloc: no match"
 
 
@@ -235,6 +240,7 @@ linearRegAlloc
         :: forall instr. (Instruction instr)
         => NCGConfig
         -> LabelSet  -- ^ the blocks that follow a failed heap or stack check
+        -> BlockFreqs -- ^ each block's estimated frequency
         -> [BlockId] -- ^ entry points
         -> BlockMap Regs
               -- ^ live regs on entry to each basic block
@@ -242,7 +248,7 @@ linearRegAlloc
               -- ^ instructions annotated with "deaths"
         -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc config cold entry_ids block_live sccs
+linearRegAlloc config cold freqs entry_ids block_live sccs
  = case platformArch platform of
       ArchX86        -> other $ (frInitFreeRegs platform :: X86.FreeRegs)
       ArchX86_64     -> go $ (frInitFreeRegs platform :: X86_64.FreeRegs)
@@ -262,7 +268,7 @@ linearRegAlloc config cold entry_ids block_live sccs
  where
   go :: FR regs
      => regs -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
-  go f = linearRegAlloc' config f cold entry_ids block_live sccs
+  go f = linearRegAlloc' config f cold freqs entry_ids block_live sccs
   -- See Note [Specialising the linear allocator]
   other :: FR regs
         => regs -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
@@ -281,12 +287,13 @@ linearRegAlloc'
         -> freeRegs
         -> LabelSet                     -- ^ the blocks that follow a failed
                                         --   heap or stack check
+        -> BlockFreqs                   -- ^ each block's estimated frequency
         -> [BlockId]                    -- ^ entry points
         -> BlockMap Regs              -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
         -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc' config initFreeRegs cold entry_ids block_live sccs
+linearRegAlloc' config initFreeRegs cold !_freqs entry_ids block_live sccs
  = UDSM $ \us -> do
     let !(!stack, !stats, !blocks, us') =
             runR ctx us

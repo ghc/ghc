@@ -501,6 +501,17 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         let allocCold = if backendMaintainsCfg platform
                           then checkFailures nativeCfgWeights
                           else setEmpty
+        -- how often the linear allocator estimates each block to run, from
+        -- the procedure's first block, where the backend maintains the CFG and
+        -- static prediction is on (-fcmm-static-pred, at -O and -O2); bound
+        -- strictly, so that at -O0 it is the static 'const noBlockFreqs' and
+        -- not a thunk a procedure
+            !allocFreqs = case cmm of
+              CmmProc _ _ _ graph
+                | backendMaintainsCfg platform && ncgCmmStaticPred config
+                -> \entry -> blockFrequencies (tagRegisters graph) allocCold
+                                              entry nativeCfgWeights
+              _ -> const noBlockFreqs
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
                 runUniqueDSM usGen
@@ -578,7 +589,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 -- do linear register allocation
                 let reg_alloc proc = do
                        (alloced, maybe_more_stack, ra_stats) <-
-                               Linear.regAlloc config allocCold proc
+                               Linear.regAlloc config allocCold allocFreqs proc
                        case maybe_more_stack of
                          Nothing -> return ( alloced, ra_stats, [] )
                          Just amount -> do
