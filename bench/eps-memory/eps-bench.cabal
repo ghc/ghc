@@ -1,0 +1,49 @@
+cabal-version: 3.0
+name:          eps-bench
+version:       0.1.0.0
+synopsis:      Measure memory reachable from GHC's ExternalPackageState via ghc-debug
+build-type:    Simple
+
+common shared
+  default-language: GHC2021
+  ghc-options:      -Wall
+  build-depends:    base >=4.16 && <5
+                  , containers
+                  , directory
+                  , filepath
+                  , process
+
+executable eps-flags
+  import:         shared
+  main-is:        Flags.hs
+  hs-source-dirs: app
+
+executable eps-analyse
+  import:         shared
+  main-is:        Analyse.hs
+  other-modules:  Results
+  hs-source-dirs: app
+  ghc-options:    -threaded "-with-rtsopts=-N -qn1"
+  build-depends:  ghc-debug-client
+                , ghc-debug-common
+                , text
+                , mtl
+
+executable eps-compare
+  import:         shared
+  main-is:        Compare.hs
+  other-modules:  Results
+  hs-source-dirs: app
+
+executable eps-peak
+  import:         shared
+  main-is:        Peak.hs
+  other-modules:  Results
+  hs-source-dirs: app
+  build-depends:  ghc-events
+                , text
+
+executable perf-compare
+  import:         shared
+  main-is:        PerfCompare.hs
+  hs-source-dirs: app
