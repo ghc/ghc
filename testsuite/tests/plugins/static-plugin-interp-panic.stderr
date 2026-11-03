@@ -1,7 +1,7 @@
 static-plugin-interp-panic-module.hs:12:5: error: [GHC-87897]
     • Exception when trying to run compile-time code:
         panic! (the 'impossible' happened)
-  GHC version 10.1.20261027:
+  GHC version <VERSION>:
 	static-plugin-interp-panic: panic loading GHC.Internal.Real
 
 Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug
