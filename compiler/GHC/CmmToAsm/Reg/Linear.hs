@@ -340,13 +340,17 @@ linearRegAlloc' config initFreeRegs cold !freqs entry_ids block_live sccs
                 $ linearRA_SCCs cold freqs entry_ids js block_live sccs
         -- each block's jump targets, read by the allocation order and the
         -- context alike
-        js = jumpSuccs sccs
+        js = jumpSuccs flat
         platform = ncgPlatform config
+        -- the blocks, flattened once for the walks over them
+        flat = flattenSCCs sccs
+        wv = wideMoveDests platform cold freqs block_live flat
         ctx = RA_Context
                 { rc_jumpLocs  = []
                 , rc_moveDests = mkMoveDests emptyUFM
                 , rc_claims    = emptyUFM
-                , rc_wideDests = wideMoveDests platform cold block_live sccs
+                , rc_wideDests = fst wv
+                , rc_via       = snd wv
                 , rc_dests     = []
                 , rc_succs     = js
                 , rc_live      = block_live
@@ -354,9 +358,9 @@ linearRegAlloc' config initFreeRegs cold !freqs entry_ids block_live sccs
                     [ (b, listToUFM
                             [ (vr, rr)
                             | (vr, RegReal rr) <- dyingMoves platform instrs ])
-                    | BasicBlock b instrs <- flattenSCCs sccs ]
+                    | BasicBlock b instrs <- flat ]
                 , rc_clobbers  = case platformArch platform of
-                    ArchX86_64 -> Just (regClobbers platform sccs)
+                    ArchX86_64 -> Just (regClobbers platform flat)
                     _          -> Nothing
                 , rc_initFree  = initFreeRegs
                 , rc_config    = config }
@@ -374,14 +378,14 @@ linearRegAlloc' config initFreeRegs cold !freqs entry_ids block_live sccs
 -- stack check too, which run seldom; a write could count by how often its block
 -- runs: see Note [Frequencies before register allocation] in GHC.CmmToAsm.CFG.
 regClobbers :: Instruction instr
-            => Platform -> [SCC (LiveBasicBlock instr)]
+            => Platform -> [LiveBasicBlock instr]
             -> UniqFM VirtualReg Word64
-regClobbers platform sccs
+regClobbers platform blocks
   = foldl' (\acc (hit, s) -> nonDetStrictFoldUniqSet (mark hit) acc s)
            direct byHit
   where
     (direct, byHit) = foldl' (\m (BasicBlock _ instrs) -> foldl' ins m instrs)
-                             (emptyUFM, []) (flattenSCCs sccs)
+                             (emptyUFM, []) blocks
     -- each write's registers live past it: a small set marked at once, a vreg
     -- at a time, its mask looked up; a large one, as most divisions
     -- of !16269's CmmDiamondChain have, united with the others written with
@@ -512,18 +516,28 @@ dyingMovesLast platform instrs = nonDetEltsUFM (foldl' step emptyUFM instrs)
 -- is moved into that register in the same block, where the later vreg dies. A
 -- vreg that the vreg is moved into where it dies counts as the vreg in this
 -- check, where the move is in a block some vreg is live into and not one of the
--- given ones. The walk of each block follows only those vregs and registers,
--- taking an instruction's writes from its register usage ('liveBorn' being
--- filled in only for the graph allocator and the liveness dump).
+-- given ones. A vreg moved so into a vreg with a register here has that
+-- register too, up to four such moves back, so that its value is computed
+-- there, unless the check leaves it out; the second map gives each vreg moved
+-- so, left out or not, the vreg it is moved into. The walk of each block
+-- follows only those vregs and registers, taking an instruction's writes from
+-- its register usage ('liveBorn' being filled in only for the graph allocator
+-- and the liveness dump).
+{-# NOINLINE [0] wideMoveDests #-}
+-- (without this pragma, inlined before phase 0, into linearRegAlloc', its
+-- where-bindings were floated out of the thunk of its result, a thunk each,
+-- built for every procedure whether read or not)
 wideMoveDests :: Instruction instr
-              => Platform -> LabelSet -> BlockMap Regs
-              -> [SCC (LiveBasicBlock instr)]
-              -> UniqFM VirtualReg RealReg
-wideMoveDests platform cold block_live sccs
-  | isNullUFM cands = cands
-  | otherwise       = cands `minusUFM` foldl' blk emptyUFM blocks
+              => Platform -> LabelSet -> BlockFreqs -> BlockMap Regs
+              -> [LiveBasicBlock instr]
+              -> (UniqFM VirtualReg RealReg, UniqFM VirtualReg VirtualReg)
+wideMoveDests platform cold freqs block_live blocks
+  -- (no candidates, no walk: the walk over every block, which then marks
+  -- nothing, made the compiler allocate 0.015% more compiling T9961 at -O0, and
+  -- moved no figure by 0.005% at -O or -O2, on GHC 10.1.20261108)
+  | isNullUFM cands = (cands, via)
+  | otherwise       = (cands `minusUFM` foldl' blk emptyUFM blocks, via)
   where
-    blocks = flattenSCCs sccs
     live_in bid = mapFindWithDefault noRegs bid block_live
     -- a block some vreg is live into, and not one of the given ones
     warm bid live = uniqSetAny (isVirtualReg . regWithFormat_reg) (getRegs live)
@@ -539,21 +553,45 @@ wideMoveDests platform cold block_live sccs
     -- where it is the last block's and shadows a usable one or, on x86-64, is a
     -- vreg's only preference, which fallbackReg counts as one: leaving those
     -- out changed no code measured and costs compile allocation.
-    -- One walk finds them, and the moves of a vreg into another where it dies
-    -- in the same blocks, of which follow takes those of candidates: a walk
-    -- for each made the compiler run 0.39% more instructions compiling
-    -- !16269's CmmDiamondChain at -O0 and 0.18% more compiling T12707 and
-    -- T9961 at -O0 when this was added.
-    (cands, vmoves) = foldl' blkMoves (emptyUFM, []) blocks
+    -- Four moves back, bounding back's passes, is arbitrary, and may be raised
+    -- where a case needs more at little cost to the compiler: lifted to 1000,
+    -- compiling a loop that rotates 50 to 400 variables ran 1.02 to 1.19 times
+    -- the instructions, the excess growing as N squared.
+    (cands, via) = back (4 :: Int) (direct, emptyUFM)
+    direct = mapUFM fst directAt
+    -- One walk finds them, with the block of the move, and the moves of a vreg
+    -- into another where it dies in the same blocks, which back and follow
+    -- take: a walk for each made the compiler run 0.46% more instructions
+    -- compiling !16269's CmmDiamondChain at -O0, 0.39% more at -O and 0.38%
+    -- more at -O2, on GHC 10.1.20261108.
+    (directAt, vmovesR) = foldl' blkMoves (emptyUFM, []) blocks
     blkMoves acc (BasicBlock bid instrs)
       | warm bid live = foldl' mv acc (dyingMoves platform instrs)
       | otherwise     = acc
       where
         live = live_in bid
         mv (!cs, !vm) (vr, RegReal rr)
-          | RegVirtual vr `elemRegs` live = (addToUFM cs vr rr, vm)
+          | RegVirtual vr `elemRegs` live = (addToUFM cs vr (rr, bid), vm)
         mv (!cs, !vm) (a, RegVirtual b)   = (cs, (a, b) : vm)
         mv csvm _                         = csvm
+    -- a vreg moved where it dies into a candidate, the move coalescing the two,
+    -- has the candidate's destination too, so that the value is computed there
+    -- from the start, and the candidate as the vreg it is moved into: up to
+    -- four such moves back
+    back :: Int -> (UniqFM VirtualReg RealReg, UniqFM VirtualReg VirtualReg)
+         -> (UniqFM VirtualReg RealReg, UniqFM VirtualReg VirtualReg)
+    back 0 cv = cv
+    back n cv@(c, w)
+      | isNullUFM c = cv
+      | null new    = cv
+      | otherwise   = back (n - 1)
+                        ( addListToUFM c [ (a, d) | (a, _, d) <- new ]
+                        , addListToUFM w [ (a, b) | (a, b, _) <- new ] )
+      where new = [ (a, b, d) | (a, b) <- vmoves, not (a `elemUFM` c)
+                              , Just d <- [lookupUFM c b] ]
+    -- the moves of vregs into vregs where they die, in the blocks warm takes,
+    -- in the walk's order, of which back keeps a vreg's last
+    vmoves = reverse vmovesR
     -- The order in which the folds over and listings of unique sets and maps
     -- here visit their members does not reach the result: each builds a set,
     -- adds or deletes members or tests for one, and born's bear marks a
@@ -571,7 +609,8 @@ wideMoveDests platform cold block_live sccs
     -- vreg where it dies
     follow = plusUFM_C (++) (mapUFM_Directly (\u d -> [(u, d)]) cands)
            $ listToUFM_C (++)
-      [ (b, [(getUnique a, d)]) | (a, b) <- vmoves, Just d <- [lookupUFM cands a] ]
+      [ (b, [(getUnique a, d)])
+      | (a, b) <- vmoves, Just d <- [lookupUFM cands a] ]
     -- bad: the candidates found live together with their destination;
     -- vs: the followed vregs live; ds: the destinations live
     blk bad (BasicBlock bid instrs)
@@ -584,41 +623,42 @@ wideMoveDests platform cold block_live sccs
         in go loc bad' vs ds instrs
       where live = live_in bid
     -- a block finds a candidate bad only where a destination is live into
-    -- it or written in it, a move into one where a vreg dies included:
-    -- elsewhere no destination is live during its walk, which then marks
-    -- nothing; walking every block made the compiler run 3.8% more
-    -- instructions compiling !16269's CmmDiamondChain at -O0 and 3.1% more at
-    -- -O1 and -O2 when this was added
+    -- it or written in it, a move into one where a vreg dies included, or,
+    -- where candidates are propagated, where it writes a vreg with a
+    -- destination directly (wantedDirect): elsewhere no destination is live
+    -- during its walk and no such vreg is born, so that it marks nothing;
+    -- walking every block made the compiler run 3.8% more instructions
+    -- compiling !16269's CmmDiamondChain at -O0 and 3.1% more at -O1 and -O2
+    -- when this was added
     touched live instrs
       =  any (\rr -> RegReal rr `elemRegs` live) destList
       || any (any isDest . writes . liveInstrUsage) instrs
+      || not (isNullUFM via)
+         && any (any isDirect . writes . liveInstrUsage) instrs
     destList = bitsOf dests
     bitsOf 0 = []
     bitsOf m = RealRegSingle (countTrailingZeros m) : bitsOf (m .&. (m - 1))
     isDest r = case regWithFormat_reg r of
       RegReal rr -> inDests rr
       _          -> False
+    isDirect r = case regWithFormat_reg r of
+      RegVirtual v -> v `elemUFM` direct
+      _            -> False
     go _ !bad !_ !_ [] = bad
     go loc !bad !vs !ds (LiveInstr (Instr _) (Just l) : is)
-      | quiet (liveDieRead l), not (any seen ws), quiet (liveDieWrite l)
-      , isEmptyUniqSet vs || not (any (local loc) ws)
-      = go loc bad vs ds is
-      | otherwise
       = let !(vs1, ds1)       = dies (vs, ds) (liveDieRead l)
-            -- (no followed vreg live, no candidate wanted: the fold over the
+            -- (no followed vreg live, no candidate wanted: the folds over the
             -- writes anyway made the compiler run 0.051% more instructions
             -- compiling nofib's puzzle at -O0 and 0.015% and 0.014% more at -O
             -- and -O2, on GHC 10.1.20261108)
             bad1 | isEmptyUniqSet vs1 = bad
-                 | otherwise          = foldl' (wanted loc vs1) bad ws
+                 | otherwise          = foldl' (wantedDirect vs1)
+                                          (foldl' (wanted loc vs1) bad ws) ws
             !(bad', vs2, ds2) = foldl' (flip bear) (bad1, vs1, ds1) ws
             !(vs3, ds3)       = dies (vs2, ds2) (liveDieWrite l)
         in go loc bad' vs3 ds3 is
       where ws = writes (liveUsage l)
     go loc !bad !vs !ds (_ : is) = go loc bad vs ds is
-    local loc r = case regWithFormat_reg r of
-      RegVirtual v -> v `elemUFM` loc
-      RegReal _    -> False
     -- a vreg born with a destination in loc: the live followed vregs'
     -- candidates with that destination are bad, but the vreg's own, which an
     -- update in place keeps in its register
@@ -626,11 +666,24 @@ wideMoveDests platform cold block_live sccs
       RegVirtual v
         | Just w <- lookupUFM loc v -> clash w bad (delOneFromUniqSet vs v)
       _ -> bad
-    -- none of the registers names a followed vreg or a destination
-    quiet regs = not (uniqSetAny seen (getRegs regs))
-    seen r = case regWithFormat_reg r of
-      RegVirtual v -> v `elemUFM` follow
-      RegReal rr   -> inDests rr
+    -- a propagated candidate yields its destination to a vreg with that
+    -- destination directly, born while it is live, where the direct vreg's move
+    -- into the register is estimated to run more often than the move into it at
+    -- the end of the candidate's chain, by the block frequencies, which inherit
+    -- static prediction's errors on tag tests (Note [Static prediction of tag
+    -- tests] in GHC.CmmToAsm.CFG)
+    wantedDirect vs bad r = case regWithFormat_reg r of
+      RegVirtual v
+        | Just w <- lookupUFM direct v
+        -> nonDetStrictFoldUniqSet
+             (\x b -> if x /= v && x `elemUFM` via && lookupUFM cands x == Just w
+                         && hotter v x
+                        then addToUFM b x () else b)
+             bad vs
+      _ -> bad
+    hotter d p = moveFreq d > moveFreq (chainEnd p)
+    moveFreq u = maybe 0 (blockFreq freqs . snd) (lookupUFM directAt u)
+    chainEnd p = maybe p chainEnd (lookupUFM via p)
     dies acc regs = nonDetStrictFoldUniqSet die acc (getRegs regs)
     die r acc@(!vs, !ds) = case regWithFormat_reg r of
       RegVirtual v | v `elementOfUniqSet` vs    -> (delOneFromUniqSet vs v, ds)
@@ -1122,10 +1175,10 @@ isReached entry_ids block_assig bid
 
 -- | Each block's jump targets.
 jumpSuccs :: Instruction instr
-          => [SCC (LiveBasicBlock instr)] -> BlockMap [BlockId]
-jumpSuccs sccs = mapFromList
+          => [LiveBasicBlock instr] -> BlockMap [BlockId]
+jumpSuccs blocks = mapFromList
   [ (bid, [ d | LiveInstr (Instr i) _ <- instrs, d <- jumpDestsOfInstr i ])
-  | BasicBlock bid instrs <- flattenSCCs sccs ]
+  | BasicBlock bid instrs <- blocks ]
 
 -- | Do register allocation on this basic block
 --
@@ -1876,12 +1929,21 @@ from which 'firstFreeInOrder' takes the first that is free:
    variable an earlier allocation gave the wide destination so (isStaleFirst),
    the free register of a recorded block the walk does reach takes this place.
 
+ * For a variable whose wide destination, below, is propagated from another
+   variable it is moved into where it dies, the register that variable has in
+   its first assignment: the propagated destination is where that variable
+   goes later, such as a loop variable at the loop's exit, and its first
+   assignment where it is, such as at the loop's head.
+
  * The real register a block the variable is live into moves it into where it
-   dies, such as R1 for a value evaluated some blocks after it is computed,
-   unless that register is live together with the variable somewhere, as
-   wideMoveDests counts it, or, on x86-64, the block follows a failed heap or
-   stack check. It is left out also where another variable the current block
-   reads or writes, with no location yet, has it as its first-used register.
+   dies, such as R1 for a value evaluated some blocks after it is computed, or,
+   for a variable moved where it dies into another variable that has such a
+   register, up to four such moves back, that register, so that the value is
+   computed where it goes; unless that register is live together with the
+   variable somewhere, as wideMoveDests counts it, or, on x86-64, the block
+   follows a failed heap or stack check. It is left out also where another
+   variable the current block reads or writes, with no location yet, has it as
+   its first-used register.
 
 Preferring every register the variable was assigned to, not only the first, was
 tried and turned out to barely matter.
@@ -1898,17 +1960,17 @@ for a value live across a C call on System V, so that the value need not move
 out of their way; and among those, as among the rest, R1's register, %rbx, last,
 as an evaluation and a return write it: a value given it may have to move out of
 their way, and a loop variable given it at the loop's entry moves at every
-iteration (#27981). On x86-64, for a virtual register with preferences, the free
-registers that one of the assignments the block's jumps lead to (rc_jumpLocs:
-a recorded jump target's, or that of a block a target not yet recorded jumps
-to) gives another virtual register are left out where others
-remain. This applies to the fallback only: a
-free preferred register is taken even where one of those assignments gives it to
-another virtual register, as leaving those out too made more join fixups cyclic
-and cost containers 0.13% and vector 0.11% more instructions (nofib's puzzle
-2.7%). Leaving them out for one with no preferences too gains nothing measured
-and costs compile time, the list of registers to leave out then being built for
-every such allocation.
+iteration (#27981). On x86-64, for a virtual register with preferences, the
+third above not counted, the free registers that one of the assignments the
+block's jumps lead to (rc_jumpLocs: a recorded jump target's, or that of a block
+a target not yet recorded jumps to) gives another virtual
+register are left out where others remain. This
+applies to the fallback only: a free preferred register is taken even where one
+of those assignments gives it to another virtual register, as leaving those out
+too made more join fixups cyclic and cost containers 0.13% and vector 0.11% more
+instructions (nofib's puzzle 2.7%). Leaving them out for one with no preferences
+too gains nothing measured and costs compile time, the list of registers to
+leave out then being built for every such allocation.
 
 TODO: the first-used preference is keyed by virtual register, and a Cmm local
 is one virtual register over its whole procedure, however many live ranges
@@ -1933,6 +1995,7 @@ firstFreeInOrder u free = do
   ctx@RA_Context { rc_moveDests = MoveDests moves allMoved movedTwice
                  , rc_claims    = claims
                  , rc_wideDests = wide
+                 , rc_via       = via
                  , rc_dests     = dests
                  , rc_succs     = succs
                  , rc_live      = live
@@ -2019,7 +2082,15 @@ firstFreeInOrder u free = do
                               fs -> fs
       noPrefs = isNothing mv && isNothing fu
                 && maybe True claimed (lookupUFM_Directly wide u)
-      chosen = pick mv (pick fu wdFree)
+      -- for a vreg whose wide destination is propagated from a vreg it is
+      -- moved into where it dies, that vreg's first-used register where it is
+      -- free: the propagated destination is where that vreg goes later, its
+      -- first-used register where it is
+      viaFirst = case lookupUFM_Directly via u of
+                   Just y | isJust (lookupUFM_Directly wide u)
+                          -> lookupFirstUsed (getUnique y) bassig
+                   _      -> Nothing
+      chosen = pick mv (pick fu (pick viaFirst wdFree))
   case stale of
     Just w | chosen == Just w -> setBlockAssigR (markStaleFirst u bassig)
     _                         -> return ()
