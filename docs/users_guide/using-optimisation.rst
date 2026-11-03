@@ -286,6 +286,25 @@ as such you shouldn't need to set any of them explicitly. A flag
     Enables some control flow optimisations in the Cmm code
     generator, merging basic blocks and avoiding jumps right after jumps.
 
+.. ghc-flag:: -fasm-copy-loop-heads
+    :shortdesc: Copy small loop heads over the jumps to them. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-asm-copy-loop-heads
+    :category:
+
+    :default: off but enabled by :ghc-flag:`-O`.
+    :since: 10.2.1
+
+    This copies, at the assembly stage of the code generator, each small loop
+    head that ends in a conditional branch over the jumps to it. Code layout
+    lets one edge into a loop head fall through and makes the others jump;
+    a block that jumped to the head now ends in a copy of the head's
+    instructions and branches to the head's successors itself, which saves
+    the jump at the cost of larger code.
+
+    This flag has an effect only together with :ghc-flag:`-fblock-layout-cfg`,
+    only on x86-64, and not under :ghc-flag:`-finfo-table-map`.
+
 .. ghc-flag:: -fasm-shortcutting
     :shortdesc: Enable shortcutting on assembly. Implied by :ghc-flag:`-O2`.
     :type: dynamic

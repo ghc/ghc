@@ -84,11 +84,12 @@
 --     register allocation: x86-64 alone (backendMaintainsCfg in
 --     GHC.CmmToAsm.BlockLayout), and, under -finfo-table-map, kept only
 --     through instruction selection (the TODO #20428 at livenessCfg
---     in cmmNativeGen). Static branch prediction for the layout, the chain
---     layout of -fblock-layout-cfg and invertCondBranches need it, and so
---     do the linear allocator's order of blocks and some of its register
---     preferences (step 6; Note [Frequencies before register allocation] in
---     GHC.CmmToAsm.CFG), which take it from step 4 under -finfo-table-map too.
+--     in cmmNativeGen). Static branch prediction for the layout, the copying of
+--     loop heads, the chain layout of -fblock-layout-cfg and
+--     invertCondBranches need it, and so do the linear allocator's
+--     order of blocks and some of its register preferences (step 6;
+--     Note [Frequencies before register allocation] in GHC.CmmToAsm.CFG), which
+--     take it from step 4 under -finfo-table-map too.
 --   * the machine registers of STG's argument registers (R1 and up, F, D, XMM)
 --     handed out between their uses: x86-64, PowerPC and, for XMM1 to XMM4,
 --     i386, which maps R1 to esi and reserves it; AArch64, RISC-V and LoongArch
@@ -173,7 +174,11 @@
 --      placed next, unless that block has an info table. Last, it calls
 --      ncgMakeFarBranches. On PowerPC, AArch64, RISC-V and LoongArch, this
 --      rewrites the branches that may be out of range; on x86 and x86-64 it
---      does nothing.
+--      does nothing. Under -fblock-layout-cfg and -fasm-copy-loop-heads (both
+--      on at -O1 and -O2), copyLoopHeads then copies each small loop head that
+--      ends in a conditional branch over the jumps to it that the layout left
+--      (Note [Copying loop heads] in GHC.CmmToAsm.X86.CodeGen), taking the
+--      loops from the back edges that optimizeCFG returns.
 --  12. On x86-64, when the CFG is kept, invertCondBranches turns a conditional
 --      jump to the block placed next, followed by a jump to another block, into
 --      the inverted conditional jump to the other block, unless the block
@@ -293,7 +298,7 @@ import GHC.Data.Stream (liftIO)
 import qualified GHC.Data.Stream as Stream
 import GHC.Settings
 
-import Data.List (sortBy)
+import Data.List (sortBy, mapAccumL)
 import Data.List.NonEmpty (groupAllWith, head)
 import Data.Maybe
 import Data.Ord         ( comparing )
@@ -691,9 +696,25 @@ cmmNativeGen
 
 cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
  = do
-        let config   = ncgConfig ncgImpl
+        -- config evaluated first, and the settings of the layout and of the
+        -- copying read from it once a decl, bound strictly: with config bound
+        -- lazily and the settings read in the tests after optimizeCFG, config
+        -- was a thunk that the code generator's state and the readers of the
+        -- platform and the weights held, each read entering it, and the
+        -- compiler ran 0.156% more instructions compiling T9961 at -O0 and
+        -- 0.150% more compiling T3294 at -O0, allocating 0.055% more compiling
+        -- T9961 there; with config evaluated first and the settings read in
+        -- those tests, it ran 0.012% more compiling T9961 at -O0, and 0.002%
+        -- and 0.003% more at -O and -O2, on GHC 10.1.20261111, all under
+        -- +RTS -A3G -V0 (under GHC's own RTS options, binding config lazily
+        -- added about half as many instructions compiling T9961 at -O0)
+        let !config  = ncgConfig ncgImpl
         let platform = ncgPlatform config
         let weights  = ncgCfgWeights config
+        let !layoutMode
+              | not (ncgCfgBlockLayout config) = 0 :: Int
+              | ncgCopyLoopHeads config, backendMaintainsCfg platform = 2
+              | otherwise = 1
 
         let proc_name = case cmm of
                 (CmmProc _ entry_label _ _) -> pprAsmLabel platform entry_label
@@ -751,17 +772,20 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                           else setEmpty
         -- how often the linear allocator estimates each block to run, from
         -- the procedure's first block, where the backend maintains the CFG and
-        -- static prediction is on (-fcmm-static-pred, at -O and -O2); bound
-        -- strictly, so that at -O0 it is the static 'const noBlockFreqs' and
-        -- not a thunk a procedure: bound lazily, it made the compiler allocate
-        -- 0.060% more compiling T9961 at -O0, and 0.025% and 0.024% more at -O
-        -- and -O2, on GHC 10.1.20261107
-            !allocFreqs = case cmm of
+        -- static prediction is on (-fcmm-static-pred, at -O and -O2), and the
+        -- registers holding tags, which static prediction reads in both
+        -- estimates; bound strictly, so that at -O0 the pair is static and not
+        -- a thunk a procedure: bound lazily, allocFreqs alone made the compiler
+        -- allocate 0.060% more compiling T9961 at -O0, and 0.025% and 0.024%
+        -- more at -O and -O2, on GHC 10.1.20261107
+            !(allocFreqs, predTags) = case cmm of
               CmmProc _ _ _ graph
                 | backendMaintainsCfg platform && ncgCmmStaticPred config
-                -> \entry -> blockFrequencies (tagRegisters graph) allocCold
-                                              entry nativeCfgWeights
-              _ -> const noBlockFreqs
+                , let tags = tagRegisters graph
+                -> ( blockFrequencies tags allocCold (g_entry graph)
+                                      nativeCfgWeights
+                   , tags )
+              _ -> (noBlockFreqs, mempty)
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
                 runUniqueDSM usGen
@@ -905,9 +929,56 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 {-# SCC "shortcutBranches" #-}
                 shortcutBranches config ncgImpl tabled postRegCFG
 
-        let optimizedCFG :: Maybe CFG
-            optimizedCFG =
-                optimizeCFG (ncgCmmStaticPred config) weights cmm <$!> postShortCFG
+        let optimizedLoops
+              :: Maybe (CFG, [(BlockId, BlockId)], [(BlockId, BlockId)])
+            optimizedLoops =
+                optimizeCFG (ncgCmmStaticPred config) predTags weights cmm
+                  <$!> postShortCFG
+
+        ---- copy small loop heads over the jumps to them that the chain layout
+        -- leaves, only in a procedure with loops: run for every decl, the step
+        -- made the compiler allocate 0.11% more and run 0.067% more
+        -- instructions compiling T9961 at -O, allocate 0.078% more compiling it
+        -- at -O2 and run 0.067% more compiling T3294 there, and nothing more at
+        -- -O0, where the step does not run, on GHC 10.1.20261108; the step is
+        -- bound strictly, as a function of the blocks as layout places them,
+        -- so that where it does not run it is a static Nothing that branchOpt
+        -- cases on: with the copies and their CFG bound strictly after layout,
+        -- the compiler ran 0.029% more instructions and allocated 0.040% more
+        -- compiling T9961 at -O0, and with them bound in branchOpt's where,
+        -- 0.023% and 0.027% more, on GHC 10.1.20261111; and test if block
+        -- layout may have a back edge to raise: where optimizeCFG found none,
+        -- the layout's search finds only edges into the procedure's first
+        -- block, if any, and it raises a back edge only above another edge into
+        -- its head that is neither a back edge nor a self loop, of which that
+        -- block has none from a block the CFG holds, the CFG holding only the
+        -- blocks the entry reaches (BUG #28088 at getCfg in GHC.CmmToAsm.CFG);
+        -- both by one chain of tests, here: with the step's tests made after
+        -- the layout, the compiler ran 0.010% and 0.011% more instructions
+        -- compiling T9961 at -O and -O2, on GHC 10.1.20261111
+        let !(copyHeads, optimizedCFG, layoutBacks)
+              | layoutMode == 2
+              , CmmProc {} <- cmm
+              , Just (cfg0, backs, _) <- optimizedLoops
+              , notNull backs
+              = ( Just $ \placed -> {-# SCC "copyLoopHeads" #-}
+                let copy cfg (CmmProc _ _ _ (ListGraph blocks),
+                              CmmProc info lbl live (ListGraph placed'))
+                      | Just (placed'', cfg') <- copyLoopHeads ncgImpl cfg backs
+                                                     info blocks placed'
+                      = (cfg', CmmProc info lbl live (ListGraph placed''))
+                    copy cfg (_, top) = (cfg, top)
+                    (cfg', tops) = mapAccumL copy cfg0 (zip shorted placed)
+                in (tops, Just $! cfg')
+                , Just cfg0, True )
+              -- the layout's flag first: the lists tested before it made the
+              -- compiler run 0.0076% more instructions compiling T9961 at -O0,
+              -- where the layout does not run, on GHC 10.1.20261111
+              | layoutMode /= 0
+              , Just (cfg, [], []) <- optimizedLoops
+              = (Nothing, Just cfg, False)
+              | otherwise
+              = (Nothing, (\(c, _, _) -> c) <$> optimizedLoops, True)
 
         maybeDumpCfg logger optimizedCFG "CFG Weights - Final" proc_name
 
@@ -928,7 +999,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         let (sequenced, us_seq) =
                         {-# SCC "sequenceBlocks" #-}
                         runUniqueDSM usAlloc $ mapM (BlockLayout.sequenceTop
-                                ncgImpl optimizedCFG)
+                                ncgImpl layoutBacks optimizedCFG)
                             shorted
 
         massert (checkLayout shorted sequenced)
@@ -936,14 +1007,17 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         let branchOpt :: [NatCmmDecl statics instr]
             branchOpt =
                 {-# SCC "invertCondBranches" #-}
-                map invert sequenced
+                case copyHeads of
+                  Nothing   -> map (invert optimizedCFG) sequenced
+                  Just copy -> case copy sequenced of
+                    (copied, copiedCFG) -> map (invert copiedCFG) copied
               where
-                invertConds :: LabelMap RawCmmStatics -> [NatBasicBlock instr]
-                            -> [NatBasicBlock instr]
-                invertConds = invertCondBranches ncgImpl optimizedCFG
-                invert top@CmmData {} = top
-                invert (CmmProc info lbl live (ListGraph blocks)) =
-                    CmmProc info lbl live (ListGraph $ invertConds info blocks)
+                invert :: Maybe CFG -> NatCmmDecl statics instr
+                       -> NatCmmDecl statics instr
+                invert _ top@CmmData {} = top
+                invert cfg (CmmProc info lbl live (ListGraph blocks)) =
+                    CmmProc info lbl live
+                      (ListGraph $ invertCondBranches ncgImpl cfg info blocks)
 
         -- generate unwinding information from cmm
         let unwinds :: BlockMap [UnwindPoint]

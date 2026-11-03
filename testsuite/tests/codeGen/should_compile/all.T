@@ -233,3 +233,29 @@ test('T20333c',
      [only_ways(['optasm']), unless(arch('x86_64'), skip),
       grep_errmsg(r'(-\d+\(%rbp\))$', [1])],
      compile, ['-ddump-asm'])
+
+# A loop head copied over one of the two jumps to it, by default, and over
+# neither under -fno-asm-copy-loop-heads: the head's comparison twice in the
+# assembly, then once (x86-64 assembly)
+test('CopyLoopHeads',
+     [only_ways(['optasm']), unless(arch('x86_64'), skip),
+      grep_errmsg(r'(cmpq \$1000003,)', [1])],
+     compile, ['-ddump-asm'])
+test('CopyLoopHeadsOff',
+     [extra_files(['CopyLoopHeads.hs']),
+      only_ways(['optasm']), unless(arch('x86_64'), skip),
+      grep_errmsg(r'(cmpq \$1000003,)', [1])],
+     multimod_compile, ['CopyLoopHeads', '-ddump-asm -fno-asm-copy-loop-heads'])
+
+# A loop head copied over the jumps to it from blocks that call C, without -g
+# and with it, where each call leaves unwinding information in its block:
+# the head's comparison three times in the assembly (x86-64 assembly)
+test('CopyLoopHeadsCall',
+     [only_ways(['optasm']), unless(arch('x86_64'), skip),
+      grep_errmsg(r'(cmpq \$1000003,)', [1])],
+     compile, ['-ddump-asm'])
+test('CopyLoopHeadsCallG',
+     [extra_files(['CopyLoopHeadsCall.hs']),
+      only_ways(['optasm']), unless(arch('x86_64'), skip),
+      grep_errmsg(r'(cmpq \$1000003,)', [1])],
+     multimod_compile, ['CopyLoopHeadsCall', '-ddump-asm -g'])

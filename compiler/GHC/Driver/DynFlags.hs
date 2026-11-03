@@ -1299,6 +1299,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_IgnoreAsserts)
     , ([1,2],   Opt_Loopification)
     , ([1,2],   Opt_CfgBlocklayout)      -- Experimental
+    , ([1,2],   Opt_AsmCopyLoopHeads)
 
     , ([1,2],   Opt_Specialise)
     , ([1,2],   Opt_PolymorphicSpecialisation)  -- Now on by default (#23559)
