@@ -104,32 +104,12 @@
 #include <fcntl.h>
 
 
-// Forward declarations of local types and helper functions to hide the
-// difference between ppoll() and select()
-#if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
-typedef struct timespec timeout;  // for ppoll()
-typedef struct { struct pollfd pollfds[1]; } fdset;
-#else
-typedef struct timeval timeout;   // for select()
-typedef struct { int fd; fd_set selectfds; } fdset; // need to stash fd
-#endif
-
-// local helpers, to hide the difference between ppoll() and select()
-static void poll_init_timeout(timeout *tv, Time t);
-static void poll_init_fdset(fdset *fds, int fd); // single fd only
-// These two return: >0 if fd ready, ==0 if timeout, <0 if error
-static int poll_no_timeout(fdset *fdset);
-static int poll_with_timeout(fdset *fdset, timeout *t);
-
-
 struct Timer {
-    /* Mutex to protect changes to the running state and thread id.
-     */
-    Mutex running_mutex;
+    /* Mutex to protect the thread id and other shared variables below. */
+    Mutex mutex;
 
-    /* Variable used to track if the timer is running or stopped.
-     */
-    bool running;
+    /* Condition variable for notifying changtes to the shared variables. */
+    Condition cond;
 
     /* When running (i.e. not stopped) each timer runs in its own thread.
      * The thread id is used to wait for the timer thread to terminate after
@@ -146,19 +126,17 @@ struct Timer {
     /* For periodic timers this is the tick interval. */
     Time interval;
 
-    /* Fds used with sendFdWakeup to notify the timer thread that any of the
-     * request variables below have been modified.
+    /* Shared variable used to track if the timer is running or stopped.
      */
-    int notifyfd_r;
-    int notifyfd_w;
+    bool running;
 
-    /* Atomic shared variable used by client threads to communicate that they
+    /* Shared variable used by client threads to communicate that they
      * want the timer thread to pause. This communication is one-way, with no
      * acknowledgement.
      */
     bool pause_request;
 
-    /* Atomic shared variable used by other threads to communicate that they
+    /* Shared variable used by other threads to communicate that they
      * want the timer thread to stop.
      */
     bool stop_request;
@@ -168,48 +146,37 @@ static void *timer_thread_func(void *_timer)
 {
     Timer *timer = _timer;
 
-    // Thread-local view of our state. We compare these with the corresponding
-    // atomic shared variables used to request state changes.
-    bool paused = ACQUIRE_LOAD_ALWAYS(&timer->pause_request);
-    bool stop   = RELAXED_LOAD_ALWAYS(&timer->stop_request);
-
-    timeout timeout;
-    fdset fdset;
-    poll_init_timeout(&timeout, timer->interval);
-    poll_init_fdset(&fdset, timer->notifyfd_r);
-
-    while (!stop) {
-
-        int notify;
-        if (paused) {
-            notify = poll_no_timeout(&fdset);
+    /* We release the lock during waitCondition (which is of course most of the
+     * time) and when running the timer handler.
+     */
+    ACQUIRE_LOCK_ALWAYS(&timer->mutex);
+    while (!timer->stop_request) {
+        if (timer->pause_request) {
+            waitCondition(&timer->cond, &timer->mutex);
         } else {
-            notify = poll_with_timeout(&fdset, &timeout);
-        }
+            if (!timedWaitCondition(&timer->cond, &timer->mutex, timer->interval)) {
+                /* The time expired */
 
-        if (RTS_LIKELY(notify == 0)) {
-            // The time expired, no state change notification.
-            timer->handler(timer->handler_arg);
-
-        } else if (notify > 0) {
-            // State change notification, check the request variables.
-
-            // We rely on sendFdWakeup and select/poll to provide the
-            // happens-before relation. So if the request variables are set
-            // before calling sendFdWakeup, then we should be able to reliably
-            // read them here afterwards.
-            collectFdWakeup(timer->notifyfd_r);
-
-            paused = ACQUIRE_LOAD_ALWAYS(&timer->pause_request);
-            stop   = RELAXED_LOAD_ALWAYS(&timer->stop_request);
-
-        } else if (errno != EINTR) {
-            // While the RTS attempts to mask signals, some foreign libraries
-            // that rely on signal delivery may unmask them. Consequently we
-            // may see EINTR. See #24610.
-            sysErrorBelch("Timer: poll failed: %s", strerror(errno));
+                if (timer->hint == TimerHandlerLongRunning) {
+                    /* Long-running handlers are allowed to take locks, and in
+                     * particular it may need pause the timer, which requires
+                     * taking the timer lock! Thus we must release the lock
+                     * while running the handler,
+                     */
+                    RELEASE_LOCK_ALWAYS(&timer->mutex);
+                    timer->handler(timer->handler_arg);
+                    ACQUIRE_LOCK_ALWAYS(&timer->mutex);
+                } else {
+                    /* Short-running handlers on the other hand are not allowed
+                     * to block, which means they're not allowed to take locks,
+                     * and hence we don't need to drop the lock here.
+                     */
+                    timer->handler(timer->handler_arg);
+                }
+            }
         }
     }
+    RELEASE_LOCK_ALWAYS(&timer->mutex);
 
     return NULL;
 }
@@ -243,23 +210,17 @@ void reinitTimer(Timer *timer)
     timer->pause_request = false;
     timer->stop_request  = false;
     timer->running       = false;
-    initMutex(&timer->running_mutex);
-
-    /* In the child process after a fork() the thread is gone but the fds
-     * remain. To avoid leaking the old file descriptors (#25280), we must
-     * close them and create new ones for the child.
-     */
-    closeFdWakeup(timer->notifyfd_r, timer->notifyfd_w);
-    newFdWakeup(&timer->notifyfd_r, &timer->notifyfd_w);
+    initMutex(&timer->mutex);
+    initCondition(&timer->cond);
 }
 
 
 /* Idempotent. */
 void runTimer(Timer *timer)
 {
-    ACQUIRE_LOCK_ALWAYS(&timer->running_mutex);
+    ACQUIRE_LOCK_ALWAYS(&timer->mutex);
     if (timer->running) {
-        RELEASE_LOCK_ALWAYS(&timer->running_mutex);
+        RELEASE_LOCK_ALWAYS(&timer->mutex);
         return;
     }
 
@@ -306,7 +267,7 @@ void runTimer(Timer *timer)
         barf("Timer: Failed to spawn thread: %s", strerror(errno));
     }
     timer->running = true;
-    RELEASE_LOCK_ALWAYS(&timer->running_mutex);
+    RELEASE_LOCK_ALWAYS(&timer->mutex);
 }
 
 
@@ -315,38 +276,31 @@ void runTimer(Timer *timer)
  */
 void haltTimer(Timer *timer)
 {
-    ACQUIRE_LOCK_ALWAYS(&timer->running_mutex);
+    ACQUIRE_LOCK_ALWAYS(&timer->mutex);
     if (!timer->running) {
-        RELEASE_LOCK_ALWAYS(&timer->running_mutex);
+        RELEASE_LOCK_ALWAYS(&timer->mutex);
         return;
     }
 
-    RELEASE_STORE_ALWAYS(&timer->stop_request, true);
-    sendFdWakeup(timer->notifyfd_w);
+    timer->stop_request = true;
+    signalCondition(&timer->cond);
+    timer->running = false;
+    RELEASE_LOCK_ALWAYS(&timer->mutex);
 
     // wait for the timer thread to terminate
     if (pthread_join(timer->thread_id, NULL)) {
         sysErrorBelch("Timer: Failed to join: %s", strerror(errno));
     }
-    timer->running = false;
-    RELEASE_LOCK_ALWAYS(&timer->running_mutex);
 }
 
 
 /* Asynchronous. Idempotent. */
 void unpauseTimer(Timer *timer)
 {
-    RELEASE_STORE_ALWAYS(&timer->pause_request, false);
-    sendFdWakeup(timer->notifyfd_w);
-    /* TODO: there's a bit of a resource problem here. If the fd wakeup is
-     * using pipes then if the timer thread is not running then the pipe will
-     * fill. This is not a corectness problem: the pipe is written to with
-     * non-blocking writes. But it does pointlessly use up memory.
-     *
-     * It might be better to use a condition variable rather than the fdwakeup.
-     * For flexible timers however using timerfd, one would still want to use
-     * eventfd. And for kqueue there is probably another solution.
-     */
+    ACQUIRE_LOCK_ALWAYS(&timer->mutex);
+    timer->pause_request = false;
+    signalCondition(&timer->cond);
+    RELEASE_LOCK_ALWAYS(&timer->mutex);
 }
 
 
@@ -356,86 +310,16 @@ void unpauseTimer(Timer *timer)
  */
 void pauseTimer(Timer *timer)
 {
-    RELEASE_STORE_ALWAYS(&timer->pause_request, true);
-    sendFdWakeup(timer->notifyfd_w);
+    ACQUIRE_LOCK_ALWAYS(&timer->mutex);
+    timer->pause_request = true;
+    signalCondition(&timer->cond);
+    RELEASE_LOCK_ALWAYS(&timer->mutex);
 }
 
 
 void freeTimer(Timer *timer)
 {
-    closeFdWakeup(timer->notifyfd_r, timer->notifyfd_w);
+    closeMutex(&timer->mutex);
+    closeCondition(&timer->cond);
     stgFree(timer);
 }
-
-
-/* Implementation of the local helpers, to hide the difference between ppoll()
- * and select().
- */
-#if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
-static void poll_init_timeout(timeout *tv, Time t)
-{
-    tv->tv_sec  = TimeToSeconds(t);
-    tv->tv_nsec = TimeToNS(t) % 1000000000;
-}
-
-static void poll_init_fdset(fdset *fds, int fd)
-{
-    fds->pollfds[0].fd = fd;
-    fds->pollfds[0].events = POLLIN;
-}
-
-static int poll_no_timeout(fdset *fds)
-{
-    int nfds = 1;
-    return ppoll(fds->pollfds, nfds, NULL, NULL);
-}
-
-static int poll_with_timeout(fdset *fds, timeout *ts)
-{
-    int nfds = 1;
-    return ppoll(fds->pollfds, nfds, ts, NULL);
-}
-
-#else // select()
-
-static void poll_init_timeout(timeout *tv, Time t)
-{
-    tv->tv_sec  = TimeToSeconds(t);
-    /* convert remainder time in nanoseconds to microseconds, rounding up: */
-    tv->tv_usec = ((TimeToNS(t) % 1000000000) + 999) / 1000;
-}
-
-static void poll_init_fdset(fdset *fds, int fd)
-{
-    /* select() modifies the fd_set: it uses the same fd_set for reporting as
-     * for input. Thus we must rebuild it every time. We can optimise this
-     * rebuilding somewhat however if we rely on select() not modifying the
-     * bits that we didn't ask it to look at. So we can zero the fd_set just
-     * once, and then only reset the single bit for the single fd, before each
-     * call to selct().
-     */
-    fds->fd = fd;
-    FD_ZERO(&fds->selectfds);
-}
-
-static int poll_no_timeout(fdset *fds)
-{
-    /* select() modifies the fd_set so we must set it every time, but we rely
-     * on it not touching other bits to avoid having to FD_ZERO it every time
-     */
-    FD_SET(fds->fd, &fds->selectfds);
-    int nfds = fds->fd+1;
-    return select(nfds, &fds->selectfds, NULL, NULL, NULL);
-}
-
-static int poll_with_timeout(fdset *fds, timeout *tv)
-{
-    struct timeval tv_tmp = *tv; // copy since select may change this value.
-    /* select() modifies the fd_set so we must set it every time, but we rely
-     * on it not touching other bits to avoid having to FD_ZERO it every time
-     */
-    FD_SET(fds->fd, &fds->selectfds);
-    int nfds = fds->fd+1;
-    return select(nfds, &fds->selectfds, NULL, NULL, &tv_tmp);
-}
-#endif
