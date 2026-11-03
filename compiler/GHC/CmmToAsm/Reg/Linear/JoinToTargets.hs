@@ -42,10 +42,7 @@ import GHC.Data.Word64Map.Strict (isSubmapOfBy)
 --
 joinToTargets
         :: (FR freeRegs, Instruction instr)
-        => BlockMap Regs -- ^ maps the unique of the blockid to the set of vregs
-                                        --      that are known to be live on the entry to each block.
-
-        -> BlockId                      -- ^ id of the current block
+        => BlockId                      -- ^ id of the current block
         -> instr                        -- ^ branch instr on the end of the source block.
 
         -> RegM freeRegs ([NatBasicBlock instr] -- fresh blocks of fixup code.
@@ -54,7 +51,7 @@ joinToTargets
                                                 -- patched to jump
                                                 -- to a fixup block first.
 
-joinToTargets block_live id instr
+joinToTargets id instr
 
         -- we only need to worry about jump instructions.
         | not $ isJumpishInstr instr
@@ -67,15 +64,12 @@ joinToTargets block_live id instr
         -- with the same moves, and both are reachable. This costs only code
         -- size, on x86 and x86-64.
         | otherwise
-        = joinToTargets' block_live [] id instr (jumpDestsOfInstr instr)
+        = joinToTargets' [] id instr (jumpDestsOfInstr instr)
 
 -----
 joinToTargets'
         :: (FR freeRegs, Instruction instr)
-        => BlockMap Regs -- ^ maps the unique of the blockid to the set of vregs
-                                        --      that are known to be live on the entry to each block.
-
-        -> [NatBasicBlock instr]        -- ^ acc blocks of fixup code.
+        => [NatBasicBlock instr]        -- ^ acc blocks of fixup code.
 
         -> BlockId                      -- ^ id of the current block
         -> instr                        -- ^ branch instr on the end of the source block.
@@ -85,17 +79,20 @@ joinToTargets'
         -> RegM freeRegs ([NatBasicBlock instr], instr)
 
 -- no more targets to consider. all done.
-joinToTargets' _          new_blocks _ instr []
+joinToTargets' new_blocks _ instr []
         = return (new_blocks, instr)
 
 -- handle a branch target.
-joinToTargets' block_live new_blocks block_id instr (dest:dests)
+joinToTargets' new_blocks block_id instr (dest:dests)
  = do
         -- get the map of where the vregs are stored on entry to each basic block.
         block_assig     <- getBlockAssigR
 
         -- get the assignment on entry to the branch instruction.
         assig           <- getAssigR
+
+        -- get the map of the vregs live on entry to each block.
+        RA_Context { rc_live = block_live } <- getContextR
 
         -- adjust the current assignment to remove any vregs that are not live
         -- on entry to the destination block.
@@ -110,11 +107,11 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
          Nothing
           -> do setBlockAssigR
                   (updateBlockAssignment dest adjusted_assig block_assig)
-                joinToTargets' block_live new_blocks block_id instr dests
+                joinToTargets' new_blocks block_id instr dests
 
          Just dest_assig
           -> joinToTargets_again
-                        block_live new_blocks block_id instr dest dests
+                        new_blocks block_id instr dest dests
                         assig dest_assig
 
 
@@ -161,8 +158,7 @@ given, and it stands for the rest of the procedure.
 
 -- we've jumped to this block before
 joinToTargets_again :: (FR freeRegs, Instruction instr)
-                    => BlockMap Regs
-                    -> [NatBasicBlock instr]
+                    => [NatBasicBlock instr]
                     -> BlockId
                     -> instr
                     -> BlockId
@@ -171,12 +167,12 @@ joinToTargets_again :: (FR freeRegs, Instruction instr)
                     -> UniqFM Reg Loc
                     -> RegM freeRegs ([NatBasicBlock instr], instr)
 joinToTargets_again
-    block_live new_blocks block_id instr dest dests
+    new_blocks block_id instr dest dests
     src_assig dest_assig
 
         -- every vreg of the recorded assignment is where it records it
         | recordedLocsHold dest_assig src_assig
-        = joinToTargets' block_live new_blocks block_id instr dests
+        = joinToTargets' new_blocks block_id instr dests
 
         -- assignments don't match, need fixup code
         | otherwise
@@ -234,7 +230,7 @@ joinToTargets_again
 
                 -- if we didn't need any fixups, then don't include the block
                 case fixUpInstrs of
-                 []     -> joinToTargets' block_live new_blocks block_id instr dests
+                 []     -> joinToTargets' new_blocks block_id instr dests
 
                  -- patch the original branch instruction so it goes to our
                  --     fixup block instead.
@@ -263,7 +259,7 @@ joinToTargets_again
                                 -- to, which gets an edge in the CFG and is laid
                                 -- out and emitted. This costs only code size.
                                 recordFixupBlock block_id fixup_block_id dest
-                                joinToTargets' block_live (block : new_blocks)
+                                joinToTargets' (block : new_blocks)
                                                block_id instr' dests
 
 
