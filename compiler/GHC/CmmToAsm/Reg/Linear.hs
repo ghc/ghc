@@ -119,6 +119,7 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Types
 import GHC.Platform.Reg
+import GHC.Platform.Reg.Class (RegClass)
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
@@ -342,10 +343,11 @@ linearRegAlloc' config initFreeRegs cold !freqs entry_ids block_live sccs
                 , rc_wideDests = fst wv
                 , rc_via       = snd wv
                 , rc_dests     = []
-                , rc_lastReads = LastReads emptyUFM []
+                , rc_lastReads = LastReads emptyUFM [] []
                 , rc_succs     = js
                   -- built where read
                 , rc_joins     = joinBlocks cold js
+                , rc_acyclicJoins = acyclicJoins js sccs
                 , rc_live      = block_live
                   -- only the blocks with such moves, built where first read
                 , rc_dying     = foldl' (dyingIn platform) mapEmpty flat
@@ -793,7 +795,7 @@ linearRA_SCCs cold freqs entry_ids succs block_live sccs
     clobbersMany li
       = length [ () | RegWithFormat (RegReal _) _ <- writes (liveInstrUsage li) ] > 4
     one acc (AcyclicSCC block) = do
-        blocks' <- processBlock succs block_live block
+        blocks' <- processBlock False succs block_live block
         return (reverse blocks' ++ acc)
     one acc (CyclicSCC blocks) = process entries succs block_live acc blocks
 
@@ -1157,7 +1159,7 @@ process entry_ids succs block_live =
       = do
           block_assig <- getBlockAssigR
           if isReached entry_ids block_assig id
-            then do b' <- processBlock succs block_live b
+            then do b' <- processBlock True succs block_live b
                     go blocks next_round (reverse b' ++ accum) True
 
             else do go blocks (b : next_round) accum madeProgress
@@ -1180,16 +1182,18 @@ jumpSuccs blocks = mapFromList
 --
 processBlock
         :: RegAllocConstraint freeRegs instr
-        => BlockMap [BlockId]         -- ^ each block's jump targets
+        => Bool                       -- ^ whether the block is in a cycle
+        -> BlockMap [BlockId]         -- ^ each block's jump targets
         -> BlockMap Regs              -- ^ live regs on entry to each basic block
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
 
-processBlock succs block_live (BasicBlock id instrs)
+processBlock cyclic succs block_live (BasicBlock id instrs)
  = do   -- pprTraceM "processBlock" $ text "" $$ ppr (BasicBlock id instrs)
         initBlock id block_live
         platform <- getPlatform
         bassig <- getBlockAssigR
+        RA_Context { rc_acyclicJoins = joins } <- getContextR
         let !dests = mapFindWithDefault [] id succs
             -- the jump targets' recorded assignments, and for one not yet
             -- reached, those of the blocks it jumps to, up to three jumps on,
@@ -1248,7 +1252,7 @@ processBlock succs block_live (BasicBlock id instrs)
             -- reads in it, built when the block first has to spill one or to
             -- free for a vreg the first register the assignments in rc_jumpLocs
             -- give it ('slotAhead')
-            lastReads = lastReadsIn dests block_live instrs
+            lastReads = lastReadsIn joins dests block_live bassig cyclic instrs
         setBlockContextR dests locs claims lastReads $ mkMoveDests $ listToUFM $
           loop_moves
           -- unlike dyingMovesLast's, these moves into real registers include
@@ -1709,15 +1713,17 @@ the first two taking it as a ranking:
 
 * allocRegsAndSpill_spill, where no register of the class needed is free,
   chooses among the vregs in a register of the class, other than those being
-  allocated for the instruction (keep). It evicts the first in the order of
-  those in both a register and their slot or, if there are none, of those in
-  a register only, whatever its next use (the ToDo of step (a) in the outline
-  at the top of this module). Where a register of the class is free, it gives
-  the vreg being allocated the first register that the assignments in
-  rc_jumpLocs give it, evicting its holder, if the holder is not
-  kept, no instruction left in the block reads it, and one of those assignments
-  has it in its slot and none in a register ('slotAhead'): a choice that does
-  not depend on the order.
+  allocated for the instruction (keep). It evicts, of those in both a register
+  and their slot or, if there are none, of those in a register only, the first
+  in the order that it counts as read no more in the block, else the first,
+  whatever their preferences or the x86-64 order of free registers (evicting
+  the last instead about doubles the reloads compiling perf/compiler's T3294 at
+  -O0). Before ranking the vregs, and whether or not a register of the class is
+  free, it gives the vreg being allocated the first register that the
+  assignments in rc_jumpLocs give it, evicting its holder, if the
+  holder is not kept, no instruction left in the block reads it, and one of
+  those assignments has it in its slot and none in a register ('slotAhead'): a
+  choice that does not depend on the order.
 * saveClobberedTemps finds new registers for the values an instruction clobbers
   in the order, so an earlier value can take a free register that a later one
   prefers, and once the free registers that would suit them run out, the later
@@ -2458,13 +2464,30 @@ allocRegsAndSpill_spill reading !pos keep spills alloc r@(VirtualRegWithFormat v
             jl = jumpLocRegs (getUnique vr) locs
             -- the register w taken from temp, at l in the assignment, which
             -- goes to its slot, stored there unless l is InBoth
-            ahead w temp l old_fmt = do
-                (spill_store, slot) <- case l of
-                  InBoth _ sl -> return ([], sl)
-                  _           -> do
-                    sp <- spillR (RegWithFormat (RegReal w) old_fmt) temp
-                    recordSpill (SpillAlloc temp)
-                    return sp
+            ahead w temp l old_fmt = case l of
+                InBoth _ slot -> evicted w temp old_fmt [] slot
+                _             -> do
+                  (spill_store, slot) <- spillR (RegWithFormat (RegReal w) old_fmt) temp
+                  recordSpill (SpillAlloc temp)
+                  evicted w temp old_fmt spill_store slot
+            -- the register the first assignment in rc_jumpLocs holding the vreg
+            -- in a register gives it (ws, 'jumpLocRegs'), with its holder and
+            -- the holder's location, where it is not free and the holder is one
+            -- the block reads no more that goes to its slot ('slotAhead')
+            {-# INLINE holderAhead #-}
+            holderAhead ws
+              | w : _ <- ws
+              , w `notElem` freeRegs_thisClass
+              , targetClassOfRealReg platform w == regclass
+              , Just (temp, loc) <- occupant w assig
+              , notKept temp keep
+              , slotAhead lastReads locs pos temp
+              = Just (w, temp, loc)
+              | otherwise = Nothing
+            -- the register w taken from temp, in slot once spill_store has run,
+            -- for the vreg, at its format rather than temp's (#26542)
+            {-# INLINE evicted #-}
+            evicted w temp old_fmt spill_store slot = do
                 let assig1 = addToUFM_Directly assig temp $ Loc (InMem slot) old_fmt
                     assig2 = addToUFM assig1 vr $! newLocation spill_loc (RealRegUsage w vrFmt)
                 setAssigR $ toRegMap assig2
@@ -2479,12 +2502,7 @@ allocRegsAndSpill_spill reading !pos keep spills alloc r@(VirtualRegWithFormat v
            -- having that one in its slot and none in a register ('slotAhead'):
            -- that one goes to its slot here rather than on the way there, and
            -- the vreg takes its register, as it would have to on the way
-           | w : _ <- jl
-           , w `notElem` freeRegs_thisClass
-           , targetClassOfRealReg platform w == regclass
-           , Just (temp, Loc l old_fmt) <- occupant w assig
-           , temp `notElem` map (getUnique . virtualRegWithFormat_reg) keep
-           , slotAhead lastReads locs pos temp
+           | Just (w, temp, Loc l old_fmt) <- holderAhead jl
            -> ahead w temp l old_fmt
 
          _ : _ ->
@@ -2505,68 +2523,68 @@ allocRegsAndSpill_spill reading !pos keep spills alloc r@(VirtualRegWithFormat v
            do   let compat reg'
                       =  targetClassOfRealReg platform reg'
                       == regclass
-                    keep_us = map (getUnique . virtualRegWithFormat_reg) keep
-                    evictable temp reg = compat reg && temp `notElem` keep_us
-                    -- the first vreg we could kick out that is already in
-                    -- a slot, and the first that is only in a reg, which
-                    -- would require writing the reg to a new slot before
-                    -- using it
-                    pick temp (Loc l fmt) acc@(both, only) = case l of
-                      InBoth reg mem
-                        | Nothing <- both, evictable temp reg
-                        -> (Just (temp, RealRegUsage reg fmt, mem), only)
-                      InReg reg
-                        | Nothing <- only, evictable temp reg
-                        -> (both, Just (temp, RealRegUsage reg fmt))
-                      _ -> acc
-                    -- the fold visits the vregs in the order of their uniques,
-                    -- and that order picks the vreg evicted below: of those in
-                    -- a register and not in keep whose register is of the class
-                    -- needed (compat), the first in both a register and a slot,
-                    -- else the first in a register only (Note [Unique order in
-                    -- the linear allocator])
-                    !(first_inBoth, first_inReg)
-                      = nonDetStrictFoldUFM_Directly pick (Nothing, Nothing)
-                                                     assig
+                    evictable temp reg = compat reg && notKept temp keep
+                    -- of the vregs we could kick out that are already in
+                    -- a slot, the first that no instruction left in the block
+                    -- reads, else the first; and of those only in a reg, the
+                    -- same, sought only while none of the first kind has been
+                    -- found, which would be chosen instead. One live into a
+                    -- jump target with no recorded assignment that other
+                    -- blocks jump to as well counts as read again: evicted,
+                    -- it would be in its slot in the assignment this block
+                    -- records, so that every later jump there stores it and
+                    -- the code after the join reloads it ('intoUnrecorded');
+                    -- not where the block or the join is in a cycle, a loop's
+                    -- head then recording what the loop keeps in registers
+                    -- whether a vreg of the class is live out of the block,
+                    -- as one evicted by the guard of `result` below is
+                    lo = liveOutClass (platformArch platform) lastReads regclass
+                    readNoMore temp = not (readLeft lastReads pos temp)
+                                      && not (intoUnrecorded lastReads temp)
+                    {-# INLINE better #-}
+                    better seek temp loc@(Loc l _) best@(Victim k _) = case l of
+                      InBoth reg _ -> at 3 reg
+                      InReg reg    -> at 1 reg
+                      _            -> best
+                      where
+                        found rank = Victim rank (Just (temp, loc))
+                        at base !reg
+                          | k > base || (k == base && not seek) = best
+                          | not (evictable temp reg)            = best
+                          | seek, readNoMore temp = found (base + 1)
+                          | k < base              = found base
+                          | otherwise             = best
+                    -- The folds visit the vregs in the order of their uniques,
+                    -- which decides the first of each kind above
+                    -- (Note [Unique order in the linear allocator]).
+                    -- Only a vreg live out of the block can be read no more
+                    -- in it, so where none of the class is, the second fold
+                    -- calls no readNoMore, which builds the map of last-read
+                    -- positions in the block's LastReads: called there too,
+                    -- the compiler ran 3.7% more instructions and allocated
+                    -- 0.21% more compiling T3294 at -O0, 1.8% and 0.11% more
+                    -- at -O and 1.8% and 0.10% more at -O2, on GHC
+                    -- 10.1.20261108.
+                    victim
+                      | lo = nonDetStrictFoldUFM_Directly (better True) none assig
+                      | otherwise
+                      = nonDetStrictFoldUFM_Directly (better False) none assig
+                    none = Victim 0 Nothing
 
                 let result
 
-                        -- we have a temporary that is in both register and mem,
-                        -- just free up its register for use.
-                        | Just (temp, (RealRegUsage cand_reg old_fmt), slot) <- first_inBoth
-                        = do    spills' <- loadTemp r spill_loc cand_reg spills
-                                let assig1  = addToUFM_Directly assig temp $ Loc (InMem slot) old_fmt
-                                let assig2  = addToUFM assig1 vr $! newLocation spill_loc (RealRegUsage cand_reg vrFmt)
+                        -- as in case (2), where the first register the
+                        -- assignments in rc_jumpLocs give the vreg is held by
+                        -- one the block reads no more ('slotAhead'), live out
+                        -- of it
+                        | lo
+                        , Just (w, temp, Loc l old_fmt)
+                            <- holderAhead (jumpLocRegs (getUnique vr) locs)
+                        = ahead w temp l old_fmt
 
-                                setAssigR $ toRegMap assig2
-                                allocateRegsAndSpill reading pos keep spills' (cand_reg:alloc) rs
-
-                        -- otherwise, we need to spill a temporary that currently
-                        -- resides in a register.
-                        | Just (temp_to_push_out, RealRegUsage cand_reg old_reg_fmt)
-                                        <- first_inReg
-                        = do
-                                -- Spill what's currently in the register, with the format of what's in the register.
-                                (spill_store, slot) <- spillR (RegWithFormat (RegReal cand_reg) old_reg_fmt) temp_to_push_out
-
-                                -- record that this temp was spilled
-                                recordSpill (SpillAlloc temp_to_push_out)
-
-                                -- Update the register assignment:
-                                --  - the old data is now only in memory,
-                                --  - the new data is now allocated to this register;
-                                --    make sure to use the new format (#26542)
-                                let assig1  = addToUFM_Directly assig temp_to_push_out $ Loc (InMem slot) old_reg_fmt
-                                let assig2  = addToUFM assig1 vr $! newLocation spill_loc (RealRegUsage cand_reg vrFmt)
-                                setAssigR $ toRegMap assig2
-
-                                -- if need be, load up a spilled temp into the reg we've just freed up.
-                                spills' <- loadTemp r spill_loc cand_reg spills
-
-                                allocateRegsAndSpill reading pos keep
-                                        (spill_store ++ spills')
-                                        (cand_reg:alloc) rs
-
+                        | Victim _ (Just (temp, Loc l old_fmt)) <- victim
+                        , reg : _ <- regsOfLoc l
+                        = ahead reg temp l old_fmt
 
                         -- there wasn't anything to spill, so we're screwed.
                         | otherwise
@@ -2583,11 +2601,35 @@ allocRegsAndSpill_spill reading !pos keep spills alloc r@(VirtualRegWithFormat v
                 result
 
 
--- | The last reads of the vregs live out of a block, given its jump targets.
-lastReadsIn :: [BlockId] -> BlockMap Regs -> [LiveInstr instr] -> LastReads
-lastReadsIn dests block_live instrs = LastReads (go 0 emptyUFM instrs) outs
+-- | allocRegsAndSpill_spill's choice of the vreg to evict, as its fold over
+-- the assignment goes: the highest rank so far, 0 while there is none, with
+-- the first vreg of that rank and its location. The ranks: 1 in a register
+-- only, 3 in its slot too, and one more where it counts as read no more (its
+-- `readNoMore`). The rank is a strict field and the vreg a lazy one: with a sum
+-- of none and a victim, the compiler ran 2.6% more instructions compiling T3294
+-- at -O0, on GHC 10.1.20261111.
+data Victim = Victim !Int (Maybe (Unique, Loc))
+
+-- | A block's 'LastReads', given the procedure's joins outside cycles
+-- ('rc_acyclicJoins'), its jump targets, the recorded assignments and whether
+-- the block is in a cycle.
+lastReadsIn :: LabelSet -> [BlockId] -> BlockMap Regs -> BlockAssignment -> Bool
+            -> [LiveInstr instr] -> LastReads
+lastReadsIn joins dests block_live bassig cyclic instrs
+  = LastReads (go 0 emptyUFM instrs) outs joinOuts
   where
     outs = [ mapFindWithDefault noRegs d block_live | d <- dests ]
+    -- the recorded assignment tested first, so that a block whose targets all
+    -- have one does not compute the joins: the joins tested first made the
+    -- compiler run 0.049% more instructions and allocate 0.050% more compiling
+    -- nofib's puzzle at -O2, 0.024% and 0.024% more at -O, and none at -O0, on
+    -- GHC 10.1.20261108
+    !joinOuts
+      | cyclic    = []
+      | otherwise = [ mapFindWithDefault noRegs d block_live
+                    | d <- dests
+                    , isNothing (lookupBlockAssignment d bassig)
+                    , d `setMember` joins ]
     go :: Int -> UniqFM VirtualReg Int -> [LiveInstr instr]
        -> UniqFM VirtualReg Int
     go !_ !m [] = m
@@ -2604,7 +2646,7 @@ lastReadsIn dests block_live instrs = LastReads (go 0 emptyUFM instrs) outs
 -- reads ('lastReadsIn'): one not live out of the block is read again before it
 -- dies, as it is live there.
 readLeft :: LastReads -> Int -> Unique -> Bool
-readLeft (LastReads lastReads outs) !pos u = case lookupUFM_Directly lastReads u of
+readLeft (LastReads lastReads outs _) !pos u = case lookupUFM_Directly lastReads u of
   Just p  -> p > pos
   Nothing -> not (liveOutOf u outs)
 
@@ -2623,6 +2665,38 @@ slotAhead lastReads locs !pos u = not (readLeft lastReads pos u) && go False loc
       Just _                 -> False
       Nothing                -> go s more
 
+-- | Whether a vreg of the given class is live out of the block, from its last
+-- reads ('lastReadsIn'): where none is, every vreg of the class there is read
+-- again in the block ('readLeft').
+liveOutClass :: Arch -> LastReads -> RegClass -> Bool
+liveOutClass arch (LastReads _ outs _) cls
+  = any (uniqSetAny ofClass . getRegs) outs
+  where
+    ofClass (RegWithFormat (RegVirtual v) _) = classOfVirtualReg arch v == cls
+    ofClass _                                = False
+
+-- | Whether the vreg with the given unique is live into a jump target of the
+-- block with no recorded assignment that another block jumps to as well, where
+-- neither is in a cycle, given the block's last reads ('lastReadsIn').
+intoUnrecorded :: LastReads -> Unique -> Bool
+intoUnrecorded (LastReads _ _ joinOuts) u = liveOutOf u joinOuts
+
+-- | The blocks of a procedure in no cycle that more than one of its blocks
+-- jumps to, given the jump targets of each block and the procedure's SCCs.
+acyclicJoins :: BlockMap [BlockId] -> [SCC (LiveBasicBlock instr)] -> LabelSet
+acyclicJoins jsuccs sccs = jumpedToTwice (const True) jsuccs `setDifference` cyclic
+  where
+    cyclic = setFromList [ b | CyclicSCC bs <- sccs, BasicBlock b _ <- bs ]
+
+-- | Whether a unique is not that of any of the given vregs: 'notElem', but
+-- strict in the unique, so that its worker takes it unboxed: with notElem
+-- the compiler ran 0.10% more instructions compiling T3294 at -O0, 0.035%
+-- more at -O and 0.033% more at -O2, its allocation within 0.003%, on GHC
+-- 10.1.20261108.
+notKept :: Unique -> [VirtualRegWithFormat] -> Bool
+notKept !_ []       = True
+notKept u (k : ks) = getUnique (virtualRegWithFormat_reg k) /= u && notKept u ks
+
 -- | The vreg of an assignment in the given register, with its location. A
 -- register holds at most one vreg of an assignment, so the order of the list
 -- does not reach the result.
@@ -2631,9 +2705,9 @@ occupant r assig
   = find (\ (_, Loc l _) -> r `elem` regsOfLoc l) (nonDetUFMToList assig)
 
 -- | Whether the vreg with the given unique is live into one of the jump targets
--- whose live registers are given: a loop strict in the unique; with any, the
--- compiler allocated 0.054% more compiling !16269's CmmDiamondChain at -O0 and
--- 0.044% more at -O and -O2, on GHC 10.1.20261108.
+-- whose live registers are given: a loop strict in the unique, as 'notKept' is;
+-- with any, the compiler allocated 0.054% more compiling !16269's
+-- CmmDiamondChain at -O0 and 0.044% more at -O and -O2, on GHC 10.1.20261108.
 liveOutOf :: Unique -> [Regs] -> Bool
 liveOutOf !_ []         = False
 liveOutOf u (rs : rss) = elemUniqSet_Directly u (getRegs rs) || liveOutOf u rss

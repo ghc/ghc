@@ -508,10 +508,10 @@ ufmToSet_Directly :: UniqFM key elt -> S.Word64Set
 ufmToSet_Directly (UFM m) = M.keysSet m
 
 anyUFM :: (elt -> Bool) -> UniqFM key elt -> Bool
-anyUFM p (UFM m) = M.foldr ((||) . p) False m
+anyUFM p (UFM m) = any p m
 
 allUFM :: (elt -> Bool) -> UniqFM key elt -> Bool
-allUFM p (UFM m) = M.foldr ((&&) . p) True m
+allUFM p (UFM m) = all p m
 
 seqEltsUFM :: (elt -> SeqResult) -> UniqFM key elt -> SeqResult
 seqEltsUFM seqElt = nonDetFoldUFM (\v rest -> seqElt v M.<> rest) mempty
