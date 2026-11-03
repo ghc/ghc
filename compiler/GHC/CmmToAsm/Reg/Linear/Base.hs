@@ -292,6 +292,10 @@ data RA_Context freeRegs
         --   allocated
         , rc_wideDests  :: UniqFM VirtualReg RealReg
 
+        -- | for each vreg whose wide destination in 'rc_wideDests' is
+        --   propagated from a vreg it is moved into where it dies, that vreg
+        , rc_via        :: UniqFM VirtualReg VirtualReg
+
         -- | the block being allocated
         , rc_block      :: BlockId
 
