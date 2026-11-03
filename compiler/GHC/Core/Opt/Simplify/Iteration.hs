@@ -51,6 +51,7 @@ import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporarily comment
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Cpr( isTopCprSig )
 import GHC.Types.InlinePragma
 import GHC.Types.Name   ( mkSystemVarName, isExternalName, getOccFS )
 import GHC.Types.Demand
@@ -4022,9 +4023,9 @@ mkDupableContWithDmds env _
 
        -- A lambda binder may have only occurrence and demand info;
        -- see (SB3) in Note [StrictBind]
-       ; let info = idInof bndr
+       ; let info = idInfo bndr
              zapped_info = vanillaIdInfo `setOccInfo`    occInfo info
-                                         `setDemandInfo` dmd_info
+                                         `setDemandInfo` (demandInfo info)
              zapped_bndr = bndr `setIdInfo` zapped_info
 
        ; (sb_env1, bndr')      <- simplBinder sb_env zapped_bndr
