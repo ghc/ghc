@@ -342,6 +342,7 @@ linearRegAlloc' config initFreeRegs cold !freqs entry_ids block_live sccs
                 , rc_wideDests = fst wv
                 , rc_via       = snd wv
                 , rc_dests     = []
+                , rc_lastReads = LastReads emptyUFM []
                 , rc_succs     = js
                   -- built where read
                 , rc_joins     = joinBlocks cold js
@@ -1243,7 +1244,12 @@ processBlock succs block_live (BasicBlock id instrs)
             -- and allocate 0.37% more compiling !16269's CmmDiamondChain at
             -- -O0 when this was added)
             claims = claimsOf bassig instrs
-        setBlockContextR dests locs claims $ mkMoveDests $ listToUFM $
+            -- the vregs live out of the block that it reads, with their last
+            -- reads in it, built when the block first has to spill one or to
+            -- free for a vreg the first register the assignments in rc_jumpLocs
+            -- give it ('slotAhead')
+            lastReads = lastReadsIn dests block_live instrs
+        setBlockContextR dests locs claims lastReads $ mkMoveDests $ listToUFM $
           loop_moves
           -- unlike dyingMovesLast's, these moves into real registers include
           -- those of a vreg the block writes again after the move, its later
@@ -1255,7 +1261,7 @@ processBlock succs block_live (BasicBlock id instrs)
           ++ [ (vr, rr) | (vr, RegReal rr) <- dyingMoves platform instrs ]
 
         (instrs', fixups)
-                <- linearRA block_live id instrs
+                <- linearRA id instrs
         -- pprTraceM "blockResult" $ ppr (instrs', fixups)
         return  $ BasicBlock id instrs' : fixups
 
@@ -1294,51 +1300,55 @@ initBlock id block_live
 -- | Do allocation for a sequence of instructions.
 linearRA
         :: forall freeRegs instr. (RegAllocConstraint freeRegs instr)
-        => BlockMap Regs                      -- ^ map of what vregs are live on entry to each block.
-        -> BlockId                              -- ^ id of the current block, for debugging.
+        => BlockId                              -- ^ id of the current block, for debugging.
         -> [LiveInstr instr]                    -- ^ liveness annotated instructions in this block.
         -> RegM freeRegs
                 ( [instr]                       --   instructions after register allocation
                 , [NatBasicBlock instr])        --   fresh blocks of fixup code.
-linearRA block_live block_id = go [] []
+linearRA block_id = go 0 [] []
   where
-    go :: [instr]                              -- accumulator for instructions already processed.
+    go :: Int                                  -- position of the next instruction in the block.
+       -> [instr]                              -- accumulator for instructions already processed.
        -> [NatBasicBlock instr]                -- accumulator for blocks of fixup code.
        -> [LiveInstr instr]                    -- liveness annotated instructions in this block.
        -> RegM freeRegs
                ( [instr]                       --   instructions after register allocation
                , [NatBasicBlock instr] )       --   fresh blocks of fixup code.
-    go !accInstr !accFixups [] = do
+    go !_ !accInstr !accFixups [] = do
         return ( reverse accInstr               -- instrs need to be returned in the correct order.
                , accFixups )                    -- it doesn't matter what order the fixup blocks are returned in.
 
-    go accInstr accFixups (instr:instrs) = do
-        (accInstr', new_fixups) <- raInsn block_live accInstr block_id instr instrs
-        go accInstr' (new_fixups ++ accFixups) instrs
+    go !i accInstr accFixups (instr:instrs) = do
+        (accInstr', new_fixups) <- raInsn accInstr block_id i instr instrs
+        go (i + 1) accInstr' (new_fixups ++ accFixups) instrs
 
 -- | Do allocation for a single instruction.
 raInsn
         :: RegAllocConstraint freeRegs instr
-        => BlockMap Regs                         -- ^ map of what vregs are live on entry to each block.
-        -> [instr]                              -- ^ accumulator for instructions already processed.
+        => [instr]                              -- ^ accumulator for instructions already processed.
         -> BlockId                              -- ^ the id of the current block, for debugging
+        -> Int                                  -- ^ the position of the instr in the block.
         -> LiveInstr instr                      -- ^ the instr to have its regs allocated, with liveness info.
         -> [LiveInstr instr]                    -- ^ the instructions after it in the block.
         -> RegM freeRegs
                 ( [instr]                       -- new instructions
                 , [NatBasicBlock instr])        -- extra fixup blocks
 
-raInsn _     new_instrs _ (LiveInstr ii Nothing) _
+-- The position is banged where unused, here and in allocateRegsAndSpill, so
+-- that it is passed unboxed: without the bangs the compiler ran 0.39% more
+-- instructions and allocated 0.15% more compiling T3294 at -O0, 0.15% and
+-- 0.053% more at -O and 0.15% and 0.050% more at -O2, on GHC 10.1.20261108.
+raInsn new_instrs _ !_ (LiveInstr ii Nothing) _
         | Just n        <- takeDeltaInstr ii
         = do    setDeltaR n
                 return (new_instrs, [])
 
-raInsn _     new_instrs _ (LiveInstr ii@(Instr i) Nothing) _
+raInsn new_instrs _ !_ (LiveInstr ii@(Instr i) Nothing) _
         | isMetaInstr ii
         = return (i : new_instrs, [])
 
 
-raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live)) rest
+raInsn new_instrs id !pos (LiveInstr (Instr instr) (Just live)) rest
  = do
     platform <- getPlatform
     assig    <- getAssigR
@@ -1414,9 +1424,9 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live)) rest
           -}
            return (new_instrs, [])
 
-        _ -> genRaInsn block_live new_instrs id instr rest live
+        _ -> genRaInsn new_instrs id pos instr rest live
 
-raInsn _ _ _ instr _
+raInsn _ _ !_ instr _
         = do
             platform <- getPlatform
             let instr' = fmap (pprInstr platform) instr
@@ -1455,15 +1465,15 @@ isInReg src assig
 
 genRaInsn :: forall freeRegs instr.
              (RegAllocConstraint freeRegs instr)
-          => BlockMap Regs
-          -> [instr]
+          => [instr]
           -> BlockId
+          -> Int
           -> instr
           -> [LiveInstr instr]
           -> Liveness
           -> RegM freeRegs ([instr], [NatBasicBlock instr])
 
-genRaInsn block_live new_instrs block_id instr rest live = do
+genRaInsn new_instrs block_id !pos instr rest live = do
 -- pprTraceM "genRaInsn" $ ppr (block_id, instr)
   platform <- getPlatform
   case liveUsage live of { RU read written ->
@@ -1493,7 +1503,7 @@ genRaInsn block_live new_instrs block_id instr rest live = do
 
     -- (a), (b) allocate real regs for all regs read by this instruction.
     (r_spills, r_allocd) <-
-        allocateRegsAndSpill True{-reading-} virt_read [] [] virt_read
+        allocateRegsAndSpill True{-reading-} pos virt_read [] [] virt_read
 
     -- (c) save any temporaries which will be clobbered by this instruction
     clobber_saves <- saveClobberedTemps real_written (liveDieRead live) rest
@@ -1503,7 +1513,7 @@ genRaInsn block_live new_instrs block_id instr rest live = do
     -- these dead regs might in fact be live in the jump targets (they're
     -- only dead in the code that follows in the current basic block).
     (fixup_blocks, adjusted_instr)
-        <- joinToTargets block_live block_id instr
+        <- joinToTargets block_id instr
 
 --     when (not $ null fixup_blocks) $ pprTraceM "genRA:FixBlocks" $ ppr fixup_blocks
 
@@ -1521,7 +1531,7 @@ genRaInsn block_live new_instrs block_id instr rest live = do
 
     -- (g) Allocate registers for temporaries *written* (only)
     (w_spills, w_allocd) <-
-        allocateRegsAndSpill False{-writing-} virt_written [] [] virt_written
+        allocateRegsAndSpill False{-writing-} pos virt_written [] [] virt_written
 
     -- (h) Release registers for temps which are written here and not
     -- used again.
@@ -1697,11 +1707,17 @@ keep the 'c' uniques its parser draws, which nothing renames
 TODO: nothing in the allocator chose this order, but three places depend on it,
 the first two taking it as a ranking:
 
-* allocRegsAndSpill_spill chooses among the vregs in a register of the class
-  needed, other than those being allocated for the instruction (keep). It evicts
-  the first in the order of those in both a register and their slot or, if there
-  are none, of those in a register only, whatever its next use (the ToDo of step
-  (a) in the outline at the top of this module).
+* allocRegsAndSpill_spill, where no register of the class needed is free,
+  chooses among the vregs in a register of the class, other than those being
+  allocated for the instruction (keep). It evicts the first in the order of
+  those in both a register and their slot or, if there are none, of those in
+  a register only, whatever its next use (the ToDo of step (a) in the outline
+  at the top of this module). Where a register of the class is free, it gives
+  the vreg being allocated the first register that the assignments in
+  rc_jumpLocs give it, evicting its holder, if the holder is not
+  kept, no instruction left in the block reads it, and one of those assignments
+  has it in its slot and none in a register ('slotAhead'): a choice that does
+  not depend on the order.
 * saveClobberedTemps finds new registers for the values an instruction clobbers
   in the order, so an earlier value can take a free register that a later one
   prefers, and once the free registers that would suit them run out, the later
@@ -1784,7 +1800,8 @@ saveClobberedTemps clobbered dying rest
               -- next read; use it to save the
               -- clobbered value.
               free@(_ : _) -> do
-                  my_reg <- firstFreeInOrder temp free
+                  locs <- rc_jumpLocs <$> getContextR
+                  my_reg <- firstFreeInOrder temp (jumpLocRegs temp locs) free
                   setFreeRegsR (frAllocateReg my_reg freeRegs)
 
                   let new_assign = addToUFM_Directly assig temp (Loc (InReg my_reg) fmt)
@@ -1867,20 +1884,22 @@ data SpillLoc = ReadMem StackSlot Format -- reading from register only in memory
 allocateRegsAndSpill
         :: forall freeRegs instr. (FR freeRegs, Instruction instr)
         => Bool               -- True <=> reading (load up spilled regs)
+        -> Int                -- the position of this instruction in the block
         -> [VirtualRegWithFormat] -- don't push these out
         -> [instr]            -- spill insns
         -> [RealReg]          -- real registers allocated (accum.)
         -> [VirtualRegWithFormat] -- temps to allocate
         -> RegM freeRegs ( [instr] , [RealReg])
 
-allocateRegsAndSpill _       _    spills alloc []
+-- the position banged though unused: see raInsn
+allocateRegsAndSpill _       !_ _    spills alloc []
         = return (spills, reverse alloc)
 
-allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt):rs)
+allocateRegsAndSpill reading !pos keep spills alloc (r@(VirtualRegWithFormat vr vrFmt):rs)
  = do   assig <- toVRegMap <$> getAssigR
         -- pprTraceM "allocateRegsAndSpill:assig" (ppr (r:rs) $$ ppr assig)
         -- See Note [UniqFM and the register allocator]
-        let doSpill = allocRegsAndSpill_spill reading keep spills alloc r rs assig
+        let doSpill = allocRegsAndSpill_spill reading pos keep spills alloc r rs assig
         case lookupUFM assig vr of
                 -- case (1a): already in a register
                 Just (Loc (InReg my_reg) in_reg_fmt) -> do
@@ -1889,7 +1908,7 @@ allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt
                   when (not reading && vrFmt /= in_reg_fmt) $
                     setAssigR $ toRegMap $
                       addToUFM assig vr (Loc (InReg my_reg) vrFmt)
-                  allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
+                  allocateRegsAndSpill reading pos keep spills (my_reg:alloc) rs
 
                 -- case (1b): already in a register (and memory)
                 Just (Loc (InBoth my_reg _) _) -> do
@@ -1900,7 +1919,7 @@ allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt
                   when (not reading) $
                     setAssigR $ toRegMap $
                       addToUFM assig vr (Loc (InReg my_reg) vrFmt)
-                  allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
+                  allocateRegsAndSpill reading pos keep spills (my_reg:alloc) rs
 
                 -- Not already in a register, so we need to find a free one...
                 Just (Loc (InMem slot) memFmt)
@@ -2019,15 +2038,15 @@ a recorded block the walk reaches (reached, in firstFreeInOrder).
 -}
 
 -- | Of the given free registers of a class, the one to take for the
--- virtual register with the given unique: the first of its preferred
+-- virtual register with the given unique, given its registers in the
+-- assignments in rc_jumpLocs ('jumpLocRegs'): the first of its preferred
 -- registers, best first, that is free, else the first free one in the order
 -- Note [Register preferences in the linear allocator] gives.
-firstFreeInOrder :: Unique -> [RealReg] -> RegM freeRegs RealReg
-firstFreeInOrder u free = do
+firstFreeInOrder :: Unique -> [RealReg] -> [RealReg] -> RegM freeRegs RealReg
+firstFreeInOrder u !jl free = do
   bassig <- getBlockAssigR
   cur <- getAssigR :: RegM freeRegs (RegMap Loc)
-  ctx@RA_Context { rc_jumpLocs  = locs
-                 , rc_moveDests = MoveDests moves allMoved movedTwice
+  ctx@RA_Context { rc_moveDests = MoveDests moves allMoved movedTwice
                  , rc_claims    = claims
                  , rc_wideDests = wide
                  , rc_via       = via
@@ -2035,8 +2054,7 @@ firstFreeInOrder u free = do
                  , rc_succs     = succs
                  , rc_live      = live
                  , rc_dying     = dying } <- getContextR
-  let !jl = jumpLocRegs u locs
-      mv = lookupUFM_Directly moves u
+  let mv = lookupUFM_Directly moves u
       !firstUsed = lookupFirstUsed u bassig
       -- the wide destination, where it and the first-used register differ,
       -- both are free and no other vreg of the block claims it (claimed),
@@ -2420,6 +2438,7 @@ jumpLocRegs u locs = foldr at [] locs
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
 allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
                         => Bool
+                        -> Int
                         -> [VirtualRegWithFormat]
                         -> [instr]
                         -> [RealReg]
@@ -2428,16 +2447,49 @@ allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
                         -> UniqFM VirtualReg Loc
                         -> SpillLoc
                         -> RegM freeRegs ([instr], [RealReg])
-allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrFmt) rs assig spill_loc
+allocRegsAndSpill_spill reading !pos keep spills alloc r@(VirtualRegWithFormat vr vrFmt) rs assig spill_loc
  = do   platform <- getPlatform
         freeRegs <- getFreeRegsR
+        RA_Context { rc_lastReads = lastReads, rc_jumpLocs = locs } <- getContextR
         let regclass = classOfVirtualReg (platformArch platform) vr
             freeRegs_thisClass = frGetFreeRegs regclass freeRegs :: [RealReg]
+            -- the vreg's registers in the assignments in rc_jumpLocs, computed
+            -- once for the guard below and firstFreeInOrder
+            jl = jumpLocRegs (getUnique vr) locs
+            -- the register w taken from temp, at l in the assignment, which
+            -- goes to its slot, stored there unless l is InBoth
+            ahead w temp l old_fmt = do
+                (spill_store, slot) <- case l of
+                  InBoth _ sl -> return ([], sl)
+                  _           -> do
+                    sp <- spillR (RegWithFormat (RegReal w) old_fmt) temp
+                    recordSpill (SpillAlloc temp)
+                    return sp
+                let assig1 = addToUFM_Directly assig temp $ Loc (InMem slot) old_fmt
+                    assig2 = addToUFM assig1 vr $! newLocation spill_loc (RealRegUsage w vrFmt)
+                setAssigR $ toRegMap assig2
+                spills' <- loadTemp r spill_loc w spills
+                allocateRegsAndSpill reading pos keep (spill_store ++ spills') (w : alloc) rs
 
         case freeRegs_thisClass of
          -- case (2): we have a free register
+         _ : _
+           -- unless the first register the assignments in rc_jumpLocs give
+           -- the vreg is held by one the block reads no more, one of them
+           -- having that one in its slot and none in a register ('slotAhead'):
+           -- that one goes to its slot here rather than on the way there, and
+           -- the vreg takes its register, as it would have to on the way
+           | w : _ <- jl
+           , w `notElem` freeRegs_thisClass
+           , targetClassOfRealReg platform w == regclass
+           , Just (temp, Loc l old_fmt) <- occupant w assig
+           , temp `notElem` map (getUnique . virtualRegWithFormat_reg) keep
+           , slotAhead lastReads locs pos temp
+           -> ahead w temp l old_fmt
+
          _ : _ ->
-           do   final_reg <- firstFreeInOrder (getUnique vr) freeRegs_thisClass
+           do   final_reg <- firstFreeInOrder (getUnique vr) jl
+                                                  freeRegs_thisClass
 
                 spills'   <- loadTemp r spill_loc final_reg spills
 
@@ -2445,7 +2497,7 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
                           $ (addToUFM assig vr $! newLocation spill_loc $ RealRegUsage final_reg vrFmt)
                 setFreeRegsR $  frAllocateReg final_reg freeRegs
 
-                allocateRegsAndSpill reading keep spills' (final_reg : alloc) rs
+                allocateRegsAndSpill reading pos keep spills' (final_reg : alloc) rs
 
 
           -- case (3): we need to push something out to free up a register
@@ -2487,7 +2539,7 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
                                 let assig2  = addToUFM assig1 vr $! newLocation spill_loc (RealRegUsage cand_reg vrFmt)
 
                                 setAssigR $ toRegMap assig2
-                                allocateRegsAndSpill reading keep spills' (cand_reg:alloc) rs
+                                allocateRegsAndSpill reading pos keep spills' (cand_reg:alloc) rs
 
                         -- otherwise, we need to spill a temporary that currently
                         -- resides in a register.
@@ -2511,7 +2563,7 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
                                 -- if need be, load up a spilled temp into the reg we've just freed up.
                                 spills' <- loadTemp r spill_loc cand_reg spills
 
-                                allocateRegsAndSpill reading keep
+                                allocateRegsAndSpill reading pos keep
                                         (spill_store ++ spills')
                                         (cand_reg:alloc) rs
 
@@ -2530,6 +2582,61 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
 
                 result
 
+
+-- | The last reads of the vregs live out of a block, given its jump targets.
+lastReadsIn :: [BlockId] -> BlockMap Regs -> [LiveInstr instr] -> LastReads
+lastReadsIn dests block_live instrs = LastReads (go 0 emptyUFM instrs) outs
+  where
+    outs = [ mapFindWithDefault noRegs d block_live | d <- dests ]
+    go :: Int -> UniqFM VirtualReg Int -> [LiveInstr instr]
+       -> UniqFM VirtualReg Int
+    go !_ !m [] = m
+    go i m (LiveInstr _ (Just live) : is)
+      = go (i + 1) (foldl' (readAt i) m (getRU (liveUsage live))) is
+    go i m (_ : is) = go (i + 1) m is
+    getRU (RU rd _) = rd
+    readAt i m (RegWithFormat (RegVirtual v) _)
+      | liveOutOf (getUnique v) outs = addToUFM m v i
+    readAt _ m _ = m
+
+-- | Whether an instruction of the block after the given position reads the vreg
+-- with the given unique, a candidate for spilling there, from the block's last
+-- reads ('lastReadsIn'): one not live out of the block is read again before it
+-- dies, as it is live there.
+readLeft :: LastReads -> Int -> Unique -> Bool
+readLeft (LastReads lastReads outs) !pos u = case lookupUFM_Directly lastReads u of
+  Just p  -> p > pos
+  Nothing -> not (liveOutOf u outs)
+
+-- | Whether the vreg with the given unique is a victim that will be in its slot
+-- on the way to a jump target anyway, where the block must spill at the given
+-- position, given the block's last reads ('lastReadsIn') and the assignments
+-- in rc_jumpLocs: no instruction of the block after the position reads it
+-- ('readLeft'), and one of those assignments holds it in its slot and none in a
+-- register, which it would have to be reloaded into on the way there.
+slotAhead :: LastReads -> [RegMap Loc] -> Int -> Unique -> Bool
+slotAhead lastReads locs !pos u = not (readLeft lastReads pos u) && go False locs
+  where
+    go !s [] = s
+    go s (assig : more) = case lookupUFM_Directly assig u of
+      Just (Loc (InMem _) _) -> go True more
+      Just _                 -> False
+      Nothing                -> go s more
+
+-- | The vreg of an assignment in the given register, with its location. A
+-- register holds at most one vreg of an assignment, so the order of the list
+-- does not reach the result.
+occupant :: RealReg -> UniqFM VirtualReg Loc -> Maybe (Unique, Loc)
+occupant r assig
+  = find (\ (_, Loc l _) -> r `elem` regsOfLoc l) (nonDetUFMToList assig)
+
+-- | Whether the vreg with the given unique is live into one of the jump targets
+-- whose live registers are given: a loop strict in the unique; with any, the
+-- compiler allocated 0.054% more compiling !16269's CmmDiamondChain at -O0 and
+-- 0.044% more at -O and -O2, on GHC 10.1.20261108.
+liveOutOf :: Unique -> [Regs] -> Bool
+liveOutOf !_ []         = False
+liveOutOf u (rs : rss) = elemUniqSet_Directly u (getRegs rs) || liveOutOf u rss
 
 -- | Calculate a new location after a register has been loaded.
 newLocation :: SpillLoc -> RealRegUsage -> Loc
