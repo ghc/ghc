@@ -310,11 +310,13 @@ linearRegAlloc' config initFreeRegs cold !freqs entry_ids block_live sccs
         -- context alike
         js = jumpSuccs sccs
         platform = ncgPlatform config
+        wv = wideMoveDests platform cold block_live sccs
         ctx = RA_Context
                 { rc_jumpLocs  = []
                 , rc_moveDests = emptyUFM
                 , rc_claims    = []
-                , rc_wideDests = wideMoveDests platform cold block_live sccs
+                , rc_wideDests = fst wv
+                , rc_via       = snd wv
                 , rc_block     = case flattenSCCs sccs of
                                    BasicBlock b _ : _ -> b
                                    []                 -> panic "linearRegAlloc'"
@@ -431,16 +433,21 @@ dyingMovesLast platform instrs = fst $ foldr step ([], emptyUniqSet) instrs
 -- is moved into that register in the same block, where the later vreg dies. A
 -- vreg that the vreg is moved into where it dies counts as the vreg in this
 -- check, where the move is in a block some vreg is live into and not one of the
--- given ones. The walk of each block follows only those vregs and registers,
--- taking an instruction's writes from its register usage ('liveBorn' being
--- filled in only for the graph allocator and the liveness dump).
+-- given ones. A vreg moved so into a vreg with a register here has that
+-- register too, up to four such moves back, so that its value is computed
+-- there, unless the check leaves it out; the second map gives each vreg moved
+-- so, left out or not, the vreg it is moved into. The walk of each block
+-- follows only those
+-- vregs and registers, taking an instruction's writes from its register usage
+-- ('liveBorn' being filled in only for the graph allocator and the liveness
+-- dump).
 wideMoveDests :: Instruction instr
               => Platform -> LabelSet -> BlockMap Regs
               -> [SCC (LiveBasicBlock instr)]
-              -> UniqFM VirtualReg RealReg
+              -> (UniqFM VirtualReg RealReg, UniqFM VirtualReg VirtualReg)
 wideMoveDests platform cold block_live sccs
-  | isNullUFM cands = cands
-  | otherwise       = cands `minusUFM` foldl' blk emptyUFM blocks
+  | isNullUFM cands = (cands, via)
+  | otherwise       = (cands `minusUFM` foldl' blk emptyUFM blocks, via)
   where
     blocks = flattenSCCs sccs
     live_in bid = mapFindWithDefault noRegs bid block_live
@@ -457,12 +464,32 @@ wideMoveDests platform cold block_live sccs
     -- candidate here and in processBlock's move destinations, harmless but
     -- where it is the last block's and shadows a usable one or, on x86-64, is a
     -- vreg's only preference, which frFallbackReg counts as one.
-    cands = listToUFM
+    (cands, via) = back (4 :: Int) (direct, emptyUFM)
+    direct = listToUFM
       [ (vr, rr) | BasicBlock bid instrs <- blocks
                  , let live = live_in bid
                  , warm bid live
                  , (vr, RegReal rr) <- dyingMoves platform instrs
                  , RegVirtual vr `elemRegs` live ]
+    -- a vreg moved where it dies into a candidate, the move coalescing the two,
+    -- has the candidate's destination too, so that the value is computed there
+    -- from the start, and the candidate as the vreg it is moved into: up to
+    -- four such moves back
+    back :: Int -> (UniqFM VirtualReg RealReg, UniqFM VirtualReg VirtualReg)
+         -> (UniqFM VirtualReg RealReg, UniqFM VirtualReg VirtualReg)
+    back 0 cv = cv
+    back n cv@(c, w)
+      | isNullUFM c = cv
+      | null new    = cv
+      | otherwise   = back (n - 1)
+                        ( plusUFM c (listToUFM [ (a, d) | (a, _, d) <- new ])
+                        , plusUFM w (listToUFM [ (a, b) | (a, b, _) <- new ]) )
+      where new = [ (a, b, d) | (a, b) <- vmoves, not (a `elemUFM` c)
+                              , Just d <- [lookupUFM c b] ]
+    -- the moves of vregs into vregs where they die, in the blocks warm takes
+    vmoves = [ (a, b) | BasicBlock bid instrs <- blocks
+                      , warm bid (live_in bid)
+                      , (a, RegVirtual b) <- dyingMoves platform instrs ]
     dests = mkUniqSet (nonDetEltsUFM cands)
     -- each followed vreg to the candidates whose values it holds, with their
     -- destinations: a candidate itself, and each candidate moved into the
@@ -470,10 +497,7 @@ wideMoveDests platform cold block_live sccs
     follow = plusUFM_C (++) (mapUFM_Directly (\u d -> [(u, d)]) cands)
            $ listToUFM_C (++)
       [ (b, [(getUnique a, d)])
-      | BasicBlock bid instrs <- blocks
-      , warm bid (live_in bid)
-      , (a, RegVirtual b) <- dyingMoves platform instrs
-      , Just d <- [lookupUFM cands a] ]
+      | (a, b) <- vmoves, Just d <- [lookupUFM cands a] ]
     -- bad: the candidates found live together with their destination;
     -- vs: the followed vregs live; ds: the destinations live
     blk bad (BasicBlock bid instrs)
@@ -1590,12 +1614,21 @@ from which 'firstFreeInOrder' takes the first that is free:
    value live into the block that recorded it reaches none of the blocks this
    value reaches either: there it comes after the wide destination.
 
+ * For a variable whose wide destination, below, is propagated from another
+   variable it is moved into where it dies, the register that variable has in
+   its first assignment: the propagated destination is where that variable
+   goes later, such as a loop variable at the loop's exit, and its first
+   assignment where it is, such as at the loop's head.
+
  * The real register a block the variable is live into moves it into where it
-   dies, such as R1 for a value evaluated some blocks after it is computed,
-   unless that register is live together with the variable somewhere, as
-   wideMoveDests counts it, or, on x86-64, the block follows a failed heap or
-   stack check. It is left out also where another variable the current block
-   reads or writes, with no location yet, has it as its first-used register.
+   dies, such as R1 for a value evaluated some blocks after it is computed, or,
+   for a variable moved where it dies into another variable that has such a
+   register, up to four such moves back, that register, so that the value is
+   computed where it goes; unless that register is live together with the
+   variable somewhere, as wideMoveDests counts it, or, on x86-64, the block
+   follows a failed heap or stack check. It is left out also where another
+   variable the current block reads or writes, with no location yet, has it as
+   its first-used register.
 
 Preferring every register the variable was assigned to, not only the first, was
 tried and turned out to barely matter.
@@ -1653,6 +1686,7 @@ firstFreeInOrder u free = do
                  , rc_moveDests = moves
                  , rc_claims    = claims
                  , rc_wideDests = wide
+                 , rc_via       = via
                  , rc_block     = blk
                  , rc_succs     = succs
                  , rc_live      = live
@@ -1725,8 +1759,18 @@ firstFreeInOrder u free = do
                 fs -> fs
       noPrefs = null jl && isNothing mv && isNothing fu
                 && maybe True claimed (lookupUFM_Directly wide u)
+      -- for a vreg whose wide destination is propagated from a vreg it is
+      -- moved into where it dies, that vreg's first-used register where it is
+      -- free: the propagated destination is where that vreg goes later, its
+      -- first-used register where it is
+      viaFree = case lookupUFM_Directly via u of
+                  Just y | isJust (lookupUFM_Directly wide u)
+                         , Just r <- lookupFirstUsed (getUnique y) bassig
+                         , isFree r
+                         -> Just r
+                  _      -> Nothing
       chosen = case find isFree jl of
-                 Nothing -> pick mv (pick fu wdFree)
+                 Nothing -> pick mv (pick fu (pick viaFree wdFree))
                  found   -> found
   case stale of
     Just w | chosen == Just w -> setBlockAssigR (markStaleFirst u bassig)
