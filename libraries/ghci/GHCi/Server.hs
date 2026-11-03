@@ -78,7 +78,7 @@ servWithCustom verbose hook pipe restore customHandler = do
       when verbose (trace ("msg: " ++ (show msg))) %>>= \_ ->
 
       case msg of
-        CustomMessage tag payload -> handleCustom tag payload %>>= writeReply wr
+        CustomMessage tag payload _ -> handleCustom tag payload %>>= writeReply wr
         Shutdown                  -> writeIORef doneRef True >>
                                      reply ()                 %>>= writeReply wr
         RunTH ii st q ty loc      -> spawnFinally mngr         (runWriteReply wr)

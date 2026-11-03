@@ -45,7 +45,7 @@ import GHC.Prelude
 import GHC.Linker.Types
 
 import GHCi.RemoteTypes
-import GHCi.Message         ( Pipe )
+import GHCi.Message         ( Pipe, RemoteResource )
 
 import GHC.Data.FastString.Env
 import GHC.Platform
@@ -133,7 +133,7 @@ data ExtInterpInstance c = ExtInterpInstance
   { instProcess       :: {-# UNPACK #-} !InterpProcess
       -- ^ External interpreter process and its pipe (communication channel)
 
-  , instPendingFrees  :: !(MVar [HValueRef])
+  , instPendingFrees  :: !(MVar [RemoteResource])
       -- ^ Values that need to be freed before the next command is sent.
       -- Finalizers for ForeignRefs can append values to this list
       -- asynchronously.

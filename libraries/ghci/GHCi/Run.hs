@@ -116,6 +116,7 @@ run m = case m of
     mapM mkRemoteRef =<< getIdValFromApStack aps ix
   MallocData bs -> mkString bs
   MallocStrings bss -> mapM mkString0 bss
+  FreeRemoteResources rs -> mapM_ freeRes rs
   PrepFFI args res -> toRemotePtr <$> prepForeignCall args res
   FreeFFI p -> freeForeignCallInfo (fromRemotePtr p)
   StartTH -> startTH
@@ -131,6 +132,10 @@ run m = case m of
   RunTH {}            -> unexpectedMessage m
   RunModFinalizers {} -> unexpectedMessage m
   CustomMessage {}    -> unexpectedMessage m
+  where
+    freeRes (RemoteHValueRef href) = freeRemoteRef href
+    freeRes (RemoteRemotePtr rptr) = free $ fromRemotePtr rptr
+    freeRes (RemoteFFI p) = freeForeignCallInfo (fromRemotePtr p)
 
 unexpectedMessage :: Message a -> b
 unexpectedMessage m = error ("GHCi.Run.Run: unexpected message: " ++ show m)

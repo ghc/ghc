@@ -9,6 +9,7 @@ import Control.Monad (void)
 import Data.Word (Word8)
 import GHCi.Message
   ( Message(..)
+  , CustomMessageMethods(..)
   , mkPipeFromHandles
   , remoteCall
   , Pipe
@@ -145,7 +146,7 @@ customMessage :: (Show a, Bin.Binary a) => Pipe -> ClientCommand a -> IO a
 customMessage pipe c = do
   let payload = encodeLazy (Some @Bin.Binary c)
   putStrLn $ "Sending: " ++ show c
-  respBytes <- remoteCall pipe (CustomMessage customTag payload)
+  respBytes <- remoteCall pipe (CustomMessage customTag payload (CustomMessageMethods $ \ _ -> [])) (const $ pure ())
   case decodeLazy respBytes of
     Left err -> error $ "Decode error: " ++ err
     Right res -> pure res

@@ -253,10 +253,16 @@ spawnInterpMaybe cfg spawn mstatus = do
     InterpRunning inst -> do
       pure (InterpRunning inst, inst)
 
-  -- free any ForeignRef that have been garbage collected.
-  pending_frees <- liftIO $ swapMVar (instPendingFrees inst) []
-  liftIO $ when (not (null (pending_frees))) $
-    sendMessage inst (FreeHValueRefs pending_frees)
+  -- Free any ForeignRef that have been garbage collected.
+  -- Or any other RemoteResource disposed of while canceling.
+  liftIO $ bracketOnError
+    (swapMVar (instPendingFrees inst) [])
+    -- if interrupted while freeing we store the refs back to free later.
+    -- Done this way to avoid holding the lock for the duration of `sendMessage`.
+    (\pending_frees -> unless (null pending_frees) $
+       modifyMVar_ (instPendingFrees inst) (pure . (pending_frees ++)))
+    (\pending_frees -> unless (null pending_frees) $
+       sendMessage inst (FreeRemoteResources pending_frees))
 
   -- run the inner action
   pure inst
@@ -724,7 +730,7 @@ mkFinalizedHValue interp rref = do
 freeReallyRemoteRef :: ExtInterpInstance d -> RemoteRef a -> IO ()
 freeReallyRemoteRef inst rref =
   -- add to the list of HValues to free
-  modifyMVar_ (instPendingFrees inst) (\xs -> pure (castRemoteRef rref : xs))
+  modifyMVar_ (instPendingFrees inst) (\xs -> pure (RemoteHValueRef (castRemoteRef rref) : xs))
 
 
 freeHValueRefs :: Interp -> [HValueRef] -> IO ()

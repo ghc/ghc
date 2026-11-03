@@ -12,6 +12,9 @@
 --
 module GHCi.Message
   ( Message(..), Msg(..)
+  , CustomMessageMethods(CustomMessageMethods)
+  , RemoteResource(..)
+  , resultRemoteResources
   , ConInfoTable(..)
   , THMessage(..), THMsg(..)
   , QResult(..)
@@ -25,12 +28,14 @@ module GHCi.Message
   , getMessage, putMessage, getTHMessage, putTHMessage
 
   , Pipe(..), mkPipeFromHandles, mkPipeFromContinuations, closePipe
-  , remoteCall, remoteCallWithResponse, remoteTHCall
+  , remoteCall, remoteCallInterleaving, remoteTHCall
   , handleRemoteCall, handleRemoteTHCall, writeReply
   , RemoteProcessException(..), PipeClosedException(..)
+  , disposeTHMessage
 
   , InboxId(..)
-  , withNewMailbox
+  , newMailbox
+  , closeMailbox
 
   , BreakModule
   , BreakUnitId
@@ -65,6 +70,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.ByteString.Short as BS
 import Data.Dynamic
+import Data.Foldable (toList)
 import Data.Typeable (TypeRep)
 import Data.IORef
 import Data.Map (Map)
@@ -111,6 +117,9 @@ data Message a where
 
   -- | Release 'HValueRef's
   FreeHValueRefs :: [HValueRef] -> Message ()
+
+  -- | Release 'RemoteResource's.
+  FreeRemoteResources :: [RemoteResource] -> Message ()
 
   -- | Add entries to the Static Pointer Table
   AddSptEntry :: Fingerprint -> HValueRef -> Message ()
@@ -256,9 +265,91 @@ data Message a where
   -- | User-defined request encoded as a tag/payload pair.  This is left
   -- uninterpreted by GHC and is meant for GHC API applications to be able to supply
   -- their own interpreter which understands additional commands.
-  CustomMessage :: Word8 -> ByteString -> Message ByteString
+  CustomMessage :: Word8 -> ByteString -> CustomMessageMethods -> Message ByteString
 
 deriving instance Show (Message a)
+
+-- | See 'FreeRemoteResources'
+data RemoteResource
+  = RemoteHValueRef !HValueRef
+  | RemoteRemotePtr !(RemotePtr ())        -- ^ 'MallocData', 'MallocStrings'
+  | RemoteFFI       !(RemotePtr C_ffi_cif) -- ^ 'PrepFFI'
+  deriving Show
+
+data CustomMessageMethods
+     = CustomMessageMethods { customResultRemoteResources :: ByteString -> [RemoteResource] }
+     | Deserialized
+
+instance Show CustomMessageMethods where
+  show _ = "<CustomMessageMethods>"
+
+-- | The 'RemoteResource's in the reply to a 'Message'.
+--
+-- Collected from replies to canceled requests, so they can be freed.
+--
+-- Fully explicit match so adding new messages requires update.
+resultRemoteResources :: Message a -> a -> [RemoteResource]
+resultRemoteResources msg res = case msg of
+  MallocData{}              -> [RemoteRemotePtr res]
+  MallocStrings{}           -> map RemoteRemotePtr res
+  PrepFFI{}                 -> [RemoteFFI res]
+  LookupClosure{}           -> map RemoteHValueRef $ toList res
+  CreateBCOs{}              -> map RemoteHValueRef $ res
+  EvalStmt{}                -> map RemoteHValueRef $ evalStatus id res
+  ResumeStmt{}              -> map RemoteHValueRef $ evalStatus id res
+  NewBreakArray{}           -> map RemoteHValueRef $ [castRemoteRef res]
+  GetBreakpointVar{}        -> map RemoteHValueRef $ toList res
+  StartTH{}                 -> [RemoteHValueRef $ castRemoteRef res]
+  GetClosure{}              -> map RemoteHValueRef $ toList res
+  Seq{}                     -> map RemoteHValueRef $ evalStatus (const []) res
+  ResumeSeq{}               -> map RemoteHValueRef $ evalStatus (const []) res
+
+  (CustomMessage _ _ CustomMessageMethods{..})
+                            -> customResultRemoteResources res
+  (CustomMessage _ _ Deserialized)
+                            -> error "resultRemoteRefs on deserialized CustomMessage"
+
+  -- 'LoadDLLs' is idempotent.
+  LoadDLLs{}                -> []
+
+  -- Owned by the RTS.
+  MkCostCentres{}           -> []
+
+  MkConInfoTable{}          -> []
+  Shutdown{}                -> []
+  RtsRevertCAFs{}           -> []
+  InitLinker{}              -> []
+  LookupSymbol{}            -> []
+  LookupSymbolInDLL{}       -> []
+  LoadArchive{}             -> []
+  LoadObj{}                 -> []
+  UnloadObj{}               -> []
+  AddLibrarySearchPath{}    -> []
+  RemoveLibrarySearchPath{} -> []
+  ResolveObjs{}             -> []
+  FindSystemLibrary{}       -> []
+  FreeHValueRefs{}          -> []
+  AddSptEntry{}             -> []
+  AddHpcModule{}            -> []
+  FreeFFI{}                 -> []
+  AbandonStmt{}             -> []
+  EvalString{}              -> []
+  EvalStringToString{}      -> []
+  EvalIO{}                  -> []
+  CostCentreStackInfo{}     -> []
+  SetupBreakpoint{}         -> []
+  BreakpointStatus{}        -> []
+  RunTH{}                   -> []
+  RunModFinalizers{}        -> []
+  WhereFrom{}               -> []
+  FreeRemoteResources{}     -> []
+  where
+    evalStatus :: (b -> [HValueRef]) -> EvalStatus_ b c -> [HValueRef]
+    evalStatus f = \case
+      EvalComplete _ (EvalSuccess b)   -> f b
+      EvalComplete _ (EvalException _) -> []
+      -- the last field is the cost centre stack, which is owned by the cost centre tree.
+      EvalBreak apStack _ ctxt _       -> [apStack, castRemoteRef ctxt]
 
 -- | Used to dynamically create a data constructor's info table at
 -- run-time.
@@ -529,6 +620,21 @@ instance Binary InfoProv where
   put (InfoProv x1 x2 x3 x4 x5 x6 x7) = put x1 >> put x2 >> put x3 >> put x4 >> put x5 >> put x6 >> put x7
 #endif
 
+instance Binary RemoteResource where
+  get = do
+    b <- getWord8
+    case b of
+      0 -> RemoteHValueRef <$> get
+      1 -> RemoteRemotePtr <$> get
+      2 -> RemoteFFI <$> get
+      _ -> error "Unknown RemoteResource code"
+
+  put r = do
+    case r of
+      RemoteHValueRef a -> putWord8 0 >> put a
+      RemoteRemotePtr a -> putWord8 0 >> put a
+      RemoteFFI a -> putWord8 0 >> put a
+
 data Msg = forall a . (Binary a, Show a) => Msg (Message a)
 
 getMessage :: Get Msg
@@ -578,7 +684,8 @@ getMessage = do
       39 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
       40 -> Msg <$> (WhereFrom <$> get)
       41 -> Msg <$> (AddHpcModule <$> get <*> get <*> get <*> get)
-      42 -> Msg <$> (CustomMessage <$> get <*> get)
+      42 -> Msg <$> (CustomMessage <$> get <*> get <*> pure Deserialized)
+      43 -> Msg <$> (FreeRemoteResources <$> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -626,7 +733,8 @@ putMessage m = case m of
   LookupSymbolInDLL dll str   -> putWord8 39 >> put dll >> put str
   WhereFrom a                 -> putWord8 40 >> put a
   AddHpcModule m n h ticks    -> putWord8 41 >> put m >> put n >> put h >> put ticks
-  CustomMessage tag payload   -> putWord8 42 >> put tag >> put payload
+  CustomMessage tag payload _ -> putWord8 42 >> put tag >> put payload
+  FreeRemoteResources ps      -> putWord8 43 >> put ps
 
 {-
 Note [Parallelize CreateBCOs serialization]
@@ -658,13 +766,20 @@ serializeBCOs rbcos = parMap doChunk (chunkList 100 rbcos)
 
 -- | Send a 'Message' request to and wait for a reply from the interpreter
 -- (blocks on the calling side, doesn't necessarily block the interpreter)
-remoteCall :: Binary a => Pipe -> Message a -> IO a
-remoteCall pipe msg = remoteCallWithResponse pipe msg id
+remoteCall :: Binary a => Pipe -> Message a -> (a -> IO ()) -> IO a
+remoteCall pipe msg dispose =
+  either throwIO pure
+    =<< remoteCallInterleaving pipe msg (pure ()) (either (const $ pure ()) dispose)
 
-remoteCallWithResponse :: Binary a => Pipe -> Message a -> (IO a -> IO b) -> IO b
-remoteCallWithResponse pipe msg k =
-  remoteAsyncReqWithResponse pipe (putMessage msg) Nothing $ \ m ->
-    k $ either throwIO (pure . runGet get) =<< m
+remoteCallInterleaving :: Binary a
+                       => Pipe
+                       -> Message a
+                       -> IO ()
+                       -> (Either SomeException a -> IO ())
+                       -> IO (Either SomeException a)
+remoteCallInterleaving pipe msg middle dispose = mask $ \restore ->
+  fmap (fmap (runGet get)) . getAsyncReqReply (restore middle) (dispose . fmap (runGet get))
+    =<< remoteAsyncReqWithResponse pipe (putMessage msg) Nothing
 
 -- | Handle a single 'Message' request on the interpreter and reply to the host
 handleRemoteCall :: Pipe
@@ -683,8 +798,12 @@ handleRemoteCall pipe hook k =
 -- 'RunTH'-like run. Since the host may have many in-flight TH runs, we always
 -- want a specific host 'InboxId' (which is announced in the 'RunTH' request)
 remoteTHCall :: Binary a => Pipe -> InboxId -> THMessage a -> IO a
-remoteTHCall pipe ii msg = either throwIO (pure . runGet get)
-                       =<< remoteAsyncReq pipe (putTHMessage msg) (Just ii)
+remoteTHCall pipe ii msg = either throwIO (pure . runGet get) =<< remoteAsyncReq pipe (putTHMessage msg) (Just ii) (disposeTHMessage msg)
+
+
+disposeTHMessage :: THMessage a -> Either SomeException LB.ByteString -> IO ()
+-- TODO: setup THMessage cleanups, even though atm there's none.
+disposeTHMessage _ _ = pure ()
 
 -- | Handle a 'THMessage' request on the host and reply to the interpreter.
 -- Symmterically to 'remoteTHCall', we always want to specify the 'InboxId' for
