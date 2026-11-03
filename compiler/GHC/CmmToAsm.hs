@@ -123,7 +123,7 @@ import GHC.Data.Stream (liftIO)
 import qualified GHC.Data.Stream as Stream
 import GHC.Settings
 
-import Data.List (sortBy)
+import Data.List (sortBy, mapAccumL)
 import Data.List.NonEmpty (groupAllWith, head)
 import Data.Maybe
 import Data.Ord         ( comparing )
@@ -649,9 +649,25 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 {-# SCC "shortcutBranches" #-}
                 shortcutBranches config ncgImpl tabled postRegCFG
 
-        let optimizedCFG :: Maybe CFG
-            optimizedCFG =
+        let optimizedLoops :: Maybe (CFG, Maybe [(BlockId, BlockId)])
+            optimizedLoops =
                 optimizeCFG (ncgCmmStaticPred config) weights cmm <$!> postShortCFG
+            optimizedCFG0 = fst <$> optimizedLoops
+
+        ---- copy small loop heads over the jumps to them, where the chain
+        -- layout follows to place the copies' successors
+        let (copied, optimizedCFG)
+              | ncgCfgBlockLayout config
+              , backendMaintainsCfg platform
+              , Just (cfg0, backs) <- optimizedLoops
+              = {-# SCC "copyLoopHeads" #-}
+                let copy cfg (CmmProc info lbl live (ListGraph blocks))
+                      | Just (blocks', cfg') <- copyLoopHeads ncgImpl cfg backs info blocks
+                      = (cfg', CmmProc info lbl live (ListGraph blocks'))
+                    copy cfg top = (cfg, top)
+                    (cfg', tops) = mapAccumL copy cfg0 shorted
+                in (tops, Just $! cfg')
+              | otherwise = (shorted, optimizedCFG0)
 
         maybeDumpCfg logger optimizedCFG "CFG Weights - Final" proc_name
 
@@ -661,7 +677,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
 
         when ( ncgEnableDeadCodeElimination config &&
                 (ncgAsmLinting config || debugIsOn )) $ do
-                let blocks = concatMap getBlks shorted
+                let blocks = concatMap getBlks copied
                 let labels = setFromList $ fmap blockId blocks :: LabelSet
                 let cfg = fromJust optimizedCFG
                 return $! seq (sanityCheckCfg cfg labels $
@@ -673,9 +689,9 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                         {-# SCC "sequenceBlocks" #-}
                         runUniqueDSM usAlloc $ mapM (BlockLayout.sequenceTop
                                 ncgImpl optimizedCFG)
-                            shorted
+                            copied
 
-        massert (checkLayout shorted sequenced)
+        massert (checkLayout copied sequenced)
 
         let branchOpt :: [NatCmmDecl statics instr]
             branchOpt =

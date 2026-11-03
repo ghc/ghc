@@ -34,7 +34,8 @@ ncgLA64 config =
       ncgAllocMoreStack         = LA64.allocMoreStack platform,
       ncgMakeFarBranches        = LA64.makeFarBranches,
       extractUnwindPoints       = const [],
-      invertCondBranches        = \_ _ -> id
+      invertCondBranches        = \_ _ -> id,
+      copyLoopHeads             = \_ _ _ _ -> Nothing
     }
   where
     platform = ncgPlatform config

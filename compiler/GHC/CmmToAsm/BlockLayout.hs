@@ -63,6 +63,9 @@ import GHC.Types.Unique.DSM (UniqDSM)
   * Based on the CFG and loop information refine the edge weights
     in the CFG and normalize them relative to the most often visited
     node. (See `mkGlobalWeights`)
+  * On x86-64, copy each small loop head that ends in a conditional branch over
+    the jumps to it, adding the copies' edges to the CFG (`copyLoopHeads`,
+    Note [Copying loop heads] in GHC.CmmToAsm.X86.CodeGen).
   * Feed this CFG into the block layout code (`sequenceTop`) in this
     module. Which will then produce a code layout based on the input weights.
 

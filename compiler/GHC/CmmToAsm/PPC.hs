@@ -36,6 +36,7 @@ ncgPPC config = NcgImpl
    , ncgMakeFarBranches        = PPC.makeFarBranches
    , extractUnwindPoints       = const []
    , invertCondBranches        = \_ _ -> id
+   , copyLoopHeads             = \_ _ _ _ -> Nothing
    }
     where
       platform = ncgPlatform config

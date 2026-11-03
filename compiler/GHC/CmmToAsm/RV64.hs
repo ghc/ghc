@@ -32,7 +32,8 @@ ncgRV64 config =
       ncgAllocMoreStack = RV64.allocMoreStack platform,
       ncgMakeFarBranches = RV64.makeFarBranches,
       extractUnwindPoints = const [],
-      invertCondBranches = \_ _ -> id
+      invertCondBranches = \_ _ -> id,
+      copyLoopHeads = \_ _ _ _ -> Nothing
     }
   where
     platform = ncgPlatform config

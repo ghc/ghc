@@ -119,10 +119,16 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock"
     -- and Note [Unwinding information in the NCG] in this module.
     invertCondBranches        :: Maybe CFG -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
-                              -> [NatBasicBlock instr]
+                              -> [NatBasicBlock instr],
     -- ^ Turn the sequence of @jcc l1; jmp l2@ into @jncc l2; \<block_l1>@
     -- when possible, and on x86 into @jncc l2; jmp l1@ where neither jump
     -- falls through and l2 is the likely target.
+    copyLoopHeads             :: CFG -> Maybe [(BlockId, BlockId)] -> LabelMap RawCmmStatics
+                              -> [NatBasicBlock instr] -> Maybe ([NatBasicBlock instr], CFG)
+    -- ^ Copy each small loop head that ends in a conditional branch over
+    -- the jumps to it, before block layout, given the back edges of static
+    -- prediction's loops where it ran, or Nothing where no head is copied;
+    -- Note [Copying loop heads] in "GHC.CmmToAsm.X86.CodeGen".
     }
 
 {- Note [supporting shortcutting]

@@ -743,8 +743,10 @@ findBackEdges root cfg
       | otherwise             = go s (succs s) ((n, ss) : stack)
                                    (setInsert s seen) (setInsert s onStack) acc
 
-optimizeCFG :: Bool -> Weights -> RawCmmDecl -> CFG -> CFG
-optimizeCFG _ _ (CmmData {}) cfg = cfg
+-- | The CFG with its final weights, and, where static prediction estimated
+-- them, the back edges of the loops it found ('loopInfo').
+optimizeCFG :: Bool -> Weights -> RawCmmDecl -> CFG -> (CFG, Maybe Edges)
+optimizeCFG _ _ (CmmData {}) cfg = (cfg, Nothing)
 optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg
   -- no bonus for back edges where static prediction follows: it starts each
   -- two-way branch from optHsPatterns' weights, so that the penalties become
@@ -753,9 +755,12 @@ optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg
   -- all back edges; the back edges are loopInfo's: one into the root is
   -- findBackEdges' alone, and a branch with one starts from its weight with no
   -- bonus
-  | doStaticPred = staticPredCfg (tagRegisters graph) entry $ optHsPatterns weights proc cfg
-  | otherwise    = optHsPatterns weights proc
-                     (increaseBackEdgeWeight weights entry cfg)
+  | doStaticPred
+  , (cfg', backs) <- staticPredCfg (tagRegisters graph) entry $
+                       optHsPatterns weights proc cfg
+  = (cfg', Just backs)
+  | otherwise
+  = (optHsPatterns weights proc (increaseBackEdgeWeight weights entry cfg), Nothing)
   where entry = g_entry graph
 
 -- Increase the weight of all backedges in the CFG
@@ -841,12 +846,13 @@ optHsPatterns weights (CmmProc info _lab _live _graph) cfg =
           | CmmSource { trans_cmmNode = CmmCondBranch {} } <- source = True
           | otherwise = False
 
--- | Convert block-local branch weights to global weights.
-staticPredCfg :: S.Set LocalReg -> BlockId -> CFG -> CFG
-staticPredCfg tags entry cfg = cfg'
+-- | Convert block-local branch weights to global weights, with the back edges
+-- of 'loopInfo'.
+staticPredCfg :: S.Set LocalReg -> BlockId -> CFG -> (CFG, Edges)
+staticPredCfg tags entry cfg = (cfg', backs)
   where
-    (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-}
-                             mkGlobalWeightsWith tags entry cfg
+    (_, globalEdgeWeights, backs) = {-# SCC mkGlobalWeights #-}
+                                    mkGlobalWeightsWith tags entry cfg
     cfg' = {-# SCC rewriteEdges #-}
             mapFoldlWithKey
                 (\cfg from m ->
@@ -1003,17 +1009,20 @@ revPostorderFrom cfg root =
 --   for edges is the number of traversals.
 
 mkGlobalWeights :: HasDebugCallStack => BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
-mkGlobalWeights = mkGlobalWeightsWith S.empty
+mkGlobalWeights root cfg
+  | (blockFreqs, edgeFreqs, _) <- mkGlobalWeightsWith S.empty root cfg
+  = (blockFreqs, edgeFreqs)
 
 -- | 'mkGlobalWeights', told which local registers hold a constructor tag
--- (see 'tagRegisters').
+-- (see 'tagRegisters'), with the back edges of 'loopInfo'.
 {-# NOINLINE mkGlobalWeightsWith #-}
 {-# SCC mkGlobalWeightsWith #-}
-mkGlobalWeightsWith :: HasDebugCallStack => S.Set LocalReg -> BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
+mkGlobalWeightsWith :: HasDebugCallStack => S.Set LocalReg -> BlockId -> CFG
+                    -> (LabelMap Double, LabelMap (LabelMap Double), Edges)
 mkGlobalWeightsWith tags root localCfg
   | null localCfg = panic "Error - Empty CFG"
   | otherwise
-  = (blockFreqs', edgeFreqs')
+  = (blockFreqs', edgeFreqs', backedges)
   where
     -- Calculate fixpoints
     (blockFreqs, edgeFreqs) = calcFreqs nodeProbs backEdges' bodies' revOrder'

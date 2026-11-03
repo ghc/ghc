@@ -41,6 +41,7 @@ ncgX86_64 config = NcgImpl
    , ncgMakeFarBranches        = \_p _i bs -> pure bs
    , extractUnwindPoints       = X86.extractUnwindPoints
    , invertCondBranches        = X86.invertCondBranches
+   , copyLoopHeads             = X86.copyLoopHeads
    }
     where
       platform = ncgPlatform config
