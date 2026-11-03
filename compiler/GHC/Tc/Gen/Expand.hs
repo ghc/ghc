@@ -25,14 +25,13 @@ import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.WiredIn.Ids ( leftSectionName, rightSectionName )
 import GHC.Rename.Utils
-import GHC.Rename.Env ( lookupOccRnNone )
+import GHC.Rename.Env ( lookupOccRnNone, lookupSyntaxName )
 
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
 
 import qualified Data.List.NonEmpty as NE ( map, head, (<|) )
 import Data.List.NonEmpty ( NonEmpty(..), init, last, tail )
-import Data.Maybe ( isJust )
 
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Builtin.KnownKeys (getFieldClassOpOcc)
@@ -119,6 +118,9 @@ Wrinkle (TBE1)
 
 -}
 
+ifThenElseOcc :: KnownOcc
+ifThenElseOcc = rdrNameOcc $ mkVarUnqual (fsLit "ifThenElse")
+
 -- See Note [Typechecking by expansion: overview]
 tcExpand :: HsExpr GhcRn -> TcM (Maybe (HsExpansion GhcRn))
 
@@ -168,60 +170,54 @@ tcExpand e@(HsIf NoRebindable p b1 b2 )
   = do { isRebindableOn <- getThRebindableSyntax
        -- Check if we are actually expanding a template haskell generated spliced-in expression
        -- and the original expression was typed in a rebindable context
-       ; if isJust isRebindableOn
-         then do
-         { ifThenElseName <- lookupOccRnNone (mkVarUnqual (fsLit "ifThenElse"))
-           -- This ought to pass as ifThenElse would be added into the enviornment
-           -- by the setThRebindableSyntax call below
-         ; return $ Just $
-           HSE { hse_ctxt = ExprCtxt e
-               , hse_exp = wrapGenSpan $ genHsApps ifThenElseName [p, b1, b2] }
-         }
-         else return Nothing }
-tcExpand e@(HsIf (Rebindable rs_table) p b1 b2)
- | Just ifThenElseName <- lookup (rdrNameOcc $ mkVarUnqual (fsLit "ifThenElse")) rs_table
-  = return $ Just $
-    HSE { hse_ctxt = ExprCtxt e
-        , hse_exp = wrapGenSpan $ genHsApps ifThenElseName [p, b1, b2]
-        }
-  | otherwise
-  = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find ifThenElse in rs_table"
-                              , ppr e ])
+       ; case isRebindableOn of
+           Just mod ->
+             do { ifThenElseName <- lookupOccRnNone (mkRdrQual mod ifThenElseOcc)
+                -- This ought to pass as ifThenElse would be added into the enviornment
+                -- by the setThRebindableSyntax call below (hopefully)
+                ; return $ Just $
+                  HSE { hse_ctxt = ExprCtxt e
+                      , hse_exp = wrapGenSpan $ genHsApps ifThenElseName [p, b1, b2] }
+                }
+           _ -> return Nothing
+       }
+tcExpand e@(HsIf (Rebindable _) p b1 b2)
+  = do { (ifThenElseName, _) <- lookupSyntaxName ifThenElseOcc
+       ; return $ Just $
+         HSE { hse_ctxt = ExprCtxt e
+             , hse_exp = wrapGenSpan $ genHsApps ifThenElseName [p, b1, b2]
+             }
+       }
+
 
 ------------------------------------------
 -- Record dot syntax
 
-tcExpand e@(HsGetField (Rebindable rs_table) expr f)
- | Just getField <- lookup getFieldClassOpOcc rs_table
- = return $ Just $
-   HSE { hse_ctxt = ExprCtxt e
-       , hse_exp = wrapGenSpan $ (mkGetField getField expr (fmap (unLoc . dfoLabel) f)) }
- | otherwise
- = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField in rs_table"
-                             , ppr e ])
+tcExpand e@(HsGetField (Rebindable _)  expr f)
+ = do { (getFieldName, _) <- lookupSyntaxName getFieldClassOpOcc
+      ; return $ Just $
+        HSE { hse_ctxt = ExprCtxt e
+            , hse_exp = wrapGenSpan $ (mkGetField getFieldName expr (fmap (unLoc . dfoLabel) f)) }
+      }
+tcExpand (HsGetField _ _ _) = return Nothing
 
-tcExpand e@(HsProjection (Rebindable rs_table) fs)
- | Just getField <- lookup getFieldClassOpOcc rs_table
- , Just circ <- lookup (rdrNameOcc compose_RDR) rs_table
- = return $ Just $
-   HSE { hse_ctxt = ExprCtxt e
-       , hse_exp = wrapGenSpan $ (mkProjection getField circ $ NE.map (unLoc . dfoLabel) fs) }
- | otherwise
- = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField or circ in rs_table"
-                             , ppr e])
+tcExpand e@(HsProjection (Rebindable _) fs)
+  = do { (getFieldName, _) <- lookupSyntaxName getFieldClassOpOcc
+       ; (circName, _) <- lookupSyntaxName (rdrNameOcc compose_RDR)
+       ; return $ Just $
+         HSE { hse_ctxt = ExprCtxt e
+             , hse_exp = wrapGenSpan $ (mkProjection getFieldName circName $ NE.map (unLoc . dfoLabel) fs) }
+       }
+tcExpand (HsProjection _ _) = return Nothing
 
-
+tcExpand e@(RecordUpd (Rebindable _) (L l expr) (OverloadedRecUpdFields { olRecUpdFields = us}))
+ = do {
+        (getFieldName, _) <- lookupSyntaxName getFieldClassOpOcc
+      ; (setFieldName, _) <- lookupSyntaxName setFieldClassOpOcc
+      ; return $ Just $
+        HSE { hse_ctxt = ExprCtxt e
+            , hse_exp = wrapGenSpan $ mkRecordDotUpd getFieldName setFieldName (L l expr) us } }
 tcExpand (RecordUpd NoRebindable _ _ ) = return Nothing -- until #27160 is fixed
-
-tcExpand e@(RecordUpd (Rebindable rs_table) (L l expr) (OverloadedRecUpdFields { olRecUpdFields = us}))
- | Just getField <- lookup getFieldClassOpOcc rs_table
- , Just setField <- lookup setFieldClassOpOcc rs_table
- = return $ Just $
-   HSE { hse_ctxt = ExprCtxt e
-       , hse_exp = wrapGenSpan $ mkRecordDotUpd getField setField (L l expr) us }
- | otherwise
- = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField or setfield in rs_table"
-                             , ppr e ])
 
 ------------------------------------------
 -- Left and Right Sections
@@ -306,6 +302,7 @@ tcExpand e@(XExpr (ReSynBindsRn m inner_e))
   = setThRebindableSyntax m $
       -- set environment variable to be in rebindable syntax
       -- add the required rebindable syntax binding names into the environment
+
     do {
          -- now try expanding inner_e
        ; traceTc "tcExpand: ReSynBindsRn" (ppr e)
@@ -519,3 +516,24 @@ mkRecordDotUpd get_field set_field exp updates = foldl' fieldUpdate (unLoc exp) 
   where
     fieldUpdate :: HsExpr GhcRn -> LHsRecUpdProj GhcRn -> HsExpr GhcRn
     fieldUpdate acc lpu =  unLoc $ (mkProjUpdateSetField get_field set_field lpu) (wrapGenSpan acc)
+
+
+----------------------------------------------------
+-- Template Haskell Splices with Rebindable Syntax
+
+-- We have a module name
+-- We need to get the toplevel environment of that module
+-- so that we can (implicitly) add it to the current module
+-- and then type check the splice expression
+
+-- getExternalModIface :: Name -> TcM (Maybe ModIface)
+-- getExternalModIface nm = do
+--   isLocal <- nameIsLocalOrFrom <$> getModule <*> pure nm
+--   if isLocal
+--     then pure Nothing -- should not be reached, unless there is a circular dependency
+--     else case nameModule_maybe nm of
+--           Nothing -> pure Nothing
+--           Just modNm -> do
+--             hsc_env <- getTopEnv
+--             iface <- liftIO $ hscGetModuleInterface hsc_env modNm
+--             pure (Just iface)
