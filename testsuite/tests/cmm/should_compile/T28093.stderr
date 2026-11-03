@@ -1,0 +1,7 @@
+==================== CFG Weights - Final ====================
+stg_self:
+digraph {
+	c1 -> c4[label="1.00000",weight="1.00000"];
+	c5 -> c1[label="1.00000",weight="1.00000"];
+	c1 -> c1[label="7.00000",weight="7.00000"];
+}

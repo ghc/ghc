@@ -1,0 +1,17 @@
+#include "Cmm.h"
+
+// On x86-64 the atomic or is a compare-and-swap loop: a block added by the
+// NCG with a self edge of weight 0. That block dominates the loop L -> B -> L.
+// Expected: the loop's edges outweigh its exit edge. Without the self edge
+// counting as a back edge, every edge after the atomic op gets weight 0.
+stg_cas {
+  W_ old;
+  (old) = prim %fetch_or64(R2, 1 :: I64);
+  goto L;
+L:
+  if (R1 > 0) { goto B; }
+  jump stg_cas [R1, R2];
+B:
+  R1 = R1 - 1;
+  goto L;
+}

@@ -1,0 +1,11 @@
+==================== CFG Weights - Final ====================
+stg_cas:
+digraph {
+	c4 -> c7[label="1.00000",weight="1.00000"];
+	c9 -> n1[label="1.00000",weight="1.00000"];
+	n1 -> n2[label="1.00000",weight="1.00000"];
+	n2 -> c4[label="1.00000",weight="1.00000"];
+	c4 -> c5[label="3.00000",weight="3.00000"];
+	c5 -> c4[label="3.00000",weight="3.00000"];
+	n1 -> n1[label="7.00000",weight="7.00000"];
+}

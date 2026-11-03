@@ -1,0 +1,14 @@
+#include "Cmm.h"
+
+// The entry is a bare goto, so the Cmm control-flow optimiser makes L the
+// entry, heading the loop L -> B -> L. Expected: L -> B outweighs the exit
+// edge. Without loop detection they tie.
+stg_loop {
+  goto L;
+L:
+  if (R1 > 0) { goto B; }
+  jump stg_loop [R1];
+B:
+  R1 = R1 - 1;
+  goto L;
+}

@@ -2,6 +2,14 @@ setTestOpts(
   [ req_cmm
   ])
 
+def final_cfg_weights(s):
+  """
+  The edge weights of the final CFG, without the block labels, which
+  depend on uniques.
+  """
+  final = s.split('CFG Weights - Final')[-1]
+  return '\n'.join(re.findall(r'weight="([^"]*)"', final))
+
 test('selfloop', [cmm_src], compile, ['-no-hs-main'])
 test('cmm_sink_sp', [ only_ways(['optasm']),
                       grep_errmsg(r'(\[Sp.*\]).*(=).*(\[.*R1.*\]).*;',[1,2,3]),
@@ -11,6 +19,21 @@ test('T16930', normal, makefile_test, ['T16930'])
 test('T17442', normal, compile, [''])
 test('T20725', normal, compile, ['-package ghc'])
 test('T23610', normal, makefile_test, ['T23610'])
+test('T28083', [cmm_src, only_ways(['optasm']),
+                unless(arch('x86_64'), skip),
+                when(leading_underscore(), skip),
+                normalise_errmsg_fun(final_cfg_weights)],
+     compile, ['-no-hs-main -ddump-cfg-weights'])
+test('T28093', [cmm_src, only_ways(['optasm']),
+                unless(arch('x86_64'), skip),
+                when(leading_underscore(), skip),
+                normalise_errmsg_fun(final_cfg_weights)],
+     compile, ['-no-hs-main -ddump-cfg-weights'])
+test('T28093_cas', [cmm_src, only_ways(['optasm']),
+                    unless(arch('x86_64'), skip),
+                    when(leading_underscore(), skip),
+                    normalise_errmsg_fun(final_cfg_weights)],
+     compile, ['-no-hs-main -ddump-cfg-weights'])
 test('T24224', [cmm_src, grep_errmsg(r'(F64.*);', [1]), only_ways(['normal'])], compile, ['-no-hs-main -ddump-cmm -dsuppress-all -dsuppress-uniques'])
 test('T24474', cmm_src, compile, ['-optc-g3'])
 # Grep for a `... = + .. 42 ..;` occurence from within the dead code block in the cmm dump output.

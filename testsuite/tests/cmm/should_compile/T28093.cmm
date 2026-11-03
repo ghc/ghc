@@ -1,0 +1,14 @@
+#include "Cmm.h"
+
+// S is a self-loop that dominates the exit block, so it is not a leaf of
+// the dominator tree. The entry does work, so it isn't merged into S.
+// Expected: the self edge outweighs the exit edge. Without loop detection
+// both get weight 0.
+stg_self {
+  R1 = R1 + 1;
+  goto S;
+S:
+  R1 = R1 - 1;
+  if (R1 > 0) { goto S; }
+  jump stg_self [R1];
+}
