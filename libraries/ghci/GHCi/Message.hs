@@ -274,6 +274,7 @@ data RemoteResource
   = RemoteHValueRef !HValueRef
   | RemoteRemotePtr !(RemotePtr ())        -- ^ 'MallocData', 'MallocStrings'
   | RemoteFFI       !(RemotePtr C_ffi_cif) -- ^ 'PrepFFI'
+  | RemoteLibrarySearchPath !(RemotePtr ())
   deriving Show
 
 data CustomMessageMethods
@@ -303,6 +304,7 @@ resultRemoteResources msg res = case msg of
   GetClosure{}              -> map RemoteHValueRef $ toList res
   Seq{}                     -> map RemoteHValueRef $ evalStatus (const []) res
   ResumeSeq{}               -> map RemoteHValueRef $ evalStatus (const []) res
+  AddLibrarySearchPath{}    -> [RemoteLibrarySearchPath res]
 
   (CustomMessage _ _ CustomMessageMethods{..})
                             -> customResultRemoteResources res
@@ -324,7 +326,6 @@ resultRemoteResources msg res = case msg of
   LoadArchive{}             -> []
   LoadObj{}                 -> []
   UnloadObj{}               -> []
-  AddLibrarySearchPath{}    -> []
   RemoveLibrarySearchPath{} -> []
   ResolveObjs{}             -> []
   FindSystemLibrary{}       -> []
@@ -627,13 +628,15 @@ instance Binary RemoteResource where
       0 -> RemoteHValueRef <$> get
       1 -> RemoteRemotePtr <$> get
       2 -> RemoteFFI <$> get
+      3 -> RemoteLibrarySearchPath <$> get
       _ -> error "Unknown RemoteResource code"
 
   put r = do
     case r of
       RemoteHValueRef a -> putWord8 0 >> put a
-      RemoteRemotePtr a -> putWord8 0 >> put a
-      RemoteFFI a -> putWord8 0 >> put a
+      RemoteRemotePtr a -> putWord8 1 >> put a
+      RemoteFFI a       -> putWord8 2 >> put a
+      RemoteLibrarySearchPath a -> putWord8 3 >> put a
 
 data Msg = forall a . (Binary a, Show a) => Msg (Message a)
 

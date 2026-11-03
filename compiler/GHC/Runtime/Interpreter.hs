@@ -48,6 +48,7 @@ module GHC.Runtime.Interpreter
   , findSystemLibrary
 
   , interpCmd
+  , withInterpCmdMasked
   , withExtInterp
   , withExtInterpStatus
   , withIServ
@@ -199,6 +200,13 @@ interpCmd interp msg = case interpInstance interp of
 #endif
   ExternalInterp ext -> withExtInterp interp ext $ \inst ->
     sendMessage inst msg
+
+-- | Calls `interpCmd` and the continuation while masked.
+--
+-- Should be used whenever the message reply contains resources that need a
+-- finalizer or other cleanup.
+withInterpCmdMasked :: Binary a => Interp -> Message a -> (a -> IO b) -> IO b
+withInterpCmdMasked interp msg own = mask_ $ interpCmd interp msg >>= own
 
 withExtInterp :: ExceptionMonad m => Interp -> ExtInterp -> (forall d. ExtInterpInstance d -> m a) -> m a
 withExtInterp interp ext action = stopInterpOnPipeClosed $ case ext of
@@ -385,9 +393,8 @@ costCentreStackInfo interp ccs =
   interpCmd interp (CostCentreStackInfo ccs)
 
 newBreakArray :: Interp -> Int -> IO (ForeignRef BreakArray)
-newBreakArray interp size = do
-  breakArray <- interpCmd interp (NewBreakArray size)
-  mkFinalizedHValue interp breakArray
+newBreakArray interp size =
+  withInterpCmdMasked interp (NewBreakArray size) (mkFinalizedHValue interp)
 
 storeBreakpoint :: Interp -> ForeignRef BreakArray -> Int -> Int -> IO ()
 storeBreakpoint interp ref ix cnt = do                               -- #19157
@@ -401,15 +408,15 @@ breakpointStatus interp ref ix =
 
 getBreakpointVar :: Interp -> ForeignHValue -> Int -> IO (Maybe ForeignHValue)
 getBreakpointVar interp ref ix =
-  withForeignRef ref $ \apStack -> do
-    mb <- interpCmd interp (GetBreakpointVar apStack ix)
-    mapM (mkFinalizedHValue interp) mb
+  withForeignRef ref $ \apStack ->
+    withInterpCmdMasked interp (GetBreakpointVar apStack ix)
+                    (mapM (mkFinalizedHValue interp))
 
 getClosure :: Interp -> ForeignHValue -> IO (Heap.GenClosure ForeignHValue)
 getClosure interp ref =
-  withForeignRef ref $ \hval -> do
-    mb <- interpCmd interp (GetClosure hval)
-    mapM (mkFinalizedHValue interp) mb
+  withForeignRef ref $ \hval ->
+    withInterpCmdMasked interp (GetClosure hval) $
+      mapM (mkFinalizedHValue interp)
 
 whereFrom :: Interp -> ForeignHValue -> IO (Maybe InfoProv.InfoProv)
 whereFrom interp ref =
@@ -528,9 +535,11 @@ interpSymbolToCLabel s = eliminateInterpSymbol s interpretedInterpSymbol $ \is -
         ]
   in mkFastStringByteString label
 
-lookupClosure :: Interp -> InterpSymbol s -> IO (Maybe HValueRef)
+lookupClosure :: Interp -> InterpSymbol s -> IO (Maybe ForeignHValue)
 lookupClosure interp str =
-  interpCmd interp (LookupClosure (fastStringToShortByteString (interpSymbolToCLabel str)))
+  withInterpCmdMasked interp
+    (LookupClosure (fastStringToShortByteString (interpSymbolToCLabel str)))
+    (mapM (mkFinalizedHValue interp))
 
 -- | 'withSymbolCache' tries to find a symbol in the 'interpLookupSymbolCache'
 -- which maps symbols to the address where they are loaded.
