@@ -34,8 +34,8 @@ module GHC.CmmToAsm.CFG
     , mkGlobalWeights
 
     -- Block frequencies before register allocation
-    , BlockFreqs, blockFrequencies, blockFreq, noBlockFreqs
-    , tagRegisters
+    , BlockFreqs, blockFrequencies, blockFreq, blockFreqAt, noBlockFreqs
+    , blockIndex, blockCount, tagRegisters
 
      )
 where
@@ -1054,6 +1054,19 @@ blockFreq (BlockFreqs ks fs) b
   | otherwise = 0
   where i = uniqueIndex ks (lblToUnique b)
 
+-- | The frequency of the block at an index 'blockIndex' gave, not -1.
+blockFreqAt :: BlockFreqs -> Int -> Double
+blockFreqAt (BlockFreqs _ fs) i = unsafeAt fs i
+
+-- | A block's index in the estimate, from 0 to 'blockCount' - 1, or -1 for
+-- one the estimate does not hold.
+blockIndex :: BlockFreqs -> BlockId -> Int
+blockIndex (BlockFreqs ks _) b = uniqueIndex ks (lblToUnique b)
+
+-- | The number of blocks the estimate holds.
+blockCount :: BlockFreqs -> Int
+blockCount (BlockFreqs ks _) = snd (bounds ks) + 1
+
 -- | A unique's index in an ascending array of uniques, -1 where absent.
 uniqueIndex :: UArray Int Word64 -> Word64 -> Int
 uniqueIndex ks !k = go 0 (snd (bounds ks))
@@ -1083,6 +1096,11 @@ wrI a i x = unsafeWrite a i (fromIntegral x)
 forMapST :: (Word64 -> a -> Int -> ST s ()) -> LabelMap a -> Int -> ST s Int
 forMapST f (LM m0) = go m0
   where
+    -- over the map's constructors, a workaround for an unidentified issue:
+    -- foldM over WM.toList made the compiler allocate 0.16% more and run
+    -- 0.074% more instructions compiling !16269's CmmDiamondChain at -O1, 0.16%
+    -- and 0.070% more at -O2, and nothing more at -O0, where blockFrequencies
+    -- does not run, on GHC 10.1.20261108
     go WMI.Nil          !i = return i
     go (WMI.Tip k x)    !i = f k x i >> return (i + 1)
     go (WMI.Bin _ _ l r) !i = go l i >>= go r
@@ -1093,7 +1111,13 @@ forMapST f (LM m0) = go m0
 -- the register allocator before it allocates, from the CFG as instruction
 -- selection gives it, given the procedure's 'tagRegisters' and the CFG's
 -- checkFailures, in time linear in the CFG but for its loops' nesting and in
--- two arrays. Static prediction (Note [Static Branch Prediction]) gives the
+-- two arrays: run at -O0 as well when this was written, it made the compiler
+-- allocate 4.4% more compiling T783 at -O0 over LabelMaps, and 0.18% more in
+-- the arrays. Run only under -fcmm-static-pred now, it makes the compiler run
+-- 0.36% and 0.35% more instructions compiling !16269's CmmDiamondChain at -O1
+-- and -O2, and allocate 0.067% and 0.060% more compiling T12707 at -O and -O2,
+-- and nothing more at -O0, where it does not run, on GHC 10.1.20261108. Static
+-- prediction (Note [Static Branch Prediction]) gives the
 -- edges their probabilities as staticBranchPrediction gives them, and the
 -- fixpoint is calcFreqs', but a loop's blocks are walked alone and the back
 -- edges into one block taken as one loop. A back edge is an edge into a block
@@ -1320,6 +1344,13 @@ blockFrequencies tags failed root cfg@(LM cm)
                           else (1 - weightToDouble pred_LBH) / fromIntegral (cnt - nb))
               else when (cnt == 2 && nb == 0 && hc == 0) $
                 case mapLookup (mkHooplLabel (unsafeAt keys v)) cfg of
+                  -- the two edges off the map's constructors: a match on
+                  -- mapToList, which builds the list it matches, made the
+                  -- compiler allocate 0.021% and 0.020% more compiling !16269's
+                  -- CmmDiamondChain at -O1 and -O2 and run 0.009% and 0.008%
+                  -- more instructions compiling T783 at -O and -O2, and nothing
+                  -- more at -O0, where blockFrequencies does not run, on GHC
+                  -- 10.1.20261108
                   Just (LM (WMI.Bin _ _ (WMI.Tip k1 i1) (WMI.Tip _ i2))) -> do
                     t1 <- dec <$> rdI ia (oTgt + s)
                     t2 <- dec <$> rdI ia (oTgt + s + 1)
@@ -1485,12 +1516,16 @@ entry block's one successor.
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Static prediction estimates block frequencies for the layout only under
 -fcmm-static-pred and only after register allocation
-(Note [Static Branch Prediction]); the graph allocator's spill costs hold
-mkGlobalWeights' estimate whatever the flag, but as a thunk no spill choice
-forces (GHC.CmmToAsm.Reg.Graph.SpillCost). So the code that depends on how often
-a block runs uses stand-ins, each marked by a TODO pointing here. Once the
-estimate is computed in a Cmm pass, as that Note proposes, these could use it
-instead, and they are to be reinvestigated together:
+(Note [Static Branch Prediction]); blockFrequencies makes the estimate for the
+linear allocator before it allocates, under the same flag, from the CFG as
+instruction selection gives it (static prediction runs on the CFG only after
+shortcutting and optHsPatterns adjust it), and linearRA_SCCs orders the SCCs by
+the estimate; the graph allocator's spill costs hold mkGlobalWeights'
+estimate whatever the flag, but as a thunk no spill choice forces
+(GHC.CmmToAsm.Reg.Graph.SpillCost). So the code that depends on how often a
+block runs uses stand-ins, at -O0 and elsewhere, each marked by a TODO pointing
+here. Once the estimate is computed in a Cmm pass, as that Note proposes, these
+could use it instead, and they are to be reinvestigated together:
 
  * coldBlocks misses two shapes. In a procedure needing more stack than
    maxSpillSlots, allocMoreStack splits each entry block into a stack allocation
@@ -1510,7 +1545,7 @@ instead, and they are to be reinvestigated together:
 
  * checkFailures counts as cold a block the garbage collector returns to that a
    call returns to as well, which the hot path runs, and linearRA_SCCs in
-   GHC.CmmToAsm.Reg.Linear defers it; it also counts a failure target that
+   GHC.CmmToAsm.Reg.Linear, where it has no estimate, defers it; it also counts a failure target that
    another edge enters, and, for static prediction and the layout, the lighter
    side of an unannotated test of a register held off BaseReg, as of CurrentTSO,
    once favourFewerPreds has broken its tie. The estimate would give each
