@@ -72,10 +72,13 @@ module GHC.Utils.Binary
 
    -- * Lazy Binary I/O
    lazyGet,
+   lazyGetCopy,
    lazyPut,
    lazyGet',
+   lazyGetCopy',
    lazyPut',
    lazyGetMaybe,
+   lazyGetMaybeCopy,
    lazyPutMaybe,
 
    -- * EnumBinary
@@ -248,8 +251,6 @@ data FullBinData = FullBinData
   -- ^ 'ReaderUserData' that can be used to resume reading.
   , fbd_off_s :: {-# UNPACK #-} !Int
   -- ^ start offset
-  , fbd_off_e :: {-# UNPACK #-} !Int
-  -- ^ end offset
   , fbd_size :: {-# UNPACK #-} !Int
   -- ^ total buffer size
   , fbd_buffer :: {-# UNPACK #-} !BinArray
@@ -257,16 +258,15 @@ data FullBinData = FullBinData
 
 -- Equality and Ord assume that two distinct buffers are different, even if they compare the same things.
 instance Eq FullBinData where
-  (FullBinData _ b c d e) == (FullBinData _ b1 c1 d1 e1) = b == b1 && c == c1 && d == d1 && e == e1
+  (FullBinData _ b d e) == (FullBinData _ b1 d1 e1) = b == b1 && d == d1 && e == e1
 
 instance Ord FullBinData where
-  compare (FullBinData _ b c d e) (FullBinData _ b1 c1 d1 e1) =
-    compare b b1 `mappend` compare c c1 `mappend` compare d d1 `mappend` compare e e1
+  compare (FullBinData _ b d e) (FullBinData _ b1 d1 e1) =
+    compare b b1 `mappend` compare d d1 `mappend` compare e e1
 
 -- | Write the 'FullBinData' slice into the 'WriteBinHandle'.
 putFullBinData :: WriteBinHandle -> FullBinData -> IO ()
-putFullBinData bh (FullBinData _ o1 o2 _sz ba) = do
-  let sz = o2 - o1
+putFullBinData bh (FullBinData _ o1 sz ba) = do
   putPrim bh sz $ \dest ->
     unsafeWithForeignPtr (ba `plusForeignPtr` o1) $ \orig ->
     copyBytes dest orig sz
@@ -276,15 +276,14 @@ putFullBinData bh (FullBinData _ o1 o2 _sz ba) = do
 -- 'FullBinData' stores a slice starting from the 'Bin a' location to the current
 -- offset of the 'ReadBinHandle'.
 freezeBinHandle :: ReadBinHandle -> Bin a -> IO FullBinData
-freezeBinHandle (ReadBinMem user_data ixr sz binr) (BinPtr start) = do
-  ix <- readFastMutInt ixr
-  pure (FullBinData user_data start ix sz binr)
+freezeBinHandle (ReadBinMem user_data _ixr sz binr) (BinPtr start) = do
+  pure (FullBinData user_data start sz binr)
 
 -- | Turn the 'FullBinData' into a 'ReadBinHandle', setting the 'ReadBinHandle'
 -- offset to the start of the 'FullBinData' and restore the 'ReaderUserData' that was
 -- obtained from 'freezeBinHandle'.
 thawBinHandle :: FullBinData -> IO ReadBinHandle
-thawBinHandle (FullBinData user_data ix _end sz ba) = do
+thawBinHandle (FullBinData user_data ix sz ba) = do
   ixr <- newFastMutInt ix
   return $ ReadBinMem user_data ixr sz ba
 
@@ -1382,6 +1381,9 @@ lazyPut = lazyPut' put_
 lazyGet :: Binary a => ReadBinHandle -> IO a
 lazyGet = lazyGet' get
 
+lazyGetCopy :: Binary a => ReadBinHandle -> IO a
+lazyGetCopy = lazyGetCopy' get
+
 lazyPut' :: (WriteBinHandle -> a -> IO ()) -> WriteBinHandle -> a -> IO ()
 lazyPut' f bh a = do
     -- output the obj with a ptr to skip over it:
@@ -1406,6 +1408,35 @@ lazyGet' f bh = do
     seekBinReader bh (makeAbsoluteBin p) -- skip over the object for now
     return a
 
+lazyGetCopy' :: (ReadBinHandle -> IO a) -> ReadBinHandle -> IO a
+lazyGetCopy' f bh = do
+    p <- getRelBin bh -- a BinPtr
+    p_a <- tellBinReader bh
+    let
+      BinPtr slice_start = p_a
+      BinPtr slice_end = makeAbsoluteBin p
+
+    slice_bin_data <- do
+      let
+        slice_size = slice_end - slice_start
+      target <- mallocForeignPtrBytes slice_size
+      unsafeWithForeignPtr (rbm_arr_r bh) $ \ source ->
+        unsafeWithForeignPtr target $ \ dest ->
+          copyBytes dest (source `plusPtr` slice_start) slice_size
+      pure
+        FullBinData
+          { fbd_readerUserData = getReaderUserData bh
+          , fbd_off_s = 0
+          , fbd_size = slice_size
+          , fbd_buffer = target
+          }
+
+    a <- unsafeInterleaveIO $ do
+      slice_bh <- thawBinHandle slice_bin_data
+      f slice_bh
+    seekBinReader bh (makeAbsoluteBin p) -- skip over the object for now
+    return a
+
 -- | Serialize the constructor strictly but lazily serialize a value inside a
 -- 'Just'.
 --
@@ -1424,6 +1455,13 @@ lazyGetMaybe bh = do
   case h of
     0 -> pure Nothing
     _ -> Just <$> lazyGet bh
+
+lazyGetMaybeCopy :: Binary a => ReadBinHandle -> IO (Maybe a)
+lazyGetMaybeCopy bh = do
+  h <- getWord8 bh
+  case h of
+    0 -> pure Nothing
+    _ -> Just <$> lazyGetCopy bh
 
 -- -----------------------------------------------------------------------------
 -- UserData

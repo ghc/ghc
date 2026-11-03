@@ -632,12 +632,12 @@ instance Binary ModIface where
    get bh = do
         mod_info    <- get bh
         iface_hash  <- get bh
-        deps        <- lazyGet bh
-        public      <- lazyGet bh
-        top_env     <- lazyGet bh
-        docs        <- lazyGetMaybe bh
-        self_recomp <- lazyGetMaybe bh
-        simplified_core <- lazyGetMaybe bh
+        deps        <- lazyGetCopy bh
+        public      <- lazyGetCopy bh
+        top_env     <- lazyGetCopy bh
+        docs        <- lazyGetMaybeCopy bh
+        self_recomp <- lazyGetMaybeCopy bh
+        simplified_core <- lazyGetMaybeCopy bh
 
         return (PrivateModIface {
                  mi_mod_info_   = mod_info,
