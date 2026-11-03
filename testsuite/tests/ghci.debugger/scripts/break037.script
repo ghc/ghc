@@ -1,0 +1,9 @@
+:l break037
+:set -fbreak-on-exception
+:step f ()
+:step
+-- Stepping into throwIO stops on the exception rather than at a breakpoint
+:step
+-- Running the cleanup in g while abandoning must not hit a breakpoint
+:abandon
+putStrLn "after abandon"
