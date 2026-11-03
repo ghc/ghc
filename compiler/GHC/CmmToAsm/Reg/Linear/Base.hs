@@ -267,8 +267,12 @@ data DyingMoves = DyingMoves {-# UNPACK #-} !Word64 [(VirtualReg, RealReg)]
 
 -- | Of a block, the vregs live out of it that it reads, each with the position
 --   in the block of the last instruction reading it (built only where it is
---   consulted), and the registers live into each of its jump targets.
-data LastReads = LastReads (UniqFM VirtualReg Int) [Regs]
+--   consulted), the registers live into each of its jump targets, and those
+--   live into each of them with no recorded assignment when its allocation
+--   began that another block jumps to as well, where neither is in a cycle
+--   ('GHC.CmmToAsm.Reg.Linear.intoUnrecorded').
+data LastReads
+  = LastReads (UniqFM VirtualReg Int) [Regs] [Regs]
 
 -- | What the allocator uses, but does not update, while it allocates the
 --   instructions of a block, held in one field of 'RA_State' rather than in
@@ -317,6 +321,10 @@ data RA_Context freeRegs
         -- | the blocks that two blocks or more jump to, those that follow a
         --   failed heap or stack check not counted
         , rc_joins      :: LabelSet
+
+        -- | the blocks of the procedure being allocated that are in no cycle
+        --   and that more than one of its blocks jumps to
+        , rc_acyclicJoins :: LabelSet
 
         -- | the registers live on entry to each block of the procedure being
         --   allocated
