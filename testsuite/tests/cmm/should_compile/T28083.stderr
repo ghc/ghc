@@ -1,0 +1,7 @@
+==================== CFG Weights - Final ====================
+stg_loop:
+digraph {
+	c1 -> c4[label="0.25000",weight="0.25000"];
+	c1 -> c2[label="0.75000",weight="0.75000"];
+	c2 -> c1[label="0.75000",weight="0.75000"];
+}

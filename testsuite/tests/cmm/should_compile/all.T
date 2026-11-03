@@ -21,3 +21,18 @@ test('T24474-cmm-opt-order', cmm_src, compile, ['-optc-DFOO '
                                                 '-optCmmP-UFOO '
                                                 '-optCmmP-UBAR '
                                                 '-optc-DBAR'])
+test('T28083', [cmm_src, only_ways(['optasm']),
+                unless(arch('x86_64'), skip),
+                when(leading_underscore(), skip),
+                multiline_grep_errmsg(r'=+ CFG Weights - Final[^}]*}')],
+     compile, ['-no-hs-main -ddump-cfg-weights'])
+test('T28093', [cmm_src, only_ways(['optasm']),
+                unless(arch('x86_64'), skip),
+                when(leading_underscore(), skip),
+                multiline_grep_errmsg(r'=+ CFG Weights - Final[^}]*}')],
+     compile, ['-no-hs-main -ddump-cfg-weights'])
+test('T28093_cas', [cmm_src, only_ways(['optasm']),
+                    unless(arch('x86_64'), skip),
+                    when(leading_underscore(), skip),
+                    multiline_grep_errmsg(r'=+ CFG Weights - Final[^}]*}')],
+     compile, ['-no-hs-main -ddump-cfg-weights'])

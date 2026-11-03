@@ -890,3 +890,14 @@ test ('T26989',
       multimod_compile,
       ['T26989', '-v0 -O'])
 
+test('CmmDiamondChain',
+     [ only_ways(['optasm']),
+       unless(have_ncg(), skip),
+       cmm_src,
+       collect_compiler_stats('bytes allocated', 2),
+       pre_cmd('./genCmmDiamondChain'),
+       extra_files(['genCmmDiamondChain']),
+     ],
+     compile,
+     ['-O2 -v0'])
+
