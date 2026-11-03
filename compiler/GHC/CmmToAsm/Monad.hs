@@ -121,7 +121,8 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     invertCondBranches        :: Maybe CFG -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
                               -> [NatBasicBlock instr]
     -- ^ Turn the sequence of @jcc l1; jmp l2@ into @jncc l2; \<block_l1>@
-    -- when possible.
+    -- when possible, and on x86 into @jncc l2; jmp l1@ where neither jump
+    -- falls through and l2 is the likely target.
     }
 
 {- Note [supporting shortcutting]
