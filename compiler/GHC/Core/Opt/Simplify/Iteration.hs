@@ -1829,10 +1829,10 @@ simplNonRecE :: HasDebugCallStack
 
 simplNonRecE env from_what bndr (rhs, rhs_se) body cont
   | assertPpr (isId bndr && not (isJoinId bndr)) (ppr bndr) True
-  , Just bndr' <- useStrictBind_maybe env from_what bndr
+  , useStrictBind env from_what bndr
   = -- Evaluate RHS strictly
     simplExprF (rhs_se `setInScopeFromE` env) rhs
-               (StrictBind { sc_bndr = bndr', sc_body = body, sc_from = from_what
+               (StrictBind { sc_bndr = bndr, sc_body = body, sc_from = from_what
                            , sc_env = UnSimplified env, sc_cont = cont })
 
   | otherwise  -- Evaluate RHS lazily
@@ -1864,47 +1864,45 @@ simplRecE env pairs body cont
         ; return (floats1 `addFloats` floats2, expr') }
 
 
-useStrictBind_maybe :: SimplEnv -> FromWhat -> InId -> Maybe InId
+useStrictBind :: SimplEnv -> FromWhat -> InId -> Bool
 -- Can we use a StrictBind continuation for this let-binding?
 -- If so, return a binder that is suitable to become a lambda binder,
 -- i.e. one satisfying `lamBndrInfoOK`; see (SB3) in Note [StrictBind]
-useStrictBind_maybe env from_what bndr
+useStrictBind env from_what bndr
   -- If we are coming from a beta-reduction (FromBeta) we must
   -- establish the let-can-float invariant, so we must go via StrictBind
   -- If not, the invariant holds already, and it's optional.
   | FromBeta Unlifted <- from_what
-  = Just bndr   -- Already a lambda binder
+  = True
 
   -- Not if the demand is non-strict
   | not (isStrUsedDmd dmd_info)
-  = Nothing
+  = False
 
   -- Not if case-of-case is off
   -- See (SB1) in Note [StrictBind]
   | not (seCaseCase env)
-  = Nothing
+  = False
 
   | FromBeta Lifted <- from_what
-  = Just bndr   -- Already a lambda binder
+  = True
 
   -- Not for things with RULES or INLINE or NOINLINE
+  -- or with a strictnes or CPR signature -- all things we might lose
   -- See (SB3) in Note [StrictBind]
   | isStableUnfolding (unfoldingInfo info)
     || not (isEmptyRuleInfo (ruleInfo info))
     || not (isAlwaysActive (inlinePragmaActivation (inlinePragInfo info)))
-  = Nothing
+    || not (isNopSig (dmdSigInfo info))
+    || not (isTopCprSig (cprSigInfo info))
+  = False
 
-  | otherwise   -- FromLet: zap the IdInfo that a lambda binder may not have
-  = Just (bndr `setIdInfo` zapped_info)
+  | otherwise
+  = True
 
   where
     info     = idInfo bndr
     dmd_info = demandInfo info
-
-    -- A lambda binder may have only occurrence and demand info;
-    -- see (SB3) in Note [StrictBind]
-    zapped_info = vanillaIdInfo `setOccInfo`    occInfo info
-                                `setDemandInfo` dmd_info
 
 {- Note [Dark corner with representation polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4022,7 +4020,14 @@ mkDupableContWithDmds env _
                             -- The contIsDupable caught the OkDup case, and
                             -- we never build a StrictBind with a NoDup in it.
 
-       ; (sb_env1, bndr')      <- simplBinder sb_env bndr
+       -- A lambda binder may have only occurrence and demand info;
+       -- see (SB3) in Note [StrictBind]
+       ; let info = idInof bndr
+             zapped_info = vanillaIdInfo `setOccInfo`    occInfo info
+                                         `setDemandInfo` dmd_info
+             zapped_bndr = bndr `setIdInfo` zapped_info
+
+       ; (sb_env1, bndr')      <- simplBinder sb_env zapped_bndr
        ; (floats1, join_inner) <- simplNonRecBody sb_env1 from_what body cont
           -- No need to use mkDupableCont before simplNonRecBody; we
           -- use cont once here, and then share the result if necessary
@@ -4652,9 +4657,10 @@ We simplify `rhs` with a StrictBind continuation that continues with
    binder, and so must satisfy `lamBndrInfoOK`; see Note [Core binder IdInfo
    invariants] in GHC.Core.  But a let-binder `x` usually has IdInfo that a
    lambda binder may not have (an unfolding, arity, a demand signature...).
+
    So `useStrictBind_maybe` zaps that info, keeping only the occurrence info
-   and the demand info.  If it happens to stay as a let-binding it can be
-   re-derived, so nothing is lost.
+   and the demand info.  If it happens to stay as a let-binding arity info will
+   be re-derived, so nothing is lost.
 
    The exceptions are RULES, a stable unfolding, and a non-default inlining
    activation: these cannot be re-derived, and we have nowhere convenient to
