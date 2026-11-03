@@ -125,12 +125,14 @@ block's entry assignment (joinToTargets'): where each vreg live into the block
 is, InReg, InMem or InBoth. Every jump into the block that is processed later is
 made to conform to that assignment by fixup code (joinToTargets_again), whatever
 its own assignment and however often its edge runs. So the order in which a
-block's predecessors are allocated decides where the moves run. The SCCs come
-in dependency order, the path into a loop before the loop's body, so that a
-loop's head takes the registers of the path into it, and its back edge pays
-for any difference at every iteration; firstFreeInOrder's preferences work to
-keep a loop's values in its head's registers. The SCCs linearRA_SCCs defers are
-allocated after the others. Hence:
+block's predecessors are allocated decides where the moves run. Without the
+blocks' estimated frequencies the SCCs come in dependency order, the path
+into a loop before the loop's body, so that a loop's head takes the registers
+of the path into it, and its back edge pays for any difference at every
+iteration; with the frequencies they come in hotFirst's order (linearRA_SCCs
+in GHC.CmmToAsm.Reg.Linear). firstFreeInOrder's preferences work to keep a
+loop's values in its head's registers. The SCCs linearRA_SCCs defers without the
+frequencies are allocated after the others. Hence:
 
 * TODO: where a loop head's entry assignment comes from a preheader that has
   spilled a loop-carried vreg, it records the vreg InMem. The body then reloads
@@ -138,17 +140,18 @@ allocated after the others. Hence:
   has written it. Likewise where the preheader has it InBoth, every back edge
   that holds it in a register only stores it.
 
-* BUG TODO #27800: a return continuation is an entry block, and the allocator,
-  going in SCC order, processes one that jumps into a loop from outside it
-  before that loop where the loop calls something (linearRA_SCCs defers one
-  that jumps into a loop that calls nothing and whose entry assignment is
-  not yet recorded). So where the procedure's entry and such a continuation
-  enter one loop at two different blocks, the two can record incompatible
-  assignments, and then the loop's own edges get fixup code that runs on every
-  iteration. This costs only speed, under the linear allocator, on every target
-  but wasm32. Taking the entry first and then, after each SCC, an SCC holding a
-  block whose entry assignment is recorded, a cyclic one first, was tried on a
-  development branch and showed no gain.
+* BUG TODO #27800: a return continuation is an entry block, and without the
+  blocks' estimated frequencies (on targets other than x86-64, or under
+  -fno-cmm-static-pred) the allocator, going in SCC order, processes one that
+  jumps into a loop from outside it before that loop where the loop calls
+  something (linearRA_SCCs defers one that jumps into a loop that calls nothing
+  and whose entry assignment is not yet recorded). So where the procedure's
+  entry and such a continuation enter one loop at two different blocks, the two
+  can record incompatible assignments, and then the loop's own edges get fixup
+  code that runs on every iteration. This costs only speed, under the linear
+  allocator, on every target but wasm32. Taking the entry first and then, after
+  each SCC, an SCC holding a block whose entry assignment is recorded, a cyclic
+  one first, was tried on a development branch and showed no gain.
 
 That first jump decides one more thing. A vreg's first-used register
 (lookupFirstUsed) is its register in the first assignment that, recorded for a

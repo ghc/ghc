@@ -267,13 +267,13 @@ as such you shouldn't need to set any of them explicitly. A flag
 
     This enables static control flow prediction in the native code generator
     for x86-64. If enabled GHC will apply certain heuristics to identify loops
-    and hot code paths, and use this information to lay out the code (not
-    under :ghc-flag:`-fblock-layout-weightless` without
+    and hot code paths, and use this information to order the blocks the linear
+    register allocator allocates and, after register allocation and unless
+    :ghc-flag:`-finfo-table-map` is on, to lay out the code (not under
+    :ghc-flag:`-fblock-layout-weightless` without
     :ghc-flag:`-fblock-layout-cfg`) and to order the jumps of some conditional
-    branches. The graph colouring allocators (:ghc-flag:`-fregs-graph`,
-    :ghc-flag:`-fregs-iterative`) choose what to spill by live range length
-    alone, so this flag does not change their allocation. It has no effect when
-    :ghc-flag:`-finfo-table-map` is on.
+    branches. On other architectures the flag has no effect: the linear
+    register allocator and the layout use the prediction on x86-64 only.
 
 .. ghc-flag:: -fcmm-control-flow
     :shortdesc: Enable control flow optimisation in the Cmm backend. Implied by :ghc-flag:`-O`.

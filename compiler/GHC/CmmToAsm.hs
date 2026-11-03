@@ -87,9 +87,9 @@
 --     register allocation: x86-64 alone (backendMaintainsCfg in
 --     GHC.CmmToAsm.BlockLayout), and, under -finfo-table-map, kept only
 --     through instruction selection (the TODO #20428 at livenessCfg
---     in cmmNativeGen). Static branch prediction, the chain layout
---     of -fblock-layout-cfg and invertCondBranches need it, and so do
---     the linear allocator's order of blocks and some of its register
+--     in cmmNativeGen). Static branch prediction for the layout, the chain
+--     layout of -fblock-layout-cfg and invertCondBranches need it, and so
+--     do the linear allocator's order of blocks and some of its register
 --     preferences (step 6; Note [Frequencies before register allocation] in
 --     GHC.CmmToAsm.CFG), which take it from step 4 under -finfo-table-map too.
 --   * the machine registers of STG's argument registers (R1 and up, F, D, XMM)
@@ -143,17 +143,19 @@
 --      (GHC.CmmToAsm.Reg.Graph) under -fregs-graph or -fregs-iterative, and
 --      the linear allocator (GHC.CmmToAsm.Reg.Linear) otherwise. On x86-64, the
 --      linear allocator allocates last the blocks the garbage collector returns
---      to after a failed heap or stack check, reading them off the CFG of step
---      4 (the first item of the list above, and linearRA_SCCs). Where the
---      linear allocator uses more spill slots than maxSpillSlots,
---      ncgAllocMoreStack reserves stack for the slots from maxSpillSlots
---      on (the BUG at regAlloc in GHC.CmmToAsm.Reg.Linear). The graph
---      allocator's pool of slots starts with maxSpillSlots+1 slots and grows
---      512 slots at a time when a round of spilling needs more than are
---      free (regSpill in GHC.CmmToAsm.Reg.Graph.Spill); once it has grown,
---      ncgAllocMoreStack reserves stack for as many slots as the pool's highest
---      slot number, the preallocated slots counted (the BUG at needStack
---      in GHC.CmmToAsm.Reg.Graph). -ddump-asm-regalloc (after the graph
+--      to after a failed heap or stack check, or, under -fcmm-static-pred,
+--      allocates the hotter SCCs first, after the procedure's first block,
+--      reading either off the CFG of step 4 (the first item of the list
+--      above, and linearRA_SCCs). Where the linear allocator uses more spill
+--      slots than maxSpillSlots, ncgAllocMoreStack reserves stack for the
+--      slots from maxSpillSlots on (the BUG at regAlloc in
+--      GHC.CmmToAsm.Reg.Linear). The graph allocator's pool of slots starts
+--      with maxSpillSlots+1 slots and grows 512 slots at a time when a round
+--      of spilling needs more than are free (regSpill in
+--      GHC.CmmToAsm.Reg.Graph.Spill); once it has grown, ncgAllocMoreStack
+--      reserves stack for as many slots as the pool's highest slot number,
+--      the preallocated slots counted (the BUG at needStack in
+--      GHC.CmmToAsm.Reg.Graph). -ddump-asm-regalloc (after the graph
 --      allocator, the code before ncgAllocMoreStack), -ddump-asm-stats, and
 --      under -fregs-graph or -fregs-iterative -ddump-asm-regalloc-stages,
 --      the graph allocator's stages, and -ddump-asm-conflicts, given with
@@ -775,6 +777,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         -- blocks after failed heap or stack checks off nativeCfgWeights, so
         -- the layout has neither static prediction nor the chains of
         -- -fblock-layout-cfg: sequenceTop lays the blocks out without weights.
+        -- The linear allocator's estimate, allocFreqs, is made all the same.
         let livenessCfg = if ncgEnableDeadCodeElimination config
                                 then Just nativeCfgWeights
                                 else Nothing
@@ -785,6 +788,19 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         let allocCold = if backendMaintainsCfg platform
                           then checkFailures nativeCfgWeights
                           else setEmpty
+        -- how often the linear allocator estimates each block to run, from
+        -- the procedure's first block, where the backend maintains the CFG and
+        -- static prediction is on (-fcmm-static-pred, at -O and -O2); bound
+        -- strictly, so that at -O0 it is the static 'const noBlockFreqs' and
+        -- not a thunk a procedure: bound lazily, it made the compiler allocate
+        -- 0.060% more compiling T9961 at -O0, and 0.025% and 0.024% more at -O
+        -- and -O2, on GHC 10.1.20261107
+            !allocFreqs = case cmm of
+              CmmProc _ _ _ graph
+                | backendMaintainsCfg platform && ncgCmmStaticPred config
+                -> \entry -> blockFrequencies (tagRegisters graph) allocCold
+                                              entry nativeCfgWeights
+              _ -> const noBlockFreqs
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
                 runUniqueDSM usGen
@@ -862,7 +878,7 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 -- do linear register allocation
                 let reg_alloc proc = do
                        (alloced, maybe_more_stack, ra_stats) <-
-                               Linear.regAlloc config allocCold proc
+                               Linear.regAlloc config allocCold allocFreqs proc
                        case maybe_more_stack of
                          Nothing -> return ( alloced, ra_stats, [] )
                          Just amount -> do
