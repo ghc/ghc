@@ -1010,17 +1010,22 @@ dynLinkCompiledByteCode interp pkgs_loaded whole_bytecode_state traverse_bytecod
           let lb2 = lb1 { breakarray_env = be2, ccs_env = ce2 }
           return $! bytecode_state { bco_linker_env = le2, bco_linked_breaks = lb2 }
 
-        -- NB: Important to pass the whole bytecode loader state to linkSomeBCOs so that you can find Names in local
-        -- and external packages.
-        names_and_refs <- linkSomeBCOs interp pkgs_loaded st1 cbcs
+        -- mask, so we are sure to free/finalize the name_and_refs.
+        new_binds <- mask_ $ do
+          -- NB: Important to pass the whole bytecode loader state to linkSomeBCOs so that you can find Names in local
+          -- and external packages.
+          names_and_refs <- linkSomeBCOs interp pkgs_loaded st1 cbcs
 
-        -- We only want to add the external ones to the ClosureEnv
-        let (to_add, to_drop) = partition (keepDefinitions keep_spec . fst) names_and_refs
+          -- We only want to add the external ones to the ClosureEnv
+          let (to_add, to_drop) = partition (keepDefinitions keep_spec . fst) names_and_refs
+          -- Wrap finalizers on the ones we want to keep.
+          new_binds <- makeForeignNamedHValueRefs interp to_add
 
-        -- Immediately release any HValueRefs we're not going to add
-        freeHValueRefs interp (map snd to_drop)
-        -- Wrap finalizers on the ones we want to keep
-        new_binds <- makeForeignNamedHValueRefs interp to_add
+          -- Release any HValueRefs we're not going to add
+          -- Done last because interruptible while waiting for response.
+          freeHValueRefs interp (map snd to_drop)
+
+          return new_binds
 
         traverse_bytecode_state st1 $ \bytecode_state -> do
           let ce2 = extendClosureEnv (closure_env (bco_linker_env bytecode_state)) new_binds

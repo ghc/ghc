@@ -244,25 +244,30 @@ withWasmInterp (ExtInterpState cfg mstate) action = do
 -- the JS one.
 spawnInterpMaybe :: ExceptionMonad m => cfg -> (cfg -> IO (ExtInterpInstance d)) -> ExtInterpStatusVar d -> m (ExtInterpInstance d)
 spawnInterpMaybe cfg spawn mstatus = do
-  inst <- liftIO $ modifyMVarMasked mstatus $ \case
-    -- start the external iserv process if we haven't done so yet
-    InterpPending -> do
-      inst <- spawn cfg
-      pure (InterpRunning inst, inst)
+  inst <- liftIO $ do
+    -- readMVar first, so when the interp is running we don't take lock.
+    -- Removes an interruptible point for concurrent calls.
+    readMVar mstatus >>= \case
+      InterpRunning inst -> pure inst
+      InterpPending{}    -> modifyMVarMasked mstatus $ \case
+        -- start the external iserv process if we haven't done so yet
+        InterpPending -> do
+          inst <- spawn cfg
+          pure (InterpRunning inst, inst)
 
-    InterpRunning inst -> do
-      pure (InterpRunning inst, inst)
+        InterpRunning inst -> do
+          pure (InterpRunning inst, inst)
 
-  -- Free any ForeignRef that have been garbage collected.
-  -- Or any other RemoteResource disposed of while canceling.
-  liftIO $ bracketOnError
-    (swapMVar (instPendingFrees inst) [])
-    -- if interrupted while freeing we store the refs back to free later.
-    -- Done this way to avoid holding the lock for the duration of `sendMessage`.
-    (\pending_frees -> unless (null pending_frees) $
-       modifyMVar_ (instPendingFrees inst) (pure . (pending_frees ++)))
-    (\pending_frees -> unless (null pending_frees) $
-       sendMessage inst (FreeRemoteResources pending_frees))
+  -- free any ForeignRef that have been garbage collected.
+  -- or any other pending RemoteResource.
+  --
+  -- done concurrently so we don't risk interruptions.
+  void $ liftIO $ forkIO $ do
+    pending_frees <- swapMVar (instPendingFrees inst) []
+    -- assumes a failure means the ext. interp. is unrecoverable:
+    -- sending the same refs again would risk a double free.
+    unless (null pending_frees) $
+       sendMessage inst (FreeRemoteResources pending_frees)
 
   -- run the inner action
   pure inst
