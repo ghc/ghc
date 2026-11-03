@@ -47,7 +47,7 @@ import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.WiredIn.Types ( nilDataConName, oneDataConName )
 
-import GHC.Unit.Module ( isInteractiveModule )
+import GHC.Unit.Module ( isInteractiveModule, hsModuleName )
 
 import GHC.Types.Basic (TypeOrKind (TypeLevel))
 import GHC.Types.FieldLabel
@@ -610,7 +610,7 @@ rnExpr (HsFunArr _ mult arg res)
 rnExpr (XExpr (ReSynBindsPs m e))
   =  do { traceRn "XExpr ReSynBinds" (text "module:" <+> ppr m)
         ; (e', fvs) <- rnExpr e
-        ; return (XExpr (ReSynBindsRn m e'), fvs)
+        ; return (XExpr (ReSynBindsRn (hsModuleName m) e'), fvs)
         }
 
 {-

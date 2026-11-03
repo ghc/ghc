@@ -129,6 +129,8 @@ module GHC.Tc.Utils.Monad(
   recordThUse, recordThNeededRuntimeDeps,
   keepAlive, getThLevel, getCurrentAndBindLevel, setThLevel,
   addModFinalizersWithLclEnv,
+  setThRebindableSyntax, unsetThRebindableSyntax,
+  getThRebindableSyntax,
 
   -- * Safe Haskell context
   recordUnsafeInfer, finalSafeMode, fixSafeInstances,
@@ -476,6 +478,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_in_gen_code = False,
                 tcl_err_ctxt   = [],
                 tcl_rdr        = emptyLocalRdrEnv,
+                tcl_th_rs      = Nothing,
                 tcl_th_ctxt    = topLevel,
                 tcl_th_bndrs   = emptyNameEnv,
                 tcl_arrow_ctxt = NoArrowCtxt,
@@ -2500,6 +2503,17 @@ addModFinalizersWithLclEnv mod_finalizers
        th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
        updTcRef th_modfinalizers_var $ \fins ->
          (lcl_env, mod_finalizers) : fins
+
+setThRebindableSyntax :: ModuleName -> TcM a -> TcM a
+setThRebindableSyntax m = updLclEnv (setLclEnvThRebindable m)
+
+-- TODO: ANI we probably won't need the unset bit
+unsetThRebindableSyntax :: TcM a -> TcM a
+unsetThRebindableSyntax = updLclEnv (unsetLclEnvThRebindable)
+
+getThRebindableSyntax :: TcM (Maybe ModuleName)
+getThRebindableSyntax = getLclEnvThRebindable <$> getLclEnv
+
 
 {-
 ************************************************************************

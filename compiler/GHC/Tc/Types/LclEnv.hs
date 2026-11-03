@@ -12,6 +12,7 @@ module GHC.Tc.Types.LclEnv (
   , getLclEnvRdrEnv
   , getLclEnvTcLevel
   , getLclEnvThLevel
+  , getLclEnvThRebindable
   , setLclEnvTcLevel
   , setLclEnvLoc
   , setLclEnvRdrEnv
@@ -19,6 +20,8 @@ module GHC.Tc.Types.LclEnv (
   , setLclEnvErrCtxt
   , setLclEnvThLevel
   , setLclEnvTypeEnv
+  , setLclEnvThRebindable
+  , unsetLclEnvThRebindable
   , modifyLclEnvTcLevel
 
   , setLclEnvHsCtxt
@@ -52,6 +55,8 @@ import GHC.Tc.Types.TH
 import GHC.Tc.Types.TcRef
 import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Constraint ( WantedConstraints )
+
+import GHC.Unit.Module.Name ( ModuleName )
 
 {-
 ************************************************************************
@@ -111,7 +116,10 @@ data TcLclCtxt
                 -- We still need the unsullied global name env so that
                 --   we can look up record field names
 
-
+        tcl_th_rs      :: Maybe ModuleName, -- Are we type checking a splice
+                                            -- declared with rebindable syntax enabled?
+                                            -- Nothing <=> No rebindable syntax
+                                            -- Just m <=> Rebindable syntax enabled in module m
         tcl_th_ctxt    :: ThLevel,         -- Template Haskell context
         tcl_th_bndrs   :: ThBindEnv,       -- and binder info
             -- The ThBindEnv records the TH binding level of in-scope Names
@@ -134,6 +142,15 @@ setLclEnvThLevel l = modifyLclCtxt (\env -> env { tcl_th_ctxt = l })
 
 getLclEnvThBndrs :: TcLclEnv -> ThBindEnv
 getLclEnvThBndrs = tcl_th_bndrs . tcl_lcl_ctxt
+
+getLclEnvThRebindable :: TcLclEnv -> Maybe ModuleName
+getLclEnvThRebindable = tcl_th_rs . tcl_lcl_ctxt
+
+setLclEnvThRebindable :: ModuleName -> TcLclEnv -> TcLclEnv
+setLclEnvThRebindable mod = modifyLclCtxt (\env -> env {tcl_th_rs = Just mod} )
+
+unsetLclEnvThRebindable :: TcLclEnv -> TcLclEnv
+unsetLclEnvThRebindable = modifyLclCtxt (\env -> env {tcl_th_rs = Nothing} )
 
 getLclEnvArrowCtxt :: TcLclEnv -> ArrowCtxt
 getLclEnvArrowCtxt = tcl_arrow_ctxt . tcl_lcl_ctxt

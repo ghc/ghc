@@ -2616,14 +2616,14 @@ repDoE = repDoBlock doEOcc
 repMDoE :: Maybe HsModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))
 repMDoE = repDoBlock mdoEOcc
 
-repReSynBindsE :: HsModuleName -> Core (M TH.Exp) -> MetaM (Core (M TH.Exp))
-repReSynBindsE m (MkC e) = do
+repReSynBindsE :: ModuleName -> Core (M TH.Exp) -> MetaM (Core (M TH.Exp))
+repReSynBindsE mod (MkC e) = do
    MkC coreModName <- coreModNameM
    krep2 resynbindEOcc [coreModName, e]
   where
     coreModNameM :: MetaM (Core TH.ModName)
     coreModNameM = do
-      MkC s <- lift $ coreStringLit (moduleNameFS (hsModuleName m))
+      MkC s <- lift $ coreStringLit (moduleNameFS mod)
       rep2_nw mkModNameOcc [s]
 
 repDoBlock :: KnownOcc -> Maybe HsModuleName -> Core [(M TH.Stmt)] -> MetaM (Core (M TH.Exp))

@@ -25,12 +25,14 @@ import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.WiredIn.Ids ( leftSectionName, rightSectionName )
 import GHC.Rename.Utils
+import GHC.Rename.Env ( lookupOccRnNone )
 
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
 
 import qualified Data.List.NonEmpty as NE ( map, head, (<|) )
 import Data.List.NonEmpty ( NonEmpty(..), init, last, tail )
+import Data.Maybe ( isJust )
 
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Builtin.KnownKeys (getFieldClassOpOcc)
@@ -162,10 +164,22 @@ tcExpand e@(OpApp _ arg1 op arg2)
 
 -- NoRebindable <=> rebindable is turned off
 --             so we typecheck the HsIf in tcExprNoExpand
-tcExpand (HsIf NoRebindable _ _ _ )
-  = return Nothing
+tcExpand e@(HsIf NoRebindable p b1 b2 )
+  = do { isRebindableOn <- getThRebindableSyntax
+       -- Check if we are actually expanding a template haskell generated spliced-in expression
+       -- and the original expression was typed in a rebindable context
+       ; if isJust isRebindableOn
+         then do
+         { ifThenElseName <- lookupOccRnNone (mkVarUnqual (fsLit "ifThenElse"))
+           -- This ought to pass as ifThenElse would be added into the enviornment
+           -- by the setThRebindableSyntax call below
+         ; return $ Just $
+           HSE { hse_ctxt = ExprCtxt e
+               , hse_exp = wrapGenSpan $ genHsApps ifThenElseName [p, b1, b2] }
+         }
+         else return Nothing }
 tcExpand e@(HsIf (Rebindable rs_table) p b1 b2)
-  | Just ifThenElseName <- lookup (rdrNameOcc $ mkVarUnqual (fsLit "ifThenElse")) rs_table
+ | Just ifThenElseName <- lookup (rdrNameOcc $ mkVarUnqual (fsLit "ifThenElse")) rs_table
   = return $ Just $
     HSE { hse_ctxt = ExprCtxt e
         , hse_exp = wrapGenSpan $ genHsApps ifThenElseName [p, b1, b2]
@@ -288,11 +302,13 @@ tcExpand e@(HsUntypedSplice splice_res _)
 ------------------------
 -- XExpr
 
-tcExpand e@(XExpr (ReSynBindsRn _ inner_e))
-  = do { -- set environment variable to be in rebindable syntax
-         -- add the required rebindable syntax binding names into the environment
-         -- try expanding inner_e
-         traceTc "tcExpand: ReSynBindsRn" (ppr e)
+tcExpand e@(XExpr (ReSynBindsRn m inner_e))
+  = setThRebindableSyntax m $
+      -- set environment variable to be in rebindable syntax
+      -- add the required rebindable syntax binding names into the environment
+    do {
+         -- now try expanding inner_e
+       ; traceTc "tcExpand: ReSynBindsRn" (ppr e)
        ; e' <- tcExpand inner_e
        ; let expr = case e' of
                       Just (HSE {hse_exp = expanded_e}) ->

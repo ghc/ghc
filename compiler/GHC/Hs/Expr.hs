@@ -57,6 +57,7 @@ import GHC.Core.Type
 import GHC.Builtin.WiredIn.Types (mkTupleStr)
 import GHC.Tc.Utils.TcType (TcType)
 import {-# SOURCE #-} GHC.Tc.Types.LclEnv (TcLclEnv)
+import GHC.Unit.Module.Name ( ModuleName )
 
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified GHC.Boot.TH.Monad as TH (Q)
@@ -684,7 +685,7 @@ data XXExprGhcRn
   | HsRecSelRn  (FieldOcc GhcRn)   -- ^ Variable pointing to record selector
                            -- See Note [Non-overloaded record field selectors] and
                            -- Note [Record selectors in the AST]
-  | ReSynBindsRn HsModuleName (HsExpr GhcRn)
+  | ReSynBindsRn ModuleName (HsExpr GhcRn)
 
 
 data XXExprGhcTc
