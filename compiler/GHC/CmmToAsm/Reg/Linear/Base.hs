@@ -28,6 +28,7 @@ module GHC.CmmToAsm.Reg.Linear.Base (
 
         -- liveness
         liveInto,
+        LastReads(..),
 )
 
 where
@@ -264,6 +265,11 @@ data RA_State freeRegs
 --   die, and those registers as bits by register number.
 data DyingMoves = DyingMoves {-# UNPACK #-} !Word64 [(VirtualReg, RealReg)]
 
+-- | Of a block, the vregs live out of it that it reads, each with the position
+--   in the block of the last instruction reading it (built only where it is
+--   consulted), and the registers live into each of its jump targets.
+data LastReads = LastReads (UniqFM VirtualReg Int) [Regs]
+
 -- | What the allocator uses, but does not update, while it allocates the
 --   instructions of a block, held in one field of 'RA_State' rather than in
 --   fields of their own, each of which costs allocation at every update of
@@ -297,6 +303,12 @@ data RA_Context freeRegs
 
         -- | the block being allocated
         , rc_block      :: BlockId
+
+        -- | the last reads of the vregs live out of the block being
+        --   allocated, built when the block first has to spill one or to
+        --   free a register a jump target's recorded assignment wants
+        --   (allocRegsAndSpill_spill)
+        , rc_lastReads  :: LastReads
 
         -- | the jump targets of each block of the procedure being allocated
         , rc_succs      :: LabelMap [BlockId]
