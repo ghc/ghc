@@ -153,12 +153,22 @@ noLoc = TH.Loc "<no file>" "<no package>" "<no module>" (0,0) (0,0)
 
 -- | Send a 'THMessage' to GHC and return the result.
 ghcCmd :: Binary a => THMessage (THResult a) -> GHCiQ a
-ghcCmd m = GHCiQ $ \sRef -> do
+ghcCmd m = GHCiQ $ \ sRef -> handleTHResult sRef =<< ghcCmdResult sRef m
+
+-- | Throws 'GHCiQException' on 'THException'.
+handleTHResult :: IORef QState -> THResult a -> IO a
+handleTHResult sRef r = do
+ s <- readIORef sRef
+ case r of
+  THException str -> throwIO (GHCiQException s str)
+  THComplete res -> return res
+
+-- | Like 'ghcCmd' but returns the 'THResult a' as-is.
+ghcCmdResult :: Binary a => IORef QState -> THMessage (THResult a) -> IO (THResult a)
+ghcCmdResult sRef m = do
   s <- readIORef sRef
-  r <- remoteTHCall (qsPipe s) (qsInboxId s) m
-  case r of
-    THException str -> throwIO (GHCiQException s str)
-    THComplete res -> return res
+  remoteTHCall (qsPipe s) (qsInboxId s) m
+
 
 instance MonadIO GHCiQ where
   liftIO m = GHCiQ $ \_ -> m
@@ -212,8 +222,9 @@ metaHandlersGHCiQ runInIO = TH.MetaHandlers {
   , mAddTempFile = \suffix -> runInIO $ ghcCmd (AddTempFile suffix)
   , mAddTopDecls = \decls -> runInIO $ ghcCmd (AddTopDecls decls)
   , mAddForeignFilePath = \lang fp -> runInIO $ ghcCmd (AddForeignFilePath lang fp)
-  , mAddModFinalizer = \fin -> runInIO $ GHCiQ (\_ -> mkRemoteRef fin) >>=
-                         ghcCmd . AddModFinalizer
+  , mAddModFinalizer = \fin -> runInIO $ GHCiQ $ \sRef -> handleTHResult sRef =<< do
+      bracketOnError (mkRemoteRef fin) freeRemoteRef $
+        ghcCmdResult sRef . AddModFinalizer
   , mAddCorePlugin = \str -> runInIO $ ghcCmd (AddCorePlugin str)
   , mGetQ = runInIO $ do
     s <- getState
