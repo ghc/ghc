@@ -632,11 +632,19 @@ instance Binary ModIface where
    get bh = do
         mod_info    <- get bh
         iface_hash  <- get bh
-        deps        <- lazyGetCopy bh
-        public      <- lazyGetCopy bh
-        top_env     <- lazyGetCopy bh
+        -- Only the parts that may stay unevaluated after the 'ModIface' is
+        -- gone are copied out of the buffer (if the handle asks for it):
+        -- the docs (kept lazily in the EPS) and the simplified core (kept by
+        -- the bytecode loading action in the EPS). The rest is either forced
+        -- when the interface is loaded, or only reachable from the
+        -- 'ModIface'. See Note [Copying lazily read slices] in
+        -- GHC.Utils.Binary and Note [The EPS does not keep ModIfaces] in
+        -- GHC.Unit.External.Iface.
+        deps        <- lazyGet bh
+        public      <- lazyGet bh
+        top_env     <- lazyGet bh
         docs        <- lazyGetMaybeCopy bh
-        self_recomp <- lazyGetMaybeCopy bh
+        self_recomp <- lazyGetMaybe bh
         simplified_core <- lazyGetMaybeCopy bh
 
         return (PrivateModIface {
@@ -707,7 +715,8 @@ instance Binary (IfacePublic_ 'ModIfaceFinal) where
     lazyPut bh abi_hashes
 
   get bh = do
-    exports <- lazyGet bh
+    -- The exports are kept lazily in the EPS: see 'mkExternalIface'
+    exports <- lazyGetCopy bh
     decls <- lazyGet bh
     fixities <- lazyGet bh
     warns <- lazyGet bh

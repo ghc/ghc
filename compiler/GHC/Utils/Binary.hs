@@ -22,7 +22,7 @@
 --     http://www.cs.york.ac.uk/fp/nhc98/
 
 module GHC.Utils.Binary
-  ( {-type-}  Bin, RelBin(..), getRelBin,
+  ( {-type-}  Bin, RelBin(..), getRelBin, makeAbsoluteBin,
     {-class-} Binary(..),
     {-type-}  ReadBinHandle, WriteBinHandle,
     SymbolTable, Dictionary,
@@ -73,9 +73,12 @@ module GHC.Utils.Binary
    -- * Lazy Binary I/O
    lazyGet,
    lazyGetCopy,
+   setCopyLazily,
+   copiesLazily,
    lazyPut,
    lazyGet',
    lazyGetCopy',
+   copyBinReaderSlice,
    lazyPut',
    lazyGetMaybe,
    lazyGetMaybeCopy,
@@ -188,7 +191,7 @@ import GHC.Float
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import GHC.ByteOrder
-import GHC.ForeignPtr           ( unsafeWithForeignPtr )
+import GHC.ForeignPtr           ( unsafeWithForeignPtr, mallocPlainForeignPtrBytes )
 import GHC.Exts
 import GHC.IO
 import GHC.Word
@@ -230,7 +233,7 @@ instance Binary BinData where
 dataHandle :: BinData -> IO ReadBinHandle
 dataHandle (BinData size bin) = do
   ixr <- newFastMutInt 0
-  return (ReadBinMem noReaderUserData ixr size bin)
+  return (ReadBinMem noReaderUserData ixr size bin False)
 
 handleData :: WriteBinHandle -> IO BinData
 handleData (WriteBinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef binr
@@ -247,12 +250,13 @@ handleData (WriteBinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readI
 -- Additionally, the byte array slice can be put into a 'WriteBinHandle' without extra
 -- conversions via 'putFullBinData'.
 data FullBinData = FullBinData
-  { fbd_readerUserData :: ReaderUserData
+  { fbd_readerUserData :: !ReaderUserData
   -- ^ 'ReaderUserData' that can be used to resume reading.
+  -- Strict, so that it is not a selector thunk retaining the 'ReadBinHandle'.
   , fbd_off_s :: {-# UNPACK #-} !Int
-  -- ^ start offset
+  -- ^ start offset of the slice
   , fbd_size :: {-# UNPACK #-} !Int
-  -- ^ total buffer size
+  -- ^ total buffer size; the slice extends from 'fbd_off_s' to the end of the buffer
   , fbd_buffer :: {-# UNPACK #-} !BinArray
   }
 
@@ -266,17 +270,18 @@ instance Ord FullBinData where
 
 -- | Write the 'FullBinData' slice into the 'WriteBinHandle'.
 putFullBinData :: WriteBinHandle -> FullBinData -> IO ()
-putFullBinData bh (FullBinData _ o1 sz ba) = do
+putFullBinData bh (FullBinData _ o1 buf_sz ba) = do
+  let sz = buf_sz - o1
   putPrim bh sz $ \dest ->
     unsafeWithForeignPtr (ba `plusForeignPtr` o1) $ \orig ->
     copyBytes dest orig sz
 
 -- | Freeze a 'ReadBinHandle' and a start index into a 'FullBinData'.
 --
--- 'FullBinData' stores a slice starting from the 'Bin a' location to the current
--- offset of the 'ReadBinHandle'.
+-- 'FullBinData' stores a slice starting from the 'Bin a' location to the end
+-- of the buffer of the 'ReadBinHandle'.
 freezeBinHandle :: ReadBinHandle -> Bin a -> IO FullBinData
-freezeBinHandle (ReadBinMem user_data _ixr sz binr) (BinPtr start) = do
+freezeBinHandle (ReadBinMem user_data _ixr sz binr _) (BinPtr start) = do
   pure (FullBinData user_data start sz binr)
 
 -- | Turn the 'FullBinData' into a 'ReadBinHandle', setting the 'ReadBinHandle'
@@ -285,7 +290,8 @@ freezeBinHandle (ReadBinMem user_data _ixr sz binr) (BinPtr start) = do
 thawBinHandle :: FullBinData -> IO ReadBinHandle
 thawBinHandle (FullBinData user_data ix sz ba) = do
   ixr <- newFastMutInt ix
-  return $ ReadBinMem user_data ixr sz ba
+  -- A thawed slice is not copied again: see Note [Copying lazily read slices]
+  return $ ReadBinMem user_data ixr sz ba False
 
 ---------------------------------------------------------------
 -- BinHandle
@@ -318,7 +324,10 @@ data ReadBinHandle
      -- such as in the case of 'Name'.
      rbm_off_r    :: !FastMutInt,     -- ^ the current offset
      rbm_sz_r     :: !Int,            -- ^ size of the array (cached)
-     rbm_arr_r    :: !BinArray        -- ^ the array (bounds: (0,size-1))
+     rbm_arr_r    :: !BinArray,       -- ^ the array (bounds: (0,size-1))
+     rbm_copy_lazy :: !Bool
+     -- ^ Should 'lazyGetCopy' copy the bytes of lazily read values into
+     -- buffers of their own? See Note [Copying lazily read slices].
     }
 
 getReaderUserData :: ReadBinHandle -> ReaderUserData
@@ -330,6 +339,33 @@ getWriterUserData bh = wbm_userData bh
 setWriterUserData :: WriteBinHandle -> WriterUserData -> WriteBinHandle
 setWriterUserData bh us = bh { wbm_userData = us }
 
+-- | Should 'lazyGetCopy' copy the slices of lazily read values out of the
+-- buffer of this handle? See Note [Copying lazily read slices].
+setCopyLazily :: Bool -> ReadBinHandle -> ReadBinHandle
+setCopyLazily b bh = bh { rbm_copy_lazy = b }
+
+copiesLazily :: ReadBinHandle -> Bool
+copiesLazily = rbm_copy_lazy
+
+{- Note [Copying lazily read slices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A value read with 'lazyGet' is a thunk that retains the 'ReadBinHandle', and
+thus the whole buffer it was read from, until it is forced. For a buffer that
+is kept alive anyway (e.g. the interface of a home module, whose bytes are kept
+in 'mi_hi_bytes' for writing it back, see Note [Sharing of ModIface]) that is
+fine. For an interface whose lazily read parts may stay unevaluated for the
+whole session (an external interface loaded into the EPS) it means retaining
+the whole .hi file for the sake of a few unforced declarations.
+
+'lazyGetCopy' therefore copies the bytes of the value into a buffer of its own
+when the handle has 'rbm_copy_lazy' set, so that the thunk only retains these
+bytes. Copying costs allocation, so it is only enabled (with 'setCopyLazily')
+by callers whose buffer would otherwise be retained, and only used for values
+that are likely to stay unevaluated. A slice that has been copied (see
+'thawBinHandle') is small already, so nested 'lazyGetCopy's within it do not
+copy again.
+-}
+
 setReaderUserData :: ReadBinHandle -> ReaderUserData -> ReadBinHandle
 setReaderUserData bh us = bh { rbm_userData = us }
 
@@ -337,15 +373,13 @@ setReaderUserData bh us = bh { rbm_userData = us }
 -- If a 'BinaryReader' for the associated type already exists in 'ReaderUserData',
 -- it is overwritten.
 addReaderToUserData :: forall a. Typeable a => BinaryReader a -> ReadBinHandle -> ReadBinHandle
-addReaderToUserData reader bh = bh
-  { rbm_userData = (rbm_userData bh)
-      { ud_reader_data =
-          let
-            typRep = Refl.typeRep @a
-          in
-            Map.insert (SomeTypeRep typRep) (SomeBinaryReader typRep reader) (ud_reader_data (rbm_userData bh))
-      }
-  }
+addReaderToUserData reader bh =
+  -- Strict: a lazy update would retain the old 'ReadBinHandle' (and its buffer)
+  let !old_ud = rbm_userData bh
+      typRep = Refl.typeRep @a
+      !readers = Map.insert (SomeTypeRep typRep) (SomeBinaryReader typRep reader) (ud_reader_data old_ud)
+      !new_ud = old_ud { ud_reader_data = readers }
+  in bh { rbm_userData = new_ud }
 
 -- | Add 'SomeBinaryWriter' as a known binary encoder.
 -- If a 'BinaryWriter' for the associated type already exists in 'WriterUserData',
@@ -371,7 +405,7 @@ withBinBuffer (WriteBinMem _ ix_r _ arr_r) action = do
 unsafeUnpackBinBuffer :: ByteString -> IO ReadBinHandle
 unsafeUnpackBinBuffer (BS.BS arr len) = do
   ix_r <- newFastMutInt 0
-  return (ReadBinMem noReaderUserData ix_r len arr)
+  return (ReadBinMem noReaderUserData ix_r len arr False)
 
 ---------------------------------------------------------------
 -- Bin
@@ -475,6 +509,7 @@ freezeWriteHandle wbm = do
     , rbm_off_r = rbm_off_r
     , rbm_sz_r = rbm_sz_r
     , rbm_arr_r = rbm_arr_r
+    , rbm_copy_lazy = False
     }
 
 -- | Copy the BinBuffer to a new BinBuffer which is exactly the right size.
@@ -504,7 +539,7 @@ tellBinWriter :: WriteBinHandle -> IO (Bin a)
 tellBinWriter (WriteBinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
 
 tellBinReader :: ReadBinHandle -> IO (Bin a)
-tellBinReader (ReadBinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
+tellBinReader (ReadBinMem _ r _ _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
 
 seekBinWriter :: WriteBinHandle -> Bin a -> IO ()
 seekBinWriter h@(WriteBinMem _ ix_r sz_r _) (BinPtr !p) = do
@@ -526,13 +561,13 @@ seekBinNoExpandWriter (WriteBinMem _ ix_r sz_r _) (BinPtr !p) = do
 
 -- | SeekBin but without calling expandBin
 seekBinReader :: ReadBinHandle -> Bin a -> IO ()
-seekBinReader (ReadBinMem _ ix_r sz_r _) (BinPtr !p) = do
+seekBinReader (ReadBinMem _ ix_r sz_r _ _) (BinPtr !p) = do
   if (p > sz_r)
         then panic "seekBinReader: seek out of range"
         else writeFastMutInt ix_r p
 
 seekBinReaderRel :: ReadBinHandle -> RelBin a -> IO ()
-seekBinReaderRel (ReadBinMem _ ix_r sz_r _) relBin = do
+seekBinReaderRel (ReadBinMem _ ix_r sz_r _ _) relBin = do
   let (BinPtr !p) = makeAbsoluteBin relBin
   if (p > sz_r)
         then panic "seekBinReaderRel: seek out of range"
@@ -574,6 +609,7 @@ readBinMem_ filesize h = do
     , rbm_off_r = ix_r
     , rbm_sz_r = filesize
     , rbm_arr_r = arr
+    , rbm_copy_lazy = False
     }
 
 -- expand the size of the array to include a specified offset
@@ -659,7 +695,7 @@ putPrim h@(WriteBinMem _ ix_r sz_r arr_r) size f = do
 --   writeFastMutInt ix_r (ix + written)
 
 getPrim :: ReadBinHandle -> Int -> (Ptr Word8 -> IO a) -> IO a
-getPrim (ReadBinMem _ ix_r sz_r arr_r) size f = do
+getPrim (ReadBinMem _ ix_r sz_r arr_r _) size f = do
   ix <- readFastMutInt ix_r
   when (ix + size > sz_r) $
       ioError (mkIOError eofErrorType "Data.Binary.getPrim" Nothing Nothing)
@@ -1408,34 +1444,50 @@ lazyGet' f bh = do
     seekBinReader bh (makeAbsoluteBin p) -- skip over the object for now
     return a
 
+-- | Like 'lazyGet'', but if the 'ReadBinHandle' asks for it
+-- ('setCopyLazily'), the lazily deserialised value does not retain the buffer
+-- of the 'ReadBinHandle': the bytes of the object are copied into a buffer of
+-- their own, eagerly, and the thunk only retains that copy.
+--
+-- Use it for values that may stay unevaluated for a long time (e.g. in the
+-- EPS), when the original buffer is large.
+-- See Note [Copying lazily read slices].
 lazyGetCopy' :: (ReadBinHandle -> IO a) -> ReadBinHandle -> IO a
-lazyGetCopy' f bh = do
+lazyGetCopy' f bh
+  | not (rbm_copy_lazy bh) = lazyGet' f bh
+  | otherwise = do
     p <- getRelBin bh -- a BinPtr
     p_a <- tellBinReader bh
-    let
-      BinPtr slice_start = p_a
-      BinPtr slice_end = makeAbsoluteBin p
-
-    slice_bin_data <- do
-      let
-        slice_size = slice_end - slice_start
-      target <- mallocForeignPtrBytes slice_size
-      unsafeWithForeignPtr (rbm_arr_r bh) $ \ source ->
-        unsafeWithForeignPtr target $ \ dest ->
-          copyBytes dest (source `plusPtr` slice_start) slice_size
-      pure
-        FullBinData
-          { fbd_readerUserData = getReaderUserData bh
-          , fbd_off_s = 0
-          , fbd_size = slice_size
-          , fbd_buffer = target
-          }
-
+    slice_bin_data <- copyBinReaderSlice bh p_a (makeAbsoluteBin p)
     a <- unsafeInterleaveIO $ do
       slice_bh <- thawBinHandle slice_bin_data
       f slice_bh
     seekBinReader bh (makeAbsoluteBin p) -- skip over the object for now
     return a
+
+-- | Copy the bytes @[start, end)@ of the buffer of a 'ReadBinHandle' into a
+-- fresh buffer. The result shares no memory with the 'ReadBinHandle', except
+-- for its 'ReaderUserData'. Relative offsets ('RelBin') within the slice stay
+-- valid; absolute ones ('Bin') do not.
+copyBinReaderSlice :: ReadBinHandle -> Bin a -> Bin a -> IO FullBinData
+copyBinReaderSlice bh (BinPtr slice_start) (BinPtr slice_end) = do
+    let slice_size = slice_end - slice_start
+    when (slice_start < 0 || slice_size < 0 || slice_end > rbm_sz_r bh) $
+      panic "copyBinReaderSlice: slice out of range"
+    -- A PlainPtr has no finalizer IORef: the copies are small and numerous
+    -- (one per lazily read IfaceId), so the overhead matters.
+    target <- mallocPlainForeignPtrBytes slice_size
+    unsafeWithForeignPtr (rbm_arr_r bh) $ \ source ->
+      unsafeWithForeignPtr target $ \ dest ->
+        copyBytes dest (source `plusPtr` slice_start) slice_size
+    let !ud = getReaderUserData bh
+    pure
+      FullBinData
+        { fbd_readerUserData = ud
+        , fbd_off_s = 0
+        , fbd_size = slice_size
+        , fbd_buffer = target
+        }
 
 -- | Serialize the constructor strictly but lazily serialize a value inside a
 -- 'Just'.
