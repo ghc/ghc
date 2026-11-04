@@ -40,7 +40,6 @@ import GHC.Types.Var.Env( mkInScopeSet )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Control.Monad( unless )
 import GHC.Data.Pair
 import Data.List.NonEmpty( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
@@ -586,10 +585,8 @@ tryFamEqFunDeps mode eqs_for_me fam_tc work_args
               eqns <- mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
             ; tryFDEqns False fam_tc work_args work_item eqns
 
-            ; unless (hasRelevantGiven eqs_for_me work_args work_item) $
-              -- hasRelevantGiven: See (CF1) in Note [Exploiting closed type families]
-              do { eqns <- mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
-                 ; tryFDEqns True fam_tc work_args work_item eqns } }
+            ; eqns <- mkTopBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_item
+            ; tryFDEqns True fam_tc work_args work_item eqns }
 
   | isGiven ev  -- See (INJFAM:Given)
   , not (tcsmResumable mode)   -- In the pattern-match checker, continue even for
@@ -600,20 +597,16 @@ tryFamEqFunDeps mode eqs_for_me fam_tc work_args
 
   | otherwise   -- Wanted, user-defined type families
   = do { -- Note [Do local fundeps before top-level instances]
-         case tyConInjectivityInfo fam_tc of
-           NotInjective  -> nopStage ()
-           Injective inj -> do { eqns <- mkLocalFamEqFDs eqs_for_me fam_tc inj work_args work_rhs
-                               ; tryFDEqns False fam_tc work_args work_item eqns }
+         eqns <- mkLocalFamEqFDs eqs_for_me fam_tc work_args work_rhs
+       ; tryFDEqns False fam_tc work_args work_item eqns
          -- NB: tryFDEqns bales out on an insoluble fundep
          -- See (CF4) in Note [Exploiting closed type families]
 
-       ; unless (hasRelevantGiven eqs_for_me work_args work_item) $
-         -- hasRelevantGiven: See (CF1) in Note [Exploiting closed type families]
-         do { eqns <- mkTopFamEqFDs fam_tc work_args work_item
-            ; tryFDEqns True fam_tc work_args work_item eqns } }
+       ; eqns <- mkTopFamEqFDs eqs_for_me fam_tc work_args work_item
+       ; tryFDEqns True fam_tc work_args work_item eqns }
 
-mkTopFamEqFDs :: TyCon -> [TcType] -> EqCt -> SolverStage [FunDepEqns]
-mkTopFamEqFDs fam_tc work_args work_item
+mkTopFamEqFDs :: [EqCt] -> TyCon -> [TcType] -> EqCt -> SolverStage [FunDepEqns]
+mkTopFamEqFDs eqs_for_me fam_tc work_args work_item
   -- NB: work_args exactly saturate fam_tc
   | isOpenTypeFamilyTyCon fam_tc
   , Injective inj_flags <- tyConInjectivityInfo fam_tc
@@ -623,7 +616,11 @@ mkTopFamEqFDs fam_tc work_args work_item
   -- Non built-in closed type families
   -- (Built-in closed type families were dealt with in 'tryFamEqFunDeps'.)
   | Just ax <- closedFamilyTyConCoAxiom_maybe fam_tc
-  = mkTopClosedFamEqFDs ax work_args work_item
+  = if hasRelevantGiven eqs_for_me work_args work_item
+       -- hasRelevantGiven: See (CF1) in Note [Exploiting closed type families]
+       -- NB: (CF1) applies only to /closed/ type families (#28082)
+    then return []
+    else mkTopClosedFamEqFDs ax work_args work_item
 
   | otherwise
   = -- Anything else: data families, open type families that are not injective,
@@ -766,27 +763,31 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
       | otherwise
       = Nothing
 
-mkLocalFamEqFDs :: [EqCt] -> TyCon -> [Bool] -> [TcType] -> Xi -> SolverStage [FunDepEqns]
+mkLocalFamEqFDs :: [EqCt] -> TyCon -> [TcType] -> Xi -> SolverStage [FunDepEqns]
 -- Wanted constraints only
 -- Both open and closed type families, but only ones with declared injectivity
 -- See Note [Exploiting local type-family injectivity]
-mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
-  = do { let -- eqns_from_inerts: see (INJFAM:Wanted/other)
-             eqns_from_inerts = mapMaybe do_one eqs_for_me
-             -- eqns_from_self: see (INJFAM:Wanted/Self)
-             eqns_from_self = case saturatedFamApp_maybe work_rhs of
-                                Just (tc, rhs_tys) | fam_tc == tc -> maybeToList (mk_eqn rhs_tys)
-                                _                                 -> []
+mkLocalFamEqFDs eqs_for_me fam_tc work_args work_rhs
+  | Injective inj_flags <- tyConInjectivityInfo fam_tc
+  = let -- eqns_from_inerts: see (INJFAM:Wanted/other)
+        eqns_from_inerts = mapMaybe do_one eqs_for_me
+        -- eqns_from_self: see (INJFAM:Wanted/Self)
+        eqns_from_self = case saturatedFamApp_maybe work_rhs of
+                           Just (tc, rhs_tys) | fam_tc == tc -> maybeToList (mk_eqn rhs_tys)
+                           _                                 -> []
 
-       ; return (eqns_from_inerts ++ eqns_from_self) }
-  where
-    do_one :: EqCt -> Maybe FunDepEqns
-    do_one (EqCt { eq_lhs = TyFamLHS _ inert_args, eq_rhs = inert_rhs })
-      | work_rhs `tcEqType` inert_rhs = mk_eqn inert_args
-      | otherwise                     = Nothing
-    do_one _ = pprPanic "interactFunEq 2" (ppr fam_tc)  -- TyVarLHS
+        do_one :: EqCt -> Maybe FunDepEqns
+        do_one (EqCt { eq_lhs = TyFamLHS _ inert_args, eq_rhs = inert_rhs })
+          | work_rhs `tcEqType` inert_rhs = mk_eqn inert_args
+          | otherwise                     = Nothing
+        do_one _ = pprPanic "interactFunEq 2" (ppr fam_tc)  -- TyVarLHS
 
-    mk_eqn iargs = mkInjectivityFDEqn [] inj_flags work_args iargs
+        mk_eqn iargs = mkInjectivityFDEqn [] inj_flags work_args iargs
+
+    in return (eqns_from_inerts ++ eqns_from_self)
+
+  | otherwise    -- Not injective
+  = return []
 
 
 trimQtvs :: Subst -> [TyVar] -> (Subst, [TyVar])
@@ -875,8 +876,14 @@ tryGivenBuiltinFamEqFDs eqs_for_me fam_tc ops work_args
 
     do_one _ = return ()
 
-mkTopBuiltinFamEqFDs :: TyCon -> BuiltinClosedTyFam -> [TcType] -> Xi -> SolverStage [FunDepEqns]
-mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
+mkTopBuiltinFamEqFDs :: [EqCt] -> TyCon -> BuiltinClosedTyFam -> [TcType] -> EqCt
+                     -> SolverStage [FunDepEqns]
+mkTopBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_item@(EqCt { eq_rhs = work_rhs })
+  | hasRelevantGiven eqs_for_me work_args work_item
+    -- hasRelevantGiven: See (CF1) in Note [Exploiting closed type families]
+    -- A built-in family is very like a closed type family
+  = return []
+  | otherwise
   = return [ FDEqns { fd_qtvs = [], fd_eqs = eqs }
            | Just eqs <- [nonEmpty $ map snd $ tryInteractTopFam ops fam_tc work_args work_rhs] ]
 

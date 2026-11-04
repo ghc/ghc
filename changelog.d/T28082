@@ -1,0 +1,9 @@
+section: compiler
+issues: #28082
+mrs: !16930
+synopsis:
+  Fix a regression in type inference for injective open type families
+description:
+  Some programs involving an injective open type family with a Given equality
+  involving that same type family are no longer incorrectly rejected by the
+  typechecker.
