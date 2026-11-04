@@ -93,7 +93,10 @@ prepForeignCall _ _ =
 freeForeignCallInfo :: Ptr C_ffi_cif -> IO ()
 #if !defined(javascript_HOST_ARCH)
 freeForeignCallInfo p = do
-  free ((#ptr ffi_cif, arg_types) p)
+  -- #ptr is the address of the field, not its contents: the array to free is
+  -- the pointer stored there, which is the one prepForeignCall allocated.
+  arg_types <- (#peek ffi_cif, arg_types) p :: IO (Ptr (Ptr C_ffi_type))
+  free arg_types
   free p
 #else
 freeForeignCallInfo _ =
