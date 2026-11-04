@@ -374,8 +374,8 @@ xtE (D env (Lam v e))            f m = m { cm_lam = cm_lam m
                                                  |> xtG (D (extendCME env v) e)
                                                  |>> xtBndr env v f }
 xtE (D env (Let (NonRec b r) e)) f m = m { cm_letn = cm_letn m
-                                                 |> xtG (D (extendCME env b) e)
-                                                 |>> xtG (D env r)
+                                                 |> xtG (D env r)
+                                                 |>> xtG (D (extendCME env b) e)
                                                  |>> xtBndr env b f }
 xtE (D env (Let (Rec prs) e))    f m = m { cm_letr =
                                               let (bndrs,rhss) = unzip prs

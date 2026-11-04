@@ -1,0 +1,11 @@
+section: compiler
+synopsis: Fix lookups of non-recursive lets in CoreMap
+description:
+  ``CoreMap`` stored a non-recursive ``let`` under one key path and looked
+  it up under a different key path. When a map held two different
+  expressions, each lookup of an expression with a non-recursive ``let``
+  or join point failed. Thus CSE did not share identical bindings, and the
+  pattern-match checker could report spurious non-exhaustive matches for
+  guards or view patterns with equal expressions.
+mrs: !16936
+issues: #27892
