@@ -23,6 +23,10 @@ import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dataflow.Graph ( NonLocal(..) )
+import GHC.Cmm.Dataflow.Label
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Cmm.Opt           ( cmmMachOpFold )
 import GHC.Cmm.CLabel
 import GHC.Data.FastString
@@ -59,8 +63,42 @@ cmmToCmm :: NCGConfig -> RawCmmDecl -> (RawCmmDecl, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
 cmmToCmm config (CmmProc info lbl live graph)
     = runCmmOpt config $
-      do blocks' <- mapM cmmBlockConFold (toBlockList graph)
-         return $ CmmProc info lbl live (ofBlockList (g_entry graph) blocks')
+      do (blocks', reached) <- foldReachableBlocks graph
+         -- CQ[prune-info-tables]
+         -- Q: Can a block with an info table become unreachable here, and
+         --    what goes wrong if its info table is kept?
+         -- A~ Only if the call returning to it is in a block that the fold
+         --    made dead; the NCG would then emit an info table without code
+         --    behind it (see is_valid_label / natCmmTopToLive's hasNode).
+         let info' | setSize reached == mapSize (toBlockMap graph) = info
+                   | otherwise = mapFilterWithKey (\l _ -> setMember l reached) info
+         return $ CmmProc info' lbl live (ofBlockList (g_entry graph) blocks')
+
+-- CQ[fold-only-reachable]
+-- Q: Why fold blocks in a traversal from the entry instead of mapping over
+--    toBlockList?
+-- A~ Folding a literal CmmCondBranch into a CmmBranch can make the other
+--    target unreachable. The NCG builds its CFG from the reachable blocks only
+--    (getCfgProc) but generates code for every block in the graph, and some
+--    lowerings update the CFG for the current block, which panics for a block
+--    that is not a node (#28088). Visiting successors of the *folded* last
+--    node drops such blocks (and their imports) in the same pass.
+-- D~ Alternatively keep mapM and prune with a second revPostorder (!16933).
+foldReachableBlocks :: CmmGraph -> CmmOptM ([CmmBlock], LabelSet)
+foldReachableBlocks graph = go setEmpty [g_entry graph] []
+  where
+    block_map = toBlockMap graph
+
+    go :: LabelSet -> [BlockId] -> [CmmBlock] -> CmmOptM ([CmmBlock], LabelSet)
+    go seen [] acc = return (acc, seen)
+    go seen (l:ls) acc
+      | setMember l seen = go seen ls acc
+      | otherwise = do
+          let block = mapFindWithDefault
+                        (pprPanic "cmmToCmm: no block for label" (ppr l))
+                        l block_map
+          block' <- cmmBlockConFold block
+          go (setInsert l seen) (successors block' ++ ls) (block' : acc)
 
 type OptMResult a = (# a, [CLabel] #)
 
