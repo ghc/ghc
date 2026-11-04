@@ -63,7 +63,7 @@ import GHC.Driver.Session hiding (verbosity)
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline (compileFile)
 import GHC.HsToCore.Docs (getMainDeclBinder)
-import GHC.Iface.Load (loadSysInterface, readFullIfaceFromDisk)
+import GHC.Iface.Load (loadSysInterface)
 import GHC.Tc.Utils.Monad (initIfaceLoad)
 import GHC.Tc.Utils.Env (lookupGlobal_maybe)
 import GHC.Types.Error (mkUnknownDiagnostic)
@@ -75,11 +75,9 @@ import GHC.Unit.Module.Graph (ModuleGraphNode (..), ModuleNodeInfo(..))
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModSummary (isBootSummary)
 import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName, text, ppr)
-import GHC.Utils.Panic (pprPanic, throwGhcExceptionIO)
+import GHC.Utils.Panic (pprPanic)
 import GHC.Unit.Home.Graph (lookupHugByModule)
-import GHC.Iface.Errors.Ppr (missingInterfaceErrorDiagnostic)
-import GHC.Driver.Config.Diagnostic (initIfaceMessageOpts)
-import GHC.Driver.Ppr (showSDoc)
+import GHC.Types.TypeEnv (TypeEnv)
 import GHC.Utils.Error (withTiming)
 import GHC.Utils.Monad (mapMaybeM)
 
@@ -257,27 +255,20 @@ dropErr :: MaybeErr e a -> Maybe a
 dropErr (Succeeded a) = Just a
 dropErr (Failed _) = Nothing
 
-loadHiFile :: HscEnv -> Outputable.SDoc -> Module -> IO (ModIface, ([ClsInst], [FamInst]))
+loadHiFile :: HscEnv -> Outputable.SDoc -> Module -> IO (ModIface, TypeEnv, ([ClsInst], [FamInst]))
 loadHiFile hsc_env doc theModule = do
   -- The module is a module of the home unit, so loading its interface
   -- typechecks it into the HPT, together with its instances.
   -- See Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState.
+  -- The interface in the HPT does not keep its declarations; haddock only
+  -- needs their names, which it takes from the type environment.
   _ <- initIfaceLoad hsc_env $ loadSysInterface doc theModule
-  details <- lookupHugByModule theModule (hsc_HUG hsc_env) >>= \case
-    Just hmi -> pure (hm_details hmi)
+  hmi <- lookupHugByModule theModule (hsc_HUG hsc_env) >>= \case
+    Just hmi -> pure hmi
     Nothing  -> pprPanic "loadHiFile: not a home module" (ppr theModule)
-  let insts = (instEnvElts (md_insts details), md_fam_insts details)
-
-  -- Haddock needs the declarations of the full interface, which neither the
-  -- HPT entry nor the EPS keep (see Note [The EPS does not keep ModIfaces]),
-  -- so we read the interface file once more.
-  mod_iface <- readFullIfaceFromDisk hsc_env theModule >>= \case
-    Succeeded i -> pure i
-    Failed err  -> throwGhcExceptionIO $ ProgramError $
-      showSDoc (hsc_dflags hsc_env)
-        (missingInterfaceErrorDiagnostic (initIfaceMessageOpts (hsc_dflags hsc_env)) err)
-
-  pure (mod_iface, insts)
+  let details = hm_details hmi
+      insts   = (instEnvElts (md_insts details), md_fam_insts details)
+  pure (hm_iface hmi, md_types details, insts)
 
 processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> WarningMap -> Ghc (Maybe Interface)
 processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
@@ -289,7 +280,7 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
       doc = text "processModule"
       unit_state = hsc_units hsc_env
 
-  (mod_iface, insts) <- if Flag_NoCompilation `elem` flags
+  (mod_iface, type_env, insts) <- if Flag_NoCompilation `elem` flags
     then liftIO $ loadHiFile hsc_env doc $ ms_mod modSummary
     else do
       hmi <- liftIO $ lookupHpt (hsc_HPT hsc_env) (moduleName $ ms_mod modSummary) >>= \case
@@ -299,14 +290,14 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
       let cls_insts = instEnvElts . md_insts $ hm_details hmi
           fam_insts = md_fam_insts $ hm_details hmi
 
-      pure (hm_iface hmi, (cls_insts, fam_insts))
+      pure (hm_iface hmi, md_types (hm_details hmi), (cls_insts, fam_insts))
 
   !interface <- do
     logger <- getLogger
     {-# SCC createInterface #-}
       withTiming logger "createInterface" (const ()) $
         runIfM (liftIO . fmap dropErr . lookupGlobal_maybe hsc_env) $
-          createInterface1 flags unit_state modSummary mod_iface ifaceMap instIfaceMap insts warningMap
+          createInterface1 flags unit_state modSummary mod_iface type_env ifaceMap instIfaceMap insts warningMap
 
   let
     (haddockable, haddocked) =
@@ -385,7 +376,7 @@ createOneShotIface verbosity flags instIfaceMap moduleNameStr = do
   modifySession $ hscSetFlags dflags
   hsc_env <- getSession
 
-  (iface, insts) <- liftIO $ loadHiFile hsc_env doc $ mkMainModule_ moduleNm
+  (iface, type_env, insts) <- liftIO $ loadHiFile hsc_env doc $ mkMainModule_ moduleNm
 
   -- Update the DynFlags with the extensions from the source file (as stored in the interface file)
   -- This is instead of ms_hspp_opts from ModSummary, which is not available in one-shot mode.
@@ -407,7 +398,7 @@ createOneShotIface verbosity flags instIfaceMap moduleNameStr = do
     {-# SCC createInterface #-}
       withTiming logger "createInterface" (const ()) $
         runIfM (liftIO . fmap dropErr . lookupGlobal_maybe hsc_env) $
-          createInterface1' flags (hsc_units hsc_env) dflags' hieFilePath iface mempty instIfaceMap insts inst_warning_map
+          createInterface1' flags (hsc_units hsc_env) dflags' hieFilePath iface type_env mempty instIfaceMap insts inst_warning_map
 
   pure [interface]
 
