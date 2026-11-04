@@ -56,6 +56,7 @@ import GHC.Parser.Lexer (ParserOpts)
 import GHC.Types.Avail
 import GHC.Types.Name
 import GHC.Types.Name.Set
+import GHC.Types.TypeEnv (TypeEnv, typeEnvIds)
 import GHC.Types.SafeHaskell
 import qualified GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Types.Unique.Map as UniqMap
@@ -82,12 +83,14 @@ createInterface1
   -> UnitState
   -> ModSummary
   -> ModIface
+  -> TypeEnv
+  -- ^ The type environment of the module ('md_types' of its 'ModDetails')
   -> IfaceMap
   -> InstIfaceMap
   -> ([ClsInst], [FamInst])
   -> WarningMap
   -> IfM m Interface
-createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings =
+createInterface1 flags unit_state mod_sum mod_iface type_env ifaces inst_ifaces (instances, fam_instances) depWarnings =
   let
     ModSummary
       { -- Cached flags from OPTIONS, INCLUDE and LANGUAGE
@@ -97,7 +100,7 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
       , ms_location = modl
       } = mod_sum
    in
-    createInterface1' flags unit_state ms_hspp_opts (ml_hie_file modl) mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings
+    createInterface1' flags unit_state ms_hspp_opts (ml_hie_file modl) mod_iface type_env ifaces inst_ifaces (instances, fam_instances) depWarnings
 
 createInterface1'
   :: MonadIO m
@@ -106,12 +109,14 @@ createInterface1'
   -> DynFlags
   -> FilePath
   -> ModIface
+  -> TypeEnv
+  -- ^ The type environment of the module ('md_types' of its 'ModDetails')
   -> IfaceMap
   -> InstIfaceMap
   -> ([ClsInst], [FamInst])
   -> WarningMap
   -> IfM m Interface
-createInterface1' flags unit_state dflags hie_file mod_iface ifaces inst_ifaces (instances, fam_instances) depWarnings = do
+createInterface1' flags unit_state dflags hie_file mod_iface type_env ifaces inst_ifaces (instances, fam_instances) depWarnings = do
   let
     sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle
     mLanguage = language dflags
@@ -147,11 +152,17 @@ createInterface1' flags unit_state dflags hie_file mod_iface ifaces inst_ifaces 
 
     -- This is used for looking up the Name of a default method
     -- from its OccName. See Note [default method Name] in GHC.Iface.Recomp
+    --
+    -- We take them from the type environment rather than 'mi_decls': the
+    -- interface of a demand-loaded home module (one-shot mode,
+    -- --no-compilation) does not keep its declarations, see
+    -- Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState.
     def_meths_env = mkOccEnv def_meths
     def_meths =
-      [ (nameOccName nm, nm)
-      | (_, IfaceId{ifName = nm}) <- mi_decls mod_iface
-      , let occ = nameOccName nm
+      [ (occ, nm)
+      | dm_id <- typeEnvIds type_env
+      , let nm = getName dm_id
+            occ = nameOccName nm
       , isDefaultMethodOcc occ
       ]
 
