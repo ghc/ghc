@@ -94,6 +94,10 @@ Dropped, compared to the old PIT:
 'GHC.Iface.Load.loadInterface' returns a 'LoadedIface': either the ModIface of a
 home module (from the HUG), or the 'ExternalIface' from the EPS.  The li_*
 accessors work on both.
+
+GHC API users who need the full interface (e.g. its declarations) can install
+'GHC.Driver.Hooks.ifaceReadHook': it is called with the full ModIface every
+time an interface file is read from disk.
 -}
 
 -- | What the EPS remembers about an external interface.

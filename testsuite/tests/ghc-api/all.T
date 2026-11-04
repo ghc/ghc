@@ -101,3 +101,5 @@ test('T4162', [ extra_run_opts(f'"{config.libdir}"')
               # no subprocesses or signals
               , when(arch('wasm32') or arch('javascript'), skip)
               ], compile_and_run, ['-package ghc'])
+test('IfaceReadHook', [extra_files(['IfaceReadHook_A.hs']), extra_run_opts('"' + config.libdir + '"')],
+     compile_and_run, ['-package ghc'])
