@@ -94,7 +94,6 @@ import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 
-import GHC.Builtin.Modules( gHC_PRIM )
 
 import Control.Applicative ((<|>))
 import Data.IORef
@@ -318,11 +317,6 @@ hugSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
           <- Set.toList (moduleGraphModulesBelow mg uid mn)
     , include_hi_boot || (is_boot == NotBoot)
 
-        -- unsavoury: when compiling the base package with --make, we
-        -- sometimes try to look up RULES etc for GHC.Prim. GHC.Prim won't
-        -- be in the HPT, because we never compile it; it's in the EPT
-        -- instead. ToDo: clean up, and remove this slightly bogus filter:
-    , mod /= moduleName gHC_PRIM
     , not (mod == gwib_mod mn && uid == mod_uid)
 
         -- Look it up in the HUG
@@ -410,13 +404,11 @@ lookupIfaceByModule hug eps mod
   = HUG.lookupHugByModule mod hug >>= pure . \case
        Just hm -> Just (LoadedHome (hm_iface hm))
        Nothing -> LoadedExternal <$> lookupExternalIface eps mod
-   -- If the module does come from the home package, why do we look in the EPS as well?
-   -- There is *one* case where a home-package module is in the EPS, namely
-   -- GHC.Prim when compiling the base package.  Demand-loaded home modules in
-   -- OneShot mode are in the HUG (see Note [Demand-loaded home interfaces] in
-   -- GHC.Unit.Home.LoadedState).
-   -- We could eliminate (b) if we wanted, by making GHC.Prim belong to a package
-   -- of its own, but it doesn't seem worth the bother.
+   -- Home-unit modules are never in the EPS: in --make mode and GHCi they are
+   -- in the HUG because we compile or load them in dependency order, and in
+   -- OneShot mode demand-loaded home modules go to the HUG too (see
+   -- Note [Demand-loaded home interfaces] in GHC.Unit.Home.LoadedState).
+   -- This includes GHC.Prim when compiling ghc-internal.
 
 lookupIfaceByModuleHsc :: HscEnv -> Module -> IO (Maybe LoadedIface)
 lookupIfaceByModuleHsc hsc_env mod = do
