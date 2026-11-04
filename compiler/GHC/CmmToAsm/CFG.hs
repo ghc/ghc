@@ -1189,6 +1189,16 @@ cfgEdgeProbabilities cfg toVertex
          = w/totalWeight
          | otherwise = panic "impossible"
 
+-- | What the frequencies computed by one pass of 'calcFreqs' are relative to.
+data FreqUnit
+  = PerIteration !Vertex
+    -- ^ One iteration of a loop with this header, which therefore has
+    -- frequency 1. The frequency of an edge back to the header is the
+    -- probability that an iteration is followed by another one via that edge.
+  | PerInvocation
+    -- ^ One invocation of the procedure. It accounts for one execution of
+    -- the entry, in addition to those caused by edges back to the entry.
+
 -- | Compute how often each block runs and each edge is taken per invocation
 -- of the procedure, given the probabilities of the edges.
 --
@@ -1253,26 +1263,26 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
         setBackProb b1 b2 = setProb' edgeBackProbs b1 b2
 
 
-    let calcOutFreqs :: Vertex -> Vertex -> ST s ()
-        calcOutFreqs bhead block = do
+    let calcOutFreqs :: FreqUnit -> Vertex -> ST s ()
+        calcOutFreqs unit block = do
           !f <- getFreq block
           forM_ (successors block) $ \bi -> do
             let !prob = getProb block bi
             let !succFreq = f * prob
             setEdgeFreq block bi succFreq
             -- traceM $ "SetOut: " ++ show (block, bi, f, prob, succFreq)
-            when (bi == bhead) $ setBackProb block bi succFreq
+            when (isHead unit bi) $ setBackProb block bi succFreq
 
 
-    let propFreq :: Vertex -> Vertex -> ST s ()
-        propFreq block head = do
+    let propFreq :: FreqUnit -> Vertex -> ST s ()
+        propFreq unit block = do
             -- traceM ("prop:" ++ show (block,head))
             -- traceShowM block
 
             !v <- visited block
             if v then
                 return () --Dont look at nodes twice
-            else if block == head then
+            else if isHead unit block then
                 setFreq block 1.0 -- Loop header frequency is always 1
             else do
                 let preds = IS.elems $ predecessors block
@@ -1282,9 +1292,16 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
                     return (not bp_visited && not bp_backedge)
 
                 if irreducible
-                then return () -- Rare we don't care
+                then
+                    -- Irreducible control flow is rare, so we accept that the
+                    -- block is skipped and keeps the frequency it had.
+                    --
+                    -- The entry is never skipped: it dominates every block, so
+                    -- every edge into it is a back edge.
+                    massertPpr (block /= entry)
+                               (text "calcFreqs: entry has a non-back-edge predecessor")
                 else do
-                    setFreq block 0
+                    setFreq block (inflow unit block)
                     !cycleProb <- sum <$> (forM preds $ \pred -> do
                         if isBackEdge pred block
                             then
@@ -1304,17 +1321,17 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
                     setFreq block (f / (1.0 - cycleProb))
 
             setVisited block
-            calcOutFreqs head block
+            calcOutFreqs unit block
 
     -- Loops, by nesting, inner to outer
     forM_ loops $ \(head, body) -> do
         forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i True) -- Mark all nodes as visited.
         forM_ body (\i -> unsafeWrite visitedNodes i False) -- Mark all blocks reachable from head as not visited
-        forM_ body $ \block -> propFreq block head
+        forM_ body $ \block -> propFreq (PerIteration head) block
 
-    -- After dealing with all loops, deal with non-looping parts of the CFG
+    -- The whole procedure, using the back edge probabilities from the loop passes
     forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i False) -- Everything in revPostOrder is reachable
-    forM_ revPostOrder $ \block -> propFreq block (head revPostOrder)
+    forM_ revPostOrder $ \block -> propFreq PerInvocation block
 
     -- trace ("Final freqs:") $ return ()
     -- let freqString = pprFreqs freqs
@@ -1325,6 +1342,17 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
 
     return (freqs', graph')
   where
+    entry = head revPostOrder
+
+    isHead :: FreqUnit -> Vertex -> Bool
+    isHead (PerIteration h) b = h == b
+    isHead PerInvocation    _ = False
+
+    -- Frequency entering the block from outside the CFG.
+    inflow :: FreqUnit -> Vertex -> Double
+    inflow PerInvocation b | b == entry = 1
+    inflow _             _              = 0
+
     -- How can these lookups fail? Consider the CFG [A -> B]
     predecessors :: Vertex -> VertexSet
     predecessors b = fromMaybe IS.empty $ IM.lookup b revGraph
