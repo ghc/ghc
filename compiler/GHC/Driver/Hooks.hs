@@ -18,6 +18,7 @@ module GHC.Driver.Hooks
    , hscFrontendHook
    , hscCompileCoreExprHook
    , ghcPrimIfaceHook
+   , ifaceReadHook
    , runPhaseHook
    , runMetaHook
    , linkHook
@@ -93,6 +94,7 @@ emptyHooks = Hooks
   , hscFrontendHook        = Nothing
   , hscCompileCoreExprHook = Nothing
   , ghcPrimIfaceHook       = Nothing
+  , ifaceReadHook          = Nothing
   , runPhaseHook           = Nothing
   , runMetaHook            = Nothing
   , linkHook               = Nothing
@@ -139,6 +141,15 @@ data Hooks = Hooks
   , hscFrontendHook        :: !(Maybe (ModSummary -> Hsc FrontendResult))
   , hscCompileCoreExprHook :: !(Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)))
   , ghcPrimIfaceHook       :: !(Maybe ModIface)
+  , ifaceReadHook          :: !(Maybe (FilePath -> ModIface -> IO ()))
+  -- ^ Called with the path and the full 'ModIface' every time GHC reads an
+  -- interface file from disk (for GHC.Prim: with its virtual interface).
+  --
+  -- GHC does not keep the full interfaces of external modules (see
+  -- Note [The EPS does not keep ModIfaces] in "GHC.Unit.External.Iface"), so
+  -- this is the place to get hold of all of an interface, e.g. its
+  -- declarations. The hook only observes the interface; to change an
+  -- interface, use a plugin's 'interfaceLoadAction'.
   , runPhaseHook           :: !(Maybe PhaseHook)
   , runMetaHook            :: !(Maybe (MetaHook TcM))
   , linkHook               :: !(Maybe (GhcLink -> DynFlags -> Bool

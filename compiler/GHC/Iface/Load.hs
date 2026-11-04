@@ -152,6 +152,7 @@ import Language.Haskell.Syntax.Lit (StringLiteral(..))
 
 import Control.Monad
 import qualified Data.Foldable as Foldable
+import Data.Foldable ( for_ )
 import Data.Function ((&))
 import Data.Map ( toList )
 import System.FilePath
@@ -1478,7 +1479,8 @@ readIfaceCopying copy_lazily hooks logger dflags name_cache wanted_mod file_path
         -- critical for correctness of recompilation checking
         -- (it lets us tell when -this-unit-id has changed.)
         | wanted_mod == actual_mod
-                        -> return (Succeeded final_iface)
+                        -> do { for_ (ifaceReadHook hooks) $ \h -> h file_path final_iface
+                              ; return (Succeeded final_iface) }
         | otherwise     -> return (Failed err)
         where
           final_iface

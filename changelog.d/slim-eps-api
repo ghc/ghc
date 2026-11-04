@@ -1,0 +1,32 @@
+section: ghc-lib
+synopsis:
+  The External Package State no longer keeps the ``ModIface`` of external
+  modules; interface loading functions return a ``LoadedIface``
+description:
+  The Package Interface Table (``eps_PIT``) is replaced by ``eps_ext_ifaces``,
+  which keeps a slim ``ExternalIface`` per loaded external module (exports,
+  fixities, warnings, hashes, dependencies, trust, docs). This reduces the
+  memory retained in ``--make`` mode. In one-shot mode, interfaces of home-unit
+  modules are put into the HPT instead of the EPS.
+
+  Breaking change: the following functions now return a
+  ``GHC.Unit.External.Iface.LoadedIface`` (a home ``ModIface`` or an
+  ``ExternalIface``, with ``li_*`` accessors) instead of a ``ModIface``:
+
+  * ``GHC.Iface.Load.loadInterface``, ``loadSysInterface``,
+    ``loadUserInterface``, ``loadSrcInterface``, ``loadSrcInterface_maybe``,
+    ``loadInterfaceForName``, ``loadInterfaceForModule``,
+    ``loadModuleInterface``, ``loadPluginInterface``
+  * ``GHC.Driver.Env.lookupIfaceByModule`` (which now takes the
+    ``ExternalPackageState``) and ``lookupIfaceByModuleHsc``
+  * ``GHC.Tc.Module.getModuleInterface``, ``GHC.Driver.Main.hscGetModuleInterface``
+  * ``GHC.Runtime.Loader.lookupRdrNameInModuleForPlugins``, and the
+    ``lpModule`` field of ``GHC.Driver.Plugins.LoadedPlugin``
+
+  ``GHC.Unit.External.PackageIfaceTable`` and ``emptyPackageIfaceTable`` are
+  removed. ``GHC.Iface.Load.readFullIfaceFromDisk`` reads the full interface of
+  a module without touching the EPS.
+
+  To get hold of full interfaces, the new hook
+  ``GHC.Driver.Hooks.ifaceReadHook :: Maybe (FilePath -> ModIface -> IO ())``
+  is called with every interface GHC reads from disk.
