@@ -9,6 +9,7 @@ import Control.Exception (IOException, catch)
 import Control.Monad (when)
 import Data.Foldable (traverse_)
 import qualified Data.List as List
+import qualified Data.Text as T
 import Data.Traversable (for)
 import Data.TreeDiff
 import Data.TreeDiff.Golden
@@ -102,7 +103,7 @@ acceptFixtures = traverse_ $ \(Fixture i o) -> do
   writeFile o actual
 
 parseString :: String -> Doc String
-parseString = Parse.toRegular . _doc . Parse.parseParas Nothing
+parseString = Parse.toRegular . _doc . Parse.parseParas Nothing . T.pack
 
 data Cmd = CmdRun | CmdAccept | CmdList
 

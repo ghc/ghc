@@ -22,19 +22,19 @@ infixr 6 <>
 type Doc id = DocH () id
 
 instance IsString (Doc String) where
-  fromString = DocString
+  fromString = DocString . T.pack
 
 instance IsString a => IsString (Maybe a) where
   fromString = Just . fromString
 
-parseParas :: T.Text -> MetaDoc () String
-parseParas = overDoc Parse.toRegular . Parse.parseParas Nothing
+parseParas :: String -> MetaDoc () String
+parseParas = overDoc Parse.toRegular . Parse.parseParas Nothing . T.pack
 
-parseString :: T.Text -> Doc String
+parseString :: String -> Doc String
 parseString = Parse.toRegular . Parse.parseString
 
 hyperlink :: String -> Maybe (Doc String) -> Doc String
-hyperlink url = DocHyperlink . Hyperlink url
+hyperlink url = DocHyperlink . Hyperlink (T.pack url)
 
 main :: IO ()
 main = hspec spec
@@ -63,7 +63,7 @@ spec = do
       it "allows to backslash-escape characters except \\r" $ do
         property $ \y -> case y of
           '\r' -> "\\\r" `shouldParseTo` DocString "\\"
-          x -> ['\\', x] `shouldParseTo` DocString [x]
+          x -> ['\\', x] `shouldParseTo` DocString (T.singleton x)
 
       context "when parsing strings contaning numeric character references" $ do
         it "will implicitly convert digits to characters" $ do
@@ -271,7 +271,7 @@ spec = do
 
     context "when parsing images" $ do
       let image :: String -> Maybe String -> Doc String
-          image uri = DocPic . Picture uri
+          image uri = DocPic . Picture (T.pack uri) . fmap T.pack
 
       it "accepts markdown syntax for images" $ do
         "![label](url)" `shouldParseTo` image "url" "label"
@@ -616,7 +616,7 @@ spec = do
         property $ \xs ->
           let input = filterSpecial xs
            in (not . null) input ==>
-                input `shouldParseTo` DocParagraph (DocString input)
+                input `shouldParseTo` DocParagraph (DocString (T.pack input))
 
       it "separates paragraphs by empty lines" $ do
         unlines
@@ -843,7 +843,7 @@ spec = do
 
       it "parses bird-tracks inside of paragraphs as plain strings" $ do
         let xs = "foo\n>>> bar"
-        xs `shouldParseTo` DocParagraph (DocString xs)
+        xs `shouldParseTo` DocParagraph (DocString (T.pack xs))
 
       it "skips empty lines in front of an example" $ do
         "\n   \n\n>>> foo" `shouldParseTo` DocExamples [Example "foo" []]
