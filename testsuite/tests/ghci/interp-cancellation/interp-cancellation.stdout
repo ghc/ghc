@@ -1,0 +1,8 @@
+ok: cancelled MallocData is queued as RemotePtr
+ok: cancelled MallocStrings is queued as one FreeData for every pointer
+ok: cancelled PrepFFI is queued as RemoteFFI
+ok: cancelled NewBreakArray is queued as RemoteRef
+ok: server still answers after a cancellation
+ok: a reply that was waited for is not queued
+ok: cancelled MallocData allocations are reclaimed
+ok: cancelled NewBreakArray refs are reclaimed
