@@ -64,7 +64,7 @@ elimCommonBlocks :: CmmGraph -> CmmGraph
 elimCommonBlocks g =
     assert (g_entry g == g_entry g') g'
   where
-     g' = replaceLabels env $ copyTicks env g
+     g' = replaceLabels env $ dropEliminatedBlocks env $ copyTicks env g
      env = iterate mapEmpty blocks_with_key
      blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]
      groups = groupByInt hash_block candidates :: [[CmmBlock]]
@@ -321,6 +321,15 @@ copyTicks env g
               (CmmEntry lbl scp1, code) = blockSplitHead to
           in CmmEntry lbl (combineTickScopes scp0 scp1) `blockJoinHead`
              foldr blockCons code (map CmmTick ticks)
+
+-- | Remove the blocks eliminated by the substitution from the graph.
+--
+-- This function does not update any references to the eliminated blocks.
+-- Use 'replaceLabels' for this.
+dropEliminatedBlocks :: Subst -> CmmGraph -> CmmGraph
+dropEliminatedBlocks env g
+  | mapNull env = g
+  | otherwise   = ofBlockMap (g_entry g) (toBlockMap g `mapDifference` env)
 
 -- Group by [Label]
 -- See Note [Compressed TrieMap] in GHC.Core.Map.Expr about the usage of GenMap.
