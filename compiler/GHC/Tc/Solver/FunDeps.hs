@@ -42,7 +42,9 @@ import GHC.Utils.Panic
 
 import Control.Monad( unless )
 import GHC.Data.Pair
-import Data.Maybe( isJust, mapMaybe )
+import Data.List.NonEmpty( NonEmpty(..), nonEmpty )
+import qualified Data.List.NonEmpty as NE
+import Data.Maybe( isJust, mapMaybe, maybeToList )
 
 
 {- Note [Overview of functional dependencies in type inference]
@@ -630,6 +632,8 @@ mkTopFamEqFDs fam_tc work_args work_item
 
 tryFDEqns :: Bool -> TyCon -> [TcType] -> EqCt -> [FunDepEqns] -> SolverStage ()
 tryFDEqns is_top fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) fd_eqns
+  | null fd_eqns = return () -- nothing to do
+  | otherwise
   = Stage $
     do { traceTcS "tryFDEqns" (vcat [ text "lhs:" <+> ppr fam_tc <+> ppr work_args
                                     , text "rhs:" <+> ppr rhs
@@ -699,7 +703,7 @@ getRelevantBranches :: CoAxiom Branched -> [TcType] -> Xi -> [FunDepEqns]
 getRelevantBranches ax work_args work_rhs
   = go (fromBranches (coAxiomBranches ax))
   where
-    work_tys = work_rhs : work_args
+    work_tys = work_rhs :| work_args
 
     go [] = []
     go (branch:branches)
@@ -710,7 +714,7 @@ getRelevantBranches ax work_args work_rhs
          is_relevant branch@(CoAxBranch { cab_tvs = qtvs
                                         , cab_lhs = lhs_tys
                                         , cab_rhs = rhs_ty })
-            | Just subst <- tcUnifyTysForInjectivity Unifying (rhs_ty:lhs_tys) work_tys
+            | Just subst <- tcUnifyTysForInjectivity Unifying (rhs_ty:lhs_tys) (NE.toList work_tys)
                             -- See (RW1)-(RW3) in Note [Relevance]
             , let lhs_tys' = map (deepSubstTy subst) lhs_tys
                   -- deepSubstTy: see (CF8) in Note [Exploiting closed type families]
@@ -721,15 +725,15 @@ getRelevantBranches ax work_args work_rhs
               then -- `subst` eliminates all qtvs; and no qtvs in range of subst
                    -- See (CF7)(A) in Note [Exploiting closed type families]
                    FDEqns { fd_qtvs = []
-                          , fd_eqs  = zipWith Pair (substTy subst rhs_ty : lhs_tys')
-                                                   work_tys }
+                          , fd_eqs  = NE.zipWith Pair (substTy subst rhs_ty :| lhs_tys')
+                                                      work_tys }
                           -- Do not apply `subst` to `work_tys`;
                           -- See (CF9) in Note [Exploiting closed type families]
 
               else -- Abandon `subst`; re-create it from (rhs_ty ~ work_rhs)
                    -- See (CF7)(B) in Note [Exploiting closed type families]
                    FDEqns { fd_qtvs = qtvs
-                          , fd_eqs  = zipWith Pair (rhs_ty:lhs_tys) work_tys }
+                          , fd_eqs  = NE.zipWith Pair (rhs_ty :| lhs_tys) work_tys }
 
             | otherwise
             = Nothing
@@ -757,7 +761,7 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
             branch_lhs_tys' = substTys subst' branch_lhs_tys
         -- We must apply the substitution here see
         -- the Basic Plan in Note [Exploiting open type families]
-      = Just (mkInjectivityFDEqn qtvs' inj_flags branch_lhs_tys' work_args)
+      = mkInjectivityFDEqn qtvs' inj_flags branch_lhs_tys' work_args
 
       | otherwise
       = Nothing
@@ -771,14 +775,14 @@ mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
              eqns_from_inerts = mapMaybe do_one eqs_for_me
              -- eqns_from_self: see (INJFAM:Wanted/Self)
              eqns_from_self = case saturatedFamApp_maybe work_rhs of
-                                Just (tc, rhs_tys) | fam_tc == tc -> [mk_eqn rhs_tys]
+                                Just (tc, rhs_tys) | fam_tc == tc -> maybeToList (mk_eqn rhs_tys)
                                 _                                 -> []
 
        ; return (eqns_from_inerts ++ eqns_from_self) }
   where
     do_one :: EqCt -> Maybe FunDepEqns
     do_one (EqCt { eq_lhs = TyFamLHS _ inert_args, eq_rhs = inert_rhs })
-      | work_rhs `tcEqType` inert_rhs = Just (mk_eqn inert_args)
+      | work_rhs `tcEqType` inert_rhs = mk_eqn inert_args
       | otherwise                     = Nothing
     do_one _ = pprPanic "interactFunEq 2" (ppr fam_tc)  -- TyVarLHS
 
@@ -873,26 +877,26 @@ tryGivenBuiltinFamEqFDs eqs_for_me fam_tc ops work_args
 
 mkTopBuiltinFamEqFDs :: TyCon -> BuiltinClosedTyFam -> [TcType] -> Xi -> SolverStage [FunDepEqns]
 mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
-  = return [FDEqns { fd_qtvs = []
-                   , fd_eqs = map snd $ tryInteractTopFam ops fam_tc work_args work_rhs }]
+  = return [ FDEqns { fd_qtvs = [], fd_eqs = eqs }
+           | Just eqs <- [nonEmpty $ map snd $ tryInteractTopFam ops fam_tc work_args work_rhs] ]
 
 mkLocalBuiltinFamEqFDs :: [EqCt] -> TyCon -> BuiltinClosedTyFam
                        -> [TcType] -> Xi -> SolverStage [FunDepEqns]
 mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
   = do { let do_one :: EqCt -> [FunDepEqns]
              do_one (EqCt { eq_lhs = TyFamLHS _ inert_args, eq_rhs = inert_rhs })
-               | inert_rhs `tcEqType` work_rhs = [mk_eqn inert_args]
+               | inert_rhs `tcEqType` work_rhs = maybeToList (mk_eqn inert_args)
                | otherwise                     = []
              do_one _ = pprPanic "interactFunEq 1" (ppr fam_tc) -- TyVarLHS
 
-             mk_eqn :: [TcType] -> FunDepEqns
-             mk_eqn iargs = FDEqns { fd_qtvs = []
-                                   , fd_eqs = map snd $ tryInteractInertFam ops fam_tc
-                                                                     work_args iargs }
+             mk_eqn :: [TcType] -> Maybe FunDepEqns
+             mk_eqn iargs = do { eqs <- nonEmpty $ map snd $
+                                        tryInteractInertFam ops fam_tc work_args iargs
+                               ; return (FDEqns { fd_qtvs = [], fd_eqs = eqs }) }
 
        ; let eqns_from_inerts = concatMap do_one eqs_for_me
              eqns_from_self   = case tcSplitTyConApp_maybe work_rhs of
-                                  Just (tc,rhs_tys) | tc==fam_tc -> [mk_eqn rhs_tys]
+                                  Just (tc,rhs_tys) | tc==fam_tc -> maybeToList (mk_eqn rhs_tys)
                                   _                              -> []
        ; return (eqns_from_inerts ++ eqns_from_self) }
 
@@ -900,7 +904,7 @@ mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
 mkInjectivityFDEqn :: [TcTyVar]             -- Quantify these
                    -> [Bool]                -- Injectivity flags
                    -> [TcType] -> [TcType]  -- Make these equal
-                   -> FunDepEqns
+                   -> Maybe FunDepEqns
 -- When F s1 s2 s3 ~ F t1 t2 t3, and F has injectivity info [True,False,True]
 --   return the FDEqns { fd_eqs = [Pair s1 t1, Pair s3 t3] }
 -- The injectivity flags [Bool] will not all be False,
@@ -912,10 +916,11 @@ mkInjectivityFDEqn qtvs inj_args lhs_args rhs_args
                     , text "lhs_args:" <+> ppr lhs_args
                     , text "rhs_args:" <+> ppr rhs_args ]) $
     -- Need inj_args lhs_args and rhs_args to be same length for zip3
-    FDEqns { fd_qtvs = qtvs, fd_eqs = eqs }
+    do { eqs <- nonEmpty eqs_list
+       ; return (FDEqns { fd_qtvs = qtvs, fd_eqs = eqs }) }
   where
-    eqs = [ Pair lhs_arg rhs_arg
-          | (True, lhs_arg, rhs_arg) <- zip3 inj_args lhs_args rhs_args ]
+    eqs_list = [ Pair lhs_arg rhs_arg
+               | (True, lhs_arg, rhs_arg) <- zip3 inj_args lhs_args rhs_args ]
 
 getInertFamEqsFor :: TyCon -> [TcType] -> Xi -> TcS [EqCt]
 -- Look in the InertSet, and return all inert equalities
@@ -1603,8 +1608,8 @@ instantiateFunDepEqns (FDEqns { fd_qtvs = qtvs, fd_eqs = eqs })
        ; (_, subst) <- instFlexiXTcM empty_subst qtvs  -- Takes account of kind substitution
        ; return (map (subst_pair subst) rev_eqs) }
   where
-    rev_eqs = reverse eqs
-       -- (reverse eqs): See Note [Reverse order of fundep equations]
+    rev_eqs = reverse $ NE.toList eqs
+       -- reverse: See Note [Reverse order of fundep equations]
 
     -- The kinds of `qtvs` can have free variables;
     -- in the FDEqns produced by GHC.Tc.Instance.FunDeps.improveFromInstEnv

@@ -48,6 +48,8 @@ import GHC.Utils.Panic
 
 import GHC.Data.Pair ( Pair(..) )
 import Data.List     ( nubBy )
+import Data.List.NonEmpty ( NonEmpty, nonEmpty )
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe    ( isJust, isNothing )
 
 {-
@@ -123,7 +125,7 @@ Wrinkles:
        FDEqns { fd_qtvs = [x2], fd_eqs = [ Maybe x2 ~ ty ] }
     with two FDEqns, generating two separate unification variables.
 
-    This is why fd_eqs is a [TypeEqn] not just a TypeEqn
+    This is why fd_eqs is a (NonEmpty TypeEqn) not just a TypeEqn
 
 (IMP3) improveFromInstEnv doesn't return any equations that already hold.
     Reason: just an optimisation; the caller does the same thing, but
@@ -136,7 +138,7 @@ data FunDepEqns  -- Plural becuase fd_eqs has multiple equations
                                  --   to fresh unification vars,
                                  -- See (IMP2) in Note [Improving against instances]
 
-           , fd_eqs  :: [TypeEqn]  -- Make these pairs of types equal
+           , fd_eqs  :: NonEmpty TypeEqn  -- Make these pairs of types equal
                         -- Invariant: In each (Pair ty1 ty2), the fd_qtvs may be
                         -- free in ty1 but not in ty2.  See Wrinkle (1) of
                         -- Note [Improving against instances]
@@ -149,7 +151,7 @@ pprEquation :: FunDepEqns -> SDoc
 pprEquation (FDEqns { fd_qtvs = qtvs, fd_eqs = pairs })
   = vcat [text "forall" <+> braces (pprWithCommas ppr qtvs),
           nest 2 (vcat [ ppr t1 <+> text "~" <+> ppr t2
-                       | Pair t1 t2 <- pairs])]
+                       | Pair t1 t2 <- NE.toList pairs])]
 
 {-
 Given a bunch of predicates that must hold, such as
@@ -216,8 +218,7 @@ improveFromAnother pred1 pred2
     , let (ltys1, rs1) = instFD fd cls_tvs tys1
           (ltys2, rs2) = instFD fd cls_tvs tys2
     , eqTypes ltys1 ltys2               -- The LHSs match
-    , let eqs = zipAndComputeFDEqs eqType rs1 rs2
-    , not (null eqs) ]
+    , Just eqs <- [nonEmpty (zipAndComputeFDEqs eqType rs1 rs2)] ]
 
 improveFromAnother _ _ = []
 
@@ -232,7 +233,7 @@ improveFromInstEnv :: InstEnvs
 -- See Note [Improving against instances]
 -- Post: Equations oriented from the template (matching instance) to the workitem!
 improveFromInstEnv inst_env cls tys
-  = [ FDEqns { fd_qtvs = meta_tvs, fd_eqs = eqs }
+  = [ fd_eqn
     | fd <- cls_fds             -- Iterate through the fundeps first,
                                 -- because there often are none!
     , let trimmed_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs
@@ -241,8 +242,8 @@ improveFromInstEnv inst_env cls tys
                 -- symmetrically, so it's ok to trim the rough_tcs,
                 -- rather than trimming each inst_tcs in turn
     , ispec <- instances
-    , (meta_tvs, eqs) <- improveClsFD cls_tvs fd ispec
-                                      tys trimmed_tcs -- NB: orientation
+    , fd_eqn <- improveClsFD cls_tvs fd ispec
+                             tys trimmed_tcs -- NB: orientation
     ]
   where
     (cls_tvs, cls_fds) = classTvsFds cls
@@ -252,7 +253,7 @@ improveFromInstEnv inst_env cls tys
 improveClsFD :: [TyVar] -> FunDep TyVar    -- One functional dependency from the class
              -> ClsInst                    -- An instance template
              -> [Type] -> [RoughMatchTc]   -- Arguments of this (C tys) predicate
-             -> [([TyCoVar], [TypeEqn])]   -- Empty or singleton
+             -> [FunDepEqns]               -- Empty or singleton
 -- See Note [Improving against instances]
 
 improveClsFD clas_tvs fd
@@ -284,10 +285,7 @@ improveClsFD clas_tvs fd
                         -- so we would produce no FDs, which is clearly wrong.
                   -> []
 
-                  | null fdeqs
-                  -> []
-
-                  | otherwise
+                  | Just fdeqs_ne <- nonEmpty fdeqs
                   -> -- pprTrace "iproveClsFD" (vcat
                      --  [ text "is_tvs =" <+> ppr qtvs
                      --  , text "tys_inst =" <+> ppr tys_inst
@@ -295,12 +293,15 @@ improveClsFD clas_tvs fd
                      --  , text "ltys1 =" <+> ppr ltys1
                      --  , text "ltys2 =" <+> ppr ltys2
                      --  , text "subst =" <+> ppr subst ]) $
-                     [(meta_tvs, fdeqs)]
+                     [FDEqns { fd_qtvs = meta_tvs, fd_eqs = fdeqs_ne }]
                         -- We could avoid this substTy stuff by producing the eqn
                         -- (qtvs, ls1++rs1, ls2++rs2)
                         -- which will re-do the ls1/ls2 unification when the equation is
                         -- executed.  What we're doing instead is recording the partial
                         -- work of the ls1/ls2 unification leaving a smaller unification problem
+
+                  | otherwise
+                  -> []
                   where
                     rtys1' = map (substTy subst) rtys1
 
