@@ -1241,17 +1241,17 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
             let !succFreq = f * prob
             setEdgeFreq block bi succFreq
             -- traceM $ "SetOut: " ++ show (block, bi, f, prob, succFreq)
-            when (bi == bhead) $ setBackProb block bi succFreq
+            when (Just bi == bhead) $ setBackProb block bi succFreq
 
 
-    let propFreq block head = do
+    let propFreq block mhead = do
             -- traceM ("prop:" ++ show (block,head))
             -- traceShowM block
 
             !v <- visited block
             if v then
                 return () --Dont look at nodes twice
-            else if block == head then
+            else if Just block == mhead then
                 setFreq block 1.0 -- Loop header frequency is always 1
             else do
                 let preds = IS.elems $ predecessors block
@@ -1263,7 +1263,7 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
                 if irreducible
                 then return () -- Rare we don't care
                 else do
-                    setFreq block 0
+                    setFreq block (if block == entry then 1 else 0)
                     !cycleProb <- sum <$> (forM preds $ \pred -> do
                         if isBackEdge pred block
                             then
@@ -1283,17 +1283,17 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
                     setFreq block (f / (1.0 - cycleProb))
 
             setVisited block
-            calcOutFreqs head block
+            calcOutFreqs mhead block
 
     -- Loops, by nesting, inner to outer
     forM_ loops $ \(head, body) -> do
         forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i True) -- Mark all nodes as visited.
         forM_ body (\i -> unsafeWrite visitedNodes i False) -- Mark all blocks reachable from head as not visited
-        forM_ body $ \block -> propFreq block head
+        forM_ body $ \block -> propFreq block (Just head)
 
     -- After dealing with all loops, deal with non-looping parts of the CFG
     forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i False) -- Everything in revPostOrder is reachable
-    forM_ revPostOrder $ \block -> propFreq block (head revPostOrder)
+    forM_ revPostOrder $ \block -> propFreq block Nothing
 
     -- trace ("Final freqs:") $ return ()
     -- let freqString = pprFreqs freqs
@@ -1304,6 +1304,8 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
 
     return (freqs', graph')
   where
+    entry = head revPostOrder
+
     -- How can these lookups fail? Consider the CFG [A -> B]
     predecessors :: Int -> IS.IntSet
     predecessors b = fromMaybe IS.empty $ IM.lookup b revGraph
