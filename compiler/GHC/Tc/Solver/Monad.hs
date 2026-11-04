@@ -2043,7 +2043,7 @@ setWantedDict :: TcEvDest -> CanonicalEvidence -> EvTerm -> TcS ()
 setWantedDict dest canonical tm
   = case dest of
       EvVarDest ev_id -> setEvBind (mkWantedEvBind ev_id canonical tm)
-      HoleDest h      -> pprPanic "setWantedEq: HoleDest" (ppr h)
+      HoleDest h      -> pprPanic "setWantedDict: HoleDest" (ppr h)
 
 fillCoercionHole :: CoercionHole -> CoercionPlusHoles -> TcS ()
 fillCoercionHole hole co_plus_holes

@@ -29,7 +29,7 @@ import GHC.Core.Reduction( Reduction, reductionCoercion )
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Core.Make
-import GHC.Core.Coercion( isReflCo, mkSubCo, hasCoercionHole )
+import GHC.Core.Coercion( isReflCo, mkSubCo, mkCoVarCo, coHoleCoVar, hasCoercionHole )
 import GHC.Core.Unify    ( tcMatchTyKis )
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -293,7 +293,23 @@ solveImplicationUsingUnsatGiven unsat_given
     go_simple ct = case ctEvidence ct of
       CtWanted (WantedCt { ctev_pred = pty, ctev_dest = dest })
         -> do { ev_expr <- unsatisfiableEvExpr unsat_given pty
-              ; setWantedDict dest EvNonCanonical $ EvExpr ev_expr }
+              ; case dest of
+                  EvVarDest {} -> setWantedDict dest EvNonCanonical $ EvExpr ev_expr
+                  -- Make sure to handle coercion holes (see #28081):
+                  --
+                  --   hole_co_var = <unsatisfiableEvExpr>
+                  --   {hole} := hole_co_var
+                  --
+                  -- See also Note [Deferred errors for coercion holes] in GHC.Tc.Errors.
+                  HoleDest hole ->
+                    do { let co_var = coHoleCoVar hole
+                       ; setEvBind $ mkWantedEvBind co_var EvNonCanonical (EvExpr ev_expr)
+                       ; setWantedEq dest $
+                           CPH { cph_co    = mkCoVarCo co_var
+                               , cph_holes = emptyCoHoleSet
+                               }
+                       }
+              }
       _ -> return ()
 
 -- | Create an evidence expression for an arbitrary constraint using
