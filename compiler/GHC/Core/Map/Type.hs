@@ -534,11 +534,6 @@ instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
                                       D env xs == D env' xs'
     _            == _               = False
 
-instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
-    D _   Nothing  == D _    Nothing   = True
-    D env (Just x) == D env' (Just x') = D env x  == D env' x'
-    _              == _                = False
-
 --------- Variable binders -------------
 
 -- | A 'BndrMap' is a 'TypeMapG' which allows us to distinguish between
@@ -548,46 +543,18 @@ instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
 -- we can disambiguate this by matching on the type (or kind, if this
 -- a binder in a type) of the binder.
 --
--- We also need to do the same for multiplicity! Which, since multiplicities are
--- encoded simply as a 'Type', amounts to have a Trie for a pair of types. Tries
--- of pairs are composition.
-newtype BndrMap a = BndrMap (TypeMapG (MaybeMap TypeMapG a))
-
--- TODO(22292): derive
-instance Functor BndrMap where
-    fmap f = \ (BndrMap tm) -> BndrMap (fmap (fmap f) tm)
-    {-# INLINE fmap #-}
-
-instance TrieMap BndrMap where
-   type Key BndrMap = Var
-   emptyTM  = BndrMap emptyTM
-   lookupTM = lkBndr emptyCME
-   alterTM  = xtBndr emptyCME
-   foldTM   = fdBndrMap
-   filterTM = ftBndrMap
-   mapMaybeTM = mpBndrMap
-
-fdBndrMap :: (a -> b -> b) -> BndrMap a -> b -> b
-fdBndrMap f (BndrMap tm) = foldTM (foldTM f) tm
-
-mpBndrMap :: (a -> Maybe b) -> BndrMap a -> BndrMap b
-mpBndrMap f (BndrMap tm) = BndrMap (fmap (mapMaybeTM f) tm)
+-- The map ignores the multiplicity of the binder.
+-- See Note [Binders] in GHC.Core.Map.Expr.
+type BndrMap = TypeMapG
 
 -- We need to use 'BndrMap' for 'Coercion', 'CoreExpr' AND 'Type', since all
 -- of these data types have binding forms.
 
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
-lkBndr env v (BndrMap tymap) = do
-  multmap <- lkG (D env (varType v)) tymap
-  lookupTM (D env <$> varMultMaybe v) multmap
+lkBndr env v m = lkG (D env (varType v)) m
 
-
-xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
-xtBndr env v xt (BndrMap tymap)  =
-  BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (D env <$> varMultMaybe v) xt))
-
-ftBndrMap :: (a -> Bool) -> BndrMap a -> BndrMap a
-ftBndrMap f (BndrMap tm) = BndrMap (fmap (filterTM f) tm)
+xtBndr :: CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
+xtBndr env v f = xtG (D env (varType v)) f
 
 --------- Variable occurrence -------------
 data VarMap a = VM { vm_bvar   :: BoundVarMap a  -- Bound variable

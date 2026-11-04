@@ -28,7 +28,6 @@ import GHC.Core.Map.Type
 import GHC.Core
 import GHC.Core.Type
 import GHC.Types.Tickish
-import GHC.Types.Var
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -85,6 +84,14 @@ Note [Binders]
      - the binders in an alternative
    because they are totally fixed by the context
 
+ * We ignore the multiplicity of all binders, in the trie and in
+   'eqDeBruijnExpr'. The multiplicity of a let binder has no meaning: see
+   Note [Multiplicity of let binders] in GHC.Types.Var. Core-to-core
+   passes do not keep the multiplicities of lambda binders correct: see
+   Note [Linting linearity] in GHC.Core.Lint. Thus two terms that differ
+   only in binder multiplicities are equal for CSE and for the
+   pattern-match checker (#28095).
+
 Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * For a key (Case e b ty (alt:alts))  we don't need to look the return type
@@ -104,6 +111,10 @@ See also Note [Empty case alternatives] in GHC.Core.
 
 -- | @CoreMap a@ is a map from 'CoreExpr' to @a@.  If you are a client, this
 -- is the type you want.
+--
+-- 'CoreMap' is not linear: it ignores the multiplicities of binders. Two
+-- expressions that differ only in the multiplicities of their lambda or let
+-- binders have the same key. See Note [Binders].
 newtype CoreMap a = CoreMap (CoreMapG a)
 
 -- TODO(22292): derive
@@ -163,7 +174,7 @@ eqDeBruijnExpr (D env1 e1) (D env2 e2) = go e1 e2 where
 
     go (Lam b1 e1)  (Lam b2 e2)
       =  eqDeBruijnType (D env1 (varType b1)) (D env2 (varType b2))
-      && D env1 (varMultMaybe b1) == D env2 (varMultMaybe b2)
+         -- Ignore multiplicities: see Note [Binders]
       && eqDeBruijnExpr (D (extendCME env1 b1) e1) (D (extendCME env2 b2) e2)
 
     go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)
@@ -200,7 +211,8 @@ eqDeBruijnTickish (D env1 t1) (D env2 t2) = go t1 t2 where
         && lext == rext
     go l r = l == r
 
--- Compares for equality, modulo alpha
+-- | Compares for equality, modulo alpha. Like 'CoreMap', it ignores the
+-- multiplicities of binders. See Note [Binders].
 eqCoreExpr :: CoreExpr -> CoreExpr -> Bool
 eqCoreExpr e1 e2 = eqDeBruijnExpr (deBruijnize e1) (deBruijnize e2)
 

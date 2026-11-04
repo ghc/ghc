@@ -6,6 +6,7 @@ description:
   expressions, each lookup of an expression with a non-recursive ``let``
   or join point failed. Thus CSE did not share identical bindings, and the
   pattern-match checker could report spurious non-exhaustive matches for
-  guards or view patterns with equal expressions.
+  guards or view patterns with equal expressions. ``CoreMap`` and
+  ``eqCoreExpr`` also ignore the multiplicities of binders.
 mrs: !16936
-issues: #27892
+issues: #27892 #28095
