@@ -802,8 +802,9 @@ loadInterface doc_str mod from
               -- Is this a module of a home unit?  If so, its interface goes
               -- into the HPT, not the EPS.  This only happens in one-shot mode,
               -- see Note [Home module load error].
-              -- GHC.Prim is special, it always goes into the EPS.
-              is_home_mod = HUG.memberHugUnitId mod_uid hug && mod /= gHC_PRIM
+              -- This includes GHC.Prim when compiling ghc-internal: its
+              -- (virtual) interface comes from 'readIface' like any other.
+              is_home_mod = HUG.memberHugUnitId mod_uid hug
         ; liftIO (lookupIfaceByModule hug eps mod) >>= \case {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
