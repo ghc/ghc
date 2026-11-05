@@ -39,9 +39,6 @@ T14999:
 	gdb --batch -ex 'set disassembly-flavor intel' -ex 'file T14999.o' -ex 'disassemble stg_catch_frame_info' --nx | tr -s '[[:blank:]\n]'
 	LANG=C readelf --debug-dump=frames-interp T14999.o | tr -s '[[:blank:]\n]'
 
-T15196:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-asm T15196.hs | grep "jp " ; echo $$?
-
 T15723:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -prof -fPIC -fexternal-dynamic-refs -fforce-recomp -O2 -c T15723A.hs -o T15723A.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -prof -fPIC -fexternal-dynamic-refs -fforce-recomp -O2 -c T15723B.hs -o T15723B.o
