@@ -1,4 +1,4 @@
-.. _multiline-strings:
+.. _qualified-strings:
 
 Qualified string literals
 -------------------------
