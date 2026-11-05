@@ -1,0 +1,35 @@
+CHECK-LABEL: Testing :set
+CHECK:       options currently set: none.
+CHECK-NEXT:  base language is: GHC2021
+CHECK-NEXT:  with the following modifiers:
+CHECK-NEXT:  GHCi-specific dynamic flag settings:
+CHECK-NEXT:  other dynamic, non-language, flag settings:
+CHECK:       -fimplicit-import-qualified
+CHECK:       warning settings:
+
+CHECK-LABEL: Testing :set -a
+CHECK:       options currently set: none.
+CHECK-NEXT:  base language is: GHC2021
+CHECK-NEXT:  all active language options:
+CHECK:       GHCi-specific dynamic flag settings:
+CHECK-NEXT:  -fno-print-explicit-foralls
+CHECK:       warning settings:
+CHECK:       -Wno-implicit-prelude
+
+CHECK-LABEL: Testing :show languages
+CHECK:       base language is: GHC2021
+CHECK-NEXT:  with the following modifiers:
+CHECK-NOT:   -X
+
+CHECK-LABEL: Testing :show languages, with -XMagicHash
+CHECK:       base language is: GHC2021
+CHECK-NEXT:  with the following modifiers:
+CHECK-NEXT:  -XMagicHash
+CHECK-NOT:   -X
+
+CHECK-LABEL: Testing :show packages
+CHECK:       active package flags: none
+
+CHECK-LABEL: Testing :show packages, including the ghc package
+CHECK:       active package flags:
+CHECK-NEXT:  -package ghc

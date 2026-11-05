@@ -1,0 +1,4 @@
+# Re-include files that the root .gitignore rules `_*` and `*.patch` hide.
+!__init__.py
+!__main__.py
+!patches/*.patch

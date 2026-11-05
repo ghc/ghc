@@ -3,8 +3,7 @@ setTestOpts(
   ])
 
 test('selfloop', [cmm_src], compile, ['-no-hs-main'])
-test('cmm_sink_sp', [ only_ways(['optasm']),
-                      grep_errmsg(r'(\[Sp.*\]).*(=).*(\[.*R1.*\]).*;',[1,2,3]),
+test('cmm_sink_sp', [ only_ways(['optasm']), filecheck_stderr,
                       cmm_src], compile, ['-no-hs-main -ddump-cmm -dsuppress-uniques -O'])
 
 test('T16930', normal, makefile_test, ['T16930'])
