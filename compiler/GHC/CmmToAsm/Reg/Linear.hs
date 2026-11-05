@@ -858,12 +858,9 @@ allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt
                    | otherwise -> doSpill WriteMem
                 Nothing | reading   ->
                    pprPanic "allocateRegsAndSpill: Cannot read from uninitialized register" (ppr vr)
-                   -- NOTE: if the input to the NCG contains some
-                   -- unreachable blocks with junk code, this panic
-                   -- might be triggered.  Make sure you only feed
-                   -- sensible code into the NCG.  In GHC.Cmm.Pipeline we
-                   -- call removeUnreachableBlocksProc at the end for this
-                   -- reason.
+                   -- NOTE: unreachable blocks with junk code could
+                   -- trigger this panic, so sccBlocks in
+                   -- GHC.CmmToAsm.Reg.Liveness discards them (#7574).
 
                         | otherwise -> doSpill WriteNew
 
