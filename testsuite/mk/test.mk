@@ -284,6 +284,15 @@ RUNTEST_OPTS += --config 'stats_files_dir=$(TOP)/tests/perf/haddock'
 
 RUNTEST_OPTS += -e "config.stage=$(GhcStage)"
 
+# CQ[filecheck-make-path]
+# Q: Why read hadrian's system.config here, when nothing else in the make
+#    path depends on ./configure having run?
+# A~ FileCheck is a testsuite tool, not a compiler setting, so ghc --info
+#    cannot supply it. An unconfigured tree yields an empty value and the
+#    driver falls back to $FILECHECK or _build/filecheck (see find_filecheck).
+FILECHECK ?= $(shell sed -n 's/^filecheck *= *//p' '$(TOP)/../hadrian/cfg/system.config' 2>/dev/null)
+RUNTEST_OPTS += -e 'config.filecheck=r"$(FILECHECK)"'
+
 ifneq "$(METRICS_FILE)" ""
 RUNTEST_OPTS +=  \
 	--metrics-file "$(METRICS_FILE)"

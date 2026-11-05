@@ -34,7 +34,8 @@ In this order, taking the first that exists:
    name.
 2. `_build/filecheck/bin/FileCheck` in the GHC tree, where
    `build_filecheck.py` installs to.
-3. What `./configure` found, passed by hadrian as `config.filecheck`.
+3. What `./configure` found, passed as `config.filecheck` by hadrian and by
+   `make -C testsuite/tests`, which reads it from `hadrian/cfg/system.config`.
    Configure searches `PATH` the way it does for `llc`: `FileCheck-23` down
    to `FileCheck-12` (the Debian and Ubuntu names), `FileCheck23` down to
    `FileCheck12` (the FreeBSD names), then plain `FileCheck`, and rejects a
