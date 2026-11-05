@@ -1283,6 +1283,43 @@ def check_stdout( f ):
 def _check_stdout( name, opts, f ):
     opts.check_stdout = f
 
+def filecheck_stderr(check_file=None, prefixes=None):
+    return lambda name, opts: _filecheck(name, opts, 'stderr', check_file, prefixes)
+
+def filecheck_stdout(check_file=None, prefixes=None):
+    return lambda name, opts: _filecheck(name, opts, 'stdout', check_file, prefixes)
+
+def _filecheck(name, opts, kind, check_file, prefixes):
+    # CQ[filecheck-missing-tool]
+    # Q: a framework failure per test makes a missing FileCheck loud, where
+    #    have_llvm() tests merely skip; is loud right for a tool only some
+    #    tests need?
+    if find_filecheck() is None:
+        framework_fail(name, None, 'FileCheck not found: set FILECHECK or '
+                       'config.filecheck, or run testsuite/driver/build_filecheck.py')
+        opts.skip = True
+    opts.filecheck[kind] = (name, check_file, prefixes or ['CHECK'])
+
+# CQ[filecheck-discovery]
+# Q: should configure find FileCheck like llc (FIND_LLVM_PROG) and hadrian
+#    pass it as config.filecheck, instead of this search from the driver?
+# CQ[filecheck-version-range]
+# Q: the versioned names mirror configure's LlvmMinVersion..LlvmMaxVersion;
+#    which FileCheck versions do the tests actually require?
+def find_filecheck() -> Optional[str]:
+    if config.filecheck is None:
+        built = config.top.parent / '_build' / 'filecheck' / 'bin' / 'FileCheck'
+        candidates = [os.environ.get('FILECHECK'), str(built), 'FileCheck'] \
+                     + ['FileCheck-%d' % v for v in range(23, 12, -1)]
+        for c in candidates:
+            found = shutil.which(c) if c else None
+            if found:
+                config.filecheck = found
+                break
+        else:
+            config.filecheck = ''
+    return config.filecheck or None
+
 def no_check_hp(name, opts):
     opts.check_hp = False
 
@@ -2850,6 +2887,12 @@ async def compare_outputs(
     actual_raw = read_no_crs(actual_path)
     actual_str = normaliser(actual_raw)
 
+    filecheck_opts = getTestOpts().filecheck.get(kind)
+    if filecheck_opts is not None:
+        actual_normalised_path = add_suffix(actual_path, 'normalised')
+        write_file(actual_normalised_path, actual_str)
+        return await run_filecheck(way, filecheck_opts, actual_normalised_path)
+
     # See Note [Output comparison].
     if whitespace_normaliser(expected_str) == whitespace_normaliser(actual_str):
         return CompareOutput(True)
@@ -2913,6 +2956,33 @@ async def compare_outputs(
                 write_file(out, actual_raw)
 
             return CompareOutput(False, read_diff(diff_file))
+
+async def run_filecheck(way: WayName,
+                        check: Tuple[TestName, Optional[str], List[str]],
+                        actual_path: Path) -> CompareOutput:
+    name, check_file, prefixes = check
+    if check_file is None:
+        check_file = add_hs_lhs_suffix(name)
+    # CQ[filecheck-platform-prefixes]
+    # Q: WS32/WS64 are always enabled, mirroring the -ws-NN golden suffixes;
+    #    should OS/arch prefixes follow (cf. find_expected_file's platform chain)?
+    prefixes = prefixes + ['WS' + config.wordsize]
+    report_path = add_suffix(actual_path, 'filecheck')
+    # CQ[filecheck-flags]
+    # Q: --allow-empty lets a CHECK-NOT-only file pass on empty output and
+    #    --allow-unused-prefixes tolerates WS32/WS64 absent from a file; is
+    #    the default --dump-input-context (5 lines) enough for Core dumps?
+    cmd = ('{0} "{1}" --input-file "{2}" --check-prefixes={3} '
+           '--allow-unused-prefixes --allow-empty --dump-input=fail'
+           ).format(find_filecheck(), os.path.relpath(in_srcdir(check_file)),
+                    actual_path, ','.join(prefixes))
+    if await runCmd(cmd, stderr=report_path) == 0:
+        report_path.unlink()
+        return CompareOutput(True)
+    report = read_diff(report_path)
+    if config.verbose >= 1 and _expect_pass(way):
+        print(report)
+    return CompareOutput(False, report, 'FileCheck report:')
 
 # Checks that each line from pattern_file is present in actual_file as
 # a substring or regex pattern depending on is_substring.
