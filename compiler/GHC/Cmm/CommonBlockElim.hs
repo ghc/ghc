@@ -59,6 +59,10 @@ import qualified Data.List.NonEmpty as NE
 -- hashes, and at most once otherwise. Previously, we were slower, and people
 -- rightfully complained: #10397
 
+-- Unreachable blocks in the input take part in deduplication like any other
+-- block. Eliminated blocks stay in the graph, unreachable; see
+-- Note [unreachable blocks] in GHC.Cmm.Pipeline.
+
 -- TODO: Use optimization fuel
 elimCommonBlocks :: CmmGraph -> CmmGraph
 elimCommonBlocks g =

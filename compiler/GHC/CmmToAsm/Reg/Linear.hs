@@ -862,7 +862,7 @@ allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt
                    -- unreachable blocks with junk code, this panic
                    -- might be triggered.  Make sure you only feed
                    -- sensible code into the NCG.  In GHC.Cmm.Pipeline we
-                   -- call removeUnreachableBlocks at the end for this
+                   -- call removeUnreachableBlocksProc at the end for this
                    -- reason.
 
                         | otherwise -> doSpill WriteNew

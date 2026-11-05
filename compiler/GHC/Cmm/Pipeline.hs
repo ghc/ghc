@@ -353,10 +353,21 @@ _GLOBAL_OFFSET_TABLE_, regardless of which entry point we arrived via.
 
 {- Note [unreachable blocks]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
-The control-flow optimiser sometimes leaves unreachable blocks behind
-containing junk code.  These aren't necessarily a problem, but
-removing them is good because it might save time in the native code
-generator later.
+The control-flow optimiser and common block elimination leave
+unreachable blocks behind containing junk code.  These aren't
+necessarily a problem, but removing them is good because it might save
+time in the native code generator later.
+
+Any pass that rebuilds the graph from revPostorder drops them as a side
+effect.  Normally the first such pass after the first round of
+control-flow optimisation is stack layout, so every pass in between may
+encounter unreachable blocks.  removeUnreachableBlocksProc at the end of
+cpsTop removes the blocks orphaned by the second round of control-flow
+optimisation, along with their info tables.
+
+Unreachable blocks are not entirely harmless though: callProcPoints, for
+example, folds over the whole block map, so a call in an unreachable
+block caused the panic in #27368.
 
 To make unreachable blocks visible in -ddump-cmm-* output, add -dppr-debug.
 -}
