@@ -32,6 +32,12 @@ class Context:
 
     negative_matches_start: int | None = field(default=None)
 
+    last_match_start: int | None = field(default=None)
+    """
+    Start of the match made by the current check line, if any. Marks the end of the
+    range searched by the preceding CHECK-NOTs.
+    """
+
 
 @dataclass
 class Matcher:
@@ -193,6 +199,8 @@ class Matcher:
         if op.name != "NOT":
             if self.ctx.negative_matches_start is not None:
                 end = self.file.range.start
+                if self.ctx.last_match_start is not None:
+                    end = self.ctx.last_match_start
                 # catch cases where the CHECK-NOT is followed by CHECK-DAG
                 # in that case, go until the first "hole" in the region
                 disc = self.file.is_discontigous()
@@ -210,6 +218,7 @@ class Matcher:
                 # reset the state
                 self.ctx.negative_matches_start = None
                 self.ctx.negative_matches_stack = []
+        self.ctx.last_match_start = None
         if self.opts.match_full_lines and op.name != "DAG":
             # DAG ops don't advance the file position to the end of the match
             # (they record holes instead), so the position check doesn't apply.
@@ -295,6 +304,7 @@ class Matcher:
         """
         pattern, repl = compile_uops(op, self.ctx.live_variables, self.opts)
         if match := self.file.match(pattern):
+            self.record_match_start(match)
             self.file.move_to(match.end(0))
             self.capture_results(match, repl, op)
         else:
@@ -308,10 +318,19 @@ class Matcher:
         """
         pattern, repl = compile_uops(op, self.ctx.live_variables, self.opts)
         if match := self.file.find(pattern, op.name == "SAME"):
+            self.record_match_start(match)
             self.file.move_to(match.end())
             self.capture_results(match, repl, op)
         else:
             raise CheckError(f'Couldn\'t match "{op.arg}".', op)
+
+    def record_match_start(self, match: re.Match[str]):
+        """
+        Remember where the current check line first matched (a CHECK-COUNT matches
+        several times, and the range of a preceding CHECK-NOT ends at the first one).
+        """
+        if self.ctx.last_match_start is None:
+            self.ctx.last_match_start = match.start(0)
 
     def fail_op(self, op: CheckOp):
         """
