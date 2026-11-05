@@ -45,7 +45,7 @@ import Control.Monad
 -- In this situation we say that we shortcut L2 to L3. One of the
 -- consequences of shortcutting is that some blocks of code may become
 -- unreachable (in the example above this is true for L2). See
--- Note [unreachable blocks] in GHC.Cmm.Pipeline.
+-- Note [Unreachable blocks in the Cmm pipeline] in GHC.Cmm.Pipeline.
 
 
 -- Note [Control-flow optimisations]
@@ -342,7 +342,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
 -- A block whose count drops to 0 is unreachable. maybe_concat deletes it
 -- only when concatenating it with its predecessor. Shortcutting and
 -- replaceLabels leave unreachable blocks in the graph. See
--- Note [unreachable blocks] in GHC.Cmm.Pipeline.
+-- Note [Unreachable blocks in the Cmm pipeline] in GHC.Cmm.Pipeline.
 incPreds, decPreds :: BlockId -> LabelMap Int -> LabelMap Int
 incPreds bid edges = mapInsertWith (+) bid 1 edges
 decPreds bid edges = case mapLookup bid edges of
