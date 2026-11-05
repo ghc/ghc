@@ -291,7 +291,7 @@ class TestResult:
     expected_failures, framework_failures, framework_warnings, unexpected_passes,
     unexpected_failures, unexpected_stat_failures lists of TestRun.
     """
-    __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr', 'diff', 'runtime'
+    __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr', 'diff', 'diff_label', 'runtime'
     def __init__(self,
                  directory: str,
                  testname: TestName,
@@ -300,6 +300,7 @@ class TestResult:
                  stdout: Optional[str]=None,
                  stderr: Optional[str]=None,
                  diff: Optional[str]=None,
+                 diff_label: Optional[str]=None,
                  runtime: Optional[float]=None) -> None:
         self.directory = directory
         self.testname = testname
@@ -308,6 +309,8 @@ class TestResult:
         self.stdout = stdout
         self.stderr = stderr
         self.diff = diff
+        # Heading for diff in reports, None for the default one
+        self.diff_label = diff_label
         self.runtime = runtime # Walltime
 
 # A performance metric measured in this test run.

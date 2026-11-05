@@ -1844,6 +1844,7 @@ async def do_test(name: TestName,
                                                  stdout=result.stdout,
                                                  stderr=result.stderr,
                                                  diff=result.diff,
+                                                 diff_label=result.diff_label,
                                                  runtime=runtime))
     elif result.passed:
         if _expect_pass(way):
@@ -1867,6 +1868,7 @@ async def do_test(name: TestName,
                                 stdout=result.stdout,
                                 stderr=result.stderr,
                                 diff=result.diff,
+                                diff_label=result.diff_label,
                                 runtime=runtime)
                 t.unexpected_failures.append(tr)
         else:
@@ -2053,7 +2055,8 @@ async def do_compile(name: TestName,
                                                          "whitespace_normaliser",
                                                          normalise_whitespace))
         if not stderr_match:
-            return failBecause('stderr mismatch', diff=stderr_match.diff)
+            return failBecause('stderr mismatch', diff=stderr_match.diff,
+                               diff_label=stderr_match.diff_label)
 
     opts = getTestOpts()
     if isGenericStatsTest():
@@ -2474,13 +2477,15 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
         return failBecause('bad stderr',
                            stderr=None if stderr_match.diff else read_stderr(name),
                            stdout=read_stdout(name),
-                           diff=stderr_match.diff)
+                           diff=stderr_match.diff,
+                           diff_label=stderr_match.diff_label)
     stdout_match = CompareOutput(True) if opts.ignore_stdout else await stdout_ok(name, way)
     if not stdout_match:
         return failBecause('bad stdout',
                            stderr=read_stderr(name),
                            stdout=None if stdout_match.diff else read_stdout(name),
-                           diff=stdout_match.diff)
+                           diff=stdout_match.diff,
+                           diff_label=stdout_match.diff_label)
 
     check_hp = '-hT' in my_rts_flags and opts.check_hp
     check_prof = '-p' in my_rts_flags
@@ -2593,7 +2598,8 @@ async def interpreter_run(name: TestName,
         return failBecause('bad stderr',
                            stderr=None if stderr_match.diff else read_stderr(name),
                            stdout=read_stdout(name),
-                           diff=stderr_match.diff)
+                           diff=stderr_match.diff,
+                           diff_label=stderr_match.diff_label)
     stdout_match = CompareOutput(True) if opts.ignore_stdout else await stdout_ok(name, way)
     if not stdout_match:
         if _expect_pass(way):
@@ -2601,7 +2607,8 @@ async def interpreter_run(name: TestName,
         return failBecause('bad stdout',
                            stderr=read_stderr(name),
                            stdout=None if stdout_match.diff else read_stdout(name),
-                           diff=stdout_match.diff)
+                           diff=stdout_match.diff,
+                           diff_label=stdout_match.diff_label)
     return passed()
 
 def split_file(in_fn: Path, delimiter: str, out1_fn: Path, out2_fn: Path):
@@ -2634,10 +2641,12 @@ def get_compiler_flags() -> List[str]:
     return flags
 
 class CompareOutput:
-    __slots__ = 'ok', 'diff'
-    def __init__(self, ok: bool, diff: Optional[str]=None) -> None:
+    __slots__ = 'ok', 'diff', 'diff_label'
+    def __init__(self, ok: bool, diff: Optional[str]=None,
+                 diff_label: Optional[str]=None) -> None:
         self.ok = ok
         self.diff = diff
+        self.diff_label = diff_label
     def __bool__(self) -> bool:
         return self.ok
 
@@ -3763,7 +3772,8 @@ def printTestOutputSummary(file: TextIO,
             result.testname, ', '.join(ways), result.directory + os.sep, result.reason)
         file.write(colored_if(color, Color.RED, header) + '\n')
         # See Note [Redundant output in test results] for why these don't overlap.
-        for label, contents in [('Output diff (expected vs actual):', diff),
+        diff_label = result.diff_label or 'Output diff (expected vs actual):'
+        for label, contents in [(diff_label, diff),
                                 ('Captured stdout:', result.stdout),
                                 ('Captured stderr:', result.stderr)]:
             if contents and contents.strip():

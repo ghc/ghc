@@ -15,6 +15,7 @@ PassFail = NamedTuple('PassFail',
                        ('stderr', Optional[str]),
                        ('stdout', Optional[str]),
                        ('diff', Optional[str]),
+                       ('diff_label', Optional[str]),
                        ('hc_opts', Optional[str]),
                        ])
 
@@ -28,16 +29,19 @@ def passed(hc_opts=None) -> PassFail:
                     stderr=None,
                     stdout=None,
                     diff=None,
+                    diff_label=None,
                     hc_opts=hc_opts)
 
 def failBecause(reason: str,
                 tag: Optional[str]=None,
                 stderr: Optional[str]=None,
                 stdout: Optional[str]=None,
-                diff: Optional[str]=None
+                diff: Optional[str]=None,
+                diff_label: Optional[str]=None
                 ) -> PassFail:
     return PassFail(passed=False, reason=reason, tag=tag,
-                    stderr=stderr, stdout=stdout, diff=diff, hc_opts=None)
+                    stderr=stderr, stdout=stdout, diff=diff,
+                    diff_label=diff_label, hc_opts=None)
 
 def strip_quotes(s: str) -> str:
     # Don't wrap commands to subprocess.call/Popen in quotes.
