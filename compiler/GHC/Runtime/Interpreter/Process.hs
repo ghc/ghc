@@ -48,7 +48,7 @@ sendTHComputation
   :: Binary a
   => ExtInterpInstance d
   -> (InboxId -> Message a)
-  -> (forall b. Binary b => THMessage b -> IO (Bool, b))
+  -> (forall b. Binary b => (forall a. IO a -> IO a) -> THMessage b -> IO (Bool, b))
   -- ^ Handle one message. Return True to end the loop.
   -> IO a
 sendTHComputation i mkMsg reqHandler = mask $ \ restore -> do
@@ -73,9 +73,9 @@ sendTHComputation i mkMsg reqHandler = mask $ \ restore -> do
         Left _   -> pure ()
         Right r -> disposeMessageResults i msg r
     proc = instProcess i
-    handleOne mbox doneRef = do
+    handleOne mbox doneRef = mask $ \ restore -> do
       handleRemoteTHCall (interpPipe proc) mbox $ \_setCancel req -> do
-        (stop, res) <- reqHandler req
+        (stop, res) <- reqHandler restore req
         writeIORef doneRef stop
         return res
     handlerLoop mbox = do

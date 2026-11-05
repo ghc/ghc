@@ -1170,8 +1170,8 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
             recovers <- newIORef []
             withForeignRef fhv $ \st ->
               withForeignRefs finRefs $ \qrefs ->
-                sendTHComputation inst (\ii -> RunModFinalizers ii st qrefs) $ \msg ->
-                  runInIO (runRemoteTH recovers msg)
+                sendTHComputation inst (\ii -> RunModFinalizers ii st qrefs) $ \restore msg ->
+                  runInIO (runRemoteTH recovers restore msg)
           checkQResult qr
 
 runQResult
@@ -1828,8 +1828,8 @@ runTH ty fhv = do
         recovers <- newIORef []
         withForeignRef rstate $ \state_hv ->
           withForeignRef fhv $ \q_hv ->
-            sendTHComputation inst (\ii -> RunTH ii state_hv q_hv ty (Just loc)) $ \msg ->
-              runInIO (runRemoteTH recovers msg)
+            sendTHComputation inst (\ii -> RunTH ii state_hv q_hv ty (Just loc)) $ \restore msg ->
+              runInIO (runRemoteTH recovers restore msg)
       bs <- checkQResult qr
       return $! runGet get (LB.fromStrict bs)
 
@@ -1839,9 +1839,10 @@ runTH ty fhv = do
 runRemoteTH
   :: Binary a
   => IORef [Messages TcRnMessage] -- ^ saved from nested calls to qRecover
+  -> (forall a. IO a -> IO a)
   -> THMessage a
   -> TcM (Bool, a)
-runRemoteTH recovers msg = do
+runRemoteTH recovers restore msg = do
   case msg of
     RunTHDone -> return (True, ())
     StartRecover -> do -- Note [TH recover with -fexternal-interpreter]
@@ -1864,7 +1865,7 @@ runRemoteTH recovers msg = do
       writeIORef recovers rest & liftIO
       return (False, ())
     _other -> do
-      (False,) <$> handleTHMessage msg
+      (False,) <$> handleTHMessage restore msg
 
 -- | Check a QResult
 checkQResult :: QResult a -> TcM a
@@ -1936,8 +1937,12 @@ wrapTHResult tcm = do
     Left e -> return (THException (show e))
     Right a -> return (THComplete a)
 
-handleTHMessage :: THMessage a -> TcM a
-handleTHMessage msg = case msg of
+handleTHMessage :: (forall a. IO a -> IO a) -> THMessage a -> TcM a
+handleTHMessage restore (AddModFinalizer r) = do
+  interp <- hscInterp <$> getTopEnv
+  fref <- liftIO (mkFinalizedHValue interp r)
+  withRunInIO $ \runInIO -> restore $ runInIO $ wrapTHResult $ addModFinalizerRef fref
+handleTHMessage restore msg = withRunInIO $ \runInIO -> restore $ runInIO $ case msg of
   NewName a -> wrapTHResult $ runQinTcM $ TH.newName a
   Report b str -> wrapTHResult $ runQinTcM $ TH.report b str
   LookupName b str -> wrapTHResult $ runQinTcM $ TH.lookupName b str
@@ -1954,9 +1959,6 @@ handleTHMessage msg = case msg of
   AddDependentFile f -> wrapTHResult $ runQinTcM $ TH.addDependentFile f
   AddDependentDirectory d -> wrapTHResult $ runQinTcM $ TH.addDependentDirectory d
   AddTempFile s -> wrapTHResult $ runQinTcM $ TH.addTempFile s
-  AddModFinalizer r -> do
-    interp <- hscInterp <$> getTopEnv
-    wrapTHResult $ liftIO (mkFinalizedHValue interp r) >>= addModFinalizerRef
   AddCorePlugin str -> wrapTHResult $ runQinTcM $ TH.addCorePlugin str
   AddTopDecls decs -> wrapTHResult $ runQinTcM $ TH.addTopDecls decs
   AddForeignFilePath lang str -> wrapTHResult $ runQinTcM $ TH.addForeignFilePath lang str
