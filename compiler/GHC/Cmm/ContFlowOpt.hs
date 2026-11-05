@@ -67,7 +67,7 @@ import Control.Monad
 --
 -- Blocks are processed using postorder DFS traversal. A side effect
 -- of determining traversal order with a graph search is elimination
--- of any blocks that are unreachable in the input.
+-- of any blocks that are unreachable.
 --
 -- Transformations are improved by working from the end of the graph
 -- towards the beginning, because we may be able to perform many
