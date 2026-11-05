@@ -1,0 +1,51 @@
+Delimit comment prefixes like check prefixes
+
+Comment prefixes were matched as bare substrings anywhere before the check
+prefix, so a line like
+
+    -- COMPILER CHECK: foo
+
+was silently dropped because of the "COM" in "COMPILER". LLVM's FileCheck
+only recognises a comment directive when the prefix is delimited and
+followed by a colon ("COM:", "RUN:"), and the line is a comment when such
+a directive precedes the check prefix. Note that tests/filecheck/comments.test
+upstream relies on the old substring behaviour ("COM this will be ignored
+CHECK: ...") and needs the colon added.
+
+Upstream: https://github.com/AntonLydike/filecheck (not yet submitted)
+---
+diff --git a/testsuite/driver/vendor/filecheck/parser.py b/testsuite/driver/vendor/filecheck/parser.py
+index 7038739fbb4..3c4aca3c1f5 100644
+--- a/testsuite/driver/vendor/filecheck/parser.py
++++ b/testsuite/driver/vendor/filecheck/parser.py
+@@ -29,11 +29,12 @@ from filecheck.regex import (
+ 
+ def pattern_for_opts(opts: Options) -> tuple[re.Pattern[str], re.Pattern[str]]:
+     prefixes = f"({'|'.join(map(re.escape, opts.check_prefixes))})"
++    comment_prefixes = f"({'|'.join(map(re.escape, opts.comment_prefixes))})"
+     return re.compile(
+         r"(^|[^a-zA-Z-_])"
+         + prefixes
+         + r"(-(DAG|COUNT-\d+|NOT|EMPTY|NEXT|SAME|LABEL))?(\{LITERAL})?:([^\n]*)\n?"
+-    ), re.compile(f"({'|'.join(map(re.escape, opts.comment_prefixes))}).*{prefixes}")
++    ), re.compile(r"(^|[^a-zA-Z-_])" + comment_prefixes + ":")
+ 
+ 
+ # see https://llvm.org/docs/CommandGuide/FileCheck.html#filecheck-string-substitution-blocks
+@@ -97,13 +98,13 @@ class Parser(Iterator[CheckOp]):
+             line = self.input.readline()
+             if line == "":
+                 raise StopIteration()
+-            # skip any lines containing comment markers before checks
+-            if self.comment_line_regexp.search(line) is not None:
+-                continue
+             match = self.check_line_regexp.search(line)
+             # no check line = skip
+             if match is None:
+                 continue
++            # a comment directive before the check prefix makes the line a comment
++            if self.comment_line_regexp.search(line, 0, match.start(2)) is not None:
++                continue
+             prefix = match.group(2)
+             kind = match.group(4)
+             literal = match.group(5)

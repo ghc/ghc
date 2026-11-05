@@ -29,11 +29,12 @@ from filecheck.regex import (
 
 def pattern_for_opts(opts: Options) -> tuple[re.Pattern[str], re.Pattern[str]]:
     prefixes = f"({'|'.join(map(re.escape, opts.check_prefixes))})"
+    comment_prefixes = f"({'|'.join(map(re.escape, opts.comment_prefixes))})"
     return re.compile(
         r"(^|[^a-zA-Z-_])"
         + prefixes
         + r"(-(DAG|COUNT-\d+|NOT|EMPTY|NEXT|SAME|LABEL))?(\{LITERAL})?:([^\n]*)\n?"
-    ), re.compile(f"({'|'.join(map(re.escape, opts.comment_prefixes))}).*{prefixes}")
+    ), re.compile(r"(^|[^a-zA-Z-_])" + comment_prefixes + ":")
 
 
 # see https://llvm.org/docs/CommandGuide/FileCheck.html#filecheck-string-substitution-blocks
@@ -97,12 +98,12 @@ class Parser(Iterator[CheckOp]):
             line = self.input.readline()
             if line == "":
                 raise StopIteration()
-            # skip any lines containing comment markers before checks
-            if self.comment_line_regexp.search(line) is not None:
-                continue
             match = self.check_line_regexp.search(line)
             # no check line = skip
             if match is None:
+                continue
+            # a comment directive before the check prefix makes the line a comment
+            if self.comment_line_regexp.search(line, 0, match.start(2)) is not None:
                 continue
             prefix = match.group(2)
             kind = match.group(4)
