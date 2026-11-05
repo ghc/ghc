@@ -42,20 +42,32 @@ In this order, taking the first that exists:
 ### Distribution packages
 
 Checked against the package file lists or build recipes on 2026-11-05, not by
-installing each one.
+installing each one. Versions below LLVM 12 do not work (see above).
 
 | System | Package | Binary | Found automatically? |
 | --- | --- | --- | --- |
-| Debian, Ubuntu | `llvm-NN-tools` | `/usr/bin/FileCheck-NN` | yes |
+| Debian 11+, Ubuntu 20.04+ | `llvm-NN-tools` | `/usr/bin/FileCheck-NN` | yes |
+| Debian 9, 10, Ubuntu 18.04 | `llvm-NN-tools` from [apt.llvm.org](https://apt.llvm.org) | `/usr/bin/FileCheck-NN` | yes |
 | Fedora | `llvm` | `/usr/bin/FileCheck` | yes |
+| Rocky 8, 9 | `llvm` | `/usr/bin/FileCheck` | yes |
+| Alpine 3.16+ | `llvmNN-test-utils` | `/usr/lib/llvmNN/bin/FileCheck` | no, set `FILECHECK` |
 | Arch | `llvm` | `/usr/bin/FileCheck` | yes |
 | Homebrew | `llvm` (keg-only) | `$(brew --prefix llvm)/bin/FileCheck` | no, set `FILECHECK` |
 | Nix | `llvmPackages.llvm` | `bin/FileCheck` of that package | yes, once in `PATH` |
-| FreeBSD | `llvmNN` (`LIT` option, on by default) | `/usr/local/bin/FileCheckNN` | no, set `FILECHECK` |
-| MSYS2 | `mingw-w64-<env>-llvm` | `FileCheck.exe` in the environment's `bin` | yes, in that shell |
+| FreeBSD, DragonFly | `llvmNN` (`LIT` option, on by default) | `/usr/local/bin/FileCheckNN` | no, set `FILECHECK` |
+| MSYS2 (all environments, including CLANGARM64) | `mingw-w64-<env>-llvm` | `FileCheck.exe` in the environment's `bin` | yes, in that shell |
 
-Not checked: the official `clang+llvm-*` release bindists (which GHC's CI
-images install LLVM from) and LLVM's Windows installer.
+The Debian and Ubuntu packages exist for amd64, i386, arm64, armhf, ppc64el,
+s390x, riscv64 and loong64 (loong64 in unstable only).
+
+Sources that do **not** ship FileCheck, so use the build script below:
+
+- the official `clang+llvm-*` release tarballs and the LLVM Windows
+  installer, which are built without `LLVM_INSTALL_UTILS`
+- llvm-mingw
+- MacPorts `llvm-NN`
+- OpenBSD's `devel/llvm`, which removes it on purpose
+- Alpine 3.12 to 3.15, whose only `-test-utils` package is LLVM 10
 
 The Debian package is the cheapest route: it is a few hundred kB and does not
 pull in the rest of LLVM. For example, on Ubuntu 24.04:
