@@ -339,10 +339,10 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
 -- Functions for incrementing and decrementing number of predecessors. If
 -- decrementing would set the predecessor count to 0, we remove entry from the
 -- map.
--- Invariant: if a block has no predecessors it should be dropped from the
--- graph because it is unreachable. maybe_concat is constructed to maintain
--- that invariant, but calling replaceLabels may introduce unreachable blocks.
--- See Note [unreachable blocks] in GHC.Cmm.Pipeline.
+-- A block whose count drops to 0 is unreachable. maybe_concat deletes it
+-- only when concatenating it with its predecessor. Shortcutting and
+-- replaceLabels leave unreachable blocks in the graph. See
+-- Note [unreachable blocks] in GHC.Cmm.Pipeline.
 incPreds, decPreds :: BlockId -> LabelMap Int -> LabelMap Int
 incPreds bid edges = mapInsertWith (+) bid 1 edges
 decPreds bid edges = case mapLookup bid edges of
