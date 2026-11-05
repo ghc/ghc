@@ -238,6 +238,7 @@ runTestBuilderArgs = builder Testsuite ? do
     (testEnv, testMetricsFile) <- expr . liftIO $
         (,) <$> lookupEnv "TEST_ENV" <*> lookupEnv "METRICS_FILE"
     perfBaseline <- expr . liftIO $ lookupEnv "PERF_BASELINE_COMMIT"
+    filecheck <- expr $ setting FileCheck
     targetWrapper <- expr . liftIO $ lookupEnv "CROSS_EMULATOR"
 
     threads     <- shakeThreads <$> expr getShakeOptions
@@ -282,6 +283,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ "config.package_conf_cache_file=" ++ show pkgConfCacheFile
 
             , arg "-e", arg $ "config.libdir=" ++ show libdir
+            , arg "-e", arg $ "config.filecheck=" ++ show filecheck
 
 
             , arg "-e", arg $ "config.have_interp=" ++ show withInterpreter

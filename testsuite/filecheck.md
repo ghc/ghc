@@ -17,7 +17,7 @@ Installing FileCheck
 Without a `FileCheck` binary every test that uses it is reported as a
 framework failure and skipped:
 
-    FileCheck not found: set FILECHECK or config.filecheck, or run
+    FileCheck not found: pass FILECHECK=... to configure, or run
     testsuite/driver/build_filecheck.py
 
 Any LLVM 12 or newer should do. The directives and the regex dialect have not
@@ -30,31 +30,35 @@ supported LLVM version range.
 
 In this order, taking the first that exists:
 
-1. `config.filecheck`, which nothing in configure or hadrian sets yet. It can
-   be set with `-e config.filecheck=...` when invoking `runtests.py`
-   directly.
-2. The `FILECHECK` environment variable, a path or a command name.
-3. `_build/filecheck/bin/FileCheck` in the GHC tree, where
+1. The `FILECHECK` environment variable at test time, a path or a command
+   name.
+2. `_build/filecheck/bin/FileCheck` in the GHC tree, where
    `build_filecheck.py` installs to.
-4. `FileCheck` on `PATH`, then `FileCheck-23` down to `FileCheck-13`, the
-   names Debian-style packages use.
+3. What `./configure` found, passed by hadrian as `config.filecheck`.
+   Configure searches `PATH` the way it does for `llc`: `FileCheck-23` down
+   to `FileCheck-12` (the Debian and Ubuntu names), `FileCheck23` down to
+   `FileCheck12` (the FreeBSD names), then plain `FileCheck`, and rejects a
+   version outside that range. `./configure FILECHECK=/path/to/FileCheck`
+   overrides the search, which is needed where the binary is not on `PATH`
+   (Alpine, Homebrew). The result is in configure's summary under "Using
+   LLVM tools".
 
 ### Distribution packages
 
 Checked against the package file lists or build recipes on 2026-11-05, not by
 installing each one. Versions below LLVM 12 do not work (see above).
 
-| System | Package | Binary | Found automatically? |
+| System | Package | Binary | Found by configure? |
 | --- | --- | --- | --- |
 | Debian 11+, Ubuntu 20.04+ | `llvm-NN-tools` | `/usr/bin/FileCheck-NN` | yes |
 | Debian 9, 10, Ubuntu 18.04 | `llvm-NN-tools` from [apt.llvm.org](https://apt.llvm.org) | `/usr/bin/FileCheck-NN` | yes |
 | Fedora | `llvm` | `/usr/bin/FileCheck` | yes |
 | Rocky 8, 9 | `llvm` | `/usr/bin/FileCheck` | yes |
-| Alpine 3.16+ | `llvmNN-test-utils` | `/usr/lib/llvmNN/bin/FileCheck` | no, set `FILECHECK` |
+| Alpine 3.16+ | `llvmNN-test-utils` | `/usr/lib/llvmNN/bin/FileCheck` | no, pass `FILECHECK=` |
 | Arch | `llvm` | `/usr/bin/FileCheck` | yes |
-| Homebrew | `llvm` (keg-only) | `$(brew --prefix llvm)/bin/FileCheck` | no, set `FILECHECK` |
+| Homebrew | `llvm` or `llvm@NN` (keg-only) | `$(brew --prefix llvm)/bin/FileCheck` | no, pass `FILECHECK=` |
 | Nix | `llvmPackages.llvm` | `bin/FileCheck` of that package | yes, once in `PATH` |
-| FreeBSD, DragonFly | `llvmNN` (`LIT` option, on by default) | `/usr/local/bin/FileCheckNN` | no, set `FILECHECK` |
+| FreeBSD, DragonFly | `llvmNN` (`LIT` option, on by default) | `/usr/local/bin/FileCheckNN` | yes |
 | MSYS2 (all environments, including CLANGARM64) | `mingw-w64-<env>-llvm` | `FileCheck.exe` in the environment's `bin` | yes, in that shell |
 
 The Debian and Ubuntu packages exist for amd64, i386, arm64, armhf, ppc64el,

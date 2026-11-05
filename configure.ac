@@ -583,6 +583,20 @@ FIND_LLVM_PROG([LLVMAS], [clang], [$LlvmMinVersion], [$LlvmMaxVersion])
 LlvmAsCmd="$LLVMAS"
 AC_SUBST([LlvmAsCmd])
 
+dnl ** Which LLVM FileCheck to use? (testsuite only)
+dnl --------------------------------------------------------------
+# CQ[filecheck-version-range]
+# Q: FileCheck is independent of the LLVM backend, so why the backend's
+#    LlvmMaxVersion as the upper bound, and what fixes the floor at 12?
+# A~ FIND_LLVM_PROG needs a finite range to enumerate the suffixed names
+#    (FileCheck-NN, FileCheckNN). The testsuite passes
+#    --allow-unused-prefixes, which appeared in LLVM 12.
+FileCheckMinVersion=12  # inclusive
+AC_ARG_VAR(FILECHECK,[Use as the path to LLVM's FileCheck, for the testsuite [default=autodetect]])
+FIND_LLVM_PROG([FILECHECK], [FileCheck], [$FileCheckMinVersion], [$LlvmMaxVersion])
+FileCheckCmd="$FILECHECK"
+AC_SUBST([FileCheckCmd])
+
 dnl --------------------------------------------------------------
 dnl End of configure script option section
 dnl --------------------------------------------------------------
@@ -1077,7 +1091,8 @@ echo "\
       llc          : $LlcCmd
       opt          : $OptCmd
       llvm-as      : $LlvmAsCmd
-      llvm-dlltool : $DlltoolCmd"
+      llvm-dlltool : $DlltoolCmd
+      FileCheck    : $FileCheckCmd"
 
 if test "$HSCOLOUR" = ""; then
 echo "

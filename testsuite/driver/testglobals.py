@@ -129,9 +129,9 @@ class TestConfig:
         # Do we have a functional LLVM toolchain?
         self.have_llvm = False
 
-        # LLVM's FileCheck, for filecheck_stderr and filecheck_stdout
-        # (None: look for it when first needed, see find_filecheck)
-        self.filecheck = None # type: Optional[str]
+        # LLVM's FileCheck as found by configure, for filecheck_stderr and
+        # filecheck_stdout (empty: none found, see find_filecheck)
+        self.filecheck = ''
 
         # Do we have vanilla libraries?
         self.have_vanilla = False

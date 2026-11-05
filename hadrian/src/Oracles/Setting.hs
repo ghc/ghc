@@ -62,6 +62,7 @@ data ProjectSetting =
              | HostPlatformFull
              | BourneShell
              | EmsdkVersion
+             | FileCheck
 
 -- | Things which configure how a specific stage is built
 data BuildSetting =
@@ -105,6 +106,7 @@ setting key = lookupSystemConfig $ case key of
     HostPlatformFull   -> "host-platform-full"
     BourneShell        -> "bourne-shell"
     EmsdkVersion       -> "emsdk-version"
+    FileCheck          -> "filecheck"
 
 buildSetting :: BuildSetting -> Stage -> Action String
 buildSetting key stage = tgtConfig stage $ case key of

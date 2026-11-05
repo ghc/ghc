@@ -1295,30 +1295,18 @@ def _filecheck(name, opts, kind, check_file, prefixes):
     #    have_llvm() tests merely skip; is loud right for a tool only some
     #    tests need?
     if find_filecheck() is None:
-        framework_fail(name, None, 'FileCheck not found: set FILECHECK or '
-                       'config.filecheck, or run testsuite/driver/build_filecheck.py')
+        framework_fail(name, None, 'FileCheck not found: pass FILECHECK=... to '
+                       'configure, or run testsuite/driver/build_filecheck.py')
         opts.skip = True
     opts.filecheck[kind] = (name, check_file, prefixes or ['CHECK'])
 
-# CQ[filecheck-discovery]
-# Q: should configure find FileCheck like llc (FIND_LLVM_PROG) and hadrian
-#    pass it as config.filecheck, instead of this search from the driver?
-# CQ[filecheck-version-range]
-# Q: the versioned names mirror configure's LlvmMinVersion..LlvmMaxVersion;
-#    which FileCheck versions do the tests actually require?
 def find_filecheck() -> Optional[str]:
-    if config.filecheck is None:
-        built = config.top.parent / '_build' / 'filecheck' / 'bin' / 'FileCheck'
-        candidates = [os.environ.get('FILECHECK'), str(built), 'FileCheck'] \
-                     + ['FileCheck-%d' % v for v in range(23, 12, -1)]
-        for c in candidates:
-            found = shutil.which(c) if c else None
-            if found:
-                config.filecheck = found
-                break
-        else:
-            config.filecheck = ''
-    return config.filecheck or None
+    built = config.top.parent / '_build' / 'filecheck' / 'bin' / 'FileCheck'
+    for c in [os.environ.get('FILECHECK'), str(built), config.filecheck]:
+        found = shutil.which(c) if c else None
+        if found:
+            return found
+    return None
 
 def no_check_hp(name, opts):
     opts.check_hp = False
