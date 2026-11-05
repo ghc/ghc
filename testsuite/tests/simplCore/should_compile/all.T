@@ -149,7 +149,7 @@ test('T7785', [ only_ways(['optasm']),
       compile, ['-ddump-cse'])
 
 # One module, T7803.hs, has OPTIONS_GHC -ddump-simpl; the checks are in there too.
-test('T7803', [ filecheck_stderr ],
+test('T7803', [ filecheck_stderr() ],
      multimod_compile, ['T7803', '-O2 -v0 -dsuppress-all -dsuppress-uniques -dno-typeable-binds'])
 
 test('T7702',
