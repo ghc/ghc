@@ -668,7 +668,7 @@ checkDependencies hsc_env summary iface
                                             (Set.map ((SpliceLevel),) (dep_plugin_pkgs (mi_deps iface))))
 
    classify st _ (Found _ mod)
-    | (toUnitId $ moduleUnit mod) `elem` all_home_units = Right (Left ((st, toUnitId $ moduleUnit mod, moduleName mod)))
+    | toUnitId (moduleUnit mod) `Set.member` all_home_units = Right (Left ((st, toUnitId $ moduleUnit mod, moduleName mod)))
     | otherwise = Right (Right (moduleNameFS (moduleName mod), (st, toUnitId $ moduleUnit mod)))
    classify _ reason _ = Left (RecompBecause reason)
 
