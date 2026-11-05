@@ -37,21 +37,9 @@ static int ticks_to_eventlog_flush = 0;
 #endif
 
 
-/*
- * Function: handle_tick()
- *
- * At each occurrence of a tick, the OS timer will invoke
- * handle_tick().
- */
-static
-void
-handle_tick(void *unused STG_UNUSED)
+static void handleProfTimerTick(void *unused STG_UNUSED)
 {
-  handleProfTick(); // Bad or worse: see issue #27250.
-
-#if defined(THREADED_IDLEGC)
-  handleIdleGcTick();
-#endif
+    handleProfTick();   //TODO: short-cut this indirection.
 }
 
 static void handleCtxSwitchTimerTick(void *unused STG_UNUSED)
@@ -80,9 +68,17 @@ static void handleEventLogTimerTick(void *unused STG_UNUSED)
 }
 #endif
 
-static Timer *main_timer      = NULL;
+#if defined(THREADED_IDLEGC)
+static void handleIdleGcTimerTick(void *unused STG_UNUSED)
+{
+    handleIdleGcTick();  //TODO: short-cut this indirection.
+}
+#endif
+
+static Timer *prof_timer      = NULL;
 static Timer *ctxswitch_timer = NULL;
 static Timer *eventlog_timer  = NULL;
+static Timer *idlegc_timer    = NULL;
 
 void initTimers(void)
 {
@@ -90,17 +86,12 @@ void initTimers(void)
     initProfTimer();
 
     /* initTimer is called in the child of a fork */
-    if (main_timer) {
-        reinitTimer(main_timer);
-    } else if (RtsFlags.MiscFlags.tickInterval != 0) {
-        main_timer = newPeriodicTimer(handle_tick, NULL,
-                                      TimerHandlerShortRunning,
+    if (prof_timer) {
+        reinitTimer(prof_timer);
+    } else if (RtsFlags.MiscFlags.tickInterval > 0) {
+        prof_timer = newPeriodicTimer(handleProfTimerTick, NULL,
+                                      TimerHandlerLongRunning,
                                       RtsFlags.MiscFlags.tickInterval);
-    //TODO: using TickerHandlerShortRunning is fine for context switching, and
-    // plausibly also ok for profile sampling but is way out for eventlog
-    // flushing. The eventlog flush does a global synchronisation of all
-    // capabilities and I/O! And with eventlog providers, it calls arbitrary
-    // user code. This is not ok! See issue #27250.
     }
 
     if (ctxswitch_timer) {
@@ -121,14 +112,24 @@ void initTimers(void)
     }
 #endif
 
+#if defined(THREADED_IDLEGC)
+    if (idlegc_timer) {
+        reinitTimer(idlegc_timer);
+    } else if (RtsFlags.MiscFlags.tickInterval > 0) {
+        idlegc_timer = newPeriodicTimer(handleIdleGcTimerTick, NULL,
+                                        TimerHandlerLongRunning,
+                                        RtsFlags.MiscFlags.tickInterval);
+    }
+#endif
+
 #endif
 }
 
 void startTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (main_timer) {
-        runTimer(main_timer);
+    if (prof_timer) {
+        runTimer(prof_timer);
     }
     if (ctxswitch_timer) {
         runTimer(ctxswitch_timer);
@@ -136,14 +137,17 @@ void startTimers(void)
     if (eventlog_timer) {
         runTimer(eventlog_timer);
     }
+    if (idlegc_timer) {
+        runTimer(idlegc_timer);
+    }
 #endif
 }
 
 void pauseTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (main_timer) {
-        pauseTimer(main_timer);
+    if (prof_timer) {
+        pauseTimer(prof_timer);
     }
     if (ctxswitch_timer) {
         pauseTimer(ctxswitch_timer);
@@ -151,14 +155,17 @@ void pauseTimers(void)
     if (eventlog_timer) {
         pauseTimer(eventlog_timer);
     }
+    if (idlegc_timer) {
+        pauseTimer(idlegc_timer);
+    }
 #endif
 }
 
 void unpauseTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (main_timer) {
-        unpauseTimer(main_timer);
+    if (prof_timer) {
+        unpauseTimer(prof_timer);
     }
     if (ctxswitch_timer) {
         unpauseTimer(ctxswitch_timer);
@@ -166,15 +173,18 @@ void unpauseTimers(void)
     if (eventlog_timer) {
         unpauseTimer(eventlog_timer);
     }
+    if (idlegc_timer) {
+        unpauseTimer(idlegc_timer);
+    }
 #endif
 }
 
 void exitTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (main_timer) {
-        haltTimer(main_timer);
-        freeTimer(main_timer);
+    if (prof_timer) {
+        haltTimer(prof_timer);
+        freeTimer(prof_timer);
     }
     if (ctxswitch_timer) {
         haltTimer(ctxswitch_timer);
@@ -183,6 +193,10 @@ void exitTimers(void)
     if (eventlog_timer) {
         haltTimer(eventlog_timer);
         freeTimer(eventlog_timer);
+    }
+    if (idlegc_timer) {
+        haltTimer(idlegc_timer);
+        freeTimer(idlegc_timer);
     }
 #endif
 }
