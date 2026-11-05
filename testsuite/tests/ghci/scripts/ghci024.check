@@ -12,7 +12,7 @@ CHECK:       options currently set: none.
 CHECK-NEXT:  base language is: GHC2021
 CHECK-NEXT:  all active language options:
 CHECK:       GHCi-specific dynamic flag settings:
-CHECK-NEXT:  -fno-print-explicit-foralls
+CHECK:       -fno-print-explicit-foralls
 CHECK:       warning settings:
 CHECK:       -Wno-implicit-prelude
 
