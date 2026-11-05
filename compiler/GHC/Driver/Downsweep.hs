@@ -415,7 +415,7 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
 downsweepInstalledModules :: HscEnv -> [Module] -> IO ModuleGraph
 downsweepInstalledModules hsc_env mods = do
     let
-        (home_mods, external_mods) = partition (\u -> moduleUnitId u `elem` hsc_all_home_unit_ids hsc_env) mods
+        (home_mods, external_mods) = partition (\u -> moduleUnitId u `Set.member` hsc_all_home_unit_ids hsc_env) mods
         installed_mods = map (fst . getModuleInstantiation) home_mods
         external_uids = map moduleUnitId external_mods
 
