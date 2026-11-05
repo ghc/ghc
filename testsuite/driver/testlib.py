@@ -40,6 +40,9 @@ from collections import OrderedDict
 
 from _elffile import ELFFile
 
+# Vendored packages, see vendor/README.md
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'vendor'))
+
 import asyncio
 import contextvars
 
@@ -1282,6 +1285,20 @@ def check_stdout( f ):
 
 def _check_stdout( name, opts, f ):
     opts.check_stdout = f
+
+def filecheck_stderr(check_file=None, prefixes=None):
+    return lambda name, opts: _filecheck(name, opts, 'stderr', check_file, prefixes)
+
+def filecheck_stdout(check_file=None, prefixes=None):
+    return lambda name, opts: _filecheck(name, opts, 'stdout', check_file, prefixes)
+
+def _filecheck(name, opts, kind, check_file, prefixes):
+    # CQ[filecheck-python-floor]
+    # Q: configure accepts Python >= 3.7 but the vendored filecheck needs 3.10;
+    #    skip silently, or raise the floor (deb11/alpine3_12 CI images)?
+    if sys.version_info < (3, 10):
+        opts.skip = True
+    opts.filecheck[kind] = (name, check_file, prefixes or ['CHECK'])
 
 def no_check_hp(name, opts):
     opts.check_hp = False
@@ -2841,6 +2858,12 @@ async def compare_outputs(
     actual_raw = read_no_crs(actual_path)
     actual_str = normaliser(actual_raw)
 
+    filecheck_opts = getTestOpts().filecheck.get(kind)
+    if filecheck_opts is not None:
+        actual_normalised_path = add_suffix(actual_path, 'normalised')
+        write_file(actual_normalised_path, actual_str)
+        return run_filecheck(way, filecheck_opts, actual_normalised_path)
+
     # See Note [Output comparison].
     if whitespace_normaliser(expected_str) == whitespace_normaliser(actual_str):
         return CompareOutput(True)
@@ -2904,6 +2927,34 @@ async def compare_outputs(
                 write_file(out, actual_raw)
 
             return CompareOutput(False, read_diff(diff_file))
+
+def run_filecheck(way: WayName,
+                  check: Tuple[TestName, Optional[str], List[str]],
+                  actual_path: Path) -> CompareOutput:
+    from filecheck.matcher import Matcher
+    from filecheck.options import Options
+    import filecheck.colors
+    # CQ[filecheck-colors]
+    # Q: COLOR_SUPPORT is computed from sys.stdout.isatty() at import time; is
+    #    overriding the module global the intended way to get plain output?
+    filecheck.colors.COLOR_SUPPORT = False
+
+    name, check_file, prefixes = check
+    if check_file is None:
+        check_file = add_hs_lhs_suffix(name)
+    # CQ[filecheck-platform-prefixes]
+    # Q: WS32/WS64 are always enabled, mirroring the -ws-NN golden suffixes;
+    #    should OS/arch prefixes follow (cf. find_expected_file's platform chain)?
+    opts = Options(match_filename=str(in_srcdir(check_file)),
+                   input_file=str(actual_path),
+                   check_prefixes=prefixes + ['WS' + config.wordsize])
+    matcher = Matcher.from_opts(opts)
+    matcher.stderr = io.StringIO()
+    ok = matcher.run() == 0
+    report = matcher.stderr.getvalue()
+    if not ok and config.verbose >= 1 and _expect_pass(way):
+        print(report)
+    return CompareOutput(ok, None if ok else report)
 
 # Checks that each line from pattern_file is present in actual_file as
 # a substring or regex pattern depending on is_substring.

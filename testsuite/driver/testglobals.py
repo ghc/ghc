@@ -466,6 +466,11 @@ class TestOptions:
        # output, and a normaliser function given other test options
        self.check_stdout = None # type: Optional[Callable[[Path, OutputNormalizer], bool]]
 
+       # FileCheck-style checks instead of a golden file, per output kind
+       # ('stdout'/'stderr'): the test name, the check file (None: the test's
+       # source file) and the enabled check prefixes.
+       self.filecheck = {} # type: Dict[str, Tuple[TestName, Optional[str], List[str]]]
+
        # Check .hp file when profiling libraries are available?
        self.check_hp = True
 
