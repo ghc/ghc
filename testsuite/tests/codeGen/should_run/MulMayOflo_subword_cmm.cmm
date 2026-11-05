@@ -1,0 +1,40 @@
+#include "Cmm.h"
+
+// Regression test for the in-place sign-extension in do_mul_may_oflo.
+// The local 'a' must remain zero-extended after %mulmayoflo, because it is
+// returned to Haskell as a Word.
+runMulMayOfloSubword8zh (W_ x, W_ y) {
+    I8 a, b, needed;
+    a = %lobits8(x);
+    b = %lobits8(y);
+    needed = %mulmayoflo(a, b);
+    if (needed != 0::I8) {
+        return (0);
+    } else {
+        return (%zx64(a));
+    }
+}
+
+runMulMayOfloSubword16zh (W_ x, W_ y) {
+    I16 a, b, needed;
+    a = %lobits16(x);
+    b = %lobits16(y);
+    needed = %mulmayoflo(a, b);
+    if (needed != 0::I16) {
+        return (0);
+    } else {
+        return (%zx64(a));
+    }
+}
+
+runMulMayOfloSubword32zh (W_ x, W_ y) {
+    I32 a, b, needed;
+    a = %lobits32(x);
+    b = %lobits32(y);
+    needed = %mulmayoflo(a, b);
+    if (needed != 0::I32) {
+        return (0);
+    } else {
+        return (%zx64(a));
+    }
+}

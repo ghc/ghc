@@ -1099,7 +1099,10 @@ getRegister' config plat expr =
     do_mul_may_oflo w@W64 x y = do
       (reg_x, format_x, code_x) <- getSomeReg x
       (reg_y, format_y, code_y) <- getSomeReg y
-      -- TODO: Can't we clobber reg_x and reg_y to save registers?
+      -- Sign-extend into fresh registers: the operands may be locals which
+      -- are still live after this operation.
+      (reg_x', code_x') <- signExtendReg (formatToWidth format_x) W64 reg_x
+      (reg_y', code_y') <- signExtendReg (formatToWidth format_y) W64 reg_y
       lo <- getNewRegNat II64
       hi <- getNewRegNat II64
       -- TODO: Overhaul CSET: 3rd operand isn't needed for SNEZ
@@ -1109,12 +1112,12 @@ getRegister' config plat expr =
           (intFormat w)
           ( \dst ->
               code_x
-                `appOL` signExtend (formatToWidth format_x) W64 reg_x reg_x
+                `appOL` code_x'
                 `appOL` code_y
-                `appOL` signExtend (formatToWidth format_y) W64 reg_y reg_y
+                `appOL` code_y'
                 `appOL` toOL
-                  [ annExpr expr (MULH (OpReg w hi) (OpReg w reg_x) (OpReg w reg_y)),
-                    MUL (OpReg w lo) (OpReg w reg_x) (OpReg w reg_y),
+                  [ annExpr expr (MULH (OpReg w hi) (OpReg w reg_x') (OpReg w reg_y')),
+                    MUL (OpReg w lo) (OpReg w reg_x') (OpReg w reg_y'),
                     SRA (OpReg w lo) (OpReg w lo) (OpImm (ImmInt (widthInBits W64 - 1))),
                     ann
                       (text "Set flag if result of MULH contains more than sign bits.")
@@ -1144,15 +1147,19 @@ getRegister' config plat expr =
           if use32BitMul
             then do
               narrowedReg <- getNewRegNat II64
+              -- Sign-extend into fresh registers: the operands may be locals
+              -- which are still live after this operation.
+              (reg_x', code_x') <- signExtendReg (formatToWidth format_x) W32 reg_x
+              (reg_y', code_y') <- signExtendReg (formatToWidth format_y) W32 reg_y
               pure
                 $ Any
                   (intFormat w)
                   ( \dst ->
                       code_x
-                        `appOL` signExtend (formatToWidth format_x) W32 reg_x reg_x
+                        `appOL` code_x'
                         `appOL` code_y
-                        `appOL` signExtend (formatToWidth format_y) W32 reg_y reg_y
-                        `snocOL` annExpr expr (MUL (OpReg W32 dst) (OpReg W32 reg_x) (OpReg W32 reg_y))
+                        `appOL` code_y'
+                        `snocOL` annExpr expr (MUL (OpReg W32 dst) (OpReg W32 reg_x') (OpReg W32 reg_y'))
                         `appOL` signExtendAdjustPrecission W32 w dst narrowedReg
                         `appOL` toOL
                           [ ann

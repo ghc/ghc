@@ -1,0 +1,13 @@
+section: compiler
+synopsis: Fix the RISC-V NCG sign-extending MulMayOflo operands in place, corrupting live subword values
+issues: #28131
+mrs: !16999
+
+description: {
+  ``do_mul_may_oflo`` sign-extended its operands into their own registers. For
+  subword widths this violated the zero-extended subword invariant when an
+  operand was a local that remained live after the operation.
+
+  The operands are now sign-extended into fresh registers, leaving the original
+  values untouched.
+}

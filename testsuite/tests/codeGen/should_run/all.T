@@ -245,6 +245,19 @@ test('MulMayOflo_full',
         ignore_stdout],
      multi_compile_and_run,
      ['MulMayOflo', [('MulMayOflo_full.cmm', '')], ''])
+# Enable this wherever it can run, so that code-generator bugs are revealed.
+# The only reasonable exclusion is the PPC NCG: its MULLO instruction has no
+# byte/halfword form, so lowering a subword %mulmayoflo there would panic (see
+# PPC/Ppr.hs). An unregisterised PPC compiler lowers %mulmayoflo to
+# hs_mulIntMayOflo instead and can run the test.
+test('MulMayOflo_subword',
+     [ req_cmm
+     , when(
+         (arch('powerpc64') or arch('powerpc64le')) and not unregisterised(),
+         skip
+       )
+     ], multi_compile_and_run,
+     ['MulMayOflo_subword', [('MulMayOflo_subword_cmm.cmm', '')], ''])
 test('T24264run', normal, compile_and_run, [''])
 test('T24295a', normal, compile_and_run, ['-O -floopification'])
 test('T24295b', normal, compile_and_run, ['-O -floopification -fpedantic-bottoms'])
