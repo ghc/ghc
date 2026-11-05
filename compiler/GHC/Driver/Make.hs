@@ -424,7 +424,7 @@ load how_much = loadWithCache noIfaceCache mkUnknownDiagnostic how_much
 
 mkBatchMsg :: HscEnv -> Messager
 mkBatchMsg hsc_env =
-  if length (hsc_all_home_unit_ids hsc_env) > 1
+  if Set.size (hsc_all_home_unit_ids hsc_env) > 1
     -- This also displays what unit each module is from.
     then batchMultiMsg
     else batchMsg
