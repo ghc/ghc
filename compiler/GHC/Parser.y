@@ -3322,7 +3322,7 @@ acmd    :: { LHsCmdTop GhcPs }
 
 cvtopbody :: { (AnnList,LocatedA [LHsDecl GhcPs]) }
         :  '{'            cvtopdecls0 '}'      { (AnnList (EpExplicitBraces (epTok $1) (epTok $3)) [],sLLa $1 $> $2) }
-        |      vocurly    cvtopdecls0 close    { (AnnList (EpVirtualBraces (glR $1)) [],sLLa $1 (listLocation $2) $2) }
+        |      vocurly    cvtopdecls0 close    { (pal $ AnnList (epVirtualBraces (glR $1) (L (locA (listLocation $2)) ())) [],sLLa $1 (listLocation $2) $2) }
 
 cvtopdecls0 :: { [LHsDecl GhcPs] }
         : topdecls_semi         { cvTopDecls $1 }
