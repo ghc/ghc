@@ -33,4 +33,7 @@ The various ways that GHC supports are defined in `config/ghc`
 
 Please see the more extensive documentation [here][1].
 
+Tests that check their output with LLVM's FileCheck, and how to get the
+`FileCheck` binary they need, are described in [filecheck.md](filecheck.md).
+
   [1]: https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests
