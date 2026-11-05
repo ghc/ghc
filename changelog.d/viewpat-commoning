@@ -1,0 +1,25 @@
+section: compiler
+issues: #28084
+mrs: !16937
+synopsis: ViewPatterns commoning improvements
+description:
+
+  When using :extension:`ViewPatterns`, GHC attempts to group occurrences of the
+  same view expression in multiple branches of a function definition or case
+  expression, e.g. ::
+
+    f (expensive -> False) = ...
+    f (expensive -> True) = ...
+
+  This avoids applying the ``expensive`` expression more than once. This
+  optimisation has been broken for most view expressions, including the above
+  example, since GHC 8.0.1, and has been restored in this release.
+
+  Note that :ghc-flag:`common subexpression elimination <-fcse>`, which is
+  enabled under :ghc-flag:`-O`, could often recover this optimisation, limiting
+  the impact of the bug on optimised programs.
+
+  The limited notion of when two view pattern expressions are "the same" has
+  also been extended to support type applications and expressions with a type
+  signature. See the "Efficiency" section of :extension:`ViewPatterns` for more
+  details.

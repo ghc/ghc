@@ -78,3 +78,5 @@ test('T25065b', normal, compile_and_run, [''])
 test('Or5', exit_code(1), compile_and_run, [''])
 
 test('LazyFieldAnnotationsSemantics', normal, compile_and_run, [''])
+
+test('viewpat-commoning', normal, compile_and_run, [''])

@@ -133,10 +133,10 @@ follows:
 
    The current notion of when two view pattern expressions are "the
    same" is very restricted: it is not even full syntactic equality.
-   However, it does include variables, literals, applications, and
-   tuples; e.g., two instances of ``view ("hi", "there")`` will be
-   collected. However, the current implementation does not compare up to
-   alpha-equivalence, so two instances of ``(x, view x -> y)`` will not
-   be coalesced.
+   However, it does include variables, literals, applications, type
+   applications, expressions with a type signature, and tuples; e.g.,
+   two instances of ``view ("hi", "there")`` will be collected. However,
+   the current implementation does not compare up to alpha-equivalence,
+   so two instances of ``(x, view x -> y)`` will not be coalesced.
 
 

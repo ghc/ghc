@@ -1158,10 +1158,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
       wrap h h' && exp e e'
     exp (XExpr (ExpandedThingTc (HSE _ x))) (XExpr (ExpandedThingTc (HSE _ x')))
       = lexp x x'
-    exp (HsVar _ i) (HsVar _ i') = i == i'
-    exp (HsIPVar _ i) (HsIPVar _ i') =
-      -- the instance for IPName derives using the id, so follow the HsVar case
-      i == i'
+    exp (HsVar _ i) (HsVar _ i') = i `eqLocated` i'
     exp (XExpr (ConLikeTc c)) (XExpr (ConLikeTc c')) = c == c'
     exp (HsOverLit _ l) (HsOverLit _ l') =
         -- Overloaded lits are equal if they have the same type
@@ -1172,25 +1169,19 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
         -- (presumably to improve sharing)
         eqType (overLitType l) (overLitType l') && l == l'
     exp (HsApp _ e1 e2) (HsApp _ e1' e2') = lexp e1 e1' && lexp e2 e2'
-    -- the fixities have been straightened out by now, so it's safe
-    -- to ignore them?
-    exp (OpApp _ l g ri) (OpApp _ l' o' ri') =
-        lexp l l' && lexp g o' && lexp ri ri'
     exp (NegApp _ e n) (NegApp _ e' n') = lexp e e' && syn_exp n n'
-    exp (SectionL _ e1 e2) (SectionL _ e1' e2') =
-        lexp e1 e1' && lexp e2 e2'
-    exp (SectionR _ e1 e2) (SectionR _ e1' e2') =
-        lexp e1 e1' && lexp e2 e2'
     exp (ExplicitTuple _ es1 _) (ExplicitTuple _ es2 _) =
         eq_list tup_arg es1 es2
     exp (ExplicitSum _ _ _ e) (ExplicitSum _ _ _ e') = lexp e e'
     exp (HsIf _ e e1 e2) (HsIf _ e' e1' e2') =
         lexp e e' && lexp e1 e1' && lexp e2 e2'
+    exp (HsAppType t e _) (HsAppType t' e' _) = t `eqType` t' && lexp e e'
+    exp (ExprWithTySig _ (L _ e) _) e' = exp e e'
+    exp e (ExprWithTySig _ (L _ e') _) = exp e e'
 
     -- Enhancement: could implement equality for more expressions
     --   if it seems useful
-    -- But no need for HsLit, ExplicitList, ExplicitTuple,
-    -- because they cannot be functions
+    -- But no need for HsLit, ExplicitList because they cannot be functions
     exp _ _  = False
 
     ---------
