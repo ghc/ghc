@@ -1,0 +1,11 @@
+section: ghc-pkg
+synopsis: Add --always-use-cache flag
+mrs: !16941
+
+description: {
+Added a flag `--always-use-cache` to `ghc-pkg`, which forces use of
+`package.cache` regardless of its timestamp. This is intended for use
+in scenarios where timestamps are unreliable but the user has reason
+to trust the validity of the cache, for example the Buck2 build system
+doesn't guarantee to maintain timestamps on build artifacts.
+}
