@@ -5,10 +5,14 @@ stg_sink_things ( P_ x1 )
     W_ res;
     W_ x2, x3, x4, x5, x6;
 
-    // Should produce a series of loads that are sunk into
-    // stores to Sp like this:
-    //    I64[Sp - 64] = I64[R1 + 1];   // CmmStore
-    //    I64[Sp - 56] = I64[R1 + 2];   // CmmStore
+    // Each load must be sunk into its store to Sp, none bound to a
+    // local first:
+    // CHECK-NOT: {{::I64 = I64\[R1}}
+    // CHECK:     I64[Sp - 8] = I64[R1 + 4];
+    // CHECK:     I64[Sp - 16] = I64[R1 + 8];
+    // CHECK:     I64[Sp - 24] = I64[R1 + 12];
+    // CHECK:     I64[Sp - 32] = I64[R1 + 16];
+    // CHECK:     I64[Sp - 40] = I64[R1 + 20];
     x2 = W_[x1+4];
     x3 = W_[x1+8];
     x4 = W_[x1+12];
