@@ -2733,19 +2733,23 @@ tryEtaReduce rec_ids bndrs body eval_sd
       = fmap (Tick t) $ go bs e co
       -- Float app ticks: \x -> Tick t (e x) ==> Tick t e
 
-    go all_bs@(b : bs) all_e@(App fun (Type arg_ty)) co
-      = case ok_ty_arg b fun arg_ty co of
-           Just co' -> go bs fun co'
-           Nothing  -> go_finish all_bs all_e co
-                       -- Want to go to the finish case; see the call
-                       -- to (all isTyVar remaining_bndrs) there
+    go all_bs@(b : bs) all_e@(App fun (Type arg_ty)) mco
+      | Just tv <- getTyVar_maybe arg_ty
+      , b == tv
+      , Just co' <- mkEtaReduceForAllMCo (exprType fun) tv mco
+      = go bs fun co'
+      | otherwise
+      = go_finish all_bs all_e mco
+        -- Want to go to the finish case; see the call
+        -- to (all isTyVar remaining_bndrs) there
 
-    go (b : bs) (App fun val_arg) co
-      = case ok_val_arg b fun val_arg co of
-           Nothing           -> Nothing
-           Just (co', ticks) -> fmap (flip (foldr mkTick) ticks) $
-                                go bs fun co'
-               -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
+    go (b : bs) (App fun val_arg) mco
+      | Just (v, arg_mco, arg_ticks) <- getTrivialHead_maybe val_arg
+      , b == v
+      , Just co' <- mkEtaReduceFunCo (exprType fun) arg_mco mco
+      = fmap (flip (foldr mkTick) arg_ticks) $
+        go bs fun co'
+        -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
 
     go bs fun co = go_finish bs fun co
 
@@ -2814,74 +2818,63 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ok_lam v = isTyVar v || isEvId v
     -- See Note [Eta reduction soundness], point (EtaT)
 
-    ---------------
-    ok_ty_arg :: TyVar -> CoreExpr -> Type -> MCoercion -> Maybe MCoercion
-    ok_ty_arg bndr fun arg_ty mco
-      | Just tv <- getTyVar_maybe arg_ty
-      , bndr == tv
-      = mkEtaReduceForAllMCo (exprType fun) tv mco
-      | otherwise
-      = Nothing
 
-    ---------------
-    ok_val_arg :: Id               -- Of type bndr_ty
-               -> CoreExpr         -- Function, of type (arg_ty -> res_ty)
-               -> CoreExpr         -- Argument, of type arg_ty
-               -> MCoercion        -- Of kind (res_ty ~ res_ty')
-               -> Maybe ( MCoercion  -- Of type (arg_ty -> res_ty ~  bndr_ty -> res_ty')
-                                     --   (and similarly for tyvars, coercion args)
-                        , [CoreTickish])
-         -- See Note [Eta reduction with casted arguments]
+-----------------
+getTrivialHead_maybe :: CoreExpr -> Maybe (Id, MCoercion, [CoreTickish])
+-- (go e) returns (Just (fn, co,ts))
+-- if `e` looks like (Tick ts (fn |> co)) and ts are floatable
+-- So  co :: fn_ty ~ arg_ty
 
-    ok_val_arg bndr fun arg res_mco
-      | Just (arg_mco, arg_ticks) <- go arg
-      = case (arg_mco, res_mco) of
-          (MRefl, MRefl) -> Just (MRefl, arg_ticks)  -- Very common
-          _ | Just (ftf, mult, arg_ty, res_ty) <- splitFunTy_maybe (exprType fun)
-            , let arg_co  = mCoToCo Representational arg_ty arg_mco
-                  res_co  = mCoToCo Representational res_ty res_mco
-                  mult_co = multToCo mult
-                  fun_co  = mkFunCo Representational ftf mult_co (mkSymCo arg_co) res_co
-                            -- ftf: assumes no change of FunTyFlag, looks fine
-            -> Just (MCo fun_co, arg_ticks)
-            | otherwise
-            -> Nothing
-      | otherwise
-      = Nothing
+getTrivialHead_maybe (Var v)
+   = Just (v, MRefl, [])
 
-      where
-        go :: CoreExpr -> Maybe (MCoercion, [CoreTickish])
-        -- (go e) returns (Just (co,ts))
-        -- if `e` looks like (Tick ts (bndr |> co)) and ts are floatable
-        -- So  co :: bndr_ty ~ arg_ty
-        go (Var v)
-           | bndr == v    -- See Historical note (EtaMult)
-           = Just (MRefl, [])
+getTrivialHead_maybe (Cast e co_outer)
+   = do { (v, mco_inner, ticks) <- getTrivialHead_maybe e
+        ; return (v, mco_inner `mkTransMCoL` co_outer, ticks) }
 
-        go (Cast e co_outer)
-           = do { (mco_inner, ticks) <- go e
-                ; return (mco_inner `mkTransMCoL` co_outer, ticks) }
+getTrivialHead_maybe (Tick t arg)
+   | tickishFloatable t
+   = do { (v, co, ticks) <- getTrivialHead_maybe arg
+        ; return (v, co, t:ticks) }
 
-        go (Tick t arg)
-           | tickishFloatable t
-           = do { (co, ticks) <- go arg; return (co, t:ticks) }
+getTrivialHead_maybe _ = Nothing
 
-        go _ = Nothing
+-----------------
+mkEtaReduceFunCo :: Type -> MCoercion -> MCoercion -> Maybe MCoercion
+mkEtaReduceFunCo _ MRefl MRefl
+  = Just MRefl    -- Very common case
+mkEtaReduceFunCo fun_ty arg_mco res_mco
+  | Just (ftf, mult, arg_ty, res_ty) <- splitFunTy_maybe fun_ty
+  , let arg_co  = mCoToCo Representational arg_ty arg_mco
+        res_co  = mCoToCo Representational res_ty res_mco
+        mult_co = multToCo mult
+  = Just (MCo (mkFunCo Representational ftf mult_co (mkSymCo arg_co) res_co))
+                       -- ftf: assumes no change of FunTyFlag, looks fine
+  | otherwise
+  = Nothing
+  where
 
+-----------------
 mkEtaReduceForAllMCo :: Type -> TyVar -> MCoercion -> Maybe MCoercion
 -- Very similar to mkEtaForAllMCo, but with
 -- the visibilities the other way around.  Tiresome.
+--   mkEtaReduceForAllMCo (forall a[vis]. ty) (co :: ty1 ~ ty2)
+--   = ForAllCo a[vis]~[spec]. ty1 ~ ty2
+-- where `coreTyLamForAllTyFlag` is  [spec]
 mkEtaReduceForAllMCo fun_ty tv mco
-  | Just (Bndr _ vis, fun_ty_body) <- splitForAllForAllTyBinder_maybe fun_ty
-  , let mk_fco co = Just $ MCo $
-                    mkForAllCo tv vis coreTyLamForAllTyFlag MRefl co
+  | Just (Bndr fun_tv vis, fun_ty_body) <- splitForAllForAllTyBinder_maybe fun_ty
+  , let refl_co = mkRepReflCo fun_ty_body
+        mco' = case mco of
+          MRefl  | isCoreTyLamForAllTyFlag vis
                     -- The lambda we are eta-reducing always has visibility
                     -- 'coreTyLamForAllTyFlag' which may or may not match the
                     -- visibility on the inner function (#24014)
-  = case mco of
-      MRefl | isCoreTyLamForAllTyFlag vis -> Just MRefl
-            | otherwise                   -> mk_fco (mkRepReflCo fun_ty_body)
-      MCo co                              -> mk_fco co
+                 -> MRefl
+                 | otherwise
+                 -> MCo $ mkForAllCo fun_tv vis coreTyLamForAllTyFlag MRefl refl_co
+          MCo co -> MCo $ mkForAllCo tv     vis coreTyLamForAllTyFlag MRefl co
+  = Just mco'
+
   | otherwise
   = Nothing
 
