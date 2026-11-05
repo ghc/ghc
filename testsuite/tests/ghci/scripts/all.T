@@ -52,7 +52,7 @@ test('ghci022', normal, ghci_script, ['ghci022.script'])
 
 test('ghci023', normal, ghci_script, ['ghci023.script'])
 test('ghci024',
-     [req_interp, when(fast(), skip)],
+     [req_interp, when(fast(), skip), filecheck_stdout('ghci024.check')],
      makefile_test, [])
 test('T9367',
      [req_interp, when(fast() or config.os != 'mingw32', skip)],
