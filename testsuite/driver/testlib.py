@@ -2954,16 +2954,41 @@ def run_filecheck(way: WayName,
     # CQ[filecheck-platform-prefixes]
     # Q: WS32/WS64 are always enabled, mirroring the -ws-NN golden suffixes;
     #    should OS/arch prefixes follow (cf. find_expected_file's platform chain)?
-    opts = Options(match_filename=str(in_srcdir(check_file)),
+    prefixes = prefixes + ['WS' + config.wordsize]
+    opts = Options(match_filename=os.path.relpath(in_srcdir(check_file)),
                    input_file=str(actual_path),
-                   check_prefixes=prefixes + ['WS' + config.wordsize])
+                   check_prefixes=prefixes)
     matcher = Matcher.from_opts(opts)
     matcher.stderr = io.StringIO()
-    ok = matcher.run() == 0
-    report = matcher.stderr.getvalue()
-    if not ok and config.verbose >= 1 and _expect_pass(way):
+    if matcher.run() == 0:
+        return CompareOutput(True)
+    report = matcher.stderr.getvalue() + filecheck_input_window(matcher, prefixes)
+    if config.verbose >= 1 and _expect_pass(way):
         print(report)
-    return CompareOutput(ok, None if ok else report, 'FileCheck report:')
+    return CompareOutput(False, report, 'FileCheck report:')
+
+# The input from where the failing check started looking, numbered like the
+# tool's positions; a substitute for LLVM FileCheck's annotated input dump.
+def filecheck_input_window(matcher, prefixes: List[str], max_lines: int=40) -> str:
+    content = matcher.file.content
+    lines = content.split('\n')
+    if content.endswith('\n'):
+        lines.pop()
+    # CQ[filecheck-window-anchor]
+    # Q: a failing CHECK-NOT raises from inside the deferred check, leaving
+    #    negative_matches_start set; is relying on that too fragile?
+    start = matcher.ctx.negative_matches_start
+    if start is None:
+        start = matcher.file.range.start
+    first = content.count('\n', 0, start)
+    shown = lines[first:first + max_lines]
+    out = ['Input from line {} of {}, checked with prefixes {}:'.format(
+               first + 1, len(lines), ', '.join(prefixes))]
+    out += ['{:4} | {}'.format(first + i + 1, l) for i, l in enumerate(shown)]
+    omitted = len(lines) - first - len(shown)
+    if omitted > 0:
+        out.append('... ({} more lines)'.format(omitted))
+    return '\n'.join(out) + '\n'
 
 # Checks that each line from pattern_file is present in actual_file as
 # a substring or regex pattern depending on is_substring.
