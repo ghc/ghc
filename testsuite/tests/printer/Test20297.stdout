@@ -5484,8 +5484,7 @@
                     (EpaSpan { Test20297.hs:112:9-10 })
                     (NormalSyntax))
                    (AnnList
-                    (EpVirtualBraces
-                     (EpaSpan { Test20297.hs:112:9 }))
+                    (EpNoLayout)
                     []))
                   (L
                    (EpAnn
@@ -11437,8 +11436,7 @@
                     (EpaSpan { Test20297.ppr.hs:72:9-10 })
                     (NormalSyntax))
                    (AnnList
-                    (EpVirtualBraces
-                     (EpaSpan { Test20297.ppr.hs:72:9 }))
+                    (EpNoLayout)
                     []))
                   (L
                    (EpAnn
