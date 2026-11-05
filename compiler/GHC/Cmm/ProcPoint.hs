@@ -174,7 +174,7 @@ procPointLattice = DataflowLattice unreached add_to
 --
 -- Extract the set of Continuation BlockIds, see Note [Continuation BlockIds].
 -- This includes calls in unreachable blocks, see
--- Note [Unreachable blocks in the Cmm pipeline] in GHC.Cmm.Pipeline.
+-- Note [Unreachable blocks] in GHC.Cmm.Pipeline.
 callProcPoints      :: CmmGraph -> ProcPointSet
 callProcPoints g = foldlGraphBlocks add (setSingleton (g_entry g)) g
   where add :: LabelSet -> CmmBlock -> LabelSet

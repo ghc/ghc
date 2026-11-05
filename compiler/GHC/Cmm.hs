@@ -154,8 +154,7 @@ toBlockMap (CmmGraph {g_graph=GMany NothingO body NothingO}) = body
 -- | Print the blocks reachable from the entry, in reverse postorder.
 --
 -- Under @-dppr-debug@ the unreachable blocks stored in the graph are appended
--- too. See Note [Unreachable blocks in the Cmm pipeline] in
--- "GHC.Cmm.Pipeline".
+-- too. See Note [Unreachable blocks] in "GHC.Cmm.Pipeline".
 pprCmmGraph :: Platform -> CmmGraph -> SDoc
 pprCmmGraph platform g
    = text "{" <> text "offset"

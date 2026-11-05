@@ -173,7 +173,7 @@ cpsTop logger platform cfg dus proc =
                     then map (cmmCfgOptsProc splitting_proc_points) g
                     else g
       g <- return $ map (removeUnreachableBlocksProc platform) g
-           -- See Note [Unreachable blocks in the Cmm pipeline]
+           -- See Note [Unreachable blocks]
       dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations (2)" g
 
       return (dus, Left (cafEnv, g))
@@ -351,8 +351,8 @@ _GLOBAL_OFFSET_TABLE_, regardless of which entry point we arrived via.
 
 -}
 
-{- Note [Unreachable blocks in the Cmm pipeline]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Unreachable blocks]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
 The control-flow optimiser and common block elimination leave
 unreachable blocks behind containing junk code.  These aren't
 necessarily a problem, but removing them is good because it might save

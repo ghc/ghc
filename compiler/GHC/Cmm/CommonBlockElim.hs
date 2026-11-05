@@ -61,7 +61,7 @@ import qualified Data.List.NonEmpty as NE
 
 -- Unreachable blocks in the input take part in deduplication like any other
 -- block. Eliminated blocks stay in the graph, unreachable; see
--- Note [Unreachable blocks in the Cmm pipeline] in GHC.Cmm.Pipeline.
+-- Note [Unreachable blocks] in GHC.Cmm.Pipeline.
 
 -- TODO: Use optimization fuel
 elimCommonBlocks :: CmmGraph -> CmmGraph
