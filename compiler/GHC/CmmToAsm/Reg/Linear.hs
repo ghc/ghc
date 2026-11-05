@@ -311,10 +311,6 @@ process entry_ids block_live =
 
     go [] next_round accum madeProgress
       | not madeProgress
-          {- BUGS: There are so many unreachable blocks in the code the warnings are overwhelming.
-             pprTrace "RegAlloc.Linear.Main.process: no progress made, bailing out."
-                (  text "Unreachable blocks:"
-                $$ vcat (map ppr next_round)) -}
       = return $ reverse accum
 
       | otherwise
