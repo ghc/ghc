@@ -163,7 +163,7 @@ parse_paragraph ctx = snd . parse p
   where
     p :: Parser (DocH mod Identifier)
     p =
-      docConcat
+      docConcat . mark_infix
         <$> many
           ( choice' $
               [ monospace
@@ -190,6 +190,11 @@ parse_paragraph ctx = snd . parse p
     backtick_parsers = case ctx of
       Prose -> [backtickSpan, identifier]
       Code -> [identifier]
+
+    mark_infix :: [DocH mod Identifier] -> [DocH mod Identifier]
+    mark_infix = case ctx of
+      Prose -> id
+      Code -> infixInCode
 
 -- | Parses and processes
 -- <https://en.wikipedia.org/wiki/Numeric_character_reference Numeric character references>
@@ -1081,3 +1086,127 @@ identifier = DocIdentifier <$> parseValid
 -- 'backtickSpan' there. The backticks of a span stay as text:
 --
 --   @x <- f   -- of type `M Bool`@     code "x <- f   -- of type `M Bool`"
+--
+-- 'identifier' still parses `x`, and its backticks have two uses:
+--
+-- * A link marker, as in prose: @`foldlM` :: ...@ or @`seq`@. The
+--   backticks are not shown.
+--
+-- * The infix form of Haskell: @f `elem` xs@. The backticks must be shown,
+--   else the code reads "f elem xs".
+--
+-- 'infixInCode' uses the Haskell grammar to choose: `x` is infix only in
+-- an infix application or in an operator section. Thus, spaces excluded,
+-- one of these must be true:
+--
+-- * An operand ends before `x` (a name, a literal, a closing bracket or
+--   other markup) and an operand starts after it.
+--
+-- * A section: '(' is before `x` and an operand starts after it, or an
+--   operand ends before `x` and ')' is after it.
+--
+--   @f `elem` xs@          infix: link "`elem`", as if written ``elem``
+--   @(`elem` xs)@          infix (right section)
+--   @(x `elem`)@           infix (left section)
+--   @`foldlM` :: t@        link marker: link "foldlM"
+--   @(`elem`)@             link marker: no operand
+--   @`map` `show` xs@      link markers: `map` is not an operand
+--   @(op \``on`\` f)@      link marker: '`' does not end an operand
+--
+-- Only an alphanumeric identifier can be infix, so @`(<*>)`@ is always a
+-- link marker.
+--
+-- If GHC cannot parse an infix identifier (for example the keyword
+-- `case`), it becomes text with both pairs of backticks: "``case``".
+
+-- | Mark the infix identifiers of a code span. See Note [Backticks in code].
+--
+-- >>> parseString "@f `elem` xs@"
+-- DocMonospaced (DocAppend (DocString "f ") (DocAppend (DocIdentifier (Identifier None '`' "`elem`" '`')) (DocString " xs")))
+infixInCode :: [DocH mod Identifier] -> [DocH mod Identifier]
+infixInCode = go []
+  where
+    -- The first argument holds the previous pieces, nearest first.
+    go :: [DocH mod Identifier] -> [DocH mod Identifier] -> [DocH mod Identifier]
+    go _ [] = []
+    go before (d : after) = d' : go (d : before) after
+      where
+        d' = case d of
+          DocIdentifier (Identifier ns '`' x '`')
+            | is_alpha_ident x
+            , is_infix (side_before before) (side_after after) ->
+                DocIdentifier (Identifier ns '`' ("`" ++ x ++ "`") '`')
+          _ -> d
+
+    -- An infix application, or a left or right operator section.
+    is_infix :: InfixSide -> InfixSide -> Bool
+    is_infix l r = case (l, r) of
+      (Operand, Operand) -> True
+      (SectionParen, Operand) -> True
+      (Operand, SectionParen) -> True
+      _ -> False
+
+    -- Only an alphanumeric identifier, possibly qualified, can be infix.
+    is_alpha_ident :: String -> Bool
+    is_alpha_ident x = case x of
+      c : _ -> isAlpha c || c == '_'
+      [] -> False
+
+    side_before :: [DocH mod Identifier] -> InfixSide
+    side_before = infix_side (fmap snd . T.unsnoc . T.stripEnd) classify
+      where
+        classify c
+          | isAlphaNum c || c `elem` (")]}_'\"#" :: String) = Operand
+          | c == '(' = SectionParen
+          | otherwise = NoOperand
+
+    side_after :: [DocH mod Identifier] -> InfixSide
+    side_after = infix_side (fmap fst . T.uncons . T.stripStart) classify
+      where
+        classify c
+          | isAlphaNum c || c `elem` ("([_'\"\\" :: String) = Operand
+          | c == ')' = SectionParen
+          | otherwise = NoOperand
+
+-- | Classify the side of a backticked identifier in code. See
+-- 'infixInCode'.
+--
+-- The pieces are the ones on that side, nearest first. The first function
+-- gives the character of a text that is nearest to the identifier,
+-- spaces excluded; the second classifies it.
+--
+-- * A text of only spaces (or newlines, in a code block) says nothing,
+--   so the next piece decides. Thus @f   `elem`  xs@ is infix.
+--
+-- * An identifier between backticks is not an operand: next to it, the
+--   backticks are link markers. Thus in @`map` `show` xs@ both are links,
+--   and the code reads "map show xs".
+--
+-- * Any other piece comes from markup inside the code: an identifier, a
+--   module name, a link, emphasis, and so on. Such a piece stands for a
+--   name or an expression, so it is an operand. Thus @'f' `elem` xs@ is
+--   infix.
+--
+-- * No piece means the edge of the code span: there is no operand.
+infix_side
+  :: (Text -> Maybe Char)
+  -> (Char -> InfixSide)
+  -> [DocH mod Identifier]
+  -> InfixSide
+infix_side nearest_char classify = go
+  where
+    go ds = case ds of
+      DocString t : rest -> maybe (go rest) classify (nearest_char t)
+      DocIdentifier (Identifier _ '`' _ '`') : _ -> NoOperand
+      _ : _ -> Operand
+      [] -> NoOperand
+
+-- | What is on one side of a backticked identifier in code. See
+-- 'infixInCode'.
+data InfixSide
+  = -- | The end of an operand before, or the start of an operand after
+    Operand
+  | -- | The parenthesis of an operator section: '(' before or ')' after
+    SectionParen
+  | -- | Anything else, or the edge of the code span
+    NoOperand

@@ -445,6 +445,37 @@ spec = do
         "@x `M Bool` y@" `shouldParseTo` DocMonospaced "x `M Bool` y"
         "@/a `b c`/@" `shouldParseTo` DocMonospaced (DocEmphasis "a `b c`")
 
+      it "keeps the backticks of an infix identifier inside @...@" $ do
+        "@f `elem` xs@" `shouldParseTo` DocMonospaced ("f " <> DocIdentifier "`elem`" <> " xs")
+        "@x `M.member` m@" `shouldParseTo` DocMonospaced ("x " <> DocIdentifier "`M.member`" <> " m")
+        "@x ``elem`` y@" `shouldParseTo` DocMonospaced ("x " <> DocIdentifier "`elem`" <> " y")
+        "@'elem' x xs@" `shouldParseTo` DocMonospaced (DocIdentifier "elem" <> " x xs")
+        "@'f' `elem` xs@" `shouldParseTo` DocMonospaced (DocIdentifier "f" <> " " <> DocIdentifier "`elem`" <> " xs")
+        "@x `seq` \\\\y -> y@" `shouldParseTo` DocMonospaced ("x " <> DocIdentifier "`seq`" <> " \\y -> y")
+        "@r{a = 1} `seq` x@" `shouldParseTo` DocMonospaced ("r{a = 1} " <> DocIdentifier "`seq`" <> " x")
+        "@x# `seq` y@" `shouldParseTo` DocMonospaced ("x# " <> DocIdentifier "`seq`" <> " y")
+
+      it "keeps the backticks of an operator section inside @...@" $ do
+        "@(`elem` xs)@" `shouldParseTo` DocMonospaced ("(" <> DocIdentifier "`elem`" <> " xs)")
+        "@(x `elem`)@" `shouldParseTo` DocMonospaced ("(x " <> DocIdentifier "`elem`" <> ")")
+        "@filter (`elem` xs) ys@" `shouldParseTo` DocMonospaced ("filter (" <> DocIdentifier "`elem`" <> " xs) ys")
+
+      it "keeps backticks as link markers inside @...@ where infix is not possible" $ do
+        "@`seq`@" `shouldParseTo` DocMonospaced (DocIdentifier "seq")
+        "@`foldlM` :: t@" `shouldParseTo` DocMonospaced (DocIdentifier "foldlM" <> " :: t")
+        "@(`elem`)@" `shouldParseTo` DocMonospaced ("(" <> DocIdentifier "elem" <> ")")
+        "@x `seq`@" `shouldParseTo` DocMonospaced ("x " <> DocIdentifier "seq")
+        "@`flip` `(<*>)`@" `shouldParseTo` DocMonospaced (DocIdentifier "flip" <> " " <> DocIdentifier "(<*>)")
+        "@`map` `show` xs@" `shouldParseTo` DocMonospaced (DocIdentifier "map" <> " " <> DocIdentifier "show" <> " xs")
+        "@`x` `f` y@" `shouldParseTo` DocMonospaced (DocIdentifier "x" <> " " <> DocIdentifier "f" <> " y")
+
+      it "handles several infix identifiers inside @...@" $ do
+        "@a `f` b `g` c@" `shouldParseTo` DocMonospaced ("a " <> DocIdentifier "`f`" <> " b " <> DocIdentifier "`g`" <> " c")
+        "@a`f`b`g`c@" `shouldParseTo` DocMonospaced ("a" <> DocIdentifier "`f`" <> "b" <> DocIdentifier "`g`" <> "c")
+        "@(a `f` b) `g` c@" `shouldParseTo` DocMonospaced ("(a " <> DocIdentifier "`f`" <> " b) " <> DocIdentifier "`g`" <> " c")
+        "@x `f` 'y' `g` z@" `shouldParseTo` DocMonospaced ("x " <> DocIdentifier "`f`" <> " " <> DocIdentifier "y" <> " " <> DocIdentifier "`g`" <> " z")
+        "@((`f` a) . (`g` b))@" `shouldParseTo` DocMonospaced ("((" <> DocIdentifier "`f`" <> " a) . (" <> DocIdentifier "`g`" <> " b))")
+
     context "when parsing bold strings" $ do
       it "allows for a bold string on its own" $ do
         "__bold string__"
@@ -723,6 +754,9 @@ spec = do
                       ]
                   )
               )
+
+        it "keeps the backticks of an infix identifier" $ do
+          "@\nf `elem` xs\n@" `shouldParseTo` DocCodeBlock ("f " <> DocIdentifier "`elem`" <> " xs\n")
 
       context "when a paragraph contains a markdown link" $ do
         it "correctly parses the link" $ do

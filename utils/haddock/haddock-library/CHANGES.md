@@ -8,8 +8,10 @@
     whole content is one identifier, so `` `foldl' f z xs` `` is code, not
     the identifier `foldl`. (#28090)
 
-  * Backtick spans are not parsed inside `@...@`: their backticks stay as
-    text.
+  * Backtick spans are not parsed inside `@...@`. An identifier between
+    backticks inside `@...@` in an infix application or an operator section,
+    as in `` @f `elem` xs@ `` or `` @(`elem` xs)@ ``, is now parsed in infix form (like ``` ``elem`` ```),
+    so its backticks are rendered.
 
 ## Changes in version 1.11.0
 

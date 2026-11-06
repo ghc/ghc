@@ -8,7 +8,10 @@
    `` `foldl' f z xs` `` is code, not a link to `foldl`. (#28090)
 
  * Backtick spans are not parsed inside `@...@`: their backticks stay as
-   text.
+   text. An identifier between backticks inside `@...@` in an infix
+   application or an operator section, as in `` @f `elem` xs@ `` or
+   `` @(`elem` xs)@ ``, now keeps its backticks in the
+   output instead of rendering as `f elem xs`.
 
  * Allow the `--incremental` flag for modules in other units than main.
    In the initial implementation, the argument to incremental could only

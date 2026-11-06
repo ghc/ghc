@@ -1022,6 +1022,12 @@ parsed and their backticks stay as text: ::
 
     -- | @x <- f   -- of type `M Bool`@
 
+A backticked identifier inside ``@...@`` is still a hyperlinked
+identifier. When it is Haskell infix syntax, in an infix application or
+an operator section, the backticks are shown: ``@f `elem` xs@`` renders
+as ``f `elem` xs`` with ``elem`` linked, and so does ``@(`elem` xs)@``. Elsewhere the backticks only mark
+the link, as in ``@`foldlM` :: ...@``.
+
 Linking to Modules
 ~~~~~~~~~~~~~~~~~~
 
