@@ -9,7 +9,7 @@ import GHC.Prelude
 import GHC.CmmToAsm.AArch64.Cond
 import GHC.CmmToAsm.AArch64.Regs
 
-import GHC.CmmToAsm.Instr (RegUsage(..))
+import GHC.CmmToAsm.Instr (RegUsage(..), nubJumpDests)
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
@@ -418,7 +418,7 @@ jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
 jumpDestsOfInstr (CBZ _ t) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (CBNZ _ t) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
-jumpDestsOfInstr (J_TBL ids _mbLbl _r) = catMaybes ids
+jumpDestsOfInstr (J_TBL ids _mbLbl _r) = nubJumpDests (catMaybes ids)
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (BL t _) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (BCOND _ t) = [ id | TBlock id <- [t]]

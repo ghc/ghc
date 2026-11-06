@@ -24,6 +24,7 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Data.Graph.Directed
 import GHC.Data.Maybe
 import GHC.Utils.Panic
+import GHC.Utils.Misc (equalLength)
 import GHC.Utils.Monad (concatMapM)
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
@@ -58,7 +59,13 @@ joinToTargets block_live id instr
         = return ([], instr)
 
         | otherwise
-        = joinToTargets' block_live [] id instr (jumpDestsOfInstr instr)
+        -- One fixup block per destination: a repeated destination would get
+        -- a dead fixup block. See 'jumpDestsOfInstr'.
+        = assertPpr (dests `equalLength` nubJumpDests dests)
+                    (text "repeated jump destinations:" <+> ppr dests) $
+          joinToTargets' block_live [] id instr dests
+        where
+          dests = jumpDestsOfInstr instr
 
 -----
 joinToTargets'

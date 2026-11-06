@@ -12,7 +12,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Label
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
-import GHC.CmmToAsm.Instr (RegUsage (..))
+import GHC.CmmToAsm.Instr (RegUsage (..), nubJumpDests)
 import GHC.CmmToAsm.RV64.Cond
 import GHC.CmmToAsm.RV64.Regs
 import GHC.CmmToAsm.Types
@@ -260,7 +260,7 @@ canFallthroughTo insn bid =
 -- | Get the `BlockId`s of the jump destinations (if any)
 jumpDestsOfInstr :: Instr -> [BlockId]
 jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
-jumpDestsOfInstr (J_TBL ids _mbLbl _r) = catMaybes ids
+jumpDestsOfInstr (J_TBL ids _mbLbl _r) = nubJumpDests (catMaybes ids)
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (BCOND _ _ _ t) = [id | TBlock id <- [t]]

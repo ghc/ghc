@@ -51,7 +51,7 @@ import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Reg.Target (targetClassOfReg)
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
-import GHC.CmmToAsm.Instr (RegUsage(..), noUsage)
+import GHC.CmmToAsm.Instr (RegUsage(..), noUsage, nubJumpDests)
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class.Unified
 
@@ -1074,7 +1074,7 @@ jumpDestsOfInstr
 jumpDestsOfInstr insn
   = case insn of
         JXX _ id            -> [id]
-        JMP_TBL _ ids _ _ _ -> [id | Just (DestBlockId id) <- ids]
+        JMP_TBL _ ids _ _ _ -> nubJumpDests [id | Just (DestBlockId id) <- ids]
         _                   -> []
 
 

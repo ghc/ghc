@@ -3,6 +3,7 @@ module GHC.CmmToAsm.Instr
    ( Instruction(..)
    , RegUsage(..)
    , noUsage
+   , nubJumpDests
    )
 where
 
@@ -13,6 +14,7 @@ import GHC.Platform.Reg
 import GHC.Utils.Outputable (SDoc)
 
 import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Label
 
 import GHC.CmmToAsm.Config
 import GHC.Data.FastString
@@ -78,6 +80,9 @@ class Instruction instr where
 
         -- | Give the possible *local block* destinations of this jump instruction.
         --      Must be defined for all jumpish instructions.
+        --      Each destination is listed once, even when a jump table names
+        --      it in several entries (see 'nubJumpDests'). The register
+        --      allocator makes one fixup block per destination.
         jumpDestsOfInstr
                 :: instr -> [BlockId]
 
@@ -178,3 +183,12 @@ class Instruction instr where
 
         -- Create a comment instruction
         mkComment :: FastString -> [instr]
+
+-- | Remove the repeated destinations of a jump table. The order is kept.
+nubJumpDests :: [BlockId] -> [BlockId]
+nubJumpDests = go setEmpty
+  where
+    go _ [] = []
+    go seen (d:ds)
+      | setMember d seen = go seen ds
+      | otherwise        = d : go (setInsert d seen) ds
