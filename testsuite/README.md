@@ -31,6 +31,9 @@ The various ways that GHC supports are defined in `config/ghc`
 
 ## Adding Tests
 
+To reduce merge conflicts, add new tests in the middle of an `all.T` file
+(e.g. next to related tests) rather than at the end.
+
 Please see the more extensive documentation [here][1].
 
   [1]: https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests
