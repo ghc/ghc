@@ -8,6 +8,9 @@
     whole content is one identifier, so `` `foldl' f z xs` `` is code, not
     the identifier `foldl`. (#28090)
 
+  * Backtick spans are not parsed inside `@...@`: their backticks stay as
+    text.
+
 ## Changes in version 1.11.0
 
   * Add support for linking identifiers with a quote between backticks (#1408)

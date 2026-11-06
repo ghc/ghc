@@ -441,6 +441,10 @@ spec = do
       it "allows backtick code spans inside other markup" $ do
         "/foo `bar baz`/" `shouldParseTo` DocEmphasis ("foo " <> DocMonospaced "bar baz")
 
+      it "does not parse backtick code spans inside @...@" $ do
+        "@x `M Bool` y@" `shouldParseTo` DocMonospaced "x `M Bool` y"
+        "@/a `b c`/@" `shouldParseTo` DocMonospaced (DocEmphasis "a `b c`")
+
     context "when parsing bold strings" $ do
       it "allows for a bold string on its own" $ do
         "__bold string__"
@@ -698,6 +702,27 @@ spec = do
       context "when a paragraph only contains a backtick code span" $ do
         it "turns it into a code block" $ do
           "`foo bar`" `shouldParseTo` DocCodeBlock "foo bar"
+
+      context "when a code block contains backticks" $ do
+        it "keeps them" $ do
+          unlines
+            [ "@"
+            , "myExample opt1 opt2 ="
+            , "  Code.do"
+            , "   x <- someSideEffect               -- This one is of type `M Bool`"
+            , "   if x then opt1 else opt2"
+            , "@"
+            ]
+            `shouldParseTo` DocCodeBlock
+              ( DocString
+                  ( T.unlines
+                      [ "myExample opt1 opt2 ="
+                      , "  Code.do"
+                      , "   x <- someSideEffect               -- This one is of type `M Bool`"
+                      , "   if x then opt1 else opt2"
+                      ]
+                  )
+              )
 
       context "when a paragraph contains a markdown link" $ do
         it "correctly parses the link" $ do

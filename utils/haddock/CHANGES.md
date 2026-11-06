@@ -7,6 +7,9 @@
    A closed span is a link only when its whole content is one identifier, so
    `` `foldl' f z xs` `` is code, not a link to `foldl`. (#28090)
 
+ * Backtick spans are not parsed inside `@...@`: their backticks stay as
+   text.
+
  * Allow the `--incremental` flag for modules in other units than main.
    In the initial implementation, the argument to incremental could only
    be the name of a module in the main unit. Now this can be changed by

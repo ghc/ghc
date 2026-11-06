@@ -148,33 +148,48 @@ parseString = parseText . T.pack
 parseText :: Text -> DocH mod Identifier
 parseText = parseParagraph . T.dropWhile isSpace . T.filter (/= '\r')
 
+-- | Where inline markup is parsed. See Note [Backticks in code].
+data SpanContext
+  = -- | Normal text
+    Prose
+  | -- | Text between \@...\@
+    Code
+
 parseParagraph :: Text -> DocH mod Identifier
-parseParagraph = snd . parse p
+parseParagraph = parse_paragraph Prose
+
+parse_paragraph :: SpanContext -> Text -> DocH mod Identifier
+parse_paragraph ctx = snd . parse p
   where
     p :: Parser (DocH mod Identifier)
     p =
       docConcat
         <$> many
-          ( choice'
+          ( choice' $
               [ monospace
               , anchor
-              , backtickSpan
-              , identifier
-              , backtickRun
-              , moduleName
-              , picture
-              , mathDisplay
-              , mathInline
-              , markdownImage
-              , markdownLink
-              , hyperlink
-              , bold
-              , emphasis
+              ]
+                ++ backtick_parsers
+                ++ [ backtickRun
+                   , moduleName
+                   , picture
+                   , mathDisplay
+                   , mathInline
+                   , markdownImage
+                   , markdownLink ctx
+                   , hyperlink
+                   , bold ctx
+                   , emphasis ctx
               , encodedChar
               , string'
-              , skipSpecialChar
-              ]
+                   , skipSpecialChar
+                   ]
           )
+
+    backtick_parsers :: [Parser (DocH mod Identifier)]
+    backtick_parsers = case ctx of
+      Prose -> [backtickSpan, identifier]
+      Code -> [identifier]
 
 -- | Parses and processes
 -- <https://en.wikipedia.org/wiki/Numeric_character_reference Numeric character references>
@@ -232,17 +247,17 @@ skipSpecialChar = DocString . T.singleton <$> Parsec.oneOf specialChar
 --
 -- >>> parseString "/Hello world/"
 -- DocEmphasis (DocString "Hello world")
-emphasis :: Parser (DocH mod Identifier)
-emphasis =
-  DocEmphasis . parseParagraph
+emphasis :: SpanContext -> Parser (DocH mod Identifier)
+emphasis ctx =
+  DocEmphasis . parse_paragraph ctx
     <$> disallowNewline ("/" *> takeWhile1_ (/= '/') <* "/")
 
 -- | Bold parser.
 --
 -- >>> parseString "__Hello world__"
 -- DocBold (DocString "Hello world")
-bold :: Parser (DocH mod Identifier)
-bold = DocBold . parseParagraph <$> disallowNewline ("__" *> takeUntil "__")
+bold :: SpanContext -> Parser (DocH mod Identifier)
+bold ctx = DocBold . parse_paragraph ctx <$> disallowNewline ("__" *> takeUntil "__")
 
 disallowNewline :: Parser Text -> Parser Text
 disallowNewline = mfilter (T.all (/= '\n'))
@@ -275,7 +290,7 @@ anchor =
 -- DocMonospaced (DocString "cruel")
 monospace :: Parser (DocH mod Identifier)
 monospace =
-  DocMonospaced . parseParagraph
+  DocMonospaced . parse_paragraph Code
     <$> ("@" *> takeWhile1_ (/= '@') <* "@")
 
 -- Note [Backtick code spans]
@@ -285,8 +300,9 @@ monospace =
 --   `foo`      a hyperlinked identifier, same as 'foo'
 --   `foo bar`  a monospaced code span, same as @foo bar@
 --
--- 'backtickSpan' is tried before 'identifier' in 'parseParagraph'. It parses
--- a closed code span (rules below) and then decides:
+-- In prose, 'backtickSpan' is tried before 'identifier'. Text between @...@
+-- does not use it: see Note [Backticks in code]. 'backtickSpan' parses a
+-- closed code span (rules below) and then decides:
 --
 -- * If 'takeIdentifier' parses the whole span, the result is the
 --   identifier. Thus `foo`, `Foo.bar`, `(++)` and `foldl'` are links, and
@@ -406,9 +422,9 @@ moduleNameString = modid `maybeFollowedBy` anchor_
 
 -- | A labeled link to an indentifier, module or url using markdown
 -- syntax.
-markdownLink :: Parser (DocH mod Identifier)
-markdownLink = do
-  lbl <- markdownLinkText
+markdownLink :: SpanContext -> Parser (DocH mod Identifier)
+markdownLink ctx = do
+  lbl <- markdownLinkText ctx
   choice' [markdownModuleName lbl, markdownURL lbl]
   where
     markdownModuleName lbl = do
@@ -463,7 +479,7 @@ mathDisplay =
 -- DocPic (Picture "www.site.com" (Just "some emphasis in a description"))
 markdownImage :: Parser (DocH mod Identifier)
 markdownImage = do
-  text <- markup stringMarkup <$> ("!" *> markdownLinkText)
+  text <- markup stringMarkup <$> ("!" *> markdownLinkText Prose)
   url <- markdownLinkTarget
   pure $ DocPic (Picture url (Just text))
   where
@@ -731,7 +747,7 @@ textParagraph :: Parser (DocH mod Identifier)
 textParagraph = parseText . T.intercalate "\n" <$> some nonEmptyLine
 
 textParagraphThatStartsWithMarkdownLink :: Parser (DocH mod Identifier)
-textParagraphThatStartsWithMarkdownLink = docParagraph <$> (docAppend <$> markdownLink <*> optionalTextParagraph)
+textParagraphThatStartsWithMarkdownLink = docParagraph <$> (docAppend <$> markdownLink Prose <*> optionalTextParagraph)
   where
     optionalTextParagraph :: Parser (DocH mod Identifier)
     optionalTextParagraph =
@@ -976,7 +992,7 @@ property = DocProperty . T.strip <$> ("prop>" *> takeWhile1 (/= '\n'))
 -- for markup.
 codeblock :: Parser (DocH mod Identifier)
 codeblock =
-  DocCodeBlock . parseParagraph . dropSpaces
+  DocCodeBlock . parse_paragraph Code . dropSpaces
     <$> ("@" *> skipHorizontalSpace *> "\n" *> block' <* "@")
   where
     dropSpaces xs = let ys = splitByNl xs in
@@ -1021,8 +1037,8 @@ angleBracketLink =
     <$> disallowNewline ("<" *> takeUntil ">")
 
 -- | The text for a markdown link, enclosed in square brackets.
-markdownLinkText :: Parser (DocH mod Identifier)
-markdownLinkText = parseParagraph . T.strip <$> ("[" *> takeUntil "]")
+markdownLinkText :: SpanContext -> Parser (DocH mod Identifier)
+markdownLinkText ctx = parse_paragraph ctx . T.strip <$> ("[" *> takeUntil "]")
 
 -- | The target for a markdown link, enclosed in parenthesis.
 markdownLinkTarget :: Parser Text
@@ -1058,3 +1074,10 @@ autoUrl = mkLink <$> url
 -- | Parses identifiers with help of 'parseValid'.
 identifier :: Parser (DocH mod Identifier)
 identifier = DocIdentifier <$> parseValid
+
+-- Note [Backticks in code]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
+-- Text between @...@ is already code, so 'parse_paragraph' does not use
+-- 'backtickSpan' there. The backticks of a span stay as text:
+--
+--   @x <- f   -- of type `M Bool`@     code "x <- f   -- of type `M Bool`"

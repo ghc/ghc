@@ -1017,6 +1017,11 @@ line. Where it does, use ``'T'`` instead: ::
 
     -- | 'Foldable' and `elem`.
 
+Inside ``@...@``, the text is already code, so backtick spans are not
+parsed and their backticks stay as text: ::
+
+    -- | @x <- f   -- of type `M Bool`@
+
 Linking to Modules
 ~~~~~~~~~~~~~~~~~~
 
