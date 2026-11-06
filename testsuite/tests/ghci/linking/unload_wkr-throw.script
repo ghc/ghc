@@ -1,0 +1,6 @@
+:load UnloadWkrA UnloadWkrB
+putStrLn UnloadWkrA.hello
+UnloadWkrB.boom
+putStrLn UnloadWkrA.hello
+:reload
+putStrLn UnloadWkrA.hello
