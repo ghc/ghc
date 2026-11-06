@@ -7,7 +7,7 @@ import GHC.Prelude
 import GHC.CmmToAsm.LA64.Cond
 import GHC.CmmToAsm.LA64.Regs
 
-import GHC.CmmToAsm.Instr (RegUsage(..))
+import GHC.CmmToAsm.Instr (RegUsage(..), nubJumpDests)
 import GHC.CmmToAsm.RegUsage (Usage, (<.>), runUsage, readReg, writeReg, modifyReg, foldMapUsage, withPlatform)
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Types
@@ -445,7 +445,7 @@ isJumpishInstr instr = case instr of
 jumpDestsOfInstr :: Instr -> [BlockId]
 jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
-jumpDestsOfInstr (J_TBL ids _mbLbl _r) = catMaybes ids
+jumpDestsOfInstr (J_TBL ids _mbLbl _r) = nubJumpDests (catMaybes ids)
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (BL t _) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (CALL t _) = [id | TBlock id <- [t]]
