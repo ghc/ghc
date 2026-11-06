@@ -1075,7 +1075,7 @@ import GHC.Internal.Data.Foldable
 -- abstract potentially faster than linear search over general container
 -- structures.  This can be achieved by defining an additional type class (e.g.
 -- @HasMember@ below).  Instances of such a type class (that are also
--- `Foldable') can employ the `elem` linear search as a last resort, when
+-- 'Foldable') can employ the `elem` linear search as a last resort, when
 -- faster search is not supported.
 --
 -- > {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}

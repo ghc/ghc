@@ -130,14 +130,14 @@ data ForeignImport pass
     --  * the two strings specifying a header file or library
     --   may be empty, which indicates the absence of a
     --   header or object specification (both are not used
-    --   in the case of `CWrapper' and when `CFunction'
+    --   in the case of 'CWrapper' and when 'CFunction'
     --   has a dynamic target)
     --
     --  * the calling convention is irrelevant for code
-    --   generation in the case of `CLabel', but is needed
+    --   generation in the case of 'CLabel', but is needed
     --   for pretty printing
     --
-    --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
+    --  * 'Safety' is irrelevant for 'CLabel' and 'CWrapper'
     --
     CImport
       (XCImport pass)
