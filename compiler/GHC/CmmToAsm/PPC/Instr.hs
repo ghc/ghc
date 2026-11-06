@@ -37,7 +37,7 @@ import GHC.Prelude hiding (head, init, last, tail)
 import GHC.CmmToAsm.PPC.Regs
 import GHC.CmmToAsm.PPC.Cond
 import GHC.CmmToAsm.Types
-import GHC.CmmToAsm.Instr (RegUsage)
+import GHC.CmmToAsm.Instr (RegUsage, nubJumpDests)
 import GHC.CmmToAsm.RegUsage (Usage, (<.>), runUsage, readReg, writeReg, foldMapUsage, withPlatform)
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Reg.Target
@@ -549,7 +549,7 @@ jumpDestsOfInstr insn
   = case insn of
         BCC _ id _       -> [id]
         BCCFAR _ id _    -> [id]
-        BCTR targets _ _ -> [id | Just id <- targets]
+        BCTR targets _ _ -> nubJumpDests [id | Just id <- targets]
         _                -> []
 
 
