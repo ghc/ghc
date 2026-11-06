@@ -377,6 +377,70 @@ spec = do
       it "requires the closing @" $ do
         "@foo /bar/ baz" `shouldParseTo` "@foo " <> DocEmphasis "bar" <> " baz"
 
+    context "when parsing backtick code spans" $ do
+      it "parses a backtick span that is not an identifier as monospaced text" $ do
+        "`foo bar`" `shouldParseTo` DocMonospaced "foo bar"
+
+      it "parses inline backtick code spans" $ do
+        "foo `bar baz` qux" `shouldParseTo` "foo " <> DocMonospaced "bar baz" <> " qux"
+
+      it "prefers the identifier reading for a valid identifier" $ do
+        "`foo`" `shouldParseTo` DocIdentifier "foo"
+        "`Foo.bar`" `shouldParseTo` DocIdentifier "Foo.bar"
+        "`(++)`" `shouldParseTo` DocIdentifier "(++)"
+
+      it "does not parse markup inside a backtick code span" $ do
+        "`/foo/ @bar@ 'baz'`" `shouldParseTo` DocMonospaced "/foo/ @bar@ 'baz'"
+
+      it "does not remove backslashes inside a backtick code span" $ do
+        "`\\x -> x`" `shouldParseTo` DocMonospaced "\\x -> x"
+
+      it "closes a span with a run of the same number of backticks" $ do
+        "``x `plus` y``" `shouldParseTo` DocMonospaced "x `plus` y"
+        "```a `` b```" `shouldParseTo` DocMonospaced "a `` b"
+
+      it "keeps the identifier reading of a backticked infix identifier" $ do
+        "``foo``" `shouldParseTo` DocIdentifier "`foo`"
+
+      it "keeps the identifier reading of an identifier with a prime" $ do
+        "`foldl'`" `shouldParseTo` DocIdentifier "foldl'"
+
+      it "does not close a span with a single quote inside it" $ do
+        "`foldl' f z xs`" `shouldParseTo` DocMonospaced "foldl' f z xs"
+        "`don't panic`" `shouldParseTo` DocMonospaced "don't panic"
+        "`a' b'`" `shouldParseTo` DocMonospaced "a' b'"
+
+      it "keeps the identifier reading of `foo' when no span closes" $ do
+        "`foo' and 'bar'" `shouldParseTo` DocIdentifier "foo" <> " and " <> DocIdentifier "bar"
+
+      it "prefers a closed span to `foo'" $ do
+        "`foo' or `bar`" `shouldParseTo` DocMonospaced "foo' or " <> "bar`"
+
+      it "strips one space at each end when both are present" $ do
+        "`` `foo` ``" `shouldParseTo` DocMonospaced "`foo`"
+        "``  a  ``" `shouldParseTo` DocMonospaced " a "
+        "`` a``" `shouldParseTo` DocMonospaced " a"
+        "`` ``" `shouldParseTo` DocMonospaced " "
+
+      it "treats an unclosed run of backticks as plain text" $ do
+        "``foo`" `shouldParseTo` "``foo`"
+        "`` and `x y`" `shouldParseTo` "`` and " <> DocMonospaced "x y"
+
+      it "accepts unicode" $ do
+        "`foo 灼眼のシャナ bar`" `shouldParseTo` DocMonospaced "foo 灼眼のシャナ bar"
+
+      it "requires the closing backtick" $ do
+        "`foo /bar/ baz" `shouldParseTo` "`foo " <> DocEmphasis "bar" <> " baz"
+
+      it "requires the span to be on a single line" $ do
+        "`foo\nbar`" `shouldParseTo` "`foo\nbar`"
+
+      it "does not treat an empty span as code" $ do
+        "``" `shouldParseTo` "``"
+
+      it "allows backtick code spans inside other markup" $ do
+        "/foo `bar baz`/" `shouldParseTo` DocEmphasis ("foo " <> DocMonospaced "bar baz")
+
     context "when parsing bold strings" $ do
       it "allows for a bold string on its own" $ do
         "__bold string__"
@@ -630,6 +694,10 @@ spec = do
       context "when a pragraph only contains monospaced text" $ do
         it "turns it into a code block" $ do
           "@foo@" `shouldParseTo` DocCodeBlock "foo"
+
+      context "when a paragraph only contains a backtick code span" $ do
+        it "turns it into a code block" $ do
+          "`foo bar`" `shouldParseTo` DocCodeBlock "foo bar"
 
       context "when a paragraph contains a markdown link" $ do
         it "correctly parses the link" $ do

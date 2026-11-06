@@ -1,0 +1,8 @@
+DocParagraph
+  (DocAppend
+     (DocString "Run ")
+     (DocAppend
+        (DocMonospaced (DocString "ghc -O2 Main.hs"))
+        (DocAppend
+           (DocString " and then ")
+           (DocAppend (DocIdentifier "main") (DocString ".")))))

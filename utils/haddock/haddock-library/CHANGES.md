@@ -1,3 +1,13 @@
+## Changes in version 1.12.0
+
+  * Backtick spans that are not valid identifiers, e.g. `` `foo bar` ``, are
+    now parsed as monospaced text (like `@foo bar@`) instead of plain text.
+    The content of such a span is taken literally. As in Markdown, a span
+    opened with N backticks closes with N backticks, e.g.
+    ``` ``x `plus` y`` ```. A closed span is an identifier only when its
+    whole content is one identifier, so `` `foldl' f z xs` `` is code, not
+    the identifier `foldl`. (#28090)
+
 ## Changes in version 1.11.0
 
   * Add support for linking identifiers with a quote between backticks (#1408)

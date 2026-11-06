@@ -158,7 +158,9 @@ parseParagraph = snd . parse p
           ( choice'
               [ monospace
               , anchor
+              , backtickSpan
               , identifier
+              , backtickRun
               , moduleName
               , picture
               , mathDisplay
@@ -275,6 +277,106 @@ monospace :: Parser (DocH mod Identifier)
 monospace =
   DocMonospaced . parseParagraph
     <$> ("@" *> takeWhile1_ (/= '@') <* "@")
+
+-- Note [Backtick code spans]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- A backtick span has two readings:
+--
+--   `foo`      a hyperlinked identifier, same as 'foo'
+--   `foo bar`  a monospaced code span, same as @foo bar@
+--
+-- 'backtickSpan' is tried before 'identifier' in 'parseParagraph'. It parses
+-- a closed code span (rules below) and then decides:
+--
+-- * If 'takeIdentifier' parses the whole span, the result is the
+--   identifier. Thus `foo`, `Foo.bar`, `(++)` and `foldl'` are links, and
+--   ``foo`` is the identifier foo in infix form, not code "foo".
+--
+-- * Else the result is code. This includes spans in which 'takeIdentifier'
+--   reads a shorter identifier closed by a single quote:
+--
+--     `foldl' f z xs`     code "foldl' f z xs", not identifier foldl
+--     `don't panic`       code "don't panic", not identifier don
+--
+-- If no closing run exists, 'backtickSpan' fails and 'identifier' gets the
+-- input. Thus the TeX-style form `foo' stays the identifier foo. Then
+-- 'backtickRun' makes the opening run plain text.
+--
+-- Code spans follow the CommonMark rules:
+--
+-- * A span opens with a run of N backticks and closes with the next run of
+--   exactly N backticks on the same line. A run of a different length is
+--   part of the content. Thus a code span that contains a backtick, such as
+--   an infix application, uses more backticks:
+--
+--     ``x `plus` y``      code "x `plus` y"
+--
+-- * If the content both starts and ends with a space, and is not only
+--   spaces, one space is removed at each end:
+--
+--     `` `foo` ``         code "`foo`"
+--
+-- * The content is literal: no markup is parsed and backslash escapes are
+--   not removed, so `\x -> x` keeps its backslash.
+--
+-- * If no closing run exists, the whole opening run is plain text. Thus
+--   "``" and a lone backtick keep their old meaning, and in "`` `a b`" only
+--   "`a b`" is a code span.
+--
+-- A closed code span wins over the mixed form `foo'. Thus a line such as
+-- "`Foldable') or `elem`" gives code "Foldable') or ". Write 'Foldable'
+-- there instead.
+
+-- | Backtick span parser: an identifier or a code span. Fails if the span
+-- is not closed. See Note [Backtick code spans].
+--
+-- >>> parseString "`foo bar`"
+-- DocMonospaced (DocString "foo bar")
+--
+-- >>> parseString "``x `plus` y``"
+-- DocMonospaced (DocString "x `plus` y")
+--
+-- >>> parseString "`foldl' f z xs`"
+-- DocMonospaced (DocString "foldl' f z xs")
+backtickSpan :: Parser (DocH mod Identifier)
+backtickSpan = do
+  (n, content) <- code_span
+  let fence = T.replicate n "`"
+  pure $ case takeIdentifier (fence <> content <> fence) of
+    Just (ns, op, ident, cl, rest)
+      | T.null rest -> DocIdentifier (Identifier ns op (T.unpack ident) cl)
+    _ -> DocMonospaced (DocString (strip_space content))
+  where
+    -- The length of the opening run and the content up to the closing run
+    -- of exactly as many backticks.
+    code_span :: Parser (Int, Text)
+    code_span = do
+      n <- T.length <$> takeWhile1 (== '`')
+      content <- T.concat <$> many (try (content_chunk n))
+      _ <- backtick_run n
+      if T.null content then empty else pure (n, content)
+
+    content_chunk :: Int -> Parser Text
+    content_chunk n =
+      takeWhile1 (\c -> c /= '`' && c /= '\n')
+        <|> mfilter ((/= n) . T.length) (takeWhile1 (== '`'))
+
+    backtick_run :: Int -> Parser Text
+    backtick_run n = mfilter ((== n) . T.length) (takeWhile1 (== '`'))
+
+    strip_space :: Text -> Text
+    strip_space t
+      | T.length t >= 2
+      , T.head t == ' '
+      , T.last t == ' '
+      , not (T.all (== ' ') t) =
+          T.init (T.tail t)
+      | otherwise = t
+
+-- | A run of backticks that opens neither a code span nor an identifier is
+-- plain text. See Note [Backtick code spans].
+backtickRun :: Parser (DocH mod a)
+backtickRun = DocString <$> takeWhile1 (== '`')
 
 -- | Module names.
 --

@@ -906,6 +906,8 @@ Haddock provides markup for properties: ::
 
 This allows third-party applications to extract and verify them.
 
+.. _hyperlinked-identifiers:
+
 Hyperlinked Identifiers
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -980,6 +982,40 @@ Frequent special cases:
   fragment.
 * ``@__FILE__@`` will render ``FILE`` in bold with no underscores, 
   which may not be what you had in mind.
+
+Monospaced text can also be written between backticks, as in Markdown: ::
+
+    -- | Run `ghc -O2 Main.hs` to build it.
+
+A backtick span is interpreted as a hyperlinked identifier when its
+content is a valid Haskell identifier (see :ref:`hyperlinked-identifiers`),
+and as monospaced text otherwise. Both render in a typewriter font, so
+```foo``` and ```foo bar``` look alike; the first is also a link when
+``foo`` is in scope.
+
+Unlike ``@...@``, no markup is interpreted inside a backtick span: the
+content is taken literally, backslashes included: ::
+
+    -- | The span `/not emphasized/` is literal, and so is `\x -> x`.
+
+As in Markdown, a span can start with more than one backtick. It ends
+at the next run of the same number of backticks, so a span with
+backticks inside, such as an infix application, uses double backticks.
+When the content both starts and ends with a space, one space is removed
+at each end: ::
+
+    -- | Write ``x `plus` y`` or `` `plus` x y ``.
+
+The span must be non-empty and closed on the same line; otherwise the
+opening backticks are plain text.
+
+A closed backtick span is a hyperlinked identifier only when the whole
+content is one identifier. Thus ```foldl' f z xs``` is monospaced text,
+not a link to ``foldl`` closed by the single quote. The mixed form
+```T'`` is still a link when no backtick closes the span on the same
+line. Where it does, use ``'T'`` instead: ::
+
+    -- | 'Foldable' and `elem`.
 
 Linking to Modules
 ~~~~~~~~~~~~~~~~~~

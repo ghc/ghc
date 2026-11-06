@@ -13,6 +13,7 @@
 module Documentation.Haddock.Parser.Identifier
   ( Identifier (..)
   , parseValid
+  , takeIdentifier
   ) where
 
 import Control.Monad (guard)

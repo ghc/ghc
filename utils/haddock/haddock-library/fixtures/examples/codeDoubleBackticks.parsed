@@ -1,0 +1,12 @@
+DocParagraph
+  (DocAppend
+    (DocString "Use ")
+    (DocAppend
+      (DocMonospaced
+        (DocString "x `plus` y"))
+      (DocAppend
+        (DocString " or ")
+        (DocAppend
+          (DocMonospaced
+            (DocString "\\x -> x"))
+          (DocString ".")))))

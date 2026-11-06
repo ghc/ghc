@@ -81,7 +81,7 @@ library
   -- this package typically supports only single major versions
   build-depends: base             >= 4.16 && < 4.24
                , ghc             ^>= 10.1
-               , haddock-library ^>= 1.11
+               , haddock-library ^>= 1.12
                , xhtml           ^>= 3000.4.0.0
                , parsec          ^>= 3.1.13.0
                , text             >= 2.0 && < 2.2
@@ -214,7 +214,7 @@ test-suite spec
 
   build-depends: ghc             ^>= 9.7
                , ghc-paths       ^>= 0.1.0.12
-               , haddock-library ^>= 1.11
+               , haddock-library ^>= 1.12
                , xhtml           ^>= 3000.4.0.0
                , hspec           ^>= 2.9
                , parsec          ^>= 3.1.13.0

@@ -1,5 +1,12 @@
 ## Changes in next
 
+ * Backtick spans that are not valid identifiers, e.g. `` `foo bar` ``, are now
+   rendered as monospaced text, like `@foo bar@`, instead of plain text. The
+   content of such a span is taken literally. As in Markdown, a span opened
+   with N backticks closes with N backticks, e.g. ``` ``x `plus` y`` ```.
+   A closed span is a link only when its whole content is one identifier, so
+   `` `foldl' f z xs` `` is code, not a link to `foldl`. (#28090)
+
  * Allow the `--incremental` flag for modules in other units than main.
    In the initial implementation, the argument to incremental could only
    be the name of a module in the main unit. Now this can be changed by
