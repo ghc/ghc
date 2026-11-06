@@ -22,6 +22,7 @@ test('PluralS', normal, compile, [''])
 test('T12574',normal, compile, ['-fwarn-missing-local-signatures'])
 
 test('DeprU', [extra_files(['DeprM.hs'])], multimod_compile, ['DeprU', '-Wall'])
+test('T26044', [extra_files(['T26044a.hs'])], multimod_compile, ['T26044', '-Wdeprecations'])
 
 test('Werror01', normal, compile, [''])
 test('Werror02', normal, compile, [''])

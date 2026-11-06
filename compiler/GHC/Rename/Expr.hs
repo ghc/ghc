@@ -1290,7 +1290,7 @@ rnStmt ctxt rnBody (L loc (BodyStmt _ (L lb body) _ _)) thing_inside
                   , thing), fv_expr `plusFN` fvs1 `plusFN` fvs2 `plusFN` fvs3) }
 
 rnStmt ctxt rnBody (L loc (BindStmt _ pat (L lb body))) thing_inside
-  = do  { (body', fv_expr) <- rnBody body
+  = do  { (body', fv_expr) <- setSrcSpanA lb $ rnBody body
                 -- The binders do not scope over the expression
         ; (bind_op, fvs1) <- lookupQualifiedDoStmtName ctxt bindMClassOpOcc
 
