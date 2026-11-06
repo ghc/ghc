@@ -77,3 +77,57 @@ test('big-obj', [extra_files(['big-obj-c.c', 'big-obj.hs']),
      makefile_test, ['big-obj'])
 
 test('T25155', [req_c, req_th, req_interp, req_rts_linker, extra_files(['T25155_iserv_main.c', 'T25155_iserv.hs', 'T25155_TH.hs'])], makefile_test, [])
+
+# unload_wkr-throw{,-ext}: a link failure in one module must not silently
+# unload another module that was already linked.
+#
+# When resolveObjs fails, GHC.Linker.Loader.loadObjects calls unload_wkr, which
+# empties objs_loaded/bcos_loaded/bco_loader_state and returns the new state.
+# But every caller of unload_wkr except `unload` itself then throws on the
+# Failed result, so modifyLoaderState's modifyMVar restores the *old* state and
+# GHC goes on believing UnloadWkrA is loaded after the interpreter has dropped
+# it.  Evaluating UnloadWkrA.hello then fails, and the :reload after it calls
+# unloadObj on an object the RTS has already unloaded.
+#
+# Only reachable when the interpreter is not dynamic: the dynamic branch of
+# loadObjects goes through dynLoadObjs and never calls resolveObjs at all.
+# For the internal interpreter that means a non-dynamic GHC (hostIsDynamic is
+# fixed at build time), hence the ghc_dynamic skip.  The external interpreter
+# takes its way from the session, so -static is enough there.
+#
+# The expected output is the *fixed* behaviour: UnloadWkrB fails to link and
+# nothing else does, so UnloadWkrA keeps working and :reload succeeds.
+#
+# FIXME: replace the expect_broken ticket numbers once the bug is filed.
+
+def normalise_unload_wkr(s):
+    import re
+    # The failing object is named with the full path of the test directory.
+    s = re.sub(r'\S*UnloadWkrB\.o', 'UnloadWkrB.o', s)
+    # With -fexternal-interpreter the messages are prefixed with the name of
+    # the iserv binary, which GHC generates into a temporary directory.
+    # normalise_errmsg only knows how to normalise the compiler's own name.
+    s = re.sub(r'^ghc_tmp_\d+\.iserv:', 'ghc:', s, flags=re.M)
+    return s
+
+test('unload_wkr-throw',
+     [extra_files(['UnloadWkrA.hs', 'UnloadWkrB.hs']),
+      extra_run_opts('-fobject-code'),
+      only_ways(['ghci']),
+      unless(doing_ghci, skip),
+      req_rts_linker,
+      when(ghc_dynamic(), skip),
+      normalise_errmsg_fun(normalise_unload_wkr),
+      expect_broken(28104)],
+     ghci_script, ['unload_wkr-throw.script'])
+
+test('unload_wkr-throw-ext',
+     [extra_files(['UnloadWkrA.hs', 'UnloadWkrB.hs',
+                   'unload_wkr-throw.script']),
+      extra_run_opts('-static -fexternal-interpreter -fobject-code'),
+      only_ways(['ghci']),
+      unless(doing_ghci, skip),
+      req_rts_linker,
+      normalise_errmsg_fun(normalise_unload_wkr),
+      expect_broken(28104)],
+     ghci_script, ['unload_wkr-throw.script'])
