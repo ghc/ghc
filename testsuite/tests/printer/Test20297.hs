@@ -116,4 +116,10 @@ f = if | x -> y
 pattern P x <- Just x where
   P x = Just x
 
+-- GADT leading semis
+
+data T where { ; C1 :: T ;; C2 :: T }   ->   data T where {   C1 :: T ;  C2 :: T }
+data U where
+  C3 :: U ;; C4 :: U                    ->     C3 :: U ;  C4 :: U
+
 -- eof
