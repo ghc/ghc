@@ -2564,23 +2564,37 @@ gadt_constrlist :: { Located ((EpToken "where", AnnList)
 
         : 'where' '{'        gadt_constrs '}'    {% checkEmptyGADTs $
                                                       L (comb2 $1 $4)
-                                                        ((epTok $1, AnnList (EpExplicitBraces (epTok $2) (epTok $4)) [])
-                                                        , sLL $2 $4 (unLoc $3)) }
+                                                        ((epTok $1, AnnList (EpExplicitBraces (epTok $2) (epTok $4)) (fst $ unLoc $3))
+                                                        , sLL $2 $4 (fromOL $ snd $ unLoc $3)) }
         | 'where' vocurly    gadt_constrs close  {% do { let { loc = if isGoodSrcSpan (getLoc $3)
                                                                        then comb2 $2 $3
                                                                        else noSrcSpan }
                                                        ; checkEmptyGADTs $
                                                            L (comb2 $1 $3)
-                                                             ((epTok $1, pal $ AnnList (epVirtualBraces (glR $2) $3) [])
-                                                             , L loc (unLoc $3)) }}
+                                                             ((epTok $1, pal $ AnnList (epVirtualBraces (glR $2) $3) (fst $ unLoc $3))
+                                                             , L loc (fromOL $ snd $ unLoc $3)) }}
         | {- empty -}                            { noLoc (noAnn,noLocA []) }
 
-gadt_constrs :: { Located [LConDecl GhcPs] }
-        : gadt_constr ';' gadt_constrs
-                  {% do { h <- addTrailingSemiA $1 (epTok $2)
-                        ; return (L (comb2 $1 $3) (h : unLoc $3)) }}
-        | gadt_constr                   { L (glA $1) [$1] }
-        | {- empty -}                   { noLoc [] }
+gadt_constrs :: { Located ([EpToken ";"], OrdList (LConDecl GhcPs)) } -- Reversed
+        : gadt_constrs ';' gadt_constr  {% if isNilOL (snd $ unLoc $1)
+                                           then return (sLL $1 $> ((fst $ unLoc $1) ++ [mzEpTok $2]
+                                                                  , unitOL $3))
+                                          else case (snd $ unLoc $1) of
+                                            SnocOL hs t -> do
+                                               t' <- addTrailingSemiA t (epTok $2)
+                                               return (sLL $1 $> (fst $ unLoc $1
+                                                              , snocOL hs t' `appOL` unitOL $3)) }
+
+        | gadt_constrs ';'              {% if isNilOL (snd $ unLoc $1)
+                                           then return (sLZ $1 $> ( (fst $ unLoc $1) ++ [mzEpTok $2]
+                                                                                 ,snd $ unLoc $1))
+                                           else case (snd $ unLoc $1) of
+                                             SnocOL hs t -> do
+                                                t' <- addTrailingSemiA t (epTok $2)
+                                                return (sLZ $1 $> (fst $ unLoc $1
+                                                               , snocOL hs t')) }
+        | gadt_constr                   { L (glA $1) ([], unitOL $1) }
+        | {- empty -}                   { noLoc ([], nilOL) }
 
 -- We allow the following forms in 'gadt_constr'.
 --
@@ -2620,10 +2634,9 @@ gadt_constrs :: { Located [LConDecl GhcPs] }
 
 gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
-    -- TODO:AZ capture the optSemi. Why leading?
-        : optSemi modifiers con_list '::' sigtype
-                {% do { unless (null $ unLoc $2) $ hintModifiers (getLoc $2)
-                      ; mkGadtDecl (comb3 $2 $3 $>) (reverse $ unLoc $2) (unLoc $3) (epUniTok $4) $5 } }
+        : modifiers con_list '::' sigtype
+                {% do { unless (null $ unLoc $1) $ hintModifiers (getLoc $1)
+                      ; mkGadtDecl (comb3 $1 $2 $>) (reverse $ unLoc $1) (unLoc $2) (epUniTok $3) $4 } }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
