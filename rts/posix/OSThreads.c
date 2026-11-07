@@ -50,6 +50,7 @@
 
 #include "RtsUtils.h"
 #include "Task.h"
+#include "posix/OSThreads.h"
 
 #if HAVE_STRING_H
 #include <string.h>
@@ -104,66 +105,207 @@
  *
  */
 
+
+/* Note [Posix condition variable clocks]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Posix condition variables support timed waits, using an _absolute_ wakeup
+ * time. What clock does it use? Excellent question. By default posix (in their
+ * great wisdom) specify the CLOCK_REALTIME, which is mad because the real time
+ * clock "is affected by discontinuous jumps in the system time". They should
+ * have specified CLOCK_MONOTONIC. In their defence, they do note, quote:
+ *
+ * > For cases when the system clock is advanced discontinuously by an
+ * > operator, it is expected that implementations process any timed wait
+ * > expiring at an intervening time as if that time had actually occurred.
+ *
+ * In practice nobody seems to believe this gets done properly. So we really
+ * would like to use the monotonic clock if at all possible. Also, we don't
+ * just care about relative timeouts, absolute timeouts are also useful, but
+ * our only current use cases in the RTS are ones using the monotonic clock.
+ *
+ * There are a bunch of standard and non-standard variants, with varying
+ * platform support:
+ *
+ * + pthread_condattr_setclock: this is a posix standard function used when
+ *   initialising the cond var that can set the clock used for cond var waits.
+ *   This is widely supported now, but was not available on earlier macOS.
+ *
+ * + pthread_cond_clockwait: this is a posix standard function which takes an
+ *   extra argument that is the clock source. This lets us specify the clock
+ *   directly rather than needing to do it on cond var initialisation. This is
+ *   fairly new, only being standardised in posix 2024. It's a good choice on
+ *   the platforms where it is available.
+ *
+ * + pthread_cond_timedwait_relative_np: this extension (np == non-portable)
+ *   is available on macOS. It apparently pre-dates macOS support for the
+ *   standard pthread_condattr_setclock. This appears to be a good choice when
+ *   we actually want to do a relative wait, i.e. waitConditionTimedRelative.
+ *   It avoids doing an extra call to get the current time.
+ *
+ * We have the common platform-independent API waitConditionTimedRelative
+ * (which is straightforward to implement on win32 too) and an extra posix
+ * specific one waitConditionTimedAbsolute.
+ *
+ * For waitConditionTimedRelative we pick the first supported method
+ * 1. pthread_cond_timedwait_relative_np: this catches old macOS but is also
+ *    a fine implementation for relative waits.
+ * 2. pthread_cond_clockwait
+ * 3. pthread_condattr_setclock in initCondition
+ * 4. pthread_cond_timedwait using the real time clock and conversions.
+ *
+ * For waitConditionTimedAbsolute we pick:
+ * 1. pthread_cond_clockwait
+ * 2. pthread_condattr_setclock in initCondition
+ * 3. pthread_cond_timedwait_relative_np using absolute to relative conversion
+ * 4. pthread_cond_timedwait using unpleasant clock conversions
+ */
+
+
 void
 initCondition( Condition* pCond )
 {
+#if !defined(HAVE_PTHREAD_COND_CLOCKWAIT) \
+  && defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)
+  // See Note [Posix condition variable clocks]
   pthread_condattr_t attr;
   CHECK(pthread_condattr_init(&attr) == 0);
-#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)
-  pCond->timeout_clk = CLOCK_REALTIME;
-  if (pthread_condattr_setclock(&attr, CLOCK_MONOTONIC) == 0) {
-      pCond->timeout_clk = CLOCK_MONOTONIC;
-  }
-#endif
-  CHECK(pthread_cond_init(&pCond->cond, &attr) == 0);
+  CHECK(pthread_condattr_setclock(&attr, CLOCK_MONOTONIC) == 0);
+  CHECK(pthread_cond_init(pCond, &attr) == 0);
   CHECK(pthread_condattr_destroy(&attr) == 0);
+#else
+  CHECK(pthread_cond_init(pCond, NULL) == 0);
+#endif
 }
 
 void
 closeCondition( Condition* pCond )
 {
-  CHECK(pthread_cond_destroy(&pCond->cond) == 0);
+  CHECK(pthread_cond_destroy(pCond) == 0);
 }
 
 void
 broadcastCondition ( Condition* pCond )
 {
-  CHECK(pthread_cond_broadcast(&pCond->cond) == 0);
+  CHECK(pthread_cond_broadcast(pCond) == 0);
 }
 
 void
 signalCondition ( Condition* pCond )
 {
-  CHECK(pthread_cond_signal(&pCond->cond) == 0);
+  CHECK(pthread_cond_signal(pCond) == 0);
 }
 
 void
 waitCondition ( Condition* pCond, Mutex* pMut )
 {
-  CHECK(pthread_cond_wait(&pCond->cond, pMut) == 0);
+  CHECK(pthread_cond_wait(pCond, pMut) == 0);
 }
 
 bool
-waitConditionTimedRelative ( Condition* pCond, Mutex* pMut, Time timeout )
+waitConditionTimedRelative(Condition *cond, Mutex *mutex, Time timeout)
 {
-    struct timespec ts;
-
-#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)
-    CHECK(clock_gettime(pCond->timeout_clk, &ts) == 0);
+  // See Note [Posix condition variable clocks]
+#if defined(HAVE_PTHREAD_COND_TIMEDWAIT_RELATIVE_NP)
+    struct timespec ts = {
+        .tv_sec  = timeout / 1000000000,
+        .tv_nsec = timeout % 1000000000
+    };
+    int ret = pthread_cond_timedwait_relative_np(cond, mutex, &ts);
+#elif defined(HAVE_PTHREAD_COND_CLOCKWAIT) || defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)
+    // Use CLOCK_MONOTONIC and convert relative to absolute
+    struct timespec now_ts;
+    CHECK(clock_gettime(CLOCK_MONOTONIC, &now_ts) == 0);
+    Time now    = SecondsToTime(now_ts.tv_sec) + NSToTime(now_ts.tv_nsec);
+    Time expiry = now + timeout;
+    struct timespec ts = {
+        .tv_sec  = expiry / 1000000000,
+        .tv_nsec = expiry % 1000000000
+    };
+#if defined(HAVE_PTHREAD_COND_CLOCKWAIT)
+    int ret = pthread_cond_clockwait(cond, mutex, CLOCK_MONOTONIC, &ts);
 #else
-    struct timeval tv;
-    CHECK(gettimeofday(&tv, NULL) == 0);
-    ts.tv_sec = tv.tv_sec;
-    ts.tv_nsec = 1000 * tv.tv_usec;
+    // We rely on initCondition having set the cond clock to CLOCK_MONOTONIC
+    int ret = pthread_cond_timedwait(cond, mutex, &ts);
 #endif
 
-    uint64_t sec = TimeToSeconds(timeout);
-    ts.tv_sec += sec;
-    ts.tv_nsec += TimeToNS(timeout - SecondsToTime(sec));
-    ts.tv_sec += ts.tv_nsec / 1000000000;
-    ts.tv_nsec %= 1000000000;
+#else
+// For now we fail in this configuration rather than using this completely
+// untested fallback implementation.
+#error No pthread_cond_timedwait with monotonic clock available. This should be doable though. Please file a ticket with platform details.
+#if 0
+    // Use CLOCK_REALTIME. Sigh. This is the last and least favoured option.
+    struct timespec now_ts;
+    CHECK(clock_gettime(CLOCK_REALTIME, &now_ts) == 0);
+    Time now    = SecondsToTime(now_ts.tv_sec) + NSToTime(now_ts.tv_nsec);
+    Time expiry = now + timeout;
+    struct timespec ts = {
+        .tv_sec  = expiry / 1000000000,
+        .tv_nsec = expiry % 1000000000
+    };
+    int ret = pthread_cond_timedwait(cond, mutex, &ts);
+#endif
+#endif
+    switch (ret) {
+    case ETIMEDOUT:
+        return false;
+    case 0:
+        return true;
+    default:
+        barf("pthread_cond_timedwait failed");
+    }
+}
 
-    int ret = pthread_cond_timedwait(&pCond->cond, pMut, &ts);
+bool
+waitConditionTimedAbsolute(Condition* cond, Mutex* mutex, Time expiry_mono)
+{
+  // See Note [Posix condition variable clocks]
+#if defined(HAVE_PTHREAD_COND_CLOCKWAIT) || defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)
+    struct timespec ts = {
+        .tv_sec  = expiry_mono / 1000000000,
+        .tv_nsec = expiry_mono % 1000000000
+    };
+#if defined(HAVE_PTHREAD_COND_CLOCKWAIT)
+    int ret = pthread_cond_clockwait(cond, mutex, CLOCK_MONOTONIC, &ts);
+#else
+    // We rely on initCondition having set the clock to CLOCK_MONOTONIC
+    int ret = pthread_cond_timedwait(cond, mutex, &ts);
+#endif
+
+#elif defined(HAVE_PTHREAD_COND_TIMEDWAIT_RELATIVE_NP)
+    Time now_mono = getProcessElapsedTime();
+    Time timeout  = expiry_mono - now_mono;
+    struct timespec ts = {
+        .tv_sec  = timeout / 1000000000,
+        .tv_nsec = timeout % 1000000000
+    };
+    int ret = pthread_cond_timedwait_relative_np(cond, mutex, &ts);
+
+#else
+// For now we fail in this configuration rather than using this completely
+// untested fallback implementation.
+#error No pthread_cond_timedwait with monotonic clock available. This may be doable though. Please file a ticket with platform details.
+#if 0
+    // Fall back to unpleasant time calculations to convert from the monotonic
+    // to the real time clock.
+    struct timespec now_real_ts, now_mono_ts;
+    CHECK(clock_gettime(CLOCK_REALTIME,  &now_real_ts) == 0);
+    // Use the same monotonic time source as the rest of the RTS:
+    CHECK(clock_gettime(CLOCK_MONOTONIC, &now_mono_ts) == 0);
+    Time now_real    = SecondsToTime(now_real_ts.tv_sec)
+                          + NSToTime(now_real_ts.tv_nsec);
+    Time now_mono    = SecondsToTime(now_mono_ts.tv_sec)
+                          + NSToTime(now_mono_ts.tv_nsec);
+    Time delta       = expiry_mono - now_mono;
+    Time expiry_real = now_real + delta;
+
+    struct timespec ts = {
+        .tv_sec  = expiry_real / 1000000000,
+        .tv_nsec = expiry_real % 1000000000
+    };
+    int ret = pthread_cond_timedwait(cond, mutex, &ts);
+#endif
+#endif
     switch (ret) {
     case ETIMEDOUT:
         return false;
