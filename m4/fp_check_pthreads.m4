@@ -105,6 +105,6 @@ AC_DEFUN([FP_CHECK_PTHREAD_FUNCS],
     AC_MSG_RESULT(no)
   )
 
-  AC_CHECK_FUNCS_ONCE([pthread_condattr_setclock])
+  AC_CHECK_FUNCS_ONCE([pthread_condattr_setclock pthread_cond_clockwait pthread_cond_timedwait_relative_np])
   LIBS=$OLD_LIBS
 ])
