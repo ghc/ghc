@@ -434,7 +434,6 @@ Observed> sync_phase_marking_budget Data
 Observed> sysErrorMsgFn Data
 Observed> tagConstr Code
 Observed> thunk_sizeW_fromITBL Code
-Observed> timedWaitCondition Code
 Observed> totalArgumentSize Code
 Observed> total_ticks Data
 Observed> unloadNativeObj Code
@@ -447,6 +446,7 @@ Observed> verifyGot Code
 Observed> verrorBelch Code
 Observed> vsysErrorBelch Code
 Observed> waitCondition Code
+Observed> waitConditionTimedRelative Code
 Observed> warnMissingKBLibraryPaths Code
 Observed> yieldThread Code
 
