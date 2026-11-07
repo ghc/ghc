@@ -512,7 +512,7 @@ waitCondition ( Condition* pCond, Mutex* pMut )
 }
 
 bool
-timedWaitCondition ( Condition* pCond, Mutex* pMut, Time timeout )
+waitConditionTimedRelative ( Condition* pCond, Mutex* pMut, Time timeout )
 {
   // If we pass a timeout of 0 SleepConditionVariableSRW will return immediately
   // https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-sleepconditionvariablesrw
