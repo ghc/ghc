@@ -1548,7 +1548,7 @@ waitForGcThreads (Capability *cap, bool idle_cap[])
         }
         // this 1ms timeout is not well justified. It's the shortest timeout we
         // can use on windows. It seems to work well for me.
-        timedWaitCondition(&gc_entry_arrived_cv, &gc_entry_mutex, USToTime(1000));
+        waitConditionTimedRelative(&gc_entry_arrived_cv, &gc_entry_mutex, USToTime(1000));
         t2 = getMonotonicTime();
         if (RtsFlags.GcFlags.longGCSync != 0 &&
             t2 - t1 > RtsFlags.GcFlags.longGCSync) {

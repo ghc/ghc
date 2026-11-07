@@ -144,7 +144,8 @@ waitCondition ( Condition* pCond, Mutex* pMut )
 }
 
 bool
-timedWaitCondition ( Condition* pCond, Mutex* pMut, Time timeout) {
+waitConditionTimedRelative ( Condition* pCond, Mutex* pMut, Time timeout )
+{
     struct timespec ts;
 
 #if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)

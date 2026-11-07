@@ -244,8 +244,12 @@ extern void closeCondition        ( Condition* pCond );
 extern void broadcastCondition    ( Condition* pCond );
 extern void signalCondition       ( Condition* pCond );
 extern void waitCondition         ( Condition* pCond, Mutex* pMut );
+
+// Like waitCondition but with a maximum timeout duration. As the name
+// suggests, this is a relative time duration, not an absolute expiry time.
 // Returns false on timeout, true otherwise.
-extern bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout);
+extern bool waitConditionTimedRelative ( Condition* pCond, Mutex* pMut,
+                                         Time timeout );
 
 //
 // Mutexes
