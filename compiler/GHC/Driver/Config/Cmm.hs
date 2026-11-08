@@ -18,6 +18,7 @@ initCmmConfig dflags = CmmConfig
   , cmmDoLinting           = gopt Opt_DoCmmLinting        dflags
   , cmmOptElimCommonBlks   = gopt Opt_CmmElimCommonBlocks dflags
   , cmmOptSink             = gopt Opt_CmmSink             dflags
+  , cmmOptRefetchFields    = False  -- doCodeGen alone turns it on
   , cmmOptThreadSanitizer  = gopt Opt_CmmThreadSanitizer dflags
   , cmmGenStackUnwindInstr = debugLevel dflags > 0
   , cmmExternalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags

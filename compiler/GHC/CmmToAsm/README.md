@@ -144,7 +144,7 @@ First confirm the wrong result against an oracle:
   For a Haskell module it changes the Cmm as well.
 
 Then switch off or swap the passes that have a flag, one at a time
-and the latest first, as each changes only what follows it:
+and the latest first:
 
 * step 11: `-fno-block-layout-cfg`, which lays the blocks out
   by `sequenceBlocks`, with the CFG's weights, or without them
@@ -152,7 +152,9 @@ and the latest first, as each changes only what follows it:
 * step 10: `-fno-cmm-static-pred`;
 * step 9: `-fno-asm-shortcutting`;
 * step 6: `-fregs-graph` or `-fregs-iterative` in place of the linear allocator;
-* in the Cmm pipeline: `-fno-cmm-sink`, `-fno-cmm-elim-common-blocks`
+* in the Cmm pipeline: `-fno-cmm-sink`, which also stops stack layout loading
+  fields again after a call (Note [Fields loaded again after a call]
+  in `GHC.Cmm.LayoutStack`), `-fno-cmm-elim-common-blocks`
   and `-fno-cmm-control-flow`.
 
 The other steps have no flag of their own. `-dcmm-lint` and `-dasm-lint` catch

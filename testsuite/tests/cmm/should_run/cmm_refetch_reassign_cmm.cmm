@@ -1,0 +1,47 @@
+#include "Cmm.h"
+
+// Stack layout loads a field again after a call from its constructor's
+// variable only in Cmm generated from STG (Note [Fields loaded again after a
+// call] in GHC.Cmm.LayoutStack), saving it where that variable is assigned
+// again after the field's load; the test checks that in a Cmm file the value
+// loaded is the one used after the call. q is a pointer tagged 1 to a cell of
+// three words: its words 1 and 2 are at q + 7 and q + 15, a field's address
+// for stack layout (GHC.Cmm.LayoutStack.fieldBase) once q is in a GC pointer's
+// register.
+
+fr_id (W_ n) {
+    return (n);
+}
+
+// x loaded from c, then c assigned again in the same block, both live across
+// the call: after the call x is 1, the first cell's word, and c the second cell
+fr_block (W_ q) {
+    P_ c; W_ x;
+    c = q;
+    x = W_[c + 7];
+    c = W_[c + 15];
+    (W_ r) = call fr_id(x);
+    return (x + (W_[c + 7] << 8) + (r << 16));
+}
+
+// the same in two blocks that cmmCfgOpts merges before stack layout
+fr_merge (W_ q) {
+    P_ c; W_ x;
+    c = q;
+    x = W_[c + 7];
+    goto next;
+  next:
+    c = W_[c + 15];
+    (W_ r) = call fr_id(x);
+    return (x + (W_[c + 7] << 8) + (r << 16));
+}
+
+// control: c assigned before the load only, so that the result is the same
+// whether or not x is loaded again after the call
+fr_ctl (W_ q) {
+    P_ c; W_ x;
+    c = W_[q + 15];
+    x = W_[c + 7];
+    (W_ r) = call fr_id(x);
+    return (x + (W_[c + 7] << 8) + (r << 16));
+}

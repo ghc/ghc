@@ -54,6 +54,7 @@ module GHC.StgToCmm.Monad (
 
         -- ideally we wouldn't export these, but some other modules access internal state
         getState, setState, getSelfLoop, withSelfLoop, getStgToCmmConfig,
+        noteConFields,
 
         -- more localised access to monad state
         CgIdInfo(..),
@@ -707,6 +708,12 @@ emitCgStmt stmt
         ; setState $ state { cgs_stmts = cgs_stmts state `snocOL` stmt }
         }
 
+-- | Record the registers of a case alternative that loads every field of its
+-- constructor, or (True) of a function closure's free variables, for stack
+-- layout: see Note [Fields loaded again after a call] in GHC.Cmm.LayoutStack
+noteConFields :: Bool -> [LocalReg] -> FCode ()
+noteConFields fvs regs = emitCgStmt (CgConFields fvs regs)
+
 emitLabel :: BlockId -> FCode ()
 emitLabel id = do tscope <- getTickScope
                   emitCgStmt (CgLabel id tscope)
@@ -782,15 +789,23 @@ emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalRegUse] -> CmmAGraphScoped
          -> Int -> Bool -> FCode ()
 emitProc mb_info lbl live blocks offset do_layout
   = do  { l <- newBlockId
+        ; cfg <- getStgToCmmConfig
         ; let
               blks :: DCmmGraph
-              blks = labelAGraph l blocks
+              -- labelAGraph where no field is recorded (by labelAGraphConFields
+              -- always, the compiler ran 0.009% more instructions and allocated
+              -- 0.018% more compiling T9961 at -O0, on GHC 10.1.20261108; at
+              -- -O1 and -O2 both call labelAGraphConFields)
+              !(blks, fields)
+                | stgToCmmConFields cfg = labelAGraphConFields l blocks
+                | otherwise             = (labelAGraph l blocks, [])
 
               infos | Just info <- mb_info = [((g_entry blks), info)]
                     | otherwise            = []
 
               sinfo = StackInfo { arg_space = offset
-                                , do_layout = do_layout }
+                                , do_layout = do_layout
+                                , con_fields = fields }
 
               tinfo = TopInfo { info_tbls = DWrap infos
                               , stack_info=sinfo}

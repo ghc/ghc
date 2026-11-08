@@ -109,6 +109,34 @@ test('cmm_swoff',
      multi_compile_and_run,
      ['cmm_swoff', [('cmm_swoff_cmm.cmm', '')], ''])
 
+# Hand-written Cmm: a field loaded from a constructor's variable that its block
+# then assigns again, both live across a call: the test checks that the value
+# loaded is the one used, where loading the field again after the call would
+# read it from the variable's new value (stack layout loads no field again in a
+# Cmm file)
+test('cmm_refetch_reassign',
+     [ req_cmm
+     , when(wordsize(32), skip)
+     , extra_ways(['optasm'])
+     , when(have_llvm(), extra_ways(['optasm', 'optllvm']))
+     ],
+     multi_compile_and_run,
+     ['cmm_refetch_reassign', [('cmm_refetch_reassign_cmm.cmm', '')], ''])
+
+# Hand-written Cmm: a word loaded through a GC pointer's local at an offset
+# that is no multiple of the word size and written before its use, across a
+# call: the test checks that the value loaded is the one used, where loading
+# the word again after the call would read what was written (stack layout loads
+# no field again in a Cmm file)
+test('cmm_refetch_store',
+     [ req_cmm
+     , when(wordsize(32), skip)
+     , extra_ways(['optasm'])
+     , when(have_llvm(), extra_ways(['optasm', 'optllvm']))
+     ],
+     multi_compile_and_run,
+     ['cmm_refetch_store', [('cmm_refetch_store_cmm.cmm', '')], ''])
+
 # A loop whose back edges arrive deeper than its one continuation that is not
 # cold, with a variable in one slot on each: the stack map its head was seeded
 # with named a slot below its Sp, and the compiler died setting up the next

@@ -147,7 +147,7 @@ import GHC.Iface.Env ( trace_if )
 import GHC.Stg.EnforceEpt.TagSig (seqTagSig)
 import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
-import GHC.Cmm.Config (CmmConfig)
+import GHC.Cmm.Config (CmmConfig(..))
 import Data.Bifunctor
 
 
@@ -999,7 +999,10 @@ doCodeGen hsc_env this_mod mod_loc denv tycons
 
         ppr_stream1 = Stream.mapM (liftIO . dump1) cmm_stream
 
-        cmm_config = initCmmConfig dflags
+        -- Cmm generated from STG: see Note [Fields loaded again after a call]
+        -- in GHC.Cmm.LayoutStack
+        cmm_config = (initCmmConfig dflags)
+          { cmmOptRefetchFields = gopt Opt_CmmSink dflags }
 
         pipeline_stream :: CgStream CmmGroupSRTs CmmCgInfos
         pipeline_stream = do

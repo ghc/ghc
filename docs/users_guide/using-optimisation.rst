@@ -253,6 +253,9 @@ as such you shouldn't need to set any of them explicitly. A flag
     This optimisation attempts to move variable bindings closer
     to their usage sites. It also inlines simple expressions like
     literals or registers.
+    It also makes stack layout save a constructor, or a function closure,
+    across a call in place of the fields or free variables used after it,
+    and load those from it again after the call.
 
 .. ghc-flag:: -fcmm-static-pred
     :shortdesc: Enable static control flow prediction. Implied by :ghc-flag:`-O`.
