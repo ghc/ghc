@@ -318,7 +318,9 @@ test('T7919', [ when(fast(), skip)
 
 test('T8035', normal, compile_and_run, [''])
 
-test('T8209', [ req_target_smp, req_ghc_smp, only_ways(threaded_ways), ignore_stdout ],
+test('T8209', [ req_target_smp, req_ghc_smp, only_ways(threaded_ways), ignore_stdout,
+                when(opsys('freebsd') or opsys('darwin'),
+                     fragile_for(27948, ['ghci', 'ghci-opt'])) ],
               compile_and_run, [''])
 
 test('T8242', [ req_target_smp, req_ghc_smp, only_ways(threaded_ways), ignore_stdout ],
