@@ -1081,7 +1081,7 @@ insertReloadsAsNeeded platform procpoints final_stackmaps entry blocks =
             (middle1, live_with_reloads)
                 | entry_label `setMember` procpoints
                 = let reloads = insertReloads platform stackmap live_at_middle0
-                  in (foldr blockCons middle0 reloads, emptyRegSet)
+                  in (withReloads reloads middle0, emptyRegSet)
                 | otherwise
                 = (middle0, live_at_middle0)
 
@@ -1103,6 +1103,22 @@ insertReloads platform stackmap live =
      ]
    where
      sp_off = sm_sp stackmap
+
+-- | The reloads put at the start of a block's middle, after the unwind
+-- it starts with under -g ('maybeAddSpAdj'): before it, they would run under
+-- the Sp rule of the block laid out before this one, which at a return point
+-- would also describe its return address (Note [Info Offset] in
+-- "GHC.CmmToAsm.Dwarf.Types"), as at -O0, where no sinking moves them.
+withReloads :: [CmmNode O O] -> Block CmmNode O O -> Block CmmNode O O
+withReloads reloads middle = foldr reload middle reloads
+  where
+    -- one foldr, which fuses with a list comprehension giving the reloads
+    reload r b = case b of
+      BCons u@(CmmUnwind {}) rest -> u `BCons` (r `blockCons` rest)
+      BMiddle u@(CmmUnwind {})    -> u `BCons` (r `BCons` BNil)
+      BNil                        -> BMiddle r
+      _                           -> r `BCons` b
+{-# INLINE withReloads #-}
 
 -- -----------------------------------------------------------------------------
 -- Lowering safe foreign calls
