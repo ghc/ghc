@@ -114,7 +114,8 @@ cpsTop logger platform cfg reentered recs dus proc =
       dump Opt_D_dump_cmm_cfg "Post control-flow optimisations (1)" l g
 
       let !TopInfo {stack_info=StackInfo { arg_space = entry_off
-                                         , do_layout = do_layout }} = h
+                                         , do_layout = do_layout
+                                         , con_fields = con_fields }} = h
 
       ----------- Eliminate common blocks -------------------------------------
       g <- {-# SCC "elimCommonBlocks" #-}
@@ -177,7 +178,9 @@ cpsTop logger platform cfg reentered recs dus proc =
       ((g, stackmaps, split_bodies), dus) <- pure $
          {-# SCC "layoutStack" #-}
          if do_layout
-            then runUniqueDSM dus $ cmmLayoutStack cfg self_lbl rec_lbls lift_frames proc_points entry_off g
+            then runUniqueDSM dus $
+                   cmmLayoutStack cfg self_lbl rec_lbls lift_frames proc_points
+                                  entry_off con_fields g
             else ((g, mapEmpty, mapEmpty), dus)
       dump Opt_D_dump_cmm_sp "Layout Stack" l g
 

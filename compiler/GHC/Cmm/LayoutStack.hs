@@ -32,7 +32,7 @@ import GHC.Data.Graph.Directed ( Node(..), SCC(..), flattenSCC
                                , stronglyConnCompFromEdgedVerticesUniq )
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set ( differenceUniqueSet, filterUniqueSet
-                            , sizeUniqueSet )
+                            , foldlUniqueSet, sizeUniqueSet )
 import GHC.Cmm.LRegSet
 import GHC.Types.Unique.DSM
 import GHC.Utils.Misc
@@ -41,6 +41,8 @@ import GHC.Utils.Outputable hiding ( isEmpty )
 import GHC.Utils.Panic
 import qualified Data.Set as Set
 import qualified Data.Map.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntSet as IntSet
 import Control.Monad.Fix
 import Data.Array as Array
 import Data.Array.ST ( STUArray, newArray, readArray, writeArray )
@@ -49,6 +51,7 @@ import Control.Monad.ST ( ST, runST )
 import Data.STRef ( newSTRef, readSTRef, writeSTRef, modifySTRef' )
 import Data.List (nub, partition, sortOn)
 import Data.List.NonEmpty ( NonEmpty (..) )
+import GHC.Exts ( noinline )
 
 {- Note [Stack Layout]
    ~~~~~~~~~~~~~~~~~~~
@@ -249,15 +252,18 @@ instance Outputable StackMap where
 
 cmmLayoutStack :: CmmConfig -> Maybe CLabel -> Set.Set CLabel -> LiftFrames
                -> ProcPointSet
-               -> ByteOff -> CmmGraph
+               -> ByteOff -> [(Bool, [LocalReg])] -> CmmGraph
                -> UniqDSM (CmmGraph, LabelMap StackMap, LabelMap BlockId)
 cmmLayoutStack cfg self_lbl rec_lbls lift_frames procpoints entry_args
-               graph@(CmmGraph { g_entry = entry })
+               con_fields graph@(CmmGraph { g_entry = entry })
   = do
     -- We need liveness info. Dead assignments are removed later
     -- by the sinking pass.
-    let liveness = cmmLocalLivenessL platform graph
+    let liveness0 = cmmLocalLivenessL platform graph
         blocks   = revPostorder graph
+        -- See Note [Fields loaded again after a call]
+        !(liveness, refetch_out) = refetchPass cfg platform procpoints entry
+                                     con_fields liveness0 blockmap blocks
         profile  = cmmProfile   cfg
         platform = profilePlatform profile
         -- the variables live on entry to each proc point, the only labels
@@ -384,8 +390,8 @@ cmmLayoutStack cfg self_lbl rec_lbls lift_frames procpoints entry_args
                            new_blocks1
 
     blocks_with_reloads <-
-        insertReloadsAsNeeded platform procpoints final_stackmaps bodies entry
-                              new_blocks
+        insertReloadsAsNeeded platform procpoints final_stackmaps bodies
+                              split_bodies refetch_out entry new_blocks
     new_blocks' <- mapM (lowerSafeForeignCall profile) blocks_with_reloads
     -- joinCallEdges only where layout made a block on an edge into a call:
     -- called for every procedure, it made the compiler run 0.006% more
@@ -2258,9 +2264,10 @@ atMiddle platform blk fb =
       joined = gen_killL platform last $! joinOutFacts liveLatticeL last fb
   in foldNodesBwdOO (gen_killL platform) middle joined
 
--- | Pass 2's liveness, as insertReloadsAsNeeded's rewriteCC passes it on:
--- nothing into a block the predicate holds of, and into a split body
--- the variables live at its middle's start that its stack map does not reload
+-- | Pass 2's liveness, as insertReloadsAsNeeded's rewriteCC passes it on
+-- where no field is loaded again: nothing into a block the predicate holds
+-- of, and into a split body the variables live at its middle's start that
+-- its stack map does not reload
 reloadXfer :: Platform -> (BlockId -> Bool) -> LabelMap StackMap
            -> TransferFun LRegSet
 reloadXfer platform stops slots = \blk fb ->
@@ -2600,24 +2607,92 @@ laterSearch fc_res st0 r = go setEmpty setEmpty [(st0, False)] 0
 -- Pass 2
 -- -----------------------------------------------------------------------------
 
+-- | Pass 2, loading again after the calls the fields of the 'Refetches'
+-- given, Note [Fields loaded again after a call]
 insertReloadsAsNeeded
     :: Platform
     -> ProcPointSet
     -> LabelMap StackMap
     -> LabelMap StackMap  -- split bodies' own reloads
+    -> LabelMap BlockId   -- split bodies' continuations
+    -> Refetches
     -> BlockId
     -> [CmmBlock]
     -> UniqDSM [CmmBlock]
-insertReloadsAsNeeded platform procpoints final_stackmaps bodies entry blocks =
-    toBlockList . fst <$>
+insertReloadsAsNeeded platform procpoints final_stackmaps bodies split_bodies
+                      refetch entry blocks =
+    -- noinline, a workaround for an issue whose cause is unidentified and whose
+    -- effect was observed: where this function inlines into cmmLayoutStack, its
+    -- one caller, toBlockList's list fuses with the mapM over it, which then
+    -- builds and calls a closure for each block (inlined, it made the compiler
+    -- run 0.055% more instructions and allocate 0.079% more compiling T9961 at
+    -- -O0, 0.018% more and 0.026% more compiling T12707 at -O, and 0.017% more
+    -- and 0.022% more compiling nofib's puzzle at -O2, on GHC 10.1.20261108)
+    noinline toBlockList . fst <$>
         rewriteCmmBwd liveLatticeL rewriteCC (ofBlockList entry blocks) mapEmpty
   where
+    -- a split body's reloads and loads, with what it takes in registers
+    split sm fields live middle =
+      let reloads = insertReloadsFields platform sm fields live
+          loaded  = foldl' (flip insertLRegSet) emptyLRegSet
+                           [ x | (x, _, _) <- fields ]
+          needed  = foldl' (flip insertLRegSet) live
+                           [ c | (_, c, _) <- fields ]
+      in ( withReloads reloads middle
+         , filterUniqueSet (\r -> not (r `elemUFM_Directly` sm_regs sm))
+                           (needed `differenceUniqueSet` loaded) )
+    -- whether any field is loaded again (none is without -fcmm-sink), computed
+    -- once, so that a procedure loading none calls fieldLoads at no proc point
+    -- and tests no block's label against split_bodies (without it, the compiler
+    -- ran 0.012% more instructions and allocated 0.007% more compiling nofib's
+    -- puzzle at -O0, 0.004% more and 0.004% more compiling T12707 at -O, and
+    -- 0.007% more and 0.004% more compiling nofib's puzzle at -O2, on GHC
+    -- 10.1.20261108)
+    !refetching = case refetch of
+        Refetches [] _ _ _ -> False
+        _                  -> True
+    stackmapOf l = case mapLookup l final_stackmaps of
+        Just sm -> sm
+        Nothing -> panic "insertReloadsAsNeeded: rewriteCC: stackmap"
+    -- the blocks a heap check ending a proc point or a split body passes to,
+    -- each neither and with no other predecessor, with the check's block and
+    -- the variables it and its GC call's block use or assign
+    passes :: LabelMap (BlockId, LRegSet)
+    passes
+      | null checks = mapEmpty
+      | otherwise   = mapFromList
+          [ (s, (entryLabel b, regsIn b (regsIn gb emptyLRegSet)))
+          | (b, g, s) <- checks, mapLookup s preds == Just (1 :: Int)
+          , Just gb <- [mapLookup g gcs] ]
+      where
+        checks = [ (b, g, s)
+                 | b <- blocks, let l = entryLabel b
+                 , l `setMember` procpoints || l `mapMember` split_bodies
+                 , CmmCondBranch { cml_true = g, cml_false = s
+                                 , cml_likely = Just False } <- [lastNode b]
+                 , g /= s, not (s `setMember` procpoints)
+                 , foldBlockNodesF (assignsGlobal Hp) b False ]
+        targets = setFromList (concat [ [g, s] | (_, g, s) <- checks ])
+        preds = mapFromListWith (+)
+                  [ (s, 1) | b <- blocks, s <- successors (lastNode b)
+                           , s `setMember` targets ]
+        gcs = mapFromList
+                [ (l, b) | b <- blocks, let l = entryLabel b
+                         , l `setMember` targets, CmmCall{} <- [lastNode b]
+                         , foldBlockNodesF (assignsGlobal HpAlloc) b False ]
+        assignsGlobal :: GlobalReg -> CmmNode e x -> Bool -> Bool
+        assignsGlobal r n a = a || case n of
+          CmmAssign (CmmGlobal (GlobalRegUse r' _)) _ -> r' == r
+          _                                           -> False
+        regsIn :: CmmBlock -> LRegSet -> LRegSet
+        regsIn blk acc = foldBlockNodesF one blk acc
+          where
+            one :: CmmNode e x -> LRegSet -> LRegSet
+            one n a = foldLocalRegsDefd platform (flip insertLRegSet)
+                        (foldLocalRegsUsed platform (flip insertLRegSet) a n) n
     rewriteCC :: RewriteFun CmmLocalLive
     rewriteCC (BlockCC e_node middle0 x_node) fact_base0 = do
         let entry_label = entryLabel e_node
-            stackmap = case mapLookup entry_label final_stackmaps of
-                Just sm -> sm
-                Nothing -> panic "insertReloadsAsNeeded: rewriteCC: stackmap"
 
             -- Merge the liveness from successor blocks and analyse the last
             -- node.
@@ -2631,17 +2706,42 @@ insertReloadsAsNeeded platform procpoints final_stackmaps bodies entry blocks =
             -- to a proc point.
             (middle1, live_with_reloads)
                 | entry_label `setMember` procpoints
-                = let reloads = insertReloads platform stackmap live_at_middle0
+                = let stackmap = stackmapOf entry_label
+                      reloads
+                        | refetching
+                        = insertReloadsFields platform stackmap
+                            (fieldLoads refetch stackmap live_at_middle0)
+                            live_at_middle0
+                        | otherwise
+                        = insertReloads platform stackmap live_at_middle0
                   in (withReloads reloads middle0, emptyLRegSet)
                 -- A body split off a continuation reloads itself the
                 -- variables in their slots on both paths, Note [Tagged path
-                -- skips the reloads]
+                -- skips the reloads], and loads again the fields the
+                -- continuation saved nowhere (Note [Fields loaded again after
+                -- a call]), its frame being the continuation's
                 | Just sm <- mapLookup entry_label bodies
-                = let reloads = insertReloads platform sm live_at_middle0
-                  in ( withReloads reloads middle0
-                     , filterUniqueSet
-                         (\r -> not (r `elemUFM_Directly` sm_regs sm))
-                         live_at_middle0 )
+                = split sm (fieldLoads refetch (stackmapOf entry_label)
+                                       live_at_middle0)
+                        live_at_middle0 middle0
+                | refetching
+                , entry_label `mapMember` split_bodies
+                , let stackmap = stackmapOf entry_label
+                , fields@(_ : _) <- fieldLoads refetch stackmap live_at_middle0
+                = split stackmap { sm_regs = emptyUFM } fields live_at_middle0
+                        middle0
+                -- A block a heap check passes to loads, by the check's frame,
+                -- the fields that pass through the check, below it (Note
+                -- [Fields loaded again after a call])
+                | refetching
+                , Just (b, busy) <- mapLookup entry_label passes
+                , let stackmap = stackmapOf b
+                , fields@(_ : _) <- [ f | f@(x, _, _) <- fieldLoads refetch
+                                                           stackmap
+                                                           live_at_middle0
+                                        , not (x `elemLRegSet` busy) ]
+                = split stackmap { sm_regs = emptyUFM } fields live_at_middle0
+                        middle0
                 | otherwise
                 = (middle0, live_at_middle0)
 
@@ -2679,6 +2779,767 @@ withReloads reloads middle = foldr reload middle reloads
       BNil                        -> BMiddle r
       _                           -> r `BCons` b
 {-# INLINE withReloads #-}
+
+-- | The reloads of the variables live in their slots, the constructors'
+-- variables of the fields given included, and then the fields' loads
+insertReloadsFields :: Platform -> StackMap -> [(LocalReg, LocalReg, CmmExpr)]
+                    -> CmmLocalLive -> [CmmNode O O]
+insertReloadsFields platform stackmap fields live =
+     -- no field: the reloads alone (by the second alternative always, the
+     -- compiler ran 0.002% more instructions and allocated 0.003% more
+     -- compiling nofib's puzzle at -O0, 0.002% more and 0.004% more at -O1, and
+     -- 0.008% more and 0.015% more at -O2, on GHC 10.1.20261108)
+     case fields of
+       [] -> insertReloads platform stackmap live
+       _  -> insertReloads platform stackmap
+               (foldl' (flip insertLRegSet) live
+                       [ c | (_, c, _) <- fields ])
+             ++ [ CmmAssign (CmmLocal x) load | (x, _, load) <- fields ]
+
+-- | The fields live here that the frame has in no slot while it has their
+-- constructors' variables in slots, each with its variable and its load, in
+-- the order of those slots and the fields' offsets.
+-- See Note [Fields loaded again after a call]
+fieldLoads :: Refetches -> StackMap -> CmmLocalLive
+           -> [(LocalReg, LocalReg, CmmExpr)]
+fieldLoads (Refetches fields _ _ _) stackmap live =
+  [ (x, c, load) | (_, x, c, load) <- sortOn (\(k, _, _, _) -> k) found ]
+  where
+    regs  = sm_regs stackmap
+    found = [ ((c_off, off), x, c, load)
+            | (x, (c, off, load)) <- fields
+            , x `elemLRegSet` live
+            , not (x `elemUFM` regs)
+            , Just (_, c_off) <- [lookupUFM regs c] ]
+
+-- -----------------------------------------------------------------------------
+-- Fields loaded again after a call
+
+{- Note [Fields loaded again after a call]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A case alternative loads the fields of the constructor it uses where it
+starts (GHC.StgToCmm.DataCon.bindConArgs), so a field used only after a call
+is loaded before the call and saved across it, beside the constructor's
+variable c where that is live across the call too (#20334):
+
+     x = I64[c + 7];
+     P64[Sp - 16] = c;
+     I64[Sp - 8] = x;
+     call f() returns to L;
+  L: c = P64[Sp + 8];
+     x = I64[Sp + 16];
+
+Holding a constructor across a call in place of its fields would keep all its
+fields alive where only some are live (#20333). But where c is saved anyway,
+its slot keeps them alive already, and a constructor is immutable, so x can be
+loaded from it again after the call:
+
+     P64[Sp - 8] = c;
+     call f() returns to L;
+  L: c = P64[Sp + 8];
+     x = I64[c + 7];
+
+which saves the store and the slot of x, and with sinking the load before the
+call, then dead. Without sinking (-O0) that load stays, and loading x again
+would save only the store, at the cost of finding the fields: so only where
+sinking runs.
+
+Where c is dead across the call but every field of its constructor is live
+across it, c's slot in place of theirs keeps alive nothing they do not but c's
+own words, so c is saved instead, here for two fields used only after the call:
+
+     P64[Sp - 8] = c;
+     call f() returns to L;
+  L: c = P64[Sp + 8];
+     x = I64[c + 7];
+     y = I64[c + 15];
+
+which saves the stores and the slots of the fields but one, and the loads
+before the call, at the cost of the reload of c. Across a later call where only
+some of the fields are live, those are saved, as c's slot there would keep
+the others alive; so c is saved in their place only where two or more of them
+are saved across no such call, a list cell saved in place of its head and its
+tail, the tail saved again for the next call, replacing no store but changing
+the frame. Where none of the fields is live at a proc point that is neither
+the entry nor a continuation only heap checks' calls to the collector return
+to, the fields are saved across those calls instead: c held until such a call
+costs the path passing the check a register, and saves stores only on the other
+(with c saved there, nofib's boyer ran 0.21% more instructions, copying c to
+another register to hold it to the check, and multiplier 0.26% more). Across a
+diamond's call (Note [diamond proc point]) to a body using some of the fields
+the fields are saved too, as the tagged path has them in registers, where
+the body split off L (Note [Tagged path skips the reloads]) would load them
+from c again, or move c out of R1 to keep it beside them: IntSet's foldl' ran
+2.8% more instructions so, loading a Tip's two fields twice on each, and the
+lookupGE benchmarks' fold one move more an element. Which fields a constructor
+has the code does not show, an alternative loading only those it uses, so the
+code generator lists in the procedure's CmmStackInfo (con_fields) the registers
+of each alternative that loads every field of its constructor, two or more, a
+single field gaining nothing so.
+
+A function closure loads its free variables where its code starts
+(GHC.StgToCmm.Bind), and the code generator lists their registers too, two or
+more, as an alternative's, marked so that the diamond rule above does not hold
+them: across a diamond's call the closure is saved in their place too, and the
+body split off L loads them from it (#20333). For k free variables the tagged
+path then saves their k loads and k stores for a move of the closure out of R1
+and its store, and pays its reload and the k loads from it, which fold into
+their uses as reloads from the stack do, where a heap check follows only if
+Pass 2 loads them below it (below): 2k - 3 instructions fewer, less one for each
+used after a store to the heap, which its load does not pass, and 3 - k more
+where they stay above the check (with two, one of them used after the stores of
+a new Int box, containers' set traverseSum folds ran as many instructions, and
+0.6% to 0.7% more, one an element, loaded above the check). Saving the closure
+holds it from its assignment to the call, beside the free variables used on the
+way, so where the blocks reached from its assignment without passing a proc
+point hold a loop, on the way to the call or not, it is saved in their place
+only where one of them is used in none of those blocks that assign the closure
+or start with it dead, the closure being live in the others anyway: where all
+were, spectral-norm's timesAtAv, over four free variables two of which its loops
+use and two of which a call after them takes, held one register more in its
+loops and ran 5.9% more instructions. Without a loop that register costs one
+spill and reload at most, and saving the closure in place of k free variables
+saves k - 1 stores for one load more. A constructor's alternative keeps the rule
+above, loop or not: where a loop before the call used three of four fields and
+the call took the fourth, holding c beside them spilled nothing, and saving the
+fields in its place cost two instructions more a call.
+
+A field is told from other loads by its address: a word, naturally aligned,
+loaded from a GC pointer plus an offset that is not a multiple of the word
+size. Heap objects are aligned to words, so such a pointer is tagged, and
+a tagged pointer points to a constructor or a function, whose fields and free
+variables are immutable. A load from a mutable object, or from memory the call
+may write, could not be repeated after the call; the code generator marks
+a load of a word from a byte array at an offset it does not know to be
+aligned Unaligned (alignmentFromTypes in GHC.StgToCmm.Prim).
+
+So Pass 1 leaves such a field x out of the variables live at a proc point L,
+and saves it nowhere there, where:
+
+  * x is assigned once in the procedure, by that load from c;
+  * x is dead at the start of each block assigning c, so that wherever x is
+    live c holds the constructor x was loaded from;
+  * at each proc point where x and c are live and x is needed after it ---
+    used in the blocks reached from it without passing a proc point, or saved
+    at a proc point those blocks reach, or those blocks more than sixteen ---
+    c is used in the first sixteen of them, so that Pass 2 reloads c there
+    anyway and loading x again costs the one load reloading x would; where x
+    is not needed, its load there is dead and Sink drops it;
+  * at each proc point where x is live and c dead, x is one of an
+    alternative's registers listed so, each of them meeting these conditions;
+  * c is not itself such a field, so that c is in a slot where it is live;
+    and
+  * at L, c is live, or every register of x's alternative is and two or more of
+    them are live at no proc point where c and some register of the alternative
+    are dead, nor, unless they are a function closure's free variables, at a
+    diamond's continuation where c is dead whose first sixteen blocks use one
+    of them, one of them is live at some proc point that is neither the entry
+    nor a continuation only heap checks' calls to the collector return to, and,
+    where they are a function closure's free variables, the blocks reached from
+    c's assignment without passing a proc point hold no cycle, or one of them
+    is used in none of those blocks that assign c or start with c dead, Pass 1
+    then saving c at L in their place: so c is saved only where it keeps alive
+    no field that is dead and replaces two or more stores, and a closure is held
+    around a loop only in place of a free variable.
+
+Left out at some proc points where c is live and not others, x would be
+loaded from c after one call and stored again for the next, in a loop on every
+turn: Data.Graph's buildG and transposeG, whose accumArray keeps two Int boxes
+and their Int#s across the evaluation of each element, the boxes not used in
+that loop, ran up to 7% more instructions so. Hence one decision for all the
+proc points where c is live. Where c is dead the decision is made at each proc
+point, by liveness alone, which cannot give that shape: a cycle that does not
+assign c either assigns a field, from c, so that c is live at every block
+of it, or assigns none, so that c and each field are live at every block of it
+if at one, and every proc point of it takes the same decision. And
+along a path assigning neither c nor its fields, c and a field once dead stay
+dead, so that c is saved in place of the fields before, never after, some
+of them are saved.
+
+Pass 2 then loads x from c at L, after the reloads, where x is live and in no
+slot. Where L's body is split off (Note [Tagged path skips the reloads]), the
+body loads x itself, from c in its register or reloaded there, so that on the
+tagged path too x is loaded after the test, on the paths that use it; where x
+is also used before the test, that is one load more on the tagged path. Where
+L, or that body, ends in a heap check, the block the check passes to, entered
+from it alone, loads instead the fields that neither the check's block nor
+its GC call's block uses or assigns: Sink moves no load from the heap past an
+assignment of Hp (GHC.Cmm.Sink), so loaded above the check they would not fold
+into their uses, and the GC call returns to L, which reloads c.
+-}
+
+-- | The fields a continuation may load again from their constructors, each
+-- with its constructor's variable, the load's offset from it, and the load,
+-- as a list and by field, those some proc point where they and their
+-- constructors' variables are live cannot load again, and those live at
+-- a proc point where their constructor's variable is dead, each with its
+-- alternative's registers: Note [Fields loaded again after a call]
+data Refetches = Refetches [(LocalReg, (LocalReg, Int, CmmExpr))]
+                           (UniqFM LocalReg (LocalReg, Int, CmmExpr))
+                           (UniqFM LocalReg ())
+                           (UniqFM LocalReg [LocalReg])
+
+noRefetches :: Refetches
+noRefetches = Refetches [] emptyUFM emptyUFM emptyUFM
+
+-- | A listed alternative's registers in fieldRefetches' walk over the proc
+-- points: those live at no proc point where some of them are dead and their
+-- constructor's variable is dead; the diamonds' continuations where all of them
+-- are live and that variable is dead, with them; those live at some proc point
+-- where that variable is dead; and whether one of them is live at a proc point
+-- that is not a continuation only heap checks' calls to the collector return to
+data AtGroup = AtGroup [LocalReg] [(BlockId, [LocalReg])] [LocalReg] Bool
+
+-- | The constructor's variable of a field: a word loaded, naturally aligned,
+-- from a local GC pointer plus an offset that is not a multiple of the word
+-- size
+fieldBase :: Platform -> CmmExpr -> Maybe LocalReg
+fieldBase platform (CmmLoad addr ty NaturallyAligned)
+  | typeWidth ty == wordWidth platform
+  = case addr of
+      CmmRegOff (CmmLocal c) k | field c (toInteger k) -> Just c
+      CmmMachOp (MO_Add _) [CmmReg (CmmLocal c), CmmLit (CmmInt k _)]
+        | field c k -> Just c
+      CmmMachOp (MO_Sub _) [CmmReg (CmmLocal c), CmmLit (CmmInt k _)]
+        | field c k -> Just c
+      _ -> Nothing
+  where field c k = isGcPtrType (localRegType c)
+                    && k `rem` toInteger (platformWordSizeInBytes platform) /= 0
+fieldBase _ _ = Nothing
+
+-- | The offset a field's load adds to its constructor's variable
+fieldOffset :: CmmExpr -> Int
+fieldOffset (CmmLoad (CmmRegOff _ k) _ _) = k
+fieldOffset (CmmLoad (CmmMachOp (MO_Add _) [_, CmmLit (CmmInt k _)]) _ _)
+  = fromInteger k
+fieldOffset (CmmLoad (CmmMachOp (MO_Sub _) [_, CmmLit (CmmInt k _)]) _ _)
+  = fromInteger (negate k)
+fieldOffset _ = 0
+
+-- | The fields assigned once, each dead at the start of every block assigning
+-- its constructor's variable, whose chains of constructors' variables that are
+-- such fields themselves end, as they do where each variable is assigned
+-- before it is read.
+fieldRefetches :: Platform -> ProcPointSet -> [(BlockId, CmmLocalLive)]
+               -> [(Bool, [LocalReg])] -> LabelMap CmmLocalLive
+               -> LabelMap CmmBlock
+               -> [CmmBlock] -> Refetches
+fieldRefetches platform procpoints pps groups0 liveness blockmap blocks
+  -- no proc point but the entry, a test made before the loads' walk, or no
+  -- candidate, one made after it: none (without the two tests, the compiler
+  -- ran 0.001% more instructions and allocated no more compiling T9961 at -O0,
+  -- 0.25% more and 0.052% more compiling T3294 at -O, and 0.24% more and 0.05%
+  -- more at -O2, on GHC 10.1.20261108)
+  | null pplive || null cands
+  || all (\(x, _) -> x `elemUFM` unused) cands = noRefetches
+  | otherwise = Refetches [ e | e@(x, _) <- cands, x `elemUFM` final ] final
+                          unused whole
+  where
+    -- the candidates some proc point where they and their constructors'
+    -- variables are live cannot load again, wanting them after it but not
+    -- using those variables in its first blocks; and those live where their
+    -- constructors' variables are dead, with their alternatives' registers
+    -- (the others having left out those of no listed alternative there)
+    unused :: UniqFM LocalReg ()
+    unused = foldl' at emptyUFM pps
+    whole :: UniqFM LocalReg [LocalReg]
+    whole = listToUFM [ (x, groupArr Array.! i)
+                      | (i, AtGroup _ _ xs _) <- IntMap.toList atGroups
+                      , savingArr Array.! i, x <- xs ]
+    at bad (l, live)
+      | null with_c = bad
+      | otherwise = bad'
+      where
+        -- those not yet bad whose constructors' variables are live too: from
+        -- the smaller of live and the candidates (from the candidates always,
+        -- the compiler ran 0.022% more instructions and allocated 0.023% more
+        -- compiling T12707 at -O, 0.039% more and 0.038% more compiling nofib's
+        -- puzzle at -O2, and nothing more at -O0, where no field is recorded,
+        -- on GHC 10.1.20261108)
+        with_c
+          | sizeUniqueSet live <= ncands
+          = foldlUniqueSet (\acc u -> case lookupUFM_Directly candm u of
+                                        Just (x, (c, _, _))
+                                          | c `elemLRegSet` live
+                                          , not (x `elemUFM` bad)
+                                          -> (x, c) : acc
+                                        _ -> acc) [] live
+          | otherwise
+          = [ (x, c) | (x, (c, _, _)) <- cands, x `elemLRegSet` live
+                     , c `elemLRegSet` live, not (x `elemUFM` bad) ]
+        (used, exits, cut)
+          | null with_c = ([], [], False)
+          | otherwise   = regionUses platform procpoints blockmap l
+                            (nubRegs [ c | (_, c) <- with_c ])
+                            [ x | (x, _) <- with_c ]
+        -- whether x is wanted after l: used in l's first blocks, saved at
+        -- a proc point they reach, or those blocks too many to tell
+        needed x c = cut || x `elemReg` used || any (savedAt x c) exits
+        savedAt x c l' = case mapLookup l' liveness of
+          Just live' -> x `elemLRegSet` live' && not (c `elemLRegSet` live')
+                        && not (maybe False
+                                  (\(_, g, s) ->
+                                     s && all (`elemLRegSet` live') g)
+                                  (lookupUFM groupOf x))
+          Nothing    -> True
+        !bad' = addListToUFM bad
+                  [ (x, ()) | (x, c) <- with_c, not (c `elemReg` used)
+                            , needed x c ]
+    !ncands = length cands
+    groups = map snd groups0
+    -- whether each listed group is a function closure's free variables
+    freeArr = listArray (0, length groups - 1) (map fst groups0)
+    -- each register of a listed alternative, with all of them and whether
+    -- they are saving
+    groupOf :: UniqFM LocalReg (Int, [LocalReg], Bool)
+    groupOf = listToUFM [ (x, gs) | (i, g) <- zip [0 ..] groups
+                                  , let gs = (i, g, savingArr Array.! i), x <- g ]
+    savingArr = listArray (0, length groups - 1)
+                          [ maybe False (saving i g) (IntMap.lookup i atGroups)
+                          | (i, g) <- zip [0 ..] groups ]
+    -- whether an alternative's constructor's variable is saved in place of
+    -- its registers: where it replaces two or more stores, two or more of
+    -- them saved at no proc point where they are live, that variable dead and
+    -- some register of the alternative dead, nor, unless they are a function
+    -- closure's free variables, at a diamond's continuation where that variable
+    -- is dead and whose first blocks use some of them; where one of them is
+    -- live at a proc point that is not a continuation only heap checks' calls
+    -- to the collector return to; and, where they are a function closure's free
+    -- variables and the blocks reached from that variable's assignments without
+    -- passing a proc point hold a cycle, only where one of them is used in none
+    -- of those blocks that assign it or start with it dead (each register taken
+    -- to be of one listed alternative, as by groupOf)
+    saving :: Int -> [LocalReg] -> AtGroup -> Bool
+    saving i g (AtGroup left ds _ other)
+      = other && enough left ds'
+        && not (freeArr Array.! i && all used g && any heldRegionLoop heldC)
+      where
+        ds' | freeArr Array.! i = []
+            | otherwise         = ds
+        -- those left after the diamonds' continuations where all of them
+        -- are live, each walked only where it would leave fewer
+        enough left' dls
+          | not (left' `lengthAtLeast` 2) = False
+          | otherwise = case dls of
+              [] -> True
+              (l, xs) : dls'
+                | any (`elemReg` left') xs, bodyUses l g
+                -> enough (filter (\x -> not (x `elemReg` xs)) left') dls'
+                | otherwise -> enough left' dls'
+        used x = x `elemReg` heldUses
+        heldC = take 1 [ c | x <- g
+                           , Just (_, (c, _, _)) <- [lookupUFM candm0 x] ]
+        heldUses = concatMap (`heldRegionUses` g) heldC
+    -- for each listed alternative, by its index, while two or more of its
+    -- registers are live at no proc point where some of them are dead and
+    -- their constructor's variable is dead: those registers, the diamonds'
+    -- continuations where all of them are live and that variable is dead, with
+    -- them, and those live at some proc point where that variable is dead; in
+    -- one walk over the proc points, which leaves an alternative once fewer
+    -- than two remain (over every alternative at every proc point, the
+    -- compiler allocated 0.49% more compiling Data.Colour.Names at -O2, whose
+    -- one function closure's free variables are each live up to one of the
+    -- calls of a chain, on GHC 10.1.20261108)
+    atGroups :: IntMap.IntMap AtGroup
+    atGroups = foldl' atPP (IntMap.fromList [ (i, AtGroup g [] [] False)
+                                            | (i, g) <- zip [0 ..] groups ])
+                      pps
+    atPP alive (l, live)
+      | IntMap.null alive = alive
+      | otherwise         = foldl' (atGroup l) alive (liveGroups live alive)
+    atGroup l alive (i, all_live, xs)
+      | null xs, gc = alive
+      | otherwise   = IntMap.update upd i alive
+      where
+        gc = l `setMember` gcConts
+        upd (AtGroup left ds ws other)
+          | null xs   = Just (AtGroup left ds ws True)
+          | all_live  = Just (AtGroup left (if l `setMember` diamonds
+                                              then (l, xs) : ds else ds)
+                                      (xs ++ ws) other')
+          | left' `lengthAtLeast` 2 = Just (AtGroup left' ds (xs ++ ws) other')
+          | otherwise               = Nothing
+          where left' = filter (\x -> not (x `elemReg` xs)) left
+                !other' = other || not gc
+    -- the listed alternatives with a register in live and still walked, each
+    -- once by its index, whether all of their registers are, and their
+    -- candidates live there whose constructors' variables are dead: from the
+    -- smaller of live and the alternatives' registers (from the alternatives
+    -- always, the compiler ran 0.008% more instructions and allocated 0.002%
+    -- less compiling nofib's puzzle at -O2, and nothing more at -O0 and -O, on
+    -- GHC 10.1.20261108)
+    liveGroups :: CmmLocalLive -> IntMap.IntMap AtGroup
+               -> [(Int, Bool, [LocalReg])]
+    liveGroups live alive
+      | sizeUniqueSet live <= ngroupRegs
+      = [ one i (groupArr Array.! i)
+        | i <- IntSet.toList (foldlUniqueSet idx IntSet.empty live) ]
+      | otherwise
+      = [ one i g | i <- IntMap.keys alive, let g = groupArr Array.! i
+                  , any (`elemLRegSet` live) g ]
+      where
+        idx acc u = case lookupUFM_Directly groupOf u of
+          Just (i, _, _) | i `IntMap.member` alive -> IntSet.insert i acc
+          _                                        -> acc
+        one i g = ( i, all (`elemLRegSet` live) g
+                  , [ x | x <- g, x `elemLRegSet` live, deadCon x ] )
+        deadCon x = case lookupUFM candm0 x of
+          Just (_, (c, _, _)) -> not (c `elemLRegSet` live)
+          Nothing             -> False
+    -- those of the registers given used in the blocks reached from a block
+    -- assigning c without passing a proc point, the assigning blocks and those
+    -- where c is dead where they start, which hold c where they lead to a proc
+    -- point saving it in their place: Note [Fields loaded again after a call]
+    heldRegionUses :: LocalReg -> [LocalReg] -> [LocalReg]
+    heldRegionUses c g = go startSet starts []
+      where
+        starts = conDefBlocks c
+        startSet = setFromList starts
+        go _ [] found = found
+        go seen (y : ys) found = case mapLookup y blockmap of
+          Nothing -> go seen ys found
+          Just (BlockCC _ mid lst) ->
+            let held = y `setMember` startSet
+                       || not (c `elemLRegSet`
+                                 mapFindWithDefault emptyLRegSet y liveness)
+                found' | held      = foldNodesBwdOO uses mid (uses lst found)
+                       | otherwise = found
+                next = [ s | s <- successors lst, not (s `setMember` seen)
+                           , not (s `setMember` procpoints) ]
+            in if all (`elemReg` found') g then found'
+               else go (foldl' (flip setInsert) seen next) (next ++ ys) found'
+        uses :: CmmNode e x -> [LocalReg] -> [LocalReg]
+        uses n a = foldLocalRegsUsed platform
+          (\a' r -> if r `elemReg` g && not (r `elemReg` a') then r : a'
+                                                             else a')
+          a n
+    -- whether the blocks reached from a block assigning c without passing
+    -- a proc point hold a cycle, on the way to a proc point or not
+    heldRegionLoop :: LocalReg -> Bool
+    heldRegionLoop c = not (null (blockCycles (`setMember` region) blocks))
+      where
+        starts = conDefBlocks c
+        region = go (setFromList starts) starts
+        go seen [] = seen
+        go seen (y : ys) = case mapLookup y blockmap of
+          Nothing -> go seen ys
+          Just (BlockCC _ _ lst) ->
+            let next = [ s | s <- successors lst, not (s `setMember` seen)
+                           , not (s `setMember` procpoints) ]
+            in go (foldl' (flip setInsert) seen next) (next ++ ys)
+    -- the blocks assigning a candidate's constructor's variable, found in one
+    -- walk over the blocks
+    conDefBlocks :: LocalReg -> [BlockId]
+    conDefBlocks c = case lookupUFM conDefs c of
+      Just ls -> ls
+      Nothing -> []
+    conDefs :: UniqFM LocalReg [BlockId]
+    conDefs = listToUFM_C (++)
+      [ (r, [entryLabel b]) | b <- blocks, r <- foldBlockNodesF defd b [] ]
+      where
+        conVars = foldl' (flip insertLRegSet) emptyLRegSet
+                         [ c | (_, (c, _, _)) <- cands0 ]
+        defd :: CmmNode e x -> [LocalReg] -> [LocalReg]
+        defd n a = foldLocalRegsDefd platform
+          (\a' r -> if r `elemLRegSet` conVars && not (r `elemReg` a')
+                      then r : a' else a')
+          a n
+    !ngroupRegs = sum (map length groups)
+    groupArr = listArray (0, length groups - 1) groups
+    -- the continuations of heap checks' calls to the collector, their blocks
+    -- setting HpAlloc, that no other call returns to, where holding
+    -- a constructor's variable costs the path passing the check: Note [Fields
+    -- loaded again after a call]
+    gcConts :: LabelSet
+    gcConts = setDifference (setFromList [ l | (True, l) <- conts ])
+                            (setFromList [ l | (False, l) <- conts ])
+    conts = [ (foldBlockNodesF hpAlloc mid False, l)
+            | BlockCC _ mid CmmCall{ cml_cont = Just l } <- blocks ]
+    hpAlloc :: CmmNode e x -> Bool -> Bool
+    hpAlloc (CmmAssign (CmmGlobal (GlobalRegUse HpAlloc _)) _) _ = True
+    hpAlloc _ a = a
+    -- whether a diamond's continuation uses some of the registers given in
+    -- its first blocks, which its body split off would load on the tagged
+    -- path too: Note [Fields loaded again after a call]
+    bodyUses l g = l `setMember` diamonds
+                   && regionUsesAny platform procpoints blockmap l g
+    -- the continuations of diamonds, Note [diamond proc point], whose blocks
+    -- end in branches
+    diamonds :: LabelSet
+    diamonds = setFromList
+      [ l | BlockCC _ mid lst <- blocks, branches lst
+          , Just l <- [futureContinuation mid]
+          , onlyProcPoint l (successors lst) ]
+    onlyProcPoint l ss = case filter (`setMember` procpoints) ss of
+      []  -> False
+      pps' -> all (== l) pps'
+    branches :: CmmNode O C -> Bool
+    branches CmmBranch{}     = True
+    branches CmmCondBranch{} = True
+    branches CmmSwitch{}     = True
+    branches _               = False
+    -- the fields live at a proc point but the entry, which the others are not
+    -- saved at, and whose constructors' variables are live at each proc point
+    -- where they are unless they are of a listed alternative, in a walk that
+    -- allocates only for them (by foldBlockNodesF, the compiler ran 0.062% more
+    -- instructions and allocated 0.069% more compiling T12707 at -O, 0.056%
+    -- more and 0.058% more compiling nofib's puzzle at -O2, and nothing more at
+    -- -O0, where no field is recorded, on GHC 10.1.20261108)
+    loads :: UniqFM LocalReg (LocalReg, (LocalReg, Int, CmmExpr))
+    loads = foldl' (\m (BlockCC _ mid _) -> walk mid m) emptyUFM blocks
+    walk :: Block CmmNode O O
+         -> UniqFM LocalReg (LocalReg, (LocalReg, Int, CmmExpr))
+         -> UniqFM LocalReg (LocalReg, (LocalReg, Int, CmmExpr))
+    walk (BCat b1 b2) !acc = walk b2 (walk b1 acc)
+    walk (BSnoc h n) !acc  = load n (walk h acc)
+    walk (BCons n t) !acc  = walk t (load n acc)
+    walk (BMiddle n) !acc  = load n acc
+    walk BNil acc          = acc
+    load :: CmmNode O O -> UniqFM LocalReg (LocalReg, (LocalReg, Int, CmmExpr))
+         -> UniqFM LocalReg (LocalReg, (LocalReg, Int, CmmExpr))
+    load (CmmAssign (CmmLocal r) e) !m
+      | Just c <- fieldBase platform e, c /= r
+      , if r `elemUFM` groupOf then any (r `elemLRegSet`) pplive
+                               else withCon r c pplive False
+      = addToUFM m r (r, (c, fieldOffset e, e))
+    load _ m = m
+    -- whether r, of no listed alternative, is live at some proc point, and c
+    -- at each where r is
+    withCon _ _ [] seen = seen
+    withCon r c (live : ls) seen
+      | r `elemLRegSet` live = c `elemLRegSet` live && withCon r c ls True
+      | otherwise           = withCon r c ls seen
+    -- See Note [Unique Determinism and code generation]
+    cands0 = nonDetEltsUFM loads
+    candm0 = listToUFM [ (x, e) | e@(x, _) <- cands0 ]
+    -- the candidates but those of a listed alternative not saving whose
+    -- constructors' variables are live at no proc point, which none loads
+    -- again
+    cands = [ e | e@(x, (c, _, _)) <- cands0
+                , case lookupUFM groupOf x of
+                    Just (_, _, s) -> s || c `elemLRegSet` ppLiveAny
+                    Nothing        -> True ]
+    ppLiveAny = unionsLRegSet pplive
+    -- the latest first: a field is live at the proc points after its load,
+    -- where its constructor's variable is most often dead, ending withCon
+    -- (earliest first, the compiler ran 0.085% more instructions and allocated
+    -- no more compiling T3294 at -O, 0.082% more and no more at -O2, and
+    -- nothing more at -O0, where no field is recorded, on GHC 10.1.20261108)
+    pplive = reverse (map snd pps)
+    -- each constructor's variable, with its fields
+    fieldsOf :: UniqFM LocalReg [LocalReg]
+    fieldsOf = listToUFM_C (++) [ (c, [x]) | (x, (c, _, _)) <- cands ]
+    -- the fields assigned more than once, and those live at the start of
+    -- a block assigning their constructor's variable, in a walk that
+    -- allocates only for them
+    (counts, clobbered) =
+      foldl' (\acc blk@(BlockCC _ mid lst) ->
+                let live = mapFindWithDefault emptyLRegSet (entryLabel blk)
+                                              liveness
+                in foldNodesBwdOO (assigns live) mid (assigns live lst acc))
+             (emptyUFM, []) blocks
+    assigns :: CmmLocalLive -> CmmNode e x
+            -> (UniqFM LocalReg Int, [LocalReg])
+            -> (UniqFM LocalReg Int, [LocalReg])
+    assigns live n acc = foldLocalRegsDefd platform one acc n
+      where
+        one acc'@(cs, cl) r = case (r `elemUFM` candm, lookupUFM fieldsOf r) of
+          (False, Nothing) -> acc'
+          (field, mxs) ->
+            let !cs' | field     = addToUFM_C (+) cs r (1 :: Int)
+                     | otherwise = cs
+                !cl' = case mxs of
+                  Just xs -> [ x | x <- xs, x `elemLRegSet` live ] ++ cl
+                  Nothing -> cl
+            in (cs', cl')
+    candm = listToUFM [ (x, e) | e@(x, _) <- cands ]
+    kept = filterUFM (\(x, _) -> lookupUFM counts x == Just 1) candm
+             `delListFromUFM` clobbered
+    final = mapUFM snd (filterUFM ends kept)
+    -- the chain of constructors' variables that are such fields themselves
+    -- ends within as many steps as there are fields
+    ends (_, (c, _, _)) = go (sizeUFM kept) c
+      where go :: Int -> LocalReg -> Bool
+            go n r = case lookupUFM kept r of
+              Nothing              -> True
+              Just (_, (r', _, _)) -> n > 0 && go (n - 1) r'
+
+-- | Liveness for Pass 1 and the fields loaded again after a call, under
+-- -fcmm-sink. Kept out of line, a workaround for an issue whose cause is
+-- unidentified and whose effect was observed: cmmLayoutStack's code after
+-- it was otherwise compiled twice, once specialised to a result loading no
+-- field again; without the pragma, the compiler ran 0.12% more instructions
+-- and allocated 0.1% more compiling T9961 at -O0, 0.011% more and 0.008% more
+-- compiling nofib's puzzle at -O1, and 0.024% more and 0.024% more at -O2, on
+-- GHC 10.1.20261108.
+refetchPass :: CmmConfig -> Platform -> ProcPointSet -> BlockId
+            -> [(Bool, [LocalReg])]
+            -> LabelMap CmmLocalLive -> LabelMap CmmBlock -> [CmmBlock]
+            -> (LabelMap CmmLocalLive, Refetches)
+refetchPass cfg platform procpoints entry con_fields liveness0 blockmap blocks
+  | cmmOptSink cfg
+  = refetchLiveness pps blocks
+      (fieldRefetches platform procpoints pps con_fields liveness0
+                      blockmap blocks)
+      liveness0
+  | otherwise = (liveness0, noRefetches)
+  where
+    -- the proc points but the entry, with their liveness
+    pps = [ (l, live) | l <- setElems procpoints, l /= entry
+                      , Just live <- [mapLookup l liveness0] ]
+{-# NOINLINE refetchPass #-}
+
+-- | Liveness for Pass 1: at each proc point but the entry, without the fields
+-- loaded again after a call, and with their constructors' variables where
+-- those are dead and every register of their alternative is live, those
+-- variables then live too in the blocks reaching such a proc point without
+-- assigning them; and the fields so left out at some proc point, the only
+-- ones Pass 2 loads again. See Note [Fields loaded again after a call]
+refetchLiveness :: [(BlockId, CmmLocalLive)] -> [CmmBlock] -> Refetches
+                -> LabelMap CmmLocalLive
+                -> (LabelMap CmmLocalLive, Refetches)
+-- no field: as given (by the general equation, the compiler ran 0.004% more
+-- instructions and allocated no more compiling T9961 at -O0, 0.001% more and
+-- 0.001% more compiling T12707 at -O, and 0.002% more and 0.001% more compiling
+-- T3294 at -O2, on GHC 10.1.20261108)
+refetchLiveness _ _ r@(Refetches [] _ _ _) liveness = (liveness, r)
+refetchLiveness pps blocks (Refetches fields refetch unused whole) liveness
+  | null left = (liveness, noRefetches)
+  | otherwise = case foldl' adj (liveness, [], emptyUFM) pps of
+      (m, added, out) ->
+        ( spread m added
+        , Refetches [ f | f@(x, _) <- fields, x `elemUFM` out ] refetch
+                    unused whole )
+  where
+    -- c live in each block from which a proc point it was added at is reached
+    -- without assigning it, so that it stays in its slot there
+    spread m [] = m
+    spread m ((l, c) : rest) =
+      let new = [ entryLabel b | b <- mapFindWithDefault [] l preds
+                               , Just live <- [mapLookup (entryLabel b) m]
+                               , not (c `elemLRegSet` live), not (assigns c b) ]
+      in spread (foldl' (\m' p -> mapAdjust (insertLRegSet c) p m') m new)
+                ([ (p, c) | p <- new ] ++ rest)
+    preds = mapFromListWith (++) [ (s, [b]) | b <- blocks, s <- successors b ]
+    assigns :: LocalReg -> CmmBlock -> Bool
+    assigns c b = def lst (foldBlockNodesF def mid False)
+      where
+        (_, mid, lst) = blockSplit b
+        def :: CmmNode e x -> Bool -> Bool
+        def (CmmAssign (CmmLocal r) _) a     = a || r == c
+        def (CmmUnsafeForeignCall _ rs _) a  = a || c `elemReg` rs
+        def CmmForeignCall{ res = rs } a     = a || c `elemReg` rs
+        def _ a                              = a
+    -- left out at l: the fields whose constructors' variables are live there,
+    -- and those of an alternative whose registers are all live there, its
+    -- constructor's variable saved in their place
+    adj acc@(m, added, out) (l, live) = case foldl' pick ([], []) left of
+      ([], _)  -> acc
+      (xs, cs) -> ( mapInsert l (foldl' (flip insertLRegSet)
+                                        (foldl' deleteFromLRegSet live xs) cs) m
+                  , [ (l, c) | c <- nubRegs cs ] ++ added
+                  , addListToUFM out [ (x, ()) | x <- xs ] )
+      where
+        pick acc@(xs, cs) x = case lookupUFM refetch x of
+          Just (c, _, _)
+            | not (x `elemLRegSet` live) -> acc
+            | c `elemLRegSet` live -> (x : xs, cs)
+            | Just g <- lookupUFM whole x
+            , all (`elemLRegSet` live) g -> (x : xs, c : cs)
+          _ -> acc
+    pairs = [ (x, c) | (x, (c, _, _)) <- fields ]
+    -- the fields that may be left out: bad at no proc point, their
+    -- constructors' variables not such fields themselves, and where those are
+    -- dead at a proc point where they are live, with every register of their
+    -- alternative such a field too
+    left0 = [ x | (x, _) <- pairs, out x ]
+    out x = not (x `elemUFM` unused) && case lookupUFM refetch x of
+      Just (c, _, _) -> not (c `elemUFM` refetch && out c)
+      Nothing        -> False
+    -- no filter where no alternative is whole (filtered always, the compiler
+    -- ran 0.011% more instructions and allocated 0.01% more compiling T12707 at
+    -- -O, 0.008% more and 0.008% more at -O2, and nothing more at -O0, where no
+    -- field is recorded, on GHC 10.1.20261108)
+    left | isNullUFM whole = left0
+         | otherwise       = filter (`elemUFM` complete) left0
+    complete = alts (listToUFM [ (x, ()) | x <- left0 ])
+    alts s = case [ x | x <- left0, x `elemUFM` s
+                      , Just g <- [lookupUFM whole x]
+                      , not (all (`elemUFM` s) g) ] of
+      []  -> s
+      bad -> alts (delListFromUFM s bad)
+
+-- | Those of the variables given, cs and then xs, used in the first sixteen
+-- blocks reached from l without passing a proc point, l's own included; the
+-- proc points those blocks reach; and whether blocks were left unvisited. The
+-- walk ends once each of cs is found. Sixteen, bounding the walk, is
+-- arbitrary, and may be raised where a case needs more at little cost to the
+-- compiler: lifted to 1000 here and in regionUsesAny, it changed the compile
+-- cost and code of programs of 50 to 400 loops, calls, cases or diamonds by
+-- under 0.1%.
+regionUses :: Platform -> ProcPointSet -> LabelMap CmmBlock -> BlockId
+           -> [LocalReg] -> [LocalReg] -> ([LocalReg], [BlockId], Bool)
+regionUses platform procpoints blockmap l cs xs =
+  go (16 :: Int) (setSingleton l) [l] [] []
+  where
+    rs = cs ++ xs
+    go 0 _ ys found ex = (found, ex, not (null ys))
+    go _ _ [] found ex = (found, ex, False)
+    go n seen (y : ys) found ex = case mapLookup y blockmap of
+      Nothing -> go n seen ys found ex
+      Just (BlockCC _ mid lst) ->
+        let found' = foldNodesBwdOO uses mid (uses lst found)
+            (pp, next) = partition (`setMember` procpoints)
+                           [ s | s <- successors lst, not (s `setMember` seen) ]
+            !ex' = pp ++ ex
+        in if all (`elemReg` found') cs then (found', ex', False)
+           else go (n - 1) (foldl' (flip setInsert) seen next) (next ++ ys)
+                   found' ex'
+    uses :: CmmNode e x -> [LocalReg] -> [LocalReg]
+    uses node a = foldLocalRegsUsed platform
+      (\a' r -> if r `elemReg` rs && not (r `elemReg` a') then r : a' else a')
+      a node
+
+-- | Whether one of the variables given is used in the first sixteen blocks
+-- reached from l without passing a proc point, l's own included, or blocks
+-- were left unvisited: regionUses' walk, ended at the first use, with the
+-- same arbitrary bound of sixteen blocks
+regionUsesAny :: Platform -> ProcPointSet -> LabelMap CmmBlock -> BlockId
+              -> [LocalReg] -> Bool
+regionUsesAny _ _ _ _ [] = False
+regionUsesAny platform procpoints blockmap l rs =
+  go (16 :: Int) (setSingleton l) [l]
+  where
+    go 0 _ ys = not (null ys)
+    go _ _ [] = False
+    go n seen (y : ys) = case mapLookup y blockmap of
+      Nothing -> go n seen ys
+      Just (BlockCC _ mid lst) ->
+        let next = [ s | s <- successors lst, not (s `setMember` seen)
+                       , not (s `setMember` procpoints) ]
+        in uses lst || foldBlockNodesF (\n' a -> a || uses n') mid False
+           || go (n - 1) (foldl' (flip setInsert) seen next) (next ++ ys)
+    uses :: CmmNode e x -> Bool
+    uses = foldLocalRegsUsed platform (\a r -> a || r `elemReg` rs) False
+
+-- | Whether a register is in a list (by elem, the compiler ran 0.045% more
+-- instructions and allocated 0.006% more compiling nofib's puzzle at -O1, 0.11%
+-- more and 0.008% more at -O2, and nothing more at -O0, where no field is
+-- recorded, on GHC 10.1.20261108)
+elemReg :: LocalReg -> [LocalReg] -> Bool
+elemReg r = go
+  where go []       = False
+        go (y : ys) = y == r || go ys
+
+-- | A list of registers without its repetitions (by Data.List's nub, the
+-- compiler ran 0.002% more instructions and allocated no more compiling nofib's
+-- puzzle at -O1, 0.007% more and 0.001% more at -O2, and nothing more at -O0,
+-- where no field is recorded, on GHC 10.1.20261108)
+nubRegs :: [LocalReg] -> [LocalReg]
+nubRegs = go []
+  where go seen (r : rs) | r `elemReg` seen = go seen rs
+                         | otherwise        = r : go (r : seen) rs
+        go _ []                             = []
 
 -- -----------------------------------------------------------------------------
 -- Lowering safe foreign calls

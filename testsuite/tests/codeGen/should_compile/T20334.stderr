@@ -1,0 +1,3 @@
+movsd %xmm1,-24(%rbp)
+movsd %xmm2,-16(%rbp)
+movsd %xmm3,-8(%rbp)

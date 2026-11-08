@@ -592,7 +592,14 @@ closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
                 ; fv_bindings <- mapM bind_fv fv_details
                 -- Load free vars out of closure *after*
                 -- heap check, to reduce live vars over check
-                ; when node_points $ load_fvs node lf_info fv_bindings
+                ; when node_points $ do
+                    { load_fvs node lf_info fv_bindings
+                    -- See Note [Fields loaded again after a call] in
+                    -- GHC.Cmm.LayoutStack
+                    ; cfg <- getStgToCmmConfig
+                    ; when (stgToCmmConFields cfg
+                            && fv_bindings `lengthAtLeast` 2) $
+                        noteConFields True (map fst fv_bindings) }
                 ; checkFunctionArgTags (text "TagCheck failed - Argument to local function:" <> ppr bndr) bndr args
                 ; void $ cgExpr body
                 }}}

@@ -2,7 +2,7 @@ module GHC.Cmm.Graph
   ( CmmAGraph, CmmAGraphScoped, CgStmt(..)
   , (<*>), catAGraphs
   , mkLabel, mkMiddle, mkLast, outOfLine
-  , lgraphOfAGraph, labelAGraph
+  , lgraphOfAGraph, labelAGraph, labelAGraphConFields
 
   , stackStubExpr
   , mkNop, mkAssign, mkStore
@@ -70,13 +70,38 @@ data CgStmt
   | CgStmt  (CmmNode O O)
   | CgLast  (CmmNode O C)
   | CgFork  BlockId CmmAGraph CmmTickScope
+  | CgConFields Bool [LocalReg]
+      -- The registers a case alternative loads every field of its
+      -- constructor into, or (True) a function closure its free variables,
+      -- for the procedure's CmmStackInfo: no code
+
+-- | The blocks of a flattened AGraph, each 'CgConFields' where it stands. With
+-- master's flatten kept and the fields collected by a walk of their own over
+-- the statements, the compiler ran 0.013% more instructions and allocated
+-- 0.017% more compiling T9961 at -O0, 0.053% more and 0.061% more compiling
+-- T12707 at -O, and 0.047% more and 0.052% more compiling nofib's puzzle at
+-- -O2, on GHC 10.1.20261108.
+data FlatBlocks
+  = FlatBlock (Block CmmNode C C) FlatBlocks
+  | FlatConFields Bool [LocalReg] FlatBlocks
+  | FlatEnd
 
 flattenCmmAGraph :: BlockId -> CmmAGraphScoped -> DCmmGraph
-flattenCmmAGraph id (stmts_t, tscope) =
+flattenCmmAGraph id ag =
     CmmGraph { g_entry = id,
                g_graph = GMany NothingO body NothingO }
   where
-  body = DWrap [(entryLabel b, b) | b <- flatten id stmts_t tscope [] ]
+  body = DWrap (flatPairs (flattenBlocks id ag))
+
+-- | The flattened blocks with their labels
+flatPairs :: FlatBlocks -> [(BlockId, Block CmmNode C C)]
+flatPairs (FlatBlock b bs)       = (entryLabel b, b) : flatPairs bs
+flatPairs (FlatConFields _ _ bs) = flatPairs bs
+flatPairs FlatEnd                = []
+
+flattenBlocks :: BlockId -> CmmAGraphScoped -> FlatBlocks
+flattenBlocks id (stmts_t, tscope) = flatten id stmts_t tscope FlatEnd
+  where
 
   --
   -- flatten: given an entry label and a CmmAGraph, make a list of blocks.
@@ -84,8 +109,7 @@ flattenCmmAGraph id (stmts_t, tscope) =
   -- NB. avoid the quadratic-append trap by passing in the tail of the
   -- list.  This is important for Very Long Functions (e.g. in T783).
   --
-  flatten :: Label -> CmmAGraph -> CmmTickScope -> [Block CmmNode C C]
-          -> [Block CmmNode C C]
+  flatten :: Label -> CmmAGraph -> CmmTickScope -> FlatBlocks -> FlatBlocks
   flatten id g tscope blocks
       = flatten1 (fromOL g) block' blocks
       where !block' = blockJoinHead (CmmEntry id tscope) emptyBlock
@@ -93,7 +117,7 @@ flattenCmmAGraph id (stmts_t, tscope) =
   -- flatten0: we are outside a block at this point: any code before
   -- the first label is unreachable, so just drop it.
   --
-  flatten0 :: [CgStmt] -> [Block CmmNode C C] -> [Block CmmNode C C]
+  flatten0 :: [CgStmt] -> FlatBlocks -> FlatBlocks
   flatten0 [] blocks = blocks
 
   flatten0 (CgLabel id tscope : stmts) blocks
@@ -105,14 +129,15 @@ flattenCmmAGraph id (stmts_t, tscope) =
 
   flatten0 (CgLast _ : stmts) blocks = flatten0 stmts blocks
   flatten0 (CgStmt _ : stmts) blocks = flatten0 stmts blocks
+  flatten0 (CgConFields fv rs : stmts) blocks
+    = FlatConFields fv rs (flatten0 stmts blocks)
 
   --
   -- flatten1: we have a partial block, collect statements until the
   -- next last node to make a block, then call flatten0 to get the rest
   -- of the blocks
   --
-  flatten1 :: [CgStmt] -> Block CmmNode C O
-           -> [Block CmmNode C C] -> [Block CmmNode C C]
+  flatten1 :: [CgStmt] -> Block CmmNode C O -> FlatBlocks -> FlatBlocks
 
   -- The current block falls through to the end of a function or fork:
   -- this code should not be reachable, but it may be referenced by
@@ -121,15 +146,18 @@ flattenCmmAGraph id (stmts_t, tscope) =
   -- well-formed, so we terminate the block with a branch to the
   -- beginning of the current block.
   flatten1 [] block blocks
-    = blockJoinTail block (CmmBranch (entryLabel block)) : blocks
+    = FlatBlock (blockJoinTail block (CmmBranch (entryLabel block))) blocks
 
   flatten1 (CgLast stmt : stmts) block blocks
-    = block' : flatten0 stmts blocks
+    = FlatBlock block' (flatten0 stmts blocks)
     where !block' = blockJoinTail block stmt
 
   flatten1 (CgStmt stmt : stmts) block blocks
     = flatten1 stmts block' blocks
     where !block' = blockSnoc block stmt
+
+  flatten1 (CgConFields fv rs : stmts) block blocks
+    = FlatConFields fv rs (flatten1 stmts block blocks)
 
   flatten1 (CgFork fork_id stmts_t tscope : rest) block blocks
     = flatten fork_id stmts_t tscope $ flatten1 rest block blocks
@@ -137,10 +165,24 @@ flattenCmmAGraph id (stmts_t, tscope) =
   -- a label here means that we should start a new block, and the
   -- current block should fall through to the new block.
   flatten1 (CgLabel id tscp : stmts) block blocks
-    = blockJoinTail block (CmmBranch id) :
-      flatten1 stmts (blockJoinHead (CmmEntry id tscp) emptyBlock) blocks
+    = FlatBlock (blockJoinTail block (CmmBranch id))
+        (flatten1 stmts (blockJoinHead (CmmEntry id tscp) emptyBlock) blocks)
 
 
+
+-- | 'labelAGraph', with the registers 'CgConFields' records, its out-of-line
+-- code included, the last first
+labelAGraphConFields :: BlockId -> CmmAGraphScoped
+                     -> (DCmmGraph, [(Bool, [LocalReg])])
+labelAGraphConFields lbl ag = (graph, fields flat [])
+  where
+    graph = CmmGraph { g_entry = lbl,
+                       g_graph = GMany NothingO (DWrap (flatPairs flat))
+                                       NothingO }
+    flat = flattenBlocks lbl ag
+    fields (FlatBlock _ bs) acc         = fields bs acc
+    fields (FlatConFields fv rs bs) acc = fields bs ((fv, rs) : acc)
+    fields FlatEnd acc                  = acc
 
 ---------- AGraph manipulation
 

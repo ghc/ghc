@@ -48,6 +48,9 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmLoopification  :: !Bool              -- ^ Loopification enabled (cf @-floopification@)
   , stgToCmmAlignCheck     :: !Bool              -- ^ Insert alignment check (cf @-falignment-sanitisation@)
   , stgToCmmFastPAPCalls   :: !Bool              -- ^
+  , stgToCmmConFields      :: !Bool              -- ^ Record the registers each case alternative loads its
+                                                 -- constructor's fields into, and each function closure its
+                                                 -- free variables, for stack layout (cf @-fcmm-sink@)
   , stgToCmmSCCProfiling   :: !Bool              -- ^ Check if cost-centre profiling is enabled
   , stgToCmmEagerBlackHole :: !Bool              -- ^
   , stgToCmmOrigThunkInfo  :: !Bool              -- ^ Push @stg_orig_thunk_info@ frames during thunk update.

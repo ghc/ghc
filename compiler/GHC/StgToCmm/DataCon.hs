@@ -49,6 +49,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Monad (mapMaybeM)
 
+import Control.Monad ( when )
 import Data.Char
 import GHC.StgToCmm.Config (stgToCmmPlatform)
 import GHC.StgToCmm.TagCheck (checkConArgsStatic, checkConArgsDyn)
@@ -380,7 +381,13 @@ bindConArgs (DataAlt con) base args
                                               base offset tag
                   ; Just <$> bindArgToReg arg }
 
-       mapMaybeM bind_arg args_w_offsets
+       regs <- mapMaybeM bind_arg args_w_offsets
+       -- See Note [Fields loaded again after a call] in GHC.Cmm.LayoutStack
+       cfg <- getStgToCmmConfig
+       when (stgToCmmConFields cfg && regs `lengthAtLeast` 2
+             && regs `equalLength` args_w_offsets) $
+         noteConFields False regs
+       return regs
 
 bindConArgs _other_con _base args
   = assert (null args ) return []

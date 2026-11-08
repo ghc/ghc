@@ -352,7 +352,8 @@ splitAtProcPoints platform entry_label callPPs procPoints procMap cmmProc = do
               g' = replacePPIds g
               live = ppLiveness (g_entry g')
               stack_info = StackInfo { arg_space = 0
-                                     , do_layout = True }
+                                     , do_layout = True
+                                     , con_fields = [] }
                             -- cannot use panic, this is printed by -ddump-cmm
 
       -- References to procpoint IDs can now be replaced with the

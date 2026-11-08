@@ -14,6 +14,7 @@ module GHC.Cmm.UniqueRenamer
 import GHC.Prelude
 import GHC.Utils.Monad.StrictState
 import Data.Tuple (swap)
+import Data.Maybe (mapMaybe)
 import GHC.Word
 import GHC.Cmm
 import GHC.Cmm.CLabel
@@ -121,9 +122,21 @@ detRenameCmmGroup dufm group = swap (runState (mapM detRenameCmmDecl group) dufm
         lbl' <- detRenameCLabel lbl
         regs' <- mapM detRenameGlobalRegUse regs
         g' <- detRenameCmmGraph g
-        return (CmmProc h' lbl' regs' g')
+        h'' <- detRenameConFields h'
+        return (CmmProc h'' lbl' regs' g')
     detRenameCmmDecl (CmmData sec d)
       = CmmData <$> detRenameSection sec <*> detRenameCmmStatics d
+
+    -- After the graph, whose registers they are: renamed in their own order
+    -- first, they would not be renamed deterministically. A group with
+    -- a register the graph does not have is dropped.
+    detRenameConFields :: CmmTopInfo -> DetRnM CmmTopInfo
+    detRenameConFields top@TopInfo{ stack_info = si } = do
+          m <- gets mapping
+          let rn (LocalReg u t) = (`LocalReg` t) <$> lookupUFM m u
+          return top{ stack_info =
+                        si{ con_fields = mapMaybe (traverse (mapM rn))
+                                                  (con_fields si) } }
 
     detRenameCmmTop :: DCmmTopInfo -> DetRnM CmmTopInfo
     detRenameCmmTop (TopInfo (DWrap i) b)
