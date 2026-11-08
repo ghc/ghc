@@ -1,0 +1,39 @@
+#include "Cmm.h"
+
+// Hand-written Cmm may load a word through a local of a GC pointer's type at
+// an offset that is no multiple of the word size from memory that is written
+// later, which code generated from Haskell does not. So stack layout loads
+// no field again in a Cmm file (Note [Fields loaded again after a call] in
+// GHC.Cmm.LayoutStack), and the test checks that the value loaded is the one
+// used after the call. q is a pointer tagged 1 to three words: its second word
+// is at q + 7.
+
+fs_id (W_ n) {
+    return (n);
+}
+
+// writes 99 over the second word of q, and returns n
+fs_poke (W_ q, W_ n) {
+    W_[q + 7] = 99;
+    return (n);
+}
+
+// the call writes the word between x's load and x's use
+fs_call (W_ q) {
+    P_ c; W_ x;
+    c = q;
+    x = W_[c + 7];
+    (W_ r) = call fs_poke(c, 5);
+    return (x + (W_[c + 7] << 8) + (r << 16));
+}
+
+// the procedure itself writes it, between two calls
+fs_own (W_ q) {
+    P_ c; W_ x;
+    c = q;
+    x = W_[c + 7];
+    (W_ r) = call fs_id(5);
+    W_[c + 7] = 98;
+    (W_ s) = call fs_id(6);
+    return (x + (W_[c + 7] << 8) + (r << 16) + (s << 24));
+}

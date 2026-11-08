@@ -30,8 +30,11 @@
 --
 --   * stack layout (GHC.Cmm.LayoutStack) has made Sp explicit, saved each local
 --     that is live across a call with a continuation and reloaded it into the
---     same local after the call (Note [Tagged path skips the reloads]), and
---     turned safe foreign calls into unsafe ones;
+--     same local after the call (Note [Tagged path skips the reloads]) but for
+--     a field or a free variable, which it loads again from its saved
+--     constructor or closure under -fcmm-sink
+--     (Note [Fields loaded again after a call]), and turned safe foreign calls
+--     into unsafe ones;
 --   * switches are comparisons and dense jump tables
 --     (GHC.Cmm.Switch.Implement);
 --   * where tables are next to code, proc points are not split, so a

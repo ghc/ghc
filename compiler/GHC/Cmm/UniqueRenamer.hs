@@ -121,9 +121,16 @@ detRenameCmmGroup dufm group = swap (runState (mapM detRenameCmmDecl group) dufm
         lbl' <- detRenameCLabel lbl
         regs' <- mapM detRenameGlobalRegUse regs
         g' <- detRenameCmmGraph g
-        return (CmmProc h' lbl' regs' g')
+        h'' <- detRenameConFields h'
+        return (CmmProc h'' lbl' regs' g')
     detRenameCmmDecl (CmmData sec d)
       = CmmData <$> detRenameSection sec <*> detRenameCmmStatics d
+
+    -- After the graph, whose registers they are and whose order numbers them.
+    detRenameConFields :: CmmTopInfo -> DetRnM CmmTopInfo
+    detRenameConFields top@TopInfo{ stack_info = si } = do
+          fields <- mapM (traverse (mapM detRenameLocalReg)) (con_fields si)
+          return top{ stack_info = si{ con_fields = fields } }
 
     detRenameCmmTop :: DCmmTopInfo -> DetRnM CmmTopInfo
     detRenameCmmTop (TopInfo (DWrap i) b)

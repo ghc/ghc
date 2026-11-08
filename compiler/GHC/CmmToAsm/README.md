@@ -161,7 +161,7 @@ First confirm the wrong result against an oracle:
   the Cmm as well.
 
 Then switch off or swap the passes that have a flag, one at a time
-and the latest first, as each changes only what follows it:
+and the latest first:
 
 * step 11, where the CFG is kept (x86-64, not under `-finfo-table-map`):
   `-fno-block-layout-cfg`, which lays the blocks out by `sequenceBlocks`,
@@ -173,7 +173,9 @@ and the latest first, as each changes only what follows it:
 * step 6: `-fregs-graph` or `-fregs-iterative` in place of the linear allocator;
 * in the Cmm pipeline: `-fno-cmm-control-flow`, which skips only the second
   of its two control-flow rounds (the first, in `cpsTop` in `GHC.Cmm.Pipeline`,
-  always runs), `-fno-cmm-sink` and `-fno-cmm-elim-common-blocks`.
+  always runs), `-fno-cmm-sink`, which also stops stack layout loading
+  fields again after a call (Note [Fields loaded again after a call]
+  in `GHC.Cmm.LayoutStack`), and `-fno-cmm-elim-common-blocks`.
 
 The other steps have no flag of their own. `-dcmm-lint` and `-dasm-lint` catch
 some faults where they arise, and `-ddump-asm-native` and `-ddump-asm-regalloc`

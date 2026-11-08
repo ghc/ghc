@@ -771,10 +771,7 @@ conflicts platform assig@(r, rhs, addr) node
   | CmmStore addr' e _ <- node
   , memConflicts addr (loadAddr platform addr' (cmmExprWidth platform e)) = True
 
-  -- (b) an assignment to Hp/Sp conflicts with a heap/stack read respectively
-  | CmmAssign (CmmGlobal (GlobalRegUse Hp _)) _ <- node
-  , memConflicts addr HeapMem
-  = True
+  -- (b) an assignment to Sp conflicts with a stack read
   | CmmAssign (CmmGlobal (GlobalRegUse Sp _)) _ <- node
   , memConflicts addr StackMem
   = True
