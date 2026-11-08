@@ -1,0 +1,29 @@
+
+==================== Output Cmm ====================
+[stg_sink_join() { //  [R1]
+         { info_tbls: []
+           stack_info: arg_space: 8
+         }
+     {offset
+       _lbl_: // global
+           //tick src<cmm_sink_join.cmm:(4,1)-(19,1)>
+           if (R1 == 0) goto c4; else goto c6;
+       _lbl_: // global
+           //tick src<cmm_sink_join.cmm:(11,17)-(14,5)>
+           //tick src<cmm_sink_join.cmm:12:11-27>
+           //tick src<cmm_sink_join.cmm:13:11-14>
+           __locVar_::I64 = 1;
+           goto c5;
+       _lbl_: // global
+           //tick src<cmm_sink_join.cmm:(14,12)-(17,5)>
+           //tick src<cmm_sink_join.cmm:15:11-27>
+           //tick src<cmm_sink_join.cmm:16:11-14>
+           __locVar_::I64 = 2;
+           goto c5;
+       _lbl_: // global
+           R1 = I64[Sp + 8] + __locVar_::I64;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+     }
+ }]
+
+

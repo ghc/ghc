@@ -1,0 +1,33 @@
+#include "Cmm.h"
+
+stg_sink_switch ( W_ c )
+{
+    W_ x;
+
+    // The block ending in the switch (a jump table) and block a both end with
+    // the load x = W_[Sp + 8] and continue at j; the switch lists j for three
+    // cases. The load is sunk into j, so the output loads I64[Sp + 8] once.
+    // Note [Sinking into shared successors/join points]
+    if (c > 7) goto a;
+    x = W_[Sp + 8];
+    switch [0 .. 7] c {
+        case 0, 2, 4: { goto j; }
+        case 1: { goto k1; }
+        case 3: { goto k2; }
+        case 5: { goto k3; }
+        default: { goto k4; }
+    }
+a:
+    x = W_[Sp + 8];
+    goto j;
+k1:
+    return (1);
+k2:
+    return (2);
+k3:
+    return (3);
+k4:
+    return (4);
+j:
+    return (x);
+}

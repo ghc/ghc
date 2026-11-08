@@ -1,21 +1,23 @@
-.text
-	.align 8
+.section .text
+.align 8
 .globl callMemcpy
-.type callMemcpy, @object
+.type callMemcpy, @function
 callMemcpy:
-.Lc8:
-	testq %rbx,%rbx
-	je .Lcb
-	movl 0(%r14),%eax
-	movl %eax,0(%rbx)
-	movl 4(%r14),%eax
-	movl %eax,4(%rbx)
-	movl 8(%r14),%eax
-	movl %eax,8(%rbx)
-	movl 12(%r14),%eax
-	movl %eax,12(%rbx)
 .Lcb:
+	movq %rbx,%rax
+	testq %rbx,%rbx
+	je .Lc6
+.Lc5:
+	movl 0(%r14),%ebx
+	movl %ebx,0(%rax)
+	movl 4(%r14),%ebx
+	movl %ebx,4(%rax)
+	movl 8(%r14),%ebx
+	movl %ebx,8(%rax)
+	movl 12(%r14),%ebx
+	movl %ebx,12(%rax)
+.Lc6:
 	jmp *(%rbp)
 	.size callMemcpy, .-callMemcpy
 .section .note.GNU-stack,"",@progbits
-.ident "GHC 7.7.20121009"
+.ident "GHC 10.1.20261108"

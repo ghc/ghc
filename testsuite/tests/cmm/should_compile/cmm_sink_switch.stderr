@@ -1,0 +1,46 @@
+
+==================== Output Cmm ====================
+[stg_sink_switch() { //  [R1]
+         { info_tbls: []
+           stack_info: arg_space: 8
+         }
+     {offset
+       _lbl_: // global
+           //tick src<cmm_sink_switch.cmm:(4,1)-(33,1)>
+           __locVar_::I64 = R1;
+           if (R1 > 7) goto ce; else goto c3;
+       _lbl_: // global
+           //tick src<cmm_sink_switch.cmm:12:7-23>
+           if (__locVar_::I64 < 6) goto u0; else goto c4;
+       _lbl_: // global
+           switch [0 .. 5] __locVar_::I64 {
+               case 0 : goto ce;
+               case 1 : goto c6;
+               case 2 : goto ce;
+               case 3 : goto c7;
+               case 4 : goto ce;
+               case 5 : goto c8;
+           }
+       _lbl_: // global
+           //tick src<cmm_sink_switch.cmm:17:17-28>
+           R1 = 3;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+       _lbl_: // global
+           //tick src<cmm_sink_switch.cmm:16:17-28>
+           R1 = 2;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+       _lbl_: // global
+           //tick src<cmm_sink_switch.cmm:15:17-28>
+           R1 = 1;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+       _lbl_: // global
+           R1 = I64[Sp + 8];
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+       _lbl_: // global
+           //tick src<cmm_sink_switch.cmm:18:18-29>
+           R1 = 4;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+     }
+ }]
+
+

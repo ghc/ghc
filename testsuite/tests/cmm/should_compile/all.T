@@ -6,6 +6,14 @@ test('selfloop', [cmm_src], compile, ['-no-hs-main'])
 test('cmm_sink_sp', [ only_ways(['optasm']),
                       grep_errmsg(r'(\[Sp.*\]).*(=).*(\[.*R1.*\]).*;',[1,2,3]),
                       cmm_src], compile, ['-no-hs-main -ddump-cmm -dsuppress-uniques -O'])
+# Note [Sinking into shared successors/join points]: the load is sunk into
+# the join, so it appears once.
+test('cmm_sink_join', [ only_ways(['optasm']),
+                        grep_errmsg(r'(I64\[Sp \+ 8\])', [1]),
+                        cmm_src], compile, ['-no-hs-main -ddump-cmm -dsuppress-uniques -O'])
+test('cmm_sink_switch', [ only_ways(['optasm']),
+                          grep_errmsg(r'(I64\[Sp \+ 8\])', [1]),
+                          cmm_src], compile, ['-no-hs-main -ddump-cmm -dsuppress-uniques -O'])
 
 test('T16930', normal, makefile_test, ['T16930'])
 test('T17442', normal, compile, [''])

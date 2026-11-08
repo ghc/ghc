@@ -1,0 +1,19 @@
+#include "Cmm.h"
+
+stg_sink_join ( W_ c )
+{
+    W_ x, y;
+
+    // Both branches end with the same load x = W_[Sp + 8], live only in the
+    // join and independent of the other pending assignment. It is sunk into
+    // the join, so the output loads I64[Sp + 8] once.
+    // Note [Sinking into shared successors/join points]
+    if (c == 0) {
+        x = W_[Sp + 8];
+        y = 1;
+    } else {
+        x = W_[Sp + 8];
+        y = 2;
+    }
+    return (x + y);
+}

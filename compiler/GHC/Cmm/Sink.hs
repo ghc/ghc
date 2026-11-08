@@ -14,6 +14,8 @@ import GHC.Cmm.Utils
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Graph
+import GHC.Cmm.Dataflow
+import GHC.Types.Unique.DSM (runUniqueDSM, initDUniqSupply)
 import GHC.Platform.Regs
 
 import GHC.Platform
@@ -83,10 +85,10 @@ Algorithm:
      * drop any assignments that are live on more than one successor
        and are not trivial
      * if any successor has more than one predecessor (a join-point),
-       drop everything live in that successor. Since we only propagate
-       assignments that are not dead at the successor, we will therefore
-       eliminate all assignments dead at this point. Thus analysis of a
-       join-point will always begin with an empty list of assignments.
+       drop everything live in that successor, except for assignments that
+       every predecessor drops there in the same form and that the join can
+       take (see the conditions in the Note).
+       See Note [Sinking into shared successors/join points].
 
 As a result of above algorithm, sinking deletes some dead assignments
 (transitively, even).  This isn't as good as removeDeadAssignments,
@@ -146,25 +148,242 @@ type Assignments = [Assignment]
   --     y = e2
   --     x = e1
 
+-- | A block for which we still have to decide, for some assignments, if we drop
+-- them or move them into the join successor.
+-- After 'applyJoinSinks' the block ends up as:
+--
+-- > block:            // uf_entry
+-- >   ...             // uf_middle
+-- >   <uf_dropped>    // minus what the joins in uf_joins get sunk into.
+-- >   goto succ;      // uf_last
+data UnfinishedBlock = UnfinishedBlock
+  { uf_entry   :: CmmNode C O
+  , uf_middle  :: Block CmmNode O O
+  , uf_dropped :: [CmmNode O O]   -- ^ assignments dropped at the end
+  , uf_last    :: CmmNode O C
+  , uf_joins   :: [Label]         -- ^ successors that might take assignments
+  }
+
+-- | Facts *at* the block, not any particular edge.
+-- See Note [Sinking into shared successors/join points]
+data SinkFact
+  = Sunk Assignments   -- ^ assignments definitely sunk from one predecessor
+  | Offer Assignments  -- ^ at a join: assignments predecessors have in common
+                       -- that could be sunk if *all* predecessors agree.
+
+factAssigs :: SinkFact -> Assignments
+factAssigs (Sunk as)  = as
+factAssigs (Offer as) = as
+
+sameAssig :: Assignment -> Assignment -> Bool
+sameAssig (r, e, _) (r', e', _) = r == r' && e == e'
+
+-- | Dataflow lattice for sinking assignments across blocks.
+sinkLattice :: DataflowLattice SinkFact
+sinkLattice = DataflowLattice { fact_bot = (Sunk []), fact_join = join }
+  where
+    -- Simple update old with new facts along linear block sequences.
+    join (OldFact (Sunk old)) (NewFact (Sunk new)) =
+      changedIf (not (sameAssigs old new)) (Sunk new)
+    -- For joins we start with the initial set of assignments and
+    -- only ever shrink it.
+    join (OldFact old) (NewFact new) =
+      let o    = factAssigs old
+          kept = filter (\a -> any (sameAssig a) o) (factAssigs new)
+      -- We don't have duplicate assignments to the same register,
+      -- any only ever remove assignments from joins. So we can compare
+      -- number of assignments for efficiency instead of comparing assignments.
+      in changedIf (length kept /= length o) (Offer kept)
+
+    -- The change test for Sunk facts. A different order counts as a change,
+    -- which only re-runs the successor.
+    sameAssigs as bs = length as == length bs && and (zipWith sameAssig as bs)
+
+{- Note [Sinking into shared successors/join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We can end up with code like this:
+
+   A:
+      ...
+      x = Sp[n];
+      goto C;
+   B:
+      ...
+      x = Sp[n];
+      goto C;
+
+These blocks differ but their tail ends contain identical loads. So we want
+to push the loads into the shared successor to save code size. It also
+allows us to sink the assignment further into C for the usual benefits:
+less register pressure, removing duplicate loads, etc.
+We allow statements that perform the same operation on the stack to pass
+an Sp assignment by "rebasing" their value first.
+See Note [Sinking past Sp adjustments].
+
+We sink an assignment x = e into a join C if every predecessor of C arrives
+there via a *branch* (not a call) and, in every predecessor:
+
+  * x = e is pending at the end of the block, in the same form;
+  * x is live in C and in no other successor of the block;
+  * x = e does not conflict with the block's last node;
+  * e reads no argument register (Note [Argument registers stay in their block]);
+  * x = e is independent of the block's other pending assignments: none of
+    them assigns x, reads x, or is read by e.
+
+A switch that lists C twice makes it count twice as a predecessor edge, so
+C becomes a join with a single predecessor that offers twice; that changes
+nothing.
+
+We compute what is sunk into each block with a forward dataflow fixpoint
+('rewriteCmmFwd', GHC.Cmm.Dataflow) over what is pending on the block's
+entry (SinkFact). A block with one predecessor gets what that predecessor
+sinks into it (Sunk); a join gets an offer from each predecessor (Offer),
+the assignments it would drop at its end that meet the conditions above,
+and we sink into it what all offers have in common. Nothing is sunk into
+the graph entry over a back edge: its fact is always Sunk [] ('fact' in
+'sink'). No local register is live on entry to a procedure, so nothing
+pending at the end of a predecessor could be needed there anyway.
+
+Termination and soundness: at every join we only ever remove assignments
+from its fact between iterations, so the join facts reach a fixed point.
+Every other block has a single predecessor and its fact is a function of
+that predecessor's fact, and every cycle in the graph passes through a join
+or through the entry, whose fact is constant, so the whole analysis
+terminates. GHC.Cmm.Dataflow re-runs a block whenever
+its entry fact changes, so each block's last rewrite used its final fact.
+cmmSink then re-sinks the predecessors of every join with their final facts
+and removes from their drops what the join takes. So an assignment a join
+takes is dropped, in that form, by every one of its predecessors, and no
+predecessor computes it as well.
+
+Why the independence condition:
+
+  (a) A join may take some of a predecessor's drops but not others. Those
+      it does not take stay in the predecessor and so run before the ones
+      it takes, which is wrong when they depend on each other:
+
+         A: t = Sp[8]; k = t + 1; goto J
+         B: t = Sp[8]; k = 0;     goto J
+
+      Both drop t = Sp[8], but only A drops k = t + 1. Taking t into J would
+      leave k = t + 1 in A reading t before it is assigned.
+
+  (b) With dependencies, syntactically equal offers need not be equal
+      values: x = y + 1 in A and in B agree only if y does.
+
+  (c) It keeps loop-carried parallel moves (t = a + b; a = b; b = t) out of
+      the offers to the loop header.
+
+Loops: at the fixed point no non-trivial assignment is carried around a
+loop. An assignment that reaches the loop's exit test and is used after the
+loop is live in both successors of that test, so live_in_multi drops it
+there; the back edge then stops offering it and the loop header stops taking
+it. Only trivial assignments can circulate, and they emit no code on the
+loop path. Assignments reading an argument register were the exception
+(spectral-norm), which is one reason they stay in their block.
+-}
+
 cmmSink :: Platform -> CmmGraph -> CmmGraph
-cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
+cmmSink platform graph = ofBlockList (g_entry graph) blocks'
+  where
+  env = mkSinkEnv platform graph
+  (graph', facts :: FactBase SinkFact) = sinkDataflow env graph
+
+  taken = mapFromList [ (j, factAssigs f) | (j, f) <- mapToList facts
+                                          , setMember j (envSinkJoins env) ]
+  blocks' = [ case mapLookup (entryLabel b) (envBlockMap env) of
+                Just orig | any (`setMember` envSinkJoins env) (successors b)
+                  -> applyJoinSinks taken (fst (sink env (incomingAt (entryLabel b) facts) orig))
+                _ -> b
+            | b <- toBlockList graph' ]
+
+-- | Per-graph context for 'sink' and 'sinkDataflow'.
+data SinkEnv = SinkEnv
+  { envPlatform  :: Platform
+  , envLive      :: Label -> LRegSet
+  , envBlockMap  :: LabelMap CmmBlock
+  , envJoinPts   :: LabelMap Int
+  , envSinkJoins :: LabelSet
+  , envEntry     :: Label
+  }
+
+mkSinkEnv :: Platform -> CmmGraph -> SinkEnv
+mkSinkEnv platform graph = SinkEnv
+  { envPlatform  = platform
+  , envLive      = \l -> mapFindWithDefault emptyLRegSet l liveness
+  , envBlockMap  = bmap
+  , envJoinPts   = join_pts
+  , envSinkJoins = sink_join_pts
+  , envEntry     = g_entry graph
+  }
   where
   liveness = cmmLocalLivenessL platform graph
-  getLive l = mapFindWithDefault emptyLRegSet l liveness
-
   blocks = revPostorder graph
-
+  bmap = toBlockMap graph
+  preds :: LabelMap [Label]
+  preds = mapFromListWith (++) [ (s, [entryLabel b]) | b <- blocks, s <- successors b ]
   join_pts = findJoinPoints blocks
 
-  sink :: LabelMap Assignments -> [CmmBlock] -> [CmmBlock]
-  sink _ [] = []
-  sink sunk (b:bs) =
-    -- pprTrace "sink" (ppr lbl) $
-    blockJoin first final_middle final_last : sink sunk' bs
-    where
-      lbl = entryLabel b
-      (first, middle, last) = blockSplit b
+  -- Blocks with more than one predecessor, all ending in a branch to them
+  -- (endsInBranchTo), excluding the graph entry.
+  sink_join_pts :: LabelSet
+  sink_join_pts = setFromList
+    [ j | (j, ps) <- mapToList preds, length ps > 1, j /= g_entry graph
+        , all (endsInBranchTo j) ps ]
 
+  -- Only control flow we can sink things across.
+  endsInBranchTo j p = case lastNode <$> mapLookup p bmap of
+    Just (CmmBranch t) -> t == j
+    Just (CmmCondBranch { cml_true = t, cml_false = f }) -> (t == j) /= (f == j)
+    Just sw@CmmSwitch{} -> j `elem` successors sw
+    -- What remains is call-like, and not much can sensibly be sunk across calls.
+    _ -> False
+
+-- | The forward dataflow pass: shuffles assignments across block boundaries.
+-- See Note [Sinking into shared successors/join points].
+sinkDataflow :: SinkEnv -> CmmGraph -> (CmmGraph, FactBase SinkFact)
+sinkDataflow env graph = fst $ runUniqueDSM (initDUniqSupply 'k' 0) $
+  rewriteCmmFwd sinkLattice rewrite graph mapEmpty
+  where
+  rewrite b fb = pure (applyJoinSinks mapEmpty u, mkFactBase sinkLattice out)
+    where (u, out) = sink env (incomingAt (entryLabel b) fb) b
+
+incomingAt :: Label -> FactBase SinkFact -> Assignments
+incomingAt l fb = maybe [] factAssigs (lookupFact l fb)
+
+-- Drop from the end of an unfinished block what is now assigned
+-- inside the join successors.
+applyJoinSinks :: LabelMap Assignments -> UnfinishedBlock -> CmmBlock
+applyJoinSinks taken_at u =
+  blockJoin (uf_entry u) middle' (uf_last u)
+  where
+      taken = [ (r, e) | j <- uf_joins u
+                       , (r, e, _) <- mapFindWithDefault [] j taken_at ]
+      is_taken (CmmAssign (CmmLocal r) e) = (r, e) `elem` taken
+      is_taken _ = False
+      -- Drop assignments not sunk into the join just before the branching statement.
+      middle' = foldl' blockSnoc (uf_middle u)
+                       (filter (not . is_taken) (uf_dropped u))
+
+-- Sink assignments into and through a block, potentially picking up and
+-- sinking new assignments as we go.
+-- The result is a preliminary block definition and the assignments that could
+-- potentially be pushed into join successors.
+sink :: SinkEnv -> Assignments -> CmmBlock -> (UnfinishedBlock, [(Label, SinkFact)])
+sink env incoming b =
+  -- pprTrace "sink" (ppr (entryLabel b)) $
+  ( UnfinishedBlock { uf_entry   = first
+               , uf_middle  = middle'
+               , uf_dropped = dropped_last
+               , uf_last    = final_last
+               , uf_joins   = map fst my_cands }
+  , out )
+  where
+      platform = envPlatform env
+      getLive = envLive env
+      join_pts = envJoinPts env
+      sink_join_pts = envSinkJoins env
+      (first, middle, last) = blockSplit b
       succs = successors last
 
       -- Annotate the middle nodes with the registers live *after*
@@ -175,13 +394,38 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       ann_middles = annotate platform live_middle (blockToList middle)
 
       -- Now sink and inline in this block
-      (middle', assigs) = walk platform ann_middles (mapFindWithDefault [] lbl sunk)
+      (middle', assigs) = walk platform ann_middles incoming
       fold_last = constantFoldNode platform last
       (final_last, assigs') = tryToInline platform live fold_last assigs
 
-      -- We cannot sink into join points (successors with more than
-      -- one predecessor), so identify the join points and the set
-      -- of registers live in them.
+      -- The assignment candidates for being sunk into another block.
+      -- An assignment is a candidate if:
+      -- * It's live only in j and no other successor
+      -- * It doesn't conflict with the last node
+      -- * It reads no argument register: Note [Argument registers stay in their block]
+      -- * It is independent of every other pending assignment: none assigns the
+      --   same register, reads it, or is read by it.
+      my_cands :: [(Label, Assignments)]
+      my_cands = [ (j, [ a | (i, a) <- ias
+                           , candidate j a [ b | (k, b) <- ias, k /= i ] ])
+                 | j <- succs, setMember j sink_join_pts ]
+      ias = zip [0 :: Int ..] assigs'
+      candidate j a@(r, rhs, _) others =
+           r `elemLRegSet` getLive j
+        && not (any (\s -> s /= j && r `elemLRegSet` getLive s) succs)
+        && not (conflicts platform a final_last)
+        && not (readsArgReg platform rhs)
+        && not (any clash others)
+        where
+          rhs_regs = localRegsUsed platform rhs
+          clash (r', rhs', _) = r' == r
+                             || r' `elemLRegSet` rhs_regs
+                             || r `elemLRegSet` localRegsUsed platform rhs'
+
+      -- We do not sink into join points (successors with more than
+      -- one predecessor), except for what all predecessors drop there
+      -- (Note [Sinking into shared successors/join points]); so identify
+      -- the join points and the set of registers live in them.
       (joins, nonjoins) = partition (`mapMember` join_pts) succs
       live_in_joins = unionsLRegSet (map getLive joins)
 
@@ -200,12 +444,16 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
       (dropped_last, assigs'') = dropAssignments platform drop_if init_live_sets assigs'
 
       drop_if :: (LocalReg, CmmExpr, AbsMem)
-                      -> [LRegSet] -> (Bool, [LRegSet])
-      drop_if a@(r,rhs,_) live_sets = (should_drop, live_sets')
+                      -> [LRegSet] -> (Commute, [LRegSet])
+      drop_if a@(r,rhs,_) live_sets = (res, live_sets')
           where
             should_drop =  conflicts platform a final_last
+                        || readsArgReg platform rhs -- Note [Argument registers stay in their block]
                         || not (isTrivial platform rhs) && live_in_multi live_sets r
                         || r `elemLRegSet` live_in_joins
+
+            res | should_drop = Conflict
+                | otherwise   = NoConflict
 
             live_sets' | should_drop = live_sets
                        | otherwise   = map upd live_sets
@@ -213,13 +461,20 @@ cmmSink platform graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
             upd set | r `elemLRegSet` set = set `unionLRegSet` live_rhs
                     | otherwise          = set
 
-            live_rhs = foldRegsUsed platform (flip insertLRegSet) emptyLRegSet rhs
+            live_rhs = localRegsUsed platform rhs
 
-      final_middle = foldl' blockSnoc middle' dropped_last
-
-      sunk' = mapUnion sunk $
-                 mapFromList [ (l, filterAssignments platform (getLive l) assigs'')
-                             | l <- succs ]
+      -- Note [Sinking into shared successors/join points]:
+      -- * a join gets this block's candidate assignments
+      -- * any other successor what is live there.
+      out = [ (l, fact l) | l <- succs ]
+      fact l
+        -- Nothing is sunk into the entry over a back edge: no local is live
+        -- on procedure entry, so the fact is empty anyway; this keeps it so.
+        | l == envEntry env = Sunk []
+        | Just cs <- lookup l my_cands
+        = Offer cs
+        | mapMember l join_pts = Offer []
+        | otherwise = Sunk (filterAssignments platform (getLive l) assigs'')
 
 {- TODO: enable this later, when we have some good tests in place to
    measure the effect and tune it.
@@ -247,6 +502,14 @@ isTrivial platform (CmmReg (CmmGlobal (GlobalRegUse r _))) = -- see Note [Inline
 isTrivial _ (CmmLit _) = True
 isTrivial _ _          = False
 
+-- | Does an expression read an argument register (R1, F1, D1, ...)?
+readsArgReg :: Platform -> CmmExpr -> Bool
+readsArgReg platform = foldRegsUsed platform (\b r -> b || isArgReg r) False
+
+-- | The local registers an expression mentions.
+localRegsUsed :: Platform -> CmmExpr -> LRegSet
+localRegsUsed platform = foldRegsUsed platform (flip insertLRegSet) emptyLRegSet
+
 --
 -- annotate each node with the set of registers live *after* the node
 --
@@ -255,8 +518,8 @@ annotate platform live nodes = snd $ foldr ann (live,[]) nodes
   where ann n (live,nodes) = (gen_killL platform n live, (live,n) : nodes)
 
 --
--- Find the blocks that have multiple successors (join points)
---
+-- Find the blocks that have multiple predecessors (join points)
+-- by looking for it appearing as successor multiple times.
 findJoinPoints :: [CmmBlock] -> LabelMap Int
 findJoinPoints blocks = mapFilter (>1) succ_counts
  where
@@ -329,9 +592,11 @@ walk platform nodes assigs = go nodes emptyBlock assigs
       -- Inline assignments
       (node2, as1) = tryToInline platform live node1 as
 
-      -- Drop any earlier assignments conflicting with node2
+      -- Drop any earlier assignments conflicting with node2.
+      -- Loads from the stack may instead be rebased past writes to Sp.
+      -- Note [Sinking past Sp adjustments]
       (dropped, as') = dropAssignmentsSimple platform
-                          (\a -> conflicts platform a node2) as1
+                          (\a -> commute platform a node2) as1
 
       -- Walk over the rest of the block. Includes dropped assignments
       block' = foldl' blockSnoc block dropped `blockSnoc` node2
@@ -414,11 +679,11 @@ noOpAssignment node
 toNode :: Assignment -> CmmNode O O
 toNode (r,rhs,_) = CmmAssign (CmmLocal r) rhs
 
-dropAssignmentsSimple :: Platform -> (Assignment -> Bool) -> Assignments
+dropAssignmentsSimple :: Platform -> (Assignment -> Commute) -> Assignments
                       -> ([CmmNode O O], Assignments)
 dropAssignmentsSimple platform f = dropAssignments platform (\a _ -> (f a, ())) ()
 
-dropAssignments :: Platform -> (Assignment -> s -> (Bool, s)) -> s -> Assignments
+dropAssignments :: Platform -> (Assignment -> s -> (Commute, s)) -> s -> Assignments
                 -> ([CmmNode O O], Assignments)
 dropAssignments platform should_drop state assigs
  = (dropped, reverse kept)
@@ -430,11 +695,68 @@ dropAssignments platform should_drop state assigs
       | conflict  =
           let !node = toNode assig
           in  go state' rest (node : dropped) kept
-      | otherwise = go state' rest dropped (assig:kept)
+      | otherwise = go state' rest dropped (assig' : kept)
       where
-        (dropit, state') = should_drop assig state
-        conflict = dropit || any (conflicts platform assig) dropped
+        (res, state') = should_drop assig state
+        conflict = isConflict res || any (conflicts platform assig) dropped
+        assig' = case res of
+                   SpRebase assig' -> assig'
+                   _               -> assig
 
+        isConflict Conflict = True
+        isConflict _        = False
+
+
+{- Note [Sinking past Sp adjustments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sometimes we end up with:
+
+left:
+  x = Sp[8];
+  goto join;
+right:
+  x = Sp[16];
+  Sp = Sp + 8;
+  goto join;
+join:
+  ...
+
+We want to sink x = Sp[8] into the shared successor. Naively the assignment
+to Sp conflicts with reading Sp[16].
+
+But after Sp = Sp + 8 the slot right reads is Sp[8], the one left reads. So
+rebaseSpLoad rewrites the pending load to x = Sp[8] and lets it sink past
+the assignment to Sp; both predecessors then offer x = Sp[8]. A load whose
+slot would end up below Sp is not rebased.
+-}
+
+-- | @Just k@ for a node @Sp = Sp + k@.
+spAdjustment :: CmmNode O O -> Maybe Int
+spAdjustment (CmmAssign (CmmGlobal (GlobalRegUse Sp _)) e) = case e of
+  CmmRegOff (CmmGlobal (GlobalRegUse Sp _)) k -> Just k
+  CmmMachOp (MO_Add _) [CmmReg (CmmGlobal (GlobalRegUse Sp _)), CmmLit (CmmInt k _)]
+    -> Just (fromInteger k)
+  CmmMachOp (MO_Sub _) [CmmReg (CmmGlobal (GlobalRegUse Sp _)), CmmLit (CmmInt k _)]
+    -> Just (negate (fromInteger k))
+  _ -> Nothing
+spAdjustment _ = Nothing
+
+-- | Update an assignment for a stack adjustment of k bytes.
+--
+-- For @Sp = Sp + 8@: rebaseSpLoad 8 (r, Sp[16]) = Just (r, Sp[8]); Nothing
+-- if the slot would end up below Sp.
+-- See Note [Sinking past Sp adjustments]
+rebaseSpLoad :: Platform -> Int -> Assignment -> Maybe Assignment
+rebaseSpLoad platform k (r, CmmLoad addr ty align, SpMem n w)
+  | Just n' <- spOff addr, n' == n, n - k >= 0
+  = Just (r, CmmLoad (cmmOffset platform (spExpr platform) (n - k)) ty align, SpMem (n - k) w)
+  where
+    spOff (CmmReg (CmmGlobal (GlobalRegUse Sp _))) = Just 0
+    spOff (CmmRegOff (CmmGlobal (GlobalRegUse Sp _)) i) = Just i
+    spOff (CmmMachOp (MO_Add _) [CmmReg (CmmGlobal (GlobalRegUse Sp _)), CmmLit (CmmInt i _)])
+      = Just (fromInteger i)
+    spOff _ = Nothing
+rebaseSpLoad _ _ _ = Nothing
 
 -- -----------------------------------------------------------------------------
 -- Try to inline assignments into a node.
@@ -732,6 +1054,29 @@ conflicts platform assig@(r, rhs, addr) node
 
   | otherwise = False
 
+-- | Can we sink an assignment past a node.
+data Commute
+  = Conflict            -- ^ the assignment conflicts with the node; drop it
+  | NoConflict          -- ^ sinks past the node unchanged
+  | SpRebase Assignment -- ^ sinks only by rebasing across an Sp adjustment,
+                        -- See Note [Sinking past Sp adjustments]
+
+-- | @commute platform assig node@ decides whether @assig@ can be sunk
+-- past @node@, and if so in which form.
+-- See Note [When does an assignment conflict?].
+commute :: Platform -> Assignment -> CmmNode O O -> Commute
+commute platform assig node
+  -- If we have (x,Sp[n]) and Sp = Sp + 8
+  -- we can sink the assignment by applying the Sp change to
+  -- the assignment. Even though technically they conflict.
+  | Just assig' <- rebased = SpRebase assig'
+  | conflicts platform assig node = Conflict
+  | otherwise = NoConflict
+  where
+    rebased = do -- Maybe Monad
+      !k <- spAdjustment node
+      rebaseSpLoad platform k assig
+
 {- Note [Inlining foldRegsDefd]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 foldRegsDefd is, after optimization, *not* a small function so
@@ -921,6 +1266,29 @@ regAddr r _ _ | isGcPtrType (cmmRegType r) = HeapMem -- yay! GCPtr pays for itse
 regAddr _ _ _ = AnyMem
 
 {-
+Note [Argument registers stay in their block]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An assignment that reads an argument register (R1, F1, D1, ...: isArgReg) is
+never sunk out of its block: drop_if drops it at the block's end, and it is
+never offered to a join. Other GlobalRegs (Sp, Hp, BaseReg, ...) are not
+affected; sinking stack loads depends on that.
+
+In generated Cmm the first thing we do with an argument register is copy it
+into a local, x = R1. Sinking that copy into a successor makes R1, a fixed
+register, live in place of x, which can live in any register and which the
+allocator usually coalesces with R1 for free (Note [Inline GlobalRegs?]).
+Across blocks this mostly loses: sunk around a loop it kept R1 live through
+spectral-norm's inner loop. Within a block we still sink and inline these
+copies; the copy-in/copy-out code profits from it, see cgrun020 in
+Note [Inline GlobalRegs?].
+
+Liveness does not track GlobalRegs either, which is another reason not to
+move reads of them across blocks.
+
+See Note [Sinking into shared successors/join points].
+
+
+
 Note [Inline GlobalRegs?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
