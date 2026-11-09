@@ -334,10 +334,14 @@ as such you shouldn't need to set any of them explicitly. A flag
     fetch and decode stages of modern processors, at a small code-size
     cost. ``-falign-loops=16`` is a reasonable choice on x86 processors.
 
-    A block is only aligned when the padding in front of it can never be
+    Loops are identified by combining the final block layout with the
+    control flow graph's loop analysis: a block is aligned when it is the
+    target of a backward branch and belongs to a natural loop. A block is
+    also only aligned when the padding in front of it can never be
     executed, so entirely fallthrough-entered loop shapes are not
-    affected. Currently only implemented for the x86 native code
-    generator; on other backends the flag has no effect.
+    affected (but see :ghc-flag:`-falign-loops-pad-fallthrough`).
+    Currently only implemented for the x86 native code generator; on
+    other backends the flag has no effect.
 
 .. ghc-flag:: -falign-loops-pad-fallthrough
     :shortdesc: Align fallthrough-entered loop blocks too, executing the padding.
@@ -352,10 +356,12 @@ as such you shouldn't need to set any of them explicitly. A flag
     By default :ghc-flag:`-falign-loops` only aligns a loop block when the
     padding in front of it can never be executed. With this flag,
     fallthrough-entered loop blocks are aligned as well; the entering path
-    then executes the padding, which consists of no-op instructions.
-    Depending on the loop shape this trades a one-off (per loop entry) nop
-    cost for aligned iterations, or — for bottom-tested loops entered by
-    fallthrough each iteration — pays for the nops every time around.
+    then executes the padding, which consists of no-op instructions. This
+    is only done when the fallthrough edge enters the loop from outside,
+    so the padding cost is paid once per loop entry rather than on every
+    iteration. When no control flow graph is available for a function that
+    distinction cannot be made and every fallthrough-entered loop block is
+    padded.
 
 .. ghc-flag:: -falign-loops-mode
     :shortdesc: Which loops :ghc-flag:`-falign-loops` applies to.

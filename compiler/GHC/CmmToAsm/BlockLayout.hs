@@ -786,37 +786,64 @@ With -falign-loops=N we pad the code so that blocks which start a loop in
 the *final* block order begin at an N-byte boundary, which helps the
 instruction fetch/decode stages of modern x86 cores.
 
-Two things are easy to get wrong here:
+Finding the loop tops combines two views of the code:
 
-* The interesting block is NOT the loop header in the dominator sense.
-  The chain-based layout (see Note [Chain based CFG serialization])
-  deliberately breaks each loop's cycle at its cheapest edge, which
-  usually places the condition-test header at the *bottom* of the loop,
-  entered by fallthrough, while the per-iteration backward branch targets
-  whatever block ended up first in the cycle's chain — possibly a block
-  that did not even exist at Cmm level (codegen-time splits). So we
-  detect alignment targets from the final layout order itself, not from
-  a CFG-level loop analysis: a block qualifies when some block at an
-  equal or later position jumps to it (a backward branch, including a
-  self-loop).
+* The *position* comes from the final layout order, not from a CFG-level
+  loop analysis. The chain-based layout (see Note [Chain based CFG
+  serialization]) deliberately breaks each loop's cycle at its cheapest
+  edge, which usually places the condition-test header at the *bottom* of
+  the loop, entered by fallthrough, while the per-iteration backward
+  branch targets whatever block ended up first in the cycle's chain —
+  possibly a block that did not even exist at Cmm level (codegen-time
+  splits). So a block is a candidate when some block at an equal or later
+  position jumps to it (a backward branch, including a self-loop).
 
-* Padding must never be executed. We only align a block whose layout
-  predecessor ends in an instruction that cannot fall through
-  (mayFallthroughInstr); then the padding sits after an unconditional
-  transfer and costs nothing at run time. Aligning a fallthrough-entered
-  block would insert executed nops on that path — for the rotated loop
-  shape above that would be nops *inside* the loop body, paid every
-  iteration.
+* The *loop-ness* comes from the CFG. Not every backward-branch target
+  closes a loop: backward jumps also reach cold shared continuations
+  (error and join blocks, stack-fixup blocks sitting on loop-exit edges)
+  which merely happen to be laid out early. So a candidate is only
+  aligned when it and at least one of its backward-jump sources belong to
+  the body of the same natural loop, per loopInfo run on the CFG right
+  here. This is sound because the CFG is maintained in lockstep with the
+  block list through codegen splits, register allocation, and
+  shortcutting (sanityCheckCfg asserts node agreement just before
+  layout), and layout itself never changes the graph — so at this point
+  loopInfo is keyed by exactly the labels of the final block list.
 
-  -falign-loops-pad-fallthrough lifts this restriction: fallthrough-
-  entered loop blocks are then aligned as well, and the entering path
-  simply executes the nop padding (gas fills text-section alignment with
-  multi-byte nops). Whether that pays off depends on the shape: a loop
-  top whose fallthrough entry runs once per loop entry gets aligned
-  iterations for a one-off nop cost, but a rotated header entered by
-  fallthrough on every iteration pays for the nops each time around.
-  We cannot cheaply tell these apart here, hence a flag rather than a
-  heuristic; it exists to measure which effect dominates in practice.
+  Two blind spots of the dominator-based loop analysis are handled
+  conservatively:
+
+  - Self-loops: loopInfo's backedge test can miss a block that jumps to
+    itself while dominating other blocks (its domMap only includes the
+    node itself for leaves of the dominator tree). A block jumping to
+    itself is a loop top by definition, so such blocks bypass the
+    loop-body test.
+
+  - Loops whose header is the proc entry, and irreducible control flow,
+    do not appear in liLoops; their blocks are simply not aligned.
+
+  When no CFG is available (non-x86_64, or -finfo-table-map disables the
+  lockstep maintenance, see ncgEnableDeadCodeElimination) every
+  backward-branch target qualifies.
+
+Padding must never be executed. We only align a block whose layout
+predecessor ends in an instruction that cannot fall through
+(mayFallthroughInstr); then the padding sits after an unconditional
+transfer and costs nothing at run time. Aligning a fallthrough-entered
+block would insert executed nops on that path — for the rotated loop
+shape above that would be nops *inside* the loop body, paid every
+iteration.
+
+-falign-loops-pad-fallthrough lifts this restriction: fallthrough-
+entered loop tops are then aligned as well, and the entering path
+executes the nop padding (gas fills text-section alignment with
+multi-byte nops). Whether that pays off depends on which path the nops
+sit on, so with a CFG we insist that the fallthrough edge is a loop
+*entry* edge — the layout predecessor must lie outside the target's
+loop body — making the nops a once-per-entry cost. Rotated loop shapes,
+whose fallthrough predecessor is inside the loop and would execute the
+pad every iteration, stay unaligned. Without a CFG the flag pads every
+fallthrough-entered candidate.
 
 We also skip:
 
@@ -830,26 +857,18 @@ We also skip:
   still be worthwhile but needs the table size taken into account, which
   we don't do yet.
 
-By default this aligns every qualifying backward-branch target — inner
-and outer loop tops alike, and occasionally a cold retry edge. The
-padding for those is never executed either; the only cost is a slightly
-larger code size.
-
-With -falign-loops-mode=inner we instead consult the CFG's loop analysis
-(loopInfo, which at this point in the pipeline already covers
-codegen-split blocks, since the CFG is maintained in lockstep through
-regalloc and shortcutting) and only align a backward-branch target when
-it and one of its backward-jump sources both belong to the body of an
-*innermost* loop — a loop whose body contains no other loop's header.
-Loops sharing one header (several backedges to the same header) count as
-one loop for this purpose and do not disqualify each other. So in
+By default (-falign-loops-mode=all) every loop-confirmed target is
+aligned — inner and outer loop tops alike. With -falign-loops-mode=inner
+only *innermost* loops are aligned: loops whose body contains no other
+loop's header. Loops sharing one header (several backedges to the same
+header) count as one loop for this purpose and do not disqualify each
+other. So in
 
     Loop1 { Loop2; Loop3 { Loop4 } }
 
-only Loop2's and Loop4's closing branches get aligned. Backward branches
-that are not part of any natural CFG loop (e.g. cold retry paths, or
-irreducible flow) are not aligned in this mode. When no CFG is available
-the mode falls back to aligning every qualifying backward-branch target.
+only Loop2's and Loop4's closing branches get aligned. When no CFG is
+available both modes fall back to aligning every qualifying
+backward-branch target.
 
 This runs after dropJumps: a dropped terminal jump turns its successor
 into a fallthrough target, which correctly disqualifies that successor
@@ -864,10 +883,11 @@ per-iteration backward branch still lands on the aligned label.
 -- alignment, so that the pretty printer emits an alignment directive in
 -- front of them. See Note [Aligning loop headers].
 --
--- With 'AlignInnerLoops' (and a CFG to consult) only blocks which close an
--- innermost loop -- a loop containing no nested loop -- are annotated.
+-- When a CFG is available a backward-branch target is only annotated when
+-- the CFG's loop analysis confirms it belongs to a (with 'AlignInnerLoops':
+-- innermost) natural loop.
 annotateLoopAligns :: Instruction instr => Alignment -> LoopAlignMode
-                   -> Bool -- ^ pad fallthrough-entered blocks too (rule (b) off)
+                   -> Bool -- ^ pad fallthrough-entered loop tops too
                    -> Maybe CFG -> LabelMap a
                    -> [GenBasicBlock instr] -> [GenBasicBlock instr]
 annotateLoopAligns algn mode pad_fallthrough mb_cfg info blocks =
@@ -891,47 +911,65 @@ annotateLoopAligns algn mode pad_fallthrough mb_cfg info blocks =
                    (concatMap jumpDestsOfInstr instrs)
           | otherwise = m
 
-    -- Bodies of innermost loops: loops whose body contains no other
+    -- The bodies of the natural loops we are willing to align, from the
+    -- CFG's loop analysis: all of them, or with 'AlignInnerLoops' only
+    -- those of innermost loops -- loops whose body contains no other
     -- loop's header. Loops sharing a header (several backedges to one
-    -- header) do not disqualify each other. Only computed when gating.
-    innerBodies :: [LabelSet]
-    innerBodies = case (mode, mb_cfg, blocks) of
-      (AlignInnerLoops, Just cfg, entry_blk : _)
+    -- header) do not disqualify each other. Nothing when we have no CFG.
+    mb_bodies :: Maybe [LabelSet]
+    mb_bodies = case (mb_cfg, blocks) of
+      (Just cfg, entry_blk : _)
         -> let loops = liLoops (loopInfo cfg (blockId entry_blk))
                isInner ((_, hdr), body) =
                  not (any (\((_, hdr'), _) ->
                              hdr' /= hdr && setMember hdr' body) loops)
-           in [ body | l@(_, body) <- loops, isInner l ]
-      _ -> []
-
-    -- Does this backward-branch target belong to a loop we want aligned?
-    gateOK dst = case mode of
-      AlignAllLoops -> True
-      AlignInnerLoops -> case mb_cfg of
-        -- Without a CFG we cannot tell nesting apart; keep the plain
-        -- backward-branch behaviour rather than silently aligning nothing.
-        Nothing -> True
-        Just _  ->
-          case mapLookup dst backSources of
-            Nothing   -> False
-            Just srcs -> any (\body -> setMember dst body
-                                       && any (`setMember` body) srcs)
-                             innerBodies
+               kept = case mode of
+                 AlignAllLoops   -> loops
+                 AlignInnerLoops -> filter isInner loops
+           in Just (map snd kept)
+      _ -> Nothing
 
     annotate mb_pred blk@(BasicBlock lbl mb_align instrs)
-      | Nothing <- mb_align                            -- keep existing annotations
-      , Just (BasicBlock _ _ pred_instrs) <- mb_pred   -- proc entry is never aligned
-      , pad_fallthrough || predCannotFallthrough pred_instrs
-      , mapMember lbl backSources
+      | Nothing <- mb_align                                 -- keep existing annotations
+      , Just (BasicBlock pred_lbl _ pred_instrs) <- mb_pred -- proc entry is never aligned
+      , Just srcs <- mapLookup lbl backSources
       , not (mapMember lbl info)
-      , gateOK lbl
+      , wantAlign lbl srcs pred_lbl pred_instrs
       = BasicBlock lbl (Just algn) instrs
       | otherwise
       = blk
+
+    -- Should this backward-branch target be aligned, given its backward-jump
+    -- sources and its layout predecessor?
+    wantAlign lbl srcs pred_lbl pred_instrs
+      -- A block jumping to itself is a loop top no matter what the loop
+      -- analysis says; loopInfo can miss self-loops (see Note [Aligning
+      -- loop headers]).
+      | lbl `elem` srcs
+      = pad_fallthrough || pred_no_fallthrough
+      | Just bodies <- mb_bodies
+      -- Only align targets the CFG confirms as loop-closing: the target
+      -- and one of its backward-jump sources must share a loop body. This
+      -- filters backward branches to cold join/retry blocks which are not
+      -- part of any loop.
+      = case filter in_body bodies of
+          []      -> False
+          qbodies -> pred_no_fallthrough
+                     -- Executed padding is only allowed on a loop *entry*
+                     -- edge: the fallthrough predecessor must sit outside
+                     -- the loop, so the nops run once per entry rather
+                     -- than once per iteration.
+                     || (pad_fallthrough
+                         && any (\body -> not (setMember pred_lbl body)) qbodies)
+      -- No CFG: every backward-branch target qualifies, and
+      -- pad_fallthrough is not gated.
+      | otherwise
+      = pad_fallthrough || pred_no_fallthrough
       where
+        in_body body = setMember lbl body && any (`setMember` body) srcs
         -- An empty predecessor (possible after shortcutting) always
         -- falls through.
-        predCannotFallthrough pred_instrs = case nonEmpty pred_instrs of
+        pred_no_fallthrough = case nonEmpty pred_instrs of
           Just pred_instrs' -> not (mayFallthroughInstr (NE.last pred_instrs'))
           Nothing           -> False
 
