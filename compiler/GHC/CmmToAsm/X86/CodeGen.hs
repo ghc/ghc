@@ -3471,6 +3471,18 @@ getAmode e = do
    let is32Bit = target32Bit platform
 
    case e of
+      -- r + n as the alternative for x + lit below makes it of
+      -- mangleIndexTree r n, without building the sum
+      CmmRegOff r n
+         | not (isPicBase r)
+         , is32BitLit platform lit
+         -> do
+            (x_reg, x_code) <- getSomeReg (CmmReg r)
+            return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone (litToImm lit)) x_code)
+         where lit = CmmInt (fromIntegral n) (typeWidth (cmmRegType r))
+               isPicBase (CmmGlobal (GlobalRegUse PicBaseReg _)) = True
+               isPicBase _                                      = False
+
       CmmRegOff r n
          -> getAmode $ mangleIndexTree r n
 

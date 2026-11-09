@@ -63,3 +63,12 @@ test('T27447',
 
 test('T27722', [req_cmm], multi_compile_and_run,
      ['T27722', [('T27722_cmm.cmm', '')], '-O'])
+
+test('cmm_regoff',
+     [ req_cmm
+     , when(wordsize(32), skip)
+     , extra_ways(['optasm'])
+     , when(have_llvm(), extra_ways(['optasm', 'optllvm']))
+     ],
+     multi_compile_and_run,
+     ['cmm_regoff', [('cmm_regoff_cmm.cmm', '')], ''])
