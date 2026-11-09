@@ -320,6 +320,7 @@ def main() -> None:
     parser.add_argument('--metadata', required=True, type=Path, help='Path to GHCUp metadata')
     parser.add_argument('--pipeline-id', required=True, type=int, help='Which pipeline to generate metadata for')
     parser.add_argument('--release-mode', action='store_true', help='Generate metadata which points to downloads folder')
+    parser.add_argument('--nightly-mode', action='store_true', help='The pipeline is a nightly pipeline')
     parser.add_argument('--fragment', action='store_true', help='Output the generated fragment rather than whole modified file')
     # TODO: We could work out the --version from the project-version CI job.
     parser.add_argument('--version', required=True, type=str, help='Version of the GHC compiler')
@@ -329,19 +330,14 @@ def main() -> None:
 
     project = gl.projects.get(1, lazy=True)
     pipeline = project.pipelines.get(args.pipeline_id)
-    jobs = pipeline.jobs.list()
+    jobs = pipeline.jobs.list(iterator=True)
     job_map = { job.name: job for job in jobs }
-    # Bit of a hacky way to determine what pipeline we are dealing with but
-    # the aarch64-darwin job should stay stable for a long time.
-    if 'nightly-aarch64-darwin-validate' in job_map:
-        pipeline_type = 'n'
-        if args.release_mode:
-            raise Exception("Incompatible arguments: nightly pipeline but using --release-mode")
 
-    elif 'release-aarch64-darwin-release' in job_map:
-        pipeline_type = 'r'
-    else:
-        raise Exception("Not a nightly nor release pipeline")
+    if args.nightly_mode and args.release_mode:
+        raise Exception("Incompatible arguments: --nightly-mode and --release-mode are mutually exclusive")
+    if not args.nightly_mode and not args.release_mode:
+        raise Exception("Specify either --nightly-mode or --release-mode")
+    pipeline_type = 'n' if args.nightly_mode else 'r'
     eprint(f"Pipeline Type: {pipeline_type}")
 
 
