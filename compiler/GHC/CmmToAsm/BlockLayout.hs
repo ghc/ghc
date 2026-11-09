@@ -923,7 +923,7 @@ lookupDeleteUFM m k = do -- Maybe monad
 
 backendMaintainsCfg :: Platform -> Bool
 backendMaintainsCfg platform = case platformArch platform of
-    -- ArchX86 -- Should work but not tested so disabled currently.
     ArchX86_64 -> True
+    ArchX86    -> True
     _otherwise -> False
 
