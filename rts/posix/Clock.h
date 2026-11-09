@@ -19,6 +19,7 @@
 #endif
 
 #define RTS_CLOCK_MONOTONIC CLOCK_MONOTONIC
+#define RTS_CLOCK_REALTIME  CLOCK_REALTIME
 
 #if defined(darwin_HOST_OS)
 # include <mach/mach.h>
