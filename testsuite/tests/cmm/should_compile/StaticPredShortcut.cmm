@@ -1,0 +1,35 @@
+#include "Cmm.h"
+
+// The test `a == 5` jumps to t when it holds. The move in t is to the
+// register its source is in, so the assembly's t is a bare jump to c, and
+// -fasm-shortcutting sends the test's true edge to c, whose label is smaller
+// than f's. Static prediction read the side off the label the branch was made
+// with, treated the edge to c as the false side, estimated c the likelier
+// successor and so had it placed after the test. With the side recorded on the
+// edge, f (2222) comes after the test and before c (1111), as it does without
+// -fasm-shortcutting.
+//
+// The tests of b give t and f a second predecessor each, so that the
+// control-flow optimisation neither inverts the test nor merges f into the
+// block before it; g gives x a second definition, so that t stays a block.
+stale_pred (W_ a, W_ b) {
+  W_ x;
+  if (b == 0) goto h;
+  if (b == 2) goto f;
+  if (b == 1) goto t;
+  if (a == 5) goto t;
+  goto f;
+ t:
+  x = b;
+  goto c;
+ h:
+  if (a == 0) goto g;
+  goto f;
+ g:
+  x = a + 3333;
+  goto c;
+ c:
+  return (x + 1111);
+ f:
+  return (b + 2222);
+}

@@ -30,13 +30,11 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Utils.Monad.StrictState
-import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Format
 import GHC.Utils.Misc
 
 import Data.List        (nub)
 import Data.Maybe
-import Control.Monad (join)
 
 
 -- | Records the expected cost to spill some register.
@@ -78,52 +76,43 @@ plusSpillCostRecord (r1, a1, b1, c1) (r2, a2, b2, c2)
 --
 slurpSpillCostInfo :: forall instr statics. Instruction instr
                    => Platform
-                   -> Maybe CFG
                    -> LiveCmmDecl statics instr
                    -> SpillCostInfo
 
-slurpSpillCostInfo platform cfg cmm
+slurpSpillCostInfo platform cmm
         = execState (countCmm cmm) zeroSpillCostInfo
  where
         countCmm CmmData{}              = return ()
         countCmm (CmmProc info _ _ sccs)
-                = mapM_ (countBlock info freqMap)
+                = mapM_ (countBlock info)
                 $ flattenSCCs sccs
-            where
-                LiveInfo _ entries _ _ = info
-                -- WIP: no spill choice depends on these frequencies. They scale
-                -- only the counts of uses and definitions, while chooseSpill
-                -- uses spillCost_length, a function of the lifetimes alone;
-                -- spillCost_chaitin, which would use the counts, is commented
-                -- out.
-                freqMap = (fst . mkGlobalWeights (head entries)) <$> cfg
 
         -- Lookup the regs that are live on entry to this block in
         --      the info table from the CmmProc.
-        countBlock info freqMap (BasicBlock blockId instrs)
+        countBlock info (BasicBlock blockId instrs)
                 | LiveInfo _ _ blockLive _ <- info
                 , Just rsLiveEntry  <- mapLookup blockId blockLive
                 , rsLiveEntry_virt  <- takeVirtualRegs $ getRegs rsLiveEntry
-                = countLIs (ceiling $ blockFreq freqMap blockId) rsLiveEntry_virt instrs
+                = countLIs rsLiveEntry_virt instrs
 
                 | otherwise
                 = error "RegAlloc.SpillCost.slurpSpillCostInfo: bad block"
 
 
-        countLIs :: Int -> UniqSet VirtualReg -> [LiveInstr instr] -> SpillCostState
-        countLIs _      _      []
+        countLIs :: UniqSet VirtualReg -> [LiveInstr instr] -> SpillCostState
+        countLIs _      []
                 = return ()
 
         -- Skip over comment and delta pseudo instrs.
-        countLIs scale rsLive (LiveInstr instr Nothing : lis)
+        countLIs rsLive (LiveInstr instr Nothing : lis)
                 | isMetaInstr instr
-                = countLIs scale rsLive lis
+                = countLIs rsLive lis
 
                 | otherwise
                 = pprPanic "RegSpillCost.slurpSpillCostInfo"
                 $ text "no liveness information on instruction " <> pprInstr platform instr
 
-        countLIs scale rsLiveEntry (LiveInstr _ (Just live) : lis)
+        countLIs rsLiveEntry (LiveInstr _ (Just live) : lis)
          = do
                 -- Increment the lifetime counts for regs live on entry to this instr.
                 mapM_ incLifetime $ nonDetEltsUniqSet rsLiveEntry
@@ -133,8 +122,8 @@ slurpSpillCostInfo platform cfg cmm
 
                 -- Increment counts for what regs were read/written from.
                 let (RU read written)   = liveUsage live
-                mapM_ (incUses scale) $ nub $ mapMaybe (takeVirtualReg . regWithFormat_reg) read
-                mapM_ (incDefs scale) $ nub $ mapMaybe (takeVirtualReg . regWithFormat_reg) written
+                mapM_ incUses $ nub $ mapMaybe (takeVirtualReg . regWithFormat_reg) read
+                mapM_ incDefs $ nub $ mapMaybe (takeVirtualReg . regWithFormat_reg) written
 
                 -- Compute liveness for entry to next instruction.
                 let liveDieRead_virt    = takeVirtualRegs $ getRegs (liveDieRead  live)
@@ -148,18 +137,11 @@ slurpSpillCostInfo platform cfg cmm
                         = (rsLiveAcross `unionUniqSets` liveBorn_virt)
                                         `minusUniqSet`  liveDieWrite_virt
 
-                countLIs scale rsLiveNext lis
+                countLIs rsLiveNext lis
 
-        incDefs     count reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, count, 0, 0)
-        incUses     count reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, count, 0)
+        incDefs           reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 1, 0, 0)
+        incUses           reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, 1, 0)
         incLifetime       reg = modify $ \s -> addToUFM_C plusSpillCostRecord s reg (reg, 0, 0, 1)
-
-        blockFreq :: Maybe (LabelMap Double) -> Label -> Double
-        blockFreq freqs bid
-          | Just freq <- join (mapLookup bid <$> freqs)
-          = max 1.0 (10000 * freq)
-          | otherwise
-          = 1.0 -- Only if no cfg given
 
 -- | Choose a node to spill from this graph
 chooseSpill

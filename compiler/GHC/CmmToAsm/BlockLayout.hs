@@ -57,11 +57,11 @@ import GHC.Types.Unique.DSM (UniqDSM)
   * After register allocation and shortcutting, where the CFG is kept (x86-64,
     not under -finfo-table-map), we run `optimizeCFG` which adds a few
     more "educated guesses" to the equation.
-  * Then we run loop analysis on the CFG (`loopInfo`) which tells us
+  * Then we run loop analysis on the CFG (`freqEstimate`) which tells us
     about loop headers, loop bodies and the sort.
   * Based on the CFG and loop information refine the edge weights
     in the CFG and normalize them relative to the entry
-    node. (See `mkGlobalWeights`)
+    node. (See `staticPredCfg`)
     This step and the loop analysis run for the layout only under
     -fcmm-static-pred, on at -O1 and -O2.
   * Feed this CFG into the block layout code (`sequenceTop`) in this

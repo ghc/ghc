@@ -40,7 +40,7 @@ Then, pass by pass, in the overview's order:
 * step 9, shortcutting: Note [supporting shortcutting] in `GHC.CmmToAsm.Monad`
   and Note [Updating the CFG during shortcutting] in `GHC.CmmToAsm.CFG`;
 * step 10, static prediction:
-  Note [Static Branch Prediction], Note [Back edges in loopInfo],
+  Note [Static Branch Prediction], Note [Back edges in freqEstimate],
   Note [Static prediction of tag tests]
   and Note [Where a branch's likely side is known] in `GHC.CmmToAsm.CFG`;
 * step 11, block layout and the copying of loop heads:
@@ -124,23 +124,18 @@ or uses it:
   place its two blocks next to each other (Note [CFG Edge Weights]
   in `GHC.CmmToAsm.CFG`). `getCfg` sets it from `-fblock-layout-weights`, and,
   where the CFG is kept, under `-fcmm-static-pred` it is replaced
-  by the frequency that `calcFreqs` computes.
-* back edge: an edge that closes a loop, by one of two notions that disagree
-  on some edges (Note [Back edges in loopInfo] in `GHC.CmmToAsm.CFG`).
-  For `loopInfo`, an edge of the CFG whose target dominates its source,
-  as `mkDomMap` computes dominance: no edge into the entry block, and every
-  self loop. For `findBackEdges`, which `optHsPatterns` uses, an edge into
-  a block still on the stack of a depth-first search from the entry, and no
-  self loop.
-* irreducible: said of a cycle that can be entered at more than one
-  of its blocks, and of control flow that has one
-  (Note [Back edges in loopInfo], `loopInfo`, `mkGlobalWeights`); and,
-  in `calcFreqs`, of a block that has, when `calcFreqs` reaches it,
-  a predecessor not yet visited whose edge into it is not one of `loopInfo`'s
-  back edges.
+  by the frequency that `freqEstimate` computes.
+* back edge: an edge into a block still on the stack of a depth-first search
+  from the entry (`findBackEdges`, which counts no self loop,
+  and `freqEstimate`'s own search, which counts none into the entry);
+  `freqEstimate` counts such an edge as a loop's back edge where the block
+  dominates the edge's source. Note [Back edges in freqEstimate]
+  in `GHC.CmmToAsm.CFG` names one kind of such edge that it misses.
+* irreducible: said of a region of the CFG holding a back edge whose target does
+  not dominate its source, and of a block such an edge enters (`freqEstimate`).
 * loop head: the block that a loop's back edges enter. Static prediction's loop
   heads and those of the layout's back edges can differ
-  (Note [Back edges in loopInfo] in `GHC.CmmToAsm.CFG`).
+  (Note [Back edges in freqEstimate] in `GHC.CmmToAsm.CFG`).
 * chain: a sequence of blocks that the layout places one after another, built
   along heavy edges (Note [Chain based CFG serialization]
   in `GHC.CmmToAsm.BlockLayout`).
@@ -149,6 +144,10 @@ or uses it:
   in `GHC.Cmm.LayoutStack`), or whether it, or its closure's info table, holds
   a given constructor's tag (Note [Static prediction of tag tests]
   in `GHC.CmmToAsm.CFG`).
+* frequency: how many times a block runs each time the procedure runs, as static
+  prediction estimates it (`freqEstimate` in `GHC.CmmToAsm.CFG`): for the layout
+  after register allocation, and for the linear allocator before
+  it (Note [Frequencies before register allocation] in `GHC.CmmToAsm.CFG`).
 
 Finding the pass at fault
 -------------------------
