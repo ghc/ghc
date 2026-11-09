@@ -1800,19 +1800,19 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
     sub_code rep x y = trivialCode rep (SUB (intFormat rep)) Nothing x y
 
     -- our three-operand add instruction, x + y for a 32-bit y.  An x of
-    -- (a + b) or (a + (b << shift)) goes into the same LEA as an address of
-    -- that form would (Note [Additive normal form] in GHC.Cmm.Opt), and
-    -- (a - b) + y is computed as (a + y) - b, the LEA taking the place of
-    -- the move of a into the destination.
+    -- (a + b), (a + (b << shift)) or (b << shift) goes into the same LEA as
+    -- an address of that form would (Note [Additive normal form] in
+    -- GHC.Cmm.Opt), and (a - b) + y is computed as (a + y) - b, the LEA
+    -- taking the place of the move of a into the destination.
     -- x is evaluated once by the bang, the default alternative taking the
     -- value rather than a thunk it would evaluate again.
     add_int width !x y = case x of
       CmmMachOp (MO_Add _) [_, b]
         | not (isLit b)
-        -> do Amode addr addr_code <- getAmode (CmmMachOp (MO_Add width)
-                                                 [x, CmmLit (CmmInt y width)])
-              return (Any format (\dst -> addr_code `snocOL`
-                                          LEA format (OpAddr addr) (OpReg dst)))
+        -> lea_amode
+      CmmMachOp (MO_Shl _) [_, CmmLit (CmmInt shift _)]
+        | shift == 0 || shift == 1 || shift == 2 || shift == 3
+        -> lea_amode
       CmmMachOp (MO_Sub _) [a, b]
         -> trivialCode width (SUB format) Nothing
              (CmmMachOp (MO_Add width) [a, CmmLit (CmmInt y width)]) b
@@ -1828,6 +1828,11 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
         --
         return (Any format code)
       where format = intFormat width
+            lea_amode = do
+              Amode addr addr_code <- getAmode (CmmMachOp (MO_Add width)
+                                                 [x, CmmLit (CmmInt y width)])
+              return (Any format (\dst -> addr_code `snocOL`
+                                          LEA format (OpAddr addr) (OpReg dst)))
 
     ----------------------
 
@@ -3529,9 +3534,10 @@ getAmode e = do
          | is32BitLit platform lit
          -- assert (rep == II32)???
          -> let !x' = x in case x' of
-              -- (b + (i << shift)) + offset and (b + i) + offset, the
-              -- additive normal form of these addresses (Note [Additive
-              -- normal form] in GHC.Cmm.Opt), tested here so that x is
+              -- (b + (i << shift)) + offset and (b + i) + offset, the additive
+              -- normal form of these addresses (Note [Additive normal form]
+              -- in GHC.Cmm.Opt), and (i << shift) + lit with no base, as an
+              -- entry of a closure table is addressed; tested here so that x is
               -- evaluated once, the default alternative taking its value x'
               CmmMachOp (MO_Add _) [b, CmmMachOp (MO_Shl _) [i, CmmLit (CmmInt shift _)]]
                 | shift == 0 || shift == 1 || shift == 2 || shift == 3
@@ -3543,13 +3549,23 @@ getAmode e = do
                 , CmmInt offset _ <- lit
                 , is32BitInteger offset
                 -> x86_complex_amode b i 0 offset
+              CmmMachOp (MO_Shl _) [i, CmmLit (CmmInt shift _)]
+                | shift == 0 || shift == 1 || shift == 2 || shift == 3
+                -> do (i_reg, i_code) <- getSomeReg i
+                      let amode = AddrBaseIndex EABaseNone
+                                    (EAIndex i_reg (fromInteger (2 ^ shift)))
+                                    (litToImm lit)
+                      return (Amode amode i_code)
               _ -> do
                 (x_reg, x_code) <- getSomeReg x'
                 let off = litToImm lit
                 return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
-      -- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be
-      -- recognised by the next rule.
+      -- Turn (a << n) + lit into lit + (a << n), so that x + (y << shift)
+      -- below, or for n above 3 x + y, puts lit into a base register: x + lit
+      -- above takes every lit a displacement holds, so here lit is a label on
+      -- Windows (Note [%rip-relative addressing on x86-64]) or an integer or a
+      -- label's offset wider than 32 bits.
       CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _), b@(CmmLit _)]
          -> getAmode (CmmMachOp (MO_Add rep) [b,a])
 
