@@ -164,6 +164,18 @@ class Instruction instr where
                 -> Maybe instr
         mkRegRegSwapInstr _ _ _ _ = Nothing
 
+        -- | Copy a value of a format from one spill slot to another, every
+        --      register keeping its value, where the target's instance defines
+        --      the method, or Nothing.
+        mkSlotSlotMoveInstr
+                :: NCGConfig
+                -> Format
+                -> Int          -- ^ the current stack delta
+                -> Int          -- ^ the source spill slot
+                -> Int          -- ^ the destination spill slot
+                -> Maybe [instr]
+        mkSlotSlotMoveInstr _ _ _ _ _ = Nothing
+
         -- | Take the source and destination from this reg -> reg move instruction
         --      or Nothing if it's not one
         takeRegRegMoveInstr

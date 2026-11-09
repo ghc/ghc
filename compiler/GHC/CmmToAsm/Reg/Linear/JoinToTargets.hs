@@ -12,10 +12,13 @@ import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Linear.State
 import GHC.CmmToAsm.Reg.Linear.Base
+import GHC.CmmToAsm.Reg.Linear.FreeRegs (FR (..))
+import GHC.CmmToAsm.Reg.Target (targetClassOfReg, targetMkVirtualReg)
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Types
 
+import GHC.Platform (platformWordSizeInBytes)
 import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
@@ -38,7 +41,7 @@ import GHC.Data.Word64Map.Strict (isSubmapOfBy)
 --      vregs are in the correct regs for its destination.
 --
 joinToTargets
-        :: Instruction instr
+        :: (FR freeRegs, Instruction instr)
         => BlockMap Regs -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
@@ -67,7 +70,7 @@ joinToTargets block_live id instr
 
 -----
 joinToTargets'
-        :: Instruction instr
+        :: (FR freeRegs, Instruction instr)
         => BlockMap Regs -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
@@ -151,7 +154,7 @@ given, and it stands for the rest of the procedure.
 -}
 
 -- we've jumped to this block before
-joinToTargets_again :: Instruction instr
+joinToTargets_again :: (FR freeRegs, Instruction instr)
                     => BlockMap Regs
                     -> [NatBasicBlock instr]
                     -> BlockId
@@ -203,7 +206,14 @@ joinToTargets_again
                         (return ())
                 -}
                 delta           <- getDeltaR
-                fixUpInstrs     <- concatMapM (handleComponent delta instr) sccs
+                -- The moves between two slots come first: no other move reads
+                -- the slot one writes or writes the slot it reads, both being
+                -- one vreg's, and before the other moves every register free
+                -- at the jump holds nothing (makeMove).
+                fixUpInstrs     <- case filter slotToSlot sccs of
+                  []    -> concatMapM (handleComponent delta) sccs
+                  slots -> concatMapM (handleComponent delta)
+                             (slots ++ filter (not . slotToSlot) sccs)
 
                 -- make a new basic block containing the fixup code.
                 --      A the end of the current block we will jump to the fixup one,
@@ -253,19 +263,17 @@ joinToTargets_again
 
 -- | Construct a graph of register\/spill movements.
 --
---      We cut some corners by not handling memory-to-memory moves.
---      This shouldn't happen because every temporary gets its own stack slot.
---      BUG #27638: since #26668 a temporary can have more than one stack
---      slot, and a move between two of them panics in makeMove: see
---      handleComponent. It can be reached two ways (expandNode), both from
---      a jump at which the temporary is in one of its slots only: into a
---      block that holds it in another of its slots only, and into a block
---      that holds it in a register and another slot, where makeMove loads the
---      register first, so the value is in that register when the slot is to be
---      written. A fix cannot count on a spare register: nothing keeps one free
---      at a jump, and the block's entry assignment can hold every allocatable
---      register, on x86-64 the eleven integer registers (rax, rbx, rcx, rdx,
---      rsi, rdi, r8 to r11 and r14) and the sixteen vector registers.
+--      A move from memory to memory is made through a register (makeMove).
+--      BUG: since #26668 a temporary can have more than one stack slot,
+--      and a jump into a block that holds it in another of its slots only
+--      needs a move between two of them, which makeMove makes through a
+--      register free at the jump, and where there is none, on x86 and x86-64
+--      by mkSlotSlotMoveInstr, a word at a time through one register saved and
+--      given back; on AArch64, the one other target with formats wider than
+--      a slot, it panics. Nothing keeps one free on any target: the assignment
+--      at the jump can hold every allocatable register, on x86-64 the eleven
+--      integer registers (rax, rbx, rcx, rdx, rsi, rdi, r8 to r11 and r14) and
+--      the sixteen vector registers.
 --
 makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [Node Loc Unique]
 makeRegMovementGraph adjusted_assig dest_assig
@@ -325,15 +333,28 @@ expandNode vreg (Loc srcLoc srcFmt) (Loc dstLoc dstFmt)
 --      cycles in expandNode above.
 --
 handleComponent
-        :: Instruction instr
-        => Int -> instr -> SCC (Node Loc Unique)
+        :: (FR freeRegs, Instruction instr)
+        => Int -> SCC (Node Loc Unique)
         -> RegM freeRegs [instr]
 
 -- If the graph is acyclic then we won't get the swapping problem below.
 --      In this case we can just do the moves directly, and avoid having to
 --      go via a spill slot.
 --
-handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
+-- From a slot to a register and another slot (expandNode), the value is
+--      stored into the slot from the register it was loaded into, at the
+--      narrower of the two formats, as makeMove moves it between two slots,
+--      and with no free register.  The node is in no cycle, its source slot
+--      being its vreg's own, and no other move writes the register or the slot.
+handleComponent delta
+        (AcyclicSCC (DigraphNode vreg src@(Loc (InMem _) srcFmt)
+                                 [dst@(Loc (InReg r) dstFmt), Loc (InMem d) _]))
+ = do load  <- makeMove delta vreg src dst
+      store <- makeMove delta vreg (Loc (InReg r) dstFmt)
+                        (Loc (InMem d) (narrowerFormat srcFmt dstFmt))
+      return (load ++ store)
+
+handleComponent delta (AcyclicSCC (DigraphNode vreg src dsts))
         = concatMapM (makeMove delta vreg src) dsts
 
 
@@ -354,25 +375,25 @@ handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
 --      and reload the slot into the first move's destination reg last.
 --
 --      There can be no cycle through a memory location, as a stack slot is
---      allocated for one virtual register only. But since #26668 a vreg can
---      have more than one slot: getStackSlotFor gives it a new one where its
---      format has outgrown the old.
+--      allocated for one virtual register only. A virtual register does get
+--      a new slot where its format outgrows the old one (getStackSlotFor,
+--      #26668), but no other move writes the slot it is moved from, so its move
+--      between the two slots is in no cycle.
 --
---      BUG #27638: a jump can then need a move from one of a vreg's slots to
---      another, which makeMove does not handle: it panics. A vreg outgrows its
---      slots only at a format wider than 8 bytes, a vector format, so the panic
---      is reached only on i386, x86-64 and AArch64, the targets whose code
---      generators take vectors; a program reaches it on x86-64 at -O1 and -O2.
+--      BUG: a jump can then need a move from one of a vreg's slots to another,
+--      which makeMove makes through a free register, panicking on AArch64
+--      where none is (see makeRegMovementGraph).
 --
 --      BUG: where the first move goes to an InBoth destination and no one
 --      instruction swaps two registers of the format (a floating-point or
 --      vector format on x86 and x86-64, any format on the other targets), the
 --      pattern below leaves out the destination's slot, which is then written
 --      only if it is the slot spillR picks; otherwise the slot keeps a stale
---      value, which is wrong code where it is reloaded, on the same targets. No
---      program is known to leave a stale slot.
+--      value, which is wrong code where it is reloaded, on i386, x86-64 and
+--      AArch64, the targets whose code generators take vectors. No program is
+--      known to leave a stale slot.
 --
-handleComponent delta instr
+handleComponent delta
         (CyclicSCC ((DigraphNode vreg src@(Loc (InReg sreg) scls) ((Loc (InReg dreg) dcls: more))) : rest))
         -- dest list may have more than one element, if the reg is also InMem.
  = do
@@ -388,7 +409,7 @@ handleComponent delta instr
             moved n = n
             inSreg (Loc (InReg r) _) = r == sreg
             inSreg _                 = False
-        remainingFixUps <- mapM (handleComponent delta instr)
+        remainingFixUps <- mapM (handleComponent delta)
                                 (movementGraphSCCs (map moved rest))
         return (stores ++ swap : concat remainingFixUps)
       Nothing -> do
@@ -399,14 +420,14 @@ handleComponent delta instr
         -- reload into destination reg
         instrLoad       <- loadR (RegWithFormat (RegReal dreg) dcls) slot
 
-        remainingFixUps <- mapM (handleComponent delta instr)
+        remainingFixUps <- mapM (handleComponent delta)
                                 (movementGraphSCCs rest)
 
         -- make sure to do all the reloads after all the spills,
         --      so we don't end up clobbering the source values.
         return (instrSpill ++ concat remainingFixUps ++ instrLoad)
 
-handleComponent _ _ (CyclicSCC _)
+handleComponent _ (CyclicSCC _)
  = panic "Register Allocator: handleComponent cyclic"
 
 -- | Whether the second assignment has every vreg of the first at the first's
@@ -415,6 +436,13 @@ recordedLocsHold :: RegMap Loc -> RegMap Loc -> Bool
 recordedLocsHold dest src
   = isSubmapOfBy (\(Loc l1 _) (Loc l2 _) -> l1 == l2)
                  (ufmToIntMap dest) (ufmToIntMap src)
+
+-- | Whether the component is a move between two slots, which expandNode
+-- gives a node of its own and makeMove makes through a register.
+slotToSlot :: SCC (Node Loc Unique) -> Bool
+slotToSlot (AcyclicSCC (DigraphNode _ (Loc (InMem _) _) [Loc (InMem _) _]))
+  = True
+slotToSlot _ = False
 
 -- A helper function that uses the @Ord (IgnoreFormat Loc)@ instance.
 
@@ -425,14 +453,14 @@ movementGraphSCCs =
 -- | Move a vreg between these two locations.
 --
 makeMove
-    :: Instruction instr
+    :: (FR freeRegs, Instruction instr)
     => Int           -- ^ current C stack delta
     -> Unique        -- ^ unique of the vreg that we're moving
     -> Loc -- ^ source location
     -> Loc -- ^ destination location
     -> RegM freeRegs [instr]  -- ^ move instruction
 
-makeMove delta vreg (Loc src _srcFmt) (Loc dst dstFmt)
+makeMove delta vreg (Loc src srcFmt) (Loc dst dstFmt)
  = do config <- getConfig
       case (src, dst) of
           (InReg s, InReg d) ->
@@ -444,11 +472,49 @@ makeMove delta vreg (Loc src _srcFmt) (Loc dst dstFmt)
           (InReg s, InMem d) ->
               do recordSpill (SpillJoinRM vreg)
                  return $ mkSpillInstr config (RegWithFormat (RegReal s) dstFmt) delta d
+          -- A vreg that outgrows its slot gets a new one (getStackSlotFor,
+          -- #26668), so on two paths to a join it can be in memory only, in
+          -- two slots (#27638).  Where it goes into no register at the join
+          -- (handleComponent), it is moved through a register that holds
+          -- nothing at the jump, at the narrower of the two formats.  At most
+          -- a word can go through an integer register.  Where no such register
+          -- is spare, it is moved by mkSlotSlotMoveInstr, through a register
+          -- saved and given back, where the target's instance defines the
+          -- method (x86 and x86-64), and otherwise makeMove panics.
+          (InMem s, InMem d) ->
+              do platform <- getPlatform
+                 free     <- getFreeRegsR
+                 let fmt = narrowerFormat srcFmt dstFmt
+                     spare f = [ (r, f)
+                               | r <- frGetFreeRegs (targetClassOfReg platform
+                                        (RegVirtual (targetMkVirtualReg platform vreg f)))
+                                        free ]
+                     viaInt | formatInBytes fmt <= platformWordSizeInBytes platform
+                            = spare (intFormat (formatToWidth fmt))
+                            | otherwise
+                            = []
+                 recordSpill (SpillJoinRM vreg)
+                 recordSpill (SpillJoinRM vreg)
+                 case spare fmt ++ viaInt of
+                   (r, f) : _ ->
+                     return $ mkLoadInstr config (RegWithFormat (RegReal r) f) delta s
+                           ++ mkSpillInstr config (RegWithFormat (RegReal r) f) delta d
+                   -- BUG: on AArch64, panics where no register is free at the
+                   -- jump: see makeRegMovementGraph.
+                   []
+                     | Just move <- mkSlotSlotMoveInstr config fmt delta s d
+                     -> return move
+                     | otherwise
+                     -> pprPanic "makeMove: no free register for a mem->mem move"
+                          (ppr vreg <+> parens (ppr src) <+> parens (ppr dst))
           _ ->
-              -- we don't handle memory to memory moves.
-              -- they shouldn't happen because we don't share
-              -- stack slots between vregs.
-              -- BUG #27638: they can happen, between two slots of one vreg, and
-              -- the compiler then panics here: see handleComponent.
-              pprPanic "makeMove: we don't handle mem->mem moves"
+              -- expandNode leaves no InBoth location
+              pprPanic "makeMove: InBoth"
                  (ppr vreg <+> parens (ppr src) <+> parens (ppr dst))
+
+-- | The narrower of a vreg's formats in two slots: no more is in the source
+-- slot or fits in the destination slot.
+narrowerFormat :: Format -> Format -> Format
+narrowerFormat srcFmt dstFmt
+  | formatInBytes srcFmt <= formatInBytes dstFmt = srcFmt
+  | otherwise                                    = dstFmt
