@@ -2,13 +2,15 @@
 -- | The assignment of virtual registers to stack slots
 
 --      We have lots of stack slots. Memory-to-memory moves are a pain on most
---      architectures. Therefore, we avoid having to generate memory-to-memory moves
---      by simply giving every virtual register its own stack slot.
+--      architectures. Therefore, we avoid having to generate memory-to-memory
+--      moves, but for the BUG below, by simply giving every virtual register
+--      its own stack slot.
 
---      BUG #27638: since #26668 a virtual register whose format has outgrown
---      its slot gets new slots (getStackSlotFor), and a jump can then need a
---      move between two slots of one register, on which makeMove panics: see
---      handleComponent in GHC.CmmToAsm.Reg.Linear.JoinToTargets.
+--      BUG: since #26668 a virtual register whose format has outgrown its
+--      slot gets new slots (getStackSlotFor), and a jump can then need a move
+--      between two slots of one register, which makeMove makes through a free
+--      register and, on AArch64, panics where there is none: see
+--      makeRegMovementGraph in GHC.CmmToAsm.Reg.Linear.JoinToTargets.
 
 --      The StackMap stack map keeps track of virtual register - stack slot
 --      associations and of which stack slots are still free. Once it has been

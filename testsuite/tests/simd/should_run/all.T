@@ -219,3 +219,11 @@ test('StackAlignment64'
     )
 
 test('T27565', [], compile_and_run, [''])
+test('T27638', [], compile_and_run, [''])
+test('T27638a', [], compile_and_run, [''])
+test('T27638b', [], compile_and_run, [''])
+test('T27638c', [], compile_and_run, ['-O'])
+test('T27638d', [], compile_and_run, ['-O'])
+test('T27638e', [], compile, ['-O'])
+test('T27638f', [], compile_and_run, ['-O'])
+test('T27638g', [], compile_and_run, ['-O'])

@@ -32,6 +32,7 @@ module GHC.CmmToAsm.X86.Instr
    , mkSpillInstr
    , mkRegRegMoveInstr
    , mkRegRegSwapInstr
+   , mkSlotSlotMoveInstr
    , movInstr
    , jumpDestsOfInstr
    , canFallthroughTo
@@ -1334,6 +1335,39 @@ mkRegRegSwapInstr config fmt r1 r2
   = Just (XCHG (scalarMoveFormat (ncgPlatform config) fmt) (OpReg r1) r2)
   | otherwise
   = Nothing
+
+-- | Copy a value of a format from one spill slot to another, a word at a time
+-- through the accumulator: its value is stored into the destination's first
+-- word, the other words go through it, and the source's first word, loaded
+-- last, is exchanged with the stored value, which gives it back.  The slots
+-- from each given one hold the format in whole words (getStackSlotFor,
+-- spillSlotSize), and the two runs are disjoint.  Neither the moves nor the
+-- exchange set flags.
+mkSlotSlotMoveInstr :: NCGConfig -> Format -> Int -> Int -> Int -> Maybe [Instr]
+mkSlotSlotMoveInstr config fmt delta src dst
+  = Just $  MOV wfmt (OpReg rax) (word dst 0)
+         :  concat [ [ MOV wfmt (word src i) (OpReg rax)
+                     , MOV wfmt (OpReg rax) (word dst i) ]
+                   | i <- [1 .. n - 1] ]
+         ++ [ MOV wfmt (word src 0) (OpReg rax)
+            , XCHG wfmt (word dst 0) rax ]
+  where
+    -- XCHG with a memory operand is locked whatever its prefix (the XCHG
+    -- entry of Intel's manual), so the exchange costs more cycles than a
+    -- move, which a count of instructions does not show; how many was not
+    -- measured.  PUSH of each source word and POP into the destination's
+    -- would need no lock, no register and one instruction fewer, both taking
+    -- their address with the stack pointer as it is before the PUSH; they are
+    -- not used because between the two the stack pointer is a word lower and
+    -- no row of the unwinding tables says so: addSpUnwindings in
+    -- GHC.CmmToAsm.X86.CodeGen makes one at each DELTA, by an UNWIND, whose
+    -- label this method cannot make.
+    platform = ncgPlatform config
+    wfmt     = archWordFormat (target32Bit platform)
+    w        = platformWordSizeInBytes platform
+    n        = (formatInBytes fmt + w - 1) `quot` w
+    word slot i
+      = OpAddr (spRel platform (spillSlotToOffset platform slot - delta + w * i))
 
 -- | Check whether an instruction represents a reg-reg move.
 --      The register allocator attempts to eliminate reg->reg moves whenever it can,
