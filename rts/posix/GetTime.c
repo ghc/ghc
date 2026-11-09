@@ -31,30 +31,12 @@
 #error No implementation for getProcessCPUTime() available.
 #endif
 
-#if defined(darwin_HOST_OS)
-#include <mach/mach_time.h>
-#include <mach/mach_init.h>
-#include <mach/thread_act.h>
-#include <mach/mach_port.h>
-#endif
-
 #if defined(solaris2_HOST_OS)
 #include <sys/time.h>
 #endif
 
-#if defined(darwin_HOST_OS)
-static uint64_t timer_scaling_factor_numer = 0;
-static uint64_t timer_scaling_factor_denom = 0;
-#endif
-
 void initializeTimer(void)
 {
-#if defined(darwin_HOST_OS)
-    mach_timebase_info_data_t info;
-    (void) mach_timebase_info(&info);
-    timer_scaling_factor_numer = (uint64_t)info.numer;
-    timer_scaling_factor_denom = (uint64_t)info.denom;
-#endif
 }
 
 static Time getClockTime(clockid_t clock)

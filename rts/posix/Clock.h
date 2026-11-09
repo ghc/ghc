@@ -21,8 +21,3 @@
 #define RTS_CLOCK_MONOTONIC CLOCK_MONOTONIC
 #define RTS_CLOCK_REALTIME  CLOCK_REALTIME
 #define RTS_CLOCK_CPUTIME_THREAD CLOCK_THREAD_CPUTIME_ID
-
-#if defined(darwin_HOST_OS)
-# include <mach/mach.h>
-# include <mach/mach_time.h>
-#endif
