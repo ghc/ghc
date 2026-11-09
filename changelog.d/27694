@@ -1,0 +1,8 @@
+section: codegen
+synopsis: Fix the control flow graph tracking of the x86 native code generator
+  for word-to-float conversions, 64-bit shifts on i386, other operations that
+  introduce basic blocks, and for the stack allocation blocks inserted by the
+  register allocator. This fixes a panic ("Can't find weight for edge that
+  should have one") and improves code layout.
+mrs: !16535
+issues: #27694 #27915

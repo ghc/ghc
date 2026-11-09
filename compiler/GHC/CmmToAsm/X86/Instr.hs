@@ -1472,7 +1472,8 @@ mkStackDeallocInstr platform amount
 -- Otherwise, we would repeat the $rsp adjustment for each branch to
 -- L.
 --
--- Returns a list of (L,Lnew) pairs.
+-- Returns a list of (L,Lnew) pairs. The caller uses them to update
+-- the CFG in the same way (see addPreentryBlock in GHC.CmmToAsm.CFG).
 --
 allocMoreStack
   :: Platform
