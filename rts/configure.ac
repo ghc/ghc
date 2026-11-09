@@ -202,8 +202,11 @@ fi
 
 FP_MUSTTAIL
 
-dnl ** check for librt
-AC_CHECK_FUNCS(clock_gettime timer_settime)
+dnl ** We now require clock_gettime for our monotonic clock.
+if test "$ghc_host_os" != "mingw32" ; then
+  AC_CHECK_FUNCS([clock_gettime], [],
+    AC_MSG_ERROR([The POSIX.1-2008 function 'clock_gettime' is required but is not available]))
+fi
 
 dnl ** check for Apple's "interesting" long double compatibility scheme
 AC_MSG_CHECKING(for printf\$LDBLStub)
