@@ -71,47 +71,14 @@ static Time getClockTime(clockid_t clock)
 
 Time getCurrentThreadCPUTime(void)
 {
-    // N.B. Since macOS Catalina, Darwin supports clock_gettime but does not
-    // support clock_getcpuclockid. Hence we prefer to use the Darwin-specific
-    // path on Darwin, even if clock_gettime is available.
-#if defined(darwin_HOST_OS)
-    thread_basic_info_data_t info = { };
-    mach_msg_type_number_t info_count = THREAD_BASIC_INFO_COUNT;
-    kern_return_t kern_err = thread_info(mach_thread_self(), THREAD_BASIC_INFO,
-                                         (thread_info_t) &info, &info_count);
-    if (kern_err == KERN_SUCCESS) {
-        return SecondsToTime(info.user_time.seconds) + USToTime(info.user_time.microseconds);
-    } else {
-        sysErrorBelch("getThreadCPUTime");
-        stg_exit(EXIT_FAILURE);
-    }
-#elif defined(solaris2_HOST_OS)
+#if defined(solaris2_HOST_OS)
     // On OpenSolaris derivatives, the constant CLOCK_THREAD_CPUTIME_ID is
     // defined in a system header but it isn't actually usable. clock_gettime(2)
     // always returns EINVAL. Use solaris-specific gethrvtime(3) as an
     // alternative.
     return NSToTime(gethrvtime());
-#elif defined(HAVE_CLOCK_GETTIME)        &&  \
-       defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
-       defined(HAVE_SYSCONF)
-    static bool have_checked_usability = false;
-    // The RELAXED operation is fine here as it's okay if we do the check below
-    // more than once.
-    if (!RELAXED_LOAD(&have_checked_usability)) {
-        // The Linux clock_getres(2) manpage claims that some early versions of
-        // Linux will return values which are uninterpretable in the presence
-        // of migration across CPUs. They claim that clock_getcpuclockid(0)
-        // will return ENOENT in this case. Check this.
-        clockid_t clkid;
-        if (clock_getcpuclockid(0, &clkid)) {
-            sysErrorBelch("getCurrentThreadCPUTime: no supported");
-            stg_exit(EXIT_FAILURE);
-        }
-        RELAXED_STORE(&have_checked_usability, true);
-    }
-    return getClockTime(CLOCK_THREAD_CPUTIME_ID);
 #else
-#error I know of no means to find the CPU time of current thread on this platform.
+    return getClockTime(CLOCK_THREAD_CPUTIME_ID);
 #endif
 }
 
