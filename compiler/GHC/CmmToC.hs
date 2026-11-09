@@ -584,12 +584,20 @@ pprLit :: Platform -> CmmLit -> SDoc
 pprLit platform lit = case lit of
     CmmInt i rep      -> pprHexVal platform i rep
 
-    CmmFloat f fty       -> parens (machRep_F_CType w) <> str
+    CmmFloat f fty
+      -- See Note [Printing NaN literals] in GHC.Types.Literal.Floating
+      | litFloatingIsNaN fty f
+      -> case fty of
+           LitFloat  -> text "hs_bitcastword2float"
+                        <> parens (pprLit platform (floatToWord32 f))
+           LitDouble -> text "hs_bitcastword642double"
+                        <> parens (pprLit platform (doubleToWord64 f))
+      | otherwise
+      -> parens (machRep_F_CType w) <> str
         where w = litFloatingTypeWidth fty
               d = litFloatingToHostDouble f
               str | isInfinite d && d < 0 = text "-INFINITY"
                   | isInfinite d          = text "INFINITY"
-                  | isNaN d               = text "NAN"
                   | otherwise             = text (show d)
                 -- these constants come from <math.h>
                 -- see #1861

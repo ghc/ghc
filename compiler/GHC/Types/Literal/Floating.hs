@@ -21,7 +21,7 @@ module GHC.Types.Literal.Floating
   , encodeLitFloat, encodeLitDouble
 
   , isZeroLF, isPositiveZeroLF, isPositiveLF, isOneLF, isFiniteLF
-  , isPositiveZero, litFloatingIsNonStandardNaN
+  , isPositiveZero, litFloatingIsNaN
   ) where
 
 import GHC.Prelude
@@ -65,15 +65,32 @@ data ConstantFoldingPrecision
   | DoublePrecision
   | ExcessPrecision
 
-litFloatingIsNonStandardNaN :: LitFloatingType -> LitFloating -> Bool
-litFloatingIsNonStandardNaN ty lit =
+-- | Is the literal a NaN (any sign, quiet bit or payload)?
+--
+-- See Note [Printing NaN literals].
+litFloatingIsNaN :: LitFloatingType -> LitFloating -> Bool
+litFloatingIsNaN ty lit =
   case ty of
-    LitFloat -> isNaN f && w /= 0x7FC00000
-      where f = litFloatingToHostFloat lit
-            w = castFloatToWord32 f
-    LitDouble -> isNaN f && w /= 0x7FF8000000000000
-      where f = litFloatingToHostDouble lit
-            w = castDoubleToWord64 f
+    LitFloat  -> isNaN (litFloatingToHostFloat  lit)
+    LitDouble -> isNaN (litFloatingToHostDouble lit)
+
+-- Note [Printing NaN literals]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Code generators that print a floating-point literal as text (assembly
+-- or C) must not print a NaN as "NaN" or "NAN". Print the bits of the NaN
+-- as an integer instead:
+--
+--   * NCG data sections: ".long"/".quad" instead of ".float"/".double".
+--   * C backend: hs_bitcastword2float(0x7fc00000U), etc.
+--
+-- The assembler or the C compiler does not keep the sign and payload of
+-- such a NaN. Also, its "standard" NaN is not ours: GNU as and clang encode
+-- ".double NaN" as 0x7FFFFFFFFFFFFFFF, not as 0x7FF8000000000000 like we do.
+-- Thus this Cmm code (#28101):
+--
+--   %f2w_bitcast(%w2f_bitcast(0x7FF8000000000000 :: bits64))
+--
+-- returned 0x7FFFFFFFFFFFFFFF after constant folding.
 
 pprLitFloating :: LitFloatingType -> LitFloating -> SDoc
 pprLitFloating ty lit = getPprDebug $ \ dbg -> getPprStyle $ \ sty ->

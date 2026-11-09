@@ -1,0 +1,4 @@
+section: codegen
+synopsis: Fix the code generation of NaN literals: the generated code did not always keep all the bits of a NaN literal.
+mrs: !16964
+issues: #28101

@@ -1,0 +1,29 @@
+#include "Cmm.h"
+
+// Regression test for #28101: the bit-cast of a NaN constant is folded into a
+// float literal. The code generator must keep all the bits of the NaN.
+// See Note [Printing NaN literals] in GHC.Types.Literal.Floating.
+
+#define ROUNDTRIP32(name,w)                                             \
+  name (bits64 unused) {                                                \
+    bits32 r;                                                           \
+    bits64 ret;                                                         \
+    r = %f2w_bitcast(%w2f_bitcast((w :: bits32)));                      \
+    ret = %zx64(r);                                                     \
+    return (ret);                                                       \
+  }
+
+#define ROUNDTRIP64(name,w)                                             \
+  name (bits64 unused) {                                                \
+    bits64 r;                                                           \
+    r = %f2w_bitcast(%w2f_bitcast((w :: bits64)));                      \
+    return (r);                                                         \
+  }
+
+ROUNDTRIP32(T28101_f32_qnan,     0x7fc00000)
+ROUNDTRIP32(T28101_f32_neg_qnan, 0xffc00000)
+ROUNDTRIP32(T28101_f32_payload,  0x7fc00001)
+
+ROUNDTRIP64(T28101_f64_qnan,     0x7ff8000000000000)
+ROUNDTRIP64(T28101_f64_neg_qnan, 0xfff8000000000000)
+ROUNDTRIP64(T28101_f64_payload,  0x7ff8000000000001)

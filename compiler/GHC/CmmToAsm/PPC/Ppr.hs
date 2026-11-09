@@ -327,14 +327,15 @@ pprDataItem platform lit
                  text "\t.long\t"
                     <> int (fromIntegral (fromIntegral x :: Word32))]
 
+        -- See Note [Printing NaN literals] in GHC.Types.Literal.Floating
         ppr_item FF32 l@(CmmFloat f _)
-          | litFloatingIsNonStandardNaN LitFloat f
+          | litFloatingIsNaN LitFloat f
           , let w32 = castFloatToWord32 (litFloatingToHostFloat f)
           = ppr_item II32 (CmmInt (toInteger w32) W32)
           | otherwise
           = [text "\t.float\t" <> ppr_imm l]
         ppr_item FF64 l@(CmmFloat f _)
-          | litFloatingIsNonStandardNaN LitDouble f
+          | litFloatingIsNaN LitDouble f
           , let w64 = castDoubleToWord64 (litFloatingToHostDouble f)
           = ppr_item II64 (CmmInt (toInteger w64) W64)
           | otherwise

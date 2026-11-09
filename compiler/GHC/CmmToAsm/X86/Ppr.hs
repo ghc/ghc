@@ -618,12 +618,13 @@ pprDataItem config lit =
           -> (II32, ) <$> pprAsII32x2 lit
         FF32
           | CmmFloat f _ <- lit
-          , litFloatingIsNonStandardNaN LitFloat f
+          , litFloatingIsNaN LitFloat f
+            -- See Note [Printing NaN literals] in GHC.Types.Literal.Floating
           , let w32 = castFloatToWord32 (litFloatingToHostFloat f)
           -> [(II32, ppr_lit (CmmInt (fromIntegral w32) W32))]
         FF64
           | CmmFloat f _ <- lit
-          , litFloatingIsNonStandardNaN LitDouble f
+          , litFloatingIsNaN LitDouble f
           , let w64 = castDoubleToWord64 (litFloatingToHostDouble f)
                 ilit = CmmInt (fromIntegral w64) W64
           -> if | OSDarwin <- platformOS platform
