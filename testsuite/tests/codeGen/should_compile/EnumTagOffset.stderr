@@ -1,0 +1,4 @@
+_closure_tbl+-16(
+_closure_tbl(
+leaq -2(%r14)
+leaq 2(%r14)

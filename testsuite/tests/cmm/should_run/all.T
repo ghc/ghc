@@ -90,3 +90,21 @@ test('cmm_scaledlit',
      ],
      multi_compile_and_run,
      ['cmm_scaledlit', [('cmm_scaledlit_cmm.cmm', '')], ''])
+
+test('cmm_sinkoff',
+     [ req_cmm
+     , when(wordsize(32), skip)
+     , extra_ways(['optasm'])
+     , when(have_llvm(), extra_ways(['optasm', 'optllvm']))
+     ],
+     multi_compile_and_run,
+     ['cmm_sinkoff', [('cmm_sinkoff_cmm.cmm', '')], ''])
+
+test('cmm_swoff',
+     [ req_cmm
+     , when(wordsize(32), skip)
+     , extra_ways(['optasm'])
+     , when(have_llvm(), extra_ways(['optasm', 'optllvm']))
+     ],
+     multi_compile_and_run,
+     ['cmm_swoff', [('cmm_swoff_cmm.cmm', '')], ''])

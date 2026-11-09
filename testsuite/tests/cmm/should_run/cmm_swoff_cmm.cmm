@@ -1,0 +1,112 @@
+#include "Cmm.h"
+
+// Each procedure switches on a sum or difference with a literal over a dense
+// range and no default, a jump table whose index the NCG offsets by cmmOffset
+// (genSwitch) where the table does not start at 0; cmm_swoff.hs passes only
+// values in the range.
+
+// e - k: base (x - 1) + (-100), B3 x + (-101)
+w01 (W_ x) {
+    W_ r;
+    switch [100 .. 105] (x - 1) {
+        case 100: { r = 110; goto out; }
+        case 101: { r = 111; goto out; }
+        case 102: { r = 112; goto out; }
+        case 103: { r = 113; goto out; }
+        case 104: { r = 114; goto out; }
+        case 105: { r = 115; goto out; }
+    }
+out:
+    return (r);
+}
+
+// e + k: x + (-97) under both
+w02 (W_ x) {
+    W_ r;
+    switch [100 .. 105] (x + 3) {
+        case 100: { r = 110; goto out; }
+        case 101: { r = 111; goto out; }
+        case 102: { r = 112; goto out; }
+        case 103: { r = 113; goto out; }
+        case 104: { r = 114; goto out; }
+        case 105: { r = 115; goto out; }
+    }
+out:
+    return (r);
+}
+
+// k - e: base (200 - x) + (-100), B3 100 - x
+w03 (W_ x) {
+    W_ r;
+    switch [100 .. 105] (200 - x) {
+        case 100: { r = 110; goto out; }
+        case 101: { r = 111; goto out; }
+        case 102: { r = 112; goto out; }
+        case 103: { r = 113; goto out; }
+        case 104: { r = 114; goto out; }
+        case 105: { r = 115; goto out; }
+    }
+out:
+    return (r);
+}
+
+// a masked value minus one
+w04 (W_ x) {
+    W_ r;
+    switch [100 .. 105] ((x & 127) - 1) {
+        case 100: { r = 110; goto out; }
+        case 101: { r = 111; goto out; }
+        case 102: { r = 112; goto out; }
+        case 103: { r = 113; goto out; }
+        case 104: { r = 114; goto out; }
+        case 105: { r = 115; goto out; }
+    }
+out:
+    return (r);
+}
+
+// e - k at W32
+w05 (W_ x) {
+    W_ r;
+    switch [100 .. 105] (%lobits32(x) - (1::bits32)) {
+        case 100: { r = 110; goto out; }
+        case 101: { r = 111; goto out; }
+        case 102: { r = 112; goto out; }
+        case 103: { r = 113; goto out; }
+        case 104: { r = 114; goto out; }
+        case 105: { r = 115; goto out; }
+    }
+out:
+    return (r);
+}
+
+// k - e at W32
+w06 (W_ x) {
+    W_ r;
+    switch [100 .. 105] ((200::bits32) - %lobits32(x)) {
+        case 100: { r = 110; goto out; }
+        case 101: { r = 111; goto out; }
+        case 102: { r = 112; goto out; }
+        case 103: { r = 113; goto out; }
+        case 104: { r = 114; goto out; }
+        case 105: { r = 115; goto out; }
+    }
+out:
+    return (r);
+}
+
+// e - k, a table from 0: no offset, a control
+w07 (W_ x) {
+    W_ r;
+    switch [1 .. 6] (x - 1) {
+        case 1: { r = 11; goto out; }
+        case 2: { r = 12; goto out; }
+        case 3: { r = 13; goto out; }
+        case 4: { r = 14; goto out; }
+        case 5: { r = 15; goto out; }
+        case 6: { r = 16; goto out; }
+    }
+out:
+    return (r);
+}
+

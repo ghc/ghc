@@ -21,7 +21,8 @@ module GHC.Cmm.Utils(
         mkIntExpr, zeroExpr,
         mkLblExpr,
         cmmRegOff,  cmmOffset,  cmmLabelOff,  cmmOffsetLit,  cmmOffsetExpr,
-        isPicReg,
+        AddTerm(..), AddConst(..), addView, addBuild, isPicReg,
+        validOffsetRep,
         cmmRegOffB, cmmOffsetB, cmmLabelOffB, cmmOffsetLitB, cmmOffsetExprB,
         cmmRegOffW, cmmOffsetW, cmmLabelOffW, cmmOffsetLitW, cmmOffsetExprW,
         cmmIndex, cmmIndexExpr, cmmLoadIndex, cmmLoadIndexW,
@@ -211,11 +212,8 @@ mkRODataLits :: CLabel -> [CmmLit] -> GenCmmDecl (GenCmmStatics raw) info stmt
 mkRODataLits lbl lits
   = mkDataLits section lbl lits
   where
-    section | any needsRelocation lits = Section RelocatableReadOnlyData lbl
-            | otherwise                = Section ReadOnlyData lbl
-    needsRelocation (CmmLabel _)      = True
-    needsRelocation (CmmLabelOff _ _) = True
-    needsRelocation _                 = False
+    section | any isLabelLit lits = Section RelocatableReadOnlyData lbl
+            | otherwise           = Section ReadOnlyData lbl
 
 ---------------------------------------------------
 --
@@ -239,12 +237,21 @@ cmmOffset platform  e byte_off = case e of
    CmmLit lit            -> CmmLit (cmmOffsetLit lit byte_off)
    CmmStackSlot area off -> CmmStackSlot area (off - byte_off)
   -- note stack area offsets increase towards lower addresses
-   CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt byte_off1 _rep)]
-      -> let !lit_off = (byte_off1 + toInteger byte_off)
-         in CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt lit_off rep)]
+   -- a sum or difference with a constant, in Note [Additive normal form] of
+   -- GHC.Cmm.Opt: the offset added to its constant
+   CmmMachOp op _
+      | Just w <- addWidth op
+      , Just (t, k) <- addView w e
+      -> addBuild w t $ case k of
+           KInt i -> KInt (i + toInteger byte_off)
+           KLab l -> KLab (cmmOffsetLit l byte_off)
    _ -> let !width = cmmExprWidth platform e
         in
         CmmMachOp (MO_Add width) [e, CmmLit (CmmInt (toInteger byte_off) width)]
+  where
+    addWidth (MO_Add w) = Just w
+    addWidth (MO_Sub w) = Just w
+    addWidth _          = Nothing
 
 -- Smart constructor for CmmRegOff.  Same caveats as cmmOffset above.
 cmmRegOff :: CmmReg -> Int -> CmmExpr
@@ -263,6 +270,81 @@ cmmLabelOff :: CLabel -> Int -> CmmLit
 -- Smart constructor for CmmLabelOff
 cmmLabelOff lbl 0        = CmmLabel lbl
 cmmLabelOff lbl byte_off = CmmLabelOff lbl byte_off
+
+-- | An operand of an addition or subtraction at some width: no term, a term
+-- added or a term subtracted, ...
+data AddTerm = NoTerm | Plus !CmmExpr | Minus !CmmExpr
+
+-- | ... and the constant added: an integer, or a label literal with its offset.
+data AddConst = KInt !Integer | KLab !CmmLit
+
+-- | The term and the constant of an operand at width w in the additive normal
+-- form, or Nothing where the operand is a term alone: (e + k) << s and
+-- (e + k) * c at w, k an integer, as e << s and e * c with the constant k << s
+-- and k * c where it fits in 32 bits (Note [Additive normal form] in
+-- GHC.Cmm.Opt), and any other operand as sumView has it.
+addView :: Width -> CmmExpr -> Maybe (AddTerm, AddConst)
+addView w e = case e of
+  CmmMachOp op [a, n@(CmmLit (CmmInt m _))]
+    | Just f <- factor op
+    , Just (Plus x, KInt k) <- sumView w a
+    , let k' = narrowS w (k * f)
+    , narrowS W32 k' == k'
+    -> Just (Plus (CmmMachOp op [x, n]), KInt k')
+    where
+      factor (MO_Mul w')
+        | w' == w                           = Just m
+      factor (MO_Shl w')
+        | w' == w, m >= 0
+        , m < toInteger (widthInBits w)     = Just (2 ^ m)
+      factor _                              = Nothing
+  _                                       -> sumView w e
+
+-- | The operand at width w with the term t and the constant k: addView's
+-- inverse.
+addBuild :: Width -> AddTerm -> AddConst -> CmmExpr
+addBuild w t k = case (t, k) of
+  (NoTerm,  KInt i) -> CmmLit (CmmInt (narrowS w i) w)
+  (NoTerm,  KLab l) -> CmmLit l
+  (Plus e,  KInt i)
+    | i' == 0                         -> e
+    | CmmReg r <- e, validOffsetRep w -> cmmRegOff r (fromInteger i')
+    | otherwise                       -> CmmMachOp (MO_Add w) [e, CmmLit (CmmInt i' w)]
+    where i' = narrowS w i
+  (Plus e,  KLab l) -> CmmMachOp (MO_Add w) [e, CmmLit l]
+  (Minus e, KInt i) -> CmmMachOp (MO_Sub w) [CmmLit (CmmInt (narrowS w i) w), e]
+  (Minus e, KLab l) -> CmmMachOp (MO_Sub w) [CmmLit l, e]
+
+-- | addView of an operand that is a sum, a difference, a register offset or
+-- a literal, or Nothing. A label added to PicBaseReg is no such sum: it stays
+-- with the register (Note [Additive normal form] in GHC.Cmm.Opt).
+sumView :: Width -> CmmExpr -> Maybe (AddTerm, AddConst)
+{-# INLINE sumView #-}
+sumView w e = case e of
+  CmmLit (CmmInt i _)                     -> Just (NoTerm, KInt i)
+  CmmLit l | isLabelLit l                 -> Just (NoTerm, KLab l)
+  CmmMachOp (MO_Add w') [a, CmmLit l] | w' == w -> case l of
+    CmmInt i _                            -> Just (Plus a, KInt i)
+    _ | isLabelLit l, not (isPicReg a)    -> Just (Plus a, KLab l)
+    _                                     -> Nothing
+  CmmMachOp (MO_Sub w') [a, CmmLit (CmmInt i _)]
+    | w' == w                             -> Just (Plus a, KInt (negate i))
+  CmmMachOp (MO_Sub w') [CmmLit (CmmInt i _), a]
+    | w' == w                             -> Just (Minus a, KInt i)
+  CmmRegOff r o
+    | typeWidth (cmmRegType r) == w       -> Just (Plus (CmmReg r), KInt (toInteger o))
+  _                                       -> Nothing
+
+isLabelLit :: CmmLit -> Bool
+isLabelLit CmmLabel{}    = True
+isLabelLit CmmLabelOff{} = True
+isLabelLit _             = False
+
+-- | Check that a literal width is compatible with the host word size used to
+-- store offsets. This should be fixed properly (using larger types to store
+-- literal offsets). See #24893
+validOffsetRep :: Width -> Bool
+validOffsetRep rep = widthInBits rep <= finiteBitSize (undefined :: Int)
 
 isPicReg :: CmmExpr -> Bool
 isPicReg (CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _))) = True
