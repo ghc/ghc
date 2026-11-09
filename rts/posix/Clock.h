@@ -18,13 +18,9 @@
 # include <sys/time.h>
 #endif
 
-#if defined(HAVE_CLOCK_GETTIME)
-# if defined(_POSIX_MONOTONIC_CLOCK)
-#  define CLOCK_ID CLOCK_MONOTONIC
-# else
-#  define CLOCK_ID CLOCK_REALTIME
-# endif
-#elif defined(darwin_HOST_OS)
+#define RTS_CLOCK_MONOTONIC CLOCK_MONOTONIC
+
+#if defined(darwin_HOST_OS)
 # include <mach/mach.h>
 # include <mach/mach_time.h>
 #endif
