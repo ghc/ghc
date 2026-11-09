@@ -21,6 +21,7 @@ module GHC.Cmm.Utils(
         mkIntExpr, zeroExpr,
         mkLblExpr,
         cmmRegOff,  cmmOffset,  cmmLabelOff,  cmmOffsetLit,  cmmOffsetExpr,
+        isPicReg,
         cmmRegOffB, cmmOffsetB, cmmLabelOffB, cmmOffsetLitB, cmmOffsetExprB,
         cmmRegOffW, cmmOffsetW, cmmLabelOffW, cmmOffsetLitW, cmmOffsetExprW,
         cmmIndex, cmmIndexExpr, cmmLoadIndex, cmmLoadIndexW,
@@ -262,6 +263,10 @@ cmmLabelOff :: CLabel -> Int -> CmmLit
 -- Smart constructor for CmmLabelOff
 cmmLabelOff lbl 0        = CmmLabel lbl
 cmmLabelOff lbl byte_off = CmmLabelOff lbl byte_off
+
+isPicReg :: CmmExpr -> Bool
+isPicReg (CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _))) = True
+isPicReg _ = False
 
 -- | Useful for creating an index into an array, with a statically known offset.
 -- The type is the element type; used for making the multiplier
