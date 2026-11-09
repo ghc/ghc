@@ -42,10 +42,6 @@
 #include <sys/time.h>
 #endif
 
-#if defined(HAVE_GETTIMEOFDAY) && defined(HAVE_GETRUSAGE)
-// we'll implement getProcessCPUTime() and getProcessElapsedTime()
-// separately, using getrusage() and gettimeofday() respectively
-
 #if defined(darwin_HOST_OS)
 static uint64_t timer_scaling_factor_numer = 0;
 static uint64_t timer_scaling_factor_denom = 0;
@@ -61,19 +57,17 @@ void initializeTimer(void)
 #endif
 }
 
-#if defined(HAVE_CLOCK_GETTIME)
 static Time getClockTime(clockid_t clock)
 {
     struct timespec ts;
     int res = clock_gettime(clock, &ts);
-    if (res == 0) {
+    if (RTS_LIKELY(res == 0)) {
         return SecondsToTime(ts.tv_sec) + NSToTime(ts.tv_nsec);
     } else {
         sysErrorBelch("clock_gettime");
         stg_exit(EXIT_FAILURE);
     }
 }
-#endif
 
 Time getCurrentThreadCPUTime(void)
 {
@@ -151,25 +145,7 @@ Time getProcessCPUTime(void)
 
 StgWord64 getMonotonicNSec(void)
 {
-#if defined(HAVE_CLOCK_GETTIME)
-    return getClockTime(CLOCK_ID);
-
-#elif defined(darwin_HOST_OS)
-
-    uint64_t time = mach_absolute_time();
-    return (time * timer_scaling_factor_numer) / timer_scaling_factor_denom;
-
-#else // use gettimeofday()
-
-    struct timeval tv;
-
-    if (gettimeofday(&tv, (struct timezone *) NULL) != 0) {
-        debugBlech("getMonotonicNSec: gettimeofday failed: %s", strerror(errno));
-    };
-    return (StgWord64)tv.tv_sec * 1000000000 +
-           (StgWord64)tv.tv_usec * 1000;
-
-#endif
+    return getClockTime(CLOCK_MONOTONIC);
 }
 
 Time getProcessElapsedTime(void)
@@ -182,57 +158,6 @@ void getProcessTimes(Time *user, Time *elapsed)
     *user    = getProcessCPUTime();
     *elapsed = getProcessElapsedTime();
 }
-
-#elif defined(HAVE_TIMES)
-
-// we'll use the old times() API.
-
-Time getProcessCPUTime(void)
-{
-    Time user, elapsed;
-    getProcessTimes(&user,&elapsed);
-    return user;
-}
-
-Time getProcessElapsedTime(void)
-{
-    Time user, elapsed;
-    getProcessTimes(&user,&elapsed);
-    return elapsed;
-}
-
-void getProcessTimes(Time *user, Time *elapsed)
-{
-    static uint32_t ClockFreq = 0;
-
-    if (ClockFreq == 0) {
-#if defined(HAVE_SYSCONF)
-        long ticks;
-        ticks = sysconf(_SC_CLK_TCK);
-        if ( ticks == -1 ) {
-            sysErrorBelch("sysconf");
-            stg_exit(EXIT_FAILURE);
-        }
-        ClockFreq = ticks;
-#elif defined(CLK_TCK)          /* defined by POSIX */
-        ClockFreq = CLK_TCK;
-#elif defined(HZ)
-        ClockFreq = HZ;
-#elif defined(CLOCKS_PER_SEC)
-        ClockFreq = CLOCKS_PER_SEC;
-#else
-        errorBelch("can't get clock resolution");
-        stg_exit(EXIT_FAILURE);
-#endif
-    }
-
-    struct tms t;
-    clock_t r = times(&t);
-    *user = SecondsToTime(t.tms_utime) / ClockFreq;
-    *elapsed = SecondsToTime(r) / ClockFreq;
-}
-
-#endif // HAVE_TIMES
 
 void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
 {
