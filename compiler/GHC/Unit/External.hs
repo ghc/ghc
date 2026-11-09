@@ -71,8 +71,7 @@ eucEPS = readIORef . euc_eps
 
 initExternalPackageState :: ExternalPackageState
 initExternalPackageState = EPS
-  { eps_is_boot          = emptyInstalledModuleEnv
-  , eps_PIT              = emptyPackageIfaceTable
+  { eps_PIT              = emptyPackageIfaceTable
   , eps_free_holes       = emptyInstalledModuleEnv
   , eps_PTE              = emptyTypeEnv
   , eps_iface_bytecode   = emptyModuleEnv
@@ -101,19 +100,6 @@ initExternalPackageState = EPS
 -- their interface files
 data ExternalPackageState
   = EPS {
-        eps_is_boot :: !(InstalledModuleEnv ModuleNameWithIsBoot),
-                -- ^ In OneShot mode (only), home-package modules
-                -- accumulate in the external package state, and are
-                -- sucked in lazily.  For these home-pkg modules
-                -- (only) we need to record which are boot modules.
-                -- We set this field after loading all the
-                -- explicitly-imported interfaces, but before doing
-                -- anything else
-                --
-                -- The 'ModuleName' part is not necessary, but it's useful for
-                -- debug prints, and it's convenient because this field comes
-                -- direct from 'GHC.Tc.Utils.imp_dep_mods'
-
         eps_PIT :: !PackageIfaceTable,
                 -- ^ The 'ModIface's for modules in external packages
                 -- whose interfaces we have opened.

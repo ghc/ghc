@@ -98,6 +98,7 @@ import GHC.Builtin.Modules( gHC_PRIM )
 import Data.IORef
 import qualified Data.Set as Set
 import GHC.Types.Name.Reader (ExactRdrName(..))
+import qualified GHC.Unit.Home.PackageTable as HomePackageTable
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env hsc = do
@@ -348,10 +349,11 @@ prepareAnnotations hsc_env mb_guts = do
     home_pkg_anns  <- fromMaybe (hugAllAnns (hsc_unit_env hsc_env))
                       $ uncurry (hugAnnsBelow hsc_env)
                       . get_mod <$> mb_guts
+    more_home_pkg_anns <- HomePackageTable.hptLoadedAnnEnv $ hsc_HPT hsc_env
     let
         other_pkg_anns = eps_ann_env eps
         !ann_env       = maybe id plusAnnEnv mb_this_module_anns $!
-            plusAnnEnv home_pkg_anns other_pkg_anns
+            plusAnnEnv home_pkg_anns (plusAnnEnv more_home_pkg_anns other_pkg_anns)
     return ann_env
 
 -- | Find the 'TyThing' for the given 'Name' by using all the resources
@@ -374,12 +376,9 @@ lookupTypeInPTE hsc_env pte name = ty
             then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
             else nameModule name
 
-    ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
-            -- in one-shot, we don't use the HPT
-            then return $! lookupNameEnv pte name
-            else HUG.lookupHugByModule mod hpt >>= \case
-             Just hm -> pure $! lookupNameEnv (md_types (hm_details hm)) name
-             Nothing -> pure $! lookupNameEnv pte name
+    ty = HUG.lookupHugByModule mod hpt >>= \case
+          Just hm -> pure $! lookupNameEnv (md_types (hm_details hm)) name
+          Nothing -> pure $! lookupNameEnv pte name
 
 -- | Find the 'ModIface' for a 'Module', searching in both the loaded home
 -- and external package module information

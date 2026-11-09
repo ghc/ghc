@@ -1568,7 +1568,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   let unit_env = hsc_unit_env hsc_env
   let simplify_expr_opts = initSimplifyExprOpts dflags ic
 
-  simpl_expr <- simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr
+  simpl_expr <- simplifyExpr logger (ue_eps unit_env) (ue_hpt unit_env) simplify_expr_opts ds_expr
 
   -- Create a unique temporary binding
   --
