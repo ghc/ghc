@@ -449,8 +449,9 @@ doCorePass pass guts = do
   dflags    <- getDynFlags
   us        <- getUniqueSupplyM
   p_fam_env <- getPackageFamInstEnv
+  l_fam_env <- getLazyHomeFamInstEnv
   let platform = targetPlatform dflags
-  let fam_envs = (p_fam_env, mg_fam_inst_env guts)
+  let fam_envs = (p_fam_env `unionFamInstEnv` l_fam_env, mg_fam_inst_env guts)
   let updateBinds  f = return $ guts { mg_binds = f (mg_binds guts) }
   let updateBindsM f = f (mg_binds guts) >>= \b' -> return $ guts { mg_binds = b' }
   let updateBindsAndRulesM f = f (mg_binds guts) (mg_rules guts) >>= \(b',r') -> return $ guts { mg_binds = b', mg_rules = r' }

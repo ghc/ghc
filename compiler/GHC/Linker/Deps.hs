@@ -157,8 +157,8 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         else homeModInfoObject hmi   <|> homeModInfoByteCode hmi
 
     get_linkable osuf mod      -- A home-package module
-      = HUG.lookupHugByModule mod (ue_home_unit_graph unit_env) >>= \case
-          Just mod_info -> adjust_linkable (expectJust (homeModLinkable mod_info))
+      = lookupHomeLinkable mod (ue_home_unit_graph unit_env) >>= \ case
+          Just home_linkable -> adjust_linkable home_linkable
           Nothing -> do
            -- It's not in the HPT because we are in one shot mode,
            -- so use the Finder to get a ModLocation...
@@ -175,6 +175,10 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
                   maybe (fallback_no_bytecode home_unit mod) pure from_bc
                 _ -> fallback_no_bytecode home_unit mod
         where
+            lookupHomeLinkable mod hug =
+              HUG.lookupHugByModule mod hug >>= \case
+                Just mod_info -> pure $ homeModLinkable mod_info
+                Nothing -> pure Nothing
 
             fallback_no_bytecode home_unit mod = do
               let fc = ldFinderCache opts

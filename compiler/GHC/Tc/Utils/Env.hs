@@ -152,6 +152,7 @@ import Control.Monad
 import Data.IORef
 import Data.List          ( intercalate )
 import qualified Data.List.NonEmpty as NE
+import qualified GHC.Unit.Home.PackageTable as HomePackageTable
 
 {- *********************************************************************
 *                                                                      *
@@ -385,7 +386,8 @@ tcGetClsDefaults :: [Module] -> TcM [DefaultEnv]
 tcGetClsDefaults mods = do
   hug <- hsc_HUG <$> getTopEnv
   module_env_defaults <- eps_defaults <$> getEps
-  liftIO $ mapMaybeM (lookupClsDefault hug module_env_defaults) mods
+  more_env_defaults <- queryHpt HomePackageTable.hptLoadedDefaults
+  liftIO $ mapMaybeM (lookupClsDefault hug (module_env_defaults `plusModuleEnv` more_env_defaults)) mods
 
 lookupClsDefault :: HomeUnitGraph -> ModuleEnv DefaultEnv -> Module -> IO (Maybe DefaultEnv)
 lookupClsDefault hug module_env_defaults mod =
@@ -398,8 +400,9 @@ tcGetInstEnvs :: TcM InstEnvs
 -- and the home-pkg inst env (includes module being compiled)
 tcGetInstEnvs = do { eps <- getEps
                    ; env <- getGblEnv
+                   ; extra <- queryHpt HomePackageTable.hptLoadedInstEnv
                    ; return (InstEnvs { ie_global  = eps_inst_env eps
-                                      , ie_local   = tcg_inst_env env
+                                      , ie_local   = tcg_inst_env env `unionInstEnv` extra
                                       , ie_visible = tcVisibleOrphanMods env }) }
 
 -- Illegal term-level use of type things

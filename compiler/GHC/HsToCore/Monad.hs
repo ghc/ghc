@@ -131,6 +131,7 @@ import GHC.Data.OrdList
 import Data.IORef
 
 import GHC.IO.Unsafe (unsafeInterleaveIO)
+import qualified GHC.Unit.Home.PackageTable as HomePackageTable
 
 {-
 ************************************************************************
@@ -385,6 +386,7 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
            -- ToDo: what becomes of the values put into these ref-cells?
 
        ; eps <- liftIO $ hscEPS hsc_env
+       ; extra_matches <- liftIO $ HomePackageTable.hptLoadedCompleteMatches $ hsc_HPT hsc_env
        ; let unit_env = hsc_unit_env hsc_env
              this_mod = tcg_mod tcg_env
              type_env = tcg_type_env tcg_env
@@ -406,7 +408,7 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              -- Relevant test case: MultiLayerModulesTH_Make, which regresses
              -- in allocations by ~5% if we don't do this.
            traverse (lookupCompleteMatch type_env hsc_env) =<<
-             localAndImportedCompleteMatches tcg_comp_env eps
+             localAndImportedCompleteMatches (tcg_comp_env ++ extra_matches) eps
        ; tcm_plugins <- liftIO $ readIORef (tcg_plugins tcg_env)
 
        -- Pass the running 'TcM' plugins to the desugarer, so that the pattern-match
@@ -469,6 +471,7 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
        ; statics_var      <- newIORef nilOL
        ; known_key_maps_var <- newIORef Nothing
        ; eps <- liftIO $ hscEPS hsc_env
+       ; extra_matches <- liftIO $ HomePackageTable.hptLoadedCompleteMatches $ hsc_HPT hsc_env
        ; let unit_env = hsc_unit_env hsc_env
              type_env = typeEnvFromEntities ids tycons patsyns fam_insts
              ptc = initPromotionTickContext (hsc_dflags hsc_env)
@@ -476,7 +479,7 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
              bindsToIds (Rec    binds) = map fst binds
              ids = concatMap bindsToIds binds
        ; ds_complete_matches <- traverse (lookupCompleteMatch type_env hsc_env) =<<
-            localAndImportedCompleteMatches local_complete_matches eps
+            localAndImportedCompleteMatches (local_complete_matches ++ extra_matches) eps
        ; let
             tcm_plugins = emptyTcMPluginsRun
             envs  = mkDsEnvs unit_env this_mod rdr_env type_env
@@ -842,8 +845,8 @@ dsGetFamInstEnvs :: DsM FamInstEnvs
 -- Gets both the external-package inst-env
 -- and the home-pkg inst env (includes module being compiled)
 dsGetFamInstEnvs
-  = do { eps <- getEps; env <- getGblEnv
-       ; return (eps_fam_inst_env eps, ds_fam_inst_env env) }
+  = do { eps <- getEps; env <- getGblEnv; lazy_env <- queryHpt HomePackageTable.hptLoadedFamInstEnv
+       ; return (eps_fam_inst_env eps, ds_fam_inst_env env `unionFamInstEnv` lazy_env) }
 
 dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
 dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }

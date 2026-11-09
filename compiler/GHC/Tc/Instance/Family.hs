@@ -57,6 +57,8 @@ import Data.Function ( on )
 import qualified GHC.LanguageExtensions  as LangExt
 import Data.List (sortOn)
 import qualified GHC.Unit.Home.Graph as HUG
+import qualified GHC.Unit.Home.PackageTable as HomePackageTable
+import Control.Applicative ((<|>))
 
 
 {- Note [The type family instance consistency story]
@@ -407,8 +409,9 @@ getFamInsts hpt_fam_insts mod
   | Just env <- lookupModuleEnv hpt_fam_insts mod = return env
   | otherwise = do { _ <- initIfaceTcRn (loadSysInterface doc mod)
                    ; eps <- getEps
+                   ; hpt_extra_mod_fam_insts <- queryHpt HomePackageTable.hptLoadedModFamInstEnv
                    ; return (expectJust $
-                             lookupModuleEnv (eps_mod_fam_inst_env eps) mod) }
+                             lookupModuleEnv hpt_extra_mod_fam_insts mod <|> lookupModuleEnv (eps_mod_fam_inst_env eps) mod) }
   where
     doc = ppr mod <+> text "is a family-instance module"
 
@@ -615,7 +618,8 @@ addLocalFamInst (home_fie, my_fis) fam_inst
            -- by the current module, rather than every instance
            -- we've ever seen. Fixing this is part of #13102.
        ; eps <- getEps
-       ; let inst_envs = (eps_fam_inst_env eps, home_fie)
+       ; extra <- queryHpt HomePackageTable.hptLoadedFamInstEnv
+       ; let inst_envs = (eps_fam_inst_env eps `unionFamInstEnv` extra, home_fie)
              home_fie' = extendFamInstEnv home_fie fam_inst
 
            -- Check for conflicting instance decls and injectivity violations
@@ -948,7 +952,7 @@ tcGetFamInstEnvs :: TcM FamInstEnvs
 -- Gets both the external-package inst-env
 -- and the home-pkg inst env (includes module being compiled)
 tcGetFamInstEnvs
-  = do { eps <- getEps; env <- getGblEnv
+  = do { eps <- getEps; env <- getGblEnv; !extra <- queryHpt HomePackageTable.hptLoadedFamInstEnv
        ; let !pkg_env  = eps_fam_inst_env eps
              !home_env = tcg_fam_inst_env env
-       ; return (pkg_env, home_env) }
+       ; return (pkg_env, home_env `unionFamInstEnv` extra) }

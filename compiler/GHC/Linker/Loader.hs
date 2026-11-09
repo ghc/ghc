@@ -668,6 +668,7 @@ findWholeCoreBindings hsc_env mod = do
              loadInterface (text "get_reachable_nodes" <+> parens (ppr mod))
                  mod ImportBySystem
       EPS {eps_iface_bytecode} <- hscEPS hsc_env
+      
       sequence (lookupModuleEnv eps_iface_bytecode mod)
 
 

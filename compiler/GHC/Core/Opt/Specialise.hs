@@ -854,7 +854,8 @@ spec_import env callers dict_binds cis@(CIS fn _)
              -- We keep doing this in case we "page-fault in"
              -- more rules as we go along
        ; eps_rules <- getExternalRuleBase
-       ; let rule_env = se_rules env `updExternalPackageRules` eps_rules
+       ; home_rules <- getLazyHomeRuleBase
+       ; let rule_env = se_rules env `updHomePackageRules` home_rules `updExternalPackageRules` eps_rules
 
 --       ; debugTraceMsg (text "specImport1" <+> vcat
 --           [ text "function:" <+> ppr fn

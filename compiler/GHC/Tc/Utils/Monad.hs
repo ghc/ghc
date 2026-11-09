@@ -30,7 +30,7 @@ module GHC.Tc.Utils.Monad(
   getEpsVar,
   getEps,
   updateEps, updateEps_,
-  getHpt, getEpsAndHug,
+  getHpt, queryHpt, getEpsAndHug,
 
   -- * Initialising TcM plugins
   TcMPluginHandling(..),
@@ -261,6 +261,7 @@ import Control.Monad.Catch ( bracket_, finally, onException, mask, mask_, MonadC
 import Data.Foldable (traverse_)
 import Data.IORef
 import qualified Data.Map as Map
+import qualified GHC.Unit.Home.PackageTable as HomePackageTable
 
 {-
 ************************************************************************
@@ -739,6 +740,11 @@ updateEps_ upd_fn = updateEps (\eps -> (upd_fn eps, ()))
 
 getHpt :: TcRnIf gbl lcl HomePackageTable
 getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
+
+queryHpt :: (HomePackageTable -> IO a) -> TcRnIf gbl lcl a
+queryHpt f = do
+  hpt <- getHpt
+  liftIO $ f hpt
 
 getEpsAndHug :: TcRnIf gbl lcl (ExternalPackageState, HomeUnitGraph)
 getEpsAndHug = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
@@ -2740,8 +2746,9 @@ getCompleteMatchesTcM
   = do { hsc_env <- getTopEnv
        ; eps <- liftIO $ hscEPS hsc_env
        ; tcg_env <- getGblEnv
+       ; extra_matches <- queryHpt HomePackageTable.hptLoadedCompleteMatches
        ; let tcg_comps = tcg_complete_match_env tcg_env
-       ; liftIO $ localAndImportedCompleteMatches tcg_comps eps
+       ; liftIO $ localAndImportedCompleteMatches (tcg_comps ++ extra_matches) eps
        }
 
 localAndImportedCompleteMatches :: CompleteMatches -> ExternalPackageState -> IO CompleteMatches

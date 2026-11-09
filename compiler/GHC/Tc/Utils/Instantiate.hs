@@ -88,6 +88,7 @@ import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Control.Monad( when, unless )
 import Data.Function ( on )
+import qualified GHC.Unit.Home.PackageTable as HomePackageTable
 
 {-
 ************************************************************************
@@ -922,6 +923,7 @@ addLocalInst (home_ie, my_insts) ispec
              -- 'dups'     are those 'matches' that are equal to the new one
          ; isGHCi <- getIsGHCi
          ; eps    <- getEps
+         ; extra_inst_env <- queryHpt HomePackageTable.hptLoadedInstEnv
          ; tcg_env <- getGblEnv
 
            -- In GHCi, we *override* any identical instances
@@ -933,7 +935,7 @@ addLocalInst (home_ie, my_insts) ispec
 
                global_ie = eps_inst_env eps
                inst_envs = InstEnvs { ie_global  = global_ie
-                                    , ie_local   = home_ie'
+                                    , ie_local   = home_ie' `unionInstEnv` extra_inst_env
                                     , ie_visible = tcVisibleOrphanMods tcg_env }
 
              -- Check for inconsistent functional dependencies
@@ -945,6 +947,13 @@ addLocalInst (home_ie, my_insts) ispec
          ; let (_tvs, cls, tys) = instanceHead ispec
                (matches, _, _)  = lookupInstEnv False inst_envs cls tys
                dups             = filter (identicalClsInstHead ispec) (map fst matches)
+         ; traceRn "addLocalInst 0" (ppr ispec)
+         ; traceRn "addLocalInst 1" (ppr home_ie)
+         ; traceRn "addLocalInst 2" (ppr my_insts)
+         ; traceRn "addLocalInst 3" (ppr matches)
+         ; traceRn "addLocalInst 4" (ppr dups)
+         ; traceRn "addLocalInst 5" (ppr global_ie)
+         ; traceRn "addLocalInst 6" (ppr extra_inst_env)
          ; unless (null dups) $
            dupInstErr ispec (head dups)
 

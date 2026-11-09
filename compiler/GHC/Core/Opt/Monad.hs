@@ -16,8 +16,8 @@ module GHC.Core.Opt.Monad (
 
     -- ** Reading from the monad
     getModule,
-    initRuleEnv, getExternalRuleBase,
-    getDynFlags, getPackageFamInstEnv,
+    initRuleEnv, getExternalRuleBase, getLazyHomeRuleBase,
+    getDynFlags, getPackageFamInstEnv, getLazyHomeFamInstEnv,
     getInteractiveContext,
     getUniqTag,
     getNamePprCtx, getSrcSpanM,
@@ -44,7 +44,7 @@ import GHC.Driver.Errors ( reportDiagnostic, reportError )
 import GHC.Driver.Config.Diagnostic ( initDiagOpts )
 import GHC.Driver.Env
 
-import GHC.Core.Rules     ( RuleBase, RuleEnv, mkRuleEnv )
+import GHC.Core.Rules     ( RuleBase, RuleEnv, mkRuleEnv, unionRuleBase )
 import GHC.Core.Opt.Stats ( SimplCount, zeroSimplCount, plusSimplCount )
 
 import GHC.Types.Annotations
@@ -73,6 +73,9 @@ import Data.Dynamic
 import Data.Maybe (listToMaybe)
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
+import GHC.Unit.Home.PackageTable (HomePackageTable)
+import qualified GHC.Unit.Home.PackageTable as HomePackageTable
+import GHC.Core.FamInstEnv
 
 data FloatOutSwitches = FloatOutSwitches
   { floatOutLambdas   :: Maybe Int  -- ^ Just n <=> float lambdas to top level, if
@@ -248,7 +251,10 @@ instance HasHscEnv CoreM where
     getHscEnv = read cr_hsc_env
 
 getHomeRuleBase :: CoreM RuleBase
-getHomeRuleBase = read cr_rule_base
+getHomeRuleBase = do
+  hptRules <- read cr_rule_base
+  extraRules <- getLazyHomeRuleBase
+  pure $ hptRules `unionRuleBase` extraRules
 
 initRuleEnv :: ModGuts -> CoreM RuleEnv
 initRuleEnv guts
@@ -258,6 +264,9 @@ initRuleEnv guts
 
 getExternalRuleBase :: CoreM RuleBase
 getExternalRuleBase = eps_rule_base <$> get_eps
+
+getLazyHomeRuleBase :: CoreM RuleBase
+getLazyHomeRuleBase = get_hpt HomePackageTable.hptLoadedRuleBase
 
 getNamePprCtx :: CoreM NamePprCtx
 getNamePprCtx = read cr_name_ppr_ctx
@@ -302,10 +311,19 @@ getInteractiveContext = hsc_IC <$> getHscEnv
 getPackageFamInstEnv :: CoreM PackageFamInstEnv
 getPackageFamInstEnv = eps_fam_inst_env <$> get_eps
 
+getLazyHomeFamInstEnv :: CoreM FamInstEnv
+getLazyHomeFamInstEnv = get_hpt HomePackageTable.hptLoadedFamInstEnv
+
 get_eps :: CoreM ExternalPackageState
 get_eps = do
     hsc_env <- getHscEnv
     liftIO $ hscEPS hsc_env
+
+get_hpt :: (HomePackageTable -> IO a) -> CoreM a
+get_hpt f = do
+    hsc_env <- getHscEnv
+    a <- liftIO $ f $ hsc_HPT hsc_env
+    pure a
 
 {-
 ************************************************************************
