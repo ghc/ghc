@@ -6,9 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-// Not POSIX, due to use of ru_majflt in getPageFaults()
-// #include "rts/PosixSource.h"
-
+#include "rts/PosixSource.h"
 #include "Rts.h"
 #include "GetTime.h"
 
@@ -63,10 +61,4 @@ void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
     gettimeofday(&tv, (struct timezone *) NULL);
     *sec  = tv.tv_sec;
     *nsec = tv.tv_usec * 1000;
-}
-
-W_
-getPageFaults(void)
-{
-  return 0;
 }
