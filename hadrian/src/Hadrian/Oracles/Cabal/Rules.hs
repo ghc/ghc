@@ -17,7 +17,6 @@ import Development.Shake
 import Distribution.Simple.GHC
 import Distribution.Simple.Program.Builtin
 import Distribution.Simple.Program.Db
-import Distribution.Verbosity
 
 import Builder
 import Context
@@ -73,7 +72,7 @@ cabalOracle = do
                      $ addKnownProgram ghcPkgProgram
                      $ emptyProgramDb
         (compiler, maybePlatform, _pkgdb) <- liftIO $
-            configure normal Nothing Nothing progDb
+            configure cabalNormal Nothing Nothing progDb
         let platform = fromMaybe (error msg) maybePlatform
             msg      = "PackageConfiguration oracle: cannot detect platform"
         return $ PackageConfiguration (compiler, platform)

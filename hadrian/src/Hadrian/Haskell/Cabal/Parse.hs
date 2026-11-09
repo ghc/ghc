@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MultiWayIf #-}
 -----------------------------------------------------------------------------
 -- |
@@ -11,7 +12,8 @@
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Cabal.Parse (
     parsePackageData, resolveContextData, parseCabalPkgId, configurePackage,
-    buildAutogenFiles, copyPackage, writeInplacePkgConf, registerPackage
+    buildAutogenFiles, copyPackage, writeInplacePkgConf, registerPackage,
+    cabalNormal
     ) where
 
 import Data.Bifunctor
@@ -71,15 +73,16 @@ import Packages
 parsePackageData :: Package -> Action PackageData
 parsePackageData pkg = do
     gpd' <- traced "cabal-read" $
-        C.readGenericPackageDescription C.verbose Nothing (C.makeSymbolicPath (pkgCabalFile pkg))
+        C.readGenericPackageDescription cabalVerbose Nothing (C.makeSymbolicPath (pkgCabalFile pkg))
     -- We need to make the data dir relative to the package path so that cabal can actually find it
     let gpd = gpd' { C.packageDescription = (C.packageDescription gpd') { C.dataDir = C.makeSymbolicPath (pkgPath pkg) C.</> C.makeRelativePathEx (C.interpretSymbolicPathCWD (C.dataDir (C.packageDescription gpd'))) } }
     let pd      = C.packageDescription gpd
         pkgId   = C.package pd
         name    = C.unPackageName (C.pkgName pkgId)
         version = C.display (C.pkgVersion pkgId)
-        libDeps = collectDeps (C.condLibrary gpd)
-        exeDeps = map (collectDeps . Just . snd) (C.condExecutables gpd)
+        libDeps = collectDeps (C.targetBuildDepends . C.libBuildInfo) (C.condLibrary gpd)
+        exeDeps = map (collectDeps (C.targetBuildDepends . C.buildInfo) . Just . snd)
+                      (C.condExecutables gpd)
         allDeps = concat (libDeps : exeDeps)
         sorted  = sort [ C.unPackageName p | C.Dependency p _ _ <- allDeps ]
         deps    = nubOrd sorted \\ [name]
@@ -90,15 +93,34 @@ parsePackageData pkg = do
                          depPkgs gpd
   where
     -- Collect an overapproximation of dependencies by ignoring conditionals
-    collectDeps :: Maybe (C.CondTree v [C.Dependency] a) -> [C.Dependency]
-    collectDeps Nothing = []
-    collectDeps (Just (C.CondNode _ deps ifs)) = deps ++ concatMap f ifs
+#if MIN_VERSION_Cabal(3,18,0)
+    collectDeps :: (a -> [C.Dependency]) -> Maybe (C.CondTree v a) -> [C.Dependency]
+    collectDeps _ Nothing = []
+    collectDeps deps (Just (C.CondNode a ifs)) = deps a ++ concatMap f ifs
       where
-        f (C.CondBranch _ t mt) = collectDeps (Just t) ++ collectDeps mt
+        f (C.CondBranch _ t mt) = collectDeps deps (Just t) ++ collectDeps deps mt
+#else
+    collectDeps :: (a -> [C.Dependency]) -> Maybe (C.CondTree v [C.Dependency] a) -> [C.Dependency]
+    collectDeps _ Nothing = []
+    collectDeps deps (Just (C.CondNode _ ds ifs)) = ds ++ concatMap f ifs
+      where
+        f (C.CondBranch _ t mt) = collectDeps deps (Just t) ++ collectDeps deps mt
+#endif
+
+cabalSilent, cabalNormal, cabalVerbose :: C.Verbosity
+#if MIN_VERSION_Cabal(3,18,0)
+cabalSilent  = C.mkVerbosity C.defaultVerbosityHandles C.silent
+cabalNormal  = C.mkVerbosity C.defaultVerbosityHandles C.normal
+cabalVerbose = C.mkVerbosity C.defaultVerbosityHandles C.verbose
+#else
+cabalSilent  = C.silent
+cabalNormal  = C.normal
+cabalVerbose = C.verbose
+#endif
 
 -- | Parse the package identifier from a Cabal file.
 parseCabalPkgId :: FilePath -> IO String
-parseCabalPkgId file = C.display . C.package . C.packageDescription <$> C.readGenericPackageDescription C.silent Nothing (C.makeSymbolicPath file)
+parseCabalPkgId file = C.display . C.package . C.packageDescription <$> C.readGenericPackageDescription cabalSilent Nothing (C.makeSymbolicPath file)
 
 biModules :: C.PackageDescription -> (C.BuildInfo, [C.ModuleName], Maybe [C.ModuleName], Maybe (C.ModuleName, String))
 biModules pd = go [ comp | comp@(bi,_,_,_) <-
@@ -428,7 +450,7 @@ generateRegistrationInfo pd lbi = do
     case [ (lib, targetCLBI tgt) | tgt <- allTargetsInBuildOrder' pd lbi
                                  , CLib lib <- [targetComponent tgt] ] of
       [(lib, clbi)] -> do
-        abi_hash <- C.mkAbiHash <$> GHC.libAbiHash C.silent pd lbi lib clbi
+        abi_hash <- C.mkAbiHash <$> GHC.libAbiHash cabalSilent pd lbi lib clbi
         return (C.absoluteInstalledPackageInfo pd abi_hash lib lbi clbi)
       libs -> error $ "generateRegistrationInfo: expected exactly one library for "
                    ++ C.display (C.package pd) ++ ", got " ++ show (length libs)
@@ -447,8 +469,8 @@ buildAutogenFiles context = do
         lbi <- C.getPersistBuildConfig Nothing (C.makeSymbolicPath cPath)
         let lbi' = lbi { C.localPkgDescr = pd }
         C.withAllComponentsInBuildOrder pd lbi' $ \_comp clbi -> do
-          C.createDirectoryIfMissingVerbose C.silent True (C.getSymbolicPath (componentBuildDir lbi' clbi))
-          C.writeBuiltinAutogenFiles C.silent pd lbi' clbi
+          C.createDirectoryIfMissingVerbose cabalSilent True (C.getSymbolicPath (componentBuildDir lbi' clbi))
+          C.writeBuiltinAutogenFiles cabalSilent pd lbi' clbi
 
 -- | Write a .conf file for the inplace package database which points into the
 -- build directories rather than the final install locations.
@@ -470,10 +492,10 @@ writeInplacePkgConf context = do
 getHookedBuildInfo :: [FilePath] -> IO C.HookedBuildInfo
 getHookedBuildInfo [] = return C.emptyHookedBuildInfo
 getHookedBuildInfo (baseDir:baseDirs) = do
-    maybeInfoFile <- C.findHookedPackageDesc C.normal Nothing (C.makeSymbolicPath baseDir)
+    maybeInfoFile <- C.findHookedPackageDesc cabalNormal Nothing (C.makeSymbolicPath baseDir)
     case maybeInfoFile of
         Nothing       -> getHookedBuildInfo baseDirs
-        Just infoFile -> C.readHookedBuildInfo C.silent Nothing infoFile
+        Just infoFile -> C.readHookedBuildInfo cabalSilent Nothing infoFile
 
 externalPackageDeps :: C.LocalBuildInfo -> [(C.UnitId, C.MungedPackageId)]
 externalPackageDeps lbi =
