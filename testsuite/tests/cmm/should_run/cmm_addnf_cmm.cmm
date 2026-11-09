@@ -553,3 +553,380 @@ k01 (W_ xw, W_ yw) {
     return (0);
 }
 
+d01_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (1::bits64)) << 3) + y)));
+}
+
+d01_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (9223372036854775808::bits64)) << 3) + y)));
+}
+
+d01_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((((x + (255::bits8)) << 3) + y)));
+}
+
+d02_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((y + ((x + (1::bits64)) << 3))));
+}
+
+d02_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((y + ((x + (9223372036854775808::bits64)) << 3))));
+}
+
+d02_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((y + ((x + (255::bits8)) << 3))));
+}
+
+d03_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((y - ((x + (1::bits64)) << 3))));
+}
+
+d03_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((y - ((x + (9223372036854775808::bits64)) << 3))));
+}
+
+d03_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((y - ((x + (255::bits8)) << 3))));
+}
+
+d04_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x - (1::bits64)) << 3) - y)));
+}
+
+d04_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x - (9223372036854775808::bits64)) << 3) - y)));
+}
+
+d04_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((((x - (255::bits8)) << 3) - y)));
+}
+
+d05_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64(((((1::bits64) - x) << 3) + y)));
+}
+
+d05_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64(((((9223372036854775808::bits64) - x) << 3) + y)));
+}
+
+d05_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64(((((255::bits8) - x) << 3) + y)));
+}
+
+d06_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((y - (((1::bits64) - x) << 1))));
+}
+
+d06_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((y - (((9223372036854775808::bits64) - x) << 1))));
+}
+
+d06_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((y - (((255::bits8) - x) << 1))));
+}
+
+d07_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (1::bits64)) << 63) + y)));
+}
+
+d07_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (9223372036854775808::bits64)) << 63) + y)));
+}
+
+d07_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((((x + (255::bits8)) << 7) + y)));
+}
+
+d08_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (1::bits64)) << 40) - y)));
+}
+
+d08_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (9223372036854775808::bits64)) << 40) - y)));
+}
+
+d08_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((((x + (255::bits8)) << 7) - y)));
+}
+
+d09_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (1::bits64)) * (24::bits64)) + y)));
+}
+
+d09_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (9223372036854775808::bits64)) * (1::bits64)) + y)));
+}
+
+d09_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((((x + (255::bits8)) * (255::bits8)) + y)));
+}
+
+d10_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((y - ((x - (1::bits64)) * (24::bits64)))));
+}
+
+d10_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((y - ((x - (9223372036854775808::bits64)) * (1::bits64)))));
+}
+
+d10_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((y - ((x - (255::bits8)) * (255::bits8)))));
+}
+
+d11_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64(((((1::bits64) - x) * (24::bits64)) - y)));
+}
+
+d11_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64(((((9223372036854775808::bits64) - x) * (1::bits64)) - y)));
+}
+
+d11_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64(((((255::bits8) - x) * (255::bits8)) - y)));
+}
+
+d12_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((24::bits64) * (x + (1::bits64))) + y)));
+}
+
+d12_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((1::bits64) * (x + (9223372036854775808::bits64))) + y)));
+}
+
+d12_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((((255::bits8) * (x + (255::bits8))) + y)));
+}
+
+d13_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (1::bits64)) << 3) + ((y + (24::bits64)) << 1))));
+}
+
+d13_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (9223372036854775808::bits64)) << 3) + ((y + (1::bits64)) << 1))));
+}
+
+d13_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((((x + (255::bits8)) << 3) + ((y + (255::bits8)) << 1))));
+}
+
+d14_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64(((((x << 2) + (1::bits64)) << 3) + y)));
+}
+
+d14_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64(((((x << 2) + (9223372036854775808::bits64)) << 3) + y)));
+}
+
+d14_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64(((((x << 2) + (255::bits8)) << 3) + y)));
+}
+
+d15_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (1::bits64)) << 3) + (24::bits64))));
+}
+
+d15_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (9223372036854775808::bits64)) << 3) + (1::bits64))));
+}
+
+d15_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((((x + (255::bits8)) << 3) + (255::bits8))));
+}
+
+d16_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64(((24::bits64) - ((x + (1::bits64)) << 2))));
+}
+
+d16_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64(((1::bits64) - ((x + (9223372036854775808::bits64)) << 2))));
+}
+
+d16_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64(((255::bits8) - ((x + (255::bits8)) << 2))));
+}
+
+d17_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (1::bits64)) << 3) & y)));
+}
+
+d17_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((x + (9223372036854775808::bits64)) << 3) & y)));
+}
+
+d17_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((((x + (255::bits8)) << 3) & y)));
+}
+
+d18_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64(((((x + y) + (1::bits64)) << 3) - x)));
+}
+
+d18_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64(((((x + y) + (9223372036854775808::bits64)) << 3) - x)));
+}
+
+d18_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64(((((x + y) + (255::bits8)) << 3) - x)));
+}
+
+d19_64_t1 (W_ xw, W_ yw, W_ zw) {
+    bits64 x, y, z; x = %lobits64(xw); y = %lobits64(yw); z = %lobits64(zw);
+    return (%zx64(((((x + (1::bits64)) << 3) + y) - ((z - (24::bits64)) * (1::bits64)))));
+}
+
+d19_64_s3 (W_ xw, W_ yw, W_ zw) {
+    bits64 x, y, z; x = %lobits64(xw); y = %lobits64(yw); z = %lobits64(zw);
+    return (%zx64(((((x + (9223372036854775808::bits64)) << 3) + y) - ((z - (1::bits64)) * (9223372036854775808::bits64)))));
+}
+
+d19_8_s4 (W_ xw, W_ yw, W_ zw) {
+    bits8 x, y, z; x = %lobits8(xw); y = %lobits8(yw); z = %lobits8(zw);
+    return (%zx64(((((x + (255::bits8)) << 3) + y) - ((z - (255::bits8)) * (255::bits8)))));
+}
+
+d20_64_t1 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((((x + (1::bits64)) << 1) + (24::bits64)) << 2) + y)));
+}
+
+d20_64_s3 (W_ xw, W_ yw) {
+    bits64 x, y; x = %lobits64(xw); y = %lobits64(yw);
+    return (%zx64((((((x + (9223372036854775808::bits64)) << 1) + (1::bits64)) << 2) + y)));
+}
+
+d20_8_s4 (W_ xw, W_ yw) {
+    bits8 x, y; x = %lobits8(xw); y = %lobits8(yw);
+    return (%zx64((((((x + (255::bits8)) << 1) + (255::bits8)) << 2) + y)));
+}
+
+e01 (W_ p, W_ i) {
+    return (I64[p + ((i + 1) << 3)]);
+}
+
+e02 (W_ p, W_ i) {
+    return (I64[((i - 1) << 3) + p]);
+}
+
+e03 (W_ p, W_ i) {
+    return (I64[(p + 16) + ((i - 1) << 3)]);
+}
+
+e04 (W_ p, W_ i) {
+    return (I64[p + ((i + 2) * 8)]);
+}
+
+e05 (W_ p, W_ i) {
+    return (I64[p - ((1 - i) << 3)]);
+}
+
+e06 (W_ p, W_ i) {
+    return (I64[(p + ((i + 1) << 3)) + ((i - 1) << 3)]);
+}
+
+e07 (W_ p, W_ i) {
+    return (I64[p + ((i + 1) * 24)]);
+}
+
+e08 (W_ p, W_ i) {
+    return (I64[p - ((i + 1) << 3)]);
+}
+
+e09 (W_ p, W_ i) {
+    return (I64[p + ((i + 1) << 4)]);
+}
+
+e10 (W_ p, W_ i) {
+    return (I64[(p + ((i - 2147483648) << 3)) + 17179869184]);
+}
+
+e11 (W_ p, W_ i) {
+    return (I64[(p + ((i + 268435456) << 3)) - 2147483648]);
+}
+
+e12 (W_ p, W_ i) {
+    return (I64[(p + ((i + 1) << 3)) - 8]);
+}
+
+s02 (W_ p, W_ i, W_ v) {
+    I64[p + ((i - 1) << 3)] = v;
+    return (I64[(p - 8) + (i << 3)]);
+}
+
+m01 (W_ i) {
+    return (I64[(((i >> 3) - 1) << 3) + cmm_addnf_tbl]);
+}
+
+m02 (W_ i) {
+    return (I64[cmm_addnf_tbl + (((i >> 3) + 1) << 3)]);
+}
+
+m03 (W_ i) {
+    return (I64[(((i >> 3) - 1) << 3) + (cmm_addnf_tbl + 8)]);
+}
+
+m04 (W_ i) {
+    return (I64[(((i >> 3) + 1) * 8) + cmm_addnf_tbl]);
+}
+
+m05 (W_ i) {
+    return (I64[((1 - (i >> 3)) << 3) + (cmm_addnf_tbl + 64)]);
+}
+
+m06 (W_ i) {
+    return (I64[(cmm_addnf_tbl - 8) + ((i >> 3) << 3)]);
+}
+

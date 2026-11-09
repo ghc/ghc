@@ -5,6 +5,7 @@
 -- here with the same formula computed in Haskell over boundary values.
 
 import Control.Monad
+import Data.Bits
 import Data.Int
 import Data.Word
 import Foreign.Marshal.Array
@@ -124,6 +125,85 @@ foreign import prim "l04" l04# :: Word# -> Word#
 foreign import prim "l05" l05# :: Word# -> Word#
 foreign import prim "l06" l06# :: Word# -> Word#
 foreign import prim "k01" k01# :: Word# -> Word# -> Word#
+foreign import prim "d01_64_t1" d01_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d01_64_s3" d01_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d01_8_s4" d01_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d02_64_t1" d02_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d02_64_s3" d02_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d02_8_s4" d02_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d03_64_t1" d03_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d03_64_s3" d03_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d03_8_s4" d03_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d04_64_t1" d04_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d04_64_s3" d04_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d04_8_s4" d04_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d05_64_t1" d05_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d05_64_s3" d05_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d05_8_s4" d05_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d06_64_t1" d06_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d06_64_s3" d06_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d06_8_s4" d06_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d07_64_t1" d07_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d07_64_s3" d07_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d07_8_s4" d07_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d08_64_t1" d08_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d08_64_s3" d08_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d08_8_s4" d08_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d09_64_t1" d09_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d09_64_s3" d09_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d09_8_s4" d09_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d10_64_t1" d10_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d10_64_s3" d10_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d10_8_s4" d10_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d11_64_t1" d11_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d11_64_s3" d11_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d11_8_s4" d11_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d12_64_t1" d12_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d12_64_s3" d12_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d12_8_s4" d12_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d13_64_t1" d13_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d13_64_s3" d13_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d13_8_s4" d13_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d14_64_t1" d14_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d14_64_s3" d14_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d14_8_s4" d14_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d15_64_t1" d15_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d15_64_s3" d15_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d15_8_s4" d15_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d16_64_t1" d16_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d16_64_s3" d16_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d16_8_s4" d16_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d17_64_t1" d17_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d17_64_s3" d17_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d17_8_s4" d17_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d18_64_t1" d18_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d18_64_s3" d18_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d18_8_s4" d18_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "d19_64_t1" d19_64_t1# :: Word# -> Word# -> Word# -> Word#
+foreign import prim "d19_64_s3" d19_64_s3# :: Word# -> Word# -> Word# -> Word#
+foreign import prim "d19_8_s4" d19_8_s4# :: Word# -> Word# -> Word# -> Word#
+foreign import prim "d20_64_t1" d20_64_t1# :: Word# -> Word# -> Word#
+foreign import prim "d20_64_s3" d20_64_s3# :: Word# -> Word# -> Word#
+foreign import prim "d20_8_s4" d20_8_s4# :: Word# -> Word# -> Word#
+foreign import prim "e01" e01# :: Word# -> Word# -> Word#
+foreign import prim "e02" e02# :: Word# -> Word# -> Word#
+foreign import prim "e03" e03# :: Word# -> Word# -> Word#
+foreign import prim "e04" e04# :: Word# -> Word# -> Word#
+foreign import prim "e05" e05# :: Word# -> Word# -> Word#
+foreign import prim "e06" e06# :: Word# -> Word# -> Word#
+foreign import prim "e07" e07# :: Word# -> Word# -> Word#
+foreign import prim "e08" e08# :: Word# -> Word# -> Word#
+foreign import prim "e09" e09# :: Word# -> Word# -> Word#
+foreign import prim "e10" e10# :: Word# -> Word# -> Word#
+foreign import prim "e11" e11# :: Word# -> Word# -> Word#
+foreign import prim "e12" e12# :: Word# -> Word# -> Word#
+foreign import prim "s02" s02# :: Word# -> Word# -> Word# -> Word#
+foreign import prim "m01" m01# :: Word# -> Word#
+foreign import prim "m02" m02# :: Word# -> Word#
+foreign import prim "m03" m03# :: Word# -> Word#
+foreign import prim "m04" m04# :: Word# -> Word#
+foreign import prim "m05" m05# :: Word# -> Word#
+foreign import prim "m06" m06# :: Word# -> Word#
 
 un :: Word64 -> Word#
 un w = case fromIntegral w of W# x -> x
@@ -360,5 +440,144 @@ main = allocaArray 64 $ \buf -> do
     , check "l06" (map pure [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f1 l06#) (\[i] -> i)
     , check "k01" (replicateM 2 [0, 1, 127, 128, 255]) (f2 k01#)
       (\[x, y] -> if (fromIntegral x + 1 - fromIntegral y :: Word8) == 3 then 1 else 0)
+    , check "d01_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d01_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (1 :: Word64)) `shiftL` 3) + y))
+    , check "d01_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d01_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (9223372036854775808 :: Word64)) `shiftL` 3) + y))
+    , check "d01_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d01_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (((x + (255 :: Word8)) `shiftL` 3) + y))
+    , check "d02_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d02_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (y + ((x + (1 :: Word64)) `shiftL` 3)))
+    , check "d02_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d02_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (y + ((x + (9223372036854775808 :: Word64)) `shiftL` 3)))
+    , check "d02_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d02_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (y + ((x + (255 :: Word8)) `shiftL` 3)))
+    , check "d03_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d03_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (y - ((x + (1 :: Word64)) `shiftL` 3)))
+    , check "d03_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d03_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (y - ((x + (9223372036854775808 :: Word64)) `shiftL` 3)))
+    , check "d03_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d03_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (y - ((x + (255 :: Word8)) `shiftL` 3)))
+    , check "d04_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d04_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x - (1 :: Word64)) `shiftL` 3) - y))
+    , check "d04_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d04_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x - (9223372036854775808 :: Word64)) `shiftL` 3) - y))
+    , check "d04_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d04_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (((x - (255 :: Word8)) `shiftL` 3) - y))
+    , check "d05_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d05_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral ((((1 :: Word64) - x) `shiftL` 3) + y))
+    , check "d05_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d05_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral ((((9223372036854775808 :: Word64) - x) `shiftL` 3) + y))
+    , check "d05_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d05_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral ((((255 :: Word8) - x) `shiftL` 3) + y))
+    , check "d06_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d06_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (y - (((1 :: Word64) - x) `shiftL` 1)))
+    , check "d06_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d06_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (y - (((9223372036854775808 :: Word64) - x) `shiftL` 1)))
+    , check "d06_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d06_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (y - (((255 :: Word8) - x) `shiftL` 1)))
+    , check "d07_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d07_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (1 :: Word64)) `shiftL` 63) + y))
+    , check "d07_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d07_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (9223372036854775808 :: Word64)) `shiftL` 63) + y))
+    , check "d07_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d07_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (((x + (255 :: Word8)) `shiftL` 7) + y))
+    , check "d08_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d08_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (1 :: Word64)) `shiftL` 40) - y))
+    , check "d08_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d08_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (9223372036854775808 :: Word64)) `shiftL` 40) - y))
+    , check "d08_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d08_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (((x + (255 :: Word8)) `shiftL` 7) - y))
+    , check "d09_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d09_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (1 :: Word64)) * (24 :: Word64)) + y))
+    , check "d09_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d09_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (9223372036854775808 :: Word64)) * (1 :: Word64)) + y))
+    , check "d09_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d09_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (((x + (255 :: Word8)) * (255 :: Word8)) + y))
+    , check "d10_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d10_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (y - ((x - (1 :: Word64)) * (24 :: Word64))))
+    , check "d10_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d10_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (y - ((x - (9223372036854775808 :: Word64)) * (1 :: Word64))))
+    , check "d10_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d10_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (y - ((x - (255 :: Word8)) * (255 :: Word8))))
+    , check "d11_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d11_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral ((((1 :: Word64) - x) * (24 :: Word64)) - y))
+    , check "d11_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d11_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral ((((9223372036854775808 :: Word64) - x) * (1 :: Word64)) - y))
+    , check "d11_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d11_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral ((((255 :: Word8) - x) * (255 :: Word8)) - y))
+    , check "d12_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d12_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((24 :: Word64) * (x + (1 :: Word64))) + y))
+    , check "d12_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d12_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((1 :: Word64) * (x + (9223372036854775808 :: Word64))) + y))
+    , check "d12_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d12_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (((255 :: Word8) * (x + (255 :: Word8))) + y))
+    , check "d13_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d13_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (1 :: Word64)) `shiftL` 3) + ((y + (24 :: Word64)) `shiftL` 1)))
+    , check "d13_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d13_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (9223372036854775808 :: Word64)) `shiftL` 3) + ((y + (1 :: Word64)) `shiftL` 1)))
+    , check "d13_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d13_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (((x + (255 :: Word8)) `shiftL` 3) + ((y + (255 :: Word8)) `shiftL` 1)))
+    , check "d14_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d14_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral ((((x `shiftL` 2) + (1 :: Word64)) `shiftL` 3) + y))
+    , check "d14_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d14_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral ((((x `shiftL` 2) + (9223372036854775808 :: Word64)) `shiftL` 3) + y))
+    , check "d14_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d14_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral ((((x `shiftL` 2) + (255 :: Word8)) `shiftL` 3) + y))
+    , check "d15_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d15_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (1 :: Word64)) `shiftL` 3) + (24 :: Word64)))
+    , check "d15_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d15_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (9223372036854775808 :: Word64)) `shiftL` 3) + (1 :: Word64)))
+    , check "d15_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d15_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (((x + (255 :: Word8)) `shiftL` 3) + (255 :: Word8)))
+    , check "d16_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d16_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral ((24 :: Word64) - ((x + (1 :: Word64)) `shiftL` 2)))
+    , check "d16_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d16_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral ((1 :: Word64) - ((x + (9223372036854775808 :: Word64)) `shiftL` 2)))
+    , check "d16_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d16_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral ((255 :: Word8) - ((x + (255 :: Word8)) `shiftL` 2)))
+    , check "d17_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d17_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (1 :: Word64)) `shiftL` 3) .&. y))
+    , check "d17_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d17_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((x + (9223372036854775808 :: Word64)) `shiftL` 3) .&. y))
+    , check "d17_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d17_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (((x + (255 :: Word8)) `shiftL` 3) .&. y))
+    , check "d18_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d18_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral ((((x + y) + (1 :: Word64)) `shiftL` 3) - x))
+    , check "d18_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d18_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral ((((x + y) + (9223372036854775808 :: Word64)) `shiftL` 3) - x))
+    , check "d18_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d18_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral ((((x + y) + (255 :: Word8)) `shiftL` 3) - x))
+    , check "d19_64_t1" (replicateM 3 [0, 9223372036854775807, 18446744073709551615]) (f3 d19_64_t1#)
+      (\[a0, a1, a2] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64; z = fromIntegral a2 :: Word64 } in fromIntegral ((((x + (1 :: Word64)) `shiftL` 3) + y) - ((z - (24 :: Word64)) * (1 :: Word64))))
+    , check "d19_64_s3" (replicateM 3 [0, 9223372036854775807, 18446744073709551615]) (f3 d19_64_s3#)
+      (\[a0, a1, a2] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64; z = fromIntegral a2 :: Word64 } in fromIntegral ((((x + (9223372036854775808 :: Word64)) `shiftL` 3) + y) - ((z - (1 :: Word64)) * (9223372036854775808 :: Word64))))
+    , check "d19_8_s4" (replicateM 3 [0, 127, 255]) (f3 d19_8_s4#)
+      (\[a0, a1, a2] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8; z = fromIntegral a2 :: Word8 } in fromIntegral ((((x + (255 :: Word8)) `shiftL` 3) + y) - ((z - (255 :: Word8)) * (255 :: Word8))))
+    , check "d20_64_t1" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d20_64_t1#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((((x + (1 :: Word64)) `shiftL` 1) + (24 :: Word64)) `shiftL` 2) + y))
+    , check "d20_64_s3" (replicateM 2 [0, 1, 9223372036854775807, 9223372036854775808, 18446744073709551615]) (f2 d20_64_s3#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word64; y = fromIntegral a1 :: Word64 } in fromIntegral (((((x + (9223372036854775808 :: Word64)) `shiftL` 1) + (1 :: Word64)) `shiftL` 2) + y))
+    , check "d20_8_s4" (replicateM 2 [0, 1, 127, 128, 255]) (f2 d20_8_s4#)
+      (\[a0, a1] -> let { x = fromIntegral a0 :: Word8; y = fromIntegral a1 :: Word8 } in fromIntegral (((((x + (255 :: Word8)) `shiftL` 1) + (255 :: Word8)) `shiftL` 2) + y))
+    , check "e01" [[pw + 192, i] | i <- [0 .. 7]] (f2 e01#) (\[_, i] -> 0x1000 + 24 + (8 + i + 1))
+    , check "e02" [[pw + 192, i] | i <- [0 .. 7]] (f2 e02#) (\[_, i] -> 0x1000 + 24 + (8 + i - 1))
+    , check "e03" [[pw + 192, i] | i <- [0 .. 7]] (f2 e03#) (\[_, i] -> 0x1000 + 24 + (8 + 2 + i - 1))
+    , check "e04" [[pw + 192, i] | i <- [0 .. 7]] (f2 e04#) (\[_, i] -> 0x1000 + 24 + (8 + i + 2))
+    , check "e05" [[pw + 192, i] | i <- [0 .. 7]] (f2 e05#) (\[_, i] -> 0x1000 + 24 + (8 + i - 1))
+    , check "e06" [[pw + 192, i] | i <- [0 .. 7]] (f2 e06#) (\[_, i] -> 0x1000 + 24 + (8 + 2 * i))
+    , check "e07" [[pw + 192, i] | i <- [0 .. 7]] (f2 e07#) (\[_, i] -> 0x1000 + 24 + (8 + 3 * (i + 1)))
+    , check "e08" [[pw + 192, i] | i <- [0 .. 7]] (f2 e08#) (\[_, i] -> 0x1000 + 24 + (8 - i - 1))
+    , check "e09" [[pw + 192, i] | i <- [0 .. 7]] (f2 e09#) (\[_, i] -> 0x1000 + 24 + (8 + 2 * (i + 1)))
+    , check "e10" [[pw + 192, i] | i <- [0 .. 7]] (f2 e10#) (\[_, i] -> 0x1000 + 24 + (8 + i))
+    , check "e11" [[pw + 192, i] | i <- [0 .. 7]] (f2 e11#) (\[_, i] -> 0x1000 + 24 + (8 + i))
+    , check "e12" [[pw + 192, i] | i <- [0 .. 7]] (f2 e12#) (\[_, i] -> 0x1000 + 24 + (8 + i))
+    , check "s02" [[pw, i, 0xbeef0000 + i] | i <- [0 .. 7]] (f3 s02#) (\[_, _, v] -> v)
+    , check "m01" [[i] | i <- [8, 16 .. 64]] (f1 m01#) (\[i] -> 11 * (1 + (i `div` 8 - 1)))
+    , check "m02" [[i] | i <- [8, 16 .. 64]] (f1 m02#) (\[i] -> 11 * (1 + (i `div` 8 + 1)))
+    , check "m03" [[i] | i <- [8, 16 .. 64]] (f1 m03#) (\[i] -> 11 * (1 + (i `div` 8)))
+    , check "m04" [[i] | i <- [8, 16 .. 64]] (f1 m04#) (\[i] -> 11 * (1 + (i `div` 8 + 1)))
+    , check "m05" [[i] | i <- [8, 16 .. 64]] (f1 m05#) (\[i] -> 11 * (1 + (9 - i `div` 8)))
+    , check "m06" [[i] | i <- [8, 16 .. 64]] (f1 m06#) (\[i] -> 11 * (1 + (i `div` 8 - 1)))
     ]
   printf "%d procedures, %d calls\n" (length ns) (sum ns)
