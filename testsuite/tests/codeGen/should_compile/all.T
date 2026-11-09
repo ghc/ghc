@@ -104,6 +104,16 @@ test('T14373d',
      multimod_compile_filter, ['T14373d', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_and_entries_only])
 
+# An entry of a closure table, loaded with the table's label as the
+# displacement of a scaled index and no base register (x86-64 assembly;
+# skipped on Windows and where code is position-independent by default, the
+# label being addressed relative to %rip there)
+test('ClosureTblAmode', [only_ways(['optasm']), unless(arch('x86_64'), skip),
+                         when(opsys('mingw32') or opsys('darwin')
+                              or opsys('openbsd'), skip),
+                         grep_errmsg(r'(_closure_tbl\(,?%)', [1])],
+     compile, ['-ddump-asm'])
+
 test('T17648', js_broken(22370), makefile_test, [])
 test('T17904', normal, compile, ['-O'])
 test('T18227A', normal, compile, [''])

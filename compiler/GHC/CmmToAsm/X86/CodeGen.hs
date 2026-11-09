@@ -1826,10 +1826,10 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
     sub_code rep x y = trivialCode rep (SUB (intFormat rep)) Nothing x y
 
     -- our three-operand add instruction, x + y for a 32-bit y.  An x of
-    -- (a + b) or (a + (b << shift)) goes into the same LEA as an address of
-    -- that form would (Note [Additive normal form] in GHC.Cmm.Opt), and
-    -- (a - b) + y is computed as (a + y) - b, the LEA taking the place of
-    -- the move of a into the destination.
+    -- (a + b), (a + (b << shift)) or (b << shift) goes into the same LEA as
+    -- an address of that form would (Note [Additive normal form] in
+    -- GHC.Cmm.Opt), and (a - b) + y is computed as (a + y) - b, the LEA
+    -- taking the place of the move of a into the destination.
     add_int width !x y = case x of
       CmmMachOp (MO_Sub _) [a, b]
         -> trivialCode width (SUB format) Nothing
@@ -3526,13 +3526,12 @@ getAmode e = do
          -- assert (rep == II32)???
          -> x86_offset_amode x lit
 
-      -- Turn (e << n) + lit into lit + (e << n), for a lit that the clause for
-      -- x + lit above does not take (on x86-64: a W64 integer that does not
-      -- fit in 32 bits; on Windows also any label, with or without an offset;
-      -- elsewhere also a label's offset that does not fit in 32 bits), so that
-      -- the clause for x + (y << shift) below takes it, or else that for x + y.
-      CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _), b@(CmmLit _)]
-         -> getAmode (CmmMachOp (MO_Add rep) [b,a])
+      -- (a << n) + lit, lit into a base register: x + lit above takes every
+      -- lit a displacement holds, so here lit is a label on Windows (Note
+      -- [%rip-relative addressing on x86-64]) or an integer or a label's offset
+      -- wider than 32 bits.
+      CmmMachOp (MO_Add _) [a@(CmmMachOp (MO_Shl _) _), b@(CmmLit _)]
+         -> x86_complex_amode b a 0
 
       -- Matches: (x + offset) + (y << shift)
       -- BUG #28105: offset is not checked to fit in 32 bits; where it does not,
@@ -3541,26 +3540,22 @@ getAmode e = do
       -- there the assembler shortens an offset outside 32 bits modulo 2^32, to
       -- the address meant, warning only where its magnitude reaches 2^32. This
       -- costs at most the warning.
-      CmmMachOp (MO_Add _) [CmmRegOff x offset, CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)]]
+      CmmMachOp (MO_Add _) [CmmRegOff x offset, y@(CmmMachOp (MO_Shl _) [_, CmmLit (CmmInt shift _)])]
          | shift == 0 || shift == 1 || shift == 2 || shift == 3
-         -> x86_complex_amode (CmmReg x) y shift (fromIntegral offset)
-
-      CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)]]
-         | shift == 0 || shift == 1 || shift == 2 || shift == 3
-         -> x86_complex_amode x y shift 0
+         -> x86_complex_amode (CmmReg x) y (fromIntegral offset)
 
       -- BUG #28105: && binds tighter than ||, so the guard checks offset only
       -- at shift 3; where offset does not fit in 32 bits, the x86-64 assembler
       -- rejects the module.
-      CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Add _) [CmmMachOp (MO_Shl _)
-                                                    [y, CmmLit (CmmInt shift _)], CmmLit (CmmInt offset _)]]
+      CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Add _) [y@(CmmMachOp (MO_Shl _)
+                                                    [_, CmmLit (CmmInt shift _)]), CmmLit (CmmInt offset _)]]
          | shift == 0 || shift == 1 || shift == 2 || shift == 3
          && is32BitInteger offset
-         -> x86_complex_amode x y shift offset
+         -> x86_complex_amode x y offset
 
       CmmMachOp (MO_Add _) [x,y]
          | not (isLit y) -- we already handle valid literals above.
-         -> x86_complex_amode x y 0 0
+         -> x86_complex_amode x y 0
 
       CmmLit lit@(CmmFloat {})
         -> pprPanic "X86 CodeGen: attempt to use floating-point value as a memory address"
@@ -3618,21 +3613,24 @@ getSimpleAmode addr = is32BitPlatform >>= \case
 
 -- | The mode of x + lit, for a lit that a displacement holds: (b + (i <<
 -- shift)) + lit and (b + i) + lit, the additive normal form of these addresses
--- (Note [Additive normal form] in GHC.Cmm.Opt), else x's register with the
--- displacement lit. x is evaluated once by the bang, the default alternative
--- taking its value.
+-- (Note [Additive normal form] in GHC.Cmm.Opt), (i << shift) + lit with no
+-- base, as an entry of a closure table is addressed, else x's register with
+-- the displacement lit. x is evaluated once by the bang, the default
+-- alternative taking its value.
 x86_offset_amode :: CmmExpr -> CmmLit -> NatM Amode
 x86_offset_amode !x lit = case x of
-  CmmMachOp (MO_Add _) [b, CmmMachOp (MO_Shl _) [i, CmmLit (CmmInt shift _)]]
-    | shift == 0 || shift == 1 || shift == 2 || shift == 3
-    , CmmInt offset _ <- lit
-    , is32BitInteger offset
-    -> x86_complex_amode b i shift offset
   CmmMachOp (MO_Add _) [b, i]
     | not (isLit i)
     , CmmInt offset _ <- lit
     , is32BitInteger offset
-    -> x86_complex_amode b i 0 offset
+    -> x86_complex_amode b i offset
+  CmmMachOp (MO_Shl _) [i, CmmLit (CmmInt shift _)]
+    | shift == 0 || shift == 1 || shift == 2 || shift == 3
+    -> do (i_reg, i_code) <- getSomeReg i
+          return (Amode (AddrBaseIndex EABaseNone
+                           (EAIndex i_reg (fromInteger (2 ^ shift)))
+                           (dispOf lit))
+                        i_code)
   _ -> do
     (x_reg, x_code) <- getSomeReg x
     return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone (dispOf lit))
@@ -3643,18 +3641,24 @@ x86_offset_amode !x lit = case x of
     dispOf (CmmInt i w) = ImmInt (fromInteger (narrowS w i))
     dispOf l            = litToImm l
 
-x86_complex_amode :: CmmExpr -> CmmExpr -> Integer -> Integer -> NatM Amode
-x86_complex_amode base index shift offset
-  = do (x_reg, x_code) <- getNonClobberedReg base
-        -- x must be in a temp, because it has to stay live over y_code
-        -- we could compare x_reg and y_reg and do something better here...
-       (y_reg, y_code) <- getSomeReg index
-       let
-           code = x_code `appOL` y_code
-           base = case shift of 0 -> 1; 1 -> 2; 2 -> 4; 3 -> 8;
-                                n -> panic $ "x86_complex_amode: unhandled shift! (" ++ show n ++ ")"
-       return (Amode (AddrBaseIndex (EABaseReg x_reg) (EAIndex y_reg base) (ImmInt (fromIntegral offset)))
-               code)
+-- | The mode of base + index + offset; an index i << shift, shift from 0 to 3,
+-- is i scaled by 2^shift.
+x86_complex_amode :: CmmExpr -> CmmExpr -> Integer -> NatM Amode
+x86_complex_amode base index offset = case index of
+    CmmMachOp (MO_Shl _) [i, CmmLit (CmmInt shift _)]
+      | shift == 0 -> scaled i 1
+      | shift == 1 -> scaled i 2
+      | shift == 2 -> scaled i 4
+      | shift == 3 -> scaled i 8
+    _ -> scaled index 1
+  where
+    scaled i scale
+      = do (x_reg, x_code) <- getNonClobberedReg base
+            -- x must be in a temp, because it has to stay live over y_code
+            -- we could compare x_reg and y_reg and do something better here...
+           (y_reg, y_code) <- getSomeReg i
+           return (Amode (AddrBaseIndex (EABaseReg x_reg) (EAIndex y_reg scale) (ImmInt (fromIntegral offset)))
+                   (x_code `appOL` y_code))
 
 
 
