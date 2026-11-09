@@ -161,18 +161,15 @@ void getProcessTimes(Time *user, Time *elapsed)
 
 void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
 {
-#if defined(HAVE_GETTIMEOFDAY)
-    struct timeval tv;
-    gettimeofday(&tv, (struct timezone *) NULL);
-    *sec  = tv.tv_sec;
-    *nsec = tv.tv_usec * 1000;
-#else
-    /* Sigh, fall back to second resolution. */
-    time_t t;
-    time(&t);
-    *sec  = t;
-    *nsec = 0;
-#endif
+    struct timespec ts;
+    int res = clock_gettime(CLOCK_REALTIME, &ts);
+    if (RTS_LIKELY(res == 0)) {
+        *sec  = ts.tv_sec;
+        *nsec = ts.tv_nsec;
+    } else {
+        sysErrorBelch("clock_gettime");
+        stg_exit(EXIT_FAILURE);
+    }
 }
 
 W_
