@@ -56,11 +56,11 @@ import GHC.Types.Unique.DSM (UniqDSM)
     on how important they are.
   * After we convert Cmm to Asm we run `optimizeCFG` which
     adds a few more "educated guesses" to the equation.
-  * Then we run loop analysis on the CFG (`loopInfo`) which tells us
+  * Then we run loop analysis on the CFG (`freqEstimate`) which tells us
     about loop headers, loop bodies and the sort.
   * Based on the CFG and loop information refine the edge weights
     in the CFG and normalize them relative to the most often visited
-    node. (See `mkGlobalWeights`)
+    node. (See `staticPredCfg`)
   * On x86-64, copy each small loop head that ends in a conditional branch over
     the jumps to it, adding the copies' edges to the CFG (`copyLoopHeads`,
     Note [Copying loop heads] in GHC.CmmToAsm.X86.CodeGen).

@@ -6588,16 +6588,16 @@ second back edge into the head outranks it, nor where an edge in from another
 block that does not jump to the head outranks every jump. A block that follows a
 failed heap or stack check ('coldBlocks') takes no copy: it seldom runs.
 
-A loop head is a target of a back edge of static prediction's loops (loopInfo
-in GHC.CmmToAsm.CFG), or of 'findBackEdges'' where static prediction does
-not run; a heap check that the garbage collector returns to is one, and several
+A loop head is a target of a back edge of static prediction's loops
+(staticPredCfg in GHC.CmmToAsm.CFG), or of 'findBackEdges'' where it does not
+run; a heap check that the garbage collector returns to is one, and several
 blocks can jump to it. Where static prediction runs, layout's back edges,
 'findBackEdges'', which preferBackEdges raises, can include edges that are none
 of the loops': in an irreducible region, where a loop has two entries,
 the search can reach through the head a block that the head does not dominate,
-whose edge into the head is then a back edge for layout alone. calcFreqs finds
-those edges, and the jumps into a head are ranked taking them for back edges,
-as layout ranks them: ranked without them, the jump kept could be one
+whose edge into the head is then a back edge for layout alone. staticPredCfg
+finds those edges, and the jumps into a head are ranked taking them for back
+edges, as layout ranks them: ranked without them, the jump kept could be one
 that layout does not let fall through, and the block it lets fall through could
 take a copy. A head has at most 'maxCopiedHead' instructions before
 its branches: most heads copied in the benchmarks of containers, vector
