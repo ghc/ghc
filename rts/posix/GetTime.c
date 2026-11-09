@@ -27,10 +27,6 @@
 #warning _POSIX_MONOTONIC_CLOCK not defined, which is likely to be a problem.
 #endif
 
-#if ! (defined(HAVE_GETRUSAGE) || defined(HAVE_TIMES))
-#error No implementation for getProcessCPUTime() available.
-#endif
-
 #if defined(solaris2_HOST_OS)
 #include <sys/time.h>
 #endif
@@ -66,30 +62,7 @@ Time getCurrentThreadCPUTime(void)
 
 Time getProcessCPUTime(void)
 {
-#if !defined(BE_CONSERVATIVE)            &&  \
-       defined(HAVE_CLOCK_GETTIME)       &&  \
-       defined(_SC_CPUTIME)              &&  \
-       defined(CLOCK_PROCESS_CPUTIME_ID) &&  \
-       defined(HAVE_SYSCONF)
-    static int checked_sysconf = 0;
-    static int sysconf_result = 0;
-
-    if (!checked_sysconf) {
-        sysconf_result = sysconf(_SC_CPUTIME);
-        checked_sysconf = 1;
-    }
-    if (sysconf_result != -1) {
-        return getClockTime(CLOCK_PROCESS_CPUTIME_ID);
-    }
-#endif
-
-    // fallback to getrusage
-    {
-        struct rusage t;
-        getrusage(RUSAGE_SELF, &t);
-        return SecondsToTime(t.ru_utime.tv_sec + t.ru_stime.tv_sec)
-                + USToTime(t.ru_utime.tv_usec + t.ru_stime.tv_usec);
-    }
+    return getClockTime(CLOCK_PROCESS_CPUTIME_ID);
 }
 
 StgWord64 getMonotonicNSec(void)
