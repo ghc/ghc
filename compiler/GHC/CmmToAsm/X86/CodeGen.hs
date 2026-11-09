@@ -6468,14 +6468,16 @@ copyLoopHeads cfg backs info blocks@(BasicBlock entry _ : _) placed
     -- followed by the run of blocks that one of its successors starts,
     -- the likelier first, where the run is not the first, starts with no info
     -- table, ends in a block that cannot fall through and holds no block
-    -- the copy follows
+    -- the copy follows; then each copy that wants a run another copy took
+    -- ending in a duplicate of that run, where it is small
     pullRuns :: [NatBasicBlock Instr] -> [NatBasicBlock Instr]
     pullRuns bs
       | not (any jumping bs) = bs
       | mapNull after        = bs
-      | otherwise            = concatMap emit [ r | (s, r) <- rs
-                                                  , not (mapMember s pulled) ]
+      | mapNull dups         = moved
+      | otherwise            = dupRuns moved
       where
+        moved = concatMap emit [ r | (s, r) <- rs, not (mapMember s pulled) ]
         jumping (BasicBlock p ins) = mapMember p copies && isJust (lastJump ins)
         lastJump ins = case lastMaybe ins of
           Just (JXX ALWAYS b) -> Just b
@@ -6567,6 +6569,45 @@ copyLoopHeads cfg backs info blocks@(BasicBlock entry _ : _) placed
           , BasicBlock p ins <- last r
           = init r ++ BasicBlock p (dropFall ins r') : emit r'
         emit r = r
+        -- each run moved after a copy, by its first block, to its
+        -- instructions, where none of its blocks has an info table, all but
+        -- the last hold no code and 'copyableRun' holds of the instructions
+        dups :: LabelMap [Instr]
+        dups = mapMapMaybe dupOf byStart
+        dupOf r
+          | all (\(BasicBlock l _) -> not (mapMember l info)) r
+          , all (\(BasicBlock _ is) -> codeless is) (init r)
+          , let ins = concatMap (\(BasicBlock _ is) -> is) r
+          , copyableRun ins
+          = Just ins
+          | otherwise = Nothing
+        -- the blocks, each copy that still ends in a conditional jump and a
+        -- jump, neither to the block placed next, ending in a duplicate of
+        -- the run that one of the head's successors starts, the likelier
+        -- first, where another copy took the run: the duplicate defines no
+        -- label, so that only the copy falls into it, and the copy's jump to
+        -- the run is dropped, a conditional one inverted to the other
+        -- successor; under -g the duplicate drops the run's leading unwinding
+        -- rules, as a copy drops the head's, and is made only where they are
+        -- the copy's at its end, for each register whose rule both state
+        dupRuns (BasicBlock p ins : more)
+          | Just h <- mapLookup p copies
+          , Just (JXX cc a, JXX ALWAYS b) <- last2 ins
+          , cc /= ALWAYS
+          , not (fallsTo isMetaInstr info (\l -> l == a || l == b) more)
+          , ins' : _ <- [ ins' | t <- likelier h b ins
+                               , Just s <- [mapLookup t leadOf]
+                               , Just d <- [mapLookup s dups]
+                               , unwinds d ins
+                               , Just ins' <- [dupInto ins cc b t
+                                                       (copiedHead d)] ]
+          = BasicBlock p ins' : dupRuns more
+        dupRuns (blk : more) = blk : dupRuns more
+        dupRuns [] = []
+        dupInto ins cc b t d
+          | t == b    = Just (dropTail 1 ins ++ d)
+          | otherwise = (\cc' -> dropTail 2 ins ++ JXX cc' b : d)
+                          <$> maybeInvertCond cc
 
     -- the blocks, each copy that still ends in a conditional jump and a jump,
     -- the first not to the block placed next, jumping conditionally to the
@@ -6632,6 +6673,26 @@ which holds the entry, nor one that starts with an info table or whose last
 block can fall through, nor one after which the copy's own run has already
 moved.
 
+A run moves after one copy only, and several copies can want it, as the loop's
+entry and a back edge both want the loop's exit. A copy left ending in a
+conditional jump and a jump, neither to the block placed next, whose head's
+successor starts a run that another copy took, ends in a duplicate of that run
+instead of its jump to it, the likelier successor tried first, where the run
+is small ('copyableRun'): no block of it has an info table, every block but
+the last holds no code, and the instructions are at most 'maxCopiedHead' and
+a jump that cannot fall through, none of them a call, a jump table or a meta
+instruction but a comment, a location, a delta or, ahead of the first
+instruction, the unwinding information that -g puts there, so that under -g a
+run whose code adjusts Sp is not duplicated. The duplicate drops that
+information, as a copy drops a head's, and is made only where the copy's block
+states at its end the run's rule for each register whose rule both state
+(below). The duplicate takes no label
+of its own: it is the end of the copy's block, so that only the copy falls into
+it, and the run keeps its label and every other jump into it. Where
+the duplicated run is the conditional jump's target, the condition is inverted
+and the jump goes to the other successor. The path through the copy then
+executes no jump to the run, and the code grows by the duplicate.
+
 Where no run moves, the copy still ends in a conditional jump and a jump,
 neither to the block placed next, and the path through the last jump executes
 two jumps. Where the head's branch says nothing of its likely side (cml_likely)
@@ -6672,11 +6733,12 @@ a C call leaves in a block, which names MachSp alone, leaves the block's rule
 for Sp in force. The copy then runs under the rules in force where the block's
 code does. Where the block states no rule for a register, as a fixup block
 of register allocation states none at all, those can differ from the head's
-own: the copy is then unwound, as the block's own code already is, by the rules
-of the code before the block. BUG: the DWARF printer takes an UNWIND that does
-not name Sp to state the rule Sp has at the procedure's entry
-(addDefaultUnwindings in GHC.CmmToAsm.Dwarf), so that after a C call it unwinds
-the rest of a block's code, a copy at its end included, by that rule; this
+own: the copy and a duplicate after it are then unwound, as the block's own code
+already is, by the rules of the code before the block. BUG: the DWARF printer
+takes an UNWIND that does not name Sp to state the rule Sp has at the
+procedure's entry (addDefaultUnwindings in GHC.CmmToAsm.Dwarf), so that after a
+C call it unwinds the rest of a block's code, a copy and a duplicate at its end
+included, by that rule; this
 leads only to wrong unwinding information. Under -g, a head that holds
 unwinding information after an instruction, as one that adjusts Sp does, is not
 copied. copyLoopHeads runs only under the chain layout (-fblock-layout-cfg, on
@@ -6712,9 +6774,32 @@ copyableHead = body (0 :: Int)
     branches (JXX c _ : is) | c /= ALWAYS = branches is
     branches _ = False
 
--- | A loop head's instructions as copyLoopHeads copies them: without the
--- unwinding information ahead of its first instruction, which states the rules
--- the jumping block has at its jump where that block states any, and whose
+-- | Whether copyLoopHeads may duplicate a run of these instructions after a
+-- copy of a loop head: at most 'maxCopiedHead' of them, comments, locations
+-- and deltas aside and the unwinding information ahead of the first, none of
+-- them a jump, a call or another meta instruction, followed by a jump that
+-- cannot fall through and is no jump table's.
+copyableRun :: [Instr] -> Bool
+copyableRun = body (0 :: Int)
+  where
+    body !n (i : is) = case i of
+      COMMENT{}  -> body n is
+      LOCATION{} -> body n is
+      DELTA{}    -> body n is
+      UNWIND{} | n == 0 -> body n is
+      _ | null is -> case i of
+            JXX ALWAYS _     -> True
+            JMP{}            -> True
+            JXX_GBL ALWAYS _ -> True
+            _                -> False
+        | isJumpishInstr i || isMetaInstr i -> False
+        | n < maxCopiedHead -> body (n + 1) is
+        | otherwise -> False
+    body _ [] = False
+
+-- | A loop head's or a run's instructions as copyLoopHeads copies them: without
+-- the unwinding information ahead of its first instruction, which states the
+-- rules the copying block has at its end where that block states any, and whose
 -- label a copy would define a second time.
 copiedHead :: [Instr] -> [Instr]
 copiedHead (UNWIND{} : is)          = copiedHead is
@@ -6722,7 +6807,8 @@ copiedHead (i : is) | isMetaInstr i = i : copiedHead is
 copiedHead is                       = is
 
 -- | The most instructions a loop head that copyLoopHeads copies holds before
--- its branches: Note [Copying loop heads]. Eight, as many as the heads of
+-- its branches, and a run it duplicates before its jump: Note [Copying loop
+-- heads]. Eight, as many as the heads of
 -- (^)'s loops hold, is otherwise arbitrary, and may be raised where a case
 -- needs more at little cost to the compiler: lifted to 1000, it changed the
 -- compile cost and code of programs of 50 to 400 loops, calls, cases or
