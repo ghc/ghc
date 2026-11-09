@@ -21,6 +21,12 @@
 # include <sys/times.h>
 #endif
 
+#if !defined(HAVE_CLOCK_GETTIME)
+#error We reqire clock_gettime. This should have been checked in configure.ac
+#elif !defined(_POSIX_MONOTONIC_CLOCK)
+#warning _POSIX_MONOTONIC_CLOCK not defined, which is likely to be a problem.
+#endif
+
 #if ! (defined(HAVE_GETRUSAGE) || defined(HAVE_TIMES))
 #error No implementation for getProcessCPUTime() available.
 #endif

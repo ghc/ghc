@@ -2906,7 +2906,6 @@
       "TEST_ENV": "x86_64-darwin-validate",
       "TEST_WAYS": "",
       "XZ_OPT": "-9",
-      "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
       "ac_cv_func_utimensat": "no"
     }
@@ -2973,7 +2972,6 @@
       "TEST_ENV": "x86_64-darwin-validate",
       "TEST_WAYS": "",
       "XZ_OPT": "-9",
-      "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
       "ac_cv_func_utimensat": "no"
     }
@@ -8386,7 +8384,6 @@
       "TEST_ENV": "x86_64-darwin-release",
       "TEST_WAYS": "",
       "XZ_OPT": "-9",
-      "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
       "ac_cv_func_utimensat": "no"
     }
@@ -8454,7 +8451,6 @@
       "TEST_ENV": "x86_64-darwin-release",
       "TEST_WAYS": "",
       "XZ_OPT": "-9",
-      "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
       "ac_cv_func_utimensat": "no"
     }
@@ -10570,7 +10566,6 @@
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-darwin-validate",
       "TEST_WAYS": "",
-      "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
       "ac_cv_func_utimensat": "no"
     }
@@ -10636,7 +10631,6 @@
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-darwin-validate",
       "TEST_WAYS": "",
-      "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
       "ac_cv_func_utimensat": "no"
     }
