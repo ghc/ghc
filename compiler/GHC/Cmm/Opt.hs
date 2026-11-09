@@ -617,10 +617,3 @@ we really want to convert to
 
 That's what the constant-folding operations on comparison operators do above.
 -}
-
--- -----------------------------------------------------------------------------
--- Utils
-
-isPicReg :: CmmExpr -> Bool
-isPicReg (CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _))) = True
-isPicReg _ = False
