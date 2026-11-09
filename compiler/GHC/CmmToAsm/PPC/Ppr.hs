@@ -40,6 +40,7 @@ import GHC.Utils.Panic
 
 import Data.Word
 import Data.Int
+import GHC.Float (castDoubleToWord64, castFloatToWord32)
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
@@ -308,14 +309,15 @@ pprDataItem :: IsDoc doc => Platform -> CmmLit -> doc
 pprDataItem platform lit
   = lines_ (ppr_item (cmmTypeFormat $ cmmLitType platform lit) lit)
     where
-        imm = litToImm lit
         archPPC_64 = not $ target32Bit platform
 
-        ppr_item II8  _ = [text "\t.byte\t"  <> pprImm platform imm]
-        ppr_item II16 _ = [text "\t.short\t" <> pprImm platform imm]
-        ppr_item II32 _ = [text "\t.long\t"  <> pprImm platform imm]
-        ppr_item II64 _
-           | archPPC_64 = [text "\t.quad\t"  <> pprImm platform imm]
+        ppr_imm l = pprImm platform (litToImm l)
+
+        ppr_item II8  l = [text "\t.byte\t"  <> ppr_imm l]
+        ppr_item II16 l = [text "\t.short\t" <> ppr_imm l]
+        ppr_item II32 l = [text "\t.long\t"  <> ppr_imm l]
+        ppr_item II64 l
+           | archPPC_64 = [text "\t.quad\t"  <> ppr_imm l]
 
         ppr_item II64 (CmmInt x _)
            | not archPPC_64 =
@@ -325,18 +327,18 @@ pprDataItem platform lit
                  text "\t.long\t"
                     <> int (fromIntegral (fromIntegral x :: Word32))]
 
-        ppr_item FF32 (CmmFloat f _)
+        ppr_item FF32 l@(CmmFloat f _)
           | litFloatingIsNonStandardNaN LitFloat f
-          = let bs = floatToBytes (litFloatingToHostFloat f)
-             in map (\b -> text "\t.byte\t" <> int (fromIntegral b)) bs
+          , let w32 = castFloatToWord32 (litFloatingToHostFloat f)
+          = ppr_item II32 (CmmInt (toInteger w32) W32)
           | otherwise
-          = [text "\t.float\t" <> pprImm platform imm]
-        ppr_item FF64 (CmmFloat f _)
+          = [text "\t.float\t" <> ppr_imm l]
+        ppr_item FF64 l@(CmmFloat f _)
           | litFloatingIsNonStandardNaN LitDouble f
-          = let bs = doubleToBytes (litFloatingToHostDouble f)
-             in map (\b -> text "\t.byte\t" <> int (fromIntegral b)) bs
+          , let w64 = castDoubleToWord64 (litFloatingToHostDouble f)
+          = ppr_item II64 (CmmInt (toInteger w64) W64)
           | otherwise
-          = [text "\t.double\t" <> pprImm platform imm]
+          = [text "\t.double\t" <> ppr_imm l]
 
         ppr_item _ _
                 = panic "PPC.Ppr.pprDataItem: no match"
