@@ -553,6 +553,7 @@ library
                     win32/GetTime.c
                     win32/MIOManager.c
                     win32/OSMem.c
+                    win32/OSStats.c
                     win32/OSThreads.c
                     win32/ThrIOManager.c
                     win32/Ticker.c
@@ -564,6 +565,7 @@ library
         c-sources: wasm/StgRun.c
                    wasm/GetTime.c
                    wasm/OSMem.c
+                   wasm/OSStats.c
                    wasm/OSThreads.c
                    wasm/JSFFI.c
                    wasm/JSFFIGlobals.c
@@ -579,6 +581,7 @@ library
                     posix/GetTime.c
                     posix/Ticker.c
                     posix/OSMem.c
+                    posix/OSStats.c
                     posix/OSThreads.c
                     posix/FdWakeup.c
                     posix/MIO.c

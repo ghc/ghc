@@ -156,11 +156,3 @@ getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
        Note that nanoseconds always fits in a 32bit word */
     *nsec = ((unsigned long)(unixtime.QuadPart % 10000000ull)) * 100ul;
 }
-
-W_
-getPageFaults(void)
-{
-  /* ToDo (on NT): better, get this via the performance data
-     that's stored in the registry. */
-    return 0;
-}

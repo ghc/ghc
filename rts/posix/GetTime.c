@@ -6,9 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-// Not POSIX, due to use of ru_majflt in getPageFaults()
-// #include "rts/PosixSource.h"
-
+#include "rts/PosixSource.h"
 #include "Rts.h"
 #include "GetTime.h"
 
@@ -87,16 +85,4 @@ void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
         sysErrorBelch("clock_gettime");
         stg_exit(EXIT_FAILURE);
     }
-}
-
-W_
-getPageFaults(void)
-{
-#if !defined(HAVE_GETRUSAGE) || defined(haiku_HOST_OS)
-    return 0;
-#else
-    struct rusage t;
-    getrusage(RUSAGE_SELF, &t);
-    return(t.ru_majflt);
-#endif
 }
