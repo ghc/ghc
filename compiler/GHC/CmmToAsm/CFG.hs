@@ -1010,7 +1010,7 @@ forMapST f (LM m0) = go m0
 -- before it allocates from the CFG as instruction selection gives it.
 blockFrequencies :: S.Set LocalReg -> LabelSet -> BlockId -> CFG -> BlockFreqs
 blockFrequencies tags failed root cfg
-  = freqEstimate False noBlockFreqs (\keys _ fs -> BlockFreqs keys fs)
+  = freqEstimate noBlockFreqs (\keys _ fs -> BlockFreqs keys fs)
                  tags failed root cfg
 
 {- Note [Back edges in freqEstimate]
@@ -1056,27 +1056,22 @@ not the entry block.
 -- of an irreducible region and the order in which a block's inflows are summed:
 -- see 'findBackEdges' on -fobject-determinism.
 --
--- Given True first, a block entered by a back edge from a block it does not
--- dominate is skipped: where it heads a loop, it runs once each time the
--- head of a loop holding it, or the procedure, runs, and else never. Static
--- prediction gives True and the allocator False ('blockFrequencies').
---
 -- The estimate inherits static prediction's errors on tag tests: a lookup's
 -- loop down one of Data.Map's trees comes out as rarely repeated (the BUG TODO
 -- at ohPredicts, Note [Static prediction of tag tests]).
 --
--- Given no blocks, or a given block not among them, the result is the second
--- argument; else the third applied to the blocks' uniques in ascending order
+-- Given no blocks, or a given block not among them, the result is the first
+-- argument; else the second applied to the blocks' uniques in ascending order
 -- and the two arrays, for n blocks and m edges: the Int32 array holding at 0
 -- the offsets of each block's edges, at n + 1 their targets as encoded below,
 -- at n + 1 + m the blocks' head flags and at 2 * n + 1 + m the edges' flags,
 -- and the Double array each block's frequency at its index and each edge's
 -- probability at 2 * n plus its.
-freqEstimate :: forall r. Bool -> r
+freqEstimate :: forall r. r
              -> (UArray Int Word64 -> UArray Int Int32 -> UArray Int Double
                  -> r)
              -> S.Set LocalReg -> LabelSet -> BlockId -> CFG -> r
-freqEstimate skip none found tags failed root cfg@(LM cm)
+freqEstimate none found tags failed root cfg@(LM cm)
   | n == 0    = none
   | otherwise = runST $ do
     ks <- newArray (0, n - 1) 0 :: ST s (STUArray s Int Word64)
@@ -1375,21 +1370,8 @@ freqEstimate skip none found tags failed root cfg@(LM cm)
         -- times its multiplier where it heads a loop itself, and the head's
         -- multiplier is 1 / (1 - p), p the probability of returning to it,
         -- capped at limit: the paper uses 1 - epsilon, but this works, and it
-        -- bounds how large the frequencies in a loop can grow. The head flags
-        -- keep 2 for a loop's head and, where the first argument says so, 1 for
-        -- a block entered by a back edge from a block it does not dominate
-        forM_ [0 .. n - 1] $ \i -> do
-          f <- rdI ia (oHd + i)
-          wrI ia (oHd + i) (if hdHead f then 2 else 0)
-        -- TODO: irreducible blocks are not rare in Haskell code. Such a block's
-        -- frequency, and those of the blocks reached only through it, can be
-        -- far below or above what summing its inflow would give, and on x86-64
-        -- under -fcmm-static-pred, not under -finfo-table-map, the layout by
-        -- default ranks their edges by numbers that do not add up. Summing the
-        -- inflow was tried on a development branch, and kept there.
-        when skip $ reached $ \v -> edges v $ \e t _ -> do
-          fl <- rdI ia (oEf + e)
-          when (fl .&. 4 /= 0) $ rdI ia (oHd + t) >>= wrI ia (oHd + t) . (.|. 1)
+        -- bounds how large the frequencies in a loop can grow
+        forM_ [0 .. n - 1] $ \i -> rdI ia (oHd + i) >>= wrI ia (oHd + i) . hdState
         let limit = 1 - 1 / 512
             fwd u f = do
               ru <- rdI ia (oRpo + u)
@@ -1398,11 +1380,9 @@ freqEstimate skip none found tags failed root cfg@(LM cm)
                 when (rt > ru) $ f e t
             addAcc t x = unsafeRead da (oF + t) >>= unsafeWrite da (oF + t) . (+ x)
             inflow v = do
-              hv <- rdI ia (oHd + v)
-              if odd hv then return (if hdHead hv then 1 else 0) else do
-                a <- unsafeRead da (oF + v)
-                x <- unsafeRead da (oMul + v)
-                return (a * x)
+              a <- unsafeRead da (oF + v)
+              x <- unsafeRead da (oMul + v)
+              return (a * x)
             loops !r
               | r < first = return ()
               | otherwise = do
@@ -1485,7 +1465,7 @@ staticPredCfg tags entry cfg@(LM cm) = (cfg', backs', searchBacks')
     -- keeps its worker (CPR): returning freqEstimate's result, it allocated
     -- the triple its caller takes apart at once, at -O0 as well
     (cfg', backs', searchBacks')
-      = freqEstimate True (cfg, [], []) weigh tags (checkFailures cfg) entry cfg
+      = freqEstimate (cfg, [], []) weigh tags (checkFailures cfg) entry cfg
     weigh keys is fs = (LM (snd (WM.mapAccum block 0 cm)), backs, searchBacks)
       where
         n = snd (bounds keys) + 1
@@ -1645,14 +1625,13 @@ entry block's one successor.
 Static prediction estimates block frequencies for the layout only under
 -fcmm-static-pred and only after register allocation, from the CFG as
 shortcutting and optHsPatterns leave it (staticPredCfg, Note [Static Branch
-Prediction]); blockFrequencies makes the same estimate, freqEstimate's, but for
-the skip of irreducible regions (its first argument), for the linear allocator
-before it allocates, under the same flag, from the CFG as instruction selection
-gives it, and linearRA_SCCs orders the SCCs by the estimate. So the code that
-depends on how often a block runs uses stand-ins, at -O0 and elsewhere, each
-marked by a TODO pointing here. TODO: once the estimate is computed in a Cmm
-pass, as Note [Static Branch Prediction] proposes, these could use it instead,
-and they are to be reinvestigated together:
+Prediction]); blockFrequencies makes the same estimate, freqEstimate's, for
+the linear allocator before it allocates, under the same flag, from the CFG
+as instruction selection gives it, and linearRA_SCCs orders the SCCs by the
+estimate. So the code that depends on how often a block runs uses stand-ins, at
+-O0 and elsewhere, each marked by a TODO pointing here. TODO: once the estimate
+is computed in a Cmm pass, as Note [Static Branch Prediction] proposes, these
+could use it instead, and they are to be reinvestigated together:
 
  * coldBlocks misses two shapes. In a procedure needing more stack than
    maxSpillSlots, allocMoreStack splits each entry block into a stack allocation
