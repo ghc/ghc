@@ -15,6 +15,7 @@
 #include "Stats.h"
 #include "Profiling.h"
 #include "GetTime.h"
+#include "OSStats.h"
 #include "sm/Storage.h"
 #include "sm/GCThread.h"
 #include "sm/BlockAlloc.h"
