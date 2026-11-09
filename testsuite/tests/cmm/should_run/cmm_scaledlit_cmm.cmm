@@ -1,0 +1,535 @@
+#include "Cmm.h"
+
+// Each procedure but ta, which returns lbl, loads or stores at (i << s) + lbl,
+// or computes (x << s) + k, with no base; cmm_scaledlit.hs compares it with the
+// same formula computed in Haskell.
+
+section "data" {
+    cmm_scaledlit_tbl: bits64 72623859790382856; bits64 145247719580765712; bits64 217871579371148568; bits64 290495439161531424; bits64 363119298951914280; bits64 435743158742297136; bits64 508367018532679992; bits64 580990878323062848; bits64 653614738113445704; bits64 726238597903828560; bits64 798862457694211416; bits64 871486317484594272; bits64 944110177274977128; bits64 1016734037065359984; bits64 1089357896855742840; bits64 1161981756646125696;
+}
+
+section "data" {
+    cmm_scaledlit_rw: bits64 0; bits64 0; bits64 0; bits64 0; bits64 0; bits64 0; bits64 0; bits64 0; bits64 0; bits64 0; bits64 0; bits64 0; bits64 0; bits64 0; bits64 0; bits64 0;
+}
+
+t64 (W_ i) {
+    return (I64[(i << 3) + cmm_scaledlit_tbl]);
+}
+
+t64p (W_ i) {
+    return (I64[(i << 3) + (cmm_scaledlit_tbl + 8)]);
+}
+
+t64m (W_ i) {
+    return (I64[(i << 3) + (cmm_scaledlit_tbl - 8)]);
+}
+
+t32 (W_ i) {
+    return (%zx64(I32[(i << 2) + cmm_scaledlit_tbl]));
+}
+
+t16 (W_ i) {
+    return (%zx64(I16[(i << 1) + cmm_scaledlit_tbl]));
+}
+
+t8 (W_ i) {
+    return (%zx64(I8[(i << 0) + cmm_scaledlit_tbl]));
+}
+
+t32b (W_ i) {
+    return (%zx64(I32[(i << 3) + (cmm_scaledlit_tbl + 4)]));
+}
+
+ts64 (W_ i, W_ v) {
+    I64[(i << 3) + cmm_scaledlit_rw] = v;
+    return (I64[(i << 3) + cmm_scaledlit_rw]);
+}
+
+ts32 (W_ i, W_ v) {
+    I32[(i << 2) + (cmm_scaledlit_rw + 4)] = %lobits32(v);
+    return (%zx64(I32[(i << 2) + (cmm_scaledlit_rw + 4)]));
+}
+
+tl (W_ i) {
+    return ((i << 3) + cmm_scaledlit_tbl);
+}
+
+ta (W_ i) {
+    return (cmm_scaledlit_tbl);
+}
+
+v64_s0_k0 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 0) + (1::bits64)));
+}
+
+v64_s0_k1 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 0) - (1::bits64)));
+}
+
+v64_s0_k2 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 0) + (4::bits64)));
+}
+
+v64_s0_k3 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 0) - (3::bits64)));
+}
+
+v64_s0_k4 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 0) + (2147483647::bits64)));
+}
+
+v64_s0_k5 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 0) - (2147483648::bits64)));
+}
+
+v64_s0_k6 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 0) + (2147483648::bits64)));
+}
+
+v64_s0_k7 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 0) - (2147483649::bits64)));
+}
+
+v64_s1_k0 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 1) + (1::bits64)));
+}
+
+v64_s1_k1 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 1) - (1::bits64)));
+}
+
+v64_s1_k2 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 1) + (4::bits64)));
+}
+
+v64_s1_k3 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 1) - (3::bits64)));
+}
+
+v64_s1_k4 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 1) + (2147483647::bits64)));
+}
+
+v64_s1_k5 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 1) - (2147483648::bits64)));
+}
+
+v64_s1_k6 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 1) + (2147483648::bits64)));
+}
+
+v64_s1_k7 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 1) - (2147483649::bits64)));
+}
+
+v64_s2_k0 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 2) + (1::bits64)));
+}
+
+v64_s2_k1 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 2) - (1::bits64)));
+}
+
+v64_s2_k2 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 2) + (4::bits64)));
+}
+
+v64_s2_k3 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 2) - (3::bits64)));
+}
+
+v64_s2_k4 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 2) + (2147483647::bits64)));
+}
+
+v64_s2_k5 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 2) - (2147483648::bits64)));
+}
+
+v64_s2_k6 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 2) + (2147483648::bits64)));
+}
+
+v64_s2_k7 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 2) - (2147483649::bits64)));
+}
+
+v64_s3_k0 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 3) + (1::bits64)));
+}
+
+v64_s3_k1 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 3) - (1::bits64)));
+}
+
+v64_s3_k2 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 3) + (4::bits64)));
+}
+
+v64_s3_k3 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 3) - (3::bits64)));
+}
+
+v64_s3_k4 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 3) + (2147483647::bits64)));
+}
+
+v64_s3_k5 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 3) - (2147483648::bits64)));
+}
+
+v64_s3_k6 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 3) + (2147483648::bits64)));
+}
+
+v64_s3_k7 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 3) - (2147483649::bits64)));
+}
+
+v64_s4_k0 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 4) + (1::bits64)));
+}
+
+v64_s4_k1 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 4) - (1::bits64)));
+}
+
+v64_s4_k2 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 4) + (4::bits64)));
+}
+
+v64_s4_k3 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 4) - (3::bits64)));
+}
+
+v64_s4_k4 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 4) + (2147483647::bits64)));
+}
+
+v64_s4_k5 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 4) - (2147483648::bits64)));
+}
+
+v64_s4_k6 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 4) + (2147483648::bits64)));
+}
+
+v64_s4_k7 (W_ xw) {
+    bits64 x; x = %lobits64(xw);
+    return (%zx64((x << 4) - (2147483649::bits64)));
+}
+
+v32_s0_k0 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 0) + (1::bits32)));
+}
+
+v32_s0_k1 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 0) - (1::bits32)));
+}
+
+v32_s0_k2 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 0) + (2147483647::bits32)));
+}
+
+v32_s0_k3 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 0) - (2147483648::bits32)));
+}
+
+v32_s1_k0 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 1) + (1::bits32)));
+}
+
+v32_s1_k1 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 1) - (1::bits32)));
+}
+
+v32_s1_k2 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 1) + (2147483647::bits32)));
+}
+
+v32_s1_k3 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 1) - (2147483648::bits32)));
+}
+
+v32_s2_k0 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 2) + (1::bits32)));
+}
+
+v32_s2_k1 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 2) - (1::bits32)));
+}
+
+v32_s2_k2 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 2) + (2147483647::bits32)));
+}
+
+v32_s2_k3 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 2) - (2147483648::bits32)));
+}
+
+v32_s3_k0 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 3) + (1::bits32)));
+}
+
+v32_s3_k1 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 3) - (1::bits32)));
+}
+
+v32_s3_k2 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 3) + (2147483647::bits32)));
+}
+
+v32_s3_k3 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 3) - (2147483648::bits32)));
+}
+
+v32_s4_k0 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 4) + (1::bits32)));
+}
+
+v32_s4_k1 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 4) - (1::bits32)));
+}
+
+v32_s4_k2 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 4) + (2147483647::bits32)));
+}
+
+v32_s4_k3 (W_ xw) {
+    bits32 x; x = %lobits32(xw);
+    return (%zx64((x << 4) - (2147483648::bits32)));
+}
+
+v16_s0_k0 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 0) + (1::bits16)));
+}
+
+v16_s0_k1 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 0) - (1::bits16)));
+}
+
+v16_s0_k2 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 0) + (32767::bits16)));
+}
+
+v16_s0_k3 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 0) - (32768::bits16)));
+}
+
+v16_s1_k0 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 1) + (1::bits16)));
+}
+
+v16_s1_k1 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 1) - (1::bits16)));
+}
+
+v16_s1_k2 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 1) + (32767::bits16)));
+}
+
+v16_s1_k3 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 1) - (32768::bits16)));
+}
+
+v16_s2_k0 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 2) + (1::bits16)));
+}
+
+v16_s2_k1 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 2) - (1::bits16)));
+}
+
+v16_s2_k2 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 2) + (32767::bits16)));
+}
+
+v16_s2_k3 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 2) - (32768::bits16)));
+}
+
+v16_s3_k0 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 3) + (1::bits16)));
+}
+
+v16_s3_k1 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 3) - (1::bits16)));
+}
+
+v16_s3_k2 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 3) + (32767::bits16)));
+}
+
+v16_s3_k3 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 3) - (32768::bits16)));
+}
+
+v16_s4_k0 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 4) + (1::bits16)));
+}
+
+v16_s4_k1 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 4) - (1::bits16)));
+}
+
+v16_s4_k2 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 4) + (32767::bits16)));
+}
+
+v16_s4_k3 (W_ xw) {
+    bits16 x; x = %lobits16(xw);
+    return (%zx64((x << 4) - (32768::bits16)));
+}
+
+v8_s0_k0 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 0) + (1::bits8)));
+}
+
+v8_s0_k1 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 0) - (1::bits8)));
+}
+
+v8_s0_k2 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 0) + (127::bits8)));
+}
+
+v8_s1_k0 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 1) + (1::bits8)));
+}
+
+v8_s1_k1 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 1) - (1::bits8)));
+}
+
+v8_s1_k2 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 1) + (127::bits8)));
+}
+
+v8_s2_k0 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 2) + (1::bits8)));
+}
+
+v8_s2_k1 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 2) - (1::bits8)));
+}
+
+v8_s2_k2 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 2) + (127::bits8)));
+}
+
+v8_s3_k0 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 3) + (1::bits8)));
+}
+
+v8_s3_k1 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 3) - (1::bits8)));
+}
+
+v8_s3_k2 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 3) + (127::bits8)));
+}
+
+v8_s4_k0 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 4) + (1::bits8)));
+}
+
+v8_s4_k1 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 4) - (1::bits8)));
+}
+
+v8_s4_k2 (W_ xw) {
+    bits8 x; x = %lobits8(xw);
+    return (%zx64((x << 4) + (127::bits8)));
+}
+
