@@ -652,7 +652,7 @@ sequenceChain :: forall a i. Instruction i
               -> [GenBasicBlock i] -- ^ Blocks placed in sequence.
 sequenceChain _info _weights    [] = []
 sequenceChain _info _weights    [x] = [x]
-sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
+sequenceChain  info weights     blocks@((BasicBlock entry _ _):_) =
     let directEdges :: [CfgEdge]
         directEdges = sortBy (flip compare) $ mapMaybe relevantWeight (infoEdgeList weights)
           where
@@ -684,7 +684,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
 
         blockMap :: LabelMap (GenBasicBlock i)
         blockMap
-            = foldl' (\m blk@(BasicBlock lbl _ins) ->
+            = foldl' (\m blk@(BasicBlock lbl _align _ins) ->
                         mapInsert lbl blk m)
                      mapEmpty blocks
 
@@ -767,14 +767,14 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
 dropJumps :: forall a i. Instruction i => LabelMap a -> [GenBasicBlock i]
           -> [GenBasicBlock i]
 dropJumps _    [] = []
-dropJumps info (BasicBlock lbl ins:todo)
+dropJumps info (BasicBlock lbl align ins:todo)
     | Just ins <- nonEmpty ins --This can happen because of shortcutting
-    , BasicBlock nextLbl _ : _ <- todo
+    , BasicBlock nextLbl _ _ : _ <- todo
     , canFallthroughTo (NE.last ins) nextLbl
     , not (mapMember nextLbl info)
-    = BasicBlock lbl (NE.init ins) : dropJumps info todo
+    = BasicBlock lbl align (NE.init ins) : dropJumps info todo
     | otherwise
-    = BasicBlock lbl ins : dropJumps info todo
+    = BasicBlock lbl align ins : dropJumps info todo
 
 
 -- -----------------------------------------------------------------------------
@@ -850,7 +850,7 @@ sccBlocks edgeWeights blocks =
 mkNode :: (Instruction t)
        => Maybe CFG -> GenBasicBlock t
        -> Node BlockId (GenBasicBlock t)
-mkNode edgeWeights block@(BasicBlock id instrs) =
+mkNode edgeWeights block@(BasicBlock id _align instrs) =
     DigraphNode block id outEdges
   where
     outEdges :: [BlockId]
@@ -894,11 +894,11 @@ seqBlocks infos blocks = placeNext pullable0 todo0
 
     place pullable todo (block,[])
                           = block : placeNext pullable todo
-    place pullable todo (block@(BasicBlock id instrs),[next])
+    place pullable todo (block@(BasicBlock id align instrs),[next])
         | mapMember next infos
         = block : placeNext pullable todo
         | Just (nextBlock, pullable') <- lookupDeleteUFM pullable next
-        = BasicBlock id instrs : place pullable' todo nextBlock
+        = BasicBlock id align instrs : place pullable' todo nextBlock
         | otherwise
         = block : placeNext pullable todo
     place _ _ (_,tooManyNextNodes)

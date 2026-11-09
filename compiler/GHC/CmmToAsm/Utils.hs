@@ -26,7 +26,7 @@ entryBlocks (CmmProc info _ _ (ListGraph code)) = entries
         infos = mapKeys info
         entries = case code of
                     [] -> infos
-                    BasicBlock entry _ : _ -- first block is the entry point
+                    BasicBlock entry _ _ : _ -- first block is the entry point
                        | entry `elem` infos -> infos
                        | otherwise          -> entry : infos
 entryBlocks _ = []

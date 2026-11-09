@@ -137,8 +137,9 @@ pprBasicBlock ::
   LabelMap RawCmmStatics ->
   NatBasicBlock Instr ->
   doc
-pprBasicBlock config info_env (BasicBlock blockid instrs) =
-  maybe_infotable
+pprBasicBlock config info_env (BasicBlock blockid malign instrs) =
+  maybe_align
+    $ maybe_infotable
     $ pprLabel platform asmLbl
     $$ vcat (map (pprInstr platform) (id {-detectTrivialDeadlock-} optInstrs))
     $$ ppWhen
@@ -158,6 +159,13 @@ pprBasicBlock config info_env (BasicBlock blockid instrs) =
       where
         f (MOV o1 o2) | o1 == o2 = False
         f _ = True
+
+    -- See Note [Basic block alignment] in GHC.Cmm.
+    -- The directive is emitted ahead of the info table (if any) so that the
+    -- info table stays immediately adjacent to the entry label.
+    maybe_align c = case malign of
+      Nothing    -> c
+      Just align -> pprAlign align $$ c
 
     asmLbl = blockLbl blockid
     platform = ncgPlatform config

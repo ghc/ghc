@@ -245,7 +245,7 @@ cmmDebugLabels is_valid_label isMeta nats = seqList lbls lbls
         lbls = filter is_valid_label $ map blockId $ filter (not . allMeta) $ concatMap getBlocks nats
         getBlocks (CmmProc _ _ _ (ListGraph bs)) = bs
         getBlocks _other                         = []
-        allMeta (BasicBlock _ instrs) = all isMeta instrs
+        allMeta (BasicBlock _ _ instrs) = all isMeta instrs
 
 -- | Sets position and unwind table fields in the debug block tree according to
 -- native generated code.

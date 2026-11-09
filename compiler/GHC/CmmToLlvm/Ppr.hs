@@ -56,7 +56,7 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
            link = if externallyVisibleCLabel lbl
                       then ExternallyVisible
                       else Internal
-           lmblocks = map (\(BasicBlock id stmts) ->
+           lmblocks = map (\(BasicBlock id _align stmts) ->
                                 LlvmBlock (getUnique id) stmts) blks
 
        funDec   <- llvmFunSig live lbl link

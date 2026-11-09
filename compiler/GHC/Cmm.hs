@@ -16,7 +16,7 @@ module GHC.Cmm (
      DWrap(..), unDeterm, removeDeterm, removeDetermDecl, removeDetermGraph,
 
      -- ** Blocks containing lists
-     GenBasicBlock(..), blockId,
+     GenBasicBlock(..), blockId, blockAlignment,
      ListGraph(..), pprBBlock,
 
      -- * Info Tables
@@ -40,6 +40,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Types.Id
 import GHC.Types.CostCentre
+import GHC.Types.Basic (Alignment)
 import GHC.Cmm.CLabel
 import GHC.Cmm.BlockId
 import GHC.Cmm.Node
@@ -419,15 +420,42 @@ removeDetermGraph (CmmGraph x y) =
 -- These are used by the LLVM and NCG backends, when populating Cmm
 -- with lists of instructions.
 
+-- | A basic block: a label, an optional alignment request for the block's
+-- entry point, and the block's instructions.
+--
+-- See Note [Basic block alignment].
 data GenBasicBlock i
-   = BasicBlock BlockId [i]
+   = BasicBlock BlockId (Maybe Alignment) [i]
    deriving (Functor)
 
+{- Note [Basic block alignment]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'GenBasicBlock' carries an optional 'Alignment' describing how the block's
+entry point should be aligned when it is emitted. 'Nothing' means "no
+particular alignment", which is what every block gets today: nothing in the
+NCG computes a non-trivial alignment yet, so the field is threaded through
+unchanged by all passes and the emitted code is unaffected.
+
+The intended use is loop-head alignment on x86, where aligning the target of a
+backedge can measurably help the frontend. Backends that know how to honour
+the request print an alignment directive in their @pprBasicBlock@; the ones
+that do not simply ignore the field.
+
+Passes that rewrite a block must preserve the field: it belongs to the *logical*
+block, not to a particular instruction list. Genuinely new blocks (fixup blocks
+inserted by the register allocator, blocks split off to fit branch ranges, ...)
+get 'Nothing'.
+-}
 
 -- | The branch block id is that of the first block in
 -- the branch, which is that branch's entry point
 blockId :: GenBasicBlock i -> BlockId
-blockId (BasicBlock blk_id _ ) = blk_id
+blockId (BasicBlock blk_id _ _) = blk_id
+
+-- | The alignment requested for this block's entry point, if any.
+-- See Note [Basic block alignment].
+blockAlignment :: GenBasicBlock i -> Maybe Alignment
+blockAlignment (BasicBlock _ align _) = align
 
 newtype ListGraph i
    = ListGraph [GenBasicBlock i]
@@ -447,8 +475,14 @@ instance OutputableP env instr => OutputableP env (GenBasicBlock instr) where
     pdoc env block = ppr (fmap (pdoc env) block)
 
 pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
-pprBBlock (BasicBlock ident stmts) =
-    hang (ppr ident <> colon) 4 (vcat (map ppr stmts))
+pprBBlock (BasicBlock ident malign stmts) =
+    hang (ppr ident <> colon <> pprAlignAnnot) 4 (vcat (map ppr stmts))
+  where
+    -- Only shown when an alignment was actually requested, so dumps of
+    -- unaligned code are unchanged. See Note [Basic block alignment].
+    pprAlignAnnot = case malign of
+      Nothing    -> empty
+      Just align -> space <> text "// align" <+> ppr align
 
 
 -- --------------------------------------------------------------------------

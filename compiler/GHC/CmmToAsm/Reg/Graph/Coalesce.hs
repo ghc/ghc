@@ -80,7 +80,7 @@ slurpJoinMovs platform live
         slurpCmm   rs (CmmProc _ _ _ sccs)
          = foldl' slurpBlock rs (flattenSCCs sccs)
 
-        slurpBlock rs (BasicBlock _ instrs)
+        slurpBlock rs (BasicBlock _ _ instrs)
          = foldl' slurpLI    rs instrs
 
         slurpLI    rs (LiveInstr _      Nothing)    = rs

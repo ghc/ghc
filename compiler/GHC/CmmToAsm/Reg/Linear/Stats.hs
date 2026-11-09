@@ -45,7 +45,7 @@ countRegRegMovesNat
 countRegRegMovesNat platform cmm
         = execState (mapGenBlockTopM countBlock cmm) 0
  where
-        countBlock b@(BasicBlock _ instrs)
+        countBlock b@(BasicBlock _ _ instrs)
          = do   mapM_ countInstr instrs
                 return  b
 

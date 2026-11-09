@@ -130,7 +130,11 @@ pprProcEndLabel platform lbl =
 
 pprBasicBlock :: IsDoc doc => NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr
               -> doc
-pprBasicBlock config info_env (BasicBlock blockid instrs)
+-- The block alignment request is ignored on PPC: this backend has no
+-- byte-granular alignment helper (its @.align@ takes a shift, not a byte
+-- count) and nothing requests block alignment on PPC.
+-- See Note [Basic block alignment] in GHC.Cmm.
+pprBasicBlock config info_env (BasicBlock blockid _malign instrs)
   = maybe_infotable $$
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) instrs) $$

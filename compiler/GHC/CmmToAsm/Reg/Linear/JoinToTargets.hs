@@ -204,7 +204,9 @@ joinToTargets_again
                 --      A the end of the current block we will jump to the fixup one,
                 --      then that will jump to our original destination.
                 fixup_block_id <- mkBlockId <$> getUniqueR
-                let block = BasicBlock fixup_block_id
+                -- A brand new block, so no alignment request.
+                -- See Note [Basic block alignment] in GHC.Cmm.
+                let block = BasicBlock fixup_block_id Nothing
                                 $ fixUpInstrs ++ mkJumpInstr dest
 
                 -- if we didn't need any fixups, then don't include the block

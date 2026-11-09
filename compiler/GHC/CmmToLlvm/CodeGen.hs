@@ -89,14 +89,14 @@ basicBlocksCodeGen live cmmBlocks
        -- and #11649.
        bid <- newBlockId
        (prologue, prologueTops) <- funPrologue live cmmBlocks
-       let entryBlock = BasicBlock bid (fromOL prologue)
+       let entryBlock = BasicBlock bid Nothing (fromOL prologue)
 
        -- allocate one unreachable basic block that can be used as a default
        -- destination in exhaustive switches.
        --
        -- See Note [Unreachable block as default destination in Switch]
        ubid@(UnreachableBlockId ubid') <- UnreachableBlockId <$> newBlockId
-       let ubblock = BasicBlock ubid' [Unreachable]
+       let ubblock = BasicBlock ubid' Nothing [Unreachable]
 
        -- Generate code
        (blocks, topss) <- fmap unzip $ mapM (basicBlockCodeGen ubid) $ toList cmmBlocks
@@ -113,7 +113,7 @@ basicBlockCodeGen ubid block
        (mid_instrs, top) <- stmtsToInstrs ubid $ blockToList nodes
        (tail_instrs, top')  <- stmtToInstrs ubid tail
        let instrs = fromOL (mid_instrs `appOL` tail_instrs)
-       return (BasicBlock id instrs, top' ++ top)
+       return (BasicBlock id Nothing instrs, top' ++ top)
 
 -- -----------------------------------------------------------------------------
 -- * CmmNode code generation

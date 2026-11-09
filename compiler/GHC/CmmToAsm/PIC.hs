@@ -735,7 +735,7 @@ initializePicBase_ppc ArchPPC os picReg
                        [] -> []
                        (b:bs) -> fetchPC b : map maybeFetchPC bs
 
-            maybeFetchPC b@(BasicBlock bID _)
+            maybeFetchPC b@(BasicBlock bID _ _)
               | bID `mapMember` info = fetchPC b
               | otherwise            = b
 
@@ -748,8 +748,8 @@ initializePicBase_ppc ArchPPC os picReg
             -- TODO: below we use it over temporary register,
             -- it can and should be optimised by picking
             -- correct PIC reg.
-            fetchPC (BasicBlock bID insns) =
-              BasicBlock bID (PPC.FETCHPC picReg
+            fetchPC (BasicBlock bID align insns) =
+              BasicBlock bID align (PPC.FETCHPC picReg
                               : PPC.ADDIS picReg picReg (PPC.HA gotOffset)
                               : PPC.ADD picReg picReg
                                         (PPC.RIImm (PPC.LO gotOffset))
@@ -776,8 +776,8 @@ initializePicBase_ppc (ArchPPC_64 ELF_V2) OSLinux picReg
            bID <-getUniqueM
            return (CmmProc info lab live (ListGraph (b':entry:blocks))
                                          : statics)
-        where   BasicBlock entryID _ = entry
-                b' = BasicBlock bID [PPC.FETCHTOC picReg lab,
+        where   BasicBlock entryID _ _ = entry
+                b' = BasicBlock bID Nothing [PPC.FETCHTOC picReg lab,
                                      PPC.BCC PPC.ALWAYS entryID]
 -}
 
@@ -808,19 +808,19 @@ initializePicBase_x86 os picReg
           -- we want to add a FETCHGOT instruction to the beginning of
           -- every block that is an entry point, which corresponds to
           -- the blocks that have entries in the info-table mapping.
-          maybeFetchGOT b@(BasicBlock bID _)
+          maybeFetchGOT b@(BasicBlock bID _ _)
             | bID `mapMember` info = fetchGOT b
             | otherwise            = b
 
-          fetchGOT (BasicBlock bID insns) =
-             BasicBlock bID (X86.FETCHGOT picReg : insns)
+          fetchGOT (BasicBlock bID align insns) =
+             BasicBlock bID align (X86.FETCHGOT picReg : insns)
 
 initializePicBase_x86 OSDarwin picReg
         (CmmProc info lab live (ListGraph (entry:blocks)) : statics)
         = return (CmmProc info lab live (ListGraph (block':blocks)) : statics)
 
-    where BasicBlock bID insns = entry
-          block' = BasicBlock bID (X86.FETCHPC picReg : insns)
+    where BasicBlock bID align insns = entry
+          block' = BasicBlock bID align (X86.FETCHPC picReg : insns)
 
 initializePicBase_x86 _ _ _
         = panic "initializePicBase_x86: not needed"

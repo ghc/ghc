@@ -95,7 +95,7 @@ slurpSpillCostInfo platform cfg cmm
 
         -- Lookup the regs that are live on entry to this block in
         --      the info table from the CmmProc.
-        countBlock info freqMap (BasicBlock blockId instrs)
+        countBlock info freqMap (BasicBlock blockId _ instrs)
                 | LiveInfo _ _ blockLive _ <- info
                 , Just rsLiveEntry  <- mapLookup blockId blockLive
                 , rsLiveEntry_virt  <- takeVirtualRegs $ getRegs rsLiveEntry

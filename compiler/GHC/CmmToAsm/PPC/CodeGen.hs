@@ -103,11 +103,11 @@ cmmTopCodeGen (CmmProc info lab live graph) = do
     where
       fixup_entry (CmmProc info lab live (ListGraph (entry:blocks)) : statics)
         = do
-        let BasicBlock bID insns = entry
+        let BasicBlock bID align insns = entry
         bID' <- if lab == (blockLbl bID)
                 then newBlockId
                 else return bID
-        let b' = BasicBlock bID' insns
+        let b' = BasicBlock bID' align insns
         return (CmmProc info lab live (ListGraph (b':blocks)) : statics)
       fixup_entry _ = panic "cmmTopCodegen: Broken CmmProc"
 
@@ -142,12 +142,12 @@ basicBlockCodeGen block = do
         (top,other_blocks,statics) = foldrOL mkBlocks ([],[],[]) instrs
 
         mkBlocks (NEWBLOCK id) (instrs,blocks,statics)
-          = ([], BasicBlock id instrs : blocks, statics)
+          = ([], BasicBlock id Nothing instrs : blocks, statics)
         mkBlocks (LDATA sec dat) (instrs,blocks,statics)
           = (instrs, blocks, CmmData sec dat:statics)
         mkBlocks instr (instrs,blocks,statics)
           = (instr:instrs, blocks, statics)
-  return (BasicBlock id top : other_blocks, statics)
+  return (BasicBlock id Nothing top : other_blocks, statics)
 
 stmtsToInstrs :: [CmmNode e x] -> NatM InstrBlock
 stmtsToInstrs stmts

@@ -111,7 +111,7 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
         infos   = mapKeys info
         entries = case code of
                     [] -> infos
-                    BasicBlock entry _ : _ -- first block is the entry point
+                    BasicBlock entry _ _ : _ -- first block is the entry point
                         | entry `elem` infos -> infos
                         | otherwise          -> entry : infos
 
@@ -127,13 +127,15 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
         new_blockmap :: LabelMap BlockId
         new_blockmap = mapFromList retargetList
 
-        insert_stack_insns (BasicBlock id insns)
+        -- The alignment request stays with the entry label 'id', which is
+        -- what branches target. See Note [Basic block alignment] in GHC.Cmm.
+        insert_stack_insns (BasicBlock id align insns)
             | Just new_blockid <- mapLookup id new_blockmap
-                = [ BasicBlock id $ alloc ++ [BCC ALWAYS new_blockid Nothing]
-                  , BasicBlock new_blockid block'
+                = [ BasicBlock id align $ alloc ++ [BCC ALWAYS new_blockid Nothing]
+                  , BasicBlock new_blockid Nothing block'
                   ]
             | otherwise
-                = [ BasicBlock id block' ]
+                = [ BasicBlock id align block' ]
             where
               block' = foldr insert_dealloc [] insns
 
@@ -708,10 +710,10 @@ makeFarBranches _platform info_env blocks
     where
         blockAddresses = NE.scanl (+) 0 $ map blockLen blocks
         blockAddressList = toList blockAddresses
-        blockLen (BasicBlock _ instrs) = length instrs
+        blockLen (BasicBlock _ _ instrs) = length instrs
 
-        handleBlock addr (BasicBlock id instrs)
-                = BasicBlock id (zipWith makeFar [addr..] instrs)
+        handleBlock addr (BasicBlock id align instrs)
+                = BasicBlock id align (zipWith makeFar [addr..] instrs)
 
         makeFar _ (BCC ALWAYS tgt _) = BCC ALWAYS tgt Nothing
         makeFar addr (BCC cond tgt p)

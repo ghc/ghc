@@ -21,6 +21,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.InitFini
 
+import GHC.Types.Basic (Alignment, alignmentBytes)
 import GHC.Types.Literal.Floating
 import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Platform
@@ -77,6 +78,11 @@ pprLabel platform lbl =
    $$ pprTypeDecl platform lbl
    $$ line (pprAsmLabel platform lbl <> char ':')
 
+pprAlign :: IsDoc doc => Alignment -> doc
+pprAlign alignment =
+  -- .balign is stable, whereas .align is platform dependent.
+  line $ text "\t.balign " <> int (alignmentBytes alignment)
+
 -- | Print appropriate alignment for the given section type.
 pprAlignForSection :: IsDoc doc => Platform -> SectionType -> doc
 pprAlignForSection _platform _seg
@@ -115,8 +121,9 @@ pprSizeDecl platform lbl
 
 pprBasicBlock :: IsDoc doc => Platform -> {- dwarf enabled -} Bool -> LabelMap RawCmmStatics -> NatBasicBlock Instr
               -> doc
-pprBasicBlock platform with_dwarf info_env (BasicBlock blockid instrs)
-  = maybe_infotable $
+pprBasicBlock platform with_dwarf info_env (BasicBlock blockid malign instrs)
+  = maybe_align $
+    maybe_infotable $
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) (id {-detectTrivialDeadlock-} optInstrs)) $$
     (if  with_dwarf
@@ -128,6 +135,13 @@ pprBasicBlock platform with_dwarf info_env (BasicBlock blockid instrs)
     optInstrs = filter f instrs
       where f (MOV o1 o2) | o1 == o2 = False
             f _ = True
+
+    -- See Note [Basic block alignment] in GHC.Cmm.
+    -- The directive is emitted ahead of the info table (if any) so that the
+    -- info table stays immediately adjacent to the entry label.
+    maybe_align c = case malign of
+      Nothing    -> c
+      Just align -> pprAlign align $$ c
 
     asmLbl = blockLbl blockid
     maybe_infotable c = case mapLookup blockid info_env of

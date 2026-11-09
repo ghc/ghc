@@ -641,12 +641,14 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
       new_blockmap :: LabelMap BlockId
       new_blockmap = mapFromList retargetList
 
-      insert_stack_insn (BasicBlock id insns)
+      -- The alignment request stays with the entry label 'id', which is what
+      -- branches target. See Note [Basic block alignment] in GHC.Cmm.
+      insert_stack_insn (BasicBlock id align insns)
         | Just new_blockid <- mapLookup id new_blockmap
-        = [ BasicBlock id $ alloc ++ [ B (TBlock new_blockid) ]
-          , BasicBlock new_blockid block' ]
+        = [ BasicBlock id align $ alloc ++ [ B (TBlock new_blockid) ]
+          , BasicBlock new_blockid Nothing block' ]
         | otherwise
-        = [ BasicBlock id block' ]
+        = [ BasicBlock id align block' ]
         where
           block' = foldr insert_dealloc [] insns
 

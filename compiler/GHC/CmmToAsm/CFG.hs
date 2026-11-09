@@ -23,7 +23,7 @@ module GHC.CmmToAsm.CFG
     , getCfgNodes, hasNode
 
     -- Loop Information
-    , loopMembers, loopLevels, loopInfo
+    , loopMembers, loopLevels, loopInfo, LoopInfo(..)
 
     --Construction/Misc
     , getCfg, getCfgProc, pprEdgeWeights, sanityCheckCfg

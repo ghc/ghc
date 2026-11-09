@@ -347,7 +347,7 @@ slurpConflicts platform live
         slurpSCC  info rs (CyclicSCC bs)
                 = foldl'  (slurpBlock info) rs bs
 
-        slurpBlock info rs (BasicBlock blockId instrs)
+        slurpBlock info rs (BasicBlock blockId _ instrs)
                 | LiveInfo _ _ blockLive _        <- info
                 , Just rsLiveEntry                <- mapLookup blockId blockLive
                 , (conflicts, moves)              <- slurpLIs rsLiveEntry rs instrs
@@ -440,7 +440,7 @@ slurpReloadCoalesce live
 
         slurpBlock :: Bool -> LiveBasicBlock instr
                    -> State (UniqFM BlockId [UniqFM Slot Reg]) (Bag (Reg, Reg))
-        slurpBlock propagate (BasicBlock blockId instrs)
+        slurpBlock propagate (BasicBlock blockId _ instrs)
          = do   -- grab the slot map for entry to this block
                 slotMap         <- if propagate
                                         then getSlotMap blockId
@@ -560,8 +560,8 @@ stripLiveBlock
         -> LiveBasicBlock instr
         -> NatBasicBlock instr
 
-stripLiveBlock config (BasicBlock i lis)
- =      BasicBlock i instrs'
+stripLiveBlock config (BasicBlock i align lis)
+ =      BasicBlock i align instrs'
 
  where  (instrs', _)
                 = runState (spillNat nilOL lis) 0
@@ -596,8 +596,8 @@ eraseDeltasLive
 eraseDeltasLive cmm
         = mapBlockTop eraseBlock cmm
  where
-        eraseBlock (BasicBlock id lis)
-                = BasicBlock id
+        eraseBlock (BasicBlock id align lis)
+                = BasicBlock id align
                 $ filter (\(LiveInstr i _) -> not $ isJust $ takeDeltaInstr i)
                 $ lis
 
@@ -628,8 +628,8 @@ patchEraseLive platform patchF cmm
         patchSCC (AcyclicSCC b)  = AcyclicSCC (patchBlock b)
         patchSCC (CyclicSCC  bs) = CyclicSCC  (map patchBlock bs)
 
-        patchBlock (BasicBlock id lis)
-                = BasicBlock id $ patchInstrs lis
+        patchBlock (BasicBlock id align lis)
+                = BasicBlock id align $ patchInstrs lis
 
         patchInstrs []          = []
         patchInstrs (li : lis)
@@ -709,8 +709,8 @@ natCmmTopToLive mCfg proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
         first_id        = blockId first
         all_entry_ids   = entryBlocks proc
         sccs            = sccBlocks blocks all_entry_ids mCfg
-        sccsLive        = map (fmap (\(BasicBlock l instrs) ->
-                                       BasicBlock l (map (\i -> LiveInstr (Instr i) Nothing) instrs)))
+        sccsLive        = map (fmap (\(BasicBlock l align instrs) ->
+                                       BasicBlock l align (map (\i -> LiveInstr (Instr i) Nothing) instrs)))
                         $ sccs
 
         entry_ids       = filter (reachable_node) .
@@ -743,7 +743,7 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
   where
         nodes :: [ Node BlockId (NatBasicBlock instr) ]
         nodes = [ DigraphNode block id (getOutEdges instrs)
-                | block@(BasicBlock id instrs) <- blocks ]
+                | block@(BasicBlock id _ instrs) <- blocks ]
 
         g1 = graphFromEdgedVerticesUniq nodes
 
@@ -837,7 +837,7 @@ checkIsReverseDependent sccs'
                  []             -> go blocksSeen' sccs
                  bad : _        -> Just bad
 
-        slurpJumpDestsOfBlock (BasicBlock _ instrs)
+        slurpJumpDestsOfBlock (BasicBlock _ _ instrs)
                 = unionManyUniqSets
                 $ map (mkUniqSet . jumpDestsOfInstr)
                         [ i | LiveInstr i _ <- instrs]
@@ -939,7 +939,7 @@ livenessBlock
         -> LiveBasicBlock instr
         -> (BlockMap Regs, LiveBasicBlock instr)
 
-livenessBlock platform blockmap (BasicBlock block_id instrs)
+livenessBlock platform blockmap (BasicBlock block_id align instrs)
  = let
         (regsLiveOnEntry, instrs1)
             = livenessBack platform noRegs blockmap [] (reverse instrs)
@@ -947,7 +947,7 @@ livenessBlock platform blockmap (BasicBlock block_id instrs)
 
         instrs2         = livenessForward platform regsLiveOnEntry instrs1
 
-        output          = BasicBlock block_id instrs2
+        output          = BasicBlock block_id align instrs2
 
    in   ( blockmap', output)
 

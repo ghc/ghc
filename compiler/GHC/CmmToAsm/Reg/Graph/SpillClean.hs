@@ -126,7 +126,7 @@ cleanBlockForward
         -> LiveBasicBlock instr
         -> CleanM (LiveBasicBlock instr)
 
-cleanBlockForward config (BasicBlock blockId instrs)
+cleanBlockForward config (BasicBlock blockId align instrs)
  = do
         -- See if we have a valid association for the entry to this block.
         jumpValid       <- gets sJumpValid
@@ -135,7 +135,7 @@ cleanBlockForward config (BasicBlock blockId instrs)
                                 Nothing         -> emptyAssoc
 
         instrs_reload   <- cleanForward config blockId assoc [] instrs
-        return  $ BasicBlock blockId instrs_reload
+        return  $ BasicBlock blockId align instrs_reload
 
 
 
@@ -322,9 +322,9 @@ cleanBlockBackward
         -> LiveBasicBlock instr
         -> CleanM (LiveBasicBlock instr)
 
-cleanBlockBackward liveSlotsOnEntry (BasicBlock blockId instrs)
+cleanBlockBackward liveSlotsOnEntry (BasicBlock blockId align instrs)
  = do   instrs_spill    <- cleanBackward liveSlotsOnEntry  emptyUniqSet  [] instrs
-        return  $ BasicBlock blockId instrs_spill
+        return  $ BasicBlock blockId align instrs_spill
 
 
 

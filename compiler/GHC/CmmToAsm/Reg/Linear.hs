@@ -320,7 +320,7 @@ process entry_ids block_live =
       | otherwise
       = go next_round [] accum False
 
-    go (b@(BasicBlock id _) : blocks) next_round accum madeProgress
+    go (b@(BasicBlock id _ _) : blocks) next_round accum madeProgress
       = do
           block_assig <- getBlockAssigR
           if isJust (lookupBlockAssignment id block_assig) || id `elem` entry_ids
@@ -338,14 +338,14 @@ processBlock
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
 
-processBlock block_live (BasicBlock id instrs)
- = do   -- pprTraceM "processBlock" $ text "" $$ ppr (BasicBlock id instrs)
+processBlock block_live (BasicBlock id align instrs)
+ = do   -- pprTraceM "processBlock" $ text "" $$ ppr (BasicBlock id align instrs)
         initBlock id block_live
 
         (instrs', fixups)
                 <- linearRA block_live id instrs
         -- pprTraceM "blockResult" $ ppr (instrs', fixups)
-        return  $ BasicBlock id instrs' : fixups
+        return  $ BasicBlock id align instrs' : fixups
 
 
 -- | Load the freeregs and current reg assignment into the RegM state

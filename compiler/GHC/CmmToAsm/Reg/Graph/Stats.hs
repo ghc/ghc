@@ -321,9 +321,9 @@ countSRM_block
         -> GenBasicBlock (LiveInstr instr)
         -> State (Int, Int, Int) (GenBasicBlock (LiveInstr instr))
 
-countSRM_block platform (BasicBlock i instrs)
+countSRM_block platform (BasicBlock i align instrs)
  = do   instrs' <- mapM (countSRM_instr platform) instrs
-        return  $ BasicBlock i instrs'
+        return  $ BasicBlock i align instrs'
 
 
 countSRM_instr

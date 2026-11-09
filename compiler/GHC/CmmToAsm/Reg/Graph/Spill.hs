@@ -173,9 +173,9 @@ regSpill_block
         -> LiveBasicBlock instr
         -> SpillM (LiveBasicBlock instr)
 
-regSpill_block platform regSlotMap (BasicBlock i instrs)
+regSpill_block platform regSlotMap (BasicBlock i align instrs)
  = do   instrss'        <- mapM (regSpill_instr platform regSlotMap) instrs
-        return  $ BasicBlock i (concat instrss')
+        return  $ BasicBlock i align (concat instrss')
 
 
 -- | Spill some registers to stack slots in a single instruction.

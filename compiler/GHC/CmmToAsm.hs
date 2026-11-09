@@ -731,7 +731,7 @@ computeUnwinding _ ncgImpl (CmmProc _ _ _ (ListGraph blks)) =
     -- information at the beginning of every block means that there is no need
     -- to perform this sort of push-down.
     mapFromList [ (blk_lbl, extractUnwindPoints ncgImpl instrs)
-                | BasicBlock blk_lbl instrs <- blks ]
+                | BasicBlock blk_lbl _ instrs <- blks ]
 
 -- | Build a doc for all the imports.
 --
@@ -797,7 +797,7 @@ generateJumpTables
 generateJumpTables ncgImpl xs = concatMap f xs
     where f p@(CmmProc _ _ _ (ListGraph xs)) = p : concatMap g xs
           f p = [p]
-          g (BasicBlock _ xs) = mapMaybe (generateJumpTableForInstr ncgImpl) xs
+          g (BasicBlock _ _ xs) = mapMaybe (generateJumpTableForInstr ncgImpl) xs
 
 -- -----------------------------------------------------------------------------
 -- Shortcut branches
@@ -855,13 +855,13 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     shortcut_blocks :: [(BlockId, jumpDest)]
     (_, shortcut_blocks, others) =
         foldl' split (setEmpty :: LabelSet, [], []) blocks
-    split (s, shortcut_blocks, others) b@(BasicBlock id [insn])
+    split (s, shortcut_blocks, others) b@(BasicBlock id _ [insn])
         | Just jd <- canShortcut ncgImpl insn
         , Just dest <- getJumpDestBlockId ncgImpl jd
         , not (has_info id)
         , (setMember dest s) || dest == id -- loop checks
         = (s, shortcut_blocks, b : others)
-    split (s, shortcut_blocks, others) (BasicBlock id [insn])
+    split (s, shortcut_blocks, others) (BasicBlock id _ [insn])
         | Just dest <- canShortcut ncgImpl insn
         , not (has_info id)
         = (setInsert id s, (id,dest) : shortcut_blocks, others)
@@ -882,7 +882,7 @@ apply_mapping ncgImpl ufm (CmmData sec statics)
 apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
   = CmmProc info lbl live (ListGraph $ map short_bb blocks)
   where
-    short_bb (BasicBlock id insns) = BasicBlock id $! map short_insn insns
+    short_bb (BasicBlock id align insns) = BasicBlock id align $! map short_insn insns
     short_insn i = shortcutJump ncgImpl (\bid -> mapLookup bid ufm) i
                  -- shortcutJump should apply the mapping repeatedly,
                  -- just in case we can short multiple branches.

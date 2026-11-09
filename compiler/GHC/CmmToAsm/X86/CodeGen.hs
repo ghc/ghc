@@ -203,12 +203,12 @@ basicBlockCodeGen block = do
         (top,other_blocks,statics) = foldrOL mkBlocks ([],[],[]) instrs'
 
         mkBlocks (NEWBLOCK id) (instrs,blocks,statics)
-          = ([], BasicBlock id instrs : blocks, statics)
+          = ([], BasicBlock id Nothing instrs : blocks, statics)
         mkBlocks (LDATA sec dat) (instrs,blocks,statics)
           = (instrs, blocks, CmmData sec dat:statics)
         mkBlocks instr (instrs,blocks,statics)
           = (instr:instrs, blocks, statics)
-  return (BasicBlock id top : other_blocks, statics)
+  return (BasicBlock id Nothing top : other_blocks, statics)
 
 -- | Convert 'DELTA' instructions into 'UNWIND' instructions to capture changes
 -- in the @sp@ register. See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock"
@@ -6210,7 +6210,7 @@ invertCondBranches (Just cfg) keep bs =
     invert bs
   where
     invert :: [NatBasicBlock Instr] -> [NatBasicBlock Instr]
-    invert (BasicBlock lbl1 ins:b2@(BasicBlock lbl2 _):bs)
+    invert (BasicBlock lbl1 align1 ins:b2@(BasicBlock lbl2 _ _):bs)
       | --pprTrace "Block" (ppr lbl1) True,
         Just (jmp1,jmp2) <- last2 ins
       , JXX cond1 target1 <- jmp1
@@ -6246,7 +6246,7 @@ invertCondBranches (Just cfg) keep bs =
                   | otherwise
                     -> [jmp1, jmp2]
         in --pprTrace "Cutable" (ppr [jmp1,jmp2] <+> text "=>" <+> ppr jumps) $
-           (BasicBlock lbl1
+           (BasicBlock lbl1 align1
             (dropTail 2 ins ++ jumps))
             : invert (b2:bs)
     invert (b:bs) = b : invert bs

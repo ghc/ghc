@@ -123,7 +123,7 @@ basicBlockCodeGen block = do
       -- stream into basic blocks again. Also, we extract LDATAs here too.
       (top, other_blocks, statics) = foldrOL mkBlocks ([], [], []) instrs
 
-  return (BasicBlock id top : other_blocks, statics)
+  return (BasicBlock id Nothing top : other_blocks, statics)
   where
     genLocInstrs :: NatM (OrdList Instr)
     genLocInstrs = do
@@ -141,7 +141,7 @@ mkBlocks ::
   ([Instr], [GenBasicBlock Instr], [GenCmmDecl RawCmmStatics h g]) ->
   ([Instr], [GenBasicBlock Instr], [GenCmmDecl RawCmmStatics h g])
 mkBlocks (NEWBLOCK id) (instrs, blocks, statics) =
-  ([], BasicBlock id instrs : blocks, statics)
+  ([], BasicBlock id Nothing instrs : blocks, statics)
 mkBlocks (LDATA sec dat) (instrs, blocks, statics) =
   (instrs, blocks, CmmData sec dat : statics)
 mkBlocks instr (instrs, blocks, statics) =
@@ -2238,7 +2238,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
 
     -- Replace out of range conditional jumps with unconditional jumps.
     replace_blk :: LabelMap Int -> Int -> GenBasicBlock Instr -> UniqDSM (Int, [GenBasicBlock Instr])
-    replace_blk !m !pos (BasicBlock lbl instrs) = do
+    replace_blk !m !pos (BasicBlock lbl align instrs) = do
       -- Account for a potential info table before the label.
       let !block_pos = pos + infoTblSize_maybe lbl
       (!pos', instrs') <- mapAccumLM (replace_jump m) block_pos instrs
@@ -2248,7 +2248,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       -- There should be no data in the instruction stream at this point
       massert (null no_data)
 
-      let final_blocks = BasicBlock lbl top : split_blocks
+      let final_blocks = BasicBlock lbl align top : split_blocks
       pure (pos', final_blocks)
 
     replace_jump :: LabelMap Int -> Int -> Instr -> UniqDSM (Int, [Instr])
@@ -2290,7 +2290,7 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
           else NotInRange dest_lbl
 
     calc_lbl_positions :: (Int, LabelMap Int) -> GenBasicBlock Instr -> (Int, LabelMap Int)
-    calc_lbl_positions (pos, m) (BasicBlock lbl instrs) =
+    calc_lbl_positions (pos, m) (BasicBlock lbl _ instrs) =
       let !pos' = pos + infoTblSize_maybe lbl
        in foldl' instr_pos (pos', mapInsert lbl pos' m) instrs
 
