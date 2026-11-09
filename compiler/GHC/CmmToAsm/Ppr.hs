@@ -15,6 +15,8 @@ module GHC.CmmToAsm.Ppr (
         pprASCII,
         pprString,
         pprFileEmbed,
+        cmmStaticsByteSize,
+        pprInfoTableBlockAlign,
         pprCOFFComdatKey,
         pprSectionHeader
 )
@@ -28,6 +30,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.InitFini
 import GHC.Cmm
 import GHC.CmmToAsm.Config
+import GHC.Types.Basic ( Alignment, alignmentBytes )
 import GHC.Utils.Outputable as SDoc
 import GHC.Utils.Panic
 import GHC.Platform
@@ -137,6 +140,42 @@ pprFileEmbed path
      <> text "\n\t.byte 0"
 {-# SPECIALIZE pprFileEmbed :: FilePath -> SDoc #-}
 {-# SPECIALIZE pprFileEmbed :: FilePath -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+
+-- | The number of bytes the NCG data printers ('pprString', 'pprFileEmbed'
+-- and the backends' @pprData@/@pprDataItem@) emit for the given statics.
+--
+-- This assumes that the printer inserts no alignment padding between the
+-- items, which holds for the x86, LA64 and RV64 printers. The AArch64 printer
+-- aligns floating-point and vector literals; its callers must account for
+-- that themselves.
+cmmStaticsByteSize :: Platform -> [CmmStatic] -> Int
+cmmStaticsByteSize platform = sum . map size
+  where
+    size (CmmStaticLit lit)   = widthInBytes (typeWidth (cmmLitType platform lit))
+    size (CmmUninitialised n) = n
+    size (CmmString bs)       = BS.length bs + 1 -- '.string' appends a NUL
+    size (CmmFileEmbed _ n)   = n + 1            -- pprFileEmbed appends '.byte 0'
+
+-- | Alignment directives for a block that carries an info table and requests
+-- the given alignment: they make the block's code label, which directly
+-- follows the info table, land on an alignment boundary. Emitted in front of
+-- the info table statics. See Note [Basic block alignment] in "GHC.Cmm".
+--
+-- We align to the boundary and then skip just enough bytes that the table
+-- ends on the next boundary. The skipped bytes are never executed nor read:
+-- a block with an info table is never entered by fallthrough and its table is
+-- read at negative offsets from the code label.
+pprInfoTableBlockAlign :: IsDoc doc => Platform -> Alignment -> [CmmStatic] -> doc
+pprInfoTableBlockAlign platform align info =
+  line (text "\t.p2align " <> int (countTrailingZeros bytes)) $$
+  -- The padding must be a constant: assemblers differ in whether they
+  -- accept '.'-relative expressions as '.skip' arguments.
+  ppUnless (pad == 0) (line (text "\t.skip " <> int pad))
+  where
+    bytes = alignmentBytes align
+    -- The outer 'mod' makes a table whose size is already a multiple of the
+    -- alignment get no padding, rather than a full 'bytes' of it.
+    pad = (bytes - cmmStaticsByteSize platform info `mod` bytes) `mod` bytes
 
 {-
 Note [Embedding large binary blobs]

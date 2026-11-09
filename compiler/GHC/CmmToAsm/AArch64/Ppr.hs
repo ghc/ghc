@@ -122,8 +122,7 @@ pprSizeDecl platform lbl
 pprBasicBlock :: IsDoc doc => Platform -> {- dwarf enabled -} Bool -> LabelMap RawCmmStatics -> NatBasicBlock Instr
               -> doc
 pprBasicBlock platform with_dwarf info_env (BasicBlock blockid malign instrs)
-  = maybe_align $
-    maybe_infotable $
+  = maybe_infotable $
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) (id {-detectTrivialDeadlock-} optInstrs)) $$
     (if  with_dwarf
@@ -137,17 +136,31 @@ pprBasicBlock platform with_dwarf info_env (BasicBlock blockid malign instrs)
             f _ = True
 
     -- See Note [Basic block alignment] in GHC.Cmm.
-    -- The directive is emitted ahead of the info table (if any) so that the
-    -- info table stays immediately adjacent to the entry label.
+    -- Without an info table we simply align the block label.
     maybe_align c = case malign of
       Nothing    -> c
       Just align -> pprAlign align $$ c
+    -- With an info table the padding goes in front of the table, sized so
+    -- that the code label after the table lands on the boundary.
+    maybe_align_info info = case malign of
+      Nothing    -> empty
+      Just align
+        -- pprDataItem aligns floating-point and vector literals, which
+        -- cmmStaticsByteSize does not model. Info tables never contain
+        -- such literals; should one ever do, leave the block unaligned
+        -- rather than misplace its label.
+        | any implicitlyAligned info -> empty
+        | otherwise -> pprInfoTableBlockAlign platform align info
+    implicitlyAligned (CmmStaticLit lit) =
+      let ty = cmmLitType platform lit in isFloatType ty || isVecType ty
+    implicitlyAligned _ = False
 
     asmLbl = blockLbl blockid
     maybe_infotable c = case mapLookup blockid info_env of
-       Nothing   -> c
+       Nothing   -> maybe_align c
        Just (CmmStaticsRaw info_lbl info) ->
           --  pprAlignForSection platform Text $$
+           maybe_align_info info $$
            infoTableLoc $$
            vcat (map (pprData platform) info) $$
            pprLabel platform info_lbl $$

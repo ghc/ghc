@@ -432,14 +432,40 @@ data GenBasicBlock i
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 'GenBasicBlock' carries an optional 'Alignment' describing how the block's
 entry point should be aligned when it is emitted. 'Nothing' means "no
-particular alignment", which is what every block gets today: nothing in the
-NCG computes a non-trivial alignment yet, so the field is threaded through
-unchanged by all passes and the emitted code is unaffected.
+particular alignment", which is what every block gets unless loop alignment
+(-falign-loops) is enabled; see Note [Aligning loop headers] in
+GHC.CmmToAsm.BlockLayout.
 
 The intended use is loop-head alignment on x86, where aligning the target of a
 backedge can measurably help the frontend. Backends that know how to honour
 the request print an alignment directive in their @pprBasicBlock@; the ones
 that do not simply ignore the field.
+
+What gets aligned is the block's *code* label. For a block without an info
+table the printer just emits an alignment directive in front of the label.
+A block with an info table is laid out as
+
+    <info table statics>
+  info_lbl:
+  block_lbl:
+    <code>
+
+and nothing may be inserted between the table and the label: the table is
+found at a negative offset from the label. So the padding goes in front of
+the table instead (GHC.CmmToAsm.Ppr.pprInfoTableBlockAlign):
+
+    .p2align k        -- 2^k = alignment
+    .skip pad         -- pad = (2^k - tableSize `mod` 2^k) `mod` 2^k
+    <info table statics>
+  info_lbl:
+  block_lbl:          -- lands on a 2^k boundary
+
+where tableSize is the number of bytes the printer emits for the table
+statics (GHC.CmmToAsm.Ppr.cmmStaticsByteSize). The skipped bytes are dead:
+they are never read (the table is accessed relative to the label) and never
+executed (a block with an info table is never entered by fallthrough). The
+pad must be a constant computed by us; assemblers disagree on whether
+'.'-relative expressions are allowed as '.skip' arguments.
 
 Passes that rewrite a block must preserve the field: it belongs to the *logical*
 block, not to a particular instruction list. Genuinely new blocks (fixup blocks

@@ -845,17 +845,19 @@ whose fallthrough predecessor is inside the loop and would execute the
 pad every iteration, stay unaligned. Without a CFG the flag pads every
 fallthrough-entered candidate.
 
-We also skip:
+We never align the entry block (it has no layout predecessor): it is
+placed by the proc's own alignment, controlled by -fproc-alignment.
 
-* the entry block: its label follows the proc's info table, and padding
-  between an info table and its code is not allowed (the entry point is
-  covered by -fproc-alignment instead), and
-
-* blocks with an info table: the alignment directive would have to be
-  emitted ahead of the info table (see Note [Basic block alignment] in
-  GHC.Cmm), aligning the table start rather than the code. This can
-  still be worthwhile but needs the table size taken into account, which
-  we don't do yet.
+Blocks with an info table (typically return continuations of calls in the
+loop body) are aligned like any other block. The pretty printer then puts
+the padding in front of the info table, sized so that the code label right
+after the table lands on the boundary; see Note [Basic block alignment] in
+GHC.Cmm. The no-executed-padding restriction above never rejects them: no
+block falls through into a block with an info table (dropJumps and
+invertCondBranches keep the jump), so the layout predecessor always ends in
+an unconditional transfer. Such a block still needs a local backward jump
+to it to become a candidate; a loop closed only by a call returning to the
+block is not detected.
 
 By default (-falign-loops-mode=all) every loop-confirmed target is
 aligned — inner and outer loop tops alike. With -falign-loops-mode=inner
@@ -888,9 +890,9 @@ per-iteration backward branch still lands on the aligned label.
 -- innermost) natural loop.
 annotateLoopAligns :: Instruction instr => Alignment -> LoopAlignMode
                    -> Bool -- ^ pad fallthrough-entered loop tops too
-                   -> Maybe CFG -> LabelMap a
+                   -> Maybe CFG
                    -> [GenBasicBlock instr] -> [GenBasicBlock instr]
-annotateLoopAligns algn mode pad_fallthrough mb_cfg info blocks =
+annotateLoopAligns algn mode pad_fallthrough mb_cfg blocks =
     zipWith annotate (Nothing : map Just blocks) blocks
   where
     positions :: LabelMap Int
@@ -933,7 +935,6 @@ annotateLoopAligns algn mode pad_fallthrough mb_cfg info blocks =
       | Nothing <- mb_align                                 -- keep existing annotations
       , Just (BasicBlock pred_lbl _ pred_instrs) <- mb_pred -- proc entry is never aligned
       , Just srcs <- mapLookup lbl backSources
-      , not (mapMember lbl info)
       , wantAlign lbl srcs pred_lbl pred_instrs
       = BasicBlock lbl (Just algn) instrs
       | otherwise
@@ -1016,7 +1017,7 @@ sequenceTop ncgImpl edgeWeights (CmmProc info lbl live (ListGraph blocks)) = do
             -> annotateLoopAligns (mkAlignment align)
                                   (ncgLoopAlignmentMode config)
                                   (ncgLoopAlignPadFallthrough config)
-                                  edgeWeights info seq_blocks
+                                  edgeWeights seq_blocks
           _ -> seq_blocks
 
     far_blocks <- (ncgMakeFarBranches ncgImpl) platform info align_blocks

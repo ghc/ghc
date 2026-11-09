@@ -164,8 +164,7 @@ pprSizeDecl platform lbl
 
 pprBasicBlock :: IsDoc doc => NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> doc
 pprBasicBlock config info_env (BasicBlock blockid malign instrs)
-  = maybe_align $
-    maybe_infotable $
+  = maybe_infotable $
     pprLabel platform block_label $$
     vcat (map (pprInstr platform) instrs) $$
     ppWhen (ncgDwarfEnabled config) (
@@ -176,18 +175,23 @@ pprBasicBlock config info_env (BasicBlock blockid malign instrs)
     )
   where
     -- See Note [Basic block alignment] in GHC.Cmm.
-    -- The directive is emitted ahead of the info table (if any) so that the
-    -- info table stays immediately adjacent to the entry label.
+    -- Without an info table we simply align the block label.
     maybe_align c = case malign of
       Nothing    -> c
       Just align -> pprAlign platform align $$ c
+    -- With an info table the padding goes in front of the table, sized so
+    -- that the code label after the table lands on the boundary.
+    maybe_align_info info = case malign of
+      Nothing    -> empty
+      Just align -> pprInfoTableBlockAlign platform align info
 
     block_label = blockLbl blockid
     platform = ncgPlatform config
     maybe_infotable c = case mapLookup blockid info_env of
-       Nothing -> c
+       Nothing -> maybe_align c
        Just (CmmStaticsRaw infoLbl info) ->
            pprAlignForSection platform Text $$
+           maybe_align_info info $$
            infoTableLoc $$
            vcat (map (pprData config) info) $$
            pprLabel platform infoLbl $$
