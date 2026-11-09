@@ -34,8 +34,6 @@
 #include <errno.h>
 #include <string.h>
 
-#include "Clock.h"
-
 #if defined(IOMGR_ENABLED_SELECT)
 
 // The target time for a threadDelay is stored in a one-word quantity

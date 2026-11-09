@@ -64,8 +64,10 @@
 #include "RtsUtils.h"
 #include "Proftimer.h"
 #include "Schedule.h"
-#include "posix/Clock.h"
 #include "posix/FdWakeup.h"
+
+#include <unistd.h>
+#include <time.h>
 
 #if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
 /* We prefer the ppoll() function if available since it allows sanely waiting
@@ -85,11 +87,6 @@
 #include <sys/select.h>
 #endif
 
-#include <time.h>
-#if HAVE_SYS_TIME_H
-# include <sys/time.h>
-#endif
-
 #if defined(HAVE_SIGNAL_H)
 # include <signal.h>
 #endif
@@ -100,7 +97,6 @@
 #if defined(HAVE_PTHREAD_NP_H)
 #include <pthread_np.h>
 #endif
-#include <unistd.h>
 #include <fcntl.h>
 
 
