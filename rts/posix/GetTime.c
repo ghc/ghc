@@ -11,24 +11,19 @@
 
 #include "Rts.h"
 #include "GetTime.h"
-#include "Clock.h"
 
-#if defined(HAVE_SYS_RESOURCE_H)
-# include <sys/resource.h>
+#include <unistd.h>
+#include <time.h>
+
+#if defined(solaris2_HOST_OS)
+#include <sys/time.h>
 #endif
 
-#if defined(HAVE_SYS_TIMES_H)
-# include <sys/times.h>
-#endif
 
 #if !defined(HAVE_CLOCK_GETTIME)
 #error We reqire clock_gettime. This should have been checked in configure.ac
 #elif !defined(_POSIX_MONOTONIC_CLOCK)
 #warning _POSIX_MONOTONIC_CLOCK not defined, which is likely to be a problem.
-#endif
-
-#if defined(solaris2_HOST_OS)
-#include <sys/time.h>
 #endif
 
 void initializeTimer(void)
