@@ -297,13 +297,7 @@ generateJumpTableForInstr _ _ = Nothing
 
 stmtsToInstrs :: [CmmNode O O] -- ^ Cmm Statements
               -> NatM InstrBlock -- ^ Resulting instructions
-stmtsToInstrs stmts =
-    go stmts nilOL
-  where
-    go []        instrs = return instrs
-    go (s:stmts) instrs = do
-      instrs' <- stmtToInstrs s
-      go stmts (instrs `appOL` instrs')
+stmtsToInstrs stmts = concatOL <$> mapM stmtToInstrs stmts
 
 stmtToInstrs :: CmmNode e x -- ^ Cmm Statement
              -> NatM InstrBlock -- ^ Resulting Instructions

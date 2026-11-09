@@ -153,4 +153,6 @@ test('T20298c', normal, compile, ['-O2 -dno-builtin-rules -ddump-simpl -dno-type
 
 test('T27368', normal, compile, ['-O'])
 test('T27979', [req_cmm, check_errmsg('stg_ap_0_fast')], compile, ['-O -ddump-cmm -dno-typeable-binds -dsuppress-uniques'])
+test('T27694', normal, compile, ['-dasm-lint'])
 test('T27694c', normal, compile, ['-O -dasm-lint'])
+test('T27694d', normal, compile, ['-O2 -dasm-lint'])
