@@ -1,0 +1,2 @@
+	leaq 2222(%rax),%rbx
+	leaq 1111(%rax),%rbx

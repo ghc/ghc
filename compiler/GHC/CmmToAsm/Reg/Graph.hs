@@ -30,7 +30,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSM
 import GHC.Utils.Misc (seqList, HasDebugCallStack)
-import GHC.CmmToAsm.CFG
 
 import Data.Maybe
 import Control.Monad
@@ -53,13 +52,12 @@ regAlloc
         -> UniqSet Int                  -- ^ set of available spill slots.
         -> Int                          -- ^ current number of spill slots
         -> [LiveCmmDecl statics instr]  -- ^ code annotated with liveness information.
-        -> Maybe CFG                    -- ^ CFG of basic blocks if available
         -> UniqDSM ( [NatCmmDecl statics instr]
                    , Maybe Int, [RegAllocStats statics instr] )
            -- ^ code with registers allocated, additional stacks required
            -- and stats for each stage of allocation
 
-regAlloc config regsFree slotsFree slotsCount code cfg
+regAlloc config regsFree slotsFree slotsCount code
  = do
         let platform = ncgPlatform config
             triv = trivColorable platform
@@ -69,7 +67,7 @@ regAlloc config regsFree slotsFree slotsCount code cfg
         (code_final, debug_codeGraphs, slotsCount', _)
                 <- regAlloc_spin config 0
                         triv
-                        regsFree slotsFree slotsCount [] code cfg
+                        regsFree slotsFree slotsCount [] code
 
         -- BUG: the preallocated slots are reserved a second time. slotsCount',
         -- returned here as the stack needed, is the highest slot number,
@@ -112,13 +110,12 @@ regAlloc_spin
         -> Int                           -- ^ Number of spill slots in use
         -> [RegAllocStats statics instr] -- ^ Current regalloc stats to add to.
         -> [LiveCmmDecl statics instr]   -- ^ Liveness annotated code to allocate.
-        -> Maybe CFG
         -> UniqDSM ( [NatCmmDecl statics instr]
                   , [RegAllocStats statics instr]
                   , Int                  -- Slots in use
                   , Color.Graph VirtualReg RegClass RealReg)
 
-regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGraphs code_in cfg
+regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGraphs code_in
  = do
         let platform = ncgPlatform config
             -- when registers are born, which slurpConflicts, slurpSpillCostInfo
@@ -161,7 +158,7 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
         -- This is a lazy binding, so the map will only be computed if we
         -- actually have to spill to the stack.
         let spillCosts  = foldl' plusSpillCostInfo zeroSpillCostInfo
-                        $ map (slurpSpillCostInfo platform cfg) code
+                        $ map (slurpSpillCostInfo platform) code
 
         -- The function to choose regs to leave uncolored.
         let spill       = chooseSpill spillCosts
@@ -306,7 +303,7 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                 seqList statList (return ())
 
                 regAlloc_spin config (spinCount + 1) triv regsFree slotsFree'
-                              slotsCount' statList code_relive cfg
+                              slotsCount' statList code_relive
 
 
 -- | Build a graph from the liveness and coalesce information in this code.

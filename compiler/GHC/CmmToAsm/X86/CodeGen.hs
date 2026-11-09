@@ -6334,7 +6334,8 @@ invertCondBranches (Just cfg) keep bs =
                 else likely == Just False && isJust (maybeInvertComparison op)
       , Just edgeInfo2 <- getEdgeInfo lbl1 target2 cfg
       -- Both jumps come from the same cmm statement
-      , transitionSource edgeInfo1 == transitionSource edgeInfo2
+      , CmmSource {trans_cmmNode = cmmCondBranch2} <- transitionSource edgeInfo2
+      , cmmCondBranch == cmmCondBranch2
       , Just invCond <- maybeInvertCond cond1
 
       --Swap the last two jumps, invert the conditional jumps condition.
@@ -6648,9 +6649,9 @@ that the edge weighs less without being less likely. The evaluated side of
 an evaluatedness test is such an edge where it goes straight to the
 continuation that the evaluation returns to.
 
-A loop head is a target of a back edge of static prediction's loops (loopInfo
-in GHC.CmmToAsm.CFG), or of 'findBackEdges'' where static prediction does
-not run; a heap check that the garbage collector returns to is one, and several
+A loop head is a target of a back edge of static prediction's loops
+(staticPredCfg in GHC.CmmToAsm.CFG), or of 'findBackEdges'' where it does not
+run; a heap check that the garbage collector returns to is one, and several
 blocks can jump to it. A head has at most 'maxCopiedHead' instructions before
 its branches: most heads copied in the benchmarks of containers, vector
 and megaparsec hold one to three; nubInt's loops (Data.Containers.ListUtils)

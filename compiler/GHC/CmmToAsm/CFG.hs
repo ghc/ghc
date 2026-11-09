@@ -23,15 +23,11 @@ module GHC.CmmToAsm.CFG
     , getCfgNodes, hasNode
     , checkFailures, coldBlocks, findBackEdges
 
-    -- Loop Information
-    , loopInfo
-
     --Construction/Misc
     , getCfg, getCfgProc, pprEdgeWeights, sanityCheckCfg
 
     --Find backedges and update their weight
     , optimizeCFG
-    , mkGlobalWeights
 
     -- Block frequencies before register allocation
     , BlockFreqs, blockFrequencies, blockFreq, blockFreqAt, noBlockFreqs
@@ -54,18 +50,10 @@ import qualified GHC.Cmm.Dataflow.Graph as G
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 
-import qualified GHC.CmmToAsm.CFG.Dominators as Dom
 import GHC.CmmToAsm.CFG.Weight
-import Data.IntMap.Strict (IntMap)
-import Data.IntSet (IntSet)
 
-import qualified Data.IntMap.Strict as IM
 import qualified Data.Map as M
-import qualified Data.IntSet as IS
 import qualified Data.Set as S
-import Data.Tree
-import Data.Bifunctor
-import Data.Coerce
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -74,8 +62,7 @@ import GHC.Utils.Panic
 --import GHC.Data.OrdList
 --import GHC.Cmm.DebugBlock.Trace
 
-import Data.List (sort, sortOn, partition)
-import Data.STRef.Strict
+import Data.List (sort, partition)
 import Control.Monad.ST
 
 import Data.Array.MArray
@@ -90,7 +77,6 @@ import Data.Array.Unboxed (UArray)
 import Data.Word (Word64)
 
 import Control.Monad
-import GHC.Utils.Monad (anyM)
 import GHC.Data.UnionFind
 
 type Prob = Double
@@ -156,7 +142,7 @@ instance Outputable CfgEdge where
 -- See also Note [Inverting conditions]
 data TransitionSource
   = CmmSource { trans_cmmNode :: (CmmNode O C)
-              , trans_info :: BranchInfo }
+              , trans_info :: !BranchInfo }
   | AsmCodeGen
   -- | An edge the code generator adds for an operation's retry, as
   -- cmpxchg_code's: static prediction's rule that a back edge is more likely
@@ -164,17 +150,42 @@ data TransitionSource
   | AsmCodeGenRetry
   deriving (Eq)
 
+-- | What 'getCfg' records of an edge beside its node: whether the node is
+-- a heap or stack check, and whether the edge is the one made for the true
+-- target of a 'CmmCondBranch'. The edge's target does not tell which side it
+-- is: a fixup block of the register allocator ('addNodesBetween') or
+-- a shortcut ('shortcutWeightMap') moves the edge to another target, and the
+-- node keeps the labels it was made with.
 data BranchInfo = NoInfo         -- ^ Unknown, but not heap or stack check.
+                | NoInfoTrue     -- ^ The same, a branch's true side.
                 | HeapStackCheck -- ^ Heap or stack check
+                | HeapStackCheckTrue
+                                 -- ^ Heap or stack check, its true side.
     deriving Eq
 
 instance Outputable BranchInfo where
     ppr NoInfo = text "regular"
+    ppr NoInfoTrue = text "regular, true side"
     ppr HeapStackCheck = text "heap/stack"
+    ppr HeapStackCheckTrue = text "heap/stack, true side"
+
+-- | The info of the same branch's true side.
+trueSide :: BranchInfo -> BranchInfo
+trueSide NoInfo = NoInfoTrue
+trueSide HeapStackCheck = HeapStackCheckTrue
+trueSide info = info
 
 isHeapOrStackCheck :: TransitionSource -> Bool
 isHeapOrStackCheck (CmmSource { trans_info = HeapStackCheck}) = True
+isHeapOrStackCheck (CmmSource { trans_info = HeapStackCheckTrue}) = True
 isHeapOrStackCheck _ = False
+
+-- | Whether the edge is the one 'getCfg' made for the true target of
+-- a 'CmmCondBranch'.
+isTrueSide :: TransitionSource -> Bool
+isTrueSide (CmmSource { trans_info = NoInfoTrue}) = True
+isTrueSide (CmmSource { trans_info = HeapStackCheckTrue}) = True
+isTrueSide _ = False
 
 -- | The blocks that follow a failed heap or stack check: those the check's less
 -- likely branch enters, such as one calling the garbage collector, and their
@@ -705,15 +716,20 @@ getCfg platform weights graph =
         CmmBranch dest -> [mkEdge dest uncondWeight]
         CmmCondBranch cond t f l
           | l == Nothing ->
-              [mkEdge f condBranchWeight,   mkEdge t condBranchWeight]
+              [ mkEdge False f condBranchWeight
+              , mkEdge True  t condBranchWeight ]
           | l == Just True ->
-              [mkEdge f unlikelyCondWeight, mkEdge t likelyCondWeight]
+              [ mkEdge False f unlikelyCondWeight
+              , mkEdge True  t likelyCondWeight ]
           | l == Just False ->
-              [mkEdge f likelyCondWeight,   mkEdge t unlikelyCondWeight]
+              [ mkEdge False f likelyCondWeight
+              , mkEdge True  t unlikelyCondWeight ]
           where
-            mkEdgeInfo = -- pprTrace "Info" (ppr branchInfo <+> ppr cond)
-                         EdgeInfo (CmmSource branch branchInfo) . fromIntegral
-            mkEdge target weight = ((bid,target), mkEdgeInfo weight)
+            mkEdgeInfo side = -- pprTrace "Info" (ppr branchInfo <+> ppr cond)
+              EdgeInfo (CmmSource branch
+                          (if side then trueSide branchInfo else branchInfo))
+              . fromIntegral
+            mkEdge side target weight = ((bid,target), mkEdgeInfo side weight)
             -- BUG: this runs after fixStgRegisters, which turns a read of
             -- a global register with no machine register into a load at
             -- its offset from BaseReg. So on x86-64 a test of CurrentTSO
@@ -722,7 +738,7 @@ getCfg platform weights graph =
             -- speed, on x86-64: under -fcmm-static-pred or -fblock-layout-cfg,
             -- and, for an annotated test such as that one, in the linear
             -- allocator's cold blocks at any optimisation level.
-            branchInfo =
+            !branchInfo =
               foldRegsUsed
                 (panic "GHC.CmmToAsm.CFG.getCfg: foldRegsUsed")
                 (\info r -> if r == SpLim || r == HpLim || r == BaseReg
@@ -769,14 +785,12 @@ getCfg platform weights graph =
 
 -- | The back edges of a depth-first search from the given block: the edges into
 -- a block still on the search's stack, but for an edge from a block to itself.
--- They differ from loopInfo's back edges, each an edge into a block that
--- dominates its source: an edge into the root is one here and none there, and
--- in an irreducible region the search's order of visits picks which edges
--- are. A self loop at a block other than the root is one there and none
--- here. The search takes a block's successors in their labels' order, so in
--- an irreducible region the labels pick which edges are back edges; under
--- -fobject-determinism a Haskell module's labels are the same for the same
--- inputs (Note [Norms of the NCG] in GHC.CmmToAsm).
+-- They differ from the back edges of static prediction's loops on three kinds
+-- of edge (Note [Back edges in freqEstimate]). The search takes a block's
+-- successors in their labels' order, so in an irreducible region the labels
+-- pick which edges are back edges; under -fobject-determinism a Haskell
+-- module's labels are the same for the same inputs (Note [Norms of the NCG] in
+-- GHC.CmmToAsm).
 findBackEdges :: BlockId -> CFG -> Edges
 findBackEdges root cfg
   = go root (getSuccessors cfg root) [] (setSingleton root) (setSingleton root)
@@ -796,10 +810,9 @@ findBackEdges root cfg
                                    (setInsert s seen) (setInsert s onStack) acc
 
 -- | The CFG with its final weights and its back edges: where static prediction
--- estimated the weights, those of the loops it found ('loopInfo'), with
--- the back edges of 'findBackEdges'' search that are none of theirs and
--- not into the root, which only an irreducible region has ('calcFreqs'),
--- else 'findBackEdges'' with none; given the registers holding tags
+-- estimated the weights, those of the loops it found, with the other back edges
+-- of its search, which only an irreducible region has ('staticPredCfg'), else
+-- 'findBackEdges'' with none; given the registers holding tags
 -- ('tagRegisters').
 optimizeCFG :: Bool -> S.Set LocalReg -> Weights -> RawCmmDecl -> CFG
             -> (CFG, Edges, Edges)
@@ -809,9 +822,9 @@ optimizeCFG doStaticPred tags weights (CmmProc info _lab _live graph) cfg
   -- two-way branch from optHsPatterns' weights, so that the penalties become
   -- probabilities, and overwrites the weights of every branch with a back edge
   -- among its targets except a heap or stack check's and one whose targets are
-  -- all back edges; the back edges are loopInfo's: one into the root is
-  -- findBackEdges' alone, and a branch with one starts from its weight with no
-  -- bonus
+  -- all back edges; the back edges are those of its loops: one into the root
+  -- is findBackEdges' alone, and a branch with one starts from its weight with
+  -- no bonus, which changed no code measured and saves optimizeCFG a search
   | doStaticPred
   -- each component evaluated, here and in the guard below: left lazy, the CFG
   -- made the compiler allocate 0.048% more compiling T9961 at -O0, where only
@@ -833,9 +846,6 @@ optHsPatterns :: Edges -> Weights -> LabelMap a -> CFG -> CFG
 optHsPatterns backs weights info cfg =
     {-# SCC optHsPatterns #-}
     -- pprTrace "Initial:" (pprEdgeWeights cfg) $
-    -- pprTrace "Initial:" (ppr $ mkGlobalWeights (g_entry graph) cfg) $
-
-    -- pprTrace "LoopInfo:" (ppr $ loopInfo cfg (g_entry graph)) $
     favourFewerPreds  .
     penalizeInfoTables info .
     increaseBackEdgeWeight backs $ cfg
@@ -906,284 +916,6 @@ optHsPatterns backs weights info cfg =
           | CmmSource { trans_cmmNode = CmmCondBranch {} } <- source = True
           | otherwise = False
 
--- | Convert block-local branch weights to global weights, with the back edges
--- of 'loopInfo' and the other back edges of 'findBackEdges'' search that
--- 'calcFreqs' returns.
-staticPredCfg :: S.Set LocalReg -> BlockId -> CFG -> (CFG, Edges, Edges)
-staticPredCfg tags entry cfg = (cfg', backs, searchBacks)
-  where
-    (_, globalEdgeWeights, backs, searchBacks) = {-# SCC mkGlobalWeights #-}
-                                    mkGlobalWeightsWith tags entry cfg
-    cfg' = {-# SCC rewriteEdges #-}
-            mapFoldlWithKey
-                (\cfg from m ->
-                    mapFoldlWithKey
-                        (\cfg to w -> setEdgeWeight cfg (EdgeWeight w) from to )
-                        cfg m )
-                cfg
-                globalEdgeWeights
-
-data LoopInfo = LoopInfo
-  { liBackEdges :: [(Edge)] -- ^ List of back edges
-  , liLoops :: [(Edge, LabelSet)] -- ^ (backEdge, loopBody), body includes header
-  }
-
-instance Outputable LoopInfo where
-    ppr (LoopInfo _ loops) =
-        text "Loops:(backEdge, bodyNodes)" $$
-            (vcat $ map ppr loops)
-
-{-  Note [Determining the loop body]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    Starting with the knowledge that:
-    * head dominates the loop
-    * `tail` -> `head` is a backedge
-
-    We can determine all nodes by:
-    * Deleting the loop head from the graph.
-    * Collect all blocks which are reachable from the `tail`.
-
-    We do so by performing bfs from the tail node towards the head.
- -}
-
-{- Note [Back edges in loopInfo]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-loopInfo takes an edge for a back edge where its target is in its source's set
-of dominators, as mkDomMap computes them. mkDomMap leaves the root out of every
-set, and puts every other block in its own set. Hence:
-
-* BUG #28083: an edge into the entry block is never a back edge, so a loop whose
-  head is the entry block is not found. This costs only speed, on x86-64 under
-  -fcmm-static-pred.
-
-findBackEdges, which optHsPatterns uses for the back edge bonus where static
-prediction does not follow, classifies the edges by a depth-first search
-instead. It counts as back edges the edges
-into the entry block and the back edges of irreducible cycles, and no self
-loop. TODO: the two notions of a back edge disagree on these three kinds of
-edge.
--}
-
--- | Determine loop membership of blocks based on Dominator analysis.
---   This is slower but gives loop bodies instead of just loop membership.
---   However it only detects natural loops. Irreducible control flow is not
---   recognized even if it loops. But that is rare enough that we don't have
---   to care about that special case.
-loopInfo :: HasDebugCallStack => CFG -> BlockId -> LoopInfo
-loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
-                              , liLoops = loopBodies }
-  where
-    revCfg = reverseEdges cfg
-
-    graph = -- pprTrace "CFG - loopInfo" (pprEdgeWeights cfg) $
-            fmap (setFromList . mapKeys ) cfg :: LabelMap LabelSet
-
-
-    rooted = coerce (root, graph)
-    tree = coerce (Dom.domTree rooted) :: Tree BlockId
-
-    -- Map from Nodes to their dominators
-    domMap :: LabelMap LabelSet
-    domMap = mkDomMap tree
-
-    edges = edgeList cfg :: [(BlockId, BlockId)]
-
-    -- identify back edges: see Note [Back edges in loopInfo]
-    isBackEdge (from,to)
-      | Just doms <- mapLookup from domMap
-      , setMember to doms
-      = True
-      | otherwise = False
-
-    -- See Note [Determining the loop body]
-    -- Get the loop body associated with a back edge.
-    findBody edge@(tail, head)
-      = ( edge, setInsert head $ go (setSingleton tail) (setSingleton tail) )
-      where
-        -- See Note [Determining the loop body]
-
-
-        go :: LabelSet -> LabelSet -> LabelSet
-        go found current
-          | setNull current = found
-          | otherwise = go  (setUnion newSuccessors found)
-                            newSuccessors
-          where
-            -- Really predecessors, since we use the reversed cfg.
-            newSuccessors = setFilter (\n -> not $ setMember n found) successors :: LabelSet
-            successors = setDelete head $ setUnions $ map
-                                      (\x -> if x == head then setEmpty else setFromList (getSuccessors revCfg x))
-                                      (setElems current) :: LabelSet
-
-    backEdges = filter isBackEdge edges
-    loopBodies = map findBody backEdges :: [(Edge, LabelSet)]
-
-    -- each block but the root to the blocks dominating it, itself included
-    -- and the root left out, so that no edge into the root is a back edge
-    mkDomMap :: Tree BlockId -> LabelMap LabelSet
-    mkDomMap (Node _ kids) = foldl' (go setEmpty) mapEmpty kids
-      where
-        go :: LabelSet -> LabelMap LabelSet -> Tree BlockId -> LabelMap LabelSet
-        go !parents !acc (Node lbl kids')
-          = let !doms = setInsert lbl parents
-            in  foldl' (go doms) (mapInsert lbl doms acc) kids'
-
--- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
-newtype BlockNode (e :: Extensibility) (x :: Extensibility) = BN (BlockId,[BlockId])
-
-instance G.NonLocal (BlockNode) where
-  entryLabel (BN (lbl,_))   = lbl
-  successors (BN (_,succs)) = succs
-
-revPostorderFrom :: HasDebugCallStack => CFG -> BlockId -> [BlockId]
-revPostorderFrom cfg root =
-    map fromNode $ G.revPostorderFrom hooplGraph root
-  where
-    nodes = getCfgNodes cfg
-    hooplGraph = foldl' (\m n -> mapInsert n (toNode n) m) mapEmpty nodes
-
-    fromNode :: BlockNode C C -> BlockId
-    fromNode (BN x) = fst x
-
-    toNode :: BlockId -> BlockNode C C
-    toNode bid =
-        BN (bid,getSuccessors cfg $ bid)
-
-
--- | We take in a CFG which has on its edges weights which are
---   relative only to other edges originating from the same node.
---
---   We return a CFG for which each edge represents a GLOBAL weight.
---   This means edge weights are comparable across the whole graph.
---
---   For irreducible control flow results might be imprecise, otherwise they
---   are reliable.
---
---   The algorithm is based on the Paper
---   "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus
---   The only big change is that we go over the nodes in the body of loops in
---   reverse post order. Which is required for diamond control flow to work probably.
---
---   We also apply a few prediction heuristics (based on the same paper)
---
---   The returned result represents frequences.
---   For blocks it's the expected number of executions and
---   for edges is the number of traversals.
-
-mkGlobalWeights :: HasDebugCallStack => BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
-mkGlobalWeights root cfg
-  | (blockFreqs, edgeFreqs, _, _) <- mkGlobalWeightsWith S.empty root cfg
-  = (blockFreqs, edgeFreqs)
-
--- No pragma: with NOINLINE, which master had on mkGlobalWeights, whose body
--- this is, the compiler's code differed only in this not being inlined, and
--- its instructions and allocation moved by under 0.001% compiling T3294, T783,
--- T9961, T12707, !16269's CmmDiamondChain and nofib's puzzle at -O0, -O and
--- -O2, on GHC 10.1.20261108.
--- | 'mkGlobalWeights', told which local registers hold a constructor tag
--- (see 'tagRegisters'), with the back edges of 'loopInfo' and those
--- of a depth-first search from the root that are none of theirs, but those
--- into the root ('calcFreqs').
-{-# SCC mkGlobalWeightsWith #-}
-mkGlobalWeightsWith :: HasDebugCallStack => S.Set LocalReg -> BlockId -> CFG
-                    -> (LabelMap Double, LabelMap (LabelMap Double), Edges,
-                        Edges)
-mkGlobalWeightsWith tags root localCfg
-  | null localCfg = panic "Error - Empty CFG"
-  | otherwise
-  = (blockFreqs', edgeFreqs', backedges, searchBacks)
-  where
-    -- Calculate fixpoints
-    (blockFreqs, edgeFreqs, searchBacks') =
-      calcFreqs nodeProbs backEdges' bodies' revOrder'
-    searchBacks = map (bimap fromVertex fromVertex) searchBacks'
-    blockFreqs' = mapFromList $ map (first fromVertex) (assocs blockFreqs) :: LabelMap Double
-    edgeFreqs' = fmap fromVertexMap $ fromVertexMap edgeFreqs
-
-    fromVertexMap :: IM.IntMap x -> LabelMap x
-    fromVertexMap m = mapFromList . map (first fromVertex) $ IM.toList m
-
-    revOrder = revPostorderFrom localCfg root :: [BlockId]
-    loopResults@(LoopInfo backedges bodies) = loopInfo localCfg root
-
-    revOrder' = map toVertex revOrder
-    backEdges' = map (bimap toVertex toVertex) backedges
-    -- calcFreqs takes the loops inner first; an inner loop's body is
-    -- a proper subset of an enclosing one's
-    bodies' = map calcBody (sortOn (setSize . snd) bodies)
-
-    estimatedCfg = staticBranchPrediction tags root loopResults localCfg
-    -- Normalize the weights to probabilities and apply heuristics
-    nodeProbs = cfgEdgeProbabilities estimatedCfg toVertex
-
-    -- By mapping vertices to numbers in reverse post order we can bring any subset into reverse post
-    -- order simply by sorting.
-    -- TODO: The sort is redundant if we can guarantee that setElems returns elements ascending
-    calcBody (backedge, blocks) =
-        (toVertex $ snd backedge, sort . map toVertex $ (setElems blocks))
-
-    vertexMapping = mapFromList $ zip revOrder [0..] :: LabelMap Int
-    blockMapping = listArray (0,mapSize vertexMapping - 1) revOrder :: Array Int BlockId
-    -- Map from blockId to indices starting at zero
-    toVertex :: BlockId -> Int
-    toVertex   blockId  = expectJust $ mapLookup blockId vertexMapping
-    -- Map from indices starting at zero to blockIds
-    fromVertex :: Int -> BlockId
-    fromVertex vertex   = blockMapping ! vertex
-
-{- Note [Where a branch's likely side is known]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Which side of a conditional branch runs more often is known in one of three
-places, and the code generator treats each case differently:
-
-* Where the branch is made. GHC.StgToCmm annotates some branches with their
-  likely side, and getCfg sets the weights of an annotated branch's edges from
-  the annotation. One such branch is that of a heap or stack check to the
-  garbage collector, which GHC.StgToCmm.Heap marks as unlikely (`Just False`).
-  getCfg tags such a branch HeapStackCheck, and staticBranchPrediction leaves
-  alone the weights of any branch with an edge so tagged. getCfg recognises the
-  branch by the registers its condition reads, not by the annotation, so other
-  tests of the same registers are tagged too (a BUG at getCfg). Of the third
-  case's heuristics, two reach any other annotated branch: lehPredicts combines
-  its prediction with the weights the branch has by then, and the back edge rule
-  replaces them where the branch has both a back edge and another edge (the BUG
-  in Note [Static Branch Prediction]). ohPredicts skips an annotated
-  branch. Stack layout reads the annotation too, in unlikelyOnlyBlocks and
-  gcRetryCopies (GHC.Cmm.LayoutStack).
-
-* Upstream, and not carried down. Core and STG know which constructor a tag
-  test selects, but the test that chooses a case alternative carries no
-  annotation: cgAlts in GHC.StgToCmm.Expr makes it a CmmSwitch, which
-  GHC.Cmm.Switch.Implement turns into CmmCondBranches without one. So ohPredicts
-  treats it like any comparison with a constant where it is spelt as an equality
-  (the BUG TODO there), and leaves it out where it is spelt as an inequality
-  (the TODO there).
-
-* Nowhere. Under -fcmm-static-pred, staticBranchPrediction applies its
-  heuristics to every other two-way branch: a loop is not left (lehPredicts),
-  an equality test (MO_Eq) with a literal and no likelihood annotation is false
-  and such an inequality test (MO_Ne) true unless an operand is bits under a
-  mask (MO_And) or a constructor tag (ohPredicts), and a back edge is taken
-  (Note [Static Branch Prediction]).
-
-The code generator keeps these trade-offs with that knowledge, each for the
-reason given:
-
-* GHC.Cmm.ContFlowOpt inverts a condition so that its true side falls through,
-  even where the false side is likely and not inverting would be faster: telling
-  those cases apart is neither easy nor cheap, and inverting gives smaller
-  binaries and code that is as fast on average (Note [Invert Cmm conditionals]).
-* The layout leaves out edges across calls when it builds chains and when it
-  combines neighbouring chains (directEdges in GHC.CmmToAsm.BlockLayout):
-  control returns from a call to its continuation through the continuation's
-  info table, not by falling through.
-* Stack layout copies a heap or stack check that a body split off a continuation
-  also enters, for the garbage collector's retry, under the conditions of
-  Note [Retries copy their checks] in GHC.Cmm.LayoutStack: the copies cost code,
-  and the hot check loses the retry's way in.
--}
-
 -- | Each block's estimated frequency: see 'blockFrequencies'. The labels'
 -- uniques in ascending order, and each one's frequency at its index.
 data BlockFreqs = BlockFreqs !(UArray Int Word64) !(UArray Int Double)
@@ -1235,6 +967,20 @@ wrI :: STUArray s Int Int32 -> Int -> Int -> ST s ()
 wrI a i x = unsafeWrite a i (fromIntegral x)
 {-# INLINE wrI #-}
 
+-- | A block's head flag in 'freqEstimate': its state, 1 for a back edge's
+-- target, 2 for a loop's head and 3 for one counting for prediction; whether
+-- the block heads a loop; what is counted above the state, and the unit it is
+-- counted in.
+hdState, hdAbove :: Int -> Int
+hdState f = f .&. 3
+hdAbove f = f `shiftR` 2
+
+hdHead :: Int -> Bool
+hdHead f = hdState f >= 2
+
+hdUnit :: Int
+hdUnit = 4
+
 -- | Run the action on each element of a label map with its label's unique,
 -- in their order, and its index counted from the given one; the index after
 -- the last.
@@ -1252,53 +998,97 @@ forMapST f (LM m0) = go m0
 {-# INLINE forMapST #-}
 
 -- | Each block's estimated frequency, how many times it runs each time the
--- procedure runs from the given block: mkGlobalWeights' estimate, made for
--- the register allocator before it allocates, from the CFG as instruction
--- selection gives it, given the procedure's 'tagRegisters' and the CFG's
--- checkFailures, in time linear in the CFG but for its loops' nesting and in
--- two arrays: run at -O0 as well when this was written, it made the compiler
--- allocate 4.4% more compiling T783 at -O0 over LabelMaps, and 0.18% more in
--- the arrays. Run only under -fcmm-static-pred now, it makes the compiler run
--- 0.36% and 0.35% more instructions compiling !16269's CmmDiamondChain at -O1
--- and -O2, and allocate 0.067% and 0.060% more compiling T12707 at -O and -O2,
--- and nothing more at -O0, where it does not run, on GHC 10.1.20261108. Static
--- prediction (Note [Static Branch Prediction]) gives the
--- edges their probabilities as staticBranchPrediction gives them, and the
--- fixpoint is calcFreqs', but a loop's blocks are walked alone and the back
--- edges into one block taken as one loop. A back edge is an edge into a block
--- still on the stack of a depth-first search from the given block, but one
--- into that block, and the loop's blocks are those reached backwards from the
--- edges' sources without passing the head; where one comes before the head in
--- the search's reverse postorder, the head does not dominate it, and the loop,
--- in an irreducible region, is left out, as loopInfo leaves it out. A loop
--- counts for static prediction's loop heads and loop levels where one of its
--- back edges leaves a block not in 'coldBlocks'. A block the given one does not
--- reach runs 0 times.
+-- procedure runs from the given block ('freqEstimate'), given the procedure's
+-- 'tagRegisters' and the CFG's checkFailures: the linear allocator's, made
+-- before it allocates from the CFG as instruction selection gives it.
+blockFrequencies :: S.Set LocalReg -> LabelSet -> BlockId -> CFG -> BlockFreqs
+blockFrequencies tags failed root cfg
+  = freqEstimate False noBlockFreqs (\keys _ fs -> BlockFreqs keys fs)
+                 tags failed root cfg
+
+{- Note [Back edges in freqEstimate]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+freqEstimate takes an edge for a loop's back edge where its target dominates its
+source, and never takes an edge into the root for a back edge. Hence:
+
+* BUG #28083: an edge into the entry block is never a back edge, so a loop whose
+  head is the entry block is not found. This costs only speed, on x86-64 under
+  -fcmm-static-pred.
+
+findBackEdges, which optHsPatterns uses for the back edge bonus where static
+prediction does not follow, classifies the edges by a depth-first search alone.
+It counts as back edges the edges into the entry block and the back edges of
+irreducible cycles, and no self loop. TODO: the two notions of a back edge
+disagree on these three kinds of edge.
+-}
+
+-- | Static prediction's estimate (Note [Static Branch Prediction]): each
+-- block's frequency, how many times it runs each time the procedure runs
+-- from the given block, and each edge's probability, given the procedure's
+-- 'tagRegisters' and the CFG's checkFailures, in time linear in the CFG but
+-- for its loops' nesting and in two arrays: run at -O0 as well when this was
+-- written, it made the compiler allocate 4.4% more compiling T783 at -O0 over
+-- LabelMaps, and 0.18% more in the arrays. Run only under -fcmm-static-pred
+-- now, for the allocator it made the compiler run 0.40% more instructions
+-- compiling !16269's CmmDiamondChain at -O1 and -O2, and allocate 0.070% and
+-- 0.065% more compiling T12707 at -O and -O2, and nothing more at -O0, where
+-- it does not run, on GHC 10.1.20261108. The fixpoint is Wu and Larus's, inner
+-- loops first, the back edges into one block taken as one loop. A back edge
+-- is an edge into a block still on the stack of a depth-first search from
+-- the given block, but one into that block; it is a loop's where its target
+-- dominates its source, and the loop's blocks are those reached backwards from
+-- its back edges' sources without passing the head. Where the walk from a
+-- source reaches a block before the head in the search's reverse postorder, the
+-- head does not dominate the source, and its edge, in an irreducible region,
+-- counts for no block's frequency. A loop counts for static prediction's loop
+-- heads where one of its back edges leaves a block not in 'coldBlocks', and for
+-- the loop levels of the blocks reached from those edges' sources. A block the
+-- given one does not reach runs 0 times. The search takes a block's successors
+-- in their labels' order, as 'findBackEdges' does, which picks the back edges
+-- of an irreducible region and the order in which a block's inflows are summed:
+-- see 'findBackEdges' on -fobject-determinism.
+--
+-- Given True first, a block entered by a back edge from a block it does not
+-- dominate is skipped: where it heads a loop, it runs once each time the
+-- head of a loop holding it, or the procedure, runs, and else never. Static
+-- prediction gives True and the allocator False ('blockFrequencies').
 --
 -- The estimate inherits static prediction's errors on tag tests: a lookup's
 -- loop down one of Data.Map's trees comes out as rarely repeated (the BUG TODO
 -- at ohPredicts, Note [Static prediction of tag tests]).
-blockFrequencies :: S.Set LocalReg -> LabelSet -> BlockId -> CFG -> BlockFreqs
-blockFrequencies tags failed root cfg@(LM cm)
-  | n == 0    = noBlockFreqs
+--
+-- Given no blocks, or a given block not among them, the result is the second
+-- argument; else the third applied to the blocks' uniques in ascending order
+-- and the two arrays, for n blocks and m edges: the Int32 array holding at 0
+-- the offsets of each block's edges, at n + 1 their targets as encoded below,
+-- at n + 1 + m the blocks' head flags and at 2 * n + 1 + m the edges' flags,
+-- and the Double array each block's frequency at its index and each edge's
+-- probability at 2 * n plus its.
+freqEstimate :: forall r. Bool -> r
+             -> (UArray Int Word64 -> UArray Int Int32 -> UArray Int Double
+                 -> r)
+             -> S.Set LocalReg -> LabelSet -> BlockId -> CFG -> r
+freqEstimate skip none found tags failed root cfg@(LM cm)
+  | n == 0    = none
   | otherwise = runST $ do
     ks <- newArray (0, n - 1) 0 :: ST s (STUArray s Int Word64)
     _ <- forMapST (\k _ i -> unsafeWrite ks i k) cfg 0
     keys <- unsafeFreeze ks
     let rootV = uniqueIndex keys (lblToUnique root)
-    if rootV < 0 then return noBlockFreqs else estimate keys rootV
+    if rootV < 0 then return none else estimate keys rootV
   where
     n = WM.size cm
     m = WM.foldl' (\a (LM om) -> a + WM.size om) 0 cm
     cold = coldBlocksOf failed cfg
-    estimate :: UArray Int Word64 -> Int -> ST s BlockFreqs
+    estimate :: UArray Int Word64 -> Int -> ST s r
     estimate keys rootV = do
         let vtx = uniqueIndex keys
         -- the Int32 array ia: each block's successors, the elements off + i ..
         -- off + i + 1 - 1 of tgt for block i, in their labels' order, -2 - j
         -- for a back edge into block j, with
-        -- each edge's flags in ef, 1 for a heap or stack check and 2 for
-        -- a retry; each block's predecessors that are reached, the elements
+        -- each edge's flags in ef, 1 for a heap or stack check, 2 for a retry
+        -- and 4 for a back edge whose target does not dominate its source;
+        -- each block's predecessors that are reached, the elements
         -- pof + i .. pof + i + 1 - 1 of prd; rpo, each block's position in
         -- the search's reverse postorder, -1 for one not reached and -2 for one
         -- on its stack; ord, the blocks by position; stk, the search's stack
@@ -1306,22 +1096,18 @@ blockFrequencies tags failed root cfg@(LM cm)
         -- the walk's blocks and then the loop's queue; hd, 1 for a back edge's
         -- target, 2 for a loop's head, 3 for one counting for prediction, plus
         -- 4 times its loop level and then its count of forward edges in a loop
-        -- still to visit
-        let oOff = 0; oTgt = n + 1; oEf = oTgt + m; oPrd = oEf + m
-            oPof = oPrd + m; oRpo = oPof + n + 1; oOrd = oRpo + n
-            oStk = oOrd + n; oNxt = oStk + n; oHd = oNxt + n
-        ia <- newArray (0, oHd + n - 1) 0 :: ST s (STUArray s Int Int32)
-        -- hd's state, whether a loop's head, what is counted above the state,
-        -- and the unit it is counted in
-        let hdState, hdAbove :: Int -> Int
-            hdState f = f .&. 3
-            hdHead f = hdState f >= 2
-            hdAbove f = f `shiftR` 2
-            hdUnit = 4 :: Int
+        -- still to visit; off, tgt, hd and ef come first, for the caller; ef's
+        -- offset, feEf n m, is written as oHd + n: computed by feEf, it made
+        -- the compiler run 0.013% more instructions compiling T12707 at -O, on
+        -- GHC 10.1.20261111
+        let oOff = 0; oTgt = feTgt n; oHd = oTgt + m; oEf = oHd + n
+            oPrd = oEf + m; oPof = oPrd + m; oRpo = oPof + n + 1
+            oOrd = oRpo + n; oStk = oOrd + n; oNxt = oStk + n
+        ia <- newArray (0, oNxt + n - 1) 0 :: ST s (STUArray s Int Int32)
         -- the Double array da: each block's frequency, which holds its inflow
         -- until the block is visited, and its multiplier, at its index, and
         -- each edge's weight and then probability at its
-        let oF = 0; oMul = n; oPr = 2 * n
+        let oF = 0; oMul = n; oPr = fePr n
         da <- newArray (0, oPr + m - 1) 0 :: ST s (STUArray s Int Double)
         _ <- forMapST (\_ outs v -> do
                s <- rdI ia (oOff + v)
@@ -1393,11 +1179,22 @@ blockFrequencies tags failed root cfg@(LM cm)
           c <- subtract 1 <$> rdI ia (oPof + t)
           wrI ia (oPrd + c) v
           wrI ia (oPof + t) c
-        -- the walk from a head's back edges' sources, marking each block it
-        -- reaches with the tag in stk and listing it in nxt, the head first:
-        -- the number of the loop's blocks, or -1 where it reaches a block
-        -- before the head in reverse postorder
-        let walk h tag = do
+        -- the back edge from block p into block h: its index in tgt; and
+        -- whether h dominates p, the edge not flagged 4 in ef
+        let backInto p h = do
+              s <- rdI ia (oOff + p)
+              let go !e = do x <- rdI ia (oTgt + e)
+                             if x == -2 - h then return e else go (e + 1)
+              go s
+            dominated h p = do
+              e <- backInto p h
+              (\fl -> fl .&. 4 == 0) <$> rdI ia (oEf + e)
+            -- the walk from the sources of a head's back edges that the given
+            -- test takes, marking each block it reaches with the tag in stk
+            -- and listing it in nxt, the head first: the number of the loop's
+            -- blocks, or -1 where it reaches a block before the head in reverse
+            -- postorder
+            walk h tag from = do
               wrI ia (oStk + h) tag
               wrI ia oNxt h
               rh <- rdI ia (oRpo + h)
@@ -1409,7 +1206,9 @@ blockFrequencies tags failed root cfg@(LM cm)
                         p <- rdI ia (oPrd + i)
                         rp <- rdI ia (oRpo + p)
                         sp <- rdI ia (oStk + p)
-                        if rp >= rh && sp /= tag
+                        ok <- if rp >= rh && sp /= tag then from p
+                                                       else return False
+                        if ok
                           then do wrI ia (oStk + p) tag
                                   wrI ia (oNxt + len) p
                                   tails (i + 1) (len + 1)
@@ -1437,28 +1236,65 @@ blockFrequencies tags failed root cfg@(LM cm)
         reached $ \h -> do
           f <- rdI ia (oHd + h)
           when (hdState f == 1) $ do
-            len <- walk h (-1 - h)
-            if len < 0 then wrI ia (oHd + h) (f - 1) else do
-              ps <- rdI ia (oPof + h)
-              pe <- rdI ia (oPof + h + 1)
-              rh <- rdI ia (oRpo + h)
-              let warm !i
-                    | i == pe = return False
-                    | otherwise = do
-                        p <- rdI ia (oPrd + i)
-                        rp <- rdI ia (oRpo + p)
-                        if rp >= rh && not (mkHooplLabel (unsafeAt keys p) `setMember` cold)
-                          then return True else warm (i + 1)
-              w <- warm ps
-              wrI ia (oHd + h) (f + if w then 2 else 1)
-              when w $ forM_ [0 .. len - 1] $ \j -> do
-                u <- rdI ia (oNxt + j)
-                bump (oHd + u) hdUnit
-        -- each edge's probability: static prediction's weight, normalised as
-        -- cfgEdgeProbabilities normalises it
-        let kept x = if x < -1 then hdHead <$> rdI ia (oHd + dec x)
-                               else return False
-            normalise s e1 = do
+            ps <- rdI ia (oPof + h)
+            pe <- rdI ia (oPof + h + 1)
+            rh <- rdI ia (oRpo + h)
+            len <- walk h (-1 - h) (\_ -> return True)
+            -- in an irreducible region, each source is walked alone, and the
+            -- edge from one the head does not dominate is flagged: it is no
+            -- back edge of the head's loop
+            when (len < 0) $ forM_ [ps .. pe - 1] $ \i -> do
+              p <- rdI ia (oPrd + i)
+              rp <- rdI ia (oRpo + p)
+              when (rp >= rh) $ do
+                l <- walk h (2 * n + i) (return . (== p))
+                when (l < 0) $ backInto p h >>= \e -> bump (oEf + e) 4
+            -- the loop's back edges, and those of them leaving a block not
+            -- in 'coldBlocks', else the loop heads nothing and counts for no
+            -- level: such a back edge closes the cycle a failed heap or stack
+            -- check makes through the garbage collector, and lehPredicts says
+            -- nothing about a branch into a loop head, so it would say nothing
+            -- about the test that stays in a loop holding a check. A back edge
+            -- leaving a continuation that a call returns to as well counts the
+            -- same, so a loop closed through such a call loses its head
+            -- too (the TODO at checkFailures). The check's own branch already
+            -- gets no heuristic (below); this rule is for a branch into the
+            -- cycle's head, which is the check's block where the collector's
+            -- call returns to it or to a block that jumps back to it, and,
+            -- where the call returns to a block that chooses among case
+            -- alternatives, for that block's own test, of which lehPredicts
+            -- would take the branch towards an alternative without such a check
+            -- for a loop exit. This saves cycles, not instructions: with the
+            -- stay side predicted, the layout can let it fall through, a taken
+            -- jump fewer an iteration, which an instruction count does not
+            -- show, as a conditional jump is one instruction whether taken or
+            -- not.
+            let isCold p = mkHooplLabel (unsafeAt keys p) `setMember` cold
+                warm p = (&& not (isCold p)) <$> dominated h p
+                tally !i !nd !nw
+                  | i == pe = return (nd, nw)
+                  | otherwise = do
+                      p <- rdI ia (oPrd + i)
+                      rp <- rdI ia (oRpo + p)
+                      if rp < rh then tally (i + 1) nd nw else do
+                        d <- dominated h p
+                        let w = d && not (isCold p)
+                        tally (i + 1) (if d then nd + 1 else nd)
+                                      (if w then nw + 1 else nw)
+            (nd, nw) <- tally ps (0 :: Int) (0 :: Int)
+            if nd == 0 then wrI ia (oHd + h) (f - 1) else do
+              wrI ia (oHd + h) (f + if nw > 0 then 2 else 1)
+              -- the levels: the blocks reached from the sources of those
+              -- leaving a block not in 'coldBlocks'
+              when (nw > 0) $ do
+                lw <- if len >= 0 && nw == nd then return len
+                      else walk h (2 * n + m + h) warm
+                forM_ [0 .. lw - 1] $ \j -> do
+                  u <- rdI ia (oNxt + j)
+                  bump (oHd + u) hdUnit
+        -- each edge's weight made a probability: a negative one taken as 0,
+        -- over its block's total, or an equal share where that is 0
+        let normalise s e1 = do
               let total !e !a | e == e1   = return a
                               | otherwise = do w <- unsafeRead da (oPr + e)
                                                total (e + 1) (a + max 0 w)
@@ -1472,24 +1308,29 @@ blockFrequencies tags failed root cfg@(LM cm)
           e1 <- rdI ia (oOff + v + 1)
           let cnt = e1 - s
           if cnt == 1 then unsafeWrite da (oPr + s) 1 else when (cnt > 1) $ do
-            -- the back edges into a loop's head, but a retry's, and the heap
-            -- or stack checks
-            let count !e !nb !hc
+            normalise s e1
+            -- the back edges into a loop's head, but a retry the code
+            -- generator adds (cmpxchg_code's of an emulated atomic operation),
+            -- and the heap or stack checks: a branch with back edges and other
+            -- edges and no check gives the back edges pred_LBH between them,
+            -- superseding every other heuristic, wrongly for a rare retry, as
+            -- the BUG in Note [Static prediction of tag tests] says; a check
+            -- "loops", but only once, and gets no heuristic
+            let kept x fl = x < -1 && fl .&. 4 == 0 && fl .&. 2 == 0
+                count !e !nb !hc
                   | e == e1 = return (nb, hc)
                   | otherwise = do
                       x <- rdI ia (oTgt + e)
                       fl <- rdI ia (oEf + e)
-                      k <- kept x
-                      count (e + 1) (if k && fl .&. 2 == 0 then nb + 1 else nb)
+                      count (e + 1) (if kept x fl then nb + 1 else nb)
                                     (hc + fl .&. 1)
             (nb, hc) <- count s (0 :: Int) (0 :: Int)
             if nb > 0 && nb < cnt && hc == 0
               then forM_ [s .. e1 - 1] $ \e -> do
                      x <- rdI ia (oTgt + e)
                      fl <- rdI ia (oEf + e)
-                     k <- kept x
                      unsafeWrite da (oPr + e)
-                       (if k && fl .&. 2 == 0
+                       (if kept x fl
                           then weightToDouble pred_LBH / fromIntegral nb
                           else (1 - weightToDouble pred_LBH) / fromIntegral (cnt - nb))
               else when (cnt == 2 && nb == 0 && hc == 0) $
@@ -1501,26 +1342,50 @@ blockFrequencies tags failed root cfg@(LM cm)
                   -- more instructions compiling T783 at -O and -O2, and nothing
                   -- more at -O0, where blockFrequencies does not run, on GHC
                   -- 10.1.20261108
-                  Just (LM (WMI.Bin _ _ (WMI.Tip k1 i1) (WMI.Tip _ i2))) -> do
+                  Just (LM (WMI.Bin _ _ (WMI.Tip _ i1) (WMI.Tip _ _))) -> do
+                    n1 <- unsafeRead da (oPr + s)
+                    n2 <- unsafeRead da (oPr + s + 1)
                     t1 <- dec <$> rdI ia (oTgt + s)
                     t2 <- dec <$> rdI ia (oTgt + s + 1)
                     let fact t = do f <- rdI ia (oHd + t)
                                     return (hdState f == 3, hdAbove f)
                     (h1, l1) <- fact t1
                     (h2, l2) <- fact t2
-                    let (p1, p2) = predictBranch tags h1 l1 (mkHooplLabel k1) i1 h2 l2 i2
+                    let (p1, p2) = predictBranch tags h1 l1 i1 (EdgeWeight n1)
+                                     h2 l2 (EdgeWeight n2)
                     unsafeWrite da (oPr + s) (weightToDouble p1)
                     unsafeWrite da (oPr + s + 1) (weightToDouble p2)
                   _ -> return ()
-            normalise s e1
+        -- TODO: nothing checks the result, as sanityCheckCfg checks the CFG
+        -- against the blocks. A check could compare each block's frequency
+        -- with the sum of the frequencies on its in-edges; the propagation
+        -- below departs from that sum at some blocks, among them an irreducible
+        -- block, a loop head whose cycle probability is capped, and the entry
+        -- block, which it gives 1 whatever its in-edges.
+        --
         -- the fixpoint, inner loops first: a loop's head runs once, every
         -- other block of it as often as the forward edges into it lead there,
         -- times its multiplier where it heads a loop itself, and the head's
         -- multiplier is 1 / (1 - p), p the probability of returning to it,
         -- capped at limit: the paper uses 1 - epsilon, but this works, and it
-        -- bounds how large the frequencies in a loop can grow
-        forM_ [0 .. n - 1] $ \i -> rdI ia (oHd + i) >>= wrI ia (oHd + i) . hdState
-        let limit = 1 - 1 / 512  -- calcFreqs'
+        -- bounds how large the frequencies in a loop can grow. The head flags
+        -- keep 2 for a loop's head and, where the first argument says so, 1 for
+        -- a block entered by a back edge from a block it does not dominate
+        forM_ [0 .. n - 1] $ \i -> do
+          f <- rdI ia (oHd + i)
+          wrI ia (oHd + i) (if hdHead f then 2 else 0)
+        -- TODO: irreducible blocks are not rare in Haskell code. Such a block's
+        -- frequency, and those of the blocks reached only through it, can be
+        -- far below or above what summing its inflow would give, and on x86-64
+        -- under -fcmm-static-pred the layout by default ranks their edges by
+        -- numbers that do not add up. Summing the inflow was tried on a
+        -- development branch: nofib's mkhprog ran 0.53% more instructions at
+        -- -O2, eliza 0.20% and megaparsec's many and skipMany 0.72% to 1.06%
+        -- fewer at -O1.
+        when skip $ reached $ \v -> edges v $ \e t _ -> do
+          fl <- rdI ia (oEf + e)
+          when (fl .&. 4 /= 0) $ rdI ia (oHd + t) >>= wrI ia (oHd + t) . (.|. 1)
+        let limit = 1 - 1 / 512
             fwd u f = do
               ru <- rdI ia (oRpo + u)
               edges u $ \e t _ -> do
@@ -1528,9 +1393,11 @@ blockFrequencies tags failed root cfg@(LM cm)
                 when (rt > ru) $ f e t
             addAcc t x = unsafeRead da (oF + t) >>= unsafeWrite da (oF + t) . (+ x)
             inflow v = do
-              a <- unsafeRead da (oF + v)
-              x <- unsafeRead da (oMul + v)
-              return (a * x)
+              hv <- rdI ia (oHd + v)
+              if odd hv then return (if hdHead hv then 1 else 0) else do
+                a <- unsafeRead da (oF + v)
+                x <- unsafeRead da (oMul + v)
+                return (a * x)
             loops !r
               | r < first = return ()
               | otherwise = do
@@ -1538,7 +1405,7 @@ blockFrequencies tags failed root cfg@(LM cm)
                   hf <- rdI ia (oHd + h)
                   when (hdHead hf) $ do
                     let tag = h + n
-                    len <- walk h tag
+                    len <- walk h tag (dominated h)
                     forM_ [0 .. len - 1] $ \j -> do
                       u <- rdI ia (oNxt + j)
                       unsafeWrite da (oF + u) 0
@@ -1589,7 +1456,100 @@ blockFrequencies tags failed root cfg@(LM cm)
             p <- unsafeRead da (oPr + e)
             addAcc t (fv * p)
         fs <- unsafeFreeze da
-        return (BlockFreqs keys fs)
+        is <- unsafeFreeze ia
+        return $! found keys is fs
+
+-- | The offsets in 'freqEstimate''s arrays, for n blocks and m edges, of the
+-- edges' targets, probabilities and flags.
+feTgt, fePr :: Int -> Int
+feTgt n = n + 1
+fePr n = 2 * n
+feEf :: Int -> Int -> Int
+feEf n m = 2 * n + 1 + m
+
+-- | The CFG with each edge's weight its estimated frequency, how many times
+-- it is taken each time the procedure runs, its source's frequency times its
+-- probability ('freqEstimate'); with the back edges of the estimate's loops,
+-- and the other back edges of its search, those whose target does not dominate
+-- their source, which only an irreducible region has.
+{-# SCC staticPredCfg #-}
+staticPredCfg :: S.Set LocalReg -> BlockId -> CFG -> (CFG, Edges, Edges)
+staticPredCfg tags entry cfg@(LM cm) = (cfg', backs', searchBacks')
+  where
+    -- the triple built here, so that optimizeCFG returns one on every path and
+    -- keeps its worker (CPR): returning freqEstimate's result, it allocated
+    -- the triple its caller takes apart at once, at -O0 as well
+    (cfg', backs', searchBacks')
+      = freqEstimate True (cfg, [], []) weigh tags (checkFailures cfg) entry cfg
+    weigh keys is fs = (LM (snd (WM.mapAccum block 0 cm)), backs, searchBacks)
+      where
+        n = snd (bounds keys) + 1
+        at i = fromIntegral (unsafeAt is i) :: Int
+        m = at n
+        block !v (LM outs) =
+          (v + 1, LM (snd (WM.mapAccum (edge (unsafeAt fs v)) (at v) outs)))
+        edge !f !e info =
+          (e + 1, info { edgeWeight = EdgeWeight (f * unsafeAt fs (oPr + e)) })
+        oPr = fePr n
+        !oEf = feEf n m
+        label v = mkHooplLabel (unsafeAt keys v)
+        (loops, others) = partition (\(_, _, e) -> at (oEf + e) .&. 4 == 0)
+          [ (v, -2 - x, e) | v <- [0 .. n - 1], e <- [at v .. at (v + 1) - 1]
+                           , let x = at (feTgt n + e), x < -1 ]
+        backs = [ (label v, label j) | (v, j, _) <- loops ]
+        searchBacks = [ (label v, label j) | (v, j, _) <- others ]
+
+{- Note [Where a branch's likely side is known]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Which side of a conditional branch runs more often is known in one of three
+places, and the code generator treats each case differently:
+
+* Where the branch is made. GHC.StgToCmm annotates some branches with their
+  likely side, and getCfg sets the weights of an annotated branch's edges from
+  the annotation. One such branch is that of a heap or stack check to the
+  garbage collector, which GHC.StgToCmm.Heap marks as unlikely (`Just False`).
+  getCfg tags such a branch HeapStackCheck, and freqEstimate leaves alone the
+  weights of any branch with an edge so tagged. getCfg recognises the
+  branch by the registers its condition reads, not by the annotation, so other
+  tests of the same registers are tagged too (a BUG at getCfg). Of the third
+  case's heuristics, two reach any other annotated branch: lehPredicts combines
+  its prediction with the weights the branch has by then, and the back edge rule
+  replaces them where the branch has both a back edge and another edge (the BUG
+  in Note [Static Branch Prediction]). ohPredicts skips an annotated
+  branch. Stack layout reads the annotation too, in unlikelyOnlyBlocks and
+  gcRetryCopies (GHC.Cmm.LayoutStack).
+
+* Upstream, and not carried down. Core and STG know which constructor a tag
+  test selects, but the test that chooses a case alternative carries no
+  annotation: cgAlts in GHC.StgToCmm.Expr makes it a CmmSwitch, which
+  GHC.Cmm.Switch.Implement turns into CmmCondBranches without one. So ohPredicts
+  treats it like any comparison with a constant where it is spelt as an equality
+  (the BUG TODO there), and leaves it out where it is spelt as an inequality
+  (the TODO there).
+
+* Nowhere. Under -fcmm-static-pred, freqEstimate applies static prediction's
+  heuristics to every other two-way branch: a loop is not left (lehPredicts),
+  an equality test (MO_Eq) with a literal and no likelihood annotation is false
+  and such an inequality test (MO_Ne) true unless an operand is bits under a
+  mask (MO_And) or a constructor tag (ohPredicts), and a back edge is taken
+  (Note [Static Branch Prediction]).
+
+The code generator keeps these trade-offs with that knowledge, each for the
+reason given:
+
+* GHC.Cmm.ContFlowOpt inverts a condition so that its true side falls through,
+  even where the false side is likely and not inverting would be faster: telling
+  those cases apart is neither easy nor cheap, and inverting gives smaller
+  binaries and code that is as fast on average (Note [Invert Cmm conditionals]).
+* The layout leaves out edges across calls when it builds chains and when it
+  combines neighbouring chains (directEdges in GHC.CmmToAsm.BlockLayout):
+  control returns from a call to its continuation through the continuation's
+  info table, not by falling through.
+* Stack layout copies a heap or stack check that a body split off a continuation
+  also enters, for the garbage collector's retry, under the conditions of
+  Note [Retries copy their checks] in GHC.Cmm.LayoutStack: the copies cost code,
+  and the hot check loses the retry's way in.
+-}
 
 {- Note [Static Branch Prediction]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1629,7 +1589,7 @@ TODO:
   + making the TransitionSource info wrong.
   + potential to use this information in CmmPasses.
   - Requires refactoring of all the code relying on the binary nature of likelihood.
-  - Requires refactoring `loopInfo` to work on both, Cmm Graphs and the backend CFG.
+  - Requires refactoring `freqEstimate` to work on both, Cmm Graphs and the backend CFG.
 -}
 
 {- Note [Static prediction of tag tests]
@@ -1676,18 +1636,16 @@ entry block's one successor.
 {- Note [Frequencies before register allocation]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Static prediction estimates block frequencies for the layout only under
--fcmm-static-pred and only after register allocation
-(Note [Static Branch Prediction]); blockFrequencies makes the estimate for the
-linear allocator before it allocates, under the same flag, from the CFG as
-instruction selection gives it (static prediction runs on the CFG only after
-shortcutting and optHsPatterns adjust it), and linearRA_SCCs orders the SCCs by
-the estimate; the graph allocator's spill costs hold mkGlobalWeights'
-estimate whatever the flag, but as a thunk no spill choice forces
-(GHC.CmmToAsm.Reg.Graph.SpillCost). So the code that depends on how often a
-block runs uses stand-ins, at -O0 and elsewhere, each marked by a TODO pointing
-here. TODO: once the estimate is computed in a Cmm pass, as
-Note [Static Branch Prediction] proposes, these could use it instead, and they
-are to be reinvestigated together:
+-fcmm-static-pred and only after register allocation, from the CFG as
+shortcutting and optHsPatterns leave it (staticPredCfg, Note [Static Branch
+Prediction]); blockFrequencies makes the same estimate, freqEstimate's, but for
+the skip of irreducible regions (its first argument), for the linear allocator
+before it allocates, under the same flag, from the CFG as instruction selection
+gives it, and linearRA_SCCs orders the SCCs by the estimate. So the code that
+depends on how often a block runs uses stand-ins, at -O0 and elsewhere, each
+marked by a TODO pointing here. TODO: once the estimate is computed in a Cmm
+pass, as Note [Static Branch Prediction] proposes, these could use it instead,
+and they are to be reinvestigated together:
 
  * coldBlocks misses two shapes. In a procedure needing more stack than
    maxSpillSlots, allocMoreStack splits each entry block into a stack allocation
@@ -1725,120 +1683,21 @@ are to be reinvestigated together:
 
 
 
--- | Update branch weights based on certain heuristics.
--- See Note [Static Branch Prediction]
--- TODO: This should be combined with optimizeCFG
-{-# SCC staticBranchPrediction #-}
-staticBranchPrediction :: S.Set LocalReg -> BlockId -> LoopInfo -> CFG -> CFG
-staticBranchPrediction tags _root (LoopInfo l_backEdges l_loops) cfg =
-    -- pprTrace "staticEstimatesOn" (ppr (cfg)) $
-    foldl' update cfg nodes
-  where
-    nodes = getCfgNodes cfg
-    -- each block to the blocks its back edges enter, looked up once a node:
-    -- as master's set of the edges' pairs, looked up at each successor, they
-    -- made the compiler run 0.047% more instructions and allocate 0.012% more
-    -- compiling !16269's CmmDiamondChain at -O1 and -O2, and nothing more
-    -- at -O0, where static prediction does not run, on GHC 10.1.20261108
-    backedges = mapFromListWith setUnion
-      [ (from, setSingleton to) | (from, to) <- l_backEdges ]
-    -- The heads of loops but those whose back edges all leave a block of
-    -- 'coldBlocks': such a back edge closes the cycle a failed heap or stack
-    -- check makes through the garbage collector, and lehPredicts says nothing
-    -- about a branch into a loop head, so it would say nothing about the test
-    -- that stays in a loop holding a check. A back edge leaving a continuation
-    -- that a call returns to as well counts the same, so a loop closed through
-    -- such a call loses its head too. The check's own branch already gets no
-    -- heuristic (isHeapOrStackCheck in update); this rule is for a branch
-    -- into the cycle's head, which is the check's block where the collector's
-    -- call returns to it or to a block that jumps back to it, and, where the
-    -- call returns to a block that chooses among case alternatives, for that
-    -- block's own test, of which lehPredicts would take the branch towards an
-    -- alternative without such a check for a loop exit. This saves cycles, not
-    -- instructions: with the stay side predicted, the layout can let it fall
-    -- through, a taken jump fewer an iteration, which an instruction count does
-    -- not show, as a conditional jump is one instruction whether taken or not.
-    loopHeads = M.keysSet headBodies
-    headBodies = M.fromListWith setUnion
-      [ (h, body) | ((from, h), body) <- l_loops, not (from `setMember` cold) ]
-    -- each block to the number of those loops whose bodies hold it
-    loopLevels = mapFromListWith (+)
-      [ (b, 1 :: Int) | body <- M.elems headBodies, b <- setElems body ]
-    cold = coldBlocks cfg
-
-    update :: CFG -> BlockId -> CFG
-    update cfg node
-        -- No successors, nothing to do.
-        | null successors = cfg
-
-        -- Mix of backedges and others:
-        -- Always predict the backedges.
-        -- This supersedes ohPredicts, wrongly for a rare retry: see
-        -- Note [Static prediction of tag tests].
-        | not (null m) && length m < length successors
-        -- Heap/Stack checks "loop", but only once.
-        -- So we simply exclude any case involving them.
-        , not $ any (isHeapOrStackCheck  . transitionSource . snd) successors
-        = let   loopChance = repeat $! pred_LBH / (fromIntegral $ length m)
-                exitChance = repeat $! (1 - pred_LBH) / fromIntegral (length not_m)
-                updates = zip (map fst m) loopChance ++ zip (map fst not_m) exitChance
-        in  -- pprTrace "mix" (ppr (node,successors)) $
-            foldl' (\cfg (to,weight) -> setEdgeWeight cfg weight node to) cfg updates
-
-        -- For (regular) non-binary branches we keep the weights from the STG -> Cmm translation.
-        | length successors /= 2
-        = cfg
-
-        -- Only backedges - no need to adjust. This case also keeps the weights
-        -- of a back edge beside a heap or stack check's edge, which the mix
-        -- case above excludes.
-        | length m > 0
-        = cfg
-
-        -- A regular binary branch, we can plug addition predictors in here.
-        | [(s1,s1_info),(s2,s2_info)] <- successors
-        , not $ any (isHeapOrStackCheck  . transitionSource . snd) successors
-        , (p1, p2) <- predictBranch tags (s1 `S.member` loopHeads) (level s1)
-                                    s1 s1_info
-                                    (s2 `S.member` loopHeads) (level s2) s2_info
-        = setEdgeWeight (setEdgeWeight cfg p1 node s1) p2 node s2
-
-        -- Branch on heap/stack check
-        | otherwise = cfg
-
-      where
-        -- successors
-        successors = getSuccessorEdges cfg node
-        -- backedges, but a retry the code generator adds, as cmpxchg_code's of
-        -- an emulated atomic operation
-        !backs = mapFindWithDefault setEmpty node backedges
-        (m,not_m) = partition (\succ -> setMember (fst succ) backs
-                                        && transitionSource (snd succ)
-                                           /= AsmCodeGenRetry) successors
-        level s = mapFindWithDefault 0 s loopLevels
-
 -- | Chance that loops are taken.
 pred_LBH :: EdgeWeight
 pred_LBH = 0.875
 
 -- | The weights static prediction gives the two edges of a two-way branch that
--- is neither a heap or stack check nor has a back edge: the edges' weights made
--- probabilities, then lehPredicts' and ohPredicts' predictions applied in turn.
+-- is neither a heap or stack check nor has a back edge, given the edges'
+-- probabilities: lehPredicts' and ohPredicts' predictions applied in turn.
 -- Each target comes with whether it is a loop head and the number of loops
 -- holding it.
-predictBranch :: S.Set LocalReg -> Bool -> Int -> BlockId -> EdgeInfo
-              -> Bool -> Int -> EdgeInfo -> (EdgeWeight, EdgeWeight)
-predictBranch tags h1 l1 s1 s1_info h2 l2 s2_info
+predictBranch :: S.Set LocalReg -> Bool -> Int -> EdgeInfo -> EdgeWeight
+              -> Bool -> Int -> EdgeWeight
+              -> (EdgeWeight, EdgeWeight)
+predictBranch tags h1 l1 s1_info !n1 h2 l2 !n2
   = applyHeuristic (applyHeuristic (n1, n2) lehPredicts) ohPredicts
   where
-    -- Normalize weights to total of 1
-    !w1 = max (edgeWeight s1_info) (0)
-    !w2 = max (edgeWeight s2_info) (0)
-    -- Of both weights are <= 0 we set both to 0.5
-    normalizeWeight w = if w1 + w2 == 0 then 0.5 else w/(w1+w2)
-    !n1 = normalizeWeight w1
-    !n2 = normalizeWeight w2
-
     -- Apply result of a heuristic. Argument is the likelihood
     -- predicted for s1.
     applyHeuristic :: (EdgeWeight, EdgeWeight) -> Maybe Prob
@@ -1860,8 +1719,8 @@ predictBranch tags h1 l1 s1 s1_info h2 l2 s2_info
     -- Heuristics return nothing if they don't say anything about this branch
     -- or Just (prob_s1) where prob_s1 is the likelihood for s1 to be the taken
     -- branch. s1 is the successor with the smaller label and need not be the
-    -- true branch: a heuristic that needs the true branch looks it up, as
-    -- ohPredicts does.
+    -- true branch: a heuristic that needs the true branch reads which one
+    -- s1 is off its edge ('isTrueSide'), as ohPredicts does.
     -- The other heuristics from the paper, phPredicts, ghPredicts,
     -- lhhPredicts, chPredicts, shPredicts and rhPredicts, are not implemented:
     -- the WIP in Note [Static Branch Prediction].
@@ -1901,16 +1760,9 @@ predictBranch tags h1 l1 s1 s1_info h2 l2 s2_info
     -- is likely depends on the order of the type's constructors: wrong for
     -- the trees of Data.Map and Data.Set (Note [Static prediction of tag
     -- tests]). This costs only speed, on x86-64 under -fcmm-static-pred.
-    -- BUG: s1 is taken for the true side only where it is ltrue, the label
-    -- the branch was made with, which an edge no longer ends at once the
-    -- linear allocator's fixup block (addNodesBetween) or shortcutting
-    -- (shortcutWeightMap) has redirected it. Where the redirected true
-    -- edge's new target has the smaller label of the two, each side gets
-    -- the other's prediction. This costs only speed, on x86-64 under
-    -- -fcmm-static-pred.
     ohPredicts
-        | CmmSource { trans_cmmNode = src1 } <- transitionSource s1_info
-        , CmmCondBranch cond ltrue _lfalse likely <- src1
+        | s1_src@CmmSource { trans_cmmNode = src1 } <- transitionSource s1_info
+        , CmmCondBranch cond _ltrue _lfalse likely <- src1
         , likely == Nothing
         , CmmMachOp mop args <- cond
         , Just trueProb <- case mop of
@@ -1918,7 +1770,7 @@ predictBranch tags h1 l1 s1 s1_info h2 l2 s2_info
                              MO_Ne {} | any isLit args
                                       , not (any isConTag args) -> Just 0.7
                              _        -> Nothing
-        = if s1 == ltrue then Just trueProb else Just (1 - trueProb)
+        = if isTrueSide s1_src then Just trueProb else Just (1 - trueProb)
 
         | otherwise
         = Nothing
@@ -2006,220 +1858,3 @@ tagSource e = case e of
   CmmMachOp (MO_Sub _) [CmmReg (CmmLocal r), CmmLit (CmmInt 1 _)] -> Just r
   CmmReg (CmmLocal r) -> Just r
   _ -> Nothing
-
--- We normalize all edge weights as probabilities between 0 and 1.
--- Ignoring rounding errors all outgoing edges sum up to 1.
-cfgEdgeProbabilities :: CFG -> (BlockId -> Int) -> IM.IntMap (IM.IntMap Prob)
-cfgEdgeProbabilities cfg toVertex
-    = mapFoldlWithKey foldEdges IM.empty cfg
-  where
-    foldEdges = (\m from toMap -> IM.insert (toVertex from) (normalize toMap) m)
-
-    normalize :: (LabelMap EdgeInfo) -> (IM.IntMap Prob)
-    normalize weightMap
-        | edgeCount <= 1 = mapFoldlWithKey (\m k _ -> IM.insert (toVertex k) 1.0 m) IM.empty weightMap
-        | otherwise = mapFoldlWithKey (\m k _ -> IM.insert (toVertex k) (normalWeight k) m) IM.empty weightMap
-      where
-        edgeCount = mapSize weightMap
-        -- Negative weights are generally allowed but are mapped to zero.
-        -- We then check if there is at least one non-zero edge and if not
-        -- assign uniform weights to all branches.
-        minWeight = 0 :: Prob
-        weightMap' = fmap (\w -> max (weightToDouble . edgeWeight $ w) minWeight) weightMap
-        totalWeight = sum weightMap'
-
-        normalWeight :: BlockId -> Prob
-        normalWeight bid
-         | totalWeight == 0
-         = 1.0 / fromIntegral edgeCount
-         | Just w <- mapLookup bid weightMap'
-         = w/totalWeight
-         | otherwise = panic "impossible"
-
--- This is the fixpoint algorithm from
---   "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus
--- The adaption to Haskell is my own.
---
--- It returns with the frequencies the edges into a block other than the
--- root from a block not before it in the reverse postorder given, the back
--- edges given left out: given 'loopInfo''s back edges and the order of
--- 'revPostorderFrom', whose search visits the blocks as 'findBackEdges'' does,
--- those are the back edges of 'findBackEdges'' that are none of the loops' and
--- not into the root, which only an irreducible region has.
---
--- TODO: nothing checks the result, as sanityCheckCfg checks the CFG against
--- the blocks. A check could compare each block's frequency with the sum of the
--- frequencies on its in-edges; the propagation below departs from that sum
--- at some blocks, among them an irreducible block, a loop head whose cycle
--- probability is capped, and the entry block, which it gives 1 whatever its
--- in-edges.
-calcFreqs :: IM.IntMap (IM.IntMap Prob) -> [(Int,Int)] -> [(Int, [Int])] -> [Int]
-          -> (Array Int Double, IM.IntMap (IM.IntMap Prob), [(Int, Int)])
-calcFreqs graph backEdges loops revPostOrder = runST $ do
-    visitedNodes <- newArray (0,nodeCount-1) False :: ST s (STUArray s Int Bool)
-    blockFreqs <- newArray (0,nodeCount-1) 0.0 :: ST s (STUArray s Int Double)
-    edgeProbs <- newSTRef graph
-    edgeBackProbs <- newSTRef graph
-    searchBacks <- newSTRef []
-
-    -- let traceArray a = do
-    --       vs <- forM [0..nodeCount-1] $ \i -> readArray a i >>= (\v -> return (i,v))
-          -- trace ("array: " ++ show vs) $ return ()
-
-    let  -- See #1600, we need to inline or unboxing makes perf worse.
-        -- {-# INLINE getFreq #-}
-        {-# INLINE visited #-}
-        visited b = unsafeRead visitedNodes b
-        getFreq b = unsafeRead blockFreqs b
-        -- setFreq :: forall s. Int -> Double -> ST s ()
-        setFreq b f = unsafeWrite blockFreqs b f
-        -- setVisited :: forall s. Node -> ST s ()
-        setVisited b = unsafeWrite visitedNodes b True
-        -- Frequency/probability that edge is taken.
-        getProb' arr b1 b2 = readSTRef arr >>=
-            (\graph ->
-                return .
-                        fromMaybe (error "getFreq 1") .
-                        IM.lookup b2 .
-                        fromMaybe (error "getFreq 2") $
-                        (IM.lookup b1 graph)
-            )
-        setProb' arr b1 b2 prob = do
-          g <- readSTRef arr
-          let !m = fromMaybe (error "Foo") $ IM.lookup b1 g
-              !m' = IM.insert b2 prob m
-          writeSTRef arr $! (IM.insert b1 m' g)
-
-        getEdgeFreq b1 b2 = getProb' edgeProbs b1 b2
-        setEdgeFreq b1 b2 = setProb' edgeProbs b1 b2
-        getProb b1 b2 = fromMaybe (error "getProb") $ do
-            m' <- IM.lookup b1 graph
-            IM.lookup b2 m'
-
-        getBackProb b1 b2 = getProb' edgeBackProbs b1 b2
-        setBackProb b1 b2 = setProb' edgeBackProbs b1 b2
-
-
-    let -- calcOutFreqs :: Node -> ST s ()
-        calcOutFreqs bhead block = do
-          !f <- getFreq block
-          forM_ (successors block) $ \bi -> do
-            let !prob = getProb block bi
-            let !succFreq = f * prob
-            setEdgeFreq block bi succFreq
-            -- traceM $ "SetOut: " ++ show (block, bi, f, prob, succFreq)
-            when (bi == bhead) $ setBackProb block bi succFreq
-
-
-    let propFreq block head = do
-            -- traceM ("prop:" ++ show (block,head))
-            -- traceShowM block
-
-            !v <- visited block
-            if v then
-                return () --Dont look at nodes twice
-            else if block == head then
-                setFreq block 1.0 -- Loop header frequency is always 1
-            else do
-                let preds = IS.elems $ predecessors block
-                    irreducibleFrom bp = do
-                      !bp_visited <- visited bp
-                      let bp_backedge = isBackEdge bp block
-                      return (not bp_visited && not bp_backedge)
-                irreducible <- anyM irreducibleFrom preds
-
-                -- An irreducible block keeps the frequency it has, 1 where
-                -- it heads one of loopInfo's loops (that loop's pass set it)
-                -- and else 0, and passes it on to its out-edges below. TODO:
-                -- irreducible blocks are not rare in Haskell code. Such a
-                -- block's frequency, and those of the blocks reached only
-                -- through it, can thus be far below or above what summing its
-                -- inflow would give, and on x86-64 under -fcmm-static-pred
-                -- the layout by default ranks their edges by numbers that do
-                -- not add up. Summing the inflow was tried
-                -- on a development branch, in a replacement of this function:
-                -- nofib's mkhprog ran 0.53% more instructions at -O2, eliza
-                -- 0.20% and megaparsec's many and skipMany 0.72% to 1.06% fewer
-                -- at -O1.
-                if irreducible
-                then -- Nothing to do, but for the edges in the last pass,
-                     -- the one from the root, which is no loop's head
-                     when (head == root) $ do
-                       bps <- filterM irreducibleFrom preds
-                       modifySTRef' searchBacks
-                                    (map (\bp -> (bp, block)) bps ++)
-                else do
-                    setFreq block 0
-                    !cycleProb <- foldM (\ !acc pred -> do
-                        if isBackEdge pred block
-                            then
-                                (acc +) <$> getBackProb pred block
-                            else do
-                                !f <- getFreq block
-                                !prob <- getEdgeFreq pred block
-                                setFreq block $! f + prob
-                                return acc) 0 preds
-                    -- traceM $ "cycleProb:" ++ show cycleProb
-                    let limit = 1 - 1/512 -- Paper uses 1 - epsilon, but this works.
-                                          -- determines how large likelyhoods in loops can grow.
-                    !cycleProb <- return $ min cycleProb limit -- <- return $ if cycleProb > limit then limit else cycleProb
-                    -- traceM $ "cycleProb:" ++ show cycleProb
-
-                    !f <- getFreq block
-                    setFreq block (f / (1.0 - cycleProb))
-
-            setVisited block
-            calcOutFreqs head block
-
-    -- Loops, by nesting, inner to outer.
-    forM_ loops $ \(head, body) -> do
-        forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i True) -- Mark all nodes as visited.
-        forM_ body (\i -> unsafeWrite visitedNodes i False) -- Mark all blocks reachable from head as not visited
-        forM_ body $ \block -> propFreq block head
-
-    -- After dealing with all loops, deal with non-looping parts of the CFG
-    forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i False) -- Everything in revPostOrder is reachable
-    forM_ revPostOrder $ \block -> propFreq block root
-
-    -- trace ("Final freqs:") $ return ()
-    -- let freqString = pprFreqs freqs
-    -- trace (unlines freqString) $ return ()
-    -- trace (pprFre) $ return ()
-    graph' <- readSTRef edgeProbs
-    freqs' <- unsafeFreeze  blockFreqs
-    searchBacks' <- readSTRef searchBacks
-
-    return (freqs', graph', searchBacks')
-  where
-    root = head revPostOrder
-    -- How can these lookups fail? Consider the CFG [A -> B]
-    predecessors :: Int -> IS.IntSet
-    predecessors b = fromMaybe IS.empty $ IM.lookup b revGraph
-    successors :: Int -> [Int]
-    successors b = fromMaybe (lookupError "succ" b graph)$ IM.keys <$> IM.lookup b graph
-    lookupError s b g = pprPanic ("Lookup error " ++ s) $
-                            ( text "node" <+> ppr b $$
-                                text "graph" <+>
-                                vcat (map (\(k,m) -> ppr (k,m :: IM.IntMap Double)) $ IM.toList g)
-                            )
-
-    nodeCount = IM.foldl' (\count toMap -> IM.foldlWithKey' countTargets (count + 1) toMap) 0 graph
-      where
-        countTargets = (\count k _ -> countNode k + count )
-        countNode n = if IM.member n graph then 0 else 1
-
-    -- each block to the blocks its back edges enter: as master's set of the
-    -- edges' pairs, each lookup comparing pairs, they made the compiler run
-    -- 0.098% more instructions compiling !16269's CmmDiamondChain at -O1 and
-    -- -O2, allocating 0.028% less, and 0.043% more instructions compiling
-    -- nofib's puzzle at -O2, and nothing more at -O0, where calcFreqs does not
-    -- run, on GHC 10.1.20261108
-    isBackEdge from to = maybe False (IS.member to) (IM.lookup from backEdgeSet)
-    backEdgeSet = IM.fromListWith IS.union
-      [ (from, IS.singleton to) | (from, to) <- backEdges ]
-
-    revGraph :: IntMap IntSet
-    revGraph = IM.foldlWithKey' (\m from toMap -> addEdges m from toMap) IM.empty graph
-        where
-            addEdges m0 from toMap = IM.foldlWithKey' (\m k _ -> addEdge m from k) m0 toMap
-            addEdge m0 from to = IM.insertWith IS.union to (IS.singleton from) m0

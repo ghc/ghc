@@ -41,3 +41,10 @@ test('T27800', [cmm_src, only_ways(['optasm']), unless(arch('x86_64'), skip),
 test('T8327', [cmm_src, only_ways(['optasm']), grep_errmsg(r'(1234567)', [1])],
      compile, ['-no-hs-main -ddump-cmm'])
 test('CmmRegOffW16', [cmm_src, only_ways(['optasm']), unless(arch('x86_64'), skip)], compile, ['-no-hs-main'])
+# A test whose true edge -fasm-shortcutting moves to a block with a smaller
+# label than its false target: static prediction took that edge for the false
+# side and the layout put the equal side after the test (the unequal side's
+# 2222 must come before the equal side's 1111 in the assembly; x86-64)
+test('StaticPredShortcut', [cmm_src, only_ways(['optasm']), unless(arch('x86_64'), skip),
+                            grep_errmsg(r'leaq (1111|2222)\(', [1])],
+     compile, ['-no-hs-main -fasm-shortcutting -ddump-asm'])
