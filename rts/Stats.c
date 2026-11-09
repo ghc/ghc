@@ -83,6 +83,12 @@ Time stat_getElapsedTime(void)
     return getProcessElapsedTime() - start_init_elapsed;
 }
 
+static void getProcessTimes(Time *user, Time *elapsed)
+{
+    *user    = getProcessCPUTime();
+    *elapsed = getProcessElapsedTime();
+}
+
 /* ---------------------------------------------------------------------------
    Measure the current MUT time, for profiling
    ------------------------------------------------------------------------ */

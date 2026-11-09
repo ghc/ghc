@@ -25,13 +25,6 @@ fileTimeToRtsTime(FILETIME ft)
     return t;
 }
 
-void
-getProcessTimes(Time *user, Time *elapsed)
-{
-    *user    = getProcessCPUTime();
-    *elapsed = getProcessElapsedTime();
-}
-
 Time
 getCurrentThreadCPUTime(void)
 {

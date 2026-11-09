@@ -49,12 +49,6 @@ Time getProcessElapsedTime(void)
     return NSToTime(getMonotonicNSec());
 }
 
-void getProcessTimes(Time *user, Time *elapsed)
-{
-    *user    = getProcessCPUTime();
-    *elapsed = getProcessElapsedTime();
-}
-
 void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
 {
     struct timeval tv;
