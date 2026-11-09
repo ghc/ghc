@@ -601,9 +601,11 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         let cfgWithFixupBlks =
                 (\cfg -> addNodesBetween weights cfg cfgRegAllocUpdates) <$> livenessCfg
 
-        -- Insert stack update blocks
+        -- Insert stack update blocks. allocMoreStack turns each entry block
+        -- into a pre-entry block and retargets local jumps to the new block
+        -- holding its code.
         let postRegCFG =
-                pure (foldl' (\m (from,to) -> addImmediateSuccessor weights from to m ))
+                pure (foldl' (\m (entry,block) -> addPreentryBlock weights entry block m ))
                      <*> cfgWithFixupBlks
                      <*> pure stack_updt_blks
 
@@ -636,9 +638,8 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         when ( ncgEnableDeadCodeElimination config &&
                 (ncgAsmLinting config || debugIsOn )) $ do
                 let blocks = concatMap getBlks shorted
-                let labels = setFromList $ fmap blockId blocks :: LabelSet
                 let cfg = fromJust optimizedCFG
-                return $! seq (sanityCheckCfg cfg labels $
+                return $! seq (sanityCheckCfg cfg blocks $
                                 text "cfg not in lockstep") ()
 
         ---- sequence blocks
