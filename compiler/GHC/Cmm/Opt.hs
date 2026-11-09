@@ -583,13 +583,6 @@ and the reassociation (a + b) + c ==> a + (b + c) no longer moves a literal c
 from the top.
 -}
 
--- | An operand of an addition or subtraction at some width: no term, a term
--- added or a term subtracted, ...
-data AddTerm = NoTerm | Plus !CmmExpr | Minus !CmmExpr
-
--- | ... and the constant added: an integer, or a label literal with its offset.
-data AddConst = KInt !Integer | KLab !CmmLit
-
 -- | What addView finds in an operand: a term alone, a constant alone, or both.
 data AddShape = TermOnly | ConstOnly | TermConst
 
@@ -599,52 +592,6 @@ addShape w e = case addView w e of
   Nothing             -> TermOnly
   Just (NoTerm, _)    -> ConstOnly
   Just _              -> TermConst
-
--- | The term and the constant of an operand at width w in the additive normal
--- form, or Nothing where the operand is a term alone: (e + k) << s and
--- (e + k) * c at w, k an integer, as e << s and e * c with the constant k << s
--- and k * c where it fits in 32 bits (Note [Additive normal form]), and any
--- other operand as sumView has it.
-addView :: Width -> CmmExpr -> Maybe (AddTerm, AddConst)
-addView w e = case e of
-  CmmMachOp op [a, n@(CmmLit (CmmInt m _))]
-    | Just f <- factor op
-    , Just (Plus x, KInt k) <- sumView w a
-    , let k' = narrowS w (k * f)
-    , narrowS W32 k' == k'
-    -> Just (Plus (CmmMachOp op [x, n]), KInt k')
-    where
-      factor (MO_Mul w')
-        | w' == w                           = Just m
-      factor (MO_Shl w')
-        | w' == w, m >= 0
-        , m < toInteger (widthInBits w)     = Just (2 ^ m)
-      factor _                              = Nothing
-  _                                       -> sumView w e
-
--- | addView of an operand that is a sum, a difference, a register offset or
--- a literal, or Nothing.
-sumView :: Width -> CmmExpr -> Maybe (AddTerm, AddConst)
-{-# INLINE sumView #-}
-sumView w e = case e of
-  CmmLit (CmmInt i _)                     -> Just (NoTerm, KInt i)
-  CmmLit l | isLabelLit l                 -> Just (NoTerm, KLab l)
-  CmmMachOp (MO_Add w') [a, CmmLit l] | w' == w -> case l of
-    CmmInt i _                            -> Just (Plus a, KInt i)
-    _ | isLabelLit l, not (isPicReg a)    -> Just (Plus a, KLab l)
-    _                                     -> Nothing
-  CmmMachOp (MO_Sub w') [a, CmmLit (CmmInt i _)]
-    | w' == w                             -> Just (Plus a, KInt (negate i))
-  CmmMachOp (MO_Sub w') [CmmLit (CmmInt i _), a]
-    | w' == w                             -> Just (Minus a, KInt i)
-  CmmRegOff r o
-    | typeWidth (cmmRegType r) == w       -> Just (Plus (CmmReg r), KInt (toInteger o))
-  _                                       -> Nothing
-
-isLabelLit :: CmmLit -> Bool
-isLabelLit CmmLabel{}    = True
-isLabelLit CmmLabelOff{} = True
-isLabelLit _             = False
 
 -- | x + y (or x - y, if the flag is set) at width w in the additive normal
 -- form, given x and y in it; Nothing where it is that already, or where it
@@ -782,11 +729,6 @@ maybe_comparison (MO_S_Lt _) rep False = Just (MO_U_Lt rep)
 maybe_comparison (MO_S_Le _) rep False = Just (MO_U_Le rep)
 maybe_comparison _ _ _ = Nothing
 
--- | Check that a literal width is compatible with the host word size used to
--- store offsets. This should be fixed properly (using larger types to store
--- literal offsets). See #24893
-validOffsetRep :: Width -> Bool
-validOffsetRep rep = widthInBits rep <= finiteBitSize (undefined :: Int)
 
 
 -- Is this a vector 'MachOp' that is an element-wise lift of
@@ -851,10 +793,3 @@ we really want to convert to
 
 That's what the constant-folding operations on comparison operators do above.
 -}
-
--- -----------------------------------------------------------------------------
--- Utils
-
-isPicReg :: CmmExpr -> Bool
-isPicReg (CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _))) = True
-isPicReg _ = False

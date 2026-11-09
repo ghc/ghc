@@ -114,6 +114,16 @@ test('ClosureTblAmode', [only_ways(['optasm']), unless(arch('x86_64'), skip),
                          grep_errmsg(r'(_closure_tbl\(,?%)', [1])],
      compile, ['-ddump-asm'])
 
+# A constructor's index plus or minus a literal, and the next or the previous
+# constructor loaded from its closure table: the - 1 that takes the index from
+# the pointer's tag folded into the literal or into the table's displacement
+# (x86-64 assembly)
+test('EnumTagOffset',
+     [only_ways(['optasm']), unless(arch('x86_64'), skip),
+      grep_errmsg(r'(leaq -?\d+\(%r14\)|subq \$1,|_closure_tbl[^(\s]*\()',
+                  [1])],
+     compile, ['-ddump-asm'])
+
 test('T17648', js_broken(22370), makefile_test, [])
 test('T17904', normal, compile, ['-O'])
 test('T18227A', normal, compile, [''])

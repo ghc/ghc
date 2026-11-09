@@ -21,6 +21,8 @@ module GHC.Cmm.Utils(
         mkIntExpr, zeroExpr,
         mkLblExpr,
         cmmRegOff,  cmmOffset,  cmmLabelOff,  cmmOffsetLit,  cmmOffsetExpr,
+        AddTerm(..), AddConst(..), addView, isLabelLit, isPicReg,
+        validOffsetRep,
         cmmRegOffB, cmmOffsetB, cmmLabelOffB, cmmOffsetLitB, cmmOffsetExprB,
         cmmRegOffW, cmmOffsetW, cmmLabelOffW, cmmOffsetLitW, cmmOffsetExprW,
         cmmIndex, cmmIndexExpr, cmmLoadIndex, cmmLoadIndexW,
@@ -238,12 +240,31 @@ cmmOffset platform  e byte_off = case e of
    CmmLit lit            -> CmmLit (cmmOffsetLit lit byte_off)
    CmmStackSlot area off -> CmmStackSlot area (off - byte_off)
   -- note stack area offsets increase towards lower addresses
-   CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt byte_off1 _rep)]
-      -> let !lit_off = (byte_off1 + toInteger byte_off)
-         in CmmMachOp (MO_Add rep) [expr, CmmLit (CmmInt lit_off rep)]
+   -- a sum or difference with a constant, in Note [Additive normal form] of
+   -- GHC.Cmm.Opt: the offset added to its constant
+   CmmMachOp op _
+      | Just w <- addWidth op
+      , Just (t, k) <- addView w e
+      , Just e' <- offsetSum w t k
+      -> e'
    _ -> let !width = cmmExprWidth platform e
         in
         CmmMachOp (MO_Add width) [e, CmmLit (CmmInt (toInteger byte_off) width)]
+  where
+    addWidth (MO_Add w) = Just w
+    addWidth (MO_Sub w) = Just w
+    addWidth _          = Nothing
+    offsetSum w (Plus t) (KInt k)
+      | k' == 0                         = Just t
+      | CmmReg r <- t, validOffsetRep w = Just $! cmmRegOff r (fromInteger k')
+      | otherwise = Just $! CmmMachOp (MO_Add w) [t, CmmLit (CmmInt k' w)]
+      where k' = narrowS w (k + toInteger byte_off)
+    offsetSum w (Minus t) (KInt k) =
+      Just $! CmmMachOp (MO_Sub w)
+                [CmmLit (CmmInt (narrowS w (k + toInteger byte_off)) w), t]
+    offsetSum w (Plus t) (KLab l)  =
+      Just $! CmmMachOp (MO_Add w) [t, CmmLit (cmmOffsetLit l byte_off)]
+    offsetSum _ _ _                = Nothing
 
 -- Smart constructor for CmmRegOff.  Same caveats as cmmOffset above.
 cmmRegOff :: CmmReg -> Int -> CmmExpr
@@ -262,6 +283,69 @@ cmmLabelOff :: CLabel -> Int -> CmmLit
 -- Smart constructor for CmmLabelOff
 cmmLabelOff lbl 0        = CmmLabel lbl
 cmmLabelOff lbl byte_off = CmmLabelOff lbl byte_off
+
+-- | An operand of an addition or subtraction at some width: no term, a term
+-- added or a term subtracted, ...
+data AddTerm = NoTerm | Plus !CmmExpr | Minus !CmmExpr
+
+-- | ... and the constant added: an integer, or a label literal with its offset.
+data AddConst = KInt !Integer | KLab !CmmLit
+
+-- | The term and the constant of an operand at width w in the additive normal
+-- form, or Nothing where the operand is a term alone: (e + k) << s and
+-- (e + k) * c at w, k an integer, as e << s and e * c with the constant k << s
+-- and k * c where it fits in 32 bits (Note [Additive normal form] in
+-- GHC.Cmm.Opt), and any other operand as sumView has it.
+addView :: Width -> CmmExpr -> Maybe (AddTerm, AddConst)
+addView w e = case e of
+  CmmMachOp op [a, n@(CmmLit (CmmInt m _))]
+    | Just f <- factor op
+    , Just (Plus x, KInt k) <- sumView w a
+    , let k' = narrowS w (k * f)
+    , narrowS W32 k' == k'
+    -> Just (Plus (CmmMachOp op [x, n]), KInt k')
+    where
+      factor (MO_Mul w')
+        | w' == w                           = Just m
+      factor (MO_Shl w')
+        | w' == w, m >= 0
+        , m < toInteger (widthInBits w)     = Just (2 ^ m)
+      factor _                              = Nothing
+  _                                       -> sumView w e
+
+-- | addView of an operand that is a sum, a difference, a register offset or
+-- a literal, or Nothing.
+sumView :: Width -> CmmExpr -> Maybe (AddTerm, AddConst)
+{-# INLINE sumView #-}
+sumView w e = case e of
+  CmmLit (CmmInt i _)                     -> Just (NoTerm, KInt i)
+  CmmLit l | isLabelLit l                 -> Just (NoTerm, KLab l)
+  CmmMachOp (MO_Add w') [a, CmmLit l] | w' == w -> case l of
+    CmmInt i _                            -> Just (Plus a, KInt i)
+    _ | isLabelLit l, not (isPicReg a)    -> Just (Plus a, KLab l)
+    _                                     -> Nothing
+  CmmMachOp (MO_Sub w') [a, CmmLit (CmmInt i _)]
+    | w' == w                             -> Just (Plus a, KInt (negate i))
+  CmmMachOp (MO_Sub w') [CmmLit (CmmInt i _), a]
+    | w' == w                             -> Just (Minus a, KInt i)
+  CmmRegOff r o
+    | typeWidth (cmmRegType r) == w       -> Just (Plus (CmmReg r), KInt (toInteger o))
+  _                                       -> Nothing
+
+isLabelLit :: CmmLit -> Bool
+isLabelLit CmmLabel{}    = True
+isLabelLit CmmLabelOff{} = True
+isLabelLit _             = False
+
+-- | Check that a literal width is compatible with the host word size used to
+-- store offsets. This should be fixed properly (using larger types to store
+-- literal offsets). See #24893
+validOffsetRep :: Width -> Bool
+validOffsetRep rep = widthInBits rep <= finiteBitSize (undefined :: Int)
+
+isPicReg :: CmmExpr -> Bool
+isPicReg (CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _))) = True
+isPicReg _ = False
 
 -- | Useful for creating an index into an array, with a statically known offset.
 -- The type is the element type; used for making the multiplier
