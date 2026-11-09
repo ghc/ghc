@@ -137,6 +137,7 @@ import Language.Haskell.Syntax.BooleanFormula (BooleanFormula)
 import Language.Haskell.Syntax.BooleanFormula qualified as BF(BooleanFormula(..))
 import Language.Haskell.Syntax.Extension (NoExtField (NoExtField))
 import GHC.Builtin.KnownKeys (ioTyConKey)
+import GHC.Unit.Home.PackageTable
 
 {-
 This module takes
@@ -631,12 +632,13 @@ tcHiBootIface hsc_src mod
         -- current module, which either means a module loop (not
         -- a SOURCE import) or that our hi-boot file has mysteriously
         -- disappeared.
-    do  { eps <- getEps
-        ; case lookupInstalledModuleEnv (eps_is_boot eps) (toUnitId <$> mod) of
+    do  { hpt <- getHpt
+        ; hls <- liftIO $ hptLoaderState hpt
+        ; case hlsIsBoot hls (toUnitId <$> mod) of
             -- The typical case
             Nothing -> return NoSelfBoot
             -- error cases
-            Just (GWIB { gwib_isBoot = is_boot }) -> case is_boot of
+            Just is_boot -> case is_boot of
               IsBoot ->
                 let diag = Can'tFindInterface err
                              (LookingForHiBoot mod)

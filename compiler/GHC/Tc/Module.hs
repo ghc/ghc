@@ -157,7 +157,6 @@ import GHC.Types.SourceFile
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Unit.Env as UnitEnv
-import GHC.Unit.External
 import GHC.Unit.Types
 import GHC.Unit.State
 import GHC.Unit.Home
@@ -192,6 +191,7 @@ import qualified Data.Map as M
 import Data.Foldable ( for_ )
 import Data.Traversable ( for )
 import Data.IORef( newIORef )
+import GHC.Unit.Home.PackageTable (hlsSetBootInfo)
 
 {-
 ************************************************************************
@@ -513,7 +513,8 @@ tcRnImports hsc_env import_decls
           -- visible to loadHiBootInterface in tcRnSrcDecls,
           -- and any other incrementally-performed imports
         ; when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
-            updateEps_ $ \eps  -> eps { eps_is_boot = imp_boot_mods imports }
+            ; hpt <- getHpt
+            ; liftIO $ hlsSetBootInfo hpt (imp_boot_mods imports)
          }
 
                 -- Update the gbl env

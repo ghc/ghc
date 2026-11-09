@@ -13,7 +13,12 @@ module GHC.Unit.Module.Env
    , extendModuleEnvWith, filterModuleEnv, mapMaybeModuleEnv
 
      -- * ModuleName mappings
-   , ModuleNameEnv, DModuleNameEnv
+   , ModuleNameEnv
+   , extendModuleNameEnv
+   , emptyModuleNameEnv
+   , lookupModuleNameEnv
+   , unionModuleNameEnv
+   , DModuleNameEnv
 
      -- * Sets of Modules
    , ModuleSet
@@ -234,6 +239,17 @@ UniqFM.
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 type ModuleNameEnv elt = UniqFM ModuleName elt
 
+extendModuleNameEnv :: ModuleNameEnv elt -> ModuleName -> elt -> ModuleNameEnv elt
+extendModuleNameEnv = addToUFM
+
+emptyModuleNameEnv :: ModuleNameEnv elt
+emptyModuleNameEnv = emptyUFM
+
+lookupModuleNameEnv :: ModuleNameEnv elt -> ModuleName -> Maybe elt
+lookupModuleNameEnv = lookupUFM
+
+unionModuleNameEnv :: ModuleNameEnv elt -> ModuleNameEnv elt -> ModuleNameEnv elt
+unionModuleNameEnv = unionModuleNameEnv
 
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 -- Has deterministic folds and can be deterministically converted to a list

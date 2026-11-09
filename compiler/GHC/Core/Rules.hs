@@ -13,8 +13,9 @@ module GHC.Core.Rules (
 
         -- ** RuleBase, RuleEnv
         RuleBase, RuleEnv(..), mkRuleEnv, emptyRuleEnv,
-        updExternalPackageRules, addLocalRules, updLocalRules,
-        emptyRuleBase, mkRuleBase, extendRuleBaseList,
+        updExternalPackageRules, updHomePackageRules,
+        addLocalRules, updLocalRules,
+        emptyRuleBase, mkRuleBase, extendRuleBaseList, unionRuleBase,
         pprRuleBase,
 
         -- ** Checking rule applications
@@ -398,6 +399,10 @@ extendRuleBase rule_base rule
 lookupRuleBase :: RuleBase -> Unique -> Maybe [CoreRule]
 lookupRuleBase = lookupUFM
 
+unionRuleBase :: RuleBase -> RuleBase -> RuleBase
+unionRuleBase
+  = plusUFM
+
 pprRuleBase :: RuleBase -> SDoc
 pprRuleBase rules = pprUFM rules $ \rss ->
   vcat [ pprRules (tidyRules emptyTidyEnv rs)
@@ -432,6 +437,10 @@ updExternalPackageRules :: RuleEnv -> RuleBase -> RuleEnv
 -- Completely over-ride the external rules in RuleEnv
 updExternalPackageRules rule_env eps_rules
   = rule_env { re_eps_rules = eps_rules }
+
+updHomePackageRules :: RuleEnv -> RuleBase -> RuleEnv
+updHomePackageRules rule_env eps_rules
+  = rule_env { re_home_rules = (re_home_rules rule_env ) `unionRuleBase` eps_rules }
 
 updLocalRules :: RuleEnv -> [CoreRule] -> RuleEnv
 -- Completely over-ride the local rules in RuleEnv

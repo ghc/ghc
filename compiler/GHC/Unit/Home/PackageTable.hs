@@ -23,8 +23,11 @@
 -- 'hptCollectObjects'...
 module GHC.Unit.Home.PackageTable
   (
-    HomePackageTable(..)
+    HomePackageTable
   , emptyHomePackageTable
+
+  , HomeLoaderState -- TODO: should this be opaque? Probably
+  , emptyHomeLoaderState
 
     -- * Lookups in the HPT
   , lookupHpt
@@ -33,6 +36,7 @@ module GHC.Unit.Home.PackageTable
     -- * Extending the HPT
   , addHomeModInfoToHpt
   , addHomeModInfosToHpt
+  , addOnDemandHomeModule
 
     -- * Restrict the HPT
   , restrictHpt
@@ -42,6 +46,18 @@ module GHC.Unit.Home.PackageTable
   , hptAllInstances
   , hptAllFamInstances
   , hptAllAnnotations
+  , hlsIsModuleNameWithBoot
+  , hlsIsBoot
+  , hlsSetBootInfo
+  , hptLoadedIsBoot
+  , hptLoadedTypeEnv
+  , hptLoadedInstEnv
+  , hptLoadedFamInstEnv
+  , hptLoadedModFamInstEnv
+  , hptLoadedRuleBase
+  , hptLoadedAnnEnv
+  , hptLoadedCompleteMatches
+  , hptLoadedDefaults
 
     -- ** More Traversal-based queries
   , hptCollectDependencies
@@ -64,7 +80,7 @@ module GHC.Unit.Home.PackageTable
     -- it is not sufficient to go through the intended insert-only API.
   , hptInternalTableRef
   , hptInternalTableFromRef
-
+  , hptLoaderState
     -- * Legacy API
     --
     -- | This API is deprecated and meant to be removed.
@@ -80,8 +96,14 @@ import qualified Data.Set as Set
 
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv
+import GHC.Core.Rules (RuleBase, extendRuleBaseList, emptyRuleBase)
+import GHC.Data.Word64Set qualified as W64
+import GHC.Linker.Types (Linkable)
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
+import GHC.Types.TypeEnv
+import GHC.Types.TyThing
+import GHC.Types.Unique (getKey, getUnique)
 import GHC.Types.Unique.DFM
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module
@@ -89,13 +111,15 @@ import GHC.Unit.Module.Deps
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModIface
 import GHC.Utils.Outputable
-import GHC.Types.Unique (getUnique, getKey)
-import qualified GHC.Data.Word64Set as W64
+import GHC.Types.Name
+import GHC.Types.Name.Env (extendNameEnvList)
+import GHC.Types.DefaultEnv (DefaultEnv)
+import GHC.Core
 
 -- | Helps us find information about modules in the home package
-newtype HomePackageTable = HPT {
+data HomePackageTable = HPT {
 
-    table :: IORef (DModuleNameEnv HomeModInfo)
+    table :: IORef (DModuleNameEnv HomeModInfo),
     -- ^ Domain = modules in this home unit
     --
     -- This is an IORef because we want to avoid leaking HPTs (see the particularly bad #25511).
@@ -109,6 +133,7 @@ newtype HomePackageTable = HPT {
     -- to temporarily violate the HPT monotonicity.
     --
     -- The elements of this table may be updated (e.g. on rehydration).
+    loader :: IORef HomeLoaderState
   }
 
 -- | Create a new 'HomePackageTable'.
@@ -120,7 +145,38 @@ emptyHomePackageTable :: IO HomePackageTable
 -- romes:todo: use a MutableArray directly?
 emptyHomePackageTable = do
   table <- newIORef emptyUDFM
-  return HPT{table}
+  loader <- newIORef emptyHomeLoaderState
+  return HPT{table, loader}
+
+data HomeLoaderState = HomeLoaderState
+  { hls_is_boot          :: InstalledModuleEnv ModuleNameWithIsBoot
+  , hls_iface_table      :: ModuleEnv ModIface
+  , hls_type_env         :: !TypeEnv
+  , hls_iface_bytecode   :: !(ModuleEnv (IO Linkable))
+  , hls_inst_env         :: !InstEnv
+  , hls_fam_inst_env     :: !FamInstEnv
+  , hls_mod_fam_inst_env :: !(ModuleEnv FamInstEnv)
+  , hls_rule_base        :: !RuleBase
+  , hls_ann_env          :: !AnnEnv
+  , hls_complete_matches :: !CompleteMatches
+  , hls_defaults         :: ModuleEnv DefaultEnv
+  }
+
+emptyHomeLoaderState :: HomeLoaderState
+emptyHomeLoaderState =
+  HomeLoaderState
+    { hls_is_boot = emptyInstalledModuleEnv
+    , hls_iface_table = emptyModuleEnv
+    , hls_type_env = emptyTypeEnv
+    , hls_iface_bytecode = emptyModuleEnv
+    , hls_inst_env = emptyInstEnv
+    , hls_fam_inst_env = emptyFamInstEnv
+    , hls_mod_fam_inst_env = emptyModuleEnv
+    , hls_rule_base = emptyRuleBase
+    , hls_ann_env = emptyAnnEnv
+    , hls_complete_matches = []
+    , hls_defaults = emptyModuleEnv
+    }
 
 --------------------------------------------------------------------------------
 -- * Lookups in the HPT
@@ -138,6 +194,36 @@ lookupHptByModule hpt mod
     lookupHpt hpt (moduleName mod) >>= pure . \case
       Just hm | mi_module (hm_iface hm) == mod -> Just hm
       _otherwise                               -> Nothing
+
+hptLoaderState :: HomePackageTable -> IO HomeLoaderState
+hptLoaderState = readIORef . loader
+
+hptLoadedIsBoot :: HomePackageTable -> IO (InstalledModuleEnv ModuleNameWithIsBoot)
+hptLoadedIsBoot hpt = hls_is_boot <$> readIORef (loader hpt)
+
+hptLoadedTypeEnv :: HomePackageTable -> IO TypeEnv
+hptLoadedTypeEnv hpt = hls_type_env <$> readIORef (loader hpt)
+
+hptLoadedInstEnv :: HomePackageTable -> IO InstEnv
+hptLoadedInstEnv hpt = hls_inst_env <$> readIORef (loader hpt)
+
+hptLoadedFamInstEnv :: HomePackageTable -> IO FamInstEnv
+hptLoadedFamInstEnv hpt = hls_fam_inst_env <$> readIORef (loader hpt)
+
+hptLoadedModFamInstEnv :: HomePackageTable -> IO (ModuleEnv FamInstEnv)
+hptLoadedModFamInstEnv hpt = hls_mod_fam_inst_env <$> readIORef (loader hpt)
+
+hptLoadedRuleBase :: HomePackageTable -> IO RuleBase
+hptLoadedRuleBase hpt = hls_rule_base <$> readIORef (loader hpt)
+
+hptLoadedAnnEnv :: HomePackageTable -> IO AnnEnv
+hptLoadedAnnEnv hpt = hls_ann_env <$> readIORef (loader hpt)
+
+hptLoadedCompleteMatches :: HomePackageTable -> IO CompleteMatches
+hptLoadedCompleteMatches hpt = hls_complete_matches <$> readIORef (loader hpt)
+
+hptLoadedDefaults :: HomePackageTable -> IO (ModuleEnv DefaultEnv)
+hptLoadedDefaults hpt = hls_defaults <$> readIORef (loader hpt)
 
 --------------------------------------------------------------------------------
 -- * Extending the HPT
@@ -186,6 +272,56 @@ restrictHpt HPT{table=hptr} hmis =
 addListToHpt :: HomePackageTable -> [(ModuleName, HomeModInfo)] -> IO ()
 addListToHpt hpt = mapM_ (uncurry (addToHpt hpt))
 
+addOnDemandHomeModule :: HomePackageTable -> Module -> ModIface -> Bool -> ([(Name, TyThing)], [ClsInst], DefaultEnv, [FamInst], [CoreRule], [Annotation], [CompleteMatch]) -> Maybe (IO Linkable) -> IO ()
+addOnDemandHomeModule hpt mn iface bad_boot (new_hls_decls, new_hls_insts, new_hls_defaults, new_hls_fam_insts, new_hls_rules, new_hls_anns, new_hls_complete_matches) bytecode = do
+  atomicModifyIORef (loader hpt) $ \hls ->
+    ( if mn `elemModuleEnv` hls_iface_table hls
+        then hls -- If already loaded, don't add twice
+        else
+          if bad_boot
+            then addHomeModTypeEnv hls
+            else addHomeModData hls
+    , ()
+    )
+  where
+    addHomeModTypeEnv hls = hls
+      { hls_type_env = extendNameEnvList   (hls_type_env hls) new_hls_decls
+      }
+
+    addHomeModData hls = hls {
+      hls_iface_table    =  extendModuleEnv (hls_iface_table hls) mn iface,
+      hls_type_env       = extendNameEnvList   (hls_type_env hls) new_hls_decls,
+      hls_iface_bytecode = case bytecode of
+        Nothing -> hls_iface_bytecode hls
+        Just bc -> extendModuleEnv (hls_iface_bytecode hls) mn bc,
+      hls_rule_base      = extendRuleBaseList (hls_rule_base hls)
+                                            new_hls_rules,
+      hls_complete_matches
+                         = hls_complete_matches hls ++ new_hls_complete_matches,
+      hls_inst_env       = extendInstEnvList (hls_inst_env hls)
+                                            new_hls_insts,
+      hls_fam_inst_env   = extendFamInstEnvList (hls_fam_inst_env hls)
+                                              new_hls_fam_insts,
+      hls_ann_env        = extendAnnEnvList (hls_ann_env hls)
+                                          new_hls_anns,
+      hls_mod_fam_inst_env
+                         =
+                          let
+                            fam_inst_env =
+                              extendFamInstEnvList emptyFamInstEnv
+                                                  new_hls_fam_insts
+                          in
+                          extendModuleEnv (hls_mod_fam_inst_env hls)
+                                          mn
+                                          fam_inst_env,
+      hls_defaults       =  extendModuleEnv (hls_defaults hls) mn new_hls_defaults
+  }
+
+hlsSetBootInfo :: HomePackageTable -> InstalledModuleEnv ModuleNameWithIsBoot -> IO ()
+hlsSetBootInfo hpt is_boot_env =
+  atomicModifyIORef' (loader hpt) $ \ hls ->
+    (hls { hls_is_boot = is_boot_env }, ())
+
 ----------------------------------------------------------------------------------
 ---- * Queries
 ----------------------------------------------------------------------------------
@@ -216,6 +352,11 @@ hptAllFamInstances = fmap mkModuleEnv . concatHpt (\hmi -> [(hmiModule hmi, hmiF
 hptAllAnnotations :: HomePackageTable -> IO AnnEnv
 hptAllAnnotations = fmap mkAnnEnv . concatHpt (md_anns . hm_details)
 
+hlsIsBoot :: HomeLoaderState -> InstalledModule -> Maybe IsBootInterface
+hlsIsBoot hls mn = gwib_isBoot <$> hlsIsModuleNameWithBoot hls mn
+
+hlsIsModuleNameWithBoot :: HomeLoaderState -> InstalledModule -> Maybe ModuleNameWithIsBoot
+hlsIsModuleNameWithBoot hls mn = lookupInstalledModuleEnv (hls_is_boot hls) mn
 
 --------------------------------------------------------------------------------
 -- * Traversal-based queries
@@ -315,7 +456,8 @@ hptInternalTableRef = table
 -- Use with care, only if you can really justify going around the intended insert-only API.
 hptInternalTableFromRef :: IORef (DModuleNameEnv HomeModInfo) -> IO HomePackageTable
 hptInternalTableFromRef ref = do
+  loader <- newIORef emptyHomeLoaderState
   return HPT {
-    table = ref
+    table = ref,
+    loader
   }
-

@@ -152,6 +152,13 @@ import Data.Function ((&))
 import Data.Map ( toList )
 import System.FilePath
 import System.Directory
+import GHC.Types.DefaultEnv (DefaultEnv)
+import GHC.Core (CoreRule)
+import GHC.Unit.Module.ModDetails (ModDetails(..))
+import GHC.Unit.Home.ModInfo (HomeModInfo(..), emptyHomeModInfoLinkable)
+import qualified Data.Set as Set
+import qualified GHC.Unit.Home.PackageTable as HomePackageTable
+import Control.Applicative ((<|>))
 
 
 {- *********************************************************************
@@ -513,8 +520,9 @@ importDecl name
           ; Succeeded _ -> do
 
         -- Now look it up again; this time we should find it
-        { eps <- getEps
-        ; case lookupTypeEnv (eps_PTE eps) name of
+        { eps <- getEps -- @fendor: DONE
+        ; loaderTypeEnv <- queryHpt HomePackageTable.hptLoadedTypeEnv
+        ; case lookupTypeEnv loaderTypeEnv name <|> lookupTypeEnv (eps_PTE eps) name of
             Just thing -> return $ Succeeded thing
             Nothing    -> return $ Failed $
               Can'tFindNameInInterface name
@@ -789,7 +797,9 @@ loadInterface doc_str mod from
             _ -> do {
 
         -- READ THE MODULE IN
-        ; read_result <- case wantHiBootFile mhome_unit eps mod from of
+        ; hpt <- getHpt
+        ; hls <- liftIO (hptLoaderState hpt)
+        ; read_result <- case wantHiBootFile mhome_unit hls mod from of
                            Failed err             -> return (Failed err)
                            Succeeded hi_boot_file -> do
                              hsc_env <- getTopEnv
@@ -818,114 +828,171 @@ loadInterface doc_str mod from
         let
             loc_doc = text (ml_hi_file loc)
         in
-        initIfaceLcl (mi_semantic_module iface) loc_doc (mi_boot iface) $
+        initIfaceLcl (mi_semantic_module iface) loc_doc (mi_boot iface) $ do
 
-        dontLeakTheHUG $ do
-
-        --      Load the new ModIface into the External Package State
-        -- Even home-package interfaces loaded by loadInterface
-        --      (which only happens in OneShot mode; in Batch/Interactive
-        --      mode, home-package modules are loaded one by one into the HPT)
-        -- are put in the EPS.
-        --
-        -- The main thing is to add the ModIface to the PIT, but
-        -- we also take the
-        --      IfaceDecls, IfaceClsInst, IfaceFamInst, IfaceRules,
-        -- out of the ModIface and put them into the big EPS pools
-
-        -- NB: *first* we do tcIfaceDecls, so that the provenance of all the locally-defined
-        ---    names is done correctly (notably, whether this is an .hi file or .hi-boot file).
-        --     If we do loadExport first the wrong info gets into the cache (unless we
-        --      explicitly tag each export which seems a bit of a bore)
-
-        -- Crucial assertion that checks if you are trying to load a HPT module into the EPS.
-        -- If you start loading HPT modules into the EPS then you get strange errors about
-        -- overlapping instances.
-        ; massertPpr
-              ((isOneShot (ghcMode (hsc_dflags hsc_env)))
-                || moduleUnitId mod `notElem` hsc_all_home_unit_ids hsc_env
-                || mod == gHC_PRIM)
-                (text "Attempting to load home package interface into the EPS" $$ ppr (HUG.allUnits hug) $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
-        ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
-        ; new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
-        ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
-        ; new_eps_defaults  <- tcIfaceDefaults mod (mi_defaults iface)
-        ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-        ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
-        ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
-        ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
-        ; purged_hsc_env <- getTopEnv
-
-        ; let final_iface = iface
-                               & set_mi_decls     (panic "No mi_decls in PIT")
-                               & set_mi_insts     (panic "No mi_insts in PIT")
-                               & set_mi_defaults  (panic "No mi_defaults in PIT")
-                               & set_mi_fam_insts (panic "No mi_fam_insts in PIT")
-                               & set_mi_rules     (panic "No mi_rules in PIT")
-                               & set_mi_anns      (panic "No mi_anns in PIT")
-                               & set_mi_simplified_core (panic "No mi_simplified_core in PIT")
-
-              bad_boot = mi_boot iface == IsBoot
-                          && isJust (lookupKnotVars (if_rec_types gbl_env) mod)
-                            -- Warn against an EPS-updating import
-                            -- of one's own boot file! (one-shot only)
-                            -- See Note [Loading your own hi-boot file]
-
-              -- Create an IO action that loads and compiles bytecode from Core
-              -- bindings.
+        ; if fromMaybe False $ fmap (`isHomeModule` mod) mhome_unit -- TODO @fendor: horrible code
+            then do -- TODO @fendor: document that we don't want/need 'dontLeakTheHUG' here
+              massertPpr (moduleUnitId mod `Set.member` hsc_all_home_unit_ids hsc_env)
+                      (text "Attempting to non-home package interface into the Home Loader State" $$ ppr (HUG.allUnits $ hsc_HUG hsc_env) $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
+              tcParts <- tcPartsOfTheIface mod iface
+              addModIfacePartsToHpt gbl_env mod loc iface tcParts
+            else dontLeakTheHUG $ do
+              --      Load the new ModIface into the External Package State
               --
-              -- See Note [Interface Files with Core Definitions]
-              add_bytecode old
-                | Just action <- loadIfaceByteCode purged_hsc_env iface loc (mkNameEnv new_eps_decls)
-                = extendModuleEnv old mod action
-                -- Don't add an entry if the iface doesn't have 'extra_decls'
-                -- so 'get_link_deps' knows that it should load object code.
-                | otherwise
-                = old
+              -- The main thing is to add the ModIface to the PIT, but
+              -- we also take the
+              --      IfaceDecls, IfaceClsInst, IfaceFamInst, IfaceRules,
+              -- out of the ModIface and put them into the big EPS pools
 
-        ; warnPprTrace bad_boot "loadInterface" (ppr mod) $
-          updateEps_  $ \ eps ->
-           if elemModuleEnv mod (eps_PIT eps) || is_external_sig mhome_unit iface
-                then eps
-           else if bad_boot
-                -- See Note [Loading your own hi-boot file]
-                then eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
-           else
-                eps {
-                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
-                  eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
-                  eps_iface_bytecode = add_bytecode (eps_iface_bytecode eps),
-                  eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
-                                                        new_eps_rules,
-                  eps_complete_matches
-                                   = eps_complete_matches eps ++ new_eps_complete_matches,
-                  eps_inst_env     = extendInstEnvList (eps_inst_env eps)
-                                                       new_eps_insts,
-                  eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
-                                                          new_eps_fam_insts,
-                  eps_ann_env      = extendAnnEnvList (eps_ann_env eps)
-                                                      new_eps_anns,
-                  eps_mod_fam_inst_env
-                                   = let
-                                       fam_inst_env =
-                                         extendFamInstEnvList emptyFamInstEnv
-                                                              new_eps_fam_insts
-                                     in
-                                     extendModuleEnv (eps_mod_fam_inst_env eps)
-                                                     mod
-                                                     fam_inst_env,
-                  eps_stats        = addEpsInStats (eps_stats eps)
-                                                   (length new_eps_decls)
-                                                   (length new_eps_insts)
-                                                   (length new_eps_rules),
-                  eps_defaults    =  extendModuleEnv (eps_defaults eps) mod new_eps_defaults
-                                                   }
+              -- NB: *first* we do tcIfaceDecls, so that the provenance of all the locally-defined
+              ---    names is done correctly (notably, whether this is an .hi file or .hi-boot file).
+              --     If we do loadExport first the wrong info gets into the cache (unless we
+              --      explicitly tag each export which seems a bit of a bore)
+
+              -- Crucial assertion that checks if you are trying to load a HPT module into the EPS.
+              -- If you start loading HPT modules into the EPS then you get strange errors about
+              -- overlapping instances.
+
+              massertPpr
+                    (moduleUnitId mod `Set.notMember` hsc_all_home_unit_ids hsc_env
+                      || mod == gHC_PRIM)
+                      (text "Attempting to load home package interface into the EPS" $$ ppr (HUG.allUnits $ hsc_HUG hsc_env) $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
+              tcParts <- tcPartsOfTheIface mod iface
+              addModIfacePartsToEps gbl_env mod loc iface tcParts
 
         ; -- invoke plugins with *full* interface, not final_iface, to ensure
           -- that plugins have access to declarations, etc.
           res <- withPlugins (hsc_plugins hsc_env) (\p -> interfaceLoadAction p) iface
         ; return (Succeeded res)
     }}}}
+
+tcPartsOfTheIface :: Module -> ModIface -> IfL ([(Name, TyThing)], [ClsInst], DefaultEnv, [FamInst], [CoreRule], [Annotation], CompleteMatches)
+tcPartsOfTheIface mod iface = do
+  ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
+  new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
+  new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
+  new_eps_defaults  <- tcIfaceDefaults mod (mi_defaults iface)
+  new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+  new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+  new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
+  new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
+  pure
+    ( new_eps_decls
+    , new_eps_insts
+    , new_eps_defaults
+    , new_eps_fam_insts
+    , new_eps_rules
+    , new_eps_anns
+    , new_eps_complete_matches
+    )
+
+addModIfacePartsToHpt :: IfGblEnv -> Module -> ModLocation -> ModIface -> ([(Name, TyThing)], [ClsInst], DefaultEnv, [FamInst], [CoreRule],  [Annotation], [CompleteMatch]) -> IfL ()
+addModIfacePartsToHpt gbl_env mod loc iface (new_eps_decls, new_eps_insts, new_eps_defaults, new_eps_fam_insts, new_eps_rules, new_eps_anns, new_eps_complete_matches) = do
+  ; hsc_env <- getTopEnv
+  ; let details = ModDetails
+                            { md_types            = mkNameEnv new_eps_decls
+                            , md_exports          = mi_exports iface
+                            , md_defaults         = new_eps_defaults
+                            , md_insts            = mkInstEnv new_eps_insts
+                            , md_fam_insts        = new_eps_fam_insts
+                            , md_rules            = new_eps_rules
+                            , md_anns             = new_eps_anns
+                            , md_complete_matches = new_eps_complete_matches
+                            }
+  ; let final_iface = iface
+                          & set_mi_decls     (panic "No mi_decls in HomeLoaderState")
+                          & set_mi_insts     (panic "No mi_insts in HomeLoaderState")
+                          & set_mi_defaults  (panic "No mi_defaults in HomeLoaderState")
+                          & set_mi_fam_insts (panic "No mi_fam_insts in HomeLoaderState")
+                          & set_mi_rules     (panic "No mi_rules in HomeLoaderState")
+                          & set_mi_anns      (panic "No mi_anns in HomeLoaderState")
+                          & set_mi_simplified_core (panic "No mi_simplified_core in HomeLoaderState")
+
+        bad_boot = mi_boot iface == IsBoot
+                    && isJust (lookupKnotVars (if_rec_types gbl_env) mod)
+                      -- Warn against an HPT-updating import
+                      -- of one's own boot file! (one-shot only)
+                      -- See Note [Loading your own hi-boot file]
+
+  ; warnPprTrace bad_boot "loadInterface" (ppr mod) $ do
+      hpt <- getHpt
+      -- Create an IO action that loads and compiles bytecode from Core
+      -- bindings.
+      --
+      -- See Note [Interface Files with Core Definitions]
+      let lazy_bytecode = loadIfaceByteCode hsc_env iface loc (mkNameEnv new_eps_decls)
+      liftIO $ addHomeModInfoToHpt (HomeModInfo iface details emptyHomeModInfoLinkable) hpt
+      liftIO $ addOnDemandHomeModule hpt mod final_iface bad_boot (new_eps_decls, new_eps_insts, new_eps_defaults, new_eps_fam_insts, new_eps_rules, new_eps_anns, new_eps_complete_matches) lazy_bytecode
+
+addModIfacePartsToEps :: IfGblEnv -> Module -> ModLocation -> ModIface -> ([(Name, TyThing)], [ClsInst], DefaultEnv, [FamInst], [CoreRule],  [Annotation], [CompleteMatch]) -> IfL ()
+addModIfacePartsToEps gbl_env mod loc iface (new_eps_decls, new_eps_insts, new_eps_defaults, new_eps_fam_insts, new_eps_rules, new_eps_anns, new_eps_complete_matches) = do
+  ; purged_hsc_env <- getTopEnv
+
+  ; let final_iface = iface
+                          & set_mi_decls     (panic "No mi_decls in PIT")
+                          & set_mi_insts     (panic "No mi_insts in PIT")
+                          & set_mi_defaults  (panic "No mi_defaults in PIT")
+                          & set_mi_fam_insts (panic "No mi_fam_insts in PIT")
+                          & set_mi_rules     (panic "No mi_rules in PIT")
+                          & set_mi_anns      (panic "No mi_anns in PIT")
+                          & set_mi_simplified_core (panic "No mi_simplified_core in PIT")
+
+        bad_boot = mi_boot iface == IsBoot
+                    && isJust (lookupKnotVars (if_rec_types gbl_env) mod)
+                      -- Warn against an EPS-updating import
+                      -- of one's own boot file! (one-shot only)
+                      -- See Note [Loading your own hi-boot file]
+
+        -- Create an IO action that loads and compiles bytecode from Core
+        -- bindings.
+        --
+        -- See Note [Interface Files with Core Definitions]
+        add_bytecode old
+          | Just action <- loadIfaceByteCode purged_hsc_env iface loc (mkNameEnv new_eps_decls)
+          = extendModuleEnv old mod action
+          -- Don't add an entry if the iface doesn't have 'extra_decls'
+          -- so 'get_link_deps' knows that it should load object code.
+          | otherwise
+          = old
+  ; let mhome_unit = ue_homeUnit (hsc_unit_env purged_hsc_env)
+  ; warnPprTrace bad_boot "loadInterface" (ppr mod) $
+    updateEps_  $ \ eps ->
+      if elemModuleEnv mod (eps_PIT eps) || is_external_sig mhome_unit iface
+          then eps
+      else if bad_boot
+          -- See Note [Loading your own hi-boot file]
+          then eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
+      else
+          eps {
+            eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
+            eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
+            eps_iface_bytecode = add_bytecode (eps_iface_bytecode eps),
+            eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
+                                                  new_eps_rules,
+            eps_complete_matches
+                              = eps_complete_matches eps ++ new_eps_complete_matches,
+            eps_inst_env     = extendInstEnvList (eps_inst_env eps)
+                                                  new_eps_insts,
+            eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
+                                                    new_eps_fam_insts,
+            eps_ann_env      = extendAnnEnvList (eps_ann_env eps)
+                                                new_eps_anns,
+            eps_mod_fam_inst_env
+                              = let
+                                  fam_inst_env =
+                                    extendFamInstEnvList emptyFamInstEnv
+                                                        new_eps_fam_insts
+                                in
+                                extendModuleEnv (eps_mod_fam_inst_env eps)
+                                                mod
+                                                fam_inst_env,
+            eps_stats        = addEpsInStats (eps_stats eps)
+                                              (length new_eps_decls)
+                                              (length new_eps_insts)
+                                              (length new_eps_rules),
+            eps_defaults    =  extendModuleEnv (eps_defaults eps) mod new_eps_defaults
+                                              }
+
 
 {- Note [Loading your own hi-boot file]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1142,10 +1209,10 @@ moduleFreeHolesPrecise doc_str mod
                 return (Succeeded (renameFreeHoles ifhs insts))
             Failed err -> return (Failed err)
 
-wantHiBootFile :: Maybe HomeUnit -> ExternalPackageState -> Module -> WhereFrom
+wantHiBootFile :: Maybe HomeUnit -> HomeLoaderState -> Module -> WhereFrom
                -> MaybeErr MissingInterfaceError IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
-wantHiBootFile mhome_unit eps mod from
+wantHiBootFile mhome_unit hls mod from
   = case from of
        ImportByUser usr_boot
           | usr_boot == IsBoot && notHomeModuleMaybe mhome_unit mod
@@ -1164,8 +1231,8 @@ wantHiBootFile mhome_unit eps mod from
              -- We never import boot modules from other packages!
 
           | otherwise
-          -> case lookupInstalledModuleEnv (eps_is_boot eps) (toUnitId <$> mod) of
-                Just (GWIB { gwib_isBoot = is_boot }) ->
+          -> case hlsIsBoot hls (toUnitId <$> mod) of
+                Just is_boot ->
                   Succeeded is_boot
                 Nothing ->
                   Succeeded NotBoot

@@ -30,7 +30,7 @@ import GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
 
-import GHC.Unit.Env ( UnitEnv, ueEPS )
+import GHC.Unit.Env ( UnitEnv, ueEPS, ue_hpt )
 import GHC.Unit.External
 import GHC.Unit.Module.ModGuts
 
@@ -44,6 +44,7 @@ import GHC.Types.Unique.FM
 
 import Control.Monad
 import Data.Foldable ( for_ )
+import GHC.Unit.Home.PackageTable (hptLoadedRuleBase, HomePackageTable)
 
 {-
 ************************************************************************
@@ -63,13 +64,14 @@ data SimplifyExprOpts = SimplifyExprOpts
 
 simplifyExpr :: Logger
              -> ExternalUnitCache
+             -> HomePackageTable
              -> SimplifyExprOpts
              -> CoreExpr
              -> IO CoreExpr
 -- ^ Simplify an expression using 'simplExprGently'.
 --
 -- See 'simplExprGently' for details.
-simplifyExpr logger euc opts expr
+simplifyExpr logger euc hpt opts expr
   = withTiming logger (text "Simplify [expr]") (const ()) $
     do  { eps <- eucEPS euc ;
         ; let fam_envs = ( eps_fam_inst_env eps
@@ -81,7 +83,8 @@ simplifyExpr logger euc opts expr
               base_env  = mkSimplEnv (se_mode opts) fam_envs
               top_env_cfg = se_top_env_cfg opts
               read_eps_rules = eps_rule_base <$> eucEPS euc
-              read_ruleenv = updExternalPackageRules emptyRuleEnv <$> read_eps_rules
+              read_home_rules = hptLoadedRuleBase hpt
+              read_ruleenv = (\ home_rules eps_rules -> updExternalPackageRules (updHomePackageRules emptyRuleEnv home_rules) eps_rules) <$> read_home_rules <*> read_eps_rules
 
         ; let sz = exprSize expr
 
@@ -285,8 +288,11 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                 ; read_eps_rules :: IO PackageRuleBase
                 ; read_eps_rules = eps_rule_base <$> ueEPS unit_env
 
+                ; read_home_rules :: IO RuleBase
+                ; read_home_rules = hptLoadedRuleBase (ue_hpt unit_env)
+
                 ; read_rule_env :: IO RuleEnv
-                ; read_rule_env = updExternalPackageRules base_rule_env <$> read_eps_rules
+                ; read_rule_env = (\ home_rules eps_rules -> updExternalPackageRules (updHomePackageRules base_rule_env home_rules) eps_rules) <$> read_home_rules <*> read_eps_rules
 
                 ; fam_envs = (eps_fam_inst_env eps, fam_inst_env)
                 ; simpl_env = mkSimplEnv mode fam_envs } ;
