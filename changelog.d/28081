@@ -1,5 +1,0 @@
-section: compiler
-synopsis: Fix a compiler panic when an ``Unsatisfiable`` constraint is used to
-  solve an equality constraint.
-mrs: !16929
-issues: #28081

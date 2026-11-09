@@ -560,7 +560,8 @@ Compiler
 
 - Cache unit databases and use a global ``UnitIndex`` to deduplicate
   ``UnitInfo``\ s across multiple home units, reducing memory usage
-  (:ghc-ticket:`26423`, :ghc-ticket:`27500`, :ghc-ticket:`27748`).
+  (:ghc-ticket:`26423`, :ghc-ticket:`27500`, :ghc-ticket:`27748`,
+  :ghc-ticket:`27834`, :ghc-ticket:`27835`, :ghc-ticket:`27836`).
 
 - AArch64 code generation: use ``SXTW`` instead of ``SXTH`` for ``W32`` sign
   extension (:ghc-ticket:`26978`).
@@ -660,6 +661,47 @@ Compiler
 - :ghc-flag:`-fobject-determinism` sorts the list of object files to be linked
   for reproducible builds (:ghc-ticket:`27612`).
 
+- Fix instance resolution dropping instances imported from a module with the
+  same name as the importing module (:ghc-ticket:`26610`).
+
+- Propagate annotations when producing simple interfaces, so plugins that
+  require annotations also work when run by Haddock (:ghc-ticket:`26761`).
+
+- Fix a ``setInfoTableStackMap`` panic caused by common block elimination
+  leaving references to eliminated blocks (:ghc-ticket:`27368`).
+
+- Fix a bug where an argument used lazily only by a function's stable
+  unfolding could be treated as strict in its fields (:ghc-ticket:`27845`).
+
+- Fix a compiler panic when an ``Unsatisfiable`` constraint is used to solve
+  an equality constraint (:ghc-ticket:`28081`).
+
+- Reduce allocations when (de)serialising ``Array`` in the ``ghc`` library,
+  mostly visible when parsing HIE files and bytecode objects
+  (:ghc-ticket:`27109`).
+
+- Fix a bug in :extension:`ImpredicativeTypes` where Quick Look was defeated
+  by a kind coercion in the types being unified (:ghc-ticket:`26543`).
+
+- Fix a "No skolem info" compiler crash in the implementation of functional
+  dependencies for type families (:ghc-ticket:`27828`), and a Core Lint
+  failure in a heavily kind-polymorphic program caused by the same code
+  (:ghc-ticket:`27994`).
+
+- Fix a segfault that could occur when a function that always diverges was
+  stored in a strict field and the constructor was pattern matched nearby
+  (:ghc-ticket:`27831`).
+
+- Fix an "urk! lookup local fingerprint" panic involving a type synonym,
+  defined later in the same module, used in a kind (:ghc-ticket:`27916`).
+
+- Evaluating a value of a type such as ``forall a. D a`` for a datatype ``D``
+  again uses fast inline code instead of a slower fallback in the RTS
+  (:ghc-ticket:`27979`).
+
+- Fix missing top-level procedure labels in some intermediate Cmm pass dumps
+  (:ghc-ticket:`27553`).
+
 GHCi
 ~~~~
 
@@ -701,6 +743,16 @@ GHCi
 
 - Allocate static constructors for bytecode, fixing segfaults when certain
   programs are loaded by the bytecode interpreter (:ghc-ticket:`25636`).
+
+- ``:add`` no longer accepts modules that the loader will reject
+  (:ghc-ticket:`27641`).
+
+- Drop GHCi's own exception context when rethrowing exceptions in ``ghc -e``
+  and ``runghc`` (:ghc-ticket:`27847`).
+
+- Fix a segfault caused by reusing interface files generated with
+  :ghc-flag:`-fbyte-code-and-object-code` for interpreter sessions using
+  :ghc-flag:`-fprefer-byte-code` (:ghc-ticket:`27842`).
 
 JavaScript backend
 ~~~~~~~~~~~~~~~~~~
@@ -887,6 +939,16 @@ Runtime system
 - The RTS ``-l`` flag now accepts the new event class ``I``, which controls
   whether or not IPE events are emitted (:ghc-ticket:`27239`).
 
+- Fix a hang when a program is started with one of the standard file
+  descriptors closed: the runtime now opens ``/dev/null`` onto whichever of
+  the descriptors 0, 1 and 2 are closed at startup (:ghc-ticket:`24450`).
+
+- Fix a deadlock where threads could block forever on a string literal if
+  entering it triggered a stack overflow (:ghc-ticket:`27272`).
+
+- Fix a crash in the non-moving GC caused by racing weak pointer evacuation
+  (:ghc-ticket:`23160`).
+
 
 Cmm
 ~~~
@@ -897,6 +959,9 @@ Cmm
 
 - Fix miscompiled ``%load_relaxed`` primop, add missing ``%store_relaxed``
   (:ghc-ticket:`27483`).
+
+- Fix common block elimination dropping the entry block's info table in
+  hand-written Cmm (:ghc-ticket:`27722`).
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
@@ -1009,6 +1074,19 @@ Cmm
 
 - Show ``ExceptionContext`` in the ``displayExceptionAnnotation``
   implementation of ``WhileHandling`` (:ghc-ticket:`27456`).
+
+- WinIO: fix a bug where Win32 and NTSTATUS error codes could be confused,
+  leading to the result of some I/O operations being misinterpreted
+  (:ghc-ticket:`27971`).
+
+- Preserve exception context when rethrowing exceptions in ``modifyIOError``
+  and ``mapException`` (`CLC proposal #446
+  <https://github.com/haskell/core-libraries-committee/issues/446>`_).
+
+- Preserve exception context when rethrowing exceptions in ``hGetLine``,
+  ``hGetContents``, ``hGetContents'``, ``hClose``, ``executablePath``, and on
+  Windows in ``openFile``, ``openFileBlocking`` and ``openBinaryFile`` (`CLC
+  proposal #447 <https://github.com/haskell/core-libraries-committee/issues/447>`_).
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -1231,6 +1309,21 @@ Packaging and Build System
   rebuilding in the same build root with different settings (e.g. another
   flavour, or when hashes change with ``+hash-unit-ids``)
   (:ghc-ticket:`26661`).
+
+- Hadrian now includes transitive dependencies when building library
+  documentation, so Haddock can resolve references to indirect dependencies
+  (:ghc-ticket:`25850`, :ghc-ticket:`27786`).
+
+- Fix a race condition in ``make install -j`` of the binary distribution on
+  macOS and FreeBSD (:ghc-ticket:`27499`).
+
+- Fix the unregisterised build with GCC 15 and later (:ghc-ticket:`27404`).
+
+- Hadrian no longer passes the target's ``libffi`` directories to the stage 0
+  build of ``ghci`` when cross compiling, which could make linking the stage 1
+  compiler pick up the target's ``libffi`` (:ghc-ticket:`28053`).
+
+- Hadrian now builds with Cabal 3.18 (:ghc-ticket:`27823`).
 
 ``ghc-pkg``
 ~~~~~~~~~~~

@@ -1,4 +1,0 @@
-section: packaging
-synopsis: Fix unregisterised build for gcc 15+
-issues: #27404
-mrs: !16264

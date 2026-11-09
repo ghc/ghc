@@ -1,6 +1,0 @@
-section: packaging
-synopsis: Hadrian no longer passes the target's ``libffi`` directories to the
-  stage 0 build of ``ghci`` when cross compiling, which could make linking the
-  stage 1 compiler pick up the target's ``libffi``.
-issues: #28053
-mrs: !16923
