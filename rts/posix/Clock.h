@@ -1,22 +1,12 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2012
+ * (c) The GHC Team, 2012, 2026
  *
- * Posix monotonic clock
+ * The choice of POSIX clocks used in the RTS
  *
  * ---------------------------------------------------------------------------*/
 
 #pragma once
-
-#if defined(HAVE_UNISTD_H)
-# include <unistd.h>
-#endif
-
-#include <time.h>
-
-#if defined(HAVE_SYS_TIME_H)
-# include <sys/time.h>
-#endif
 
 #define RTS_CLOCK_MONOTONIC CLOCK_MONOTONIC
 #define RTS_CLOCK_REALTIME  CLOCK_REALTIME
