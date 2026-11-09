@@ -62,7 +62,6 @@ Compiler
 - Fixed spurious incomplete record selector warnings for bare record field projections such as ``.fld`` (:ghc-ticket:`26686`)
 - Fixed the simplifier firing rules or inlinings that are not active throughout the whole activation range of a RULE or stable unfolding when simplifying its right-hand side (:ghc-ticket:`26323`)
 - Fixed a compiler loop caused by not taking the current simplifier phase into account when computing the phase range used to simplify the right-hand side of a RULE or stable unfolding (:ghc-ticket:`26826`)
-- Fixed a QuickLook instantiation bug that could cause the typechecker to reject programs using the ``($)`` operator that are accepted when using explicit parentheses (:ghc-ticket:`26543`)
 - Fix a token leak in the ``-jsem`` jobserver shutdown path (:ghc-ticket:`27253`)
 - Update to semaphore-compat 2.0.0 (``-jsem`` protocol v2) (:ghc-ticket:`25087`)
 - Fixed a compiler panic when trimming the continuation for bottoming functions (:ghc-ticket:`27261`)
@@ -105,6 +104,11 @@ Compiler
 - Recognise ``considerAccessible`` under ticks (``-g``, ``-finfo-table-map``, ``-fhpc`` etc) (:ghc-ticket:`27360`)
 - Fix spurious ``-Wincomplete-uni-patterns`` warning under ``-finfo-table-map``. (:ghc-ticket:`27314`)
 - Fix a scoping bug in the type-class specialiser (:ghc-ticket:`27629`)
+- Fix a segfault that could occur when a bottoming function was stored in a strict field (:ghc-ticket:`27831`)
+- Fix a miscompilation where a CAF with a strict field could be passed untagged to a worker that assumed it was tagged, selecting the wrong constructor (:ghc-ticket:`27857`)
+- Fix a ``setInfoTableStackMap`` panic caused by common block elimination leaving references to eliminated blocks (:ghc-ticket:`27368`)
+- Fix instances being dropped from imported modules with the same name as a module in another home unit (:ghc-ticket:`26610`)
+- Enable :ghc-flag:`-finter-module-far-jumps` by default for profiled code on AArch64 Linux, avoiding jump offset errors at link time with some toolchains (:ghc-ticket:`26994`)
 
 GHCi
 ~~~~
@@ -152,6 +156,8 @@ Runtime System
 - Fix "unknown/strange object 1" crash in compacting GC (:ghc-ticket:`27649`)
 - Fix a crash when capturing or resuming a delimited continuation that adjusts the async exception masking state (:ghc-ticket:`27651`)
 - Fix a segfault that could occur when querying the label of an unlabeled thread (:ghc-ticket:`27618`)
+- Fix a crash in the nonmoving GC when two threads race to evacuate the same ``Weak#`` object (:ghc-ticket:`23160`)
+- Fix a deadlock where threads could block forever on a string literal if entering it triggered a stack overflow (:ghc-ticket:`27272`)
 
 Code Generation
 ~~~~~~~~~~~~~~~
@@ -174,6 +180,7 @@ Bytecode Compiler
 - Improved bytecode loading performance by caching ``MallocStrings`` requests for repeated breakpoint strings, avoiding redundant remote heap allocation (:ghc-ticket:`26995`)
 - Fixed the ``SLIDE`` bytecode instruction crashing when sliding off the end of a stack chunk (:ghc-ticket:`27001`)
 - Removed the size limit on unboxed tuples supported by the bytecode interpreter on 64-bit platforms (:ghc-ticket:`26946`)
+- Fix a segfault when interface files generated with :ghc-flag:`-fbyte-code-and-object-code` were reused by interpreter sessions using :ghc-flag:`-fprefer-byte-code` (:ghc-ticket:`27842`)
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
@@ -181,6 +188,10 @@ Bytecode Compiler
 - Added ``@since`` annotation to ``System.Info.fullCompilerVersion`` (:ghc-ticket:`26973`)
 - Don't drop ``ExceptionContext`` in ``SomeException(toException)`` (:ghc-ticket:`27455`)
 - Fix ``retry`` and async exception delivery inside a ``catchSTM`` handler (:ghc-ticket:`27657`)
+- Show the ``ExceptionContext`` of the carried exception in the ``displayExceptionAnnotation`` implementation of ``WhileHandling`` (:ghc-ticket:`27456`)
+- Preserve exception context when rethrowing exceptions in ``modifyIOError`` and ``mapException`` (`CLC proposal #446 <https://github.com/haskell/core-libraries-committee/issues/446>`__, :ghc-ticket:`27851`)
+- Preserve exception context when rethrowing exceptions in ``hGetLine``, ``hGetContents``, ``hGetContents'``, ``hClose``, ``executablePath``, and on Windows in ``openFile``, ``openFileBlocking`` and ``openBinaryFile`` (`CLC proposal #447 <https://github.com/haskell/core-libraries-committee/issues/447>`__, :ghc-ticket:`27875`)
+- WinIO: Fix confusion between Win32 error codes and ``NTSTATUS`` codes, which could cause the results of some I/O operations to be misreported (:ghc-ticket:`27971`)
 
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -243,3 +254,7 @@ Packaging and Build System
 - Bumped ``process`` submodule to 1.6.30.0
 - Fixed a validate-build failure of the runtime system with GCC 16 (:ghc-ticket:`27366`)
 - Hadrian no longer leaves stale `.conf` files in its package databases when rebuilding in the same build root with different settings (e.g. another flavour, or when hashes change with +hash-unit-ids) (:ghc-ticket:`26661`)
+- Hadrian now includes transitive dependencies when building library documentation, so Haddock can resolve references to indirect dependencies (:ghc-ticket:`25850`, :ghc-ticket:`27786`)
+- Hadrian no longer passes the target's ``libffi`` directories to the stage 0 build of ``ghci`` when cross compiling, which could make linking the stage 1 compiler pick up the target's ``libffi`` (:ghc-ticket:`28053`)
+- Fixed building with the ``+werror`` flavour transformer on glibc 2.43 (:ghc-ticket:`27076`)
+- Bumped ``containers`` submodule to 0.8.1

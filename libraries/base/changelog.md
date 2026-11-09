@@ -9,9 +9,10 @@
   * GHC internals re-exported from `GHC.Num` have been deprecated and will be removed after one major release ([CLC proposal #360](https://github.com/haskell/core-libraries-committee/issues/360))
   * The implementation of `toException` in `SomeException`'s `Exception` instance no longer drops exception context, in keeping with the behavior originally proposed in [CLC Proposal #200](https://github.com/haskell/core-libraries-committee/issues/200).
   * Fix `retry` and async exception delivery inside a `catchSTM` handler ([#27657](https://gitlab.haskell.org/ghc/ghc/-/issues/27657))
-  * Show `ExceptionContext` in `displayExceptionAnnotation` implementation of `WhileHandling` ([GHC #27456](https://gitlab.haskell.org/ghc/ghc/-/issues/27456))
-  * Preserve exception context when rethrowing exceptions in `modifyIOError` and `mapException`. ([CLC proposal #446](https://github.com/haskell/core-libraries-committee/issues/446))
-  * Preserve exception context when rethrowing exceptions in `hGetLine`, `hGetContents`, `hGetContents'`, `hClose`, `executablePath`, and on Windows in `openFile`, `openFileBlocking` and `openBinaryFile`. ([CLC proposal #447](https://github.com/haskell/core-libraries-committee/issues/447))
+  * Show the `ExceptionContext` of the carried exception in the `displayExceptionAnnotation` implementation of `WhileHandling` ([#27456](https://gitlab.haskell.org/ghc/ghc/-/issues/27456))
+  * Preserve exception context when rethrowing exceptions in `modifyIOError` and `mapException` ([CLC proposal #446](https://github.com/haskell/core-libraries-committee/issues/446), [#27851](https://gitlab.haskell.org/ghc/ghc/-/issues/27851))
+  * Preserve exception context when rethrowing exceptions in `hGetLine`, `hGetContents`, `hGetContents'`, `hClose`, `executablePath`, and on Windows in `openFile`, `openFileBlocking` and `openBinaryFile` ([CLC proposal #447](https://github.com/haskell/core-libraries-committee/issues/447), [#27875](https://gitlab.haskell.org/ghc/ghc/-/issues/27875))
+  * WinIO: Fix confusion between Win32 error codes and `NTSTATUS` codes, which could cause the results of some I/O operations to be misreported ([#27971](https://gitlab.haskell.org/ghc/ghc/-/issues/27971))
 
 ## 4.22.0.0 *December 2025*
   * Shipped with GHC 9.14.1
