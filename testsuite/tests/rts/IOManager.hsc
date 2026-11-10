@@ -582,15 +582,15 @@ recvEmptyBufPtcl (EmptyBufPtcl sync) fd = do
 -- just do simple blocking read\/write of bytes. So this should just be needed
 -- at the far ends of the hops.
 --
-data FullBufPtcl = FullBufPtcl !(TVar Bool) !Int -- wait milliseconds
+data FullBufPtcl = FullBufPtcl !(TVar Bool) !Int -- wait microseconds
 
 newFullBufPtcl :: Int -> IO FullBufPtcl
-newFullBufPtcl nhops = FullBufPtcl <$> newTVarIO False <*> pure waitms
+newFullBufPtcl nhops = FullBufPtcl <$> newTVarIO False <*> pure waitus
   where
-    waitms = nhops * 100 --100ms per hop
+    waitus = nhops * 100 -- 100µs per hop: 'timeout' takes microseconds
 
 sendFullBufPtcl :: FullBufPtcl -> Fd -> Word8 -> IO ()
-sendFullBufPtcl ptcl@(FullBufPtcl sync _waitms) fd x = do
+sendFullBufPtcl ptcl@(FullBufPtcl sync _waitus) fd x = do
     res <- writeByteNonBlocking fd x
     case res of
       Just () ->
@@ -606,20 +606,21 @@ sendFullBufPtcl ptcl@(FullBufPtcl sync _waitms) fd x = do
         sendFullBufPtcl ptcl fd x
 
 finishSendFullBufPtcl :: FullBufPtcl -> IO ()
-finishSendFullBufPtcl (FullBufPtcl sync _waitms) =
+finishSendFullBufPtcl (FullBufPtcl sync _waitus) =
     atomically $ writeTVar sync True -- release reader to finish
 
 recvFullBufPtcl :: FullBufPtcl -> Fd -> IO (Maybe Word8)
-recvFullBufPtcl (FullBufPtcl sync waitms) fd = do
+recvFullBufPtcl ptcl@(FullBufPtcl sync waitus) fd = do
     atomically $ readTVar sync >>= check
     res <- readByteNonBlocking fd
     case res of
-      Nothing -> fail "recvFullBufPtcl: unexpected blocking"
+      -- With copy hops in between, the far end can lag behind the sender.
+      Nothing -> threadWaitRead fd >> recvFullBufPtcl ptcl fd
       Just Nothing  -> return Nothing
       Just (Just x) -> do
         traceIO ("recvFullBufPtcl: read byte '" ++ show x
                                   ++ "' on fd " ++ show fd ++ ", now waiting")
-        _ <- timeout waitms $ atomically $ readTVar sync >>= check . not
+        _ <- timeout waitus $ atomically $ readTVar sync >>= check . not
         return (Just x)
 
 
