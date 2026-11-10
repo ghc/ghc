@@ -91,7 +91,7 @@ void interruptIOManagerSelect(CapIOManager *iomgr)
  */
 static LowResTime getLowResTimeOfDay(void)
 {
-    return TimeToLowResTimeRoundDown(getProcessElapsedTime());
+    return TimeToLowResTimeRoundDown(getMonotonicTime());
 }
 
 /*
@@ -100,7 +100,7 @@ static LowResTime getLowResTimeOfDay(void)
 LowResTime getDelayTarget (HsInt us)
 {
     Time elapsed;
-    elapsed = getProcessElapsedTime();
+    elapsed = getMonotonicTime();
 
     // If the desired target would be larger than the maximum Time,
     // default to the maximum Time. (#7087)
