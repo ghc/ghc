@@ -52,6 +52,7 @@ import System.Process
   , waitForProcess
   , ProcessHandle
   )
+import System.Process.CommunicationHandle
 import Text.Read (readMaybe)
 
 --------------------------------------------------------------------------------
@@ -163,15 +164,16 @@ runClient input = do
 
 withServer :: FilePath -> (Pipe -> IO a) -> IO a
 withServer serverExe action = do
-  (ghcRead, serverWrite) <- createPipe
-  (serverRead, ghcWrite) <- createPipe
-  mapM_ (\h -> setFdOption h CloseOnExec False) [serverWrite, serverRead]
-  let args = ["server", show serverWrite, show serverRead]
+  (ghcRead, serverWrite) <- createWeReadTheyWritePipe
+  (serverRead, ghcWrite) <- createTheyReadWeWritePipe
+  let inherited = [serverWrite, serverRead]
+  let args = ["server"] ++ map show inherited
   (_, _, _, ph) <- createProcess (proc serverExe args)
     { std_in  = Inherit
     , std_out = Inherit
     , std_err = Inherit
     }
+  mapM_ closeCommunicationHandle inherited
   bracket (mkHandles ghcRead ghcWrite >>= uncurry mkPipeFromHandles)
           (\pipe -> do
              closePipe pipe
@@ -179,9 +181,7 @@ withServer serverExe action = do
              void (waitForProcess ph))
           (\pipe -> action pipe)
   where
-    mkHandles r w = do
-      hR <- fdToHandle r
-      hW <- fdToHandle w
+    mkHandles hR hW = do
       mapM_ (`hSetBuffering` NoBuffering) [hR, hW]
       mapM_ (`hSetBinaryMode` True) [hR, hW]
       pure (hR, hW)
