@@ -10,8 +10,6 @@
 
 #include "BeginPrivate.h"
 
-void initializeTimer       (void);
-
 Time getProcessCPUTime     (void);
 Time getCurrentThreadCPUTime (void);
 

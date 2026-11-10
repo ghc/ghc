@@ -52,10 +52,6 @@ getProcessCPUTime(void)
     return fileTimeToRtsTime(userTime);
 }
 
-void initializeTimer(void)
-{
-}
-
 HsWord64
 getMonotonicNSec(void)
 {

@@ -360,9 +360,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* Initialise the stats department, phase 0 */
     initStats0();
 
-    /* Initialize system timer before starting to collect stats */
-    initializeTimer();
-
     /* Next we do is grab the start time...just in case we're
      * collecting timing statistics.
      */

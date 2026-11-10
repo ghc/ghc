@@ -24,10 +24,6 @@
 #warning _POSIX_MONOTONIC_CLOCK not defined, which is likely to be a problem.
 #endif
 
-void initializeTimer(void)
-{
-}
-
 static Time getClockTime(clockid_t clock)
 {
     struct timespec ts;
