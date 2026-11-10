@@ -31,10 +31,6 @@ extern char *ctime_r(const time_t *, char *);
 #include <fcntl.h>
 #endif
 
-#if defined(HAVE_GETTIMEOFDAY)
-#include <sys/time.h>
-#endif
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
@@ -205,31 +201,6 @@ exitHeapOverflow(void)
 {
     reportHeapOverflow();  // reportHeapOverflow() doesn't exit (see #2592)
     stg_exit(EXIT_HEAPOVERFLOW);
-}
-
-/* -----------------------------------------------------------------------------
-   Sleep for the given period of time.
-   -------------------------------------------------------------------------- */
-
-/* Returns -1 on failure but handles EINTR internally. On Windows this will
- * only have millisecond precision. */
-int rtsSleep(Time t)
-{
-#if defined(_WIN32)
-    // N.B. we can't use nanosleep on Windows as it would incur a pthreads
-    // dependency. See #18272.
-    Sleep(TimeToMS(t));
-    return 0;
-#else
-    struct timespec req;
-    req.tv_sec = TimeToSeconds(t);
-    req.tv_nsec = TimeToNS(t - req.tv_sec * TIME_RESOLUTION);
-    int ret;
-    do {
-        ret = nanosleep(&req, &req);
-    } while (ret == -1 && errno == EINTR);
-    return ret;
-#endif /* _WIN32 */
 }
 
 /* -----------------------------------------------------------------------------
