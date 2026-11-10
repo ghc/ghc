@@ -60,6 +60,11 @@ data ExecutableLinkOpts = ExecutableLinkOpts
   , leUseXLinkerRPath :: !Bool
   , leSingleLibFolder :: !Bool
   , leWholeArchiveHsLibs :: !Bool
+  , leGcSections :: !Bool
+    -- ^ Let a GNU linker remove the sections that nothing references
+    -- (@--gc-sections@).
+    -- See Note [No --gc-sections for the on-demand iserv] in
+    -- GHC.Runtime.Interpreter.C.
   , leGenManifest :: !Bool
   , leRPath :: !Bool
   , leCompactUnwind :: !Bool
@@ -99,6 +104,7 @@ initExecutableLinkOpts dflags blm =
     , leUseXLinkerRPath = useXLinkerRPath dflags os
     , leSingleLibFolder = gopt Opt_SingleLibFolder dflags
     , leWholeArchiveHsLibs = gopt Opt_WholeArchiveHsLibs dflags
+    , leGcSections = True
     , leGenManifest = gopt Opt_GenManifest dflags
     , leRPath = gopt Opt_RPath dflags
     , leCompactUnwind = gopt Opt_CompactUnwind dflags
@@ -296,7 +302,8 @@ linkExecutable logger tmpfs opts unit_env o_files dep_units = do
 
                      -- We should rather be asking does it support --gc-sections?
                  ++ (if linkerIsGnuLd (leLinkerConfig opts) &&
-                        not (leWholeArchiveHsLibs opts)
+                        not (leWholeArchiveHsLibs opts) &&
+                        leGcSections opts
                      then ["-Wl,--gc-sections"]
                      else [])
 

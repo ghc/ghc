@@ -61,6 +61,9 @@ generateIservC dflags logger tmpfs opts unit_env = do
           -- must retain CAFs for running interpreted code.
         , leKeepCafs = True
 
+          -- See Note [No --gc-sections for the on-demand iserv]
+        , leGcSections = False
+
           -- link with -threaded if target has threaded RTS
         , leWays =
             let ways = leWays opts
@@ -90,3 +93,18 @@ generateIservC dflags logger tmpfs opts unit_env = do
   linkExecutable logger tmpfs opts' unit_env [] [ghci_unit_id]
 
   pure exe_file
+
+-- Note [No --gc-sections for the on-demand iserv]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- GHC links the iserv program each time a session needs the external
+-- interpreter. The link is static, against the ghci library and all the
+-- boot libraries. Executable links add -Wl,--gc-sections with a GNU
+-- linker. On libraries built with -split-sections (the release
+-- bindists), the section garbage collection of ld.bfd is the largest
+-- part of that link: with binutils 2.45, the link takes 3 times longer
+-- with --gc-sections than without. The program lives in a temporary
+-- directory and its size is not important. Thus the iserv link does not
+-- use --gc-sections.
+--
+-- Against libraries without split sections (the validate bindists), the
+-- flag makes no difference to the link time.
