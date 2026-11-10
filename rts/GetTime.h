@@ -11,8 +11,6 @@
 
 #include "BeginPrivate.h"
 
-void initializeTimer       (void);
-
 /* Get the current time in a monotonic clock.
  *
  * The time is represented as nanoseconds since an arbitrary epoch.
