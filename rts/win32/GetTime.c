@@ -52,56 +52,42 @@ getProcessCPUTime(void)
     return fileTimeToRtsTime(userTime);
 }
 
-// Number of ticks per second used by the QueryPerformanceFrequency
-// implementation, represented by a 64-bit union type.
-static LARGE_INTEGER qpc_frequency = {.QuadPart = 0};
-
-// Initialize qpc_frequency. This function should be called before any call to
-// getMonotonicNSec.  If QPC is not supported on this system, qpc_frequency is
-// set to 0.
 void initializeTimer(void)
 {
-    BOOL qpc_supported = QueryPerformanceFrequency(&qpc_frequency);
-    if (!qpc_supported)
-    {
-        qpc_frequency.QuadPart = 0;
-    }
 }
 
 HsWord64
 getMonotonicNSec(void)
 {
-    if (qpc_frequency.QuadPart)
-    {
-        // system_time is a 64-bit union type used to represent the
-        // tick count returned by QueryPerformanceCounter
-        LARGE_INTEGER system_time;
+    // https://learn.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps
+    // The advice there is use QueryPerformanceCounter, and that this is now
+    // always supported in Windows XP and later, and reliable from Vista.
 
-        // get the tick count.
-        QueryPerformanceCounter(&system_time);
+    // Number of ticks per second, provided by QueryPerformanceFrequency
+    static uint64_t ticks_per_sec = 0;
 
-        // compute elapsed seconds as double
-        double secs = (double)system_time.QuadPart /
-                      (double)qpc_frequency.QuadPart;
-
-        // return elapsed time in nanoseconds
-        return (HsWord64)(secs * 1e9);
+    // Initialize ticks_per_sec on the first call. It should not matter if two
+    // threads race to do this. The result should be the same.
+    if (RTS_UNLIKELY(RELAXED_LOAD_ALWAYS(&ticks_per_sec) == 0)) {
+        LARGE_INTEGER qpc_frequency; // a 64-bit union type
+        if (QueryPerformanceFrequency(&qpc_frequency)) {
+            RELAXED_STORE_ALWAYS(&ticks_per_sec, qpc_frequency.QuadPart);
+        } else {
+            // This should be impossible now.
+            sysErrorBelch("getMonotonicNSec: high res timestamps not available");
+            stg_exit(EXIT_FAILURE);
+        }
     }
-    else // fallback to GetTickCount
-    {
-        // TODO: Remove this code path, it cannot be taken because
-        // `QueryPerformanceFrequency` cannot fail on Windows >= XP
-        // and GHC no longer supports Windows <= XP.
-        // See https://gitlab.haskell.org/ghc/ghc/issues/14233
 
-        // NOTE: GetTickCount is a 32-bit millisecond value, so it wraps around
-        // every 49 days.
-        DWORD count = GetTickCount();
+    // Get the tick count.
+    LARGE_INTEGER tick_count;
+    QueryPerformanceCounter(&tick_count);
 
-        // getTickCount is in milliseconds, so multiply it by 1000000 to get
-        // nanoseconds.
-        return (HsWord64)count * 1000000;
-    }
+    // Compute elapsed time in nanoseconds. If avoiding float, we must multiply
+    // by nanoseconds first (1e9) and then divide by ticks per sec. The
+    // intermediate result can overflow a 64bit integer. So we use 128bit.
+    return ((__uint128_t)tick_count.QuadPart * (__uint128_t)1000000000ull)
+         / (__uint128_t)ticks_per_sec;
 }
 
 Time
