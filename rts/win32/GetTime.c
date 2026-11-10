@@ -102,17 +102,13 @@ getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
     /* Windows has a bunch of time APIs but none that directly give
        us unix epoch time, so we have to do a little dance. */
 
-    SYSTEMTIME systime;
     FILETIME filetime;
     ULARGE_INTEGER unixtime;
 
-    /* Windows SYSTEMTIME is a big struct with fields for
-       year, month, day, hour, minute, second, millisecond. */
-    GetSystemTime(&systime);
     /* Windows FILETIME timestamps use an epoch-based time,
        using a 64bit unsigned word. The time is measured in
        units of 100 nanoseconds since an epoch of 1601. */
-    SystemTimeToFileTime(&systime, &filetime);
+    GetSystemTimePreciseAsFileTime(&filetime);
 
     /* FILETIME isn't directly a 64bit word, but a struct with
        a pair of 32bit words, so we have to convert via a
