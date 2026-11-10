@@ -30,7 +30,7 @@
 
 bool syncDelayTimeout(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay)
 {
-    Time now = getProcessElapsedTime();
+    Time now = getMonotonicTime();
     Time target;
 
     /* If the desired target would be larger than the maximum Time,

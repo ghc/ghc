@@ -812,10 +812,6 @@ void postCapsetVecEvent (EventTypeNum tag,
 
 void postWallClockTime (EventCapsetID capset)
 {
-    StgWord64 ts;
-    StgWord64 sec;
-    StgWord32 nsec;
-
     ACQUIRE_LOCK_ALWAYS(&eventBufMutex);
 
     /* The EVENT_WALL_CLOCK_TIME event is intended to allow programs
@@ -834,8 +830,12 @@ void postWallClockTime (EventCapsetID capset)
        difference we just call them very close together.
      */
 
-    getUnixEpochTime(&sec, &nsec);  /* Get the wall clock time */
-    ts = time_ns();                 /* Get the eventlog timestamp */
+    Time now = getWallClockTime();  /* Get the wall clock time */
+    StgWord64 ts = time_ns();       /* Get the eventlog timestamp */
+
+    StgWord64 sec  = now / TIME_RESOLUTION;
+    StgWord32 nsec = now % TIME_RESOLUTION;
+
     ensureRoomForEvent(&eventBuf, EVENT_WALL_CLOCK_TIME);
 
     /* Normally we'd call postEventHeader(), but that generates its own

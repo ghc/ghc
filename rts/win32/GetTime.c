@@ -14,9 +14,7 @@
 #include <time.h>
 
 /* Convert FILETIMEs into secs */
-
-static inline Time
-fileTimeToRtsTime(FILETIME ft)
+static inline Time fileTimeToRtsTime(FILETIME ft)
 {
     Time t;
     t = ((Time)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
@@ -25,8 +23,7 @@ fileTimeToRtsTime(FILETIME ft)
     return t;
 }
 
-Time
-getCurrentThreadCPUTime(void)
+Time getCurrentThreadCPUTime(void)
 {
     FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
 
@@ -39,8 +36,7 @@ getCurrentThreadCPUTime(void)
     return fileTimeToRtsTime(userTime);
 }
 
-Time
-getProcessCPUTime(void)
+Time getProcessCPUTime(void)
 {
     FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
 
@@ -68,8 +64,7 @@ void initializeTimer(void)
     }
 }
 
-HsWord64
-getMonotonicNSec(void)
+Time getMonotonicTime(void)
 {
     if (qpc_frequency.QuadPart)
     {
@@ -85,7 +80,7 @@ getMonotonicNSec(void)
                       (double)qpc_frequency.QuadPart;
 
         // return elapsed time in nanoseconds
-        return (HsWord64)(secs * 1e9);
+        return (Time)(secs * 1e9);
     }
     else // fallback to GetTickCount
     {
@@ -100,18 +95,11 @@ getMonotonicNSec(void)
 
         // getTickCount is in milliseconds, so multiply it by 1000000 to get
         // nanoseconds.
-        return (HsWord64)count * 1000000;
+        return (Time)count * 1000000;
     }
 }
 
-Time
-getProcessElapsedTime(void)
-{
-    return NSToTime(getMonotonicNSec());
-}
-
-void
-getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
+Time getWallClockTime(void)
 {
     /* Windows has a bunch of time APIs but none that directly give
        us unix epoch time, so we have to do a little dance. */
@@ -137,15 +125,6 @@ getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
     /* We have to do an epoch conversion, since FILETIME uses 1601
        while we want unix epoch of 1970. In case you were wondering,
        there were 11,644,473,600 seconds between 1601 and 1970, then
-       multiply by 10^7 for units of 100 nanoseconds. */
-    unixtime.QuadPart = unixtime.QuadPart - 116444736000000000ull;
-
-    /* For the seconds part we use integer division by 10^7 */
-    *sec  = unixtime.QuadPart / 10000000ull;
-
-    /* The remainder from integer division by 10^7 gives us
-       the sub-second component in units of 100 nanoseconds.
-       So for nanoseconds we just multiply by 100.
-       Note that nanoseconds always fits in a 32bit word */
-    *nsec = ((unsigned long)(unixtime.QuadPart % 10000000ull)) * 100ul;
+       multiply by 100 for units of 100 nanoseconds. */
+    return ((Time)unixtime.QuadPart - 116444736000000000ull) * 100ull;
 }
