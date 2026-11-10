@@ -196,3 +196,10 @@ def discover_io_managers(hs_exe: Union[str, Path], cwd: Union[str, Path]) -> Set
         raise Exception('Expected stdout output of form \'... ("I/O managers", "select selectbis poll") ...\' but got:\n{}'.format(stdout))
 
     return set(m.group(1).split())
+
+# Suffix appended to a test case's name to identify the IO Manager it was run
+# with. Empty for the default IO Manager (None) so that output is unchanged.
+def io_manager_test_name_suffix(io_manager: Optional[str]) -> str:
+    if io_manager is None:
+        return ''
+    return ' (IO Manager: {})'.format(io_manager)

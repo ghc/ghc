@@ -300,12 +300,13 @@ class TestResult:
     expected_failures, framework_failures, framework_warnings, unexpected_passes,
     unexpected_failures, unexpected_stat_failures lists of TestRun.
     """
-    __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr', 'diff', 'runtime'
+    __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr', 'diff', 'runtime', 'io_manager'
     def __init__(self,
                  directory: str,
                  testname: TestName,
                  reason: str,
                  way: WayName,
+                 io_manager: Optional[str],
                  stdout: Optional[str]=None,
                  stderr: Optional[str]=None,
                  diff: Optional[str]=None,
@@ -318,6 +319,7 @@ class TestResult:
         self.stderr = stderr
         self.diff = diff
         self.runtime = runtime # Walltime
+        self.io_manager = io_manager # None means the default IO Manager
 
 # A performance metric measured in this test run.
 PerfMetric = NamedTuple('PerfMetric',

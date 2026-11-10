@@ -3,13 +3,15 @@ from datetime import datetime
 import xml.etree.ElementTree as ET
 
 from testglobals import TestRun, TestResult
+from testutil import io_manager_test_name_suffix
 
 
 def add_testcase(testsuite: ET.Element, test_result: TestResult) -> ET.Element:
     """Adds the xml element representing the testcase."""
     testcase = ET.SubElement(testsuite, 'testcase',
                              classname = test_result.way,
-                             name = '%s(%s)' % (test_result.testname, test_result.way))
+                             name = '%s(%s)%s' % (test_result.testname, test_result.way,
+                                                  io_manager_test_name_suffix(test_result.io_manager)))
     if test_result.runtime is not None:
         testcase.set('time', '%.3f' % test_result.runtime)
     return testcase

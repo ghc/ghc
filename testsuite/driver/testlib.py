@@ -26,7 +26,8 @@ from testglobals import config, ghc_env, default_testopts, brokens, t, \
 from testutil import discover_io_managers, strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, residency_testing_metrics, \
                      stable_perf_counters, \
-                     PassFail, badResult, str_warn, str_removeprefix
+                     PassFail, badResult, str_warn, str_removeprefix, \
+                     io_manager_test_name_suffix
 from term_color import Color, colored_if
 import testutil
 from cpu_features import have_cpu_feature
@@ -1769,6 +1770,8 @@ async def test_common_work(name: TestName, opts,
                     traceback.print_exc()
                     framework_fail(name, way, traceback.format_exc(),
                                 runtime=time.monotonic() - start)
+                finally:
+                    getTestOpts().io_manager_current = None
 
         for skipped_way in set(all_ways) - set(do_ways):
             t.n_tests_skipped += len(all_ways_and_io_managers[skipped_way])
@@ -1798,9 +1801,8 @@ async def do_test(name: TestName,
     opts = getTestOpts()
     start = time.monotonic()
 
-    full_name = name + '(' + way + ')'
-    if opts.io_manager_current is not None:
-        full_name += ' (IO Manager: {})'.format(opts.io_manager_current)
+    io_manager = opts.io_manager_current
+    full_name = name + '(' + way + ')' + io_manager_test_name_suffix(io_manager)
     test_n = len(allTestNames)
     progress_args = [ full_name, t.total_tests, test_n,
         [len(t.unexpected_passes),
@@ -1894,22 +1896,21 @@ async def do_test(name: TestName,
     if way in opts.fragile_ways:
         if_verbose(1, '*** fragile test %s resulted in %s' % (full_name, 'pass' if result.passed else 'fail'))
         if result.passed:
-            t.fragile_passes.append(TestResult(directory, name, 'fragile', way,
-                                               runtime=runtime))
+            t.fragile_passes.append(TestResult(directory, name, 'fragile', way, io_manager, runtime=runtime))
         else:
             reason = '%s (fragile)' % result.reason if result.reason else 'fragile'
-            t.fragile_failures.append(TestResult(directory, name, reason, way,
+            t.fragile_failures.append(TestResult(directory, name, reason, way, io_manager,
                                                  stdout=result.stdout,
                                                  stderr=result.stderr,
                                                  diff=result.diff,
                                                  runtime=runtime))
     elif result.passed:
         if _expect_pass(way):
-            t.expected_passes.append(TestResult(directory, name, "", way,
+            t.expected_passes.append(TestResult(directory, name, "", way, io_manager,
                                                 runtime=runtime))
         else:
             if_verbose(1, '*** unexpected pass for %s' % full_name)
-            t.unexpected_passes.append(TestResult(directory, name, 'unexpected', way,
+            t.unexpected_passes.append(TestResult(directory, name, 'unexpected', way, io_manager,
                                                   runtime=runtime))
     else:
         if _expect_pass(way):
@@ -1917,11 +1918,11 @@ async def do_test(name: TestName,
             tag = result.tag
             if tag == 'stat':
                 if_verbose(1, '*** unexpected stat test failure for %s' % full_name)
-                t.unexpected_stat_failures.append(TestResult(directory, name, reason, way,
+                t.unexpected_stat_failures.append(TestResult(directory, name, reason, way, io_manager,
                                                              runtime=runtime))
             else:
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
-                tr = TestResult(directory, name, reason, way,
+                tr = TestResult(directory, name, reason, way, io_manager,
                                 stdout=result.stdout,
                                 stderr=result.stderr,
                                 diff=result.diff,
@@ -1930,7 +1931,7 @@ async def do_test(name: TestName,
         else:
             # Only keep the reason: nothing reports the output of expected
             # failures.
-            t.expected_failures.append(TestResult(directory, name, result.reason, way,
+            t.expected_failures.append(TestResult(directory, name, result.reason, way, io_manager,
                                                   runtime=runtime))
 
 # Make is often invoked with -s, which means if it fails, we get
@@ -1955,21 +1956,23 @@ def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str
       directory = _result_directory(opts)
     except:
       directory = ''
-    full_name = '%s(%s)' % (name, way)
+    io_manager = opts.io_manager_current
+    full_name = '%s(%s)%s' % (name, way, io_manager_test_name_suffix(io_manager))
     if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
     name2 = name if name is not None else TestName('none')
     way2 = way if way is not None else WayName('none')
     if way not in opts.fragile_ways:
         # If the test is fragile then we rather report this as a fragile test failure
-        t.framework_failures.append(TestResult(directory, name2, reason, way2,
+        t.framework_failures.append(TestResult(directory, name2, reason, way2, io_manager,
                                                runtime=runtime))
 
 def framework_warn(name: TestName, way: WayName, reason: str) -> None:
     opts = getTestOpts()
     directory = _result_directory(opts)
-    full_name = name + '(' + way + ')'
+    io_manager = opts.io_manager_current
+    full_name = name + '(' + way + ')' + io_manager_test_name_suffix(io_manager)
     if_verbose(1, '*** framework warning for %s %s ' % (full_name, reason))
-    t.framework_warnings.append(TestResult(directory, name, reason, way))
+    t.framework_warnings.append(TestResult(directory, name, reason, way, io_manager))
 
 # -----------------------------------------------------------------------------
 # Generic command tests
@@ -3797,21 +3800,24 @@ def strip_diff_header(diff: Optional[str]) -> Optional[str]:
     return diff
 
 def sorted_results(testInfos: List[TestResult]) -> List[TestResult]:
-    return sorted(testInfos, key=lambda r: (r.testname.lower(), r.directory, r.way))
+    return sorted(testInfos, key=lambda r: (r.testname.lower(), r.directory, r.way,
+                                            r.io_manager or ''))
 
 # A failure-output block: a representative result, its header-stripped diff,
 # and the ways that share it.
 OutputGroup = Tuple[TestResult, Optional[str], List[WayName]]
 
 # Tests that fail identically in several ways (e.g. normal and g1) share one
-# output block, with the ways collected in the header.
+# output block, with the ways collected in the header. Results from different
+# IO Managers are kept in separate blocks, so that each header can name its IO
+# Manager.
 def groupTestOutput(testInfos: List[TestResult]) -> List[OutputGroup]:
     # Relies on dicts preserving insertion order.
     groups = {} # type: Dict[Tuple, OutputGroup]
     for result in sorted_results(testInfos):
         diff = strip_diff_header(result.diff)
-        key = (result.testname, result.directory, result.reason,
-               diff, result.stdout, result.stderr)
+        key = (result.testname, result.directory, result.io_manager,
+               result.reason, diff, result.stdout, result.stderr)
         groups.setdefault(key, (result, diff, []))[2].append(result.way)
     return list(groups.values())
 
@@ -3826,8 +3832,9 @@ def printTestOutputSummary(file: TextIO,
 
     where = ', see {}'.format(junit_path) if junit_path else ''
     for result, diff, ways in groups:
-        header = '=====> {}({}) ({}) [{}]'.format(
-            result.testname, ', '.join(ways), result.directory + os.sep, result.reason)
+        header = '=====> {}({}){} ({}) [{}]'.format(
+            result.testname, ', '.join(ways), io_manager_test_name_suffix(result.io_manager),
+            result.directory + os.sep, result.reason)
         file.write(colored_if(color, Color.RED, header) + '\n')
         # See Note [Redundant output in test results] for why these don't overlap.
         for label, contents in [('Output diff (expected vs actual):', diff),
@@ -3851,7 +3858,8 @@ def printTestOutputSummary(file: TextIO,
 def printTestInfosSummary(file: TextIO, testInfos):
     for result in sorted_results(testInfos):
         path = os.path.join(result.directory, result.testname)
-        file.write('   {path} [{r.reason}] ({r.way})\n'.format(r=result, path=path))
+        file.write('   {path} [{r.reason}] ({r.way}){io}\n'.format(
+            r=result, path=path, io=io_manager_test_name_suffix(result.io_manager)))
     file.write('\n')
 
 def modify_lines(s: str, f: Callable[[str], str]) -> str:
