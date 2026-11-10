@@ -80,13 +80,13 @@ static void statsClose( void );
 
 Time stat_getElapsedTime(void)
 {
-    return getProcessElapsedTime() - start_init_elapsed;
+    return getMonotonicTime() - start_init_elapsed;
 }
 
 static void getProcessTimes(Time *user, Time *elapsed)
 {
     *user    = getProcessCPUTime();
-    *elapsed = getProcessElapsedTime();
+    *elapsed = getMonotonicTime();
 }
 
 /* ---------------------------------------------------------------------------
@@ -301,7 +301,7 @@ stat_endExit(void)
 void
 stat_startGCSync (gc_thread *gct)
 {
-    gct->gc_sync_start_elapsed = getProcessElapsedTime();
+    gct->gc_sync_start_elapsed = getMonotonicTime();
 }
 
 void
@@ -309,7 +309,7 @@ stat_startNonmovingGc (void)
 {
     ACQUIRE_LOCK(&stats_mutex);
     start_nonmoving_gc_cpu = getCurrentThreadCPUTime();
-    start_nonmoving_gc_elapsed = getProcessElapsedTime();
+    start_nonmoving_gc_elapsed = getMonotonicTime();
     RELEASE_LOCK(&stats_mutex);
 }
 
@@ -317,7 +317,7 @@ void
 stat_endNonmovingGc (void)
 {
     Time cpu = getCurrentThreadCPUTime();
-    Time elapsed = getProcessElapsedTime();
+    Time elapsed = getMonotonicTime();
 
     ACQUIRE_LOCK(&stats_mutex);
     stats.gc.nonmoving_gc_elapsed_ns = elapsed - start_nonmoving_gc_elapsed;
@@ -336,7 +336,7 @@ void
 stat_startNonmovingGcSync (void)
 {
     ACQUIRE_LOCK(&stats_mutex);
-    start_nonmoving_gc_sync_elapsed = getProcessElapsedTime();
+    start_nonmoving_gc_sync_elapsed = getMonotonicTime();
     RELEASE_LOCK(&stats_mutex);
     traceConcSyncBegin();
 }
@@ -344,7 +344,7 @@ stat_startNonmovingGcSync (void)
 void
 stat_endNonmovingGcSync (void)
 {
-    Time end_elapsed = getProcessElapsedTime();
+    Time end_elapsed = getMonotonicTime();
     ACQUIRE_LOCK(&stats_mutex);
     stats.gc.nonmoving_gc_sync_elapsed_ns = end_elapsed - start_nonmoving_gc_sync_elapsed;
     stats.nonmoving_gc_sync_elapsed_ns +=  stats.gc.nonmoving_gc_sync_elapsed_ns;
@@ -451,7 +451,7 @@ stat_startGC (Capability *cap, gc_thread *gct)
         gct->gc_start_cpu = getCurrentThreadCPUTime();
     }
 
-    gct->gc_start_elapsed = getProcessElapsedTime();
+    gct->gc_start_elapsed = getMonotonicTime();
 #if !defined(THREADED_RTS)
     // Non-threaded RTS has no sync phase. Initializing in this way makes the
     // calculated statistics correctly read zero.

@@ -413,6 +413,7 @@ library
                  Disassembler.c
                  FileLock.c
                  ForeignExports.c
+                 GetTime.c
                  Globals.c
                  Hash.c
                  Heap.c

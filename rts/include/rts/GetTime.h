@@ -13,4 +13,24 @@
 
 #pragma once
 
-StgWord64 getMonotonicNSec (void);
+/* The monotonic time source used within the RTS.
+ *
+ * Note that this uses StgWord64, rather than Time which is int64_t .
+ */
+StgWord64 getMonotonicNSec(void);
+
+/* The monotonic time source used within the RTS.
+ *
+ * There is no good reason (except history) that we have both this and
+ * getMonotonicNSec.
+ */
+Time getProcessElapsedTime(void);
+
+
+/* It might be nice to tidy this up and export monotonic and wall clock time
+ * and precision and bind them in ghc-internal. They should probably all
+ * use int64_t / CInt64.
+ *
+ * The internal functions are getMonotonicTime() and getWallClockTime().
+ * These would be better candidates for export.
+ */

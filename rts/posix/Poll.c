@@ -370,7 +370,7 @@ void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
     ASSERT(iomgr->aiop_poll_table == iomgr->full_poll_table+1);
 
     if (!isEmptyTimeoutQueue(iomgr->timeout_queue)) {
-        Time now = getProcessElapsedTime();
+        Time now = getMonotonicTime();
         processTimeoutCompletions(iomgr, now);
     }
 
@@ -440,7 +440,7 @@ bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
         ASSERT(!isEmptyTimeoutQueue(iomgr->timeout_queue) ||
                !isEmptyClosureTable(&iomgr->aiop_table));
 
-        Time now = getProcessElapsedTime();
+        Time now = getMonotonicTime();
         processTimeoutCompletions(iomgr, now);
 
         /* If we didn't wake any threads due to expiring timeouts, then we need

@@ -54,25 +54,12 @@ Time getProcessCPUTime(void)
     return getClockTime(CLOCK_PROCESS_CPUTIME_ID);
 }
 
-StgWord64 getMonotonicNSec(void)
+Time getMonotonicTime(void)
 {
     return getClockTime(CLOCK_MONOTONIC);
 }
 
-Time getProcessElapsedTime(void)
+Time getWallClockTime(void)
 {
-    return NSToTime(getMonotonicNSec());
-}
-
-void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
-{
-    struct timespec ts;
-    int res = clock_gettime(CLOCK_REALTIME, &ts);
-    if (RTS_LIKELY(res == 0)) {
-        *sec  = ts.tv_sec;
-        *nsec = ts.tv_nsec;
-    } else {
-        sysErrorBelch("clock_gettime");
-        stg_exit(EXIT_FAILURE);
-    }
+    return getClockTime(CLOCK_REALTIME);
 }

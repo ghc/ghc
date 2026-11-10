@@ -35,20 +35,14 @@ Time getProcessCPUTime(void)
     return getClockTime(CLOCK_MONOTONIC);
 }
 
-StgWord64 getMonotonicNSec(void)
+Time getMonotonicTime(void)
 {
     return getClockTime(CLOCK_MONOTONIC);
 }
 
-Time getProcessElapsedTime(void)
-{
-    return NSToTime(getMonotonicNSec());
-}
-
-void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
+Time getWallClockTime(void)
 {
     struct timeval tv;
     gettimeofday(&tv, (struct timezone *) NULL);
-    *sec  = tv.tv_sec;
-    *nsec = tv.tv_usec * 1000;
+    return SecondsToTime(tv.tv_sec) + USToTime(tv.tv_usec);
 }
