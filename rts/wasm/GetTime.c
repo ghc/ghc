@@ -13,10 +13,6 @@
 #include <time.h>
 #include <sys/time.h>
 
-void initializeTimer(void)
-{
-}
-
 static Time getClockTime(clockid_t clock)
 {
     struct timespec ts;

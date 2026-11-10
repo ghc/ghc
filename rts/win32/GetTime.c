@@ -49,10 +49,6 @@ Time getProcessCPUTime(void)
     return fileTimeToRtsTime(userTime);
 }
 
-void initializeTimer(void)
-{
-}
-
 /* Note [Windows time/clock functions]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

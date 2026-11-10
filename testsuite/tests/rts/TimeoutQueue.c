@@ -227,7 +227,6 @@ int main_bench (bool showtiming)
 
     StgTimeoutQueue *root = EMPTY;
     Time before, after;
-    initializeTimer();
 
     /* Init */
     StgTimeoutQueue *elems = calloc(N, sizeof(StgTimeoutQueue));
