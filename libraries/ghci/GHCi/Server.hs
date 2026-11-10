@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, CPP, RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables, LinearTypes #-}
+{-# LANGUAGE LambdaCase, CPP, RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables, LinearTypes, TypeApplications #-}
 module GHCi.Server
   ( MessageHook
   , CustomMessageHandler
@@ -39,7 +39,7 @@ import System.Exit
 import System.IO
 
 import Control.Concurrent
-import GHCi.Message.Async (runWriteReply, (%>>=))
+import GHCi.Message.Async (runWriteReply, (%>>=), WriteReply, ReplyResult(..), closingPipe)
 import GHCi.Server.Threads
 
 type MessageHook = Msg -> IO Msg
@@ -66,7 +66,7 @@ servWithCustom
   -> IO ()
 servWithCustom verbose hook pipe restore customHandler = do
   ref <- newIORef False
-  withThreadManager $ \mngr -> do
+  withThreadManager $ \mngr -> handle @PipeClosedException (const $ pure ()) $ do
     loop ref mngr `finally` closePipe pipe
  where
   loop doneRef mngr = do
@@ -79,12 +79,13 @@ servWithCustom verbose hook pipe restore customHandler = do
 
       case msg of
         CustomMessage tag payload _ -> handleCustom tag payload %>>= writeReply wr
-        Shutdown                  -> writeIORef doneRef True >>
-                                     reply ()                 %>>= writeReply wr
-        RunTH ii st q ty loc      -> spawnFinally mngr         (runWriteReply wr)
+        Shutdown                  -> writeIORef doneRef True >> closingPipe pipe >>
+                                     reply ()                %>>= \r ->
+                                     runWriteReply wr (Right r) ignorePipeClosedException
+        RunTH ii st q ty loc      -> handleAsync wr
                                      (restore $ wrapRunTH ii (runTH pipe ii st q ty loc))
                                      (setCancel . void . forkIO . killThread)
-        RunModFinalizers ii st qs -> spawnFinally mngr         (runWriteReply wr)
+        RunModFinalizers ii st qs -> handleAsync wr
                                      (restore $ wrapRunTH ii (runModFinalizerRefs pipe ii st qs))
                                      (setCancel . void . forkIO . killThread)
         _other                    -> run msg >>= reply        %>>= writeReply wr
@@ -92,6 +93,20 @@ servWithCustom verbose hook pipe restore customHandler = do
     isDone <- readIORef doneRef
     if isDone then pure ()
               else loop doneRef mngr
+    where
+      handleAsync :: WriteReply a %1 -> IO a -> (ThreadId -> IO ()) -> IO ()
+      handleAsync wr h cancel = spawnFinally mngr (\ r -> runWriteReply wr r ignorePipeClosedException) h cancel
+
+      -- ignores PipeClosedException when writing reply, to avoid uncaught
+      -- exception messages on Shutdown. If there's an actual error it's
+      -- reported as a different exception type.
+      ignorePipeClosedException = \case
+        ReplyWritingError e
+          | Just _ <- fromException @PipeClosedException e
+          -> pure ()
+          | otherwise
+          -> throwIO e
+        _ -> pure ()
 
   handleCustom tag payload = do
     mresp <- customHandler tag payload

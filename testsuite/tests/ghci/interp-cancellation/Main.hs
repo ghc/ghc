@@ -63,6 +63,7 @@ import System.Process
   , terminateProcess
   , waitForProcess
   )
+import System.Process.CommunicationHandle
 
 --------------------------------------------------------------------------------
 -- The messages the server holds back
@@ -337,18 +338,16 @@ check what ok = must what ok >> putStrLn ("ok: " ++ what)
 withServer :: (Pipe -> ProcessHandle -> Gate -> IO a) -> IO a
 withServer action = do
   serverExe <- getExecutablePath
-  (ghcRead, serverWrite)    <- createPipe
-  (serverRead, ghcWrite)    <- createPipe
-  (notifyRead, notifyWrite) <- createPipe -- server -> client
-  (goRead, goWrite)         <- createPipe -- client -> server
+  (ghcRead, serverWrite)    <- createWeReadTheyWritePipe
+  (serverRead, ghcWrite)    <- createTheyReadWeWritePipe
+  (notifyRead, notifyWrite) <- createWeReadTheyWritePipe -- server -> client
+  (goRead, goWrite)         <- createTheyReadWeWritePipe -- client -> server
   let inherited = [serverWrite, serverRead, notifyWrite, goRead]
-  mapM_ (\fd -> setFdOption fd CloseOnExec False) inherited
   ph <- spawnServer serverExe (map show inherited)
-  notifyH <- fdToHandle notifyRead
-  goH     <- fdToHandle goWrite
-  prepareGateHandles [notifyH, goH]
-  let gate = Gate { gateWait    = void (hGetChar notifyH)
-                  , gateRelease = hPutChar goH 'g' >> hFlush goH
+  mapM_ closeCommunicationHandle inherited
+  prepareGateHandles [notifyRead, goWrite]
+  let gate = Gate { gateWait    = void (hGetChar notifyRead)
+                  , gateRelease = hPutChar goWrite 'g' >> hFlush goWrite
                   }
   bracket (mkHandles ghcRead ghcWrite >>= uncurry mkPipeFromHandles)
           (\pipe -> do
@@ -366,9 +365,7 @@ withServer action = do
         }
       pure ph
 
-    mkHandles r w = do
-      hR <- fdToHandle r
-      hW <- fdToHandle w
+    mkHandles hR hW = do
       mapM_ (`hSetBuffering` NoBuffering) [hR, hW]
       mapM_ (`hSetBinaryMode` True) [hR, hW]
       pure (hR, hW)
