@@ -228,10 +228,12 @@ library
             dbghelp
             -- for process information
             psapi
+            mincore
          extra-libraries-static:
             wsock32 gdi32 winmm
             dbghelp
             psapi
+            mincore
          -- TODO: Hadrian will use this cabal file, so drop WINVER from Hadrian's configs.
          -- Minimum supported Windows version.
          -- These numbers can be found at:
