@@ -359,6 +359,7 @@ Library
         GHC.Core.Coercion.Opt
         GHC.Core.ConLike
         GHC.Core.DataCon
+        GHC.Core.Dependent
         GHC.Core.FamInstEnv
         GHC.Core.FVs
         GHC.Core.InstEnv

@@ -71,6 +71,12 @@ Substitution of a Boolean variable or constructor into an index produces the
 corresponding index. Substitution of any other expression must fail explicitly
 in the initial experiment. It must not leave a stale variable behind.
 
+`composeTCvSubst` composes type and coercion environments. It also composes
+supported Boolean index mappings in the expression environment. It preserves
+apply-once substitution and the second environment's priority on shared domains.
+It does not compose arbitrary Core expressions. Such expressions cannot replace
+native indices in this increment.
+
 This restricted grammar is not closed under general Core substitution. The
 experiment therefore cannot enter the ordinary optimizer or backend yet.
 Preserving lazy binding boundaries or adding an internal expression-index form

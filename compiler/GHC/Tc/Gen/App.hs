@@ -2176,6 +2176,8 @@ foldQLInstVars check_tv ty
                                              -- in GHC.Core.TyCo.FVs
                         , tcf_lit        = mempty
                         , tcf_tyvar      = do_tv
+                        , tcf_termvar    = \v -> pprPanic "foldQLInstVars: native term index not implemented" (ppr v)
+                        , tcf_termbinder = \v _ -> pprPanic "foldQLInstVars: native dependent binder not implemented" (ppr v)
                         , tcf_covar      = mempty
                         , tcf_hole       = do_hole
                         , tcf_tycobinder = do_bndr }

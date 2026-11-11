@@ -11,6 +11,8 @@ Last updated: 2026-11-11.
 
 - [Implementation plan](PLAN.md): Core extension, port tasks, and acceptance checks.
 - [References](REFERENCES.md): annotated sources, reading order, and status dates.
+- [Historical port](PORT.md): pinned commits, module mapping, and missing rules.
+- [Restricted Core](CORE.md): representation, typing, substitution, and gates.
 - This file: current status, validation results, and instructions to resume work.
 
 ## Current status
@@ -20,16 +22,36 @@ Last updated: 2026-11-11.
 | GHC source baseline | `19ff36f2aede0ca2e554016ff22c71e73aa9803b`, dated 2026-11-09 |
 | Project branch | `codex/dependent-haskell` |
 | Baseline build | Passed on 2026-11-11 |
-| Singleton reference translation | Checked in temporary files on 2026-11-11 |
-| Native Core and frontend | Planned; no compiler implementation changes yet |
+| Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
+| Native Core | Retained Boolean lambda and application pass the internal API regression |
+| Frontend and execution | Not implemented; optimizer, backend, and interface gates remain |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| First task | [M1: audit and pin the historical port](PLAN.md#m1-audit-and-pin-the-historical-port) |
+| Current task | [M3: dependent lambda and application](PLAN.md#m3-port-binders-and-implement-dependent-lambda-and-application), build and API validation |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
-computation and Boolean elimination need completion. The native target accepts
-ordinary runtime Boolean bindings directly and preserves laziness. Singleton
+computation and Boolean elimination need completion. The native target must accept
+ordinary runtime Boolean bindings directly and preserve laziness. Singleton
 reification remains specific to the comparison implementation.
+
+## First native Core increment
+
+`TermVarTy` refers to the index of an existing runtime Boolean identifier.
+`DepFunTy` binds that identifier in a dependent result type. Type recovery and
+Core Lint agree on retained application. The implementation includes scope,
+capture avoidance, supported index substitution, alpha equality, and diagnostic
+printing. It does not add a singleton argument or evaluate index variables.
+
+The `NativeDependentCore` GHC API regression passes against the refreshed stage0
+compiler library. It covers constructor and shared-variable applications,
+substitution composition, binder cloning, invalid indices, scope errors, and
+the boundary gates. The complete default Hadrian rebuild is still in progress.
+These API results do not establish native execution or optimizer preservation.
+There is no performance measurement for the changed type traversals.
+
+The frontend cannot produce the new forms. The ordinary optimizer, CorePrep,
+interface serialization, and unsupported frontend operations reject them.
+Dependent Boolean case evidence is the next implementation task.
 
 ## Verified baseline
 
@@ -101,8 +123,8 @@ inspected `singletons` package excludes that version in its bounds.
 
 The temporary evidence is at `/tmp/ghc-retained-bool-plan.DJqnmf/`:
 `Oracle.hs`, `Reject.hs`, `LibraryOracle.hs`, `check.log`, and `library-check.log`.
-The temporary directory can expire. M1 must retain a reproducible reference
-before implementation depends on these files.
+The temporary directory can expire. The maintained comparison sources and
+reproduction recipe are now in [reference/](reference/README.md).
 
 ## How to resume
 

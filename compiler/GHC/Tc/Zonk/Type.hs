@@ -505,6 +505,8 @@ zonkCoHole hole@(CH { ch_ref = ref, ch_co_var = cv })
 zonk_tycomapper :: TyCoMapper ZonkTcM
 zonk_tycomapper = TyCoMapper
     { tcm_tyvar      = zonkTyVarOcc
+    , tcm_termvar    = \v -> pprPanic "zonk_tycomapper: native term index not implemented" (ppr v)
+    , tcm_termbinder = \v _ -> pprPanic "zonk_tycomapper: native dependent binder not implemented" (ppr v)
     , tcm_covar      = zonkCoVarOcc
     , tcm_hole       = zonkCoHole
     , tcm_tycobinder = \ tcv _vis k -> runZonkBndrT (zonkTyBndrX tcv) k

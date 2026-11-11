@@ -1799,6 +1799,8 @@ kickOutRewritableLHS ko_spec new_fr@(_, new_role)
     tv_at_head is_tv = go
       where
         go (Rep.TyVarTy tv)    = is_tv tv
+        go (Rep.TermVarTy {})  = False
+        go (Rep.DepFunTy {})   = False
         go (Rep.AppTy fun _)   = go fun
         go (Rep.CastTy ty _)   = go ty
         go (Rep.TyConApp {})   = False
@@ -1811,6 +1813,8 @@ kickOutRewritableLHS ko_spec new_fr@(_, new_role)
     fam_at_head fun_tc fun_args = go
       where
         go (Rep.TyVarTy {})       = False
+        go (Rep.TermVarTy {})     = False
+        go (Rep.DepFunTy {})      = False
         go (Rep.AppTy {})         = False  -- no TyConApp to the left of an AppTy
         go (Rep.CastTy ty _)      = go ty
         go (Rep.TyConApp tc args) = tcEqTyConApps fun_tc fun_args tc args

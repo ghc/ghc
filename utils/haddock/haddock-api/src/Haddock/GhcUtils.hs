@@ -792,6 +792,8 @@ typeNames ty = go ty Set.empty
     go t acc =
       case t of
         TyVarTy{} -> acc
+        TermVarTy v -> go (varType v) acc
+        DepFunTy b body -> go body $ go (varType b) acc
         AppTy t1 t2 -> go t2 $ go t1 acc
         FunTy _ _ t1 t2 -> go t2 $ go t1 acc
         TyConApp tcon args -> List.foldl' (\s t' -> go t' s) (Set.insert (getName tcon) acc) args
@@ -865,6 +867,8 @@ defaultRuntimeRepVars = go emptyVarEnv
           liftedRepTy
       | otherwise =
           TyVarTy (updateTyVarKind (go subs) tv)
+    go _ (TermVarTy{}) = panic "defaultRuntimeRepVars: native runtime index is not supported"
+    go _ (DepFunTy{}) = panic "defaultRuntimeRepVars: native dependent function is not supported"
     go subs (TyConApp tc tc_args) =
       TyConApp tc (map (go subs) tc_args)
     go subs (FunTy af w arg res) =

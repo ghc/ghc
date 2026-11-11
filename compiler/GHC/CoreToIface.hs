@@ -194,6 +194,10 @@ toIfaceTypeX :: VarSet -> Type -> IfaceType
 toIfaceTypeX fr (TyVarTy tv)   -- See Note [Free TyVars and CoVars in IfaceType] in GHC.Iface.Type
   | tv `elemVarSet` fr         = IfaceFreeTyVar tv
   | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
+toIfaceTypeX _ (TermVarTy var) = IfaceTermVar var
+toIfaceTypeX fr (DepFunTy var res)
+  = IfaceDepFunTy var (toIfaceTypeX fr (varType var))
+                      (toIfaceTypeX (fr `delVarSet` var) res)
 toIfaceTypeX fr ty@(AppTy {})  =
   -- Flatten as many argument AppTys as possible, then turn them into an
   -- IfaceAppArgs list.
@@ -379,6 +383,8 @@ toIfaceAppArgsX fr kind ty_args
     go env ty                  ts
       | Just ty' <- coreView ty
       = go env ty' ts
+    go _ ty@(DepFunTy {}) (_:_)
+      = pprPanic "toIfaceAppArgsX: native dependent kind application not implemented" (ppr ty)
     go env (ForAllTy (Bndr tv vis) res) (t:ts)
       = IA_Arg t' (IfaceForAllTyFlag vis) ts'
       where

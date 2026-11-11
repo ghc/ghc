@@ -1598,6 +1598,15 @@ unify_ty env ty1 ty2 kco
   | Just ty1' <- coreView ty1 = unify_ty env ty1' ty2 kco
   | Just ty2' <- coreView ty2 = unify_ty env ty1 ty2' kco
 
+unify_ty _ ty1@(TermVarTy {}) ty2 _
+  = pprPanic "unify_ty: unsupported runtime index" (ppr ty1 $$ ppr ty2)
+unify_ty _ ty1 ty2@(TermVarTy {}) _
+  = pprPanic "unify_ty: unsupported runtime index" (ppr ty1 $$ ppr ty2)
+unify_ty _ ty1@(DepFunTy {}) ty2 _
+  = pprPanic "unify_ty: unsupported retained function" (ppr ty1 $$ ppr ty2)
+unify_ty _ ty1 ty2@(DepFunTy {}) _
+  = pprPanic "unify_ty: unsupported retained function" (ppr ty1 $$ ppr ty2)
+
 unify_ty env (CastTy ty1 co1) ty2 kco
   | mentionsForAllBoundTyVarsL env (tyCoVarsOfCo co1)
     -- See (KCU1) in Note [Kind coercions in Unify]
@@ -1978,6 +1987,10 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
     go :: TyCoVarSet   -- Bound by enclosing foralls; see (OCU1)
        -> Type -> Bool
     go bvs ty | Just ty' <- coreView ty = go bvs ty'
+    go _ ty@(TermVarTy {})
+      = pprPanic "uOccursCheck: unsupported runtime index" (ppr ty)
+    go _ ty@(DepFunTy {})
+      = pprPanic "uOccursCheck: unsupported retained function" (ppr ty)
     go bvs (TyVarTy tv) | Just ty' <- lookupVarEnv tv_env tv
                         = go bvs ty'
                         | TyVarLHS tv' <- lhs, tv==tv'
@@ -2307,6 +2320,10 @@ ty_co_match :: MatchEnv   -- ^ ambient helpful info
    -- ^ Just env ==> liftCoSubst Nominal env ty == co, modulo roles.
    -- Also: Just env ==> lsubst(ty) == lty and rsubst(ty) == rty,
    -- where lsubst = lcSubstLeft(env) and rsubst = lcSubstRight(env)
+ty_co_match _ _ ty@(TermVarTy {}) _ _ _
+  = pprPanic "ty_co_match: unsupported runtime index" (ppr ty)
+ty_co_match _ _ ty@(DepFunTy {}) _ _ _
+  = pprPanic "ty_co_match: unsupported retained function" (ppr ty)
 ty_co_match menv subst ty co lkco rkco
   | Just ty' <- coreView ty = ty_co_match menv subst ty' co lkco rkco
 

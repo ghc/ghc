@@ -746,6 +746,10 @@ check_type :: ValidityEnv -> Type -> TcM ()
 -- Rank is allowed rank for function args
 -- Rank 0 means no for-alls anywhere
 
+check_type _ ty@(TermVarTy {})
+  = pprPanic "check_type: unsupported runtime index" (ppr ty)
+check_type _ ty@(DepFunTy {})
+  = pprPanic "check_type: unsupported retained function" (ppr ty)
 check_type _ (TyVarTy _)
   = return ()
 

@@ -245,6 +245,14 @@ debug_ppr_ty _ (LitTy l)
 debug_ppr_ty _ (TyVarTy tv)
   = ppr tv  -- With -dppr-debug we get (tv :: kind)
 
+debug_ppr_ty _ (TermVarTy var)
+  = ppr var
+
+debug_ppr_ty prec (DepFunTy var res)
+  = maybeParen prec funPrec $
+    sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> debug_ppr_ty topPrec (varType var))
+        , arrow <+> debug_ppr_ty topPrec res ]
+
 debug_ppr_ty prec (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
   = maybeParen prec funPrec $
     sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]

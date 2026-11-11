@@ -229,6 +229,8 @@ zonkCo      :: Coercion -> ZonkM Coercion
     zonkTcTypeMapper :: TyCoMapper ZonkM
     zonkTcTypeMapper = TyCoMapper
       { tcm_tyvar = zonkTcTyVar
+      , tcm_termvar = \v -> pprPanic "zonkTcTypeMapper: native term index not implemented" (ppr v)
+      , tcm_termbinder = \v _ -> pprPanic "zonkTcTypeMapper: native dependent binder not implemented" (ppr v)
       , tcm_covar = \cv -> mkCoVarCo <$> zonkTyCoVarKind cv
       , tcm_hole       = zonk_hole
       , tcm_tycobinder = \ tcv _vis k -> zonkTyCoVarKind tcv >>= k

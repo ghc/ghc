@@ -94,6 +94,8 @@ synonymTyConsOfType ty
   = nonDetNameEnvElts (go ty)
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
+     go (TermVarTy v)     = go (varType v)
+     go (DepFunTy v ty)   = go (varType v) `plusNameEnv` go ty
      go (TyConApp tc tys) = go_tc tc `plusNameEnv` go_s tys
      go (LitTy _)         = emptyNameEnv
      go (TyVarTy _)       = emptyNameEnv
@@ -587,6 +589,10 @@ irType = go
   where
     go lcls ty                 | Just ty' <- coreView ty -- #14101
                                = go lcls ty'
+    go _ ty@(TermVarTy {})
+      = pprPanic "irType: unsupported runtime index" (ppr ty)
+    go _ ty@(DepFunTy {})
+      = pprPanic "irType: unsupported retained function" (ppr ty)
     go lcls (TyVarTy tv)       = unless (tv `elemVarSet` lcls) $
                                  updateRole Representational tv
     go lcls (AppTy t1 t2)      = go lcls t1 >> markNominal lcls t2
@@ -632,6 +638,10 @@ markNominal lcls ty = mapM_ (updateRole Nominal) $
     get_ty_vars :: Type -> VarSet
     get_ty_vars t                 | Just t' <- coreView t -- #20999
                                   = get_ty_vars t'
+    get_ty_vars ty@(TermVarTy {})
+      = pprPanic "markNominal: unsupported runtime index" (ppr ty)
+    get_ty_vars ty@(DepFunTy {})
+      = pprPanic "markNominal: unsupported retained function" (ppr ty)
     get_ty_vars (TyVarTy tv)      = unitVarSet tv
     get_ty_vars (AppTy t1 t2)     = get_ty_vars t1 `unionVarSet` get_ty_vars t2
     get_ty_vars (FunTy _ w t1 t2) = get_ty_vars w `unionVarSet` get_ty_vars t1

@@ -90,7 +90,7 @@ module GHC.Core.TyCo.Rep (
         mkInvisFunTy, mkInvisFunTys,
         tcMkVisFunTy, tcMkInvisFunTy, tcMkScaledFunTy, tcMkScaledFunTys,
         mkForAllTy, mkForAllTys, mkInvisForAllTys,
-        mkPiTy, mkPiTys,
+        mkPiTy, mkPiTys, mkDepFunTy,
         mkVisFunTyMany, mkVisFunTysMany,
         nonDetCmpTyLit, cmpTyLit,
 
@@ -173,6 +173,12 @@ data Type
   -- See Note [Non-trivial definitional equality]
   = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
 
+  | TermVarTy Id -- ^ The Boolean index of a local runtime identifier.
+                 -- See Note [Restricted retained dependent types].
+
+  | DepFunTy Id Type -- ^ A retained Boolean binder and its dependent result.
+                     -- See Note [Restricted retained dependent types].
+
   | AppTy
         Type
         Type            -- ^ Type application to something other than a 'TyCon'. Parameters:
@@ -239,6 +245,23 @@ data Type
                     -- GADT data constructor
 
   deriving Data.Data
+
+{- Note [Restricted retained dependent types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TermVarTy and DepFunTy implement an internal experiment. The runtime variable
+remains an Id. It must be local, non-coercion, unrestricted, and of type Bool.
+TermVarTy has kind Bool. A DepFunTy result must have lifted kind Type.
+
+The binder scopes over the result. A vacuous binder is represented by FunTy;
+use mkDepFunTy to maintain this invariant. Index occurrences are scope
+dependencies, not additional runtime uses. Type-variable and coercion-variable
+callbacks must not process runtime index variables.
+
+Only variable and constructor index substitution is implemented. General
+expression substitution, dependent case evidence, optimization, code generation,
+and interface serialization are not implemented for these forms. The frontend
+cannot emit them. See docs/dependent-haskell/CORE.md.
+-}
 
 instance Outputable Type where
   ppr = pprType
@@ -819,6 +842,12 @@ mkPiTy (Named bndr) ty    = mkForAllTy bndr ty
 
 mkPiTys :: HasDebugCallStack => [PiTyBinder] -> Type -> Type
 mkPiTys tbs ty = foldr mkPiTy ty tbs
+
+-- | Construct a retained dependent function. Remove vacuous dependence.
+mkDepFunTy :: Id -> Type -> Type
+mkDepFunTy b body
+  | b `elemVarSet` tyCoVarsOfType body = DepFunTy b body
+  | otherwise = mkVisFunTyMany (varType b) body
 
 -- | 'mkNakedTyConTy' creates a nullary 'TyConApp'. In general you
 -- should rather use 'GHC.Core.Type.mkTyConTy', which picks the shared
@@ -2136,6 +2165,9 @@ data TyCoFolder a
       , tcf_tyvar :: TyVar -> a    -- Does not automatically recur
       , tcf_covar :: CoVar -> a    -- into kinds of variables
 
+      , tcf_termvar :: Id -> a
+      , tcf_termbinder :: Id -> a -> a
+
       , tcf_hole  :: CoercionHole -> a   -- ^ What to do with coercion holes.
                                          -- See Note [Coercion holes]
 
@@ -2150,6 +2182,8 @@ foldTyCo :: Monoid a => TyCoFolder a
 foldTyCo (TyCoFolder { tcf_view       = view
                      , tcf_lit        = lit
                      , tcf_tyvar      = tyvar
+                     , tcf_termvar    = termvar
+                     , tcf_termbinder = termbinder
                      , tcf_tycobinder = tycobinder
                      , tcf_covar      = covar
                      , tcf_hole       = cohole })
@@ -2157,6 +2191,8 @@ foldTyCo (TyCoFolder { tcf_view       = view
   where
     go_ty ty | Just ty' <- view ty = go_ty ty'
     go_ty (TyVarTy tv)        = tyvar tv
+    go_ty (TermVarTy v)       = termvar v
+    go_ty (DepFunTy b body)   = go_ty (varType b) M.<> termbinder b (go_ty body)
     go_ty (LitTy l)           = lit l
     go_ty (AppTy t1 t2)       = go_ty t1 M.<> go_ty t2
     go_ty (CastTy ty co)      = go_ty ty M.<> go_co co
@@ -2251,6 +2287,8 @@ typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
 typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
+typeSize (TermVarTy v)             = 1 + typeSize (varType v)
+typeSize (DepFunTy b t)            = 1 + typeSize (varType b) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + typesSize ts
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co
 typeSize (CoercionTy co)            = coercionSize co

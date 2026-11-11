@@ -2093,6 +2093,10 @@ freeNamesIfAppArgs IA_Nil          = emptyNameSet
 
 freeNamesIfType :: IfaceType -> NameSet
 freeNamesIfType (IfaceFreeTyVar _)    = emptyNameSet
+freeNamesIfType (IfaceTermVar _)
+  = panic "freeNamesIfType: native dependent Core interfaces are not implemented"
+freeNamesIfType (IfaceDepFunTy _ _ _)
+  = panic "freeNamesIfType: native dependent Core interfaces are not implemented"
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs t
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs ts

@@ -1660,6 +1660,10 @@ invalidAbsDataSubTypes = execWriter . go
     go ty
       | Just ty' <- coreView ty
       = go ty'
+    go ty@(TermVarTy {})
+      = invalid ty
+    go ty@(DepFunTy {})
+      = invalid ty
     go TyVarTy{}
       = ok -- We report an error at the binding site of type variables,
            -- e.g. in the TySyn LHS or in the forall.

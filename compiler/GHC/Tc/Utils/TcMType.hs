@@ -1421,6 +1421,10 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
     -----------------
     go :: CandidatesQTvs -> TcType -> TcM CandidatesQTvs
     -- Uses accumulating-parameter style
+    go _ ty@(TermVarTy {})
+      = pprPanic "collect_cand_qtvs: unsupported runtime index" (ppr ty)
+    go _ ty@(DepFunTy {})
+      = pprPanic "collect_cand_qtvs: unsupported retained function" (ppr ty)
     go dv (AppTy t1 t2)       = foldlM go dv [t1, t2]
     go dv (TyConApp tc tys)   = go_tc_args dv (tyConBinders tc) tys
     go dv (FunTy _ w arg res) = foldlM go dv [arg, w, res]

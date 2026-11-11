@@ -184,6 +184,8 @@ GHC.Utils.Monad.StrictReader.
 data TyCoMapper m
   = TyCoMapper
       { tcm_tyvar :: TyVar -> m Type
+      , tcm_termvar :: Id -> m Type
+      , tcm_termbinder :: forall r. Id -> (Id -> m r) -> m r
       , tcm_covar :: CoVar -> m Coercion
       , tcm_hole  :: CoercionHole -> m Coercion
           -- ^ What to do with coercion holes.
@@ -217,6 +219,8 @@ mapTyCo :: forall m. Monad m
            , Coercion   -> m Coercion
            , [Coercion] -> m [Coercion] )
 mapTyCo (TyCoMapper { tcm_tyvar = tyvar
+                    , tcm_termvar = termvar
+                    , tcm_termbinder = termbinder
                     , tcm_tycobinder = tycobinder
                     , tcm_tcapp_ty = tcapp_ty
                     , tcm_tcapp_co = tcapp_co
@@ -229,6 +233,9 @@ mapTyCo (TyCoMapper { tcm_tyvar = tyvar
     go_tys (ty:tys) = (:) <$> go_ty ty <*> go_tys tys
 
     go_ty (TyVarTy tv)    = tyvar tv
+    go_ty (TermVarTy v)   = termvar v
+    go_ty (DepFunTy b body)
+      = termbinder b $ \b' -> mkDepFunTy b' <$> go_ty body
     go_ty (AppTy t1 t2)   = mkAppTy <$> go_ty t1 <*> go_ty t2
     go_ty ty@(LitTy {})   = return ty
     go_ty (CastTy ty co)  = mkCastTy <$> go_ty ty <*> go_co co

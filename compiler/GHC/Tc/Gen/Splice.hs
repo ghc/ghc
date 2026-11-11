@@ -2713,6 +2713,8 @@ reifyType :: TyCoRep.Type -> TcM TH.Type
 reifyType ty                | tcIsLiftedTypeKind ty = return TH.StarT
   -- Make sure to use tcIsLiftedTypeKind here, since we don't want to confuse it
   -- with Constraint (#14869).
+reifyType ty@(TermVarTy {}) = pprPanic "reifyType: unsupported runtime index" (ppr ty)
+reifyType ty@(DepFunTy {}) = pprPanic "reifyType: unsupported retained function" (ppr ty)
 reifyType ty@(ForAllTy (Bndr _ argf) _)
                             = reify_for_all argf ty
 reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }

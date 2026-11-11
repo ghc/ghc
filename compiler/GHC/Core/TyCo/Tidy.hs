@@ -232,6 +232,10 @@ tidyTypes env tys = strictMap (tidyType env) tys
 tidyType :: TidyEnv -> Type -> Type
 tidyType _   t@(LitTy {})           = t -- Preserve sharing
 tidyType env (TyVarTy tv)           = TyVarTy $! tidyTyCoVarOcc env tv
+tidyType env (TermVarTy var)        = TermVarTy $! tidyTyCoVarOcc env var
+tidyType env (DepFunTy var res)     = (DepFunTy $! var') $! tidyType body_env res
+  where
+    (body_env, var') = tidyVarBndr env var
 tidyType _   t@(TyConApp _ [])      = t -- Preserve sharing if possible
 tidyType env (TyConApp tycon tys)   = TyConApp tycon $! tidyTypes env tys
 tidyType env (AppTy fun arg)        = (AppTy $! (tidyType env fun)) $! (tidyType env arg)

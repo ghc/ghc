@@ -203,6 +203,10 @@ in the heap. We can take advantage of this by shortcutting the equality
 check if two types are represented by the same pointer under the hood.
 In some cases this reduces compiler allocations by ~2%.
 
+The shortcut requires an absent renaming environment. Under a dependent binder,
+the same runtime index node can refer to a bound identifier on one side and a
+free identifier on the other. Compare those occurrences through RnEnv2.
+
 See Note [Pointer comparison operations] in GHC.Builtin.primops.txt.pp
 
 Note [Respecting multiplicity when comparing types]
@@ -377,7 +381,8 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
         gos _ _               = False
 
     in case (t1,t2) of
-      _ | 1# <- reallyUnsafePtrEquality# t1 t2 -> True
+      _ | Nothing <- mb_env
+        , 1# <- reallyUnsafePtrEquality# t1 t2 -> True
       -- See Note [Type comparisons using object pointer comparisons]
 
       (TyConApp tc1 tys1, TyConApp tc2 tys2)
@@ -395,6 +400,20 @@ inline_generic_eq_type_x syn_flag mult_flag mb_env
         -> case mb_env of
               Nothing  -> tv1 == tv2
               Just env -> rnOccL env tv1 == rnOccR env tv2
+
+      (TermVarTy v1, TermVarTy v2)
+        -> case mb_env of
+              Nothing  -> v1 == v2
+              Just env -> rnOccL env v1 == rnOccR env v2
+
+      (DepFunTy v1 body1, DepFunTy v2 body2)
+        -> case mb_env of
+              Nothing -> generic_eq_type_x syn_flag mult_flag
+                            (Just (initRnEnv t1 t2)) t1 t2
+              Just env
+                -> go (varType v1) (varType v2)
+                   && generic_eq_type_x syn_flag mult_flag
+                        (Just (rnBndr2 env v1 v2)) body1 body2
 
       (LitTy lit1,    LitTy lit2)    -> lit1 == lit2
       (CastTy t1' _,   _)            -> go t1' t2 -- Ignore casts
@@ -453,7 +472,8 @@ hasCasts (CastTy {})     = True
 hasCasts (CoercionTy {}) = True
 hasCasts (AppTy t1 t2)   = hasCasts t1 || hasCasts t2
 hasCasts (ForAllTy _ ty) = hasCasts ty
-hasCasts _               = False   -- TyVarTy, TyConApp, FunTy, LitTy
+hasCasts (DepFunTy v ty) = hasCasts (varType v) || hasCasts ty
+hasCasts _               = False   -- TyVarTy, TermVarTy, TyConApp, FunTy, LitTy
 
 
 {- *********************************************************************
@@ -694,6 +714,11 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 
     go env (TyVarTy tv1)       (TyVarTy tv2)
       = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2
+    go env (TermVarTy v1)      (TermVarTy v2)
+      = liftOrdering $ rnOccL env v1 `nonDetCmpVar` rnOccR env v2
+    go env (DepFunTy v1 t1) (DepFunTy v2 t2)
+      = go env (varType v1) (varType v2)
+        `thenCmpTy` go (rnBndr2 env v1 v2) t1 t2
     go env (ForAllTy (Bndr tv1 vis1) t1) (ForAllTy (Bndr tv2 vis2) t2)
       = liftOrdering (vis1 `cmpForAllVis` vis2)   -- See Note [ForAllTy and type equality]
         `thenCmpTy` go env (varType tv1) (varType tv2)
@@ -731,11 +756,13 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
               = pprPanic "nonDetCmpTypeX.get_rank" (ppr [ty1,ty2])
             get_rank (TyVarTy {})    = 0
             get_rank (CoercionTy {}) = 1
+            get_rank (TermVarTy {})  = 2
             get_rank (AppTy {})      = 3
             get_rank (LitTy {})      = 4
             get_rank (TyConApp {})   = 5
             get_rank (FunTy {})      = 6
             get_rank (ForAllTy {})   = 7
+            get_rank (DepFunTy {})   = 8
 
     gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
     gos _   []         []         = TEQ
@@ -880,6 +907,13 @@ mayLookIdentical orig_ty1 orig_ty2
           do { kind_ok <- tell_on_mismatch InvisibleKind $ go env False (typeKind ty) (tyVarKind tv)
              ; return $ not kind_ok }
     go _ _ (TyVarTy {}) (TyVarTy {}) = return False
+
+    go env _top (TermVarTy v1) (TermVarTy v2)
+      = return $ rnOccL env v1 == rnOccR env v2
+
+    go env _top (DepFunTy v1 ty1) (DepFunTy v2 ty2)
+      = (&&) <$> go env False (varType v1) (varType v2)
+             <*> go (rnBndr2 env v1 v2) False ty1 ty2
 
     go _   _   (LitTy lit1)    (LitTy lit2)    = return $ lit1 == lit2
     go top vis (CastTy t1 _)   t2              = go top vis t1 t2

@@ -78,6 +78,7 @@ import GHC.Core.Ppr
 import GHC.Core.FVs( exprFreeVars, bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
+import GHC.Core.TyCo.Rep ( Type(DepFunTy) )
 import GHC.Core.Predicate( isEqPred )
 import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.FamInstEnv
@@ -142,7 +143,11 @@ exprType (Coercion co)       = coercionType co
 exprType (Let bind body)
   | NonRec tv rhs <- bind    -- See Note [Type bindings]
   , Type ty <- rhs           = substTyWithUnchecked [tv] [ty] (exprType body)
-  | otherwise                = exprType body
+  | otherwise
+  = let body_ty = exprType body
+    in if any (\b -> isNonCoVarId b && b `elemVarSet` tyCoVarsOfType body_ty) (bindersOf bind)
+       then pprPanic "exprType: let-bound runtime index escapes its scope" (ppr body_ty)
+       else body_ty
 exprType (Case _ _ ty _)     = ty
 exprType (Cast _ co)         = coercionRKind co
 exprType (Tick _ e)          = exprType e
@@ -185,6 +190,12 @@ mkLamType v body_ty
    , v `elemVarSet` tyCoVarsOfType body_ty
      -- See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep
    = mkForAllTy (Bndr v coreTyLamForAllTyFlag) body_ty
+
+   | isBoolIndexId v
+   , anyFreeVarsOfType (== v) body_ty
+   = assertPpr (isBoolIndexId v && isLiftedTypeKind (typeKind body_ty))
+       (text "Unsupported retained dependent lambda:" <+> ppr v <+> dcolon <+> ppr body_ty) $
+     DepFunTy v body_ty
 
    | otherwise
    = mkFunctionType (idMult v) (idType v) body_ty
@@ -237,6 +248,11 @@ applyTypeToArgs op_ty args
     go op_ty []                   = op_ty
     go op_ty (Type ty : args)     = go_ty_args op_ty [ty] args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
+    go op_ty (arg : args)
+      | DepFunTy b res_ty <- coreFullView op_ty
+      , Just _ <- exprToBoolIndex arg
+      = let in_scope = mkInScopeSet (tyCoVarsOfType res_ty `unionVarSet` exprFreeVars arg)
+        in go (substTy (Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv) res_ty) args
     go op_ty (_ : args)           | Just (_, _, _, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
     go _ args = pprPanic "applyTypeToArgs" (panic_msg args)

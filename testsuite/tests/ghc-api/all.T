@@ -2,6 +2,9 @@ setTestOpts(when(arch('wasm32'), run_timeout_multiplier(2)))
 
 test('ghcApi', normal, compile_and_run, ['-package ghc'])
 
+test('NativeDependentCore', [extra_run_opts(f'"{config.libdir}"')],
+     compile_and_run, ['-package ghc'])
+
 test('T6145',
      [extra_run_opts(f'"{config.libdir}"')
      # needs to spawn c compiler process, and wasm doesn't have

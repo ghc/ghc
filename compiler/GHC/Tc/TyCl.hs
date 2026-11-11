@@ -1389,6 +1389,8 @@ swizzleTcTyConBndrs tc_infos
 
     swizzleMapper :: TyCoMapper StrictIdentity
     swizzleMapper = TyCoMapper { tcm_tyvar = swizzle_tv
+                               , tcm_termvar = \v -> pprPanic "swizzleMapper: native term index not implemented" (ppr v)
+                               , tcm_termbinder = \v _ -> pprPanic "swizzleMapper: native dependent binder not implemented" (ppr v)
                                , tcm_covar = swizzle_cv
                                , tcm_hole  = swizzle_hole
                                , tcm_tycobinder = swizzle_bndr
@@ -5887,6 +5889,11 @@ checkValidRoles tc
     check_ty_roles env role ty
       | Just ty' <- coreView ty -- #14101
       = check_ty_roles env role ty'
+
+    check_ty_roles _ _ ty@(TermVarTy {})
+      = pprPanic "check_ty_roles: unsupported runtime index" (ppr ty)
+    check_ty_roles _ _ ty@(DepFunTy {})
+      = pprPanic "check_ty_roles: unsupported retained function" (ppr ty)
 
     check_ty_roles env role (TyVarTy tv)
       = case lookupVarEnv env tv of

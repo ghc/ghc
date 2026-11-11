@@ -1593,6 +1593,8 @@ hsTypeNeedsParens p = go_hs_ty
       GhcRn -> go_core_ty t
 
     go_core_ty (TyVarTy{})    = False
+    go_core_ty (TermVarTy{})  = False
+    go_core_ty (DepFunTy{})   = p >= funPrec
     go_core_ty (AppTy{})      = p >= appPrec
     go_core_ty (TyConApp _ args)
       | null args             = False

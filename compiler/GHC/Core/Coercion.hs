@@ -1352,8 +1352,16 @@ mkFunResCo :: Role -> Id -> Coercion -> Coercion
 --   mkFunResCo r m arg res_co :: (arg -> res1) ~r (arg -> res2)
 -- Reflexive in the multiplicity argument
 mkFunResCo role id res_co
+  | isNonCoVarId id
+  , id `elemVarSet` tyCoVarsOfTypes [res_lty, res_rty]
+  = case isReflCo_maybe res_co of
+      Just (res_ty, _) -> mkReflCo role (mkDepFunTy id res_ty)
+      Nothing -> pprPanic "mkFunResCo: native dependent congruence not implemented"
+                   (ppr id $$ ppr res_co)
+  | otherwise
   = mkFunCoNoFTF role mult arg_co res_co
   where
+    Pair res_lty res_rty = coercionKind res_co
     arg_co = mkReflCo role (varType id)
     mult   = multToCo (idMult id)
 
@@ -1764,6 +1772,8 @@ ty_co_subst !lc role ty
     go Phantom ty           = lift_phantom ty
     go r (TyVarTy tv)       = expectJust $
                               liftCoSubstTyVar lc r tv
+    go r ty@(TermVarTy {})  = lift_native r ty
+    go r ty@(DepFunTy {})   = lift_native r ty
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys)  = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)
     go r (FunTy af w t1 t2) = mkFunCo r af (go Nominal w) (go r t1) (go r t2)
@@ -1787,6 +1797,13 @@ ty_co_subst !lc role ty
     go r (CoercionTy co)   = mkProofIrrelCo r kco (substLeftCo lc co)
                                                   (substRightCo lc co)
       where kco = go Nominal (coercionType co)
+
+    lift_native r ty
+      | lty `eqType` rty = mkReflCo r lty
+      | otherwise = pprPanic "ty_co_subst: native dependent congruence not implemented" (ppr ty)
+      where
+        lty = substTy (lcSubstLeft lc) ty
+        rty = substTy (lcSubstRight lc) ty
 
     lift_phantom ty = mkPhantomCo (go Nominal (typeKind ty))
                                   (substTy (lcSubstLeft  lc) ty)
@@ -1877,8 +1894,10 @@ liftCoSubstVarBndrUsing :: (r -> CoercionN)              -- ^ coercion getter
 liftCoSubstVarBndrUsing view_co fun lc old_var
   | isTyVar old_var
   = liftCoSubstTyVarBndrUsing view_co fun lc old_var
-  | otherwise
+  | isCoVar old_var
   = liftCoSubstCoVarBndrUsing view_co fun lc old_var
+  | otherwise
+  = pprPanic "liftCoSubstVarBndrUsing: native dependent binder not implemented" (ppr old_var)
 
 -- Works for tyvar binder
 liftCoSubstTyVarBndrUsing :: (r -> CoercionN)              -- ^ coercion getter
@@ -2276,6 +2295,16 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
                   ; _           -> False      }) $
         mkNomReflCo ty1
 
+    go ty1@(TermVarTy {}) ty2
+      | ty1 `eqType` ty2 = mkNomReflCo ty1
+      | otherwise = pprPanic "buildCoercion: native term-index congruence not implemented"
+                      (ppr ty1 $$ ppr ty2)
+
+    go ty1@(DepFunTy {}) ty2
+      | ty1 `eqType` ty2 = mkNomReflCo ty1
+      | otherwise = pprPanic "buildCoercion: native dependent congruence not implemented"
+                      (ppr ty1 $$ ppr ty2)
+
     go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
        (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
       = assert (af1 == af2) $
@@ -2362,6 +2391,8 @@ has_co_hole_ty :: Type -> Monoid.Any
     folder :: TyCoFolder Monoid.Any
     folder = TyCoFolder { tcf_view  = noView
                         , tcf_tyvar = const (Monoid.Any False)
+                        , tcf_termvar = has_co_hole_ty . varType
+                        , tcf_termbinder = \ _ x -> x
                         , tcf_covar = const (Monoid.Any False)
                         , tcf_hole  = const (Monoid.Any True)
                         , tcf_lit   = const (Monoid.Any False)

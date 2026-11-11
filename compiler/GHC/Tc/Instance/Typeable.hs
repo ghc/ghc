@@ -620,6 +620,8 @@ kindIsTypeable ty
 kindIsTypeable ty
   | isLiftedTypeKind ty             = True
 kindIsTypeable (TyVarTy _)          = True
+kindIsTypeable (TermVarTy {})       = False
+kindIsTypeable (DepFunTy {})        = False
 kindIsTypeable (AppTy a b)          = kindIsTypeable a && kindIsTypeable b
 kindIsTypeable (FunTy _ w a b)      = kindIsTypeable w &&
                                       kindIsTypeable a &&
@@ -749,6 +751,11 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
     new_kind_rep ki  -- Expand synonyms
       | Just ki' <- coreView ki
       = new_kind_rep ki'
+
+    new_kind_rep ki@(TermVarTy {})
+      = pprPanic "mkKindRepRhs: unsupported runtime index" (ppr ki)
+    new_kind_rep ki@(DepFunTy {})
+      = pprPanic "mkKindRepRhs: unsupported retained function" (ppr ki)
 
     new_kind_rep (TyVarTy v)
       | Just idx <- lookupCME in_scope v

@@ -3652,6 +3652,7 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
     rhs_tcv_is_bad tcv
        -- c.f. checkTyVar, the TEFTyVar case
        | isCoVar tcv                                      = occ_check
+       | isId tcv = pprPanic "simpleUnifyCheck: unsupported runtime index" (ppr tcv)
        | tcTyVarLevel tcv `strictlyDeeperThan` lhs_tv_lvl = True
        | lhs_tv_is_concrete, not (isConcreteTyVar tcv)    = True
        | occ_check                                        = True
@@ -3659,6 +3660,10 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
        where
          occ_check = simpleOccursCheck lhs_tv_nm tcv
 
+    rhs_is_bad ty@(TermVarTy {})
+      = pprPanic "simpleUnifyCheck: unsupported runtime index" (ppr ty)
+    rhs_is_bad ty@(DepFunTy {})
+      = pprPanic "simpleUnifyCheck: unsupported retained function" (ppr ty)
     rhs_is_bad (TyVarTy tv) = rhs_tcv_is_bad tv
 
     rhs_is_bad (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
@@ -4313,6 +4318,8 @@ check_ty_eq_rhs :: forall m a
 {-# INLINEABLE check_ty_eq_rhs #-}
 check_ty_eq_rhs flags ty
   = case ty of
+      TermVarTy {} -> pprPanic "check_ty_eq_rhs: unsupported runtime index" (ppr ty)
+      DepFunTy {} -> pprPanic "check_ty_eq_rhs: unsupported retained function" (ppr ty)
       LitTy {}        -> return $ okCheckRefl ty
       TyConApp tc tys -> checkTyConApp flags ty tc tys
       TyVarTy tv      -> checkTyVar flags tv

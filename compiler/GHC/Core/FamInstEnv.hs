@@ -1544,6 +1544,10 @@ normalise_type ty
   = go ty
   where
     go :: Type -> NormM Reduction
+    go ty@(TermVarTy {})
+      = pprPanic "normalise_type: unsupported runtime index" (ppr ty)
+    go ty@(DepFunTy {})
+      = pprPanic "normalise_type: unsupported retained function" (ppr ty)
     go (TyConApp tc tys) = normalise_tc_app tc tys
     go ty@(LitTy {})
       = do { r <- getRole

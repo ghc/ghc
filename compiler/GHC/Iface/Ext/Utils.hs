@@ -38,6 +38,7 @@ import Data.Traversable           ( for )
 import Data.Coerce
 import GHC.Utils.Monad.StrictState hiding (get)
 import GHC.Utils.Panic.Plain( assert )
+import GHC.Utils.Panic ( pprPanic )
 import Control.Monad.Trans.Reader
 import qualified Data.Tree as Tree
 
@@ -224,6 +225,10 @@ getTypeIndex t
         HTS (extendTypeMap tm t i) (IM.insert i ht tt) fi
       return i
 
+    go ty@(TermVarTy {})
+      = pprPanic "getTypeIndex: unsupported runtime index" (ppr ty)
+    go ty@(DepFunTy {})
+      = pprPanic "getTypeIndex: unsupported retained function" (ppr ty)
     go (TyVarTy v) = return $ HTyVarTy $ varName v
     go ty@(AppTy _ _) = do
       let (head,args) = splitAppTys ty

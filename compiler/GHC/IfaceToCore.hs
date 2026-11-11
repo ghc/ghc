@@ -1510,6 +1510,8 @@ tcIfaceType = go
   where
     go (IfaceTyVar n)            = TyVarTy <$> tcIfaceTyVar n
     go (IfaceFreeTyVar n)        = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
+    go ty@(IfaceDepFunTy {})     = pprPanic "tcIfaceType: native dependent Core import not implemented" (ppr ty)
+    go ty@(IfaceTermVar {})      = pprPanic "tcIfaceType: native dependent Core import not implemented" (ppr ty)
     go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
     go (IfaceFunTy flag w t1 t2) = FunTy flag <$> tcIfaceType w <*> go t1 <*> go t2
     go (IfaceTupleTy s i tks)    = tcIfaceTupleTy s i tks

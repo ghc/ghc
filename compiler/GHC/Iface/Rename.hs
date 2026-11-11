@@ -935,6 +935,10 @@ rnIfaceIdDetails details
 rnIfaceType :: Rename IfaceType
 rnIfaceType (IfaceFreeTyVar n) = pure (IfaceFreeTyVar n)
 rnIfaceType (IfaceTyVar   n)   = pure (IfaceTyVar n)
+rnIfaceType (IfaceDepFunTy {})
+    = panic "rnIfaceType: native dependent interfaces are not implemented"
+rnIfaceType (IfaceTermVar {})
+    = panic "rnIfaceType: native dependent interfaces are not implemented"
 rnIfaceType (IfaceAppTy t1 t2)
     = IfaceAppTy <$> rnIfaceType t1 <*> rnIfaceAppArgs t2
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)

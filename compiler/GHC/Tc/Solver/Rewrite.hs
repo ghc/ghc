@@ -656,6 +656,11 @@ rewrite_one ty
   | Just ty' <- rewriterView ty  -- See Note [Rewriting synonyms]
   = rewrite_one ty'
 
+rewrite_one ty@(TermVarTy {})
+  = pprPanic "rewrite_one: unsupported runtime index" (ppr ty)
+rewrite_one ty@(DepFunTy {})
+  = pprPanic "rewrite_one: unsupported retained function" (ppr ty)
+
 rewrite_one xi@(LitTy {})
   = do { role <- getRole
        ; return $! mkReflRedn role xi }

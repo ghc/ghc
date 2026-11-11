@@ -22,13 +22,15 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
+import GHC.Core.Dependent
 import GHC.Core.SimpleOpt (simpleOptPgm)
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( RuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings, pprRules )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram, diffBinds, stripTicksE )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
-import GHC.Core.Opt.Simplify ( simplifyExpr, simplifyPgm )
+import GHC.Core.Opt.Simplify ( SimplifyExprOpts, simplifyPgm )
+import qualified GHC.Core.Opt.Simplify as Simplify
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.Pipeline.Types
@@ -54,6 +56,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Unit.Module.ModGuts
+import GHC.Unit.External ( ExternalUnitCache )
 
 import GHC.Types.Id.Info
 import GHC.Types.Tickish ( tickishIsCode )
@@ -74,6 +77,12 @@ import GHC.Unit.Module
 *                                                                      *
 ************************************************************************
 -}
+
+-- | Reject native dependent Core before simplifying a standalone expression.
+simplifyExpr :: Logger -> ExternalUnitCache -> SimplifyExprOpts -> CoreExpr -> IO CoreExpr
+simplifyExpr logger euc opts expr = do
+  rejectNativeDependentExpr "expression simplification" expr
+  Simplify.simplifyExpr logger euc opts expr
 
 core2core :: HscEnv -> ModGuts -> IO ModGuts
 core2core hsc_env guts@(ModGuts { mg_module  = mod
@@ -428,15 +437,20 @@ This extra run of the simplifier has a cost, but this is only with -O2.
 
 runCorePasses :: [CoreToDo] -> ModGuts -> CoreM ModGuts
 runCorePasses passes guts
-  = foldM do_pass guts passes
+  = do { liftIO $ rejectNativeDependentProgram "the Core optimization pipeline" (mg_binds guts) (mg_rules guts)
+       ; foldM do_pass guts passes }
   where
     do_pass guts CoreDoNothing = return guts
-    do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
+    do_pass guts (CoreDoPasses ps) = foldM do_pass guts ps
     do_pass guts pass = do
       logger <- getLogger
       withTiming logger (ppr pass <+> brackets (ppr mod))
                    (const ()) $ do
             guts' <- lintAnnots (ppr pass) (doCorePass pass) guts
+            case pass of
+              CoreDoPluginPass{} -> liftIO $
+                rejectNativeDependentProgram "the output of a Core plugin" (mg_binds guts') (mg_rules guts')
+              _ -> pure ()
             endPass pass (mg_binds guts') (mg_rules guts')
             return guts'
 
@@ -581,6 +595,7 @@ dmdAnal logger before_ww dflags fam_envs rules binds = do
 -- before the first (simple) optimization took place. See #23337
 desugarOpt :: DynFlags -> Logger -> Module -> CoreProgram -> [CoreRule] -> CoreM (CoreProgram,[CoreRule])
 desugarOpt dflags logger mod binds rules = liftIO $ do
+  rejectNativeDependentProgram "simpleOptPgm" binds rules
   let simpl_opts = initSimpleOpts dflags
   let !(ds_binds, ds_rules_for_imps, occ_anald_binds) = simpleOptPgm simpl_opts mod binds rules
 

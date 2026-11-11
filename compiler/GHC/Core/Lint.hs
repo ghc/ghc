@@ -531,6 +531,8 @@ lintRecBindings top_lvl pairs thing_inside
 lintLetBody :: LintLocInfo -> [Id] -> CoreExpr -> LintM (Type, UsageEnv)
 lintLetBody loc bndrs body
   = do { (body_ty, body_ue) <- addLoc loc (lintCoreExpr body)
+       ; lintL (not (any (\b -> isNonCoVarId b && b `elemVarSet` tyCoVarsOfType body_ty) bndrs))
+           (text "Let-bound runtime index escapes its scope:" <+> ppr body_ty)
        ; mapM_ (lintJoinBndrType body_ty) bndrs
        ; return (body_ty, body_ue) }
 
@@ -955,6 +957,7 @@ lintCoreExpr e@(App _ _)
 
        ; runrw_pr <- lintApp (text "runRW# expression")
                                lintTyArg lint_rw_cont
+                               (Just id)
                                (idType fun) [ty_arg1,ty_arg2,cont_arg] zeroUE
        ; lintCoreArgs runrw_pr rest }
 
@@ -1440,7 +1443,7 @@ subtype of the required type, as one would expect.
 -- e.g. f :: Int -> Bool -> Int would return `Int` as result type.
 lintCoreArgs  :: (Type, UsageEnv) -> [CoreExpr] -> LintM (Type, UsageEnv)
 lintCoreArgs (fun_ty, fun_ue) args
-  = lintApp (text "expression") lintTyArg lintValArg fun_ty args fun_ue
+  = lintApp (text "expression") lintTyArg lintValArg (Just id) fun_ty args fun_ue
 
 lintTyArg :: CoreExpr -> LintM Type
 
@@ -1929,6 +1932,23 @@ lintType (TyVarTy tv)
   | otherwise
   = lintVarOcc tv
 
+lintType (TermVarTy v)
+  = do { in_scope <- getInScope
+       ; lintL (isBoolIndexId v
+                 && maybe False isBoolIndexId (lookupInScope in_scope v))
+           (text "Invalid runtime Boolean index:" <+> ppr v <+> dcolon <+> ppr (varType v))
+       ; lintVarOcc v }
+
+lintType (DepFunTy b body)
+  = do { lintL (isBoolIndexId b)
+           (text "Invalid retained Boolean binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
+       ; lintL (b `elemVarSet` tyCoVarsOfType body)
+           (text "Vacuous retained dependent binder:" <+> ppr b)
+       ; lintBinder LambdaBind b $
+         do { lintType body
+            ; lintL (isLiftedTypeKind (typeKind body))
+                (text "Retained dependent result must have kind Type:" <+> ppr body) } }
+
 lintType ty@(AppTy t1 t2)
   | TyConApp {} <- t1
   = failWithL $ text "TyConApp to the left of AppTy:" <+> ppr ty
@@ -2092,6 +2112,7 @@ lint_tyco_app msg fun_kind arg_tys
     -- See Note [Avoiding compiler perf traps when constructing error messages.]
   = do { _ <- lintApp msg (\ty     -> do { lintType ty; return ty })
                           (\ty _ _ -> do { lintType ty; return (typeKind ty,()) })
+                          Nothing
                           fun_kind arg_tys ()
        ; return () }
 
@@ -2100,6 +2121,7 @@ lintApp :: forall a acc. Outputable a =>
              SDoc
           -> (a -> LintM Type)                        -- Lint the thing and return its value
           -> (a -> Mult -> acc -> LintM (Kind, acc))  -- Lint the thing and return its type
+          -> Maybe (a -> CoreExpr)                  -- Runtime arguments only
           -> Type
           -> [a]                          -- The arguments
           -> acc                          -- Used (only) for UsageEnv in /term/ applications
@@ -2120,7 +2142,7 @@ lintApp :: forall a acc. Outputable a =>
 {-# INLINE lintApp #-}    -- INLINE: very few call sites;
                           -- not recursive; specialised at its call sites
 
-lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
+lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
     = do { !in_scope <- getInScope
          -- We need the in_scope set to satisfy the invariant in
          -- Note [The substitution invariant] in GHC.Core.TyCo.Subst
@@ -2146,6 +2168,20 @@ lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
                                 2 (ppr arg' <+> dcolon <+> ppr karg'))
                       ; go subst' body_ty acc args }
 
+               go subst (DepFunTy b body_ty) acc (arg:args)
+                 = case runtime_arg of
+                     Nothing -> failWithL (text "Retained runtime binder in a type application")
+                     Just to_core -> do
+                       { (arg_ty, acc') <- lint_arrow_arg arg ManyTy acc
+                       ; ensureEqTys (varType b) arg_ty
+                           (text "Retained Boolean argument has the wrong type:" <+> ppr arg)
+                       ; let arg_expr = to_core arg
+                       ; lintL (isJust (exprToBoolIndex arg_expr))
+                           (text "Unsupported retained Boolean argument:" <+> ppr arg)
+                       ; let Subst in_scope ids tvs cvs = subst
+                             subst' = Subst in_scope (extendVarEnv ids b arg_expr) tvs cvs
+                       ; go subst' body_ty acc' args }
+
                go subst fun_ty@(FunTy _ mult exp_arg_ty res_ty) acc (arg:args)
                  = do { (arg_ty, acc') <- lint_arrow_arg arg (substTy subst mult) acc
                       ; ensureEqTys (substTy subst exp_arg_ty) arg_ty $
@@ -2159,7 +2195,7 @@ lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
                  | Just fun_ty' <- coreView fun_ty
                  = go subst fun_ty' acc args
 
-                 | not (isEmptyTCvSubst subst)  -- See Note [Care with kind instantiation]
+                 | not (isEmptySubst subst)  -- See Note [Care with kind instantiation]
                  = go init_subst (substTy subst fun_ty) acc args
 
                  | otherwise

@@ -58,7 +58,7 @@ module GHC.Core.Type (
         splitPiTy_maybe, splitPiTy, splitPiTys, splitUninstantiatedValArgTys,
         getRuntimeArgTys,
         mkTyConBindersPreferAnon,
-        mkPiTy, mkPiTys,
+        mkPiTy, mkPiTys, mkDepFunTy, isBoolIndexId,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
         mkFamilyTyConApp,
@@ -245,7 +245,7 @@ import GHC.Types.Var.Set
 import GHC.Builtin.WiredIn.Prim
 
 import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
-   ( charTy, naturalTy
+   ( charTy, naturalTy, boolTy
    , typeSymbolKind, liftedTypeKind, unliftedTypeKind
    , manyDataConTy, oneDataConTy
    , liftedRepTy )
@@ -1789,6 +1789,8 @@ fun_kind_arg_flags = go emptySubst
 isTauTy :: Type -> Bool
 isTauTy ty | Just ty' <- coreView ty = isTauTy ty'
 isTauTy (TyVarTy _)       = True
+isTauTy (TermVarTy _)     = True
+isTauTy (DepFunTy {})     = False
 isTauTy (LitTy {})        = True
 isTauTy (TyConApp tc tys) = all isTauTy tys && isTauTyCon tc
 isTauTy (AppTy a b)       = isTauTy a && isTauTy b
@@ -1804,6 +1806,7 @@ isAtomicTy :: Type -> Bool
 -- Used when deciding how to lay out type error messages; see the
 -- call in GHC.Tc.Errors
 isAtomicTy (TyVarTy {})    = True
+isAtomicTy (TermVarTy {})  = True
 isAtomicTy (LitTy {})      = True
 isAtomicTy (TyConApp _ []) = True
 
@@ -1849,6 +1852,8 @@ coAxNthLHS ax ind =
 isFamFreeTy :: Type -> Bool
 isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
 isFamFreeTy (TyVarTy _)       = True
+isFamFreeTy (TermVarTy _)     = True
+isFamFreeTy (DepFunTy b ty)   = isFamFreeTy (varType b) && isFamFreeTy ty
 isFamFreeTy (LitTy {})        = True
 isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc
 isFamFreeTy (AppTy a b)       = isFamFreeTy a && isFamFreeTy b
@@ -2168,6 +2173,8 @@ seqCos   :: [Coercion] -> SeqResult
     folder :: TyCoFolder SeqResult
     folder = TyCoFolder { tcf_view       = noView
                         , tcf_tyvar      = seqUnit
+                        , tcf_termvar    = seqUnit
+                        , tcf_termbinder = \_ x -> x
                         , tcf_covar      = seqUnit
                         , tcf_lit        = seqUnit
                         , tcf_hole       = \h -> seqUnit (coHoleCoVar h)
@@ -2261,12 +2268,24 @@ See #14939.
 -}
 
 -----------------------------
+-- | Test whether an identifier can occur as a retained Boolean index.
+isBoolIndexId :: Id -> Bool
+isBoolIndexId v
+  | isLocalId v, not (isCoVar v)
+  , TyConApp tc [] <- coreFullView (varType v)
+  , tc `hasKey` boolTyConKey
+  , ManyTy <- coreFullView (idMult v)
+  = True
+  | otherwise = False
+
 typeKind :: HasDebugCallStack => Type -> Kind
 -- No need to expand synonyms
 typeKind (TyConApp tc tys)      = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)              = typeLiteralKind l
 typeKind (FunTy { ft_af = af }) = liftedTypeOrConstraintKind (funTyFlagResultTypeOrConstraint af)
 typeKind (TyVarTy tyvar)        = tyVarKind tyvar
+typeKind (TermVarTy _)          = boolTy
+typeKind (DepFunTy _ _)         = liftedTypeKind
 typeKind (CastTy _ty co)        = coercionRKind co
 typeKind (CoercionTy co)        = coercionType co
 
@@ -2454,6 +2473,8 @@ isConcreteTypeWith :: TyVarSet -> Type -> Bool
 isConcreteTypeWith conc_tvs = go
   where
     go (TyVarTy tv)        = isConcreteTyVar tv || tv `elemVarSet` conc_tvs
+    go (TermVarTy _)       = False
+    go (DepFunTy {})       = False
     go (AppTy ty1 ty2)     = go ty1 && go ty2
     go (TyConApp tc tys)   = go_tc tc tys
     go ForAllTy{}          = False

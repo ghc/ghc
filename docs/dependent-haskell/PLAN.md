@@ -98,12 +98,12 @@ See [the port inventory](PORT.md) and [comparison programs](reference/README.md)
 
 - [ ] Define retained Boolean binders, term indices, lambda, application, and case
       typing. State scope, substitution, erasure, and non-strictness rules.
-- [ ] Choose how runtime terms occur in types. Compare historical promotion with
+- [x] Choose how runtime terms occur in types. Compare historical promotion with
       a checked index-expression representation. Require substitution closure.
-- [ ] Keep dependence, visibility, retention, and multiplicity distinct. Prefer a
+- [x] Keep dependence, visibility, retention, and multiplicity distinct. Prefer a
       dedicated retained-dependent form that preserves existing `FunTy` and
       `ForAllTy` fast paths, unless the audit gives a concrete reason to change them.
-- [ ] Define nominal equality, constructor discrimination, and checked reductions.
+- [x] Define nominal equality, constructor discrimination, and checked reductions.
       State which index comparisons remain opaque.
 - [ ] Specify a dependent motive or explicit branch-equality mechanism for cases.
       The existing case annotation lies outside the case binder's scope.
@@ -116,12 +116,13 @@ The first increment follows [the restricted Core specification](CORE.md).
 
 ### M3: port binders and implement dependent lambda and application
 
-- [ ] Add the retained binder and index representation to current type code.
-- [ ] Update free variables, capture avoidance, term/type substitution, equality,
+- [x] Add the retained binder and index representation to current type code.
+- [x] Update free variables, capture avoidance, term/type substitution, equality,
       kinding, pretty-printing, and relevant traversals together.
-- [ ] Update `exprType`, function-result calculation, and Core Lint consistently.
+- [x] Update `exprType`, function-result calculation, and Core Lint consistently.
       Runtime dependent application substitutes its argument into the result.
-- [ ] Check binder renaming, aliases, shadowing, beta reduction, and scoped lets.
+- [x] Check binder renaming, aliases, shadowing, supported index substitution, and
+      scoped lets. Ordinary optimizer reduction remains gated until M6.
 - [ ] Keep ordinary GHC programs building while the feature remains gated.
 
 Gate: hand-built Core for identity and retained application passes Lint. Lint and

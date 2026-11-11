@@ -33,7 +33,7 @@ module GHC.Core (
         mkDoubleLit,
 
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
-        varToCoreExpr, varsToCoreExprs,
+        varToCoreExpr, varsToCoreExprs, exprToBoolIndex, mapBoolIndex,
 
         mkBinds,
 
@@ -101,6 +101,8 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep ( Type(TermVarTy, TyConApp) )
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types ( trueDataCon, falseDataCon )
 import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.DataCon
@@ -2583,7 +2585,32 @@ mkTyBind tv ty      = NonRec tv (Type ty)
 mkCoBind :: CoVar -> Coercion -> CoreBind
 mkCoBind cv co      = NonRec cv (Coercion co)
 
--- | Convert a binder into either a 'Var' or 'Type' 'Expr' appropriately
+-- | Convert a supported runtime Boolean argument to its native type index.
+-- This operation does not evaluate the argument or inspect its unfolding.
+exprToBoolIndex :: CoreExpr -> Maybe Type
+exprToBoolIndex (Var v)
+  | v == dataConWorkId trueDataCon
+  = Just (mkTyConTy (promoteDataCon trueDataCon))
+  | v == dataConWorkId falseDataCon
+  = Just (mkTyConTy (promoteDataCon falseDataCon))
+  | isBoolIndexId v
+  = Just (TermVarTy v)
+exprToBoolIndex _ = Nothing
+
+-- | Map a supported Boolean index argument through a type substitution.
+-- Leave other expressions unchanged. They cannot occur as native indices.
+mapBoolIndex :: (Type -> Type) -> CoreExpr -> CoreExpr
+mapBoolIndex subst expr
+  | Just index <- exprToBoolIndex expr
+  = case subst index of
+      TermVarTy v -> Var v
+      TyConApp tc []
+        | tc == promoteDataCon trueDataCon -> Var (dataConWorkId trueDataCon)
+        | tc == promoteDataCon falseDataCon -> Var (dataConWorkId falseDataCon)
+      index' -> pprPanic "mapBoolIndex: unsupported substituted index" (ppr index')
+  | otherwise = expr
+
+-- | Convert a binder into its variable, type, or coercion expression.
 varToCoreExpr :: CoreBndr -> Expr b
 varToCoreExpr v | isTyVar v = Type (mkTyVarTy v)
                 | isCoVar v = Coercion (mkCoVarCo v)

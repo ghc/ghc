@@ -185,6 +185,10 @@ data IfaceType
                              -- IfaceType, analogous to AppTy.
   | IfaceFunTy     FunTyFlag IfaceMult IfaceType IfaceType
   | IfaceForAllTy  IfaceForAllBndr IfaceType
+  -- These forms retain runtime variable identities for diagnostics only.
+  -- Interface files do not support native dependent Core yet.
+  | IfaceDepFunTy Id IfaceType IfaceType
+  | IfaceTermVar Id
   | IfaceTyConApp  IfaceTyCon IfaceAppArgs  -- Not necessarily saturated
                                             -- Includes newtypes, synonyms, tuples
   | IfaceCastTy     IfaceType IfaceCoercion
@@ -751,6 +755,8 @@ ifTypeIsVarFree ty = go ty
   where
     go (IfaceTyVar {})         = False
     go (IfaceFreeTyVar {})     = False
+    go (IfaceTermVar {})       = False
+    go (IfaceDepFunTy {})      = False
     go (IfaceAppTy fun args)   = go fun && go_args args
     go (IfaceFunTy _ w arg res) = go w && go arg && go res
     go (IfaceForAllTy {})      = False
@@ -773,6 +779,8 @@ visibleTypeVarOccurencies = go
 
     go (IfaceTyVar var)         = Set.singleton var
     go (IfaceFreeTyVar {})      = mempty
+    go (IfaceTermVar {})        = mempty
+    go (IfaceDepFunTy _ arg res) = go arg <> go res
     go (IfaceAppTy fun args)    = go fun <> go_args args
     go (IfaceFunTy _ w arg res) = go w <> go arg <> go res
     go (IfaceForAllTy bndr ty)  = go (ifaceBndrType $ binderVar bndr) <> go ty
@@ -808,6 +816,8 @@ substIfaceType env ty
   = go ty
   where
     go (IfaceFreeTyVar tv)    = IfaceFreeTyVar tv
+    go ty@(IfaceTermVar {})  = ty
+    go (IfaceDepFunTy {})    = pprPanic "substIfaceType: native dependent Core not implemented" (ppr ty)
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
     go (IfaceFunTy af w t1 t2)  = IfaceFunTy af (go w) (go t1) (go t2)
@@ -1185,6 +1195,11 @@ ppr_ty ctxt_prec ty
 ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIfaceRhoType
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free TyVars and CoVars in IfaceType]
+ppr_ty _         (IfaceTermVar var)     = ppr var
+ppr_ty ctxt_prec (IfaceDepFunTy var arg res)
+  = maybeParen ctxt_prec funPrec $
+    sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg)
+        , arrow <+> ppr_ty_nested res ]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = ppr_tuple ctxt_prec i p tys -- always fully saturated
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
@@ -1358,6 +1373,11 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
 
     go subs rank1 (IfaceForAllTy bndr ty)
       = IfaceForAllTy (go_ifacebndr subs bndr) (go subs rank1 ty)
+
+    go subs rank1 (IfaceDepFunTy var arg res)
+      = IfaceDepFunTy var (go subs False arg) (go subs rank1 res)
+
+    go _ _ ty@(IfaceTermVar {}) = ty
 
     go subs _ ty@(IfaceTyVar tv) = case lookupFsEnv subs (ifLclNameFS tv) of
       Just s -> s
@@ -2419,6 +2439,11 @@ putIfaceType _ (IfaceFreeTyVar tv)
   = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
   -- See Note [Free TyVars and CoVars in IfaceType]
 
+putIfaceType _ ty@(IfaceDepFunTy {})
+  = pprPanic "putIfaceType: native dependent Core serialization not implemented" (ppr ty)
+putIfaceType _ ty@(IfaceTermVar {})
+  = pprPanic "putIfaceType: native dependent Core serialization not implemented" (ppr ty)
+
 putIfaceType bh (IfaceForAllTy aa ab) = do
         putByte bh 0
         put_ bh aa
@@ -2678,6 +2703,8 @@ instance NFData (DefMethSpec IfaceType) where
 instance NFData IfaceType where
   rnf = \case
     IfaceFreeTyVar f1 -> f1 `seq` ()
+    IfaceDepFunTy var arg res -> var `seq` rnf arg `seq` rnf res
+    IfaceTermVar var -> var `seq` ()
     IfaceTyVar f1 -> rnf f1
     IfaceLitTy f1 -> rnf f1
     IfaceAppTy f1 f2 -> rnf f1 `seq` rnf f2

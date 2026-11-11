@@ -102,6 +102,9 @@ import Data.Semigroup
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Definitions
 
+Runtime index identifiers are also free variables of types. These occurrences
+record scope dependencies. They do not record runtime usage.
+
 * Shallow free variables of a type: the variables
   affected by substitution. Specifically, the (TyVarTy tv)
   and (CoVar cv) that appear
@@ -289,12 +292,14 @@ deepFolder :: Monoid fv
 deepFolder occ fvs_of_type add_bndr
   = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                , tcf_tyvar = occ, tcf_covar = occ
+               , tcf_termvar = occ
                , tcf_hole  = fvs_of_type . coHoleCoVar
                      -- We don't collect the CoercionHole itself, but we /do/
                      -- need to collect the free variables of its /kind/
                      -- See Note [CoercionHoles and coercion free variables]
                , tcf_lit   = const mempty
-               , tcf_tycobinder = add_bndr }
+               , tcf_tycobinder = add_bndr
+               , tcf_termbinder = add_bndr }
 
 deepUnitFV :: (TyCoVar -> TyCoFV) -- ^ the free variables of a variable's type
            -> TyCoVar -> TyCoFV
@@ -342,8 +347,10 @@ shallowCosFV   :: [Coercion] -> TyCoFV
 shallowTcvFolder :: TyCoFolder TyCoFV
 shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                               , tcf_tyvar = do_tcv, tcf_covar = do_tcv
+                              , tcf_termvar = do_tcv
                               , tcf_hole  = do_hole, tcf_lit = const mempty
-                              , tcf_tycobinder = addBndrFV }
+                              , tcf_tycobinder = addBndrFV
+                              , tcf_termbinder = addBndrFV }
   where
     do_tcv = shallowUnitFV
     do_hole _  = mempty   -- Ignore coercion holes
@@ -640,8 +647,10 @@ selectiveTcvFolder :: TyCoFolder SelectiveDFV
 selectiveTcvFolder
   = TyCoFolder { tcf_view  = noView  -- See Note [Free vars and synonyms]
                , tcf_tyvar = shallowSelUnitFV, tcf_covar = shallowSelUnitFV
+               , tcf_termvar = shallowSelUnitFV
                , tcf_hole  = do_hole, tcf_lit = const mempty
-               , tcf_tycobinder = addBndrSelectiveFV }
+               , tcf_tycobinder = addBndrSelectiveFV
+               , tcf_termbinder = addBndrSelectiveFV }
   where
     do_hole hole = shallowSelTypeFV (varType (coHoleCoVar hole))
 
@@ -729,8 +738,10 @@ deepCoVarCosFV :: [Coercion] -> CoVarFV
 deepCoVarFolder :: TyCoFolder CoVarFV
 deepCoVarFolder = TyCoFolder { tcf_view = noView
                              , tcf_tyvar = do_tyvar, tcf_covar = do_covar
+                             , tcf_termvar = deepCoVarTypeFV . varType
                              , tcf_hole  = do_hole, tcf_lit = const mempty
-                             , tcf_tycobinder = addBndrFV }
+                             , tcf_tycobinder = addBndrFV
+                             , tcf_termbinder = addBndrFV }
   where
     do_tyvar _  = mempty
       -- This do_tyvar means we won't see any CoVars in this
@@ -772,11 +783,13 @@ univCoDepsFolder
     -- The following is incorrect: it ignores CoVars/CoercionHoles in the kinds
     -- of TyVars. This replicates the long-standing wart in 'deepCoVarFolder'.
   , tcf_tyvar      = \ _ -> mempty
+  , tcf_termvar    = univCoDepsOfTypesFV . (:[]) . varType
 
   , tcf_covar      = do_covar
   , tcf_hole       = do_hole
   , tcf_lit        = const mempty
-  , tcf_tycobinder = addBndrFV }
+  , tcf_tycobinder = addBndrFV
+  , tcf_termbinder = addBndrFV }
   where
     do_covar v = MkFV $ \ bvs -> EndoOS (add_covar bvs v)
     do_hole h  = MkFV $ \ _   -> EndoOS (addUnivCoDepHole h)
@@ -816,11 +829,13 @@ holeSearchFolder
 
     -- Wart (see 'deepCoVarFolder'): don't look into the kinds of TyVars.
   , tcf_tyvar      = \ _ -> mempty
+  , tcf_termvar    = hole_search_ty . varType
 
   , tcf_covar      = do_covar
   , tcf_hole       = do_hole
   , tcf_lit        = const mempty
-  , tcf_tycobinder = addBndrFV }
+  , tcf_tycobinder = addBndrFV
+  , tcf_termbinder = addBndrFV }
   where
     do_covar v = MkFV $ \ bvs -> EndoOS (search_kind bvs v)
     do_hole _  = MkFV $ \ _   -> EndoOS found_hole
@@ -921,6 +936,11 @@ almost_devoid_co_var_of_cos (co:cos) cv
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
 almost_devoid_co_var_of_type (TyVarTy _) _ = True
+almost_devoid_co_var_of_type (TermVarTy v) cv
+  = almost_devoid_co_var_of_type (varType v) cv
+almost_devoid_co_var_of_type (DepFunTy v ty) cv
+  = almost_devoid_co_var_of_type (varType v) cv
+  && almost_devoid_co_var_of_type ty cv
 almost_devoid_co_var_of_type (TyConApp _ tys) cv
   = almost_devoid_co_var_of_types tys cv
 almost_devoid_co_var_of_type (LitTy {}) _ = True
@@ -966,6 +986,10 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
     invis_vars = invis_vars1 `minusVarSet` vis_vars
 
     go (TyVarTy tv)      = Pair (tyCoVarsOfType $ tyVarKind tv) (unitVarSet tv)
+    go (TermVarTy v)     = Pair (tyCoVarsOfType $ varType v) (unitVarSet v)
+    go (DepFunTy v ty)
+      = ((`delVarSet` v) <$> go ty) `mappend`
+        invisible (tyCoVarsOfType $ varType v)
     go (AppTy t1 t2)     = go t1 `mappend` go t2
     go (TyConApp tc tys) = go_tc tc tys
     go (FunTy _ w t1 t2) = go w `mappend` go t1 `mappend` go t2
@@ -1001,6 +1025,8 @@ isInjectiveInType tv ty
   where
     go ty | Just ty' <- rewriterView ty = go ty'
     go (TyVarTy tv')                    = tv' == tv
+    go (TermVarTy v)                    = v == tv
+    go (DepFunTy v ty)                  = go (varType v) || (tv /= v && go ty)
     go (AppTy f a)                      = go f || go a
     go (FunTy _ w ty1 ty2)              = go w || go ty1 || go ty2
     go (TyConApp tc tys)                = go_tc tc tys
@@ -1065,6 +1091,9 @@ inj_vars_of_type look_under_tfs = go
   where
     go ty | Just ty' <- rewriterView ty = go ty'
     go (TyVarTy v)                      = deepUnitFV (go . varType) v
+    go (TermVarTy v)                    = deepUnitFV (go . varType) v
+    go (DepFunTy v ty)                  = go (varType v) `mappend`
+                                          addBndrFV v (go ty)
     go (AppTy f a)                      = go f `mappend` go a
     go (FunTy _ w ty1 ty2)              = go w `mappend` go ty1 `mappend` go ty2
     go (TyConApp tc tys)                = go_tc tc tys
@@ -1111,6 +1140,9 @@ invisibleVarsOfType = go
     go ty                  | Just ty' <- coreView ty
                            = go ty'
     go (TyVarTy v)         = go (tyVarKind v)
+    go (TermVarTy v)       = go (varType v)
+    go (DepFunTy v ty)
+      = tyCoVarsOfType (varType v) `unionVarSet` (go ty `delVarSet` v)
     go (AppTy f a)         = go f `unionVarSet` go a
     go (FunTy _ w ty1 ty2) = go ty1 `unionVarSet` go w `unionVarSet` go ty2
                              -- As per #23764, order is: arg, mult, res.
@@ -1168,9 +1200,11 @@ afvFolder :: TyCoFolder (FV (BoundVars, TyCoVar -> Bool) DM.Any)
 afvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                        , tcf_tyvar = do_tcv
                        , tcf_covar = do_tcv
+                       , tcf_termvar = do_tcv
                        , tcf_hole  = do_hole
                        , tcf_lit   = const mempty
-                       , tcf_tycobinder = addBndrSelectiveFV }
+                       , tcf_tycobinder = addBndrSelectiveFV
+                       , tcf_termbinder = addBndrSelectiveFV }
   where
     -- Check the variable itself with check_fv,
     -- and check its kind (this is a deep folder)
@@ -1257,6 +1291,8 @@ tyConsOfType ty
      go :: Type -> UniqSet TyCon  -- The UniqSet does duplicate elim
      go ty | Just ty' <- coreView ty = go ty'
      go (TyVarTy {})                = emptyUniqSet
+     go (TermVarTy v)               = go (varType v)
+     go (DepFunTy v ty)             = go (varType v) `unionUniqSets` go ty
      go (LitTy {})                  = emptyUniqSet
      go (TyConApp tc tys)           = go_tc tc `unionUniqSets` tyConsOfTypes tys
      go (AppTy a b)                 = go a `unionUniqSets` go b
@@ -1396,6 +1432,19 @@ occCheckExpand vs_to_avoid ty
       | Just tv' <- lookupVarEnv env tv = return (mkTyVarTy tv')
       | bad_var_occ as tv               = Nothing
       | otherwise                       = return ty
+
+    go (as, env) ty@(TermVarTy v)
+      | Just v' <- lookupVarEnv env v = return (TermVarTy v')
+      | bad_var_occ as v              = Nothing
+      | otherwise                    = return ty
+
+    go cxt@(as, env) (DepFunTy v body_ty)
+       = do { arg_ty <- go cxt (varType v)
+            ; let v'   = setVarType v arg_ty
+                  env' = extendVarEnv env v v'
+                  as'  = as `delVarSet` v
+            ; body' <- go (as', env') body_ty
+            ; return (mkDepFunTy v' body') }
 
     go _   ty@(LitTy {}) = return ty
     go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1

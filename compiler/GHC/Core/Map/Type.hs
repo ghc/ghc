@@ -243,6 +243,11 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
           (CastTy t1 _, _)  -> hasCast (go (D env t1) (D env t'))
           (_, CastTy t1' _) -> hasCast (go (D env t) (D env t1'))
 
+          (TermVarTy {}, _) -> pprPanic "eqDeBruijnType: unsupported runtime index" (ppr t)
+          (_, TermVarTy {}) -> pprPanic "eqDeBruijnType: unsupported runtime index" (ppr t')
+          (DepFunTy {}, _) -> pprPanic "eqDeBruijnType: unsupported retained function" (ppr t)
+          (_, DepFunTy {}) -> pprPanic "eqDeBruijnType: unsupported retained function" (ppr t')
+
           (TyVarTy v, TyVarTy v')
               -> liftEquality $ eqDeBruijnVar (D env v) (D env' v')
           -- See Note [Equality on AppTys] in GHC.Core.Type
@@ -308,6 +313,8 @@ lkT :: DeBruijn Type -> TypeMapX a -> Maybe a
 lkT (D env ty) m = go ty m
   where
     go ty | Just ty' <- trieMapView ty = go ty'
+    go ty@(TermVarTy {})           = pprPanic "lkT: unsupported runtime index" (ppr ty)
+    go ty@(DepFunTy {})            = pprPanic "lkT: unsupported retained function" (ppr ty)
     go (TyVarTy v)                 = tm_var    >.> lkVar env v
     go (AppTy t1 t2)               = tm_app    >.> lkG (D env t1)
                                                >=> lkG (D env t2)
@@ -327,6 +334,8 @@ lkT (D env ty) m = go ty m
 xtT :: DeBruijn Type -> XT a -> TypeMapX a -> TypeMapX a
 xtT (D env ty) f m | Just ty' <- trieMapView ty = xtT (D env ty') f m
 
+xtT (D _ ty@(TermVarTy {})) _ _ = pprPanic "xtT: unsupported runtime index" (ppr ty)
+xtT (D _ ty@(DepFunTy {}))  _ _ = pprPanic "xtT: unsupported retained function" (ppr ty)
 xtT (D env (TyVarTy v))       f m = m { tm_var    = tm_var m |> xtVar env v f }
 xtT (D env (AppTy t1 t2))     f m = m { tm_app    = tm_app m |> xtG (D env t1)
                                                             |>> xtG (D env t2) f }
