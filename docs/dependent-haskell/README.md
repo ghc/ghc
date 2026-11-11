@@ -26,7 +26,7 @@ Last updated: 2026-11-11.
 | Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
 | Frontend and execution | Not implemented; optimizer, backend, and interface gates remain |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Current task | Final bootstrap and registered M3/M4 regression; [M5: backend execution](PLAN.md#m5-execute-through-the-existing-backend) follows |
+| Current task | [M5: backend execution](PLAN.md#m5-execute-through-the-existing-backend); lowering audit recorded, implementation pending |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -46,15 +46,29 @@ Boolean alternatives can bind checked nominal equality evidence. The strict case
 justifies each proof. Proof-bearing cases must cover both Boolean values, and
 each proof stays inside its branch. The existing result annotation scope remains.
 
-The `NativeDependentCore` GHC API regression passes against the refreshed stage0
-compiler library. It checks constructor and shared-variable applications,
+The `NativeDependentCore` GHC API regression passes against both the stage0
+compiler library and the rebuilt stage1 compiler library. It checks constructor
+and shared-variable applications,
 substitution composition, binder cloning, invalid indices, scope errors, and
 boundary gates. It also checks `Select True = Int`, `Select False = Bool`,
 `choose`, `keep`, shared-index composition, branch casts, and forged proofs.
-The earlier default rebuild passed in 24m16s under a 16 GiB cap, with a recorded
-peak of 7,605 MiB. The final rebuild with the Boolean case rule is in progress.
+The final default rebuild passed in 10m48s under a 16 GiB cap, with a recorded
+peak of 5,454 MiB. This was an incremental rebuild. It validates compiler source
+commit `c1694431a1` with six workers and `--docs=none`.
+The registered testsuite run passed its normal way: one expected pass, ten skipped
+ways, and no unexpected failures. The command selected `NativeDependentCore`
+with `--test-way=normal`; the full testsuite was not run.
 These API results do not establish native execution or optimizer preservation.
 There is no performance measurement for the changed type traversals.
+
+The final smoke checks passed package registration, `-O2 -dcore-lint`, Template
+Haskell, threaded execution, GHCi, and Haddock startup. Both singleton comparisons
+also passed at `-O0` and `-O2` with Core Lint, including the expected mismatch
+rejection. The upstream file matched its pinned blob exactly.
+
+The implementation is recorded in local commits `ccda2a6758` for binders and
+application, and `c1694431a1` for checked Boolean cases. The case specification is
+in the preceding commit `1ade4a22c2`. No commits were pushed.
 
 The frontend cannot produce the new forms. The ordinary optimizer, CorePrep,
 interface serialization, and unsupported frontend operations reject them.

@@ -94,6 +94,11 @@ recorded a 154 MiB peak under its 4 GiB cap. Its artifacts were written to
 The upstream comparison used exact bytes matching the pinned blob. The original
 temporary source copy differed only by an extra final newline.
 
+Both comparisons and the expected rejection also passed on the modified compiler
+at `c1694431a1`. The check used both optimization levels with Core Lint and exact
+upstream bytes. It recorded a 155 MiB peak under a 4 GiB cap. This is regression
+evidence for the singleton comparison, not native dependent execution.
+
 The upstream comparison compiles one unmodified foundational module with a local
 adapter. It does not build `singletons`, `singletons-th`, or `singletons-base` as
 packages. The inspected package bounds exclude the baseline's `base-4.23.0.0`;

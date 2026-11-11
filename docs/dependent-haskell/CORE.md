@@ -141,6 +141,50 @@ Non-reflexive coercions over retained dependent functions require their own
 congruence rule. Existing `mkPiCo` must not turn a retained dependent binder into
 an ordinary function coercion. Reject unsupported coercion construction.
 
+## Lowering audit for M5
+
+The source audit found these requirements. They are not implemented.
+
+| Current function | Required change |
+| --- | --- |
+| `CoreToStg.Prep.cpCloneBndr` | Substitute proof types when only the Id environment changes. Cloning `b` must update every `TermVarTy b`. |
+| `Core.Opt.Arity.typeOneShots` | Count the retained Boolean as one runtime argument. Otherwise `typeArity` returns zero and Lint rejects positive arity metadata. |
+| `Core.Opt.Arity.mkEtaWW` | Allocate a fresh Boolean eta binder and substitute that exact Id into the codomain. Reject non-reflexive dependent congruence until its rule exists. |
+| `CoreToStg.vars_alt` | Remove the checked virtual Boolean proof from the constructor payload. The current `filterStgBinders` retains CoVars. |
+| `Stg.Lint.lintStgAppReps` | Check native argument representations. The current `splitFunTys` stops at `DepFunTy` and skips those checks. |
+| `StgToCmm.Closure.getTyDescription` | Specify supported native profiling descriptions before enabling profiling. |
+
+CorePrep still performs cloning, eta expansion, and saturation at `-O0`.
+Disabling the ordinary optimizer does not remove these obligations. Do not change
+`splitFunTy` to return a codomain whose retained binder has disappeared. Use an
+explicit representation query where the caller needs only argument layout.
+
+Preserve native typing through CorePrep. Check Core again after preparation.
+Then erase computational proof uses at CoreToStg while retaining valid layout
+metadata. `typePrimRep` obtains representations from kinds. A `Select b :: Type`
+result therefore has a fixed lifted-pointer representation. This does not
+justify replacing its index with a constructor or inserting an `Any` cast.
+Validate every runtime argument's representation separately.
+
+Do not erase ordinary CoVar lambdas or application positions. GHC's
+`Note [Coercion tokens]` in `CoreToStg.hs` explains why those positions preserve
+`seq` behavior. STG unarisation removes zero-width constructor fields but retains
+void function arguments. The new virtual alternative proof is a separate case.
+Check that erased index dependencies do not add runtime uses or captured values.
+
+Start with a closed API harness for Core Lint, CorePrep, Core Lint again,
+CoreToStg, and STG Lint. Cover both constructor applications, shared runtime
+indices, partial application, eta expansion, and proof-binder cloning. Keep the
+entry gates until this path passes. Then execute and check strict `choose bottom`
+and non-strict `keep bottom` behavior.
+
+`hscCompileCoreExpr` and the interpreter's `evalString` can execute a checked
+`IO String` observation without a host `unsafeCoerce`. That entry currently runs
+ordinary simplification and CorePrep, so it rejects surviving native forms.
+Specializing a closed constructor application and discharging its branch proof
+with reflexivity can provide an execution oracle. It does not demonstrate a
+function that accepts an unknown runtime Boolean.
+
 ## Initial validation boundary
 
 Check hand-built Core for retained identity and application. Cover alpha-renaming,

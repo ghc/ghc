@@ -145,6 +145,10 @@ it does not rely on `unsafeCoerce` or plugin axioms.
 
 ### M5: execute through the existing backend
 
+The [lowering audit](CORE.md#lowering-audit-for-m5) records the first source-level
+blockers. Start with a checked CorePrep-to-STG harness. Preserve native type
+metadata until the backend has a valid representation view.
+
 - [ ] Carry the restricted extension through the minimum mandatory Core pipeline.
 - [ ] Update CorePrep and CoreToStg for the specified erasure of new index and proof
       annotations. The retained Boolean remains one ordinary runtime argument.
