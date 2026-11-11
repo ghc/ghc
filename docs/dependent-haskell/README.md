@@ -23,10 +23,10 @@ Last updated: 2026-11-11.
 | Project branch | `codex/dependent-haskell` |
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
-| Native Core | Retained Boolean lambda and application pass the internal API regression |
+| Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
 | Frontend and execution | Not implemented; optimizer, backend, and interface gates remain |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Current task | [M3: dependent lambda and application](PLAN.md#m3-port-binders-and-implement-dependent-lambda-and-application), build and API validation |
+| Current task | Final bootstrap and registered M3/M4 regression; [M5: backend execution](PLAN.md#m5-execute-through-the-existing-backend) follows |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -34,7 +34,7 @@ computation and Boolean elimination need completion. The native target must acce
 ordinary runtime Boolean bindings directly and preserve laziness. Singleton
 reification remains specific to the comparison implementation.
 
-## First native Core increment
+## Native Core implementation
 
 `TermVarTy` refers to the index of an existing runtime Boolean identifier.
 `DepFunTy` binds that identifier in a dependent result type. Type recovery and
@@ -42,16 +42,25 @@ Core Lint agree on retained application. The implementation includes scope,
 capture avoidance, supported index substitution, alpha equality, and diagnostic
 printing. It does not add a singleton argument or evaluate index variables.
 
+Boolean alternatives can bind checked nominal equality evidence. The strict case
+justifies each proof. Proof-bearing cases must cover both Boolean values, and
+each proof stays inside its branch. The existing result annotation scope remains.
+
 The `NativeDependentCore` GHC API regression passes against the refreshed stage0
-compiler library. It covers constructor and shared-variable applications,
+compiler library. It checks constructor and shared-variable applications,
 substitution composition, binder cloning, invalid indices, scope errors, and
-the boundary gates. The complete default Hadrian rebuild is still in progress.
+boundary gates. It also checks `Select True = Int`, `Select False = Bool`,
+`choose`, `keep`, shared-index composition, branch casts, and forged proofs.
+The earlier default rebuild passed in 24m16s under a 16 GiB cap, with a recorded
+peak of 7,605 MiB. The final rebuild with the Boolean case rule is in progress.
 These API results do not establish native execution or optimizer preservation.
 There is no performance measurement for the changed type traversals.
 
 The frontend cannot produce the new forms. The ordinary optimizer, CorePrep,
 interface serialization, and unsupported frontend operations reject them.
-Dependent Boolean case evidence is the next implementation task.
+The next implementation task is a restricted lowering path for native execution.
+It must erase proof uses and index annotations together and retain strict case
+discrimination. Existing simplifier and backend binder handling is insufficient.
 
 ## Verified baseline
 

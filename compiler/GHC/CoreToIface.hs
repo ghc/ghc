@@ -66,6 +66,7 @@ import GHC.Core.TyCo.Tidy
 
 import GHC.Builtin.WiredIn.Prim ( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.WiredIn.Types ( heqTyCon )
+import GHC.Builtin.KnownKeys ( falseDataConKey, trueDataConKey )
 import GHC.Builtin.WiredIn.Ids ( noinlineIdName, noinlineConstraintIdName )
 
 import GHC.Iface.Syntax
@@ -77,6 +78,7 @@ import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
 import GHC.Types.Literal
 import GHC.Types.Name
+import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Var
 import GHC.Types.Var.Env
@@ -671,6 +673,9 @@ toIfaceTopBind b =
 
 ---------------------
 toIfaceAlt :: CoreAlt -> IfaceAlt
+toIfaceAlt alt@(Alt (DataAlt con) (_:_) _)
+  | con `hasKey` falseDataConKey || con `hasKey` trueDataConKey
+  = pprPanic "toIfaceAlt: native Boolean proof interfaces are not implemented" (ppr alt)
 toIfaceAlt (Alt c bs r) = IfaceAlt (toIfaceCon c) (map (mkIfLclName . getOccFS) bs) (toIfaceExpr r)
 
 ---------------------

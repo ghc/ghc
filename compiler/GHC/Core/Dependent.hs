@@ -9,12 +9,14 @@ module GHC.Core.Dependent (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Builtin.KnownKeys (falseDataConKey, trueDataConKey)
 import GHC.Core.DataCon (dataConRepType)
 import GHC.Core.TyCo.Rep
 import GHC.Types.Id (idCoreRules, realIdUnfolding)
 import GHC.Types.Literal (literalType)
 import GHC.Types.Tickish (CoreTickish, GenTickish (..))
 import GHC.Types.Var
+import GHC.Types.Unique (hasKey)
 import GHC.Types.Var.Set
 import GHC.Utils.Panic
 
@@ -72,7 +74,7 @@ rejectNative context found =
             ( Sorry
                 ( "Native dependent Core cannot enter "
                     ++ context
-                    ++ ". Optimization and code generation for DepFunTy/TermVarTy are not implemented."
+                    ++ ". Optimization and code generation for native dependent types and Boolean proofs are not implemented."
                 )
             )
 
@@ -97,6 +99,8 @@ scanBind (Rec pairs) = foldMap (\(b, rhs) -> scanBinder b <> scanExpr rhs) pairs
 
 -- | Inspect a case alternative and its binders.
 scanAlt :: CoreAlt -> NativeScan
+scanAlt (Alt (DataAlt con) (_ : _) _)
+    | con `hasKey` falseDataConKey || con `hasKey` trueDataConKey = NativeScan (pure True)
 scanAlt (Alt con bs rhs) =
     scanAltCon con <> foldMap scanBinder bs <> scanExpr rhs
 

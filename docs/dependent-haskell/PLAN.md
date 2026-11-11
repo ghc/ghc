@@ -123,7 +123,7 @@ The first increment follows [the restricted Core specification](CORE.md).
       Runtime dependent application substitutes its argument into the result.
 - [x] Check binder renaming, aliases, shadowing, supported index substitution, and
       scoped lets. Ordinary optimizer reduction remains gated until M6.
-- [ ] Keep ordinary GHC programs building while the feature remains gated.
+- [x] Keep ordinary GHC programs building while the feature remains gated.
 
 Gate: hand-built Core for identity and retained application passes Lint. Lint and
 type computation agree before and after supported substitutions. No frontend
@@ -131,11 +131,13 @@ syntax is required for this milestone.
 
 ### M4: implement dependent Boolean elimination and evidence
 
-- [ ] Implement the M2 case motive or branch-equality design.
-- [ ] Instantiate branch results under checked `True` and `False` refinements.
-- [ ] Update case scope in substitution, free variables, and Lint.
-- [ ] Preserve nominal index equality. Reject invalid casts and escaping binders.
-- [ ] Check that bottom cannot supply constructor refinement or unchecked equality.
+- [x] Implement the M2 case motive or branch-equality design.
+- [x] Instantiate branch results under checked `True` and `False` refinements.
+- [x] Update case scope in substitution, free variables, and Lint.
+- [x] Preserve nominal index equality. Reject invalid casts and escaping binders.
+- [x] Restrict refinement to strict constructor discrimination. Reject unsupported
+      evidence producers and incomplete proof-bearing cases. Runtime bottom
+      checks remain part of M5's execution gate.
 
 Gate: native Core for `choose`, `keep`, and shared-index composition passes Lint.
 Mismatched branches and forged refinements fail. Evidence follows checked rules;

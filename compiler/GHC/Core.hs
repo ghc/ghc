@@ -789,6 +789,10 @@ Case expressions are one of the more complicated elements of the Core
 language, and come with a number of invariants.  All of them should be
 checked by Core Lint.
 
+Experimental native Boolean alternatives can bind one virtual coercion variable.
+They require checked coverage and branch evidence. They cannot enter the ordinary
+optimizer or backend. See Note [Native Boolean branch evidence] in GHC.Core.Lint.
+
 1. The list of alternatives may be empty;
    See Note [Empty case alternatives]
 

@@ -8,26 +8,31 @@ import Data.List (isInfixOf)
 import GHC (DynFlags, getSessionDynFlags, runGhc)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (coercionLKind, mkNomReflCo, mkPiCo)
-import GHC.Core.Coercion.Axiom (Role (..))
-import GHC.Core.DataCon (dataConWorkId, promoteDataCon)
+import GHC.Core.Coercion (coercionLKind, mkAxInstCo, mkCoVarCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
+import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
+import GHC.Core.DataCon (DataCon, dataConWorkId, promoteDataCon)
 import GHC.Core.Dependent
+import GHC.Core.FamInstEnv (mkBranchedCoAxiom, mkCoAxBranch)
 import GHC.Core.Lint (lintExpr)
+import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
 import GHC.Core.TyCo.Rep (Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
+import GHC.Core.TyCon (FamTyConFlav (..), Injectivity (..), TyCon, mkAnonTyConBinder, mkFamilyTyCon, mkTyConKind)
 import GHC.Core.Type
 import GHC.Core.Utils (exprType)
+import GHC.CoreToIface (toIfaceAlt)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Driver.Ppr (showSDoc)
 import GHC.Types.Id
-import GHC.Types.Id.Info (RuleInfo (..))
+import GHC.Types.Id.Info (IdDetails (VanillaId), RuleInfo (..))
 import GHC.Types.InlinePragma (ActivationX (AlwaysActive))
 import GHC.Types.Name (mkSystemName, nameModule)
-import GHC.Types.Name.Occurrence (mkTyVarOcc)
+import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc)
+import GHC.Types.SrcLoc (noSrcSpan)
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
 import GHC.Types.Var.Env
@@ -44,6 +49,7 @@ main = do
         [libdir] -> do
             dflags <- runGhc (Just libdir) getSessionDynFlags
             runChecks dflags
+            runCaseChecks dflags
             putStrLn "native-core-api-ok"
         _ -> fail "Usage: NativeDependentCore GHC_LIBDIR"
 
@@ -310,3 +316,282 @@ runChecks dflags = do
         rejectNativeDependentExpr "native smoke" worker
     rejectsWith "native program boundary gate" "Native dependent Core cannot enter" $
         rejectNativeDependentProgram "native smoke" [NonRec (local 20 "keep" workerTy) worker] []
+
+-- | Build a nominal proof identifier with the specified endpoints.
+proof :: Int -> Type -> Type -> CoVar
+proof n lhs rhs = mkCoVar (mkSystemName (unique n) (mkVarOcc "cv")) (mkNomEqPred lhs rhs)
+
+-- | Map a Boolean constructor to its promoted index.
+constructorIndex :: DataCon -> Type
+constructorIndex = mkTyConTy . promoteDataCon
+
+-- | Build a function at a constructor index and transport it through a proof.
+dictionaryBranch :: Int -> Id -> DataCon -> CoVar -> CoreExpr
+dictionaryBranch n payload con cv = Cast body (mkSymCo funCo)
+  where
+    concrete = constructorIndex con
+    dict = local n "dict" (mkTyConApp eqTyCon [boolTy, concrete, concrete])
+    body = Lam dict (Var payload)
+    indexCo = mkCoVarCo cv
+    predCo = mkTyConAppCo Nominal eqTyCon [mkNomReflCo boolTy, indexCo, indexCo]
+    funCo = mkFunCoNoFTF Representational (mkNomReflCo ManyTy) (mkSubCo predCo) (mkReflCo Representational intTy)
+
+-- | Build exhaustive alternatives in the wired Boolean constructor tag order.
+dictionaryAlts :: Id -> CoVar -> CoVar -> [CoreAlt]
+dictionaryAlts payload falseProof trueProof =
+    [ Alt (DataAlt falseDataCon) [falseProof] (dictionaryBranch 20 payload falseDataCon falseProof)
+    , Alt (DataAlt trueDataCon) [trueProof] (dictionaryBranch 21 payload trueDataCon trueProof)
+    ]
+
+-- | Construct a small closed family and its two ordinary family equations.
+selectFamily :: (TyCon, CoAxiom Branched)
+selectFamily = (family, axiom)
+  where
+    parameter = mkTyVar (mkSystemName (unique 100) (mkTyVarOcc "b")) boolTy
+    binders = [mkAnonTyConBinder parameter]
+    family =
+        mkFamilyTyCon
+            (mkSystemName (unique 101) (mkTcOcc "Select"))
+            (mkTyConKind binders liftedTypeKind)
+            binders
+            0
+            liftedTypeKind
+            Nothing
+            (ClosedTypeFamilyTyCon (CTF (Just axiom)))
+            Nothing
+            NotInjective
+    axiom =
+        mkBranchedCoAxiom
+            Nominal
+            (mkSystemName (unique 102) (mkTcOcc "SelectAx"))
+            family
+            [ mkCoAxBranch [] [] [] [constructorIndex trueDataCon] intTy [] noSrcSpan
+            , mkCoAxBranch [] [] [] [constructorIndex falseDataCon] boolTy [] noSrcSpan
+            ]
+
+-- | Apply the test family to one Boolean index.
+selected :: Type -> Type
+selected index = mkTyConApp (fst selectFamily) [index]
+
+-- | Compose constructor refinement with an existing closed-family equation.
+selectionBranch :: Int -> CoVar -> CoreExpr -> CoreExpr
+selectionBranch branch cv payload = Cast payload (mkSubCo (mkSymCo toConcrete))
+  where
+    refinement = mkTyConAppCo Nominal (fst selectFamily) [mkCoVarCo cv]
+    equation = mkAxInstCo Nominal (BranchedAxiom (snd selectFamily) branch) [] []
+    toConcrete = mkTransCo refinement equation
+
+-- | Check branch evidence without evaluating native dependent code.
+runCaseChecks :: DynFlags -> IO ()
+runCaseChecks dflags = do
+    let b = local 1 "b" boolTy
+        other = local 2 "other" boolTy
+        caseBinder = local 3 "case_b" boolTy
+        payload = local 4 "n" intTy
+        index = TermVarTy b
+        falseIndex = constructorIndex falseDataCon
+        trueIndex = constructorIndex trueDataCon
+        falseExpr = Var (dataConWorkId falseDataCon)
+        trueExpr = Var (dataConWorkId trueDataCon)
+        falseProof = proof 5 index falseIndex
+        trueProof = proof 6 index trueIndex
+        result = indexed index
+        alts = dictionaryAlts payload falseProof trueProof
+        nativeCase = Case (Var b) caseBinder result alts
+        whole = Lam b nativeCase
+        plainCase = Case (Var b) caseBinder intTy [Alt (DataAlt falseDataCon) [] (Var payload), Alt (DataAlt trueDataCon) [] (Var payload)]
+    lintAccepts dflags "nominal branch evidence transports dictionary functions" [b, payload] nativeCase
+    lintAccepts dflags "retained Boolean lambda contains a refined case" [payload] whole
+    checkType dflags "refined case result keeps the outer index" result (exprType nativeCase)
+    checkType dflags "refined lambda retains its Boolean argument" (mkDepFunTy b result) (exprType whole)
+    lintAccepts dflags "ordinary Boolean alternatives remain unchanged" [b, payload] plainCase
+    lintAccepts dflags "DEFAULT plus one constructor proof covers Bool" [b, payload] $
+        Case
+            (Var b)
+            caseBinder
+            intTy
+            [ Alt DEFAULT [] (Var payload)
+            , Alt (DataAlt trueDataCon) [trueProof] (Var payload)
+            ]
+
+    let selectAlts =
+            [ Alt (DataAlt falseDataCon) [falseProof] (selectionBranch 1 falseProof falseExpr)
+            , Alt (DataAlt trueDataCon) [trueProof] (selectionBranch 0 trueProof (Var payload))
+            ]
+        selectCase = Case (Var b) caseBinder (selected index) selectAlts
+        choose = Lam b selectCase
+        reduce branch = mkAxInstCo Representational (BranchedAxiom (snd selectFamily) branch) [] []
+    lintAccepts dflags "Select True is Int and Select False is Bool" [payload] choose
+    lintRejects dflags "Select False branch rejects an Int payload" [payload] $
+        Lam
+            b
+            ( Case
+                (Var b)
+                caseBinder
+                (selected index)
+                [ Alt (DataAlt falseDataCon) [falseProof] (selectionBranch 1 falseProof (Var payload))
+                , Alt (DataAlt trueDataCon) [trueProof] (selectionBranch 0 trueProof (Var payload))
+                ]
+            )
+    checkType dflags "choose has a retained Select result" (mkDepFunTy b (selected index)) (exprType choose)
+    lintAccepts dflags "choose True followed by its family equation" [payload] (Cast (App choose trueExpr) (reduce 0))
+    lintAccepts dflags "choose False followed by its family equation" [payload] (Cast (App choose falseExpr) (reduce 1))
+    checkType dflags "True application selects Int" intTy (exprType (Cast (App choose trueExpr) (reduce 0)))
+    checkType dflags "False application selects Bool" boolTy (exprType (Cast (App choose falseExpr) (reduce 1)))
+
+    let keepBool = local 30 "keep_b" boolTy
+        keepIndex = TermVarTy keepBool
+        keepValue = local 31 "value" (selected keepIndex)
+        keepSelect = Lam keepBool (Lam keepValue (Var keepValue))
+        again = Lam other (App (App keepSelect (Var other)) (App choose (Var other)))
+        mixed = App (App keepSelect (Var b)) (App choose (Var other))
+        falsePayload = Cast falseExpr (mkSymCo (reduce 1))
+    lintAccepts dflags "keepSelect retains a Select value at its runtime index" [] keepSelect
+    checkType
+        dflags
+        "keepSelect has a retained dependent function type"
+        (mkDepFunTy keepBool (mkFunctionType ManyTy (selected keepIndex) (selected keepIndex)))
+        (exprType keepSelect)
+    lintAccepts dflags "choose and keepSelect compose at one shared runtime index" [payload] again
+    checkType
+        dflags
+        "shared choose and keepSelect composition retains its index"
+        (mkDepFunTy other (selected (TermVarTy other)))
+        (exprType again)
+    lintRejects dflags "independent runtime Boolean indices do not unify" [b, other, payload] mixed
+    lintRejects dflags "keepSelect True rejects an explicit Select False payload" [] $
+        App (App keepSelect trueExpr) falsePayload
+
+    let substituteTrue = indexSubst [payload] b trueExpr
+        substituteOther = indexSubst [other, payload] b (Var other)
+        trueCase = CoreSubst.substExpr substituteTrue nativeCase
+        otherCase = CoreSubst.substExpr substituteOther nativeCase
+        trueSelect = CoreSubst.substExpr substituteTrue selectCase
+        otherSelect = CoreSubst.substExpr substituteOther selectCase
+        boundChoose = CoreSubst.substExpr substituteTrue choose
+    lintAccepts dflags "constructor substitution updates every refined-case proof" [payload] trueCase
+    checkType dflags "constructor-substituted case recovers its instantiated type" (indexed trueIndex) (exprType trueCase)
+    lintAccepts dflags "variable substitution updates every refined-case proof" [other, payload] otherCase
+    checkType dflags "variable-substituted case retains the replacement identity" (indexed (TermVarTy other)) (exprType otherCase)
+    lintAccepts dflags "constructor substitution preserves Select branch equations" [payload] trueSelect
+    checkType dflags "constructor-substituted Select case recovers its instantiated type" (selected trueIndex) (exprType trueSelect)
+    lintAccepts dflags "substituted Select case reduces through its declared equation" [payload] (Cast trueSelect (reduce 0))
+    checkType dflags "substituted Select True reduces to Int" intTy (exprType (Cast trueSelect (reduce 0)))
+    lintAccepts dflags "variable substitution preserves Select branch equations" [other, payload] otherSelect
+    checkType dflags "variable-substituted Select case retains the replacement identity" (selected (TermVarTy other)) (exprType otherSelect)
+    lintAccepts dflags "substitution respects the retained binder of choose" [payload] boundChoose
+    checkType dflags "bound choose keeps its original dependent type" (mkDepFunTy b (selected index)) (exprType boundChoose)
+
+    lintRejects dflags "proof cannot refine an unrelated scrutinee" [b, other, payload] (Case (Var other) caseBinder result alts)
+    lintRejects dflags "opposite constructor proof is rejected" [b, payload] $
+        Case
+            (Var b)
+            caseBinder
+            intTy
+            [ Alt (DataAlt falseDataCon) [trueProof] (Var payload)
+            , Alt (DataAlt trueDataCon) [] (Var payload)
+            ]
+    let reverseProof = proof 7 trueIndex index
+    lintRejects dflags "reversed proof endpoints are rejected" [b, payload] $
+        Case
+            (Var b)
+            caseBinder
+            intTy
+            [ Alt (DataAlt falseDataCon) [] (Var payload)
+            , Alt (DataAlt trueDataCon) [reverseProof] (Var payload)
+            ]
+    let representational = mkCoVar (mkSystemName (unique 8) (mkVarOcc "repr")) (mkReprEqPred index trueIndex)
+    lintRejects dflags "representational proof cannot refine a nominal index" [b, payload] $
+        Case
+            (Var b)
+            caseBinder
+            intTy
+            [ Alt (DataAlt falseDataCon) [] (Var payload)
+            , Alt (DataAlt trueDataCon) [representational] (Var payload)
+            ]
+    lintRejects dflags "extra proof binder is rejected" [b, payload] $
+        Case
+            (Var b)
+            caseBinder
+            intTy
+            [ Alt (DataAlt falseDataCon) [] (Var payload)
+            , Alt (DataAlt trueDataCon) [trueProof, proof 9 index trueIndex] (Var payload)
+            ]
+    let ordinary = setIdDetails (proof 10 index trueIndex) VanillaId
+    lintRejects dflags "an ordinary Id cannot replace a proof CoVar" [b, payload] $
+        Case
+            (Var b)
+            caseBinder
+            intTy
+            [ Alt (DataAlt falseDataCon) [] (Var payload)
+            , Alt (DataAlt trueDataCon) [ordinary] (Var payload)
+            ]
+    let erased = mkTyVar (mkSystemName (unique 11) (mkTyVarOcc "erased")) boolTy
+    lintRejects dflags "a type variable cannot replace a proof CoVar" [b, payload] $
+        Case
+            (Var b)
+            caseBinder
+            intTy
+            [ Alt (DataAlt falseDataCon) [] (Var payload)
+            , Alt (DataAlt trueDataCon) [erased] (Var payload)
+            ]
+    lintRejects dflags "DEFAULT cannot bind constructor evidence" [b, payload] $
+        Case
+            (Var b)
+            caseBinder
+            intTy
+            [ Alt DEFAULT [trueProof] (Var payload)
+            , Alt (DataAlt trueDataCon) [] (Var payload)
+            ]
+    lintRejects dflags "constructor proof cannot shadow an in-scope proof identity" [b, payload, trueProof] $
+        Case
+            (Var b)
+            caseBinder
+            intTy
+            [ Alt (DataAlt falseDataCon) [] (Var payload)
+            , Alt (DataAlt trueDataCon) [trueProof] (Var payload)
+            ]
+    lintRejects dflags "missing coverage cannot justify a contradictory proof" [payload] $
+        Case
+            trueExpr
+            caseBinder
+            intTy
+            [Alt (DataAlt falseDataCon) [proof 18 trueIndex falseIndex] (Var payload)]
+    lintRejects dflags "proof cannot escape into another branch" [b, payload] $
+        Case
+            (Var b)
+            caseBinder
+            result
+            [ Alt (DataAlt falseDataCon) [falseProof] (dictionaryBranch 22 payload trueDataCon trueProof)
+            , Alt (DataAlt trueDataCon) [trueProof] (dictionaryBranch 23 payload trueDataCon trueProof)
+            ]
+    lintRejects dflags "case binder cannot occur in the outer result annotation" [b, payload] $
+        Case (Var b) caseBinder (indexed (TermVarTy caseBinder)) alts
+    lintRejects dflags "arbitrary producers cannot supply an index" [payload] $
+        Case
+            (Let (NonRec b trueExpr) (Var b))
+            caseBinder
+            (indexed trueIndex)
+            (dictionaryAlts payload (proof 12 trueIndex falseIndex) (proof 13 trueIndex trueIndex))
+    let notBool = local 14 "not_bool" intTy
+    lintRejects dflags "non-Boolean scrutinee cannot justify Boolean evidence" [notBool, payload] $
+        Case
+            (Var notBool)
+            (local 15 "case_int" intTy)
+            intTy
+            [ Alt (DataAlt falseDataCon) [] (Var payload)
+            , Alt (DataAlt trueDataCon) [trueProof] (Var payload)
+            ]
+
+    let literalCase =
+            Case
+                trueExpr
+                caseBinder
+                (indexed trueIndex)
+                (dictionaryAlts payload (proof 16 trueIndex falseIndex) (proof 17 trueIndex trueIndex))
+    lintAccepts dflags "literal scrutinee supplies branch evidence" [payload] literalCase
+    check "scanner detects literal-only virtual proof binders" (hasNativeDependentExpr literalCase)
+    check "scanner still detects runtime-index case proofs" (hasNativeDependentExpr nativeCase)
+    let literalProofAlt = Alt (DataAlt trueDataCon) [proof 24 trueIndex trueIndex] (Var payload)
+    rejectsWith "interfaces reject literal-only Boolean proof alternatives" "native Boolean proof interfaces are not implemented" $
+        evaluate (toIfaceAlt literalProofAlt)

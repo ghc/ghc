@@ -50,7 +50,7 @@ import GHC.Core.Lint.SubstTypeLets( substTypeLets )
 import GHC.Core.Ppr
 import GHC.Core.Coercion
 import GHC.Core.Type as Type
-import GHC.Core.Predicate( isCoVarType )
+import GHC.Core.Predicate( isCoVarType, mkNomEqPred )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
@@ -126,6 +126,10 @@ to decouple the safety of the resulting program from the type inference algorith
 However, do note point (4) above. Core Lint does not check for incomplete case-matches;
 see Note [Case expression invariants] in GHC.Core, invariant (4). As explained there,
 an incomplete case-match might slip by Core Lint and cause trouble at runtime.
+
+The experimental native dependent forms are outside this guarantee. They cannot
+enter the ordinary optimizer or backend. Their Boolean proof alternatives have
+an additional coverage check. See Note [Native Boolean branch evidence].
 
 Note [GHC Formalism]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1582,6 +1586,10 @@ lintCaseExpr scrut case_bndr alt_ty alts
        ; addLoc (CaseTy scrut) $ lintValueType alt_ty
 
        ; checkCaseAlts e scrut scrut_ty alts
+       ; when (any refining_bool_alt alts) $
+           lintL (any is_default alts || (any (has_con falseDataConKey) alts
+                                          && any (has_con trueDataConKey) alts))
+             (text "Native Boolean proof alternatives must be exhaustive:" <+> ppr e)
 
        -- Lint the case-binder. Must do this after linting the scrutinee
        -- because the case-binder isn't in scope in the scrutineex
@@ -1595,9 +1603,17 @@ lintCaseExpr scrut case_bndr alt_ty alts
          -- See GHC.Core Note [Case expression invariants] item (7)
 
        ; -- Check the alternatives
-       ; alt_ues <- mapM (lintCoreAlt case_bndr scrut_ty scrut_mult alt_ty) alts
+       ; alt_ues <- mapM (lintCoreAlt (exprToBoolIndex scrut) case_bndr scrut_ty scrut_mult alt_ty) alts
        ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
        ; return (alt_ty, case_ue) } }
+  where
+    refining_bool_alt (Alt (DataAlt con) args _)
+      = not (null args) && (con `hasKey` falseDataConKey || con `hasKey` trueDataConKey)
+    refining_bool_alt _ = False
+    is_default (Alt DEFAULT [] _) = True
+    is_default _ = False
+    has_con key (Alt (DataAlt con) _ _) = con `hasKey` key
+    has_con _ _ = False
 
 checkCaseAlts :: CoreExpr -> CoreExpr -> Type -> [CoreAlt] -> LintM ()
 -- a) Check that the alts are non-empty
@@ -1681,7 +1697,8 @@ lintAltExpr expr ann_ty
        ; return ue }
          -- See GHC.Core Note [Case expression invariants] item (6)
 
-lintCoreAlt :: Id         -- Case binder
+lintCoreAlt :: Maybe Type -- Supported native index of the scrutinee
+            -> Id         -- Case binder
             -> Type       -- Type of scrutinee
             -> Mult          -- Multiplicity of scrutinee
             -> Type       -- Type of the alternative
@@ -1689,7 +1706,7 @@ lintCoreAlt :: Id         -- Case binder
             -> LintM UsageEnv
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreAlt case_bndr _ scrut_mult alt_ty (Alt DEFAULT args rhs) =
+lintCoreAlt _ case_bndr _ scrut_mult alt_ty (Alt DEFAULT args rhs) =
   do { lintL (null args) (mkDefaultArgsMsg args)
      ; rhs_ue <- lintAltExpr rhs alt_ty
      ; let (case_bndr_usage, rhs_ue') = popUE rhs_ue case_bndr
@@ -1698,7 +1715,7 @@ lintCoreAlt case_bndr _ scrut_mult alt_ty (Alt DEFAULT args rhs) =
      ; ensureSubUsage case_bndr_usage scrut_mult err_msg
      ; return rhs_ue' }
 
-lintCoreAlt case_bndr scrut_ty _ alt_ty (Alt (LitAlt lit) args rhs)
+lintCoreAlt _ case_bndr scrut_ty _ alt_ty (Alt (LitAlt lit) args rhs)
   | litIsLifted lit
   = failWithL integerScrutinisedMsg
   | otherwise
@@ -1710,7 +1727,28 @@ lintCoreAlt case_bndr scrut_ty _ alt_ty (Alt (LitAlt lit) args rhs)
   where
     lit_ty = literalType lit
 
-lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rhs)
+lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rhs)
+  | not (null args)
+  , con `hasKey` falseDataConKey || con `hasKey` trueDataConKey
+  = addLoc (CaseAlt alt) $ do
+    { index <- case scrut_index of
+        Just index -> return index
+        Nothing -> failWithL (text "Unsupported scrutinee for native Boolean evidence")
+    ; cv <- case args of
+        [cv] -> return cv
+        _ -> failWithL (text "Native Boolean alternative must bind exactly one CoVar")
+    ; in_scope <- getInScope
+    ; lintL (isCoVar cv && isLocalId cv && not (cv `elemInScopeSet` in_scope))
+        (text "Native Boolean evidence requires a fresh local CoVar:" <+> ppr cv)
+    ; ensureEqTys scrut_ty (dataConRepType con) (mkBadPatMsg scrut_ty (dataConRepType con))
+    ; let expected = mkNomEqPred index (mkTyConTy (promoteDataCon con))
+    ; ensureEqTys (varType cv) expected
+        (text "Invalid nominal Boolean branch evidence:" <+> ppr cv <+> dcolon <+> ppr (varType cv))
+    ; lintBinder CasePatBind cv $ do
+      { rhs_ue <- lintAltExpr rhs alt_ty
+      ; return (deleteUE (deleteUE rhs_ue cv) case_bndr) }
+    }
+    -- See Note [Native Boolean branch evidence].
   | isNewTyCon (dataConTyCon con)            -- (DALT1) in Note [DataAlt restrictions] in GHC.Core
   = zeroUE <$ addErrL (mkNewTyDataConAltMsg scrut_ty alt)
   | isUnaryClassTyCon (dataConTyCon con)     -- (DALT3) in Note [DataAlt restrictions] in GHC.Core
@@ -1741,6 +1779,22 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
 
   | otherwise   -- Scrut-ty is wrong shape
   = zeroUE <$ addErrL (mkBadAltMsg scrut_ty alt)
+
+{- Note [Native Boolean branch evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A nonempty wired Boolean alternative binds one virtual CoVar. Strict constructor
+discrimination justifies index(scrutinee) ~# promotedConstructor. The proof is
+nominal, local to this branch, and absent from the constructor's runtime payload.
+The result annotation stays outside both the case binder and the proof binder.
+
+Do not use lintAltBinders for the virtual proof. The Boolean worker has no
+arguments. lintCaseExpr checks coverage before admitting these alternatives.
+Ordinary Boolean alternatives with no binders keep their existing rule.
+
+Optimization and code generation remain gated. They cannot reconstruct a Boolean
+worker application from this proof binder or discard the strict case. The rule
+and remaining proof obligations are specified in docs/dependent-haskell/CORE.md.
+-}
 
 {-
 Note [Validating multiplicities in a case]

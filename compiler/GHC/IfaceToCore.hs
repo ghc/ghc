@@ -102,6 +102,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Avail
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.FM
+import GHC.Types.Unique ( hasKey )
 import GHC.Types.Unique.DSet ( mkUniqDSet, emptyUniqDSet )
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Types.Unique.Supply
@@ -136,7 +137,7 @@ import GHC.Iface.Errors.Types
 import Language.Haskell.Syntax.BooleanFormula (BooleanFormula)
 import Language.Haskell.Syntax.BooleanFormula qualified as BF(BooleanFormula(..))
 import Language.Haskell.Syntax.Extension (NoExtField (NoExtField))
-import GHC.Builtin.KnownKeys (ioTyConKey)
+import GHC.Builtin.KnownKeys (ioTyConKey, falseDataConKey, trueDataConKey)
 
 {-
 This module takes
@@ -1796,6 +1797,10 @@ tcIfaceAlt scrut mult (tycon, inst_tys) (IfaceAlt (IfaceDataAlt data_occ) arg_st
 tcIfaceDataAlt :: Mult -> DataCon -> [Type] -> [IfLclName] -> IfaceExpr
                -> IfL CoreAlt
 tcIfaceDataAlt mult con inst_tys arg_strs rhs
+  | not (null arg_strs)
+  , con `hasKey` falseDataConKey || con `hasKey` trueDataConKey
+  = pprPanic "tcIfaceDataAlt: native Boolean proof interfaces are not implemented" (ppr con)
+  | otherwise
   = do  { uniqs <- getUniquesM
         ; let (ex_tvs, arg_ids)
                       = dataConRepFSInstPat (map ifLclNameFS arg_strs) uniqs mult con inst_tys

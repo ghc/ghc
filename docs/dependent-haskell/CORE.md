@@ -1,6 +1,6 @@
 # Restricted dependent Core
 
-This document specifies the first internal implementation. It is based on the
+This document specifies the restricted internal implementation. It is based on the
 `nokinds-pi` binder and application work recorded in [PORT.md](PORT.md).
 It does not specify the full dependent-Haskell language.
 
@@ -86,9 +86,9 @@ The compiler frontend cannot emit these forms in the first increment.
 ## Evidence and dependent cases
 
 The existing `Case` result annotation remains outside its case binder's scope.
-The first increment does not change this rule. It does not implement `choose`.
+The implementation preserves this rule.
 
-The next increment uses checked branch-scoped nominal evidence. It keeps the
+Boolean elimination uses checked branch-scoped nominal evidence. It keeps the
 existing `Case` syntax and result scope:
 
 ```text
@@ -147,6 +147,12 @@ Check hand-built Core for retained identity and application. Cover alpha-renamin
 capture avoidance, variable and constructor substitution, non-Boolean indices,
 wrong applications, and escaped variables. Compare Lint results with type recovery.
 
-The native forms must print in diagnostics. Interface serialization, source syntax,
-optimization, dependent cases, and execution remain gated until their plan tasks
-pass. Existing ordinary GHC programs must continue to build.
+The native forms print in diagnostics. The API regression checks dependent
+Boolean cases, `Select True = Int`, `Select False = Bool`, and composition of
+`choose` and `keep` at one shared runtime index. It also checks malformed proof
+types, incomplete proof-bearing cases, scope errors, and supported substitution
+through branch proofs. These checks construct and typecheck Core. They do not
+execute the dependent functions.
+
+Interface serialization, source syntax, optimization, and execution remain gated
+until their plan tasks pass. Existing ordinary GHC programs must continue to build.

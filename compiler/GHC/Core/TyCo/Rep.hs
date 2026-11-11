@@ -258,7 +258,7 @@ dependencies, not additional runtime uses. Type-variable and coercion-variable
 callbacks must not process runtime index variables.
 
 Only variable and constructor index substitution is implemented. General
-expression substitution, dependent case evidence, optimization, code generation,
+expression substitution, optimization, code generation,
 and interface serialization are not implemented for these forms. The frontend
 cannot emit them. See docs/dependent-haskell/CORE.md.
 -}
