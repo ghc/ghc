@@ -96,7 +96,7 @@ See [the port inventory](PORT.md) and [comparison programs](reference/README.md)
 
 ### M2: specify the restricted Core extension
 
-- [ ] Define retained Boolean binders, term indices, lambda, application, and case
+- [x] Define retained Boolean binders, term indices, lambda, application, and case
       typing. State scope, substitution, erasure, and non-strictness rules.
 - [x] Choose how runtime terms occur in types. Compare historical promotion with
       a checked index-expression representation. Require substitution closure.
@@ -105,9 +105,9 @@ See [the port inventory](PORT.md) and [comparison programs](reference/README.md)
       `ForAllTy` fast paths, unless the audit gives a concrete reason to change them.
 - [x] Define nominal equality, constructor discrimination, and checked reductions.
       State which index comparisons remain opaque.
-- [ ] Specify a dependent motive or explicit branch-equality mechanism for cases.
+- [x] Specify a dependent motive or explicit branch-equality mechanism for cases.
       The existing case annotation lies outside the case binder's scope.
-- [ ] Explain how the rules fit FC, roles, multiplicities, and fixed runtime
+- [x] Explain how the rules fit FC, roles, multiplicities, and fixed runtime
       representations. Record the remaining formal proof obligations.
 
 Gate: written rules and positive and negative Core examples. Resolve representation
