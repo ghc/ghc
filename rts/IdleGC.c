@@ -349,18 +349,8 @@ void handleIdleGcTick(void)
               // the GC.
           } else {
               setRecentActivity(ACTIVITY_PAUSED);
-              // disable timer signals (see #1623, #5991, #9105)
-              // but only if we're not profiling (e.g. passed -h or -p RTS
-              // flags). If we are profiling we need to keep the timer active
-              // so that samples continue to be collected.
-#if defined(PROFILING)
-              if (!(RtsFlags.ProfFlags.doHeapProfile
-                    || RtsFlags.CcFlags.doCostCentres)) {
-                  pauseTimers();
-              }
-#else
+              // disable timers (see #1623, #5991, #9105)
               pauseTimers();
-#endif
           }
       } else {
           if (idle_ticks_to_gc) idle_ticks_to_gc--;
@@ -436,9 +426,7 @@ void notifyIdleGcActive(void)
         uint32_t prev;
         prev = setRecentActivity(ACTIVITY_YES);
         if (prev == ACTIVITY_DONE_GC || prev == ACTIVITY_PAUSED) {
-#if !defined(PROFILING)
             unpauseTimers();
-#endif
         }
         break;
     }
@@ -463,9 +451,7 @@ void notifyIdleGcDone(bool force_major)
             // fact that we've done a GC and turn off the timer signal;
             // it will get re-enabled if we run any threads after the GC.
             setRecentActivity(ACTIVITY_DONE_GC);
-#if !defined(PROFILING)
             pauseTimers();
-#endif
 #if !defined(THREADED_IDLEGC)
             last_idle_gc_time = getProcessElapsedTime();
 #endif

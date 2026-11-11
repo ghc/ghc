@@ -146,9 +146,8 @@ void startTimers(void)
 void pauseTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (prof_timer) {
-        pauseTimer(prof_timer);
-    }
+    // Note that we do not pause the profiling timer. We need to keep the
+    // profiling timer active so that samples continue to be collected.
     if (ctxswitch_timer) {
         pauseTimer(ctxswitch_timer);
     }
@@ -164,9 +163,6 @@ void pauseTimers(void)
 void unpauseTimers(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (prof_timer) {
-        unpauseTimer(prof_timer);
-    }
     if (ctxswitch_timer) {
         unpauseTimer(ctxswitch_timer);
     }
