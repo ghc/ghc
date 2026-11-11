@@ -307,6 +307,15 @@ test('T8954', normal, compile, ['-v0'])
 test('T8932', normal, compile_fail, ['-v0'])
 test('T8987', normal, compile_fail, ['-v0'])
 test('T8987b', normal, compile_fail, ['-v0'])
+test('T8987c', normal, compile_fail, ['-v0'])
+
+# All the T8987d<n> tests are compiled from T8987d.hs, which selects one Q
+# primitive to test via the TEST_INDEX macro.
+for n in range(14):
+  test(f"T8987d{n}",
+       [extra_files(['T8987d.hs']), pre_cmd(f"cp T8987d.hs T8987d{n}.hs")],
+       compile_fail, [f"-v0 -DTEST_INDEX=TEST_{n}"])
+
 test('T7241', normal, compile_fail, ['-v0'])
 test('T9262', normal, compile, ['-v0'])
 test('T9199', normal, compile, ['-v0'])

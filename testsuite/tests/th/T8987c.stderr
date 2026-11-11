@@ -1,0 +1,6 @@
+T8987c.hs:1:1: error: [GHC-87897]
+    Exception when trying to run compile-time code:
+      user error (IOError in fail)
+    Code: (fail ['1', throw (userError "IOError in fail")]
+             >> return [])
+
