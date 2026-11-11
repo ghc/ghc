@@ -71,6 +71,7 @@ import GHC.Utils.Panic
 --import GHC.Cmm.DebugBlock.Trace
 
 import Data.List (sort, nub, partition)
+import Data.Ord (Down(..))
 import Data.STRef.Strict
 import Control.Monad.ST
 
@@ -1322,10 +1323,10 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
             setVisited block
             calcOutFreqs unit block
 
-    -- One pass per loop. Each pass sets the probabilities of its loop's back
-    -- edges, which the passes of the enclosing loops then read.
-    -- FIXME: 'loops' is not ordered inner first.
-    forM_ loops $ \(head, body) -> do
+    -- One pass per loop. A pass uses the back edge probabilities of the loops
+    -- nested in it, so those come first: the header of an enclosing loop
+    -- dominates the inner header and therefore has the smaller vertex.
+    forM_ (sortWith (Down . fst) loops) $ \(head, body) -> do
         forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i True) -- Mark all nodes as visited.
         forM_ body (\i -> unsafeWrite visitedNodes i False) -- Mark all blocks reachable from head as not visited
         forM_ body $ \block -> propFreq (PerIteration head) block

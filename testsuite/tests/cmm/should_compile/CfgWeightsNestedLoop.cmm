@@ -1,0 +1,20 @@
+#include "Cmm.h"
+
+// The loop H -> B -> H is nested in the loop L -> H -> O -> L. Expected: the
+// edge to the exit block has weight 1, like the edge from the entry to L.
+stg_nested {
+  R1 = R1 + 1;
+  goto L;
+L:
+  if (R1 > 0) { goto H; }
+  jump stg_nested [R1, R2];
+H:
+  if (R2 > 0) { goto B; }
+  goto O;
+B:
+  R2 = R2 - 1;
+  goto H;
+O:
+  R1 = R1 - 1;
+  goto L;
+}

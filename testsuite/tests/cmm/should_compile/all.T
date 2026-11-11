@@ -34,6 +34,16 @@ test('T28093_cas', [cmm_src, only_ways(['optasm']),
                     when(leading_underscore(), skip),
                     normalise_errmsg_fun(final_cfg_weights)],
      compile, ['-no-hs-main -ddump-cfg-weights'])
+test('CfgWeightsNestedLoop', [cmm_src, only_ways(['optasm']),
+                              unless(arch('x86_64'), skip),
+                              when(leading_underscore(), skip),
+                              normalise_errmsg_fun(final_cfg_weights)],
+     compile, ['-no-hs-main -ddump-cfg-weights'])
+test('CfgWeightsNestedLoopEntry', [cmm_src, only_ways(['optasm']),
+                                   unless(arch('x86_64'), skip),
+                                   when(leading_underscore(), skip),
+                                   normalise_errmsg_fun(final_cfg_weights)],
+     compile, ['-no-hs-main -ddump-cfg-weights'])
 test('T24224', [cmm_src, grep_errmsg(r'(F64.*);', [1]), only_ways(['normal'])], compile, ['-no-hs-main -ddump-cmm -dsuppress-all -dsuppress-uniques'])
 test('T24474', cmm_src, compile, ['-optc-g3'])
 # Grep for a `... = + .. 42 ..;` occurence from within the dead code block in the cmm dump output.

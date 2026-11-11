@@ -1,0 +1,19 @@
+#include "Cmm.h"
+
+// Like CfgWeightsNestedLoop, but the outer loop is headed by the entry, as
+// in T28083. Expected: the edge to the exit block has weight 1.
+stg_nested {
+  goto L;
+L:
+  if (R1 > 0) { goto H; }
+  jump stg_nested [R1, R2];
+H:
+  if (R2 > 0) { goto B; }
+  goto O;
+B:
+  R2 = R2 - 1;
+  goto H;
+O:
+  R1 = R1 - 1;
+  goto L;
+}

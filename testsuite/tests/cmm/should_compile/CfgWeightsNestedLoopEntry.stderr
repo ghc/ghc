@@ -1,0 +1,10 @@
+==================== CFG Weights - Final ====================
+stg_nested:
+digraph {
+	c1 -> c5[label="0.99750",weight="0.99750"];
+	c5 -> c8[label="0.99750",weight="0.99750"];
+	c8 -> c1[label="0.99750",weight="0.99750"];
+	c1 -> c4[label="1.00000",weight="1.00000"];
+	c5 -> c6[label="2.99251",weight="2.99251"];
+	c6 -> c5[label="2.99251",weight="2.99251"];
+}
