@@ -912,6 +912,12 @@ revPostorderFrom cfg root =
     toNode bid =
         BN (bid,getSuccessors cfg $ bid)
 
+-- | A block's index in the reverse post order of its procedure.
+type Vertex = Int
+
+type VertexMap = IntMap
+
+type VertexSet = IntSet
 
 -- | We take in a CFG which has on its edges weights which are
 --   relative only to other edges originating from the same node.
@@ -946,7 +952,7 @@ mkGlobalWeights root localCfg
     blockFreqs' = mapFromList $ map (first fromVertex) (assocs blockFreqs) :: LabelMap Double
     edgeFreqs' = fmap fromVertexMap $ fromVertexMap edgeFreqs
 
-    fromVertexMap :: IM.IntMap x -> LabelMap x
+    fromVertexMap :: VertexMap x -> LabelMap x
     fromVertexMap m = mapFromList . map (first fromVertex) $ IM.toList m
 
     revOrder = revPostorderFrom localCfg root :: [BlockId]
@@ -966,13 +972,13 @@ mkGlobalWeights root localCfg
     calcBody (backedge, blocks) =
         (toVertex $ snd backedge, sort . map toVertex $ (setElems blocks))
 
-    vertexMapping = mapFromList $ zip revOrder [0..] :: LabelMap Int
-    blockMapping = listArray (0,mapSize vertexMapping - 1) revOrder :: Array Int BlockId
+    vertexMapping = mapFromList $ zip revOrder [0..] :: LabelMap Vertex
+    blockMapping = listArray (0,mapSize vertexMapping - 1) revOrder :: Array Vertex BlockId
     -- Map from blockId to indices starting at zero
-    toVertex :: BlockId -> Int
+    toVertex :: BlockId -> Vertex
     toVertex   blockId  = expectJust $ mapLookup blockId vertexMapping
     -- Map from indices starting at zero to blockIds
-    fromVertex :: Int -> BlockId
+    fromVertex :: Vertex -> BlockId
     fromVertex vertex   = blockMapping ! vertex
 
 {- Note [Static Branch Prediction]
@@ -1156,13 +1162,13 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
 
 -- We normalize all edge weights as probabilities between 0 and 1.
 -- Ignoring rounding errors all outgoing edges sum up to 1.
-cfgEdgeProbabilities :: CFG -> (BlockId -> Int) -> IM.IntMap (IM.IntMap Prob)
+cfgEdgeProbabilities :: CFG -> (BlockId -> Vertex) -> VertexMap (VertexMap Prob)
 cfgEdgeProbabilities cfg toVertex
     = mapFoldlWithKey foldEdges IM.empty cfg
   where
     foldEdges = (\m from toMap -> IM.insert (toVertex from) (normalize toMap) m)
 
-    normalize :: (LabelMap EdgeInfo) -> (IM.IntMap Prob)
+    normalize :: (LabelMap EdgeInfo) -> (VertexMap Prob)
     normalize weightMap
         | edgeCount <= 1 = mapFoldlWithKey (\m k _ -> IM.insert (toVertex k) 1.0 m) IM.empty weightMap
         | otherwise = mapFoldlWithKey (\m k _ -> IM.insert (toVertex k) (normalWeight k) m) IM.empty weightMap
@@ -1183,14 +1189,27 @@ cfgEdgeProbabilities cfg toVertex
          = w/totalWeight
          | otherwise = panic "impossible"
 
+-- | Compute how often each block runs and each edge is taken per invocation
+-- of the procedure, given the probabilities of the edges.
+--
 -- This is the fixpoint algorithm from
 --   "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus
 -- The adaption to Haskell is my own.
-calcFreqs :: IM.IntMap (IM.IntMap Prob) -> [(Int,Int)] -> [(Int, [Int])] -> [Int]
-          -> (Array Int Double, IM.IntMap (IM.IntMap Prob))
+calcFreqs :: VertexMap (VertexMap Prob)
+          -- ^ Edge probabilities, by source and target. The probabilities of
+          -- a block's outgoing edges sum to 1.
+          -> [(Vertex, Vertex)]
+          -- ^ The back edges, as (source, target)
+          -> [(Vertex, [Vertex])]
+          -- ^ For each back edge, the header and the body of its loop. The
+          -- body includes the header and is in reverse post order.
+          -> [Vertex]
+          -- ^ All blocks in reverse post order, so the entry comes first
+          -> (Array Vertex Double, VertexMap (VertexMap Prob))
+          -- ^ Block frequencies, and edge frequencies by source and target
 calcFreqs graph backEdges loops revPostOrder = runST $ do
-    visitedNodes <- newArray (0,nodeCount-1) False :: ST s (STUArray s Int Bool)
-    blockFreqs <- newArray (0,nodeCount-1) 0.0 :: ST s (STUArray s Int Double)
+    (visitedNodes :: STUArray s Vertex Bool) <- newArray (0,nodeCount-1) False
+    (blockFreqs :: STUArray s Vertex Double) <- newArray (0,nodeCount-1) 0.0
     edgeProbs <- newSTRef graph
     edgeBackProbs <- newSTRef graph
 
@@ -1201,11 +1220,13 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
     let  -- See #1600, we need to inline or unboxing makes perf worse.
         -- {-# INLINE getFreq #-}
         {-# INLINE visited #-}
+        visited :: Vertex -> ST s Bool
         visited b = unsafeRead visitedNodes b
+        getFreq :: Vertex -> ST s Double
         getFreq b = unsafeRead blockFreqs b
-        -- setFreq :: forall s. Int -> Double -> ST s ()
+        setFreq :: Vertex -> Double -> ST s ()
         setFreq b f = unsafeWrite blockFreqs b f
-        -- setVisited :: forall s. Node -> ST s ()
+        setVisited :: Vertex -> ST s ()
         setVisited b = unsafeWrite visitedNodes b True
         -- Frequency/probability that edge is taken.
         getProb' arr b1 b2 = readSTRef arr >>=
@@ -1232,10 +1253,10 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
         setBackProb b1 b2 = setProb' edgeBackProbs b1 b2
 
 
-    let -- calcOutFreqs :: Node -> ST s ()
+    let calcOutFreqs :: Vertex -> Vertex -> ST s ()
         calcOutFreqs bhead block = do
           !f <- getFreq block
-          forM (successors block) $ \bi -> do
+          forM_ (successors block) $ \bi -> do
             let !prob = getProb block bi
             let !succFreq = f * prob
             setEdgeFreq block bi succFreq
@@ -1243,7 +1264,8 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
             when (bi == bhead) $ setBackProb block bi succFreq
 
 
-    let propFreq block head = do
+    let propFreq :: Vertex -> Vertex -> ST s ()
+        propFreq block head = do
             -- traceM ("prop:" ++ show (block,head))
             -- traceShowM block
 
@@ -1304,14 +1326,14 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
     return (freqs', graph')
   where
     -- How can these lookups fail? Consider the CFG [A -> B]
-    predecessors :: Int -> IS.IntSet
+    predecessors :: Vertex -> VertexSet
     predecessors b = fromMaybe IS.empty $ IM.lookup b revGraph
-    successors :: Int -> [Int]
+    successors :: Vertex -> [Vertex]
     successors b = fromMaybe (lookupError "succ" b graph)$ IM.keys <$> IM.lookup b graph
     lookupError s b g = pprPanic ("Lookup error " ++ s) $
                             ( text "node" <+> ppr b $$
                                 text "graph" <+>
-                                vcat (map (\(k,m) -> ppr (k,m :: IM.IntMap Double)) $ IM.toList g)
+                                vcat (map (\(k,m) -> ppr (k,m :: VertexMap Double)) $ IM.toList g)
                             )
 
     nodeCount = IM.foldl' (\count toMap -> IM.foldlWithKey' countTargets (count + 1) toMap) 0 graph
@@ -1322,7 +1344,7 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
     isBackEdge from to = S.member (from,to) backEdgeSet
     backEdgeSet = S.fromList backEdges
 
-    revGraph :: IntMap IntSet
+    revGraph :: VertexMap VertexSet
     revGraph = IM.foldlWithKey' (\m from toMap -> addEdges m from toMap) IM.empty graph
         where
             addEdges m0 from toMap = IM.foldlWithKey' (\m k _ -> addEdge m from k) m0 toMap
