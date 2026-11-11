@@ -1,41 +1,54 @@
-# Retained Boolean implementation plan
+# Native dependent Core implementation plan
 
-Implement a small singleton frontend for a retained Boolean argument. A source
-function can use the argument at runtime and refer to its index in the result
-type. The compiler will elaborate the supported forms into ordinary GADT code.
-Existing GHC typechecking will check the generated equality evidence.
+Implement dependent types in Haskell through a native extension to Core. Base the
+work on Richard Eisenberg's historical `nokinds-pi` branch. Port its useful changes
+to current GHC and complete the missing rules. The first working target is a
+retained Boolean argument whose value determines the result type.
 
-Last updated: 2026-11-11. Source baseline:
+Last updated: 2026-11-11. Compiler source baseline:
 `19ff36f2aede0ca2e554016ff22c71e73aa9803b`.
 
 See [current status](README.md) and [primary references](REFERENCES.md).
 
 ## Direction and boundaries
 
-Follow `singletons` for the representation and occurrence translations. Follow
-SHE for dependent binder syntax over a singleton argument. Keep Core unchanged
-for this experiment. The first implementation uses an experimental opt-in flag;
-its spelling is a local implementation choice, not a permanent extension name.
+The implementation extends Core. It does not require singleton elaboration or
+explicit Boolean reification at ordinary runtime call sites. Keep the validated
+singleton translation as a comparison implementation for the overlapping subset.
+It supplies expected results, but it does not prove the native extension.
 
-The first version supports one explicit, leading retained `Bool` binder on a
-signed top-level function. Other arguments and the result have fixed lifted
-runtime representations. The retained argument is unrestricted. Index expressions
-are Boolean constructors or variables already backed by a retained witness.
-Existing, fully applied type families can determine result types.
+The historical starting point is
+[`nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`](https://github.com/goldfirere/ghc/tree/b64ef80f8002727422c05092f429c38d0527ed0b),
+dated 2014-08-19. It introduces `PiTy`, independent binder attributes, and a sketch
+of dependent application checking. It is unfinished. Its type-computation utility
+still discards runtime arguments, and its case checker uses one fixed result type.
+Updating this branch requires semantic work as well as API changes.
 
-Support constructor, variable, and wildcard patterns for the retained argument.
-Use explicit Boolean constructor branches for dependent elimination. Defer
-nested retained binders, higher-order retained functions, dependent guards,
-lazy retained patterns, automatic function promotion, and arbitrary index
-expressions such as `choose (not b)`.
+Use the later D/DC, roles, and graded-usage research to evaluate the port. Their
+formal results do not automatically apply to the historical branch or this GHC
+implementation. Keep existing FC coercion checks. Do not add trusted universal
+coercions to make incomplete dependent rules pass.
 
-Start within one experimental module. Ordinary Haskell can call the generated
-singleton interface. Source-level retained imports and exports need a later
-interface design. The first version must expose its lowered interface honestly.
+Start with visible, retained, unrestricted Boolean binders. Results have fixed
+lifted runtime representations. Source index expressions initially use Boolean
+constructors and named runtime Boolean variables. A producer can supply the value
+of such a variable. The type checker does not evaluate that producer or equate
+separate variables because their definitions look equal.
 
-## Source behavior and target translation
+The internal index representation must remain valid under compiler substitution.
+A source restriction to variables and constructors is insufficient: inlining can
+replace a variable with an arbitrary expression. Either represent the substituted
+expression safely or preserve its binding and restrict the relevant transformation.
+Settle this rule before enabling dependent optimization.
 
-The source examples are:
+Defer general term evaluation in types, automatic promotion, retained linear
+binders, dependent runtime representations, and general dependent inference.
+Keep arithmetic and SMT integration separate from this Core work.
+
+## First source target
+
+These examples describe intended behavior. The `foreach` spelling follows the
+design proposal. It is not syntax implemented by this checkout.
 
 ```haskell
 type family Select (b :: Bool) where
@@ -53,181 +66,164 @@ again :: foreach (b :: Bool) -> Select b
 again b = keep b (choose b)
 ```
 
-The target is ordinary Haskell. The names below illustrate generated workers;
-the implementation must resolve names and avoid collisions.
+The native target must also accept an existing runtime Boolean as an index.
+Multiple dependent calls must refer to the same binding. Branches can consume the
+selected value after checked Boolean refinement. A locally bound index cannot
+escape its scope without a specified dependent result or existential package.
+Passing a runtime Boolean must not insert a strict singleton conversion.
 
-```haskell
-chooseS :: forall b. SBool b -> Select b
-chooseS STrue = 1
-chooseS SFalse = False
+## Task sequence
 
-keepS :: forall b. SBool b -> Select b -> Select b
-keepS _ x = x
+### M0: completed preparation
 
-againS :: forall b. SBool b -> Select b
-againS sb = keepS sb (chooseS sb)
-```
+- [x] Update and build the current GHC baseline.
+- [x] Inspect the proposals, roadmap, and implementation research.
+- [x] Validate a singleton comparison implementation on the baseline compiler.
+- [x] Record the native Core direction and initial tasks.
 
-Each retained source binder has one generated type index and one runtime
-witness. The type index erases. The witness remains at runtime.
+### M1: audit and pin the historical port
 
-| Source occurrence | Translation |
-| --- | --- |
-| `b` in a type | The generated type variable |
-| `b` in a retained argument position | The existing singleton witness |
-| `True` or `False` in a retained argument position | `STrue` or `SFalse` |
-| `b` in an ordinary term position | A shared, lazy `fromSing sb` binding |
-| A dependent match on retained `b` | A match on `sb` with singleton constructors |
+- [ ] Retain the historical branch and exact commit as a local reference.
+- [ ] Inventory the relevant commits. Separate work already incorporated into GHC
+      from retained-dependent changes. Map old modules to current equivalents.
+- [ ] Record incomplete rules and unavailable validation. Preserve commit provenance
+      when porting changes. Keep current buildable GHC as the development base.
+- [ ] Retain the temporary singleton comparison program in a reproducible location.
 
-Matching a demoted `Bool` does not supply GADT refinement. Match the singleton
-when the branch result depends on the index. Do not infer nominal equality from
-representation equality. Use the existing GADT and type-family role rules.
+Gate: a port inventory identifies reusable code, required adaptations, and new
+semantic work. We have inspected the historical source but have not built it.
 
-## Runtime Boolean input
+### M2: specify the restricted Core extension
 
-Ordinary runtime input enters through explicit `withSomeSing @Bool`. The
-continuation scopes a fresh existential index. Every dependent use in that
-scope must reuse the same witness.
+- [ ] Define retained Boolean binders, term indices, lambda, application, and case
+      typing. State scope, substitution, erasure, and non-strictness rules.
+- [ ] Choose how runtime terms occur in types. Compare historical promotion with
+      a checked index-expression representation. Require substitution closure.
+- [ ] Keep dependence, visibility, retention, and multiplicity distinct. Prefer a
+      dedicated retained-dependent form that preserves existing `FunTy` and
+      `ForAllTy` fast paths, unless the audit gives a concrete reason to change them.
+- [ ] Define nominal equality, constructor discrimination, and checked reductions.
+      State which index comparisons remain opaque.
+- [ ] Specify a dependent motive or explicit branch-equality mechanism for cases.
+      The existing case annotation lies outside the case binder's scope.
+- [ ] Explain how the rules fit FC, roles, multiplicities, and fixed runtime
+      representations. Record the remaining formal proof obligations.
 
-```haskell
-runtimeUse :: Bool -> String
-runtimeUse flag =
-  withSomeSing @Bool flag $ \sb ->
-    case sb of
-      STrue -> show (keepS sb (chooseS sb))
-      SFalse -> show (keepS sb (chooseS sb))
-```
+Gate: written rules and positive and negative Core examples. Resolve representation
+choices before implementation. Cover bottom, partial application, and `seq`.
 
-This input is unknown at compile time. Its selected result is consumed inside
-the reification scope. A bare result indexed by the fresh variable cannot escape
-that scope. Returning it requires an existential package.
+### M3: port binders and implement dependent lambda and application
 
-Reification is strict for `Bool`. Do not insert it eagerly at ordinary call
-sites. A retained worker that ignores its witness must remain non-strict.
-A singleton can be bottom even when its index is known. Do not replace an
-arbitrary witness with a constructor solely because of its type index.
+- [ ] Add the retained binder and index representation to current type code.
+- [ ] Update free variables, capture avoidance, term/type substitution, equality,
+      kinding, pretty-printing, and relevant traversals together.
+- [ ] Update `exprType`, function-result calculation, and Core Lint consistently.
+      Runtime dependent application substitutes its argument into the result.
+- [ ] Check binder renaming, aliases, shadowing, beta reduction, and scoped lets.
+- [ ] Keep ordinary GHC programs building while the feature remains gated.
 
-Two independent conversions of the same raw `Bool` introduce independent
-indices. Do not assume those indices are equal. Reuse one conversion when the
-program needs one shared index.
+Gate: hand-built Core for identity and retained application passes Lint. Lint and
+type computation agree before and after supported substitutions. No frontend
+syntax is required for this milestone.
 
-## Implementation milestones
+### M4: implement dependent Boolean elimination and evidence
 
-### M0 Record the baseline and research
+- [ ] Implement the M2 case motive or branch-equality design.
+- [ ] Instantiate branch results under checked `True` and `False` refinements.
+- [ ] Update case scope in substitution, free variables, and Lint.
+- [ ] Preserve nominal index equality. Reject invalid casts and escaping binders.
+- [ ] Check that bottom cannot supply constructor refinement or unchecked equality.
 
-- [x] Update the source and synchronize recursive submodules.
-- [x] Build the default compiler and run focused smoke checks.
-- [x] Compare singleton elaboration with native dependent Core.
-- [x] Check the singleton reference encoding at `-O0` and `-O2` with Core Lint.
-- [x] Record the plan, references, validation results, and next task.
+Gate: native Core for `choose`, `keep`, and shared-index composition passes Lint.
+Mismatched branches and forged refinements fail. Evidence follows checked rules;
+it does not rely on `unsafeCoerce` or plugin axioms.
 
-### M1 Define the source subset and reference translation
+### M5: execute through the existing backend
 
-- [ ] Write down accepted and rejected source forms before parser changes.
-- [ ] Retain a reproducible reference from the temporary oracle.
-- [ ] Specify binder scope, shadowing, ordinary term use, and explicit singleton
-  interoperation. Keep automatic promotion of ordinary `let` bindings out of scope.
-- [ ] Give each acceptance check below a concrete source example and expected result.
+- [ ] Carry the restricted extension through the minimum mandatory Core pipeline.
+- [ ] Update CorePrep and CoreToStg for the specified erasure of new index and proof
+      annotations. The retained Boolean remains one ordinary runtime argument.
+- [ ] Reject unsupported forms explicitly. Do not silently pass them to the backend
+      or enable transformations that violate their invariants.
+- [ ] Inspect Core and STG for duplicate witnesses and inserted forcing.
 
-Completion: the examples and expected translations describe the same subset.
+Gate: native examples execute with the specified values and termination behavior
+through a restricted pipeline. This does not establish optimizer safety. Even an
+unoptimized build runs mandatory transformations that need an audit.
 
-### M2 Provide the singleton runtime support
+### M6: preserve dependencies through optimization
 
-- [ ] Reuse the foundational `Data.Singletons` runtime at a recorded revision.
-- [ ] Provide the small Boolean adapter following `singletons-base`.
-- [ ] Confine package compatibility changes to the experimental support package.
-- [ ] Check `SingKind`, `fromSing`, `toSing`, and `withSomeSing` on this HEAD.
+- [ ] Audit simplification, beta/eta transformations, inlining, unfoldings, and
+      substitution into types and coercions.
+- [ ] Audit case simplification, case-of-case, join points, occurrence analysis, and
+      let floating. A binder used only in a type still has a scope dependency.
+- [ ] Audit demand analysis, worker/wrapper, specialization, and arity changes.
+      Preserve laziness and the fixed runtime representation restriction.
+- [ ] Enable transformations in bounded steps. Run Core Lint after each relevant
+      pass and compare optimized and unoptimized behavior.
 
-The direct module probe passed. Full package and TH generator compatibility are
-separate checks. The compiler itself does not need the TH generation stack as a
-dependency.
+Gate: the Boolean examples pass at `-O0` and `-O2` with Core Lint. Record which
+transformations were exercised and which remain gated. A passing executable does
+not establish safety for untested forms.
 
-### M3 Parse gated retained Boolean binders
+### M7: expose the restricted source language
 
-- [ ] Add opt-in syntax in `compiler/GHC/Parser/Lexer.x` and
-  `compiler/GHC/Parser.y`.
-- [ ] Represent the binder in `compiler/Language/Haskell/Syntax/Type.hs`.
-- [ ] Update the source AST printers and traversals that handle the new form.
-- [ ] Give unsupported binder forms a deliberate diagnostic.
+- [ ] Add an experimental opt-in flag, syntax, AST representation, and diagnostics.
+- [ ] Extend renaming and checking for explicit retained Boolean signatures.
+      Track one runtime binder when it occurs in both terms and types.
+- [ ] Elaborate constructor calls, retained variables, and dependent Boolean
+      patterns directly into checked native Core.
+- [ ] Accept ordinary runtime Booleans under shared bindings. Reject index escape
+      and unsupported expressions with precise diagnostics.
+- [ ] Update source printers and extension documentation.
 
-Completion: supported syntax parses with the flag. Unsupported forms report a
-source error. Existing syntax retains its meaning when the flag is disabled.
+Gate: the source target and a runtime-unknown Boolean example compile and execute
+directly. Their implementation uses no singleton ABI or reification step.
 
-### M4 Elaborate the source into singleton code
+### M8: support interfaces and validate the compiler change
 
-- [ ] Use the existing renamer for name identity and scope.
-- [ ] Add a small lowering pass before ordinary typechecking. Check the integration
-  with `compiler/GHC/Rename/Module.hs` and `compiler/GHC/Tc/Module.hs`.
-- [ ] Lower signatures to `forall` plus a singleton argument.
-- [ ] Lower retained patterns, applications, and ordinary term occurrences.
-- [ ] Share one index and one witness for each retained binder.
-- [ ] Preserve source locations for diagnostics and display the lowered form for review.
+- [ ] Encode retained binders, indices, and evidence in interface types, unfoldings,
+      fingerprints, and recompilation dependencies.
+- [ ] Check cross-module calls, imported unfoldings, and interface round trips.
+- [ ] Add focused compiler regression cases. Reuse existing testsuite conventions
+      and golden tests where appropriate.
+- [ ] Run relevant type-checker, simplifier, interface, and code-generation tests.
+      Rebuild and bootstrap the compiler with the feature disabled.
+- [ ] Record exact revisions, commands, results, and proof boundaries.
 
-Completion: `choose`, `keep`, and `again` typecheck through the existing GADT
-checker. No new Core type constructor or trusted equality axiom is required.
-
-### M5 Check reification and evaluation behavior
-
-- [ ] Support explicit singleton interoperation at runtime Boolean boundaries.
-- [ ] Reject raw ordinary `Bool` arguments that have no retained witness.
-- [ ] Check index scope, witness reuse, and shadowing.
-- [ ] Keep demotion lazy. Preserve non-strict retained functions.
-- [ ] Reject escaping indices and unsupported lazy retained patterns.
-
-Completion: a runtime input works through one explicit reification scope.
-The laziness and rejection checks below have the expected results.
-
-### M6 Validate the frontend and update the project status
-
-- [ ] Run the complete acceptance set through the frontend at `-O0` and `-O2`.
-- [ ] Run Core Lint on the generated code.
-- [ ] Rebuild the affected compiler stage and run the relevant existing frontend tests.
-- [ ] Compare behavior with the reference translation. Record allocation or extra
-  case analysis if the translation introduces a material runtime cost.
-- [ ] Update this plan and the project index with the revision, commands, results,
-  and remaining restrictions.
-
-Completion: the source examples execute correctly and the negative examples
-fail for their intended reason. The reference encoding alone is not sufficient
-to complete this milestone.
+Gate: the experiment works across modules, ordinary programs remain compatible,
+and the modified compiler builds itself. General dependent Haskell remains further
+work.
 
 ## Acceptance checks
 
-| ID | Check | Required result |
-| --- | --- | --- |
-| B01 | `choose True` | `Int`, value `1` |
-| B02 | `choose False` | `Bool`, value `False` |
-| B03 | `keep True False` | Type error |
-| B04 | `keep b (choose b)` under one retained binder | Compiles with one shared index |
-| B05 | Runtime input through one explicit reification scope | Both Boolean inputs execute correctly |
-| B06 | Dependent constructor branches | Each branch checks against its refined result type |
-| B07 | A retained worker ignores a bottom witness | No extra evaluation of the witness |
-| B08 | `withSomeSing @Bool undefined (\_ -> ())` | Bottom; explicit strict boundary |
-| B09 | A retained variable shadows another binder | Distinct names and correct scope |
-| B10 | An existential index escapes reification | Type error |
-| B11 | Two independent reifications need the same index | No equality without evidence |
-| B12 | A raw `Bool` or unsupported retained expression is supplied | Clear rejection |
-| B13 | Lazy retained pattern or unsupported binder form | Clear rejection |
-| B14 | The experimental flag is disabled | No unintended syntax change |
-| B15 | `-O0` and `-O2` with Core Lint | Equal observable results; valid generated Core |
+| ID | Required result |
+| --- | --- |
+| B01 | `choose True` returns an `Int`; `choose False` returns a `Bool`. |
+| B02 | A runtime-unknown Boolean selects and consumes the correct result. |
+| B03 | `keep b (choose b)` reuses one runtime binding and one index. |
+| B04 | Boolean branches supply checked nominal refinement. |
+| B05 | Mismatched arguments and branch result types are rejected. |
+| B06 | Separate opaque Boolean bindings do not become equal from equal-looking definitions. |
+| B07 | Aliases and shadowing preserve the specified binder identity and scope. |
+| B08 | An index cannot escape a local or existential binding. |
+| B09 | An ignored bottom Boolean stays non-strict, including partial application and `seq`. |
+| B10 | Inspecting a bottom Boolean diverges. Index knowledge does not replace its runtime value. |
+| B11 | Substitution and beta reduction preserve types without capture. |
+| B12 | Case transformation and let floating preserve dependency scope. |
+| B13 | Invalid coercions and representational substitutions cannot forge nominal index equality. |
+| B14 | Unoptimized and optimized compilation pass Core Lint and agree on defined results and tested termination behavior. |
+| B15 | Interfaces round-trip and cross-module execution passes; feature-disabled programs remain compatible. |
 
-The temporary oracle covers parts of B01 through B08. The frontend still has to
-pass the full set. Existing GHC evidence checking does not by itself prove that
-the source translation preserves evaluation behavior.
+Distinguish Core construction, frontend behavior, optimization, runtime execution,
+and module integration. The existing singleton probe supplies comparison evidence
+for some values and laziness cases only. No native Core implementation or native
+acceptance check has passed yet.
 
-## Later work
+## Further work
 
-After this experiment, evaluate source-level imports and exports, aliases,
-higher-order retained functions, additional index expressions, and other
-retained kinds. Extend the subset only with corresponding translation rules
-and acceptance checks.
-
-Native dependent Core remains a later option. Its gates are runtime indices
-and substitution, dependent elimination with checked evidence, and preservation
-through interfaces and optimization. The historical `nokinds-pi` branch and
-System D/DC, System DR, and GraD inform those gates. They do not supply a current
-GHC implementation that combines all of them.
-
-Thoralf and related solvers can automate later index equalities. The Boolean
-experiment uses existing family reduction and GADT evidence. It does not need
-an SMT dependency.
+After M8, review broader retained kinds, nested and higher-order dependence,
+source inference, arbitrary index expressions, roles involving dependent
+functions, linear retained binders, and dependent runtime representations.
+Use separate tasks for each extension. SMT reasoning and proof-certificate
+checking remain separate work within the longer-term program.

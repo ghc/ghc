@@ -1,15 +1,15 @@
 # Dependent Haskell project
 
 The long-term goal is dependent types in Haskell. The first experiment is a
-retained Boolean argument whose value determines the result type. Follow
-`singletons` and SHE: elaborate a restricted source language into existing GADTs
-and type families. Keep Core unchanged for this experiment.
+retained Boolean argument whose value determines the result type. Extend Core
+from Eisenberg's historical `nokinds-pi` work, ported and completed on current
+GHC. Keep the validated `singletons` encoding as a comparison implementation.
 
 Last updated: 2026-11-11.
 
 ## Project documents
 
-- [Implementation plan](PLAN.md): scope, translation, tasks, and acceptance checks.
+- [Implementation plan](PLAN.md): Core extension, port tasks, and acceptance checks.
 - [References](REFERENCES.md): annotated sources, reading order, and status dates.
 - This file: current status, validation results, and instructions to resume work.
 
@@ -21,13 +21,15 @@ Last updated: 2026-11-11.
 | Project branch | `codex/dependent-haskell` |
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Checked in temporary files on 2026-11-11 |
-| Experimental frontend | Planned; no compiler implementation changes yet |
-| First implementation task | [M1: define the source subset and reference translation](PLAN.md#m1-define-the-source-subset-and-reference-translation) |
+| Native Core and frontend | Planned; no compiler implementation changes yet |
+| Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
+| First task | [M1: audit and pin the historical port](PLAN.md#m1-audit-and-pin-the-historical-port) |
 
-The current direction is singleton elaboration. Runtime `Bool` input must enter
-through explicit reification. A retained binder must reuse one index and one
-witness. Demotion to an ordinary `Bool` must remain lazy. These constraints are
-part of the experiment's behavior, not optional optimizations.
+The current direction is native dependent Core. The historical branch is
+unfinished. It supplies binder and application design work, but dependent type
+computation and Boolean elimination need completion. The native target accepts
+ordinary runtime Boolean bindings directly and preserves laziness. Singleton
+reification remains specific to the comparison implementation.
 
 ## Verified baseline
 

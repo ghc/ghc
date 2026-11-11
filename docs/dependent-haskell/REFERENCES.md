@@ -8,21 +8,20 @@ permanent compatibility guarantee.
 
 See [the project overview](README.md) for the objective. See [the implementation
 plan](PLAN.md) for scope, decisions, and acceptance criteria. The first experiment
-uses singleton elaboration into existing Core. Native dependent Core and external
-solvers remain later work.
+extends Core from Eisenberg's historical branch. The singleton translation remains
+a comparison implementation. External solvers remain later work.
 
 ## Reading order
 
 1. Read proposal #378 and the current RequiredTypeArguments documentation. Separate
    dependence, visibility, and erasure before interpreting the other proposals.
-2. Read the 2012 singletons paper, SHE's pi-type translation, and the upstream
-   `Data.Singletons` API. Compare these with the Boolean experiment in PLAN.md.
-3. Read the 2014 promotion paper and the TH generator. Use these when the experiment
-   expands beyond explicit Boolean witnesses.
-4. Read pi-forall's Boolean checking rules. Then read the D/DC specification and
-   artifact before designing native dependent elimination or coercion rules.
-5. Read the roles paper and GraD before extending the native design to `Coercible`,
-   erasure, or linearity. Inspect the historical GHC branch for implementation ideas.
+2. Inspect the pinned `nokinds-pi` branch and its incomplete application and case
+   handling. Compare it with current type computation, substitution, and Core Lint.
+3. Read the D/DC specification and artifact, the roles paper, and GraD. Identify
+   which rules the native extension needs and which proof assumptions it must meet.
+4. Read pi-forall's Boolean checking rules for a small implementation example.
+5. Read the singletons papers, SHE's pi-type translation, and the upstream API as
+   comparison implementations. The TH generator remains relevant to promotion.
 6. Read the solver and proof-certificate references only when the language needs
    additional arithmetic or theory reasoning. The first Boolean experiment does not.
 
@@ -75,7 +74,7 @@ The current documentation records the implemented boundaries:
   Haskell 2012. The linked author PDF identifies itself as a submission draft.
   It explains how singleton GADTs connect promoted indices with runtime witnesses.
   It also describes generated boilerplate and the limits of Haskell's phase
-  separation. Use it for the first experiment's representation and API design.
+  separation. Use it to specify the singleton comparison implementation.
 - Richard A. Eisenberg and Jan Stolarek,
   [Promoting Functions to Type Families in Haskell](https://richarde.dev/papers/2014/promotion/promotion.pdf),
   Haskell 2014. The linked PDF is the final submission draft. It explains promotion,
@@ -116,7 +115,8 @@ that narrow API result only.
 An ordinary `Bool` reification boundary needs a separate strictness specification.
 Forcing `toSing` to expose a witness can force an input that a retained binder would
 leave unevaluated. In particular, strict reification cannot transparently implement
-a lazy `keep bottom` that returns a function. The plan must preserve this boundary.
+a lazy `keep bottom` that returns a function. The native implementation must
+preserve that non-strict behavior without requiring singleton reification.
 
 ### Earlier preprocessors
 
@@ -128,7 +128,7 @@ a lazy `keep bottom` that returns a function. The plan must preserve this bounda
   It supplies no compatibility guarantee for this GHC checkout.
   The [pi-type manual](https://personal.cis.strath.ac.uk/conor.mcbride/pub/she/pi.html)
   gives the exact translation from `pi (n :: Nat).` to `forall n.` plus a singleton
-  argument. This is the closest source syntax precedent for the first experiment.
+  argument. This documents the singleton frontend approach.
 - Adam Gundry's [Inch implementation](https://github.com/adamgundry/inch) extends a
   Haskell subset with integer constraints and emits Haskell after erasure. Its
   README records incomplete module, class, and inference support. The repository's
@@ -160,9 +160,11 @@ a lazy `keep bottom` that returns a function. The plan must preserve this bounda
   introduces `PiTy` and separate dependence, visibility, and relevance flags.
   Its [`CoreLint.lhs`](https://github.com/goldfirere/ghc/blob/b64ef80f8002727422c05092f429c38d0527ed0b/compiler/coreSyn/CoreLint.lhs#L528)
   attempts to promote a relevant argument and substitute it into a dependent result.
-  The inspected branch has unfinished work. Its small dependent tests exercise
-  promotion and kind polymorphism. We did not build it. Reuse its design questions;
-  do not assume its code can be transplanted into current GHC.
+  However, [`CoreUtils.lhs`](https://github.com/goldfirere/ghc/blob/b64ef80f8002727422c05092f429c38d0527ed0b/compiler/coreSyn/CoreUtils.lhs#L157)
+  still discards runtime arguments during result-type computation. Its case checker
+  also uses one fixed result type. The inspected branch has unfinished work. Its
+  small dependent tests exercise promotion and kind polymorphism. We did not build
+  it. It is the historical port baseline, not a completed dependent compiler.
 - [Richard Eisenberg's `rae/dependent` repository](https://gitlab.haskell.org/rae/dependent)
   identifies itself as examples of Dependent Haskell. It is not a GHC implementation.
   Searches of current source and relevant available branch references found no
