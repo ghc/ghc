@@ -151,9 +151,9 @@ void pauseTimers(void)
     if (ctxswitch_timer) {
         pauseTimer(ctxswitch_timer);
     }
-    if (eventlog_timer) {
-        pauseTimer(eventlog_timer);
-    }
+    // We also do not pause the eventlog timer. The purpose of the periodic
+    // eventlog flush is to ensure consumers see events (or the lack thereof)
+    // within a certain time lag. Pausing flushing would defeat that purpose.
     if (idlegc_timer) {
         pauseTimer(idlegc_timer);
     }
@@ -165,9 +165,6 @@ void unpauseTimers(void)
 #if defined(HAVE_PREEMPTION)
     if (ctxswitch_timer) {
         unpauseTimer(ctxswitch_timer);
-    }
-    if (eventlog_timer) {
-        unpauseTimer(eventlog_timer);
     }
     if (idlegc_timer) {
         unpauseTimer(idlegc_timer);
