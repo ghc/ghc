@@ -5,8 +5,9 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE StandaloneDeriving, DeriveAnyClass #-}
 -- Don't warn for using 'report' from ghc-internal
-{-# OPTIONS_GHC -Wno-warnings-deprecations #-}
+{-# OPTIONS_GHC -Wno-warnings-deprecations -Wno-orphans #-}
 
 module Language.Haskell.TH.Syntax (
     Quote (..),
@@ -212,6 +213,7 @@ import System.FilePath
 import Data.Data hiding (Fixity(..))
 import Data.List.NonEmpty (NonEmpty(..))
 import GHC.Lexeme ( startsVarSym, startsVarId )
+import Control.DeepSeq
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import System.IO (hPutStrLn, stderr)
 
@@ -522,7 +524,7 @@ class (MonadIO m, MonadFail m) => Quasi m where
   qRunQ :: Q a -> m a
   -- | Fresh names. See 'newName'.
   qNewName :: String -> m Name
-  qNewName = qRunQ . newName
+  qNewName s = deepseq s . qRunQ . newName $ s
 
   ------- Error reporting and recovery -------
   -- | Report an error (True) or warning (False)
@@ -530,7 +532,7 @@ class (MonadIO m, MonadFail m) => Quasi m where
   qReport  :: Bool -> String -> m ()
   -- 'msg' is forced to ensure exceptions don't escape,
   -- see Note [Exceptions in TH]
-  qReport b msg = seqList msg $ qRunQ $ Internal.report b msg
+  qReport b msg = deepseq b . deepseq msg $ qRunQ $ Internal.report b msg
 
   -- | See 'recover'.
   qRecover :: m a -- ^ the error handler
@@ -540,32 +542,32 @@ class (MonadIO m, MonadFail m) => Quasi m where
   ------- Inspect the type-checker's environment -------
   -- | True <=> type namespace, False <=> value namespace. See 'lookupName'.
   qLookupName :: Bool -> String -> m (Maybe Name)
-  qLookupName ns s = qRunQ $ lookupName ns s
+  qLookupName ns s = deepseq s $ qRunQ $ lookupName ns s
   -- | See 'reify'.
   qReify          :: Name -> m Info
-  qReify v = qRunQ $ reify v
+  qReify v = deepseq v . qRunQ $ reify v
   -- | See 'reifyFixity'.
   qReifyFixity    :: Name -> m (Maybe Fixity)
-  qReifyFixity v = qRunQ $ reifyFixity v
+  qReifyFixity v = deepseq v . qRunQ $ reifyFixity v
   -- | See 'reifyType'.
   qReifyType      :: Name -> m Type
-  qReifyType v = qRunQ $ reifyType v
+  qReifyType v = deepseq v . qRunQ $ reifyType v
   -- | Is (n tys) an instance? Returns list of matching instance Decs (with
   -- empty sub-Decs) Works for classes and type functions. See 'reifyInstances'.
   qReifyInstances :: Name -> [Type] -> m [Dec]
-  qReifyInstances cls tys = qRunQ $ reifyInstances cls tys
+  qReifyInstances cls tys = deepseq cls . deepseq tys . qRunQ $ reifyInstances cls tys
   -- | See 'reifyRoles'.
   qReifyRoles         :: Name -> m [Role]
-  qReifyRoles nm = qRunQ $ reifyRoles nm
+  qReifyRoles nm = deepseq nm . qRunQ $ reifyRoles nm
   -- | See 'reifyAnnotations'.
   qReifyAnnotations   :: Data a => AnnLookup -> m [a]
-  qReifyAnnotations an = qRunQ $ reifyAnnotations an
+  qReifyAnnotations an = deepseq an . qRunQ $ reifyAnnotations an
   -- | See 'reifyModule'.
   qReifyModule        :: Module -> m ModuleInfo
-  qReifyModule m = qRunQ $ reifyModule m
+  qReifyModule m = deepseq m . qRunQ $ reifyModule m
   -- | See 'reifyConStrictness'.
   qReifyConStrictness :: Name -> m [DecidedStrictness]
-  qReifyConStrictness nm = qRunQ $ reifyConStrictness nm
+  qReifyConStrictness nm = deepseq nm . qRunQ $ reifyConStrictness nm
 
   -- | See 'location'.
   qLocation :: m Loc
@@ -573,38 +575,38 @@ class (MonadIO m, MonadFail m) => Quasi m where
 
   -- | Input/output (dangerous). See 'runIO'.
   qRunIO :: IO a -> m a
-  qRunIO = liftIO
+  qRunIO m = m `seq` liftIO m
   -- | See 'getPackageRoot'.
   qGetPackageRoot :: m FilePath
   qGetPackageRoot = qRunQ getPackageRoot
 
   -- | See 'addDependentFile'.
   qAddDependentFile :: FilePath -> m ()
-  qAddDependentFile p = qRunQ $ addDependentFile p
+  qAddDependentFile p = deepseq p $ qRunQ $ addDependentFile p
 
   -- | See 'addDependentDirectory'.
   qAddDependentDirectory :: FilePath -> m ()
-  qAddDependentDirectory p = qRunQ $ addDependentDirectory p
+  qAddDependentDirectory p = deepseq p $ qRunQ $ addDependentDirectory p
 
   -- | See 'addTempFile'.
   qAddTempFile :: String -> m FilePath
-  qAddTempFile p = qRunQ $ addTempFile p
+  qAddTempFile p = deepseq p $ qRunQ $ addTempFile p
 
   -- | See 'addTopDecls'.
   qAddTopDecls :: [Dec] -> m ()
-  qAddTopDecls decls = qRunQ $ addTopDecls decls
+  qAddTopDecls decls = deepseq decls $ qRunQ $ addTopDecls decls
 
   -- | See 'addForeignFilePath'.
   qAddForeignFilePath :: ForeignSrcLang -> String -> m ()
-  qAddForeignFilePath lang fp = qRunQ $ addForeignFilePath lang fp
+  qAddForeignFilePath lang fp = deepseq lang . deepseq fp $ qRunQ $ addForeignFilePath lang fp
 
   -- | See 'addModFinalizer'.
   qAddModFinalizer :: Q () -> m ()
-  qAddModFinalizer fin = qRunQ $ addModFinalizer fin
+  qAddModFinalizer fin = seq fin . qRunQ $ addModFinalizer fin
 
   -- | See 'addCorePlugin'.
   qAddCorePlugin :: String -> m ()
-  qAddCorePlugin nm = qRunQ $ addCorePlugin nm
+  qAddCorePlugin nm = deepseq nm $ qRunQ $ addCorePlugin nm
 
   -- | See 'getQ'.
   qGetQ :: Typeable a => m (Maybe a)
@@ -612,21 +614,21 @@ class (MonadIO m, MonadFail m) => Quasi m where
 
   -- | See 'putQ'.
   qPutQ :: Typeable a => a -> m ()
-  qPutQ x = qRunQ $ putQ x
+  qPutQ x = seq x . qRunQ $ putQ x
 
   -- | See 'isExtEnabled'.
   qIsExtEnabled :: Extension -> m Bool
-  qIsExtEnabled ext = qRunQ $ isExtEnabled ext
+  qIsExtEnabled ext = seq (fromEnum ext) . qRunQ $ isExtEnabled ext
   -- | See 'extsEnabled'.
   qExtsEnabled :: m [Extension]
   qExtsEnabled = qRunQ extsEnabled
 
   -- | See 'putDoc'.
   qPutDoc :: DocLoc -> String -> m ()
-  qPutDoc l s = qRunQ $ putDoc l s
+  qPutDoc l s = deepseq l . deepseq s $ qRunQ $ putDoc l s
   -- | See 'getDoc'.
   qGetDoc :: DocLoc -> m (Maybe String)
-  qGetDoc l = qRunQ $ getDoc l
+  qGetDoc l = deepseq l . qRunQ $ getDoc l
 
 -- | \"Runs\" the 'Q' monad. Normal users of Template Haskell
 -- should not need this function, as the splice brackets @$( ... )@
@@ -678,7 +680,57 @@ reportError = qReport True
 reportWarning :: String -> Q ()
 reportWarning = qReport False
 
--- | copied from GHC.Utils.Misc
-seqList :: [a] -> b -> b
-seqList [] b = b
-seqList (x:xs) b = x `seq` seqList xs b
+instance NFData AnnLookup
+instance NFData PkgName
+instance NFData Name
+instance NFData OccName
+instance NFData Type
+instance NFData DocLoc
+instance NFData ForeignSrcLang
+instance NFData Module
+instance NFData ModName
+instance NFData Dec
+instance NFData a => NFData (TyVarBndr a)
+instance NFData Clause
+instance NFData Specificity
+instance NFData NameFlavour
+instance NFData Pat
+instance NFData NameSpace
+instance NFData Body
+instance NFData Lit
+instance NFData Guard
+instance NFData Bytes where
+  rnf (Bytes a b c) = a `seq` rnf b `seq` rnf c
+instance NFData Exp
+instance NFData TyLit
+instance NFData BndrVis
+instance NFData Con
+instance NFData Match
+instance NFData Stmt
+instance NFData Bang
+instance NFData DerivClause
+instance NFData DerivStrategy
+instance NFData SourceUnpackedness
+instance NFData Range
+instance NFData FunDep
+instance NFData Overlap
+instance NFData SourceStrictness
+instance NFData Foreign
+instance NFData Fixity
+instance NFData Callconv
+instance NFData Safety
+instance NFData FixityDirection
+instance NFData NamespaceSpecifier
+instance NFData Pragma
+instance NFData TySynEqn
+instance NFData Inline
+instance NFData TypeFamilyHead
+instance NFData RuleMatch
+instance NFData Phases
+instance NFData FamilyResultSig
+instance NFData RuleBndr
+instance NFData InjectivityAnn
+instance NFData Role
+instance NFData AnnTarget
+instance NFData PatSynArgs
+instance NFData PatSynDir

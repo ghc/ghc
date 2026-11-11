@@ -46,6 +46,7 @@ import GHC.Internal.Control.Monad.IO.Class
 import GHC.Internal.Control.Monad.Fail
 import GHC.Internal.Maybe (Maybe)
 import GHC.Internal.Num
+import GHC.Internal.Prim (seq)
 import GHC.Internal.IO.Unsafe
 import qualified GHC.Internal.Types as Kind (Type)
 import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
@@ -298,7 +299,10 @@ class Monad m => Quote m where
   newName :: String -> m Name
 
 instance Quote Q where
-  newName s = Q $ \h -> mNewName h s
+  newName s = seqList s $ Q $ \h -> mNewName h s
+    where
+      seqList []     b = b
+      seqList (a:as) b = a `seq` seqList as b
 
 -----------------------------------------------------
 --
@@ -496,7 +500,10 @@ joinCode = flip bindCode id
 -- | Report an error (True) or warning (False),
 -- but carry on; use 'fail' to stop.
 report  :: Bool -> String -> Q ()
-report b s = Q $ \h -> mReport h b s
+report b s = seqList s $ Q $ \h -> mReport h b s
+ where
+ seqList []     x = x
+ seqList (a:as) x = a `seq` seqList as x
 
 -- | Recover from errors raised by 'reportError' or 'fail'.
 recover :: Q a -- ^ handler to invoke on failure
