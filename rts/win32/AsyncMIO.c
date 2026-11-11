@@ -78,8 +78,8 @@ onIOComplete(unsigned int reqID,
     default:
         /* Not likely */
         fprintf(stderr,
-                "onIOComplete: failed to grab table semaphore (res=%d, err=%ld), "
-                "dropping request 0x%lx\n", reqID, dwRes, GetLastError());
+                "onIOComplete: failed to grab table semaphore (res=0x%lx, err=%lu), "
+                "dropping request %u\n", dwRes, GetLastError(), reqID);
         fflush(stderr);
         return;
     }
@@ -191,19 +191,23 @@ void
 shutdownAsyncIO(bool wait_threads)
 {
     ShutdownIOManager(wait_threads);
-    if (completed_req_event != INVALID_HANDLE_VALUE) {
-        CloseHandle(completed_req_event);
-        completed_req_event = INVALID_HANDLE_VALUE;
+    // If we didn't wait for the worker threads, they may still call
+    // onIOComplete, which uses the handles and the lock below (#28092).
+    if (wait_threads) {
+        if (completed_req_event != INVALID_HANDLE_VALUE) {
+            CloseHandle(completed_req_event);
+            completed_req_event = INVALID_HANDLE_VALUE;
+        }
+        if (abandon_req_wait != INVALID_HANDLE_VALUE) {
+            CloseHandle(abandon_req_wait);
+            abandon_req_wait = INVALID_HANDLE_VALUE;
+        }
+        if (completed_table_sema != NULL) {
+            CloseHandle(completed_table_sema);
+            completed_table_sema = NULL;
+        }
+        OS_CLOSE_LOCK(&queue_lock);
     }
-    if (abandon_req_wait != INVALID_HANDLE_VALUE) {
-        CloseHandle(abandon_req_wait);
-        abandon_req_wait = INVALID_HANDLE_VALUE;
-    }
-    if (completed_table_sema != NULL) {
-        CloseHandle(completed_table_sema);
-        completed_table_sema = NULL;
-    }
-    OS_CLOSE_LOCK(&queue_lock);
 }
 
 /*

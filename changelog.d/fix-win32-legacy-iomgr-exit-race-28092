@@ -1,0 +1,6 @@
+section: rts
+synopsis: Fix a race at program exit in the ``win32-legacy`` I/O manager
+  that could print ``onIOComplete: failed to grab table semaphore`` on
+  stderr.
+mrs: !16980
+issues: #28092
