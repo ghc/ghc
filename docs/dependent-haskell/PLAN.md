@@ -83,15 +83,16 @@ Passing a runtime Boolean must not insert a strict singleton conversion.
 
 ### M1: audit and pin the historical port
 
-- [ ] Retain the historical branch and exact commit as a local reference.
-- [ ] Inventory the relevant commits. Separate work already incorporated into GHC
+- [x] Retain the historical branch and exact commit as a local reference.
+- [x] Inventory the relevant commits. Separate work already incorporated into GHC
       from retained-dependent changes. Map old modules to current equivalents.
-- [ ] Record incomplete rules and unavailable validation. Preserve commit provenance
+- [x] Record incomplete rules and unavailable validation. Preserve commit provenance
       when porting changes. Keep current buildable GHC as the development base.
-- [ ] Retain the temporary singleton comparison program in a reproducible location.
+- [x] Retain the temporary singleton comparison program in a reproducible location.
 
 Gate: a port inventory identifies reusable code, required adaptations, and new
 semantic work. We have inspected the historical source but have not built it.
+See [the port inventory](PORT.md) and [comparison programs](reference/README.md).
 
 ### M2: specify the restricted Core extension
 
@@ -111,6 +112,7 @@ semantic work. We have inspected the historical source but have not built it.
 
 Gate: written rules and positive and negative Core examples. Resolve representation
 choices before implementation. Cover bottom, partial application, and `seq`.
+The first increment follows [the restricted Core specification](CORE.md).
 
 ### M3: port binders and implement dependent lambda and application
 
