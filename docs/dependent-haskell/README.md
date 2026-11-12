@@ -348,7 +348,8 @@ fresh runtime identities on import. It has binary round-trip checks at all three
 compression levels. A separate executable fixture imports a producer `.hi` in a
 fresh one-shot compiler context and links its `.o`. Its consumer composes imported
 `choose` and `keep` with one runtime Boolean and repeats the six program
-observations above. Native expression unfoldings remain gated.
+observations above. It also checks concrete True/False applications, which need
+the imported family equations. Native expression unfoldings remain gated.
 
 `VERSION_DATE` pins the fork to `10.1.20261112.1`. Its header version is
 `1001202611121`, distinct from the previous `100120261109`. Matching libraries

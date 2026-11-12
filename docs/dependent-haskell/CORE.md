@@ -283,7 +283,9 @@ Native expression unfoldings and virtual alternative proofs remain gated.
 The regression uses the real binary tables at all three compression levels.
 The executable fixture compiles a producer, then imports only its `.hi` in a
 fresh one-shot context. The producer source is outside the consumer import path.
-It compiles the consumer separately and links both objects. Validation of this
+The consumer also checks concrete True/False applications. Those applications
+require the imported family equations to reduce to Int and Bool. It compiles
+the consumer separately and links both objects. Validation of this
 increment is in progress. The Agda provenance is recorded in
 [the references](REFERENCES.md#agda-provenance).
 

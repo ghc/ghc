@@ -237,7 +237,12 @@ retainedConsumerSource =
             ++ [ "run :: Bool -> IO String"
                , "run b = pure (observe b (keep b (choose b)))"
                , "entry :: IO String"
-               , "entry = " ++ retainedProgramObservation
+               , "entry = do"
+               , "  concreteTrue <- observeInt (keep True (choose True))"
+               , "  concreteFalse <- observeBool (keep False (choose False))"
+               , "  if concreteTrue == \"42\" && concreteFalse == \"False\""
+               , "    then " ++ retainedProgramObservation
+               , "    else fail \"native imported constructor results did not match\""
                , "main :: IO ()"
                , "main = entry >>= putStr"
                ]
