@@ -4088,6 +4088,11 @@ data TcRnMessage where
                                -> !TypeOrKind
                                -> TcRnMessage
 
+  {-| TcRnRetainedQuantificationNotImplemented rejects retained quantification
+      before source typechecking is implemented.
+  -}
+  TcRnRetainedQuantificationNotImplemented :: TcRnMessage
+
   {-| TcRnInvalidRecordField is an error indicating that a record field was
     used that doesn't exist in a constructor.
 

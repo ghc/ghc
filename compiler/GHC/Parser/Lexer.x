@@ -810,6 +810,7 @@ data Token
   | ITwhere
 
   | ITforall            IsUnicodeSyntax -- GHC extension keywords
+  | ITforeach
   | ITexport
   | ITlabel
   | ITdynamic
@@ -1074,6 +1075,7 @@ reservedWordsFM = listToUFM $
          ( "where",          ITwhere,         0 ),
 
          ( "forall",         ITforall NormalSyntax, 0),
+         ( "foreach",        ITforeach,        xbit ExperimentalDependentTypesBit),
          ( "mdo",            ITmdo Nothing,   xbit RecursiveDoBit),
              -- See Note [Lexing type pseudo-keywords]
          ( "family",         ITfamily,        0 ),
@@ -2839,6 +2841,7 @@ data ExtBits
   | ListTuplePunsBit
   | ViewPatternsBit
   | RequiredTypeArgumentsBit
+  | ExperimentalDependentTypesBit
   | MultilineStringsBit
   | LevelImportsBit
   | QualifiedStringsBit
@@ -2925,6 +2928,7 @@ mkParserOpts extensionFlags diag_opts
       .|. ListTuplePunsBit            `xoptBit` LangExt.ListTuplePuns
       .|. ViewPatternsBit             `xoptBit` LangExt.ViewPatterns
       .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
+      .|. ExperimentalDependentTypesBit `xoptBit` LangExt.ExperimentalDependentTypes
       .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
       .|. LevelImportsBit             `xoptBit` LangExt.ExplicitLevelImports
       .|. QualifiedStringsBit         `xoptBit` LangExt.QualifiedStrings

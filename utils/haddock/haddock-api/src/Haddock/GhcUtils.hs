@@ -320,6 +320,7 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype)) =
             , hst_body = ty
             }
         )
+    -- Put the class context before value arguments, including retained binders.
     go_ty (L loc ty) =
       L
         loc
@@ -463,6 +464,8 @@ reparenTypePrec = go
       paren p PREC_SIG $ HsIParamTy x n (reparenLType ty)
     go p (HsForAllTy x tele ty) =
       paren p PREC_CTX $ HsForAllTy x (reparenHsForAllTelescope tele) (reparenLType ty)
+    go p (HsForEachTy x bndrs ty) =
+      paren p PREC_CTX $ HsForEachTy x (map (mapXRec @a reparenTyVar) bndrs) (reparenLType ty)
     go p (HsQualTy x ctxt ty) =
       let p' [_] = PREC_CTX
           p' _ = PREC_TOP -- parens will get added anyways later...

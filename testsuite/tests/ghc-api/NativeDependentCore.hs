@@ -26,19 +26,26 @@ import GHC.Core.Utils (exprType)
 import GHC.CoreToIface (toIfaceAlt)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
+import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
+import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Ppr (showSDoc)
+import GHC.Driver.Session (parseDynamicFlagsCmdLine)
+import GHC.Hs (HsType (..))
+import qualified GHC.Parser as Parser
+import qualified GHC.Parser.Lexer as Lexer
 import GHC.Types.Basic (OccInfo (..), TailCallInfo (..))
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails (VanillaId), RuleInfo (..))
 import GHC.Types.InlinePragma (ActivationX (AlwaysActive))
 import GHC.Types.Name (mkSystemName, nameModule)
 import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc)
-import GHC.Types.SrcLoc (noSrcSpan)
+import GHC.Types.SrcLoc (mkRealSrcLoc, noLoc, noSrcSpan, unLoc)
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Utils.Logger (initLogger)
 import GHC.Utils.Outputable (ppr, vcat)
 import GHC.Utils.Panic (GhcException (..))
 import System.Environment (getArgs)
@@ -51,6 +58,7 @@ main = do
     case args of
         [libdir] -> do
             dflags <- runGhc (Just libdir) getSessionDynFlags
+            runSyntaxChecks dflags
             runChecks dflags
             runCaseChecks dflags
             putStrLn "native-core-api-ok"
@@ -88,6 +96,38 @@ indexSubst scope b rhs =
 -- | Assert a semantic property and identify its failure precisely.
 check :: String -> Bool -> IO ()
 check label condition = unless condition (fail ("FAIL: " ++ label))
+
+-- | Check retained syntax, printing, and compatibility with ordinary identifiers.
+runSyntaxChecks :: DynFlags -> IO ()
+runSyntaxChecks dflags = do
+    logger <- initLogger
+    (nativeFlags, leftovers, _) <-
+        parseDynamicFlagsCmdLine logger dflags [noLoc "-XExperimentalDependentTypes"]
+    check "retained extension flag" (null leftovers)
+    let source = "foreach (b :: Bool) -> Select b -> Select b"
+        parseWith flags input =
+            case Lexer.unP Parser.parseType (Lexer.initParserState (initParserOpts flags) (stringToStringBuffer input) (mkRealSrcLoc (fsLit "retained-syntax") 1 1)) of
+                Lexer.POk _ ty -> pure ty
+                Lexer.PFailed _ -> fail ("FAIL: cannot parse type: " ++ input)
+        isRetained ty = case unLoc ty of
+            HsForEachTy{hst_bndrs = [_]} -> True
+            _ -> False
+    retained <- parseWith nativeFlags source
+    check "retained quantification has a distinct AST node" (isRetained retained)
+    reparsed <- parseWith nativeFlags (showSDoc nativeFlags (ppr retained))
+    check "retained quantification printing round trip" (isRetained reparsed)
+    check "retained binders reject inferred braces during parsing" $
+        case Lexer.unP Parser.parseType (Lexer.initParserState (initParserOpts nativeFlags) (stringToStringBuffer "foreach {b} -> Bool") (mkRealSrcLoc (fsLit "retained-syntax") 1 1)) of
+            Lexer.PFailed _ -> True
+            Lexer.POk{} -> False
+    ordinary <- parseWith dflags source
+    check "foreach remains an identifier when disabled" $ case unLoc ordinary of
+        HsFunTy{} -> True
+        _ -> False
+    visible <- parseWith nativeFlags "forall a -> a -> a"
+    check "visible forall remains erased quantification" $ case unLoc visible of
+        HsForAllTy{} -> True
+        _ -> False
 
 -- | Compare recovered types and print both sides on failure.
 checkType :: DynFlags -> String -> Type -> Type -> IO ()

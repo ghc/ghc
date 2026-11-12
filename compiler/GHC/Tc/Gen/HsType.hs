@@ -1164,6 +1164,9 @@ tcHsType mode (HsOpTy _ ty1 tyop ty2) exp_kind
   = tc_fun_type mode (HsModifiedFunArr noExtField [] $ HsStandardArr noExtField) ty1 ty2 exp_kind
 
 --------- Foralls
+tcHsType _ HsForEachTy{} _
+  = failWithTc TcRnRetainedQuantificationNotImplemented
+
 tcHsType mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
   | HsForAllInvis{} <- tele
   = tc_hs_forall_ty tele ty exp_kind

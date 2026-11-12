@@ -1,0 +1,2 @@
+RetainedQuantification.hs:12:9: error: [GHC-43582]
+    Typechecking of retained quantification is not implemented yet.

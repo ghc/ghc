@@ -232,6 +232,9 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
 
     rn_ty :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
     -- A lot of faff just to allow the extra-constraints wildcard to appear
+    rn_ty _ HsForEachTy{}
+      = failWithTc TcRnRetainedQuantificationNotImplemented
+
     rn_ty env (HsForAllTy { hst_tele = tele, hst_body = hs_body })
       = bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
         do { (hs_body', fvs) <- rn_lty env hs_body
@@ -588,6 +591,9 @@ rnLHsTyKi env (L loc ty)
        ; return (L loc ty', fvs) }
 
 rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
+
+rnHsTyKi _ HsForEachTy{}
+  = failWithTc TcRnRetainedQuantificationNotImplemented
 
 rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
   = do { checkPolyKinds env (HsType ty)
@@ -2235,6 +2241,9 @@ extract_lty (L _ ty) acc
       HsKindSig _ ty ki           -> extract_kind_sig ty ki acc
       HsForAllTy { hst_tele = tele, hst_body = ty }
                                   -> extract_hs_for_all_telescope tele acc $
+                                     extract_lty ty []
+      HsForEachTy { hst_bndrs = bndrs, hst_body = ty }
+                                  -> extract_hs_tv_bndrs bndrs acc $
                                      extract_lty ty []
       HsQualTy { hst_ctxt = ctxt, hst_body = ty }
                                   -> extract_lctxt ctxt $

@@ -8,6 +8,12 @@ clean:
 	rm -f *.o *.hi *.ppr.hs
 	rm Ppr003 Ppr004
 
+.PHONY: RetainedPrint
+RetainedPrint:
+	$(CHECK_PPR)   $(LIBDIR) RetainedPrint.hs
+	$(CHECK_EXACT) $(LIBDIR) RetainedPrint.hs
+	$(CHECK_EXACT) $(LIBDIR) RetainedPrintUnicode.hs
+
 .PHONY: ppr001
 ppr001:
 	$(CHECK_PPR)   $(LIBDIR) Ppr001.hs

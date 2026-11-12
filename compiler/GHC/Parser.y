@@ -618,6 +618,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'where'        { L _ ITwhere }
 
  'forall'       { L _ (ITforall _) }                -- GHC extension keywords
+ 'foreach'      { L _ ITforeach }
  'foreign'      { L _ ITforeign }
  'export'       { L _ ITexport }
  'label'        { L _ ITlabel }
@@ -2283,6 +2284,12 @@ ctype   :: { LHsType GhcPs }
                                               HsForAllTy { hst_tele = unLoc $1
                                                          , hst_xforall = noExtField
                                                          , hst_body = $2 } }
+        | 'foreach' foreach_bndrs '->' ctype
+                                     {% do { bndrs <- fromSpecTyVarBndrs $2
+                                           ; amsA' (sLL $1 $> $
+                                               HsForEachTy { hst_xforeach = (epTok $1, epUniTok $3)
+                                                           , hst_bndrs = bndrs
+                                                           , hst_body = $4 }) } }
         | context '=>' ctype          {% acsA (comb2 $1 $>) (\loc cs -> (L loc $
                                             HsQualTy { hst_ctxt = addTrailingDarrowA $1 (epUniTok $2) cs
                                                      , hst_xqual = NoExtField
@@ -2464,6 +2471,11 @@ bar_types2    :: { [LHsType GhcPs] }  -- Two or more:  ty|ty|ty
 tv_bndrs :: { [LHsTyVarBndr Specificity GhcPs] }
          : tv_bndr tv_bndrs             { $1 : $2 }
          | {- empty -}                  { [] }
+
+-- Retained arguments are visible. Do not accept inferred type binders here.
+foreach_bndrs :: { [LHsTyVarBndr Specificity GhcPs] }
+         : tv_bndr_no_braces foreach_bndrs { $1 : $2 }
+         | {- empty -}                    { [] }
 
 tv_bndr :: { LHsTyVarBndr Specificity GhcPs }
         : tv_bndr_no_braces             { $1 }

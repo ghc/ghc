@@ -1901,6 +1901,9 @@ instance Diagnostic TcRnMessage where
            what = case ty_or_ki of
              TypeLevel -> text "type"
              KindLevel -> text "kind"
+    TcRnRetainedQuantificationNotImplemented
+      -> mkSimpleDecorated $
+         text "Typechecking of retained quantification is not implemented yet."
     TcRnInvalidRecordField con field
       -> mkSimpleDecorated $
          hsep [text "Constructor" <+> quotes (ppr con),
@@ -2681,6 +2684,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnTypeApplicationsDisabled{}
       -> ErrorWithoutFlag
+    TcRnRetainedQuantificationNotImplemented{}
+      -> ErrorWithoutFlag
     TcRnInvalidRecordField{}
       -> ErrorWithoutFlag
     TcRnTupleTooLarge{}
@@ -3426,6 +3431,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnTypeApplicationsDisabled{}
       -> [suggestExtension LangExt.TypeApplications]
+    TcRnRetainedQuantificationNotImplemented{}
+      -> noHints
     TcRnInvalidRecordField{}
       -> noHints
     TcRnTupleTooLarge{}

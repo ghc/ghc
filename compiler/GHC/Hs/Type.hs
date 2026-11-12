@@ -452,6 +452,7 @@ type instance XModifier GhcRn = ModifierPrintsAs
 type instance XModifier GhcTc = ModifierPrintsAs
 
 type instance XForAllTy        (GhcPass _) = NoExtField
+type instance XForEachTy       (GhcPass _) = (EpToken "foreach", TokRarrow)
 type instance XQualTy          (GhcPass _) = NoExtField
 type instance XTyVar           (GhcPass _) = EpToken "'"
 type instance XAppTy           (GhcPass _) = NoExtField
@@ -1457,6 +1458,9 @@ ppr_mono_ty :: forall p. (OutputableBndrId p) => HsType (GhcPass p) -> SDoc
 ppr_mono_ty (HsForAllTy { hst_tele = tele, hst_body = ty })
   = sep [pprHsForAll tele Nothing, ppr_mono_lty ty]
 
+ppr_mono_ty (HsForEachTy { hst_bndrs = bndrs, hst_body = ty })
+  = sep [text "foreach" <+> interppSP bndrs <+> arrow, ppr_mono_lty ty]
+
 ppr_mono_ty (HsQualTy { hst_ctxt = ctxt, hst_body = ty })
   = sep [pprLHsContextAlways ctxt, ppr_mono_lty ty]
 
@@ -1554,6 +1558,7 @@ hsTypeNeedsParens :: forall p. IsPass p => PprPrec -> HsType (GhcPass p) -> Bool
 hsTypeNeedsParens p = go_hs_ty
   where
     go_hs_ty (HsForAllTy{})           = p >= funPrec
+    go_hs_ty (HsForEachTy{})          = p >= funPrec
     go_hs_ty (HsQualTy{})             = p >= funPrec
     go_hs_ty (HsTyVar{})              = False
     go_hs_ty (HsFunTy{})              = p >= funPrec

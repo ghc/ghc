@@ -748,6 +748,7 @@ type family XXHsTyPat x
 -- -------------------------------------
 -- HsType type families
 type family XForAllTy        x
+type family XForEachTy       x
 type family XQualTy          x
 type family XTyVar           x
 type family XAppTy           x
