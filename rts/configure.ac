@@ -206,6 +206,7 @@ dnl ** We now require clock_gettime for our monotonic clock.
 if test "$ghc_host_os" != "mingw32" ; then
   AC_CHECK_FUNCS([clock_gettime], [],
     AC_MSG_ERROR([The POSIX.1-2008 function 'clock_gettime' is required but is not available]))
+  AC_CHECK_FUNCS([clock_gettime_nsec_np])
 fi
 
 dnl ** check for Apple's "interesting" long double compatibility scheme
