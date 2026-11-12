@@ -59,6 +59,7 @@ module GHC.Core.Type (
         getRuntimeArgTys,
         mkTyConBindersPreferAnon,
         mkPiTy, mkPiTys, mkDepFunTy, isBoolIndexId,
+        isNativeIndexId, isNativeIndexType,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
         mkFamilyTyConApp,
@@ -229,6 +230,10 @@ import GHC.Core.TyCo.Make
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCon
+import GHC.Core.TyCon.Set
+import {-# SOURCE #-} GHC.Core.DataCon
+   ( dataConFullSig, dataConRepArgTys, dataConStupidTheta
+   , dataConWrapId_maybe )
 import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-} GHC.Core.Coercion
@@ -245,7 +250,7 @@ import GHC.Types.Var.Set
 import GHC.Builtin.WiredIn.Prim
 
 import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
-   ( charTy, naturalTy, boolTy
+   ( charTy, naturalTy
    , typeSymbolKind, liftedTypeKind, unliftedTypeKind
    , manyDataConTy, oneDataConTy
    , liftedRepTy )
@@ -2268,6 +2273,76 @@ See #14939.
 -}
 
 -----------------------------
+-- | Test whether a closed, lifted algebraic type is a supported index domain.
+-- See Note [Algebraic runtime index domains].
+isNativeIndexType :: Type -> Bool
+isNativeIndexType ty = go emptyTyConSet [ty]
+  where
+    go _ [] = True
+    go seen (ty : rest)
+      | TyConApp tc [] <- coreFullView ty
+      , tc `elemTyConSet` seen
+      = go seen rest
+      | TyConApp tc [] <- coreFullView ty
+      , isVanillaAlgTyCon tc, isBoxedDataTyCon tc
+      , not (isTypeDataTyCon tc), tyConArity tc == 0
+      , tcIsLiftedTypeKind (tyConKind tc)
+      , null (tyConStupidTheta tc)
+      , Just fields <- concat <$> traverse (con_fields tc) (tyConDataCons tc)
+      = go (extendTyConSet seen tc) (fields ++ rest)
+      | otherwise = False
+
+    con_fields tc con
+      | ([], [], [], [], orig_args, res) <- dataConFullSig con
+      , null (dataConStupidTheta con)
+      , Nothing <- dataConWrapId_maybe con
+      , TyConApp res_tc [] <- coreFullView res, res_tc == tc
+      , orig_args `equalLength` rep_args
+      , and (zipWith same_field orig_args rep_args)
+      = Just (map scaledThing rep_args)
+      | otherwise = Nothing
+      where
+        rep_args = dataConRepArgTys con
+
+    same_field (Scaled orig_mult orig) (Scaled rep_mult rep)
+      | closed_mult orig_mult, closed_mult rep_mult
+      , TyConApp orig_tc [] <- coreFullView orig
+      , TyConApp rep_tc [] <- coreFullView rep
+      = orig_tc == rep_tc
+      | otherwise = False
+
+    closed_mult ty = case coreFullView ty of
+      OneTy -> True
+      ManyTy -> True
+      _ -> False
+
+-- | Test whether a local unrestricted identifier has a supported index domain.
+isNativeIndexId :: Id -> Bool
+isNativeIndexId v
+  = isLocalId v && not (isCoVar v)
+    && isManyTy (idMult v) && isNativeIndexType (varType v)
+
+{- Note [Algebraic runtime index domains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A runtime index has a closed, first-order, lifted data type. Inspect ordinary
+TyCons and DataCons; Nat has no wired identity. Follow all constructor fields
+with one worklist and a visited set. This admits recursive and mutually recursive
+domains without assuming that their runtime values are finite or total.
+
+Reject parameters, existential variables, constructor constraints, datatype
+contexts, newtypes, type data, and wrappers. Original and representation fields
+must have the same closed domain. Thus a promoted constructor's arguments match
+its worker's runtime fields. In particular, do not promote an unpacked payload as
+if it were the original boxed field. Constructor field multiplicities may be One
+or Many; the retained identifier itself must be unrestricted.
+
+Agda's constructor indices and refined field context are the precedent. The
+closed-domain and worker restrictions bound this implementation; they are not
+Agda language restrictions. Haskell fields can be partial or cyclic. Do not use
+termination or finite-tree apartness to compare opaque runtime indices.
+See the Agda Nat/Vec provenance in docs/dependent-haskell/REFERENCES.md.
+-}
+
 -- | Test whether an identifier can occur as a retained Boolean index.
 isBoolIndexId :: Id -> Bool
 isBoolIndexId v
@@ -2284,7 +2359,7 @@ typeKind (TyConApp tc tys)      = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)              = typeLiteralKind l
 typeKind (FunTy { ft_af = af }) = liftedTypeOrConstraintKind (funTyFlagResultTypeOrConstraint af)
 typeKind (TyVarTy tyvar)        = tyVarKind tyvar
-typeKind (TermVarTy _)          = boolTy
+typeKind (TermVarTy v)          = varType v
 typeKind (DepFunTy _ _)         = liftedTypeKind
 typeKind (CastTy _ty co)        = coercionRKind co
 typeKind (CoercionTy co)        = coercionType co

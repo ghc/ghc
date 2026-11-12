@@ -96,8 +96,8 @@ of ways.  Here we summarise, but see Note [Specification of unification].
     * MARCast (obscure):
          See (KCU2) in Note [Kind coercions in Unify]
     * MARRuntimeIndex:
-         An opaque runtime Boolean might equal the other index.
-         See Note [Apartness of retained Boolean indices].
+         An opaque runtime value might equal the other index.
+         See Note [Apartness of retained runtime indices].
 
 (CU5) We need to take care with kinds.  See Note [tcMatchTy vs tcMatchTyKi]
 
@@ -1018,7 +1018,7 @@ data MaybeApartReason
   | MARCast         -- ^ Very obscure.
     -- See (KCU2) in Note [Kind coercions in Unify]
 
-  | MARRuntimeIndex -- ^ An opaque retained Boolean may equal another index.
+  | MARRuntimeIndex -- ^ An opaque retained runtime value may equal another index.
 
 
 combineMAR :: MaybeApartReason -> MaybeApartReason -> MaybeApartReason
@@ -1585,11 +1585,12 @@ type OutCoercion = Coercion   -- After applying the RnEnv2
 hasRuntimeIndex :: Type -> Bool
 hasRuntimeIndex = anyFreeVarsOfType (\v -> isId v && not (isCoVar v))
 
-{- Note [Apartness of retained Boolean indices]
+{- Note [Apartness of retained runtime indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TermVarTy denotes an opaque runtime Boolean. Equal Ids, after renaming, match
-reflexively. Different Ids can denote the same Boolean. An opaque Id can also
-denote either Boolean constructor. These comparisons must return MaybeApart,
+TermVarTy denotes an opaque runtime value. Equal Ids, after renaming, match
+reflexively. Different Ids can denote the same value. An opaque Id can also
+denote a constructor index, including S (TermVarTy v) for a cyclic Nat v.
+These comparisons must return MaybeApart,
 not SurelyApart. Otherwise a closed family could skip a possible earlier
 constructor equation. See (U3) and (U4) in Note [Specification of unification].
 
@@ -1706,7 +1707,7 @@ unify_ty env ty1 (TyVarTy tv2) kco
   | Unifying <- um_unif env  -- If unifying, can swap args; but not when matching
   = uVarOrFam (umSwapRn env) (TyVarLHS tv2) ty1 (mkSymCo kco)
 
--- See Note [Apartness of retained Boolean indices].
+-- See Note [Apartness of retained runtime indices].
 unify_ty env (TermVarTy v1) (TermVarTy v2) _kco
   | rnOccL (um_rn_env env) v1 == rnOccR (um_rn_env env) v2
   = return ()
@@ -2026,7 +2027,8 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
     go bvs ty | Just ty' <- coreView ty = go bvs ty'
     go _ (TermVarTy {}) = False
       -- The rigid Id has fixed Bool/Many metadata, with no type variables
-      -- or type-family applications. See Note [Apartness of retained Boolean indices].
+      -- or type-family applications.
+      -- See Note [Apartness of retained runtime indices].
     go _ ty@(DepFunTy {})
       = pprPanic "uOccursCheck: unsupported retained function" (ppr ty)
     go bvs (TyVarTy tv) | Just ty' <- lookupVarEnv tv_env tv

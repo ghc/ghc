@@ -1545,8 +1545,8 @@ normalise_type ty
   where
     go :: Type -> NormM Reduction
     go ty@(TermVarTy v)
-      -- See Note [Normalising retained Boolean indices].
-      | isBoolIndexId v
+      -- See Note [Normalising retained runtime indices].
+      | isNativeIndexId v
       = do { lc <- getLC
            ; r <- getRole
            ; let lty = substTy (lcSubstLeft lc) ty
@@ -1636,12 +1636,13 @@ normalise_args fun_ki roles args
     normalise1 role ty
       = withRole role $ normalise_type ty
 
-{- Note [Normalising retained Boolean indices]
+{- Note [Normalising retained runtime indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A retained Boolean index is a rigid local Id with fixed Bool/Many metadata.
+A retained runtime index is a rigid local Id with a fixed closed domain and
+unrestricted multiplicity. See Note [Algebraic runtime index domains] in GHC.Core.Type.
 Preserve that Id and return reflexivity at the current role. Do not inspect
 its unfolding or evaluate its value. Family matching keeps an opaque index
-MaybeApart from either constructor; see Note [Apartness of retained Boolean indices]
+MaybeApart from constructor indices; see Note [Apartness of retained runtime indices]
 in GHC.Core.Unify. A family application can therefore remain stuck at this index.
 
 NormM starts with an empty lifting context. It extends that context for ordinary

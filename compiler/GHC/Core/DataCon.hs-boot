@@ -36,4 +36,6 @@ instance Outputable DataCon
 instance OutputableBndr DataCon
 
 dataConWrapId :: DataCon -> Id
+dataConWrapId_maybe :: DataCon -> Maybe Id
+dataConRepArgTys :: DataCon -> [Scaled Type]
 promoteDataCon :: DataCon -> TyCon

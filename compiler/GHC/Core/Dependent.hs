@@ -11,7 +11,6 @@ module GHC.Core.Dependent (
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Builtin.KnownKeys (falseDataConKey, trueDataConKey)
 import GHC.Core.DataCon (dataConRepType)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon (TyCon, synTyConRhs_maybe)
@@ -20,7 +19,6 @@ import GHC.Types.Id (idCoreRules, realIdUnfolding)
 import GHC.Types.Literal (literalType)
 import GHC.Types.Tickish (CoreTickish, GenTickish (..))
 import GHC.Types.Var
-import GHC.Types.Unique (hasKey)
 import GHC.Types.Unique.DSet (uniqDSetToList)
 import GHC.Types.Var.Set
 import GHC.Utils.Panic
@@ -98,7 +96,7 @@ rejectNative context found =
             ( Sorry
                 ( "Native dependent Core cannot enter "
                     ++ context
-                    ++ ". This operation does not support retained Boolean types or branch proofs."
+                    ++ ". This operation does not support retained dependent types or branch proofs."
                 )
             )
 
@@ -123,8 +121,8 @@ scanBind (Rec pairs) = foldMap (\(b, rhs) -> scanBinder b <> scanExpr rhs) pairs
 
 -- | Inspect a case alternative and its binders.
 scanAlt :: CoreAlt -> NativeScan
-scanAlt (Alt (DataAlt con) (_ : _) _)
-    | con `hasKey` falseDataConKey || con `hasKey` trueDataConKey = NativeScan (pure True)
+scanAlt alt
+    | isNativeIndexAlt alt = NativeScan (pure True)
 scanAlt (Alt con bs rhs) =
     scanAltCon con <> foldMap scanBinder bs <> scanExpr rhs
 

@@ -551,9 +551,9 @@ simple_app env e0@(Lam {}) as0@(_:_)
     do_beta :: SimpleOptEnv -> InExpr -> [SimpleContItem] -> OutExpr
     do_beta env e@(Lam b body) args@(ApplyToArg a:as)
       | soe_native env
-      , isBoolIndexId b'
+      , isNativeIndexId b'
       = let arg = simple_opt_clo (soeInScope env') a
-        in case exprToBoolIndex arg of
+        in case exprToNativeIndex arg of
              Just _ -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
                                body as
              Nothing -> rebuild_app env (simple_opt_expr env e) args

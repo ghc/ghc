@@ -129,7 +129,7 @@ an incomplete case-match might slip by Core Lint and cause trouble at runtime.
 
 The experimental native dependent forms are outside this guarantee. They cannot
 enter the ordinary optimizer or backend. Their Boolean proof alternatives have
-an additional coverage check. See Note [Native Boolean branch evidence].
+an additional coverage check. See Note [Native algebraic branch evidence].
 
 Note [GHC Formalism]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1586,10 +1586,9 @@ lintCaseExpr scrut case_bndr alt_ty alts
        ; addLoc (CaseTy scrut) $ lintValueType alt_ty
 
        ; checkCaseAlts e scrut scrut_ty alts
-       ; when (any refining_bool_alt alts) $
-           lintL (any is_default alts || (any (has_con falseDataConKey) alts
-                                          && any (has_con trueDataConKey) alts))
-             (text "Native Boolean proof alternatives must be exhaustive:" <+> ppr e)
+       ; when (any isNativeIndexAlt alts) $
+           lintL (any is_default alts || covers_domain scrut_ty)
+             (text "Native index proof alternatives must be exhaustive:" <+> ppr e)
 
        -- Lint the case-binder. Must do this after linting the scrutinee
        -- because the case-binder isn't in scope in the scrutineex
@@ -1603,16 +1602,17 @@ lintCaseExpr scrut case_bndr alt_ty alts
          -- See GHC.Core Note [Case expression invariants] item (7)
 
        ; -- Check the alternatives
-       ; alt_ues <- mapM (lintCoreAlt (exprToBoolIndex scrut) case_bndr scrut_ty scrut_mult alt_ty) alts
+       ; alt_ues <- mapM (lintCoreAlt (exprToNativeIndex scrut) case_bndr scrut_ty scrut_mult alt_ty) alts
        ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
        ; return (alt_ty, case_ue) } }
   where
-    refining_bool_alt (Alt (DataAlt con) args _)
-      = not (null args) && (con `hasKey` falseDataConKey || con `hasKey` trueDataConKey)
-    refining_bool_alt _ = False
     is_default (Alt DEFAULT [] _) = True
     is_default _ = False
-    has_con key (Alt (DataAlt con) _ _) = con `hasKey` key
+    covers_domain ty
+      | isNativeIndexType ty, Just (tc, []) <- splitTyConApp_maybe ty
+      = all (\con -> any (has_con con) alts) (tyConDataCons tc)
+      | otherwise = False
+    has_con expected (Alt (DataAlt con) _ _) = con == expected
     has_con _ _ = False
 
 checkCaseAlts :: CoreExpr -> CoreExpr -> Type -> [CoreAlt] -> LintM ()
@@ -1728,27 +1728,40 @@ lintCoreAlt _ case_bndr scrut_ty _ alt_ty (Alt (LitAlt lit) args rhs)
     lit_ty = literalType lit
 
 lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rhs)
-  | not (null args)
-  , con `hasKey` falseDataConKey || con `hasKey` trueDataConKey
+  | isNativeIndexAlt alt
   = addLoc (CaseAlt alt) $ do
     { index <- case scrut_index of
         Just index -> return index
-        Nothing -> failWithL (text "Unsupported scrutinee for native Boolean evidence")
-    ; cv <- case args of
-        [cv] -> return cv
-        _ -> failWithL (text "Native Boolean alternative must bind exactly one CoVar")
+        Nothing -> failWithL (text "Unsupported scrutinee for native index evidence")
+    ; (fields, cv) <- case splitAt (dataConRepArity con) args of
+        (fields, [cv]) -> return (fields, cv)
+        _ -> failWithL (text "Native index alternative must bind its fields followed by one CoVar")
     ; in_scope <- getInScope
-    ; lintL (isCoVar cv && isLocalId cv && not (cv `elemInScopeSet` in_scope))
-        (text "Native Boolean evidence requires a fresh local CoVar:" <+> ppr cv)
-    ; ensureEqTys scrut_ty (dataConRepType con) (mkBadPatMsg scrut_ty (dataConRepType con))
-    ; let expected = mkNomEqPred index (mkTyConTy (promoteDataCon con))
-    ; ensureEqTys (varType cv) expected
-        (text "Invalid nominal Boolean branch evidence:" <+> ppr cv <+> dcolon <+> ppr (varType cv))
-    ; lintBinder CasePatBind cv $ do
-      { rhs_ue <- lintAltExpr rhs alt_ty
-      ; return (deleteUE (deleteUE rhs_ue cv) case_bndr) }
+    ; let field_set = mkVarSet fields
+    ; lintL (all isNativeIndexId fields
+             && all (\v -> not (v `elemInScopeSet` in_scope)) fields
+             && sizeVarSet field_set == length fields)
+        (text "Native index fields must be fresh unrestricted local identifiers:" <+> ppr fields)
+    ; lintL (isCoVar cv && isLocalId cv && not (cv `elemInScopeSet` in_scope)
+             && not (cv `elemVarSet` field_set))
+        (text "Native index evidence requires a fresh local CoVar:" <+> ppr cv)
+    ; ensureEqTys scrut_ty (mkTyConTy (dataConTyCon con))
+        (mkBadPatMsg scrut_ty (mkTyConTy (dataConTyCon con)))
+    ; let payload_ty = dataConRepType con
+          multiplicities = map scaledMult (dataConRepArgTys con)
+    ; lintBinders CasePatBind fields $ do
+      { let expected = mkNomEqPred index
+                         (mkTyConApp (promoteDataCon con) (map TermVarTy fields))
+      ; ensureEqTys (varType cv) expected
+          (text "Invalid nominal index branch evidence:" <+> ppr cv <+> dcolon <+> ppr (varType cv))
+      ; lintBinder CasePatBind cv $ do
+        { rhs_ue <- lintAltExpr rhs alt_ty
+        ; rhs_ue' <- allowDeadOccs $ addLoc (CasePat alt) $
+                      lintAltBinders (deleteUE rhs_ue cv) case_bndr scrut_ty payload_ty
+                                     (zipEqual multiplicities fields)
+        ; return (deleteUE rhs_ue' case_bndr) } }
     }
-    -- See Note [Native Boolean branch evidence].
+    -- See Note [Native algebraic branch evidence].
   | isNewTyCon (dataConTyCon con)            -- (DALT1) in Note [DataAlt restrictions] in GHC.Core
   = zeroUE <$ addErrL (mkNewTyDataConAltMsg scrut_ty alt)
   | isUnaryClassTyCon (dataConTyCon con)     -- (DALT3) in Note [DataAlt restrictions] in GHC.Core
@@ -1767,6 +1780,8 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
           ; multiplicities = map binderMult $ fst $ splitPiTys con_payload_ty }
 
         -- And now bring the new binders into scope
+    ; lintL (multiplicities `equalLength` args)
+        (text "Wrong number of constructor alternative binders:" <+> ppr alt)
     ; lintBinders CasePatBind args $ do
       { rhs_ue <- lintAltExpr rhs alt_ty
       ; rhs_ue' <- allowDeadOccs $  -- See Note [Dead occurrences]
@@ -1780,20 +1795,26 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
   | otherwise   -- Scrut-ty is wrong shape
   = zeroUE <$ addErrL (mkBadAltMsg scrut_ty alt)
 
-{- Note [Native Boolean branch evidence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A nonempty wired Boolean alternative binds one virtual CoVar. Strict constructor
-discrimination justifies index(scrutinee) ~# promotedConstructor. The proof is
-nominal, local to this branch, and absent from the constructor's runtime payload.
-The result annotation stays outside both the case binder and the proof binder.
+{- Note [Native algebraic branch evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A refining alternative binds its ordinary runtime fields, then one virtual
+CoVar. For Nat, S k cv has cv :: index(scrutinee) ~# 'S (TermVarTy k). Strict
+constructor discrimination justifies this nominal equality. Bring the real
+fields into scope before checking the proof. The proof is not a worker argument.
+Check the fields through lintAltBinders and erase only the proof in CoreToStg.
+An ordinary S k alternative has no virtual proof and keeps its existing rule.
 
-Do not use lintAltBinders for the virtual proof. The Boolean worker has no
-arguments. lintCaseExpr checks coverage before admitting these alternatives.
-Ordinary Boolean alternatives with no binders keep their existing rule.
+Require fresh fields as well as a fresh CoVar. If k captured the scrutinee's
+identifier, the expected equality would refer to the field on both sides.
+Retain the actual scrutinee index; do not substitute the case binder for it.
+The result annotation stays outside all alternative binders. lintCaseExpr checks
+coverage against the domain's ordinary constructors before admitting evidence.
 
-Optimization and code generation remain gated. They cannot reconstruct a Boolean
-worker application from this proof binder or discard the strict case. The rule
-and remaining proof obligations are specified in docs/dependent-haskell/CORE.md.
+Agda's constructor splitting is the precedent for a refined field context.
+Here fields remain lazy Haskell values. Constructor discrimination does not prove
+that the predecessor terminates or that a recursive runtime value is finite.
+The ordinary optimizer remains gated. See docs/dependent-haskell/CORE.md and
+the Agda provenance in docs/dependent-haskell/REFERENCES.md.
 -}
 
 {-
@@ -1988,14 +2009,15 @@ lintType (TyVarTy tv)
 
 lintType (TermVarTy v)
   = do { in_scope <- getInScope
-       ; lintL (isBoolIndexId v
-                 && maybe False isBoolIndexId (lookupInScope in_scope v))
-           (text "Invalid runtime Boolean index:" <+> ppr v <+> dcolon <+> ppr (varType v))
+       ; lintL (isNativeIndexId v
+                 && maybe False (\b -> isNativeIndexId b && varType b `eqType` varType v)
+                                (lookupInScope in_scope v))
+           (text "Invalid runtime index:" <+> ppr v <+> dcolon <+> ppr (varType v))
        ; lintVarOcc v }
 
 lintType (DepFunTy b body)
-  = do { lintL (isBoolIndexId b)
-           (text "Invalid retained Boolean binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
+  = do { lintL (isNativeIndexId b)
+           (text "Invalid retained runtime binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
        ; lintL (b `elemVarSet` tyCoVarsOfType body)
            (text "Vacuous retained dependent binder:" <+> ppr b)
        ; lintBinder LambdaBind b $
@@ -2228,10 +2250,10 @@ lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
                      Just to_core -> do
                        { (arg_ty, acc') <- lint_arrow_arg arg ManyTy acc
                        ; ensureEqTys (varType b) arg_ty
-                           (text "Retained Boolean argument has the wrong type:" <+> ppr arg)
+                           (text "Retained runtime argument has the wrong type:" <+> ppr arg)
                        ; let arg_expr = to_core arg
-                       ; lintL (isJust (exprToBoolIndex arg_expr))
-                           (text "Unsupported retained Boolean argument:" <+> ppr arg)
+                       ; lintL (isJust (exprToNativeIndex arg_expr))
+                           (text "Unsupported retained runtime argument:" <+> ppr arg)
                        ; let Subst in_scope ids tvs cvs = subst
                              subst' = Subst in_scope (extendVarEnv ids b arg_expr) tvs cvs
                        ; go subst' body_ty acc' args }

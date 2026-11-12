@@ -60,7 +60,7 @@ import GHC.Data.Maybe ( orElse )
 import {-# SOURCE #-} GHC.Core.Coercion ( mkCoercionType, coVarTypesRole, mkTyConAppCo )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 import {-# SOURCE #-} GHC.Core.Ppr ( ) -- instance Outputable CoreExpr
-import {-# SOURCE #-} GHC.Core ( CoreExpr, exprToBoolIndex, mapBoolIndex, varToCoreExpr )
+import {-# SOURCE #-} GHC.Core ( CoreExpr, exprToNativeIndex, mapNativeIndex, varToCoreExpr )
 import {-# SOURCE #-} GHC.Core.Type( isCoercionTy )
 
 import GHC.Core.TyCo.Make
@@ -240,7 +240,7 @@ emptyCvSubstEnv :: CvSubstEnv
 emptyCvSubstEnv = emptyVarEnv
 
 -- | Composes two substitutions, applying the second one provided first,
--- like in function composition. Compose supported Boolean index arguments in
+-- like in function composition. Compose supported algebraic index arguments in
 -- the expression environment too. Other expression ranges remain unchanged;
 -- this function does not compose general Core expression substitutions.
 composeTCvSubst :: Subst -> Subst -> Subst
@@ -248,7 +248,7 @@ composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 ids2 tenv2 cenv2)
   = Subst is3 ids3 tenv3 cenv3
   where
     is3 = is1 `unionInScope` is2
-    ids3 = ids1 `plusVarEnv` mapVarEnv (mapBoolIndex (substTy extended_subst1)) ids2
+    ids3 = ids1 `plusVarEnv` mapVarEnv (mapNativeIndex (substTy extended_subst1)) ids2
     tenv3 = tenv1 `plusVarEnv` mapVarEnv (substTy extended_subst1) tenv2
     cenv3 = cenv1 `plusVarEnv` mapVarEnv (substCo extended_subst1) cenv2
 
@@ -322,7 +322,7 @@ getSubstRangeTyCoFVs (Subst _ ids tenv cenv)
     tenvFVs = tyCoVarsOfTyVarEnv tenv
     cenvFVs = tyCoVarsOfCoVarEnv cenv
     indexFVs = tyCoVarsOfTypes
-      [ index | rhs <- nonDetEltsUFM ids, Just index <- [exprToBoolIndex rhs] ]
+      [ index | rhs <- nonDetEltsUFM ids, Just index <- [exprToNativeIndex rhs] ]
 
 isInScope :: Var -> Subst -> Bool
 isInScope v (Subst in_scope _ _ _) = v `elemInScopeSet` in_scope
@@ -813,9 +813,9 @@ substTyCoMapper
    subst_index v = StrictReaderT $ \(Subst in_scope ids _ _) ->
      return $ case lookupVarEnv ids v of
        Nothing -> TermVarTy (lookupInScope in_scope v `orElse` v)
-       Just rhs -> case exprToBoolIndex rhs of
+       Just rhs -> case exprToNativeIndex rhs of
          Just index -> index
-         Nothing -> pprPanic "substTy: unsupported runtime Boolean index"
+         Nothing -> pprPanic "substTy: unsupported runtime index"
                       (ppr v <+> text ":=" <+> ppr rhs)
 
    index_bndr :: Id -> (Id -> SubstM r) -> SubstM r

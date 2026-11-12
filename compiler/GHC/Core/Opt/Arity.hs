@@ -2326,7 +2326,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        , (in_scope, EI bs mco) <- go n oss' subst' ty'
        = (in_scope, EI (tcv' : bs) (mkEtaForAllMCo (Bndr tcv' vis) ty' mco))
 
-       ----------- Retained Boolean functions
+       ----------- Retained dependent functions
        | DepFunTy b res_ty <- coreFullView ty
        , (subst', eta_id) <- freshEtaId n subst (Scaled ManyTy (varType b))
        , let eta_id' = eta_id `setIdOneShotInfo` one_shot

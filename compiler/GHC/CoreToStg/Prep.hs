@@ -39,6 +39,7 @@ import GHC.Core.Dependent
 import GHC.Core.Subst
 import GHC.Core.Make
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, TyConApp) )
 import GHC.Core.TyCo.Subst ( isEmptyTypeSubst )
 import GHC.Core.Coercion
 import GHC.Core.TyCon
@@ -209,7 +210,7 @@ So our plan is:
 
   * Apply the substitution to type and coercion arguments in Core.
     `substTy` skips empty substitutions for types without runtime indices.
-    Runtime indices also use the Id substitution when a Boolean is cloned.
+    Runtime indices also use the Id substitution when an index Id is cloned.
 
   * In `cpCloneBndr`, for a tyvar/covar binder, skip substitution only if
     neither the TyCoVar environment nor a runtime index needs an update.
@@ -244,7 +245,7 @@ corePrepPgm logger cp_cfg pgm_cfg
                (\a -> a `seqList` ()) $ do
     let native = hasNativeDependentProgram binds []
         end_pass_cfg = cpPgm_endPassConfig pgm_cfg
-    -- See Note [CorePrep for retained Boolean programs].
+    -- See Note [CorePrep for retained dependent programs].
     checked_end_pass_cfg <- if native
       then do
         unless (cp_allowNativeDependent cp_cfg) $
@@ -276,9 +277,9 @@ corePrepPgm logger cp_cfg pgm_cfg
 
     return binds_out
 
-{- Note [CorePrep for retained Boolean programs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The native program path preserves retained Boolean types until CoreToStg.
+{- Note [CorePrep for retained dependent programs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The native program path preserves retained algebraic types until CoreToStg.
 The caller must disable speculation and optional arity analysis. It must
 also supply the CorePrep Lint configuration, including its weak-join rules.
 CorePrep checks the input and output even without -dcore-lint. These checks
@@ -291,7 +292,7 @@ path therefore skips occurAnalyseExpr_Prep. corePrepExpr does not call
 deFloatTop and needs no corresponding change.
 
 This restriction preserves lazy bindings. Agda's application and runtime
-irrelevance rules do not justify forcing a Haskell Boolean index. See
+irrelevance rules do not justify forcing a Haskell runtime index. See
 docs/dependent-haskell/REFERENCES.md#agda-provenance and
 docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
 -}
@@ -640,8 +641,8 @@ cpeBind top_lvl env (NonRec bndr rhs)
                      -- Keep a lazy local index when its RHS is outside the
                      -- supported index grammar. Types still refer to the Id.
                      && (not (cp_allowNativeDependent (cpe_config env))
-                         || not (isBoolIndexId bndr)
-                         || isJust (exprToBoolIndex rhs1))
+                         || not (isNativeIndexId bndr)
+                         || isJust (exprToNativeIndex rhs1))
              env2    | triv_rhs  = extendCorePrepEnvExpr env1 bndr rhs1
                      | otherwise = env1
              floats1 | triv_rhs, isInternalName (idName bndr)
@@ -1296,6 +1297,14 @@ cpeApp top_env expr
            co' = cpSubstCo env co
 
       AIApp arg -> do
+        -- See Note [Retained constructor arguments in CorePrep].
+        when (cp_allowNativeDependent (cpe_config env)) $
+          case coreFullView (exprType fun') of
+            DepFunTy {}
+              | Just (TyConApp _ (_ : _)) <- exprToNativeIndex arg
+              -> throwGhcException (Sorry
+                   "Native dependent Core cannot lower a constructor-tree retained argument in CorePrep. Checked index transport for argument naming is not implemented.")
+            _ -> pure ()
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
                = case (ss, isLazyExpr arg) of
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
@@ -1317,6 +1326,22 @@ cpeApp top_env expr
         | otherwise
         -- See [Floating Ticks in CorePrep]
         -> rebuild_app' env as fun' (snocFloat floats (FloatTick tickish)) ss rt_ticks req_depth
+
+{- Note [Retained constructor arguments in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Core index grammar includes S k, but CorePrep must name that application.
+Changing f (S k) to let t = S k in f t changes its result index from 'S k to
+TermVarTy t. Other argument types can still mention 'S k. The current type system
+has no checked let-alias transport between these indices. Reject this application
+before cpeArg introduces the name. Nullary constructors and local runtime Ids
+need no such naming step. Recursive retained workers can pass a predecessor Id.
+
+This is a temporary lowering boundary, not the source-language target. Agda
+substitutes let definitions after checking and has no internal let construct.
+Haskell must preserve lazy sharing. This precedent does not justify treating
+arbitrary Id unfoldings as equality evidence. See the M9 preservation tasks in
+docs/dependent-haskell/PLAN.md and the provenance in REFERENCES.md.
+-}
 
 isLazyExpr :: CoreExpr -> Bool
 -- See Note [lazyId magic] in GHC.Types.Id.Make
@@ -2438,7 +2463,7 @@ deFloatTop native floats
     get b _  = pprPanic "deFloatTop" (ppr b)
 
     -- See Note [Dead code in CorePrep]
-    -- See Note [CorePrep for retained Boolean programs].
+    -- See Note [CorePrep for retained dependent programs].
     get_bind bind | native = bind
     get_bind (NonRec x e) = NonRec x (occurAnalyseExpr_Prep e)
     get_bind (Rec xes)    = Rec [(x, occurAnalyseExpr_Prep e) | (x, e) <- xes]
@@ -2635,7 +2660,7 @@ data CorePrepConfig = CorePrepConfig
 
   , cp_allowNativeDependent    :: !Bool
   -- ^ Allow checked native dependent expressions and programs.
-  -- See Note [CorePrep for retained Boolean programs].
+  -- See Note [CorePrep for retained dependent programs].
 
   , cp_platform                :: Platform
 

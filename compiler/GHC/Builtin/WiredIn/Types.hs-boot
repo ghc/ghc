@@ -11,7 +11,6 @@ listTyCon :: TyCon
 typeSymbolKind :: Type
 charTy :: Type
 boolTy :: Type
-trueDataCon, falseDataCon :: DataCon
 mkBoxedTupleTy :: [Type] -> Type
 
 coercibleTyCon, heqTyCon :: TyCon

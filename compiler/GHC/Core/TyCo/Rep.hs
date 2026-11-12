@@ -173,10 +173,10 @@ data Type
   -- See Note [Non-trivial definitional equality]
   = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
 
-  | TermVarTy Id -- ^ The Boolean index of a local runtime identifier.
+  | TermVarTy Id -- ^ The algebraic index of a local runtime identifier.
                  -- See Note [Restricted retained dependent types].
 
-  | DepFunTy Id Type -- ^ A retained Boolean binder and its dependent result.
+  | DepFunTy Id Type -- ^ A retained runtime binder and its dependent result.
                      -- See Note [Restricted retained dependent types].
 
   | AppTy
@@ -249,8 +249,9 @@ data Type
 {- Note [Restricted retained dependent types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 TermVarTy and DepFunTy implement an internal experiment. The runtime variable
-remains an Id. It must be local, non-coercion, unrestricted, and of type Bool.
-TermVarTy has kind Bool. A DepFunTy result must have kind Type. Constraint
+remains an Id. It must be local, non-coercion, unrestricted, and have a supported
+closed algebraic type. See Note [Algebraic runtime index domains] in GHC.Core.Type.
+TermVarTy has the identifier's type as its kind. A DepFunTy result has kind Type. Constraint
 also has a lifted representation, but is not a supported result kind here.
 
 The binder scopes over the result. A vacuous binder is represented by FunTy;
@@ -261,8 +262,9 @@ callbacks must not process runtime index variables.
 Only variable and constructor index substitution is implemented. The restricted
 bytecode and module entries check these forms with Core Lint before and after
 preparation. Interface signatures use scoped local Ids. General expression
-substitution, the ordinary optimizer, and native unfoldings remain unsupported.
-The restricted source checker can emit these forms.
+substitution and the ordinary optimizer remain unsupported. Native interface
+templates have separate checks and a module writer gate. The restricted source
+checker currently emits only Boolean retained binders.
 See docs/dependent-haskell/CORE.md and the Agda provenance in
 docs/dependent-haskell/REFERENCES.md.
 -}

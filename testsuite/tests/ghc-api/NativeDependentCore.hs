@@ -12,20 +12,21 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Core
 import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, mkAxInstCo, mkCoVarCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
-import GHC.Core.DataCon (DataCon, dataConWorkId, promoteDataCon)
+import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConWorkId, mkDataCon, promoteDataCon)
 import GHC.Core.Dependent
 import GHC.Core.FVs (exprFreeVars)
-import GHC.Core.FamInstEnv (mkBranchedCoAxiom, mkCoAxBranch)
+import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, normaliseType)
 import GHC.Core.Lint (lintExpr)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
+import GHC.Core.Reduction (Reduction (..))
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
 import GHC.Core.TyCo.FVs (tyCoVarsOfCo)
-import GHC.Core.TyCo.Rep (TyLit (..), Type (..))
+import GHC.Core.TyCo.Rep (Scaled (..), TyLit (..), Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.TyCo.Tidy (tidyTopType)
-import GHC.Core.TyCon (FamTyConFlav (..), Injectivity (..), TyCon, mkAnonTyConBinder, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind)
+import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind)
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchTy, tcMatchTys, tcUnifyTysFG)
@@ -50,20 +51,23 @@ import GHC.IfaceToCore (tcIfaceDecl, tcIfaceExpr, tcIfaceRules)
 import qualified GHC.Parser as Parser
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Tc.Utils.Monad (initIfaceLcl, initIfaceLoad)
+import GHC.Tc.Utils.TcType (noConcreteTyVars)
 import GHC.Types.Basic (OccInfo (..), TailCallInfo (..))
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails (VanillaId), RuleInfo (..))
+import GHC.Types.Id.Make (mkDataConWorkId)
 import GHC.Types.InlinePragma (ActivationX (AlwaysActive))
 import GHC.Types.Literal (Literal (LitChar))
 import GHC.Types.Name (getOccName, mkExternalName, mkSystemName, nameModule)
-import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc, occNameFS)
+import GHC.Types.Name.Occurrence (mkDataConWorkerOcc, mkDataOcc, mkTcOcc, mkTyVarOcc, mkVarOcc, occNameFS)
+import GHC.Types.SourceText (SourceText (NoSourceText))
 import GHC.Types.SrcLoc (mkRealSrcLoc, noLoc, noSrcSpan, unLoc)
 import GHC.Types.TyThing (TyThing (AnId))
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Unit.Types (IsBootInterface (NotBoot))
+import GHC.Unit.Types (IsBootInterface (NotBoot), mainUnit, mkModule, mkModuleName)
 import qualified GHC.Utils.Binary as Binary
 import GHC.Utils.Logger (initLogger, pushLogHook)
 import GHC.Utils.Outputable (ppr, text, vcat)
@@ -82,6 +86,7 @@ main = do
             runChecks dflags
             runMatchingChecks dflags
             runCaseChecks dflags
+            runNatChecks dflags
             runIfaceChecks libdir
             putStrLn "native-core-api-ok"
         _ -> fail "Usage: NativeDependentCore GHC_LIBDIR"
@@ -109,6 +114,263 @@ keep b n = Lam b (identity n (indexed (TermVarTy b)))
 -- | Build the expected ordinary result of applying keep to an index.
 keepResult :: Type -> Type
 keepResult index = mkFunctionType ManyTy (indexed index) (indexed index)
+
+-- | Construct an ordinary recursive datatype without wired-in constructor Names.
+peanoNat :: (TyCon, DataCon, DataCon)
+peanoNat = (nat, zero, successor)
+  where
+    modu = mkModule mainUnit (mkModuleName "NativeIndexAPI")
+    name n occurrence = mkExternalName (unique n) modu occurrence noSrcSpan
+    nat =
+        mkAlgTyCon
+            (name 500 (mkTcOcc "Nat"))
+            liftedTypeKind
+            []
+            0
+            liftedTypeKind
+            []
+            Nothing
+            []
+            (mkDataTyConRhs [zero, successor])
+            (VanillaAlgTyCon (name 501 (mkVarOcc "nat_rep")))
+            False
+    zero = constructor 510 "Z" 1 []
+    successor = constructor 520 "S" 2 [mkTyConTy nat]
+    constructor n label tag fields = con
+      where
+        occurrence = mkDataOcc label
+        con =
+            mkDataCon
+                (name n occurrence)
+                False
+                (name (n + 2) (mkVarOcc (label ++ "_rep")))
+                (map (const (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)) fields)
+                (map (const HsLazy) fields)
+                (map (const NotMarkedStrict) fields)
+                []
+                []
+                []
+                noConcreteTyVars
+                []
+                []
+                []
+                (map (Scaled OneTy) fields)
+                (mkTyConTy nat)
+                NoPromInfo
+                nat
+                tag
+                []
+                (mkDataConWorkId (name (n + 1) (mkDataConWorkerOcc occurrence)) con)
+                NoDataConRep
+
+-- | Check recursive constructor indices, substitutions, and field-scoped proofs.
+runNatChecks :: DynFlags -> IO ()
+runNatChecks dflags = do
+    let (nat, zero, successor) = peanoNat
+        natTy = mkTyConTy nat
+        zeroTy = mkTyConTy (promoteDataCon zero)
+        succTy index = mkTyConApp (promoteDataCon successor) [index]
+        zeroExpr = Var (dataConWorkId zero)
+        succExpr value = App (Var (dataConWorkId successor)) value
+        n = local 530 "n" natTy
+        m = local 531 "m" natTy
+        field = local 532 "predecessor" natTy
+        payload = local 533 "payload" intTy
+        caseBinder = local 534 "nat_case" natTy
+        index = TermVarTy n
+        indexedNat ty = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, ty, ty]) intTy
+        keepNat = Lam n (identity 535 (indexedNat index))
+        keepNatResult ty = mkFunctionType ManyTy (indexedNat ty) (indexedNat ty)
+        zeroProof = proof 536 index zeroTy
+        succProof = proof 537 index (succTy (TermVarTy field))
+        branch number concrete cv = Cast body (mkSymCo transport)
+          where
+            dictionary = local number "nat_dictionary" (mkTyConApp eqTyCon [natTy, concrete, concrete])
+            body = Lam dictionary (Var payload)
+            co = mkCoVarCo cv
+            predicateCo = mkTyConAppCo Nominal eqTyCon [mkNomReflCo natTy, co, co]
+            transport = mkFunCoNoFTF Representational (mkNomReflCo ManyTy) (mkSubCo predicateCo) (mkReflCo Representational intTy)
+        zeroBranch = branch 538 zeroTy zeroProof
+        succBranch = branch 539 (succTy (TermVarTy field)) succProof
+        alternatives =
+            [ Alt (DataAlt zero) [zeroProof] zeroBranch
+            , Alt (DataAlt successor) [field, succProof] succBranch
+            ]
+        natCase = Case (Var n) caseBinder (indexedNat index) alternatives
+    domain <- timeout 2000000 (evaluate (isNativeIndexType natTy))
+    check "recursive Nat index domain terminates" (domain == Just True)
+    check "Nat runtime Id is an index" (isNativeIndexId n)
+    check "linear Nat Id is not an index" (not (isNativeIndexId (setIdMult n OneTy)))
+    checkType dflags "runtime Nat index has kind Nat" natTy (typeKind index)
+    forM_
+        [ (Var n, index)
+        , (zeroExpr, zeroTy)
+        , (succExpr (Var n), succTy index)
+        , (succExpr (succExpr (Var n)), succTy (succTy index))
+        ]
+        $ \(expression, expected) -> do
+            lintAccepts dflags "ordinary Peano constructor application" [n] expression
+            case exprToNativeIndex expression of
+                Just actual -> do
+                    checkType dflags "constructor index retains its runtime fields" expected actual
+                    checkType dflags "constructor index has kind Nat" natTy (typeKind actual)
+                Nothing -> fail "FAIL: Peano constructor application was not an index"
+    let opaque = setIdUnfolding n (unfolding (error "forced a Nat index unfolding"))
+    case exprToNativeIndex (succExpr (Var opaque)) of
+        Just actual -> checkType dflags "successor index does not inspect a lazy field unfolding" (succTy index) actual
+        Nothing -> fail "FAIL: successor lost its opaque runtime field"
+    forM_
+        [ Var (dataConWorkId successor)
+        , App (succExpr zeroExpr) zeroExpr
+        , succExpr (Var (dataConWorkId trueDataCon))
+        ]
+        $ \expression -> check "index conversion rejects malformed constructor applications" $ case exprToNativeIndex expression of
+            Nothing -> True
+            Just _ -> False
+    let replace = indexSubst [m] n (succExpr (Var m))
+        range = Subst.getSubstRangeTyCoFVs replace
+        nested = succTy (succTy index)
+    check "constructor substitution range includes its field Id" (m `elemVarSet` range)
+    checkType dflags "index substitution descends through constructors" (succTy (succTy (succTy (TermVarTy m)))) (Subst.substTy replace nested)
+    case exprToNativeIndex (mapNativeIndex (Subst.substTy replace) (succExpr (Var n))) of
+        Just actual -> checkType dflags "index mapping reconstructs constructor fields" (succTy (succTy (TermVarTy m))) actual
+        Nothing -> fail "FAIL: mapped constructor expression lost its index"
+    let replaceField = indexSubst [m] field (succExpr (Var m))
+        replaceN = indexSubst [field] n (succExpr (Var field))
+        composed = Subst.composeTCvSubst replaceField replaceN
+    checkType dflags "index composition traverses successor fields" (succTy (succTy (TermVarTy m))) (Subst.substTy composed index)
+    let template = mkTyVar (mkSystemName (unique 542) (mkTyVarOcc "length")) natTy
+    case tcMatchTy (succTy (mkTyVarTy template)) (succTy (TermVarTy field)) of
+        Just matched -> case Subst.lookupTyVar matched template of
+            Just actual -> checkType dflags "constructor matching binds an erased parameter to a runtime field" (TermVarTy field) actual
+            Nothing -> fail "FAIL: constructor matching lost its length parameter"
+        Nothing -> fail "FAIL: successor template did not match a runtime predecessor"
+    check "opaque Nat cannot exclude the zero family equation" $ case tcUnifyTysFG alwaysBindFam alwaysBindTv [index] [zeroTy] of
+        MaybeApart _ _ -> True
+        _ -> False
+    check "known Nat constructor heads remain apart" $ case tcUnifyTysFG alwaysBindFam alwaysBindTv [zeroTy] [succTy index] of
+        SurelyApart -> True
+        _ -> False
+    check "opaque Nat may be its own successor" $ case tcUnifyTysFG alwaysBindFam alwaysBindTv [index] [succTy index] of
+        MaybeApart _ _ -> True
+        _ -> False
+    let left = mkTyVar (mkSystemName (unique 550) (mkTyVarOcc "left")) natTy
+        right = mkTyVar (mkSystemName (unique 551) (mkTyVarOcc "right")) natTy
+        binders = map mkAnonTyConBinder [left, right]
+        addition =
+            mkFamilyTyCon
+                (mkSystemName (unique 552) (mkTcOcc "Add"))
+                (mkTyConKind binders natTy)
+                binders
+                0
+                natTy
+                Nothing
+                (ClosedTypeFamilyTyCon (CTF (Just additionAxiom)))
+                Nothing
+                NotInjective
+        add a b = mkTyConApp addition [a, b]
+        additionAxiom =
+            mkBranchedCoAxiom
+                Nominal
+                (mkSystemName (unique 553) (mkTcOcc "AddAx"))
+                addition
+                [ mkCoAxBranch [right] [] [] [zeroTy, mkTyVarTy right] (mkTyVarTy right) [Nominal] noSrcSpan
+                , mkCoAxBranch
+                    [left, right]
+                    []
+                    []
+                    [succTy (mkTyVarTy left), mkTyVarTy right]
+                    (succTy (add (mkTyVarTy left) (mkTyVarTy right)))
+                    [Nominal, Nominal]
+                    noSrcSpan
+                ]
+    forM_
+        [ ("zero addition", add zeroTy (TermVarTy m), TermVarTy m)
+        , ("successor addition", add (succTy index) (TermVarTy m), succTy (add index (TermVarTy m)))
+        , ("opaque addition stays stuck", add index (TermVarTy m), add index (TermVarTy m))
+        , ("known unfolding stays opaque", add (TermVarTy (setIdUnfolding n (unfolding zeroExpr))) (TermVarTy m), add index (TermVarTy m))
+        ]
+        $ \(label, original, expected) -> do
+            let Reduction co reduced = normaliseType emptyFamInstEnvs Nominal original
+            checkType dflags label expected reduced
+            checkType dflags (label ++ " coercion source") original (coercionLKind co)
+            checkType dflags (label ++ " coercion target") expected (coercionRKind co)
+            lintAccepts dflags (label ++ " coercion") [n, m] (Coercion co)
+    let captured = mkDepFunTy m (mkFunctionType ManyTy (indexedNat (TermVarTy m)) (indexedNat index))
+    case Subst.substTy replace captured of
+        DepFunTy fresh body -> do
+            check "Nat substitution avoids capturing a field Id" (fresh /= m)
+            checkType
+                dflags
+                "Nat substitution preserves both binder identities"
+                (mkFunctionType ManyTy (indexedNat (TermVarTy fresh)) (indexedNat (succTy (TermVarTy m))))
+                body
+        _ -> fail "FAIL: Nat substitution lost its retained binder"
+    lintAccepts dflags "retained Nat identity" [] keepNat
+    checkType dflags "retained Nat identity type" (mkDepFunTy n (keepNatResult index)) (exprType keepNat)
+    forM_ [zeroExpr, succExpr (Var m)] $ \argument -> do
+        lintAccepts dflags "retained application accepts Peano constructors" [m] (App keepNat argument)
+        case exprToNativeIndex argument of
+            Just actual -> checkType dflags "retained application substitutes constructor fields" (keepNatResult actual) (exprType (App keepNat argument))
+            Nothing -> fail "FAIL: retained Peano argument lost its index"
+    lintAccepts dflags "successor field is in scope in its virtual proof" [n, payload] natCase
+    lintAccepts dflags "Nat case substitution preserves successor evidence" [m, payload] $
+        CoreSubst.substExpr (indexSubst [m, payload] n (Var m)) natCase
+    lintAccepts dflags "Nat case substitution admits a constructor index" [m, payload] $
+        CoreSubst.substExpr (indexSubst [m, payload] n (succExpr (Var m))) natCase
+    lintAccepts dflags "Nat field substitution avoids alternative capture" [field, payload] $
+        CoreSubst.substExpr (indexSubst [field, payload] n (Var field)) natCase
+    lintAccepts dflags "closed retained Nat constructor case" [] (Lam n (Lam payload natCase))
+    checkType dflags "Nat case retains its outer index" (indexedNat index) (exprType natCase)
+    lintAccepts dflags "ordinary successor fields remain ordinary payload" [n, payload] $
+        Case
+            (Var n)
+            caseBinder
+            intTy
+            [ Alt (DataAlt zero) [] (Var payload)
+            , Alt (DataAlt successor) [field] (Var payload)
+            ]
+    lintRejects dflags "native successor proof cannot precede its field" [n, payload] $
+        Case
+            (Var n)
+            caseBinder
+            (indexedNat index)
+            [Alt (DataAlt zero) [zeroProof] zeroBranch, Alt (DataAlt successor) [succProof, field] succBranch]
+    lintRejects dflags "native successor requires its real runtime field" [n, payload] $
+        Case
+            (Var n)
+            caseBinder
+            (indexedNat index)
+            [Alt (DataAlt zero) [zeroProof] zeroBranch, Alt (DataAlt successor) [succProof] succBranch]
+    let wrongProof = proof 540 index zeroTy
+    lintRejects dflags "successor evidence must name its actual constructor and field" [n, payload] $
+        Case
+            (Var n)
+            caseBinder
+            (indexedNat index)
+            [Alt (DataAlt zero) [zeroProof] zeroBranch, Alt (DataAlt successor) [field, wrongProof] (branch 543 zeroTy wrongProof)]
+    let wrongField = local 544 "wrong_field" boolTy
+    lintRejects dflags "successor field must have its declared Nat type" [n, payload] $
+        Case
+            (Var n)
+            caseBinder
+            (indexedNat index)
+            [Alt (DataAlt zero) [zeroProof] zeroBranch, Alt (DataAlt successor) [wrongField, succProof] succBranch]
+    let shadowProof = proof 545 index (succTy index)
+    lintRejects dflags "successor field cannot capture its scrutinee index" [n, payload] $
+        Case
+            (Var n)
+            caseBinder
+            (indexedNat index)
+            [Alt (DataAlt zero) [zeroProof] zeroBranch, Alt (DataAlt successor) [n, shadowProof] (branch 546 (succTy index) shadowProof)]
+    lintRejects dflags "constructor field cannot escape into the case result" [n, payload] $
+        Case (Var n) caseBinder (indexedNat (TermVarTy field)) alternatives
+    lintRejects dflags "native Nat proof alternatives must cover the domain" [n, payload] $
+        Case (Var n) caseBinder (indexedNat index) [Alt (DataAlt successor) [field, succProof] succBranch]
+    let literalProof = proof 541 zeroTy zeroTy
+        literalCase = Case zeroExpr caseBinder intTy [Alt DEFAULT [] (Var payload), Alt (DataAlt zero) [literalProof] (Var payload)]
+    lintAccepts dflags "literal Nat evidence with DEFAULT remains checked" [payload] literalCase
+    check "scanner detects literal Nat evidence" (hasNativeDependentExpr literalCase)
 
 -- | Construct an index substitution with an explicit scope.
 indexSubst :: [Var] -> Id -> CoreExpr -> Subst.Subst
@@ -792,9 +1054,9 @@ runChecks dflags = do
         _ -> fail "FAIL: capture avoidance lost the retained binder"
     let missingRange = indexSubst [] b (Var c)
     check "missing substitution range fails the scope invariant" (not (Subst.isValidTCvSubst missingRange))
-    rejectsWith "unsupported expression substitution" "unsupported runtime Boolean index" $
+    rejectsWith "unsupported expression substitution" "unsupported runtime index" $
         evaluate (Subst.substTy (indexSubst [] b (Let (NonRec c trueExpr) (Var c))) (TermVarTy b))
-    rejectsWith "composition rejects an unsupported index range" "unsupported runtime Boolean index" $
+    rejectsWith "composition rejects an unsupported index range" "unsupported runtime index" $
         evaluate
             ( Subst.substTy
                 (Subst.composeTCvSubst (indexSubst [] c (Let (NonRec b trueExpr) (Var b))) toC)

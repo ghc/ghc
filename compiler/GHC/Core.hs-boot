@@ -11,5 +11,5 @@ type CoreBndr = Var
 type CoreExpr = Expr CoreBndr
 
 varToCoreExpr :: CoreBndr -> Expr b
-exprToBoolIndex :: CoreExpr -> Maybe Type
-mapBoolIndex :: (Type -> Type) -> CoreExpr -> CoreExpr
+exprToNativeIndex :: CoreExpr -> Maybe Type
+mapNativeIndex :: (Type -> Type) -> CoreExpr -> CoreExpr

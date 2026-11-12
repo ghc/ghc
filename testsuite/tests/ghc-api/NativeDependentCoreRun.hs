@@ -10,17 +10,18 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Core
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..))
-import GHC.Core.DataCon (dataConWorkId, promoteDataCon)
+import GHC.Core.DataCon (DataCon, dataConFullSig, dataConName, dataConWorkId, eqSpecTyVar, eqSpecType, promoteDataCon)
 import GHC.Core.Dependent (hasNativeDependentExpr)
 import GHC.Core.FamInstEnv (mkBranchedCoAxiom, mkCoAxBranch)
 import GHC.Core.Lint (lintExpr)
 import GHC.Core.Make (mkCoreConApps, mkIntExpr)
 import GHC.Core.Opt.Arity (etaExpand)
 import GHC.Core.Predicate (mkNomEqPred)
-import GHC.Core.TyCo.Rep (Type (..))
+import GHC.Core.TyCo.Compare (eqType)
+import GHC.Core.TyCo.Rep (Type (..), scaledThing)
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Utils (exprType)
+import GHC.Core.Utils (dataConRepInstPat, exprType)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.StringBuffer (stringToStringBuffer)
@@ -72,7 +73,8 @@ main = do
 helperSource :: String
 helperSource =
     unlines
-        [ "module NativeRuntimeHelpers where"
+        [ "{-# LANGUAGE DataKinds, GADTs, KindSignatures, TypeFamilies #-}"
+        , "module NativeRuntimeHelpers where"
         , "import Data.IORef"
         , "{-# NOINLINE drive #-}"
         , "drive :: (Bool -> IO String) -> Bool -> IO String"
@@ -88,6 +90,51 @@ helperSource =
         , "{-# NOINLINE bottomBool #-}"
         , "bottomBool :: Bool"
         , "bottomBool = error \"native-bottom-bool\""
+        , "data Nat = Z | S Nat"
+        , "data Vec a (n :: Nat) where"
+        , "  VNil :: Vec a Z"
+        , "  VCons :: a -> Vec a n -> Vec a (S n)"
+        , "type family Add (n :: Nat) (m :: Nat) :: Nat where"
+        , "  Add Z m = m"
+        , "  Add (S n) m = S (Add n m)"
+        , "appendVec :: Vec Int n -> Vec Int m -> Vec Int (Add n m)"
+        , "appendVec VNil ys = ys"
+        , "appendVec (VCons x xs) ys = VCons x (appendVec xs ys)"
+        , "vecList :: Vec Int n -> [Int]"
+        , "vecList VNil = []"
+        , "vecList (VCons x xs) = x : vecList xs"
+        , "observeVec :: Vec Int n -> IO String"
+        , "observeVec xs = let ys = vecList xs in pure (show ys ++ \":\" ++ show (length ys))"
+        , "observeVecHead :: Vec Int n -> IO String"
+        , "observeVecHead (VCons x _) = pure (show x)"
+        , "observeVecHead VNil = error \"empty-native-vector\""
+        , "observeVecPrefix :: Vec Int n -> IO String"
+        , "observeVecPrefix xs = pure (show (take 4 (vecList xs)))"
+        , "{-# NOINLINE driveNat #-}"
+        , "driveNat :: (Nat -> IO String) -> Nat -> IO String"
+        , "driveNat k seed = newIORef seed >>= readIORef >>= k"
+        , "driveNats :: (Nat -> IO String) -> IO String"
+        , "driveNats k = unlines <$> mapM (driveNat k) [Z, S (S Z), S (S (S Z))]"
+        , "{-# NOINLINE driveNatPair #-}"
+        , "driveNatPair :: (Nat -> Nat -> IO String) -> (Nat, Nat) -> IO String"
+        , "driveNatPair k seed = newIORef seed >>= readIORef >>= uncurry k"
+        , "driveNatPairs :: (Nat -> Nat -> IO String) -> IO String"
+        , "driveNatPairs k = unlines <$> mapM (driveNatPair k) [(Z,Z), (Z,S (S (S Z))), (S (S Z),Z), (S (S Z),S (S (S Z)))]"
+        , "{-# NOINLINE bottomNat #-}"
+        , "bottomNat :: Nat"
+        , "bottomNat = error \"native-bottom-nat\""
+        , "partialNat :: Nat"
+        , "partialNat = S bottomNat"
+        , "{-# NOINLINE cyclicNat #-}"
+        , "cyclicNat :: Nat"
+        , "cyclicNat = S cyclicNat"
+        , "bottomElement :: Int"
+        , "bottomElement = error \"native-bottom-element\""
+        , "bottomVec :: Vec Int n"
+        , "bottomVec = error \"native-bottom-vector\""
+        , "data IndexLeft = IndexLeft IndexRight"
+        , "data IndexRight = IndexRight IndexLeft"
+        , "data BadIndex = BadIndex BadIndex Int"
         ]
 
 -- | Check source elaboration with one shared retained worker and lazy indices.
@@ -763,7 +810,7 @@ runSourceRejectChecks = do
         sourceRejects label code fragment extensions declarations
 
 -- | Load helper bytecode and obtain its ordinary Core identifiers.
-loadHelpers :: GHC.Ghc [Id]
+loadHelpers :: GHC.Ghc ([Id], [TyCon])
 loadHelpers = do
     flags <- GHC.getSessionDynFlags
     void
@@ -786,14 +833,15 @@ loadHelpers = do
     information <- GHC.getModuleInfo (mkModule mainUnit (mkModuleName moduleName))
     case information of
         Nothing -> fail "FAIL: loaded helper module has no module information"
-        Just info -> mapM loadedId (GHC.modInfoExports info)
+        Just info -> do
+            things <- mapM loadedThing (GHC.modInfoExports info)
+            pure ([binder | GHC.AnId binder <- things, isGlobalId binder], [tycon | GHC.ATyCon tycon <- things])
   where
-    loadedId name = do
+    loadedThing name = do
         thing <- GHC.lookupGlobalName name
         case thing of
-            Just (GHC.AnId binder)
-                | isGlobalId binder -> pure binder
-            _ -> fail ("FAIL: loaded helper is not a global Id: " ++ occNameString (nameOccName name))
+            Just loaded -> pure loaded
+            Nothing -> fail ("FAIL: loaded helper has no global definition: " ++ occNameString (nameOccName name))
 
 -- | Find a helper by its source name.
 helper :: [Id] -> String -> Id
@@ -978,6 +1026,288 @@ dictionaryKeepKernel intPayload observeInt = Lam b (Let (NonRec keepId keepExpr)
     kept = App (App (Var keepId) (Var b)) value
     observation = App (Var observeInt) (App kept reflexive)
 
+-- | Build recursive retained Core using the loaded Vec constructor equalities.
+natReplication :: TyCon -> TyCon -> DataCon -> DataCon -> DataCon -> DataCon -> IO (Id, CoreExpr)
+natReplication nat vec zero successor nil cons = do
+    nilValue <- constructor nil [] zeroProof []
+    consValue <- constructor cons [TermVarTy predecessor] succProof [Var value, recursive]
+    pure
+        ( worker
+        , Lam
+            n
+            ( Lam
+                value
+                ( Case
+                    (Var n)
+                    caseBinder
+                    result
+                    [ Alt (DataAlt zero) [zeroProof] nilValue
+                    , Alt (DataAlt successor) [predecessor, succProof] consValue
+                    ]
+                )
+            )
+        )
+  where
+    natTy = mkTyConTy nat
+    n = local 200 "replicate_n" natTy
+    value = local 201 "replicate_value" intTy
+    predecessor = local 202 "predecessor" natTy
+    caseBinder = local 203 "replicate_case" natTy
+    index = TermVarTy n
+    result = mkTyConApp vec [intTy, index]
+    worker = local 204 "replicate_native" (mkDepFunTy n (mkFunctionType ManyTy intTy result))
+    zeroProof = proof 205 index (mkTyConTy (promoteDataCon zero))
+    succProof = proof 206 index (mkTyConApp (promoteDataCon successor) [TermVarTy predecessor])
+    recursive = mkApps (Var worker) [Var predecessor, Var value]
+
+    constructor con existentialArgs cv fields = do
+        let (universals, existentials, equations, theta, arguments, _) = dataConFullSig con
+            tyvars = universals ++ existentials
+            types = [intTy, index] ++ existentialArgs
+            instantiate = substTyWith tyvars types
+            description = occNameString (nameOccName (dataConName con))
+        unless
+            ( length universals == 2
+                && length existentials == length existentialArgs
+                && all isTyVar existentials
+                && null theta
+                && length arguments == length fields
+            )
+            $ fail ("FAIL: unexpected Vec constructor shape: " ++ description)
+        case equations of
+            [equation] -> do
+                let expected = instantiate (mkNomEqPred (mkTyVarTy (eqSpecTyVar equation)) (eqSpecType equation))
+                unless (coercionType (mkCoVarCo cv) `eqType` expected) $
+                    fail ("FAIL: Vec constructor proof has different endpoints: " ++ description)
+            _ -> fail ("FAIL: Vec constructor does not have one length equality: " ++ description)
+        unless (and (zipWith (\argument field -> instantiate (scaledThing argument) `eqType` exprType field) arguments fields)) $
+            fail ("FAIL: Vec constructor fields have different types: " ++ description)
+        let expression = mkApps (Var (dataConWorkId con)) (map Type types ++ [Coercion (mkCoVarCo cv)] ++ fields)
+        unless (exprType expression `eqType` result) $
+            fail ("FAIL: Vec worker did not retain its actual runtime index: " ++ description)
+        pure expression
+
+-- | Keep the ordinary erased GADT predecessor separate from the runtime index.
+nativeVecHead :: TyCon -> TyCon -> DataCon -> DataCon -> IO (Id, CoreExpr)
+nativeVecHead nat vec successor cons = do
+    case (existentials, arguments) of
+        ([erased], [cv, first, rest])
+            | isTyVar erased
+            , isCoVar cv
+            , tyVarKind erased `eqType` natTy
+            , varType first `eqType` intTy
+            , varType rest `eqType` mkTyConApp vec [intTy, mkTyVarTy erased]
+            , coercionRole (mkCoVarCo cv) == Nominal
+            , coercionLKind (mkCoVarCo cv) `eqType` successorIndex
+            , coercionRKind (mkCoVarCo cv) `eqType` mkTyConApp (promoteDataCon successor) [mkTyVarTy erased] ->
+                pure
+                    ( worker
+                    , Lam
+                        n
+                        ( Lam
+                            vector
+                            ( Case
+                                (Var vector)
+                                caseBinder
+                                intTy
+                                [Alt (DataAlt cons) (existentials ++ arguments) (Var first)]
+                            )
+                        )
+                    )
+        _ -> fail "FAIL: native head did not receive an ordinary erased Vec predecessor"
+  where
+    natTy = mkTyConTy nat
+    n = local 220 "head_n" natTy
+    successorIndex = mkTyConApp (promoteDataCon successor) [TermVarTy n]
+    vectorTy = mkTyConApp vec [intTy, successorIndex]
+    vector = local 221 "head_vector" vectorTy
+    caseBinder = local 222 "head_case" vectorTy
+    worker = local 223 "head_native" (mkDepFunTy n (mkFunctionType ManyTy vectorTy intTy))
+    (existentials, arguments) = dataConRepInstPat (map unique [230 .. 239]) ManyTy cons [intTy, successorIndex]
+
+-- | Check the Core intermediate with runtime inputs and lazy recursive fields.
+runNatChecks :: HscEnv -> DynFlags -> [Id] -> [TyCon] -> IO ()
+runNatChecks environment flags bindings tycons = do
+    nat <- namedTyCon "Nat"
+    vec <- namedTyCon "Vec"
+    add <- namedTyCon "Add"
+    zero <- namedDataCon nat "Z"
+    successor <- namedDataCon nat "S"
+    nil <- namedDataCon vec "VNil"
+    cons <- namedDataCon vec "VCons"
+    (worker, rhs) <- natReplication nat vec zero successor nil cons
+    (headWorker, headRhs) <- nativeVecHead nat vec successor cons
+    left <- namedTyCon "IndexLeft"
+    right <- namedTyCon "IndexRight"
+    bad <- namedTyCon "BadIndex"
+    unless (isNativeIndexType (mkTyConTy left) && isNativeIndexType (mkTyConTy right)) $
+        fail "FAIL: mutually recursive ordinary index domains were rejected"
+    unless (not (isNativeIndexType (mkTyConTy bad))) $
+        fail "FAIL: an index-domain cycle hid its reachable Int payload"
+    let input = local 210 "runtime_nat" (mkTyConTy nat)
+        payload = mkIntExpr (targetPlatform flags) 42
+        replicated = mkApps (Var worker) [Var input, payload]
+        kernel observer = Let (Rec [(worker, rhs)]) (Lam input (mkApps (Var (helper bindings observer)) [Type (TermVarTy input), replicated]))
+        drive observer seed = mkApps (Var (helper bindings "driveNat")) [kernel observer, Var (helper bindings seed)]
+        expect label expected expression = do
+            actual <- execute environment flags label expression
+            unless (actual == expected) $
+                fail ("FAIL: " ++ label ++ "; expected " ++ show expected ++ ", got " ++ show actual)
+        expectBottom label expression = do
+            outcome <- try (execute environment flags label expression) :: IO (Either SomeException String)
+            case outcome of
+                Left exception | "native-bottom-nat" `isInfixOf` displayException exception -> pure ()
+                Left exception -> fail ("FAIL: " ++ label ++ "; wrong exception: " ++ displayException exception)
+                Right actual -> fail ("FAIL: " ++ label ++ "; expected bottom, got " ++ show actual)
+    expect
+        "runtime Nat replication at zero/two/three"
+        (unlines ["[]:0", "[42,42]:2", "[42,42,42]:3"])
+        (App (Var (helper bindings "driveNats")) (kernel "observeVec"))
+    expect "replication head does not force predecessor" "42" (drive "observeVecHead" "partialNat")
+    expectBottom "replication tail forces partial predecessor" (drive "observeVec" "partialNat")
+    expect "replication of cyclic Nat has a finite prefix" "[42,42,42,42]" (drive "observeVecPrefix" "cyclicNat")
+    expectBottom "replication inspects its Nat constructor" (drive "observeVecHead" "bottomNat")
+    let emptyKernel =
+            Let (Rec [(worker, rhs)]) $
+                Lam
+                    input
+                    ( mkApps
+                        (Var (helper bindings "observeVec"))
+                        [ Type (TermVarTy input)
+                        , mkApps (Var worker) [Var input, Var (helper bindings "bottomElement")]
+                        ]
+                    )
+    expect "zero replication does not force its element" "[]:0" $
+        mkApps (Var (helper bindings "driveNat")) [emptyKernel, Var (dataConWorkId zero)]
+    let lazyIndex = local 224 "lazy_head_index" (mkTyConTy nat)
+        index = TermVarTy lazyIndex
+        lengthIndex = mkTyConApp (promoteDataCon successor) [index]
+        tailValue = App (Var (helper bindings "bottomVec")) (Type index)
+        vectorValue =
+            mkApps
+                (Var (dataConWorkId cons))
+                [Type intTy, Type lengthIndex, Type index, Coercion (mkNomReflCo lengthIndex), payload, tailValue]
+        headCall =
+            Let (NonRec lazyIndex (Var (helper bindings "bottomNat")))
+                $ Let (NonRec headWorker headRhs)
+                $ App (Var (helper bindings "observeInt")) (mkApps (Var headWorker) [Var lazyIndex, vectorValue])
+    expect "native head ignores its retained index and vector tail" "42" headCall
+    let natTy = mkTyConTy nat
+        appendN = local 240 "append_n" natTy
+        appendM = local 241 "append_m" natTy
+        nIndex = TermVarTy appendN
+        mIndex = TermVarTy appendM
+        leftType = mkTyConApp vec [intTy, nIndex]
+        rightType = mkTyConApp vec [intTy, mIndex]
+        resultType = mkTyConApp vec [intTy, mkTyConApp add [nIndex, mIndex]]
+        xs = local 242 "append_xs" leftType
+        ys = local 243 "append_ys" rightType
+        appendRhs =
+            Lam
+                appendN
+                ( Lam
+                    appendM
+                    ( Lam
+                        xs
+                        ( Lam
+                            ys
+                            (mkApps (Var (helper bindings "appendVec")) [Type nIndex, Type mIndex, Var xs, Var ys])
+                        )
+                    )
+                )
+        appendType =
+            mkDepFunTy
+                appendN
+                ( mkDepFunTy
+                    appendM
+                    (mkFunctionType ManyTy leftType (mkFunctionType ManyTy rightType resultType))
+                )
+        appendWorker = local 244 "append_native" appendType
+        secondInput = local 245 "second_runtime_nat" natTy
+        appendedIndex = mkTyConApp add [TermVarTy input, TermVarTy secondInput]
+        leftVector = mkApps (Var worker) [Var input, payload]
+        rightVector = mkApps (Var worker) [Var secondInput, mkIntExpr (targetPlatform flags) 7]
+        appended = mkApps (Var appendWorker) [Var input, Var secondInput, leftVector, rightVector]
+        appendKernel =
+            Let (Rec [(worker, rhs)])
+                $ Let (NonRec appendWorker appendRhs)
+                $ Lam
+                    input
+                    ( Lam
+                        secondInput
+                        (mkApps (Var (helper bindings "observeVec")) [Type appendedIndex, appended])
+                    )
+    unless (exprType appendRhs `eqType` appendType) $
+        fail "FAIL: native append lost its two retained runtime binders"
+    expect
+        "runtime Nat append at zero/zero, zero/three, two/zero, two/three"
+        (unlines ["[]:0", "[7,7,7]:3", "[42,42]:2", "[42,42,7,7,7]:5"])
+        (App (Var (helper bindings "driveNatPairs")) appendKernel)
+    let lazyN = local 246 "lazy_append_n" natTy
+        lazyM = local 247 "lazy_append_m" natTy
+        partialAppend = mkApps (Var appendWorker) [Var lazyN, Var lazyM]
+        forcePartial =
+            Let (NonRec lazyN (Var (helper bindings "bottomNat")))
+                $ Let (NonRec lazyM (Var (helper bindings "bottomNat")))
+                $ Let (NonRec appendWorker appendRhs)
+                $ mkApps (Var (helper bindings "force")) [Type (exprType partialAppend), partialAppend]
+    expect "partial append does not force either retained Nat" "forced" forcePartial
+    let bottomAt binder = App (Var (helper bindings "bottomVec")) (Type (TermVarTy binder))
+        fullAppend = mkApps partialAppend [bottomAt lazyN, bottomAt lazyM]
+        forceFull =
+            Let (NonRec lazyN (Var (helper bindings "bottomNat")))
+                $ Let (NonRec lazyM (Var (helper bindings "bottomNat")))
+                $ Let (NonRec appendWorker appendRhs)
+                $ mkApps (Var (helper bindings "force")) [Type (exprType fullAppend), fullAppend]
+    fullOutcome <- try (execute environment flags "append demands a vector before either index" forceFull) :: IO (Either SomeException String)
+    case fullOutcome of
+        Left exception | "native-bottom-vector" `isInfixOf` displayException exception -> pure ()
+        Left exception -> fail ("FAIL: append forced an unexpected argument: " ++ displayException exception)
+        Right actual -> fail ("FAIL: append returned without inspecting its bottom vector: " ++ show actual)
+    let successorIndex = mkTyConApp (promoteDataCon successor) [TermVarTy input]
+        successorValue = App (Var (dataConWorkId successor)) (Var input)
+        successorKernel =
+            Let (Rec [(worker, rhs)]) $
+                Lam
+                    input
+                    ( mkApps
+                        (Var (helper bindings "observeVec"))
+                        [Type successorIndex, mkApps (Var worker) [successorValue, payload]]
+                    )
+        constructorArgument =
+            mkApps
+                (Var (helper bindings "driveNat"))
+                [successorKernel, Var (helper bindings "partialNat")]
+    outcome <- try (execute environment flags "retained constructor argument boundary" constructorArgument) :: IO (Either GhcException String)
+    case outcome of
+        Left (Sorry message)
+            | "CorePrep" `isInfixOf` message
+            , "Checked index transport" `isInfixOf` message ->
+                pure ()
+        Left exception -> fail ("FAIL: retained constructor argument raised another exception: " ++ displayException exception)
+        Right actual -> fail ("FAIL: unsupported retained constructor argument returned " ++ show actual)
+    let natTy = mkTyConTy nat
+        keepN = local 211 "unused_nat" natTy
+        indexedNat index = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, index, index]) intTy
+        keepValue = local 212 "keep_value" (indexedNat (TermVarTy keepN))
+        keepExpr = Lam keepN (Lam keepValue (Var keepValue))
+        keepId = local 213 "keep_nat" (exprType keepExpr)
+        index = TermVarTy input
+        dictionary = local 214 "nat_dictionary" (mkTyConApp eqTyCon [natTy, index, index])
+        value = Lam dictionary payload
+        reflexive = mkCoreConApps eqDataCon [Type natTy, Type index, Type index, Coercion (mkNomReflCo index)]
+        kept = mkApps (Var keepId) [Var input, value, reflexive]
+        keepKernel = Lam input (Let (NonRec keepId keepExpr) (App (Var (helper bindings "observeInt")) kept))
+    expect "unused retained Nat does not force its input" "42" $
+        mkApps (Var (helper bindings "driveNat")) [keepKernel, Var (helper bindings "bottomNat")]
+  where
+    namedTyCon label = case find ((== label) . occNameString . nameOccName . tyConName) tycons of
+        Just tycon -> pure tycon
+        Nothing -> fail ("FAIL: missing loaded type constructor: " ++ label)
+    namedDataCon tycon label = case find ((== label) . occNameString . nameOccName . dataConName) (tyConDataCons tycon) of
+        Just constructor -> pure constructor
+        Nothing -> fail ("FAIL: missing loaded data constructor: " ++ label)
+
 -- | Lint a closed native expression before it reaches the backend API.
 lintNative :: DynFlags -> String -> CoreExpr -> IO ()
 lintNative flags label expression = do
@@ -996,7 +1326,7 @@ execute environment flags label expression = do
 -- | Check runtime results and distinguish both keep laziness observations.
 runChecks :: GHC.Ghc ()
 runChecks = do
-    bindings <- loadHelpers
+    (bindings, tycons) <- loadHelpers
     flags <- GHC.getSessionDynFlags
     environment <- GHC.getSession
     let drive = helper bindings "drive"
@@ -1039,5 +1369,6 @@ runChecks = do
                 | "native-bottom-bool" `isInfixOf` displayException exception -> putStrLn "choose bottom: raised native-bottom-bool"
                 | otherwise -> fail ("FAIL: choose bottom raised another exception: " ++ displayException exception)
             Right actual -> fail ("FAIL: choose bottom returned " ++ show actual)
+    liftIO $ runNatChecks environment flags bindings tycons
     runSourceChecks
     runSourceRejectChecks

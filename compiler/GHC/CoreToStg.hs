@@ -47,7 +47,6 @@ import GHC.Platform        ( Platform )
 import GHC.Platform.Ways
 
 import GHC.Builtin.PrimOps
-import GHC.Builtin.WiredIn.Types ( trueDataCon, falseDataCon )
 import GHC.Builtin.WiredIn.Ids ( coercionTokenId )
 
 import GHC.Utils.Outputable
@@ -488,15 +487,15 @@ coreToStgExpr (Case scrut bndr _ alts)
        ; return (StgCase scrut2 bndr (mkStgAltType bndr alts) alts2) }
   where
     vars_alt :: CoreAlt -> CtsM StgAlt
-    vars_alt (Alt con binders rhs)
-      = let -- Core Lint checks these virtual proofs. Bool has no fields.
+    vars_alt alt@(Alt con binders rhs)
+      = let -- Core Lint checks the final virtual proof. Keep real fields.
             -- Keep ordinary coercion argument slots; see Note [Coercion tokens].
             binders'
-              | DataAlt dc <- con
-              , dc == trueDataCon || dc == falseDataCon
-              , [cv] <- binders
+              | isNativeIndexAlt alt
+              , DataAlt dc <- con
+              , (fields, [cv]) <- splitAt (dataConRepArity dc) binders
               , isCoVar cv
-              = []
+              = filterStgBinders fields
               | otherwise
               = filterStgBinders binders
         in

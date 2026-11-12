@@ -683,7 +683,7 @@ This rule does not solve the equality or rewrite the runtime index. A Given
 remains an inert irreducible equality. addIrredToCans still calls updGivenEqs,
 which records its level and prevents unsafe outer metavariable assignments.
 See Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet and
-Note [Apartness of retained Boolean indices] in GHC.Core.Unify.
+Note [Apartness of retained runtime indices] in GHC.Core.Unify.
 -}
 
 {- Note [Unsolved equalities]
