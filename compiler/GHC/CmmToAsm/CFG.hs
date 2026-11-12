@@ -1323,9 +1323,8 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
             setVisited block
             calcOutFreqs unit block
 
-    -- One pass per loop. A pass uses the back edge probabilities of the loops
-    -- nested in it, so those come first: the header of an enclosing loop
-    -- dominates the inner header and therefore has the smaller vertex.
+    -- One pass per loop, inner loops first: the pass of an enclosing loop needs
+    -- their back edge probabilities. Inner headers have the larger vertices.
     forM_ (sortWith (Down . fst) loops) $ \(head, body) -> do
         forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i True) -- Mark all nodes as visited.
         forM_ body (\i -> unsafeWrite visitedNodes i False) -- Mark all blocks reachable from head as not visited
