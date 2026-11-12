@@ -32,18 +32,33 @@ Applications retain that value argument. They accept Boolean constructors or
 named local Boolean variables. They do not construct singleton witnesses or
 evaluate an index to determine its type.
 
+Constructor equations can specialise the result type::
+
+    choose :: foreach (b :: Bool) -> Select b
+    choose True = 42
+    choose False = False
+
+The checker substitutes the constructor into later argument types and the
+result type. A consumer can therefore receive the selected value::
+
+    observe :: foreach (b :: Bool) -> Select b -> String
+    observe True n = show (n :: Int)
+    observe False p = if p then "True" else "False"
+
 The current subset requires one annotated Boolean binder at the start of a
-complete monomorphic value signature. A dependent function must have one equation
-with a bare retained variable pattern. Its result must have lifted kind, and checking
-the remaining arguments must require an identity result wrapper. Ordinary rank
-restrictions still apply. Index-dependent constraints are limited to reflexive
+complete monomorphic value signature. A dependent function uses one equation
+with a bare retained variable pattern, or one unguarded equation for each Boolean
+constructor. Arguments after a constructor pattern require bare variable patterns
+and unrestricted multiplicities. The result must have lifted kind, and the outer
+match wrapper must be identity. Ordinary rank restrictions still apply.
+Index-dependent constraints are limited to reflexive
 Boolean equalities. Quick Look inference and optimisation pragmas for retained
 functions remain restricted. Dedicated rejection checks report GHC-83605.
 Ordinary payload mismatches use the existing type error. Unsupported type
 positions report GHC-43582.
 
-Dependent source constructor patterns and Boolean case refinement remain
-unimplemented. In particular, source ``choose`` is not supported yet.
+Refinement in source ``case`` expressions remains unimplemented. The constructor
+rule currently applies to function equations.
 
 The extension implies no other extensions. In particular, it does not imply
 :extension:`KindSignatures`. The ``:: Bool`` annotation specifies the

@@ -58,6 +58,25 @@ the manual does not prove those decisions correct in System FC.
   Boolean case. Agda's treatment of erased higher-order arguments also shows why
   erasure needs a calling-convention specification.
 
+Constructor checking also follows the pinned Agda v2.8.0 implementation.
+[`LHSResult`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L548-L566)
+records the pattern-context substitution and specialised body type.
+[`splitCon`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1389-L1414)
+applies the constructor substitution to the later argument telescope, target,
+and remaining pattern equations.
+[`checkRHS`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Def.hs#L747-L774)
+checks the body against that target. Thus refinement must update argument types
+as well as result types. The native frontend uses explicit coercion patterns
+and inverse result casts to connect these specialised types to the outer types.
+
+Agda's [coverage rule](https://agda.readthedocs.io/en/v2.8.0/language/coverage-checking.html#single-match-on-a-non-indexed-datatype)
+requires each constructor or a catchall. The first GHC constructor subset requires
+one unguarded equation for each Boolean constructor. General catchalls remain
+separate work. Agda's [dependent case combinator](https://agda.readthedocs.io/en/v2.8.0/language/with-abstraction.html#alternatives-to-with-abstraction)
+needs an explicit motive and does not automatically refine existing arguments.
+Constructor equations therefore precede dependent Haskell `case` expressions.
+This rule does not transfer Agda's totality assumptions to lazy Haskell.
+
 The frontend must preserve these identities through parsing, checking, and
 desugaring. RequiredTypeArguments provides erased type arguments. It cannot
 implement the retained rule by renaming `foreach` to `forall`. See the

@@ -24,10 +24,10 @@ Last updated: 2026-11-12.
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
 | Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
-| Execution | Native Core and source `keep` run through the checked bytecode entry |
+| Execution | Native Core and source `keep`/`choose` composition run through the checked bytecode entry |
 | Source syntax | `ExperimentalDependentTypes` checks one explicit retained Boolean binder; unsupported source positions report GHC-43582 |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | Source Boolean refinement for `choose` in M7; broader M6 optimizer work remains open |
+| Next task | Program/interface integration in M8; dependent source `case` and broader M6 optimizer work remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -52,8 +52,9 @@ applications, substitution composition, binder cloning, invalid indices, scope
 errors, and boundary gates. It also checks `Select True = Int`,
 `Select False = Bool`, shared-index composition, branch casts, and forged proofs.
 
-The restricted frontend produces native Core for local retained functions. The ordinary optimizer, default
-CorePrep entry, program backend entry, and interface serialization reject them.
+The restricted frontend produces native Core for local retained functions. The
+ordinary optimizer, default CorePrep entry, program backend entry, and interface
+serialization reject them.
 There is no performance measurement for the changed type traversals.
 
 ## Native execution
@@ -194,14 +195,16 @@ The compiler and Haddock files retain their existing formatting.
 ## Restricted source checking
 
 The frontend accepts one explicit `foreach (b :: Bool)` binder at the start of a
-complete monomorphic value signature. A dependent function has one equation with a bare
-retained variable pattern. Its result has lifted kind, and its match wrapper
+complete monomorphic value signature. A dependent function has one equation with
+a bare retained variable pattern, or one unguarded equation for each Boolean
+constructor. Its result has lifted kind, and its outer match wrapper
 must be identity. Calls accept Boolean constructors and named local Boolean Ids.
 The first dependent result example is `Select b -> Select b`.
 
 The renamer allocates one value `Name` and adds a scoped type-lookup alias. The
-checker registers its fixed Bool/Many Id. Pattern checking reuses the existing
-pattern Name, so the runtime lambda and its result type have the same Unique.
+checker registers its fixed Bool/Many Id. For a variable equation, pattern
+checking reuses the existing pattern Name. The runtime lambda and its result
+type have the same Unique.
 Zonking preserves the fixed index prototype. Looking up its runtime metadata
 would force GHC's recursively tied Id environment. Runtime occurrences still
 use ordinary zonking.
@@ -223,13 +226,14 @@ The fully applied indexed call with a bottom Boolean also returns `42`.
 The source family example returns `42` for `Select True` and `False` for
 `Select False`. A partial `keep bottom` reaches function WHNF.
 
-The six source observations and twelve Core observations pass against the
-bootstrap API and rebuilt compiler. All 27 source rejection cases check the
+Initial source `keep` validation at `0781706b2e` passed six source observations
+and twelve Core observations against the bootstrap API and rebuilt compiler.
+All 27 source rejection cases checked the
 diagnostic code, message, and source span. The opaque-index matching checks also
 pass. The bootstrap API and runtime checks each used a 4 GiB cap and peaked at
 913 MiB and 918 MiB. Core Lint and STG Lint remain mandatory in native lowering.
 
-The final default both-stage rebuild passed in 10 minutes 30 seconds with
+That default both-stage rebuild passed in 10 minutes 30 seconds with
 `-j6 --flavour=default --docs=none`. It peaked at 6,055 MiB under a verified
 16 GiB cap with swap disabled. All five registered normal-way regressions passed:
 `NativeDependentCore`, `NativeDependentCoreRun`, `RetainedKeywordOff`,
@@ -243,10 +247,44 @@ Local commits separate opaque matching (`723a588ed5`), native checking support
 scripts, logs, and memory records are in the ignored `_build/verification/`
 directory. The final runs used `build.sh` and `native-source-syntax-tests.sh`.
 
-Source constructor patterns, dependent Boolean cases, and source `choose` remain
-unfinished. General runtime-index inference, the ordinary dependent optimizer,
-interfaces, and machine-code integration remain open. The full testsuite,
-documentation build, and performance checks have not run. See the
+The constructor increment adds source `choose` and a constructor-based observer.
+Each equation checks later argument patterns and its RHS against types with the
+constructor substituted for the retained index. Explicit argument casts and
+inverse result casts preserve the outer types. Generated typed `AsPat` nodes
+retain one hidden runtime Id across both equations. The existing constructor
+dictionary field binds each nominal proof inside its Core alternative.
+
+Keep coercion patterns even for reflexive casts. The `Ignore b = Int` regression
+checks that desugaring preserves the original indexed argument annotation.
+Family normalisation keeps a runtime index opaque. The solver keeps its unknown
+constructor equality potentially soluble, so PMC does not discard a live branch.
+These rules add no singleton, equality axiom, or general runtime-index rewriting.
+
+Validation at `dfe9637939` passes twelve source and twelve Core observations,
+plus 35 located rejection cases. One source worker defines
+`again b = keep b (choose b)` under the same unknown Boolean. Constructor
+consumers return `42` and `False` for the
+two inputs. A bang on the selected payload exposes `choose bottom`'s named
+exception. A separate constrained-payload WHNF control leaves its Boolean
+unforced. The bootstrap API and runtime checks peaked at 920 MiB and 915 MiB
+under 4 GiB caps. The final registered run also verifies the named `again` worker.
+
+The constructor increment's default both-stage rebuild passed in 14m36s with
+`-j6 --flavour=default --docs=none`. Its peak was 7,007 MiB under a verified
+16 GiB cap with swap disabled. All five registered normal-way regressions passed;
+34 other ways were skipped. There were no unexpected failures or framework
+warnings. The test scope peaked at 2,490 MiB under an 8 GiB cap with swap disabled.
+Fourmolu parsing, fixture formatting, Cabal-gild, and local documentation link
+checks passed. Compiler files retain their existing formatting.
+
+Reproduction records use `native-source-choose-complete-build` and
+`native-source-choose-registered` in `_build/verification/`. The registered run
+uses `native-source-syntax-tests.sh` with the self-hosted stage1 compiler.
+
+Dependent source `case` expressions remain unfinished. General runtime-index
+inference, the ordinary dependent optimizer, interfaces, and machine-code
+integration remain open. The full testsuite, documentation build, and performance
+checks have not run. See the
 [frontend plan](CORE.md#frontend-identity-plan) and
 [Agda provenance](REFERENCES.md#agda-provenance).
 

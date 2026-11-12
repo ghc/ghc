@@ -48,8 +48,8 @@ Keep arithmetic and SMT integration separate from this Core work.
 ## First source target
 
 These examples describe the M7 target. The `foreach` spelling follows the design
-proposal. Restricted source `keep` now checks and executes through the native
-bytecode entry. Source constructor refinement for `choose` remains unimplemented.
+proposal. Restricted source `keep`, constructor-based `choose`, and their shared
+runtime composition now check and execute through the native bytecode entry.
 
 ```haskell
 type family Select (b :: Bool) where
@@ -217,7 +217,7 @@ not establish safety for untested forms.
 
 ### M7: expose the restricted source language
 
-Implement this task in two increments. First add the local experimental flag
+Start this task with the local experimental flag
 `ExperimentalDependentTypes`. It is disabled by default and implies no other
 extensions. Reserve `foreach` only when the flag is enabled. Parse its telescope
 into a distinct `HsForEachTy` node. Do not reuse an erased `HsForAllTy` node.
@@ -230,8 +230,17 @@ Add source regressions for the diagnostic and the flag-disabled identifier.
 
 The checking increment implements one complete monomorphic Boolean signature,
 one bare retained variable pattern, and value application. It uses the existing
-checked bytecode entry. Source `keep` passes six runtime and laziness observations.
-Parsing alone does not satisfy the full M7 gate; source `choose` remains open.
+checked bytecode entry. The constructor increment adds source `choose`, a
+constructor-based consumer, and composition under one runtime Boolean.
+
+The constructor increment checks exactly one unguarded equation for each Boolean
+constructor. It specialises later argument types and the result, following
+Agda's pattern-context substitution. It uses explicit argument and result casts,
+with branch proofs in the existing typed constructor pattern. A generated
+`AsPat` preserves one runtime Id across the equations. Later arguments require
+bare variable patterns and unrestricted multiplicities. The source target
+is `observe b (keep b (choose b))`, with one shared runtime Boolean. Source
+dependent `case` expressions require a separate context-refinement rule.
 
 - [x] Add an experimental opt-in flag, syntax, AST representation, and diagnostics.
 - [x] Support native zonking, rigid signature generalization, scoped validity,
@@ -242,16 +251,44 @@ Parsing alone does not satisfy the full M7 gate; source `choose` remains open.
       renamed `Name` in the expected type and existing pattern/desugaring path.
       Support native zonking and require an identity result wrapper.
 - [x] Elaborate constructor and retained-variable applications into native Core.
-- [ ] Elaborate dependent Boolean patterns and source `choose`.
+- [x] Elaborate dependent Boolean constructor equations and source `choose`.
 - [x] Accept ordinary runtime Booleans under shared bindings. Reject unsupported
       index expressions and inferred aliases with precise diagnostics.
 - [x] Update source printers and extension documentation.
 
 Gate: the source target and a runtime-unknown Boolean example compile and execute
-directly. Their implementation uses no singleton ABI or reification step.
+directly. Their implementation uses no singleton ABI or reification step. These
+checks pass through the bootstrap API and rebuilt compiler at `dfe9637939`.
+The default both-stage rebuild and all five registered normal-way checks pass.
+Dependent source `case` expressions remain separate work.
 
 ### M8: support interfaces and validate the compiler change
 
+Start with an ordinary single-module executable at `-O0`. Keep native workers
+local to an ordinary `main :: IO ()`. Omit interface pragmas and simplified Core
+while native interface serialization remains gated. This checks machine-code
+execution before adding cross-module transport; it does not satisfy the interface
+gate below.
+
+The module path needs a checked native branch before `core2core`, native
+SimpleOpt over RHSs with top-level identities preserved, and Core Lint around
+module tidying. Program CorePrep needs an explicit native opt-in with speculation
+and optional arity analysis disabled. Force Core Lint before and after CorePrep,
+then STG Lint. Keep profiling, late plugins, and optional STG transformations
+outside this first path. Reuse the existing CoreToStg erasure rule. Validate the
+ordinary backend with the shared Boolean and bottom observations.
+
+Handle native interface signatures and expression unfoldings separately. Encode
+runtime binders and occurrences through the interface's local Id environment,
+not its TyVar environment. Preserve existing DataKinds constructor encoding.
+Reconstruct Boolean alternative proofs from the scrutinee and constructor, then
+check the resulting Core. New type tags require an explicit format distinction:
+the current decoder treats unknown tags as literals, and the header version does
+not identify a source commit. Check real file round trips in fresh processes,
+fingerprints, malformed scope/proof rejection, and cross-module execution.
+
+- [ ] Compile and run the source target as an ordinary vanilla executable through
+      checked module simplification, tidying, CorePrep, and machine-code lowering.
 - [ ] Encode retained binders, indices, and evidence in interface types, unfoldings,
       fingerprints, and recompilation dependencies.
 - [ ] Check cross-module calls, imported unfoldings, and interface round trips.
@@ -291,8 +328,9 @@ work.
 Distinguish Core construction, frontend behavior, optimization, runtime execution,
 and module integration. M3 through M5 validate native Core construction and the
 restricted bytecode path. The singleton probe supplies comparison evidence for
-some values and laziness cases. Restricted source `keep` now executes. Source
-Boolean refinement, ordinary optimization, and module integration remain open.
+some values and laziness cases. Restricted source `keep`, constructor equations,
+and their composition now execute. Source `case` refinement, ordinary
+optimization, and module integration remain open.
 
 ## Further work
 

@@ -104,7 +104,7 @@ This restricted grammar is not closed under general Core substitution. The
 experiment therefore cannot enter the ordinary optimizer. Backend preparation
 must preserve lazy index binding boundaries. The optimizer will also need this
 restriction or an internal expression-index form for arbitrary Boolean producers.
-The source frontend supports the restricted `keep` subset described below.
+The source frontend supports the restricted Boolean functions described below.
 
 ## Evidence and dependent cases
 
@@ -254,10 +254,11 @@ index and bottom observations before claiming optimizer preservation.
 
 ## Frontend identity plan
 
-Source `keep` implements the first subset below. Source Boolean refinement
-remains open. The target signatures are explicit retained Boolean telescopes
-such as `foreach (b :: Bool) -> Select b`. They must accept ordinary runtime
-Boolean bindings. They do not require singleton conversion.
+Source `keep` and constructor-based `choose` implement the subsets below.
+Refinement in source `case` expressions remains open. The target signatures are
+explicit retained Boolean telescopes such as `foreach (b :: Bool) -> Select b`.
+They must accept ordinary runtime Boolean bindings. They do not require singleton
+conversion.
 
 The implementation must preserve one runtime identity through these stages:
 
@@ -280,16 +281,26 @@ The implementation must preserve one runtime identity through these stages:
    that `Unique`. `selectMatchVar` reuses the checked variable Id, and `wrapBind`
    adds no alias when the Ids agree. Reuse `MatchGroupTc` unchanged for this
    subset. Require an identity result wrapper. Constructor patterns and multiple
-   equations need a separate design for the shared scrutinee and branch indices.
+   equations use the shared scrutinee and branch-index rule below.
    RequiredTypeArguments instead skolemises type variables.
 4. In `Tc/Gen/App.hs`, check a retained argument as a value and instantiate the
    result with its accepted index. Keep the value application. Do not use
    `tcVDQ`, which translates an expression into a type argument.
-5. Check Boolean constructor clauses under scoped nominal evidence. The existing
-   `ConPatTc.cpt_dicts` field can carry the proof. Constructor desugaring already
-   places these binders in the Core alternative. Add the retained refinement
-   before the ordinary Boolean no-evidence fast path. Check coverage and retain
-   the fixed outer result scope.
+5. Check Boolean constructor equations with one shared hidden Bool/Many Id.
+   Generated typed `AsPat` nodes make `selectMatchVar` preserve this identity.
+   Keep `MatchGroupTc` unchanged. Specialise both later argument types and the
+   result type for each constructor, as Agda's `splitCon` does. Check later bare
+   variable patterns and the RHS against these types. Use coercion patterns to
+   transport the original arguments. Apply the inverse result coercion to the
+   RHS. Keep the original types in `MatchGroupTc`.
+6. Store each fresh nominal Boolean proof in `ConPatTc.cpt_dicts`. Constructor
+   desugaring places these binders in the strict Core alternatives. Build
+   transport with existing FC lifting over a fresh immutable type template.
+   This template adds no witness or axiom. Do not request general solver
+   rewriting of a runtime index. Preserve opaque native equalities as potentially
+   soluble irreducibles, so PMC does not treat the proof as a contradiction.
+   Require one unguarded equation for each Boolean constructor. Later arguments
+   initially require bare variable patterns and `Many` multiplicity.
 
 Native zonking and the required reflexive unification paths now support this
 source subset. Unsupported source constructs must produce located errors before
@@ -383,9 +394,10 @@ bottom. The prepared Core and STG retain one Boolean argument. The index-only
 type dependencies add no captured runtime values. Virtual branch proofs disappear
 before bytecode generation.
 
-The runtime regression also checks real source `keep`. It observes both runtime
-Boolean inputs, a fully applied indexed bottom, both concrete `Select` results,
-and a partial `keep bottom` at function WHNF. Source Boolean refinement and
-`choose` remain open. Interface serialization, the ordinary optimizer, and the
-normal program backend remain gated. Existing ordinary GHC programs must
-continue to build.
+The runtime regression checks real source `keep` and constructor-based `choose`.
+It observes both runtime Boolean inputs, shared `keep`/`choose` composition, a
+fully applied indexed bottom, both concrete `Select` results, and a partial
+`keep bottom` at function WHNF. A payload-only bang exposes strict `choose`.
+Refinement in source `case` expressions remains open. Interface serialization,
+the ordinary optimizer, and the normal program backend remain gated. Existing
+ordinary GHC programs must continue to build.
