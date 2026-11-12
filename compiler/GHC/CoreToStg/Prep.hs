@@ -32,7 +32,8 @@ import GHC.Builtin.WiredIn.Ids ( realWorldPrimId )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
-import GHC.Core.Lint    ( EndPassConfig(..), endPassIO )
+import GHC.Core.Lint    ( EndPassConfig(..), LintPassResultConfig(..)
+                        , endPassIO, lintPassResult )
 import GHC.Core hiding( FloatBind(..) )
 import GHC.Core.Dependent
 import GHC.Core.Subst
@@ -241,19 +242,59 @@ corePrepPgm logger cp_cfg pgm_cfg
     withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\a -> a `seqList` ()) $ do
-    rejectNativeDependentProgram "CorePrep" binds []
+    let native = hasNativeDependentProgram binds []
+        end_pass_cfg = cpPgm_endPassConfig pgm_cfg
+    -- See Note [CorePrep for retained Boolean programs].
+    checked_end_pass_cfg <- if native
+      then do
+        unless (cp_allowNativeDependent cp_cfg) $
+          rejectNativeDependentProgram "CorePrep" binds []
+        when (cp_specEval cp_cfg || cp_specEvalDFun cp_cfg
+              || isJust (cp_arityOpts cp_cfg)) $
+          throwGhcExceptionIO (Sorry
+            "Native dependent Core requires CorePrep speculation and optional arity analysis to be disabled.")
+        case ep_lintPassResult end_pass_cfg of
+          Nothing -> throwGhcExceptionIO (Sorry
+            "Native dependent Core requires CorePrep program Lint before and after preparation.")
+          Just lint_cfg -> do
+            let checked_lint_cfg = lint_cfg { lpr_preSubst = False }
+            lintPassResult logger
+              (checked_lint_cfg { lpr_passPpr = text "before native CorePrep" })
+              binds
+            return (end_pass_cfg { ep_lintPassResult = Just checked_lint_cfg })
+      else return end_pass_cfg
     let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
 
     us <- mkSplitUniqSupply StgTag
     let
         floats = initUs_ us $
                  corePrepTopBinds initialCorePrepEnv binds
-        binds_out = deFloatTop floats
+        binds_out = deFloatTop native floats
 
-    endPassIO logger (cpPgm_endPassConfig pgm_cfg)
+    endPassIO logger checked_end_pass_cfg
               binds_out []
 
     return binds_out
+
+{- Note [CorePrep for retained Boolean programs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The native program path preserves retained Boolean types until CoreToStg.
+The caller must disable speculation and optional arity analysis. It must
+also supply the CorePrep Lint configuration, including its weak-join rules.
+CorePrep checks the input and output even without -dcore-lint. These checks
+inspect the actual program. They do not substitute type lets first.
+
+deFloatTop must also preserve bindings that occur only in native type
+indices. Ordinary occurrence analysis does not count these runtime Ids.
+It can delete their bindings and leave an index out of scope. The native
+path therefore skips occurAnalyseExpr_Prep. corePrepExpr does not call
+deFloatTop and needs no corresponding change.
+
+This restriction preserves lazy bindings. Agda's application and runtime
+irrelevance rules do not justify forcing a Haskell Boolean index. See
+docs/dependent-haskell/REFERENCES.md#agda-provenance and
+docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
+-}
 
 corePrepExpr :: Logger -> CorePrepConfig -> CoreExpr -> IO CoreExpr
 corePrepExpr logger config expr = do
@@ -2387,9 +2428,9 @@ wrapBinds floats body
       = mkTickCpe tickish body
 
 -- | Put floats at top-level
-deFloatTop :: Floats -> [CoreBind]
+deFloatTop :: Bool -> Floats -> [CoreBind]
 -- Precondition: No Strict or LazyContextFloatable 'FloatInfo', no ticks!
-deFloatTop floats
+deFloatTop native floats
   = foldrOL get [] (getFloats floats)
   where
     get (Float b _ TopLvlFloatable) bs
@@ -2397,6 +2438,8 @@ deFloatTop floats
     get b _  = pprPanic "deFloatTop" (ppr b)
 
     -- See Note [Dead code in CorePrep]
+    -- See Note [CorePrep for retained Boolean programs].
+    get_bind bind | native = bind
     get_bind (NonRec x e) = NonRec x (occurAnalyseExpr_Prep e)
     get_bind (Rec xes)    = Rec [(x, occurAnalyseExpr_Prep e) | (x, e) <- xes]
 
@@ -2591,8 +2634,8 @@ data CorePrepConfig = CorePrepConfig
   -- checker bugs which can sometimes manifest as segmentation faults.
 
   , cp_allowNativeDependent    :: !Bool
-  -- ^ Allow checked native dependent expressions from @hscCompileCoreExpr@.
-  -- The program entry point still rejects these forms.
+  -- ^ Allow checked native dependent expressions and programs.
+  -- See Note [CorePrep for retained Boolean programs].
 
   , cp_platform                :: Platform
 

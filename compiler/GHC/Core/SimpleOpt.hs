@@ -10,6 +10,7 @@ module GHC.Core.SimpleOpt (
         -- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprNoInline, simpleOptExprWith,
         simpleOptNativeExpr,
+        simpleOptNativeProgram,
 
         -- ** Join points
         joinPointBinding_maybe, joinPointBindings_maybe,
@@ -283,6 +284,14 @@ simpleOptNativeExpr expr
     init_env = (emptyEnv opts) { soe_subst = init_subst, soe_native = True }
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
 
+-- | Simplify native program RHSs without changing top-level binding identities.
+-- See Note [Restricted dependent simplification].
+simpleOptNativeProgram :: HasDebugCallStack => CoreProgram -> CoreProgram
+simpleOptNativeProgram = map simplify_bind
+  where
+    simplify_bind (NonRec b rhs) = NonRec b (simpleOptNativeExpr rhs)
+    simplify_bind (Rec pairs) = Rec [(b, simpleOptNativeExpr rhs) | (b, rhs) <- pairs]
+
 {- Note [Restricted dependent simplification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 simpleOptNativeExpr reuses the simple optimiser without occurrence analysis,
@@ -313,6 +322,11 @@ reduction across Haskell's bottom and seq. See
 docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
 General inlining, occurrence analysis, and nonreflexive dependent congruence
 remain unsupported.
+
+simpleOptNativeProgram applies this mode independently to each RHS. Keep the
+top-level binders and groups unchanged. Their identities can occur in other
+RHSs or rules. Do not use simpleOptPgm: it runs ordinary occurrence analysis
+before simplification. Module tidying sets the final arities afterward.
 -}
 
 simpleOptExprWith :: HasDebugCallStack => SimpleOpts -> Subst -> InExpr -> OutExpr
