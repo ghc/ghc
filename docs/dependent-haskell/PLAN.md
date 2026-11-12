@@ -315,11 +315,21 @@ round trips with sharing, fresh identities, tidied nested binders, malformed
 scope and annotations, and unknown tags. Keep native unfoldings gated while
 enabling signature-only cross-module calls through the ordinary object ABI.
 
+Signature transport now passes the binary-table checks, actual `.hi` imports,
+cross-module execution in fresh contexts and separate CLI processes, concrete
+constructor applications, and old/new header rejection. Both compiler stages
+build with the new version. The ordinary compatibility smoke and all five
+registered normal-way tests pass. See
+[the validation results](README.md#native-interface-signatures). Keep explicit
+fingerprint/recompilation-change cases and native unfolding reconstruction open.
+
 - [x] Compile and run the source target as an ordinary vanilla executable through
       checked module simplification, tidying, CorePrep, and machine-code lowering.
-- [ ] Encode retained binders, indices, and evidence in interface types, unfoldings,
-      fingerprints, and recompilation dependencies.
-- [ ] Check cross-module calls, imported unfoldings, and interface round trips.
+- [x] Encode retained signature binders and indices with scoped local Id names.
+- [x] Check signature round trips, disk imports, cross-module calls, and version rejection.
+- [ ] Check signature fingerprints and recompilation after a producer signature change.
+- [ ] Encode native expression unfoldings and reconstruct virtual Boolean evidence.
+- [ ] Check imported unfoldings and malformed proof rejection.
 - [ ] Add focused compiler regression cases. Reuse existing testsuite conventions
       and golden tests where appropriate.
 - [ ] Run relevant type-checker, simplifier, interface, and code-generation tests.

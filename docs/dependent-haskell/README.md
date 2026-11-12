@@ -26,11 +26,11 @@ Last updated: 2026-11-12.
 | Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
 | Execution | Native Core and source composition pass the checked bytecode entry; source composition also runs as machine code |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
-| Native interfaces | Scoped signature codec implemented; matching rebuild and cross-module execution checks are in progress |
+| Native interfaces | Scoped signatures pass binary reconstruction, disk imports, cross-module execution, and version rejection |
 | Configured fork version | `10.1.20261112.1`, with interface header `1001202611121` |
 | Source syntax | `ExperimentalDependentTypes` checks one explicit retained Boolean binder; unsupported source positions report GHC-43582 |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | Validate native signatures across modules in M8; native unfoldings, source `case`, and broader M6 work remain open |
+| Next task | Signature fingerprint/recompilation checks, then native unfoldings in M8; source `case` and broader M6 work remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -58,7 +58,7 @@ errors, and boundary gates. It also checks `Select True = Int`,
 The restricted frontend produces native Core for local retained functions. The
 ordinary optimizer and native unfolding serialization remain gated. Program
 compilation has an explicit checked entry for native signatures and ordinary
-exported types. Signature validation is in progress below.
+exported types. Signature validation is recorded below.
 There is no performance measurement for the changed type traversals.
 
 ## Native execution
@@ -354,9 +354,44 @@ the imported family equations. Native expression unfoldings remain gated.
 `VERSION_DATE` pins the fork to `10.1.20261112.1`. Its header version is
 `1001202611121`, distinct from the previous `100120261109`. Matching libraries
 must be rebuilt. The preserved old reader accepts its old-format control file
-with both `CheckHiWay` and `IgnoreHiWay`. The new version's default both-stage
-build and runtime verification are in progress. See the scoped representation
-in [Core](CORE.md#native-interface-signatures) and the
+and rejects the new native interface with both `CheckHiWay` and `IgnoreHiWay`.
+The new reader also rejects the old file. These are actual header reads,
+including a native producer interface written by the rebuilt CLI.
+
+Compiler sources at `b3b0a835c8` passed the default both-stage version rebuild
+on 2026-11-12 in 29m56s, with a peak of 9,625 MiB under 16 GiB. A final
+incremental pass included the late diagnostic detail and Note edits in both
+stages; it passed in 7m54s and peaked at 4,700 MiB. Both runs used six workers,
+`--docs=none`, and disabled swap.
+
+The bootstrap API checks passed at all three compression levels, including
+fresh binder identity, repeated references, tidied nested names, constructor and
+caller substitution, malformed scopes and annotations, diagnostic-only forms,
+and unknown tags. This scope peaked at 972 MiB under 4 GiB. The runtime scope
+peaked at 913 MiB under 4 GiB. It covers 36 value/laziness observations plus two
+concrete cross-module applications, 35 located source diagnostics, and eight
+phase-specific program rejections.
+
+Separate CLI processes compiled the producer and consumer, linked their objects,
+and passed the same cross-module observations. `--show-iface` printed retained
+signatures without unfoldings. This scope, including the version checks, peaked
+at 93 MiB under 4 GiB. The ignored scripts are `native-iface-api.sh`,
+`native-program-runtime.sh`, and `native-iface-cli.sh` in `_build/verification/`.
+
+All five registered normal-way tests passed after the fixture-only correction
+at `18fafdda4f`: 39 cases, 34 skipped, no unexpected results, and no framework
+warnings. The run peaked at 2,277 MiB under 8 GiB. The initial run exposed an
+inconsistent bytecode/executable-link request in the negative fixture. The fix
+uses `NoLink` and retains the expected non-object phase rejection.
+
+The ordinary compatibility smoke passed package checks, an optimized threaded
+Template Haskell program using containers/text/bytestring, GHCi evaluation, and
+Haddock startup. Its peak was 147 MiB under 4 GiB. Missing-documentation package
+warnings are expected with `--docs=none`. Swap was disabled in each capped run.
+
+The full testsuite, documentation build, performance checks, native unfoldings,
+and explicit fingerprint/recompilation-change cases remain open. See the scoped
+representation in [Core](CORE.md#native-interface-signatures) and the
 [Agda provenance](REFERENCES.md#agda-provenance).
 
 ## Verified baseline
