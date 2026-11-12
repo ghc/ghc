@@ -78,6 +78,21 @@ needs its own justification. The scoped native SimpleOpt increment disables eta
 reduction. Its dependent beta and case rules do not establish an eta law.
 See [the evaluation constraints](CORE.md#laziness-and-eta).
 
+## Existing DataKinds machinery
+
+The [datatype promotion guide at the source baseline](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/docs/users_guide/exts/data_kinds.rst)
+describes promotion of data constructors to type constructors. GHC's
+`trueDataCon` and `falseDataCon` already describe the ordinary Boolean
+constructors. `promoteDataCon` supplies their existing promoted type constructors.
+`tcTyVar` in `GHC.Tc.Gen.HsType` uses this machinery for DataKinds.
+
+The spike reuses that promotion. `TermVarTy` adds a runtime-variable index, and
+`DepFunTy` binds that runtime variable in a result type. DataKinds alone supplies
+neither rule. Boolean-specific recognition is a restriction of this spike.
+General datatype support remains pending. The `Types.hs-boot` signatures expose
+existing wired-in values to low-level compiler modules through source imports.
+They do not define new Boolean constructors.
+
 ## Roadmap and proposal status
 
 - [Serokell's Dependent Haskell roadmap](https://ghc.serokell.io/dh) was last updated

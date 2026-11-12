@@ -74,6 +74,12 @@ Passing a runtime Boolean must not insert a strict singleton conversion.
 
 ## Task sequence
 
+M0 through M5 provide the internal Core and bytecode path. After the first
+restricted M6 step passes, implement source `keep` through that path in M7.
+This gives an early parse-to-execution check. Complete the remaining M6 work
+before enabling the ordinary optimizer. M8 still controls interface and program
+integration.
+
 ### M0: completed preparation
 
 - [x] Update and build the current GHC baseline.
@@ -184,6 +190,10 @@ knowledge from an unfolding cannot justify that replacement for an opaque index.
 Keep variable cases and lazy producer bindings. Require Core Lint before and
 after this step in the bytecode entry.
 
+This restricted entry is implemented at `0bbc32d396`. The registered Core API
+and bytecode regressions passed. The default rebuild and ordinary smoke checks
+also passed. The broader optimizer tasks below remain open.
+
 The audit found separate blockers in the full simplifier. Its type substitution
 can omit runtime Id mappings. Its case reconstruction treats virtual proofs as
 constructor fields. Occurrence analysis does not track runtime index scope.
@@ -209,6 +219,9 @@ not establish safety for untested forms.
 - [ ] Add an experimental opt-in flag, syntax, AST representation, and diagnostics.
 - [ ] Extend renaming and checking for explicit retained Boolean signatures.
       Track one runtime binder when it occurs in both terms and types.
+- [ ] Start with one equation and a bare retained variable pattern. Reuse its
+      renamed `Name` in the expected type and existing pattern/desugaring path.
+      Support native zonking and require an identity result wrapper.
 - [ ] Elaborate constructor calls, retained variables, and dependent Boolean
       patterns directly into checked native Core.
 - [ ] Accept ordinary runtime Booleans under shared bindings. Reject index escape

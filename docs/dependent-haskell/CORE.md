@@ -8,7 +8,7 @@ specify the full dependent-Haskell language.
 
 ## Representation
 
-Add two distinct type constructors:
+The internal `Type` datatype has two new constructors:
 
 ```text
 TermVarTy b       -- The Boolean index of a runtime identifier.
@@ -20,7 +20,9 @@ It keeps its identity as a runtime variable. It is not a `TyVar` or a `CoVar`.
 The term binder and every reference to its index use the same `Unique`.
 
 `TermVarTy b` has kind `Bool`. Constructor indices use the existing promoted
-`True` and `False` types. The result of a retained function has kind `Type`.
+`True` and `False` types. `promoteDataCon` supplies these types through GHC's
+existing DataKinds machinery. `TermVarTy` adds the link to a runtime variable.
+The result of a retained function has kind `Type`.
 Dependent runtime representations are outside this subset.
 
 Canonicalize a dependent function whose binder does not occur in its result to
@@ -225,7 +227,7 @@ at every index. Label these observations separately. Do not cast a non-bottom
 
 ## Scoped native SimpleOpt
 
-This increment is being implemented. Its acceptance checks remain pending.
+This increment passed the Core API and bytecode regressions at `0bbc32d396`.
 It adds `simpleOptNativeExpr` as a separate entry. It does not enable the full
 simplifier or the ordinary program optimization pipeline.
 
@@ -264,12 +266,14 @@ The implementation must preserve one runtime identity through these stages:
 2. Rename the retained binder as a term name that is available in its result
    type. In `Tc/Gen/HsType.hs`, check its `Bool` domain and lifted result. Permit
    `TermVarTy` only for the checked retained identifier in this scope.
-3. Check the definition against `DepFunTy`. Update `Tc/Gen/Match.hs`,
-   `Tc/Gen/Pat.hs`, and `Tc/Utils/Unify.hs` so later argument types use the actual
-   runtime binder. Preserve that identifier through `MatchGroupTc` and
-   `HsToCore/Match.hs`. The current path decomposes types before checking patterns
-   and later creates match identifiers. That path needs explicit identity
-   transport. RequiredTypeArguments instead skolemises type variables.
+3. Start with one equation and a bare retained variable pattern. Construct its
+   Boolean Id from the pattern's renamed `Name`. Substitute that Id into the
+   codomain before decomposing the remaining argument types. `tcPatBndr` keeps
+   that `Unique`. `selectMatchVar` reuses the checked variable Id, and `wrapBind`
+   adds no alias when the Ids agree. Reuse `MatchGroupTc` unchanged for this
+   subset. Require an identity result wrapper. Constructor patterns and multiple
+   equations need a separate design for the shared scrutinee and branch indices.
+   RequiredTypeArguments instead skolemises type variables.
 4. In `Tc/Gen/App.hs`, check a retained argument as a value and instantiate the
    result with its accepted index. Keep the value application. Do not use
    `tcVDQ`, which translates an expression into a type argument.
@@ -283,6 +287,19 @@ Native zonking and relevant unification paths also need support. They currently
 reject native forms. Unsupported source constructs must produce located errors
 before those internal guards. Keep binder-domain, unsupported-index, coverage,
 and branch-result errors at their respective source locations.
+`zonkMatchGroup` checks group annotations outside the pattern environment. For
+the first subset, preserve the prototype Id's fixed `Bool` type, `Many`
+multiplicity, and `Unique` when that environment has no entry.
+
+Keep `foreach` an ordinary identifier when the experimental flag is disabled.
+Its proposed syntax can also parse as an ordinary type-variable application.
+Do not reserve that spelling to produce a missing-flag error.
+Use typed, located `TcRnMessage` diagnostics for unsupported retained forms.
+Reuse ordinary diagnostics only when their meanings match. An unsupported `Int`
+domain is not a kind mismatch. A retained argument is not an erased required type
+argument. Ordinary inferred functions remain valid without a retained signature.
+Error-context formatting can itself invoke zonking. Early rejection must precede
+native type construction until the native zonkers are implemented.
 
 Start execution with local retained declarations inside an ordinary
 `entry :: IO String`. Parse, rename, typecheck, and desugar real source. Pass its

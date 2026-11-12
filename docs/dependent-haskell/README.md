@@ -26,7 +26,7 @@ Last updated: 2026-11-12.
 | Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
 | Execution | Native Core runs through the checked bytecode entry; source syntax remains unavailable |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | [M6: optimizer preservation](PLAN.md#m6-preserve-dependencies-through-optimization); M5 bytecode execution validated |
+| Next task | Source `keep` in M7 through the checked bytecode path; broader M6 optimizer work remains open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -58,7 +58,8 @@ There is no performance measurement for the changed type traversals.
 ## Native execution
 
 `hscCompileCoreExpr` now has a restricted native path. It skips the ordinary
-simplifier and runs Core Lint before and after CorePrep. CorePrep preserves native
+simplifier. It runs `simpleOptNativeExpr` between mandatory Core Lint checks,
+then checks Core again after CorePrep. CorePrep preserves native
 types, clones proof types with their Boolean indices, and supports retained eta
 binders. CoreToStg removes virtual Boolean proofs and casts. STG Lint checks the
 runtime argument representations before bytecode generation. The normal pipeline
@@ -110,6 +111,47 @@ The full testsuite and documentation build have not run. This work establishes
 bytecode execution for the restricted Core examples. It does not establish
 ordinary optimizer preservation or a source language. Native machine-code
 compilation remains behind the program gate. All commits are local.
+
+## Restricted simplification
+
+The native SimpleOpt entry substitutes supported Boolean beta arguments in
+terms and types together. Exact Boolean cases replace their virtual proof with
+checked nominal reflexivity. Variable cases remain strict. Unsupported Boolean
+producers keep their application redex. General inlining and occurrence analysis
+remain disabled. The mode creates no rules, Core unfoldings, or join points.
+
+The Core API checks now cover constructor and variable beta reduction, capture
+avoidance, literal proof elimination, opaque indices with constructor unfoldings,
+and retained binding metadata. Both bootstrap API and runtime checks passed.
+The runtime checks include a local bottom index used only in erased annotations
+and an unsupported producer application. Both reach function WHNF. Prepared
+Core and STG retain the necessary scope without a runtime use of that index in
+the function body. The dump run matched all 13 expected output lines.
+
+Compiler source commit `0bbc32d396` passed the default Hadrian rebuild with
+`-j6 --flavour=default --docs=none`. Hadrian reported 21m51s. The memory scope
+recorded a peak of 7,726 MiB under a 16 GiB cap with no swap. This was an
+incremental rebuild of both compiler stages and their dependencies.
+
+The registered normal-way run passed both tests. Twenty other ways were skipped.
+There were no unexpected failures or framework warnings. Its peak was 2,241 MiB
+under an 8 GiB cap. The bootstrap API and runtime checks peaked at 907 MiB and
+918 MiB. Ordinary `-O2 -dcore-lint`, Template Haskell, threaded execution, GHCi,
+package registration, and Haddock startup passed. Both singleton comparisons
+passed at `-O0` and `-O2` with Core Lint, including the expected rejection.
+
+Unsupported compiler operations now report their phase with `Sorry`. The native
+JavaScript entry uses this diagnostic instead of a compiler panic. The API checks
+verify the exception class and phase. No JavaScript execution was attempted.
+
+This increment does not enable the ordinary optimizer or establish the full M6
+acceptance check. The full testsuite, documentation build, and performance checks
+have not run.
+
+The next source step uses one explicit retained variable pattern. Existing
+pattern checking and desugaring preserve its `Unique`; `MatchGroupTc` needs no
+new field for that subset. See [the frontend plan](CORE.md#frontend-identity-plan)
+and [Agda provenance](REFERENCES.md#agda-provenance).
 
 ## Verified baseline
 
@@ -191,8 +233,8 @@ reproduction recipe are now in [reference/](reference/README.md).
    with the baseline above before reusing build results.
 3. Read the relevant primary sources in [the references](REFERENCES.md).
    Recheck proposal and package status when the work depends on it.
-4. Complete one milestone at a time. Keep changes small and reviewable. Run the
-   acceptance checks that apply to the milestone.
+4. Complete the next bounded step in the plan. Keep changes small and reviewable.
+   Run its acceptance checks. Keep the broader milestone open until its gate passes.
 5. Update this status and the plan after a material result or scope change.
    Record the source revision, command, outcome, and remaining boundary.
 
