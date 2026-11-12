@@ -60,7 +60,7 @@ the manual does not prove those decisions correct in System FC.
 
 The frontend must preserve these identities through parsing, checking, and
 desugaring. RequiredTypeArguments provides erased type arguments. It cannot
-implement the retained rule by renaming `foreach` to `forall`. See the pending
+implement the retained rule by renaming `foreach` to `forall`. See the
 [frontend identity plan](CORE.md#frontend-identity-plan).
 
 The first source increment uses the proposed `foreach` spelling from
@@ -72,6 +72,27 @@ This flag is not a name specified by that proposal. It implies no other
 extensions. In `foreach (b :: Bool)`, `Bool` is the domain type of a value
 binder. It is not the kind of an erased type variable. Parsing this annotation
 does not require the implementation to imply `KindSignatures`.
+
+The first source implementation follows the dependent application rule above.
+It reuses GHC's local name binding and adds a scoped type-lookup alias for the
+same value `Name`. Its final index zonker follows the existing
+`Note [The ZonkEnv]`: a type must not force the recursively tied runtime Id
+environment. Each index already has fixed Bool/Many metadata.
+
+The fully applied laziness observation uses `(b ~ b)` as a payload constraint.
+GHC's existing `solveEqualityDict` supplies the boxing construction through
+`evDictApp`. This implementation constructs checked nominal reflexivity at the
+call site to preserve runtime-binder scope. It does not add a trusted equality
+axiom. Other index-dependent predicates need a solver evidence scope and remain
+unsupported. These GHC adaptations are implementation choices; the Agda manual
+does not establish their preservation properties.
+
+Closed-family matching reuses GHC's existing three-way apartness result in
+`GHC.Core.Unify`, described by `Note [Specification of unification]`.
+An opaque Boolean can coincide with a constructor or another opaque index.
+The experiment records that uncertainty as `MARRuntimeIndex`. It does not
+declare the indices apart or select a later family clause. This preserves the
+distinction between an unavailable refinement and a disproved constructor case.
 
 ## Haskell evaluation provenance
 

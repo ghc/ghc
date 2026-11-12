@@ -47,8 +47,9 @@ Keep arithmetic and SMT integration separate from this Core work.
 
 ## First source target
 
-These examples describe intended behavior. The `foreach` spelling follows the
-design proposal. Source checking and execution remain unimplemented.
+These examples describe the M7 target. The `foreach` spelling follows the design
+proposal. Restricted source `keep` now checks and executes through the native
+bytecode entry. Source constructor refinement for `choose` remains unimplemented.
 
 ```haskell
 type family Select (b :: Bool) where
@@ -220,29 +221,30 @@ Implement this task in two increments. First add the local experimental flag
 `ExperimentalDependentTypes`. It is disabled by default and implies no other
 extensions. Reserve `foreach` only when the flag is enabled. Parse its telescope
 into a distinct `HsForEachTy` node. Do not reuse an erased `HsForAllTy` node.
-Preserve source annotations, printing, and AST traversal. Until checking exists,
-reject retained quantification with the located diagnostic GHC-43582:
-"Typechecking of retained quantification is not implemented yet."
+Preserve source annotations, printing, and AST traversal. The initial syntax
+increment rejected all retained types. Keep GHC-43582 for source positions that
+remain unsupported: "Retained quantification is not supported in this type position yet."
 Keep `foreach` available as an ordinary identifier when the flag is disabled.
 Check parsing and printing through the existing native Core API regression.
 Add source regressions for the diagnostic and the flag-disabled identifier.
 
-The next increment must replace this rejection with the restricted Boolean
-checking rule. Use the existing checked bytecode path for the first source
-execution. Parsing alone does not satisfy the M7 gate.
+The checking increment implements one complete monomorphic Boolean signature,
+one bare retained variable pattern, and value application. It uses the existing
+checked bytecode entry. Source `keep` passes six runtime and laziness observations.
+Parsing alone does not satisfy the full M7 gate; source `choose` remains open.
 
 - [x] Add an experimental opt-in flag, syntax, AST representation, and diagnostics.
-- [ ] Support native zonking, rigid signature generalization, scoped validity,
+- [x] Support native zonking, rigid signature generalization, scoped validity,
       opaque index rewriting, and same-Id equality for the first source rule.
-- [ ] Extend renaming and checking for explicit retained Boolean signatures.
+- [x] Extend renaming and checking for explicit retained Boolean signatures.
       Track one runtime binder when it occurs in both terms and types.
-- [ ] Start with one equation and a bare retained variable pattern. Reuse its
+- [x] Start with one equation and a bare retained variable pattern. Reuse its
       renamed `Name` in the expected type and existing pattern/desugaring path.
       Support native zonking and require an identity result wrapper.
-- [ ] Elaborate constructor calls, retained variables, and dependent Boolean
-      patterns directly into checked native Core.
-- [ ] Accept ordinary runtime Booleans under shared bindings. Reject index escape
-      and unsupported expressions with precise diagnostics.
+- [x] Elaborate constructor and retained-variable applications into native Core.
+- [ ] Elaborate dependent Boolean patterns and source `choose`.
+- [x] Accept ordinary runtime Booleans under shared bindings. Reject unsupported
+      index expressions and inferred aliases with precise diagnostics.
 - [x] Update source printers and extension documentation.
 
 Gate: the source target and a runtime-unknown Boolean example compile and execute
@@ -289,8 +291,8 @@ work.
 Distinguish Core construction, frontend behavior, optimization, runtime execution,
 and module integration. M3 through M5 validate native Core construction and the
 restricted bytecode path. The singleton probe supplies comparison evidence for
-some values and laziness cases. Source checking, ordinary optimization, and module
-integration remain open.
+some values and laziness cases. Restricted source `keep` now executes. Source
+Boolean refinement, ordinary optimization, and module integration remain open.
 
 ## Further work
 

@@ -24,10 +24,10 @@ Last updated: 2026-11-12.
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
 | Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
-| Execution | Native Core runs through the checked bytecode entry; source checking remains unimplemented |
-| Source syntax | `ExperimentalDependentTypes` parses distinct `foreach` syntax; the renamer reports GHC-43582 |
+| Execution | Native Core and source `keep` run through the checked bytecode entry |
+| Source syntax | `ExperimentalDependentTypes` checks one explicit retained Boolean binder; unsupported source positions report GHC-43582 |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | Signature checking and source `keep` in M7; broader M6 optimizer work remains open |
+| Next task | Source Boolean refinement for `choose` in M7; broader M6 optimizer work remains open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -52,7 +52,7 @@ applications, substitution composition, binder cloning, invalid indices, scope
 errors, and boundary gates. It also checks `Select True = Int`,
 `Select False = Bool`, shared-index composition, branch casts, and forged proofs.
 
-The frontend cannot produce native Core forms yet. The ordinary optimizer, default
+The restricted frontend produces native Core for local retained functions. The ordinary optimizer, default
 CorePrep entry, program backend entry, and interface serialization reject them.
 There is no performance measurement for the changed type traversals.
 
@@ -110,7 +110,7 @@ documentation because documentation generation was disabled.
 
 The full testsuite and documentation build have not run. This work establishes
 bytecode execution for the restricted Core examples. It does not establish
-ordinary optimizer preservation or a source language. Native machine-code
+ordinary optimizer preservation or the later source implementation. Native machine-code
 compilation remains behind the program gate. All commits are local.
 
 ## Restricted simplification
@@ -149,7 +149,7 @@ This increment does not enable the ordinary optimizer or establish the full M6
 acceptance check. The full testsuite, documentation build, and performance checks
 have not run.
 
-The next source step uses one explicit retained variable pattern. Existing
+The first source step uses one explicit retained variable pattern. Existing
 pattern checking and desugaring preserve its `Unique`; `MatchGroupTc` needs no
 new field for that subset. See [the frontend plan](CORE.md#frontend-identity-plan)
 and [Agda provenance](REFERENCES.md#agda-provenance).
@@ -159,9 +159,8 @@ and [Agda provenance](REFERENCES.md#agda-provenance).
 The local `ExperimentalDependentTypes` flag enables `foreach` in types. The AST
 uses `HsForEachTy`, separate from erased `HsForAllTy`. The flag is disabled by
 default and implies no other extensions. With the flag disabled, `foreach`
-remains an ordinary identifier. Checking still reports the located diagnostic
-GHC-43582: "Typechecking of retained quantification is not implemented yet."
-This increment does not satisfy the source-to-execution gate.
+remains an ordinary identifier. The initial syntax increment rejected all retained
+signatures. The checking increment below accepts a restricted subset.
 
 The printers, exact printer, signature traversals, HIE traversal, and Haddock
 visitors handle the new syntax. Haddock counts retained binders as runtime
@@ -184,7 +183,7 @@ All five registered normal-way regressions passed: `NativeDependentCore`,
 golden file matched the harness's no-caret format. The first run skipped 34
 other ways. The scopes peaked at 2,320 MiB and 856 MiB under 8 GiB caps. Neither
 run had framework failures or warnings. The runtime regression retained its 13
-expected observations, including the non-strict `keep` cases.
+expected output lines, including the non-strict `keep` cases.
 
 The bootstrap API check passed and peaked at 963 MiB under a 4 GiB cap. Separate
 printer checks passed. Haddock generated HTML and source links for
@@ -192,12 +191,64 @@ printer checks passed. Haddock generated HTML and source links for
 peaked at 181 MiB under a 4 GiB cap. Fourmolu parsing and Cabal-gild checks passed.
 The compiler and Haddock files retain their existing formatting.
 
-The next increment must preserve one runtime Name through source lookup,
-signature checking, patterns, zonking, and desugaring. The
-[frontend plan](CORE.md#frontend-identity-plan) records the scoped alias, rigid
-index, result-wrapper, and solver requirements. General runtime-index inference,
-the ordinary dependent optimizer, interfaces, and machine-code integration
-remain open. The full testsuite and documentation build have not run.
+## Restricted source checking
+
+The frontend accepts one explicit `foreach (b :: Bool)` binder at the start of a
+complete monomorphic value signature. A dependent function has one equation with a bare
+retained variable pattern. Its result has lifted kind, and its match wrapper
+must be identity. Calls accept Boolean constructors and named local Boolean Ids.
+The first dependent result example is `Select b -> Select b`.
+
+The renamer allocates one value `Name` and adds a scoped type-lookup alias. The
+checker registers its fixed Bool/Many Id. Pattern checking reuses the existing
+pattern Name, so the runtime lambda and its result type have the same Unique.
+Zonking preserves the fixed index prototype. Looking up its runtime metadata
+would force GHC's recursively tied Id environment. Runtime occurrences still
+use ordinary zonking.
+
+Validity preserves index scope through nested constraints and applies ordinary
+rank rules. The first subset permits only reflexive Boolean equalities that
+mention the index. Constraint instantiation creates their checked boxed
+reflexivity evidence at the call site. This keeps the evidence inside the
+runtime lambda. Other index-dependent predicates need a solver evidence scope.
+Unsigned inferred aliases, Quick Look, index-bearing metavariable assignments,
+and optimisation pragmas remain restricted. Dedicated rejection checks use
+located GHC-83605 diagnostics. Ordinary payload mismatches use GHC-83865.
+
+The existing runtime regression now parses, renames, checks, and desugars real
+source. It retains module evidence bindings around an ordinary `entry :: IO String`
+and runs that closed expression through native lowering. One source `keep`
+receives both runtime Boolean values through an IORef and returns `42` for each.
+The fully applied indexed call with a bottom Boolean also returns `42`.
+The source family example returns `42` for `Select True` and `False` for
+`Select False`. A partial `keep bottom` reaches function WHNF.
+
+The six source observations and twelve Core observations pass against the
+bootstrap API and rebuilt compiler. All 27 source rejection cases check the
+diagnostic code, message, and source span. The opaque-index matching checks also
+pass. The bootstrap API and runtime checks each used a 4 GiB cap and peaked at
+913 MiB and 918 MiB. Core Lint and STG Lint remain mandatory in native lowering.
+
+The final default both-stage rebuild passed in 10 minutes 30 seconds with
+`-j6 --flavour=default --docs=none`. It peaked at 6,055 MiB under a verified
+16 GiB cap with swap disabled. All five registered normal-way regressions passed:
+`NativeDependentCore`, `NativeDependentCoreRun`, `RetainedKeywordOff`,
+`RetainedQuantification`, and `RetainedPrint`. The run skipped 34 other ways and
+had no unexpected failures or framework warnings. It peaked at 2,403 MiB under
+an 8 GiB cap. Fourmolu and Cabal-gild checks passed. Compiler files retain their
+existing formatting.
+
+Local commits separate opaque matching (`723a588ed5`), native checking support
+(`eb29ee0a5d`), and source checking with regressions (`0781706b2e`). Reproduction
+scripts, logs, and memory records are in the ignored `_build/verification/`
+directory. The final runs used `build.sh` and `native-source-syntax-tests.sh`.
+
+Source constructor patterns, dependent Boolean cases, and source `choose` remain
+unfinished. General runtime-index inference, the ordinary dependent optimizer,
+interfaces, and machine-code integration remain open. The full testsuite,
+documentation build, and performance checks have not run. See the
+[frontend plan](CORE.md#frontend-identity-plan) and
+[Agda provenance](REFERENCES.md#agda-provenance).
 
 ## Verified baseline
 

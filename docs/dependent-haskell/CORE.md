@@ -104,7 +104,7 @@ This restricted grammar is not closed under general Core substitution. The
 experiment therefore cannot enter the ordinary optimizer. Backend preparation
 must preserve lazy index binding boundaries. The optimizer will also need this
 restriction or an internal expression-index form for arbitrary Boolean producers.
-Source frontend support remains pending.
+The source frontend supports the restricted `keep` subset described below.
 
 ## Evidence and dependent cases
 
@@ -254,9 +254,10 @@ index and bottom observations before claiming optimizer preservation.
 
 ## Frontend identity plan
 
-The source frontend is pending. The target signatures are explicit retained
-Boolean telescopes such as `foreach (b :: Bool) -> Select b`. They must accept
-ordinary runtime Boolean bindings. They do not require singleton conversion.
+Source `keep` implements the first subset below. Source Boolean refinement
+remains open. The target signatures are explicit retained Boolean telescopes
+such as `foreach (b :: Bool) -> Select b`. They must accept ordinary runtime
+Boolean bindings. They do not require singleton conversion.
 
 The implementation must preserve one runtime identity through these stages:
 
@@ -290,9 +291,9 @@ The implementation must preserve one runtime identity through these stages:
    before the ordinary Boolean no-evidence fast path. Check coverage and retain
    the fixed outer result scope.
 
-Native zonking and relevant unification paths also need support. They currently
-reject native forms. Unsupported source constructs must produce located errors
-before those internal guards. Keep binder-domain, unsupported-index, coverage,
+Native zonking and the required reflexive unification paths now support this
+source subset. Unsupported source constructs must produce located errors before
+other internal guards. Keep binder-domain, unsupported-index, coverage,
 and branch-result errors at their respective source locations.
 Enable the first rule only at the root of a complete explicit value signature.
 Keep the generic `HsForEachTy` rejection for unsupported source positions.
@@ -302,7 +303,10 @@ quantification before constructing native types. Start execution with local
 declarations, as specified below.
 `zonkMatchGroup` checks group annotations outside the pattern environment. For
 the first subset, preserve the prototype Id's fixed `Bool` type, `Many`
-multiplicity, and `Unique` when that environment has no entry.
+multiplicity, and `Unique`. Do not consult the recursively tied runtime Id
+environment for an index occurrence in a type. GHC's existing
+`Note [The ZonkEnv]` explains this knot. Runtime expression occurrences still
+use the ordinary Id lookup.
 
 `kindGeneralizeSome` also traverses the complete signature. Its candidate
 collector must treat a runtime index as rigid. It must not generalize that Id.
@@ -310,17 +314,31 @@ Validity checking must check scope, domains, multiplicities, result kinds, and
 ordinary rank rules inside the retained body. Equal native types can use the
 existing reflexive unification path. This does not permit a metavariable to
 capture an untracked runtime index. Solver rewriting and native mismatch paths
-still need conservative handling or precise source rejection.
+still need conservative handling or precise source rejection. Reject inferred
+types that contain native forms before ordinary binding generalization or
+normalization. An unsigned alias can obtain such a type without assigning a
+type metavariable. Keep complete signatures on their checking path.
 
 A constraint in the result can require a nonidentity match wrapper. For example,
 `foreach (b :: Bool) -> ((b ~ b) => Int) -> ((b ~ b) => Int)` falls outside the
 first identity-wrapper subset. A fully applied laziness observation can instead
 use `foreach (b :: Bool) -> ((b ~ b) => Int) -> Int`. Its body instantiates the
 argument's constraint. It does not require a constrained result wrapper.
-This observation still needs checked rigid-index handling in the solver.
-Lifted equality dictionaries pass through rewriting before equality solving.
-Their primitive superclass also reaches `zonkEqTypes`. Support opaque reflexive
-rewriting and same-Id equality there. Do not inspect Boolean unfoldings.
+The observation uses checked rigid-index handling and scoped reflexivity.
+Constraint instantiation builds a boxed `(b ~ b)` dictionary directly at its
+call site, with the existing `evDictApp` and nominal reflexivity constructors.
+A Wanted dictionary could receive a solver evidence binding outside the runtime
+lambda. The direct expression preserves its scope. Other index-dependent
+predicates remain gated until the solver has a runtime-index evidence scope.
+Opaque reflexive rewriting and same-Id equality remain supported in the solver.
+Do not inspect Boolean unfoldings.
+Pure family matching also preserves opaque indices. The same Id matches itself.
+Different Ids can still hold the same Boolean. A constructor and an opaque Id
+can also coincide. These comparisons are `MaybeApart MARRuntimeIndex`, rather
+than `SurelyApart`. A closed family must not skip an earlier constructor clause
+because an index is unknown. Repeated template-variable targets preserve this
+uncertainty. Ordinary family template variables can still bind indices through
+the immutable matching substitution. This does not assign a Tc metavariable.
 Using `Proxy b` as the payload would instead require assigning a runtime index
 to the constructor's fresh type metavariable. That needs an index escape rule
 and remains outside this first observation.
@@ -332,12 +350,13 @@ Use typed, located `TcRnMessage` diagnostics for unsupported retained forms.
 Reuse ordinary diagnostics only when their meanings match. An unsupported `Int`
 domain is not a kind mismatch. A retained argument is not an erased required type
 argument. Ordinary inferred functions remain valid without a retained signature.
-Error-context formatting can itself invoke zonking. Early rejection must precede
-native type construction until the native zonkers are implemented.
+Error-context formatting can itself invoke zonking. The native zonkers above
+support this subset. Reject other forms before unsupported traversals.
 
 Start execution with local retained declarations inside an ordinary
 `entry :: IO String`. Parse, rename, typecheck, and desugar real source. Pass its
-closed Core right-hand side to the checked native bytecode entry. This exercises
+closed Core right-hand side to the checked native bytecode entry. Retain its
+module-level evidence bindings around that expression. This exercises
 the frontend without enabling native interfaces or the ordinary module pipeline.
 General computed-scrutinee abstraction remains separate work. Agda's
 [with-abstraction reference](REFERENCES.md#agda-provenance) explains its effect on
@@ -364,7 +383,9 @@ bottom. The prepared Core and STG retain one Boolean argument. The index-only
 type dependencies add no captured runtime values. Virtual branch proofs disappear
 before bytecode generation.
 
-Interface serialization, source syntax, the ordinary optimizer, and the normal
-program backend remain gated. The scoped SimpleOpt work and frontend plan above
-have separate acceptance checks. Existing ordinary GHC programs must continue
-to build.
+The runtime regression also checks real source `keep`. It observes both runtime
+Boolean inputs, a fully applied indexed bottom, both concrete `Select` results,
+and a partial `keep bottom` at function WHNF. Source Boolean refinement and
+`choose` remain open. Interface serialization, the ordinary optimizer, and the
+normal program backend remain gated. Existing ordinary GHC programs must
+continue to build.
