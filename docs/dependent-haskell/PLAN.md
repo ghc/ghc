@@ -231,7 +231,9 @@ The next increment must replace this rejection with the restricted Boolean
 checking rule. Use the existing checked bytecode path for the first source
 execution. Parsing alone does not satisfy the M7 gate.
 
-- [ ] Add an experimental opt-in flag, syntax, AST representation, and diagnostics.
+- [x] Add an experimental opt-in flag, syntax, AST representation, and diagnostics.
+- [ ] Support native zonking, rigid signature generalization, scoped validity,
+      opaque index rewriting, and same-Id equality for the first source rule.
 - [ ] Extend renaming and checking for explicit retained Boolean signatures.
       Track one runtime binder when it occurs in both terms and types.
 - [ ] Start with one equation and a bare retained variable pattern. Reuse its
@@ -241,7 +243,7 @@ execution. Parsing alone does not satisfy the M7 gate.
       patterns directly into checked native Core.
 - [ ] Accept ordinary runtime Booleans under shared bindings. Reject index escape
       and unsupported expressions with precise diagnostics.
-- [ ] Update source printers and extension documentation.
+- [x] Update source printers and extension documentation.
 
 Gate: the source target and a runtime-unknown Boolean example compile and execute
 directly. Their implementation uses no singleton ABI or reification step.
@@ -256,6 +258,9 @@ directly. Their implementation uses no singleton ABI or reification step.
 - [ ] Run relevant type-checker, simplifier, interface, and code-generation tests.
       Rebuild and bootstrap the compiler with the feature disabled.
 - [ ] Record exact revisions, commands, results, and proof boundaries.
+- [ ] Before publication, add the required changelog fragment with actual issue
+      and merge-request references. Follow the
+      [changelog guide](../../utils/changelog-d/README.md).
 
 Gate: the experiment works across modules, ordinary programs remain compatible,
 and the modified compiler builds itself. General dependent Haskell remains further

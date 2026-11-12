@@ -264,8 +264,15 @@ The implementation must preserve one runtime identity through these stages:
    `Language/Haskell/Syntax/Type.hs`. Reuse located binder syntax and exact source
    annotations. Do not encode the syntax in strings, plugins, or erased foralls.
 2. Rename the retained binder as a term name that is available in its result
-   type. In `Tc/Gen/HsType.hs`, check its `Bool` domain and lifted result. Permit
-   `TermVarTy` only for the checked retained identifier in this scope.
+   type. Allocate one `VarName`. Add a scoped type-lookup alias to that same
+   `Name` in `LocalRdrEnv`. An inner `forall` must shadow this alias through the
+   existing local environment. Do not create a second Name with the same Unique.
+   Do not enable general term-name lookup in types. Check each binder annotation
+   as a value's domain type before introducing that binder.
+   In `Tc/Gen/HsType.hs`, check the `Bool` domain and lifted result. Keep a scoped
+   retained-index environment in `TcTyMode`. Permit `TermVarTy` only for a
+   registered Boolean Id. Preserve ordinary `ATcId` rejection for other names.
+   Apply term staging checks or reject retained staging constructs explicitly.
 3. Start with one equation and a bare retained variable pattern. Construct its
    Boolean Id from the pattern's renamed `Name`. Substitute that Id into the
    codomain before decomposing the remaining argument types. `tcPatBndr` keeps
@@ -287,9 +294,36 @@ Native zonking and relevant unification paths also need support. They currently
 reject native forms. Unsupported source constructs must produce located errors
 before those internal guards. Keep binder-domain, unsupported-index, coverage,
 and branch-result errors at their respective source locations.
+Enable the first rule only at the root of a complete explicit value signature.
+Keep the generic `HsForEachTy` rejection for unsupported source positions.
+This prevents native types from reaching synonym, data, class, and role checks
+before those checks support them. Reject partial signatures and embedded retained
+quantification before constructing native types. Start execution with local
+declarations, as specified below.
 `zonkMatchGroup` checks group annotations outside the pattern environment. For
 the first subset, preserve the prototype Id's fixed `Bool` type, `Many`
 multiplicity, and `Unique` when that environment has no entry.
+
+`kindGeneralizeSome` also traverses the complete signature. Its candidate
+collector must treat a runtime index as rigid. It must not generalize that Id.
+Validity checking must check scope, domains, multiplicities, result kinds, and
+ordinary rank rules inside the retained body. Equal native types can use the
+existing reflexive unification path. This does not permit a metavariable to
+capture an untracked runtime index. Solver rewriting and native mismatch paths
+still need conservative handling or precise source rejection.
+
+A constraint in the result can require a nonidentity match wrapper. For example,
+`foreach (b :: Bool) -> ((b ~ b) => Int) -> ((b ~ b) => Int)` falls outside the
+first identity-wrapper subset. A fully applied laziness observation can instead
+use `foreach (b :: Bool) -> ((b ~ b) => Int) -> Int`. Its body instantiates the
+argument's constraint. It does not require a constrained result wrapper.
+This observation still needs checked rigid-index handling in the solver.
+Lifted equality dictionaries pass through rewriting before equality solving.
+Their primitive superclass also reaches `zonkEqTypes`. Support opaque reflexive
+rewriting and same-Id equality there. Do not inspect Boolean unfoldings.
+Using `Proxy b` as the payload would instead require assigning a runtime index
+to the constructor's fresh type metavariable. That needs an index escape rule
+and remains outside this first observation.
 
 Keep `foreach` an ordinary identifier when the experimental flag is disabled.
 Its proposed syntax can also parse as an ordinary type-variable application.

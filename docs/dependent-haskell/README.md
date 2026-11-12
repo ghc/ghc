@@ -24,9 +24,10 @@ Last updated: 2026-11-12.
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
 | Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
-| Execution | Native Core runs through the checked bytecode entry; source syntax remains unavailable |
+| Execution | Native Core runs through the checked bytecode entry; source checking remains unimplemented |
+| Source syntax | `ExperimentalDependentTypes` parses distinct `foreach` syntax; the renamer reports GHC-43582 |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | Source `keep` in M7 through the checked bytecode path; broader M6 optimizer work remains open |
+| Next task | Signature checking and source `keep` in M7; broader M6 optimizer work remains open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -51,7 +52,7 @@ applications, substitution composition, binder cloning, invalid indices, scope
 errors, and boundary gates. It also checks `Select True = Int`,
 `Select False = Bool`, shared-index composition, branch casts, and forged proofs.
 
-The frontend cannot produce the new forms. The ordinary optimizer, default
+The frontend cannot produce native Core forms yet. The ordinary optimizer, default
 CorePrep entry, program backend entry, and interface serialization reject them.
 There is no performance measurement for the changed type traversals.
 
@@ -152,6 +153,51 @@ The next source step uses one explicit retained variable pattern. Existing
 pattern checking and desugaring preserve its `Unique`; `MatchGroupTc` needs no
 new field for that subset. See [the frontend plan](CORE.md#frontend-identity-plan)
 and [Agda provenance](REFERENCES.md#agda-provenance).
+
+## Experimental source syntax
+
+The local `ExperimentalDependentTypes` flag enables `foreach` in types. The AST
+uses `HsForEachTy`, separate from erased `HsForAllTy`. The flag is disabled by
+default and implies no other extensions. With the flag disabled, `foreach`
+remains an ordinary identifier. Checking still reports the located diagnostic
+GHC-43582: "Typechecking of retained quantification is not implemented yet."
+This increment does not satisfy the source-to-execution gate.
+
+The printers, exact printer, signature traversals, HIE traversal, and Haddock
+visitors handle the new syntax. Haddock counts retained binders as runtime
+arguments. The source regressions check the diagnostic and flag-disabled
+compatibility. The existing API regression also checks flag parsing, the
+distinct AST node, a printing round trip, brace rejection, and visible `forall`.
+The printer regression checks ASCII pretty/exact round trips and Unicode exact
+printing. The suite already records a Unicode pretty-printing limitation.
+
+Compiler source commit `03c4343351` passed the final default Hadrian rebuild
+with `-j6 --flavour=default --docs=none`. Hadrian reported 8m07s. The memory scope
+recorded a peak of 6,659 MiB under a 16 GiB cap with no swap. Both compiler stages
+and their dependencies built. The preceding complete rebuild took 26m56s and
+exposed missing AST cases. The final rebuild contains those fixes and has no
+new exhaustiveness warnings.
+
+All five registered normal-way regressions passed: `NativeDependentCore`,
+`NativeDependentCoreRun`, `RetainedKeywordOff`, `RetainedQuantification`, and
+`RetainedPrint`. Four passed in the first run. The diagnostic passed after its
+golden file matched the harness's no-caret format. The first run skipped 34
+other ways. The scopes peaked at 2,320 MiB and 856 MiB under 8 GiB caps. Neither
+run had framework failures or warnings. The runtime regression retained its 13
+expected observations, including the non-strict `keep` cases.
+
+The bootstrap API check passed and peaked at 963 MiB under a 4 GiB cap. Separate
+printer checks passed. Haddock generated HTML and source links for
+`RetainedKeywordOff`; each `foreach` token kept identifier styling. That check
+peaked at 181 MiB under a 4 GiB cap. Fourmolu parsing and Cabal-gild checks passed.
+The compiler and Haddock files retain their existing formatting.
+
+The next increment must preserve one runtime Name through source lookup,
+signature checking, patterns, zonking, and desugaring. The
+[frontend plan](CORE.md#frontend-identity-plan) records the scoped alias, rigid
+index, result-wrapper, and solver requirements. General runtime-index inference,
+the ordinary dependent optimizer, interfaces, and machine-code integration
+remain open. The full testsuite and documentation build have not run.
 
 ## Verified baseline
 
