@@ -24,6 +24,7 @@ import GHC.Core.Utils (exprType)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.StringBuffer (stringToStringBuffer)
+import GHC.Driver.Backend (backendWritesFiles)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Driver.DynFlags (DynFlags (..), ExecutableLinkMode (Dynamic), GhcLink (LinkExecutable, NoLink), GhcMode (OneShot), gopt_set)
 import GHC.Driver.Env (HscEnv, hscInterp)
@@ -338,11 +339,12 @@ runProgramChecks libdir = do
                           ]
                             ++ extraFlags
                 unless (null leftovers) (fail "FAIL: native program flags were not parsed")
+                let writesFiles = backendWritesFiles (backend programFlags)
                 void $
                     GHC.setSessionDynFlags
                         programFlags
-                            { ghcLink = LinkExecutable Dynamic
-                            , outputFile_ = Just executablePath
+                            { ghcLink = if writesFiles then LinkExecutable Dynamic else NoLink
+                            , outputFile_ = if writesFiles then Just executablePath else Nothing
                             }
                 target <- GHC.guessTarget sourcePath Nothing Nothing
                 GHC.setTargets [target]
@@ -380,7 +382,7 @@ runProgramChecks libdir = do
             , ("late cost centres", ["-fprof-late"], retainedProgramSource, "profiling or late cost-centre insertion")
             , ("INLINE entry", [], sourceWith ["{-# INLINE entry #-}"], "unfolding construction while desugaring binding")
             , ("INLINABLE entry", [], sourceWith ["{-# INLINABLE entry #-}"], "unfolding construction while desugaring binding")
-            , ("non-object module", ["-fbyte-code"], retainedProgramSource, "non-object module compilation")
+            , ("non-object module", ["-fbyte-code", "-no-link"], retainedProgramSource, "non-object module compilation")
             , ("native class default method", [], classSource, "default-method unfolding construction while desugaring binding")
             ]
     forM_ rejections $ \(label, extraFlags, source, phase) -> do
