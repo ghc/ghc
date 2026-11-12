@@ -6,7 +6,7 @@ from Eisenberg's historical `nokinds-pi` work, ported and completed on current
 GHC. Keep the validated `singletons` encoding as a comparison implementation.
 The next source target is runtime Peano naturals and length-indexed vectors.
 
-Last updated: 2026-11-12.
+Last updated: 2026-11-13.
 
 ## Project documents
 
@@ -24,14 +24,14 @@ Last updated: 2026-11-12.
 | Project branch | `codex/dependent-haskell` |
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
-| Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
-| Execution | Native Core and source composition pass the checked bytecode entry; source composition also runs as machine code |
+| Native Core | Closed algebraic domains, retained application, and field-scoped Nat proofs pass the API regression |
+| Execution | Core Nat/Vec and Boolean source programs pass the checked bytecode entry; Boolean source programs also run as machine code |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
-| Native interfaces | Scoped signatures pass binary reconstruction, disk imports, cross-module execution, version rejection, and incremental recompilation |
+| Native interfaces | Boolean signatures pass binary reconstruction, disk imports, cross-module execution, version rejection, and incremental recompilation |
 | Configured fork version | `10.1.20261112.1`, with interface header `1001202611121` |
 | Source syntax | `ExperimentalDependentTypes` checks one explicit retained Boolean binder; unsupported source positions report GHC-43582 |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | Runtime Nat/Vec in M9; actual unfolding files in M8, source `case`, and broader M6 remain open |
+| Next task | Nat/Vec source elaboration and CorePrep transport in M9; actual unfolding files in M8, source `case`, and broader M6 remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -41,7 +41,8 @@ reification remains specific to the comparison implementation.
 
 ## Native Core implementation
 
-`TermVarTy` refers to the index of an existing runtime Boolean identifier.
+`TermVarTy` refers to the index of an existing runtime identifier in a supported
+closed algebraic domain, including Bool and user-defined Nat.
 `DepFunTy` binds that identifier in a dependent result type. Type recovery and
 Core Lint agree on retained application. The implementation includes scope,
 capture avoidance, supported index substitution, alpha equality, and diagnostic
@@ -473,6 +474,61 @@ peaked at 848 MiB under 4 GiB. `SHA256SUMS` records both artifacts. Keep this
 binary for the next format's rejection check; do not rebuild it after the bump.
 Rejection of the future format has not been tested yet.
 
+## Core naturals and vectors
+
+Closed first-order algebraic domains now work as native Core indices. The domain
+check follows actual TyCon and DataCon structure. It accepts recursive and
+mutually recursive domains. It rejects parameters, existentials, constraints,
+newtypes, unsupported fields, and constructor wrappers.
+The user-defined `Nat` has no wired compiler identity. Constructor indices use
+the ordinary promoted constructors from DataKinds.
+
+The existing API fixture checks Nat kinding, saturated constructor indices,
+substitution, capture avoidance, closed `Add` reduction, and field-scoped branch
+proofs. A native `S` alternative binds its runtime predecessor before its virtual
+proof. Core Lint checks both. Backend lowering keeps the predecessor and removes
+only the proof. Opaque indices remain opaque even when their unfoldings contain
+known constructors. Apartness does not assume that every Nat is finite.
+
+The runtime fixture loads ordinary source definitions of `Nat`, `Vec`, `Add`,
+and a GADT append helper. It constructs checked native Core for recursive
+`replicate`, `head`, and a retained append wrapper. One worker reads unknown
+lengths from IORefs and uses the same runtime Ids across producers and consumers.
+Lengths two and three produce `[42,42,7,7,7]` with observed length five.
+
+The same fixture checks empty inputs and unused bottom elements. A replication
+at `S bottomNat` produces a first element without forcing its predecessor.
+Forcing the remaining spine raises the named Nat exception. A cyclic Nat permits
+a finite vector prefix. `head bottomNat (VCons 42 bottomVec)` returns `42`.
+Fully applying append to bottom indices and vectors raises the vector exception,
+which checks that append does not force its retained lengths first.
+
+These programs pass through the checked bytecode entry. They do not establish
+Nat source elaboration, Nat machine-code lowering, or Nat interface files. The
+source checker and interface reconstruction still accept only Boolean indices.
+CorePrep explicitly rejects a retained constructor-tree argument with fields:
+naming `S k` as an opaque local Id needs checked index transport. Recursive
+replication passes the actual predecessor Id and does not need this conversion.
+
+The implementation checkpoint is `df623104fd`. Both-stage default builds pass
+with six workers and `--docs=none`. The final incremental alignment took
+16m07s and peaked at 7,344 MiB under 16 GiB. Bootstrap
+execution passed at 966 MiB under 4 GiB. Swap was disabled in both scopes.
+
+All five registered normal-way tests pass: 39 cases, 34 skipped, no unexpected
+results, and no framework warnings. Hadrian reported 1m35s. The scope peaked at
+2,557 MiB under 8 GiB, with swap disabled. This includes the final Nat substitution
+and field-capture checks and the full runtime fixture.
+
+The ordinary optimized/threaded TH, package, GHCi, and Haddock smoke also passes
+at 145 MiB under 4 GiB, with swap disabled. Compiler sources pass nonmutating
+Fourmolu parses. Both fixtures pass canonical Fourmolu. Cabal-gild, diff, and
+local document link checks pass. The repository merge-request template requires
+the focused regressions. The full testsuite, documentation build, and performance
+measurements have not run.
+
+Logs and peak records use the `native-nat` prefix in `_build/verification/`.
+
 ## Next: runtime naturals and vectors
 
 The [M9 target](PLAN.md#m9-runtime-natural-numbers-and-indexed-vectors) is a
@@ -480,13 +536,15 @@ user-defined Peano Nat with `replicate`, `append`, and `head` for indexed vector
 Runtime lengths become native indices directly. `replicate` inspects a length;
 `append` can use an ordinary GADT helper without forcing its retained lengths.
 The [pinned Agda definitions](REFERENCES.md#agda-provenance) supply the typing
-and recursion comparison. Nat/Vec support is not implemented yet.
+and recursion comparison. Generic algebraic Core support is implemented.
+The source Nat/Vec target remains unimplemented.
 
 The audit identifies four preservation requirements: field binders before proofs
 that mention them, scoped GADT index instantiation, retained telescopes, and
 CorePrep transport when naming constructor arguments. M9 records source-level
 and cross-module acceptance checks, including partial and cyclic Nat values.
-The Core prototype will be an intermediate step, not completion of this target.
+The runnable Core programs are an intermediate step. They do not complete this
+source target.
 
 ## Verified baseline
 

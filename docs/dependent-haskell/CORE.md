@@ -11,24 +11,34 @@ specify the full dependent-Haskell language.
 The internal `Type` datatype has two new constructors:
 
 ```text
-TermVarTy b       -- The Boolean index of a runtime identifier.
+TermVarTy b       -- The algebraic index of a runtime identifier.
 DepFunTy b result -- A retained dependent function.
 ```
 
-`b` is a local non-coercion `Id`. Its type is `Bool`. Its multiplicity is `Many`.
+`b` is a local non-coercion `Id`. Its type is a supported closed algebraic domain.
+Its multiplicity is `Many`.
 It keeps its identity as a runtime variable. It is not a `TyVar` or a `CoVar`.
 The term binder and every reference to its index use the same `Unique`.
 
-`TermVarTy b` has kind `Bool`. Constructor indices use the existing promoted
-`True` and `False` types. `promoteDataCon` supplies these types through GHC's
-existing DataKinds machinery. `TermVarTy` adds the link to a runtime variable.
+`TermVarTy b` has kind `varType b`. Constructor indices use ordinary promoted
+constructors, including `True`, `False`, `Z`, and `S n`. `promoteDataCon` supplies
+these types through GHC's DataKinds machinery. Nat has no wired compiler identity.
+`TermVarTy` adds the link to a runtime variable.
 The result of a retained function has kind `Type`.
 Dependent runtime representations are outside this subset.
 
 Canonicalize a dependent function whose binder does not occur in its result to
-an ordinary unrestricted Boolean arrow. This preserves one representation for a
+an ordinary unrestricted arrow over its domain. This preserves one representation for a
 vacuous retained binder. Lambda typing detects dependence from the result type.
 No retainedness flag is added to every ordinary identifier.
+
+`isNativeIndexType` validates a closed graph of lifted, first-order data domains.
+Its worklist admits recursive and mutually recursive constructor fields. Exclude
+parameters, existential variables, constraints, datatype contexts, newtypes,
+type data, unboxed fields, and constructor wrappers. Original and representation
+fields must have the same domain. Field multiplicities may be `One` or `Many`.
+This policy bounds the Core increment. It is not an Agda language restriction.
+The source checker and interface reader still accept only Boolean indices.
 
 ## Scope and equality
 
@@ -40,22 +50,29 @@ dependencies. They are not additional runtime uses for linearity analysis.
 
 Compare runtime index variables by scoped identity. Compare dependent functions
 modulo alpha-renaming of their binders. Do not inspect identifier unfoldings to
-equate separately bound Boolean producers.
+equate separately bound runtime producers.
 
 Existing type variables, coercion variables, and their substitutions keep their
 current meanings. The new forms must use separate mapper and folder callbacks.
 
 ## Lambda and application
 
-If a runtime lambda's body type mentions its Boolean binder, its type is the
-canonical retained dependent function. Otherwise its type is an ordinary arrow.
+If a runtime lambda's body type mentions a supported runtime binder, its type is
+the canonical retained dependent function. Otherwise its type is an ordinary arrow.
 
 For application of `DepFunTy b result`, first check the runtime argument against
-`Bool`. Then substitute its index for `b` in the result. The initial accepted
-arguments are a valid local Boolean identifier and the exact nullary Boolean
-constructor workers. Constructor workers map to their corresponding promoted
-constructors. A bare variable remains opaque even if its unfolding is a Boolean
-constructor.
+the binder's domain. Then substitute its index for `b` in the result. The Core
+grammar accepts a local index Id or a saturated tree of constructor workers.
+Convert the fields recursively and check each field domain. Map workers to their
+ordinary promoted constructors. A variable stays opaque even if its unfolding
+is a known constructor. No index conversion evaluates a value.
+
+CorePrep currently rejects retained constructor arguments with fields. Naming
+`f (S k)` as `let t = S k in f t` changes its recovered index. Checked transport
+between `S k` and the new opaque Id is not implemented. Report a named `Sorry`
+before argument naming. Recursive workers can pass their actual predecessor Id.
+Nullary constructor arguments need no such naming step. This boundary remains
+an open source-target requirement in [M9](PLAN.md#m9-runtime-natural-numbers-and-indexed-vectors).
 
 Type computation and Core Lint must perform the same instantiation. A wrong
 argument type, unsupported expression, or escaping index must fail explicitly.
@@ -90,12 +107,12 @@ Entering a dependent binder removes its outer substitution and renames it to
 avoid capture. Extend the expression environment with the renamed runtime binder
 when required. Every occurrence in the result follows that renaming.
 
-Substitution of a Boolean variable or constructor into an index produces the
-corresponding index. Substitution of any other expression must fail explicitly
+Substitution of a supported variable or constructor tree into an index produces
+the corresponding index. Substitution of any other expression must fail explicitly
 in the initial experiment. It must not leave a stale variable behind.
 
 `composeTCvSubst` composes type and coercion environments. It also composes
-supported Boolean index mappings in the expression environment. It preserves
+supported algebraic index mappings in the expression environment. It preserves
 apply-once substitution and the second environment's priority on shared domains.
 It does not compose arbitrary Core expressions. Such expressions cannot replace
 native indices in this increment.
@@ -103,7 +120,7 @@ native indices in this increment.
 This restricted grammar is not closed under general Core substitution. The
 experiment therefore cannot enter the ordinary optimizer. Backend preparation
 must preserve lazy index binding boundaries. The optimizer will also need this
-restriction or an internal expression-index form for arbitrary Boolean producers.
+restriction or an internal expression-index form for arbitrary runtime producers.
 The source frontend supports the restricted Boolean functions described below.
 
 ## Evidence and dependent cases
@@ -125,6 +142,18 @@ The displayed proof types annotate the Core binders. They are not source syntax.
 Each proof is a virtual coercion binder. It is not a Boolean constructor field.
 The Boolean constructor workers keep their nullary types.
 
+A successor alternative has a real field before its virtual proof:
+
+```text
+Alt (DataAlt S) [k :: Nat, cv :: TermVarTy n ~# 'S (TermVarTy k)] rhs
+```
+
+Put `k` in scope before checking `cv`. Check its type and multiplicity against
+the ordinary constructor worker. Require fresh field identities and a fresh
+proof identity. A field that captures `n` could change the expected equality.
+The worker still takes only its actual field. An ordinary `S k` alternative
+without a virtual proof keeps its ordinary typing rule.
+
 Check the scrutinee first. Derive its index with the same variable/constructor
 rule as retained application. Do not derive evidence from an unrelated variable,
 the case binder, an unfolding, or an unsupported producer expression.
@@ -136,8 +165,8 @@ scope. Check its right-hand side with the proof in scope. Keep the proof outside
 all other alternatives and the result annotation. Ordinary Boolean alternatives
 with no binders keep their existing rule. `DEFAULT` cannot bind a proof.
 
-Require exhaustive alternatives whenever a Boolean alternative binds a proof.
-Both exact Boolean constructors or a binder-free `DEFAULT` must cover the input.
+Require exhaustive alternatives whenever an algebraic alternative binds a proof.
+All constructors of its domain or a binder-free `DEFAULT` must cover the input.
 Existing Core Lint does not check this property for ordinary algebraic cases.
 It is necessary here: an unchecked single impossible alternative could supply a
 contradictory proof if later code treated that alternative as unconditional.
@@ -158,10 +187,11 @@ for this GHC rule.
 The ordinary optimizer remains gated. Program compilation uses the checked
 module entry below. The ordinary simplifier
 reconstructs constructor applications from alternative binders. It cannot treat
-this proof as a Boolean field. After checked preparation, CoreToStg removes the
-virtual alternative proof and erases casts. It preserves strict case discrimination
+this proof as a worker field. After checked preparation, CoreToStg removes only
+the trailing virtual proof and keeps the actual fields. It erases casts and
+preserves strict case discrimination
 and ordinary coercion argument positions.
-The boundary scanner must detect virtual Boolean proofs even when their types
+The boundary scanner must detect virtual algebraic proofs even when their types
 contain only constructor indices.
 
 Non-reflexive coercions over retained dependent functions require their own

@@ -171,6 +171,23 @@ successor does not force its predecessor, and finite prefixes of a cyclic
 replication must remain observable. Keep opaque runtime indices conservative in
 equality and apartness. No Agda build was run for this comparison.
 
+The first algebraic Core increment uses this constructor/refinement precedent.
+`TermVarTy` takes its kind from the same runtime Id's domain. `S k` becomes the
+ordinary promoted application to that field's index. A native alternative scopes
+its actual fields before one trailing nominal proof. The closed, first-order,
+wrapper-free domain policy is a GHC implementation limit. It makes the source
+constructor fields match the worker fields. It is not a restriction copied from
+Agda. The Core Notes name this policy and the fresh-field scope rule.
+
+Agda's pinned [local-definition reference](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/let-and-where.lagda.rst#L57-L68)
+states that checking substitutes away let definitions; its internal syntax has no
+let construct. The file blob is `eef72940b74f0efa87c55ba9378789d26d7df402`.
+This precedent does not supply GHC's missing alias-transport rule. Naming
+`f (S k)` as `let t = S k in f t` changes the recovered result index. GHC must
+preserve lazy sharing and check transport between these indices. The current
+CorePrep increment reports an explicit unsupported operation at that boundary.
+The M9 source target still requires a solution.
+
 The frontend must preserve these identities through parsing, checking, and
 desugaring. RequiredTypeArguments provides erased type arguments. It cannot
 implement the retained rule by renaming `foreach` to `forall`. See the

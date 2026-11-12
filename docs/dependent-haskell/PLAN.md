@@ -433,13 +433,13 @@ The retained wrapper must instantiate the helper with the caller's runtime
 indices. `replicate` supplies the actual predecessor value through its Nat
 pattern. See [the Agda Nat/Vec references](REFERENCES.md#agda-provenance).
 
-- [ ] Generalize native index kinding and identifier validation from `Bool` to
+- [x] Generalize native index kinding and identifier validation from `Bool` to
       supported lifted algebraic domains. Keep scope and multiplicity checks.
-- [ ] Represent saturated constructor indices such as `S n`. Preserve their
+- [x] Represent saturated constructor indices such as `S n`. Preserve their
       runtime field identities through substitution, tidying, and type recovery.
-- [ ] Refine constructor alternatives with both real fields and a virtual proof.
+- [x] Refine constructor alternatives with both real fields and a virtual proof.
       Preserve the fields at runtime. Erase only the checked proof.
-- [ ] Check recursive Core for vector replication with an unknown runtime Nat.
+- [x] Check recursive Core for vector replication with an unknown runtime Nat.
       This is an intermediate gate; it does not complete the source target.
 - [ ] Extend frontend checking to scoped constructor-field indices, outer type
       quantification, and multiple retained binders. Support safe GADT constructor
@@ -459,11 +459,11 @@ not force its predecessor. A hand-built Core example alone does not satisfy M9.
 
 Resolve these preservation rules in the implementation:
 
-- In a native `S k` alternative, put the actual field binder before the virtual
-  proof that mentions it. The current `cpt_dicts` insertion precedes runtime
-  fields and is insufficient. Preserve ordinary GADT evidence positions.
-- Generalize the fixed-domain check through eligible TyCon/DataCon structure.
-  Start with closed, promotable, first-order data domains. Preserve lazy fields.
+- In source pattern lowering for `S k`, put the actual field binder before the
+  virtual proof that mentions it. The current `cpt_dicts` insertion precedes
+  runtime fields and is insufficient. Preserve ordinary GADT evidence positions.
+- Apply the structural Core domain check in the frontend. Start with closed,
+  promotable, first-order data domains. Preserve lazy fields.
   Exclude existential, constrained, newtype, and unboxed index constructors in
   this increment. Do not give the user-defined `Nat` a wired compiler identity.
 - Introduce the complete retained telescope before transporting an equation's
@@ -476,7 +476,8 @@ Resolve these preservation rules in the implementation:
 - Check CorePrep naming of constructor arguments. Naming `f (S k)` as
   `let t = S k in f t` changes its recovered index to `TermVarTy t`. Specify and
   check alias transport before claiming end-to-end constructor-argument support.
-  Do not use an unchecked cast or equality from an unfolding.
+  Do not use an unchecked cast or equality from an unfolding. CorePrep currently
+  reports a named unsupported operation before it names this retained argument.
 - Preserve partial and cyclic Haskell values. Check finite vector prefixes for
   `let n = S n`, a head from `replicate (S bottomNat) x`, and failure when its
   remaining spine needs `bottomNat`. Check `head bottomNat (VCons x undefined)`
