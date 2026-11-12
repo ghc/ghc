@@ -2000,7 +2000,7 @@ lintType (DepFunTy b body)
            (text "Vacuous retained dependent binder:" <+> ppr b)
        ; lintBinder LambdaBind b $
          do { lintType body
-            ; lintL (isLiftedTypeKind (typeKind body))
+            ; lintL (typeKind body `eqType` liftedTypeKind)
                 (text "Retained dependent result must have kind Type:" <+> ppr body) } }
 
 lintType ty@(AppTy t1 t2)

@@ -193,7 +193,7 @@ mkLamType v body_ty
 
    | isBoolIndexId v
    , anyFreeVarsOfType (== v) body_ty
-   = assertPpr (isBoolIndexId v && isLiftedTypeKind (typeKind body_ty))
+   = assertPpr (isBoolIndexId v && typeKind body_ty `eqType` liftedTypeKind)
        (text "Unsupported retained dependent lambda:" <+> ppr v <+> dcolon <+> ppr body_ty) $
      DepFunTy v body_ty
 

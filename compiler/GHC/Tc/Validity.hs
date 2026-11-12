@@ -763,7 +763,7 @@ check_type ve (TermVarTy v)
 check_type ve (DepFunTy v body)
   = do { unless (isBoolIndexId v && not (v `elemVarSet` ve_indices ve)) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
-       ; unless (isLiftedTypeKind (typeKind body)) $
+       ; unless (typeKind body `eqType` liftedTypeKind) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedResultKind body)
        ; check_type (ve { ve_rank = arg_rank }) (varType v)
        ; check_type (ve { ve_rank = res_rank
