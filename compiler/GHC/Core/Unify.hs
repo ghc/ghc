@@ -95,6 +95,9 @@ of ways.  Here we summarise, but see Note [Specification of unification].
          See Note [Infinitary substitutions]
     * MARCast (obscure):
          See (KCU2) in Note [Kind coercions in Unify]
+    * MARRuntimeIndex:
+         An opaque runtime Boolean might equal the other index.
+         See Note [Apartness of retained Boolean indices].
 
 (CU5) We need to take care with kinds.  See Note [tcMatchTy vs tcMatchTyKi]
 
@@ -193,7 +196,7 @@ Examples
        where  type family Loop where Loop = Maybe Loop
 
 Wrinkle (UR1): see `combineMAR`
-   There is the possibility that two types are MaybeApart for *both* reasons:
+   There is the possibility that two types are MaybeApart for several reasons:
 
    * (a, F Int) ~ (Maybe a, Bool)
 
@@ -1015,17 +1018,21 @@ data MaybeApartReason
   | MARCast         -- ^ Very obscure.
     -- See (KCU2) in Note [Kind coercions in Unify]
 
+  | MARRuntimeIndex -- ^ An opaque retained Boolean may equal another index.
+
 
 combineMAR :: MaybeApartReason -> MaybeApartReason -> MaybeApartReason
 -- See (UR1) in Note [Unification result] for why MARInfinite wins
 combineMAR MARInfinite         _ = MARInfinite   -- MARInfinite wins
 combineMAR MARTypeFamily       r = r             -- Otherwise it doesn't really matter
 combineMAR MARCast             r = r
+combineMAR MARRuntimeIndex     r = r
 
 instance Outputable MaybeApartReason where
   ppr MARTypeFamily       = text "MARTypeFamily"
   ppr MARInfinite         = text "MARInfinite"
   ppr MARCast             = text "MARCast"
+  ppr MARRuntimeIndex     = text "MARRuntimeIndex"
 
 instance Semigroup MaybeApartReason where
   (<>) = combineMAR
@@ -1574,6 +1581,30 @@ data AmIUnifying = Matching | Unifying
 type InType      = Type       -- Before applying the RnEnv2
 type OutCoercion = Coercion   -- After applying the RnEnv2
 
+-- | Test for a runtime index dependency, excluding ordinary coercion variables.
+hasRuntimeIndex :: Type -> Bool
+hasRuntimeIndex = anyFreeVarsOfType (\v -> isId v && not (isCoVar v))
+
+{- Note [Apartness of retained Boolean indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TermVarTy denotes an opaque runtime Boolean. Equal Ids, after renaming, match
+reflexively. Different Ids can denote the same Boolean. An opaque Id can also
+denote either Boolean constructor. These comparisons must return MaybeApart,
+not SurelyApart. Otherwise a closed family could skip a possible earlier
+constructor equation. See (U3) and (U4) in Note [Specification of unification].
+
+Handle ordinary TyVars first. A family template variable can match a runtime
+index through the immutable matching substitution. This does not assign a Tc
+metavariable. When matching a repeated template variable, keep the same
+uncertainty if its previous target and its next target contain runtime indices.
+Do not equate those targets or change the existing substitution.
+
+Process casts before these rigid-index cases to preserve the kind coercion.
+Do not inspect Id unfoldings or evaluate an index. Retained-function congruence
+remains unsupported. See Note [Restricted retained dependent types] in
+GHC.Core.TyCo.Rep and docs/dependent-haskell/REFERENCES.md#agda-provenance.
+-}
+
 
 unify_ty :: UMEnv
          -> InType -> InType  -- Types to be unified
@@ -1598,10 +1629,6 @@ unify_ty env ty1 ty2 kco
   | Just ty1' <- coreView ty1 = unify_ty env ty1' ty2 kco
   | Just ty2' <- coreView ty2 = unify_ty env ty1 ty2' kco
 
-unify_ty _ ty1@(TermVarTy {}) ty2 _
-  = pprPanic "unify_ty: unsupported runtime index" (ppr ty1 $$ ppr ty2)
-unify_ty _ ty1 ty2@(TermVarTy {}) _
-  = pprPanic "unify_ty: unsupported runtime index" (ppr ty1 $$ ppr ty2)
 unify_ty _ ty1@(DepFunTy {}) ty2 _
   = pprPanic "unify_ty: unsupported retained function" (ppr ty1 $$ ppr ty2)
 unify_ty _ ty1 ty2@(DepFunTy {}) _
@@ -1678,6 +1705,13 @@ unify_ty env (TyVarTy tv1) ty2 kco
 unify_ty env ty1 (TyVarTy tv2) kco
   | Unifying <- um_unif env  -- If unifying, can swap args; but not when matching
   = uVarOrFam (umSwapRn env) (TyVarLHS tv2) ty1 (mkSymCo kco)
+
+-- See Note [Apartness of retained Boolean indices].
+unify_ty env (TermVarTy v1) (TermVarTy v2) _kco
+  | rnOccL (um_rn_env env) v1 == rnOccR (um_rn_env env) v2
+  = return ()
+unify_ty _ (TermVarTy {}) _ _ = maybeApart MARRuntimeIndex
+unify_ty _ _ (TermVarTy {}) _ = maybeApart MARRuntimeIndex
 
 -- Deal with TyConApps
 unify_ty env ty1 ty2 kco
@@ -1816,6 +1850,8 @@ uVarOrFam env ty1 ty2 kco
       = -- We already have a substitution for tv1
         if | Unifying <- um_unif env              -> unify_ty env ty1' ty2 kco
            | (ty1' `mkCastTy` kco) `tcEqType` ty2 -> return ()
+           | hasRuntimeIndex ty1' || hasRuntimeIndex ty2
+               -> maybeApart MARRuntimeIndex
            | otherwise                            -> surelyApart
            -- Unifying: recurse into unify_ty
            -- Matching: we /don't/ want to just recurse here, because the range of
@@ -1858,6 +1894,7 @@ uVarOrFam env ty1 ty2 kco
       = go IsSwapped substs lhs2 (mkTyVarTy tv1) (mkSymCo kco)
 
       | occurs_check = maybeApart MARInfinite   -- Occurs check
+      | hasRuntimeIndex ty2 = maybeApart MARRuntimeIndex
       | otherwise    = surelyApart
 
       where
@@ -1987,8 +2024,9 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
     go :: TyCoVarSet   -- Bound by enclosing foralls; see (OCU1)
        -> Type -> Bool
     go bvs ty | Just ty' <- coreView ty = go bvs ty'
-    go _ ty@(TermVarTy {})
-      = pprPanic "uOccursCheck: unsupported runtime index" (ppr ty)
+    go _ (TermVarTy {}) = False
+      -- The rigid Id has fixed Bool/Many metadata, with no type variables
+      -- or type-family applications. See Note [Apartness of retained Boolean indices].
     go _ ty@(DepFunTy {})
       = pprPanic "uOccursCheck: unsupported retained function" (ppr ty)
     go bvs (TyVarTy tv) | Just ty' <- lookupVarEnv tv_env tv

@@ -22,6 +22,7 @@ import GHC.Core.TyCo.Rep (Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.TyCon (FamTyConFlav (..), Injectivity (..), TyCon, mkAnonTyConBinder, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind)
 import GHC.Core.Type
+import GHC.Core.Unify (UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchTy, tcMatchTys, tcUnifyTysFG)
 import GHC.Core.Utils (exprType)
 import GHC.CoreToIface (toIfaceAlt)
 import GHC.Data.Bag (bagToList)
@@ -60,6 +61,7 @@ main = do
             dflags <- runGhc (Just libdir) getSessionDynFlags
             runSyntaxChecks dflags
             runChecks dflags
+            runMatchingChecks dflags
             runCaseChecks dflags
             putStrLn "native-core-api-ok"
         _ -> fail "Usage: NativeDependentCore GHC_LIBDIR"
@@ -96,6 +98,44 @@ indexSubst scope b rhs =
 -- | Assert a semantic property and identify its failure precisely.
 check :: String -> Bool -> IO ()
 check label condition = unless condition (fail ("FAIL: " ++ label))
+
+-- | Check rigid index matching and conservative constructor apartness.
+runMatchingChecks :: DynFlags -> IO ()
+runMatchingChecks dflags = do
+    let b = local 200 "b" boolTy
+        other = local 201 "other" boolTy
+        index = TermVarTy b
+        otherIndex = TermVarTy other
+        template = mkTyVar (mkSystemName (unique 202) (mkTyVarOcc "template")) boolTy
+        templateTy = mkTyVarTy template
+        trueExpr = Var (dataConWorkId trueDataCon)
+        trueIndex = constructorIndex trueDataCon
+        falseIndex = constructorIndex falseDataCon
+        knownTrue = setIdUnfolding b ((unfolding trueExpr){uf_cache = UnfoldingCache True True True True})
+        fine lhs rhs = tcUnifyTysFG alwaysBindFam alwaysBindTv lhs rhs
+        matches lhs rhs = case tcMatchTy lhs rhs of Just _ -> True; Nothing -> False
+        maybeApart lhs rhs = case fine lhs rhs of MaybeApart{} -> True; _ -> False
+    check "the same runtime index matches" (matches index index)
+    check "distinct runtime indices do not match" (not (matches index otherIndex))
+    check "index matching ignores Id unfolding metadata" (matches index (TermVarTy knownTrue))
+    check "constructor templates cannot match an opaque runtime index" (not (matches trueIndex index))
+    check "a known-True unfolding cannot match the True template" (not (matches trueIndex (TermVarTy knownTrue)))
+    check "runtime index versus True is only maybe apart" (maybeApart [index] [trueIndex])
+    check "True versus runtime index is only maybe apart" (maybeApart [trueIndex] [index])
+    check "False versus runtime index is only maybe apart" (maybeApart [falseIndex] [index])
+    check "a known-True unfolding remains only maybe apart from True" (maybeApart [trueIndex] [TermVarTy knownTrue])
+    case tcMatchTy templateTy index >>= (`Subst.lookupTyVar` template) of
+        Just actual -> checkType dflags "a Bool template variable can bind a runtime index" index actual
+        Nothing -> fail "FAIL: a Bool template variable did not bind the runtime index"
+    check
+        "a repeated template cannot match distinct runtime indices"
+        (case tcMatchTys [templateTy, templateTy] [index, otherIndex] of Nothing -> True; Just _ -> False)
+    check
+        "distinct targets of a repeated template are only maybe apart"
+        (maybeApart [templateTy, templateTy] [index, otherIndex])
+    check
+        "a repeated template matches one shared runtime index"
+        (case tcMatchTys [templateTy, templateTy] [index, index] of Just _ -> True; Nothing -> False)
 
 -- | Check retained syntax, printing, and compatibility with ordinary identifiers.
 runSyntaxChecks :: DynFlags -> IO ()
