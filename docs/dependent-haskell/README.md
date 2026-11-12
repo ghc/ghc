@@ -24,10 +24,11 @@ Last updated: 2026-11-12.
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
 | Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
-| Execution | Native Core and source `keep`/`choose` composition run through the checked bytecode entry |
+| Execution | Native Core and source composition pass the checked bytecode entry; source composition also runs as machine code |
+| Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Source syntax | `ExperimentalDependentTypes` checks one explicit retained Boolean binder; unsupported source positions report GHC-43582 |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | Program/interface integration in M8; dependent source `case` and broader M6 optimizer work remain open |
+| Next task | Native interface encoding and cross-module calls in M8; source `case` and broader M6 work remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -53,8 +54,8 @@ errors, and boundary gates. It also checks `Select True = Int`,
 `Select False = Bool`, shared-index composition, branch casts, and forged proofs.
 
 The restricted frontend produces native Core for local retained functions. The
-ordinary optimizer, default CorePrep entry, program backend entry, and interface
-serialization reject them.
+ordinary optimizer and native interface serialization remain gated. Program
+compilation has an explicit checked entry for ordinary exported types.
 There is no performance measurement for the changed type traversals.
 
 ## Native execution
@@ -111,8 +112,9 @@ documentation because documentation generation was disabled.
 
 The full testsuite and documentation build have not run. This work establishes
 bytecode execution for the restricted Core examples. It does not establish
-ordinary optimizer preservation or the later source implementation. Native machine-code
-compilation remains behind the program gate. All commits are local.
+ordinary optimizer preservation or the later source implementation. That
+increment kept machine-code compilation behind the program gate. All commits
+are local.
 
 ## Restricted simplification
 
@@ -282,11 +284,58 @@ Reproduction records use `native-source-choose-complete-build` and
 uses `native-source-syntax-tests.sh` with the self-hosted stage1 compiler.
 
 Dependent source `case` expressions remain unfinished. General runtime-index
-inference, the ordinary dependent optimizer, interfaces, and machine-code
-integration remain open. The full testsuite, documentation build, and performance
+inference, the ordinary dependent optimizer, and interfaces remain open. The full
+testsuite, documentation build, and performance
 checks have not run. See the
 [frontend plan](CORE.md#frontend-identity-plan) and
 [Agda provenance](REFERENCES.md#agda-provenance).
+
+## Ordinary executable integration
+
+The restricted module driver now accepts ordinary top-level types with local
+retained workers. Use `-O0 -fomit-interface-pragmas -fno-write-if-simplified-core`.
+It applies native SimpleOpt to each RHS and keeps top-level binding identities.
+Core Lint runs around simplification, tidying, and program CorePrep. CorePrep
+disables speculation and optional arity analysis, then skips its final ordinary
+occurrence-analysis cleanup. CoreToStg erases the checked virtual proofs and
+casts. STG Lint is mandatory before the Cmm backend.
+
+`NativeDependentCoreRun` creates a fresh compiler context and a self-contained
+`Main (main)` source file. It invokes normal module compilation and linking,
+checks that an object file exists, and runs the resulting binary. Its six
+observations cover both shared `choose`/`keep` results, partial and fully applied
+non-strict `keep bottom`, the constrained-payload WHNF control, and strict
+`choose bottom`. Eight negative cases require a phase-specific `Sorry`; a panic
+or a generic failed load does not pass. These cover optimized options, interface
+unfoldings, serialized Core, late cost centres, `INLINE`, `INLINABLE`, native
+top-level signatures, and native-containing class-default methods. The bootstrap
+API runtime scope passed and peaked at 921 MiB under a 4 GiB cap.
+
+Compiler source commit `300eefffd1` passed the default both-stage Hadrian build
+on 2026-11-12 with six workers and `--docs=none`. This incremental build took
+9m41s and peaked at 5,330 MiB under a 16 GiB cap. The self-hosted stage1 CLI
+then compiled, linked, and ran the same source. Its six observations passed;
+the scope peaked at 115 MiB under 4 GiB. Final STG retains the Boolean argument
+to `choose`, removes the virtual branch proofs and casts, and represents `keep`
+as two arguments followed by the unchanged payload, without a case on the index.
+
+All five registered normal-way tests passed: `NativeDependentCore`,
+`NativeDependentCoreRun`, `RetainedKeywordOff`, `RetainedQuantification`, and
+`RetainedPrint`. The run had 39 cases, with 34 skipped, no unexpected results,
+and no framework warnings. It peaked at 2,517 MiB under an 8 GiB cap. Swap was
+disabled for each capped run. The runtime fixture now covers 30 observations,
+35 located source diagnostics, and the eight program rejection cases.
+
+The ignored verification scripts are `build.sh`, `native-program-runtime.sh`,
+`native-program-cli.sh`, and `native-source-syntax-tests.sh` under
+`_build/verification/`. The executable checks use the native code generator.
+The full testsuite, documentation build, and performance checks have not run.
+
+Native top-level signatures and unfoldings remain gated until interface support.
+Profiling, plugins, non-object module backends, and optimized module options
+remain unsupported. Native-containing `INLINE`, `INLINABLE`, and class-default
+unfoldings reject before desugaring can invoke ordinary optimization. Omitting
+interface pragmas alone does not prevent those calls.
 
 ## Verified baseline
 

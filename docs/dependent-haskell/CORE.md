@@ -155,7 +155,8 @@ records that refinement with existing FC coercions. The
 Neither the D/DC proof nor the current Ott formalism establishes preservation
 for this GHC rule.
 
-The ordinary optimizer and program backend gates remain mandatory. The simplifier
+The ordinary optimizer remains gated. Program compilation uses the checked
+module entry below. The ordinary simplifier
 reconstructs constructor applications from alternative binders. It cannot treat
 this proof as a Boolean field. After checked preparation, CoreToStg removes the
 virtual alternative proof and erases casts. It preserves strict case discrimination
@@ -207,9 +208,9 @@ and non-strict `keep bottom` behavior.
 `hscCompileCoreExpr` detects native forms and skips ordinary simplification for
 these expressions. It must run Core Lint before and after CorePrep. It must run
 STG Lint before bytecode generation. CorePrep must disable speculative evaluation
-and optional argument arity analysis for this entry. The normal CorePrep entry
-and the program entry keep their rejection gates. JavaScript execution remains
-unsupported. This entry does not enable the ordinary optimizer or interfaces.
+and optional argument arity analysis for this entry. Program CorePrep requires
+an explicit checked opt-in. JavaScript execution remains unsupported. This entry
+does not enable the ordinary optimizer or interfaces.
 The boundary scanner must inspect synonym definitions and original arguments.
 CorePrep must keep a lazy local Boolean binding if its RHS cannot replace an
 index. A global Boolean producer is one such RHS.
@@ -224,6 +225,36 @@ application of `keepSelect` has function representation even when its index is
 bottom. A fully applied indexed identity can also use a value that has a type
 at every index. Label these observations separately. Do not cast a non-bottom
 `Int` to `Select bottom` to construct the test.
+
+## Program lowering for M8
+
+Compile one native module with ordinary top-level types and local retained
+workers. Use `-O0 -fomit-interface-pragmas -fno-write-if-simplified-core`.
+The module driver selects `simpleOptNativeProgram` before `core2core`. This mode
+simplifies each RHS independently. It preserves top-level Ids, binding groups,
+and rules. Force Core Lint before and after simplification and module tidying.
+This entry reuses the Agda-derived application and constructor rules above.
+It adds no index evaluation or new proof rule.
+
+Program CorePrep requires an explicit opt-in, disabled speculation, no optional
+arity analysis, and a mandatory CorePrep Lint configuration. Check the actual
+program before and after preparation. Skip `deFloatTop`'s ordinary occurrence
+analysis because it can delete a binding used by an index. The expression entry
+does not use that cleanup. After CoreToStg erases proofs and casts, force STG Lint
+and use the existing Cmm backend. Check the linked binary directly.
+
+Reject profiling, late cost centres, plugins, non-object backends, optimized
+module options, and native top-level signatures in this first path. Interface
+types and native unfoldings remain separate work. Also reject native-containing
+`INLINE`, `INLINABLE`, and default-method unfolding construction in `makeCorePair`.
+These builders run ordinary optimization before the module driver sees the
+program. Omitting interface pragmas does not prevent that construction.
+
+The executable regression uses a fresh compiler context, an ordinary
+`Main (main)` source module, normal module compilation and linking, and direct
+binary execution. It verifies one object file and six runtime observations.
+No Core expression is extracted for this phase. A source-to-executable check
+does not establish cross-module native types or ordinary optimizer safety.
 
 ## Scoped native SimpleOpt
 
@@ -398,6 +429,7 @@ The runtime regression checks real source `keep` and constructor-based `choose`.
 It observes both runtime Boolean inputs, shared `keep`/`choose` composition, a
 fully applied indexed bottom, both concrete `Select` results, and a partial
 `keep bottom` at function WHNF. A payload-only bang exposes strict `choose`.
-Refinement in source `case` expressions remains open. Interface serialization,
-the ordinary optimizer, and the normal program backend remain gated. Existing
-ordinary GHC programs must continue to build.
+Refinement in source `case` expressions remains open. Interface serialization
+and the ordinary optimizer remain gated. The restricted program entry above
+supports local workers with ordinary exported types. Existing ordinary GHC
+programs must continue to build.

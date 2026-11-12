@@ -77,6 +77,32 @@ needs an explicit motive and does not automatically refine existing arguments.
 Constructor equations therefore precede dependent Haskell `case` expressions.
 This rule does not transfer Agda's totality assumptions to lazy Haskell.
 
+Module integration reuses these application, constructor, and erasure rules.
+It keeps the relevant Boolean as one ordinary runtime argument and removes
+only checked proof binders. Preserving lazy index bindings is a Haskell
+requirement, described below. The first module path's restrictions on profiling,
+plugins, interface bodies, and unfolding builders are GHC implementation limits.
+They are not restrictions from Agda's source language. Core and STG Lint plus
+direct binary observations supply bounded implementation evidence. They do not
+establish a compiler-preservation theorem.
+
+The pinned Agda backend supplies a concrete comparison.
+[`substArg`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Compiler/ToTreeless.hs#L589-L594)
+translates usable arguments and replaces unusable ones with `TErased`.
+MAlonzo's [`intros`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Compiler/MAlonzo/Compiler.hs#L797-L817)
+extends one variable context. Its
+[`TVar`, `TLam`, `TLet`, and `TCase` rules](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Compiler/MAlonzo/Compiler.hs#L914-L931)
+use that context for ordinary Haskell variables, bindings, and case inspection.
+These rules introduce no singleton witness. Agda also prunes unused arguments
+and inserts backend coercions. Those mechanisms do not prove native FC scope
+or coercion preservation.
+
+Agda's own
+[`etaContractErased` comment](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Compiler/ToTreeless.hs#L507-L547)
+uses total, effect-free semantics to justify erased-lambda eta contraction.
+That assumption does not cover a relevant lazy Haskell Boolean. Keep the
+separate Haskell `seq` and bottom observations below.
+
 The frontend must preserve these identities through parsing, checking, and
 desugaring. RequiredTypeArguments provides erased type arguments. It cannot
 implement the retained rule by renaming `foreach` to `forall`. See the

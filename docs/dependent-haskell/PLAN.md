@@ -171,9 +171,9 @@ The restricted entry is `hscCompileCoreExpr` through bytecode. It skips ordinary
 simplification and forces Core Lint before and after CorePrep, then STG Lint.
 CorePrep disables speculative evaluation and optional argument arity analysis.
 It keeps a lazy local index when its RHS cannot replace an index. The boundary
-scanner includes synonym definitions and original arguments. The normal program,
-optimizer, and interface gates remain. JavaScript and native machine-code
-execution are outside this increment.
+scanner includes synonym definitions and original arguments. M5 retains the
+normal program, optimizer, and interface gates. JavaScript and native machine-code
+execution are outside M5. M8 adds a separate checked module entry.
 
 `NativeDependentCoreRun` supplies both Boolean values through one compiled worker.
 It covers `choose`, shared `keep`/`choose`, retained eta expansion, partial
@@ -270,13 +270,20 @@ while native interface serialization remains gated. This checks machine-code
 execution before adding cross-module transport; it does not satisfy the interface
 gate below.
 
-The module path needs a checked native branch before `core2core`, native
+The module path uses a checked native branch before `core2core`, native
 SimpleOpt over RHSs with top-level identities preserved, and Core Lint around
 module tidying. Program CorePrep needs an explicit native opt-in with speculation
 and optional arity analysis disabled. Force Core Lint before and after CorePrep,
-then STG Lint. Keep profiling, late plugins, and optional STG transformations
-outside this first path. Reuse the existing CoreToStg erasure rule. Validate the
-ordinary backend with the shared Boolean and bottom observations.
+then STG Lint. Program CorePrep skips ordinary occurrence analysis in
+`deFloatTop`. Keep profiling, plugins, and optional STG transformations outside
+this first path. Gate native-containing unfolding construction before its
+ordinary optimizer calls. Reuse the existing CoreToStg erasure rule. The
+bootstrap API and self-hosted CLI now compile, link, and run the ordinary source
+executable with the shared Boolean and bottom observations. The default
+both-stage build and all five registered normal-way tests pass at compiler
+source commit `300eefffd1`. Eight negative cases require the expected unsupported
+phase instead of accepting a generic failed load or panic. See the validation
+details in [the status](README.md#ordinary-executable-integration).
 
 Handle native interface signatures and expression unfoldings separately. Encode
 runtime binders and occurrences through the interface's local Id environment,
@@ -287,7 +294,14 @@ the current decoder treats unknown tags as literals, and the header version does
 not identify a source commit. Check real file round trips in fresh processes,
 fingerprints, malformed scope/proof rejection, and cross-module execution.
 
-- [ ] Compile and run the source target as an ordinary vanilla executable through
+Use the existing whole-file version check before enabling the new wire tags.
+Give the fork a deliberately distinct configured snapshot version and rebuild
+matching target libraries. Record the exact chosen version and old-reader
+rejection. Snapshot dates do not distinguish incompatible builds made on the
+same day. Do not use profile tags as schema versions: `IgnoreHiWay` bypasses
+that check. Reject unknown type tags explicitly in the new reader as well.
+
+- [x] Compile and run the source target as an ordinary vanilla executable through
       checked module simplification, tidying, CorePrep, and machine-code lowering.
 - [ ] Encode retained binders, indices, and evidence in interface types, unfoldings,
       fingerprints, and recompilation dependencies.
@@ -329,8 +343,9 @@ Distinguish Core construction, frontend behavior, optimization, runtime executio
 and module integration. M3 through M5 validate native Core construction and the
 restricted bytecode path. The singleton probe supplies comparison evidence for
 some values and laziness cases. Restricted source `keep`, constructor equations,
-and their composition now execute. Source `case` refinement, ordinary
-optimization, and module integration remain open.
+and their composition now execute through bytecode and machine-code module
+compilation. Source `case` refinement, ordinary optimization, and cross-module
+native interfaces remain open.
 
 ## Further work
 
