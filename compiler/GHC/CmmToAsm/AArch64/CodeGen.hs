@@ -25,6 +25,7 @@ import GHC.CmmToAsm.Monad
    ( NatM, getNewRegNat
    , getPicBaseMaybeNat, getPlatform, getConfig
    , getDebugBlock, getFileId, getNewLabelNat, getThisModuleNat
+   , getBlockIdNat
    )
 -- import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
@@ -51,7 +52,7 @@ import GHC.Types.Unique.DSM
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
 
-import Control.Monad    ( mapAndUnzipM )
+import Control.Monad    ( mapAndUnzipM, replicateM )
 import GHC.Float
 
 import GHC.Types.Basic
@@ -2744,7 +2745,15 @@ genCCall target dest_regs arg_regs = do
         MO_Memcpy  _align   -> mkCCall "memcpy"
         MO_Memset  _align   -> mkCCall "memset"
         MO_Memmove _align   -> mkCCall "memmove"
-        MO_Memcmp  _align   -> mkCCall "memcmp"
+        MO_Memcmp  _align
+          | [p1, p2, CmmLit (CmmInt n _)] <- arg_regs
+          , [dst_reg] <- dest_regs
+          , n >= 0 -> do
+              mcode <- genMemCmpInlineMaybe dst_reg p1 p2 n
+              case mcode of
+                Just code -> return code
+                Nothing   -> mkCCall "hs_memcmp"
+          | otherwise -> mkCCall "hs_memcmp"
 
         MO_SuspendThread    -> mkCCall "suspendThread"
         MO_ResumeThread     -> mkCCall "resumeThread"
@@ -2975,6 +2984,151 @@ genCCall target dest_regs arg_regs = do
       let dst = getRegisterReg platform (CmmLocal dest_reg)
       let code = code_fx `appOL` op (OpReg w dst) (OpReg w reg_fx)
       return code
+
+-- | Inline a constant-size memcmp.
+--
+-- Unroll memcmp calls with a constant size when the generated pseudo
+-- instructions fit under ncgInlineThresholdMemcmp, otherwise return
+-- Nothing so the caller emits a call to the RTS hs_memcmp.
+genMemCmpInlineMaybe
+  :: CmmFormal -> CmmActual -> CmmActual -> Integer -> NatM (Maybe InstrBlock)
+genMemCmpInlineMaybe dst_reg p1 p2 n = do
+  config <- getConfig
+  platform <- getPlatform
+  let threshold = ncgInlineThresholdMemcmp config
+      isBE = platformByteOrder platform == BigEndian
+      res_r = getRegisterReg platform (CmmLocal dst_reg)
+      resFmt = cmmTypeFormat (cmmRegType (CmmLocal dst_reg))
+      moveRes r32
+        | resFmt == II64 = unitOL (SXTW (OpReg W64 res_r) (OpReg W32 r32))
+        | otherwise      = unitOL (MOV (OpReg W32 res_r) (OpReg W32 r32))
+      revW w t
+        | isBE      = nilOL
+        | otherwise = unitOL (REV (OpReg w t) (OpReg w t))
+  if n == 0
+    then
+      if 1 <= threshold
+        then return (Just (unitOL (MOV (OpReg W32 res_r) (OpImm (ImmInt 0)))))
+        else return Nothing
+    else if n == 1
+      then
+        if 3 <= threshold
+          then do
+            (p1_r, _, code_p1) <- getSomeReg p1
+            (p2_r, _, code_p2) <- getSomeReg p2
+            t1 <- getNewRegNat II8
+            t2 <- getNewRegNat II8
+            r32 <- getNewRegNat II32
+            let code = code_p1 `appOL` code_p2 `appOL` toOL
+                  [ LDR II8 (OpReg W8 t1) (OpAddr (AddrReg p1_r))
+                  , LDR II8 (OpReg W8 t2) (OpAddr (AddrReg p2_r))
+                  , SUB II32 (OpReg W32 r32) (OpReg W32 t1) (OpReg W32 t2)
+                  ]
+                  `appOL` moveRes r32
+            return (Just code)
+          else return Nothing
+      else if n == 2 || n == 4 || n == 8
+        then
+          if 8 <= threshold
+            then do
+              (p1_r, _, code_p1) <- getSomeReg p1
+              (p2_r, _, code_p2) <- getSomeReg p2
+              let (loadFmt, chunkW) = case n of
+                    2 -> (II16, W32)
+                    4 -> (II32, W32)
+                    _ -> (II64, W64)
+              t1 <- getNewRegNat loadFmt
+              t2 <- getNewRegNat loadFmt
+              hi <- getNewRegNat II32
+              lo <- getNewRegNat II32
+              r32 <- getNewRegNat II32
+              let code = code_p1 `appOL` code_p2 `appOL` toOL
+                    [ LDR loadFmt (OpReg chunkW t1) (OpAddr (AddrReg p1_r))
+                    , LDR loadFmt (OpReg chunkW t2) (OpAddr (AddrReg p2_r))
+                    ]
+                    `appOL` revW chunkW t1 `appOL` revW chunkW t2 `appOL` toOL
+                    [ CMP (OpReg chunkW t1) (OpReg chunkW t2)
+                    , CSET (OpReg W32 hi) UGT
+                    , CSET (OpReg W32 lo) ULT
+                    , SUB II32 (OpReg W32 r32) (OpReg W32 hi) (OpReg W32 lo)
+                    ]
+                    `appOL` moveRes r32
+              return (Just code)
+            else return Nothing
+        else do
+          let numChunks :: Integer
+              numChunks
+                | n == 3           = 2
+                | n >= 5 && n <= 7 = 2
+                | otherwise        = (n + 7) `div` 8
+              insns :: Integer
+              insns = 4 * numChunks
+          -- Compute chunk count in O(1) Integer arithmetic before constructing
+          -- offsets, and cap n <= 32768 so every aligned 8-byte chunk offset
+          -- (<= 32760) fits AArch64's 12-bit scaled unsigned LDR immediate.
+          if insns <= toInteger threshold && n <= 32768
+            then do
+              let k = n `div` 8
+                  (loadFmt, chunkW, loadW, offsets) = case n of
+                    3 -> (II16, W32, W16, [0, 1])
+                    _ | n >= 5 && n <= 7 -> (II32, W32, W32, [0, n - 4])
+                      | otherwise -> (II64, W64, W64, [0, 8 .. (k - 1) * 8] ++ [n - 8 | n `mod` 8 /= 0])
+                  chunkBytes = toInteger (widthInBytes loadW)
+                  canUseImm off = off `mod` chunkBytes == 0 && isOffsetImm (fromInteger off) loadW
+              (p1_r, _, code_p1) <- getSomeReg p1
+              (p2_r, _, code_p2) <- getSomeReg p2
+              t1 <- getNewRegNat loadFmt
+              t2 <- getNewRegNat loadFmt
+              hi <- getNewRegNat II32
+              lo <- getNewRegNat II32
+              r32 <- getNewRegNat II32
+              lblDiff <- getBlockIdNat
+              lblEq <- getBlockIdNat
+              lblDone <- getBlockIdNat
+              nextLbls <- replicateM (length offsets - 1) getBlockIdNat
+              let lastOff = last offsets
+                  needOffReg = not (canUseImm lastOff)
+                  immAddr base off = OpAddr (AddrRegImm base (ImmInt (fromInteger off)))
+              (offCode, addr1, addr2) <-
+                if needOffReg
+                  then do
+                    (off_r, _, c) <- getSomeReg (CmmLit (CmmInt lastOff W64))
+                    let a1 off
+                          | canUseImm off = immAddr p1_r off
+                          | otherwise     = OpAddr (AddrRegReg p1_r off_r)
+                        a2 off
+                          | canUseImm off = immAddr p2_r off
+                          | otherwise     = OpAddr (AddrRegReg p2_r off_r)
+                    return (c, a1, a2)
+                  else return (nilOL, immAddr p1_r, immAddr p2_r)
+              let nexts = nextLbls ++ [lblEq]
+                  chunk off next = toOL
+                    [ LDR loadFmt (OpReg chunkW t1) (addr1 off)
+                    , LDR loadFmt (OpReg chunkW t2) (addr2 off)
+                    , CMP (OpReg chunkW t1) (OpReg chunkW t2)
+                    , BCOND NE (TBlock lblDiff)
+                    , B (TBlock next)
+                    , NEWBLOCK next
+                    ]
+                  chunks = concatOL [chunk off next | (off, next) <- zip offsets nexts]
+                  code = code_p1 `appOL` code_p2 `appOL` offCode `appOL` chunks `appOL` toOL
+                    [ MOV (OpReg W32 res_r) (OpImm (ImmInt 0))
+                    , B (TBlock lblDone)
+                    , NEWBLOCK lblDiff
+                    ]
+                    `appOL` revW chunkW t1 `appOL` revW chunkW t2 `appOL` toOL
+                    [ CMP (OpReg chunkW t1) (OpReg chunkW t2)
+                    , CSET (OpReg W32 hi) UGT
+                    , CSET (OpReg W32 lo) ULT
+                    , SUB II32 (OpReg W32 r32) (OpReg W32 hi) (OpReg W32 lo)
+                    ]
+                    `appOL` moveRes r32
+                    `appOL` toOL
+                    [ B (TBlock lblDone)
+                    , NEWBLOCK lblDone
+                    ]
+              return (Just code)
+            else return Nothing
 
 {- Note [AArch64 far jumps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1816,7 +1816,7 @@ genCCall (PrimTarget mop) dest_regs arg_regs = do
     MO_Memcpy _align -> mkCCall "memcpy"
     MO_Memset _align -> mkCCall "memset"
     MO_Memmove _align -> mkCCall "memmove"
-    MO_Memcmp _align -> mkCCall "memcmp"
+    MO_Memcmp _align -> mkCCall "hs_memcmp"
     MO_SuspendThread -> mkCCall "suspendThread"
     MO_ResumeThread -> mkCCall "resumeThread"
     MO_PopCnt w -> mkCCall (popCntLabel w)

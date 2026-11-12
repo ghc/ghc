@@ -463,6 +463,10 @@ data DynFlags = DynFlags {
   -- pseudo (roughly: Cmm) instructions.
   maxInlineMemsetInsns  :: Int,
 
+  -- | Only inline memcmp if it generates no more than this many
+  -- pseudo (roughly: Cmm) instructions.
+  maxInlineMemcmpInsns  :: Int,
+
   -- | Reverse the order of error messages in GHC/GHCi
   reverseErrors         :: Bool,
 
@@ -734,6 +738,7 @@ defaultDynFlags mySettings =
         maxInlineAllocSize = 128,
         maxInlineMemcpyInsns = 32,
         maxInlineMemsetInsns = 32,
+        maxInlineMemcmpInsns = 32,
 
         initialUnique = 0,
         uniqueIncrement = 1,

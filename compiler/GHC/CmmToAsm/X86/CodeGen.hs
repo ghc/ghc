@@ -4340,6 +4340,8 @@ genPrim bid (MO_AtomicRMW width amop) [dst] [addr, n]
   = genAtomicRMW bid width amop dst addr n
 genPrim bid (MO_Ctz width) [dst] [src]
   = genCtz bid width dst src
+genPrim bid (MO_Memcmp align) [res] [dst, src, n]
+  = genMemCmp bid align res dst src n
 
 -- Then we deal with cases which not introducing new blocks in the stream.
 genPrim bid prim dst args
@@ -4353,7 +4355,6 @@ genSimplePrim
     -> NatM InstrBlock
 genSimplePrim bid (MO_Memcpy align)    []      [dst,src,n]    = genMemCpy  bid align dst src n
 genSimplePrim bid (MO_Memmove align)   []      [dst,src,n]    = genMemMove bid align dst src n
-genSimplePrim bid (MO_Memcmp align)    [res]   [dst,src,n]    = genMemCmp  bid align res dst src n
 genSimplePrim bid (MO_Memset align)    []      [dst,c,n]      = genMemSet  bid align dst c n
 genSimplePrim _   MO_AcquireFence      []      []             = return nilOL -- barriers compile to no code on x86/x86-64;
 genSimplePrim _   MO_ReleaseFence      []      []             = return nilOL -- we keep it this long in order to prevent earlier optimisations.
@@ -6638,11 +6639,157 @@ genMemMove bid _align dst src n = do
   -- memcpy and memset)
   genLibCCall bid (fsLit "memmove") [] [dst,src,n]
 
-genMemCmp :: BlockId -> p -> CmmFormal -> CmmActual -> CmmActual -> CmmActual -> NatM InstrBlock
-genMemCmp bid _align res dst src n = do
-  -- TODO: generate inline assembly when under a given threshold (similarly to
-  -- memcpy and memset)
-  genLibCCall bid (fsLit "memcmp") [res] [dst,src,n]
+-- | Compare memory
+--
+-- Unroll memcmp calls with a constant size when the generated pseudo
+-- instructions fit under ncgInlineThresholdMemcmp. Otherwise call the
+-- RTS hs_memcmp. See Note [Keeping track of the current block] for why
+-- this returns the new block.
+genMemCmp :: BlockId -> p -> CmmFormal -> CmmActual -> CmmActual -> CmmActual
+          -> NatM (InstrBlock, Maybe BlockId)
+genMemCmp bid _align res dst src n_arg = do
+  is32Bit <- is32BitPlatform
+  case n_arg of
+    CmmLit (CmmInt n _) | not is32Bit, n >= 0 -> do
+      config <- getConfig
+      platform <- getPlatform
+      let threshold = ncgInlineThresholdMemcmp config
+          res_r = getRegisterReg platform (CmmLocal res)
+          resFmt = cmmTypeFormat (localRegType res)
+          fallback = (,Nothing) <$> genLibCCall bid (fsLit "hs_memcmp") [res] [dst,src,n_arg]
+          moveRes r32
+            | resFmt == II64 = unitOL (MOVSxL II32 (OpReg r32) (OpReg res_r))
+            | otherwise      = unitOL (MOV II32 (OpReg r32) (OpReg res_r))
+      if n == 0
+        then
+          if 1 <= threshold
+            then return (unitOL (XOR II32 (OpReg res_r) (OpReg res_r)), Nothing)
+            else fallback
+        else if n == 1
+          then
+            if 3 <= threshold
+              then do
+                code_p1 <- getAnyReg dst
+                p1_r <- getNewRegNat II64
+                code_p2 <- getAnyReg src
+                p2_r <- getNewRegNat II64
+                t1 <- getNewRegNat II32
+                t2 <- getNewRegNat II32
+                let code = code_p1 p1_r `appOL` code_p2 p2_r `appOL` toOL
+                      [ MOVZxL II8 (OpAddr (AddrBaseIndex (EABaseReg p1_r) EAIndexNone (ImmInt 0))) (OpReg t1)
+                      , MOVZxL II8 (OpAddr (AddrBaseIndex (EABaseReg p2_r) EAIndexNone (ImmInt 0))) (OpReg t2)
+                      , SUB II32 (OpReg t2) (OpReg t1)
+                      ]
+                      `appOL` moveRes t1
+                return (code, Nothing)
+              else fallback
+           else if n == 2 || n == 4 || n == 8
+            then
+              if 8 <= threshold
+                then do
+                  code_p1 <- getAnyReg dst
+                  p1_r <- getNewRegNat II64
+                  code_p2 <- getAnyReg src
+                  p2_r <- getNewRegNat II64
+                  let cmpFmt = if n == 8 then II64 else II32
+                  t1 <- getNewRegNat cmpFmt
+                  t2 <- getNewRegNat cmpFmt
+                  hi8 <- getNewRegNat II8
+                  lo8 <- getNewRegNat II8
+                  r32 <- getNewRegNat II32
+                  lo32 <- getNewRegNat II32
+                  let mkAddr base = OpAddr (AddrBaseIndex (EABaseReg base) EAIndexNone (ImmInt 0))
+                      load1 = case n of
+                        2 -> MOVZxL II16 (mkAddr p1_r) (OpReg t1)
+                        4 -> MOV II32 (mkAddr p1_r) (OpReg t1)
+                        _ -> MOV II64 (mkAddr p1_r) (OpReg t1)
+                      load2 = case n of
+                        2 -> MOVZxL II16 (mkAddr p2_r) (OpReg t2)
+                        4 -> MOV II32 (mkAddr p2_r) (OpReg t2)
+                        _ -> MOV II64 (mkAddr p2_r) (OpReg t2)
+                      code = code_p1 p1_r `appOL` code_p2 p2_r `appOL` toOL
+                        [ load1
+                        , load2
+                        , BSWAP cmpFmt t1
+                        , BSWAP cmpFmt t2
+                        , CMP cmpFmt (OpReg t2) (OpReg t1)
+                        , SETCC GU (OpReg hi8)
+                        , SETCC LU (OpReg lo8)
+                        , MOVZxL II8 (OpReg hi8) (OpReg r32)
+                        , MOVZxL II8 (OpReg lo8) (OpReg lo32)
+                        , SUB II32 (OpReg lo32) (OpReg r32)
+                        ]
+                        `appOL` moveRes r32
+                  return (code, Nothing)
+                else fallback
+            else do
+              let numChunks :: Integer
+                  numChunks
+                    | n == 3           = 2
+                    | n >= 5 && n <= 7 = 2
+                    | otherwise        = (n + 7) `div` 8
+                  insns :: Integer
+                  insns = 4 * numChunks
+              -- Compute chunk count in O(1) Integer arithmetic before building
+              -- offsets, and cap displacement at 32-bit signed immediate range.
+              if insns <= toInteger threshold && is32BitInteger n
+                then do
+                  let k = n `div` 8
+                      (loadFmt, cmpFmt, offsets) = case n of
+                        3 -> (II16, II32, [0, 1])
+                        _ | n >= 5 && n <= 7 -> (II32, II32, [0, n - 4])
+                          | otherwise -> (II64, II64, [0, 8 .. (k - 1) * 8] ++ [n - 8 | n `mod` 8 /= 0])
+                      mkLoad off base tmp = case loadFmt of
+                        II16 -> MOVZxL II16 (OpAddr (AddrBaseIndex (EABaseReg base) EAIndexNone (ImmInt (fromInteger off)))) (OpReg tmp)
+                        II32 -> MOV II32 (OpAddr (AddrBaseIndex (EABaseReg base) EAIndexNone (ImmInt (fromInteger off)))) (OpReg tmp)
+                        _    -> MOV II64 (OpAddr (AddrBaseIndex (EABaseReg base) EAIndexNone (ImmInt (fromInteger off)))) (OpReg tmp)
+                  code_p1 <- getAnyReg dst
+                  p1_r <- getNewRegNat II64
+                  code_p2 <- getAnyReg src
+                  p2_r <- getNewRegNat II64
+                  t1 <- getNewRegNat cmpFmt
+                  t2 <- getNewRegNat cmpFmt
+                  r32 <- getNewRegNat II32
+                  one32 <- getNewRegNat II32
+                  lblDiff <- getBlockIdNat
+                  lblEq <- getBlockIdNat
+                  lblDone <- getBlockIdNat
+                  nextLbls <- replicateM (length offsets - 1) getBlockIdNat
+                  let blks = bid : nextLbls
+                      nexts = tail blks ++ [lblEq]
+                      chunk _blk nxt off = toOL
+                        [ mkLoad off p1_r t1
+                        , mkLoad off p2_r t2
+                        , CMP cmpFmt (OpReg t2) (OpReg t1)
+                        , JXX NE lblDiff
+                        , JXX ALWAYS nxt
+                        , NEWBLOCK nxt
+                        ]
+                      chunks = concatOL [chunk blk nxt off | ((blk, nxt), off) <- zip (zip blks nexts) offsets]
+                      code = code_p1 p1_r `appOL` code_p2 p2_r `appOL` chunks `appOL` toOL
+                        [ XOR II32 (OpReg res_r) (OpReg res_r)
+                        , JXX ALWAYS lblDone
+                        , NEWBLOCK lblDiff
+                        , BSWAP cmpFmt t1
+                        , BSWAP cmpFmt t2
+                        , CMP cmpFmt (OpReg t2) (OpReg t1)
+                        , MOV II32 (OpImm (ImmInt (-1))) (OpReg r32)
+                        , MOV II32 (OpImm (ImmInt 1)) (OpReg one32)
+                        , CMOV GU II32 (OpReg one32) r32
+                        ]
+                        `appOL` moveRes r32
+                        `appOL` toOL
+                        [ JXX ALWAYS lblDone
+                        , NEWBLOCK lblDone
+                        ]
+                  addImmediateSuccessorNat bid lblDone
+                  updateCfgNat $ \cfg ->
+                    let cfg1 = delEdge bid lblDone cfg
+                        cfg2 = foldr (\(blk, nxt) c -> addWeightEdge blk nxt 80 (addWeightEdge blk lblDiff 20 c)) cfg1 (zip blks nexts)
+                    in addWeightEdge lblEq lblDone 100 (addWeightEdge lblDiff lblDone 100 cfg2)
+                  return (code, Just lblDone)
+                else fallback
+    _ -> (,Nothing) <$> genLibCCall bid (fsLit "hs_memcmp") [res] [dst,src,n_arg]
 
 genPrefetchData :: Int -> CmmExpr -> NatM (OrdList Instr)
 genPrefetchData n src = do

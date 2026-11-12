@@ -269,6 +269,37 @@ genCall (PrimTarget op@(MO_Pext w)) [dst] args = do
         then genCallMinimumTruncationCast W32 w op dst args
         else genCallSimpleCast w op dst args
 
+-- Route constant-size memcmp through "memcmp" (rather than the RTS
+-- "hs_memcmp") when LLVM can inline and unroll it: all comparisons on
+-- non-Linux platforms, and comparisons of 1 to 32 bytes on Linux.
+-- A zero length stores 0 directly without any call.
+genCall (PrimTarget (MO_Memcmp _)) [dst] [_p1, _p2, CmmLit (CmmInt 0 _)] = do
+    (dstV, dstTy) <- getCmmReg (CmmLocal dst)
+    return (unitOL (Store (mkIntLit dstTy 0) dstV Nothing []), [])
+genCall (PrimTarget mop@(MO_Memcmp _)) [dst] [p1, p2, n] = do
+    platform <- getPlatform
+    let useMemcmp = platformOS platform /= OSLinux ||
+                    case n of
+                      CmmLit (CmmInt k _) -> 1 <= k && k <= 32
+                      _ -> False
+        fname = if useMemcmp then fsLit "memcmp" else fsLit "hs_memcmp"
+        w = llvmWord platform
+        cint = LMInt (widthInBits (cIntWidth platform))
+        argsW = [i8Ptr, i8Ptr, w]
+        dstType = cmmToLlvmType (localRegType dst)
+        signage = cmmPrimOpRetValSignage mop
+    (fptr, _, top3) <- getInstrinct fname cint argsW
+    (dstV, _dst_ty) <- getCmmReg (CmmLocal dst)
+    let (_, arg_hints) = foreignTargetHints (PrimTarget mop)
+        args_hints = zip [p1, p2, n] arg_hints
+    (argsV, stmts2, top2) <- arg_vars args_hints ([], nilOL, [])
+    (argsV', stmts4) <- castVars signage (zip argsV argsW)
+    (retV, s1) <- doExpr cint (Call StdCall fptr argsV' [])
+    (retV', stmts5) <- castVar signage retV dstType
+    let s2 = Store retV' dstV Nothing []
+        stmts = stmts2 `appOL` stmts4 `snocOL` s1 `snocOL` stmts5 `snocOL` s2
+    return (stmts, top2 ++ top3)
+
 genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
     nVar <- exprToVarW n
@@ -928,7 +959,7 @@ cmmPrimOpFunctions mop = do
     MO_Memset _
        | is32bit   -> fsLit "llvm.memset.p0i8.i32"
        | otherwise -> fsLit "llvm.memset.p0i8.i64"
-    MO_Memcmp _   -> fsLit "memcmp"
+    MO_Memcmp _   -> fsLit "hs_memcmp"
 
     MO_SuspendThread -> fsLit "suspendThread"
     MO_ResumeThread  -> fsLit "resumeThread"

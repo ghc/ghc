@@ -24,6 +24,7 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgPIC                   = positionIndependent dflags
    , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags
    , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags
+   , ncgInlineThresholdMemcmp = fromIntegral $ maxInlineMemcmpInsns dflags
    , ncgSplitSections         = gopt Opt_SplitSections dflags
    , ncgRegsIterative         = gopt Opt_RegsIterative dflags
    , ncgRegsGraph             = gopt Opt_RegsGraph dflags

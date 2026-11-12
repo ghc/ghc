@@ -447,6 +447,7 @@ ghcInternalFunctions = do
     let w = llvmWord platform
         cint = LMInt $ widthInBits $ cIntWidth platform
     mk "memcmp" cint [i8Ptr, i8Ptr, w]
+    mk "hs_memcmp" cint [i8Ptr, i8Ptr, w]
     mk "memcpy" i8Ptr [i8Ptr, i8Ptr, w]
     mk "memmove" i8Ptr [i8Ptr, i8Ptr, w]
     mk "memset" i8Ptr [i8Ptr, w, w]
@@ -486,7 +487,7 @@ getGlobalPtr llvmLbl = do
   case m_ty of
     -- Directly reference if we have seen it already
     Just ty -> do
-      if llvmLbl `elem` (map fsLit ["newSpark", "memmove", "memcpy", "memcmp", "memset"])
+      if llvmLbl `elem` (map fsLit ["newSpark", "memmove", "memcpy", "memcmp", "hs_memcmp", "memset"])
         then return $ mkGlbVar (llvmLbl) ty Global
         else return $ mkGlbVar (llvmDefLabel llvmLbl) ty Global
     -- Otherwise use a forward alias of it

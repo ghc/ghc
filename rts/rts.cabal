@@ -396,6 +396,15 @@ library
       if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64) || arch(loongarch64)
         asm-sources: StgCRunAsm.S
 
+      -- Hand-written SIMD memcmp used by hs_memcmp (rts/HsMemcmp.c) on
+      -- non-glibc Linux; the .S files expose only the hidden symbol
+      -- hs_memcmp_simd.
+      if os(linux)
+        if arch(x86_64)
+          asm-sources: memcmp/memcmp-x86_64.S
+        if arch(aarch64)
+          asm-sources: memcmp/memcmp-aarch64.S
+
       c-sources: Adjustor.c
                  AllocArray.c
                  adjustor/AdjustorPool.c
@@ -418,6 +427,7 @@ library
                  Heap.c
                  Hpc.c
                  HsFFI.c
+                 HsMemcmp.c
                  Inlines.c
                  Interpreter.c
                  IOManager.c
@@ -427,6 +437,7 @@ library
                  Linker.c
                  ReportMemoryMap.c
                  Messages.c
+                 MuslMemcmp.c
                  OldARMAtomic.c
                  PathUtils.c
                  Pool.c

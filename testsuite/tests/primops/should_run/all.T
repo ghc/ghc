@@ -39,6 +39,7 @@ test('ResizeByteArrayPinnedness',
   compile_and_run, [''])
 test('T14664', normal, compile_and_run, [''])
 test('CStringLength', normal, compile_and_run, ['-O2'])
+test('HsMemcmp', normal, compile_and_run, ['-O2'])
 test('NonNativeSwitch', normal, compile_and_run, ['-O2'])
 test('Sized', [
       # optasm is broken with js backend: #25922

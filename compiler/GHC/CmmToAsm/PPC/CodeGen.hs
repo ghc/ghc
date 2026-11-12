@@ -2144,7 +2144,7 @@ genCCall' config gcp target dest_regs args
                     MO_Memcpy _  -> (fsLit "memcpy", False)
                     MO_Memset _  -> (fsLit "memset", False)
                     MO_Memmove _ -> (fsLit "memmove", False)
-                    MO_Memcmp _  -> (fsLit "memcmp", False)
+                    MO_Memcmp _  -> (fsLit "hs_memcmp", False)
 
                     MO_SuspendThread -> (fsLit "suspendThread", False)
                     MO_ResumeThread  -> (fsLit "resumeThread", False)

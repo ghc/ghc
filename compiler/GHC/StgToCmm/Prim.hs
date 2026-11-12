@@ -3651,8 +3651,9 @@ emitMemsetCall dst c n align =
 
 emitMemcmpCall :: LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> Int -> FCode ()
 emitMemcmpCall res ptr1 ptr2 n align = do
-    -- 'MO_Memcmp' is assumed to return an 32bit 'CInt' because all
-    -- code-gens currently call out to the @memcmp(3)@ C function.
+    -- 'MO_Memcmp' is assumed to return an 32bit 'CInt' because NCG and LLVM
+    -- code-gens call the RTS @hs_memcmp@ function (while C and Wasm code-gens
+    -- call @__builtin_memcmp@ / @memcmp@), all with memcmp(3) return semantics.
     -- This was easier than moving the sign-extensions into
     -- all the code-gens.
     platform <- getPlatform

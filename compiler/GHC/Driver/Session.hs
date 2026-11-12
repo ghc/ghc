@@ -1881,6 +1881,8 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { maxInlineMemcpyInsns = n }))
   , make_ord_flag defGhcFlag "fmax-inline-memset-insns"
       (intSuffix (\n d -> d { maxInlineMemsetInsns = n }))
+  , make_ord_flag defGhcFlag "fmax-inline-memcmp-insns"
+      (intSuffix (\n d -> d { maxInlineMemcmpInsns = n }))
   , make_ord_flag defGhcFlag "dinitial-unique"
       (word64Suffix (\n d -> d { initialUnique = n }))
   , make_ord_flag defGhcFlag "dunique-increment"

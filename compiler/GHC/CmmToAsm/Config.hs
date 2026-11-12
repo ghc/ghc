@@ -27,6 +27,7 @@ data NCGConfig = NCGConfig
    , ncgPIC                   :: !Bool            -- ^ Enable Position-Independent Code
    , ncgInlineThresholdMemcpy :: !Word            -- ^ If inlining `memcpy` produces less than this threshold (in pseudo-instruction unit), do it
    , ncgInlineThresholdMemset :: !Word            -- ^ Ditto for `memset`
+   , ncgInlineThresholdMemcmp :: !Word            -- ^ Ditto for `memcmp`
    , ncgSplitSections         :: !Bool            -- ^ Split sections
    , ncgRegsIterative         :: !Bool
    , ncgRegsGraph             :: !Bool

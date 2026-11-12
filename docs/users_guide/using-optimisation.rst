@@ -885,6 +885,19 @@ as such you shouldn't need to set any of them explicitly. A flag
     Inline ``memset`` calls if they would generate no more than n pseudo
     instructions.
 
+.. ghc-flag:: -fmax-inline-memcmp-insns=⟨n⟩
+    :shortdesc: *default: 32.* Inline ``memcmp`` calls whose heuristic scan cost
+        is no more than ⟨n⟩ pseudo instructions.
+    :type: dynamic
+    :category:
+
+    :default: 32
+
+    Inline constant-size ``memcmp`` calls whose heuristic scan cost (roughly 4
+    pseudo instructions per word-sized comparison chunk, excluding shared
+    result setup) is no more than ⟨n⟩ pseudo instructions. At the default of 32,
+    comparisons up to 64 bytes are unrolled inline.
+
 .. ghc-flag:: -fmax-relevant-binds=⟨n⟩
     :shortdesc: *default: 6.* Set the maximum number of bindings to display in
         type error messages.

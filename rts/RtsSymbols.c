@@ -602,6 +602,7 @@ extern char **environ;
       SymI_HasProto(ghc_unique_counter64)                               \
       SymI_HasProto(ghc_unique_inc)                                     \
       SymI_HasProto(genericRaise)                                       \
+      SymI_HasProto(hs_memcmp)                                          \
       SymI_HasProto(getProgArgv)                                        \
       SymI_HasProto(getFullProgArgv)                                    \
       SymI_HasProto(setFullProgArgv)                                    \
