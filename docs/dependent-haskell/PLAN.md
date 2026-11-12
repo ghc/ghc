@@ -320,14 +320,40 @@ cross-module execution in fresh contexts and separate CLI processes, concrete
 constructor applications, and old/new header rejection. Both compiler stages
 build with the new version. The ordinary compatibility smoke and all five
 registered normal-way tests pass. See
-[the validation results](README.md#native-interface-signatures). Keep explicit
-fingerprint/recompilation-change cases and native unfolding reconstruction open.
+[the validation results](README.md#native-interface-signatures).
+
+Use the existing declaration dependency fingerprints for retained signatures.
+The consumer imports `choose` and `keep` without naming `Select`. Rebuild the
+producer with fresh runtime Ids, then change only a function body with unfoldings
+omitted. Require stable module and declaration ABI hashes and skipped consumer
+code generation. Next, change `Select True` from `Int` to `Bool` without changing
+the text of the retained signatures. Require changed `choose` and `keep` hashes,
+an unchanged independent-function hash, and a located `GHC-83865` when the
+unforced consumer compile rechecks its stale `Int` application. Use fresh
+one-shot contexts and separate producer sources and interface search paths.
+The bootstrap and all five registered normal-way tests pass. See the
+[fingerprint validation](README.md#signature-fingerprints-and-recompilation).
+
+For native unfoldings, first extend expression reconstruction under the existing
+module gate. Reconstruct a Boolean alternative's virtual CoVar from its
+scrutinee index and promoted constructor. Preserve ordinary binder-free Boolean
+alternatives. Check malformed binder counts, unsupported scrutinees, scope, and
+coverage with precise interface errors. Require Core Lint for native imported
+expressions even when optional interface linting is disabled.
+
+Do not enable the unfolding writer after changing only the alternative codec.
+`mkCoreUnfolding` runs ordinary occurrence analysis on its template. Introduce a
+checked construction path that preserves runtime index dependencies. Preserve
+the lazy RHS contract from `Note [Lazily checking Unfoldings]` and the cached
+fields from `Note [Tying the 'CoreUnfolding' knot]` in `GHC.IfaceToCore`.
+Validate expression round trips and malformed proofs before enabling module
+unfoldings. Then test actual imported templates and cross-module execution.
 
 - [x] Compile and run the source target as an ordinary vanilla executable through
       checked module simplification, tidying, CorePrep, and machine-code lowering.
 - [x] Encode retained signature binders and indices with scoped local Id names.
 - [x] Check signature round trips, disk imports, cross-module calls, and version rejection.
-- [ ] Check signature fingerprints and recompilation after a producer signature change.
+- [x] Check signature fingerprints and recompilation after a producer signature change.
 - [ ] Encode native expression unfoldings and reconstruct virtual Boolean evidence.
 - [ ] Check imported unfoldings and malformed proof rejection.
 - [ ] Add focused compiler regression cases. Reuse existing testsuite conventions

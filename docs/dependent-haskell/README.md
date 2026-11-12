@@ -26,11 +26,11 @@ Last updated: 2026-11-12.
 | Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
 | Execution | Native Core and source composition pass the checked bytecode entry; source composition also runs as machine code |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
-| Native interfaces | Scoped signatures pass binary reconstruction, disk imports, cross-module execution, and version rejection |
+| Native interfaces | Scoped signatures pass binary reconstruction, disk imports, cross-module execution, version rejection, and incremental recompilation |
 | Configured fork version | `10.1.20261112.1`, with interface header `1001202611121` |
 | Source syntax | `ExperimentalDependentTypes` checks one explicit retained Boolean binder; unsupported source positions report GHC-43582 |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | Signature fingerprint/recompilation checks, then native unfoldings in M8; source `case` and broader M6 work remain open |
+| Next task | Native expression reconstruction and checked unfolding construction in M8; source `case` and broader M6 work remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -389,10 +389,46 @@ Template Haskell program using containers/text/bytestring, GHCi evaluation, and
 Haddock startup. Its peak was 147 MiB under 4 GiB. Missing-documentation package
 warnings are expected with `--docs=none`. Swap was disabled in each capped run.
 
-The full testsuite, documentation build, performance checks, native unfoldings,
-and explicit fingerprint/recompilation-change cases remain open. See the scoped
+The full testsuite, documentation build, performance checks, and native unfoldings
+remain open. Signature fingerprint checks are recorded below. See the scoped
 representation in [Core](CORE.md#native-interface-signatures) and the
 [Agda provenance](REFERENCES.md#agda-provenance).
+
+## Signature fingerprints and recompilation
+
+The existing `NativeDependentCoreRun` regression now checks incremental consumer
+compilation. It reads actual declaration and module ABI hashes from producer
+interfaces. Rebuilding the same producer with fresh runtime Ids preserves these
+hashes. Changing only `choose True` from `42` to `43` also preserves them when
+unfoldings are omitted. In both cases an unchanged consumer skips code generation;
+fixed earlier object and interface timestamps make that check independent of
+filesystem timestamp resolution.
+
+The producer then changes `Select True` from `Int` to `Bool` and updates its
+payloads. The `choose` and `keep` signature text stays unchanged. Their declaration
+hashes and the module ABI change. The `keepIndependent` hash stays unchanged.
+The consumer imports only `choose` and `keep`, with no explicit `Select` use.
+Recompiling without `-fforce-recomp` rejects its stale `Int` use with located
+`GHC-83865`, including the `Int`, `Bool`, and `choose` context. Fresh one-shot
+contexts read only producer interfaces; producer sources stay outside the import
+path. These checks pass through the bootstrap API, at 917 MiB under 4 GiB with
+swap disabled.
+
+All five registered normal-way tests also pass: 39 cases, 34 skipped, no
+unexpected results, and no framework warnings. Hadrian reported 1m11s; the
+scope peaked at 2,558 MiB under 8 GiB with swap disabled. The fixture remains
+inside the existing regression; the compiler sources did not change. The
+ignored scripts are `native-recompilation-runtime.sh` and
+`native-source-choose-registered.py` in `_build/verification/`. Their logs and
+peak records use the `native-recompilation` prefix. Fourmolu, Cabal-gild parsing,
+whitespace checks, and local documentation link checks pass.
+
+The test Note records these controls and links the existing GHC fingerprinting
+Note. The [Agda import-validation comparison](REFERENCES.md#agda-provenance)
+records the shared dependency check and GHC's distinct declaration ABI policy.
+Native unfoldings remain gated. Their next increment must reconstruct virtual
+proofs, check imported native Core, and avoid ordinary occurrence analysis while
+preserving lazy unfolding reconstruction. See [the remaining M8 work](PLAN.md#m8-support-interfaces-and-validate-the-compiler-change).
 
 ## Verified baseline
 

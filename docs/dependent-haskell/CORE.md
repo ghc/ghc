@@ -287,8 +287,11 @@ The consumer also checks concrete True/False applications. Those applications
 require the imported family equations to reduce to Int and Bool. It compiles
 the consumer separately and links both objects. The bootstrap API, self-hosted
 registered tests, and separate CLI processes pass these checks. Actual old/new
-header reads reject both incompatible directions. Explicit fingerprint and
-recompilation-change cases remain separate work. The Agda provenance is recorded in
+header reads reject both incompatible directions. The signature fingerprint
+check also requires stable hashes after fresh Id allocation and an omitted-body
+edit. A family equation change must alter the retained declaration hashes and
+recheck an unchanged consumer that does not name the family. The bootstrap
+check and all five registered normal-way tests pass. The Agda provenance is recorded in
 [the references](REFERENCES.md#agda-provenance).
 
 ## Scoped native SimpleOpt

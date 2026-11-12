@@ -121,6 +121,17 @@ existing whole-file version check with the explicit configured snapshot
 codec nor its version check proves that arbitrary decoded terms are well scoped.
 GHC's new decoder checks its Bool/Many binders and index lookups separately.
 
+Agda's [import validation](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Interaction/Imports.hs#L840-L891)
+compares stored imported-module hashes with their current hashes. A mismatch
+requires rechecking. This supports checking dependent signature changes through
+the existing interface dependency mechanism. GHC uses finer declaration hashes;
+see `Note [Fingerprinting IfaceDecls]` in `GHC.Iface.Recomp`. The regression
+changes a closed-family equation beneath retained function signatures, then
+requires a consumer recheck without `-fforce-recomp`. Fresh binder identities
+must preserve these hashes. With unfoldings omitted, a body-only edit must also
+preserve the signature ABI. That last rule follows GHC's ABI policy; Agda's
+module-hash check does not establish it.
+
 The frontend must preserve these identities through parsing, checking, and
 desugaring. RequiredTypeArguments provides erased type arguments. It cannot
 implement the retained rule by renaming `foreach` to `forall`. See the
