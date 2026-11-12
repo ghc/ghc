@@ -1,7 +1,9 @@
--- | Detect native dependent types at unsupported compiler boundaries.
+-- | Detect native dependent types in Core and its metadata.
 module GHC.Core.Dependent (
     hasNativeDependentProgram,
     hasNativeDependentExpr,
+    hasNativeDependentExprRhs,
+    hasNativeDependentUnfolding,
     rejectNativeDependentProgram,
     rejectNativeDependentExpr,
 ) where
@@ -32,7 +34,12 @@ data ScanState = ScanState
     { scannedMetadata :: VarSet
     , scannedKinds :: VarSet
     , scannedSynonyms :: TyConSet
+    , scanMetadata :: MetadataScan
     }
+
+-- | Select which bound-Id metadata a boundary can demand.
+data MetadataScan = AllMetadata | StableMetadata | NoMetadata
+    deriving Eq
 
 -- | Short-circuit a structural scan when it finds a native type.
 newtype NativeScan = NativeScan {runNativeScan :: State ScanState Bool}
@@ -50,11 +57,24 @@ Do not follow unfoldings attached to variable occurrences.
 -}
 hasNativeDependentProgram :: CoreProgram -> [CoreRule] -> Bool
 hasNativeDependentProgram binds rules =
-    runScan (foldMap scanBind binds <> foldMap scanRule rules)
+    runScan AllMetadata (foldMap scanBind binds <> foldMap scanRule rules)
 
 -- | Inspect an expression and metadata on its bound identifiers.
 hasNativeDependentExpr :: CoreExpr -> Bool
-hasNativeDependentExpr = runScan . scanExpr
+hasNativeDependentExpr = runScan AllMetadata . scanExpr
+
+{- | Inspect one unfolding RHS without forcing bound-Id metadata.
+Each nested unfolding has its own deferred validation. See
+Note [Native dependent unfolding templates] in GHC.Core.Unfold.Make.
+-}
+hasNativeDependentExprRhs :: CoreExpr -> Bool
+hasNativeDependentExprRhs = runScan NoMetadata . scanExpr
+
+{- | Inspect an RHS and the metadata that occurrence analysis would traverse.
+Do not force unstable nested unfolding templates.
+-}
+hasNativeDependentUnfolding :: CoreExpr -> Bool
+hasNativeDependentUnfolding = runScan StableMetadata . scanExpr
 
 -- | Reject native dependent Core before an unsupported program pass.
 rejectNativeDependentProgram :: String -> CoreProgram -> [CoreRule] -> IO ()
@@ -67,8 +87,8 @@ rejectNativeDependentExpr context expr =
     rejectNative context (hasNativeDependentExpr expr)
 
 -- | Run a scan with empty metadata, kind, and synonym caches.
-runScan :: NativeScan -> Bool
-runScan scan = evalState (runNativeScan scan) (ScanState emptyVarSet emptyVarSet emptyTyConSet)
+runScan :: MetadataScan -> NativeScan -> Bool
+runScan metadata scan = evalState (runNativeScan scan) (ScanState emptyVarSet emptyVarSet emptyTyConSet metadata)
 
 -- | Report an unsupported compiler operation when a scan finds a native type.
 rejectNative :: String -> Bool -> IO ()
@@ -130,7 +150,8 @@ scanBinder v =
         <> NativeScan
             ( do
                 seen <- gets scannedMetadata
-                if not (isNonCoVarId v) || v `elemVarSet` seen
+                metadata <- gets scanMetadata
+                if metadata == NoMetadata || not (isNonCoVarId v) || v `elemVarSet` seen
                     then pure False
                     else do
                         modify' (\s -> s{scannedMetadata = extendVarSet seen v})
@@ -150,7 +171,11 @@ scanUnfolding BootUnfolding = mempty
 scanUnfolding (OtherCon cons) = foldMap scanAltCon cons
 scanUnfolding (DFunUnfolding{df_bndrs = bs, df_con = con, df_args = args}) =
     foldMap scanBinder bs <> scanType (dataConRepType con) <> foldMap scanExpr args
-scanUnfolding (CoreUnfolding{uf_tmpl = body}) = scanExpr body
+scanUnfolding (CoreUnfolding{uf_src = src, uf_tmpl = body}) = NativeScan $ do
+    metadata <- gets scanMetadata
+    if metadata == AllMetadata || isStableSource src
+        then runNativeScan (scanExpr body)
+        else pure False
 
 -- | Inspect a referenced variable's annotations once.
 scanVarKind :: Var -> NativeScan

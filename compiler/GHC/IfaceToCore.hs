@@ -71,6 +71,8 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
+import GHC.Core.Dependent ( hasNativeDependentExprRhs, hasNativeDependentUnfolding )
+import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseBndrsAndExpr )
 import GHC.Core.Ppr
 
@@ -1397,6 +1399,8 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                 bindIfaceBndrs bndrs                      $ \ bndrs' ->
                 do { args'  <- mapM tcIfaceExpr args
                    ; rhs'   <- tcIfaceExpr rhs
+                   ; when (any hasNativeDependentUnfolding (rhs' : args' ++ map varToCoreExpr bndrs')) $
+                       failIfM (text "Native dependent interface rules are not supported:" <+> pprRuleName name)
                    ; whenGOptM Opt_DoCoreLinting $ do
                       { dflags <- getDynFlags
                       ; (_, lcl_env) <- getEnvs
@@ -1566,8 +1570,9 @@ isLiftedTypeKind also accepts Constraint. Malformed native interface data
 must fail before construction of a retained type.
 
 IfaceFreeTermVar preserves an open Id only for diagnostics. It cannot enter
-this decoding path. Native expression unfoldings and Boolean branch proofs
-remain separate interface work.
+this decoding path. Boolean branch proof reconstruction is described in
+Note [Native Boolean evidence in interfaces]. Module unfolding generation
+remains separately gated.
 -}
 
 tcIfaceTupleTy :: TupleSort -> PromotionFlag -> IfaceAppArgs -> IfL Type
@@ -1740,6 +1745,28 @@ tcIfaceExpr (IfaceECase scrut ty)
 
 tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     scrut' <- tcIfaceExpr scrut
+    -- Check before recovering types or decoding branch bodies.
+    -- See Note [Native Boolean evidence in interfaces].
+    let native_alt (IfaceAlt (IfaceDataAlt con) names _)
+          = not (null names) && (con `hasKey` falseDataConKey || con `hasKey` trueDataConKey)
+        native_alt _ = False
+        has_con key (IfaceAlt (IfaceDataAlt con) _ _) = con `hasKey` key
+        has_con _ _ = False
+        is_default (IfaceAlt IfaceDefaultAlt [] _) = True
+        is_default _ = False
+        native = any native_alt alts
+    when native $ do
+      when (isNothing (exprToBoolIndex scrut')) $
+        failIfM (text "Unsupported scrutinee for native Boolean interface evidence:" <+> ppr scrut')
+      unless (any is_default alts || (any (has_con falseDataConKey) alts
+                                     && any (has_con trueDataConKey) alts)) $
+        failIfM (text "Native Boolean interface proof alternatives must be exhaustive:" <+> ppr scrut')
+      forM_ alts $ \ (IfaceAlt con names _) -> case con of
+        IfaceDefaultAlt | not (null names) ->
+          failIfM (text "Native Boolean interface DEFAULT alternative cannot bind names:" <+> ppr names)
+        IfaceLitAlt _ | not (null names) ->
+          failIfM (text "Native Boolean interface literal alternative cannot bind names:" <+> ppr names)
+        _ -> return ()
     case_bndr_name <- newIfaceName (mkVarOccFS (ifLclNameFS case_bndr))
     let
         scrut_ty   = exprType scrut'
@@ -1756,7 +1783,18 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
 
     extendIfaceIdEnv [case_bndr'] $ do
      alts' <- mapM (tcIfaceAlt scrut' case_mult tc_app) alts
-     return (Case scrut' case_bndr' (coreAltsType alts') alts')
+     result_ty <- if native
+       then do
+         -- coreAltType panics on an escaping binder. Report the interface error.
+         result_tys <- forM alts' $ \ (Alt con bs rhs) ->
+           case occCheckExpand (case_bndr' : bs) (exprType rhs) of
+             Just ty -> return ty
+             Nothing -> failIfM (text "Escaping binder in native Boolean interface result:" <+> ppr con)
+         case result_tys of
+           ty : _ -> return ty
+           [] -> failIfM (text "Native Boolean interface case has no alternatives")
+       else return (coreAltsType alts')
+     return (Case scrut' case_bndr' result_ty alts')
 
 tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
   = do  { name    <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
@@ -1832,14 +1870,23 @@ tcIfaceAlt scrut mult (tycon, inst_tys) (IfaceAlt (IfaceDataAlt data_occ) arg_st
   = do  { con <- tcIfaceDataCon data_occ
         ; when (debugIsOn && not (con `elem` tyConDataCons tycon))
                (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
-        ; tcIfaceDataAlt mult con inst_tys arg_strs rhs }
+        ; tcIfaceDataAlt scrut mult con inst_tys arg_strs rhs }
 
-tcIfaceDataAlt :: Mult -> DataCon -> [Type] -> [IfLclName] -> IfaceExpr
+tcIfaceDataAlt :: CoreExpr -> Mult -> DataCon -> [Type] -> [IfLclName] -> IfaceExpr
                -> IfL CoreAlt
-tcIfaceDataAlt mult con inst_tys arg_strs rhs
+tcIfaceDataAlt scrut mult con inst_tys arg_strs rhs
   | not (null arg_strs)
   , con `hasKey` falseDataConKey || con `hasKey` trueDataConKey
-  = pprPanic "tcIfaceDataAlt: native Boolean proof interfaces are not implemented" (ppr con)
+  = do { proof_name <- case arg_strs of
+           [name] -> newIfaceName (mkVarOccFS (ifLclNameFS name))
+           _ -> failIfM (text "Native Boolean interface alternative must bind exactly one proof name:"
+                         <+> ppr con <+> ppr arg_strs)
+       ; index <- case exprToBoolIndex scrut of
+           Just index -> return index
+           Nothing -> failIfM (text "Unsupported scrutinee for native Boolean interface evidence:" <+> ppr scrut)
+       ; let cv = mkCoVar proof_name (mkNomEqPred index (mkTyConTy (promoteDataCon con)))
+       ; rhs' <- extendIfaceIdEnv [cv] (tcIfaceExpr rhs)
+       ; return (Alt (DataAlt con) [cv] rhs') }
   | otherwise
   = do  { uniqs <- getUniquesM
         ; let (ex_tvs, arg_ids)
@@ -1849,6 +1896,26 @@ tcIfaceDataAlt mult con inst_tys arg_strs rhs
                   extendIfaceIdEnv arg_ids      $
                   tcIfaceExpr rhs
         ; return (Alt (DataAlt con) (ex_tvs ++ arg_ids) rhs') }
+
+{- Note [Native Boolean evidence in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A wired Boolean alternative has no constructor fields. One local name instead
+denotes its virtual CoVar. Reconstruct the nominal equality from the actual
+scrutinee index and this constructor. Do not accept endpoints from the file or
+derive them from the case binder. Allocate a fresh CoVar and extend only this
+alternative's Id environment. Ordinary binder-free Boolean alternatives keep
+their existing representation. Tidy local names before conversion.
+
+Require coverage before decoding proof-bearing bodies. Check branch-local and
+case-binder escape before recovering the result type: coreAltType would panic
+on an escaping binder. Native unfolding validation then checks the entire Core
+expression and its declared type. These checks do not validate all malformed
+legacy interface expressions. The module unfolding gate remains separate.
+
+Agda's constructor splitting refines a context and its case trees retain scoped
+branches. GHC reconstructs explicit FC evidence instead. See the pinned sources
+and Haskell evaluation boundary in docs/dependent-haskell/REFERENCES.md.
+-}
 
 {-
 ************************************************************************
@@ -1958,9 +2025,9 @@ tcLFInfo lfi = case lfi of
 
 tcUnfolding :: TopLevelFlag -> Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 -- See Note [Lazily checking Unfoldings]
-tcUnfolding toplvl name _ info (IfCoreUnfold src cache if_guidance if_expr)
+tcUnfolding toplvl name ty info (IfCoreUnfold src cache if_guidance if_expr)
   = do  { uf_opts <- unfoldingOpts <$> getDynFlags
-        ; expr <- tcUnfoldingRhs (isCompulsorySource src) toplvl name if_expr
+        ; expr <- tcUnfoldingRhs (isCompulsorySource src) toplvl name ty if_expr
         ; let guidance = case if_guidance of
                  IfWhen arity unsat_ok boring_ok -> UnfWhen arity unsat_ok boring_ok
                  IfNoGuidance -> calcUnfoldingGuidance uf_opts is_top_bottoming False expr
@@ -1972,7 +2039,11 @@ tcUnfolding toplvl name _ info (IfCoreUnfold src cache if_guidance if_expr)
 
 tcUnfolding _toplvl name dfun_ty _ (IfDFunUnfold bs ops)
   = bindIfaceBndrs bs $ \ bs' ->
-    do { ops1 <- forkM doc $ mapM tcIfaceExpr ops
+    do { ops1 <- forkM doc $ do
+           ops' <- mapM tcIfaceExpr ops
+           when (any hasNativeDependentUnfolding ops') $
+             failIfM (text "Native dependent dictionary unfoldings are not supported:" <+> ppr name)
+           return ops'
        ; return $ mkDFunUnfolding bs' (classDataCon cls) ops1 }
   where
     doc = text "Class ops for dfun" <+> ppr name
@@ -2050,23 +2121,33 @@ Ticket #21139
 
 tcUnfoldingRhs :: Bool -- ^ Is this unfolding compulsory?
                        -- See Note [Checking for representation polymorphism] in GHC.Core.Lint
-               -> TopLevelFlag -> Name -> IfaceExpr -> IfL CoreExpr
-tcUnfoldingRhs is_compulsory toplvl name expr
+               -> TopLevelFlag -> Name -> Type -> IfaceExpr -> IfL CoreExpr
+tcUnfoldingRhs is_compulsory toplvl name declared_ty expr
   = forkM doc $ do
     core_expr' <- tcIfaceExpr expr
 
+    -- Keep native checks in this thunk, including for nested unfoldings.
+    -- See Note [Native dependent unfolding templates] in GHC.Core.Unfold.Make.
+    let native = hasNativeDependentExprRhs core_expr'
+                 || hasNativeDependentExprRhs (Type declared_ty)
+    dflags <- getDynFlags
     -- Check for type consistency in the unfolding
     -- See Note [Linting Unfoldings from Interfaces] in GHC.Core.Lint
-    when (isTopLevel toplvl) $
-      whenGOptM Opt_DoCoreLinting $ do
+    when (native || (isTopLevel toplvl && gopt Opt_DoCoreLinting dflags)) $ do
         in_scope <- nonDetEltsUniqSet <$> get_in_scope
-        dflags   <- getDynFlags
         logger   <- getLogger
         case lintUnfolding is_compulsory (initLintConfig dflags in_scope) noSrcLoc core_expr' of
           Nothing   -> return ()
-          Just errs -> liftIO $
-            displayLintResults logger doc
-                               (pprCoreExpr core_expr') (emptyBag, errs)
+          Just errs
+            | native -> failIfM (text "Invalid native unfolding in interface:" <+> ppr name
+                                  $$ vcat (bagToList errs))
+            | otherwise -> liftIO $
+                displayLintResults logger doc
+                                   (pprCoreExpr core_expr') (emptyBag, errs)
+    when (native && not (exprType core_expr' `eqType` declared_ty)) $
+      failIfM (text "Native interface unfolding does not match its declared type:" <+> ppr name
+               $$ text "Declared type:" <+> ppr declared_ty
+               $$ text "Unfolding type:" <+> ppr (exprType core_expr'))
     return core_expr'
   where
     doc = ppWhen is_compulsory (text "Compulsory") <+>

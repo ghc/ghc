@@ -675,9 +675,13 @@ toIfaceTopBind b =
 
 ---------------------
 toIfaceAlt :: CoreAlt -> IfaceAlt
-toIfaceAlt alt@(Alt (DataAlt con) (_:_) _)
+toIfaceAlt alt@(Alt (DataAlt con) bs _)
   | con `hasKey` falseDataConKey || con `hasKey` trueDataConKey
-  = pprPanic "toIfaceAlt: native Boolean proof interfaces are not implemented" (ppr alt)
+  , not (null bs)
+  , not (case bs of [cv] -> isCoVar cv && isLocalId cv; _ -> False)
+  = pprPanic "toIfaceAlt: invalid native Boolean proof binder" (ppr alt)
+  -- The reader reconstructs the proof type from the scrutinee and constructor.
+  -- See Note [Native Boolean evidence in interfaces] in GHC.IfaceToCore.
 toIfaceAlt (Alt c bs r) = IfaceAlt (toIfaceCon c) (map (mkIfLclName . getOccFS) bs) (toIfaceExpr r)
 
 ---------------------

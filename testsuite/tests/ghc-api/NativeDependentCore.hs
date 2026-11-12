@@ -10,39 +10,43 @@ import Data.List (isInfixOf)
 import GHC (DynFlags, getSession, getSessionDynFlags, runGhc)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (coercionLKind, mkAxInstCo, mkCoVarCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
+import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, mkAxInstCo, mkCoVarCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.DataCon (DataCon, dataConWorkId, promoteDataCon)
 import GHC.Core.Dependent
+import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.FamInstEnv (mkBranchedCoAxiom, mkCoAxBranch)
 import GHC.Core.Lint (lintExpr)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
+import GHC.Core.TyCo.FVs (tyCoVarsOfCo)
 import GHC.Core.TyCo.Rep (TyLit (..), Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.TyCo.Tidy (tidyTopType)
 import GHC.Core.TyCon (FamTyConFlav (..), Injectivity (..), TyCon, mkAnonTyConBinder, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind)
 import GHC.Core.Type
+import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchTy, tcMatchTys, tcUnifyTysFG)
 import GHC.Core.Utils (applyTypeToArgs, exprType)
-import GHC.CoreToIface (toIfaceAlt, toIfaceType, toIfaceTypeX)
+import GHC.CoreToIface (toIfaceAlt, toIfaceExpr, toIfaceType, toIfaceTypeX)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.IOEnv (IOEnvFailure)
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Driver.Config.Parser (initParserOpts)
-import GHC.Driver.Env (HscEnv (..))
+import GHC.Driver.Env (HscEnv (..), hscUpdateFlags)
+import GHC.Driver.Flags (GeneralFlag (Opt_DoCoreLinting))
 import GHC.Driver.Ppr (showSDoc)
-import GHC.Driver.Session (parseDynamicFlagsCmdLine)
+import GHC.Driver.Session (gopt_unset, parseDynamicFlagsCmdLine)
 import GHC.Hs (HsType (..))
 import GHC.Iface.Binary (CompressionIFace (..), TraceBinIFace (..), getWithUserData, putWithUserData)
 import GHC.Iface.Env (extendIfaceIdEnv)
-import GHC.Iface.Syntax (IfaceExpr (IfaceType))
-import GHC.Iface.Type (IfaceType (..), getIfaceType, mkIfLclName)
-import GHC.IfaceToCore (tcIfaceExpr)
+import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceConAlt (..), IfaceDecl (IfaceId), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
+import GHC.Iface.Type (IfaceBndr (IfaceIdBndr), IfaceCoercion (IfaceCoVarCo), IfaceType (..), getIfaceType, ifaceBndrName, mkIfLclName)
+import GHC.IfaceToCore (tcIfaceDecl, tcIfaceExpr, tcIfaceRules)
 import qualified GHC.Parser as Parser
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Tc.Utils.Monad (initIfaceLcl, initIfaceLoad)
@@ -50,9 +54,11 @@ import GHC.Types.Basic (OccInfo (..), TailCallInfo (..))
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails (VanillaId), RuleInfo (..))
 import GHC.Types.InlinePragma (ActivationX (AlwaysActive))
-import GHC.Types.Name (getOccName, mkSystemName, nameModule)
+import GHC.Types.Literal (Literal (LitChar))
+import GHC.Types.Name (getOccName, mkExternalName, mkSystemName, nameModule)
 import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc, occNameFS)
 import GHC.Types.SrcLoc (mkRealSrcLoc, noLoc, noSrcSpan, unLoc)
+import GHC.Types.TyThing (TyThing (AnId))
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
 import GHC.Types.Var.Env
@@ -113,7 +119,7 @@ indexSubst scope b rhs =
 check :: String -> Bool -> IO ()
 check label condition = unless condition (fail ("FAIL: " ++ label))
 
--- | Check retained signatures through binary tables and fresh interface scopes.
+-- | Check retained types and closed expressions through binary interface tables.
 runIfaceChecks :: FilePath -> IO ()
 runIfaceChecks libdir = runGhc (Just libdir) $ do
     env <- getSession
@@ -123,24 +129,28 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             original = tidyTopType (exprType (keep b 301))
             iface = toIfaceType original
             ifaceModule = nameModule (idName (dataConWorkId trueDataCon))
+            restoreExpr :: [Id] -> IfaceExpr -> IO CoreExpr
+            restoreExpr scope input =
+                initIfaceLoad env
+                    $ initIfaceLcl ifaceModule (text "native interface test") NotBoot
+                    $ extendIfaceIdEnv scope
+                    $ tcIfaceExpr input
             restore :: [Id] -> IfaceType -> IO Type
             restore scope input = do
-                expression <-
-                    initIfaceLoad env
-                        $ initIfaceLcl ifaceModule (text "native interface test") NotBoot
-                        $ extendIfaceIdEnv scope
-                        $ tcIfaceExpr (IfaceType input)
+                expression <- restoreExpr scope (IfaceType input)
                 case expression of
                     Type ty -> pure ty
                     _ -> fail "FAIL: interface type reconstruction returned a term"
-            roundtrip :: CompressionIFace -> IfaceType -> IO IfaceType
+            roundtrip :: (Binary.Binary a) => CompressionIFace -> a -> IO a
             roundtrip compression input = do
                 writer <- Binary.openBinMem 1024
                 putWithUserData QuietBinIFace compression writer input
                 reader <- Binary.shrinkBinBuffer writer
                 getWithUserData (hsc_NC env) reader
             rejectsIface :: String -> String -> [Id] -> IfaceType -> IO ()
-            rejectsIface label fragment scope input = do
+            rejectsIface label fragment scope input = rejectsIfaceExpr label fragment scope (IfaceType input)
+            rejectsIfaceExpr :: String -> String -> [Id] -> IfaceExpr -> IO ()
+            rejectsIfaceExpr label fragment scope input = do
                 messages <- newIORef []
                 let logger = pushLogHook (\_ _ _ _ message -> modifyIORef' messages (showSDoc dflags message :)) (hsc_logger env)
                     quietEnv = env{hsc_logger = logger}
@@ -149,13 +159,168 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         $ initIfaceLoad quietEnv
                         $ initIfaceLcl ifaceModule (text "native interface test") NotBoot
                         $ extendIfaceIdEnv scope
-                        $ tcIfaceExpr (IfaceType input)
+                        $ tcIfaceExpr input
                 case outcome of
                     Left _ -> do
                         diagnostics <- unlines <$> readIORef messages
                         unless (fragment `isInfixOf` diagnostics) $
                             fail ("FAIL: " ++ label ++ "; unexpected interface diagnostic:\n" ++ diagnostics)
                     Right _ -> fail ("FAIL: " ++ label ++ "; malformed interface succeeded")
+            cache = UnfoldingCache False False False False
+            unlintedEnv = hscUpdateFlags (`gopt_unset` Opt_DoCoreLinting) env
+            importTemplate :: HscEnv -> IfaceType -> IfaceExpr -> IO CoreExpr
+            importTemplate importEnv declared body = do
+                let name = mkExternalName (unique 330) ifaceModule (mkVarOcc "native_unfolding") noSrcSpan
+                    declaration = IfaceId name declared IfVanillaId [HsUnfold False (IfCoreUnfold VanillaSrc cache (IfWhen 0 False False) body)]
+                thing <-
+                    initIfaceLoad importEnv
+                        $ initIfaceLcl ifaceModule (text "native unfolding test") NotBoot
+                        $ tcIfaceDecl False declaration
+                case thing of
+                    AnId imported -> case realIdUnfolding imported of
+                        unfoldingInfo@CoreUnfolding{uf_tmpl = template} -> do
+                            check "imported unfolding preserves its wire cache" (uf_cache unfoldingInfo == cache)
+                            evaluate template
+                        _ -> fail "FAIL: imported native unfolding was lost"
+                    _ -> fail "FAIL: interface declaration did not reconstruct an Id"
+            rejectsImportedUnfolding :: String -> String -> IfaceType -> IfaceExpr -> IO ()
+            rejectsImportedUnfolding label fragment declared body =
+                rejectsDeferredIface label fragment $ \importEnv -> do
+                    _ <- importTemplate importEnv declared body
+                    pure ()
+            rejectsDeferredIface :: String -> String -> (HscEnv -> IO ()) -> IO ()
+            rejectsDeferredIface label fragment action = do
+                messages <- newIORef []
+                let logger = pushLogHook (\_ _ _ _ message -> modifyIORef' messages (showSDoc dflags message :)) (hsc_logger unlintedEnv)
+                outcome <- try @GhcException (action unlintedEnv{hsc_logger = logger})
+                case outcome of
+                    Left (ProgramError message) -> do
+                        check (label ++ " fork failure") (message == "Cannot continue after interface file error")
+                        diagnostics <- unlines <$> readIORef messages
+                        check (label ++ "; diagnostic: " ++ diagnostics) (fragment `isInfixOf` diagnostics)
+                    Left exception -> fail ("FAIL: " ++ label ++ "; unexpected exception: " ++ displayException exception)
+                    Right _ -> fail ("FAIL: " ++ label ++ "; unsupported interface payload was accepted")
+            rejectsIfaceRule :: String -> [IfaceBndr] -> IfaceExpr -> IO ()
+            rejectsIfaceRule label binders body =
+                rejectsDeferredIface label "Native dependent interface rules are not supported" $ \importEnv -> do
+                    let rule = IfaceRule (fsLit "native_rule") AlwaysActive binders (idName (dataConWorkId trueDataCon)) [] body False IsOrphan
+                    rules <-
+                        initIfaceLoad importEnv
+                            $ initIfaceLcl ifaceModule (text "native rule test") NotBoot
+                            $ tcIfaceRules False [rule]
+                    case rules of
+                        [rule'] -> evaluate (ru_rhs rule') >> pure ()
+                        _ -> fail "FAIL: interface rule was lost"
+        let payload = local 309 "payload" intTy
+            caseBinder = local 310 "case_b" boolTy
+            index = TermVarTy b
+            trueExpr = Var (dataConWorkId trueDataCon)
+            falseProof = proof 311 index (constructorIndex falseDataCon)
+            trueProof = proof 312 index (constructorIndex trueDataCon)
+            literalFalseProof = proof 313 (constructorIndex trueDataCon) (constructorIndex falseDataCon)
+            literalTrueProof = proof 314 (constructorIndex trueDataCon) (constructorIndex trueDataCon)
+            oldProofs = [falseProof, trueProof, literalFalseProof, literalTrueProof]
+            close expression = Lam b (Lam payload expression)
+            variableCase =
+                close $ Case (Var b) caseBinder (indexed index) (dictionaryAlts payload falseProof trueProof)
+            literalCase =
+                close $
+                    Case
+                        trueExpr
+                        caseBinder
+                        (indexed (constructorIndex trueDataCon))
+                        (dictionaryAlts payload literalFalseProof literalTrueProof)
+            ordinaryCase =
+                close $
+                    Case
+                        (Var b)
+                        caseBinder
+                        intTy
+                        [ Alt (DataAlt falseDataCon) [] (Var payload)
+                        , Alt (DataAlt trueDataCon) [] (Var payload)
+                        ]
+            defaultCase =
+                close $
+                    Case
+                        (Var b)
+                        caseBinder
+                        intTy
+                        [ Alt DEFAULT [] (Var payload)
+                        , Alt (DataAlt trueDataCon) [trueProof] (Var payload)
+                        ]
+            expressionCases =
+                [ ("variable proof case", variableCase, 2)
+                , ("literal proof case", literalCase, 2)
+                , ("ordinary Boolean case", ordinaryCase, 0)
+                , ("DEFAULT and proof case", defaultCase, 1)
+                ]
+            lazyUnfolding = mkCoreUnfolding VanillaSrc True (error "forced a deferred unfolding RHS") Nothing UnfNever
+            keptIndex = local 331 "index_only" boolTy
+            consumer = local 332 "consumer" (indexed (TermVarTy keptIndex))
+            dictionary = local 333 "dictionary" (mkTyConApp eqTyCon [boolTy, TermVarTy keptIndex, TermVarTy keptIndex])
+            indexOnlyBody =
+                Let
+                    (NonRec keptIndex trueExpr)
+                    (App (Lam consumer (Var payload)) (Lam dictionary (Var payload)))
+            indexOnlyBinding = Lam payload indexOnlyBody
+            stableTemplate =
+                close $
+                    Case
+                        (Var b)
+                        caseBinder
+                        intTy
+                        [ Alt (DataAlt falseDataCon) [] (Var payload)
+                        , Alt (DataAlt trueDataCon) [trueProof] indexOnlyBody
+                        ]
+            nestedStable =
+                setIdUnfolding
+                    (local 334 "nested_stable" (exprType stableTemplate))
+                    (mkCoreUnfolding StableUserSrc False stableTemplate (Just cache) UnfNever)
+            ordinaryParent = Let (NonRec nestedStable ordinaryCase) (Var nestedStable)
+        check "unfolding construction leaves its RHS deferred" $ case uf_src lazyUnfolding of
+            VanillaSrc -> True
+            _ -> False
+        forM_ [Nothing, Just cache] $ \precomputed -> do
+            let constructed = mkCoreUnfolding VanillaSrc True indexOnlyBinding precomputed UnfNever
+                template = uf_tmpl constructed
+            lintAccepts dflags "constructed unfolding preserves an index-only binding" [] template
+            case template of
+                Lam _ (Let (NonRec surviving _) _) -> check "unfolding retains index binder identity" (surviving == keptIndex)
+                _ -> fail "FAIL: unfolding construction removed an index-only binding"
+            case precomputed of
+                Just supplied -> check "unfolding preserves its supplied cache" (uf_cache constructed == supplied)
+                Nothing -> pure ()
+        check "parent RHS has no native syntax" (not (hasNativeDependentExprRhs ordinaryParent))
+        let parentTemplate = uf_tmpl (mkCoreUnfolding VanillaSrc False ordinaryParent (Just cache) UnfNever)
+        case parentTemplate of
+            Let (NonRec surviving _) _ -> do
+                let nestedTemplate = uf_tmpl (realIdUnfolding surviving)
+                lintAccepts dflags "parent preserves its stable native unfolding" [] nestedTemplate
+                case nestedTemplate of
+                    Lam _ (Lam _ (Case _ _ _ [_, Alt (DataAlt constructor) [cv] (Let (NonRec retained _) _)])) -> do
+                        check "stable nested unfolding retains its proof" (constructor == trueDataCon && cv == trueProof)
+                        check "stable nested unfolding retains its index-only binding" (retained == keptIndex)
+                    _ -> fail "FAIL: parent construction changed its stable native unfolding"
+            _ -> fail "FAIL: parent construction changed its binding"
+        let nativeRuleHelper = local 336 "native_rule_helper" original
+            nativeRuleRhs = Let (NonRec nativeRuleHelper (keep b 301)) trueExpr
+            nativeRuleBinder = IfaceIdBndr (toIfaceType ManyTy, mkIfLclName (fsLit "native_rule_binder"), iface)
+        rejectsIfaceRule "native interface rule RHS" [] (toIfaceExpr nativeRuleRhs)
+        rejectsIfaceRule "native interface rule binder" [nativeRuleBinder] (toIfaceExpr trueExpr)
+        rejectsDeferredIface "native interface dictionary operators" "Native dependent dictionary unfoldings are not supported" $ \importEnv -> do
+            let name = mkExternalName (unique 337) ifaceModule (mkVarOcc "native_dictionary") noSrcSpan
+                dfunType = mkTyConApp eqTyCon [liftedTypeKind, original, original]
+                operators = map toIfaceExpr [Type liftedTypeKind, Type original, Type original, Coercion (mkNomReflCo original)]
+                declaration = IfaceId name (toIfaceType dfunType) IfDFunId [HsUnfold False (IfDFunUnfold [] operators)]
+            thing <-
+                initIfaceLoad importEnv
+                    $ initIfaceLcl ifaceModule (text "native dictionary test") NotBoot
+                    $ tcIfaceDecl False declaration
+            case thing of
+                AnId imported -> case realIdUnfolding imported of
+                    DFunUnfolding{df_args = arguments} -> evaluate arguments >> pure ()
+                    _ -> fail "FAIL: interface dictionary unfolding was lost"
+                _ -> fail "FAIL: interface dictionary did not reconstruct an Id"
         forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
             decoded <- roundtrip compression iface
             first <- restore [] decoded
@@ -208,6 +373,123 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             literalIface <- roundtrip compression (toIfaceType literal)
             literalResult <- restore [] literalIface
             checkType dflags (label ++ " (ordinary literal tag)") literal literalResult
+            let worker = keep b 301
+            lintAccepts dflags (label ++ " (keep input)") [] worker
+            workerIface <- roundtrip compression (toIfaceExpr worker)
+            workerResult <- restoreExpr [] workerIface
+            importedKeep <- importTemplate unlintedEnv iface workerIface
+            lintAccepts dflags (label ++ " imported keep unfolding") [] importedKeep
+            checkType dflags (label ++ " imported keep type") original (exprType importedKeep)
+            indexOnlyIface <- roundtrip compression (toIfaceExpr indexOnlyBinding)
+            importedIndexOnly <- importTemplate unlintedEnv (toIfaceType (exprType indexOnlyBinding)) indexOnlyIface
+            lintAccepts dflags (label ++ " imported index-only binding") [] importedIndexOnly
+            case importedIndexOnly of
+                Lam _ (Let (NonRec _ _) _) -> pure ()
+                _ -> fail ("FAIL: " ++ label ++ "; imported unfolding removed an index-only binding")
+            lintAccepts dflags (label ++ " (keep reconstruction)") [] workerResult
+            checkType dflags (label ++ " (keep expression type)") (exprType worker) (exprType workerResult)
+            case workerResult of
+                Lam fresh (Lam value (Var occurrence)) -> do
+                    check (label ++ " (keep fresh binder)") (fresh /= b)
+                    check (label ++ " (keep payload identity)") (value == occurrence)
+                    checkType dflags (label ++ " (keep annotation identity)") (indexed (TermVarTy fresh)) (varType value)
+                _ -> fail ("FAIL: " ++ label ++ "; keep expression shape changed")
+            forM_ expressionCases $ \(description, expression, expectedProofs) -> do
+                let expressionLabel = label ++ " (" ++ description ++ ")"
+                lintAccepts dflags (expressionLabel ++ " input") [] expression
+                let constructed = mkCoreUnfolding VanillaSrc True expression (Just cache) UnfNever
+                lintAccepts dflags (expressionLabel ++ " constructed unfolding") [] (uf_tmpl constructed)
+                check (expressionLabel ++ " supplied unfolding cache") (uf_cache constructed == cache)
+                expressionIface <- roundtrip compression (toIfaceExpr expression)
+                restored <- restoreExpr [] expressionIface
+                restoredAgain <- restoreExpr [] expressionIface
+                imported <- importTemplate unlintedEnv (toIfaceType (tidyTopType (exprType expression))) expressionIface
+                lintAccepts dflags (expressionLabel ++ " imported unfolding") [] imported
+                checkType dflags (expressionLabel ++ " imported unfolding type") (exprType expression) (exprType imported)
+                lintAccepts dflags expressionLabel [] restored
+                lintAccepts dflags (expressionLabel ++ " second reconstruction") [] restoredAgain
+                checkType dflags (expressionLabel ++ " type") (exprType expression) (exprType restored)
+                checkType dflags (expressionLabel ++ " second type") (exprType restored) (exprType restoredAgain)
+                check (expressionLabel ++ " closed scope") (isEmptyVarSet (exprFreeVars restored))
+                case (restored, restoredAgain) of
+                    (Lam fresh (Lam freshPayload (Case scrut freshCase _ alternatives)), Lam next _) -> do
+                        check (expressionLabel ++ " fresh runtime binder") (fresh /= b && fresh /= next)
+                        check (expressionLabel ++ " fresh case binder") (freshCase /= caseBinder && freshCase /= fresh)
+                        let proofs = [(con, cv, rhs) | Alt (DataAlt con) [cv] rhs <- alternatives]
+                        check (expressionLabel ++ " proof count") (length proofs == expectedProofs)
+                        case exprToBoolIndex scrut of
+                            Nothing -> fail ("FAIL: " ++ expressionLabel ++ "; Boolean index was lost")
+                            Just scrutIndex -> forM_ proofs $ \(constructor, cv, rhs) -> do
+                                check (expressionLabel ++ " fresh local CoVar") (isCoVar cv && isLocalId cv && cv `notElem` oldProofs)
+                                let co = mkCoVarCo cv
+                                check (expressionLabel ++ " nominal proof") (coercionRole co == Nominal)
+                                checkType dflags (expressionLabel ++ " proof index identity") scrutIndex (coercionLKind co)
+                                checkType dflags (expressionLabel ++ " proof constructor") (constructorIndex constructor) (coercionRKind co)
+                                case rhs of
+                                    Cast (Lam _ (Var value)) transport -> do
+                                        check (expressionLabel ++ " payload reference") (value == freshPayload)
+                                        check (expressionLabel ++ " proof reference") (cv `elemVarSet` tyCoVarsOfCo transport)
+                                    Var value -> check (expressionLabel ++ " payload reference") (value == freshPayload)
+                                    _ -> fail ("FAIL: " ++ expressionLabel ++ "; branch shape changed")
+                    _ -> fail ("FAIL: " ++ expressionLabel ++ "; case expression shape changed")
+        case toIfaceExpr variableCase of
+            IfaceLam retained (IfaceLam value (IfaceCase scrut caseName [falseAlt, IfaceAlt trueCon [proofName] rhs])) -> do
+                let wrap scrutinee alternatives = IfaceLam retained (IfaceLam value (IfaceCase scrutinee caseName alternatives))
+                    reject label fragment expression = do
+                        decoded <- roundtrip NormalCompression expression
+                        rejectsIfaceExpr label fragment [] decoded
+                reject
+                    "extra interface proof names"
+                    "Native Boolean interface alternative must bind exactly one proof name"
+                    (wrap scrut [falseAlt, IfaceAlt trueCon [proofName, proofName] rhs])
+                reject
+                    "unsupported interface proof scrutinee"
+                    "Unsupported scrutinee for native Boolean interface evidence"
+                    (wrap (IfaceApp (IfaceLam retained scrut) scrut) [falseAlt, IfaceAlt trueCon [proofName] rhs])
+                reject
+                    "incomplete interface proof case"
+                    "Native Boolean interface proof alternatives must be exhaustive"
+                    (wrap scrut [falseAlt])
+                reject
+                    "interface DEFAULT cannot bind proof names"
+                    "Native Boolean interface DEFAULT alternative cannot bind names"
+                    (wrap scrut [IfaceAlt IfaceDefaultAlt [proofName] rhs, falseAlt, IfaceAlt trueCon [proofName] rhs])
+                reject
+                    "interface literal cannot bind proof names"
+                    "Native Boolean interface literal alternative cannot bind names"
+                    (wrap scrut [falseAlt, IfaceAlt trueCon [proofName] rhs, IfaceAlt (IfaceLitAlt (LitChar 'x')) [proofName] rhs])
+                reject
+                    "interface proof cannot escape another alternative"
+                    "Iface id out of scope"
+                    (wrap scrut [falseAlt, IfaceAlt trueCon [mkIfLclName (fsLit "differentProof")] rhs])
+                reject
+                    "missing interface proof occurrence"
+                    "Iface id out of scope"
+                    (wrap scrut [falseAlt, IfaceAlt trueCon [proofName] (IfaceCo (IfaceCoVarCo (mkIfLclName (fsLit "missingProof"))))])
+                let payloadName = ifaceBndrName (fst value)
+                    invalid = wrap scrut [falseAlt, IfaceAlt trueCon [proofName] (IfaceLcl payloadName)]
+                    escapeBinder = IfaceIdBndr (toIfaceType ManyTy, mkIfLclName (fsLit "escape"), toIfaceType (indexed (TermVarTy caseBinder)))
+                    escaping = wrap scrut [falseAlt, IfaceAlt trueCon [proofName] (IfaceLam (escapeBinder, snd value) (IfaceLcl payloadName))]
+                reject
+                    "interface result cannot mention the case binder"
+                    "Escaping binder in native Boolean interface result"
+                    escaping
+                rejectsImportedUnfolding
+                    "native import checks branch types without -dcore-lint"
+                    "Invalid native unfolding in interface"
+                    (toIfaceType (tidyTopType (exprType variableCase)))
+                    invalid
+                rejectsImportedUnfolding
+                    "native import checks its declared type without -dcore-lint"
+                    "Native interface unfolding does not match its declared type"
+                    (toIfaceType intTy)
+                    (toIfaceExpr variableCase)
+                rejectsImportedUnfolding
+                    "native signature checks an ordinary RHS without -dcore-lint"
+                    "Native interface unfolding does not match its declared type"
+                    iface
+                    (toIfaceExpr (identity 335 intTy))
+            _ -> fail "FAIL: native proof case interface shape changed"
         case iface of
             IfaceDepFunTy (multiplicity, name, domain) body -> do
                 missing <- roundtrip NormalCompression (IfaceTermVar (mkIfLclName (fsLit "missing")))
@@ -637,6 +919,18 @@ runChecks dflags = do
     let cyclic = setIdUnfolding host (unfolding (Let (NonRec cyclic trueExpr) (Var cyclic)))
     cycleResult <- timeout 2000000 (evaluate (hasNativeDependentProgram [NonRec cyclic trueExpr] []))
     check "scanner terminates on cyclic bound metadata" (cycleResult == Just False)
+    let poisonedUnfolding = setIdUnfolding host (unfolding (error "forced nested unfolding metadata"))
+        poisonedRules = setIdSpecialisation host (RuleInfo (error "forced nested rule metadata") emptyDVarSet)
+    forM_ [poisonedUnfolding, poisonedRules] $ \poisoned -> do
+        check
+            "own-RHS scan leaves nested metadata deferred"
+            (not (hasNativeDependentExprRhs (Let (NonRec poisoned trueExpr) (Var poisoned))))
+        check
+            "own-RHS scan still detects native annotations"
+            (hasNativeDependentExprRhs (Let (NonRec poisoned trueExpr) worker))
+    let ordinaryPoisonedRhs = Let (NonRec poisonedUnfolding trueExpr) (Var poisonedUnfolding)
+        ordinaryPoisonedTemplate = uf_tmpl (mkCoreUnfolding VanillaSrc False ordinaryPoisonedRhs (Just (UnfoldingCache False False False False)) UnfNever)
+    check "unfolding construction skips unstable nested metadata" (not (hasNativeDependentExprRhs ordinaryPoisonedTemplate))
     rejectNativeDependentExpr "ordinary smoke" (Lam b (Var b))
     rejectsUnsupported "native expression boundary gate" "native smoke" $
         rejectNativeDependentExpr "native smoke" worker
@@ -953,5 +1247,10 @@ runCaseChecks dflags = do
     check "scanner detects literal-only virtual proof binders" (hasNativeDependentExpr literalCase)
     check "scanner still detects runtime-index case proofs" (hasNativeDependentExpr nativeCase)
     let literalProofAlt = Alt (DataAlt trueDataCon) [proof 24 trueIndex trueIndex] (Var payload)
-    rejectsWith "interfaces reject literal-only Boolean proof alternatives" "native Boolean proof interfaces are not implemented" $
-        evaluate (toIfaceAlt literalProofAlt)
+    check "interfaces encode one Boolean proof name" $ case toIfaceAlt literalProofAlt of
+        IfaceAlt (IfaceDataAlt _) [_] _ -> True
+        _ -> False
+    rejectsWith "interface writer rejects extra Boolean proof binders" "toIfaceAlt: invalid native Boolean proof binder" $
+        evaluate (toIfaceAlt (Alt (DataAlt trueDataCon) [trueProof, falseProof] (Var payload)))
+    rejectsWith "interface writer rejects a Boolean payload binder" "toIfaceAlt: invalid native Boolean proof binder" $
+        evaluate (toIfaceAlt (Alt (DataAlt trueDataCon) [payload] (Var payload)))
