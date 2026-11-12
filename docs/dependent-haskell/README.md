@@ -26,9 +26,11 @@ Last updated: 2026-11-12.
 | Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
 | Execution | Native Core and source composition pass the checked bytecode entry; source composition also runs as machine code |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
+| Native interfaces | Scoped signature codec implemented; matching rebuild and cross-module execution checks are in progress |
+| Configured fork version | `10.1.20261112.1`, with interface header `1001202611121` |
 | Source syntax | `ExperimentalDependentTypes` checks one explicit retained Boolean binder; unsupported source positions report GHC-43582 |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | Native interface encoding and cross-module calls in M8; source `case` and broader M6 work remain open |
+| Next task | Validate native signatures across modules in M8; native unfoldings, source `case`, and broader M6 work remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -54,8 +56,9 @@ errors, and boundary gates. It also checks `Select True = Int`,
 `Select False = Bool`, shared-index composition, branch casts, and forged proofs.
 
 The restricted frontend produces native Core for local retained functions. The
-ordinary optimizer and native interface serialization remain gated. Program
-compilation has an explicit checked entry for ordinary exported types.
+ordinary optimizer and native unfolding serialization remain gated. Program
+compilation has an explicit checked entry for native signatures and ordinary
+exported types. Signature validation is in progress below.
 There is no performance measurement for the changed type traversals.
 
 ## Native execution
@@ -331,11 +334,29 @@ The ignored verification scripts are `build.sh`, `native-program-runtime.sh`,
 `_build/verification/`. The executable checks use the native code generator.
 The full testsuite, documentation build, and performance checks have not run.
 
-Native top-level signatures and unfoldings remain gated until interface support.
+That increment kept native top-level signatures gated. The signature increment
+below removes that gate; native unfoldings remain unsupported.
 Profiling, plugins, non-object module backends, and optimized module options
 remain unsupported. Native-containing `INLINE`, `INLINABLE`, and class-default
 unfoldings reject before desugaring can invoke ordinary optimization. Omitting
 interface pragmas alone does not prevent those calls.
+
+## Native interface signatures
+
+The signature codec uses local interface Id binders and names, then reconstructs
+fresh runtime identities on import. It has binary round-trip checks at all three
+compression levels. A separate executable fixture imports a producer `.hi` in a
+fresh one-shot compiler context and links its `.o`. Its consumer composes imported
+`choose` and `keep` with one runtime Boolean and repeats the six program
+observations above. Native expression unfoldings remain gated.
+
+`VERSION_DATE` pins the fork to `10.1.20261112.1`. Its header version is
+`1001202611121`, distinct from the previous `100120261109`. Matching libraries
+must be rebuilt. The preserved old reader accepts its old-format control file
+with both `CheckHiWay` and `IgnoreHiWay`. The new version's default both-stage
+build and runtime verification are in progress. See the scoped representation
+in [Core](CORE.md#native-interface-signatures) and the
+[Agda provenance](REFERENCES.md#agda-provenance).
 
 ## Verified baseline
 

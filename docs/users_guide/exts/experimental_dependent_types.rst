@@ -15,8 +15,9 @@ This flag is local to the retained Boolean experiment.
 This extension is disabled by default. It enables ``foreach`` in types and
 checks a restricted subset of explicit value signatures. The experiment uses a
 native dependent Core representation. The restricted module path supports
-ordinary exported types and local retained functions. Native top-level signatures
-and interface serialization remain unsupported. The regression harness also
+native top-level signatures and local retained functions. Interfaces encode
+retained binders with scoped local Id names. Native expression unfoldings remain
+unsupported. The regression harness also
 executes checked local declarations through a native bytecode entry.
 
 The syntax retains a value argument whose identity can occur in the
@@ -61,13 +62,17 @@ positions report GHC-43582.
 Refinement in source ``case`` expressions remains unimplemented. The constructor
 rule currently applies to function equations.
 
-To compile an ordinary executable, keep retained functions local and use
+To compile an ordinary executable, use
 ``-O0 -fomit-interface-pragmas -fno-write-if-simplified-core``. The restricted
 module pipeline forces Core Lint and STG Lint. Profiling, plugins, non-object
 module backends, and optimized module options remain unsupported.
 Native-containing ``INLINE``, ``INLINABLE``, and class-default unfoldings also
 remain unsupported. Their current builders run ordinary optimization during
 desugaring.
+
+This fork uses interface version ``1001202611121`` from the configured compiler
+version ``10.1.20261112.1``. Rebuild matching libraries and packages with this
+compiler. The whole-file version check rejects interfaces from the old format.
 
 The extension implies no other extensions. In particular, it does not imply
 :extension:`KindSignatures`. The ``:: Bool`` annotation specifies the

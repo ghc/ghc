@@ -290,7 +290,7 @@ runtime binders and occurrences through the interface's local Id environment,
 not its TyVar environment. Preserve existing DataKinds constructor encoding.
 Reconstruct Boolean alternative proofs from the scrutinee and constructor, then
 check the resulting Core. New type tags require an explicit format distinction:
-the current decoder treats unknown tags as literals, and the header version does
+the original decoder treated unknown tags as literals, and the header version does
 not identify a source commit. Check real file round trips in fresh processes,
 fingerprints, malformed scope/proof rejection, and cross-module execution.
 

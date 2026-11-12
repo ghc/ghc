@@ -256,6 +256,37 @@ binary execution. It verifies one object file and six runtime observations.
 No Core expression is extracted for this phase. A source-to-executable check
 does not establish cross-module native types or ordinary optimizer safety.
 
+## Native interface signatures
+
+`IfaceDepFunTy` stores an `IfaceIdBndr` and a body. `IfaceTermVar` stores an
+`IfLclName` in the local Id namespace. The binder's domain and multiplicity are
+outside its scope. `bindIfaceId` allocates a fresh Id and extends the environment
+for the body. The decoder checks each binder and occurrence against Bool/Many,
+and requires result kind `Type`. `Constraint` has a lifted representation but
+does not satisfy this result rule. Core Lint, validity checking, and lambda type
+construction use the same exact kind check.
+
+Tidy types before conversion. Distinct nested binders must have distinct local
+spellings. Binary sharing compares this named syntax; it does not compare raw
+Uniques or establish alpha equivalence. `IfaceFreeTermVar` preserves raw free Ids
+for diagnostics and cannot be serialized or imported. The ordinary printer-only
+interface substitution still excludes binders. It does not become a general
+capture-avoiding substitution in this increment.
+
+Tags 10 and 11 encode the retained function and runtime index. Tag 9 remains
+the ordinary type literal. Unknown tags fail with an IO error. The configured
+fork version is `10.1.20261112.1`, with interface header `1001202611121`.
+The existing whole-file version check runs before type decoding, including for
+`IgnoreHiWay`. Rebuild matching libraries when moving from the old format.
+Native expression unfoldings and virtual alternative proofs remain gated.
+
+The regression uses the real binary tables at all three compression levels.
+The executable fixture compiles a producer, then imports only its `.hi` in a
+fresh one-shot context. The producer source is outside the consumer import path.
+It compiles the consumer separately and links both objects. Validation of this
+increment is in progress. The Agda provenance is recorded in
+[the references](REFERENCES.md#agda-provenance).
+
 ## Scoped native SimpleOpt
 
 This increment passed the Core API and bytecode regressions at `0bbc32d396`.

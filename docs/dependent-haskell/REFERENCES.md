@@ -103,6 +103,24 @@ uses total, effect-free semantics to justify erased-lambda eta contraction.
 That assumption does not cover a relevant lazy Haskell Boolean. Keep the
 separate Haskell `seq` and bottom observations below.
 
+The signature interface representation also has a direct Agda comparison.
+Agda's [internal syntax](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs#L204-L245)
+represents variables with de Bruijn indices and dependent functions with `Pi`
+and `Abs`. Its [serializer](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Serialise/Instances/Internal.hs#L97-L133)
+keeps the variable index, domain, body, and distinction between `Abs` and
+`NoAbs`. This preserves the binding structure on disk. GHC instead uses its
+existing lexical interface names and local Id environment. Import allocates a
+fresh Id for each retained binder and resolves its body occurrences there.
+No raw Id Unique enters the new wire format. Tidy nested binders before
+conversion so their local spellings remain distinct.
+
+Agda's [interface version policy](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Serialise.hs#L9-L14)
+requires a version change when serialization changes. The fork uses GHC's
+existing whole-file version check with the explicit configured snapshot
+`10.1.20261112.1`. Unknown type tags also fail explicitly. Neither the Agda
+codec nor its version check proves that arbitrary decoded terms are well scoped.
+GHC's new decoder checks its Bool/Many binders and index lookups separately.
+
 The frontend must preserve these identities through parsing, checking, and
 desugaring. RequiredTypeArguments provides erased type arguments. It cannot
 implement the retained rule by renaming `foreach` to `forall`. See the
