@@ -31,4 +31,5 @@ program indexed payload control bottom (dictionary WHNF): forced
 program choose bottom: raised native-bottom-bool
 program rejection checks: ok
 module execution checks: ok
+module fingerprint/recompilation checks: ok
 native-core-run-ok

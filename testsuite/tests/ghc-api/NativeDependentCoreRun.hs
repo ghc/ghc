@@ -26,27 +26,29 @@ import GHC.Data.FastString (fsLit)
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Driver.Backend (backendWritesFiles)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
-import GHC.Driver.DynFlags (DynFlags (..), ExecutableLinkMode (Dynamic), GhcLink (LinkExecutable, NoLink), GhcMode (OneShot), gopt_set)
-import GHC.Driver.Env (HscEnv, hscInterp)
+import GHC.Driver.DynFlags (DynFlags (..), ExecutableLinkMode (Dynamic), GhcLink (LinkExecutable, NoLink), GhcMode (OneShot), gopt_set, targetProfile)
+import GHC.Driver.Env (HscEnv, hscInterp, hsc_NC)
 import GHC.Driver.Flags (GeneralFlag (Opt_ExternalInterpreter))
 import GHC.Driver.Main (hscCompileCoreExpr, hscSimplify)
 import GHC.Driver.Phases (Phase (StopLn), StopPhase (NoStop))
 import GHC.Driver.Pipeline (compileFile, oneShot)
 import GHC.Driver.Ppr (showSDoc)
+import GHC.Iface.Binary (CheckHiWay (CheckHiWay), TraceBinIFace (QuietBinIFace), readBinIface)
 import GHC.Runtime.Interpreter (evalString)
 import GHC.Types.Error (Diagnostic (diagnosticCode), DiagnosticCode (..), MsgEnvelope (..), getMessages, pprDiagnostic)
 import GHC.Types.Id
 import GHC.Types.Name (mkSystemName, nameOccName)
 import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc, occNameString)
-import GHC.Types.SourceError (srcErrorMessages)
+import GHC.Types.SourceError (SourceError, srcErrorMessages)
 import GHC.Types.SrcLoc (isGoodSrcSpan, noLoc, noSrcSpan)
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
 import GHC.Unit.Module.ModGuts (ModGuts (mg_binds))
+import GHC.Unit.Module.ModIface (mi_hash_fn, mi_mod_hash)
 import GHC.Unit.Types (mainUnit, mkModule, mkModuleName)
 import GHC.Utils.Outputable (vcat)
 import GHC.Utils.Panic (GhcException (..))
-import System.Directory (createDirectoryIfMissing, doesFileExist, makeAbsolute)
+import System.Directory (createDirectoryIfMissing, doesFileExist, getModificationTime, makeAbsolute, setModificationTime)
 import System.Environment (getArgs)
 import System.Exit (ExitCode (..))
 import System.FilePath (replaceExtension, (</>))
@@ -62,6 +64,7 @@ main = do
             GHC.runGhc (Just libdir) runChecks
             runProgramChecks libdir
             runModuleChecks libdir
+            runRecompilationChecks libdir
             putStrLn "native-core-run-ok"
         _ -> fail "Usage: NativeDependentCoreRun GHC_LIBDIR"
 
@@ -311,6 +314,142 @@ runModuleChecks libdir = do
     unless (status == ExitSuccess && lines actual == ["42", "False", "forced", "42", "forced", "raised native-bottom-bool"]) $
         fail ("FAIL: native cross-module observations: " ++ show (status, actual, errors))
     putStrLn "module execution checks: ok"
+
+{- Note [Retained signature recompilation checks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The consumer imports choose and keep without naming Select. A change to Select
+must change both retained declarations' fingerprints and invalidate the consumer.
+See Note [Fingerprinting IfaceDecls] in GHC.Iface.Recomp. Rebuilding with fresh
+runtime Ids and changing only a function body must preserve the signature ABI.
+
+Use fresh one-shot contexts and disk interfaces. The consumer recompiles without
+-fforce-recomp. Set its object and interface timestamps to an earlier value,
+after its source timestamp, so an unchanged timestamp proves that GHC skipped
+code generation even on a filesystem with coarse timestamp resolution.
+-}
+
+-- | Check retained signature fingerprints and incremental consumer recompilation.
+runRecompilationChecks :: FilePath -> IO ()
+runRecompilationChecks libdir = do
+    directory <- makeAbsolute "NativeDependentCoreRun.recompilation"
+    let producerDirectory = directory </> "producer"
+        consumerDirectory = directory </> "consumer"
+        artifacts = directory </> "artifacts"
+        producerSource = producerDirectory </> "NativeRetainedLibrary.hs"
+        consumerSource = consumerDirectory </> "NativeRetainedUsage.hs"
+        consumerInterface = artifacts </> "NativeRetainedUsage.hi"
+        configure forceRecomp = do
+            flags <- GHC.getSessionDynFlags
+            logger <- GHC.getLogger
+            (configured, leftovers, _) <-
+                GHC.parseDynamicFlags logger flags
+                    $ map noLoc
+                    $ [ "-O0"
+                      , "-fasm"
+                      , "-fomit-interface-pragmas"
+                      , "-fno-write-if-simplified-core"
+                      , "-dcore-lint"
+                      , "-dstg-lint"
+                      , "-v0"
+                      , "-odir"
+                      , artifacts
+                      , "-hidir"
+                      , artifacts
+                      ]
+                        ++ ["-fforce-recomp" | forceRecomp]
+            unless (null leftovers) (fail "FAIL: native recompilation flags were not parsed")
+            void $
+                GHC.setSessionDynFlags
+                    configured{ghcMode = OneShot, ghcLink = NoLink, importPaths = [artifacts]}
+            GHC.getSession
+        compile environment source = do
+            result <- compileFile environment NoStop (source, Nothing)
+            case result of
+                Just object -> pure object
+                Nothing -> fail ("FAIL: native recompilation produced no object: " ++ source)
+        producer source = do
+            writeFile producerSource source
+            GHC.runGhc (Just libdir) $ do
+                environment <- configure True
+                flags <- GHC.getSessionDynFlags
+                liftIO $ do
+                    void $ compile environment producerSource
+                    readBinIface (targetProfile flags) (hsc_NC environment) CheckHiWay QuietBinIFace $
+                        artifacts </> "NativeRetainedLibrary.hi"
+        consumer forceRecomp = GHC.runGhc (Just libdir) $ do
+            environment <- configure forceRecomp
+            liftIO $ compile environment consumerSource
+        signatureHashes interface =
+            mapM
+                ( \name -> case mi_hash_fn interface (mkVarOcc name) of
+                    Just (_, hash) -> pure hash
+                    Nothing -> fail ("FAIL: retained interface has no fingerprint for " ++ name)
+                )
+                ["choose", "keep", "keepIndependent"]
+        changeBody line
+            | line == "choose True = 42" = "choose True = 43"
+            | otherwise = line
+        changeFamily line = case line of
+            "  Select True = Int" -> "  Select True = Bool"
+            "choose True = 42" -> "choose True = True"
+            "observe True n = show (n :: Int)" -> "observe True n = show (n :: Bool)"
+            _ -> line
+    forM_ [producerDirectory, consumerDirectory, artifacts] $ createDirectoryIfMissing True
+    writeFile consumerSource $
+        unlines
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes #-}"
+            , "module NativeRetainedUsage where"
+            , "import NativeRetainedLibrary (choose, keep)"
+            , "use :: Int"
+            , "use = keep True (choose True)"
+            ]
+    original <- producer retainedLibrarySource
+    originalHashes <- signatureHashes original
+    consumerObject <- consumer True
+    rebuilt <- producer retainedLibrarySource
+    rebuiltHashes <- signatureHashes rebuilt
+    unless (mi_mod_hash rebuilt == mi_mod_hash original && rebuiltHashes == originalHashes) $
+        fail "FAIL: fresh retained binder identities changed the signature ABI"
+    -- These times precede the generated files and differ by a full day.
+    let sourceTime = read "2000-01-01 00:00:00 UTC"
+        objectTime = read "2000-01-02 00:00:00 UTC"
+    setModificationTime consumerSource sourceTime
+    forM_ [consumerObject, consumerInterface] $ \path -> setModificationTime path objectTime
+    let checkSkipped = do
+            void $ consumer False
+            forM_ [consumerObject, consumerInterface] $ \path -> do
+                actual <- getModificationTime path
+                unless (actual == objectTime) $
+                    fail ("FAIL: unchanged native dependency recompiled consumer: " ++ path)
+    checkSkipped
+    bodyChanged <- producer $ unlines $ map changeBody $ lines retainedLibrarySource
+    bodyHashes <- signatureHashes bodyChanged
+    unless (mi_mod_hash bodyChanged == mi_mod_hash original && bodyHashes == originalHashes) $
+        fail "FAIL: an omitted retained function body changed the signature ABI"
+    checkSkipped
+    familyChanged <- producer $ unlines $ map changeFamily $ lines retainedLibrarySource
+    changedHashes <- signatureHashes familyChanged
+    case (originalHashes, changedHashes) of
+        ([chooseHash, keepHash, independentHash], [chooseHash', keepHash', independentHash'])
+            | mi_mod_hash familyChanged /= mi_mod_hash original
+            , chooseHash /= chooseHash'
+            , keepHash /= keepHash'
+            , independentHash == independentHash' ->
+                pure ()
+        _ -> fail "FAIL: retained signature fingerprints did not track their family dependency"
+    result <- try (consumer False) :: IO (Either SourceError FilePath)
+    case result of
+        Right _ -> fail "FAIL: stale native consumer was not rechecked after a family change"
+        Left exception -> do
+            flags <- GHC.runGhc (Just libdir) GHC.getSessionDynFlags
+            let messages = bagToList (getMessages (srcErrorMessages exception))
+                matches envelope =
+                    diagnosticCode (errMsgDiagnostic envelope) == Just (DiagnosticCode "GHC" 83865)
+                        && isGoodSrcSpan (errMsgSpan envelope)
+                        && all (`isInfixOf` showSDoc flags (pprDiagnostic (errMsgDiagnostic envelope))) ["Int", "Bool", "choose"]
+            unless (any matches messages) $
+                fail ("FAIL: stale native consumer has the wrong diagnostic: " ++ showSDoc flags (vcat (map (pprDiagnostic . errMsgDiagnostic) messages)))
+    putStrLn "module fingerprint/recompilation checks: ok"
 
 -- | Compile a source module, link its object code, and run the binary.
 runProgramChecks :: FilePath -> IO ()
