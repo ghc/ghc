@@ -23,6 +23,7 @@ import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Errors.Types
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- performs delicate algorithm on types
 import GHC.Core.TyCo.FVs( univCoDepsDeepCoVars, univCoDepsHasHoles
@@ -657,9 +658,10 @@ rewrite_one ty
   = rewrite_one ty'
 
 rewrite_one ty@(TermVarTy {})
-  = pprPanic "rewrite_one: unsupported runtime index" (ppr ty)
+  = do { role <- getRole
+       ; return $! mkReflRedn role ty }
 rewrite_one ty@(DepFunTy {})
-  = pprPanic "rewrite_one: unsupported retained function" (ppr ty)
+  = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
 
 rewrite_one xi@(LitTy {})
   = do { role <- getRole

@@ -162,6 +162,13 @@ zonkEqTypes ev eq_rel ty1 ty2
     go (TyVarTy tv1) ty2           = tyvar NotSwapped tv1 ty2
     go ty1 (TyVarTy tv2)           = tyvar IsSwapped  tv2 ty1
 
+    -- No index reduction or retained-function congruence is needed here.
+    -- See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+    go ty1@(TermVarTy v1) (TermVarTy v2)
+      | v1 == v2 = return (Right ty1)
+    go ty1@DepFunTy{} ty2@DepFunTy{}
+      | ty1 `tcEqType` ty2 = return (Right ty1)
+
     -- We handle FunTys explicitly here despite the fact that they could also be
     -- treated as an application. Why? Well, for one it's cheaper to just look
     -- at two types (the argument and result types) than four (the argument,

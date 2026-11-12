@@ -4,6 +4,7 @@ module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
   , TcRnMessageOpts(..)
+  , RetainedQuantificationError(..)
   , mkTcRnUnknownMessage
   , TcRnMessageDetailed(..), ErrInfo(..)
   , TypeDataForbids(..)
@@ -4089,9 +4090,11 @@ data TcRnMessage where
                                -> TcRnMessage
 
   {-| TcRnRetainedQuantificationNotImplemented rejects retained quantification
-      before source typechecking is implemented.
+      in unsupported source type positions.
   -}
   TcRnRetainedQuantificationNotImplemented :: TcRnMessage
+
+  TcRnRetainedQuantificationError :: RetainedQuantificationError -> TcRnMessage
 
   {-| TcRnInvalidRecordField is an error indicating that a record field was
     used that doesn't exist in a constructor.
@@ -5301,6 +5304,29 @@ data BootMismatchWhat
                          !TyCon -- ^ real 'TyCon'
                          !(NE.NonEmpty BootTyConMismatch)
   deriving Generic
+
+-- | Explain a restriction of source retained Boolean quantification.
+data RetainedQuantificationError
+  = RetainedBinderCount
+  | RetainedBinderNeedsName
+  | RetainedBinderNeedsType
+  | RetainedDomainNotBool Type
+  | RetainedResultKind Type
+  | RetainedSolverType Type
+  | RetainedQuickLook Type
+  | RetainedConstraintType Type
+  | RetainedPragma
+  | RetainedInference Type
+  | RetainedInvalidBinder Id
+  | RetainedIndexOutOfScope Id
+  | RetainedPartialSignature
+  | RetainedPolymorphicSignature
+  | RetainedUnsupportedContext
+  | RetainedStaging
+  | RetainedMultipleEquations
+  | RetainedVariablePattern
+  | RetainedResultWrapper
+  | RetainedIndexExpression
 
 -- | An error in the implementation of an abstract datatype using
 -- a type synonym.

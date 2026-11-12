@@ -1903,7 +1903,9 @@ instance Diagnostic TcRnMessage where
              KindLevel -> text "kind"
     TcRnRetainedQuantificationNotImplemented
       -> mkSimpleDecorated $
-         text "Typechecking of retained quantification is not implemented yet."
+         text "Retained quantification is not supported in this type position yet."
+    TcRnRetainedQuantificationError reason
+      -> mkSimpleDecorated $ pprRetainedQuantificationError reason
     TcRnInvalidRecordField con field
       -> mkSimpleDecorated $
          hsep [text "Constructor" <+> quotes (ppr con),
@@ -2686,6 +2688,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnRetainedQuantificationNotImplemented{}
       -> ErrorWithoutFlag
+    TcRnRetainedQuantificationError{}
+      -> ErrorWithoutFlag
     TcRnInvalidRecordField{}
       -> ErrorWithoutFlag
     TcRnTupleTooLarge{}
@@ -3433,6 +3437,8 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.TypeApplications]
     TcRnRetainedQuantificationNotImplemented{}
       -> noHints
+    TcRnRetainedQuantificationError{}
+      -> noHints
     TcRnInvalidRecordField{}
       -> noHints
     TcRnTupleTooLarge{}
@@ -3519,6 +3525,56 @@ instance Diagnostic TcRnMessage where
       -> noHints
 
   diagnosticCode = constructorCode @GHC
+
+-- | Print the checked restriction that prevents retained source elaboration.
+pprRetainedQuantificationError :: RetainedQuantificationError -> SDoc
+pprRetainedQuantificationError reason = case reason of
+  RetainedBinderCount ->
+    text "Retained quantification currently requires exactly one argument."
+  RetainedBinderNeedsName ->
+    text "A retained argument requires a variable name."
+  RetainedBinderNeedsType ->
+    text "A retained argument requires an explicit domain type."
+  RetainedDomainNotBool ty ->
+    vcat [ text "A retained argument must have type" <+> quotes (text "Bool")
+         , text "Its declared domain is:" <+> ppr ty ]
+  RetainedResultKind ty ->
+    vcat [ text "The result of retained quantification must have kind" <+> quotes (text "Type")
+         , text "The result type is:" <+> ppr ty ]
+  RetainedSolverType ty ->
+    vcat [ text "Constraint solving for this retained function type is not supported yet:"
+         , ppr ty ]
+  RetainedQuickLook ty ->
+    vcat [ text "Quick Look inference does not support this retained type yet:"
+         , ppr ty ]
+  RetainedConstraintType ty ->
+    vcat [ text "Only reflexive Boolean equality constraints can depend on a retained index yet:"
+         , ppr ty ]
+  RetainedPragma ->
+    text "Optimisation pragmas for retained functions are not supported yet."
+  RetainedInference ty ->
+    vcat [ text "This inferred retained type requires an explicit signature:"
+         , ppr ty ]
+  RetainedInvalidBinder var ->
+    text "A retained index must be a local, unrestricted Boolean:" <+> ppr var
+  RetainedIndexOutOfScope var ->
+    text "The runtime index" <+> quotes (ppr var) <+> text "is out of scope here."
+  RetainedPartialSignature ->
+    text "Retained quantification requires a complete type signature."
+  RetainedPolymorphicSignature ->
+    text "Polymorphic retained signatures are not supported yet."
+  RetainedUnsupportedContext ->
+    text "Retained quantification is supported only at the start of an explicit value signature."
+  RetainedStaging ->
+    text "Retained quantification in Template Haskell quotations or splices is not supported yet."
+  RetainedMultipleEquations ->
+    text "A retained function currently requires exactly one equation."
+  RetainedVariablePattern ->
+    text "The retained argument currently requires a bare variable pattern."
+  RetainedResultWrapper ->
+    text "This result requires a wrapper that is not supported for retained functions yet."
+  RetainedIndexExpression ->
+    text "A retained argument must be a Boolean constructor or a local Boolean variable."
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
 pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $

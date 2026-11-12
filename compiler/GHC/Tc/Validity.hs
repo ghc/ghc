@@ -30,7 +30,7 @@ import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint ( userTypeError_maybe )
-import GHC.Tc.Utils.Env (tcLookupId)
+import GHC.Tc.Utils.Env (tcLookupId, tcLookupLcl_maybe)
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Zonk.TcType
@@ -412,7 +412,8 @@ checkValidType ctxt ty
        ; env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
-                             , ve_rank = rank, ve_expand = expand }
+                             , ve_rank = rank, ve_expand = expand
+                             , ve_indices = emptyVarSet }
 
        -- Check the internal validity of the type itself
        -- Fail if bad things happen, else we misleading
@@ -435,7 +436,8 @@ checkValidMonoType ty
   = do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = SigmaCtxt
-                             , ve_rank = MustBeMonoType, ve_expand = expand }
+                             , ve_rank = MustBeMonoType, ve_expand = expand
+                             , ve_indices = emptyVarSet }
        ; check_type ve ty }
 
 checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()
@@ -446,7 +448,7 @@ checkTySynRhs ctxt ty
          then  when (isConstraintLikeKind actual_kind)
                     (do { dflags <- getDynFlags
                         ; expand <- initialExpandMode
-                        ; check_pred_ty emptyTidyEnv dflags ctxt expand ty })
+                        ; check_pred_ty emptyVarSet emptyTidyEnv dflags ctxt expand ty })
          else addErrTcM ( emptyTidyEnv
                         , TcRnIllegalConstraintSynonymOfKind (tidyType emptyTidyEnv actual_kind)
                         ) }
@@ -727,7 +729,8 @@ data ValidityEnv = ValidityEnv
   { ve_tidy_env :: TidyEnv
   , ve_ctxt     :: UserTypeCtxt
   , ve_rank     :: Rank
-  , ve_expand   :: ExpandMode }
+  , ve_expand   :: ExpandMode
+  , ve_indices  :: VarSet }
 
 instance Outputable ValidityEnv where
   ppr (ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
@@ -746,10 +749,27 @@ check_type :: ValidityEnv -> Type -> TcM ()
 -- Rank is allowed rank for function args
 -- Rank 0 means no for-alls anywhere
 
-check_type _ ty@(TermVarTy {})
-  = pprPanic "check_type: unsupported runtime index" (ppr ty)
-check_type _ ty@(DepFunTy {})
-  = pprPanic "check_type: unsupported retained function" (ppr ty)
+-- See Note [Validity of retained Boolean binders]
+check_type ve (TermVarTy v)
+  = do { unless (isBoolIndexId v) $
+           failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
+       ; unless (v `elemVarSet` ve_indices ve) $
+         do { mb_thing <- tcLookupLcl_maybe (getName v)
+            ; case mb_thing of
+                Just (ATcId { tct_id = v' })
+                  | v == v', isBoolIndexId v' -> return ()
+                _ -> failWithTc $ TcRnRetainedQuantificationError
+                                   (RetainedIndexOutOfScope v) } }
+check_type ve (DepFunTy v body)
+  = do { unless (isBoolIndexId v && not (v `elemVarSet` ve_indices ve)) $
+           failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
+       ; unless (isLiftedTypeKind (typeKind body)) $
+           failWithTc $ TcRnRetainedQuantificationError (RetainedResultKind body)
+       ; check_type (ve { ve_rank = arg_rank }) (varType v)
+       ; check_type (ve { ve_rank = res_rank
+                        , ve_indices = ve_indices ve `extendVarSet` v }) body }
+  where
+    (arg_rank, res_rank) = funArgResRank (ve_rank ve)
 check_type _ (TyVarTy _)
   = return ()
 
@@ -806,7 +826,7 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env
                 -- Reject visible, dependent quantification in the type of a
                 -- term (e.g., `f :: forall a -> a -> Maybe a`)
 
-        ; check_valid_theta env' SigmaCtxt expand theta
+        ; check_valid_theta (ve_indices ve) env' SigmaCtxt expand theta
                 -- Allow     type T = ?x::Int => Int -> Int
                 -- but not   type T = ?x::Int
 
@@ -834,6 +854,20 @@ check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
 
 check_type _ ty@(ForAllTy {}) = pprPanic "check_type" (ppr ty)
 check_type _ ty@(CoercionTy {}) = pprPanic "check_type" (ppr ty)
+
+{- Note [Validity of retained Boolean binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained binder introduces a value argument. Use the ordinary function
+argument and result ranks, and extend the index scope only for its result.
+An index occurrence must refer to that scope or to an already-bound local
+Bool Id in the typechecker environment. Its Id remains unrestricted.
+Preserve this scope when checking nested constraints and their predicates.
+
+The dependent scope follows the function types described in
+docs/dependent-haskell/REFERENCES.md#agda-provenance. This check does not
+evaluate an index. Haskell laziness still applies; see
+docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
+-}
 
 ----------------------------------------
 check_syn_tc_app :: ValidityEnv
@@ -1190,17 +1224,17 @@ checkValidTheta ctxt theta
   = addErrCtxt (ThetaCtxt ctxt theta) $
     do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
        ; expand <- initialExpandMode
-       ; check_valid_theta env ctxt expand theta }
+       ; check_valid_theta emptyVarSet env ctxt expand theta }
 
 -------------------------
-check_valid_theta :: TidyEnv -> UserTypeCtxt -> ExpandMode
+check_valid_theta :: VarSet -> TidyEnv -> UserTypeCtxt -> ExpandMode
                   -> [PredType] -> TcM ()
-check_valid_theta _ _ _ []
+check_valid_theta _ _ _ _ []
   = return ()
-check_valid_theta env ctxt expand theta
+check_valid_theta indices env ctxt expand theta
   = do { dflags <- getDynFlags
        ; traceTc "check_valid_theta" (ppr theta)
-       ; mapM_ (check_pred_ty env dflags ctxt expand) theta }
+       ; mapM_ (check_pred_ty indices env dflags ctxt expand) theta }
 
 -------------------------
 {- Note [Validity checking for constraints]
@@ -1227,11 +1261,11 @@ to avoid requiring language extensions at the use site.  Main example
 We don't want to require ConstraintKinds in module B.
 -}
 
-check_pred_ty :: TidyEnv -> DynFlags -> UserTypeCtxt -> ExpandMode
+check_pred_ty :: VarSet -> TidyEnv -> DynFlags -> UserTypeCtxt -> ExpandMode
               -> PredType -> TcM ()
 -- Check the validity of a predicate in a signature
 -- See Note [Validity checking for constraints]
-check_pred_ty env dflags ctxt expand pred
+check_pred_ty indices env dflags ctxt expand pred
   = do { check_type ve pred
        ; check_pred_help False env dflags ctxt pred }
   where
@@ -1244,7 +1278,8 @@ check_pred_ty env dflags ctxt expand pred
     ve = ValidityEnv{ ve_tidy_env = env
                     , ve_ctxt     = SigmaCtxt
                     , ve_rank     = rank
-                    , ve_expand   = expand }
+                    , ve_expand   = expand
+                    , ve_indices  = indices }
 
 check_pred_help :: Bool    -- True <=> under a type synonym
                 -> TidyEnv
@@ -2066,7 +2101,7 @@ checkValidInstance ctxt hs_type ty = case tau of
 
         ; env0 <- liftZonkM $ tcInitTidyEnv
         ; expand <- initialExpandMode
-        ; check_valid_theta env0 ctxt expand theta
+        ; check_valid_theta emptyVarSet env0 ctxt expand theta
 
         -- The Termination and Coverage Conditions
         -- Check that instance inference will terminate (if we care)

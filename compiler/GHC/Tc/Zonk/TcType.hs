@@ -229,8 +229,9 @@ zonkCo      :: Coercion -> ZonkM Coercion
     zonkTcTypeMapper :: TyCoMapper ZonkM
     zonkTcTypeMapper = TyCoMapper
       { tcm_tyvar = zonkTcTyVar
-      , tcm_termvar = \v -> pprPanic "zonkTcTypeMapper: native term index not implemented" (ppr v)
-      , tcm_termbinder = \v _ -> pprPanic "zonkTcTypeMapper: native dependent binder not implemented" (ppr v)
+      , tcm_termvar = pure . TermVarTy
+      , tcm_termbinder = \v k -> k v
+          -- See Note [Zonking retained Boolean indices]
       , tcm_covar = \cv -> mkCoVarCo <$> zonkTyCoVarKind cv
       , tcm_hole       = zonk_hole
       , tcm_tycobinder = \ tcv _vis k -> zonkTyCoVarKind tcv >>= k
@@ -321,6 +322,7 @@ zonkTyCoVar :: TyCoVar -> ZonkM TcType
 -- Works on TyVars and TcTyVars
 zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
                | isTyVar   tv = mkTyVarTy <$> zonkTyCoVarKind tv
+               | not (isCoVar tv) = return (TermVarTy tv)
                | otherwise    = assertPpr (isCoVar tv) (ppr tv) $
                                 mkCoercionTy . mkCoVarCo <$> zonkTyCoVarKind tv
    -- Hackily, when typechecking type and class decls
@@ -361,6 +363,28 @@ zonkTyCoVarBndrKind (Bndr tv flag) =
 -- | zonkId is used *during* typechecking just to zonk the 'Id''s type
 zonkId :: TcId -> ZonkM TcId
 zonkId id = updateIdTypeAndMultM zonkTcType id
+
+{- Note [Zonking retained Boolean indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained index is a rigid Id with type Bool and multiplicity Many.
+Its metadata has no metavariables. During typechecking, preserve this Id at
+both its binder and its occurrences. Do not default it or turn it into a
+TyVar. The final zonker also preserves the occurrence's prototype Id. Its
+Name and Unique identify the actual runtime binder. Its fixed Bool/Many
+metadata needs no zonking.
+
+Do not look up an index occurrence in the knot-tied Id environment. Zonking
+can inspect the resulting type before the recursive bindings are available.
+Such a lookup can cause cyclic evaluation in fixIO. See Note [The ZonkEnv]
+in GHC.Tc.Zonk.Env. Runtime expression occurrences still use zonkIdOcc.
+The final zonker still extends the binder scope for DepFunTy; see
+zonk_tycomapper in GHC.Tc.Zonk.Type.
+
+This is the restricted dependent binder described in
+docs/dependent-haskell/REFERENCES.md#agda-provenance. The index does not add
+a runtime use. Haskell laziness still governs the retained argument; see
+docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
+-}
 
 zonkCoVar :: CoVar -> ZonkM CoVar
 zonkCoVar = zonkId

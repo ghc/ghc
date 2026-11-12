@@ -1094,10 +1094,9 @@ any_rewritable role tv_pred tc_pred ty
       | otherwise
       = go_tc under_fam bvs rl tc tys
 
-    go _ _ _ ty@(TermVarTy {})
-      = pprPanic "any_rewritable: unsupported runtime index" (ppr ty)
-    go _ _ _ ty@(DepFunTy {})
-      = pprPanic "any_rewritable: unsupported retained function" (ppr ty)
+    go _ _ _ (TermVarTy {}) = False
+    go uf bvs rl (DepFunTy v ty)
+      = go uf bvs NomEq (varType v) || go uf (bvs `extendVarSet` v) rl ty
     go uf bvs rl (TyVarTy tv)        = go_tv uf bvs rl tv
     go _  _    _ (LitTy {})          = False
     go uf bvs rl (AppTy fun arg)     = go uf bvs rl fun || go uf bvs NomEq arg
