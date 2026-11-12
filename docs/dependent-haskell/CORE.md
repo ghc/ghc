@@ -143,7 +143,7 @@ an ordinary function coercion. Reject unsupported coercion construction.
 
 ## Lowering audit for M5
 
-The source audit found these requirements. They are not implemented.
+The source audit found these requirements for the restricted bytecode entry.
 
 | Current function | Required change |
 | --- | --- |
@@ -178,12 +178,23 @@ indices, partial application, eta expansion, and proof-binder cloning. Keep the
 entry gates until this path passes. Then execute and check strict `choose bottom`
 and non-strict `keep bottom` behavior.
 
-`hscCompileCoreExpr` and the interpreter's `evalString` can execute a checked
-`IO String` observation without a host `unsafeCoerce`. That entry currently runs
-ordinary simplification and CorePrep, so it rejects surviving native forms.
-Specializing a closed constructor application and discharging its branch proof
-with reflexivity can provide an execution oracle. It does not demonstrate a
-function that accepts an unknown runtime Boolean.
+`hscCompileCoreExpr` detects native forms and skips ordinary simplification for
+these expressions. It must run Core Lint before and after CorePrep. It must run
+STG Lint before bytecode generation. CorePrep must disable speculative evaluation
+and optional argument arity analysis for this entry. The normal CorePrep entry
+and the program entry keep their rejection gates. JavaScript execution remains
+unsupported. This entry does not enable the ordinary optimizer or interfaces.
+
+The interpreter's `evalString` executes an `IO String` observation without a host
+`unsafeCoerce`. The test must compile the native function before it receives its
+Boolean input. An ordinary IO action supplies the input at execution time.
+Specializing a closed constructor application does not meet this requirement.
+
+Check `keep` at a bottom index without asserting an index equation. A partial
+application of `keepSelect` has function representation even when its index is
+bottom. A fully applied indexed identity can also use a value that has a type
+at every index. Label these observations separately. Do not cast a non-bottom
+`Int` to `Select bottom` to construct the test.
 
 ## Initial validation boundary
 
