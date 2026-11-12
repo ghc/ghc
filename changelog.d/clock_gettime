@@ -1,0 +1,18 @@
+section: rts
+synopsis: The RTS now uses the `clock_gettime` monotonic clock on all POSIX platforms.
+issues: #28119
+mrs: !16968
+description:
+  Having a good monotonic clock source is vital for concurrent programming.
+  Historically platform APIs for high precision monotonic time have not been
+  widely available in a consistent standard form, and GHC was forced to depend
+  on a hodge podge of different APIs (some of which did not even provide
+  monotonic time). POSIX.1-2008 mandated the `clock_gettime` API, and this is
+  now old enough and widely supported enough that the RTS can now use this
+  with the `CLOCK_MONOTONIC` and `CLOCK_REALTIME` clocks for all of its internal
+  timing needs on all POSIX platforms.
+
+  The compatibility implication is that some older POSIX platforms that do not
+  support the POSIX.1-2008 standard will no longer be supported. To the best of
+  our knowledge the main platforms impacted are versions of macOS prior to
+  version 10.12 (released 2016, EOL 2019).
