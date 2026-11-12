@@ -3567,8 +3567,13 @@ pprRetainedQuantificationError reason = case reason of
     text "Retained quantification is supported only at the start of an explicit value signature."
   RetainedStaging ->
     text "Retained quantification in Template Haskell quotations or splices is not supported yet."
-  RetainedMultipleEquations ->
-    text "A retained function currently requires exactly one equation."
+  RetainedConstructorCoverage ->
+    text "A retained constructor match requires one unguarded False equation and one unguarded True equation."
+  RetainedConstructorArguments ->
+    text "Arguments after a retained constructor pattern currently require bare variable patterns and unrestricted multiplicities."
+  RetainedPatternType ty ->
+    vcat [ text "Retained constructor refinement does not support this type yet:"
+         , ppr ty ]
   RetainedVariablePattern ->
     text "The retained argument currently requires a bare variable pattern."
   RetainedResultWrapper ->

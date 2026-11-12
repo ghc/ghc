@@ -25,6 +25,7 @@ module GHC.Tc.Utils.Unify (
 
   -- Various unifications
   uType, unifyType, unifyKind, unifyInvisibleType,
+  tcRetainedBoolCoercion,
   unifyExprType, unifyTypeAndEmit, promoteTcType,
   swapOverTyVars, touchabilityTest, checkTopShape, lhsPriority,
   mightEqualLater,
@@ -60,7 +61,8 @@ module GHC.Tc.Utils.Unify (
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Tc.Errors.Types ( HsCtxt(..) )
+import GHC.Tc.Errors.Types ( HsCtxt(..), TcRnMessage(TcRnRetainedQuantificationError)
+                           , RetainedQuantificationError(RetainedPatternType) )
 import GHC.Tc.Utils.Concrete
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
@@ -83,6 +85,7 @@ import GHC.Tc.Utils.TcMType qualified as TcM
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
+import GHC.Core.DataCon ( promoteDataCon )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep hiding (Refl)
 import GHC.Core.TyCo.FVs
@@ -3623,6 +3626,65 @@ instance Outputable SimpleUnifyResult where
     SUC_CannotUnify -> text "SUC_CannotUnify"
     SUC_NotSure     -> text "SUC_NotSure"
     SUC_CanUnify    -> text "SUC_CanUnify"
+
+-- | Lift a checked Boolean branch proof through a monomorphic type.
+-- See Note [Transport through a retained Boolean index].
+tcRetainedBoolCoercion :: Id -> CoercionN -> TcType -> TcM CoercionN
+tcRetainedBoolCoercion index branch_co original_ty
+  = do { unless (isBoolIndexId index
+                 && coercionRole branch_co == Nominal
+                 && coercionLKind branch_co `eqType` TermVarTy index
+                 && is_bool_constructor (coercionRKind branch_co)) $
+           pprPanic "tcRetainedBoolCoercion: invalid branch proof"
+             (ppr index $$ ppr branch_co $$ ppr original_ty)
+       ; ty <- liftZonkM $ zonkTcType original_ty
+       ; name <- newSysName (mkTyVarOcc "retained")
+       ; let template = mkTyVar name boolTy
+       ; template_ty <- abstract_index (mkTyVarTy template) ty
+       ; let co = liftCoSubstWith Nominal [template] [branch_co] template_ty
+             rhs = substTyWith [template] [coercionRKind branch_co] template_ty
+       ; unless (coercionRole co == Nominal
+                 && coercionLKind co `eqType` ty
+                 && coercionRKind co `eqType` rhs) $
+           pprPanic "tcRetainedBoolCoercion: invalid lifted proof"
+             (ppr co $$ ppr ty $$ ppr rhs)
+       ; return co }
+  where
+    is_bool_constructor ty
+      = ty `eqType` mkTyConTy (promoteDataCon trueDataCon)
+        || ty `eqType` mkTyConTy (promoteDataCon falseDataCon)
+
+    abstract_index template_ty ty
+      | not (anyFreeVarsOfType (== index) ty) = return ty
+      | Just ty' <- coreView ty = abstract_index template_ty ty'
+    abstract_index template_ty (TermVarTy v)
+      | v == index = return template_ty
+    abstract_index template_ty (TyConApp tc tys)
+      = mkTyConApp tc <$> mapM (abstract_index template_ty) tys
+    abstract_index template_ty (AppTy fun arg)
+      = mkAppTy <$> abstract_index template_ty fun
+                <*> abstract_index template_ty arg
+    abstract_index template_ty (FunTy af mult arg res)
+      = FunTy af <$> abstract_index template_ty mult
+                 <*> abstract_index template_ty arg
+                 <*> abstract_index template_ty res
+    abstract_index _ _
+      = failWithTc $ TcRnRetainedQuantificationError (RetainedPatternType original_ty)
+
+{- Note [Transport through a retained Boolean index]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked Boolean constructor pattern provides b ~# True or b ~# False.
+Abstract the free occurrences of b in a monomorphic type to one fresh,
+immutable Bool TyVar. Use liftCoSubstWith to transport that template along
+the branch proof. Existing FC lifting supplies the required congruence.
+The runtime Id remains an Id. The template never enters the checked type.
+
+Keep subtrees that do not depend on b unchanged. Reject dependent foralls,
+retained functions, casts, and coercion types. This adds no retained-function
+congruence, axiom, singleton, or general term evaluation. It follows dependent
+pattern specialization; see docs/dependent-haskell/REFERENCES.md#agda-provenance.
+The caller uses the nominal proof for argument and inverse result casts.
+-}
 
 {- Note [Rigid retained indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

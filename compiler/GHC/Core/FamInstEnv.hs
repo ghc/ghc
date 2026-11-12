@@ -1544,8 +1544,19 @@ normalise_type ty
   = go ty
   where
     go :: Type -> NormM Reduction
-    go ty@(TermVarTy {})
-      = pprPanic "normalise_type: unsupported runtime index" (ppr ty)
+    go ty@(TermVarTy v)
+      -- See Note [Normalising retained Boolean indices].
+      | isBoolIndexId v
+      = do { lc <- getLC
+           ; r <- getRole
+           ; let lty = substTy (lcSubstLeft lc) ty
+                 rty = substTy (lcSubstRight lc) ty
+           ; if lty `eqType` ty && rty `eqType` ty
+             then return $ mkReflRedn r ty
+             else pprPanic "normalise_type: runtime index changed by lifting context"
+                    (ppr ty $$ ppr lty $$ ppr rty) }
+      | otherwise
+      = pprPanic "normalise_type: invalid runtime index" (ppr ty)
     go ty@(DepFunTy {})
       = pprPanic "normalise_type: unsupported retained function" (ppr ty)
     go (TyConApp tc tys) = normalise_tc_app tc tys
@@ -1624,6 +1635,20 @@ normalise_args fun_ki roles args
 
     normalise1 role ty
       = withRole role $ normalise_type ty
+
+{- Note [Normalising retained Boolean indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained Boolean index is a rigid local Id with fixed Bool/Many metadata.
+Preserve that Id and return reflexivity at the current role. Do not inspect
+its unfolding or evaluate its value. Family matching keeps an opaque index
+MaybeApart from either constructor; see Note [Apartness of retained Boolean indices]
+in GHC.Core.Unify. A family application can therefore remain stuck at this index.
+
+NormM starts with an empty lifting context. It extends that context for ordinary
+forall binders, not runtime Ids. Check that both context substitutions preserve
+the index. A nonidentity runtime substitution needs a separate transport rule.
+This case adds no retained-function congruence; DepFunTy remains unsupported.
+-}
 
 normalise_tyvar :: TyVar -> NormM Reduction
 normalise_tyvar tv

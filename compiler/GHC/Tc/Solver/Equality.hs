@@ -8,6 +8,7 @@ module GHC.Tc.Solver.Equality(
 
 
 import GHC.Prelude
+import GHC.Builtin.WiredIn.Types ( trueDataCon, falseDataCon )
 
 import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
@@ -30,7 +31,7 @@ import qualified GHC.Tc.Utils.Monad    as TcM
 import GHC.Core.Type
 import GHC.Core.Predicate
 import GHC.Core.Class
-import GHC.Core.DataCon ( dataConName )
+import GHC.Core.DataCon ( dataConName, promoteDataCon )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
 import GHC.Core.Coercion
@@ -651,13 +652,39 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 ----------------------------
 
 -- (EQNC7) We've rewritten and the types don't match. Give up.
-can_eq_nc _ _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
+can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   = do { traceTcS "can_eq_nc catch-all case" (ppr ps_ty1 $$ ppr ps_ty2)
        ; case eq_rel of -- See Note [Unsolved equalities]
             ReprEq -> finishCanWithIrred ReprEqReason ev
-            NomEq  -> finishCanWithIrred ShapeMismatchReason ev }
+            NomEq | opaque_bool_equality -> finishCanWithIrred IrredShapeReason ev
+                  | otherwise -> finishCanWithIrred ShapeMismatchReason ev }
           -- No need to call canEqSoftFailure/canEqHardFailure because they
           -- rewrite, and the types involved here are already rewritten
+  where
+    -- See Note [Opaque Boolean equalities].
+    opaque_bool_equality = case (ty1, ty2) of
+      (TermVarTy v, ty) -> isBoolIndexId v && is_bool_index ty
+      (ty, TermVarTy v) -> isBoolIndexId v && is_bool_index ty
+      _ -> False
+
+    is_bool_index (TermVarTy v) = isBoolIndexId v
+    is_bool_index ty
+      = ty `eqType` mkTyConTy (promoteDataCon trueDataCon)
+        || ty `eqType` mkTyConTy (promoteDataCon falseDataCon)
+
+{- Note [Opaque Boolean equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A runtime Boolean can equal either constructor or another runtime Boolean.
+Failure to rewrite these exact, well-kinded index forms does not establish
+a contradiction. Retain the equality as a non-insoluble IrredShapeReason.
+This also lets the pattern-match oracle retain a checked constructor proof.
+
+This rule does not solve the equality or rewrite the runtime index. A Given
+remains an inert irreducible equality. addIrredToCans still calls updGivenEqs,
+which records its level and prevents unsafe outer metavariable assignments.
+See Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet and
+Note [Apartness of retained Boolean indices] in GHC.Core.Unify.
+-}
 
 {- Note [Unsolved equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

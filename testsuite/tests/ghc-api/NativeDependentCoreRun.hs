@@ -101,15 +101,52 @@ retainedSelectionSource =
         , "type family Select (b :: Bool) where"
         , "  Select True = Int"
         , "  Select False = Bool"
+        , "type Ignore (b :: Bool) = Int"
         , "entry :: IO String"
         , "entry ="
         , "  let keep :: foreach (b :: Bool) -> Select b -> Select b"
         , "      keep b x = x"
+        , "      f :: foreach (b :: Bool) -> Ignore b -> Int"
+        , "      f True x = x"
+        , "      f False x = x"
         , "  in do t <- observeInt (keep True 42)"
-        , "        f <- observeBool (keep False False)"
+        , "        falseResult <- observeBool (keep False False)"
+        , "        aliasTrue <- observeInt (f True 42)"
+        , "        aliasFalse <- observeInt (f False 42)"
         , "        let b = bottomBool"
         , "        case keep b of"
-        , "          !_ -> pure (t ++ \"\\n\" ++ f ++ \"\\nforced\")"
+        , "          !_ -> pure (t ++ \"\\n\" ++ falseResult ++ \"\\n\" ++ aliasTrue ++ \"\\n\" ++ aliasFalse ++ \"\\nforced\")"
+        ]
+
+-- | Share constructor-refined source workers between runtime observations.
+retainedChooseSource :: String -> String -> String
+retainedChooseSource moduleName observation =
+    unlines
+        [ "{-# LANGUAGE BangPatterns, DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, RankNTypes, TypeFamilies, TypeOperators #-}"
+        , "module " ++ moduleName ++ " where"
+        , "import NativeRuntimeHelpers"
+        , "type family Select (b :: Bool) where"
+        , "  Select True = Int"
+        , "  Select False = Bool"
+        , "entry :: IO String"
+        , "entry ="
+        , "  let choose :: foreach (b :: Bool) -> Select b"
+        , "      choose True = 42"
+        , "      choose False = False"
+        , "      keep :: foreach (b :: Bool) -> Select b -> Select b"
+        , "      keep b x = x"
+        , "      again :: foreach (b :: Bool) -> Select b"
+        , "      again b = keep b (choose b)"
+        , "      observe :: foreach (b :: Bool) -> Select b -> String"
+        , "      observe False p = if p then \"True\" else \"False\""
+        , "      observe True n = show (n :: Int)"
+        , "      forceChosen :: foreach (b :: Bool) -> Select b -> ()"
+        , "      forceChosen b !x = ()"
+        , "      forceIndependent :: foreach (b :: Bool) -> ((b ~ b) => Int) -> ()"
+        , "      forceIndependent b !x = ()"
+        , "      run :: Bool -> IO String"
+        , "      run b = pure (observe b (again b))"
+        , "  in " ++ observation
         ]
 
 -- | Parse an in-memory source target without loading or compiling its bindings.
@@ -161,12 +198,41 @@ runSourceChecks = do
     selectedExpression <- sourceEntry "NativeSourceSelection" retainedSelectionSource
     selectedEnvironment <- GHC.getSession
     selectedActual <- liftIO $ execute selectedEnvironment flags "source keepSelect" selectedExpression
-    unless (lines selectedActual == ["42", "False", "forced"]) $
+    unless (lines selectedActual == ["42", "False", "42", "42", "forced"]) $
         fail ("FAIL: source keepSelect family or laziness observation: " ++ show selectedActual)
     liftIO $ do
         putStrLn "source keepSelect True: 42"
         putStrLn "source keepSelect False: False"
+        putStrLn "source alias True: 42"
+        putStrLn "source alias False: 42"
         putStrLn "source keepSelect bottom (partial WHNF): forced"
+    chosenExpression <- sourceEntry "NativeSourceChoose" (retainedChooseSource "NativeSourceChoose" "driveBoth run")
+    chosenEnvironment <- GHC.getSession
+    chosenActual <- liftIO $ execute chosenEnvironment flags "source keep/choose" chosenExpression
+    unless (lines chosenActual == ["42", "False"]) $
+        fail ("FAIL: source keep/choose with shared runtime indices: " ++ show chosenActual)
+    liftIO $ do
+        putStrLn "source keep/choose True: 42"
+        putStrLn "source keep/choose False: False"
+    controlExpression <-
+        sourceEntry "NativeSourceChooseControl" $
+            retainedChooseSource "NativeSourceChooseControl" "let b = bottomBool in force (forceIndependent b 42)"
+    controlEnvironment <- GHC.getSession
+    controlActual <- liftIO $ execute controlEnvironment flags "source indexed payload control" controlExpression
+    unless (controlActual == "forced") $
+        fail ("FAIL: source indexed payload control forced its Boolean: " ++ show controlActual)
+    liftIO $ putStrLn "source indexed payload control bottom (dictionary WHNF): forced"
+    strictExpression <-
+        sourceEntry "NativeSourceChooseBottom" $
+            retainedChooseSource "NativeSourceChooseBottom" "let b = bottomBool in force (forceChosen b (choose b))"
+    strictEnvironment <- GHC.getSession
+    result <- liftIO $ try (execute strictEnvironment flags "source choose bottom" strictExpression)
+    case result of
+        Left exception
+            | "native-bottom-bool" `isInfixOf` displayException (exception :: SomeException) ->
+                liftIO $ putStrLn "source choose bottom: raised native-bottom-bool"
+            | otherwise -> fail ("FAIL: source choose bottom raised another exception: " ++ displayException exception)
+        Right actual -> fail ("FAIL: source choose bottom returned " ++ show actual)
 
 -- | Require a located source diagnostic, without catching internal failures.
 sourceRejects :: String -> Int -> String -> [String] -> [String] -> GHC.Ghc ()
@@ -222,7 +288,7 @@ runSourceRejectChecks = do
         , ("multiple retained binders", 83605, "exactly one argument", [], local [] "foreach (b :: Bool) (c :: Bool) -> Int -> Int" ["keep b c x = x"] "42")
         , ("partial retained signature", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], local [] "foreach (b :: Bool) -> _a -> _a" identity "42")
         , ("non-variable retained pattern", 83605, "bare variable pattern", [], local [] selection ["keep _ x = x"] "42")
-        , ("multiple retained equations", 83605, "exactly one equation", [], local [] selection (identity ++ identity) "42")
+        , ("multiple variable equations", 83605, "one unguarded False equation", [], local [] selection (identity ++ identity) "42")
         , ("producer expression argument", 83605, "Boolean constructor or a local Boolean variable", [], local [] consumer identity "keep (not False) 42")
         , ("nonreflexive indexed constraint", 83605, "Only reflexive Boolean equality constraints", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
         , ("general indexed constraint", 83605, "Only reflexive Boolean equality constraints", ["FlexibleContexts"], local [] "foreach (b :: Bool) -> (Show (Select b) => Int) -> Int" identity "42")
@@ -249,11 +315,45 @@ runSourceRejectChecks = do
         , ("True payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = True"] "42")
         , ("False payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = False"] "42")
         , ("numeric payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = 42"] "42")
+        , ("swapped constructor results", 83865, "Int", [], local [] chooser ["keep True = False", "keep False = 42"] "42")
+        , ("missing constructor equation", 83605, "one unguarded False equation", [], local [] chooser ["keep True = 42"] "42")
+        , ("duplicate constructor equation", 83605, "one unguarded False equation", [], local [] chooser ["keep True = 42", "keep True = 43"] "42")
+        , ("guarded constructor equation", 83605, "one unguarded False equation", [], local [] chooser ["keep True | True = 42", "keep False = False"] "42")
+        , ("unsupported later constructor argument", 83605, "bare variable patterns and unrestricted multiplicities", [], local [] selection ["keep True _ = 42", "keep False x = x"] "42")
+        , ("linear constructor argument", 83605, "bare variable patterns and unrestricted multiplicities", ["LinearTypes"], local [] "foreach (b :: Bool) -> Select b %1 -> Select b" ["keep True x = x", "keep False x = x"] "42")
+        ,
+            ( "constructor argument with a synonym-hidden forall"
+            , 83605
+            , "Retained constructor refinement does not support this type"
+            , []
+            , ["type Poly (b :: Bool) = forall (a :: Bool). (a ~ b) => Int"]
+                ++ local [] "foreach (b :: Bool) -> Poly b -> Int" ["keep True x = 42", "keep False x = 42"] "42"
+            )
+        ,
+            ( "independent choose and keep indices"
+            , 83865
+            , "second argument"
+            , []
+            ,
+                [ "bad :: Bool -> Bool -> String"
+                , "bad b c ="
+                , "  let choose :: foreach (i :: Bool) -> Select i"
+                , "      choose True = 42"
+                , "      choose False = False"
+                , "      keep :: foreach (i :: Bool) -> Select i -> Select i"
+                , "      keep i x = x"
+                , "      observe :: foreach (i :: Bool) -> Select i -> String"
+                , "      observe True n = show (n :: Int)"
+                , "      observe False p = if p then \"True\" else \"False\""
+                , "  in observe b (keep b (choose c))"
+                ]
+            )
         ]
     liftIO $ putStrLn "source rejection checks: ok"
   where
     identity = ["keep b x = x"]
     selection = "foreach (b :: Bool) -> Select b -> Select b"
+    chooser = "foreach (b :: Bool) -> Select b"
     consumer = "foreach (b :: Bool) -> ((b ~ b) => Int) -> Int"
     local pragmas signature equations body =
         ["entry :: Int", "entry =", "  let"]

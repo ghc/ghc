@@ -5323,7 +5323,9 @@ data RetainedQuantificationError
   | RetainedPolymorphicSignature
   | RetainedUnsupportedContext
   | RetainedStaging
-  | RetainedMultipleEquations
+  | RetainedConstructorCoverage
+  | RetainedConstructorArguments
+  | RetainedPatternType Type
   | RetainedVariablePattern
   | RetainedResultWrapper
   | RetainedIndexExpression

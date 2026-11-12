@@ -15,6 +15,12 @@ source keep False: 42
 source keep bottom (fully applied): 42
 source keepSelect True: 42
 source keepSelect False: False
+source alias True: 42
+source alias False: 42
 source keepSelect bottom (partial WHNF): forced
+source keep/choose True: 42
+source keep/choose False: False
+source indexed payload control bottom (dictionary WHNF): forced
+source choose bottom: raised native-bottom-bool
 source rejection checks: ok
 native-core-run-ok
