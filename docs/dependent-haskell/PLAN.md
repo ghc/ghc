@@ -301,6 +301,20 @@ rejection. Snapshot dates do not distinguish incompatible builds made on the
 same day. Do not use profile tags as schema versions: `IgnoreHiWay` bypasses
 that check. Reject unknown type tags explicitly in the new reader as well.
 
+The signature increment uses `VERSION_DATE` set to `20261112.1`. Configure the
+fork as `10.1.20261112.1`; its existing header version becomes `1001202611121`.
+The final component distinguishes this native format from an ordinary dated
+snapshot. Rebuild matching libraries. Preserve an old reader and interface to
+check both version-mismatch directions, including `IgnoreHiWay`.
+
+Encode a retained binder as `IfaceIdBndr` and its body. Encode index occurrences
+as local Id names. Keep raw free Ids in a diagnostic-only form. Decode the domain
+and multiplicity outside the binder scope, then allocate a fresh Bool/Many Id
+for the body. Require result kind `Type`, not `Constraint`. Test real binary
+round trips with sharing, fresh identities, tidied nested binders, malformed
+scope and annotations, and unknown tags. Keep native unfoldings gated while
+enabling signature-only cross-module calls through the ordinary object ABI.
+
 - [x] Compile and run the source target as an ordinary vanilla executable through
       checked module simplification, tidying, CorePrep, and machine-code lowering.
 - [ ] Encode retained binders, indices, and evidence in interface types, unfoldings,
