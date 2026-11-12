@@ -9,5 +9,5 @@ type family Select (b :: Bool) where
     Select True = Int
     Select False = Bool
 
-keep :: foreach (b :: Bool) -> Select b -> Select b
+keep :: foreach (b :: Int) -> Select b -> Select b
 keep b x = x

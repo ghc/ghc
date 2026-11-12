@@ -23,6 +23,7 @@ import GHC.Tc.Errors.Ppr
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
+import GHC.Tc.Utils.Env ( tcLookupIdMaybe )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
@@ -34,7 +35,10 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Zonk.TcType
 
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys )
+import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys, dataConWorkId )
+import qualified GHC.Core as Core
+import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.Utils ( applyTypeToArgs )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
@@ -43,7 +47,7 @@ import GHC.Core.TyCo.Subst ( substTyWithInScope )
 import GHC.Core.Type
 import GHC.Core.Coercion
 
-import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy )
+import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, boolTy, trueDataCon, falseDataCon )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
@@ -460,9 +464,11 @@ finishApp do_ql rn_expr fun_loc rn_fun tc_fun inst_args
          --           instantiation variables in `app_res_rho`
          app_res_rho <- case do_ql of
            NoQL -> return app_res_rho
-           DoQL -> liftZonkM $
-                   do { qlMonoInstArgs inst_args
-                      ; zonkTcType app_res_rho }
+           DoQL -> do { rejectNativeQuickLook app_res_rho
+                      ; setSrcSpan fun_loc $ rejectNativeQLInstArgs inst_args
+                      ; liftZonkM $
+                        do { qlMonoInstArgs inst_args
+                           ; zonkTcType app_res_rho } }
 
          -- Step 5: subsumption check against the expected type
          -- See Note [Unify with expected type before typechecking arguments]
@@ -676,6 +682,9 @@ tcInstFun do_ql inst_final rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
                                    , text "args:" <+> ppr rn_args
                                    , text "do_ql" <+> ppr do_ql
                                    , text "lvl:" <+> ppr lvl ])
+       ; case do_ql of
+           NoQL -> return ()
+           DoQL -> setSrcSpan fun_lspan $ rejectNativeQuickLook fun_sigma
        ; fun_origin <- mk_origin rn_head
        ; res@(_, fun_ty) <- go fun_origin 1 [] fun_sigma rn_args
        ; traceTc "tcInstFun:ret" (ppr fun_ty)
@@ -816,6 +825,15 @@ tcInstFun do_ql inst_final rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
       | otherwise
       = return (reverse acc, fun_ty)
 
+    -- See Note [Retained Boolean application].
+    go1 fun_orig pos acc fun_ty
+        (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
+      | DepFunTy{} <- coreFullView fun_ty
+      = do { core_arg <- tcRetainedBoolArg arg
+           ; arg' <- skipQuickLook ctxt arg (Scaled ManyTy boolTy)
+           ; let body_ty = applyTypeToArgs fun_ty [core_arg]
+           ; go fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
+
     -- Rule ITVDQ from the GHC Proposal #281
     go1 fun_orig pos acc fun_ty ((EValArg { ea_arg = arg }) : rest_args)
       | Just (tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty
@@ -913,6 +931,46 @@ tcInstFun do_ql inst_final rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
            DoStmtOrigin -> ExpectedFunTySyntaxOp DoStmtOrigin tc_fun
            _ -> ExpectedFunTyArg (HsExprTcThing tc_fun) arg
 
+
+-- | Resolve a supported Boolean argument before its ordinary value check.
+tcRetainedBoolArg :: LHsExpr GhcRn -> TcM Core.CoreExpr
+tcRetainedBoolArg (L loc expr)
+  = setSrcSpanA loc $
+    do { arg_id <- case stripParensHsExpr expr of
+           HsVar _ lname
+             | name <- unLocWithUserRdr lname
+             , name `hasKey` trueDataConKey
+             -> return (dataConWorkId trueDataCon)
+             | name <- unLocWithUserRdr lname
+             , name `hasKey` falseDataConKey
+             -> return (dataConWorkId falseDataCon)
+             | otherwise -> do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
+                               ; case mb_id of
+                                   Just arg_id -> return arg_id
+                                   Nothing -> unsupported }
+           _ -> unsupported
+       ; let core_arg = Core.Var arg_id
+       ; case Core.exprToBoolIndex core_arg of
+           Just _ -> return core_arg
+           Nothing -> unsupported }
+  where
+    unsupported :: TcM a
+    unsupported = failWithTc (TcRnRetainedQuantificationError RetainedIndexExpression)
+
+{- Note [Retained Boolean application]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained argument is a value. Resolve a local Boolean Id or an exact Boolean
+constructor worker before instantiating the codomain. applyTypeToArgs uses the
+same index substitution as Core type recovery. Do not use tcVDQ: it translates
+an expression into an erased type argument.
+
+Keep a normal EValArg with expected type Bool. tcValArg checks the value once
+and records its runtime usage. Resolving its Id here does not typecheck or
+evaluate it. Later argument types use that same Id, including a lazy Boolean
+binding whose RHS is bottom. No singleton or separate index witness is added.
+See docs/dependent-haskell/REFERENCES.md#agda-provenance and
+docs/dependent-haskell/CORE.md#laziness-and-eta.
+-}
 
 -- Is the argument supposed to instantiate a forall?
 --
@@ -1891,7 +1949,8 @@ quickLookArg :: QLFlag -> Int
 quickLookArg NoQL _ app_lspan _ larg orig_arg_ty
   = skipQuickLook app_lspan larg orig_arg_ty
 quickLookArg DoQL pos app_lspan fun_and_lspan larg orig_arg_ty
-  = do { is_rho <- qlArgHasRhoType (scaledThing orig_arg_ty)
+  = do { setSrcSpanA (getLoc larg) $ rejectNativeQuickLook (scaledThing orig_arg_ty)
+       ; is_rho <- qlArgHasRhoType (scaledThing orig_arg_ty)
        ; traceTc "qla" (ppr orig_arg_ty $$ ppr is_rho)
        ; if not is_rho
          then skipQuickLook app_lspan larg orig_arg_ty
@@ -2151,7 +2210,8 @@ anyFreeKappa :: TcType -> TcM Bool
 -- in the argument type, after zonking
 -- See Note [The fiv test in quickLookArg]
 -- The function is monadic; it does not require a zonked type as input
-anyFreeKappa ty = unTcMBool (foldQLInstVars go_tv ty)
+anyFreeKappa ty = do { rejectNativeQuickLook ty
+                     ; unTcMBool (foldQLInstVars go_tv ty) }
   where
     go_tv tv = TCMB $ do { info <- readMetaTyVar tv
                          ; case info of
@@ -2197,6 +2257,37 @@ foldQLInstVars check_tv ty
 *                                                                      *
 ********************************************************************* -}
 
+-- | Reject retained types before Quick Look inspects or assigns them.
+rejectNativeQuickLook :: TcType -> TcM ()
+rejectNativeQuickLook ty
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; when enabled $
+         do { ty <- liftZonkM $ zonkTcType ty
+            ; when (hasNativeDependentExpr (Core.Type ty)) $
+                failWithTc (TcRnRetainedQuantificationError (RetainedQuickLook ty)) } }
+
+-- | Check the type arguments that Quick Look will monomorphise.
+rejectNativeQLInstArgs :: [HsExprArg 'TcpInst] -> TcM ()
+rejectNativeQLInstArgs = mapM_ check_arg
+  where
+    check_arg (EWrap (EHsWrap wrap)) = check_wrap wrap
+    check_arg _ = return ()
+
+    check_wrap (WpCompose wrap1 wrap2) = check_wrap wrap1 >> check_wrap wrap2
+    check_wrap (WpTyApp ty) = rejectNativeQuickLook ty
+    check_wrap _ = return ()
+
+{- Note [Retained types and Quick Look]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Quick Look assigns instantiation variables without the ordinary unifier's
+runtime-index escape check. Its instantiation-variable folders do not support
+retained types either. Reject those types before both operations. Zonk first
+so that the check also sees a type behind a filled metavariable. Check the
+WpTyApp inputs before qlMonoInstArgs enters its ZonkM folder.
+This source restriction does not add Quick Look support for retained types.
+See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+-}
+
 qlUnify ::  TcType -> TcType -> TcM ()
 -- Unify ty1 with ty2:
 --   * It unifies /only/ instantiation variables (see (UQL6)), hopefully with polytypes
@@ -2207,7 +2298,9 @@ qlUnify ::  TcType -> TcType -> TcM ()
 --   * It may return without having made the argument types equal, of course;
 --     it just makes best efforts.
 qlUnify ty1 ty2
-  = do { lvl <- getTcLevel
+  = do { rejectNativeQuickLook ty1
+       ; rejectNativeQuickLook ty2
+       ; lvl <- getTcLevel
        ; traceTc "qlUnify" (ppr lvl $$ ppr ty1 $$ ppr ty2)
        ; go ty1 ty2 }
   where

@@ -31,12 +31,15 @@ import GHC.Driver.Flags (GeneralFlag (Opt_ExternalInterpreter))
 import GHC.Driver.Main (hscCompileCoreExpr)
 import GHC.Driver.Ppr (showSDoc)
 import GHC.Runtime.Interpreter (evalString)
+import GHC.Types.Error (Diagnostic (diagnosticCode), DiagnosticCode (..), MsgEnvelope (..), getMessages, pprDiagnostic)
 import GHC.Types.Id
 import GHC.Types.Name (mkSystemName, nameOccName)
 import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc, occNameString)
-import GHC.Types.SrcLoc (noSrcSpan)
+import GHC.Types.SourceError (srcErrorMessages)
+import GHC.Types.SrcLoc (isGoodSrcSpan, noSrcSpan)
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
+import GHC.Unit.Module.ModGuts (ModGuts (mg_binds))
 import GHC.Unit.Types (mainUnit, mkModule, mkModuleName)
 import GHC.Utils.Outputable (vcat)
 import System.Environment (getArgs)
@@ -70,6 +73,194 @@ helperSource =
         , "bottomBool :: Bool"
         , "bottomBool = error \"native-bottom-bool\""
         ]
+
+-- | Check source elaboration with one shared retained worker and lazy indices.
+retainedSource :: String
+retainedSource =
+    unlines
+        [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, RankNTypes, TypeOperators #-}"
+        , "module NativeSourceKeep where"
+        , "import NativeRuntimeHelpers"
+        , "entry :: IO String"
+        , "entry ="
+        , "  let keep :: foreach (b :: Bool) -> ((b ~ b) => Int) -> Int"
+        , "      keep b x = x"
+        , "  in do both <- driveBoth (\\b -> observeInt (keep b 42))"
+        , "        let b = bottomBool"
+        , "        lazy <- observeInt (keep b 42)"
+        , "        pure (both ++ \"\\n\" ++ lazy)"
+        ]
+
+-- | Check a dependent result family and observe a partial application at WHNF.
+retainedSelectionSource :: String
+retainedSelectionSource =
+    unlines
+        [ "{-# LANGUAGE BangPatterns, DataKinds, ExperimentalDependentTypes, KindSignatures, TypeFamilies #-}"
+        , "module NativeSourceSelection where"
+        , "import NativeRuntimeHelpers"
+        , "type family Select (b :: Bool) where"
+        , "  Select True = Int"
+        , "  Select False = Bool"
+        , "entry :: IO String"
+        , "entry ="
+        , "  let keep :: foreach (b :: Bool) -> Select b -> Select b"
+        , "      keep b x = x"
+        , "  in do t <- observeInt (keep True 42)"
+        , "        f <- observeBool (keep False False)"
+        , "        let b = bottomBool"
+        , "        case keep b of"
+        , "          !_ -> pure (t ++ \"\\n\" ++ f ++ \"\\nforced\")"
+        ]
+
+-- | Parse an in-memory source target without loading or compiling its bindings.
+parseSourceTarget :: String -> String -> GHC.Ghc GHC.ParsedModule
+parseSourceTarget moduleName source = do
+    flags <- GHC.getSessionDynFlags
+    now <- liftIO getCurrentTime
+    targets <- GHC.getTargets
+    let target =
+            GHC.Target
+                { GHC.targetId = GHC.TargetFile (moduleName ++ ".hs") Nothing
+                , GHC.targetUnitId = GHC.homeUnitId_ flags
+                , GHC.targetAllowObjCode = False
+                , GHC.targetContents = Just (stringToStringBuffer source, now)
+                }
+    GHC.setTargets (targets ++ [target])
+    void (GHC.depanal [] False)
+    summary <- GHC.getModSummary (mkModule mainUnit (mkModuleName moduleName))
+    GHC.parseModule summary
+
+{- | Extract a closed entry expression before ordinary module optimisation.
+The existing native expression API then checks and lowers that expression.
+-}
+sourceEntry :: String -> String -> GHC.Ghc CoreExpr
+sourceEntry moduleName source = do
+    parsed <- parseSourceTarget moduleName source
+    checked <- GHC.typecheckModule GHC.StartAndKeepRunningTcMPlugins parsed
+    desugared <- GHC.desugarModule checked
+    let bindings = flattenBinds (mg_binds (GHC.coreModule desugared))
+    case find ((== "entry") . occNameString . nameOccName . varName . fst) bindings of
+        Just (entry, expression) ->
+            let dependencies = filter ((/= entry) . fst) bindings
+             in pure $ if null dependencies then expression else Let (Rec dependencies) expression
+        Nothing -> fail "FAIL: source module has no entry binding"
+
+-- | Run retained source code through checking, desugaring, and native lowering.
+runSourceChecks :: GHC.Ghc ()
+runSourceChecks = do
+    expression <- sourceEntry "NativeSourceKeep" retainedSource
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source keep" expression
+    unless (lines actual == ["42", "42", "42"]) $
+        fail ("FAIL: source keep runtime or laziness observation: " ++ show actual)
+    liftIO $ do
+        putStrLn "source keep True: 42"
+        putStrLn "source keep False: 42"
+        putStrLn "source keep bottom (fully applied): 42"
+    selectedExpression <- sourceEntry "NativeSourceSelection" retainedSelectionSource
+    selectedEnvironment <- GHC.getSession
+    selectedActual <- liftIO $ execute selectedEnvironment flags "source keepSelect" selectedExpression
+    unless (lines selectedActual == ["42", "False", "forced"]) $
+        fail ("FAIL: source keepSelect family or laziness observation: " ++ show selectedActual)
+    liftIO $ do
+        putStrLn "source keepSelect True: 42"
+        putStrLn "source keepSelect False: False"
+        putStrLn "source keepSelect bottom (partial WHNF): forced"
+
+-- | Require a located source diagnostic, without catching internal failures.
+sourceRejects :: String -> Int -> String -> [String] -> [String] -> GHC.Ghc ()
+sourceRejects label code fragment extensions declarations = do
+    targets <- GHC.getTargets
+    let moduleName = "NativeSourceRejected"
+        source =
+            unlines $
+                ["{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, RankNTypes, TypeFamilies, TypeOperators #-}"]
+                    ++ map (\extension -> "{-# LANGUAGE " ++ extension ++ " #-}") extensions
+                    ++ [ "module " ++ moduleName ++ " where"
+                       , "type family Select (b :: Bool) where"
+                       , "  Select True = Int"
+                       , "  Select False = Bool"
+                       ]
+                    ++ declarations
+    result <- GHC.handleSourceError (pure . Left) $ do
+        parsed <- parseSourceTarget moduleName source
+        void (GHC.typecheckModule GHC.StartAndStopTcMPlugins parsed)
+        pure (Right ())
+    GHC.setTargets targets
+    case result of
+        Right () -> fail ("FAIL: source accepted " ++ label)
+        Left exception -> do
+            flags <- GHC.getSessionDynFlags
+            let messages = bagToList (getMessages (srcErrorMessages exception))
+                expected = Just (DiagnosticCode "GHC" (fromIntegral code))
+                matches envelope =
+                    diagnosticCode (errMsgDiagnostic envelope) == expected
+                        && isGoodSrcSpan (errMsgSpan envelope)
+                        && fragment `isInfixOf` showSDoc flags (pprDiagnostic (errMsgDiagnostic envelope))
+            unless (any matches messages)
+                $ fail
+                $ "FAIL: source rejection "
+                    ++ label
+                    ++ "; expected "
+                    ++ show expected
+                    ++ " containing "
+                    ++ show fragment
+                    ++ " at a source location; actual codes: "
+                    ++ show (map (diagnosticCode . errMsgDiagnostic) messages)
+                    ++ "; got:\n"
+                    ++ showSDoc flags (vcat (map (pprDiagnostic . errMsgDiagnostic) messages))
+
+-- | Check unsupported source forms without desugaring or starting plugins twice.
+runSourceRejectChecks :: GHC.Ghc ()
+runSourceRejectChecks = do
+    mapM_
+        check
+        [ ("wrong Bool domain", 83605, "must have type", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
+        , ("missing domain annotation", 83605, "explicit domain type", [], local [] "foreach b -> Int -> Int" identity "42")
+        , ("anonymous retained binder", 83605, "requires a variable name", [], local [] "foreach (_ :: Bool) -> Int -> Int" identity "42")
+        , ("multiple retained binders", 83605, "exactly one argument", [], local [] "foreach (b :: Bool) (c :: Bool) -> Int -> Int" ["keep b c x = x"] "42")
+        , ("partial retained signature", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], local [] "foreach (b :: Bool) -> _a -> _a" identity "42")
+        , ("non-variable retained pattern", 83605, "bare variable pattern", [], local [] selection ["keep _ x = x"] "42")
+        , ("multiple retained equations", 83605, "exactly one equation", [], local [] selection (identity ++ identity) "42")
+        , ("producer expression argument", 83605, "Boolean constructor or a local Boolean variable", [], local [] consumer identity "keep (not False) 42")
+        , ("nonreflexive indexed constraint", 83605, "Only reflexive Boolean equality constraints", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
+        , ("general indexed constraint", 83605, "Only reflexive Boolean equality constraints", ["FlexibleContexts"], local [] "foreach (b :: Bool) -> (Show (Select b) => Int) -> Int" identity "42")
+        , ("ImpredicativeTypes", 83605, "Quick Look inference", ["ImpredicativeTypes"], local [] consumer ["keep b x = 42"] "keep True 42")
+        , ("Quick Look through ($)", 83605, "Quick Look inference", [], local [] consumer ["keep b x = 42"] "(keep $ True) 42")
+        , ("INLINE retained function", 83605, "Optimisation pragmas", [], local ["{-# INLINE keep #-}"] selection identity "42")
+        , ("INLINABLE retained function", 83605, "Optimisation pragmas", [], local ["{-# INLINABLE keep #-}"] selection identity "42")
+        , ("SPECIALISE type pragma", 83605, "Optimisation pragmas", [], local ["{-# SPECIALISE keep :: Bool -> Int -> Int #-}"] selection identity "42")
+        , ("SPECIALISE expression pragma", 83605, "Optimisation pragmas", [], local ["{-# SPECIALISE keep True #-}"] selection identity "42")
+        , ("constrained result wrapper", 83605, "requires a wrapper", [], local [] "foreach (b :: Bool) -> ((b ~ b) => Int) -> ((b ~ b) => Int)" identity "42")
+        , ("unsigned retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["alias = keep"]) "42")
+        , ("unsigned partial retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["index :: Bool", "index = False", "alias = keep index"]) "42")
+        , ("nested retained type", 43582, "not supported in this type position", [], ["bad :: Int -> (foreach (b :: Bool) -> Select b -> Select b)", "bad = undefined"])
+        , ("retained type synonym", 43582, "not supported in this type position", [], ["type Bad = foreach (b :: Bool) -> Select b -> Select b"])
+        , ("unregistered ordinary term name", 37479, "is a term-level binding", [], ["ordinary :: Bool", "ordinary = False", "type Bad = NativeSourceRejected.ordinary"])
+        , ("constructor payload mismatch", 83865, "second argument", [], local [] selection identity "keep True False")
+        ,
+            ( "distinct index from a local alias"
+            , 83865
+            , "Select"
+            , []
+            , local [] selection (identity ++ ["f :: " ++ selection, "f b x = let c :: Bool; c = b in keep c x"]) "42"
+            )
+        , ("True payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = True"] "42")
+        , ("False payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = False"] "42")
+        , ("numeric payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = 42"] "42")
+        ]
+    liftIO $ putStrLn "source rejection checks: ok"
+  where
+    identity = ["keep b x = x"]
+    selection = "foreach (b :: Bool) -> Select b -> Select b"
+    consumer = "foreach (b :: Bool) -> ((b ~ b) => Int) -> Int"
+    local pragmas signature equations body =
+        ["entry :: Int", "entry =", "  let"]
+            ++ map ("    " ++) (pragmas ++ ["keep :: " ++ signature] ++ equations)
+            ++ ["  in " ++ body]
+    check (label, code, fragment, extensions, declarations) =
+        sourceRejects label code fragment extensions declarations
 
 -- | Load helper bytecode and obtain its ordinary Core identifiers.
 loadHelpers :: GHC.Ghc [Id]
@@ -348,4 +539,6 @@ runChecks = do
                 | "native-bottom-bool" `isInfixOf` displayException exception -> putStrLn "choose bottom: raised native-bottom-bool"
                 | otherwise -> fail ("FAIL: choose bottom raised another exception: " ++ displayException exception)
             Right actual -> fail ("FAIL: choose bottom returned " ++ show actual)
-        putStrLn "native-core-run-ok"
+    runSourceChecks
+    runSourceRejectChecks
+    liftIO $ putStrLn "native-core-run-ok"

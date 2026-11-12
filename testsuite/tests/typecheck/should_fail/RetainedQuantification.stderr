@@ -1,2 +1,5 @@
-RetainedQuantification.hs:12:9: error: [GHC-43582]
-    Typechecking of retained quantification is not implemented yet.
+RetainedQuantification.hs:12:9: error: [GHC-83605]
+    • A retained argument must have type ‘Bool’
+      Its declared domain is: Int
+    • In the type signature:
+        keep :: foreach (b :: Int) -> Select b -> Select b

@@ -10,4 +10,11 @@ type-only local bottom (function WHNF): forced
 type-only producer beta (function WHNF): forced
 keep indexed bottom (fully applied): 42
 choose bottom: raised native-bottom-bool
+source keep True: 42
+source keep False: 42
+source keep bottom (fully applied): 42
+source keepSelect True: 42
+source keepSelect False: False
+source keepSelect bottom (partial WHNF): forced
+source rejection checks: ok
 native-core-run-ok

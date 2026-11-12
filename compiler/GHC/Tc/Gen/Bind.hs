@@ -42,6 +42,8 @@ import GHC.Tc.Solver
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
+import GHC.Core ( Expr(Type) )
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.UsageEnv ( bottomUE )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Pat
@@ -543,6 +545,7 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
   = do { (binds', mono_infos) <- tcMonoBinds rec_tc tc_sig_fn
                                              (LetGblBndr prag_fn)
                                              bind_list
+       ; rejectInferredRetainedTypes mono_infos
        ; mono_ids' <- mapM tc_mono_info mono_infos
        ; return (binds', mono_ids') }
   where
@@ -725,6 +728,7 @@ tcPolyInfer top_lvl rec_tc prag_fn tc_sig_fn bind_list
              <- pushLevelAndCaptureConstraints  $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
 
+       ; rejectInferredRetainedTypes mono_infos
        ; apply_mr <- checkMonomorphismRestriction mono_infos bind_list
 
        -- AbsBinds which are PatBinds can't be linear.
@@ -1282,6 +1286,36 @@ data MonoBindInfo = MBI { mbi_poly_name :: Name
                         , mbi_sig       :: Maybe TcIdSigInst
                         , mbi_mono_id   :: TcId
                         , mbi_mono_mult :: Mult }
+
+-- | Reject inferred retained types before ordinary binding inference.
+-- See Note [Inference of retained types].
+rejectInferredRetainedTypes :: [MonoBindInfo] -> TcM ()
+rejectInferredRetainedTypes infos
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; when enabled $ mapM_ check_info infos }
+  where
+    check_info (MBI { mbi_sig = Just (TISI { sig_inst_sig = TcCompleteSig{} }) })
+      = return ()
+    check_info (MBI { mbi_poly_name = name, mbi_mono_id = mono_id })
+      = setSrcSpan (nameSrcSpan name) $
+        do { ty <- liftZonkM $ zonkTcType (idType mono_id)
+           ; when (hasNativeDependentExpr (Type ty)) $
+               failWithTc $ TcRnRetainedQuantificationError (RetainedInference ty) }
+
+{- Note [Inference of retained types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An unsigned binding can infer a retained type without assigning a metavariable.
+For example, alias = keep copies the type of a retained function directly into
+an InferResult. The ordinary metavariable escape checks do not reject it.
+Generalisation and inferred-type normalisation do not support retained types.
+
+Check inferred binder types after tcMonoBinds, before ordinary inference.
+Zonk first to expose native syntax behind filled metavariables. Check NoGen
+bindings too: their inferred types can contain free runtime indices. Keep
+complete signatures on their checking path, including those in a binding group.
+Ordinary inferred functions whose types contain no native syntax are unchanged.
+See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+-}
 
 tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking purposes
                         -- i.e. the binders are mentioned in their RHSs, and

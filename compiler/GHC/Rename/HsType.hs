@@ -148,11 +148,53 @@ rnHsSigWcType doc (HsWC { hswc_body =
        ; (nwc_rdrs', imp_tv_nms) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
        ; bindHsOuterTyVarBndrs doc Nothing imp_tv_nms outer_bndrs $ \outer_bndrs' ->
-    do { (wcs, body_ty', fvs) <- rnWcBodyType doc nwc_rdrs body_ty
+    do { (wcs, body_ty', fvs) <-
+           if | HsForEachTy{} <- unLoc (ignoreParens body_ty)
+              -> do { case doc of
+                       TypeSigCtx{} -> pure ()
+                       _ -> failWithTc $ TcRnRetainedQuantificationError RetainedUnsupportedContext
+                   ; case outer_bndrs' of
+                       HsOuterImplicit [] -> pure ()
+                       _ -> failWithTc $ TcRnRetainedQuantificationError RetainedPolymorphicSignature
+                   ; unless (null nwc_rdrs) $
+                       failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
+                   ; (body', fvs) <- rnRetainedSigType doc body_ty
+                   ; pure ([], body', fvs) }
+              | otherwise -> rnWcBodyType doc nwc_rdrs body_ty
        ; pure ( HsWC  { hswc_ext = wcs, hswc_body = L loc $
                 HsSig { sig_ext = noExtField
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
               , fvs) } }
+
+-- | Rename the retained argument at the start of a value signature.
+-- See Note [Source retained Boolean signatures] in GHC.Tc.Gen.HsType.
+rnRetainedSigType :: HsDocContext -> LHsType GhcPs
+                  -> RnM (LHsType GhcRn, FreeNames)
+rnRetainedSigType doc (L loc (HsParTy _ body))
+  = do { (body', fvs) <- rnRetainedSigType doc body
+       ; pure (L loc (HsParTy noAnn body'), fvs) }
+rnRetainedSigType doc (L loc (HsForEachTy x bndrs body))
+  = setSrcSpanA loc $
+    do { level <- getThLevel
+       ; case level of
+           Comp -> pure ()
+           _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
+       ; case bndrs of
+           [L lb (HsTvb xb () (HsBndrVar _ (L lv (Unqual occ))) (HsBndrKind _ domain))] ->
+             do { (domain', domain_fvs) <- rnLHsType doc domain
+                ; name <- newLocalBndrRn (L lv (mkRdrUnqual (setOccNameSpace varName occ)))
+                ; (body', body_fvs) <- bindLocalNamesFV [name] $
+                    do { env <- getLocalRdrEnv
+                       ; setLocalRdrEnv (extendLocalRdrEnvWithAlias env occ name) $
+                           rnLHsType doc body }
+                ; let bndr = L lb (HsTvb xb () (HsBndrVar noExtField (L lv name))
+                                               (HsBndrKind noExtField domain'))
+                ; pure (L loc (HsForEachTy x [bndr] body'), domain_fvs `plusFN` body_fvs) }
+           [L _ (HsTvb _ _ HsBndrWildCard{} _)] ->
+             failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsName
+           [_] -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsType
+           _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount }
+rnRetainedSigType doc ty = rnLHsType doc ty
 
 rnHsPatSigType :: HsPatSigTypeScoping
                -> HsDocContext

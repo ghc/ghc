@@ -260,8 +260,8 @@ callbacks must not process runtime index variables.
 Only variable and constructor index substitution is implemented. The restricted
 bytecode entry checks these forms with Core Lint before and after preparation.
 General expression substitution, the ordinary optimizer, program code generation,
-and interface serialization remain unsupported. The frontend cannot emit these
-forms. See docs/dependent-haskell/CORE.md and the Agda provenance in
+and interface serialization remain unsupported. The restricted source checker
+can emit these forms. See docs/dependent-haskell/CORE.md and the Agda provenance in
 docs/dependent-haskell/REFERENCES.md.
 -}
 

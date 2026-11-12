@@ -58,6 +58,10 @@ import GHC.Rename.Env ( irrefutableConLikeTc )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
+import GHC.Core ( Expr(Var) )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy) )
+import GHC.Core.Type ( coreFullView )
+import GHC.Core.Utils ( applyTypeToArgs )
 -- Create chunkified tuple types for monad comprehensions
 import GHC.Core.Make.BigTuple
 
@@ -114,14 +118,7 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
     do  {  -- Check that they all have the same no of arguments
           arity <- checkArgCounts matches
         ; let herald = ExpectedFunTyMatches (NameThing fun_name) matches
-        ; traceTc "tcFunBindMatches 1" (ppr fun_name $$ ppr mult $$ ppr exp_ty $$ ppr arity)
-
-        ; (wrap_fun, r)
-             <- matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
-                tcScalingUsage mult $
-                   -- Makes sure that if the binding is unrestricted, it counts as
-                   -- consuming its rhs Many times.
-
+              tc_matches pat_tys rhs_ty = tcScalingUsage mult $
                 do { traceTc "tcFunBindMatches 2" $
                      vcat [ text "ctxt:" <+> pprUserTypeCtxt ctxt
                           , text "arity:" <+> ppr arity
@@ -129,10 +126,52 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
                           , text "pat_tys:" <+> ppr pat_tys
                           , text "rhs_ty:" <+> ppr rhs_ty ]
                    ; tcMatches mctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches }
+        ; traceTc "tcFunBindMatches 1" (ppr fun_name $$ ppr mult $$ ppr exp_ty $$ ppr arity)
+
+        ; (wrap_fun, r)
+             <- case exp_ty of
+                  Check ty | DepFunTy{} <- coreFullView ty
+                    -- See Note [Retained Boolean matches].
+                    -> do { unless (null invis_pat_tys) $
+                              failWithTc (TcRnRetainedQuantificationError RetainedPolymorphicSignature)
+                          ; pat_name <- case unLoc (mg_alts matches) of
+                              [L _ (Match { m_pats = L _ (L _ (VarPat _ (L _ name)) : _) })]
+                                -> return name
+                              [L _ (Match { m_pats = L loc _ })]
+                                -> setSrcSpanA loc $
+                                   failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
+                              _ -> setSrcSpanA (getLoc (mg_alts matches)) $
+                                   failWithTc (TcRnRetainedQuantificationError RetainedMultipleEquations)
+                          ; let pat_id = mkLocalId pat_name ManyTy boolTy
+                                body_ty = applyTypeToArgs ty [Var pat_id]
+                                bool_pat_ty = mkCheckExpFunPatTy (Scaled ManyTy boolTy)
+                          ; (wrap, result) <- matchExpectedFunTys herald ctxt (arity - 1)
+                                                (mkCheckExpType body_ty) $ \ pat_tys rhs_ty ->
+                                                tc_matches (bool_pat_ty : pat_tys) rhs_ty
+                          ; unless (isIdHsWrapper wrap) $
+                              failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
+                          ; return (idHsWrapper, result) }
+                  _ -> matchExpectedFunTys herald ctxt arity exp_ty tc_matches
 
         ; return (wrap_fun, r) }
   where
     mctxt  = mkPrefixFunRhs (noLocA fun_name) noAnn
+
+{- Note [Retained Boolean matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained signature binds a runtime Boolean in its codomain. For one equation
+with a bare variable pattern, instantiate that codomain with an Id made from
+the pattern's renamed Name. tcPatBndr uses the same Name and Unique. Desugaring
+selectMatchVar reuses this Id, so later argument types refer to the actual
+runtime lambda binder. MatchGroupTc needs no extra binder field for this case.
+
+Check the remaining arguments with the ordinary matcher. Its wrapper must be
+identity: mkWpFun cannot lift a nonidentity wrapper across the retained binder.
+Keep usage scaling around the whole match, including the Boolean argument.
+See docs/dependent-haskell/REFERENCES.md#agda-provenance for the dependent
+application rule. See docs/dependent-haskell/CORE.md#frontend-identity-plan
+for this source subset.
+-}
 
 
 funBindPrecondition :: MatchGroup GhcRn (LHsExpr GhcRn) -> Bool
