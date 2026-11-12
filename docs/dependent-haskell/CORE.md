@@ -2,7 +2,9 @@
 
 This document specifies the restricted internal implementation. It is based on the
 `nokinds-pi` binder and application work recorded in [PORT.md](PORT.md).
-It does not specify the full dependent-Haskell language.
+The dependent typing decisions use [Agda as the primary reference](REFERENCES.md#agda-provenance).
+Runtime evaluation must obey Haskell's non-strict rules. This document does not
+specify the full dependent-Haskell language.
 
 ## Representation
 
@@ -57,6 +59,25 @@ Type computation and Core Lint must perform the same instantiation. A wrong
 argument type, unsupported expression, or escaping index must fail explicitly.
 Do not silently discard the runtime argument or allocate an unrelated index.
 
+This implements the dependent application rule described in
+[Agda's function types](REFERENCES.md#agda-provenance). The Core argument remains
+a runtime expression. Its index uses its existing identity in the result type.
+
+## Laziness and eta
+
+The [Haskell evaluation rules](REFERENCES.md#haskell-evaluation-provenance) apply
+to retained functions. `keep` must not inspect its unused Boolean argument.
+`choose` must inspect its Boolean before it selects a branch. Erasing the branch
+proof must preserve that case. Type computation must not evaluate an index.
+
+Haskell's `seq` distinguishes a bottom function from a lambda that returns bottom.
+Do not infer a general eta law from the dependent function type. Native eta
+expansion must preserve the existing arity and evaluation conditions. It must
+also substitute the fresh runtime binder into later argument types. The current
+execution test expands the known `keep` lambda. It does not validate eta expansion
+of an arbitrary bottom function. Native eta reduction remains disabled in the
+scoped SimpleOpt increment.
+
 ## Substitution
 
 Type and coercion substitution must account for the existing `IdSubstEnv` when
@@ -81,7 +102,7 @@ This restricted grammar is not closed under general Core substitution. The
 experiment therefore cannot enter the ordinary optimizer. Backend preparation
 must preserve lazy index binding boundaries. The optimizer will also need this
 restriction or an internal expression-index form for arbitrary Boolean producers.
-The compiler frontend cannot emit these forms in the first increment.
+Source frontend support remains pending.
 
 ## Evidence and dependent cases
 
@@ -125,9 +146,12 @@ but that evidence cannot justify a result outside the strict case. A branch can
 transport its result through the nominal proof and an existing family equation.
 No `UnivCo` or plugin axiom supplies the refinement.
 
-This is a new Core typing rule. It follows the branch-local refinement approach
-in [pi-forall](REFERENCES.md#pi-forall) and reuses existing FC coercions. Neither
-the D/DC proof nor the current Ott formalism establishes its preservation.
+This is a new Core typing rule. Its primary design reference is
+[Agda's constructor refinement](REFERENCES.md#agda-provenance). The implementation
+records that refinement with existing FC coercions. The
+[pi-forall implementation](REFERENCES.md#pi-forall) supplies a smaller comparison.
+Neither the D/DC proof nor the current Ott formalism establishes preservation
+for this GHC rule.
 
 The ordinary optimizer and program backend gates remain mandatory. The simplifier
 reconstructs constructor applications from alternative binders. It cannot treat
@@ -199,6 +223,75 @@ bottom. A fully applied indexed identity can also use a value that has a type
 at every index. Label these observations separately. Do not cast a non-bottom
 `Int` to `Select bottom` to construct the test.
 
+## Scoped native SimpleOpt
+
+This increment is being implemented. Its acceptance checks remain pending.
+It adds `simpleOptNativeExpr` as a separate entry. It does not enable the full
+simplifier or the ordinary program optimization pipeline.
+
+The native mode reuses the SimpleOpt traversal with restricted rewrites. It
+skips occurrence analysis, general inlining, compulsory unfolding, binding
+dropping, eta reduction, and cast pushing through lambdas. It also disables
+generic known-constructor case elimination.
+It creates no rules, Core unfoldings, or join points. Unfolding construction
+would invoke ordinary occurrence analysis again. Existing join points remain.
+
+Dependent beta reduction can substitute an accepted local Boolean variable or
+an exact Boolean constructor. An unsupported producer keeps its application
+redex. A virtual-proof case can reduce only when its scrutinee is an exact
+syntactic Boolean constructor. The substituted proof must be nominal primitive
+equality whose endpoints are that same promoted constructor. Replace that proof
+with checked reflexivity before substituting into the selected branch.
+
+Keep variable cases and lazy source lets. Do not inspect unfoldings to decide an
+opaque index. These rules implement dependent substitution and checked case
+refinement from [the design references](REFERENCES.md#agda-provenance). They do
+not add arbitrary expression indices, dependent congruence, or general proof
+erasure. Run Core Lint before and after this entry. Retest the shared runtime
+index and bottom observations before claiming optimizer preservation.
+
+## Frontend identity plan
+
+The source frontend is pending. The target signatures are explicit retained
+Boolean telescopes such as `foreach (b :: Bool) -> Select b`. They must accept
+ordinary runtime Boolean bindings. They do not require singleton conversion.
+
+The implementation must preserve one runtime identity through these stages:
+
+1. Parse a distinct retained telescope in `Parser/Lexer.x`, `Parser.y`, and
+   `Language/Haskell/Syntax/Type.hs`. Reuse located binder syntax and exact source
+   annotations. Do not encode the syntax in strings, plugins, or erased foralls.
+2. Rename the retained binder as a term name that is available in its result
+   type. In `Tc/Gen/HsType.hs`, check its `Bool` domain and lifted result. Permit
+   `TermVarTy` only for the checked retained identifier in this scope.
+3. Check the definition against `DepFunTy`. Update `Tc/Gen/Match.hs`,
+   `Tc/Gen/Pat.hs`, and `Tc/Utils/Unify.hs` so later argument types use the actual
+   runtime binder. Preserve that identifier through `MatchGroupTc` and
+   `HsToCore/Match.hs`. The current path decomposes types before checking patterns
+   and later creates match identifiers. That path needs explicit identity
+   transport. RequiredTypeArguments instead skolemises type variables.
+4. In `Tc/Gen/App.hs`, check a retained argument as a value and instantiate the
+   result with its accepted index. Keep the value application. Do not use
+   `tcVDQ`, which translates an expression into a type argument.
+5. Check Boolean constructor clauses under scoped nominal evidence. The existing
+   `ConPatTc.cpt_dicts` field can carry the proof. Constructor desugaring already
+   places these binders in the Core alternative. Add the retained refinement
+   before the ordinary Boolean no-evidence fast path. Check coverage and retain
+   the fixed outer result scope.
+
+Native zonking and relevant unification paths also need support. They currently
+reject native forms. Unsupported source constructs must produce located errors
+before those internal guards. Keep binder-domain, unsupported-index, coverage,
+and branch-result errors at their respective source locations.
+
+Start execution with local retained declarations inside an ordinary
+`entry :: IO String`. Parse, rename, typecheck, and desugar real source. Pass its
+closed Core right-hand side to the checked native bytecode entry. This exercises
+the frontend without enabling native interfaces or the ordinary module pipeline.
+General computed-scrutinee abstraction remains separate work. Agda's
+[with-abstraction reference](REFERENCES.md#agda-provenance) explains its effect on
+the goal and dependent context.
+
 ## Initial validation boundary
 
 Check hand-built Core for retained identity and application. Cover alpha-renaming,
@@ -212,5 +305,15 @@ types, incomplete proof-bearing cases, scope errors, and supported substitution
 through branch proofs. These checks construct and typecheck Core. They do not
 execute the dependent functions.
 
-Interface serialization, source syntax, optimization, and execution remain gated
-until their plan tasks pass. Existing ordinary GHC programs must continue to build.
+The separate runtime regression compiles each native kernel once. The same
+compiled function receives both Boolean values through an ordinary IO action.
+It checks `choose`, shared `keep`/`choose`, partial `keepSelect` at a bottom index,
+fully applied dictionary-index `keep` at a bottom index, and strict `choose` on
+bottom. The prepared Core and STG retain one Boolean argument. The index-only
+type dependencies add no captured runtime values. Virtual branch proofs disappear
+before bytecode generation.
+
+Interface serialization, source syntax, the ordinary optimizer, and the normal
+program backend remain gated. The scoped SimpleOpt work and frontend plan above
+have separate acceptance checks. Existing ordinary GHC programs must continue
+to build.

@@ -1,6 +1,7 @@
 # Dependent Haskell references
 
-This bibliography records research checked on 2026-11-11. The GHC source baseline is
+The original survey was checked on 2026-11-11. The Agda and Haskell evaluation
+references were checked on 2026-11-12. The GHC source baseline is
 [`19ff36f2aede0ca2e554016ff22c71e73aa9803b`](https://github.com/ghc/ghc/commit/19ff36f2aede0ca2e554016ff22c71e73aa9803b).
 Later changes to proposal status, package bounds, branches, or documentation need
 verification. A link to a mutable branch identifies the inspected source, not a
@@ -13,17 +14,69 @@ a comparison implementation. External solvers remain later work.
 
 ## Reading order
 
-1. Read proposal #378 and the current RequiredTypeArguments documentation. Separate
+1. Read [the Agda provenance](#agda-provenance) and
+   [the Haskell evaluation constraints](#haskell-evaluation-provenance).
+   Separate the dependent typing rules from runtime evaluation rules.
+2. Read proposal #378 and the current RequiredTypeArguments documentation. Separate
    dependence, visibility, and erasure before interpreting the other proposals.
-2. Inspect the pinned `nokinds-pi` branch and its incomplete application and case
+3. Inspect the pinned `nokinds-pi` branch and its incomplete application and case
    handling. Compare it with current type computation, substitution, and Core Lint.
-3. Read the D/DC specification and artifact, the roles paper, and GraD. Identify
+4. Read the D/DC specification and artifact, the roles paper, and GraD. Identify
    which rules the native extension needs and which proof assumptions it must meet.
-4. Read pi-forall's Boolean checking rules for a small implementation example.
-5. Read the singletons papers, SHE's pi-type translation, and the upstream API as
+5. Read pi-forall's Boolean checking rules as a comparison implementation.
+6. Read the singletons papers, SHE's pi-type translation, and the upstream API as
    comparison implementations. The TH generator remains relevant to promotion.
-6. Read the solver and proof-certificate references only when the language needs
+7. Read the solver and proof-certificate references only when the language needs
    additional arithmetic or theory reasoning. The first Boolean experiment does not.
+
+## Agda provenance
+
+Agda supplies the primary dependent-language reference for the spike. The links
+below use the Agda 2.8.0.2 manual. The decisions describe this GHC implementation;
+the manual does not prove those decisions correct in System FC.
+
+- [Function types](https://agda.readthedocs.io/en/v2.8.0.2/language/function-types.html)
+  gives the dependent application rule: the result of `f a` has type
+  `B[x := a]`. The native implementation substitutes the argument's index into
+  the codomain. A variable index uses the same runtime `Id`. It does not allocate
+  a second witness. An opaque Boolean stays opaque until constructor inspection.
+- [Function definitions](https://agda.readthedocs.io/en/v2.8.0.2/language/function-definitions.html)
+  describes constructor-pattern refinement and case trees. Agda also checks
+  coverage and termination. The GHC rule records a constructor refinement as a
+  branch-local nominal `CoVar`. Its explicit coercions transport the branch
+  result to the fixed outer result type. Exhaustive proof-bearing Boolean cases
+  are required. General termination checking is outside this Haskell spike.
+- [With-abstraction equality](https://agda.readthedocs.io/en/v2.8.0.2/language/with-abstraction.html#with-abstraction-equality)
+  explains how `with ... in eq` retains an equation for an inspected expression.
+  It motivates keeping explicit refinement evidence until checked lowering.
+  Agda's more general abstraction also changes dependent context types.
+  That elaboration remains outside the current variable/constructor index subset.
+- [Run-time irrelevance](https://agda.readthedocs.io/en/v2.8.0.2/language/runtime-irrelevance.html)
+  separates erased information from values that drive computation. The native
+  Boolean remains relevant because `choose` inspects it. Index occurrences and
+  virtual branch proofs add no runtime witness. Erasure must preserve the strict
+  Boolean case. Agda's treatment of erased higher-order arguments also shows why
+  erasure needs a calling-convention specification.
+
+The frontend must preserve these identities through parsing, checking, and
+desugaring. RequiredTypeArguments provides erased type arguments. It cannot
+implement the retained rule by renaming `foreach` to `forall`. See the pending
+[frontend identity plan](CORE.md#frontend-identity-plan).
+
+## Haskell evaluation provenance
+
+The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)
+specifies non-strict application and `seq`. It distinguishes a bottom function
+from a lambda that returns bottom. Therefore `f` and `\x -> f x` are not
+interchangeable for arbitrary Haskell `f`.
+
+Retained application must not force an index to construct a type witness.
+[Agda's lambda abstraction reference](https://agda.readthedocs.io/en/v2.8.0.2/language/lambda-abstraction.html)
+describes function eta equality. Haskell's `seq` prevents that general equality.
+Eta expansion needs the existing arity and evaluation conditions. Eta reduction
+needs its own justification. The scoped native SimpleOpt increment disables eta
+reduction. Its dependent beta and case rules do not establish an eta law.
+See [the evaluation constraints](CORE.md#laziness-and-eta).
 
 ## Roadmap and proposal status
 

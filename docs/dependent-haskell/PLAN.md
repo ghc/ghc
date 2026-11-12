@@ -175,6 +175,22 @@ index from a global thunk, and strict `choose bottom`. See [validation](README.m
 
 ### M6: preserve dependencies through optimization
 
+The first increment uses an explicit restricted SimpleOpt entry. It omits
+occurrence analysis, general inlining, dead-binding removal, and eta reduction.
+These passes do not yet preserve runtime indices. Beta reduction must substitute
+the same supported Boolean argument in terms and types. A literal Boolean case
+can replace its branch proof with checked nominal reflexivity. Constructor
+knowledge from an unfolding cannot justify that replacement for an opaque index.
+Keep variable cases and lazy producer bindings. Require Core Lint before and
+after this step in the bytecode entry.
+
+The audit found separate blockers in the full simplifier. Its type substitution
+can omit runtime Id mappings. Its case reconstruction treats virtual proofs as
+constructor fields. Occurrence analysis does not track runtime index scope.
+Keep the ordinary optimizer gated until those rules are implemented. Agda supplies
+the application and constructor rules; Haskell's bottom and `seq` constrain which
+reductions preserve behavior. See [decision provenance](REFERENCES.md).
+
 - [ ] Audit simplification, beta/eta transformations, inlining, unfoldings, and
       substitution into types and coercions.
 - [ ] Audit case simplification, case-of-case, join points, occurrence analysis, and
@@ -238,9 +254,10 @@ work.
 | B15 | Interfaces round-trip and cross-module execution passes; feature-disabled programs remain compatible. |
 
 Distinguish Core construction, frontend behavior, optimization, runtime execution,
-and module integration. The existing singleton probe supplies comparison evidence
-for some values and laziness cases only. No native Core implementation or native
-acceptance check has passed yet.
+and module integration. M3 through M5 validate native Core construction and the
+restricted bytecode path. The singleton probe supplies comparison evidence for
+some values and laziness cases. Source checking, ordinary optimization, and module
+integration remain open.
 
 ## Further work
 
