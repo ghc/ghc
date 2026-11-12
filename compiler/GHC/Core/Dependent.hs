@@ -12,11 +12,14 @@ import GHC.Core
 import GHC.Builtin.KnownKeys (falseDataConKey, trueDataConKey)
 import GHC.Core.DataCon (dataConRepType)
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCon (TyCon, synTyConRhs_maybe)
+import GHC.Core.TyCon.Set
 import GHC.Types.Id (idCoreRules, realIdUnfolding)
 import GHC.Types.Literal (literalType)
 import GHC.Types.Tickish (CoreTickish, GenTickish (..))
 import GHC.Types.Var
 import GHC.Types.Unique (hasKey)
+import GHC.Types.Unique.DSet (uniqDSetToList)
 import GHC.Types.Var.Set
 import GHC.Utils.Panic
 
@@ -24,10 +27,11 @@ import Control.Monad (when)
 import Control.Monad.Trans.State.Strict
 import Data.Semigroup (Semigroup (..))
 
--- | Track metadata and variable kinds that the scan has already visited.
+-- | Track metadata, variable kinds, and synonyms that the scan has visited.
 data ScanState = ScanState
     { scannedMetadata :: VarSet
     , scannedKinds :: VarSet
+    , scannedSynonyms :: TyConSet
     }
 
 -- | Short-circuit a structural scan when it finds a native type.
@@ -62,9 +66,9 @@ rejectNativeDependentExpr :: String -> CoreExpr -> IO ()
 rejectNativeDependentExpr context expr =
     rejectNative context (hasNativeDependentExpr expr)
 
--- | Run a scan with empty metadata and kind caches.
+-- | Run a scan with empty metadata, kind, and synonym caches.
 runScan :: NativeScan -> Bool
-runScan scan = evalState (runNativeScan scan) (ScanState emptyVarSet emptyVarSet)
+runScan scan = evalState (runNativeScan scan) (ScanState emptyVarSet emptyVarSet emptyTyConSet)
 
 -- | Report an unsupported compiler operation when a scan finds a native type.
 rejectNative :: String -> Bool -> IO ()
@@ -158,20 +162,64 @@ scanVarKind v = NativeScan $ do
             modify' (\s -> s{scannedKinds = extendVarSet seen v})
             runNativeScan (scanAnnotations v)
 
--- | Inspect a type structurally, including closed dependent binders.
+-- | Inspect each synonym body once. Application arguments are scanned separately.
+-- Substitution can add native forms only through those arguments.
+-- Inspect the uninstantiated body to avoid duplicating argument scans.
+scanSynonym :: TyCon -> NativeScan
+scanSynonym tc
+    | Just rhs <- synTyConRhs_maybe tc = NativeScan $ do
+        seen <- gets scannedSynonyms
+        if tc `elemTyConSet` seen
+            then pure False
+            else do
+                modify' (\s -> s{scannedSynonyms = extendTyConSet seen tc})
+                runNativeScan (scanType rhs)
+    | otherwise = mempty
+
+-- | Inspect syntax and synonym bodies, including unused synonym arguments.
 scanType :: Type -> NativeScan
+scanType (TyVarTy tv) = scanVarKind tv
+scanType (TermVarTy _) = NativeScan (pure True)
+scanType (DepFunTy _ _) = NativeScan (pure True)
+scanType (LitTy _) = mempty
+scanType (TyConApp tc args) = foldMap scanType args <> scanSynonym tc
+scanType (AppTy fun arg) = scanType fun <> scanType arg
+scanType (FunTy _ mult arg res) = scanType arg <> scanType mult <> scanType res
+scanType (ForAllTy (Bndr var _) body) = scanType (varType var) <> scanType body
+scanType (CastTy ty co) = scanType ty <> scanCo co
+scanType (CoercionTy co) = scanCo co
 
 -- | Inspect coercion annotations and dependencies.
 scanCo :: Coercion -> NativeScan
-(scanType, _, scanCo, _) =
-    foldTyCo
-        TyCoFolder
-            { tcf_view = noView
-            , tcf_lit = const mempty
-            , tcf_tyvar = scanVarKind
-            , tcf_covar = scanVarKind
-            , tcf_hole = scanVarKind . coHoleCoVar
-            , tcf_tycobinder = \_ body -> body
-            , tcf_termvar = \_ -> NativeScan (pure True)
-            , tcf_termbinder = \_ _ -> NativeScan (pure True)
-            }
+scanCo (Refl ty) = scanType ty
+scanCo (GRefl _ ty mco) = scanType ty <> scanMCo mco
+scanCo (TyConAppCo _ _ args) = foldMap scanCo args
+scanCo (AppCo fun arg) = scanCo fun <> scanCo arg
+scanCo (CoVarCo cv) = scanVarKind cv
+scanCo (AxiomCo _ args) = foldMap scanCo args
+scanCo (HoleCo hole) = scanVarKind (coHoleCoVar hole)
+scanCo (SymCo co) = scanCo co
+scanCo (TransCo left right) = scanCo left <> scanCo right
+scanCo (SelCo _ co) = scanCo co
+scanCo (LRCo _ co) = scanCo co
+scanCo (InstCo co arg) = scanCo co <> scanCo arg
+scanCo (KindCo co) = scanCo co
+scanCo (SubCo co) = scanCo co
+scanCo (UnivCo{uco_lty = left, uco_rty = right, uco_deps = deps}) =
+    scanType left <> scanType right <> scanDeps deps
+scanCo (FunCo{fco_mult = mult, fco_arg = arg, fco_res = res}) =
+    scanCo mult <> scanCo arg <> scanCo res
+scanCo (ForAllCo{fco_tcv = var, fco_kind = kind, fco_body = body}) =
+    scanMCo kind <> scanType (varType var) <> scanCo body
+
+-- | Inspect an optional coercion.
+scanMCo :: MCoercion -> NativeScan
+scanMCo MRefl = mempty
+scanMCo (MCo co) = scanCo co
+
+-- | Inspect dependencies carried by a universal coercion.
+scanDeps :: UnivCoDeps -> NativeScan
+scanDeps NoUnivCoDeps = mempty
+scanDeps (UnivCoDeps{ucd_cvs = cvs, ucd_holes = holes}) =
+    foldMap scanVarKind (dVarSetElems cvs)
+        <> foldMap (scanVarKind . coHoleCoVar) (uniqDSetToList holes)

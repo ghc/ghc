@@ -99,6 +99,7 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Utils          ( exprType )
@@ -109,7 +110,7 @@ import GHC.Core.Rules
 import GHC.Core.Stats
 
 
-import GHC.CoreToStg.Prep( corePrepExpr )
+import GHC.CoreToStg.Prep( CorePrepConfig(..), corePrepExpr )
 import GHC.CoreToStg    ( coreToStg )
 
 import GHC.Parser.Errors.Types
@@ -1540,13 +1541,26 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   {- Simplify it -}
   -- Question: should we call SimpleOpt.simpleOptExpr here instead?
   -- It is, well, simpler, and does less inlining etc.
-  let dflags = hsc_dflags hsc_env
+  let native = hasNativeDependentExpr ds_expr
+      dflags = if native
+               then gopt_set (gopt_set (hsc_dflags hsc_env) Opt_DoCoreLinting)
+                             Opt_DoStgLinting
+               else hsc_dflags hsc_env
+      lint_env = hsc_env { hsc_dflags = dflags }
   let logger = hsc_logger hsc_env
   let ic = hsc_IC hsc_env
   let unit_env = hsc_unit_env hsc_env
   let simplify_expr_opts = initSimplifyExprOpts dflags ic
 
-  simpl_expr <- simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr
+  simpl_expr <- if native
+    then do
+      case hscInterp hsc_env of
+        Interp { interpInstance = ExternalInterp (ExtJS _) } ->
+          pprPanic "hscCompileCoreExpr: native dependent Core requires bytecode" empty
+        _ -> return ()
+      lintInteractiveExpr (text "native Core before preparation") lint_env ds_expr
+      return ds_expr
+    else simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr
 
   -- Create a unique temporary binding
   --
@@ -1562,13 +1576,18 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   let tidy_expr    = tidyExpr tidy_env simpl_expr
 
   {- Prepare for codegen -}
-  cp_cfg <- initCorePrepConfig hsc_env
+  cp_cfg0 <- initCorePrepConfig hsc_env
+  let cp_cfg | native = cp_cfg0 { cp_allowNativeDependent = True
+                               , cp_arityOpts = Nothing
+                               , cp_specEval = False
+                               , cp_specEvalDFun = False }
+             | otherwise = cp_cfg0
   prepd_expr <- corePrepExpr
    logger cp_cfg
    tidy_expr
 
   {- Lint if necessary -}
-  lintInteractiveExpr (text "hscCompileCoreExpr") hsc_env prepd_expr
+  lintInteractiveExpr (text "hscCompileCoreExpr") lint_env prepd_expr
   let this_loc = OsPathModLocation
           { ml_hs_file_ospath   = Nothing,
             ml_hi_file_ospath   = panic "hscCompileCoreExpr':ml_hi_file_ospath",

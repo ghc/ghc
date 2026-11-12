@@ -1,0 +1,9 @@
+choose True: 42
+choose False: False
+keep/choose True: 42
+keep/choose False: False
+keepSelect bottom (partial WHNF): forced
+keepSelect local bottom (partial WHNF): forced
+keep indexed bottom (fully applied): 42
+choose bottom: raised native-bottom-bool
+native-core-run-ok

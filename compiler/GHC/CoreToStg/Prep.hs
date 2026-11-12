@@ -38,6 +38,7 @@ import GHC.Core.Dependent
 import GHC.Core.Subst
 import GHC.Core.Make
 import GHC.Core.Type
+import GHC.Core.TyCo.Subst ( isEmptyTypeSubst )
 import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.DataCon
@@ -205,12 +206,12 @@ So our plan is:
 
   * So generally the TCvSubst is empty
 
-  * Apply the substitution to type and coercion arguments in Core; but
-    happily `substTy` has a no-op short-cut for an empty TCvSubst, so this
-    is usually very cheap.
+  * Apply the substitution to type and coercion arguments in Core.
+    `substTy` skips empty substitutions for types without runtime indices.
+    Runtime indices also use the Id substitution when a Boolean is cloned.
 
-  * In `cpCloneBndr`, for a tyvar/covar binder, check for an empty substitution;
-    in that case just do nothing
+  * In `cpCloneBndr`, for a tyvar/covar binder, skip substitution only if
+    neither the TyCoVar environment nor a runtime index needs an update.
 -}
 
 type CpeArg  = CoreExpr    -- Non-terminal 'arg'
@@ -256,7 +257,8 @@ corePrepPgm logger cp_cfg pgm_cfg
 
 corePrepExpr :: Logger -> CorePrepConfig -> CoreExpr -> IO CoreExpr
 corePrepExpr logger config expr = do
-    rejectNativeDependentExpr "CorePrep" expr
+    unless (cp_allowNativeDependent config) $
+      rejectNativeDependentExpr "CorePrep" expr
     withTiming logger (text "CorePrep [expr]") (\e -> e `seq` ()) $ do
       us <- mkSplitUniqSupply StgTag
       let initialCorePrepEnv = mkInitialCorePrepEnv config
@@ -594,6 +596,11 @@ cpeBind top_lvl env (NonRec bndr rhs)
                                    dmd lev env bndr1 rhs
        -- See Note [Inlining in CorePrep]
        ; let triv_rhs = exprIsTrivial rhs1
+                     -- Keep a lazy local index when its RHS is outside the
+                     -- supported index grammar. Types still refer to the Id.
+                     && (not (cp_allowNativeDependent (cpe_config env))
+                         || not (isBoolIndexId bndr)
+                         || isJust (exprToBoolIndex rhs1))
              env2    | triv_rhs  = extendCorePrepEnvExpr env1 bndr rhs1
                      | otherwise = env1
              floats1 | triv_rhs, isInternalName (idName bndr)
@@ -2583,6 +2590,10 @@ data CorePrepConfig = CorePrepConfig
   -- cases. This is helpful when debugging demand analysis or type
   -- checker bugs which can sometimes manifest as segmentation faults.
 
+  , cp_allowNativeDependent    :: !Bool
+  -- ^ Allow checked native dependent expressions from @hscCompileCoreExpr@.
+  -- The program entry point still rejects these forms.
+
   , cp_platform                :: Platform
 
   , cp_arityOpts               :: !(Maybe ArityOpts)
@@ -2652,11 +2663,9 @@ enterRecGroupRHSs env grp
 
 cpSubstTy :: CorePrepEnv -> Type -> Type
 cpSubstTy (CPE { cpe_subst = subst }) ty = substTy subst ty
-          -- substTy has a short-cut if the TCvSubst is empty
 
 cpSubstCo :: CorePrepEnv -> Coercion -> Coercion
 cpSubstCo (CPE { cpe_subst = subst }) co = substCo subst co
-          -- substCo has a short-cut if the TCvSubst is empty
 
 -- | See Note [Binder context]
 pushBinderContext :: Id -> CorePrepEnv -> CorePrepEnv
@@ -2688,7 +2697,7 @@ cpCloneBndr  :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
 -- See Note [Cloning in CorePrep]
 cpCloneBndr env@(CPE { cpe_subst = subst }) bndr
   | isTyCoVar bndr  -- See Note [Cloning CoVars and TyVars]
-  = if isEmptyTCvSubst subst    -- The common case
+  = if isEmptyTypeSubst subst [varType bndr] []
     then return (env { cpe_subst = extendSubstInScope subst bndr }, bndr)
     else -- No need to clone the Unique; but we must apply the substitution
          let bndr1  = updateVarType (substTy subst) bndr

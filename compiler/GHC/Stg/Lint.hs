@@ -104,6 +104,7 @@ import GHC.Stg.Utils
 import GHC.Core.DataCon
 import GHC.Core             ( AltCon(..) )
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Core.Lint        ( lintMessage )
 
 import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
@@ -125,7 +126,6 @@ import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 
 import Control.Monad
 import GHC.Exts            ( oneShot )
-import GHC.Core.Multiplicity (scaledThing)
 import GHC.Settings (Platform)
 import GHC.Core.TyCon (primRepCompatible, primRepsCompatible)
 
@@ -369,14 +369,11 @@ lintStgAppReps fun args = do
   lf <- getLintFlags
   let platform = lf_platform lf
 
-      (fun_arg_tys, _res) = splitFunTys (idType fun)
-      fun_arg_tys' = map scaledThing fun_arg_tys :: [Type]
-
       -- Might be "wrongly" typed as polymorphic. See #21399
       -- In these cases typePrimRep_maybe will return Nothing
       -- and we abort kind checking.
       fun_arg_tys_reps, actual_arg_reps :: [Maybe [PrimRep]]
-      fun_arg_tys_reps = map typePrimRep_maybe fun_arg_tys'
+      fun_arg_tys_reps = fun_arg_reps (idType fun)
       actual_arg_reps = map stgArgRep_maybe args
 
       match_args :: [Maybe [PrimRep]] -> [Maybe [PrimRep]] -> LintM ()
@@ -420,6 +417,16 @@ lintStgAppReps fun args = do
       match_args _ _ = return () -- Functions are allowed to be over/under applied.
 
   match_args actual_arg_reps fun_arg_tys_reps
+  where
+    -- Keep retained binders inside the traversal. Later argument types can
+    -- mention them, so return representations instead of open types.
+    fun_arg_reps :: Type -> [Maybe [PrimRep]]
+    fun_arg_reps ty = case coreFullView ty of
+      FunTy { ft_arg = arg, ft_res = res }
+        -> typePrimRep_maybe arg : fun_arg_reps res
+      DepFunTy b res
+        -> typePrimRep_maybe (varType b) : fun_arg_reps res
+      _ -> []
 
 lintAppCbvMarks :: Id -> [StgArg] -> LintM ()
 lintAppCbvMarks fun args

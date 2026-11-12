@@ -19,7 +19,7 @@ import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
 import GHC.Core.TyCo.Rep (Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
-import GHC.Core.TyCon (FamTyConFlav (..), Injectivity (..), TyCon, mkAnonTyConBinder, mkFamilyTyCon, mkTyConKind)
+import GHC.Core.TyCon (FamTyConFlav (..), Injectivity (..), TyCon, mkAnonTyConBinder, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind)
 import GHC.Core.Type
 import GHC.Core.Utils (exprType)
 import GHC.CoreToIface (toIfaceAlt)
@@ -283,6 +283,51 @@ runChecks dflags = do
     check "scanner detects an isolated native type" (hasNativeDependentExpr (Type workerTy))
     check "scanner detects a coercion annotation" (hasNativeDependentExpr (Coercion (mkNomReflCo workerTy)))
     check "scanner accepts ordinary Core" (not (hasNativeDependentExpr (Lam b (Var b))))
+    let hiddenSynonym =
+            mkSynonymTyCon
+                (mkSystemName (unique 70) (mkTcOcc "HiddenKeep"))
+                liftedTypeKind
+                []
+                liftedTypeKind
+                []
+                workerTy
+                True False False False
+        hiddenType = mkTyConTy hiddenSynonym
+        unusedParameter = mkTyVar (mkSystemName (unique 71) (mkTyVarOcc "unused")) liftedTypeKind
+        unusedBinders = [mkAnonTyConBinder unusedParameter]
+        unusedSynonym =
+            mkSynonymTyCon
+                (mkSystemName (unique 72) (mkTcOcc "Ignore"))
+                (mkTyConKind unusedBinders liftedTypeKind)
+                unusedBinders
+                liftedTypeKind
+                [Phantom]
+                intTy
+                True True True True
+        ignoredType = mkTyConApp unusedSynonym [workerTy]
+        ignoredHiddenType = mkTyConApp unusedSynonym [hiddenType]
+        identityParameter = mkTyVar (mkSystemName (unique 73) (mkTyVarOcc "identity")) liftedTypeKind
+        identityBinders = [mkAnonTyConBinder identityParameter]
+        identitySynonym =
+            mkSynonymTyCon
+                (mkSystemName (unique 74) (mkTcOcc "Identity"))
+                (mkTyConKind identityBinders liftedTypeKind)
+                identityBinders
+                liftedTypeKind
+                [Representational]
+                (mkTyVarTy identityParameter)
+                True True False False
+        nestedOrdinary = iterate (mkTyConApp identitySynonym . (: [])) boolTy !! 12
+    check "scanner expands a hidden retained function synonym" (hasNativeDependentExpr (Type hiddenType))
+    check "scanner expands synonyms inside ordinary types" (hasNativeDependentExpr (Type (mkVisFunTyMany intTy hiddenType)))
+    check "scanner expands synonyms inside coercions" (hasNativeDependentExpr (Coercion (mkNomReflCo hiddenType)))
+    check "scanner preserves unused native synonym arguments" (hasNativeDependentExpr (Type ignoredType))
+    check "scanner expands synonyms in unused synonym arguments" (hasNativeDependentExpr (Type ignoredHiddenType))
+    check "scanner accepts an ordinary synonym" (not (hasNativeDependentExpr (Type (mkTyConApp unusedSynonym [boolTy]))))
+    nestedResult <- timeout 2000000 (evaluate (hasNativeDependentExpr (Type nestedOrdinary)))
+    check "scanner terminates on nested ordinary identity synonyms" (nestedResult == Just False)
+    rejectsWith "hidden synonym expression boundary gate" "Native dependent Core cannot enter" $
+        rejectNativeDependentExpr "synonym smoke" (Type hiddenType)
     let host = local 19 "host" boolTy
         nativeUnfoldingHost = setIdUnfolding host (unfolding (Type workerTy))
     check

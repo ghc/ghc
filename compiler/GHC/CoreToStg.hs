@@ -28,6 +28,7 @@ import GHC.Stg.Make
 import GHC.Stg.Utils (allowTopLevelConApp)
 
 import GHC.Types.RepType
+import GHC.Types.Var ( isCoVar )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.CostCentre
@@ -46,6 +47,7 @@ import GHC.Platform        ( Platform )
 import GHC.Platform.Ways
 
 import GHC.Builtin.PrimOps
+import GHC.Builtin.WiredIn.Types ( trueDataCon, falseDataCon )
 import GHC.Builtin.WiredIn.Ids ( coercionTokenId )
 
 import GHC.Utils.Outputable
@@ -487,8 +489,16 @@ coreToStgExpr (Case scrut bndr _ alts)
   where
     vars_alt :: CoreAlt -> CtsM StgAlt
     vars_alt (Alt con binders rhs)
-      = let     -- Remove type variables
-            binders' = filterStgBinders binders
+      = let -- Core Lint checks these virtual proofs. Bool has no fields.
+            -- Keep ordinary coercion argument slots; see Note [Coercion tokens].
+            binders'
+              | DataAlt dc <- con
+              , dc == trueDataCon || dc == falseDataCon
+              , [cv] <- binders
+              , isCoVar cv
+              = []
+              | otherwise
+              = filterStgBinders binders
         in
         extendVarEnvCts [(b, LambdaBound) | b <- binders'] $ do
         rhs2 <- coreToStgExpr rhs

@@ -65,6 +65,7 @@ import GHC.Core.Subst    as Core
 import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
 import GHC.Core.TyCo.Compare( eqType, eqTypeIgnoringMultiplicity )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy) )
 
 import GHC.Types.Demand
 import GHC.Types.Cpr( CprSig, mkCprSig, botCpr )
@@ -207,6 +208,9 @@ typeOneShots ty
 
       | Just (_,_,arg,res) <- splitFunTy_maybe ty
       = typeOneShot arg : go rec_nts res
+
+      | DepFunTy _ res <- coreFullView ty
+      = NoOneShotInfo : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
@@ -2305,7 +2309,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        -> Subst -> Type   -- We are really looking at subst(ty)
        -> (InScopeSet, EtaInfo)
     -- (go [o1,..,on] subst ty) = (in_scope, EI [b1,..,bn] co)
-    --    co :: subst(ty) ~ b1_ty -> ... -> bn_ty -> tr
+    --    co :: subst(ty) ~ mkLamTypes [b1,..,bn] tr
 
     go _ [] subst _
        ----------- Done!  No more expansion needed
@@ -2321,6 +2325,18 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
          -- we consume one of the [OneShotInfo]
        , (in_scope, EI bs mco) <- go n oss' subst' ty'
        = (in_scope, EI (tcv' : bs) (mkEtaForAllMCo (Bndr tcv' vis) ty' mco))
+
+       ----------- Retained Boolean functions
+       | DepFunTy b res_ty <- coreFullView ty
+       , (subst', eta_id) <- freshEtaId n subst (Scaled ManyTy (varType b))
+       , let eta_id' = eta_id `setIdOneShotInfo` one_shot
+             subst'' = Core.extendIdSubst subst' b (Var eta_id')
+       , (in_scope, EI bs mco) <- go (n+1) oss1 subst'' res_ty
+       = case checkReflexiveMCo mco of
+           MRefl -> (in_scope, EI (eta_id' : bs) MRefl)
+           MCo co -> pprPanic "mkEtaWW: native dependent congruence not implemented"
+                       (ppr b $$ ppr co)
+         -- Later argument types must use this eta binder's identity.
 
        ----------- Function types  (t1 -> t2)
        | Just (_af, mult, arg_ty, res_ty) <- splitFunTy_maybe ty

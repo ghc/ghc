@@ -5,6 +5,10 @@ test('ghcApi', normal, compile_and_run, ['-package ghc'])
 test('NativeDependentCore', [extra_run_opts(f'"{config.libdir}"')],
      compile_and_run, ['-package ghc'])
 
+test('NativeDependentCoreRun', [req_bco, req_process,
+                              extra_run_opts(f'"{config.libdir}"')],
+     compile_and_run, ['-package ghc'])
+
 test('T6145',
      [extra_run_opts(f'"{config.libdir}"')
      # needs to spawn c compiler process, and wasm doesn't have
