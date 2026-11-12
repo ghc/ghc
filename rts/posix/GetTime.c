@@ -30,6 +30,16 @@
 
 static Time getClockTime(clockid_t clock)
 {
+#if defined(HAVE_CLOCK_GETTIME_NSEC_NP)
+    /* Non-standard extension on macOS, allowing fewer conversions. */
+    uint64_t nsec = clock_gettime_nsec_np(clock);
+    if (RTS_LIKELY(nsec)) {
+        return (Time)nsec;
+    } else {
+        sysErrorBelch("clock_gettime_nsec_np");
+        stg_exit(EXIT_FAILURE);
+    }
+#else
     struct timespec ts;
     int res = clock_gettime(clock, &ts);
     if (RTS_LIKELY(res == 0)) {
@@ -38,6 +48,7 @@ static Time getClockTime(clockid_t clock)
         sysErrorBelch("clock_gettime");
         stg_exit(EXIT_FAILURE);
     }
+#endif
 }
 
 Time getCurrentThreadCPUTime(void)
