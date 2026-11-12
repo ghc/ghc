@@ -132,6 +132,45 @@ must preserve these hashes. With unfoldings omitted, a body-only edit must also
 preserve the signature ABI. That last rule follows GHC's ABI policy; Agda's
 module-hash check does not establish it.
 
+Boolean expression reconstruction also uses Agda as a comparison.
+[`splitCon`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1464-L1532)
+unifies constructor indices and applies the resulting substitution to the
+context and target. Agda's [case trees](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/CompiledClause.hs#L35-L74)
+and [serializer](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Serialise/Instances/Internal.hs#L480-L513)
+retain constructor structure, arities, scoped branches, and bodies. They do not
+store an FC-style virtual equality binder. GHC therefore reconstructs that
+binder's nominal type from the actual Boolean scrutinee and constructor. It
+does not read trusted proof endpoints from the file. The proof remains local
+to the branch reached by strict discrimination. Agda's totality and definitional
+equality do not justify changing Haskell's bottom or `seq` behavior.
+
+The unfolding implementation also follows GHC's own lazy import contracts.
+`Note [Lazily checking Unfoldings]` and `Note [Tying the 'CoreUnfolding' knot]`
+in `GHC.IfaceToCore` require deferred templates and preserved cache fields.
+Native validation runs in each existing `forkM` thunk. It checks Core and the
+declared signature. A separate template scan follows the stable metadata that
+ordinary occurrence analysis would traverse, while leaving unused unstable
+templates deferred. This is a GHC adaptation, not an Agda serialization rule.
+
+The next Nat/Vec slice follows pinned Agda library definitions.
+The standard library's [vector constructors](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L36-L38)
+index the datatype by Nat. Its [replicate](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L246-L248)
+takes a length value and returns `Vec A n` by structural recursion. Its
+[append](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L108-L110)
+recurses through vectors, and [head](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L53-L54)
+matches a nonempty vector. GHC's retained append wrapper can use an ordinary
+erased-index GADT helper. A GADT predecessor type variable is not a runtime Nat
+argument. Agda's implicit argument syntax does not itself imply erasure.
+
+Agda's [Nat and addition](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Nat.agda#L8-L22)
+use zero/successor recursion. Agda marks them as builtins. The GHC target uses an
+ordinary user-defined Peano datatype and a closed `Add` family. The sources
+support the typing and recursion design; they do not establish Haskell runtime
+behavior. Check partial and cyclic Nat values separately. In particular, a
+successor does not force its predecessor, and finite prefixes of a cyclic
+replication must remain observable. Keep opaque runtime indices conservative in
+equality and apartness. No Agda build was run for this comparison.
+
 The frontend must preserve these identities through parsing, checking, and
 desugaring. RequiredTypeArguments provides erased type arguments. It cannot
 implement the retained rule by renaming `foreach` to `forall`. See the

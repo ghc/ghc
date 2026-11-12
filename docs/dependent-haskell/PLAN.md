@@ -338,23 +338,40 @@ For native unfoldings, first extend expression reconstruction under the existing
 module gate. Reconstruct a Boolean alternative's virtual CoVar from its
 scrutinee index and promoted constructor. Preserve ordinary binder-free Boolean
 alternatives. Check malformed binder counts, unsupported scrutinees, scope, and
-coverage with precise interface errors. Require Core Lint for native imported
-expressions even when optional interface linting is disabled.
+coverage with precise interface errors. Reject branch-local result escape before
+`coreAltsType` can panic. Require Core Lint for each native imported unfolding,
+including nested unfoldings, even when optional interface linting is disabled.
+Compare its recovered type with the declared signature. Classify native forms
+in either the RHS or the declared signature.
 
 Do not enable the unfolding writer after changing only the alternative codec.
 `mkCoreUnfolding` runs ordinary occurrence analysis on its template. Introduce a
-checked construction path that preserves runtime index dependencies. Preserve
+checked construction path that preserves runtime index dependencies. Its scan
+must include stable unfolding/rule/dictionary metadata that occurrence analysis
+would traverse. Leave unused unstable unfolding templates deferred. Use a
+separate own-RHS scan for deferred native validation. Gate native rule and
+dictionary payloads before their ordinary occurrence-analysis paths. Preserve
 the lazy RHS contract from `Note [Lazily checking Unfoldings]` and the cached
 fields from `Note [Tying the 'CoreUnfolding' knot]` in `GHC.IfaceToCore`.
 Validate expression round trips and malformed proofs before enabling module
 unfoldings. Then test actual imported templates and cross-module execution.
+
+This expression-table and declaration-reconstruction increment adds no wire
+constructors. Normal module unfolding generation remains gated. Low-level
+`writeIface` and `writeBinIface` APIs can construct files outside that gate.
+Before enabling module generation, give proof-bearing expression interfaces a
+new format distinction and verify rejection by the signature-only fork reader.
+Do not claim compatibility with the old `.1` reader for such expression bodies.
 
 - [x] Compile and run the source target as an ordinary vanilla executable through
       checked module simplification, tidying, CorePrep, and machine-code lowering.
 - [x] Encode retained signature binders and indices with scoped local Id names.
 - [x] Check signature round trips, disk imports, cross-module calls, and version rejection.
 - [x] Check signature fingerprints and recompilation after a producer signature change.
-- [ ] Encode native expression unfoldings and reconstruct virtual Boolean evidence.
+- [x] Check expression-table reconstruction, deferred template validation, and lazy
+      native unfolding construction through the GHC API.
+- [ ] Emit native expression unfoldings in actual module interface files with a
+      distinct format version.
 - [ ] Check imported unfoldings and malformed proof rejection.
 - [ ] Add focused compiler regression cases. Reuse existing testsuite conventions
       and golden tests where appropriate.
@@ -368,6 +385,108 @@ unfoldings. Then test actual imported templates and cross-module execution.
 Gate: the experiment works across modules, ordinary programs remain compatible,
 and the modified compiler builds itself. General dependent Haskell remains further
 work.
+
+### M9: runtime natural numbers and indexed vectors
+
+The next source target goes beyond Boolean selection. Support first-order
+algebraic runtime indices, with a user-defined Peano `Nat` and length-indexed
+`Vec` as the first program. Use ordinary promoted constructors for constructor
+indices. A runtime input remains a retained value. Do not add singleton conversion.
+Keep fixed lifted runtime representations and the checked `-O0` pipeline while
+the broader optimizer work in M6 remains open.
+
+```haskell
+data Nat = Z | S Nat
+
+data Vec a (n :: Nat) where
+  VNil  :: Vec a Z
+  VCons :: a -> Vec a n -> Vec a (S n)
+
+type family Add (n :: Nat) (m :: Nat) where
+  Add Z m = m
+  Add (S n) m = S (Add n m)
+
+replicate :: forall a. foreach (n :: Nat) -> a -> Vec a n
+replicate Z x = VNil
+replicate (S n) x = VCons x (replicate n x)
+
+append :: forall a.
+          foreach (n :: Nat) -> foreach (m :: Nat)
+       -> Vec a n -> Vec a m -> Vec a (Add n m)
+append n m xs ys = appendVec xs ys
+
+appendVec :: Vec a n -> Vec a m -> Vec a (Add n m)
+appendVec VNil ys = ys
+appendVec (VCons x xs) ys = VCons x (appendVec xs ys)
+
+head :: forall a. foreach (n :: Nat) -> Vec a (S n) -> a
+head n (VCons x _) = x
+```
+
+These signatures and definitions are targets, not implemented syntax coverage.
+The result uses the caller's actual runtime index. A number read from input can
+select a vector length without an explicit existential package. `Add` uses
+ordinary closed-family equations; this does not require arithmetic SMT solving.
+The ordinary GADT helper keeps append independent of runtime length evaluation.
+Its constructor pattern exposes an erased predecessor index, not a runtime Nat.
+The retained wrapper must instantiate the helper with the caller's runtime
+indices. `replicate` supplies the actual predecessor value through its Nat
+pattern. See [the Agda Nat/Vec references](REFERENCES.md#agda-provenance).
+
+- [ ] Generalize native index kinding and identifier validation from `Bool` to
+      supported lifted algebraic domains. Keep scope and multiplicity checks.
+- [ ] Represent saturated constructor indices such as `S n`. Preserve their
+      runtime field identities through substitution, tidying, and type recovery.
+- [ ] Refine constructor alternatives with both real fields and a virtual proof.
+      Preserve the fields at runtime. Erase only the checked proof.
+- [ ] Check recursive Core for vector replication with an unknown runtime Nat.
+      This is an intermediate gate; it does not complete the source target.
+- [ ] Extend frontend checking to scoped constructor-field indices, outer type
+      quantification, and multiple retained binders. Support safe GADT constructor
+      instantiation without allowing a runtime index to escape through a metavariable.
+- [ ] Compile and run the source `replicate` target, then source `append`, with
+      actual input values. Preserve the same index across producer and consumer.
+- [ ] Reject inconsistent vector lengths and escaping predecessor indices with
+      located diagnostics. Check lazy recursive fields and unused index arguments.
+- [ ] Transport the resulting signatures and programs across modules. Keep format
+      compatibility and any unfinished M8 unfolding work explicit. Pin a new
+      configured format before emitting Nat signatures and check `.1` rejection.
+
+Gate: a source program reads runtime lengths, constructs and appends vectors,
+and consumes the statically indexed results. Check empty and successor inputs.
+Check that observing the first element of a replication at `S undefined` does
+not force its predecessor. A hand-built Core example alone does not satisfy M9.
+
+Resolve these preservation rules in the implementation:
+
+- In a native `S k` alternative, put the actual field binder before the virtual
+  proof that mentions it. The current `cpt_dicts` insertion precedes runtime
+  fields and is insufficient. Preserve ordinary GADT evidence positions.
+- Generalize the fixed-domain check through eligible TyCon/DataCon structure.
+  Start with closed, promotable, first-order data domains. Preserve lazy fields.
+  Exclude existential, constrained, newtype, and unboxed index constructors in
+  this increment. Do not give the user-defined `Nat` a wired compiler identity.
+- Introduce the complete retained telescope before transporting an equation's
+  ordinary argument and result types. Splitting the first index must not require
+  the unsupported congruence for a remaining dependent function type.
+- Give GADT instantiation an explicit runtime-index scope rule. The current
+  metavariable guards are intentional. Removing them without a scope check can
+  let a predecessor escape. Evaluate expected-result constructor instantiation
+  and scoped meta-assignment against Agda's context rules.
+- Check CorePrep naming of constructor arguments. Naming `f (S k)` as
+  `let t = S k in f t` changes its recovered index to `TermVarTy t`. Specify and
+  check alias transport before claiming end-to-end constructor-argument support.
+  Do not use an unchecked cast or equality from an unfolding.
+- Preserve partial and cyclic Haskell values. Check finite vector prefixes for
+  `let n = S n`, a head from `replicate (S bottomNat) x`, and failure when its
+  remaining spine needs `bottomNat`. Check `head bottomNat (VCons x undefined)`
+  returns `x`. Agda's termination assumptions do not establish these properties.
+
+Use one compiled worker with unknown `n` and `m` from IORefs. For lengths two
+and three, `append n m (replicate n 42) (replicate m 7)` must observe
+`[42,42,7,7,7]`. Also check zero and successor inputs. Reject a constant `VNil`
+at unknown `n`, a vector at `n` where `S n` is required, and an unrelated runtime
+index. Keep `Add n m` distinct from `Add m n` without a supplied proof.
 
 ## Acceptance checks
 

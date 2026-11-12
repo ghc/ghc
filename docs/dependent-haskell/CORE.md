@@ -278,7 +278,8 @@ the ordinary type literal. Unknown tags fail with an IO error. The configured
 fork version is `10.1.20261112.1`, with interface header `1001202611121`.
 The existing whole-file version check runs before type decoding, including for
 `IgnoreHiWay`. Rebuild matching libraries when moving from the old format.
-Native expression unfoldings and virtual alternative proofs remain gated.
+Normal module unfolding generation remains gated. The expression-table path
+below reconstructs virtual alternative proofs separately.
 
 The regression uses the real binary tables at all three compression levels.
 The executable fixture compiles a producer, then imports only its `.hi` in a
@@ -293,6 +294,41 @@ edit. A family equation change must alter the retained declaration hashes and
 recheck an unchanged consumer that does not name the family. The bootstrap
 check and all five registered normal-way tests pass. The Agda provenance is recorded in
 [the references](REFERENCES.md#agda-provenance).
+
+## Native expression templates
+
+The expression codec reuses `IfaceAlt` names. A wired Boolean alternative has
+no runtime fields. One name represents its virtual CoVar. The reader allocates
+a fresh CoVar with nominal type `index(scrutinee) ~# promotedConstructor` and
+extends only that branch. It does not read proof endpoints from the file.
+Ordinary binder-free alternatives keep their existing interpretation.
+
+The reader rejects unsupported scrutinees, malformed proof counts, named
+DEFAULT/literal binders, and incomplete proof-bearing coverage. It checks
+branch-local and case-binder escape before recovering the result type.
+`coreAltType` would otherwise panic on an escaping binder. These are checks for
+the new forms, not a verifier for all malformed legacy interface expressions.
+
+Each native imported unfolding runs mandatory Core Lint inside its existing
+`forkM` thunk. This includes nested unfoldings and declarations whose retained
+signature has an ordinary but incorrect RHS. After Lint, compare the recovered
+type with the declared type through `eqType`. Report named interface failures.
+Native rule and dictionary unfolding payloads remain explicitly unsupported.
+
+`mkCoreUnfolding` preserves native templates instead of running ordinary
+occurrence analysis. The decision stays inside `uf_tmpl`. Inspecting `uf_src`
+does not force the RHS. Preserve the serialized cache. An own-RHS scan skips
+bound metadata for deferred validation. A separate construction scan includes
+the stable templates, rules, and dictionary metadata that occurrence analysis
+would traverse. It leaves unused unstable unfolding templates deferred.
+
+The API regression checks all compression levels, actual declaration
+reconstruction, types, scope, fresh proof identities, cache preservation, and
+laziness with optional Core Lint disabled. The normal module writer still omits
+unfoldings. Low-level file writers can bypass that module gate. Actual native
+expression files, a new format distinction, and cross-module template use remain
+separate work. See the two GHC Notes in `GHC.IfaceToCore` and
+`GHC.Core.Unfold.Make`, and [the Agda comparison](REFERENCES.md#agda-provenance).
 
 ## Scoped native SimpleOpt
 

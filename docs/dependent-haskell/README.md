@@ -4,6 +4,7 @@ The long-term goal is dependent types in Haskell. The first experiment is a
 retained Boolean argument whose value determines the result type. Extend Core
 from Eisenberg's historical `nokinds-pi` work, ported and completed on current
 GHC. Keep the validated `singletons` encoding as a comparison implementation.
+The next source target is runtime Peano naturals and length-indexed vectors.
 
 Last updated: 2026-11-12.
 
@@ -30,7 +31,7 @@ Last updated: 2026-11-12.
 | Configured fork version | `10.1.20261112.1`, with interface header `1001202611121` |
 | Source syntax | `ExperimentalDependentTypes` checks one explicit retained Boolean binder; unsupported source positions report GHC-43582 |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | Native expression reconstruction and checked unfolding construction in M8; source `case` and broader M6 work remain open |
+| Next task | Runtime Nat/Vec in M9; actual unfolding files in M8, source `case`, and broader M6 remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -426,9 +427,66 @@ whitespace checks, and local documentation link checks pass.
 The test Note records these controls and links the existing GHC fingerprinting
 Note. The [Agda import-validation comparison](REFERENCES.md#agda-provenance)
 records the shared dependency check and GHC's distinct declaration ABI policy.
-Native unfoldings remain gated. Their next increment must reconstruct virtual
-proofs, check imported native Core, and avoid ordinary occurrence analysis while
-preserving lazy unfolding reconstruction. See [the remaining M8 work](PLAN.md#m8-support-interfaces-and-validate-the-compiler-change).
+Normal module unfolding generation remains gated. The expression-table and
+declaration-reconstruction increment below supplies the checked template path.
+See [the remaining M8 work](PLAN.md#m8-support-interfaces-and-validate-the-compiler-change).
+
+## Native expression templates
+
+At `bb998056d5`, expression tables reconstruct fresh Boolean branch proofs from
+the scrutinee and constructor. Imported native templates run mandatory Core Lint
+and match their declared types inside deferred RHS reconstruction. The unfolding
+builder preserves runtime index bindings, native proofs, and native stable
+metadata. It leaves unused unstable templates deferred and preserves the wire
+cache. Native rule/dictionary payloads reject before ordinary occurrence analysis.
+
+The regression covers all three compression levels, variable and literal proof
+cases, ordinary Boolean cases, DEFAULT coverage, index-only lets, fresh proof
+identity, scope, malformed annotations, both signature-mismatch directions,
+named DEFAULT/literal binders, native rule/dictionary gates, and lazy metadata.
+It imports actual `IfaceId` declarations and forces their templates with optional
+Core Lint disabled. These are binary-table and declaration checks; they do not
+establish real native unfolding files or cross-module inlining.
+
+Both-stage default builds pass with six workers, `--docs=none`, and swap disabled.
+The first pass took 9m44s and peaked at 5,417 MiB under 16 GiB. The final alignment
+at `bb998056d5` took 8m28s and peaked at 4,946 MiB. The target API run peaked at
+832 MiB under 4 GiB. The aligned bootstrap API run peaked at 987 MiB under 4 GiB.
+
+All five registered normal-way tests pass: 39 cases, 34 skipped, no unexpected
+results, and no framework warnings. Hadrian reported 1m09s; the scope peaked at
+2,493 MiB under 8 GiB. The ordinary optimized/threaded TH, package, GHCi, and
+Haddock smoke also passes, at 145 MiB under 4 GiB. Swap was disabled in each scope.
+The full testsuite, documentation build, and performance measurements have not run.
+
+Ignored logs and peak records use the `native-expr` prefix under
+`_build/verification/`. Scripts include `build.sh`, `native-expr-self-api.sh`,
+`native-iface-api.sh`, `native-source-choose-registered.py`, and
+`native-iface-smoke.sh`. Compiler formatting checks are nonmutating parses;
+the fixture passes canonical Fourmolu. Cabal-gild, diff, and local link checks pass.
+See [the representation and checks](CORE.md#native-expression-templates).
+
+A statically linked header-only reader and native Boolean control interface are
+preserved in `_build/verification/interface-bool-v1/`. The reader accepts the
+`.1` control with both `CheckHiWay` and `IgnoreHiWay`. Its preservation scope
+peaked at 848 MiB under 4 GiB. `SHA256SUMS` records both artifacts. Keep this
+binary for the next format's rejection check; do not rebuild it after the bump.
+Rejection of the future format has not been tested yet.
+
+## Next: runtime naturals and vectors
+
+The [M9 target](PLAN.md#m9-runtime-natural-numbers-and-indexed-vectors) is a
+user-defined Peano Nat with `replicate`, `append`, and `head` for indexed vectors.
+Runtime lengths become native indices directly. `replicate` inspects a length;
+`append` can use an ordinary GADT helper without forcing its retained lengths.
+The [pinned Agda definitions](REFERENCES.md#agda-provenance) supply the typing
+and recursion comparison. Nat/Vec support is not implemented yet.
+
+The audit identifies four preservation requirements: field binders before proofs
+that mention them, scoped GADT index instantiation, retained telescopes, and
+CorePrep transport when naming constructor arguments. M9 records source-level
+and cross-module acceptance checks, including partial and cyclic Nat values.
+The Core prototype will be an intermediate step, not completion of this target.
 
 ## Verified baseline
 
@@ -505,7 +563,8 @@ reproduction recipe are now in [reference/](reference/README.md).
 
 ## How to resume
 
-1. Read this file and the next unchecked milestone in [the plan](PLAN.md).
+1. Read this file and the current priority in [the plan](PLAN.md). M9 Nat/Vec is
+   next. Keep the open M6 and M8 work visible while implementing that target.
 2. Check `git status`, the current branch, and the source revision. Compare them
    with the baseline above before reusing build results.
 3. Read the relevant primary sources in [the references](REFERENCES.md).
