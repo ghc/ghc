@@ -236,6 +236,28 @@ localIndexKeep force producer =
     resultType = mkFunctionType ManyTy (selected (TermVarTy b)) (selected (TermVarTy b))
     observation = mkApps (Var force) [Type resultType, App (Var keepId) (Var b)]
 
+-- | Preserve a lazy local index used only in erased annotations.
+typeOnlyLocalIndex :: CoreExpr -> Id -> Id -> CoreExpr
+typeOnlyLocalIndex intPayload force producer =
+    Let (NonRec b (Var producer)) observation
+  where
+    b = local 70 "type_only_index" boolTy
+    index = TermVarTy b
+    dictionary = local 71 "dictionary" (mkTyConApp eqTyCon [boolTy, index, index])
+    value = Lam dictionary intPayload
+    observation = mkApps (Var force) [Type (indexed index), value]
+
+-- | Execute a constructor application that permits checked case reduction.
+literalSelection :: Bool -> CoreExpr -> Id -> Id -> CoreExpr
+literalSelection value intPayload observeInt observeBool =
+    App (Var observer) (Cast selectedValue reduction)
+  where
+    constructor = if value then trueDataCon else falseDataCon
+    branch = if value then 0 else 1
+    observer = if value then observeInt else observeBool
+    selectedValue = App (choose intPayload) (Var (dataConWorkId constructor))
+    reduction = mkAxInstCo Representational (BranchedAxiom (snd selectFamily) branch) [] []
+
 -- | Observe that choose evaluates its Boolean argument.
 strictChooseKernel :: CoreExpr -> Id -> CoreExpr
 strictChooseKernel intPayload force = Lam b (Let (NonRec chooseId chooseExpr) observation)
@@ -310,8 +332,15 @@ runChecks = do
     liftIO $ do
         expectBoth "choose" (selectionKernel False payload observeInt observeBool)
         expectBoth "keep/choose" (selectionKernel True payload observeInt observeBool)
+        expect "choose literal True" "42" (literalSelection True payload observeInt observeBool)
+        expect "choose literal False" "False" (literalSelection False payload observeInt observeBool)
         expect "keepSelect bottom (partial WHNF)" "forced" (run (partialKeepKernel force) (Var bottomBool))
         expect "keepSelect local bottom (partial WHNF)" "forced" (localIndexKeep force bottomBool)
+        expect "type-only local bottom (function WHNF)" "forced" (typeOnlyLocalIndex payload force bottomBool)
+        case typeOnlyLocalIndex payload force bottomBool of
+            Let (NonRec binder producer) body ->
+                expect "type-only producer beta (function WHNF)" "forced" (App (Lam binder body) producer)
+            _ -> fail "FAIL: expected a local index in the type-only fixture"
         expect "keep indexed bottom (fully applied)" "42" (run (dictionaryKeepKernel payload observeInt) (Var bottomBool))
         result <- try (execute environment flags "choose bottom" (run (strictChooseKernel payload force) (Var bottomBool))) :: IO (Either SomeException String)
         case result of

@@ -78,7 +78,7 @@ rejectNative context found =
             ( Sorry
                 ( "Native dependent Core cannot enter "
                     ++ context
-                    ++ ". Optimization and code generation for native dependent types and Boolean proofs are not implemented."
+                    ++ ". This operation does not support retained Boolean types or branch proofs."
                 )
             )
 

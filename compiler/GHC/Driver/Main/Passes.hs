@@ -99,7 +99,7 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
-import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.Dependent ( hasNativeDependentExpr, rejectNativeDependentExpr )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Utils          ( exprType )
@@ -108,6 +108,7 @@ import GHC.Core.Opt.Pipeline.Types      ( CoreToDo (..))
 import GHC.Core.InstEnv
 import GHC.Core.Rules
 import GHC.Core.Stats
+import GHC.Core.SimpleOpt ( simpleOptNativeExpr )
 
 
 import GHC.CoreToStg.Prep( CorePrepConfig(..), corePrepExpr )
@@ -1530,6 +1531,25 @@ hscTidy hsc_env guts = do
 %*                                                                      *
 %********************************************************************* -}
 
+{- Note [Compiling native dependent Core]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The native bytecode entry uses the restricted SimpleOpt mode. See
+Note [Restricted dependent simplification] in GHC.Core.SimpleOpt. The ordinary
+simplifier does not preserve runtime index substitutions or virtual Bool proofs.
+Do not send native expressions through that path.
+
+Force Core Lint before and after simplification and CorePrep. Force STG Lint
+after lowering. Keep speculative evaluation and optional arity analysis disabled
+in CorePrep. A retained Bool is an ordinary lazy argument. An occurrence in a
+type must not force it. The strict case supplies branch evidence; CoreToStg
+removes that evidence after checking its scope and runtime representations.
+
+Report an unsupported backend as Sorry. It is a feature restriction, not an
+internal compiler error. Program compilation and interfaces remain gated.
+See docs/dependent-haskell/CORE.md and the Agda provenance in
+docs/dependent-haskell/REFERENCES.md.
+-}
+
 hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 hscCompileCoreExpr hsc_env loc expr =
   case hscCompileCoreExprHook (hsc_hooks hsc_env) of
@@ -1539,8 +1559,7 @@ hscCompileCoreExpr hsc_env loc expr =
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   {- Simplify it -}
-  -- Question: should we call SimpleOpt.simpleOptExpr here instead?
-  -- It is, well, simpler, and does less inlining etc.
+  -- See Note [Compiling native dependent Core].
   let native = hasNativeDependentExpr ds_expr
       dflags = if native
                then gopt_set (gopt_set (hsc_dflags hsc_env) Opt_DoCoreLinting)
@@ -1556,10 +1575,12 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
     then do
       case hscInterp hsc_env of
         Interp { interpInstance = ExternalInterp (ExtJS _) } ->
-          pprPanic "hscCompileCoreExpr: native dependent Core requires bytecode" empty
+          rejectNativeDependentExpr "JavaScript code generation" ds_expr
         _ -> return ()
-      lintInteractiveExpr (text "native Core before preparation") lint_env ds_expr
-      return ds_expr
+      lintInteractiveExpr (text "native Core before simplification") lint_env ds_expr
+      let simplified = simpleOptNativeExpr ds_expr
+      lintInteractiveExpr (text "native Core after simplification") lint_env simplified
+      return simplified
     else simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr
 
   -- Create a unique temporary binding

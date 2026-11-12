@@ -9,6 +9,7 @@ module GHC.Core.SimpleOpt (
 
         -- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprNoInline, simpleOptExprWith,
+        simpleOptNativeExpr,
 
         -- ** Join points
         joinPointBinding_maybe, joinPointBindings_maybe,
@@ -33,8 +34,9 @@ import GHC.Core.DataCon
 import GHC.Core.Coercion.Opt ( optCoercion, optTransCo, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
-import GHC.Core.Predicate( isCoVarType )
+import GHC.Core.Predicate( isCoVarType, getEqPredTys_maybe )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
+import GHC.Core.TyCo.Compare ( eqType )
 
 import GHC.Types.Literal
 import GHC.Types.Id
@@ -269,6 +271,50 @@ simpleOptExprNoInline opts expr
     init_env   = (emptyEnv init_opts) { soe_subst = init_subst }
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
 
+-- | Simplify checked native dependent Core with restricted Boolean reductions.
+-- See Note [Restricted dependent simplification].
+simpleOptNativeExpr :: HasDebugCallStack => CoreExpr -> CoreExpr
+simpleOptNativeExpr expr
+  = simple_opt_expr init_env expr
+  where
+    opts = defaultSimpleOpts { so_inline = const False
+                             , so_can_drop = const False
+                             , so_eta_red = False }
+    init_env = (emptyEnv opts) { soe_subst = init_subst, soe_native = True }
+    init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
+
+{- Note [Restricted dependent simplification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+simpleOptNativeExpr reuses the simple optimiser without occurrence analysis,
+general inlining, or eta reduction. Runtime index occurrences record scope
+dependencies, not runtime usage. Ordinary occurrence analysis can discard a
+binding that an index still needs. Preserve source lets until backend lowering.
+Do not create new rules or Core unfoldings. mkUnfolding would run occurrence
+analysis again. Do not create join points from pre-existing occurrence metadata.
+
+Boolean beta reduction substitutes an optimized local variable or exact
+constructor into terms and types together. Retain the redex for an unsupported
+producer. A lazy let for a retained argument could let its index escape.
+Disable compulsory unfolding too: unfolding a valid variable index can expose
+an unsupported producer. Do not push casts through native lambdas.
+
+A virtual Boolean proof is not a constructor field. Reduce its case only when
+the scrutinee is an exact constructor and the substituted primitive nominal
+equality has that constructor at both endpoints. Replace the proof with nominal
+reflexivity. Constructor knowledge from an unfolding does not supply this proof.
+Keep variable cases strict and preserve ordinary coercion argument positions.
+
+Agda's dependent application rule motivates substitution into the codomain.
+Its case-tree reduction and with-abstraction equality motivate constructor
+reduction with an explicit scrutinee equation. See
+docs/dependent-haskell/REFERENCES.md#agda-provenance. These rules do not establish
+preservation for Haskell. Agda's function eta equality does not justify eta
+reduction across Haskell's bottom and seq. See
+docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
+General inlining, occurrence analysis, and nonreflexive dependent congruence
+remain unsupported.
+-}
+
 simpleOptExprWith :: HasDebugCallStack => SimpleOpts -> Subst -> InExpr -> OutExpr
 -- See Note [The simple optimiser]
 simpleOptExprWith opts subst expr
@@ -334,6 +380,9 @@ data SimpleOptEnv
         , soe_rec_ids :: !UnVarSet
              -- ^ Fast OutVarSet tracking which recursive RHSs we are analysing.
              -- See Note [Eta reduction in recursive RHSs]
+
+        , soe_native :: !Bool
+             -- ^ See Note [Restricted dependent simplification].
         }
 
 instance Outputable SimpleOptEnv where
@@ -346,6 +395,7 @@ emptyEnv :: SimpleOpts -> SimpleOptEnv
 emptyEnv opts = SOE { soe_inl     = emptyVarEnv
                     , soe_subst   = emptySubst
                     , soe_rec_ids = emptyUnVarSet
+                    , soe_native  = False
                     , soe_opts    = opts  }
 
 soeZapSubst :: SimpleOptEnv -> SimpleOptEnv
@@ -396,7 +446,22 @@ simple_opt_expr env expr = go expr
                              (env', Just bind) -> Let bind (simple_opt_expr env' body)
 
     go (Case e b ty as)
-      | isDeadBinder b
+      | soe_native env
+      , Just index <- exprToBoolIndex e'
+      , Just (tc, []) <- splitTyConApp_maybe index
+      , Just con <- if tc == promoteDataCon trueDataCon then Just trueDataCon
+                    else if tc == promoteDataCon falseDataCon then Just falseDataCon
+                    else Nothing
+      , Just (Alt (DataAlt _) [cv] rhs) <- findAlt (DataAlt con) as
+      , isCoVar cv
+      , Just (Nominal, left, right) <- getEqPredTys_maybe (substTyUnchecked subst (varType cv))
+      , eqType left index, eqType right index
+      = let proof_env = env { soe_subst = extendCvSubst (extendIdSubst subst b e')
+                                                      cv (mkNomReflCo index) }
+        in simple_opt_expr proof_env rhs
+
+      | not (soe_native env)
+      , isDeadBinder b
       , Just (_, floats, con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
       , isEmptyFloatBinds floats
         -- We don't need to be concerned about floats when looking for coerce.
@@ -409,7 +474,8 @@ simple_opt_expr env expr = go expr
                                zipEqual bs es
 
          -- See Note [Getting the map/coerce RULE to work]
-      | isDeadBinder b
+      | not (soe_native env)
+      , isDeadBinder b
       , [Alt DEFAULT _ rhs] <- as
       , isCoVarType (varType b)
       , (Var fun, _args) <- collectArgs e
@@ -441,7 +507,8 @@ simple_app env (Var v) as
   | Just (env', e) <- lookupVarEnv (soe_inl env) v
   = simple_app (soeSetInScope (soeInScope env) env') e as
 
-  | let unf = idUnfolding v
+  | not (soe_native env)
+  , let unf = idUnfolding v
   , isCompulsoryUnfolding unf
   , isAlwaysActive (idInlineActivation v)
     -- Make sure to inline Ids with compulsory unfoldings.
@@ -468,7 +535,15 @@ simple_app env e0@(Lam {}) as0@(_:_)
     n_args = count (\case {ApplyToArg {} -> True; CastIt {} -> False}) as0
 
     do_beta :: SimpleOptEnv -> InExpr -> [SimpleContItem] -> OutExpr
-    do_beta env (Lam b body) (ApplyToArg a:as)
+    do_beta env e@(Lam b body) args@(ApplyToArg a:as)
+      | soe_native env
+      , isBoolIndexId b'
+      = let arg = simple_opt_clo (soeInScope env') a
+        in case exprToBoolIndex arg of
+             Just _ -> do_beta (env' { soe_subst = extendIdSubst (soe_subst env') b arg })
+                               body as
+             Nothing -> rebuild_app env (simple_opt_expr env e) args
+
       | -- simpl binder before looking at its type
         -- See Note [Dark corner with representation polymorphism]
         needsCaseBinding (idType b') (snd a)
@@ -483,7 +558,8 @@ simple_app env e0@(Lam {}) as0@(_:_)
 
     -- See Note [Eliminate casts in function position]
     do_beta env e@(Lam b _) as@(CastIt out_co:rest)
-      | isNonCoVarId b
+      | not (soe_native env)
+      , isNonCoVarId b
       -- Optimise the inner lambda to make it an 'OutExpr', which makes it
       -- possible to call 'pushCoercionIntoLambda' with the 'OutCoercion' 'co'.
       -- This is kind of horrible, as for nested casted lambdas with a big body,
@@ -669,14 +745,16 @@ simple_opt_bind env (NonRec b r) top_level
             Nothing    -> Nothing
             Just (b,r) -> Just (NonRec b r))
   where
-    (b', r') = joinPointBinding_maybe b r `orElse` (b, r)
+    (b', r') | soe_native env = (b, r)
+             | otherwise = joinPointBinding_maybe b r `orElse` (b, r)
     (env', mb_pr) = simple_bind_pair env b' Nothing (env,r') top_level
 
 simple_opt_bind env (Rec prs) top_level
   = (env2, res_bind)
   where
     res_bind          = Just (Rec (reverse rev_prs'))
-    prs'              = joinPointBindings_maybe prs `orElse` prs
+    prs' | soe_native env = prs
+         | otherwise = joinPointBindings_maybe prs `orElse` prs
     (env1, bndrs')    = subst_opt_bndrs env (map fst prs')
     (env2, rev_prs')  = enterRecGroupRHSs env1 bndrs' $ \env ->
                           foldl' do_pr (env, []) (prs' `zip` bndrs')
@@ -996,6 +1074,7 @@ subst_opt_id_bndr env@(SOE { soe_subst = subst, soe_inl = inl }) old_id
 ----------------------
 add_info :: SimpleOptEnv -> InVar -> TopLevelFlag -> OutExpr -> OutVar -> OutVar
 add_info env old_bndr top_level new_rhs new_bndr
+ | soe_native env = new_bndr  -- See Note [Restricted dependent simplification]
  | isTyVar old_bndr = new_bndr
  | otherwise        = lazySetIdInfo new_bndr new_info
  where

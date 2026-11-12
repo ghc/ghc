@@ -15,6 +15,7 @@ import GHC.Core.Dependent
 import GHC.Core.FamInstEnv (mkBranchedCoAxiom, mkCoAxBranch)
 import GHC.Core.Lint (lintExpr)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
+import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
 import GHC.Core.TyCo.Rep (Type (..))
@@ -27,6 +28,7 @@ import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Driver.Ppr (showSDoc)
+import GHC.Types.Basic (OccInfo (..), TailCallInfo (..))
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails (VanillaId), RuleInfo (..))
 import GHC.Types.InlinePragma (ActivationX (AlwaysActive))
@@ -38,6 +40,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Utils.Outputable (ppr, vcat)
+import GHC.Utils.Panic (GhcException (..))
 import System.Environment (getArgs)
 import System.Timeout (timeout)
 
@@ -132,6 +135,26 @@ rejectsWith label fragment action = do
         Left err -> check (label ++ " (diagnostic)") (fragment `isInfixOf` displayException err)
         Right () -> fail ("FAIL: " ++ label ++ "; unsupported operation succeeded")
 
+-- | Require an unsupported-operation diagnostic with its compiler phase.
+rejectsUnsupported :: String -> String -> IO () -> IO ()
+rejectsUnsupported label context action = do
+    result <- try @GhcException action
+    case result of
+        Left (Sorry message) -> do
+            check (label ++ " (phase)") (context `isInfixOf` message)
+            check (label ++ " (restriction)") ("This operation does not support" `isInfixOf` message)
+        Left exception -> fail ("FAIL: " ++ label ++ "; wrong exception: " ++ displayException exception)
+        Right () -> fail ("FAIL: " ++ label ++ "; unsupported operation succeeded")
+
+-- | Check simplification against the original type and both Lint boundaries.
+simplifyAccepts :: DynFlags -> String -> [Var] -> CoreExpr -> IO CoreExpr
+simplifyAccepts dflags label scope expression = do
+    lintAccepts dflags (label ++ " (before)") scope expression
+    let simplified = simpleOptNativeExpr expression
+    lintAccepts dflags (label ++ " (after)") scope simplified
+    checkType dflags label (exprType expression) (exprType simplified)
+    pure simplified
+
 -- | Make an unfolding without invoking the unsupported optimizer.
 unfolding :: CoreExpr -> Unfolding
 unfolding body =
@@ -165,6 +188,31 @@ runChecks dflags = do
     lintAccepts dflags "keep False" [] (App worker falseExpr)
     checkType dflags "True application substitutes the constructor" (keepResult trueIndex) (exprType (App worker trueExpr))
     checkType dflags "False application substitutes the constructor" (keepResult falseIndex) (exprType (App worker falseExpr))
+    optimizedTrue <- simplifyAccepts dflags "keep True beta reduction" [] (App worker trueExpr)
+    optimizedFalse <- simplifyAccepts dflags "keep False beta reduction" [] (App worker falseExpr)
+    optimizedVariable <- simplifyAccepts dflags "keep variable beta reduction" [c] (App worker (Var c))
+    optimizedShadow <- simplifyAccepts dflags "keep beta reduction avoids capture" [b] (App worker (Var b))
+    let isIdentity (Lam arg (Var result)) = arg == result
+        isIdentity _ = False
+    check "keep True removes the retained beta redex" (isIdentity optimizedTrue)
+    check "keep False removes the retained beta redex" (isIdentity optimizedFalse)
+    check "keep variable removes the retained beta redex" (isIdentity optimizedVariable)
+    check "keep shadowing removes the retained beta redex" (isIdentity optimizedShadow)
+    let g = local 80 "g" workerTy
+        f = setIdOccInfo (local 81 "f" workerTy) (ManyOccs (AlwaysTailCalled 1))
+        boundWorker = Let (NonRec g worker) (Let (NonRec f (Var g)) (App (Var f) trueExpr))
+    optimizedBound <- simplifyAccepts dflags "native simplification preserves ordinary bindings" [] boundWorker
+    let noTemplate binder = case realIdUnfolding binder of
+            CoreUnfolding{} -> False
+            DFunUnfolding{} -> False
+            _ -> null (idCoreRules binder)
+    check
+        "native simplification creates neither join points nor unfolding templates"
+        ( case optimizedBound of
+            Let (NonRec g' _) (Let (NonRec f' _) _) ->
+                not (isJoinId g' || isJoinId f') && noTemplate g' && noTemplate f'
+            _ -> False
+        )
     checkType dflags "True Id-only type substitution" (indexed trueIndex) (Subst.substTy substituteTrue (indexed (TermVarTy b)))
     checkType dflags "False Id-only type substitution" (indexed falseIndex) (Subst.substTy substituteFalse (indexed (TermVarTy b)))
     let toC = indexSubst [c] b (Var c)
@@ -291,7 +339,10 @@ runChecks dflags = do
                 liftedTypeKind
                 []
                 workerTy
-                True False False False
+                True
+                False
+                False
+                False
         hiddenType = mkTyConTy hiddenSynonym
         unusedParameter = mkTyVar (mkSystemName (unique 71) (mkTyVarOcc "unused")) liftedTypeKind
         unusedBinders = [mkAnonTyConBinder unusedParameter]
@@ -303,7 +354,10 @@ runChecks dflags = do
                 liftedTypeKind
                 [Phantom]
                 intTy
-                True True True True
+                True
+                True
+                True
+                True
         ignoredType = mkTyConApp unusedSynonym [workerTy]
         ignoredHiddenType = mkTyConApp unusedSynonym [hiddenType]
         identityParameter = mkTyVar (mkSystemName (unique 73) (mkTyVarOcc "identity")) liftedTypeKind
@@ -316,7 +370,10 @@ runChecks dflags = do
                 liftedTypeKind
                 [Representational]
                 (mkTyVarTy identityParameter)
-                True True False False
+                True
+                True
+                False
+                False
         nestedOrdinary = iterate (mkTyConApp identitySynonym . (: [])) boolTy !! 12
     check "scanner expands a hidden retained function synonym" (hasNativeDependentExpr (Type hiddenType))
     check "scanner expands synonyms inside ordinary types" (hasNativeDependentExpr (Type (mkVisFunTyMany intTy hiddenType)))
@@ -357,10 +414,12 @@ runChecks dflags = do
     cycleResult <- timeout 2000000 (evaluate (hasNativeDependentProgram [NonRec cyclic trueExpr] []))
     check "scanner terminates on cyclic bound metadata" (cycleResult == Just False)
     rejectNativeDependentExpr "ordinary smoke" (Lam b (Var b))
-    rejectsWith "native expression boundary gate" "Native dependent Core cannot enter" $
+    rejectsUnsupported "native expression boundary gate" "native smoke" $
         rejectNativeDependentExpr "native smoke" worker
-    rejectsWith "native program boundary gate" "Native dependent Core cannot enter" $
+    rejectsUnsupported "native program boundary gate" "native smoke" $
         rejectNativeDependentProgram "native smoke" [NonRec (local 20 "keep" workerTy) worker] []
+    rejectsUnsupported "native JavaScript boundary diagnostic" "JavaScript code generation" $
+        rejectNativeDependentExpr "JavaScript code generation" worker
 
 -- | Build a nominal proof identifier with the specified endpoints.
 proof :: Int -> Type -> Type -> CoVar
@@ -483,6 +542,38 @@ runCaseChecks dflags = do
     lintAccepts dflags "choose False followed by its family equation" [payload] (Cast (App choose falseExpr) (reduce 1))
     checkType dflags "True application selects Int" intTy (exprType (Cast (App choose trueExpr) (reduce 0)))
     checkType dflags "False application selects Bool" boolTy (exprType (Cast (App choose falseExpr) (reduce 1)))
+    optimizedChooseTrue <- simplifyAccepts dflags "choose True reduces with checked reflexivity" [payload] (App choose trueExpr)
+    optimizedChooseFalse <- simplifyAccepts dflags "choose False reduces with checked reflexivity" [payload] (App choose falseExpr)
+    check "choose True removes virtual branch proofs" (not (hasNativeDependentExpr optimizedChooseTrue))
+    check "choose False removes virtual branch proofs" (not (hasNativeDependentExpr optimizedChooseFalse))
+    optimizedChoose <- simplifyAccepts dflags "choose retains a strict variable case" [payload] choose
+    check
+        "choose keeps constructor discrimination on an opaque index"
+        (case optimizedChoose of Lam _ (Case (Var _) _ _ _) -> True; _ -> False)
+    let knownUnfolding = (unfolding trueExpr){uf_cache = UnfoldingCache True True True True}
+        knownTrue = setIdUnfolding b knownUnfolding
+        knownCase =
+            CoreSubst.substExpr (indexSubst [knownTrue, payload] b (Var knownTrue)) $
+                Case (Var b) (setIdOccInfo caseBinder IAmDead) (selected index) selectAlts
+    optimizedKnown <- simplifyAccepts dflags "constructor unfolding preserves opaque proof" [knownTrue, payload] knownCase
+    check
+        "an unfolding cannot turn an opaque index proof into reflexivity"
+        (case optimizedKnown of Case (Var _) _ _ _ -> True; _ -> False)
+    let producer = local 82 "producer" (mkFunctionType ManyTy boolTy boolTy)
+        producerArgument = App (Var producer) trueExpr
+        closedResult =
+            Lam b $
+                Case
+                    (Var b)
+                    caseBinder
+                    intTy
+                    [ Alt (DataAlt falseDataCon) [falseProof] (Var payload)
+                    , Alt (DataAlt trueDataCon) [trueProof] (Var payload)
+                    ]
+    optimizedProducer <- simplifyAccepts dflags "unsupported Boolean beta producer stays lazy" [producer, payload] (App closedResult producerArgument)
+    check
+        "an unsupported producer keeps its application redex"
+        (case optimizedProducer of App (Lam _ _) (App (Var _) _) -> True; _ -> False)
 
     let keepBool = local 30 "keep_b" boolTy
         keepIndex = TermVarTy keepBool
