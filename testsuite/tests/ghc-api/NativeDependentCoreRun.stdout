@@ -30,4 +30,5 @@ program keep indexed bottom (fully applied): 42
 program indexed payload control bottom (dictionary WHNF): forced
 program choose bottom: raised native-bottom-bool
 program rejection checks: ok
+module execution checks: ok
 native-core-run-ok

@@ -25,10 +25,12 @@ import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
-import GHC.Driver.DynFlags (DynFlags (..), ExecutableLinkMode (Dynamic), GhcLink (LinkExecutable), gopt_set)
+import GHC.Driver.DynFlags (DynFlags (..), ExecutableLinkMode (Dynamic), GhcLink (LinkExecutable, NoLink), GhcMode (OneShot), gopt_set)
 import GHC.Driver.Env (HscEnv, hscInterp)
 import GHC.Driver.Flags (GeneralFlag (Opt_ExternalInterpreter))
 import GHC.Driver.Main (hscCompileCoreExpr, hscSimplify)
+import GHC.Driver.Phases (Phase (StopLn), StopPhase (NoStop))
+import GHC.Driver.Pipeline (compileFile, oneShot)
 import GHC.Driver.Ppr (showSDoc)
 import GHC.Runtime.Interpreter (evalString)
 import GHC.Types.Error (Diagnostic (diagnosticCode), DiagnosticCode (..), MsgEnvelope (..), getMessages, pprDiagnostic)
@@ -58,6 +60,7 @@ main = do
         [libdir] -> do
             GHC.runGhc (Just libdir) runChecks
             runProgramChecks libdir
+            runModuleChecks libdir
             putStrLn "native-core-run-ok"
         _ -> fail "Usage: NativeDependentCoreRun GHC_LIBDIR"
 
@@ -153,6 +156,8 @@ retainedChooseSource moduleName observation =
         , "      forceChosen b !x = ()"
         , "      forceIndependent :: foreach (b :: Bool) -> ((b ~ b) => Int) -> ()"
         , "      forceIndependent b !x = ()"
+        , "      keepIndependent :: foreach (b :: Bool) -> ((b ~ b) => Int) -> Int"
+        , "      keepIndependent b x = x"
         , "      run :: Bool -> IO String"
         , "      run b = pure (observe b (again b))"
         , "  in " ++ observation
@@ -172,24 +177,134 @@ retainedProgramSource =
             ++ drop 3 sourceLines
             ++ ["main :: IO ()", "main = entry >>= putStr"]
   where
-    sourceLines = lines $ retainedChooseSource "NativeProgram" observation
-    observation =
-        unlines
-            [ "do"
-            , "       both <- driveBoth run"
-            , "       let b = bottomBool"
-            , "       partial <- case keep b of !_ -> pure \"forced\""
-            , "       let keepIndependent :: foreach (i :: Bool) -> ((i ~ i) => Int) -> Int"
-            , "           keepIndependent i x = x"
-            , "       lazy <- observeInt (keepIndependent b 42)"
-            , "       control <- force (forceIndependent b 42)"
-            , "       strict <- E.try (force (forceChosen b (choose b))) :: IO (Either E.SomeException String)"
-            , "       strictText <- case strict of"
-            , "         Left exception | \"native-bottom-bool\" `isInfixOf` E.displayException exception -> pure \"raised native-bottom-bool\""
-            , "         Left exception -> fail (\"choose raised another exception: \" ++ E.displayException exception)"
-            , "         Right result -> fail (\"choose bottom returned: \" ++ result)"
-            , "       pure (unlines [both, partial, lazy, control, strictText])"
-            ]
+    sourceLines = lines $ retainedChooseSource "NativeProgram" retainedProgramObservation
+
+-- | Observe shared runtime indices and distinguish lazy and strict consumers.
+retainedProgramObservation :: String
+retainedProgramObservation =
+    unlines
+        [ "do"
+        , "       both <- driveBoth run"
+        , "       let b = bottomBool"
+        , "       partial <- case keep b of !_ -> pure \"forced\""
+        , "       lazy <- observeInt (keepIndependent b 42)"
+        , "       control <- force (forceIndependent b 42)"
+        , "       strict <- E.try (force (forceChosen b (choose b))) :: IO (Either E.SomeException String)"
+        , "       strictText <- case strict of"
+        , "         Left exception | \"native-bottom-bool\" `isInfixOf` E.displayException exception -> pure \"raised native-bottom-bool\""
+        , "         Left exception -> fail (\"choose raised another exception: \" ++ E.displayException exception)"
+        , "         Right result -> fail (\"choose bottom returned: \" ++ result)"
+        , "       pure (unlines [both, partial, lazy, control, strictText])"
+        ]
+
+-- | Export native signatures without expression unfoldings.
+retainedLibrarySource :: String
+retainedLibrarySource =
+    unlines
+        [ "{-# LANGUAGE BangPatterns, DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, RankNTypes, TypeFamilies, TypeOperators #-}"
+        , "module NativeRetainedLibrary (Select, choose, keep, observe, forceChosen, forceIndependent, keepIndependent) where"
+        , "type family Select (b :: Bool) where"
+        , "  Select True = Int"
+        , "  Select False = Bool"
+        , "choose :: foreach (b :: Bool) -> Select b"
+        , "choose True = 42"
+        , "choose False = False"
+        , "keep :: foreach (b :: Bool) -> Select b -> Select b"
+        , "keep b x = x"
+        , "observe :: foreach (b :: Bool) -> Select b -> String"
+        , "observe False p = if p then \"True\" else \"False\""
+        , "observe True n = show (n :: Int)"
+        , "forceChosen :: foreach (b :: Bool) -> Select b -> ()"
+        , "forceChosen b !x = ()"
+        , "forceIndependent :: foreach (b :: Bool) -> ((b ~ b) => Int) -> ()"
+        , "forceIndependent b !x = ()"
+        , "keepIndependent :: foreach (b :: Bool) -> ((b ~ b) => Int) -> Int"
+        , "keepIndependent b x = x"
+        ]
+
+-- | Compose imported native signatures with a runtime Boolean in the consumer.
+retainedConsumerSource :: String
+retainedConsumerSource =
+    unlines $
+        take 1 (lines retainedLibrarySource)
+            ++ [ "module Main (main) where"
+               , "import NativeRetainedLibrary"
+               , "import qualified Control.Exception as E"
+               , "import Data.IORef"
+               , "import Data.List (isInfixOf)"
+               ]
+            ++ drop 2 (lines helperSource)
+            ++ [ "run :: Bool -> IO String"
+               , "run b = pure (observe b (keep b (choose b)))"
+               , "entry :: IO String"
+               , "entry = " ++ retainedProgramObservation
+               , "main :: IO ()"
+               , "main = entry >>= putStr"
+               ]
+
+-- | Read a producer interface in a fresh one-shot context and link its object.
+runModuleChecks :: FilePath -> IO ()
+runModuleChecks libdir = do
+    directory <- makeAbsolute "NativeDependentCoreRun.modules"
+    let producerDirectory = directory </> "producer"
+        consumerDirectory = directory </> "consumer"
+        artifacts = directory </> "artifacts"
+        producerSource = producerDirectory </> "NativeRetainedLibrary.hs"
+        consumerSource = consumerDirectory </> "Main.hs"
+        executablePath = directory </> ("native-modules" ++ if os == "mingw32" then ".exe" else "")
+        configure linkMode output = do
+            flags <- GHC.getSessionDynFlags
+            logger <- GHC.getLogger
+            (configured, leftovers, _) <-
+                GHC.parseDynamicFlags logger flags $
+                    map
+                        noLoc
+                        [ "-O0"
+                        , "-fasm"
+                        , "-fomit-interface-pragmas"
+                        , "-fno-write-if-simplified-core"
+                        , "-dcore-lint"
+                        , "-dstg-lint"
+                        , "-fforce-recomp"
+                        , "-v0"
+                        , "-odir"
+                        , artifacts
+                        , "-hidir"
+                        , artifacts
+                        ]
+            unless (null leftovers) (fail "FAIL: native module flags were not parsed")
+            void $
+                GHC.setSessionDynFlags
+                    configured
+                        { ghcMode = OneShot
+                        , ghcLink = linkMode
+                        , outputFile_ = output
+                        , importPaths = [artifacts]
+                        }
+            GHC.getSession
+        compile environment path = do
+            result <- compileFile environment NoStop (path, Nothing)
+            case result of
+                Just object -> pure object
+                Nothing -> fail ("FAIL: native module produced no object: " ++ path)
+    forM_ [producerDirectory, consumerDirectory, artifacts] $ createDirectoryIfMissing True
+    writeFile producerSource retainedLibrarySource
+    writeFile consumerSource retainedConsumerSource
+    producerObject <- GHC.runGhc (Just libdir) $ do
+        environment <- configure NoLink Nothing
+        liftIO $ compile environment producerSource
+    interfaceExists <- doesFileExist (artifacts </> "NativeRetainedLibrary.hi")
+    unless interfaceExists (fail "FAIL: native producer wrote no interface")
+    GHC.runGhc (Just libdir) $ do
+        -- OneShot searches only interfaces. The producer source is outside its import path.
+        environment <- configure (LinkExecutable Dynamic) (Just executablePath)
+        liftIO $ do
+            consumerObject <- compile environment consumerSource
+            oneShot environment NoStop [(consumerObject, Just StopLn), (producerObject, Just StopLn)]
+    (status, actual, errors) <- readProcessWithExitCode executablePath [] ""
+    unless (status == ExitSuccess && lines actual == ["42", "False", "forced", "42", "forced", "raised native-bottom-bool"]) $
+        fail ("FAIL: native cross-module observations: " ++ show (status, actual, errors))
+    putStrLn "module execution checks: ok"
 
 -- | Compile a source module, link its object code, and run the binary.
 runProgramChecks :: FilePath -> IO ()
@@ -208,6 +323,7 @@ runProgramChecks libdir = do
                     GHC.parseDynamicFlags logger flags
                         $ map noLoc
                         $ [ "-O0"
+                          , "-fasm"
                           , "-fomit-interface-pragmas"
                           , "-fno-write-if-simplified-core"
                           , "-dcore-lint"
@@ -220,8 +336,7 @@ runProgramChecks libdir = do
                 void $
                     GHC.setSessionDynFlags
                         programFlags
-                            { backend = GHC.ncgBackend
-                            , ghcLink = LinkExecutable Dynamic
+                            { ghcLink = LinkExecutable Dynamic
                             , outputFile_ = Just executablePath
                             }
                 target <- GHC.guessTarget sourcePath Nothing Nothing
@@ -260,16 +375,7 @@ runProgramChecks libdir = do
             , ("late cost centres", ["-fprof-late"], retainedProgramSource, "profiling or late cost-centre insertion")
             , ("INLINE entry", [], sourceWith ["{-# INLINE entry #-}"], "unfolding construction while desugaring binding")
             , ("INLINABLE entry", [], sourceWith ["{-# INLINABLE entry #-}"], "unfolding construction while desugaring binding")
-            ,
-                ( "unused native top-level signature"
-                , []
-                , sourceWith
-                    [ "unusedChoose :: foreach (b :: Bool) -> Select b"
-                    , "unusedChoose True = 42"
-                    , "unusedChoose False = False"
-                    ]
-                , "native top-level signatures"
-                )
+            , ("non-object module", ["-fbyte-code"], retainedProgramSource, "non-object module compilation")
             , ("native class default method", [], classSource, "default-method unfolding construction while desugaring binding")
             ]
     forM_ rejections $ \(label, extraFlags, source, phase) -> do

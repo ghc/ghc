@@ -66,7 +66,7 @@ import GHC.Iface.Tidy
 import GHC.HsToCore.Breakpoints.Types (ModBreaks)
 
 import GHC.Core
-import GHC.Core.Dependent ( hasNativeDependentExpr, hasNativeDependentProgram, rejectNativeDependentProgram )
+import GHC.Core.Dependent ( hasNativeDependentProgram, rejectNativeDependentProgram )
 
 import GHC.Parser.Errors.Types
 
@@ -165,8 +165,6 @@ checkNativeDependentModule hsc_env binds rules = do
       reject phase = rejectNativeDependentProgram phase binds rules
   when native $ do
     -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
-    when (any (hasNativeDependentExpr . Var) (bindersOfBinds binds)) $
-      reject "native top-level signatures (keep retained workers local until interface support)"
     unless (backendWritesFiles (backend dflags) && not (backendUseJSLinker (backend dflags))) $
       reject "non-object module compilation"
     when (sccProfilingEnabled dflags || profAuto dflags /= NoProfAuto

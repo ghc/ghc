@@ -1472,15 +1472,15 @@ hscSimplify' plugins ds_result = do
 
 {- Note [Compiling native dependent modules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The restricted module path compiles ordinary exported entry points with local
-retained Boolean workers. Reuse native SimpleOpt on each RHS and preserve
+The restricted module path compiles retained Boolean workers, including
+exported native signatures. Reuse native SimpleOpt on each RHS and preserve
 top-level binding identities. Do not enter ordinary occurrence analysis or
 the full Core optimizer. Force Core Lint before and after simplification and
 module tidying. The program CorePrep entry requires the same checked opt-in
 and disabled speculation as the expression entry. Force STG Lint after erasure.
 
 Require -O0 and omit interface pragmas and serialized Core. Native interface
-types and unfoldings still need a scoped wire representation. Reject plugins,
+signatures use scoped local Ids. Native unfoldings remain gated. Reject plugins,
 profiling, and non-object module backends before unsupported transformations.
 Repeat the option check at the machine-code entry for direct API callers.
 This adds no singleton or index evaluation. It carries the existing dependent
@@ -1582,7 +1582,7 @@ removes that evidence after checking its scope and runtime representations.
 
 Report an unsupported backend as Sorry. It is a feature restriction, not an
 internal compiler error. The checked module path is separate; see
-Note [Compiling native dependent modules]. Native interfaces remain gated.
+Note [Compiling native dependent modules]. Native unfoldings remain gated.
 See docs/dependent-haskell/CORE.md and the Agda provenance in
 docs/dependent-haskell/REFERENCES.md.
 -}
