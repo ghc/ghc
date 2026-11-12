@@ -43,6 +43,7 @@ import GHC.Driver.Main.Hsc
       iface_core_bindings,
       handleWarningsThrowErrors,
       ioMsgMaybe,
+      checkNativeDependentModule,
       hscSimpleIface )
 
 import GHC.Driver.Plugins
@@ -108,7 +109,7 @@ import GHC.Core.Opt.Pipeline.Types      ( CoreToDo (..))
 import GHC.Core.InstEnv
 import GHC.Core.Rules
 import GHC.Core.Stats
-import GHC.Core.SimpleOpt ( simpleOptNativeExpr )
+import GHC.Core.SimpleOpt ( simpleOptNativeExpr, simpleOptNativeProgram )
 
 
 import GHC.CoreToStg.Prep( CorePrepConfig(..), corePrepExpr )
@@ -1455,8 +1456,37 @@ hscSimplify' plugins ds_result = do
         else liftIO $ initializePlugins
                     $ hscUpdateFlags (\dflags -> foldr addPluginModuleName dflags plugins)
                       hsc_env
-    {-# SCC "Core2Core" #-}
-      liftIO $ core2core hsc_env_with_plugins ds_result
+    liftIO $ do
+      native <- checkNativeDependentModule hsc_env_with_plugins (mg_binds ds_result) (mg_rules ds_result)
+      if native
+        then do
+          let lint_env = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env_with_plugins
+              name_ppr_ctx = alwaysQualify
+              binds = mg_binds ds_result
+              rules = mg_rules ds_result
+          endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt binds rules
+          let simplified = simpleOptNativeProgram binds
+          endPassHscEnvIO lint_env name_ppr_ctx CoreDesugarOpt simplified rules
+          return (ds_result { mg_binds = simplified })
+        else {-# SCC "Core2Core" #-} core2core hsc_env_with_plugins ds_result
+
+{- Note [Compiling native dependent modules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The restricted module path compiles ordinary exported entry points with local
+retained Boolean workers. Reuse native SimpleOpt on each RHS and preserve
+top-level binding identities. Do not enter ordinary occurrence analysis or
+the full Core optimizer. Force Core Lint before and after simplification and
+module tidying. The program CorePrep entry requires the same checked opt-in
+and disabled speculation as the expression entry. Force STG Lint after erasure.
+
+Require -O0 and omit interface pragmas and serialized Core. Native interface
+types and unfoldings still need a scoped wire representation. Reject plugins,
+profiling, and non-object module backends before unsupported transformations.
+Repeat the option check at the machine-code entry for direct API callers.
+This adds no singleton or index evaluation. It carries the existing dependent
+application and constructor rules through the module driver; see the Agda
+provenance in docs/dependent-haskell/REFERENCES.md#agda-provenance.
+-}
 
 --------------------------------------------------------------
 -- CoreToStg
@@ -1487,8 +1517,14 @@ myCoreToStg logger dflags ic_inscope for_bytecode this_mod ml prepd_binds = do
 
 hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 hscTidy hsc_env guts = do
+  native <- checkNativeDependentModule hsc_env (mg_binds guts) (mg_rules guts)
   let logger   = hsc_logger hsc_env
   let this_mod = mg_module guts
+  let lint_env | native = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env
+               | otherwise = hsc_env
+
+  when native $
+    endPassHscEnvIO lint_env alwaysQualify CoreDesugarOpt (mg_binds guts) (mg_rules guts)
 
   opts <- initTidyOpts hsc_env guts
   (cgguts, details) <- withTiming logger
@@ -1502,7 +1538,7 @@ hscTidy hsc_env guts = do
   let name_ppr_ctx   = mkNamePprCtx ptc (hsc_unit_env hsc_env) (mg_rdr_env guts)
       ptc            = initPromotionTickContext (hsc_dflags hsc_env)
 
-  endPassHscEnvIO hsc_env name_ppr_ctx CoreTidy all_tidy_binds tidy_rules
+  endPassHscEnvIO lint_env name_ppr_ctx CoreTidy all_tidy_binds tidy_rules
 
   -- If the endPass didn't print the rules, but ddump-rules is
   -- on, print now
@@ -1545,7 +1581,8 @@ type must not force it. The strict case supplies branch evidence; CoreToStg
 removes that evidence after checking its scope and runtime representations.
 
 Report an unsupported backend as Sorry. It is a feature restriction, not an
-internal compiler error. Program compilation and interfaces remain gated.
+internal compiler error. The checked module path is separate; see
+Note [Compiling native dependent modules]. Native interfaces remain gated.
 See docs/dependent-haskell/CORE.md and the Agda provenance in
 docs/dependent-haskell/REFERENCES.md.
 -}

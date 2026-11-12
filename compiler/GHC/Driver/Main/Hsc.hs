@@ -37,6 +37,7 @@ module GHC.Driver.Main.Hsc
     , hscSimpleIface'
     , writeInterfaceOnlyMode
     , genModDetails
+    , checkNativeDependentModule
 
     ) where
 
@@ -44,6 +45,7 @@ import GHC.Prelude
 
 import GHC.Driver.Plugins
 import GHC.Driver.Session
+import GHC.Driver.DynFlags ( optLevelFlags )
 import GHC.Driver.Backend
 import GHC.Driver.Env
 import GHC.Driver.Env.KnotVars
@@ -64,6 +66,7 @@ import GHC.Iface.Tidy
 import GHC.HsToCore.Breakpoints.Types (ModBreaks)
 
 import GHC.Core
+import GHC.Core.Dependent ( hasNativeDependentExpr, hasNativeDependentProgram, rejectNativeDependentProgram )
 
 import GHC.Parser.Errors.Types
 
@@ -152,6 +155,34 @@ initHscEnv mb_top_dir = do
 
 
 -- -----------------------------------------------------------------------------
+
+-- | Check the supported options for a module containing native dependent Core.
+-- Return whether the module needs the checked native pipeline.
+checkNativeDependentModule :: HscEnv -> CoreProgram -> [CoreRule] -> IO Bool
+checkNativeDependentModule hsc_env binds rules = do
+  let native = hasNativeDependentProgram binds rules
+      dflags = hsc_dflags hsc_env
+      reject phase = rejectNativeDependentProgram phase binds rules
+  when native $ do
+    -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
+    when (any (hasNativeDependentExpr . Var) (bindersOfBinds binds)) $
+      reject "native top-level signatures (keep retained workers local until interface support)"
+    unless (backendWritesFiles (backend dflags) && not (backendUseJSLinker (backend dflags))) $
+      reject "non-object module compilation"
+    when (sccProfilingEnabled dflags || profAuto dflags /= NoProfAuto
+          || not (null (callerCcFilters dflags))
+          || any (`gopt` dflags) [ Opt_ProfLateInlineCcs, Opt_ProfLateCcs
+                                , Opt_ProfLateOverloadedCcs, Opt_ProfLateoverloadedCallsCCs ]) $
+      reject "profiling or late cost-centre insertion"
+    when (any (\(levels, flag) -> 0 `notElem` levels && gopt flag dflags) optLevelFlags) $
+      reject "optimized module compilation (use -O0)"
+    unless (gopt Opt_OmitInterfacePragmas dflags) $
+      reject "interface unfolding generation (use -fomit-interface-pragmas)"
+    when (gopt Opt_WriteIfSimplifiedCore dflags) $
+      reject "Core interface serialization (use -fno-write-if-simplified-core)"
+    unless (null (pluginsWithArgs (hsc_plugins hsc_env)) && null (pluginModNames dflags)) $
+      reject "module plugins"
+  return native
 
 getDiagnostics :: Hsc (Messages GhcMessage)
 getDiagnostics = Hsc $ \_ w -> return (w, w)

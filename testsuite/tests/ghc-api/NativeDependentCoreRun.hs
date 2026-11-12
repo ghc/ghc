@@ -1,7 +1,7 @@
 module Main (main) where
 
 import Control.Exception (SomeException, displayException, try)
-import Control.Monad (unless, void)
+import Control.Monad (forM_, unless, void)
 import Control.Monad.IO.Class (liftIO)
 import Data.List (find, isInfixOf)
 import Data.Time.Clock (getCurrentTime)
@@ -25,10 +25,10 @@ import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
-import GHC.Driver.DynFlags (DynFlags (..), gopt_set)
+import GHC.Driver.DynFlags (DynFlags (..), ExecutableLinkMode (Dynamic), GhcLink (LinkExecutable), gopt_set)
 import GHC.Driver.Env (HscEnv, hscInterp)
 import GHC.Driver.Flags (GeneralFlag (Opt_ExternalInterpreter))
-import GHC.Driver.Main (hscCompileCoreExpr)
+import GHC.Driver.Main (hscCompileCoreExpr, hscSimplify)
 import GHC.Driver.Ppr (showSDoc)
 import GHC.Runtime.Interpreter (evalString)
 import GHC.Types.Error (Diagnostic (diagnosticCode), DiagnosticCode (..), MsgEnvelope (..), getMessages, pprDiagnostic)
@@ -36,20 +36,29 @@ import GHC.Types.Id
 import GHC.Types.Name (mkSystemName, nameOccName)
 import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc, occNameString)
 import GHC.Types.SourceError (srcErrorMessages)
-import GHC.Types.SrcLoc (isGoodSrcSpan, noSrcSpan)
+import GHC.Types.SrcLoc (isGoodSrcSpan, noLoc, noSrcSpan)
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
 import GHC.Unit.Module.ModGuts (ModGuts (mg_binds))
 import GHC.Unit.Types (mainUnit, mkModule, mkModuleName)
 import GHC.Utils.Outputable (vcat)
+import GHC.Utils.Panic (GhcException (..))
+import System.Directory (createDirectoryIfMissing, doesFileExist, makeAbsolute)
 import System.Environment (getArgs)
+import System.Exit (ExitCode (..))
+import System.FilePath (replaceExtension, (</>))
+import System.Info (os)
+import System.Process (readProcessWithExitCode)
 
 -- | Execute retained Boolean functions with inputs read at runtime.
 main :: IO ()
 main = do
     args <- getArgs
     case args of
-        [libdir] -> GHC.runGhc (Just libdir) runChecks
+        [libdir] -> do
+            GHC.runGhc (Just libdir) runChecks
+            runProgramChecks libdir
+            putStrLn "native-core-run-ok"
         _ -> fail "Usage: NativeDependentCoreRun GHC_LIBDIR"
 
 -- | Supply ordinary observations and a lazy runtime input source.
@@ -148,6 +157,145 @@ retainedChooseSource moduleName observation =
         , "      run b = pure (observe b (again b))"
         , "  in " ++ observation
         ]
+
+-- | Reuse source workers in a self-contained module with an ordinary main.
+retainedProgramSource :: String
+retainedProgramSource =
+    unlines $
+        take 1 sourceLines
+            ++ [ "module Main (main) where"
+               , "import qualified Control.Exception as E"
+               , "import Data.IORef"
+               , "import Data.List (isInfixOf)"
+               ]
+            ++ drop 2 (lines helperSource)
+            ++ drop 3 sourceLines
+            ++ ["main :: IO ()", "main = entry >>= putStr"]
+  where
+    sourceLines = lines $ retainedChooseSource "NativeProgram" observation
+    observation =
+        unlines
+            [ "do"
+            , "       both <- driveBoth run"
+            , "       let b = bottomBool"
+            , "       partial <- case keep b of !_ -> pure \"forced\""
+            , "       let keepIndependent :: foreach (i :: Bool) -> ((i ~ i) => Int) -> Int"
+            , "           keepIndependent i x = x"
+            , "       lazy <- observeInt (keepIndependent b 42)"
+            , "       control <- force (forceIndependent b 42)"
+            , "       strict <- E.try (force (forceChosen b (choose b))) :: IO (Either E.SomeException String)"
+            , "       strictText <- case strict of"
+            , "         Left exception | \"native-bottom-bool\" `isInfixOf` E.displayException exception -> pure \"raised native-bottom-bool\""
+            , "         Left exception -> fail (\"choose raised another exception: \" ++ E.displayException exception)"
+            , "         Right result -> fail (\"choose bottom returned: \" ++ result)"
+            , "       pure (unlines [both, partial, lazy, control, strictText])"
+            ]
+
+-- | Compile a source module, link its object code, and run the binary.
+runProgramChecks :: FilePath -> IO ()
+runProgramChecks libdir = do
+    let directory = "NativeDependentCoreRun.program"
+        executableName = "native-program" ++ if os == "mingw32" then ".exe" else ""
+    createDirectoryIfMissing True directory
+    sourcePath <- makeAbsolute (directory </> "Main.hs")
+    executablePath <- makeAbsolute (directory </> executableName)
+    let withProgram extraFlags source action = do
+            writeFile sourcePath source
+            GHC.runGhc (Just libdir) $ do
+                flags <- GHC.getSessionDynFlags
+                logger <- GHC.getLogger
+                (programFlags, leftovers, _) <-
+                    GHC.parseDynamicFlags logger flags
+                        $ map noLoc
+                        $ [ "-O0"
+                          , "-fomit-interface-pragmas"
+                          , "-fno-write-if-simplified-core"
+                          , "-dcore-lint"
+                          , "-dstg-lint"
+                          , "-fforce-recomp"
+                          , "-v0"
+                          ]
+                            ++ extraFlags
+                unless (null leftovers) (fail "FAIL: native program flags were not parsed")
+                void $
+                    GHC.setSessionDynFlags
+                        programFlags
+                            { backend = GHC.ncgBackend
+                            , ghcLink = LinkExecutable Dynamic
+                            , outputFile_ = Just executablePath
+                            }
+                target <- GHC.guessTarget sourcePath Nothing Nothing
+                GHC.setTargets [target]
+                action
+    withProgram [] retainedProgramSource $ do
+        loaded <- GHC.load GHC.LoadAllTargets
+        unless (GHC.succeeded loaded) (fail "FAIL: native source program did not compile or link")
+    objectExists <- doesFileExist (replaceExtension sourcePath "o")
+    unless objectExists (fail "FAIL: native source program produced no object file")
+    (status, actual, errors) <- readProcessWithExitCode executablePath [] ""
+    unless (status == ExitSuccess) $
+        fail ("FAIL: native source program exited with " ++ show status ++ ":\n" ++ errors)
+    let expected = ["42", "False", "forced", "42", "forced", "raised native-bottom-bool"]
+    unless (lines actual == expected) $
+        fail ("FAIL: native source program observations: " ++ show actual ++ "; stderr: " ++ errors)
+    putStrLn "program keep/choose True: 42"
+    putStrLn "program keep/choose False: False"
+    putStrLn "program keepSelect bottom (partial WHNF): forced"
+    putStrLn "program keep indexed bottom (fully applied): 42"
+    putStrLn "program indexed payload control bottom (dictionary WHNF): forced"
+    putStrLn "program choose bottom: raised native-bottom-bool"
+    let sourceWith declarations = retainedProgramSource ++ unlines declarations
+        classBody = drop 1 $ dropWhile (/= "entry =") $ lines $ retainedChooseSource "NativeDefault" "driveBoth run"
+        classSource =
+            sourceWith $
+                [ "class NativeDefault a where"
+                , "  method :: a -> IO String"
+                , "  method _ ="
+                ]
+                    ++ map ("  " ++) classBody
+        rejections =
+            [ ("optimized module", ["-O2"], retainedProgramSource, "optimized module compilation")
+            , ("interface pragmas", ["-fno-omit-interface-pragmas"], retainedProgramSource, "interface unfolding generation")
+            , ("serialized Core", ["-fwrite-if-simplified-core"], retainedProgramSource, "Core interface serialization")
+            , ("late cost centres", ["-fprof-late"], retainedProgramSource, "profiling or late cost-centre insertion")
+            , ("INLINE entry", [], sourceWith ["{-# INLINE entry #-}"], "unfolding construction while desugaring binding")
+            , ("INLINABLE entry", [], sourceWith ["{-# INLINABLE entry #-}"], "unfolding construction while desugaring binding")
+            ,
+                ( "unused native top-level signature"
+                , []
+                , sourceWith
+                    [ "unusedChoose :: foreach (b :: Bool) -> Select b"
+                    , "unusedChoose True = 42"
+                    , "unusedChoose False = False"
+                    ]
+                , "native top-level signatures"
+                )
+            , ("native class default method", [], classSource, "default-method unfolding construction while desugaring binding")
+            ]
+    forM_ rejections $ \(label, extraFlags, source, phase) -> do
+        -- The make driver catches panics as Failed. Call this phase directly.
+        result <-
+            try
+                ( withProgram extraFlags source $ do
+                    void (GHC.depanal [] False)
+                    summary <- GHC.getModSummary (mkModule mainUnit (mkModuleName "Main"))
+                    parsed <- GHC.parseModule summary
+                    checked <- GHC.typecheckModule GHC.StartAndKeepRunningTcMPlugins parsed
+                    desugared <- GHC.desugarModule checked
+                    environment <- GHC.getSession
+                    liftIO $ void $ hscSimplify environment [] (GHC.coreModule desugared)
+                ) ::
+                IO (Either GhcException ())
+        case result of
+            Left (Sorry message)
+                | phase `isInfixOf` message
+                , "This operation does not support" `isInfixOf` message ->
+                    pure ()
+                | otherwise -> fail ("FAIL: program rejection " ++ label ++ "; wrong phase: " ++ message)
+            Left exception -> fail ("FAIL: program rejection " ++ label ++ "; wrong exception: " ++ displayException exception)
+            Right () -> fail ("FAIL: native program accepted " ++ label)
+    writeFile sourcePath retainedProgramSource
+    putStrLn "program rejection checks: ok"
 
 -- | Parse an in-memory source target without loading or compiling its bindings.
 parseSourceTarget :: String -> String -> GHC.Ghc GHC.ParsedModule
@@ -641,4 +789,3 @@ runChecks = do
             Right actual -> fail ("FAIL: choose bottom returned " ++ show actual)
     runSourceChecks
     runSourceRejectChecks
-    liftIO $ putStrLn "native-core-run-ok"

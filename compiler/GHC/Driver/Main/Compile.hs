@@ -37,7 +37,7 @@ module GHC.Driver.Main.Compile
 import GHC.Prelude
 
 import GHC.Driver.Main.Hsc
-    ( add_iface_to_hpt, iface_core_bindings, ioMsgMaybe )
+    ( add_iface_to_hpt, iface_core_bindings, ioMsgMaybe, checkNativeDependentModule )
 
 
 import GHC.Driver.Plugins
@@ -75,12 +75,13 @@ import GHC.Iface.Load   ( writeIface, flagsToIfCompression )
 import qualified GHC.ByteCode.Serialize as ByteCode
 
 import GHC.Core
+import GHC.Core.Dependent ( rejectNativeDependentProgram )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.TyCon
 import GHC.Core.LateCC
 import GHC.Core.LateCC.Types
 
-import GHC.CoreToStg.Prep( CorePrepPgmConfig, corePrepPgm )
+import GHC.CoreToStg.Prep( CorePrepConfig(..), CorePrepPgmConfig, corePrepPgm )
 import GHC.CoreToStg.AddImplicitBinds( addImplicitBinds )
 import GHC.CoreToStg    ( coreToStg )
 
@@ -547,15 +548,20 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
                     cg_binds    = core_binds,
                     cg_ccs      = local_ccs
                     } = cgguts
-            dflags = hsc_dflags hsc_env
             logger = hsc_logger hsc_env
+
+        -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
+        native <- checkNativeDependentModule hsc_env core_binds []
+        let dflags | native = gopt_set (gopt_set (hsc_dflags hsc_env) Opt_DoCoreLinting)
+                                       Opt_DoStgLinting
+                   | otherwise = hsc_dflags hsc_env
 
         -------------------
         -- ADD IMPLICIT BINDINGS
         -- NB: we must feed mkImplicitBinds through corePrep too
         -- so that they are suitably cloned and eta-expanded
         let cp_pgm_cfg :: CorePrepPgmConfig
-            cp_pgm_cfg = initCorePrepPgmConfig (hsc_dflags hsc_env)
+            cp_pgm_cfg = initCorePrepPgmConfig dflags
                                                (interactiveInScope $ hsc_IC hsc_env)
         binds_with_implicits <- addImplicitBinds cp_pgm_cfg mod_loc (cg_tycons cgguts) core_binds
 
@@ -633,7 +639,14 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
         -------------------
         -- PREPARE FOR CODE GENERATION
         -- Do saturation and convert to A-normal form
-        cp_cfg <- initCorePrepConfig hsc_env
+        unless native $
+          rejectNativeDependentProgram "unchecked late-plugin or implicit-binding output" binds_to_prep []
+        cp_cfg0 <- initCorePrepConfig hsc_env
+        let cp_cfg | native = cp_cfg0 { cp_allowNativeDependent = True
+                                      , cp_arityOpts = Nothing
+                                      , cp_specEval = False
+                                      , cp_specEvalDFun = False }
+                   | otherwise = cp_cfg0
         (prepd_binds) <- {-# SCC "CorePrep" #-}
                          corePrepPgm
                            (hsc_logger hsc_env) cp_cfg cp_pgm_cfg
