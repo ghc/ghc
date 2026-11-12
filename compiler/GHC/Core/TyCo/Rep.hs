@@ -250,7 +250,8 @@ data Type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 TermVarTy and DepFunTy implement an internal experiment. The runtime variable
 remains an Id. It must be local, non-coercion, unrestricted, and of type Bool.
-TermVarTy has kind Bool. A DepFunTy result must have lifted kind Type.
+TermVarTy has kind Bool. A DepFunTy result must have kind Type. Constraint
+also has a lifted representation, but is not a supported result kind here.
 
 The binder scopes over the result. A vacuous binder is represented by FunTy;
 use mkDepFunTy to maintain this invariant. Index occurrences are scope
@@ -258,10 +259,11 @@ dependencies, not additional runtime uses. Type-variable and coercion-variable
 callbacks must not process runtime index variables.
 
 Only variable and constructor index substitution is implemented. The restricted
-bytecode entry checks these forms with Core Lint before and after preparation.
-General expression substitution, the ordinary optimizer, program code generation,
-and interface serialization remain unsupported. The restricted source checker
-can emit these forms. See docs/dependent-haskell/CORE.md and the Agda provenance in
+bytecode and module entries check these forms with Core Lint before and after
+preparation. Interface signatures use scoped local Ids. General expression
+substitution, the ordinary optimizer, and native unfoldings remain unsupported.
+The restricted source checker can emit these forms.
+See docs/dependent-haskell/CORE.md and the Agda provenance in
 docs/dependent-haskell/REFERENCES.md.
 -}
 

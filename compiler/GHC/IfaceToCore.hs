@@ -1511,8 +1511,30 @@ tcIfaceType = go
   where
     go (IfaceTyVar n)            = TyVarTy <$> tcIfaceTyVar n
     go (IfaceFreeTyVar n)        = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
-    go ty@(IfaceDepFunTy {})     = pprPanic "tcIfaceType: native dependent Core import not implemented" (ppr ty)
-    go ty@(IfaceTermVar {})      = pprPanic "tcIfaceType: native dependent Core import not implemented" (ppr ty)
+    go (IfaceFreeTermVar v)
+      = failIfM (text "Cannot import a diagnostic-only retained index:" <+> ppr v)
+    go (IfaceTermVar n)
+      = do { v <- tcIfaceLclId n
+           ; unless (isBoolIndexId v) $
+               failIfM (text "Invalid retained Boolean index in interface:" <+> ppr n
+                        $$ text "Expected a local Bool identifier with multiplicity Many."
+                        $$ text "Actual type:" <+> ppr (varType v)
+                        $$ text "Actual multiplicity:" <+> ppr (idMult v))
+           ; return (TermVarTy v) }
+    go (IfaceDepFunTy bndr body)
+      -- See Note [Retained Boolean binders in interfaces].
+      = bindIfaceId bndr $ \ v ->
+        do { unless (isBoolIndexId v) $
+               failIfM (text "Invalid retained Boolean binder in interface:" <+> ppr v
+                        $$ text "Expected a local Bool identifier with multiplicity Many."
+                        $$ text "Actual type:" <+> ppr (varType v)
+                        $$ text "Actual multiplicity:" <+> ppr (idMult v))
+           ; body' <- go body
+           ; unless (typeKind body' `eqType` liftedTypeKind) $
+               failIfM (text "Invalid retained function result in interface for:" <+> ppr v
+                        $$ text "Expected kind Type."
+                        $$ text "Actual kind:" <+> ppr (typeKind body'))
+           ; return (mkDepFunTy v body') }
     go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
     go (IfaceFunTy flag w t1 t2) = FunTy flag <$> tcIfaceType w <*> go t1 <*> go t2
     go (IfaceTupleTy s i tks)    = tcIfaceTupleTy s i tks
@@ -1529,6 +1551,24 @@ tcIfaceType = go
         ForAllTy (Bndr tv' (ifaceForAllTyFlag vis)) <$> go t
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
+
+{- Note [Retained Boolean binders in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained binder is a runtime Id, not a TyVar or an erased forall binder.
+bindIfaceId allocates a fresh VarName and Unique. It decodes the domain and
+multiplicity outside the binder scope, then extends the local Id environment
+for the body. Each IfaceTermVar occurrence looks up that same fresh Id.
+
+Check the fixed Bool/Many invariant before decoding the body. Check each
+index occurrence too, since the local Id environment also contains ordinary
+Ids and CoVars. The result must have kind Type, not Constraint. Use eqType:
+isLiftedTypeKind also accepts Constraint. Malformed native interface data
+must fail before construction of a retained type.
+
+IfaceFreeTermVar preserves an open Id only for diagnostics. It cannot enter
+this decoding path. Native expression unfoldings and Boolean branch proofs
+remain separate interface work.
+-}
 
 tcIfaceTupleTy :: TupleSort -> PromotionFlag -> IfaceAppArgs -> IfL Type
 tcIfaceTupleTy sort is_promoted args

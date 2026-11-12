@@ -185,10 +185,10 @@ data IfaceType
                              -- IfaceType, analogous to AppTy.
   | IfaceFunTy     FunTyFlag IfaceMult IfaceType IfaceType
   | IfaceForAllTy  IfaceForAllBndr IfaceType
-  -- These forms retain runtime variable identities for diagnostics only.
-  -- Interface files do not support native dependent Core yet.
-  | IfaceDepFunTy Id IfaceType IfaceType
-  | IfaceTermVar Id
+  -- See Note [Retained Boolean interface types].
+  | IfaceDepFunTy IfaceIdBndr IfaceType
+  | IfaceTermVar IfLclName
+  | IfaceFreeTermVar Id                 -- Diagnostics only, like IfaceFreeTyVar
   | IfaceTyConApp  IfaceTyCon IfaceAppArgs  -- Not necessarily saturated
                                             -- Includes newtypes, synonyms, tuples
   | IfaceCastTy     IfaceType IfaceCoercion
@@ -206,6 +206,27 @@ data IfaceType
           -- See !3987.
   deriving (Eq, Ord)
   -- See Note [Ord instance of IfaceType]
+
+{- Note [Retained Boolean interface types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained binder uses the existing local Id format. Its multiplicity and
+domain are outside its scope. Its body can refer to its local name through
+IfaceTermVar. The reader allocates a fresh Id and resolves those occurrences
+in the Id environment, separately from type variables. Do not serialise Id
+Uniques or use IfaceForAllTy: this argument is a retained runtime value.
+
+As with ordinary interface binders, tidy the type before conversion so that
+distinct nested binders have distinct local spellings. The derived Eq and Ord
+instances compare this named syntax for binary sharing. They do not perform
+alpha equivalence. Free runtime Ids used by diagnostics have the separate
+IfaceFreeTermVar form. That form must not enter an interface file.
+
+Tags 10 and 11 require the fork's distinct configured compiler version.
+Old readers must reject the file in the whole-file version check before
+type decoding.
+See docs/dependent-haskell/REFERENCES.md#agda-provenance for the comparison
+with Agda's explicit binder and variable serialization.
+-}
 
 {-
 Note [Ord instance of IfaceType]
@@ -756,6 +777,7 @@ ifTypeIsVarFree ty = go ty
     go (IfaceTyVar {})         = False
     go (IfaceFreeTyVar {})     = False
     go (IfaceTermVar {})       = False
+    go (IfaceFreeTermVar {})   = False
     go (IfaceDepFunTy {})      = False
     go (IfaceAppTy fun args)   = go fun && go_args args
     go (IfaceFunTy _ w arg res) = go w && go arg && go res
@@ -780,7 +802,8 @@ visibleTypeVarOccurencies = go
     go (IfaceTyVar var)         = Set.singleton var
     go (IfaceFreeTyVar {})      = mempty
     go (IfaceTermVar {})        = mempty
-    go (IfaceDepFunTy _ arg res) = go arg <> go res
+    go (IfaceFreeTermVar {})    = mempty
+    go (IfaceDepFunTy (w, _, arg) res) = go w <> go arg <> go res
     go (IfaceAppTy fun args)    = go fun <> go_args args
     go (IfaceFunTy _ w arg res) = go w <> go arg <> go res
     go (IfaceForAllTy bndr ty)  = go (ifaceBndrType $ binderVar bndr) <> go ty
@@ -817,6 +840,7 @@ substIfaceType env ty
   where
     go (IfaceFreeTyVar tv)    = IfaceFreeTyVar tv
     go ty@(IfaceTermVar {})  = ty
+    go ty@(IfaceFreeTermVar {}) = ty
     go (IfaceDepFunTy {})    = pprPanic "substIfaceType: native dependent Core not implemented" (ppr ty)
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t ts)     = IfaceAppTy  (go t) (substIfaceAppArgs env ts)
@@ -1196,7 +1220,8 @@ ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIf
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free TyVars and CoVars in IfaceType]
 ppr_ty _         (IfaceTermVar var)     = ppr var
-ppr_ty ctxt_prec (IfaceDepFunTy var arg res)
+ppr_ty _         (IfaceFreeTermVar var) = ppr var
+ppr_ty ctxt_prec (IfaceDepFunTy (_, var, arg) res)
   = maybeParen ctxt_prec funPrec $
     sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg)
         , arrow <+> ppr_ty_nested res ]
@@ -1374,10 +1399,11 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
     go subs rank1 (IfaceForAllTy bndr ty)
       = IfaceForAllTy (go_ifacebndr subs bndr) (go subs rank1 ty)
 
-    go subs rank1 (IfaceDepFunTy var arg res)
-      = IfaceDepFunTy var (go subs False arg) (go subs rank1 res)
+    go subs rank1 (IfaceDepFunTy (w, var, arg) res)
+      = IfaceDepFunTy (go subs False w, var, go subs False arg) (go subs rank1 res)
 
     go _ _ ty@(IfaceTermVar {}) = ty
+    go _ _ ty@(IfaceFreeTermVar {}) = ty
 
     go subs _ ty@(IfaceTyVar tv) = case lookupFsEnv subs (ifLclNameFS tv) of
       Just s -> s
@@ -2439,10 +2465,12 @@ putIfaceType _ (IfaceFreeTyVar tv)
   = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
   -- See Note [Free TyVars and CoVars in IfaceType]
 
-putIfaceType _ ty@(IfaceDepFunTy {})
-  = pprPanic "putIfaceType: native dependent Core serialization not implemented" (ppr ty)
-putIfaceType _ ty@(IfaceTermVar {})
-  = pprPanic "putIfaceType: native dependent Core serialization not implemented" (ppr ty)
+putIfaceType _ (IfaceFreeTermVar var)
+  = pprPanic "Can't serialise IfaceFreeTermVar" (ppr var)
+putIfaceType bh (IfaceDepFunTy bndr body)
+  = do { putByte bh 10; put_ bh bndr; put_ bh body }
+putIfaceType bh (IfaceTermVar var)
+  = do { putByte bh 11; put_ bh var }
 
 putIfaceType bh (IfaceForAllTy aa ab) = do
         putByte bh 0
@@ -2502,8 +2530,12 @@ getIfaceType bh = do
 
               8 -> do { s <- get bh; i <- get bh; tys <- get bh
                       ; return (IfaceTupleTy s i tys) }
-              _  -> do n <- get bh
+              9  -> do n <- get bh
                        return (IfaceLitTy n)
+              10 -> do { bndr <- get bh; body <- get bh
+                       ; return (IfaceDepFunTy bndr body) }
+              11 -> IfaceTermVar <$> get bh
+              _  -> ioError (userError ("getIfaceType: invalid type tag " ++ show h))
 
 instance Binary IfLclName where
   put_ bh = put_ bh . ifLclNameFS
@@ -2703,8 +2735,9 @@ instance NFData (DefMethSpec IfaceType) where
 instance NFData IfaceType where
   rnf = \case
     IfaceFreeTyVar f1 -> f1 `seq` ()
-    IfaceDepFunTy var arg res -> var `seq` rnf arg `seq` rnf res
-    IfaceTermVar var -> var `seq` ()
+    IfaceDepFunTy bndr res -> rnf bndr `seq` rnf res
+    IfaceTermVar var -> rnf var
+    IfaceFreeTermVar var -> var `seq` ()
     IfaceTyVar f1 -> rnf f1
     IfaceLitTy f1 -> rnf f1
     IfaceAppTy f1 f2 -> rnf f1 `seq` rnf f2

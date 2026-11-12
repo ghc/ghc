@@ -196,10 +196,12 @@ toIfaceTypeX :: VarSet -> Type -> IfaceType
 toIfaceTypeX fr (TyVarTy tv)   -- See Note [Free TyVars and CoVars in IfaceType] in GHC.Iface.Type
   | tv `elemVarSet` fr         = IfaceFreeTyVar tv
   | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
-toIfaceTypeX _ (TermVarTy var) = IfaceTermVar var
+toIfaceTypeX fr (TermVarTy var)
+  | var `elemVarSet` fr = IfaceFreeTermVar var
+  | otherwise = IfaceTermVar (mkIfLclName (occNameFS (getOccName var)))
 toIfaceTypeX fr (DepFunTy var res)
-  = IfaceDepFunTy var (toIfaceTypeX fr (varType var))
-                      (toIfaceTypeX (fr `delVarSet` var) res)
+  = IfaceDepFunTy (toIfaceIdBndrX fr var)
+                  (toIfaceTypeX (fr `delVarSet` var) res)
 toIfaceTypeX fr ty@(AppTy {})  =
   -- Flatten as many argument AppTys as possible, then turn them into an
   -- IfaceAppArgs list.

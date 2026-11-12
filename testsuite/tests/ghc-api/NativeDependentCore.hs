@@ -2,10 +2,12 @@
 
 module Main (main) where
 
-import Control.Exception (SomeException, displayException, evaluate, try)
-import Control.Monad (unless)
+import Control.Exception (IOException, SomeException, displayException, evaluate, try)
+import Control.Monad (forM_, unless)
+import Control.Monad.IO.Class (liftIO)
+import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
-import GHC (DynFlags, getSessionDynFlags, runGhc)
+import GHC (DynFlags, getSession, getSessionDynFlags, runGhc)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
 import GHC.Core.Coercion (coercionLKind, mkAxInstCo, mkCoVarCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
@@ -18,36 +20,47 @@ import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
-import GHC.Core.TyCo.Rep (Type (..))
+import GHC.Core.TyCo.Rep (TyLit (..), Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
+import GHC.Core.TyCo.Tidy (tidyTopType)
 import GHC.Core.TyCon (FamTyConFlav (..), Injectivity (..), TyCon, mkAnonTyConBinder, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind)
 import GHC.Core.Type
 import GHC.Core.Unify (UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchTy, tcMatchTys, tcUnifyTysFG)
-import GHC.Core.Utils (exprType)
-import GHC.CoreToIface (toIfaceAlt)
+import GHC.Core.Utils (applyTypeToArgs, exprType)
+import GHC.CoreToIface (toIfaceAlt, toIfaceType, toIfaceTypeX)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
+import GHC.Data.IOEnv (IOEnvFailure)
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Driver.Config.Parser (initParserOpts)
+import GHC.Driver.Env (HscEnv (..))
 import GHC.Driver.Ppr (showSDoc)
 import GHC.Driver.Session (parseDynamicFlagsCmdLine)
 import GHC.Hs (HsType (..))
+import GHC.Iface.Binary (CompressionIFace (..), TraceBinIFace (..), getWithUserData, putWithUserData)
+import GHC.Iface.Env (extendIfaceIdEnv)
+import GHC.Iface.Syntax (IfaceExpr (IfaceType))
+import GHC.Iface.Type (IfaceType (..), getIfaceType, mkIfLclName)
+import GHC.IfaceToCore (tcIfaceExpr)
 import qualified GHC.Parser as Parser
 import qualified GHC.Parser.Lexer as Lexer
+import GHC.Tc.Utils.Monad (initIfaceLcl, initIfaceLoad)
 import GHC.Types.Basic (OccInfo (..), TailCallInfo (..))
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails (VanillaId), RuleInfo (..))
 import GHC.Types.InlinePragma (ActivationX (AlwaysActive))
-import GHC.Types.Name (mkSystemName, nameModule)
-import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc)
+import GHC.Types.Name (getOccName, mkSystemName, nameModule)
+import GHC.Types.Name.Occurrence (mkTcOcc, mkTyVarOcc, mkVarOcc, occNameFS)
 import GHC.Types.SrcLoc (mkRealSrcLoc, noLoc, noSrcSpan, unLoc)
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Utils.Logger (initLogger)
-import GHC.Utils.Outputable (ppr, vcat)
+import GHC.Unit.Types (IsBootInterface (NotBoot))
+import qualified GHC.Utils.Binary as Binary
+import GHC.Utils.Logger (initLogger, pushLogHook)
+import GHC.Utils.Outputable (ppr, text, vcat)
 import GHC.Utils.Panic (GhcException (..))
 import System.Environment (getArgs)
 import System.Timeout (timeout)
@@ -63,6 +76,7 @@ main = do
             runChecks dflags
             runMatchingChecks dflags
             runCaseChecks dflags
+            runIfaceChecks libdir
             putStrLn "native-core-api-ok"
         _ -> fail "Usage: NativeDependentCore GHC_LIBDIR"
 
@@ -98,6 +112,134 @@ indexSubst scope b rhs =
 -- | Assert a semantic property and identify its failure precisely.
 check :: String -> Bool -> IO ()
 check label condition = unless condition (fail ("FAIL: " ++ label))
+
+-- | Check retained signatures through binary tables and fresh interface scopes.
+runIfaceChecks :: FilePath -> IO ()
+runIfaceChecks libdir = runGhc (Just libdir) $ do
+    env <- getSession
+    dflags <- getSessionDynFlags
+    liftIO $ do
+        let b = local 300 "b" boolTy
+            original = tidyTopType (exprType (keep b 301))
+            iface = toIfaceType original
+            ifaceModule = nameModule (idName (dataConWorkId trueDataCon))
+            restore :: [Id] -> IfaceType -> IO Type
+            restore scope input = do
+                expression <-
+                    initIfaceLoad env
+                        $ initIfaceLcl ifaceModule (text "native interface test") NotBoot
+                        $ extendIfaceIdEnv scope
+                        $ tcIfaceExpr (IfaceType input)
+                case expression of
+                    Type ty -> pure ty
+                    _ -> fail "FAIL: interface type reconstruction returned a term"
+            roundtrip :: CompressionIFace -> IfaceType -> IO IfaceType
+            roundtrip compression input = do
+                writer <- Binary.openBinMem 1024
+                putWithUserData QuietBinIFace compression writer input
+                reader <- Binary.shrinkBinBuffer writer
+                getWithUserData (hsc_NC env) reader
+            rejectsIface :: String -> String -> [Id] -> IfaceType -> IO ()
+            rejectsIface label fragment scope input = do
+                messages <- newIORef []
+                let logger = pushLogHook (\_ _ _ _ message -> modifyIORef' messages (showSDoc dflags message :)) (hsc_logger env)
+                    quietEnv = env{hsc_logger = logger}
+                outcome <-
+                    try @IOEnvFailure
+                        $ initIfaceLoad quietEnv
+                        $ initIfaceLcl ifaceModule (text "native interface test") NotBoot
+                        $ extendIfaceIdEnv scope
+                        $ tcIfaceExpr (IfaceType input)
+                case outcome of
+                    Left _ -> do
+                        diagnostics <- unlines <$> readIORef messages
+                        unless (fragment `isInfixOf` diagnostics) $
+                            fail ("FAIL: " ++ label ++ "; unexpected interface diagnostic:\n" ++ diagnostics)
+                    Right _ -> fail ("FAIL: " ++ label ++ "; malformed interface succeeded")
+        forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
+            decoded <- roundtrip compression iface
+            first <- restore [] decoded
+            second <- restore [] decoded
+            let label = "retained interface " ++ show compression
+            checkType dflags (label ++ " (alpha equality)") original first
+            checkType dflags (label ++ " (second reconstruction)") first second
+            check (label ++ " (closed scope)") (isEmptyVarSet (tyCoVarsOfType first))
+            case (original, first, second) of
+                (DepFunTy old _, DepFunTy fresh body, DepFunTy next _) -> do
+                    check (label ++ " (fresh binder)") (fresh /= old && next /= old && fresh /= next)
+                    check (label ++ " (local runtime binder)") (isLocalId fresh && not (isCoVar fresh))
+                    checkType dflags (label ++ " (Bool domain)") boolTy (varType fresh)
+                    checkType dflags (label ++ " (Many multiplicity)") ManyTy (idMult fresh)
+                    checkType dflags (label ++ " (shared occurrences)") (keepResult (TermVarTy fresh)) body
+                    forM_ [falseDataCon, trueDataCon] $ \constructor ->
+                        checkType
+                            dflags
+                            (label ++ " (constructor application)")
+                            (keepResult (constructorIndex constructor))
+                            (applyTypeToArgs first [Var (dataConWorkId constructor)])
+                    let caller = local 302 "caller" boolTy
+                    checkType
+                        dflags
+                        (label ++ " (caller index identity)")
+                        (keepResult (TermVarTy caller))
+                        (applyTypeToArgs first [Var caller])
+                _ -> fail ("FAIL: " ++ label ++ "; retained binder was lost")
+            let outer = local 303 "same" boolTy
+                inner = local 304 "same" boolTy
+                nested =
+                    tidyTopType
+                        $ DepFunTy outer
+                        $ DepFunTy inner
+                        $ mkFunctionType ManyTy (indexed (TermVarTy outer)) (indexed (TermVarTy inner))
+            nestedIface <- roundtrip compression (toIfaceType nested)
+            nestedResult <- restore [] nestedIface
+            checkType dflags (label ++ " (nested alpha equality)") nested nestedResult
+            case nestedResult of
+                DepFunTy outer' (DepFunTy inner' body) -> do
+                    check (label ++ " (nested distinct identities)") (outer' /= inner')
+                    check (label ++ " (nested fresh identities)") (outer' /= outer && inner' /= inner)
+                    checkType
+                        dflags
+                        (label ++ " (nested lexical references)")
+                        (mkFunctionType ManyTy (indexed (TermVarTy outer')) (indexed (TermVarTy inner')))
+                        body
+                _ -> fail ("FAIL: " ++ label ++ "; nested retained binders were lost")
+            let literal = LitTy (NumTyLit 7)
+            literalIface <- roundtrip compression (toIfaceType literal)
+            literalResult <- restore [] literalIface
+            checkType dflags (label ++ " (ordinary literal tag)") literal literalResult
+        case iface of
+            IfaceDepFunTy (multiplicity, name, domain) body -> do
+                missing <- roundtrip NormalCompression (IfaceTermVar (mkIfLclName (fsLit "missing")))
+                rejectsIface "missing interface index" "Iface id out of scope" [] missing
+                let malformed label fragment binder = do
+                        decoded <- roundtrip NormalCompression (IfaceDepFunTy binder body)
+                        rejectsIface label fragment [] decoded
+                malformed "non-Bool interface binder" "Invalid retained Boolean binder" (multiplicity, name, toIfaceType intTy)
+                malformed "linear interface binder" "Invalid retained Boolean binder" (toIfaceType OneTy, name, domain)
+                malformed "interface binder outside its own domain scope" "Iface id out of scope" (multiplicity, name, IfaceTermVar name)
+            _ -> fail "FAIL: interface conversion did not retain the Boolean binder"
+        let constraintResult = DepFunTy b (mkTyConApp eqTyCon [boolTy, TermVarTy b, TermVarTy b])
+        constraintIface <- roundtrip NormalCompression (toIfaceType (tidyTopType constraintResult))
+        rejectsIface "Constraint interface result" "Invalid retained function result" [] constraintIface
+        let badType = local 305 "badType" intTy
+            badMultiplicity = mkSysLocal (fsLit "badMultiplicity") (unique 306) OneTy boolTy
+        forM_ [badType, badMultiplicity] $ \bad -> do
+            decoded <- roundtrip NormalCompression (IfaceTermVar (mkIfLclName (occNameFS (getOccName bad))))
+            rejectsIface "invalid local interface index" "Invalid retained Boolean index" [bad] decoded
+        let diagnostic = toIfaceTypeX (unitVarSet b) (TermVarTy b)
+        check "free interface index retains diagnostic identity" $ case diagnostic of
+            IfaceFreeTermVar free -> free == b
+            _ -> False
+        rejectsWith "free interface index cannot be serialized" "Can't serialise IfaceFreeTermVar" (roundtrip NormalCompression diagnostic)
+        rejectsIface "free interface index cannot be imported" "diagnostic-only retained index" [] diagnostic
+        unknownWriter <- Binary.openBinMem 16
+        Binary.putByte unknownWriter 255
+        unknownReader <- Binary.shrinkBinBuffer unknownWriter
+        unknown <- try @IOException (getIfaceType unknownReader)
+        case unknown of
+            Left exception -> check "unknown interface type tag diagnostic" ("invalid type tag 255" `isInfixOf` displayException exception)
+            Right _ -> fail "FAIL: unknown interface type tag was accepted"
 
 -- | Check rigid index matching and conservative constructor apartness.
 runMatchingChecks :: DynFlags -> IO ()
@@ -388,6 +530,8 @@ runChecks dflags = do
     lintRejects dflags "out-of-scope index is rejected" [] lambdaX
     lintRejects dflags "non-Boolean retained binder is rejected" [] (identity 12 (DepFunTy n (indexed (TermVarTy n))))
     lintRejects dflags "non-Type dependent codomain is rejected" [] (identity 13 (DepFunTy b (TermVarTy b)))
+    lintRejects dflags "Constraint dependent codomain is rejected" [] (identity 307 (DepFunTy b (mkTyConApp eqTyCon [boolTy, TermVarTy b, TermVarTy b])))
+    lintRejects dflags "primitive equality dependent codomain is rejected" [] (identity 308 (DepFunTy b (mkNomEqPred (TermVarTy b) (TermVarTy b))))
     let erased = mkTyVar (mkSystemName (unique 14) (mkTyVarOcc "erased")) boolTy
         forged = local 14 "forged" boolTy
     lintRejects dflags "type-variable binding cannot supply a runtime index" [erased] (identity 15 (indexed (TermVarTy forged)))
