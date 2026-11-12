@@ -5,7 +5,7 @@ retained Boolean argument whose value determines the result type. Extend Core
 from Eisenberg's historical `nokinds-pi` work, ported and completed on current
 GHC. Keep the validated `singletons` encoding as a comparison implementation.
 
-Last updated: 2026-11-11.
+Last updated: 2026-11-12.
 
 ## Project documents
 
@@ -24,9 +24,9 @@ Last updated: 2026-11-11.
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
 | Native Core | Retained Boolean lambda, application, and checked cases pass the API regression |
-| Frontend and execution | Not implemented; optimizer, backend, and interface gates remain |
+| Execution | Native Core runs through the checked bytecode entry; source syntax remains unavailable |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Current task | [M5: backend execution](PLAN.md#m5-execute-through-the-existing-backend); lowering audit recorded, implementation pending |
+| Next task | [M6: optimizer preservation](PLAN.md#m6-preserve-dependencies-through-optimization); M5 bytecode execution validated |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -46,35 +46,70 @@ Boolean alternatives can bind checked nominal equality evidence. The strict case
 justifies each proof. Proof-bearing cases must cover both Boolean values, and
 each proof stays inside its branch. The existing result annotation scope remains.
 
-The `NativeDependentCore` GHC API regression passes against both the stage0
-compiler library and the rebuilt stage1 compiler library. It checks constructor
-and shared-variable applications,
-substitution composition, binder cloning, invalid indices, scope errors, and
-boundary gates. It also checks `Select True = Int`, `Select False = Bool`,
-`choose`, `keep`, shared-index composition, branch casts, and forged proofs.
-The final default rebuild passed in 10m48s under a 16 GiB cap, with a recorded
-peak of 5,454 MiB. This was an incremental rebuild. It validates compiler source
-commit `c1694431a1` with six workers and `--docs=none`.
-The registered testsuite run passed its normal way: one expected pass, ten skipped
-ways, and no unexpected failures. The command selected `NativeDependentCore`
-with `--test-way=normal`; the full testsuite was not run.
-These API results do not establish native execution or optimizer preservation.
+The `NativeDependentCore` GHC API regression checks constructor and shared-variable
+applications, substitution composition, binder cloning, invalid indices, scope
+errors, and boundary gates. It also checks `Select True = Int`,
+`Select False = Bool`, shared-index composition, branch casts, and forged proofs.
+
+The frontend cannot produce the new forms. The ordinary optimizer, default
+CorePrep entry, program backend entry, and interface serialization reject them.
 There is no performance measurement for the changed type traversals.
 
-The final smoke checks passed package registration, `-O2 -dcore-lint`, Template
-Haskell, threaded execution, GHCi, and Haddock startup. Both singleton comparisons
-also passed at `-O0` and `-O2` with Core Lint, including the expected mismatch
-rejection. The upstream file matched its pinned blob exactly.
+## Native execution
 
-The implementation is recorded in local commits `ccda2a6758` for binders and
-application, and `c1694431a1` for checked Boolean cases. The case specification is
-in the preceding commit `1ade4a22c2`. No commits were pushed.
+`hscCompileCoreExpr` now has a restricted native path. It skips the ordinary
+simplifier and runs Core Lint before and after CorePrep. CorePrep preserves native
+types, clones proof types with their Boolean indices, and supports retained eta
+binders. CoreToStg removes virtual Boolean proofs and casts. STG Lint checks the
+runtime argument representations before bytecode generation. The normal pipeline
+keeps its rejection gates. JavaScript execution remains unsupported.
 
-The frontend cannot produce the new forms. The ordinary optimizer, CorePrep,
-interface serialization, and unsupported frontend operations reject them.
-The next implementation task is a restricted lowering path for native execution.
-It must erase proof uses and index annotations together and retain strict case
-discrimination. Existing simplifier and backend binder handling is insufficient.
+`NativeDependentCoreRun` compiles each `choose` and shared `keep`/`choose` worker
+once. An ordinary helper supplies both Boolean inputs through an IORef. The
+results are `42` for `True` and `False` for `False`. The shared path uses an
+explicit retained eta expansion. It does not add a singleton argument.
+
+The laziness observations have separate types:
+
+- `keepSelect bottom` reaches function WHNF. This test does not construct a
+  non-bottom value of type `Select bottom`.
+- A fully applied indexed `keep` returns `42` with a bottom Boolean. Its value has
+  type `(b ~ b) => Int`. Ordinary reflexivity supplies the dictionary without
+  evaluating `b`.
+- A lazy local index can refer to a global Boolean thunk. CorePrep must preserve
+  the local binding when its RHS cannot replace an index.
+- `choose bottom` raises the named Boolean-bottom exception.
+
+Prepared Core and STG inspection confirmed one Boolean argument for `choose` and
+Boolean/value arguments for `keep`. The `keep` closure returns the value without
+scrutinizing the Boolean. Index-only dependencies do not add runtime captures.
+The branch proofs disappear from STG, and the strict Boolean cases remain.
+
+Compiler source commit `5a636d9274` passed the final default Hadrian rebuild on
+2026-11-12. The command used `-j6 --flavour=default --docs=none`. Hadrian reported
+7m31s. The memory scope recorded a peak of 4,658 MiB under a 16 GiB cap with no
+swap. This was an incremental rebuild.
+
+The registered test run selected `NativeDependentCore NativeDependentCoreRun`
+with `--test-way=normal`. Both tests passed. Twenty other ways were skipped, and
+there were no unexpected failures or framework warnings. The test scope peaked
+at 2,476 MiB under an 8 GiB cap. Both tests also passed against the bootstrap API
+library; runtime execution used the matching target libraries and an external
+interpreter.
+
+Ordinary smoke checks passed package registration, `-O2 -dcore-lint`, Template
+Haskell, threaded execution, GHCi, and Haddock startup. The standalone singleton
+comparison and exact pinned `Data.Singletons` source passed at `-O0` and `-O2`
+with Core Lint. The expected mismatch was rejected.
+
+Hadrian reported a nonfatal configuration comparison between `lib` and `lib/.`.
+It continued with its in-tree arguments. Package registration reported missing
+documentation because documentation generation was disabled.
+
+The full testsuite and documentation build have not run. This work establishes
+bytecode execution for the restricted Core examples. It does not establish
+ordinary optimizer preservation or a source language. Native machine-code
+compilation remains behind the program gate. All commits are local.
 
 ## Verified baseline
 

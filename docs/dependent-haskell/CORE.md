@@ -78,9 +78,9 @@ It does not compose arbitrary Core expressions. Such expressions cannot replace
 native indices in this increment.
 
 This restricted grammar is not closed under general Core substitution. The
-experiment therefore cannot enter the ordinary optimizer or backend yet.
-Preserving lazy binding boundaries or adding an internal expression-index form
-is required before those passes can operate on arbitrary Boolean producers.
+experiment therefore cannot enter the ordinary optimizer. Backend preparation
+must preserve lazy index binding boundaries. The optimizer will also need this
+restriction or an internal expression-index form for arbitrary Boolean producers.
 The compiler frontend cannot emit these forms in the first increment.
 
 ## Evidence and dependent cases
@@ -129,11 +129,11 @@ This is a new Core typing rule. It follows the branch-local refinement approach
 in [pi-forall](REFERENCES.md#pi-forall) and reuses existing FC coercions. Neither
 the D/DC proof nor the current Ott formalism establishes its preservation.
 
-The optimizer and backend gates remain mandatory. The simplifier reconstructs
-constructor applications from alternative binders. CoreToStg retains coercion
-identifiers in its binder list. Neither path can treat this proof as a Boolean
-field. A later lowering step must erase proof uses and index annotations together,
-preserve strict case discrimination, and justify each enabled transformation.
+The ordinary optimizer and program backend gates remain mandatory. The simplifier
+reconstructs constructor applications from alternative binders. It cannot treat
+this proof as a Boolean field. After checked preparation, CoreToStg removes the
+virtual alternative proof and erases casts. It preserves strict case discrimination
+and ordinary coercion argument positions.
 The boundary scanner must detect virtual Boolean proofs even when their types
 contain only constructor indices.
 
@@ -145,7 +145,7 @@ an ordinary function coercion. Reject unsupported coercion construction.
 
 The source audit found these requirements for the restricted bytecode entry.
 
-| Current function | Required change |
+| Function | Restricted lowering rule |
 | --- | --- |
 | `CoreToStg.Prep.cpCloneBndr` | Substitute proof types when only the Id environment changes. Cloning `b` must update every `TermVarTy b`. |
 | `Core.Opt.Arity.typeOneShots` | Count the retained Boolean as one runtime argument. Otherwise `typeArity` returns zero and Lint rejects positive arity metadata. |
@@ -184,6 +184,9 @@ STG Lint before bytecode generation. CorePrep must disable speculative evaluatio
 and optional argument arity analysis for this entry. The normal CorePrep entry
 and the program entry keep their rejection gates. JavaScript execution remains
 unsupported. This entry does not enable the ordinary optimizer or interfaces.
+The boundary scanner must inspect synonym definitions and original arguments.
+CorePrep must keep a lazy local Boolean binding if its RHS cannot replace an
+index. A global Boolean producer is one such RHS.
 
 The interpreter's `evalString` executes an `IO String` observation without a host
 `unsafeCoerce`. The test must compile the native function before it receives its

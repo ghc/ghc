@@ -5,7 +5,7 @@ work on Richard Eisenberg's historical `nokinds-pi` branch. Port its useful chan
 to current GHC and complete the missing rules. The first working target is a
 retained Boolean argument whose value determines the result type.
 
-Last updated: 2026-11-11. Compiler source baseline:
+Last updated: 2026-11-12. Compiler source baseline:
 `19ff36f2aede0ca2e554016ff22c71e73aa9803b`.
 
 See [current status](README.md) and [primary references](REFERENCES.md).
@@ -145,20 +145,33 @@ it does not rely on `unsafeCoerce` or plugin axioms.
 
 ### M5: execute through the existing backend
 
-The [lowering audit](CORE.md#lowering-audit-for-m5) records the first source-level
-blockers. Start with a checked CorePrep-to-STG harness. Preserve native type
-metadata until the backend has a valid representation view.
+The [lowering audit](CORE.md#lowering-audit-for-m5) specifies the restricted
+CorePrep-to-STG path. It preserves native type metadata and checks each runtime
+argument's representation before bytecode generation.
 
-- [ ] Carry the restricted extension through the minimum mandatory Core pipeline.
-- [ ] Update CorePrep and CoreToStg for the specified erasure of new index and proof
-      annotations. The retained Boolean remains one ordinary runtime argument.
-- [ ] Reject unsupported forms explicitly. Do not silently pass them to the backend
+- [x] Carry the restricted extension through the minimum mandatory Core pipeline.
+- [x] Update CorePrep and CoreToStg to preserve native typing and erase virtual
+      proof binders. The retained Boolean remains one ordinary runtime argument.
+- [x] Reject unsupported forms explicitly. Do not silently pass them to the backend
       or enable transformations that violate their invariants.
-- [ ] Inspect Core and STG for duplicate witnesses and inserted forcing.
+- [x] Inspect Core and STG for duplicate witnesses and inserted forcing.
 
 Gate: native examples execute with the specified values and termination behavior
 through a restricted pipeline. This does not establish optimizer safety. Even an
 unoptimized build runs mandatory transformations that need an audit.
+
+The restricted entry is `hscCompileCoreExpr` through bytecode. It skips ordinary
+simplification and forces Core Lint before and after CorePrep, then STG Lint.
+CorePrep disables speculative evaluation and optional argument arity analysis.
+It keeps a lazy local index when its RHS cannot replace an index. The boundary
+scanner includes synonym definitions and original arguments. The normal program,
+optimizer, and interface gates remain. JavaScript and native machine-code
+execution are outside this increment.
+
+`NativeDependentCoreRun` supplies both Boolean values through one compiled worker.
+It covers `choose`, shared `keep`/`choose`, retained eta expansion, partial
+`keepSelect bottom`, fully applied dictionary-index `keep bottom`, a lazy local
+index from a global thunk, and strict `choose bottom`. See [validation](README.md#native-execution).
 
 ### M6: preserve dependencies through optimization
 
