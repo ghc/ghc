@@ -63,6 +63,16 @@ desugaring. RequiredTypeArguments provides erased type arguments. It cannot
 implement the retained rule by renaming `foreach` to `forall`. See the pending
 [frontend identity plan](CORE.md#frontend-identity-plan).
 
+The first source increment uses the proposed `foreach` spelling from
+[GHC proposal #378](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0378-dependent-type-design.rst).
+It stores retained quantification in `HsForEachTy`. Existing `HsForAllTy`
+telescopes continue to describe erased quantification. The local
+`ExperimentalDependentTypes` flag limits this incomplete source experiment.
+This flag is not a name specified by that proposal. It implies no other
+extensions. In `foreach (b :: Bool)`, `Bool` is the domain type of a value
+binder. It is not the kind of an erased type variable. Parsing this annotation
+does not require the implementation to imply `KindSignatures`.
+
 ## Haskell evaluation provenance
 
 The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)

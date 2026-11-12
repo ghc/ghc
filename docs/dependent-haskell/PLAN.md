@@ -48,7 +48,7 @@ Keep arithmetic and SMT integration separate from this Core work.
 ## First source target
 
 These examples describe intended behavior. The `foreach` spelling follows the
-design proposal. It is not syntax implemented by this checkout.
+design proposal. Source checking and execution remain unimplemented.
 
 ```haskell
 type family Select (b :: Bool) where
@@ -215,6 +215,21 @@ transformations were exercised and which remain gated. A passing executable does
 not establish safety for untested forms.
 
 ### M7: expose the restricted source language
+
+Implement this task in two increments. First add the local experimental flag
+`ExperimentalDependentTypes`. It is disabled by default and implies no other
+extensions. Reserve `foreach` only when the flag is enabled. Parse its telescope
+into a distinct `HsForEachTy` node. Do not reuse an erased `HsForAllTy` node.
+Preserve source annotations, printing, and AST traversal. Until checking exists,
+reject retained quantification with the located diagnostic GHC-43582:
+"Typechecking of retained quantification is not implemented yet."
+Keep `foreach` available as an ordinary identifier when the flag is disabled.
+Check parsing and printing through the existing native Core API regression.
+Add source regressions for the diagnostic and the flag-disabled identifier.
+
+The next increment must replace this rejection with the restricted Boolean
+checking rule. Use the existing checked bytecode path for the first source
+execution. Parsing alone does not satisfy the M7 gate.
 
 - [ ] Add an experimental opt-in flag, syntax, AST representation, and diagnostics.
 - [ ] Extend renaming and checking for explicit retained Boolean signatures.
