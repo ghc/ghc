@@ -2415,10 +2415,8 @@ ty_co_match :: MatchEnv   -- ^ ambient helpful info
    -- ^ Just env ==> liftCoSubst Nominal env ty == co, modulo roles.
    -- Also: Just env ==> lsubst(ty) == lty and rsubst(ty) == rty,
    -- where lsubst = lcSubstLeft(env) and rsubst = lcSubstRight(env)
-ty_co_match _ _ ty@(TermVarTy {}) _ _ _
-  = pprPanic "ty_co_match: unsupported runtime index" (ppr ty)
-ty_co_match _ _ ty@(DepFunTy {}) _ _ _
-  = pprPanic "ty_co_match: unsupported retained function" (ppr ty)
+ty_co_match _ _ (TermVarTy {}) _ _ _ = Nothing
+ty_co_match _ _ (DepFunTy {}) _ _ _ = Nothing
 ty_co_match menv subst ty co lkco rkco
   | Just ty' <- coreView ty = ty_co_match menv subst ty' co lkco rkco
 
@@ -2470,6 +2468,10 @@ ty_co_match menv subst (TyVarTy tv1) co lkco rkco
   where
     rn_env = me_env menv
     tv1' = rnOccL rn_env tv1
+
+  -- Structural matching under a retained runtime binder is not supported.
+  -- A template type variable can still bind to the whole coercion above.
+ty_co_match _ _ _ (DepFunCo {}) _ _ = Nothing
 
   -- just look through SubCo's. We don't really care about roles here.
 ty_co_match menv subst ty (SubCo co) lkco rkco

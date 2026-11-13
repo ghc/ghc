@@ -2117,6 +2117,8 @@ freeNamesIfCoercion (IfaceGReflCo _ t mco)
   = freeNamesIfType t &&& freeNamesIfMCoercion mco
 freeNamesIfCoercion (IfaceFunCo _ c_mult c1 c2)
   = freeNamesIfCoercion c_mult &&& freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
+freeNamesIfCoercion (IfaceDepFunCo (w, _, arg) co)
+  = freeNamesIfType w &&& freeNamesIfType arg &&& freeNamesIfCoercion co
 freeNamesIfCoercion (IfaceTyConAppCo _ tc cos)
   = freeNamesIfTc tc &&& fnList freeNamesIfCoercion cos
 freeNamesIfCoercion (IfaceAppCo c1 c2)

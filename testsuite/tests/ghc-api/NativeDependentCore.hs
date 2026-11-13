@@ -8,9 +8,10 @@ import Control.Monad.IO.Class (liftIO)
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
 import GHC (DynFlags, getSession, getSessionDynFlags, runGhc)
+import GHC.Builtin.WiredIn.Prim (intPrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, mkAxInstCo, mkCoVarCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
+import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, eqCoercion, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConWorkId, mkDataCon, promoteDataCon)
 import GHC.Core.Dependent
@@ -23,7 +24,7 @@ import GHC.Core.SimpleOpt (simpleOptNativeExpr)
 import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType, nonDetCmpType)
 import GHC.Core.TyCo.FVs (tyCoVarsOfCo)
-import GHC.Core.TyCo.Rep (Scaled (..), TyLit (..), Type (..))
+import GHC.Core.TyCo.Rep (Coercion (..), Scaled (..), TyLit (..), Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.TyCo.Tidy (tidyTopType)
 import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind)
@@ -31,7 +32,7 @@ import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchTy, tcMatchTys, tcUnifyTysFG)
 import GHC.Core.Utils (applyTypeToArgs, exprType)
-import GHC.CoreToIface (toIfaceAlt, toIfaceExpr, toIfaceType, toIfaceTypeX)
+import GHC.CoreToIface (toIfaceAlt, toIfaceCoercion, toIfaceExpr, toIfaceType, toIfaceTypeX)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.IOEnv (IOEnvFailure)
@@ -87,6 +88,7 @@ main = do
             runMatchingChecks dflags
             runCaseChecks dflags
             runNatChecks dflags
+            runDepFunCoChecks dflags
             runIfaceChecks libdir
             putStrLn "native-core-api-ok"
         _ -> fail "Usage: NativeDependentCore GHC_LIBDIR"
@@ -941,6 +943,115 @@ runSyntaxChecks dflags = do
     check "visible forall remains erased quantification" $ case unLoc visible of
         HsForAllTy{} -> True
         _ -> False
+
+-- | Check retained congruence with a family equation and scoped nominal evidence.
+runDepFunCoChecks :: DynFlags -> IO ()
+runDepFunCoChecks dflags = do
+    let b = local 700 "co_b" boolTy
+        free = local 701 "co_free" boolTy
+        other = local 702 "co_other" boolTy
+        equation = mkAxInstCo Nominal (BranchedAxiom (snd selectFamily) 0) [] []
+        concrete = selected (constructorIndex trueDataCon)
+        cv = proof 703 concrete intTy
+        argument = mkFunctionType ManyTy (indexed (TermVarTy b)) (indexed (TermVarTy free))
+        body = mkFunCoNoFTF Nominal (mkNomReflCo ManyTy) (mkNomReflCo argument) (mkCoVarCo cv)
+        raw = DepFunCo b body
+        lifted = mkDepFunCo b body
+        left = mkDepFunTy b (mkFunctionType ManyTy argument concrete)
+        right = mkDepFunTy b (mkFunctionType ManyTy argument intTy)
+    check "retained coercion inherits nominal role" (coercionRole lifted == Nominal)
+    checkType dflags "retained coercion left endpoint" left (coercionLKind lifted)
+    checkType dflags "retained coercion right endpoint" right (coercionRKind lifted)
+    lintAccepts dflags "raw retained coercion scopes its index" [free, cv] (Coercion raw)
+    lintAccepts dflags "smart retained coercion scopes its index" [free, cv] (Coercion lifted)
+    check "retained coercion removes its bound index from free variables" (not (b `elemVarSet` tyCoVarsOfCo raw))
+    check "retained coercion preserves a free runtime index" (free `elemVarSet` tyCoVarsOfCo raw)
+    check "retained coercion preserves nominal evidence dependencies" (cv `elemVarSet` tyCoVarsOfCo raw)
+    check "scanner detects retained coercion syntax" (hasNativeDependentExpr (Coercion raw))
+    let representational = mkDepFunCo b (mkSubCo body)
+        phantom = DepFunCo b (mkReflCo Phantom (coercionLKind body))
+    check "retained coercion inherits representational role" (coercionRole representational == Representational)
+    checkType dflags "representational retained coercion source" left (coercionLKind representational)
+    checkType dflags "representational retained coercion target" right (coercionRKind representational)
+    lintAccepts dflags "representational retained congruence" [free, cv] (Coercion representational)
+    check "retained coercion inherits phantom role" (coercionRole phantom == Phantom)
+    lintAccepts dflags "phantom retained reflexivity" [free] (Coercion phantom)
+    let renamedBody = Subst.substCo (indexSubst [other, free, cv] b (Var other)) body
+        renamed = DepFunCo other renamedBody
+    check "retained coercion alpha equality" (eqCoercion raw renamed)
+    lintAccepts dflags "alpha-renamed retained coercion" [free, cv] (Coercion renamed)
+    check
+        "index substitution respects a retained coercion binder"
+        (eqCoercion raw (Subst.substCo (indexSubst [free, cv] b (Var (dataConWorkId trueDataCon))) raw))
+    let captured = Subst.substCo (indexSubst [b, cv] free (Var b)) raw
+    case captured of
+        DepFunCo fresh _ -> do
+            check "coercion substitution freshens a capturing runtime binder" (fresh /= b)
+            let expectedArgument = mkFunctionType ManyTy (indexed (TermVarTy fresh)) (indexed (TermVarTy b))
+            checkType
+                dflags
+                "coercion substitution keeps free and bound indices distinct"
+                (mkDepFunTy fresh (mkFunctionType ManyTy expectedArgument concrete))
+                (coercionLKind captured)
+            check "coercion substitution retains the free replacement" (b `elemVarSet` tyCoVarsOfCo captured)
+            check "coercion substitution removes the renamed binder" (not (fresh `elemVarSet` tyCoVarsOfCo captured))
+            lintAccepts dflags "capture-avoiding retained coercion substitution" [b, cv] (Coercion captured)
+        _ -> fail "FAIL: retained coercion substitution lost its binder"
+    let parameter = mkTyVar (mkSystemName (unique 704) (mkTyVarOcc "ignored")) boolTy
+        binders = [mkAnonTyConBinder parameter]
+        forgetful =
+            mkSynonymTyCon
+                (mkSystemName (unique 705) (mkTcOcc "ForgetIndex"))
+                (mkTyConKind binders liftedTypeKind)
+                binders
+                liftedTypeKind
+                [Phantom]
+                concrete
+                True
+                False
+                True
+                False
+        forgotten = mkTyConApp forgetful [TermVarTy b]
+        forgetting = TransCo (Refl forgotten) equation
+        disappearing = mkDepFunCo b forgetting
+    checkType dflags "one-sided retained endpoint preserves syntactic dependence" (DepFunTy b forgotten) (coercionLKind disappearing)
+    checkType dflags "one-sided retained endpoint canonicalizes the ordinary arrow" (mkFunctionType ManyTy boolTy intTy) (coercionRKind disappearing)
+    lintAccepts dflags "a family equation removes one endpoint's retained dependence" [] (Coercion disappearing)
+    let proofOnly = mkDepFunCo b (TransCo (SymCo forgetting) forgetting)
+        ordinaryEndpoint = mkFunctionType ManyTy boolTy intTy
+    check "proof-only dependence keeps the retained coercion binder" $ case proofOnly of
+        DepFunCo{} -> True
+        _ -> False
+    checkType dflags "proof-only retained coercion left endpoint" ordinaryEndpoint (coercionLKind proofOnly)
+    checkType dflags "proof-only retained coercion right endpoint" ordinaryEndpoint (coercionRKind proofOnly)
+    check "proof-only retained coercion removes its bound index from free variables" (not (b `elemVarSet` tyCoVarsOfCo proofOnly))
+    lintAccepts dflags "retained binder scopes an intermediate proof-only dependency" [] (Coercion proofOnly)
+    lintAccepts dflags "Pi construction scopes an intermediate proof-only dependency" [] $
+        Coercion (mkPiCo Nominal b (TransCo (SymCo forgetting) forgetting))
+    check "scanner detects a coercion with ordinary endpoint types" (hasNativeDependentExpr (Coercion proofOnly))
+    check "retained coercion diagnostics print its runtime binder" ("foreach" `isInfixOf` showSDoc dflags (ppr (toIfaceCoercion lifted)))
+    writer <- Binary.openBinMem 16
+    rejectsWith
+        "retained coercion diagnostic form cannot enter interface files"
+        "Native dependent coercion interfaces are not implemented"
+        (Binary.put_ writer (toIfaceCoercion lifted))
+    case mkDepFunCo b (mkNomReflCo (indexed (TermVarTy b))) of
+        Refl ty -> checkType dflags "reflexive retained coercion simplifies" (mkDepFunTy b (indexed (TermVarTy b))) ty
+        _ -> fail "FAIL: reflexive retained coercion did not simplify"
+    let nat = local 706 "co_nat" (mkTyConTy (let (tc, _, _) = peanoNat in tc))
+        erased = mkTyVar (mkSystemName (unique 707) (mkTyVarOcc "co_erased")) boolTy
+        wrongDomain = local 708 "co_int" intTy
+        linear = setIdMult b OneTy
+    lintAccepts dflags "retained Nat coercion binder" [] (Coercion (DepFunCo nat (mkNomReflCo intTy)))
+    forM_ [("erased variable", erased), ("coercion variable", cv), ("unsupported domain", wrongDomain), ("linear runtime binder", linear)] $ \(label, binder) ->
+        lintRejects dflags ("retained coercion rejects " ++ label) [] (Coercion (DepFunCo binder (mkNomReflCo intTy)))
+    lintRejects dflags "retained coercion rejects unlifted results" [] (Coercion (DepFunCo b (mkNomReflCo intPrimTy)))
+    forM_ [("left", proof 709 intPrimTy intTy), ("right", proof 710 intTy intPrimTy)] $ \(side, evidence) -> do
+        lintAccepts dflags ("ordinary heterogeneous " ++ side ++ " endpoint evidence") [evidence] (Coercion (mkCoVarCo evidence))
+        lintRejects dflags ("retained coercion rejects an unlifted " ++ side ++ " result") [evidence] (Coercion (DepFunCo b (mkCoVarCo evidence)))
+    lintRejects dflags "retained coercion rejects an out-of-scope runtime dependency" [cv] (Coercion raw)
+    lintRejects dflags "valid raw retained coercion cannot escape a let-bound index" [cv] $
+        Let (NonRec free (Var (dataConWorkId trueDataCon))) (Coercion raw)
 
 -- | Compare recovered types and print both sides on failure.
 checkType :: DynFlags -> String -> Type -> Type -> IO ()

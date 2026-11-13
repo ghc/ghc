@@ -129,6 +129,7 @@ synonymTyConsOfType ty
      go_mco MRefl    = emptyNameEnv
      go_mco (MCo co) = go_co co
 
+     go_co (DepFunCo v co)      = go (varType v) `plusNameEnv` go_co co
      go_co (Refl ty)            = go ty
      go_co (GRefl _ ty mco)     = go ty `plusNameEnv` go_mco mco
      go_co (TyConAppCo _ tc cs) = go_tc tc `plusNameEnv` go_co_s cs

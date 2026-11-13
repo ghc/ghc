@@ -37,7 +37,7 @@ module GHC.Core.Coercion (
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
         mkNakedForAllCo, mkForAllCo, mkForAllVisCos,
-        mkHomoForAllCo, mkHomoForAllCos,
+        mkHomoForAllCo, mkHomoForAllCos, mkDepFunCo,
         mkPhantomCo, mkAxiomCo,
         mkHoleCo, mkUnivCo, mkUnivCoFromDeps, mkUnivCoAddTypeDeps,
         checkUnivCoDepsInv,
@@ -1018,6 +1018,8 @@ setNominalRole_maybe r co
       = TransCo <$> setNominalRole_maybe_helper co1 <*> setNominalRole_maybe_helper co2
     setNominalRole_maybe_helper (AppCo co1 co2)
       = AppCo <$> setNominalRole_maybe_helper co1 <*> pure co2
+    setNominalRole_maybe_helper (DepFunCo b co)
+      = mkDepFunCo b <$> setNominalRole_maybe_helper co
     setNominalRole_maybe_helper co@(ForAllCo { fco_visL = visL, fco_visR = visR, fco_body = body_co })
       | visL `eqForAllVis` visR -- See (FC3) in Note [ForAllCo] in GHC.Core.TyCo.Rep
       = do { body_co' <- setNominalRole_maybe_helper body_co
@@ -1199,6 +1201,8 @@ promoteCoercion co = case co of
             -- the first equation above.  Hence `assert False`
          mkNomReflCo liftedTypeKind
 
+    DepFunCo {} -> mkNomReflCo liftedTypeKind
+
     FunCo {} -> mkKindCo co
        -- We can get Type~Constraint or Constraint~Type
        -- from FunCo {} :: (a -> (b::Type)) ~ (a -=> (b'::Constraint))
@@ -1353,15 +1357,11 @@ mkFunResCo :: Role -> Id -> Coercion -> Coercion
 -- Reflexive in the multiplicity argument
 mkFunResCo role id res_co
   | isNonCoVarId id
-  , id `elemVarSet` tyCoVarsOfTypes [res_lty, res_rty]
-  = case isReflCo_maybe res_co of
-      Just (res_ty, _) -> mkReflCo role (mkDepFunTy id res_ty)
-      Nothing -> pprPanic "mkFunResCo: native dependent congruence not implemented"
-                   (ppr id $$ ppr res_co)
+  , id `elemVarSet` tyCoVarsOfCo res_co
+  = mkDepFunCo id res_co
   | otherwise
   = mkFunCoNoFTF role mult arg_co res_co
   where
-    Pair res_lty res_rty = coercionKind res_co
     arg_co = mkReflCo role (varType id)
     mult   = multToCo (idMult id)
 
@@ -1773,7 +1773,11 @@ ty_co_subst !lc role ty
     go r (TyVarTy tv)       = expectJust $
                               liftCoSubstTyVar lc r tv
     go r ty@(TermVarTy {})  = lift_native r ty
-    go r ty@(DepFunTy {})   = lift_native r ty
+    go r (DepFunTy b body)
+      = let LC subst env = lc
+            (subst', b') = substNativeIndexBndr subst b
+            lc' = LC subst' (delVarEnv env b)
+        in mkDepFunCo b' (ty_co_subst lc' r body)
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys)  = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)
     go r (FunTy af w t1 t2) = mkFunCo r af (go Nominal w) (go r t1) (go r t2)
@@ -2084,6 +2088,7 @@ coercion_lr_kind which orig_co
     go (GRefl _ ty (MCo co1)) = pickLR which (ty, mkCastTy ty co1)
     go (TyConAppCo _ tc cos)  = mkTyConApp tc (map go cos)
     go (AppCo co1 co2)        = mkAppTy (go co1) (go co2)
+    go (DepFunCo b co)        = mkDepFunTy b (go co)
     go (CoVarCo cv)           = go_covar cv
     go (HoleCo h)             = go_covar (coHoleCoVar h)
     go (SymCo co)             = pickLR which (coercionRKind co, coercionLKind co)
@@ -2243,6 +2248,7 @@ coercionRole = go
     go (GRefl r _ _)                = r
     go (TyConAppCo r _ _)           = r
     go (AppCo co1 _)                = go co1
+    go (DepFunCo _ co)              = go co
     go (ForAllCo { fco_body = co }) = go co
     go (FunCo { fco_role = r })     = r
     go (CoVarCo cv)                 = coVarRole cv

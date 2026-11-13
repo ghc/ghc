@@ -2971,7 +2971,9 @@ pushCoValArg co
   | Just (ty, _) <- isReflCo_maybe co
   = Just (ty, MRefl, MRefl)
 
-  | isFunTy tyL
+  | isFunTy tyL, isFunTy tyR
+  -- A retained coercion can have only one ordinary function endpoint.
+  -- Keep that cast intact; SelFun does not project retained functions.
   , (_, co1, co2) <- decomposeFunCo co
       -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
       -- then co1 :: tyL1 ~ tyR1
@@ -3163,7 +3165,8 @@ collectBindersPushingCo e
 
       | isId b
       , let Pair tyL tyR = coercionKind co
-      , assert (isFunTy tyL) $ isFunTy tyR
+      , isFunTy tyL, isFunTy tyR
+      -- Retained function casts must keep their scoped runtime binder.
       , (co_mult, co_arg, co_res) <- decomposeFunCo co
       , isReflCo co_mult -- See Note [collectBindersPushingCo]
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]

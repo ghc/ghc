@@ -2542,6 +2542,16 @@ lintCoercion co@(AppCo co1 co2)
          else lintRole co Nominal r2 }
 
 ----------
+lintCoercion co@(DepFunCo b body_co)
+  = do { lintL (isNativeIndexId b)
+           (text "Invalid retained coercion binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
+       ; lintBinder LambdaBind b $
+         do { lintCoercion body_co
+            ; let Pair left right = coercionKind body_co
+            ; lintL (typeKind left `eqType` liftedTypeKind
+                      && typeKind right `eqType` liftedTypeKind)
+                (text "Retained coercion results must have kind Type:" <+> ppr co) } }
+
 lintCoercion co@(ForAllCo {})
 -- See Note [ForAllCo] in GHC.Core.TyCo.Rep for the typing rule for ForAllCo
   = do { _ <- go [] co; return () }

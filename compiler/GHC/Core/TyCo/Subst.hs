@@ -43,7 +43,7 @@ module GHC.Core.TyCo.Subst
         cloneTyVarBndr, cloneTyVarBndrs,
         substVarBndr, substVarBndrs,
         substTyVarBndr, substTyVarBndrs,
-        substCoVarBndr,
+        substCoVarBndr, substNativeIndexBndr,
         substTyVar, substTyVars,
         substTyCoVars,
         substTyCoBndr,
@@ -819,11 +819,8 @@ substTyCoMapper
                       (ppr v <+> text ":=" <+> ppr rhs)
 
    index_bndr :: Id -> (Id -> SubstM r) -> SubstM r
-   index_bndr old k = StrictReaderT $ \(Subst in_scope ids tvs cvs) ->
-     let new = uniqAway in_scope old
-         ids' | new == old = delVarEnv ids old
-              | otherwise = extendVarEnv ids old (varToCoreExpr new)
-         subst' = Subst (extendInScopeSet in_scope new) ids' tvs cvs
+   index_bndr old k = StrictReaderT $ \subst ->
+     let (subst', new) = substNativeIndexBndr subst old
      in runStrictReaderT (k new) subst'
 
    tcv_bndr :: TyCoVar -> ForAllTyFlag -> (TyCoVar -> SubstM r) -> SubstM r
@@ -833,8 +830,17 @@ substTyCoMapper
            -- Sadly unchecked because subst_ty is used from substTyUnchecked
        in runStrictReaderT (k tcv') subst'
 
-   -- Avoid allocation in this very
-   -- common case (E.g. Int, LiftedRep etc)
+-- | Rename a closed-domain runtime binder and mask its outer substitution.
+-- Use the resulting substitution only inside the binder's scope.
+substNativeIndexBndr :: Subst -> Id -> (Subst, Id)
+substNativeIndexBndr (Subst in_scope ids tvs cvs) old
+  = (Subst (extendInScopeSet in_scope new) ids' tvs cvs, new)
+  where
+    new = uniqAway in_scope old
+    ids' | new == old = delVarEnv ids old
+         | otherwise = extendVarEnv ids old (varToCoreExpr new)
+
+-- Avoid allocation in this very common case (e.g. Int, LiftedRep).
 nopTcAppTy :: Type -> TyCon -> [Type] -> SubstM Type
 nopTcAppTy  ty tc tys'
   | null tys'  = return ty

@@ -1520,6 +1520,9 @@ collect_cand_qtvs_co :: TcType -- original type at top of recursion; for errors
                      -> TcM CandidatesQTvs
 collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
   where
+    go_co dv (DepFunCo v co)
+      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (varType v)
+           ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` v) dv1 co }
     go_co dv (Refl ty)               = collect_cand_qtvs orig_ty True cur_lvl bound dv ty
     go_co dv (GRefl _ ty mco)        = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv ty
                                           ; go_mco dv1 mco }

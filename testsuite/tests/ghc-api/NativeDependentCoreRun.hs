@@ -128,6 +128,8 @@ helperSource =
         , "{-# NOINLINE cyclicNat #-}"
         , "cyclicNat :: Nat"
         , "cyclicNat = S cyclicNat"
+        , "bottomFunction :: a"
+        , "bottomFunction = error \"native-bottom-function\""
         , "bottomElement :: Int"
         , "bottomElement = error \"native-bottom-element\""
         , "bottomVec :: Vec Int n"
@@ -235,6 +237,8 @@ retainedNatSource moduleName observation =
         , "      headNative n (VCons x _) = x"
         , "      appendNative :: forall a. foreach (n :: Nat) (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)"
         , "      appendNative n m xs ys = appendVec xs ys"
+        , "      appendAfterSuccessor :: foreach (n :: Nat) (m :: Nat) -> Vec Int (S n) -> Vec Int m -> Vec Int (Add (S n) m)"
+        , "      appendAfterSuccessor n = appendNative @Int (S n)"
         , "      nested :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a n"
         , "      nested n m xs ys = xs"
         , "      vacuousFirst :: forall a. foreach (unused :: Nat) (n :: Nat) -> Vec a n -> Vec a n"
@@ -401,6 +405,8 @@ retainedNatLibrarySource =
                , "headNative n (VCons x _) = x"
                , "appendNative :: forall a. foreach (n :: Nat) (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)"
                , "appendNative n m xs ys = appendVec xs ys"
+               , "appendAfterSuccessor :: foreach (n :: Nat) (m :: Nat) -> Vec Int (S n) -> Vec Int m -> Vec Int (Add (S n) m)"
+               , "appendAfterSuccessor n = appendNative @Int (S n)"
                ]
             ++ retainedCaseDeclarations
   where
@@ -432,8 +438,10 @@ retainedNatConsumerSource =
                , "  nestedPrefix <- driveNat (\\n -> pure (show (take 2 (vecList (replicateNative @Int (S (S n)) 42))))) bottomNat"
                , "  retainedHead <- driveNat (\\n -> case appendNative @Int n of !_ -> pure \"forced\") bottomNat"
                , "  ordinaryHead <- driveNat (\\n -> let m = bottomNat in case appendNative @Int n m of !_ -> pure \"forced\") bottomNat"
+               , "  constructedPartial <- driveNat (\\n -> case appendAfterSuccessor n of !_ -> pure \"forced\") bottomNat"
+               , "  nestedPartial <- driveNat (\\n -> case appendNative @Int (S (S n)) of !_ -> pure \"forced\") cyclicNat"
                , "  caseValues <- driveNats (\\n -> observeVec (replicateCaseNative @Int n 42))"
-               , "  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead] ++ caseValues)"
+               , "  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead,constructedPartial,nestedPartial] ++ caseValues)"
                ]
 
 -- | Run Boolean and Nat consumers against separately compiled disk artifacts.
@@ -472,6 +480,8 @@ runModuleChecks libdir = do
                 , "[42,42,42,7,7,7,7]:7"
                 , "42"
                 , "[42,42]"
+                , "forced"
+                , "forced"
                 , "forced"
                 , "forced"
                 , "[]:0"
@@ -1010,13 +1020,24 @@ runNatPartialSourceChecks = do
                 , "        mixedArrow <- driveNat (\\n -> case vacuousMiddle @Int n of !_ -> pure \"forced\") bottomNat"
                 , "        mixedRetained <- driveNat (\\n -> case vacuousMiddle @Int n bottomNat of !_ -> pure \"forced\") bottomNat"
                 , "        lazyPayload <- let n = bottomNat; m = bottomNat in case appendNative @Int n m bottomVec of !_ -> pure \"forced\""
-                , "        pure (inputs ++ unlines [bottomIndex,cyclicIndex,mixedArrow,mixedRetained,lazyPayload])"
+                , "        constructed <- driveNats (\\n -> case appendNative @Int (S n) of !_ -> pure \"forced\")"
+                , "        nested <- driveNats (\\n -> case appendNative @Int (S (S n)) of !_ -> pure \"forced\")"
+                , "        constructedBottom <- driveNat (\\n -> case appendNative @Int (S n) of !_ -> pure \"forced\") bottomNat"
+                , "        constructedCycle <- driveNat (\\n -> case appendNative @Int (S n) of !_ -> pure \"forced\") cyclicNat"
+                , "        nestedBottom <- driveNat (\\n -> case appendNative @Int (S (S n)) of !_ -> pure \"forced\") bottomNat"
+                , "        nestedCycle <- driveNat (\\n -> case appendNative @Int (S (S n)) of !_ -> pure \"forced\") cyclicNat"
+                , "        latePayload <- driveNat (\\n -> let m = bottomNat in case appendAfterSuccessor n m bottomVec of !_ -> pure \"forced\") bottomNat"
+                , "        applied <- driveNats (\\n -> observeVec (appendAfterSuccessor n Z (replicateNative @Int (S n) 42) VNil))"
+                , "        headOnly <- driveNat (\\n -> observeVecHead (appendAfterSuccessor n Z (VCons 42 bottomVec) VNil)) bottomNat"
+                , "        cyclePrefix <- driveNat (\\n -> observeVecPrefix (appendAfterSuccessor n Z (replicateNative @Int (S n) 42) VNil)) cyclicNat"
+                , "        pure (inputs ++ unlines [bottomIndex,cyclicIndex,mixedArrow,mixedRetained,lazyPayload] ++ constructed ++ nested ++ unlines [constructedBottom,constructedCycle,nestedBottom,nestedCycle,latePayload] ++ applied ++ unlines [headOnly,cyclePrefix])"
                 ]
     expression <- sourceEntry moduleName (retainedNatSource moduleName observation)
     environment <- GHC.getSession
     flags <- GHC.getSessionDynFlags
     actual <- liftIO $ execute environment flags "source partial retained functions" expression
-    unless (lines actual == replicate 8 "forced") $
+    let expected = replicate 19 "forced" ++ ["[42]:1", "[42,42,42]:3", "[42,42,42,42]:4", "42", "[42,42,42,42]"]
+    unless (lines actual == expected) $
         fail ("FAIL: source partial retained function demanded an index or payload: " ++ show actual)
     let emptyName = "NativeSourceRetainedEmpty"
         emptySource =
@@ -1040,14 +1061,29 @@ runNatPartialSourceChecks = do
                 boundaryName
                 "let n = bottomNat in case appendNative @Int (S n) of !_ -> pure \"forced\""
     boundaryEnvironment <- GHC.getSession
-    outcome <- liftIO $ try (execute boundaryEnvironment flags "source remaining retained result" boundary)
-    case outcome of
-        Left (Sorry message)
-            | "cannot transport constructed retained indices through the application result" `isInfixOf` message
-            , "congruence is not supported" `isInfixOf` message ->
-                pure ()
-        Left exception -> fail ("FAIL: source retained-result boundary raised another exception: " ++ show (exception :: GhcException))
-        Right result -> fail ("FAIL: unsupported source retained-result transport returned " ++ show result)
+    boundaryActual <- liftIO $ execute boundaryEnvironment flags "source remaining retained result" boundary
+    unless (boundaryActual == "forced") $
+        fail ("FAIL: constructed partial function demanded its predecessor: " ++ show boundaryActual)
+    let unsignedName = "NativeSourceUnsignedConstructedPartial"
+    sourceModuleRejects
+        "unsigned constructed partial alias"
+        83605
+        "requires an explicit signature"
+        unsignedName
+        (retainedNatSource unsignedName "driveNat (\\n -> let f = appendNative @Int (S n) in case f of !_ -> pure \"forced\") Z")
+    forM_
+        [ ("NativeSourcePartialPayloadBottom", "driveNat (\\n -> observeVec (appendAfterSuccessor n Z bottomVec VNil)) Z", "native-bottom-vector")
+        , ("NativeSourcePartialPredecessorBottom", "driveNat (\\n -> observeVec (appendAfterSuccessor n Z (replicateNative @Int (S n) 42) VNil)) bottomNat", "native-bottom-nat")
+        ]
+        $ \(name, body, marker) -> do
+            bottomExpression <- sourceEntry name (retainedNatSource name body)
+            bottomEnvironment <- GHC.getSession
+            result <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case result of
+                Left exception
+                    | marker `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right value -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show value)
 
 -- | Exercise constructor naming with dependent payloads and lazy nested fields.
 runNatConstructorSourceChecks :: GHC.Ghc ()
@@ -1805,27 +1841,44 @@ runNatChecks environment flags bindings tycons = do
             mkApps
                 (Var (helper bindings "driveNat"))
                 [partialConstructedKernel, Var (dataConWorkId zero)]
-    outcome <- try (execute environment flags "constructed argument with retained result" retainedResultBoundary) :: IO (Either GhcException String)
-    case outcome of
-        Left (Sorry message)
-            | "cannot transport constructed retained indices through the application result" `isInfixOf` message
-            , "congruence is not supported" `isInfixOf` message ->
-                pure ()
-        Left exception -> fail ("FAIL: retained-result transport raised another exception: " ++ displayException exception)
-        Right actual -> fail ("FAIL: unsupported retained-result transport returned " ++ show actual)
+    expect "constructed argument with retained result" "forced" retainedResultBoundary
+    let savedPartial = local 254 "saved_constructed_partial" (exprType partialConstructed)
+        zeroValue = Var (dataConWorkId zero)
+        savedApplication =
+            mkApps
+                (Var savedPartial)
+                [zeroValue, mkApps (Var worker) [successorValue, payload], mkApps (Var worker) [zeroValue, payload]]
+        savedResultIndex = mkTyConApp add [successorIndex, mkTyConTy (promoteDataCon zero)]
+        savedKernel =
+            Let (Rec [(worker, rhs)])
+                $ Lam input
+                $ Let (NonRec appendWorker appendRhs)
+                $ Let (NonRec savedPartial partialConstructed)
+                $ mkApps (Var (helper bindings "observeVec")) [Type savedResultIndex, savedApplication]
+    expect
+        "saved constructed partial function accepts later arguments"
+        (unlines ["[42]:1", "[42,42,42]:3", "[42,42,42,42]:4"])
+        (App (Var (helper bindings "driveNats")) savedKernel)
     let bottomIndex = local 250 "bottom_function_index" natTy
         bottomPayload = local 251 "bottom_function_payload" (mkTyConApp vec [intTy, TermVarTy bottomIndex])
         bottomFunctionType = exprType (Lam bottomIndex (Lam bottomPayload (Var bottomPayload)))
         bottomFunction = local 252 "bottom_retained_function" bottomFunctionType
-        bottomCaseBinder = local 253 "bottom_function_case" natTy
-        bottomFunctionRhs = Case (Var (helper bindings "bottomNat")) bottomCaseBinder bottomFunctionType []
+        bottomFunctionRhs = App (Var (helper bindings "bottomFunction")) (Type bottomFunctionType)
         bottomPartial = App (Var bottomFunction) successorValue
         bottomFunctionKernel =
             Lam input
                 $ Let (NonRec bottomFunction bottomFunctionRhs)
                 $ mkApps (Var (helper bindings "force")) [Type (exprType bottomPartial), bottomPartial]
-    expectBottom "constructor transport does not eta-expand a bottom function" $
-        mkApps (Var (helper bindings "driveNat")) [bottomFunctionKernel, Var (dataConWorkId zero)]
+    bottomOutcome <-
+        try
+            ( execute environment flags "constructor transport does not eta-expand a bottom function" $
+                mkApps (Var (helper bindings "driveNat")) [bottomFunctionKernel, Var (dataConWorkId zero)]
+            ) ::
+            IO (Either SomeException String)
+    case bottomOutcome of
+        Left exception | "native-bottom-function" `isInfixOf` displayException exception -> pure ()
+        Left exception -> fail ("FAIL: constructed bottom function raised another exception: " ++ displayException exception)
+        Right value -> fail ("FAIL: constructor transport hid a bottom function: " ++ show value)
     let natTy = mkTyConTy nat
         keepN = local 211 "unused_nat" natTy
         indexedNat index = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, index, index]) intTy

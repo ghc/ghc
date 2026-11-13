@@ -331,6 +331,16 @@ toIfaceCoercionX fr co
     go (FunCo { fco_role = r, fco_mult = w, fco_arg = co1, fco_res = co2 })
       = IfaceFunCo r (go w) (go co1) (go co2)
 
+    go (DepFunCo var co)
+      = IfaceDepFunCo bndr
+                      (toIfaceCoercionX (fr `delVarSet` var) co)
+      where
+        bndr | isId var = toIfaceIdBndrX fr var
+             -- Lint must also print malformed binders. A TyVar has no multiplicity.
+             | otherwise = ( many_ty
+                           , mkIfLclName (occNameFS (getOccName var))
+                           , toIfaceTypeX fr (varType var) )
+
     go (ForAllCo tv visL visR k co)
       = IfaceForAllCo (toIfaceBndr tv)
                       (IfaceForAllTyFlag visL)

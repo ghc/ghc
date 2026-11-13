@@ -379,6 +379,14 @@ opt_co4' opts env sym rep r (AppCo co1 co2)
   = mkAppCo (opt_co4 opts env sym rep r co1)
             (opt_co4 opts env sym False Nominal co2)
 
+opt_co4' opts (LC subst lift_env) sym rep r (DepFunCo b co)
+  -- The closed domain is unchanged. Keep the runtime binder scoped over the
+  -- proof, even when it does not occur in either result endpoint.
+  -- See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+  = mkDepFunCo b' (opt_co4 opts (LC subst' lift_env) sym rep r co)
+  where
+    !(subst', b') = substNativeIndexBndr subst b
+
 opt_co4' opts env sym rep r (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
                                  , fco_kind = k_co, fco_body = co })
   = mkForAllCo tv' visL' visR' k_co' $
@@ -638,6 +646,7 @@ mkDeepSymCo = go
     go co@(UnivCo { uco_lty = t1, uco_rty = t2 }) = co { uco_lty = t2, uco_rty = t1 }
     go (TyConAppCo r tc cos)                      = TyConAppCo r tc $ map go cos
     go (AppCo co1 co2)                            = AppCo (go co1) (go co2)
+    go (DepFunCo b co)                           = mkDepFunCo b (go co)
     go (FunCo r afl afr cow co1 co2)              = FunCo r afr afl (go cow) (go co1) (go co2)
     go (TransCo co1 co2)                          = TransCo (go co2) (go co1)
     go (SelCo cs co)                              = SelCo cs $ go co

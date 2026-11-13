@@ -68,7 +68,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Basic
 import GHC.Types.Name   ( OccName, NamedThing(..), isInternalName, mkSystemName )
 import GHC.Types.Name.Occurrence (occNameString, mkTyVarOccFS)
-import GHC.Types.Var.Env ( mkInScopeSet, mkVarEnv, emptyVarEnv, lookupVarEnv )
+import GHC.Types.Var.Env ( mkInScopeSet, mkVarEnv, emptyVarEnv, lookupVarEnv, delVarEnv )
 import GHC.Types.Var.Set ( unionVarSet, unionVarSets )
 import GHC.Types.Literal
 import GHC.Types.Tickish
@@ -1158,7 +1158,7 @@ nameNativeConstructorArgs expr
       = return (arg, mkReflCo Nominal index, id)
       | otherwise = nativeIndexTransportError "an unsupported retained argument"
 
--- | Lift prepared-to-original index equalities through an ordinary value type.
+-- | Lift index equalities through value types and fixed-domain retained binders.
 -- Fresh symbolic Ids occur only in this temporary template, never in output Core.
 liftNativeIndexTransport :: String -> [(Id, CoercionN)] -> Type -> UniqSM CoercionN
 liftNativeIndexTransport context transport ty
@@ -1192,6 +1192,9 @@ liftNativeIndexTransport context transport ty
       | not (anyFreeVarsOfType (\v -> isJust (lookupVarEnv env v)) ty) = Just ty
       | Just ty' <- coreView ty = abstract env ty'
     abstract env (TermVarTy index) = mkTyVarTy <$> lookupVarEnv env index
+    abstract env (DepFunTy index body)
+      | not (anyFreeVarsOfType (\v -> isJust (lookupVarEnv env v)) (varType index))
+      = mkDepFunTy index <$> abstract (delVarEnv env index) body
     abstract env (TyConApp con args) = mkTyConApp con <$> mapM (abstract env) args
     abstract env (AppTy fun arg) = mkAppTy <$> abstract env fun <*> abstract env arg
     abstract env (FunTy flag mult arg res)
@@ -1484,8 +1487,11 @@ type applications and nominal coercion lifting, with no universal axiom.
 Build this typed expression before ordinary CorePrep naming. Keep proof-bearing
 DEFAULT cases intact: a CaseBound float has no slot for their alternative proof.
 CoreToStg erases the checked proof and retains the case binder and real fields.
-Residual dependent-function transport still needs Pi congruence. Report that
-operation rather than eta-expanding a possibly bottom partial application.
+For a remaining dependent function, lift the result equality under its unchanged
+closed domain with DepFunCo. Preserve a cast around the partial application.
+Do not eta-expand it: a lambda could hide a bottom function. Dependent erased
+binder kinds and transport through a changed runtime domain remain unsupported.
+See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
 
 Agda substitutes local lets and does not preserve their sharing. The dependent
 ANF literature retains the defining computation in continuation typing. Neither

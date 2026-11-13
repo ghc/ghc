@@ -530,6 +530,9 @@ data IfaceCoercion
   = IfaceReflCo       IfaceType
   | IfaceGReflCo      Role IfaceType (IfaceMCoercion)
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion IfaceCoercion
+  | IfaceDepFunCo     IfaceIdBndr IfaceCoercion
+      -- Diagnostic form only. The runtime binder scopes over the body.
+      -- The interface writer and importer reject this form.
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceBndr !IfaceForAllTyFlag !IfaceForAllTyFlag IfaceMCoercion IfaceCoercion
@@ -858,6 +861,8 @@ substIfaceType env ty
     go_co (IfaceReflCo ty)           = IfaceReflCo (go ty)
     go_co (IfaceGReflCo r ty mco)    = IfaceGReflCo r (go ty) (go_mco mco)
     go_co (IfaceFunCo r w c1 c2)     = IfaceFunCo r (go_co w) (go_co c1) (go_co c2)
+    go_co (IfaceDepFunCo {})
+      = panic "substIfaceCoercion: native dependent coercion substitution is not implemented"
     go_co (IfaceTyConAppCo r tc cos) = IfaceTyConAppCo r tc (go_cos cos)
     go_co (IfaceAppCo c1 c2)         = IfaceAppCo (go_co c1) (go_co c2)
     go_co (IfaceForAllCo {})         = pprPanic "substIfaceCoercion" (ppr ty)
@@ -2160,6 +2165,11 @@ ppr_co ctxt_prec (IfaceGReflCo r ty (IfaceMCo co))
   = ppr_special_co ctxt_prec
     (text "GRefl" <+> ppr r <+> pprParendIfaceType ty) [co]
 
+ppr_co ctxt_prec (IfaceDepFunCo (_, var, arg) co)
+  = maybeParen ctxt_prec funPrec $
+    sep [ text "foreach" <+> parens (ppr var <+> dcolon <+> ppr_ty_nested arg)
+        , arrow <+> pprIfaceCoercion co ]
+
 ppr_co ctxt_prec (IfaceFunCo r co_mult co1 co2)
   = maybeParen ctxt_prec funPrec $
     sep (ppr_co funPrec co1 : ppr_fun_tail co_mult co2)
@@ -2560,6 +2570,8 @@ instance Binary IfaceMCoercion where
          _ -> panic ("get IfaceMCoercion " ++ show tag)
 
 instance Binary IfaceCoercion where
+  put_ _ (IfaceDepFunCo {})
+       = ioError (userError "Native dependent coercion interfaces are not implemented.")
   put_ bh (IfaceReflCo a) = do
           putByte bh 1
           put_ bh a
@@ -2756,6 +2768,7 @@ instance NFData IfaceTyLit where
 
 instance NFData IfaceCoercion where
   rnf = \case
+    IfaceDepFunCo bndr co -> rnf bndr `seq` rnf co
     IfaceReflCo f1 -> rnf f1
     IfaceGReflCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
     IfaceFunCo f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4

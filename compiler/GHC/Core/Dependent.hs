@@ -214,6 +214,7 @@ scanType (CoercionTy co) = scanCo co
 
 -- | Inspect coercion annotations and dependencies.
 scanCo :: Coercion -> NativeScan
+scanCo (DepFunCo _ _) = NativeScan (pure True)
 scanCo (Refl ty) = scanType ty
 scanCo (GRefl _ ty mco) = scanType ty <> scanMCo mco
 scanCo (TyConAppCo _ _ args) = foldMap scanCo args

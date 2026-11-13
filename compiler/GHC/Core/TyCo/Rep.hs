@@ -264,9 +264,35 @@ bytecode and module entries check these forms with Core Lint before and after
 preparation. Interface signatures use scoped local Ids. General expression
 substitution and the ordinary optimizer remain unsupported. Native interface
 templates have separate checks and a module writer gate. The restricted source
-checker currently emits only Boolean retained binders.
+checker accepts closed algebraic domains, including Bool and user-defined Nat.
 See docs/dependent-haskell/CORE.md and the Agda provenance in
 docs/dependent-haskell/REFERENCES.md.
+-}
+
+{- Note [Retained dependent function coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+DepFunCo b co binds one unrestricted runtime index throughout co. Its domain
+is the unchanged closed algebraic type of b. If co relates s and t at role r,
+the result relates mkDepFunTy b s and mkDepFunTy b t at that role. Both body
+endpoints must have kind Type. Each endpoint can independently become an
+ordinary arrow when its result does not use b.
+
+The binder scopes over the proof as well as its endpoints. Keep DepFunCo even
+when both endpoints omit b: an intermediate proof can still use that index.
+The smart constructor simplifies a reflexive body to reflexivity. Substitution,
+lifting, free variables, and tidying use the runtime binder callbacks.
+ForAllCo continues to bind only erased type and coercion variables.
+
+This is the fixed-domain specialization of D/DC's An-PiCong rule. Agda compares
+Pi codomains under one shared context after checking their domains and
+modalities. See the pinned provenance in docs/dependent-haskell/REFERENCES.md.
+This rule compares types. It does not establish function eta equality for
+Haskell. Preserve a value cast; eta expansion can hide a bottom function.
+
+The first rule changes neither the domain nor the binder multiplicity. It adds
+no selector or erased InstCo rule. Native application and ordinary optimizer
+boundaries remain separate checks. Interface conversion supports diagnostics;
+native coercion serialization remains gated.
 -}
 
 instance Outputable Type where
@@ -964,6 +990,10 @@ data Coercion
 
   | AppCo Coercion CoercionN             -- lift AppTy
           -- AppCo :: e -> N -> e
+
+  | DepFunCo Id Coercion
+      -- DepFunCo :: _ -> e -> e
+      -- See Note [Retained dependent function coercions].
 
   -- See Note [ForAllCo]
   | ForAllCo
@@ -2223,6 +2253,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co (GRefl ro ty (MCo co))   = lit ro M.<> go_ty ty M.<> go_co co
     go_co (TyConAppCo ro tc args)  = lit ro M.<> lit tc M.<> go_cos args
     go_co (AppCo c1 c2)            = go_co c1 M.<> go_co c2
+    go_co (DepFunCo b co)          = go_ty (varType b) M.<> termbinder b (go_co co)
     go_co (CoVarCo cv)             = covar cv
     go_co (AxiomCo ax cos)         = lit ax M.<> go_cos cos
     go_co (HoleCo hole)            = cohole hole
@@ -2307,6 +2338,7 @@ coercionSize (Refl ty)             = typeSize ty
 coercionSize (GRefl _ ty mco)      = typeSize ty + mCoercionSize mco
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)        = coercionSize co + coercionSize arg
+coercionSize (DepFunCo b co)       = 1 + typeSize (varType b) + coercionSize co
 coercionSize (ForAllCo { fco_kind = h, fco_body = co })
                                    = 1 + coercionSize co + mCoercionSize h
 coercionSize (FunCo _ _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2
