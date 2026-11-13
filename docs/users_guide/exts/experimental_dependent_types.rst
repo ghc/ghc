@@ -108,9 +108,12 @@ Calls can pass constructor arguments with fields, including ``S n`` and
 ``S (S n)``. These calls do not force ``n`` to check its index. CorePrep checks
 transport of later payloads and the result when it names a constructor argument.
 Transport through a result that still contains a dependent function type remains
-unsupported. A strict match on such a partially applied function can also reach
-an internal PMC error. Producers and consumers that use local names must use
-the same named index. The checker does not equate a name with its definition.
+unsupported. A partial application with a constructed retained argument reports
+the named CorePrep restriction. Strict wildcard matching on a partial function
+with named indices preserves ordinary forcing behavior. It does not force an
+unused index or the function body. An empty match on a function type remains
+non-exhaustive. Producers and consumers that use local names must use the same
+named index. The checker does not equate a name with its definition.
 
 To compile an ordinary executable, use
 ``-O0 -fomit-interface-pragmas -fno-write-if-simplified-core``. The restricted

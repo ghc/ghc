@@ -31,7 +31,7 @@ Last updated: 2026-11-13.
 | Configured fork version | `10.1.20261113.1`, with interface header `1001202611131`; matching libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, and bare constructor fields pass the source runtime fixture |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | M6 PMC diagnostics, Pi congruence, and source `case`; M8 unfolding files and conservative lowering gaps remain open |
+| Next task | M6 Pi congruence and source `case`; M8 unfolding files and conservative lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -620,9 +620,9 @@ and ordinary smoke scope peaked at 162 MiB under 4 GiB.
 
 Remaining dependent-function congruence and dependent erased binder kinds are
 gated. The `lazy`/`noinline`/`nospec` stripping path can bypass preprocessing
-and still reject a constructed retained argument. A strict source match on a
-partially applied retained function can panic in PMC normalization before
-CorePrep. Source `case` refinement and native unfolding files remain open.
+and still reject a constructed retained argument. Known partial-function heads
+now pass PMC as described below. Source `case` refinement and native unfolding
+files remain open.
 These checks do not establish a general preservation theorem. The full
 testsuite, documentation build, and performance measurements have not run.
 
@@ -630,6 +630,43 @@ Logs use the `native-alias` prefix in `_build/verification/`. Compiler sources
 pass nonmutating Fourmolu parses. Both existing fixtures pass canonical
 Fourmolu. Cabal-gild, diff, and local document link checks pass. The repository
 merge-request template requires the focused regressions.
+
+## PMC and retained function heads
+
+The implementation checkpoint is `0335c399f3`.
+
+Strict wildcard matching on a partial retained function now passes the source
+pipeline. With a local runtime index `n`, `case appendNative @Int n of !_ -> ...`
+does not force the unused index or the function body. The tests cover IORef
+inputs zero, two, and three, bottom and cyclic indices, and a canonical mixed
+ordinary/retained telescope. An empty match on a function type reports located
+GHC-62161 under `-Werror=incomplete-patterns`.
+
+PMC preserves a known function head without rewriting its domain and codomain.
+The immutable matcher can bind a whole retained type to a template variable
+under its usual scope and occurs checks. Unsupported comparisons produce
+`MaybeApart MARRetainedFunction`. Alpha-equivalent retained types without free
+TyCoVars can compare reflexively. Pi congruence and general matching under a
+retained binder remain open. See [the Agda WHNF provenance](REFERENCES.md) and Notes
+[Coverage checking retained functions] and [Matching retained function types].
+
+The new source checks preserve possible function inhabitation. They do not
+assume a function expression is evaluated. Constructed partial applications such
+as `appendNative (S n)` still report the CorePrep result-congruence restriction.
+The former PMC and immutable-matcher panics no longer obscure that boundary.
+
+The both-stage build passed in 9m21s, peaking at 6,804 MiB under 16 GiB. All five
+registered normal-way tests passed in 1m31s at 2,593 MiB under 8 GiB, with no
+unexpected results or framework warnings. Bootstrap matching and source runtime
+checks passed. The finalized runtime scope peaked at 972 MiB under 4 GiB.
+A separate CLI producer and interface-only consumer passed 21 observations.
+CLI checks also confirmed the located empty-case diagnostic and the named
+constructed partial-result restriction, with neither reported as a panic.
+Both format-rejection directions, the guide example, and ordinary compiler
+smoke passed. The final CLI and smoke scope peaked at 165 MiB under 4 GiB.
+All scopes disabled swap. Compiler sources passed nonmutating Fourmolu parses,
+both existing fixtures passed canonical Fourmolu, and cabal-gild passed.
+Logs use the `native-pmc` prefix in `_build/verification/`.
 
 ## Verified baseline
 

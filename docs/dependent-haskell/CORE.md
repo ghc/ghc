@@ -91,9 +91,17 @@ and [Retained constructor arguments in CorePrep] and the provenance in
 
 The `lazy`/`noinline`/`nospec` stripping path can bypass this preprocessing and
 still reject a constructed retained argument. This is a conservative lowering
-gap. Strict source matching on a partially applied retained function can also
-reach an unsupported Pi constraint in PMC normalization and panic before
-CorePrep. Neither boundary is resolved by the constructor-alias rule.
+gap. PMC now preserves known function heads before component normalization.
+This supports strict wildcard matching on partial retained functions, including
+an ordinary arrow with a retained codomain. It does not assume the function
+expression is evaluated. Normalization under Pi and dependent congruence remain
+separate operations. See Note [Coverage checking retained functions].
+
+The immutable matcher can bind a whole retained function type to a template
+variable. It retains the usual occurs and escape checks. Unsupported retained
+comparisons produce `MaybeApart MARRetainedFunction`. Alpha-equivalent retained
+types without free TyCoVars can compare reflexively. This does not add structural
+matching under Pi or assign Tc metavariables. See Note [Matching retained function types].
 
 Type computation and Core Lint must perform the same instantiation. A wrong
 argument type, unsupported expression, or escaping index must fail explicitly.

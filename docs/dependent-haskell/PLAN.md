@@ -195,6 +195,13 @@ This restricted entry is implemented at `0bbc32d396`. The registered Core API
 and bytecode regressions passed. The default rebuild and ordinary smoke checks
 also passed. The broader optimizer tasks below remain open.
 
+PMC now recognizes a known retained function head without rewriting its domain
+and codomain. It also preserves an ordinary function head that contains a
+retained type. The immutable matcher handles whole-type templates with its
+existing scope checks and a retained-aware occurs check. Unsupported retained
+comparisons remain `MaybeApart`; this is not Pi congruence. Source regressions
+check strict partial applications and located incomplete empty-case diagnostics.
+
 The audit found separate blockers in the full simplifier. Its type substitution
 can omit runtime Id mappings. Its case reconstruction treats virtual proofs as
 constructor fields. Occurrence analysis does not track runtime index scope.
@@ -503,9 +510,10 @@ Resolve these preservation rules in the implementation:
   and CoreToStg erases the virtual proof explicitly. A result-only cast is
   insufficient. Remaining dependent-function congruence stays gated.
   The `lazy`/`noinline`/`nospec` stripping path can still bypass preprocessing.
-  Strict source matching on a remaining retained function can panic in PMC
-  normalization before CorePrep. Fix that diagnostic under M6; do not catch
-  the panic in an acceptance test or disable PMC to hide it.
+  Known partial-function heads now pass PMC without component rewriting.
+  Source tests require a located incomplete-pattern diagnostic for an empty
+  match on such a function. Constructed partial results still reach the named
+  CorePrep congruence restriction. Do not catch panics or disable PMC in tests.
   The Agda let and dependent ANF references describe the preservation problem;
   they do not prove this proposed FC rule or its Haskell strictness behavior.
 - Preserve partial and cyclic Haskell values. Check finite vector prefixes for

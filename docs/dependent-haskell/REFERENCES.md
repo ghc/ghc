@@ -213,6 +213,31 @@ wrapper-free domain policy is a GHC implementation limit. It makes the source
 constructor fields match the worker fields. It is not a restriction copied from
 Agda. The Core Notes name this policy and the fresh-field scope rule.
 
+Agda 2.8.0 distinguishes a known function head from full normalization.
+[`slowReduceTerm`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Reduce.hs#L563-L586)
+returns a `Pi` head unchanged. The
+[fast reducer](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Reduce/Fast.hs#L962-L966)
+also treats function types as WHNF.
+[`ifPiB`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Telescope.hs#L650-L668)
+can inspect that head immediately. In contrast, the
+[full normalizer](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Reduce.hs#L1270-L1283)
+normalizes the domain and codomain.
+
+The PMC increment uses this distinction. A known retained function head does
+not need component rewriting to classify the scrutinee as a function. An
+ordinary arrow that contains a retained type has the same outer-shape property.
+The rule preserves that head before the ordinary solver would require missing
+Pi congruence. GHC's immutable matcher also returns a conservative `MaybeApart`
+for unsupported retained-function comparisons when it filters COMPLETE sets.
+This is a GHC implementation policy. It does not claim Agda uses this matcher.
+Whole-type template substitution retains the existing escape and occurs checks.
+
+Agda's head-reduction rule does not prove Haskell inhabitation or evaluation
+behavior. A Haskell lambda can inhabit a function type whose result has no
+constructors. A function expression can still be bottom. Coverage checking must
+retain possible inhabitation, and a strict wildcard must retain its forcing.
+This increment adds no dependent congruence or Tc metavariable assignment.
+
 Agda's pinned [local-definition reference](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/let-and-where.lagda.rst#L57-L68)
 states that checking substitutes away let definitions; its internal syntax has no
 let construct. The file blob is `eef72940b74f0efa87c55ba9378789d26d7df402`.
