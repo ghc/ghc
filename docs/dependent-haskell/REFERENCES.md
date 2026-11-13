@@ -697,6 +697,18 @@ uses fresh auxiliary function definitions. File blob:
 `5162584cecf76e69206da056f4135d892d7ab41a`.
 The hidden-lambda and instance-binder rules above supply context-scope precedent.
 
+Agda's [`checkAbsurdLambda`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L744-L766)
+requires an expected Pi type and checks that its domain is empty.
+[`makeAbsurdLambda`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L768-L810)
+keeps a one-binder telescope. Its absurd pattern refers to that binder, and its
+result uses the scoped codomain. These use the same `Rules/Term.hs` blob above.
+[`ensureEmptyType`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Empty.hs#L71-L98)
+adds the proposed argument to the context and accepts a split with zero clauses.
+File blob: `0b2195c68a0010060901d49c8d4b1147617f4129`.
+The [manual](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/lambda-abstraction.lagda.rst#L205-L234)
+uses `λ ()` for an absurd lambda. GHC uses an explicit runtime binder followed
+by an empty case. The binder must remain in scope even without branch bodies.
+
 Checking a source-written lambda needs no eta transformation. Agda's
 [function eta equality](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/lambda-abstraction.lagda.rst#L69-L78)
 does not apply to Haskell's bottom and `seq`. GHC must preserve each lambda form's

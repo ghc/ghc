@@ -353,10 +353,16 @@ Keep context splitting and constructor evidence transport in their existing
 positions. Keep the current coverage, bare-field, multiplicity, and wrapper
 restrictions. Ordinary lambdas keep their existing checking and inference path.
 
+An empty lambda-case on an empty domain binds the runtime index before an empty
+case inspects it. The result type uses that same Id. The empty case needs no
+constructor proof. An empty source case keeps its original context because
+there is no branch to refine. A demanded application to bottom still diverges.
+
 This rule checks a supplied type. It does not infer a native function type or
 enable new retained type positions. Retained quantification in nested type
-positions and general checking-dependent argument inference remain separate work. Agda's expected-Pi
-lambda rule and extended-lambda function checker supply the checking precedent.
+positions and general checking-dependent argument inference remain separate work.
+Agda's expected-Pi lambda rule and extended-lambda function checker supply the
+checking precedent.
 See [the pinned sources](REFERENCES.md#checked-retained-lambdas).
 
 For application of `DepFunTy b result`, first check the runtime argument against

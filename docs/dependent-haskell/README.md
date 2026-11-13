@@ -36,7 +36,8 @@ Last updated: 2026-11-13.
 | Class consumers | Proof/vector `Show`, constrained native results, scoped dictionaries, and equality-Given transport pass |
 | Source contexts | Class and equality contexts after retained binders pass variable, constructor, and explicit case checking |
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
-| Current increment validation | Both-stage build, five registered regressions, bootstrap API/runtime, 196 imported CLI observations, ordinary typing/staging controls, nine native guide blocks, and smoke checks pass |
+| Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
+| Current increment validation | Bootstrap API/runtime and 226 imported observations pass; the both-stage build and final registered and CLI checks are pending |
 | Next task | Ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native coercion unfolding codecs, and conservative lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
@@ -1248,6 +1249,46 @@ Missing-documentation warnings are expected with `--docs=none`.
 See [the contract](CORE.md#explicit-case-evidence),
 [the task list](PLAN.md#source-case-evidence-follow-up), and
 [the pinned Agda implementation](REFERENCES.md#source-case-evidence).
+
+## Checked retained lambdas
+
+A complete retained signature now checks an anonymous lambda:
+
+```haskell
+lambdaIdentity :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n
+lambdaIdentity = \n xs -> xs
+```
+
+This uses the earlier Nat and Vec declarations. The runtime Id for `n` also
+instantiates the later argument and result types. Named equations and lambdas
+share the retained match checker. The rule preserves outer erased type patterns,
+nested lambdas, later retained indices, and class and equality contexts.
+
+Preserve the source value arity. A one-pattern `\case` can inspect the index
+before its branch returns a function. A two-pattern `\cases` waits for both
+arguments before matching. Unused indices, fields, and payloads stay lazy.
+Lambdas retain their ambient usage. A local retained lambda can capture a linear
+value and consume it once. Duplicated linear proof use remains an error.
+
+An empty-domain lambda-case binds its index explicitly before an empty case
+inspects it. The result type refers to the same Id. This fixes an unbound-index
+Core Lint error that the empty match group exposed. Empty source cases need no
+branch refinement and stay in their original context. Demanding either form at
+a bottom index still raises that bottom exception.
+
+The shared fixture appends 30 observations to the previous 196. It also checks
+four located lambda rejections and two empty-domain bottom exceptions. The
+bootstrap runtime and API kernel pass. Separate probes check explicit outer type
+patterns, linear captures, and the existing inference and type-position limits.
+The final both-stage build, registered tests, and standalone CLI validation are
+pending. Artifacts use `_build/verification/native-checked-lambda-`.
+
+This checks an expected native type. It adds no new Core form, singleton ABI, or
+interface format. Retained syntax in nested type positions, general native
+inference, structural Pi unification, and ordinary optimization remain open.
+See [the contract](CORE.md#checked-source-lambdas),
+[the tasks](PLAN.md#checked-retained-lambdas), and
+[Agda's lambda and absurd-lambda rules](REFERENCES.md#checked-retained-lambdas).
 
 ## Verified baseline
 

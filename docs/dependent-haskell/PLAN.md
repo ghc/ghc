@@ -724,18 +724,19 @@ codecs, and ordinary optimization remain open.
 
 ### Checked retained lambdas
 
-A complete native signature checks named variable and constructor equations.
-The equivalent anonymous lambda currently fails with located GHC-83865.
-Use one retained match dispatcher for both source forms.
+A complete native signature checks named equations and anonymous lambdas through
+one retained match dispatcher. Previously, the lambda form failed with GHC-83865.
 
-- [ ] Share the retained telescope and constructor dispatcher. Preserve invisible
+- [x] Share the retained telescope and constructor dispatcher. Preserve invisible
       patterns, source match contexts, and named-binding usage scaling.
-- [ ] Check anonymous lambdas under their ambient usage. Keep ordinary lambda
+- [x] Check anonymous lambdas under their ambient usage. Keep ordinary lambda
       checking and inference unchanged.
-- [ ] Check outer erased binders, nested lambdas, later retained binders, source
+- [x] Check outer erased binders, nested lambdas, later retained binders, source
       contexts, and both constructor lambda forms.
-- [ ] Check source arity at bottom and cyclic indices. Preserve linear usage and
+- [x] Check source arity at bottom and cyclic indices. Preserve linear usage and
       located diagnostics for invalid branches and unsupported inference.
+- [x] Preserve the runtime binder and strictness for empty-domain lambda-cases.
+      Keep empty source cases in their original context.
 - [ ] Complete both-stage builds, registered regressions, separate module
       execution, ordinary controls, formatting, and the checkpoint.
 

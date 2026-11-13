@@ -88,7 +88,7 @@ import GHC.Types.Id
 import GHC.Types.Var ( EvVar, varType, isCoVar )
 import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
-import GHC.Types.Basic( VisArity )
+import GHC.Types.Basic( VisArity, Origin(Generated), GenReason(OtherExpansion), DoPmc(SkipPmc) )
 import GHC.Data.Bag ( listToBag, unionBags )
 import GHC.Data.FastString ( fsLit )
 import GHC.Data.Pair ( pSnd )
@@ -147,27 +147,8 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
         ; (wrap_fun, r)
              <- case exp_ty of
                   Check ty | hasRetainedFunTy ty
-                    -- See Note [Retained argument telescopes].
-                    -> do { result <- case unLoc (mg_alts matches) of
-                              [L _ (Match { m_pats = L _ pats })]
-                                | not (first_constructor pats) ->
-                                  tcRetainedVarMatches herald ctxt ty
-                                    (filter isVisArgLPat pats) $ \pat_tys rhs_ty boundary ->
-                                      tcScalingUsage mult $
-                                        tcMatches mctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty
-                                          (case boundary of
-                                             Nothing -> matches
-                                             Just prefix -> splitRetainedContext prefix matches)
-                              _ | DepFunTy binder _ <- coreFullView ty ->
-                                  do { let domain = varType binder
-                                     ; index <- newSysLocalId (fsLit "retained") ManyTy domain
-                                     ; let body_ty = applyTypeToArgs ty [Var index]
-                                     ; (pat_tys, dictionaries, rhs_ty) <-
-                                         tcRetainedConArgs herald ctxt (arity - 1) body_ty
-                                     ; tcScalingUsage mult $
-                                         tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty matches }
-                                | otherwise -> failWithTc $
-                                    TcRnRetainedQuantificationError RetainedConstructorCoverage
+                    -> do { result <- tcScalingUsage mult $
+                                        tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
                           ; return (idHsWrapper, result) }
                   _ -> matchExpectedFunTys herald ctxt arity exp_ty tc_matches
 
@@ -175,12 +156,61 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
   where
     mctxt  = mkPrefixFunRhs (noLocA fun_name) noAnn
 
+-- | Check source patterns against an expected retained function telescope.
+-- See Note [Checked retained lambdas].
+tcRetainedMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> HsMatchContextRn
+                  -> VisArity -> [ExpPatType] -> Type
+                  -> MatchGroup GhcRn (LHsExpr GhcRn)
+                  -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
+tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
+  = case unLoc (mg_alts matches) of
+      [L _ (Match { m_pats = L _ pats })]
+        | not (first_constructor pats) ->
+          tcRetainedVarMatches herald ctxt ty (filter isVisArgLPat pats) $ \pat_tys rhs_ty boundary ->
+            tcMatches mctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty
+              (case boundary of
+                 Nothing -> matches
+                 Just prefix -> splitRetainedContext prefix matches)
+      _ | DepFunTy binder _ <- coreFullView ty ->
+          do { index <- newSysLocalId (fsLit "retained") ManyTy (varType binder)
+             ; let body_ty = applyTypeToArgs ty [Var index]
+             ; (pat_tys, dictionaries, rhs_ty) <-
+                 tcRetainedConArgs herald ctxt (arity - 1) body_ty
+             ; tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty matches }
+        | otherwise -> failWithTc $
+            TcRnRetainedQuantificationError RetainedConstructorCoverage
+  where
     first_constructor pats = case filter isVisArgLPat pats of
       pat : _ -> constructor_pat pat
       _ -> False
     constructor_pat (L _ (ParPat _ pat)) = constructor_pat pat
     constructor_pat (L _ ConPat{}) = True
     constructor_pat _ = False
+
+{- Note [Checked retained lambdas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A checked lambda and a signed function binding use the same expected Pi type.
+Both must open its runtime binder with the actual source pattern identity.
+tcRetainedMatches shares this clause rule and its constructor evidence transport.
+Agda also checks function clauses in the context of their expected telescope.
+See docs/dependent-haskell/REFERENCES.md#checked-retained-lambdas.
+
+Keep the source lambda variant and its value arity. A one-argument lambda-case
+can inspect its argument before it returns a function. A multi-argument lambda
+binds all its source arguments before it inspects their patterns. Do not change
+one form into the other. Preserve the outer erased binders in invis_pat_tys.
+
+The shared checker does not scale usage. Function bindings apply their binding
+multiplicity around it. Lambdas keep the usage context of their caller. Ordinary
+checking and inference still use matchExpectedFunTys, including its ordinary
+DeepSubsumption wrappers. This rule adds no source type positions or inference
+for a retained telescope.
+
+An empty lambda-case on an empty index domain still binds its runtime index.
+Use a generated variable clause whose body is an actual empty case on that Id.
+An empty match group alone would make matchWrapper allocate a different Id.
+See Note [Retained constructor matches].
+-}
 
 -- | Find a retained binder after any canonical ordinary arrows.
 hasRetainedFunTy :: Type -> Bool
@@ -193,6 +223,7 @@ hasRetainedFunTy ty = case coreFullView ty of
 -- See Note [Source retained case refinement].
 tcRetainedCase :: Id -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
                -> TcM (Maybe (HsExpr GhcTc))
+tcRetainedCase _ (MG { mg_alts = L _ [] }) _ = return Nothing
 tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
   = do { captures <- fmap catMaybes $ mapM capture (nameSetElemsStable (retainedCaseNames matches))
        ; givens <- filter (depends . varType) . tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
@@ -464,7 +495,8 @@ nonforcing patterns in the prefix when value patterns remain. This split must
 not force a prefix pattern before an omitted suffix argument. Strict makes the
 retained variable pattern forcing, so reject that case too. With no remaining
 value patterns, the split moves no value lambda. Preserve the old prefix shapes
-in that case. This does not enable inner retained lambdas.
+in that case. Checked suffix lambdas use the same clause rule;
+see Note [Checked retained lambdas].
 
 Use matchActualFunTy to consume a known ordinary arrow without skolemising its
 result. matchExpectedFunTys skolemises a following context even after its last
@@ -522,9 +554,26 @@ tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty
            (\(con, match) -> tcCollectingUsage (check_match con arg_tys result_ty match))
            (zip constructors matches)
        ; tcEmitBindingUsage (supUEs usages)
-       ; return (MG { mg_alts = L loc checked
-                    , mg_ext = MatchGroupTc (Scaled ManyTy (varType index) : arg_tys) result_ty origin }) }
+       ; if null matches
+         then empty_matches arg_tys result_ty
+         else return (MG { mg_alts = L loc checked
+                         , mg_ext = MatchGroupTc (Scaled ManyTy (varType index) : arg_tys) result_ty origin }) }
   where
+    empty_matches arg_tys result_ty
+      = do { arguments <- zipWithM (\dictionary (Scaled mult ty) ->
+                               maybe (newSysLocalId (fsLit "retained_arg") mult ty) return dictionary)
+                             dictionaries arg_tys
+           ; let index_ty = Scaled ManyTy (varType index)
+                 empty_case = MG { mg_alts = L loc []
+                                 , mg_ext = MatchGroupTc [index_ty] result_ty origin }
+                 rhs = L (noAnnSrcSpan (locA loc))
+                         (HsCase CaseAlt (nlHsVar index) empty_case)
+                 pats = map (noLocA . VarPat noExtField . noLocA) (index : arguments)
+                 match = mkSimpleMatch (LamAlt LamSingle) (noLocA pats) rhs
+           ; return (MG { mg_alts = L loc [match]
+                        , mg_ext = MatchGroupTc (index_ty : arg_tys) result_ty
+                                     (Generated OtherExpansion SkipPmc) }) }
+
     constructor (L match_loc (Match { m_pats = L _ pats
                                    , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
       = setSrcSpanA match_loc $
@@ -657,6 +706,14 @@ adding a field to MatchGroupTc. Keep exactly one unguarded equation for each
 constructor of the index domain. This gives the native proof case complete coverage.
 Later arguments currently require bare variable patterns and Many multiplicity.
 
+An empty domain needs no constructor proof. Bind the chosen index with a
+variable pattern and inspect it with an actual empty case. Keep the original
+span and origin on the empty case. Skip pattern-match checking for the generated
+wrapper clause. This keeps the result's runtime index in the lambda's scope
+and preserves empty-case strictness. Preserve any dictionary parameters in the
+outer telescope. An empty source case instead uses ordinary case checking in
+its original context; there is no branch to refine or context to generalize.
+
 Keep the CoPat even when transport is reflexive. A synonym such as
 Ignore b = Int can remove the index during specialisation. selectMatchVar must
 still allocate the outer argument from its original Ignore b annotation.
@@ -681,8 +738,13 @@ tcLambdaMatches e lam_variant matches invis_pat_tys res_ty
             -- Check argument counts since this is also used for \cases
 
         ; (wrapper, r)
-            <- matchExpectedFunTys herald GenSigCtxt arity res_ty $ \ pat_tys rhs_ty ->
-               tcMatches ctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches
+            <- case res_ty of
+                 Check ty | hasRetainedFunTy ty
+                   -> do { result <- tcRetainedMatches herald GenSigCtxt ctxt arity
+                                       invis_pat_tys ty matches
+                         ; return (idHsWrapper, result) }
+                 _ -> matchExpectedFunTys herald GenSigCtxt arity res_ty $ \ pat_tys rhs_ty ->
+                        tcMatches ctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty matches
 
         ; return (wrapper, r) }
   where

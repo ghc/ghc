@@ -582,11 +582,76 @@ retainedNatContextDeclarations =
     , "outerOnlyGivenArrow :: foreach (n :: Nat) -> OnlyGiven n => () -> String"
     , "outerOnlyGivenArrow n = proc () -> (case n of { Z -> \\() -> onlyGivenContext n bottomVec; S k -> \\() -> onlyGivenContext n bottomVec }) -< ()"
     ]
+        ++ retainedNatLambdaDeclarations
+
+-- | Check retained lambdas against complete signatures without inferring a Pi.
+retainedNatLambdaDeclarations :: [String]
+retainedNatLambdaDeclarations =
+    [ "lambdaId :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n"
+    , "lambdaId = \\n xs -> xs"
+    , "lambdaNested :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n"
+    , "lambdaNested @a = \\n -> \\xs -> xs"
+    , "lambdaShadow :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m"
+    , "lambdaShadow = \\n -> \\n xs ys -> ys"
+    , "lambdaGiven :: foreach (n :: Nat) -> OnlyGiven n => Vec Int n -> String"
+    , "lambdaGiven = \\n xs -> onlyLabel xs"
+    , "lambdaEquality :: foreach (n :: Nat) -> (Add n Z ~ n) => Vec Int (Add n Z) -> Vec Int n"
+    , "lambdaEquality = \\n xs -> xs"
+    , "lambdaCase :: foreach (n :: Nat) -> Vec Int n -> String"
+    , "lambdaCase = \\case { Z -> \\xs -> show xs; S k -> \\xs -> show xs }"
+    , "lambdaCases :: foreach (n :: Nat) -> Vec Int n -> String"
+    , "lambdaCases = \\cases { Z xs -> show xs; (S k) xs -> show xs }"
+    , "lambdaLinear :: foreach (n :: Nat) -> (Add n Z :~: n) %1 -> Int"
+    , "lambdaLinear = \\n p -> case p of Refl -> 42"
+    , "lambdaIgnore :: foreach (n :: Nat) -> Vec Int n -> Int"
+    , "lambdaIgnore = \\n _ -> 42"
+    , "lambdaCapture :: () %1 -> Int"
+    , "lambdaCapture p = let worker :: foreach (n :: Nat) -> Vec Int n -> (); worker = \\n xs -> p in case worker Z VNil of () -> 42"
+    , "data LambdaVoid"
+    , "type family LambdaAbsurd (v :: LambdaVoid)"
+    , "lambdaEmpty :: foreach (v :: LambdaVoid) -> LambdaAbsurd v"
+    , "lambdaEmpty = \\case {}"
+    , "explicitEmptyCase :: foreach (v :: LambdaVoid) -> LambdaAbsurd v"
+    , "explicitEmptyCase v = case v of {}"
+    , "ordinaryEmptyLambda :: LambdaVoid -> Int"
+    , "ordinaryEmptyLambda = \\case {}"
+    ]
+
+-- | Preserve lambda arity and observe unused indices through runtime inputs.
+retainedNatLambdaObservation :: [String]
+retainedNatLambdaObservation =
+    [ "identities <- driveNats (\\n -> observeVec (lambdaId @Int n (replicateNative @Int n 42)))"
+    , "nested <- driveNats (\\n -> observeVec (lambdaNested @Int n (replicateNative @Int n 42)))"
+    , "shadowed <- driveNatPairs (\\n m -> observeVec (lambdaShadow n m (replicateNative @Int n 42) (replicateNative @Int m 7)))"
+    , "equalities <- driveNats (\\n -> case rightZero n of Refl -> observeVec (lambdaEquality n (appendNative @Int n Z (replicateNative @Int n 42) VNil)))"
+    , "onePattern <- driveNats (\\n -> pure (lambdaCase n (replicateNative @Int n 42)))"
+    , "twoPatterns <- driveNats (\\n -> pure (lambdaCases n (replicateNative @Int n 42)))"
+    , "linear <- driveNats (\\n -> observeInt (lambdaLinear n (rightZero n)))"
+    , "nestedBottom <- driveNat (\\n -> force (lambdaNested @Int n)) bottomNat"
+    , "casesBottom <- driveNat (\\n -> force (lambdaCases n)) bottomNat"
+    , "caseCyclic <- driveNat (\\n -> force (lambdaCase n)) cyclicNat"
+    , "casePartialField <- driveNat (\\n -> force (lambdaCase n)) partialNat"
+    , "ignoredBottom <- driveNat (\\n -> observeInt (lambdaIgnore n bottomVec)) bottomNat"
+    , "ignoredCyclic <- driveNat (\\n -> observeInt (lambdaIgnore n bottomVec)) cyclicNat"
+    , "firstClass <- force (id (lambdaId @Int))"
+    , "captured <- observeInt (lambdaCapture ())"
+    , "pure (identities ++ nested ++ shadowed ++ equalities ++ onePattern ++ twoPatterns ++ linear ++ unlines [nestedBottom,casesBottom,caseCyclic,casePartialField,ignoredBottom,ignoredCyclic,firstClass,captured])"
+    ]
+
+-- | Append lambda results after the existing source-context observations.
+retainedNatLambdaExpected :: [String]
+retainedNatLambdaExpected =
+    concat (replicate 2 ["[]:0", "[42,42]:2", "[42,42,42]:3"])
+        ++ ["[]:0", "[7,7,7]:3", "[]:0", "[7,7,7]:3"]
+        ++ ["[]:0", "[42,42]:2", "[42,42,42]:3"]
+        ++ concat (replicate 2 ["VNil", "VCons 42 (VCons 42 VNil)", "VCons 42 (VCons 42 (VCons 42 VNil))"])
+        ++ replicate 3 "42"
+        ++ ["forced", "forced", "forced", "forced", "42", "42", "forced", "42"]
 
 -- | Check contextual functions with imported classes and local native workers.
 retainedNatContextSource :: String -> String -> String
 retainedNatContextSource moduleName observation =
-    unlines $ "{-# LANGUAGE Arrows, ConstraintKinds, FlexibleContexts, ViewPatterns #-}" : concatMap insert (lines (retainedNatClassSource moduleName observation))
+    unlines $ "{-# LANGUAGE Arrows, ConstraintKinds, EmptyCase, EmptyDataDecls, FlexibleContexts, LambdaCase, LinearTypes, ViewPatterns #-}" : concatMap insert (lines (retainedNatClassSource moduleName observation))
   where
     insert line@"entry :: IO String" = retainedNatContextDeclarations ++ [line]
     insert line = [line]
@@ -625,8 +690,10 @@ retainedNatContextObservation =
     , "caseCyclic <- driveNat (\\n -> force (casePartial n bottomVec)) cyclicNat"
     , "casePartialField <- driveNat (\\n -> force (casePartial n bottomVec)) partialNat"
     , "noCaseBottom <- driveNat (\\n -> force (noCasePartial n bottomVec)) bottomNat"
-    , "pure (rendered ++ constructors ++ guarded ++ viewed ++ lambdas ++ fullPatterns ++ forwarded ++ ignoredVectors ++ equalities ++ constructorEqualities ++ unlines [ignoredBottom,ignoredCyclic,ignoredEqualityBottom,ignoredEqualityCyclic,variablePartialBottom,variablePartialCyclic,constructorPartialBottom,constructorPartialCyclic] ++ pairs ++ unlines [legacy,legacyBang,wildcard,constrained] ++ caseRendered ++ caseEqualities ++ casePrimitiveEqualities ++ casePairs ++ caseFull ++ unlines [caseCyclic,casePartialField,noCaseBottom])"
+    , "lambdaValues <- do"
     ]
+        ++ map ("  " ++) retainedNatLambdaObservation
+        ++ ["pure (rendered ++ constructors ++ guarded ++ viewed ++ lambdas ++ fullPatterns ++ forwarded ++ ignoredVectors ++ equalities ++ constructorEqualities ++ unlines [ignoredBottom,ignoredCyclic,ignoredEqualityBottom,ignoredEqualityCyclic,variablePartialBottom,variablePartialCyclic,constructorPartialBottom,constructorPartialCyclic] ++ pairs ++ unlines [legacy,legacyBang,wildcard,constrained] ++ caseRendered ++ caseEqualities ++ casePrimitiveEqualities ++ casePairs ++ caseFull ++ unlines [caseCyclic,casePartialField,noCaseBottom] ++ lambdaValues)"]
 
 -- | Preserve the contextual observations after all existing imported results.
 retainedNatContextExpected :: [String]
@@ -652,6 +719,7 @@ retainedNatContextExpected =
            ]
         ++ ["VNil", "VCons 42 (VCons 42 VNil)", "VCons 42 (VCons 42 (VCons 42 VNil))"]
         ++ replicate 3 "forced"
+        ++ retainedNatLambdaExpected
 
 -- | Check explicit source cases with dependent results and captured payloads.
 retainedCaseSource :: String -> String -> String
@@ -787,7 +855,7 @@ retainedNatLibrarySource :: String
 retainedNatLibrarySource =
     unlines $
         take 1 (lines (retainedNatSource "NativeRetainedNatLibrary" ""))
-            ++ [ "{-# LANGUAGE Arrows, ConstraintKinds, FlexibleContexts, FlexibleInstances, LinearTypes, RankNTypes, TypeOperators, ViewPatterns #-}"
+            ++ [ "{-# LANGUAGE Arrows, ConstraintKinds, EmptyCase, EmptyDataDecls, FlexibleContexts, FlexibleInstances, LambdaCase, LinearTypes, RankNTypes, TypeOperators, ViewPatterns #-}"
                , "module NativeRetainedNatLibrary where"
                , "import Data.Type.Equality ((:~:)(Refl))"
                ]
@@ -1843,6 +1911,9 @@ runNatContextSourceChecks = do
         [ ("NativeSourceContextConstructorBottom", "driveNat (\\n -> pure (renderCtor n bottomVec)) bottomNat", "native-bottom-nat")
         , ("NativeSourceContextPayloadBottom", "driveNat (\\n -> pure (renderCtor n bottomVec)) Z", "native-bottom-vector")
         , ("NativeSourceContextCasePartialBottom", "driveNat (\\n -> force (casePartial n bottomVec)) bottomNat", "native-bottom-nat")
+        , ("NativeSourceLambdaCaseBottom", "driveNat (\\n -> force (lambdaCase n)) bottomNat", "native-bottom-nat")
+        , ("NativeSourceLambdaEmptyBottom", "let v :: LambdaVoid; v = error \"native-bottom-empty\" in force (lambdaEmpty v)", "native-bottom-empty")
+        , ("NativeSourceExplicitEmptyCaseBottom", "let v :: LambdaVoid; v = error \"native-bottom-empty\" in force (explicitEmptyCase v)", "native-bottom-empty")
         ]
         $ \(name, body, marker) -> do
             bottomExpression <- sourceEntry name (retainedNatContextSource name body)
@@ -1903,6 +1974,46 @@ runNatContextSourceChecks = do
             ,
                 [ "badQuantified :: foreach (n :: Nat) -> (forall a. Show a => Show (Vec a n)) => Vec Int n -> String"
                 , "badQuantified n xs = show xs"
+                ]
+            )
+        ,
+            ( "NativeSourceLambdaMissingConstructor"
+            , 83605
+            , "one unguarded clause for each constructor"
+            , []
+            ,
+                [ "badLambda :: foreach (n :: Nat) -> Vec Int n -> String"
+                , "badLambda = \\case { Z -> \\xs -> show xs }"
+                ]
+            )
+        ,
+            ( "NativeSourceLambdaLaterPattern"
+            , 83605
+            , "bare variable patterns"
+            , []
+            ,
+                [ "badLambda :: foreach (n :: Nat) -> Vec Int n -> String"
+                , "badLambda = \\cases { Z VNil -> \"zero\"; (S k) (VCons x xs) -> \"successor\" }"
+                ]
+            )
+        ,
+            ( "NativeSourceLambdaWrongIndex"
+            , 83865
+            , "Vec"
+            , []
+            ,
+                [ "badLambda :: foreach (n :: Nat) -> Vec Int n"
+                , "badLambda = \\n -> VNil"
+                ]
+            )
+        ,
+            ( "NativeSourceLambdaDuplicatedLinearProof"
+            , 18872
+            , "multiplicity"
+            , []
+            ,
+                [ "badLambda :: foreach (n :: Nat) -> (Add n Z :~: n) %1 -> Int"
+                , "badLambda = \\n p -> case p of Refl -> case p of Refl -> 42"
                 ]
             )
         ]
@@ -2054,7 +2165,7 @@ runNatSourceRejectChecks = do
         ,
             ( "NativeSourceNatCoverage"
             , 83605
-            , "one unguarded equation for each constructor"
+            , "one unguarded clause for each constructor"
             , "      replicateNative Z x = VNil"
             , []
             )
@@ -2095,7 +2206,7 @@ runSourceRejectChecks = do
         , ("partial retained signature", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], local [] "foreach (b :: Bool) -> _a -> _a" identity "42")
         , ("inner erased forall", 83605, "within the scope of a retained binder", ["RankNTypes"], local [] "foreach (b :: Bool) -> forall a. a -> Select b" ["keep b x = x"] "42")
         , ("non-variable retained pattern", 83605, "bare variable pattern", [], local [] selection ["keep _ x = x"] "42")
-        , ("multiple variable equations", 83605, "one unguarded equation for each constructor", [], local [] selection (identity ++ identity) "42")
+        , ("multiple variable equations", 83605, "one unguarded clause for each constructor", [], local [] selection (identity ++ identity) "42")
         , ("producer expression argument", 83605, "local index variable or a supported constructor tree", [], local [] consumer identity "keep (not False) 42")
         , ("nonreflexive indexed constraint", 18872, "True", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
         , ("general indexed constraint", 39999, "Show", ["FlexibleContexts"], local [] "foreach (b :: Bool) -> (Show (Select b) => Int) -> Int" identity "42")
@@ -2122,9 +2233,9 @@ runSourceRejectChecks = do
         , ("False payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = False"] "42")
         , ("numeric payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = 42"] "42")
         , ("swapped constructor results", 83865, "Int", [], local [] chooser ["keep True = False", "keep False = 42"] "42")
-        , ("missing constructor equation", 83605, "one unguarded equation for each constructor", [], local [] chooser ["keep True = 42"] "42")
-        , ("duplicate constructor equation", 83605, "one unguarded equation for each constructor", [], local [] chooser ["keep True = 42", "keep True = 43"] "42")
-        , ("guarded constructor equation", 83605, "one unguarded equation for each constructor", [], local [] chooser ["keep True | True = 42", "keep False = False"] "42")
+        , ("missing constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True = 42"] "42")
+        , ("duplicate constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True = 42", "keep True = 43"] "42")
+        , ("guarded constructor equation", 83605, "one unguarded clause for each constructor", [], local [] chooser ["keep True | True = 42", "keep False = False"] "42")
         , ("unsupported later constructor argument", 83605, "bare variable patterns and unrestricted multiplicities", [], local [] selection ["keep True _ = 42", "keep False x = x"] "42")
         , ("linear constructor argument", 83605, "bare variable patterns and unrestricted multiplicities", ["LinearTypes"], local [] "foreach (b :: Bool) -> Select b %1 -> Select b" ["keep True x = x", "keep False x = x"] "42")
         ,
