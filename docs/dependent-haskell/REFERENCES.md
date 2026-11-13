@@ -528,6 +528,40 @@ separate CLI checks pass as of 2026-11-13. Controls also cover ordinary GADT,
 rank-n, and higher-kinded applications, linear usage rejection, and one-time
 Template Haskell expansion.
 
+### Retained class consumers
+
+Use Agda v2.8.0 as the primary comparison for instance arguments. An instance
+argument is a contextual term. GHC passes an ordinary class dictionary as
+evidence to a method. The mechanisms share a scope obligation. Their search and
+evidence rules differ.
+
+| Source | File blob | Relevance |
+| --- | --- | --- |
+| [Instance manual, lines 24–40 and 147–172](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/instance-arguments.lagda.rst#L24-L40) | `69c52629a737a8670fe11286a705111b7ba99e9d` | `{{...}}` syntax; a record argument follows hidden type arguments |
+| [Implicit insertion, lines 81–101](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Implicit.hs#L81-L101) | `55a03200d2300486c91a95798fc8e0c3c9c675cf` | Insert arguments in telescope order and substitute into the remaining type |
+| [Application checking, lines 266–279](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L266-L279) | `82ba94ac864d19b947d4c92b9af252b0fe81347a` | Postpone instance search during application checking |
+| [Instance postponement, lines 1018–1020](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/InstanceArguments.hs#L1018-L1020) | `d2c8d6d1fd74b1fd8771ab1525fe872c861d22dd` | Restore instance search after the application action |
+| [Instance metas, lines 227–253](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars.hs#L227-L253) | `13f52cb7f2a08ac55f62e326564043470e62f6f6` | Abstract over the current telescope; apply the meta to current context arguments |
+| [Constraint closures, lines 124–145](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Monad/Constraints.hs#L124-L145) | `3a589abda7f6544215bf4a4edfbd7a3fb38c65cc` | Save and restore the constraint context |
+
+The instance-meta path explicitly uses `DontRunMetaOccursCheck`. Do not infer its
+policy from ordinary-meta checks. This spike adopts neither Agda's assignment
+algorithm nor its instance-search algorithm.
+
+Immutable GHC matching inspects the ordinary body after the constraint prefix.
+It returns the substituted original body with that prefix. Ordinary `IALL`,
+`instantiateSigmaQL`, and `instCall` then generate dictionary arguments. An
+application-local implication owns native evidence bindings. It preserves
+enclosing Givens and the current `TcLevel`. Native residual predicates cannot
+become an inferred context outside that scope. See Notes [Constrained immutable
+instantiation], [Retained application evidence], and [Retained residual constraints].
+
+The static-expression path in `GHC.Tc.Gen.Expr` supplies the GHC precedent for
+`buildImplicationFor` and expression-local `WpLet`. Its `StaticFormSkol` removes
+enclosing Givens. The retained path uses its own origin and preserves them.
+The earlier Note [Reflexive retained equality evidence] records why outer
+evidence bindings were insufficient for runtime indices.
+
 ### Future type-map equality
 
 Agda v2.8.0's

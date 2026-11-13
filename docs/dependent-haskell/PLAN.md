@@ -639,6 +639,22 @@ checking. Follow [the scoped Agda application sources](REFERENCES.md#generic-ret
 See [the contract](CORE.md#generic-retained-argument-inference). Native
 meta-variable assignment and broader application inference remain open.
 
+### Class consumer increment
+
+Use ordinary class instances for retained proof and vector types. Follow the
+[Agda instance-context sources](REFERENCES.md#retained-class-consumers).
+
+- [ ] Match the ordinary argument and result types after the constraint prefix.
+      Keep the substituted prefix for ordinary dictionary instantiation.
+- [ ] Put evidence bindings at the application, below its runtime index binders.
+      Keep enclosing Givens and report residual native constraints in scope.
+- [ ] Check proof and vector `Show`, multiple native dictionary keys, and lazy
+      consumers at bottom and cyclic indices. Keep Core and STG Lint enabled.
+- [ ] Reject missing instances and transport without equality evidence at the
+      source location. Check ordinary class and inference controls.
+- [ ] Complete registered regressions, interface-only execution, guide, smoke,
+      formatting, and the checkpoint.
+
 ## Acceptance checks
 
 | ID | Required result |

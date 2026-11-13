@@ -186,8 +186,8 @@ Here `a` has kind `Type`. The earlier cache selected only binders whose kinds
 were supported native index domains. The generic route also handles whole proof
 and vector types, and retained dependent functions passed through ordinary `id`.
 
-Keep NoQL, a saturated ordinary tau signature, and no constraints, native
-template, pending type arguments, or head concreteness requirements. Classify
+Keep NoQL and a saturated ordinary tau body after any leading constraints.
+Keep no native template, pending type arguments, or head concreteness requirements. Classify
 named argument spines with read-only Id and constructor lookups. A known Id
 whose type contains native syntax must occur in a spine. Look through named
 applications, type applications, parentheses, pragmas, and existing expansions.
@@ -220,10 +220,40 @@ Ordinary GHC also requires that binding annotation for the repeated local use
 in this control. Duplicating the linear proof must produce GHC-18872.
 
 This is a bounded application algorithm. General native meta-variable scope,
-checking-dependent argument inference, Quick Look, and class consumers remain
+checking-dependent argument inference and Quick Look remain
 separate work. The [pinned Agda application and meta-context sources](REFERENCES.md#generic-retained-argument-inference)
 use context-scoped mutable metas. This route uses immutable matching and GHC's
 existing usage cache. It does not adopt Agda's meta-assignment algorithm.
+
+## Retained class consumers
+
+An ordinary consumer can require a class dictionary for a type that contains a
+runtime index. For example, `show (rightZero n)` requires
+`Show (Add n Z :~: n)`. Match argument and result types in the ordinary body after
+the constraint prefix. Return the substituted original body with the prefix.
+Ordinary `IALL` and `instCall` must still generate every evidence application.
+All newly constrained immutable routes require a known head with no concreteness
+requirements. Constructor candidate matching remains unconstrained.
+
+Capture actual application constraints with the extension enabled. A native
+simple Wanted requires an expression-local implication and `WpLet`. Inspect the
+generated predicates, including those exposed after visible type or earlier value
+arguments. Keep the current `TcLevel` and enclosing Givens. The evidence bindings
+must remain below each runtime index binder. Nested implications already own
+their evidence. Applications without native simple Wanteds emit their original
+constraints without a new wrapper.
+
+Exclude native residual predicates from constraint generalization and defaulting.
+Keep ordinary meta-variables in those predicates monomorphic. Preserve the
+original Wanteds for solving and located diagnostics. An ordinary inferred result
+such as `String` does not establish that its residual constraints are index-free.
+
+Instance resolution inspects types. Each method keeps its ordinary runtime
+behavior. `Show (a :~: b)` matches `Refl`, so rendering a proof can force it.
+An ignoring consumer can remain lazy. A `Show` dictionary supplies no equality
+between the indices. Transport still requires explicit equality evidence.
+Source-written class contexts containing runtime binders remain outside this
+increment. See [the primary instance-context sources](REFERENCES.md#retained-class-consumers).
 
 ## Lambda and application
 
