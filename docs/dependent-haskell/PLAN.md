@@ -5,15 +5,15 @@ work on Richard Eisenberg's historical `nokinds-pi` branch. Port its useful chan
 to current GHC and complete the missing rules. The first working target is a
 retained Boolean argument whose value determines the result type.
 
-Last updated: 2026-11-13. Compiler source baseline:
+Last updated: 2026-11-13. Upstream compiler base:
 `19ff36f2aede0ca2e554016ff22c71e73aa9803b`.
 
 See [current status](README.md) and [primary references](REFERENCES.md).
 
 ## Current priority: execute from source
 
-Finish the constructor-interface validation already in progress. Then complete
-M10 through Haskell source. The acceptance program must declare Nat, Vec and
+The constructor-interface checkpoint is verified at `6a0bfbf0fd`. Complete
+M10 through Haskell source next. The acceptance program must declare Nat, Vec and
 PackedVec in source. See the [source target](examples/packed-vector/README.md). It must construct, unpack and repackage stored vectors.
 Compile a producer and a consumer as separate modules. Do not require a GHC API
 producer to add native declarations or functions.
@@ -852,22 +852,24 @@ withPacked (PackVec n xs) k = k n xs
 - [x] Instantiate Core pattern fields sequentially. Substitute actual field Ids
   in later field types. Check fresh identities, field count, dependent payload
   identity and result nonescape in Core Lint. Add existing-fixture API coverage.
-  Flat instantiated-field APIs and interface writing reject retained metadata
-  until their replacements preserve scope. Even a vacuous retained constructor
+  Flat instantiated-field APIs reject retained metadata. Interface declarations
+  now preserve field scope in the codec step below. Even a vacuous retained constructor
   stays outside native index domains. The API fixture checks nested Pi capture,
   scoped consumption and repackaging with a dictionary-function payload.
 - [x] Verify the Core checkpoint in both compiler stages and the bootstrap API,
   registered tests, runtime fixture and standalone compatibility controls.
   Record the corrected source-gate harness separately from the first combined
   CLI invocation. See [the verified checkpoint](README.md#retained-constructor-field-checkpoint).
-- [ ] Preserve the telescope in interface declarations. Reject malformed scope
+- [x] Preserve the telescope in interface declarations. Reject malformed scope
   and unsupported promotion with interface diagnostics. Version the format if
   the serialized declaration changes. Keep existing archives immutable.
   Encode aligned optional local names. Decode with fresh sequential Ids and
   deferred field checks. Expose metadata before recursive domain validation.
   Check duplicate/forward/self/inherited references, vacuous binders, distinct
   names after tidying, sibling scope and repeated imports. Preserve an immutable
-  version-1 reader before configuring version 2.
+  version-1 reader before configuring version 2. Verified binary declaration
+  round trips, recursive-domain rejection and both header-version directions.
+  See [the interface checkpoint](README.md#retained-constructor-interface-checkpoint).
 The first source checkpoint uses one package constructor, prefix constructor
 syntax, bare variable patterns for retained fields, and one eliminator equation.
 Reject unsupported forms with located diagnostics. Keep pattern coverage checks
@@ -902,6 +904,14 @@ Ids; an ordinary value alias does not establish index equality.
   indices. Multiple equations require coherent substitution through each typed
   RHS, pattern and evidence, or checked alias transport. Do not route package
   elimination through the native-index constructor equation checker.
+- [ ] Count retained field Pi binders as runtime arguments in worker LFInfo and
+  constructor layout checks. `RepType.countFunRepArgs` and `countConRepArgs`
+  currently handle ordinary arrows only. Use each fixed lifted field domain;
+  do not force its runtime value to determine its representation.
+  Constructor impossibility checks must return conservative results before
+  calling flat signature APIs. Decline product unpacking for retained packages.
+  Nonreflexive constructor-cast pushing also needs scoped field substitution;
+  preserve the cast until that rule exists. Profiling remains outside the subset.
 - [ ] Execute packaging, scoped elimination and repackaging of real Nat/Vec
   values through separate module interfaces. Inspect CorePrep/STG field layout.
   Check constructor WHNF, unused bottom/cyclic index, bottom vector, and demanded

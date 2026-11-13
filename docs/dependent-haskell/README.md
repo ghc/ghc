@@ -29,7 +29,7 @@ Last updated: 2026-11-13.
 | Execution | Nat/Vec and Boolean source programs pass checked bytecode lowering and separate-module machine-code execution |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
-| Configured fork version | `10.1.20261113.2`, with interface header `1001202611132`; matching compiler and libraries are rebuilding |
+| Configured fork version | `10.1.20261113.2`, with interface header `1001202611132`; matching compiler and libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, bare fields, and checked source `case` pass the runtime fixtures |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |
@@ -41,8 +41,8 @@ Last updated: 2026-11-13.
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
 | Last verified checkpoint | Both stages and libraries, five registered regressions, 277 imported observations, 20 focused closure/worker observations, and 12 guide blocks pass |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
-| Stored dependent pairs | Core field telescopes, scoped patterns and nonescape pass bootstrap API checks; the interface codec is under validation; source execution remains pending |
-| Next task | Finish in-flight interface validation, then compile and run a two-module Nat/Vec package entirely from Haskell source; declaration checking, source patterns and desugaring have priority |
+| Stored dependent pairs | Core field telescopes and binary declaration imports preserve scoped fields and fresh identities; source package execution remains pending |
+| Next task | Compile and run the two-module packed-vector example entirely from Haskell source; declaration checking, source patterns, roles, desugaring and runtime argument counting have priority |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -1617,3 +1617,62 @@ and two fixtures. Harness hashes cover 32 files. Current archive manifests cover
 gate files. Current hashes, the immutable interface reader, and both previous
 worker-instantiation archives verify. No serialized declaration format changed.
 Source, interfaces and runtime package execution remain pending in M10.
+
+## Retained constructor interface checkpoint
+
+Implementation: `6a0bfbf0fd`. Schema and pinned Agda provenance:
+`65611cfdb8`. Constructor declarations now serialize aligned optional field
+names. The reader allocates fresh runtime Ids in order. It keeps field scope
+out of sibling constructors and rejects unsupported promotion. The field types
+remain the only encoding of domains and multiplicities.
+
+Recursive imports expose metadata before field-domain checks. Validate Core
+constructor telescopes on worker/user type demand. Allocate named Id skeletons
+with literal Many; Id construction forces multiplicity. Inspect metadata before
+a domain constructor's full signature. This avoids reentering a validation thunk.
+See the [interface provenance](REFERENCES.md#constructor-field-interface-provenance).
+
+The fork is `10.1.20261113.2`, with interface header `1001202611132`.
+The preserved version-1 reader still accepts its original interface. Both
+readers reject the other version with CheckHiWay and IgnoreHiWay.
+
+Validation uses `_build/verification/native-constructor-iface-`:
+
+- Both compiler stages and libraries passed. The full rebuild took 27m38s and
+  peaked at 9,600 MiB under 16 GiB. A later Note correction triggered another
+  dependency check. Its first scope reached the actual 10m limit, exit 124;
+  continuation passed in 3m44s, with 3,995 MiB peak. No compiler fix followed.
+- The final bootstrap API and runtime fixtures passed under 4 GiB, with a
+  combined peak of 1,154 MiB. The API checks Normal/MaximumCompression declaration
+  round trips, repeated imports, vacuous binders, parameters, name tidying,
+  shared payload Ids, construction/elimination/repackaging Lint, malformed scope,
+  promotion and bounded self/mutual imported-domain rejection. Runtime stdout
+  remains unchanged. These package payloads are equality-dictionary functions.
+- All five selected registered tests passed across the initial run and a focused
+  rerun. The first run had 39 cases, 34 skips and four passes. The API fixture
+  missed an import after warning cleanup; adding it made the one-test rerun pass.
+  Neither run had framework failures or warnings. Peaks were 1,922/1,776 MiB
+  under 8 GiB. An earlier API setup fix initializes its package environment.
+- Separate CLI controls passed: 277 current and 177 older imported observations,
+  closure/worker/proof/class/lambda controls, 12 literal guides, ordinary typing
+  and TH, package/GHCi/Haddock smoke checks, typed splices and static pointers.
+  Version assertions needed the new header number; the copied guide harness
+  also needed its 12 input files. The remainder alone was rerun and passed.
+  Maximum peak across these scopes was 1,057 MiB under 4 GiB.
+- Source constructor syntax still rejects with located GHC-43582. The full GHC
+  suite was not run. Fourmolu fixture formatting, nonmutating compiler parsing,
+  cabal-gild and whitespace checks passed. Existing Cabal/Haddock notices and
+  Hadrian's libdir-normalization assertion remain outside this change.
+
+The successful logs are `build-v4.log`, `build-v6.log`, `bootstrap-final.log`,
+`registered-recheck.log` and `cli-remainder.log`; earlier CLI results are in
+`cli-final-v2.log`. Source hashes cover 28 compiler files, two fixtures and
+VERSION_DATE. Harness hashes cover 42 files. Archive manifests cover 27 bootstrap,
+27 older compatibility, 30 worker, 34 closure, 32 lambda and four source-gate files.
+The previous interface reader and earlier archives remain immutable.
+
+This checkpoint tests binary declaration codecs through the API. It does not
+execute a stored Vec package or establish full on-disk package compilation.
+The next gate is the [standalone source example](examples/packed-vector/README.md).
+Constructor/pattern checking, roles, PMC, desugaring and runtime argument counting
+remain open in M10. Native unfoldings, optimization and profiling remain gated.
