@@ -2063,7 +2063,10 @@ eta_expand in_scope one_shots orig_expr
       | otherwise = go (in_scope `extendInScopeSet` v) oss1 (v:vs) body
 
     go in_scope oss rev_vs expr
-      = -- pprTrace "ee" (vcat [ppr in_scope', ppr top_bndrs, ppr eis]) $
+      = -- pprTrace "ee" (
+        --    vcat [ text "top_bndrs:" <+> ppr top_bndrs
+        --         , text "top-eis:" <+> ppr top_eis
+        --         , text "eis:" <+> ppr eis]) $
         retick $
         etaInfoAbs top_eis $
         etaInfoApp in_scope' sexpr eis
@@ -2282,6 +2285,11 @@ etaInfoAbs (EI bs mco) expr = (mkLams bs expr) `mkCastMCo` mkSymMCo mco
 -- Note that this function is entirely unconcerned about cost centres and other
 -- semantically-irrelevant source annotations, so call sites must take care to
 -- preserve that info. See Note [Eta expansion and SCCs].
+--
+-- If   mkEtaWW ty = EI [b1,..,bn] co
+-- then co :: ty ~ (b1_ty -> .. -> bn_ty -> body_ty)
+-- That is, the RHS type has all arrows visible, and is the type
+--          of a core lambda (\b1...\bn. body)
 mkEtaWW
   :: [OneShotInfo]
   -- ^ How many value arguments to eta-expand
@@ -2370,7 +2378,7 @@ mkEtaForAllMCo (Bndr tcv vis) ty mco
             | otherwise                   -> mk_fco (mkRepReflCo ty)
       MCo co                              -> mk_fco co
   where
-    mk_fco co = MCo (mkForAllCo tcv coreTyLamForAllTyFlag vis MRefl co)
+    mk_fco co = MCo (mkForAllCo tcv vis coreTyLamForAllTyFlag MRefl co)
     -- coreTyLamForAllTyFlag: See Note [The EtaInfo mechanism], particularly
     -- the (EtaInfo Invariant).  (sym co) wraps a lambda that always has
     -- a ForAllTyFlag of coreTyLamForAllTyFlag; see Note [Required foralls in Core]

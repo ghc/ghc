@@ -994,9 +994,14 @@ mkSymCo :: Coercion -> Coercion
 mkSymCo co | isReflCo co   = co
 mkSymCo (SymCo co)         = co
 mkSymCo (SubCo (SymCo co)) = SubCo co
-mkSymCo co@(ForAllCo { fco_kind = kco, fco_body = body_co })
-  | isReflMCo kco          = co { fco_body = mkSymCo body_co }
-mkSymCo co                 = SymCo co
+mkSymCo (ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
+                  , fco_kind = kco, fco_body = body_co })
+  | isReflMCo kco = ForAllCo { fco_tcv  = tcv    -- Binder can stay unchanged
+                             , fco_kind = kco    --   since kco=Refl
+                             , fco_visL = visR   -- Swap visibilities!
+                             , fco_visR = visL   --   See #28123, #27557
+                             , fco_body = mkSymCo body_co } -- Swap body
+mkSymCo co = SymCo co
 
 -- | mkTransCo creates a new 'Coercion' by composing the two
 --   given 'Coercion's transitively: (co1 ; co2)
