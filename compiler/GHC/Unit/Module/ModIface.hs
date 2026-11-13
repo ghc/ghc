@@ -78,6 +78,7 @@ module GHC.Unit.Module.ModIface
    , IfaceCache_ (..)
    , IfaceSimplifiedCore (..)
    , withSelfRecomp
+   , IfaceHashData
    , IfaceSelfRecompData
    , IfaceSimplifiedCoreData
    , IfaceExtFieldsData
@@ -252,6 +253,11 @@ type family IfaceBinHandle (phase :: ModIfacePhase) where
   IfaceBinHandle 'ModIfaceFinal    = FullBinData
   IfaceBinHandle 'ModIfaceRetained = Void
 
+type family IfaceHashData (phase :: ModIfacePhase) where
+  IfaceHashData 'ModIfaceCore     = ()
+  IfaceHashData 'ModIfaceFinal    = Fingerprint
+  IfaceHashData 'ModIfaceRetained = ()
+
 type family IfaceSelfRecompData (phase :: ModIfacePhase) where
   IfaceSelfRecompData 'ModIfaceCore     = Maybe IfaceSelfRecomp
   IfaceSelfRecompData 'ModIfaceFinal    = Maybe IfaceSelfRecomp
@@ -364,7 +370,7 @@ data ModIface_ (phase :: ModIfacePhase)
                 --   when taking partially defined values into account, because
                 --   @Strict.Just undefined@ is @undefined@ and so @Nothing@ and
                 --   @undefined@ are the only inhabitants of that type.
-        mi_iface_hash_  :: Fingerprint, -- A hash of the whole interface
+        mi_iface_hash_  :: IfaceHashData phase, -- A hash of the whole interface
 
         mi_mod_info_     :: IfaceModInfo,
                 -- ^ Meta information about the module the interface file is for
@@ -870,7 +876,7 @@ emptyPartialModIface mod
   = PrivateModIface
     {
       mi_hi_bytes_        = Strict.Nothing,
-      mi_iface_hash_      = fingerprint0,
+      mi_iface_hash_      = (),
       mi_mod_info_        = emptyIfaceModInfo mod,
       mi_deps_            = noDependencies,
       mi_public_          = emptyPartialIfacePublic,
@@ -927,8 +933,9 @@ emptyModIface mod
   | PrivateModIface {..} <- emptyPartialModIface mod
   = PrivateModIface
     {
-      mi_hi_bytes_ = Strict.Nothing,
-      mi_public_   = convertIfacePublic mi_public_,
+      mi_hi_bytes_   = Strict.Nothing,
+      mi_iface_hash_ = fingerprint0,
+      mi_public_     = convertIfacePublic mi_public_,
       ..
     }
   where
@@ -987,7 +994,8 @@ emptyIfaceHashCache _occ = Nothing
 
 -- ModIface is completely forced since it will live in memory for a long time.
 -- If forcing it uses a lot of memory, then store less things in ModIface.
-instance ( NFData (IfaceSelfRecompData phase)
+instance ( NFData (IfaceHashData phase)
+         , NFData (IfaceSelfRecompData phase)
          , NFData (IfaceSimplifiedCoreData phase)
          , NFData (IfaceExtFieldsData phase)
          , NFData (IfaceAnnotationsData phase)
@@ -1133,6 +1141,7 @@ retainedModIface PrivateModIface {..}
   = PrivateModIface
     {
       mi_hi_bytes_        = Strict.Nothing,
+      mi_iface_hash_      = (),
       mi_public_          = retainedIfacePublic mi_public_,
       mi_self_recomp_     = (),
       mi_simplified_core_ = (),
@@ -1371,7 +1380,7 @@ pattern ModIface ::
   -> Module
   -> Maybe Module
   -> HscSource
-  -> Fingerprint
+  -> IfaceHashData phase
   -> Dependencies
   -> IfacePublic_ phase
   -> [IfaceExport]
