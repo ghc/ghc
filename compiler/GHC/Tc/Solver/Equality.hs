@@ -344,6 +344,20 @@ The key function `can_eq_nc` tries to make progress with a type equality t1~t2.
 (EQNC7) Give up. Make the (fully-rewrittten) constraint into an Irred and put it
   in the inerts.  See `finishCanWithIrred`.
 
+Note [Reflexivity after retained normalization]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Rewriting returns to can_eq_nc without repeating zonkEqTypes. A family equation
+can expose a shared runtime index or make two retained functions alpha-equal.
+For example, normalize Vec Int (Add Z n) under foreach n to Vec Int n.
+Recheck reflexivity after both sides have been rewritten. The rewriting evidence
+already relates the original constraint to these normalized endpoints.
+
+This check does not decompose a retained function or assign a meta-variable.
+Opaque runtime indices stay rigid. In particular, Add n Z does not reduce
+without constructor information about n. See Note [Rewriting retained dependent
+functions] in GHC.Tc.Solver.Rewrite and Note [Rigid retained indices] in
+GHC.Tc.Utils.Unify.
+
 Note [CanEqState]
 ~~~~~~~~~~~~~~~~~
 In `can_eq_nc` we want to avoid repeated attempts to rewrite or unwrap newtypes.
@@ -446,6 +460,14 @@ can_eq_nc _ces _rdr_env _envs ev eq_rel ty1@(TyConApp tc1 []) _ps_ty1 (TyConApp 
 can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   | Just ty1' <- coreView ty1 = can_eq_nc ces rdr_env envs ev eq_rel ty1' ps_ty1 ty2  ps_ty2
   | Just ty2' <- coreView ty2 = can_eq_nc ces rdr_env envs ev eq_rel ty1  ps_ty1 ty2' ps_ty2
+
+-- See Note [Reflexivity after retained normalization].
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(TermVarTy v1) _ (TermVarTy v2) _
+  | bothRewritten ces, v1 == v2
+  = canEqReflexive ev eq_rel ty1
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@DepFunTy{} _ ty2@DepFunTy{} _
+  | bothRewritten ces, ty1 `tcEqType` ty2
+  = canEqReflexive ev eq_rel ty1
 
 -- (EQNC2) Eager newtype decomposition (ReprEq only).
 -- Look for (N s1 .. sn) ~R# (N t1 .. tn)

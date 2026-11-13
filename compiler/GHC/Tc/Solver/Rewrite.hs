@@ -115,6 +115,7 @@ runRewrite loc flav eq_rel thing_inside
                         , re_eq_rel    = eq_rel
                         , re_rewriters = rewriters_ref
                         , re_used_cos  = used_cos_ref
+                        , re_native_binder = False
                         , re_zap_coercions = gopt Opt_ZapCoercions dflags }
        ; res <- runRewriteM thing_inside fmode
        ; rewriters <- readTcRef rewriters_ref
@@ -155,6 +156,26 @@ setEqRel new_eq_rel thing_inside
     then runRewriteM thing_inside env
     else runRewriteM thing_inside (env { re_eq_rel = new_eq_rel })
 {-# INLINE setEqRel #-}
+
+-- | Normalize a retained body without emitting or retaining external evidence.
+-- See Note [Rewriting retained dependent functions].
+withNativeBinder :: RewriteM a -> RewriteM a
+withNativeBinder thing_inside
+  = mkRewriteM $ \env ->
+    if re_native_binder env
+    then runRewriteM thing_inside env
+    else runRewriteM thing_inside
+           (env { re_native_binder = True, re_zap_coercions = False })
+{-# INLINE withNativeBinder #-}
+
+-- | Skip an external evidence path beneath a retained runtime binder.
+withoutNativeBinder :: a -> RewriteM a -> RewriteM a
+withoutNativeBinder fallback thing_inside
+  = mkRewriteM $ \env ->
+    if re_native_binder env
+    then return fallback
+    else runRewriteM thing_inside env
+{-# INLINE withoutNativeBinder #-}
 
 bumpReductionDepthRM :: Type -> RewriteM a -> RewriteM a
 bumpReductionDepthRM ty (RewriteM thing_inside)
@@ -645,6 +666,48 @@ rewrite_args_slow binders inner_ki fvs roles tys
            ; return $! mkReflRedn Phantom ty }
 
 ------------------
+{- Note [Rewriting retained dependent functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained function has a fixed closed index domain and a Many runtime binder.
+Normalize its body without changing that binder or its domain. mkDepFunRedn
+uses DepFunCo to bind the runtime Id in the reduction proof. Each endpoint uses
+mkDepFunTy independently: normalization can remove a dependency and produce an
+ordinary Many arrow on one side. A bound runtime index remains rigid. Do not
+inspect its definition or add a singleton witness.
+
+The ordinary ForAllTy case recurses into its body, but it does not establish a
+solver scope for runtime Ids. In particular, a plugin can emit a Wanted, and a
+family cache can retain a reduction with a free occurrence of the inner Id.
+An inert equality can also import evidence from outside the retained binder.
+Wrapping the final proof in DepFunCo does not bind an Id in any such side effect.
+
+Set re_native_binder throughout the recursive body normalization. In this mode:
+
+* Do not query or call rewriting plugins. They can emit Wanted constraints.
+* Do not read or write the family application cache. Its reductions can carry
+  evidence outside the runtime binder's scope.
+* Do not rewrite family applications or type variables with inert equalities.
+  Inert evidence belongs to the outer solver scope.
+* Do not zap coercions. Keep the explicit scoped DepFunCo proof, and do not run
+  an intermediate lint check on a body whose runtime Id is not yet bound.
+
+Global family axioms can still reduce. Ordinary type meta-variables can still be
+read and zonked. These paths emit no new constraints or index assignments.
+Coercions are only zonked, as in rewrite_co; do not rewrite CoVar predicates.
+No runtime binder or local equality enters the outer inert set or a cache.
+The existing depth, role, and location context remains active. Nested retained
+binders inherit the same restrictions. The scoped helper allocates a modified
+environment only when entering this mode. Ordinary rewriting keeps its existing
+evidence paths, and the flag checks are inlined.
+
+This rule supplies congruence for normalization. It does not enable retained
+meta-variable assignment, inferred retained bindings, or structural unification.
+Agda's context extension and conversion motivate the scoped rule. Haskell keeps
+explicit FC evidence and its own evaluation rules. See the pinned sources and
+evaluation boundary in docs/dependent-haskell/REFERENCES.md#agda-provenance and
+Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+-}
+
 rewrite_one :: TcType -> RewriteM Reduction
 -- Rewrite a type to get rid of type function applications, returning
 -- the new type-function-free type, and a collection of new equality
@@ -660,7 +723,14 @@ rewrite_one ty
 rewrite_one ty@(TermVarTy {})
   = do { role <- getRole
        ; return $! mkReflRedn role ty }
-rewrite_one ty@(DepFunTy {})
+rewrite_one ty@(DepFunTy b body)
+  -- See Note [Rewriting retained dependent functions].
+  | isId b, isNativeIndexId b
+  , isLiftedTypeKind (typeKind body)
+  = withNativeBinder $
+    do { redn <- rewrite_one body
+       ; return $! mkDepFunRedn b redn }
+  | otherwise
   = liftTcS $ failTcS $ TcRnRetainedQuantificationError (RetainedSolverType ty)
 
 rewrite_one xi@(LitTy {})
@@ -1003,7 +1073,8 @@ rewriteExactFamApp tc tys =
                      && not (univCoDepsHasHoles deps) -- (FAC_Holes)
                      ) $
                   -- NB: (FAC_Flag) is checked in 'extendFamAppCache'.
-                  liftTcS $ extendFamAppCache tc tys zapped_redn
+                  withoutNativeBinder () $
+                    liftTcS $ extendFamAppCache tc tys zapped_redn
 
               ; return zapped_redn
               }}
@@ -1096,7 +1167,8 @@ rewrite_exact_fam_app_step tc tys
 
          -- STEP 3: try the inerts
        ; flavour <- getFlavour
-       ; mb_eq <- liftTcS $ lookupFamAppInert (`eqCanRewriteFR` (flavour, eq_rel)) tc xis
+       ; mb_eq <- withoutNativeBinder Nothing $
+                    liftTcS $ lookupFamAppInert (`eqCanRewriteFR` (flavour, eq_rel)) tc xis
        ; case mb_eq of
          { Just (EqCt { eq_ev = inert_ev, eq_rhs = inert_rhs, eq_eq_rel = inert_eq_rel })
              -> do { traceRewriteM "rewrite family application with inert"
@@ -1747,8 +1819,12 @@ try_to_reduce tc tys tc_rewriters
                | otherwise
                = return mb_redn
 
-       ; result <-
-            liftTcS $ firstJustsM
+       ; result <- liftTcS $
+           if re_native_binder rewrite_env
+           -- Global family axioms do not emit constraints or update caches.
+           -- See Note [Rewriting retained dependent functions].
+           then matchFam tc tys
+           else firstJustsM
               [ -- STEP 1a & STEP 4a
                 record_deps
                   =<< runTcPluginRewriters rewrite_env tc_rewriters tys
@@ -1780,7 +1856,8 @@ try_to_reduce tc tys tc_rewriters
 -- headed by the given 'TyCon`.
 getTcPluginRewritersForTyCon :: TyCon -> RewriteM [TcPluginRewriter]
 getTcPluginRewritersForTyCon tc
-  = liftTcS $ do { tcg_env <- getGblEnv
+  = withoutNativeBinder [] $
+    liftTcS $ do { tcg_env <- getGblEnv
                  ; plugins <- readTcRef (tcg_plugins tcg_env)
                  ; let rewriters = rewriterTcMPlugins plugins
                  ; return (lookupWithDefaultUFM rewriters [] tc) }
@@ -1875,7 +1952,8 @@ rewrite_tyvar2 :: TcTyVar -> CtFlavourRole -> RewriteM RewriteTvResult
 -- See Note [Stability of rewriting] in GHC.Tc.Solver.Monad
 
 rewrite_tyvar2 tv fr@(_, eq_rel)
-  = do { ieqs <- liftTcS $ getInertEqs
+  = withoutNativeBinder RTRNotFollowed $
+    do { ieqs <- liftTcS $ getInertEqs
        ; case lookupDVarEnv ieqs tv of
            Just equal_ct_list
              | Just ct <- find can_rewrite equal_ct_list

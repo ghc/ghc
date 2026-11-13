@@ -223,6 +223,8 @@ retainedNatSource moduleName observation =
         [ "{-# LANGUAGE BangPatterns, DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, ScopedTypeVariables, TypeAbstractions, TypeApplications, TypeFamilies #-}"
         , "module " ++ moduleName ++ " where"
         , "import NativeRuntimeHelpers hiding (appendVec)"
+        , "type family ConstantNat (n :: Nat) where"
+        , "  ConstantNat n = Int"
         , "entry :: IO String"
         , "entry ="
         , "  let appendVec :: forall a n m. Vec a n -> Vec a m -> Vec a (Add n m)"
@@ -239,6 +241,16 @@ retainedNatSource moduleName observation =
         , "      appendNative n m xs ys = appendVec xs ys"
         , "      appendAfterSuccessor :: foreach (n :: Nat) (m :: Nat) -> Vec Int (S n) -> Vec Int m -> Vec Int (Add (S n) m)"
         , "      appendAfterSuccessor n = appendNative @Int (S n)"
+        , "      nativeId :: foreach (n :: Nat) -> Vec Int n -> Vec Int n"
+        , "      nativeId n xs = xs"
+        , "      leftUnit :: foreach (n :: Nat) -> Vec Int (Add Z n) -> Vec Int n"
+        , "      leftUnit = nativeId"
+        , "      leftUnitAppend :: foreach (n :: Nat) (m :: Nat) -> Vec Int (Add Z n) -> Vec Int m -> Vec Int (Add n m)"
+        , "      leftUnitAppend = appendNative @Int"
+        , "      ordinaryNat :: Nat -> Int"
+        , "      ordinaryNat _ = 42"
+        , "      constantAlias :: foreach (n :: Nat) -> ConstantNat n"
+        , "      constantAlias = ordinaryNat"
         , "      nested :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a n"
         , "      nested n m xs ys = xs"
         , "      vacuousFirst :: forall a. foreach (unused :: Nat) (n :: Nat) -> Vec a n -> Vec a n"
@@ -407,6 +419,18 @@ retainedNatLibrarySource =
                , "appendNative n m xs ys = appendVec xs ys"
                , "appendAfterSuccessor :: foreach (n :: Nat) (m :: Nat) -> Vec Int (S n) -> Vec Int m -> Vec Int (Add (S n) m)"
                , "appendAfterSuccessor n = appendNative @Int (S n)"
+               , "type family ConstantNat (n :: Nat) where"
+               , "  ConstantNat n = Int"
+               , "nativeId :: foreach (n :: Nat) -> Vec Int n -> Vec Int n"
+               , "nativeId n xs = xs"
+               , "leftUnit :: foreach (n :: Nat) -> Vec Int (Add Z n) -> Vec Int n"
+               , "leftUnit = nativeId"
+               , "leftUnitAppend :: foreach (n :: Nat) (m :: Nat) -> Vec Int (Add Z n) -> Vec Int m -> Vec Int (Add n m)"
+               , "leftUnitAppend = appendNative @Int"
+               , "ordinaryNat :: Nat -> Int"
+               , "ordinaryNat _ = 42"
+               , "constantAlias :: foreach (n :: Nat) -> ConstantNat n"
+               , "constantAlias = ordinaryNat"
                ]
             ++ retainedCaseDeclarations
   where
@@ -441,7 +465,12 @@ retainedNatConsumerSource =
                , "  constructedPartial <- driveNat (\\n -> case appendAfterSuccessor n of !_ -> pure \"forced\") bottomNat"
                , "  nestedPartial <- driveNat (\\n -> case appendNative @Int (S (S n)) of !_ -> pure \"forced\") cyclicNat"
                , "  caseValues <- driveNats (\\n -> observeVec (replicateCaseNative @Int n 42))"
-               , "  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead,constructedPartial,nestedPartial] ++ caseValues)"
+               , "  normalized <- driveNats (\\n -> observeVec (leftUnit n (replicateNative @Int n 42)))"
+               , "  normalizedAppend <- driveNatPairs (\\n m -> observeVec (leftUnitAppend n m (replicateNative @Int n 42) (replicateNative @Int m 7)))"
+               , "  constants <- driveNats (\\n -> observeInt (constantAlias n))"
+               , "  constantBottom <- driveNat (\\n -> observeInt (constantAlias n)) bottomNat"
+               , "  normalizedPartial <- driveNat (\\n -> case leftUnitAppend n of !_ -> pure \"forced\") bottomNat"
+               , "  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead,constructedPartial,nestedPartial] ++ caseValues ++ normalized ++ normalizedAppend ++ constants ++ unlines [constantBottom,normalizedPartial])"
                ]
 
 -- | Run Boolean and Nat consumers against separately compiled disk artifacts.
@@ -460,34 +489,47 @@ runModuleChecks libdir = do
             , "NativeRetainedNatLibrary"
             , retainedNatLibrarySource
             , retainedNatConsumerSource
-            ,
-                [ "[]:0"
-                , "[42,42]:2"
-                , "[42,42,42]:3"
-                , "[]:0"
-                , "[7,7,7]:3"
-                , "[42,42]:2"
-                , "[42,42,7,7,7]:5"
-                , "42"
-                , "True"
-                , "forced"
-                , "[42]:1"
-                , "[42,42,42]:3"
-                , "[42,42,42,42]:4"
-                , "[42,7]:2"
-                , "[42,7,7,7,7]:5"
-                , "[42,42,42,7]:4"
-                , "[42,42,42,7,7,7,7]:7"
-                , "42"
-                , "[42,42]"
-                , "forced"
-                , "forced"
-                , "forced"
-                , "forced"
-                , "[]:0"
-                , "[42,42]:2"
-                , "[42,42,42]:3"
-                ]
+            , -- Keep the first 26 observations. Append 12 normalization observations.
+              [ "[]:0"
+              , "[42,42]:2"
+              , "[42,42,42]:3"
+              , "[]:0"
+              , "[7,7,7]:3"
+              , "[42,42]:2"
+              , "[42,42,7,7,7]:5"
+              , "42"
+              , "True"
+              , "forced"
+              , "[42]:1"
+              , "[42,42,42]:3"
+              , "[42,42,42,42]:4"
+              , "[42,7]:2"
+              , "[42,7,7,7,7]:5"
+              , "[42,42,42,7]:4"
+              , "[42,42,42,7,7,7,7]:7"
+              , "42"
+              , "[42,42]"
+              , "forced"
+              , "forced"
+              , "forced"
+              , "forced"
+              , "[]:0"
+              , "[42,42]:2"
+              , "[42,42,42]:3"
+              ]
+                ++ [ "[]:0"
+                   , "[42,42]:2"
+                   , "[42,42,42]:3"
+                   , "[]:0"
+                   , "[7,7,7]:3"
+                   , "[42,42]:2"
+                   , "[42,42,7,7,7]:5"
+                   , "42"
+                   , "42"
+                   , "42"
+                   , "42"
+                   , "forced"
+                   ]
             )
         ]
         $ \(label, moduleName, producer, consumer, expected) ->
@@ -932,6 +974,7 @@ runNatSourceChecks = do
                 Right result -> fail ("FAIL: " ++ moduleName ++ "; expected bottom, got " ++ show result)
     runNatConstructorSourceChecks
     runNatPartialSourceChecks
+    runNatNormalizationSourceChecks
     runCaseSourceChecks
 
 -- | Observe refined source cases and reject malformed dependent alternatives.
@@ -1084,6 +1127,80 @@ runNatPartialSourceChecks = do
                     | marker `isInfixOf` displayException (exception :: SomeException) -> pure ()
                     | otherwise -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
                 Right value -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show value)
+
+-- | Normalize signed retained aliases without forcing their indices or payloads.
+runNatNormalizationSourceChecks :: GHC.Ghc ()
+runNatNormalizationSourceChecks = do
+    let moduleName = "NativeSourceNatNormalization"
+        observation =
+            unlines
+                [ "do values <- driveNats (\\n -> observeVec (leftUnit n (replicateNative @Int n 42)))"
+                , "        appended <- driveNatPairs (\\n m -> observeVec (leftUnitAppend n m (replicateNative @Int n 42) (replicateNative @Int m 7)))"
+                , "        constants <- driveNats (\\n -> observeInt (constantAlias n))"
+                , "        constantBottom <- driveNat (\\n -> observeInt (constantAlias n)) bottomNat"
+                , "        partial <- driveNat (\\n -> case leftUnitAppend n of !_ -> pure \"forced\") bottomNat"
+                , "        identityPartial <- driveNat (\\n -> case leftUnit n of !_ -> pure \"forced\") bottomNat"
+                , "        cyclicPartial <- driveNat (\\n -> case leftUnitAppend n of !_ -> pure \"forced\") cyclicNat"
+                , "        latePayload <- let n = bottomNat; m = bottomNat in case leftUnitAppend n m bottomVec of !_ -> pure \"forced\""
+                , "        headOnly <- driveNat (\\n -> observeVecHead (leftUnit n (replicateNative @Int n 42))) partialNat"
+                , "        prefix <- driveNat (\\n -> observeVecPrefix (leftUnit n (replicateNative @Int n 42))) cyclicNat"
+                , "        pure (values ++ appended ++ constants ++ unlines [constantBottom,partial,identityPartial,cyclicPartial,latePayload,headOnly,prefix])"
+                ]
+    expression <- sourceEntry moduleName (retainedNatSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source retained normalization" expression
+    let expected =
+            [ "[]:0"
+            , "[42,42]:2"
+            , "[42,42,42]:3"
+            , "[]:0"
+            , "[7,7,7]:3"
+            , "[42,42]:2"
+            , "[42,42,7,7,7]:5"
+            ]
+                ++ replicate 4 "42"
+                ++ replicate 4 "forced"
+                ++ ["42", "[42,42,42,42]"]
+    unless (lines actual == expected) $
+        fail ("FAIL: source retained normalization changed runtime behavior: " ++ show actual)
+    forM_
+        [ ("NativeSourceNormalizedPayloadBottom", "driveNat (\\n -> observeVec (leftUnit n bottomVec)) Z", "native-bottom-vector")
+        , ("NativeSourceNormalizedAppendBottom", "let n = bottomNat; m = bottomNat in case leftUnitAppend n m bottomVec bottomVec of !_ -> pure \"forced\"", "native-bottom-vector")
+        , ("NativeSourceNormalizedPredecessorBottom", "driveNat (\\n -> observeVec (leftUnit n (replicateNative @Int n 42))) partialNat", "native-bottom-nat")
+        ]
+        $ \(name, body, marker) -> do
+            bottomExpression <- sourceEntry name (retainedNatSource name body)
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case outcome of
+                Left exception
+                    | marker `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right value -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show value)
+    let rightUnitName = "NativeSourceRetainedRightUnit"
+        rightUnitSource =
+            retainedNatSource rightUnitName "pure \"unused\""
+                ++ unlines
+                    [ "rightNativeId :: foreach (n :: Nat) -> Vec Int n -> Vec Int n"
+                    , "rightNativeId n xs = xs"
+                    , "rightUnit :: foreach (n :: Nat) -> Vec Int (Add n Z) -> Vec Int n"
+                    , "rightUnit = rightNativeId"
+                    ]
+    sourceModuleRejects "retained normalization keeps right unit stuck" 83865 "Add" rightUnitName rightUnitSource
+    let loopName = "NativeSourceRetainedNormalizationDepth"
+        loopSource =
+            unlines ["{-# LANGUAGE UndecidableInstances #-}", "{-# OPTIONS_GHC -freduction-depth=12 #-}"]
+                ++ retainedNatSource loopName "pure \"unused\""
+                ++ unlines
+                    [ "type family LoopNat (n :: Nat) :: Nat where"
+                    , "  LoopNat n = LoopNat n"
+                    , "loopNativeId :: foreach (n :: Nat) -> Vec Int n -> Vec Int n"
+                    , "loopNativeId n xs = xs"
+                    , "loopAlias :: foreach (n :: Nat) -> Vec Int (LoopNat n) -> Vec Int n"
+                    , "loopAlias = loopNativeId"
+                    ]
+    sourceModuleRejects "retained normalization reduction depth" 40404 "Reduction stack overflow" loopName loopSource
 
 -- | Exercise constructor naming with dependent payloads and lazy nested fields.
 runNatConstructorSourceChecks :: GHC.Ghc ()

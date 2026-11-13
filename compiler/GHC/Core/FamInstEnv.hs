@@ -39,6 +39,7 @@ import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.Compare( eqType, eqTypes )
+import GHC.Core.TyCo.Subst( substNativeIndexBndr )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
@@ -1551,14 +1552,26 @@ normalise_type ty
            ; r <- getRole
            ; let lty = substTy (lcSubstLeft lc) ty
                  rty = substTy (lcSubstRight lc) ty
-           ; if lty `eqType` ty && rty `eqType` ty
-             then return $ mkReflRedn r ty
-             else pprPanic "normalise_type: runtime index changed by lifting context"
-                    (ppr ty $$ ppr lty $$ ppr rty) }
+           ; case lty of
+               TermVarTy v' | isNativeIndexId v'
+                            , varType v' `eqType` varType v
+                            , lty `eqType` rty
+                 -> return $ mkReflRedn r lty
+               _ -> pprPanic "normalise_type: runtime index changed by lifting context"
+                      (ppr ty $$ ppr lty $$ ppr rty) }
       | otherwise
       = pprPanic "normalise_type: invalid runtime index" (ppr ty)
-    go ty@(DepFunTy {})
-      = pprPanic "normalise_type: unsupported retained function" (ppr ty)
+    go (DepFunTy v body)
+      | isNativeIndexId v
+      , typeKind body `eqType` liftedTypeKind
+      = do { LC subst env <- getLC
+           ; let (subst', v') = substNativeIndexBndr subst v
+                 lc' = LC subst' (delVarEnv env v)
+           ; redn <- withLC lc' $ normalise_type body
+           ; return $ mkDepFunRedn v' redn }
+      | otherwise
+      = pprPanic "normalise_type: invalid retained function"
+          (ppr v $$ ppr (varType v) $$ ppr body)
     go (TyConApp tc tys) = normalise_tc_app tc tys
     go ty@(LitTy {})
       = do { r <- getRole
@@ -1645,10 +1658,17 @@ its unfolding or evaluate its value. Family matching keeps an opaque index
 MaybeApart from constructor indices; see Note [Apartness of retained runtime indices]
 in GHC.Core.Unify. A family application can therefore remain stuck at this index.
 
-NormM starts with an empty lifting context. It extends that context for ordinary
-forall binders, not runtime Ids. Check that both context substitutions preserve
-the index. A nonidentity runtime substitution needs a separate transport rule.
-This case adds no retained-function congruence; DepFunTy remains unsupported.
+NormM starts with an empty lifting context. A retained binder extends its ordinary
+substitution with a scoped runtime-Id renaming. Remove the bound Id from the
+lifting environment. That environment contains erased-variable coercions, not
+runtime-Id mappings. Normalise the body in this scope, then abstract its reduction
+with mkDepFunRedn. Both context substitutions must map a runtime occurrence to the
+same valid Id with the same domain. Do not transport it to another runtime value.
+
+The binder keeps its closed domain and unrestricted multiplicity. Ordinary forall
+binders still normalise their kinds through normalise_var_bndr. Agda compares Pi
+codomains in one shared extended context. The D/DC PiCong rule supplies explicit
+evidence for this abstraction. See docs/dependent-haskell/REFERENCES.md#agda-provenance.
 -}
 
 normalise_tyvar :: TyVar -> NormM Reduction

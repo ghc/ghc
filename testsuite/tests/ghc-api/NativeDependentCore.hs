@@ -11,7 +11,7 @@ import GHC (DynFlags, getSession, getSessionDynFlags, runGhc)
 import GHC.Builtin.WiredIn.Prim (intPrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
-import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, eqCoercion, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
+import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, eqCoercion, isReflCo, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConWorkId, mkDataCon, promoteDataCon)
 import GHC.Core.Dependent
@@ -298,6 +298,97 @@ runNatChecks dflags = do
             checkType dflags (label ++ " coercion source") original (coercionLKind co)
             checkType dflags (label ++ " coercion target") expected (coercionRKind co)
             lintAccepts dflags (label ++ " coercion") [n, m] (Coercion co)
+    let checkNormalization role label scope original expected = do
+            let context = label ++ " at " ++ showSDoc dflags (ppr role)
+                Reduction co reduced = normaliseType emptyFamInstEnvs role original
+                Reduction again twice = normaliseType emptyFamInstEnvs role reduced
+                actualFree = filterVarSet isNonCoVarId (tyCoVarsOfCo co)
+                expectedFree = filterVarSet isNonCoVarId (tyCoVarsOfType original)
+            checkType dflags context expected reduced
+            checkType dflags (context ++ " source") original (coercionLKind co)
+            checkType dflags (context ++ " target") expected (coercionRKind co)
+            check (context ++ " role") (coercionRole co == role)
+            check
+                (context ++ " free runtime indices")
+                (sizeVarSet actualFree == sizeVarSet expectedFree && actualFree `subVarSet` expectedFree)
+            lintAccepts dflags (context ++ " coercion") scope (Coercion co)
+            checkType dflags (context ++ " idempotence") reduced twice
+            check (context ++ " idempotent evidence") (isReflCo again)
+            lintAccepts dflags (context ++ " idempotent coercion") scope (Coercion again)
+            pure reduced
+        nestedPi body = mkDepFunTy n (mkDepFunTy m (indexedNat body))
+        opaqueFree = setIdUnfolding m (unfolding (error "normalization forced a runtime index unfolding"))
+    -- Existing family reduction policy preserves applications at Phantom.
+    -- Ordinary forall kinds still normalize at Nominal.
+    forM_ [Nominal, Representational, Phantom] $ \role ->
+        forM_
+            [ ("retained zero addition", [m], mkDepFunTy n (indexedNat (add zeroTy index)), mkDepFunTy n (indexedNat index))
+            , ("retained successor addition", [m], mkDepFunTy n (indexedNat (add (succTy index) (TermVarTy m))), mkDepFunTy n (indexedNat (succTy (add index (TermVarTy m)))))
+            , ("retained opaque addition stays stuck", [m], mkDepFunTy n (indexedNat (add index (TermVarTy m))), mkDepFunTy n (indexedNat (add index (TermVarTy m))))
+            , ("nested retained addition", [], nestedPi (add (succTy index) (TermVarTy m)), nestedPi (succTy (add index (TermVarTy m))))
+            , ("free index unfolding stays opaque under a retained binder", [m], mkDepFunTy n (indexedNat (add (TermVarTy opaqueFree) index)), mkDepFunTy n (indexedNat (add (TermVarTy m) index)))
+            ]
+            $ \(label, scope, original, expected) ->
+                checkNormalization role label scope original (if role == Phantom then original else expected)
+    let forgetParameter = mkTyVar (mkSystemName (unique 1700) (mkTyVarOcc "ignored")) natTy
+        forgetBinders = [mkAnonTyConBinder forgetParameter]
+        forgetFamily =
+            mkFamilyTyCon
+                (mkSystemName (unique 1701) (mkTcOcc "ForgetNat"))
+                (mkTyConKind forgetBinders liftedTypeKind)
+                forgetBinders
+                0
+                liftedTypeKind
+                Nothing
+                (ClosedTypeFamilyTyCon (CTF (Just forgetAxiom)))
+                Nothing
+                NotInjective
+        forgetAxiom =
+            mkBranchedCoAxiom
+                Nominal
+                (mkSystemName (unique 1702) (mkTcOcc "ForgetNatAx"))
+                forgetFamily
+                [mkCoAxBranch [forgetParameter] [] [] [mkTyVarTy forgetParameter] intTy [Nominal] noSrcSpan]
+        forgotten = mkTyConApp forgetFamily [index]
+        erased = mkTyVar (mkSystemName (unique 1703) (mkTyVarOcc "kind_parameter")) (selected (constructorIndex trueDataCon))
+        erasedNormalized = setTyVarKind erased intTy
+    forM_ [Nominal, Representational, Phantom] $ \role -> do
+        _ <-
+            checkNormalization
+                role
+                "normalization removes retained dependence"
+                []
+                (mkDepFunTy n forgotten)
+                (if role == Phantom then mkDepFunTy n forgotten else mkFunctionType ManyTy natTy intTy)
+        checkNormalization
+            role
+            "ordinary forall kind normalizes above retained body"
+            []
+            (mkForAllTy (Bndr erased Specified) (mkDepFunTy n (indexedNat (add zeroTy index))))
+            (mkForAllTy (Bndr erasedNormalized Specified) (mkDepFunTy n (indexedNat (if role == Phantom then add zeroTy index else index))))
+    let originalShadow = mkFunctionType ManyTy (indexedNat index) (mkDepFunTy n (indexedNat (add zeroTy index)))
+        expectedShadow = mkFunctionType ManyTy (indexedNat index) (mkDepFunTy n (indexedNat index))
+    freshened <- checkNormalization Nominal "retained normalization avoids a free outer Id" [n] originalShadow expectedShadow
+    case freshened of
+        FunTy{ft_res = DepFunTy fresh body} -> do
+            check "retained normalization freshens a shadowing Id" (fresh /= n)
+            checkType dflags "retained normalization uses the fresh Id in its body" (indexedNat (TermVarTy fresh)) body
+            check "retained normalization preserves its free outer Id" (n `elemVarSet` tyCoVarsOfType freshened)
+            check "retained normalization binds the fresh Id" (not (fresh `elemVarSet` tyCoVarsOfType freshened))
+        _ -> fail "FAIL: retained normalization lost its nested binder"
+    forM_
+        [ ("type variable", mkTyVar (mkSystemName (unique 1704) (mkTyVarOcc "bad_index")) natTy)
+        , ("coercion variable", proof 1705 zeroTy zeroTy)
+        , ("linear Id", setIdMult n OneTy)
+        , ("unsupported domain", local 1706 "bad_index" intTy)
+        , ("unlifted domain", local 1707 "bad_index" intPrimTy)
+        ]
+        $ \(label, bad) ->
+            rejectsWith ("normalization rejects a retained " ++ label) "normalise_type: invalid retained function" $
+                evaluate (normaliseType emptyFamInstEnvs Nominal (DepFunTy bad intTy))
+    forM_ [("unlifted", intPrimTy), ("constraint", mkNomEqPred index index)] $ \(label, body) ->
+        rejectsWith ("normalization rejects a retained " ++ label ++ " result") "normalise_type: invalid retained function" $
+            evaluate (normaliseType emptyFamInstEnvs Nominal (DepFunTy n body))
     let captured = mkDepFunTy m (mkFunctionType ManyTy (indexedNat (TermVarTy m)) (indexedNat index))
     case Subst.substTy replace captured of
         DepFunTy fresh body -> do

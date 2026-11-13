@@ -11,7 +11,7 @@ module GHC.Core.Reduction
      mkCastRedn1, mkCastRedn2,
      mkReflRedn, mkGReflRightRedn, mkGReflRightMRedn,
      mkGReflLeftRedn, mkGReflLeftMRedn,
-     mkAppRedn, mkAppRedns, mkFunRedn,
+     mkAppRedn, mkAppRedns, mkFunRedn, mkDepFunRedn,
      mkForAllRedn, mkHomoForAllRedn, mkTyConAppRedn, mkClassPredRedn,
      mkProofIrrelRedn, mkReflCoRedn,
      homogeniseHetRedn,
@@ -35,7 +35,7 @@ import GHC.Data.Pair       ( Pair(Pair) )
 import GHC.Data.List.Infinite ( Infinite (..) )
 import qualified GHC.Data.List.Infinite as Inf
 
-import GHC.Types.Var       ( VarBndr(..), setTyVarKind )
+import GHC.Types.Var       ( Id, VarBndr(..), setTyVarKind )
 import GHC.Types.Var.Env   ( mkInScopeSet )
 import GHC.Types.Var.Set   ( TyCoVarSet )
 
@@ -355,6 +355,15 @@ mkFunRedn r af
         (mkFunCo r af w_co arg_co res_co)
         (mkFunTy   af w_ty arg_ty res_ty)
 {-# INLINE mkFunRedn #-}
+
+-- | Lift a body reduction under an unchanged retained runtime binder.
+-- The binder scopes over the complete proof. Each endpoint can independently
+-- become an ordinary arrow. See Note [Retained dependent function coercions]
+-- in GHC.Core.TyCo.Rep.
+mkDepFunRedn :: Id -> Reduction -> Reduction
+mkDepFunRedn b (Reduction co ty)
+  = mkReduction (mkDepFunCo b co) (mkDepFunTy b ty)
+{-# INLINE mkDepFunRedn #-}
 
 -- | Create a 'Reduction' associated to a Π type,
 -- from a kind 'Reduction' and a body 'Reduction'.
