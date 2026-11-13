@@ -56,6 +56,37 @@ equate separately bound runtime producers.
 Existing type variables, coercion variables, and their substitutions keep their
 current meanings. The new forms must use separate mapper and folder callbacks.
 
+## Fixed-domain retained congruence
+
+`DepFunCo b co` binds one runtime index throughout its body proof. The binder
+has an unchanged supported closed algebraic domain and `Many` multiplicity.
+If `co :: s ~r t`, then:
+
+```text
+DepFunCo b co :: mkDepFunTy b s ~r mkDepFunTy b t
+```
+
+Both body endpoints must have kind `Type`. The coercion inherits the body's
+FC role. Each endpoint independently becomes an ordinary arrow when its result
+omits `b`. The binder also scopes over intermediate proof types. Keep it even
+when both final endpoints omit the index. `mkDepFunCo` simplifies a syntactically
+reflexive body; endpoint independence alone does not remove the proof binder.
+Substitution, free variables, lifting, zonking, and tidying preserve that scope.
+
+This rule specializes D/DC's An-PiCong to an unchanged domain. Agda supplies
+the shared-context comparison precedent. See
+[the pinned provenance](REFERENCES.md#agda-provenance) and Note
+[Retained dependent function coercions] in `GHC.Core.TyCo.Rep`.
+These sources do not prove preservation for the current GHC extension.
+
+Transport a function value with a cast. Do not replace that cast with a lambda:
+eta expansion can hide a bottom function in Haskell. General Pi matching,
+normalization under retained binders, changed domains or multiplicities,
+dependent erased binder kinds, and the ordinary optimizer remain unsupported.
+`ForAllCo` still binds only erased type and coercion variables. No new selector
+or erased `InstCo` rule is added. Diagnostic interface conversion can print the
+coercion; serialization in native unfolding bodies remains gated.
+
 ## Lambda and application
 
 If a runtime lambda's body type mentions a supported runtime binder, its type is
@@ -82,9 +113,10 @@ complete supplied telescope, casts later payloads back to their expected types,
 and casts the final result to its original type. SimpleOpt and CorePrep preserve
 the proof scope. CoreToStg erases the virtual proof explicitly.
 
-Transport through a remaining dependent function type is gated because Pi
-congruence is not implemented. Eta expansion must not hide a bottom function.
-Erased binder kinds that depend on a named index are also gated. Alias proof
+Transport through a remaining retained function uses `DepFunCo` under its
+unchanged closed domain and `Many` binder. Keep the cast on the partial function
+value. Eta expansion must not hide a bottom function.
+Erased binder kinds that depend on a named index are still gated. Alias proof
 expressions have no interface codec. See Notes [Native index alias evidence]
 and [Retained constructor arguments in CorePrep] and the provenance in
 [REFERENCES.md](REFERENCES.md).
@@ -94,8 +126,8 @@ still reject a constructed retained argument. This is a conservative lowering
 gap. PMC now preserves known function heads before component normalization.
 This supports strict wildcard matching on partial retained functions, including
 an ordinary arrow with a retained codomain. It does not assume the function
-expression is evaluated. Normalization under Pi and dependent congruence remain
-separate operations. See Note [Coverage checking retained functions].
+expression is evaluated. Normalization under Pi remains separate from checked
+fixed-domain congruence. See Note [Coverage checking retained functions].
 
 The immutable matcher can bind a whole retained function type to a template
 variable. It retains the usual occurs and escape checks. Unsupported retained
@@ -223,19 +255,21 @@ and ordinary coercion argument positions.
 The boundary scanner must detect virtual algebraic proofs even when their types
 contain only constructor indices.
 
-Non-reflexive coercions over retained dependent functions require their own
-congruence rule. Existing `mkPiCo` must not turn a retained dependent binder into
-an ordinary function coercion. Reject unsupported coercion construction.
+`mkPiCo` uses `mkDepFunCo` when its proof depends on a runtime binder.
+The dependency check includes intermediate proof types. A proof independent
+of that binder can use ordinary function congruence. Reject unsupported domains
+and transport rules explicitly.
 
 ## Lowering audit for M5
 
-The source audit found these requirements for the restricted bytecode entry.
+The M5 Boolean source audit found these requirements for the restricted bytecode
+entry. Later increments add algebraic domains and fixed-domain congruence.
 
 | Function | Restricted lowering rule |
 | --- | --- |
 | `CoreToStg.Prep.cpCloneBndr` | Substitute proof types when only the Id environment changes. Cloning `b` must update every `TermVarTy b`. |
 | `Core.Opt.Arity.typeOneShots` | Count the retained Boolean as one runtime argument. Otherwise `typeArity` returns zero and Lint rejects positive arity metadata. |
-| `Core.Opt.Arity.mkEtaWW` | Allocate a fresh Boolean eta binder and substitute that exact Id into the codomain. Reject non-reflexive dependent congruence until its rule exists. |
+| `Core.Opt.Arity.mkEtaWW` | Allocate a fresh eta binder and substitute that exact Id into the codomain. Non-reflexive eta-cast handling remains gated; checked value transport uses `DepFunCo`. |
 | `CoreToStg.vars_alt` | Remove the checked virtual Boolean proof from the constructor payload. The current `filterStgBinders` retains CoVars. |
 | `Stg.Lint.lintStgAppReps` | Check native argument representations. The current `splitFunTys` stops at `DepFunTy` and skips those checks. |
 | `StgToCmm.Closure.getTyDescription` | Specify supported native profiling descriptions before enabling profiling. |
@@ -416,7 +450,7 @@ with checked reflexivity before substituting into the selected branch.
 Keep variable cases and lazy source lets. Do not inspect unfoldings to decide an
 opaque index. These rules implement dependent substitution and checked case
 refinement from [the design references](REFERENCES.md#agda-provenance). They do
-not add arbitrary expression indices, dependent congruence, or general proof
+not add arbitrary expression indices, general Pi matching, or general proof
 erasure. Run Core Lint before and after this entry. Retest the shared runtime
 index and bottom observations before claiming optimizer preservation.
 

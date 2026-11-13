@@ -24,14 +24,15 @@ Last updated: 2026-11-13.
 | Project branch | `codex/dependent-haskell` |
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
-| Native Core | Closed algebraic domains, retained application, and field-scoped Nat proofs pass the API regression |
+| Native Core | Closed algebraic domains, field-scoped Nat proofs, and fixed-domain `DepFunCo` pass the bootstrap API regression |
 | Execution | Nat/Vec and Boolean source programs pass checked bytecode lowering and separate-module machine-code execution |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
 | Configured fork version | `10.1.20261113.1`, with interface header `1001202611131`; matching libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, bare fields, and checked source `case` pass the runtime fixtures |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | M6 Pi congruence and broader case checking; M8 unfolding files and conservative lowering gaps remain open |
+| Current increment validation | Both-stage build, five registered regressions, bootstrap API/runtime, separate CLI, guide, and ordinary smoke checks pass |
+| Next task | General Pi matching and normalization, broader case checking, native coercion unfolding codecs, and conservative lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -618,8 +619,8 @@ directions passed. The exact guide example and ordinary optimized TH, GHCi,
 package, and Haddock smoke passed. All scopes disabled swap. The CLI, guide,
 and ordinary smoke scope peaked at 162 MiB under 4 GiB.
 
-Remaining dependent-function congruence and dependent erased binder kinds are
-gated. The `lazy`/`noinline`/`nospec` stripping path can bypass preprocessing
+At this checkpoint, dependent-function congruence and dependent erased binder
+kinds were gated. The `lazy`/`noinline`/`nospec` stripping path can bypass preprocessing
 and still reject a constructed retained argument. Known partial-function heads
 now pass PMC as described below. Source `case` refinement and native unfolding
 files remain open.
@@ -646,13 +647,13 @@ PMC preserves a known function head without rewriting its domain and codomain.
 The immutable matcher can bind a whole retained type to a template variable
 under its usual scope and occurs checks. Unsupported comparisons produce
 `MaybeApart MARRetainedFunction`. Alpha-equivalent retained types without free
-TyCoVars can compare reflexively. Pi congruence and general matching under a
-retained binder remain open. See [the Agda WHNF provenance](REFERENCES.md) and Notes
+TyCoVars can compare reflexively. At this checkpoint, Pi congruence and general
+matching under a retained binder were open. See [the Agda WHNF provenance](REFERENCES.md) and Notes
 [Coverage checking retained functions] and [Matching retained function types].
 
 The new source checks preserve possible function inhabitation. They do not
-assume a function expression is evaluated. Constructed partial applications such
-as `appendNative (S n)` still report the CorePrep result-congruence restriction.
+assume a function expression is evaluated. At this checkpoint, constructed partial
+applications such as `appendNative (S n)` reported the CorePrep result-congruence restriction.
 The former PMC and immutable-matcher panics no longer obscure that boundary.
 
 The both-stage build passed in 9m21s, peaking at 6,804 MiB under 16 GiB. All five
@@ -693,8 +694,8 @@ branches, bare fields, unrestricted captures, and a lifted checked result.
 Parentheses are accepted.
 Unsupported clause shapes and quotations report located GHC-83605. Incorrect
 vector lengths use the existing type mismatch. Ordinary cases keep their
-existing checker. General inference, guards, defaults, nested patterns, and
-Pi congruence remain open.
+existing checker. General inference, guards, defaults, and nested patterns remain
+open. This checkpoint preceded fixed-domain retained congruence.
 
 The bootstrap Core and runtime checks pass. The new source matrix checks
 recursive vectors, captured Boolean payloads, direct index substitution, field
@@ -712,8 +713,9 @@ driver itself took eight seconds. Both scopes disabled swap.
 Separate CLI processes passed the 24-observation interface-only consumer.
 Four additional machine-code observations check function-result strictness and
 payload laziness. An unsupported constructor field reports GHC-83605 at its
-source location. The previous empty-case diagnostic, constructed partial-result
-restriction, and both interface format-rejection directions still pass.
+source location. At this checkpoint, the previous empty-case diagnostic,
+constructed partial-result restriction, and both interface format-rejection
+directions passed.
 The updated guide example compiles with Core and STG Lint. Ordinary optimized
 Template Haskell, package, GHCi, and Haddock smoke checks pass. The guide and
 ordinary smoke scope peaked at 149 MiB under 4 GiB, with swap disabled.
@@ -727,6 +729,60 @@ existing fixtures passed canonical Fourmolu, and cabal-gild passed.
 Logs use `native-case` in `_build/verification/`. Generated bootstrap artifacts
 are retained with hashes in `native-case-bootstrap-work/` under that directory.
 The signature format is unchanged.
+
+## Fixed-domain retained congruence
+
+On 2026-11-13, `DepFunCo` adds checked coercion transport under an unchanged
+closed algebraic domain and `Many` runtime binder. The binder scopes over the
+whole proof, including intermediate types absent from the final endpoints.
+Each endpoint independently canonicalizes a vacuous retained binder to an
+ordinary arrow. See [the Core rule](CORE.md#fixed-domain-retained-congruence)
+and [the Agda and D/DC provenance](REFERENCES.md#agda-provenance).
+
+A complete signature can now check a definition with one source pattern and
+a remaining retained function result:
+
+```haskell
+appendAfterSuccessor :: foreach (n :: Nat) (m :: Nat)
+                     -> Vec Int (S n) -> Vec Int m -> Vec Int (Add (S n) m)
+appendAfterSuccessor n = appendNative @Int (S n)
+```
+
+Later applications preserve the actual runtime indices and indexed payloads.
+Unsigned let aliases still report located GHC-83605 and require a complete
+signature. This increment does not enable retained inference.
+
+Bootstrap kernel and runtime checks pass. The kernel covers roles, endpoints,
+scope, capture avoidance, one-sided endpoint dependence, proof-only dependence,
+and malformed binders or result kinds. Runtime checks apply saved Core partial
+functions to IORef inputs zero, two, and three. They check function WHNF,
+bottom and cyclic indices, and delayed payload evaluation. The source definition
+above and its later applications pass. The bootstrap interface-only consumer
+now checks 26 observations. The logs are `native-pico-api-v2.log` and
+`native-pico-runtime-v2.log` in `_build/verification/`.
+
+The both-stage build passed in 17m14s at 7,442 MiB under 16 GiB. All five
+registered normal-way regressions passed: 39 cases, 34 skipped, no unexpected
+results or framework warnings. The test command took 1m36s, including helper
+builds, at 2,531 MiB under 8 GiB. The test driver took eight seconds.
+
+Separate CLI processes passed the 26-observation interface-only consumer,
+eight constructed partial/application observations, and nine standalone
+observations. Four additional observations check function-result strictness and
+payload laziness. Located GHC-83605, the empty-case diagnostic, both interface
+format-rejection directions, the exact guide example, and ordinary optimized
+Template Haskell, package, GHCi, and Haddock smoke checks passed. The serial
+CLI, guide, and smoke scopes peaked at 146 MiB under 4 GiB. All scopes disabled
+swap. Compiler sources passed nonmutating Fourmolu parses. Both fixtures passed
+canonical Fourmolu, and cabal-gild passed.
+
+Logs use `native-pico` in `_build/verification/`. Bootstrap-generated files and
+their hashes are retained in `native-pico-bootstrap-work/` there.
+The signature format is unchanged. Native coercion
+serialization in unfolding bodies, general Pi matching and normalization,
+heterogeneous domains, changed multiplicities, and the ordinary optimizer remain
+open. Non-reflexive eta-cast handling also remains gated. Value casts preserve
+Haskell forcing behavior; no function eta law is assumed.
 
 ## Verified baseline
 

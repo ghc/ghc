@@ -199,8 +199,36 @@ PMC now recognizes a known retained function head without rewriting its domain
 and codomain. It also preserves an ordinary function head that contains a
 retained type. The immutable matcher handles whole-type templates with its
 existing scope checks and a retained-aware occurs check. Unsupported retained
-comparisons remain `MaybeApart`; this is not Pi congruence. Source regressions
-check strict partial applications and located incomplete empty-case diagnostics.
+comparisons remain `MaybeApart`; this matcher does not construct Pi congruence.
+Source regressions check strict partial applications and located incomplete
+empty-case diagnostics.
+
+The fixed-domain congruence increment adds `DepFunCo Id Coercion`. It binds one
+shared `Many` runtime index under an unchanged supported closed domain. Both
+body endpoints have kind `Type`. The proof inherits its body's FC role and keeps
+the binder scoped through intermediate proof types. Each endpoint separately
+canonicalizes a vacuous binder to an ordinary arrow. Keep value casts instead
+of eta-expanding a partial function. See
+[the Core rule](CORE.md#fixed-domain-retained-congruence) and
+[the Agda and D/DC provenance](REFERENCES.md#agda-provenance).
+
+- [x] Add binder-aware coercion substitution, lifting, free variables, zonking,
+      tidying, and Lint checks. Preserve proof-only index dependencies.
+- [x] Transport constructed arguments through a remaining fixed-domain retained
+      function result in CorePrep. Preserve function WHNF and delayed payloads.
+- [x] Check signed source `appendAfterSuccessor n = appendNative @Int (S n)`
+      with one source pattern, then apply its remaining arguments.
+- [x] Pass bootstrap kernel and runtime regressions. The interface-only consumer
+      checks 26 observations. Unsigned aliases still report located GHC-83605.
+- [x] Complete both-stage, registered regression, and separate CLI verification.
+      Five registered regressions pass. Separate CLI checks cover 26 interface
+      observations, eight partial/application observations, and nine standalone
+      observations. Strictness, diagnostics, format rejection, guide, and ordinary
+      compiler smoke checks pass. See the [checkpoint](README.md#fixed-domain-retained-congruence).
+
+General Pi matching and normalization, changed domains or multiplicities,
+dependent erased binder kinds, and native coercion unfolding serialization
+remain gated. Non-reflexive eta-cast handling also remains unsupported.
 
 The audit found separate blockers in the full simplifier. Its type substitution
 can omit runtime Id mappings. Its case reconstruction treats virtual proofs as
@@ -483,7 +511,7 @@ pattern. See [the Agda Nat/Vec references](REFERENCES.md#agda-provenance).
 - [x] Transport constructor-tree arguments with fields through CorePrep naming.
       Keep later payload types and the final result at the original index.
       Preserve proof scope and laziness. Check prepared Core and STG. Keep
-      unsupported dependent congruence and expression codecs gated.
+      changed-domain congruence and unsupported expression codecs gated.
 
 Gate: a source program reads runtime lengths, constructs and appends vectors,
 and consumes the statically indexed results. Check empty and successor inputs.
@@ -500,11 +528,11 @@ Resolve these preservation rules in the implementation:
   Exclude existential, constrained, newtype, and unboxed index constructors in
   this increment. Do not give the user-defined `Nat` a wired compiler identity.
 - Introduce the complete retained telescope before transporting an equation's
-  ordinary argument and result types. Splitting the first index must not require
-  the unsupported congruence for a remaining dependent function type.
-  Variable equations now handle the complete telescope. Constructor equations
-  still split one leading retained index. Transport across a remaining dependent
-  function remains a named unsupported operation.
+  ordinary argument and result types. Variable equations walk their supplied
+  patterns and may leave a retained function result. Constructor equations still
+  split one leading retained index. Transport across a remaining retained
+  function now uses `DepFunCo` under its unchanged closed domain and `Many`
+  binder. Changed domains and dependent erased binder kinds remain unsupported.
 - Give GADT instantiation an explicit runtime-index scope rule. The current
   metavariable guards are intentional. Removing them without a scope check can
   let a predecessor escape. Evaluate expected-result constructor instantiation
@@ -518,12 +546,14 @@ Resolve these preservation rules in the implementation:
   fields recursively and composes their proofs. It transports later payloads
   and the result across the supplied telescope. CorePrep preserves proof scope,
   and CoreToStg erases the virtual proof explicitly. A result-only cast is
-  insufficient. Remaining dependent-function congruence stays gated.
+  insufficient. A remaining fixed-domain retained function now uses `DepFunCo`.
+  Preserve a cast on the partial function value; eta expansion can hide bottom.
   The `lazy`/`noinline`/`nospec` stripping path can still bypass preprocessing.
   Known partial-function heads now pass PMC without component rewriting.
   Source tests require a located incomplete-pattern diagnostic for an empty
-  match on such a function. Constructed partial results still reach the named
-  CorePrep congruence restriction. Do not catch panics or disable PMC in tests.
+  match on such a function. Check saved constructed partial results at unknown,
+  bottom, and cyclic indices, then apply their later payloads. Do not catch
+  panics or disable PMC in tests.
   The Agda let and dependent ANF references describe the preservation problem;
   they do not prove this proposed FC rule or its Haskell strictness behavior.
 - Preserve partial and cyclic Haskell values. Check finite vector prefixes for
@@ -564,7 +594,9 @@ some values and laziness cases. Restricted source `keep`, constructor equations,
 and their composition now execute through bytecode and machine-code module
 compilation. Expected-type-directed source `case` refinement now reuses the
 constructor rule. Ordinary optimization, broader case refinement, and native
-unfolding serialization remain open. Restricted native signature interfaces
+coercion unfolding serialization remain open. Fixed-domain retained congruence
+passes the bootstrap kernel and runtime checks; its broader verification is
+pending. Restricted native signature interfaces
 and interface-only consumers pass as described in M8.
 
 ## Further work

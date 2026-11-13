@@ -226,8 +226,8 @@ normalizes the domain and codomain.
 The PMC increment uses this distinction. A known retained function head does
 not need component rewriting to classify the scrutinee as a function. An
 ordinary arrow that contains a retained type has the same outer-shape property.
-The rule preserves that head before the ordinary solver would require missing
-Pi congruence. GHC's immutable matcher also returns a conservative `MaybeApart`
+The rule preserves that head before the ordinary solver would require rewriting
+under retained binders. GHC's immutable matcher also returns a conservative `MaybeApart`
 for unsupported retained-function comparisons when it filters COMPLETE sets.
 This is a GHC implementation policy. It does not claim Agda uses this matcher.
 Whole-type template substitution retains the existing escape and occurs checks.
@@ -236,7 +236,42 @@ Agda's head-reduction rule does not prove Haskell inhabitation or evaluation
 behavior. A Haskell lambda can inhabit a function type whose result has no
 constructors. A function expression can still be bottom. Coverage checking must
 retain possible inhabitation, and a strict wildcard must retain its forcing.
-This increment adds no dependent congruence or Tc metavariable assignment.
+The coverage-checking rule adds no dependent congruence or Tc metavariable assignment.
+
+Agda v2.8.0 compares
+[Pi domains before their codomains](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L747-L754).
+[`compareDom`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L849)
+checks modalities and the domain, then extends one shared context for the body.
+This is type equality. The separate
+[function-term equality rule](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L437-L442)
+uses extensional comparison and supplies no Haskell eta law.
+
+D/DC's An-PiCong rule supplies the explicit coercion precedent. See Figure 8,
+page 31:16 of
+[A Specification for Dependent Types in Haskell](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf#page=16)
+and the
+[pinned Ott rule](https://github.com/sweirich/corespec/blob/ee2d477fb26f3d0155be438a93a2c1427511cb24/spec/ett.ott#L1304-L1311).
+The artifact includes later eta work; this citation names the Pi congruence rule.
+Equal domains specialize its domain-cast substitution to identity.
+
+`DepFunCo` uses that specialization: one shared unrestricted runtime binder,
+one unchanged supported closed domain, and a checked body coercion. Both result
+endpoints have kind `Type`. The coercion inherits its body's FC role, as ordinary
+function congruence does. Agda supplies the shared-context precedent; the role
+rule is the GHC adaptation. Keep the runtime binder scoped through the proof,
+including intermediate types that no longer occur in the final endpoints.
+Each endpoint separately canonicalizes an unused binder to an ordinary arrow.
+See Note [Retained dependent function coercions] in `GHC.Core.TyCo.Rep`.
+
+Preserve a cast on the function value. Replacing it with a lambda can hide a
+bottom function in Haskell. The
+[PiSnd](https://github.com/sweirich/corespec/blob/ee2d477fb26f3d0155be438a93a2c1427511cb24/spec/ett.ott#L1340-L1345)
+and [Push](https://github.com/sweirich/corespec/blob/ee2d477fb26f3d0155be438a93a2c1427511cb24/spec/ett.ott#L1517-L1522)
+rules also identify the obligation to instantiate an application with its actual
+index. The fixed-domain increment adds no erased-forall projection or `InstCo`
+rule. Changed domains, multiplicities, and native unfolding serialization remain
+separate work. Diagnostic interface conversion must print the new proof before
+the binary writer rejects unsupported serialization.
 
 Agda's [dependent case combinator](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/with-abstraction.lagda.rst#L710-L741)
 checks a pattern function against an explicit motive and applies it to the
@@ -277,8 +312,8 @@ It composes equalities for nested constructor fields and transports later
 payloads as well as the result. It emits cases only for constructor WHNF.
 This rule is a GHC design choice. It is not copied from Agda's let elimination.
 The tests check lazy and cyclic Haskell values separately. They do not establish
-a general preservation theorem. Remaining dependent-function congruence and
-alias-expression serialization stay gated.
+a general preservation theorem. General Pi normalization, changed-domain
+congruence, and alias-expression serialization stay gated.
 
 [Koronkevich, Rakow, Ahmed, and Bowman, *ANF preserves dependent types up to
 extensional equality*](https://doi.org/10.1017/S0956796822000090), JFP 32, e12

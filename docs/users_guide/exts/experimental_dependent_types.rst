@@ -49,7 +49,7 @@ result type. A consumer can therefore receive the selected value::
 
 The domain can also be a user-defined closed algebraic type::
 
-    {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeFamilies #-}
+    {-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeApplications, TypeFamilies #-}
 
     data Nat = Z | S Nat
 
@@ -76,6 +76,10 @@ The domain can also be a user-defined closed algebraic type::
                  -> Vec a n -> Vec a m -> Vec a (Add n m)
     appendNative n m xs ys = appendVec xs ys
 
+    appendAfterSuccessor :: foreach (n :: Nat) (m :: Nat)
+                         -> Vec Int (S n) -> Vec Int m -> Vec Int (Add (S n) m)
+    appendAfterSuccessor n = appendNative @Int (S n)
+
     appendVec :: Vec a n -> Vec a m -> Vec a (Add n m)
     appendVec VNil ys = ys
     appendVec (VCons x xs) ys = VCons x (appendVec xs ys)
@@ -91,7 +95,11 @@ newtypes, existential or constrained constructors, unboxed fields, and
 constructor wrappers remain unsupported.
 
 One variable equation can bind the complete retained telescope and match an
-ordinary GADT payload, as in ``headNative``. Constructor equations split one
+ordinary GADT payload, as in ``headNative``. An equation with a complete signature
+can also stop before the remaining retained arguments, as in
+``appendAfterSuccessor``.
+Unsigned aliases of retained functions still require a complete signature and
+report GHC-83605. Constructor equations split one
 leading retained index. They require one unguarded equation per constructor.
 Constructor fields and later arguments require bare variable patterns and
 unrestricted multiplicities. The result must have lifted kind, and the outer
@@ -116,10 +124,13 @@ remain lazy until the selected branch uses them.
 Calls can pass constructor arguments with fields, including ``S n`` and
 ``S (S n)``. These calls do not force ``n`` to check its index. CorePrep checks
 transport of later payloads and the result when it names a constructor argument.
-Transport through a result that still contains a dependent function type remains
-unsupported. A partial application with a constructed retained argument reports
-the named CorePrep restriction. Strict wildcard matching on a partial function
-with named indices preserves ordinary forcing behavior. It does not force an
+Transport through a remaining retained function is supported when its closed
+algebraic domain and unrestricted multiplicity stay unchanged. This includes
+partial applications such as ``appendNative @Int (S n)``. Later applications
+retain the original index relationships. General Pi matching and normalization,
+changed domains or multiplicities, and dependent erased binder kinds remain
+unsupported. Strict wildcard matching on a partial function with named indices
+preserves ordinary forcing behavior. It does not force an
 unused index or the function body. An empty match on a function type remains
 non-exhaustive. Producers and consumers that use local names must use the same
 named index. The checker does not equate a name with its definition.
