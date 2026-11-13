@@ -63,7 +63,7 @@ import GHC.Core ( Expr(Var) )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy) )
 import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, splitTyConApp_maybe
                      , anyFreeVarsOfType, mkDepFunTy, typeKind )
-import GHC.Core.Coercion ( mkCoVarCo, mkSymCo, coercionKind )
+import GHC.Core.Coercion ( mkCoVarCo, mkSymCo, mkSubCo, coercionKind )
 import GHC.Core.DataCon ( DataCon, dataConName, dataConOrigArgTys, dataConTyCon, promoteDataCon )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
@@ -84,9 +84,10 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Id
-import GHC.Types.Var ( varType, isCoVar )
+import GHC.Types.Var ( EvVar, varType, isCoVar )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity )
+import GHC.Data.Bag ( listToBag, unionBags )
 import GHC.Data.FastString ( fsLit )
 import GHC.Data.Pair ( pSnd )
 import GHC.Data.Maybe ( catMaybes, fromMaybe )
@@ -97,6 +98,7 @@ import Data.Data ( Data, cast, gmapQ, gmapT )
 import Control.Monad
 import Control.Arrow ( second )
 import Data.Foldable (toList)
+import Data.List (zipWith4)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (mapMaybe)
 
@@ -148,18 +150,20 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
                               [L _ (Match { m_pats = L _ pats })]
                                 | not (first_constructor pats) ->
                                   tcRetainedVarMatches herald ctxt ty
-                                    (filter isVisArgLPat pats) tc_matches
+                                    (filter isVisArgLPat pats) $ \pat_tys rhs_ty boundary ->
+                                      tcScalingUsage mult $
+                                        tcMatches mctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty
+                                          (case boundary of
+                                             Nothing -> matches
+                                             Just prefix -> splitRetainedContext prefix matches)
                               _ | DepFunTy binder _ <- coreFullView ty ->
                                   do { let domain = varType binder
                                      ; index <- newSysLocalId (fsLit "retained") ManyTy domain
                                      ; let body_ty = applyTypeToArgs ty [Var index]
-                                     ; (wrap, result) <- matchExpectedFunTys herald ctxt (arity - 1)
-                                           (mkCheckExpType body_ty) $ \pat_tys rhs_ty ->
-                                             tcScalingUsage mult $
-                                               tcRetainedConMatches index invis_pat_tys pat_tys rhs_ty matches
-                                     ; unless (isIdHsWrapper wrap) $
-                                         failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
-                                     ; return result }
+                                     ; (pat_tys, dictionaries, rhs_ty) <-
+                                         tcRetainedConArgs herald ctxt (arity - 1) body_ty
+                                     ; tcScalingUsage mult $
+                                         tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty matches }
                                 | otherwise -> failWithTc $
                                     TcRnRetainedQuantificationError RetainedConstructorCoverage
                           ; return (idHsWrapper, result) }
@@ -214,7 +218,7 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
                                                   , m_pats = L pats_loc (pats ++ extra) })
                     matches' = matches { mg_alts = L loc (map add_arguments (zip alternatives constructors)) }
                     arg_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . generalize . varType) captures
-              ; checked <- tcRetainedConMatches fresh_index [] arg_tys
+              ; checked <- tcRetainedConMatches fresh_index [] arg_tys (map (const Nothing) arg_tys)
                              (mkCheckExpType (generalize result_ty)) matches'
               ; mapM_ (tcEmitBindingUsage . singleUsageUE) captures
               ; let fun = HsLam noAnn LamSingle checked
@@ -325,10 +329,17 @@ separate work. No equality comes from a local definition or an unfolding.
 -- | Introduce runtime index identities before checking the remaining patterns.
 tcRetainedVarMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> Type
                      -> [LPat GhcRn]
-                     -> ([ExpPatType] -> ExpRhoType -> TcM a) -> TcM a
-tcRetainedVarMatches herald ctxt = go []
+                     -> ([ExpPatType] -> ExpRhoType -> Maybe Int -> TcM a) -> TcM a
+tcRetainedVarMatches herald ctxt initial_ty initial_pats = go [] initial_ty initial_pats
   where
-    go acc ty [] thing_inside = thing_inside (reverse acc) (mkCheckExpType ty)
+    go acc ty pats thing_inside
+      | (theta, _) <- tcSplitPhiTy ty, not (null theta)
+      = do { let prefix = length (filter isVisibleExpPatType acc)
+           ; strict <- xoptM LangExt.Strict
+           ; unless (null pats || (not strict && all nonforcing_pattern (take prefix initial_pats))) $
+               failWithTc (TcRnRetainedQuantificationError RetainedContextPattern)
+           ; thing_inside (reverse acc) (mkCheckExpType ty) (Just prefix) }
+    go acc ty [] thing_inside = thing_inside (reverse acc) (mkCheckExpType ty) Nothing
     go acc ty (pat : pats) thing_inside
       | DepFunTy binder _ <- coreFullView ty
       = setSrcSpanA (getLoc pat) $
@@ -338,11 +349,75 @@ tcRetainedVarMatches herald ctxt = go []
            ; let index = mkLocalId name ManyTy (varType binder)
                  pat_ty = mkCheckExpFunPatTy (Scaled ManyTy (varType binder))
            ; go (pat_ty : acc) (applyTypeToArgs ty [Var index]) pats thing_inside }
+      | FunTy{} <- coreFullView ty
+      = do { (co, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing (length initial_pats, initial_ty) ty
+           ; unless (isIdHsWrapper (mkWpCastN co)) $
+               failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
+           ; go (mkCheckExpFunPatTy arg_ty : acc) rhs_ty pats thing_inside }
       | otherwise
       = do { (wrap, result) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $
                \pat_tys rhs_ty ->
                  do { rhs_ty <- readExpType rhs_ty
                     ; go (reverse pat_tys ++ acc) rhs_ty pats thing_inside }
+           ; unless (isIdHsWrapper wrap) $
+               failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
+           ; return result }
+
+    nonforcing_pattern (L _ pat) = case pat of
+      VarPat{} -> True
+      WildPat{} -> True
+      LazyPat{} -> True
+      ParPat _ inner -> nonforcing_pattern inner
+      AsPat _ _ inner -> nonforcing_pattern inner
+      SigPat _ inner _ -> nonforcing_pattern inner
+      _ -> False
+
+-- | Check a constrained suffix as an expression inside its retained prefix.
+-- Keep its guards and local bindings inside the evidence lambdas.
+splitRetainedContext :: Int -> MatchGroup GhcRn (LHsExpr GhcRn)
+                     -> MatchGroup GhcRn (LHsExpr GhcRn)
+splitRetainedContext prefix group@(MG { mg_alts = L loc [L match_loc match]
+                                     , mg_ext = ext })
+  = group { mg_alts = L loc [L match_loc outer] }
+  where
+    Match { m_pats = L pats_loc pats } = match
+    (before, after) = split_prefix prefix pats
+    inner = match { m_ctxt = LamAlt LamSingle, m_pats = L pats_loc after }
+    lambda = L match_loc (HsLam noAnn LamSingle
+               (MG { mg_alts = L loc [L match_loc inner], mg_ext = ext }))
+    outer = match { m_pats = L pats_loc before
+                  , m_grhss = unguardedGRHSs (locA match_loc) lambda noAnn }
+
+    split_prefix 0 ps = ([], ps)
+    split_prefix n (pat : ps)
+      = let (before, after) = split_prefix (if isVisArgLPat pat then n-1 else n) ps
+        in (pat : before, after)
+    split_prefix n [] = pprPanic "splitRetainedContext: missing prefix" (ppr n)
+splitRetainedContext _ _ = panic "splitRetainedContext: multiple equations"
+
+-- | Collect dictionaries at their telescope positions without counting them as values.
+tcRetainedConArgs :: ExpectedFunTyCtxt -> UserTypeCtxt -> Int -> Type
+                  -> TcM ([ExpPatType], [Maybe EvVar], ExpRhoType)
+tcRetainedConArgs herald ctxt = go [] []
+  where
+    go acc dictionaries n ty
+      | (theta, tau) <- tcSplitPhiTy ty, not (null theta)
+      = do { givens <- newEvVars theta
+           ; let pat_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . varType) givens
+           ; go (reverse pat_tys ++ acc) (reverse (map Just givens) ++ dictionaries) n tau }
+      | n == 0
+      = return (reverse acc, reverse dictionaries, mkCheckExpType ty)
+      | FunTy{} <- coreFullView ty
+      = do { (co, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing (n, ty) ty
+           ; unless (isIdHsWrapper (mkWpCastN co)) $
+               failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
+           ; go (mkCheckExpFunPatTy arg_ty : acc) (Nothing : dictionaries) (n-1) rhs_ty }
+      | otherwise
+      = do { (wrap, result) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $
+               \pat_tys rhs_ty ->
+                 do { rhs_ty <- readExpType rhs_ty
+                    ; go (reverse pat_tys ++ acc)
+                         (map (const Nothing) pat_tys ++ dictionaries) (n-1) rhs_ty }
            ; unless (isIdHsWrapper wrap) $
                failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
            ; return result }
@@ -355,6 +430,25 @@ pattern list only after these identities have been chosen. tcPatBndr and
 selectMatchVar preserve their Unique values. Outer erased forall binders keep
 their ordinary skolemisation and wrapper; do not lift a nonidentity wrapper
 through a retained binder.
+
+A context after a retained binder must use these actual runtime identities.
+For a single variable-prefix equation, stop at the first context. Keep the
+remaining source patterns, guards, and local bindings in a generated HsLam.
+The ordinary expression checker introduces the context before it checks this
+whole suffix. Moving only the final RHS expression would leave its guards,
+view patterns, and local bindings outside the Givens. An empty suffix still
+uses this rule: its zero-pattern match adds no value lambda. Require
+nonforcing patterns in the prefix when value patterns remain. This split must
+not force a prefix pattern before an omitted suffix argument. Strict makes the
+retained variable pattern forcing, so reject that case too. With no remaining
+value patterns, the split moves no value lambda. Preserve the old prefix shapes
+in that case. This does not enable inner retained lambdas.
+
+Use matchActualFunTy to consume a known ordinary arrow without skolemising its
+result. matchExpectedFunTys skolemises a following context even after its last
+requested value argument. That wrapper cannot move across a retained binder.
+Keep the following context for the next telescope step instead. Require the
+argument representation coercion to be reflexive, as on the existing path.
 
 mkDepFunTy turns an unused binder into an ordinary arrow. A retained telescope
 can therefore contain both FunTy and DepFunTy. Walk both forms in source order.
@@ -387,10 +481,10 @@ retainedCon _ _ = return Nothing
 
 -- | Check exhaustive constructor equations with argument and result transport.
 -- See Note [Retained constructor matches].
-tcRetainedConMatches :: Id -> [ExpPatType] -> [ExpPatType] -> ExpRhoType
+tcRetainedConMatches :: Id -> [ExpPatType] -> [ExpPatType] -> [Maybe EvVar] -> ExpRhoType
                     -> MatchGroup GhcRn (LHsExpr GhcRn)
                     -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
-tcRetainedConMatches index invis_pat_tys pat_tys rhs_ty
+tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty
                     (MG { mg_alts = L loc matches, mg_ext = (origin, _) })
   = setSrcSpanA loc $
     do { constructors <- mapM constructor matches
@@ -427,26 +521,44 @@ tcRetainedConMatches index invis_pat_tys pat_tys rhs_ty
            ; return scaled }
     argument_type _ = argument_error
 
-    check_match (con, fields) arg_tys result_ty match@(L match_loc (Match { m_pats = L _ pats }))
+    check_match (con, fields) arg_tys result_ty (L match_loc match@(Match { m_pats = L _ pats }))
       = setSrcSpanA match_loc $
         do { unless (all bare_variable (drop 1 (filter isVisArgLPat pats))) argument_error
            ; let constructor_index = mkTyConApp (promoteDataCon con) (map TermVarTy fields)
            ; cv <- newEvVar (mkNomEqPred (TermVarTy index) constructor_index)
            ; arg_cos <- mapM (tcRetainedCoercion index (mkCoVarCo cv) . scaledThing) arg_tys
            ; result_co <- tcRetainedCoercion index (mkCoVarCo cv) result_ty
-           ; let refined_args = zipWith (\(Scaled mult _) co ->
-                                           mkCheckExpFunPatTy (Scaled mult (pSnd (coercionKind co))))
-                                       arg_tys arg_cos
+           ; let dictionary_cos = [(dict, co) | (Just dict, co) <- zip dictionaries arg_cos]
+           ; refined_givens <- newEvVars (map (pSnd . coercionKind . snd) dictionary_cos)
+           ; let refined_args = zipWith3 (\dictionary (Scaled mult ty) co ->
+                                   mkCheckExpFunPatTy (Scaled mult (case dictionary of
+                                     Just _ -> ty
+                                     Nothing -> pSnd (coercionKind co))))
+                                 dictionaries arg_tys arg_cos
                  index_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType index))
-           ; L checked_loc checked <- tcMatch tcBody (invis_pat_tys ++ index_arg : refined_args)
-                                        (mkCheckExpType (pSnd (coercionKind result_co))) match
+                 match' = match { m_pats = fmap (insert_dictionaries dictionaries) (m_pats match) }
+                 check = tcMatch tcBody (invis_pat_tys ++ index_arg : refined_args)
+                           (mkCheckExpType (pSnd (coercionKind result_co))) (L match_loc match')
+           ; (ev_binds, L checked_loc checked) <- if null refined_givens
+               then do { checked <- check; return (emptyTcEvBinds, checked) }
+               else checkConstraints (PatSkol (RealDataCon con) (m_ctxt match)) [] refined_givens check
+           ; let given_binds = zipWith (\given (dict, co) ->
+                                   mkGivenEvBind given (evCast (Var dict) (mkSubCo co)))
+                                 refined_givens dictionary_cos
+           ; branch_binds <- case ev_binds of
+               TcEvBinds binds -> do { mapM_ (addTcEvBind binds) given_binds
+                                     ; return ev_binds }
+               EvBinds binds -> return (EvBinds (listToBag given_binds `unionBags` binds))
            ; let Match { m_pats = L pats_loc checked_pats, m_grhss = grhss } = checked
                  checked_pats' = case checked_pats of
                    L first_loc first : rest ->
                      L first_loc (AsPat noExtField (noLocA index)
-                                    (L first_loc (add_proof cv first)))
-                     : zipWith3 (\co (Scaled _ ty) (L pat_loc pat) ->
-                                   L pat_loc (XPat (CoPat (mkWpCastN co) pat ty))) arg_cos arg_tys rest
+                                    (L first_loc (add_proof cv branch_binds first)))
+                     : zipWith4 (\dictionary co (Scaled _ ty) (L pat_loc pat) ->
+                                   case dictionary of
+                                     Just _ -> L pat_loc pat
+                                     Nothing -> L pat_loc (XPat (CoPat (mkWpCastN co) pat ty)))
+                                dictionaries arg_cos arg_tys rest
                    [] -> panic "tcRetainedConMatches: no constructor pattern"
                  cast_rhs (L rhs_loc (GRHS x guards rhs)) =
                    L rhs_loc (GRHS x guards (mkLHsWrapCo (mkSymCo result_co) rhs))
@@ -454,14 +566,33 @@ tcRetainedConMatches index invis_pat_tys pat_tys rhs_ty
            ; return (L checked_loc (checked { m_pats = L pats_loc checked_pats'
                                           , m_grhss = grhss' })) }
 
+    insert_dictionaries ds = before_index
+      where
+        before_index (pat : pats)
+          | isVisArgLPat pat = pat : insert ds pats
+          | otherwise = pat : before_index pats
+        before_index [] = panic "tcRetainedConMatches: missing source index"
+
+        insert [] pats = pats
+        insert (Just dict : rest) pats
+          = noLocA (VarPat noExtField (noLocA (idName dict))) : insert rest pats
+        insert ds@(Nothing : rest) (pat : pats)
+          | isVisArgLPat pat = pat : insert rest pats
+          | otherwise = pat : insert ds pats
+        insert _ [] = panic "tcRetainedConMatches: missing source argument"
+
     bare_variable (L _ VarPat{}) = True
     bare_variable _ = False
 
-    add_proof cv (ParPat x (L pat_loc pat)) = ParPat x (L pat_loc (add_proof cv pat))
-    add_proof cv pat@(ConPat { pat_con_ext = ext })
-      = assertPpr (null (cpt_dicts ext) && null (cpt_tvs ext)) (ppr pat) $
-        pat { pat_con_ext = ext { cpt_dicts = [cv] } }
-    add_proof _ pat = pprPanic "tcRetainedConMatches: not a data constructor" (ppr pat)
+    add_proof cv binds (ParPat x (L pat_loc pat))
+      = ParPat x (L pat_loc (add_proof cv binds pat))
+    add_proof cv binds pat@(ConPat { pat_con_ext = ext })
+      = assertPpr (null (cpt_dicts ext) && null (cpt_tvs ext) && empty_binds (cpt_binds ext)) (ppr pat) $
+        pat { pat_con_ext = ext { cpt_dicts = [cv], cpt_binds = binds } }
+    add_proof _ _ pat = pprPanic "tcRetainedConMatches: not a data constructor" (ppr pat)
+
+    empty_binds binds@EvBinds{} = isEmptyTcEvBinds binds
+    empty_binds TcEvBinds{} = False
 
 {- Note [Retained constructor matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -475,6 +606,24 @@ original argument into its specialised pattern type. The inverse result cast
 transports the checked RHS back to the fixed outer result. Put the proof in
 ConPatTc.cpt_dicts, so it binds these casts inside the strict Core alternative.
 This does not ask the solver to rewrite opaque runtime indices.
+
+Contexts need a different placement from the variable-prefix rule in
+Note [Retained argument telescopes]. Keep all value and dictionary lambdas
+before the constructor case. tcRetainedConArgs collects contexts at their
+actual telescope positions, including a context after the last source value
+pattern. Insert shared dictionary VarPats with their original predicate types.
+selectMatchVar then chooses these original Ids for the outer lambdas. Do not
+put a refined CoPat around a dictionary: its outer lambda would have a fresh
+Id, while the evidence binding could refer to an alias bound only later.
+
+Each alternative instead gets fresh Givens at the specialised predicate types.
+Check the whole match with these Givens. Transport the original dictionaries
+with the constructor proof and bind the fresh Givens in ConPatTc.cpt_binds,
+along with the solver evidence. These bindings are inside the proof scope and
+cover later patterns, guards, and local bindings. The original dictionary
+parameters have the same Unique in every equation. This is deliberate, as for
+the hidden index AsPat. Native constructors have no existing dictionaries,
+skolems, or evidence bindings; assert this before adding the branch evidence.
 
 Use one hidden unrestricted index Id across the equations. A generated AsPat makes
 selectMatchVar choose this Id. tidy1 removes the identical alias. The retained

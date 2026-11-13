@@ -5329,6 +5329,7 @@ data RetainedQuantificationError
   | RetainedConstructorArguments
   | RetainedPatternType Type
   | RetainedVariablePattern
+  | RetainedContextPattern
   | RetainedResultWrapper
   | RetainedIndexExpression
 

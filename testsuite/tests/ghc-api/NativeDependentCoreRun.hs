@@ -75,8 +75,8 @@ main = do
 -- | Supply ordinary observations and a lazy runtime input source.
 helperSource :: String
 helperSource =
-    unlines
-        [ "{-# LANGUAGE DataKinds, GADTs, KindSignatures, TypeFamilies #-}"
+    unlines $
+        [ "{-# LANGUAGE DataKinds, FlexibleInstances, GADTs, KindSignatures, TypeFamilies #-}"
         , "module NativeRuntimeHelpers where"
         , "import Data.IORef"
         , "{-# NOINLINE drive #-}"
@@ -141,6 +141,7 @@ helperSource =
         , "data IndexRight = IndexRight IndexLeft"
         , "data BadIndex = BadIndex BadIndex Int"
         ]
+            ++ retainedNatContextClasses
 
 -- | Check source elaboration with one shared retained worker and lazy indices.
 retainedSource :: String
@@ -470,6 +471,143 @@ retainedNatClassExpected =
         ++ ["[]:0", "[42,42]:2", "[42,42,42]:3"]
         ++ replicate 5 "42"
 
+-- | Keep class selectors global when source entry expressions are localized.
+retainedNatContextClasses :: [String]
+retainedNatContextClasses =
+    [ "class Contextual (n :: Nat) where"
+    , "  contextLabel :: Vec Int n -> String"
+    , "instance Contextual Z where"
+    , "  contextLabel _ = \"zero\""
+    , "instance Contextual (S n) where"
+    , "  contextLabel _ = \"successor\""
+    , "class OnlyGiven (n :: Nat) where"
+    , "  onlyLabel :: Vec Int n -> String"
+    ]
+
+-- | Keep incoming dictionaries inside retained variable and constructor scopes.
+retainedNatContextDeclarations :: [String]
+retainedNatContextDeclarations =
+    [ "renderContext :: foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String"
+    , "renderContext n xs = show xs"
+    , "renderCtor :: foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String"
+    , "renderCtor Z xs = show xs"
+    , "renderCtor (S k) xs = show xs"
+    , "renderGuarded :: foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String"
+    , "renderGuarded n xs | True = rendered"
+    , "  where"
+    , "    rendered :: String"
+    , "    rendered = renderContext n xs"
+    , "renderView :: foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String"
+    , "renderView n (renderContext n -> rendered) = rendered"
+    , "renderLambda :: foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String"
+    , "renderLambda n = \\xs -> show xs"
+    , "renderFull :: foreach (n :: Nat) -> Show (Vec Int (S n)) => Vec Int (S n) -> String"
+    , "renderFull n xs@(VCons _ _) = show xs"
+    , "forwardContext :: foreach (n :: Nat) -> Contextual n => Vec Int n -> String"
+    , "forwardContext n xs = contextLabel xs"
+    , "provideContext :: foreach (n :: Nat) -> Vec Int n -> String"
+    , "provideContext Z xs = forwardContext Z xs"
+    , "provideContext (S k) xs = forwardContext (S k) xs"
+    , "onlyGivenContext :: foreach (n :: Nat) -> OnlyGiven n => Vec Int n -> String"
+    , "onlyGivenContext n xs = onlyLabel xs"
+    , "onlyGivenCtor :: foreach (n :: Nat) -> OnlyGiven n => Vec Int n -> String"
+    , "onlyGivenCtor Z xs = onlyLabel xs"
+    , "onlyGivenCtor (S k) xs = onlyLabel xs"
+    , "onlyGivenWhereCtor :: foreach (n :: Nat) -> OnlyGiven n => Vec Int n -> String"
+    , "onlyGivenWhereCtor Z xs = rendered"
+    , "  where rendered :: String; rendered = onlyLabel xs"
+    , "onlyGivenWhereCtor (S k) xs = rendered"
+    , "  where rendered :: String; rendered = onlyLabel xs"
+    , "onlyGivenGuardedPartial :: foreach (n :: Nat) -> OnlyGiven n => Vec Int n -> String"
+    , "onlyGivenGuardedPartial n | True = \\xs -> rendered ++ onlyLabel xs"
+    , "  where rendered :: String; rendered = onlyGivenContext n bottomVec"
+    , "lateOnlyGiven :: foreach (n :: Nat) -> Vec Int n -> OnlyGiven n => String"
+    , "lateOnlyGiven n xs = onlyLabel xs"
+    , "lateOnlyGivenCtor :: foreach (n :: Nat) -> Vec Int n -> OnlyGiven n => String"
+    , "lateOnlyGivenCtor Z xs = rendered"
+    , "  where rendered :: String; rendered = onlyLabel xs"
+    , "lateOnlyGivenCtor (S k) xs = rendered"
+    , "  where rendered :: String; rendered = onlyLabel xs"
+    , "renderContexts :: foreach (n :: Nat) -> foreach (m :: Nat) -> (Show (Vec Int n), Show (Vec Int m)) => Vec Int n -> Vec Int m -> String"
+    , "renderContexts n m xs ys = renderContext n xs ++ \"/\" ++ renderContext m ys"
+    , "equalityContext :: foreach (n :: Nat) -> (Add n Z ~ n) => Vec Int (Add n Z) -> Vec Int n"
+    , "equalityContext n xs = xs"
+    , "equalityCtor :: foreach (n :: Nat) -> (Add n Z ~ n) => Vec Int (Add n Z) -> Vec Int n"
+    , "equalityCtor Z xs = xs"
+    , "equalityCtor (S k) xs = xs"
+    , "ignoreContext :: foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> Int"
+    , "ignoreContext n _ = 42"
+    , "ignoreEqualityContext :: foreach (n :: Nat) -> (n ~ n) => Vec Int n -> Int"
+    , "ignoreEqualityContext n _ = 42"
+    , "legacyContext :: foreach (unused :: Bool) -> foreach (b :: Bool) -> (b ~ b) => Int"
+    , "legacyContext _ b = 42"
+    , "legacyBangContext :: foreach (b :: Bool) -> Int -> (b ~ b) => Int"
+    , "legacyBangContext b !x = x"
+    , "wildcardContext :: foreach (unused :: Bool) -> foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String"
+    , "wildcardContext _ n xs = show xs"
+    , "keepConstrained :: foreach (b :: Bool) -> ((b ~ b) => Int) -> ((b ~ b) => Int)"
+    , "keepConstrained b x = x"
+    , "type ContextPair (n :: Nat) = (OnlyGiven n, Show (Vec Int n))"
+    , "pairContext :: foreach (n :: Nat) -> ContextPair n => Vec Int n -> String"
+    , "pairContext n xs = onlyLabel xs ++ show xs"
+    , "pairCtorContext :: foreach (n :: Nat) -> ContextPair n => Vec Int n -> String"
+    , "pairCtorContext Z xs = onlyLabel xs ++ show xs"
+    , "pairCtorContext (S k) xs = onlyLabel xs ++ show xs"
+    ]
+
+-- | Check contextual functions with imported classes and local native workers.
+retainedNatContextSource :: String -> String -> String
+retainedNatContextSource moduleName observation =
+    unlines $ "{-# LANGUAGE ConstraintKinds, FlexibleContexts, ViewPatterns #-}" : concatMap insert (lines (retainedNatClassSource moduleName observation))
+  where
+    insert line@"entry :: IO String" = retainedNatContextDeclarations ++ [line]
+    insert line = [line]
+
+-- | Observe dictionary forwarding, pattern scope, and lazy partial applications.
+retainedNatContextObservation :: [String]
+retainedNatContextObservation =
+    [ "rendered <- driveNats (\\n -> pure (renderContext n (replicateNative @Int n 42)))"
+    , "constructors <- driveNats (\\n -> pure (renderCtor n (replicateNative @Int n 42)))"
+    , "guarded <- driveNats (\\n -> pure (renderGuarded n (replicateNative @Int n 42)))"
+    , "viewed <- driveNats (\\n -> pure (renderView n (replicateNative @Int n 42)))"
+    , "lambdas <- driveNats (\\n -> pure (renderLambda n (replicateNative @Int n 42)))"
+    , "fullPatterns <- driveNats (\\n -> pure (renderFull n (replicateNative @Int (S n) 42)))"
+    , "forwarded <- driveNats (\\n -> pure (provideContext n (replicateNative @Int n 42)))"
+    , "ignoredVectors <- driveNats (\\n -> pure (provideContext n bottomVec))"
+    , "equalities <- driveNats (\\n -> case rightZero n of Refl -> observeVec (equalityContext n (appendNative @Int n Z (replicateNative @Int n 42) VNil)))"
+    , "constructorEqualities <- driveNats (\\n -> case rightZero n of Refl -> observeVec (equalityCtor n (appendNative @Int n Z (replicateNative @Int n 42) VNil)))"
+    , "ignoredBottom <- driveNat (\\n -> observeInt (ignoreContext n bottomVec)) bottomNat"
+    , "ignoredCyclic <- driveNat (\\n -> observeInt (ignoreContext n bottomVec)) cyclicNat"
+    , "ignoredEqualityBottom <- driveNat (\\n -> observeInt (ignoreEqualityContext n bottomVec)) bottomNat"
+    , "ignoredEqualityCyclic <- driveNat (\\n -> observeInt (ignoreEqualityContext n bottomVec)) cyclicNat"
+    , "variablePartialBottom <- driveNat (\\n -> force (renderContext n)) bottomNat"
+    , "variablePartialCyclic <- driveNat (\\n -> force (renderContext n)) cyclicNat"
+    , "constructorPartialBottom <- driveNat (\\n -> force (renderCtor n)) bottomNat"
+    , "constructorPartialCyclic <- driveNat (\\n -> force (renderCtor n)) cyclicNat"
+    , "pairs <- driveNatPairs (\\n m -> pure (renderContexts n m (replicateNative @Int n 42) (replicateNative @Int m 7)))"
+    , "legacy <- drive (\\b -> observeInt (legacyContext (error \"unused-context-prefix\") b)) False"
+    , "legacyBang <- drive (\\b -> observeInt (legacyBangContext b 43)) True"
+    , "wildcard <- driveNat (\\n -> pure (wildcardContext (error \"unused-context-prefix\") n (replicateNative @Int n 42))) Z"
+    , "constrained <- drive (\\b -> observeInt (keepConstrained b 44)) False"
+    , "pure (rendered ++ constructors ++ guarded ++ viewed ++ lambdas ++ fullPatterns ++ forwarded ++ ignoredVectors ++ equalities ++ constructorEqualities ++ unlines [ignoredBottom,ignoredCyclic,ignoredEqualityBottom,ignoredEqualityCyclic,variablePartialBottom,variablePartialCyclic,constructorPartialBottom,constructorPartialCyclic] ++ pairs ++ unlines [legacy,legacyBang,wildcard,constrained])"
+    ]
+
+-- | Preserve the contextual observations after all existing imported results.
+retainedNatContextExpected :: [String]
+retainedNatContextExpected =
+    concat (replicate 5 ["VNil", "VCons 42 (VCons 42 VNil)", "VCons 42 (VCons 42 (VCons 42 VNil))"])
+        ++ ["VCons 42 VNil", "VCons 42 (VCons 42 (VCons 42 VNil))", "VCons 42 (VCons 42 (VCons 42 (VCons 42 VNil)))"]
+        ++ concat (replicate 2 ["zero", "successor", "successor"])
+        ++ concat (replicate 2 ["[]:0", "[42,42]:2", "[42,42,42]:3"])
+        ++ replicate 4 "42"
+        ++ replicate 4 "forced"
+        ++ [ "VNil/VNil"
+           , "VNil/VCons 7 (VCons 7 (VCons 7 VNil))"
+           , "VCons 42 (VCons 42 VNil)/VNil"
+           , "VCons 42 (VCons 42 VNil)/VCons 7 (VCons 7 (VCons 7 VNil))"
+           ]
+        ++ ["42", "43", "VNil", "44"]
+
 -- | Check explicit source cases with dependent results and captured payloads.
 retainedCaseSource :: String -> String -> String
 retainedCaseSource moduleName observation =
@@ -512,7 +650,8 @@ retainedProgramSource :: String
 retainedProgramSource =
     unlines $
         take 1 sourceLines
-            ++ [ "module Main (main) where"
+            ++ [ "{-# LANGUAGE FlexibleInstances #-}"
+               , "module Main (main) where"
                , "import qualified Control.Exception as E"
                , "import Data.IORef"
                , "import Data.List (isInfixOf)"
@@ -577,7 +716,8 @@ retainedConsumerSource :: String
 retainedConsumerSource =
     unlines $
         take 1 (lines retainedLibrarySource)
-            ++ [ "module Main (main) where"
+            ++ [ "{-# LANGUAGE FlexibleInstances #-}"
+               , "module Main (main) where"
                , "import NativeRetainedLibrary"
                , "import qualified Control.Exception as E"
                , "import Data.IORef"
@@ -602,7 +742,7 @@ retainedNatLibrarySource :: String
 retainedNatLibrarySource =
     unlines $
         take 1 (lines (retainedNatSource "NativeRetainedNatLibrary" ""))
-            ++ [ "{-# LANGUAGE LinearTypes, RankNTypes, TypeOperators #-}"
+            ++ [ "{-# LANGUAGE ConstraintKinds, FlexibleContexts, FlexibleInstances, LinearTypes, RankNTypes, TypeOperators, ViewPatterns #-}"
                , "module NativeRetainedNatLibrary where"
                , "import Data.Type.Equality ((:~:)(Refl))"
                ]
@@ -635,6 +775,7 @@ retainedNatLibrarySource =
             ++ retainedNatProofDeclarations
             ++ retainedNatGenericDeclarations
             ++ retainedNatClassDeclarations
+            ++ retainedNatContextDeclarations
   where
     generalizeAppend "appendVec :: Vec Int n -> Vec Int m -> Vec Int (Add n m)" =
         "appendVec :: forall a n m. Vec a n -> Vec a m -> Vec a (Add n m)"
@@ -681,7 +822,9 @@ retainedNatConsumerSource =
             ++ map ("    " ++) retainedNatGenericObservation
             ++ ["  classValues <- do"]
             ++ map ("    " ++) retainedNatClassObservation
-            ++ ["  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead,constructedPartial,nestedPartial] ++ caseValues ++ normalized ++ normalizedAppend ++ constants ++ unlines [constantBottom,normalizedPartial] ++ proofValues ++ genericValues ++ classValues)"]
+            ++ ["  contextValues <- do"]
+            ++ map ("    " ++) retainedNatContextObservation
+            ++ ["  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead,constructedPartial,nestedPartial] ++ caseValues ++ normalized ++ normalizedAppend ++ constants ++ unlines [constantBottom,normalizedPartial] ++ proofValues ++ genericValues ++ classValues ++ contextValues)"]
 
 -- | Run Boolean and Nat consumers against separately compiled disk artifacts.
 runModuleChecks :: FilePath -> IO ()
@@ -699,7 +842,7 @@ runModuleChecks libdir = do
             , "NativeRetainedNatLibrary"
             , retainedNatLibrarySource
             , retainedNatConsumerSource
-            , -- Keep the first 89 observations. Append class consumer observations.
+            , -- Keep the first 131 observations. Append contextual observations.
               [ "[]:0"
               , "[42,42]:2"
               , "[42,42,42]:3"
@@ -743,6 +886,7 @@ runModuleChecks libdir = do
                 ++ retainedNatProofExpected
                 ++ retainedNatGenericExpected
                 ++ retainedNatClassExpected
+                ++ retainedNatContextExpected
             )
         ]
         $ \(label, moduleName, producer, consumer, expected) ->
@@ -1199,6 +1343,7 @@ runNatSourceChecks = do
     runNatProofSourceChecks
     runNatGenericSourceChecks
     runNatClassSourceChecks
+    runNatContextSourceChecks
     runCaseSourceChecks
 
 -- | Observe refined source cases and reject malformed dependent alternatives.
@@ -1601,6 +1746,103 @@ runNatClassSourceChecks = do
             sourceModuleRejects name code fragment name $
                 retainedNatClassSource name "pure \"unused\"" ++ unlines declarations
 
+-- | Check scoped source contexts without forcing unused indices or arguments.
+runNatContextSourceChecks :: GHC.Ghc ()
+runNatContextSourceChecks = do
+    let moduleName = "NativeSourceNatContexts"
+        observation = unlines ("do" : map ("        " ++) retainedNatContextObservation)
+    expression <- sourceEntry moduleName (retainedNatContextSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source retained contexts" expression
+    unless (lines actual == retainedNatContextExpected) $
+        fail ("FAIL: retained contexts changed dictionary scope, patterns, or laziness: " ++ show actual)
+    sourceRejects
+        "strict retained context prefix"
+        83605
+        "strict prefix"
+        ["Strict"]
+        [ "badStrict :: foreach (b :: Bool) -> (b ~ b) => Int -> Int"
+        , "badStrict b x = x"
+        ]
+    sourceRejects
+        "explicit strict retained context prefix"
+        83605
+        "strict prefix"
+        ["BangPatterns"]
+        [ "badBang :: foreach (unused :: Bool) -> foreach (b :: Bool) -> (b ~ b) => Int -> Int"
+        , "badBang !x b y = y"
+        ]
+    sourceModuleRejects "irreducible retained context" 83605 "Only class and equality constraints" "NativeSourceIrreducibleContext" $
+        unlines
+            [ "{-# LANGUAGE ConstraintKinds, DataKinds, ExperimentalDependentTypes, FlexibleContexts, TypeFamilies #-}"
+            , "module NativeSourceIrreducibleContext where"
+            , "import Data.Kind (Constraint)"
+            , "import NativeRuntimeHelpers"
+            , "type family NativePred (n :: Nat) :: Constraint"
+            , "badIrreducible :: foreach (n :: Nat) -> NativePred n => Vec Int n -> String"
+            , "badIrreducible n xs = \"unused\""
+            ]
+    sourceModuleRejects "irreducible constraint-tuple component" 83605 "Only class and equality constraints" "NativeSourceIrreducibleTuple" $
+        unlines
+            [ "{-# LANGUAGE ConstraintKinds, DataKinds, ExperimentalDependentTypes, FlexibleContexts, TypeFamilies, TypeOperators #-}"
+            , "module NativeSourceIrreducibleTuple where"
+            , "import Data.Kind (Constraint)"
+            , "import NativeRuntimeHelpers"
+            , "type family Pending (n :: Nat) :: Constraint"
+            , "type PairC (n :: Nat) = (Show (Vec Int n), (Pending n, n ~ n))"
+            , "badTuple :: foreach (n :: Nat) -> PairC n => Vec Int n -> String"
+            , "badTuple n xs = \"unused\""
+            ]
+    forM_
+        [ ("NativeSourceContextConstructorBottom", "driveNat (\\n -> pure (renderCtor n bottomVec)) bottomNat", "native-bottom-nat")
+        , ("NativeSourceContextPayloadBottom", "driveNat (\\n -> pure (renderCtor n bottomVec)) Z", "native-bottom-vector")
+        ]
+        $ \(name, body, marker) -> do
+            bottomExpression <- sourceEntry name (retainedNatContextSource name body)
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case outcome of
+                Left exception
+                    | marker `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right value -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show value)
+    forM_
+        [
+            ( "NativeSourceMissingOnlyGiven"
+            , 39999
+            , "OnlyGiven"
+            , []
+            ,
+                [ "badOnlyGiven :: foreach (n :: Nat) -> Vec Int n -> String"
+                , "badOnlyGiven n xs = onlyGivenContext n xs"
+                ]
+            )
+        ,
+            ( "NativeSourceForgottenEqualityContext"
+            , 18872
+            , "Add"
+            , []
+            ,
+                [ "badEqualityContext :: foreach (n :: Nat) -> Vec Int (Add n Z) -> Vec Int n"
+                , "badEqualityContext n xs = equalityContext n xs"
+                ]
+            )
+        ,
+            ( "NativeSourceQuantifiedRetainedContext"
+            , 83605
+            , "forall"
+            , ["{-# LANGUAGE QuantifiedConstraints, UndecidableInstances #-}"]
+            ,
+                [ "badQuantified :: foreach (n :: Nat) -> (forall a. Show a => Show (Vec a n)) => Vec Int n -> String"
+                , "badQuantified n xs = show xs"
+                ]
+            )
+        ]
+        $ \(name, code, fragment, pragmas, declarations) ->
+            sourceModuleRejects name code fragment name $
+                unlines pragmas ++ retainedNatContextSource name "pure \"unused\"" ++ unlines declarations
+
 -- | Exercise constructor naming with dependent payloads and lazy nested fields.
 runNatConstructorSourceChecks :: GHC.Ghc ()
 runNatConstructorSourceChecks = do
@@ -1788,15 +2030,14 @@ runSourceRejectChecks = do
         , ("non-variable retained pattern", 83605, "bare variable pattern", [], local [] selection ["keep _ x = x"] "42")
         , ("multiple variable equations", 83605, "one unguarded equation for each constructor", [], local [] selection (identity ++ identity) "42")
         , ("producer expression argument", 83605, "local index variable or a supported constructor tree", [], local [] consumer identity "keep (not False) 42")
-        , ("nonreflexive indexed constraint", 83605, "Only reflexive Boolean equality constraints", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
-        , ("general indexed constraint", 83605, "Only reflexive Boolean equality constraints", ["FlexibleContexts"], local [] "foreach (b :: Bool) -> (Show (Select b) => Int) -> Int" identity "42")
+        , ("nonreflexive indexed constraint", 18872, "True", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
+        , ("general indexed constraint", 39999, "Show", ["FlexibleContexts"], local [] "foreach (b :: Bool) -> (Show (Select b) => Int) -> Int" identity "42")
         , ("ImpredicativeTypes", 83605, "Quick Look inference", ["ImpredicativeTypes"], local [] consumer ["keep b x = 42"] "keep True 42")
         , ("Quick Look through ($)", 83605, "Quick Look inference", [], local [] consumer ["keep b x = 42"] "(keep $ True) 42")
         , ("INLINE retained function", 83605, "Optimisation pragmas", [], local ["{-# INLINE keep #-}"] selection identity "42")
         , ("INLINABLE retained function", 83605, "Optimisation pragmas", [], local ["{-# INLINABLE keep #-}"] selection identity "42")
         , ("SPECIALISE type pragma", 83605, "Optimisation pragmas", [], local ["{-# SPECIALISE keep :: Bool -> Int -> Int #-}"] selection identity "42")
         , ("SPECIALISE expression pragma", 83605, "Optimisation pragmas", [], local ["{-# SPECIALISE keep True #-}"] selection identity "42")
-        , ("constrained result wrapper", 83605, "requires a wrapper", [], local [] "foreach (b :: Bool) -> ((b ~ b) => Int) -> ((b ~ b) => Int)" identity "42")
         , ("unsigned retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["alias = keep"]) "42")
         , ("unsigned partial retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["index :: Bool", "index = False", "alias = keep index"]) "42")
         , ("nested retained type", 43582, "not supported in this type position", [], ["bad :: Int -> (foreach (b :: Bool) -> Select b -> Select b)", "bad = undefined"])

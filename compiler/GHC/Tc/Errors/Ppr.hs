@@ -3548,7 +3548,7 @@ pprRetainedQuantificationError reason = case reason of
     vcat [ text "Quick Look inference does not support this retained type yet:"
          , ppr ty ]
   RetainedConstraintType ty ->
-    vcat [ text "Only reflexive Boolean equality constraints can depend on a retained index yet:"
+    vcat [ text "Only class and equality constraints can depend on a retained index yet:"
          , ppr ty ]
   RetainedPragma ->
     text "Optimisation pragmas for retained functions are not supported yet."
@@ -3580,6 +3580,8 @@ pprRetainedQuantificationError reason = case reason of
          , ppr ty ]
   RetainedVariablePattern ->
     text "The retained argument currently requires a bare variable pattern."
+  RetainedContextPattern ->
+    text "A strict prefix pattern before a retained context is not supported when later value patterns remain."
   RetainedResultWrapper ->
     text "This result requires a wrapper that is not supported for retained functions yet."
   RetainedIndexExpression ->

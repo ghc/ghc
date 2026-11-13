@@ -102,7 +102,7 @@ import GHC.Core.DataCon
 import GHC.Core.Class
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
-import GHC.Core.Predicate ( getClassPredTys_maybe )
+import GHC.Core.Predicate ( getClassPredTys_maybe, isCTupleClass )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
@@ -2237,24 +2237,34 @@ tc_lhs_pred mode pred@(L loc _)
     do { pred_ty <- tc_check_lhs_type mode pred constraintKind
        ; unless (isEmptyNameEnv (mode_indices mode)) $
          do { pred_ty <- liftZonkM $ zonkTcType pred_ty
-            ; when (hasNativeDependentExpr (Core.Type pred_ty)) $
-              case getClassPredTys_maybe pred_ty of
-                Just (cls, [kind, TermVarTy v1, TermVarTy v2])
-                  | cls == eqClass, eqType kind boolTy
-                  , isBoolIndexId v1, isBoolIndexId v2, v1 == v2 -> pure ()
-                _ -> failWithTc $ TcRnRetainedQuantificationError
-                                   (RetainedConstraintType pred_ty) }
+            ; unless (supported_predicate pred_ty) $
+                failWithTc $ TcRnRetainedQuantificationError
+                             (RetainedConstraintType pred_ty) }
        ; pure pred_ty }
+  where
+    -- Check native components hidden by constraint-tuple synonyms too.
+    supported_predicate :: PredType -> Bool
+    supported_predicate ty
+      | not (hasNativeDependentExpr (Core.Type ty)) = True
+      | Just (cls, args) <- getClassPredTys_maybe ty
+      = not (isCTupleClass cls) || all supported_predicate args
+      | otherwise = False
 
 {- Note [Retained source constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A runtime binder does not create an ordinary type-variable implication.
-The first source subset must not float index-dependent evidence outside that
-binder. Permit only the native reflexive Boolean equality handled directly by
-Note [Reflexive retained equality evidence] in GHC.Tc.Utils.Instantiate.
-Other predicates need a solver evidence scope for runtime indices. Reject them
-at the predicate before they enter the ordinary solver. Constraints without a
-runtime index keep the ordinary checking rules.
+Check each predicate in the registered runtime-index environment. Permit ordinary
+class and equality predicates. The retained equation checker introduces their
+Given dictionaries below the runtime binders. Application checking keeps native
+Wanted evidence at its call site. See Note [Retained application evidence] in
+GHC.Tc.Gen.App. The solver uses its ordinary instance and equality rules.
+
+Keep native quantified and irreducible predicates gated at their source span.
+Check constraint-tuple components after synonym expansion as well. A tuple class
+must not hide an unsupported native predicate in one of its components.
+Those unsupported predicates need separate solver scope and termination checks.
+Predicates without native syntax keep the ordinary checking rules. This rule does
+not evaluate an index or infer equality between different runtime Ids. See
+docs/dependent-haskell/REFERENCES.md#source-retained-constraints.
 -}
 
 ---------------------------
