@@ -830,19 +830,34 @@ withPacked (PackVec n xs) k = k n xs
 
 - [x] Inspect Agda Sigma, record/constructor checking, application and LHS
   substitution. Record pinned sources and the historical DataCon difference.
-- [ ] Add optional retained field binders to DataCon metadata. Preserve the old
+- [x] Add optional retained field binders to DataCon metadata. Preserve the old
   builder API and ordinary knot laziness. Rebuild worker and wrapper Pi types.
   Validate ordered scope, fixed domains, multiplicity, representation restrictions
   and result nonescape. Keep runtime fields out of erased existentials.
-- [ ] Instantiate Core pattern fields sequentially. Substitute actual field Ids
+- [x] Instantiate Core pattern fields sequentially. Substitute actual field Ids
   in later field types. Check fresh identities, field count, dependent payload
   identity and result nonescape in Core Lint. Add existing-fixture API coverage.
+  Flat instantiated-field APIs and interface writing reject retained metadata
+  until their replacements preserve scope. Even a vacuous retained constructor
+  stays outside native index domains. The API fixture checks nested Pi capture,
+  scoped consumption and repackaging with a dictionary-function payload.
+- [x] Verify the Core checkpoint in both compiler stages and the bootstrap API,
+  registered tests, runtime fixture and standalone compatibility controls.
+  Record the corrected source-gate harness separately from the first combined
+  CLI invocation. See [the verified checkpoint](README.md#retained-constructor-field-checkpoint).
 - [ ] Preserve the telescope in interface declarations. Reject malformed scope
   and unsupported promotion before constructing metadata. Version the format if
   the serialized declaration changes. Keep existing archives immutable.
 - [ ] Check source constructor declarations and patterns in order. Bind the same
   runtime identity in the later types and Core fields. Add located diagnostics
   for invalid field domains, escape and unsupported representation features.
+- [ ] Preserve actual field identities during desugaring. `matchOneConLike`
+  currently calls the gated flat `conLikeInstOrigArgTys`. Instantiate fields
+  sequentially. `selectMatchVar` can retain a bare source field Id for one clause.
+  An ordinary `bindMatchId`/`wrapBind` alias does not prove equality of runtime
+  indices. Multiple equations require coherent substitution through each typed
+  RHS, pattern and evidence, or checked alias transport. Do not route package
+  elimination through the native-index constructor equation checker.
 - [ ] Execute packaging, scoped elimination and repackaging of real Nat/Vec
   values through separate module interfaces. Inspect CorePrep/STG field layout.
   Check constructor WHNF, unused bottom/cyclic index, bottom vector, and demanded
@@ -850,6 +865,14 @@ withPacked (PackVec n xs) k = k n xs
   execution or as proof of backend support.
 - [ ] Validate both stages, focused regressions and existing compatibility
   controls. Record exact commands, peaks, artifact hashes and remaining gates.
+
+Source entry points for the next checkpoint are `mkGadtDecl`,
+`splitLHsGadtTy`/`splitHsFunType`, `rnConDecl`, `kcConDecl`, `tcConDecl` and
+`tcConGADTArgs`. They currently discard or reject the retained field telescope.
+`tcDataConPat`/`tcConValArgs` must replace each template field Id before checking
+the remaining fields. Keep erased existential freshening separate. A source
+constructor regression must retain located GHC-43582 until these paths and the
+interface declaration format are ready.
 
 The first checkpoint implements and verifies the Core metadata and pattern
 rules. Source declarations, interfaces and runtime execution remain subsequent

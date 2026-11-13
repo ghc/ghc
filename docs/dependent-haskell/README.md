@@ -21,7 +21,7 @@ Last updated: 2026-11-13.
 | Item | State |
 | --- | --- |
 | GHC source baseline | `19ff36f2aede0ca2e554016ff22c71e73aa9803b`, dated 2026-11-09 |
-| Project branch | `codex/dependent-haskell` |
+| Project branch | `dependent-haskell` |
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
 | Native Core | Closed algebraic domains, field-scoped Nat proofs, and fixed-domain `DepFunCo` pass the bootstrap API regression |
@@ -40,7 +40,8 @@ Last updated: 2026-11-13.
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
 | Current increment validation | Both stages and libraries, five registered regressions, 277 imported observations, 20 focused closure/worker observations, and 12 guide blocks pass |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
-| Next task | Broader signature positions, native template instantiation, ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native unfolding codecs, and lowering gaps remain open |
+| Stored dependent pairs | Core field telescopes, scoped patterns and nonescape pass bootstrap API checks; source declarations, interfaces and runtime execution remain pending |
+| Next task | Retained constructor declaration/pattern checking and interface field scope, then Nat/Vec package execution; broader inference, unification, native unfoldings and optimization remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -1558,3 +1559,60 @@ reproduction recipe are now in [reference/](reference/README.md).
 Keep new research in `REFERENCES.md`. Keep implementation tasks in `PLAN.md`.
 Do not turn the project index into an implementation log. Significant changes
 to the language scope or Core strategy require a new design discussion.
+
+## Retained constructor field checkpoint
+
+Specification: `cae8e34694`. Core implementation: `151bd9d6ad`.
+This checkpoint adds constructor field binders and sequential Core pattern
+instantiation. The new API checks construction, retained consumption,
+repackaging, fresh identities, nested Pi capture avoidance, payload identity and
+result nonescape. It rejects flat instantiated-field APIs and interface
+declarations that would discard the binders. It excludes even vacuous retained
+constructors from native index domains and rejects unsupported promotion.
+
+The API fixture uses an indexed equality-dictionary function as its payload.
+It does not execute a stored Vec package. Source constructor signatures remain
+gated by located GHC-43582. The next steps are source declaration/pattern
+checking, coherent field identities during desugaring, and interface field-binder
+encoding, followed by real Nat/Vec execution
+and field-laziness controls. See [M10](PLAN.md#m10-retained-constructor-field-telescopes),
+[the contract](CORE.md#retained-constructor-fields), and
+[the pinned provenance](REFERENCES.md#retained-constructor-field-telescopes).
+
+Validation passed on 2026-11-13:
+
+- Both compiler stages and libraries: 17m17s, 6,800 MiB peak under 16 GiB.
+- Final bootstrap Core API: passed, 984 MiB under 4 GiB. The initial API run
+  passed before the extra guards. The new flat-API regression then failed
+  against that library and passed after the guards were rebuilt.
+- Bootstrap runtime: passed the unchanged stdout golden, including the new
+  located source rejection, module execution and fingerprint/recompilation
+  checks. Peak: 992 MiB under 4 GiB. Existing observations remain 277 imported
+  and 146 source-context rows; these are compatibility checks for this change.
+- Five registered normal-way tests: 39 cases, 34 skips, five expected passes,
+  and no unexpected results or framework failures/warnings. Driver time:
+  11.018s; command time: 1m43s. Peak: 2,562 MiB under 8 GiB.
+- Separate CLI compatibility controls: 277 main imported observations, 177
+  older compatibility observations, 13 closure controls, seven worker controls,
+  existing lambda/context/proof/linear checks, both interface-version rejection
+  directions, 12 literal guides, ordinary typing and single-expansion TH,
+  14 native function/class observations, package/GHCi/Haddock smoke checks,
+  nested typed splices and static pointers all passed. Peak: 306 MiB under 4 GiB.
+- The final constructor gate initially failed because its imported interface
+  was outside the one-shot compilation directory. The combined CLI wrapper
+  exited there after its earlier controls passed. Copying the interface into
+  that directory fixed the harness. Rerunning only the gate passed with
+  GHC-43582 at `NativePackedVecGate.hs:5:14`. No compiler fix was needed.
+- Fourmolu formatting of both fixtures, nonmutating parsing of the five changed
+  compiler modules, cabal-gild and `git diff --check` passed. The full GHC
+  testsuite was not run. Existing Cabal/Haddock warnings and Hadrian's libdir
+  normalization assertion remain outside this change.
+
+Artifacts use `_build/verification/native-constructor-fields-`. Main logs are
+`full-build.log`, `api-v2.log`, `runtime.log`, `registered.log`,
+`final-cli.log` and `source-gate-v2.log`. Source hashes cover 24 compiler files
+and two fixtures. Harness hashes cover 32 files. Current archive manifests cover
+27 bootstrap, 27 compatibility, 30 worker, 34 closure, 32 lambda and four source
+gate files. Current hashes, the immutable interface reader, and both previous
+worker-instantiation archives verify. No serialized declaration format changed.
+Source, interfaces and runtime package execution remain pending in M10.
