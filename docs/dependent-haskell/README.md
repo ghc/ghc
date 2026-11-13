@@ -31,8 +31,8 @@ Last updated: 2026-11-13.
 | Configured fork version | `10.1.20261113.1`, with interface header `1001202611131`; matching libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, bare fields, and checked source `case` pass the runtime fixtures |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Current increment validation | Both-stage build, five registered regressions, bootstrap API/runtime, separate CLI, guide, and ordinary smoke checks pass |
-| Next task | General Pi matching and normalization, broader case checking, native coercion unfolding codecs, and conservative lowering gaps remain open |
+| Current increment validation | Family-axiom normalization passes both-stage build, five registered regressions, bootstrap API/runtime, separate CLI, guide, and ordinary smoke checks |
+| Next task | Ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native coercion unfolding codecs, and conservative lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -779,10 +779,78 @@ canonical Fourmolu, and cabal-gild passed.
 Logs use `native-pico` in `_build/verification/`. Bootstrap-generated files and
 their hashes are retained in `native-pico-bootstrap-work/` there.
 The signature format is unchanged. Native coercion
-serialization in unfolding bodies, general Pi matching and normalization,
+serialization in unfolding bodies, structural Pi matching and ambient-evidence normalization,
 heterogeneous domains, changed multiplicities, and the ordinary optimizer remain
 open. Non-reflexive eta-cast handling also remains gated. Value casts preserve
 Haskell forcing behavior; no function eta law is assumed.
+
+## Family-axiom normalization
+
+The next increment reduces family axioms under a retained binder with a fixed
+closed algebraic domain and `Many` multiplicity. `mkDepFunRedn` preserves scoped
+coercion evidence and separately canonicalizes each endpoint. The Core lifting
+context permits shared valid same-domain index alpha-renaming. The solver keeps
+global family reduction, ordinary meta-variable reading, roles, depth limits,
+and locations. Its binder-local mode suppresses plugins, inert evidence,
+family-cache reads and writes, and coercion zapping. Ordinary erased-forall
+binder-kind handling is unchanged. Family axioms reduce at nominal and
+representational roles; phantom family heads remain unreduced. Ordinary forall
+binder kinds normalize at nominal role. See [the contract](CORE.md#family-axiom-normalization-under-retained-binders)
+and [the Agda sources](REFERENCES.md#agda-provenance).
+
+New source checks target complete signatures with no source argument patterns:
+
+```haskell
+leftUnit :: foreach (n :: Nat) -> Vec Int (Add Z n) -> Vec Int n
+leftUnit = nativeId
+
+leftUnitAppend :: foreach (n :: Nat) (m :: Nat)
+               -> Vec Int (Add Z n) -> Vec Int m -> Vec Int (Add n m)
+leftUnitAppend = appendNative @Int
+```
+
+Here `nativeId n xs = xs` has an explicit retained identity signature. A further
+case reduces `ConstantNat n = Int`, so `constantAlias = ordinaryNat` checks
+against a signature that becomes an ordinary `Nat -> Int` arrow. These checks
+do not enable unsigned retained aliases or general structural unification.
+Runtime indices stay opaque, including bottom and cyclic values.
+
+The equality canonicalizer rechecks reflexivity after both endpoints have been
+rewritten. Rewriting returns to `can_eq_nc` without repeating `zonkEqTypes`.
+Same-Id runtime indices and `tcEqType`-equal retained functions use the existing
+reflexivity rule. The rewriting evidence already relates the original and
+normalized endpoints. This step adds no structural Pi decomposition or
+meta-variable assignment. See Note [Reflexivity after retained normalization].
+
+The initial bootstrap compiler build took 2m10s. Bootstrap API v3 and runtime v3 pass.
+The runtime matrix checks 17 dedicated source observations and 38 imported
+observations: the previous 26 plus 12 normalization observations. It also checks
+the opaque right-unit mismatch at GHC-83865 and reduction-depth error GHC-40404.
+The kernel checks roles and binder freshening. The successful logs are
+`native-pinorm-api-v3.log` and `native-pinorm-runtime-v3.log` in
+`_build/verification/`.
+
+The both-stage build passed in 11m11s at 6,188 MiB under 16 GiB. All five
+registered normal-way regressions passed: 39 cases, 34 skipped, no unexpected
+results or framework warnings. The test command took 1m33s, including helper
+builds, at 2,390 MiB under 8 GiB. The test driver took eight seconds.
+
+Separate CLI processes passed the 38-observation interface-only consumer,
+eight constructed partial/application observations, and nine standalone
+observations. Four additional observations check function-result strictness
+and payload laziness. The right-unit GHC-83865 and depth-limit GHC-40404 point
+to their actual RHS lines. The ordinary type-error control, empty-case error,
+located GHC-83605, and both interface format-rejection directions passed.
+All three Nat/Vec guide blocks compiled with Core and STG Lint. Ordinary
+optimized Template Haskell, package, GHCi, and Haddock smoke checks passed.
+The serial CLI, guide, and smoke scopes peaked at 147 MiB under 4 GiB.
+All scopes disabled swap. Compiler sources passed nonmutating Fourmolu parses.
+Both existing fixtures passed canonical Fourmolu, and cabal-gild passed.
+
+Logs use `native-pinorm` in `_build/verification/`. Bootstrap-generated files
+and their hashes are retained in `native-pinorm-bootstrap-work/` there.
+Full normalization with ambient Given or plugin evidence remains future work.
+The signature format is unchanged.
 
 ## Verified baseline
 

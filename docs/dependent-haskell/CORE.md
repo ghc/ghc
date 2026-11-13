@@ -81,11 +81,55 @@ These sources do not prove preservation for the current GHC extension.
 
 Transport a function value with a cast. Do not replace that cast with a lambda:
 eta expansion can hide a bottom function in Haskell. General Pi matching,
-normalization under retained binders, changed domains or multiplicities,
+ambient-evidence normalization under retained binders, changed domains or multiplicities,
 dependent erased binder kinds, and the ordinary optimizer remain unsupported.
 `ForAllCo` still binds only erased type and coercion variables. No new selector
 or erased `InstCo` rule is added. Diagnostic interface conversion can print the
 coercion; serialization in native unfolding bodies remains gated.
+
+## Family-axiom normalization under retained binders
+
+The Core normalizer recurses through `DepFunTy` under its unchanged supported
+closed domain and `Many` binder. `substNativeIndexBndr` masks an outer Id
+substitution and avoids capture. The lifting context can map an index to the
+same valid same-domain variable on both endpoints. It must not infer an index
+equation or evaluate the runtime variable.
+
+Normalize the body with the existing family reducer. `mkDepFunRedn` wraps its
+proof in `mkDepFunCo` and its result in `mkDepFunTy`. This preserves the proof
+binder even when an intermediate type alone needs it. Each endpoint separately
+canonicalizes a vacuous binder to an ordinary arrow. For example, `Add Z n`
+reduces to `n`; `Add (S n) Z` reduces to `S (Add n Z)` while its inner family
+application stays stuck. A constant family can remove the retained dependency.
+Family axioms reduce at nominal and representational roles. At phantom role,
+the existing `reduceTyFamApp_maybe` policy leaves family heads unreduced.
+Ordinary forall binder kinds still normalize at nominal role.
+
+The solver enables `re_native_binder` throughout the recursive body rewrite.
+Global family axioms still reduce. Ordinary type meta-variables can be read and
+zonked. This mode suppresses plugins, inert equality lookup for families and
+type variables, family-cache reads and writes, and coercion zapping. These paths
+could otherwise emit or retain evidence outside the runtime binder's scope.
+Keep the current role, reduction depth, and diagnostic location. Nested retained
+binders inherit the mode. No local index enters an outer inert set or cache.
+The ordinary `ForAllTy` binder-kind paths remain unchanged.
+
+After both equality endpoints have been rewritten, `can_eq_nc` checks same-Id
+runtime indices and `tcEqType` equality of retained functions. Rewriting returns
+to this function without repeating `zonkEqTypes`. This reflexivity check uses
+the rewriting evidence that already relates the original endpoints to their
+normalized types. It neither decomposes a retained function nor assigns a
+meta-variable. See Note [Reflexivity after retained normalization] in
+`GHC.Tc.Solver.Equality`.
+
+This is genuine family reduction under the binder. It does not provide ambient
+Given-based normalization, structural retained unification, retained inference,
+or runtime index evaluation. Opaque indices remain stuck where a family needs
+constructor discrimination, including bottom and cyclic runtime values.
+See Notes [Normalising retained runtime indices] and
+[Rewriting retained dependent functions], and
+[the scoped Agda normalization sources](REFERENCES.md#agda-provenance).
+Agda's conversion and eta rules do not add a Haskell function eta law.
 
 ## Lambda and application
 
@@ -126,8 +170,9 @@ still reject a constructed retained argument. This is a conservative lowering
 gap. PMC now preserves known function heads before component normalization.
 This supports strict wildcard matching on partial retained functions, including
 an ordinary arrow with a retained codomain. It does not assume the function
-expression is evaluated. Normalization under Pi remains separate from checked
-fixed-domain congruence. See Note [Coverage checking retained functions].
+expression is evaluated. Family-axiom normalization under Pi remains separate
+from coverage classification and ambient-evidence rewriting. See Note
+[Coverage checking retained functions].
 
 The immutable matcher can bind a whole retained function type to a template
 variable. It retains the usual occurs and escape checks. Unsupported retained

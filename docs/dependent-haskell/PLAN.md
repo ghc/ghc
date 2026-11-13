@@ -226,9 +226,44 @@ of eta-expanding a partial function. See
       observations. Strictness, diagnostics, format rejection, guide, and ordinary
       compiler smoke checks pass. See the [checkpoint](README.md#fixed-domain-retained-congruence).
 
-General Pi matching and normalization, changed domains or multiplicities,
+General Pi matching, ambient-evidence normalization, changed domains or multiplicities,
 dependent erased binder kinds, and native coercion unfolding serialization
 remain gated. Non-reflexive eta-cast handling also remains unsupported.
+
+The next increment normalizes family axioms under the fixed-domain retained
+binder. See [the Core contract](CORE.md#family-axiom-normalization-under-retained-binders)
+and [the pinned Agda sources](REFERENCES.md#agda-provenance).
+
+- [x] Normalize the Core body under a scoped lifting context. Permit only shared
+      valid same-domain variable alpha-renaming for runtime indices.
+- [x] Add `mkDepFunRedn` and canonicalize both endpoints independently. Preserve
+      intermediate proof dependencies beneath the runtime binder.
+- [x] Add solver `re_native_binder` mode. Keep global family axioms, ordinary
+      meta-variable reading, roles, reduction depth, and locations. Suppress
+      plugins, inert lookup, family-cache reads and writes, and coercion zapping.
+- [x] Compile the bootstrap compiler in 2m10s. Logs use `native-pinorm` in
+      `_build/verification/`.
+- [x] Verify the kernel normalization checks and signed aliases with no source
+      argument patterns: `leftUnit = nativeId`, `leftUnitAppend = appendNative @Int`,
+      and `constantAlias = ordinaryNat` after reducing `ConstantNat`.
+- [x] Verify 17 dedicated source observations and 38 imported observations
+      (26 previous observations plus 12 new normalization observations).
+- [x] Reject opaque `Add n Z` right-unit transport with GHC-83865 and report
+      reduction-depth failure with GHC-40404. Check roles and binder freshening.
+- [x] Complete both-stage, registered, CLI, guide, and ordinary smoke validation.
+      The CLI checks the actual RHS lines for GHC-83865 and GHC-40404.
+      All five registered regressions pass. See the
+      [verified checkpoint](README.md#family-axiom-normalization).
+
+This increment leaves ordinary `ForAllTy` binder-kind handling unchanged.
+Family axioms reduce at nominal and representational roles; phantom family
+heads remain unreduced. Ordinary forall binder kinds normalize at nominal role.
+After rewriting both equality endpoints, recheck same-Id index reflexivity and
+`tcEqType` equality of retained functions. The existing rewriting evidence
+justifies this step. See Note [Reflexivity after retained normalization].
+This adds neither structural retained decomposition nor meta-variable assignment.
+Full scoped rewriting with ambient Given or plugin evidence remains future
+work. Do not replace actual family reductions with a reflexive bypass.
 
 The audit found separate blockers in the full simplifier. Its type substitution
 can omit runtime Id mappings. Its case reconstruction treats virtual proofs as

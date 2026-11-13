@@ -127,13 +127,50 @@ transport of later payloads and the result when it names a constructor argument.
 Transport through a remaining retained function is supported when its closed
 algebraic domain and unrestricted multiplicity stay unchanged. This includes
 partial applications such as ``appendNative @Int (S n)``. Later applications
-retain the original index relationships. General Pi matching and normalization,
+retain the original index relationships. Structural Pi unification,
+normalization with ambient Given evidence or plugins,
 changed domains or multiplicities, and dependent erased binder kinds remain
 unsupported. Strict wildcard matching on a partial function with named indices
 preserves ordinary forcing behavior. It does not force an
 unused index or the function body. An empty match on a function type remains
 non-exhaustive. Producers and consumers that use local names must use the same
 named index. The checker does not equate a name with its definition.
+
+Global type-family equations can normalize beneath a retained binder with an
+unchanged closed algebraic domain and unrestricted multiplicity. Complete
+signatures can therefore check aliases with no source argument patterns::
+
+    nativeId :: foreach (n :: Nat) -> Vec Int n -> Vec Int n
+    nativeId n xs = xs
+
+    leftUnit :: foreach (n :: Nat) -> Vec Int (Add Z n) -> Vec Int n
+    leftUnit = nativeId
+
+    leftUnitAppend :: foreach (n :: Nat) (m :: Nat)
+                   -> Vec Int (Add Z n) -> Vec Int m -> Vec Int (Add n m)
+    leftUnitAppend = appendNative @Int
+
+A constant family can remove the retained dependency::
+
+    type family ConstantNat (n :: Nat) where
+      ConstantNat n = Int
+
+    ordinaryNat :: Nat -> Int
+    ordinaryNat _ = 42
+
+    constantAlias :: foreach (n :: Nat) -> ConstantNat n
+    constantAlias = ordinaryNat
+
+The normalized signature of ``constantAlias`` is an ordinary ``Nat -> Int``
+arrow. This normalization does not evaluate a runtime index. A family that needs
+an unknown constructor remains stuck. Solver normalization under the retained
+binder excludes ambient Given evidence and plugin rewriting. It does not enable
+unsigned aliases, structural retained unification, or a function eta law.
+After normalization, identical runtime indices and alpha-equal retained
+function types can satisfy reflexivity. This does not decompose a retained
+function or assign a type meta-variable. Family axioms reduce at nominal and
+representational roles. Existing phantom normalization leaves family heads
+unreduced; ordinary forall binder kinds normalize at nominal role.
 
 To compile an ordinary executable, use
 ``-O0 -fomit-interface-pragmas -fno-write-if-simplified-core``. The restricted

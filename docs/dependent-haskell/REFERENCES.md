@@ -6,6 +6,7 @@ references were checked on 2026-11-12. The GHC source baseline is
 Later changes to proposal status, package bounds, branches, or documentation need
 verification. A link to a mutable branch identifies the inspected source, not a
 permanent compatibility guarantee.
+The Pi normalization sources below were checked on 2026-11-13.
 
 See [the project overview](README.md) for the objective. See [the implementation
 plan](PLAN.md) for scope, decisions, and acceptance criteria. The first experiment
@@ -223,6 +224,44 @@ can inspect that head immediately. In contrast, the
 [full normalizer](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Reduce.hs#L1270-L1283)
 normalizes the domain and codomain.
 
+The same normalizer enters a dependent body through
+[`Normalise (Abs a)`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Reduce.hs#L1299-L1301).
+[`underAbstraction_`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Monad/Context.hs#L389-L413)
+adds a dummy-domain context to maintain de Bruijn scope. It does not recheck the
+body's type. Substitution under an
+[`Abs` lifts the substitution](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Substitute.hs#L1058-L1061);
+[`piApply`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Substitute.hs#L599-L602)
+instantiates the codomain with the actual argument.
+At tag `v2.8.0`, the `Reduce.hs` file blob is
+`63fafb0b1ab734b6902ba5eb99b40af43de833cc`; the `Substitute.hs` file blob is
+`1ef41f6d2a0223c8328984903b60dabc2a05a783`.
+
+Full normalization preserves neutral heads and normalizes their arguments.
+The compiled clause matcher
+[returns `NoReduction` when discrimination is stuck](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/CompiledClause/Match.hs#L180-L194).
+This supports scoped reduction under an opaque variable. GHC still uses its own
+family apartness rules. It must not infer a constructor from an Id unfolding.
+The separate
+[`instantiateFull'` routine invokes `etaOnce`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Reduce.hs#L1484-L1498).
+Do not copy that routine's eta behavior into Haskell normalization.
+
+The GHC increment normalizes global family axioms under a fixed closed-domain,
+`Many` retained binder. `mkDepFunRedn` supplies scoped FC evidence and separately
+canonicalizes each endpoint. The Core lifting context permits a shared valid
+same-domain variable alpha-renaming. The solver's `re_native_binder` mode excludes
+plugins, inert evidence, family-cache reads and writes, and coercion zapping.
+It keeps roles, reduction depth, source locations, and ordinary meta-variable
+reading. This is family-axiom normalization, not full normalization with ambient
+Given evidence or structural retained unification. It changes no ordinary
+`ForAllTy` binder-kind path. Agda supplies the scope precedent; it supplies no
+preservation proof for these FC rules or Haskell bottom and cyclic values.
+Family axioms reduce at nominal and representational roles. Existing phantom
+normalization leaves family heads unreduced. Ordinary forall binder kinds still
+normalize at nominal role. The equality canonicalizer rechecks rigid-index and
+retained-type reflexivity after rewriting both sides, without structural
+decomposition or meta-variable assignment. See Note
+[Reflexivity after retained normalization] in `GHC.Tc.Solver.Equality`.
+
 The PMC increment uses this distinction. A known retained function head does
 not need component rewriting to classify the scrutinee as a function. An
 ordinary arrow that contains a retained type has the same outer-shape property.
@@ -312,8 +351,8 @@ It composes equalities for nested constructor fields and transports later
 payloads as well as the result. It emits cases only for constructor WHNF.
 This rule is a GHC design choice. It is not copied from Agda's let elimination.
 The tests check lazy and cyclic Haskell values separately. They do not establish
-a general preservation theorem. General Pi normalization, changed-domain
-congruence, and alias-expression serialization stay gated.
+a general preservation theorem. Ambient-evidence normalization under retained
+binders, changed-domain congruence, and alias-expression serialization stay gated.
 
 [Koronkevich, Rakow, Ahmed, and Bowman, *ANF preserves dependent types up to
 extensional equality*](https://doi.org/10.1017/S0956796822000090), JFP 32, e12
