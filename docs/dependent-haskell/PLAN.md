@@ -749,13 +749,17 @@ Implementation: `a0c493d5f9`. See the
 
 ### Explicit higher-order arguments follow-up
 
-Start with a closed retained function type in an ordinary argument position:
+Admit a retained function type in an ordinary argument position:
 `applyAt :: foreach (n :: Nat) -> (foreach (m :: Nat) -> Vec Int m -> Vec Int m)
 -> Vec Int n -> Vec Int n`, with `applyAt n f xs = f n xs`.
 The parameter `f` is an ordinary closure argument. It is not a runtime index.
 
 - [ ] Admit this nested type in complete value signatures. Preserve each nested
       binder's scope. Keep type-level declaration and index-domain restrictions.
+- [ ] Admit ordinary-leading arrow signatures through the same traversal.
+      Reject partial signatures even when their wildcard is outside the Pi.
+- [ ] Project both ordinary arrow arguments and results for ambiguity checking.
+      Keep erased payload polymorphism and real signature types intact.
 - [ ] Check named functions and lambdas against the supplied argument type.
       Use the existing application checker and checked-lambda rule.
 - [ ] Verify separate-module execution with unknown runtime indices. Check that
@@ -763,13 +767,13 @@ The parameter `f` is an ordinary closure argument. It is not a runtime index.
 - [ ] Reject wrong vector lengths, escaping indices, unsupported domains, and
       function-valued runtime indices with located diagnostics.
 - [ ] Keep inferred aliases, general native meta assignment, Quick Look, and
-      structural Pi unification gated. Assess erased polymorphism separately.
+      structural Pi unification gated. Test explicit outer erased polymorphism.
 
 The renamer and signature checker currently reject the nested type. Core Lint
 and validity already check the contained retained telescope recursively.
 Agda's expected-argument and scoped-Pi lambda rules provide the checking
 precedent. See [the pinned sources](REFERENCES.md#checked-retained-lambdas).
-Ordinary-leading higher-order signatures can follow after this bounded case.
+Follow [the higher-order contract](CORE.md#explicit-higher-order-closure-arguments).
 
 ## Acceptance checks
 

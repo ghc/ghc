@@ -365,6 +365,32 @@ Agda's expected-Pi lambda rule and extended-lambda function checker supply the
 checking precedent.
 See [the pinned sources](REFERENCES.md#checked-retained-lambdas).
 
+### Explicit higher-order closure arguments
+
+A complete value signature can contain a retained function type in an ordinary
+arrow argument or result. Traverse parentheses and both sides of ordinary
+arrows. Keep the existing checks for retained domains, kinds, staging, and
+other source type positions. Apply the complete-signature rule to the whole
+signature, including wildcards outside the nested retained telescope.
+
+Each retained binder scopes its own remaining telescope and codomain. An inner
+binder must not enter an enclosing arrow's result. Its codomain can still refer
+to an outer runtime index. The ordinary closure parameter has a function type.
+It is not a runtime index and does not change the supported index domains.
+
+Check a named function or source lambda against the supplied argument type.
+Reuse retained application and the checked-lambda rule. Preserve source arity,
+usage, and laziness. Ignoring a bottom closure must not evaluate it. Supplying a
+bottom index must not evaluate that index when the selected function ignores it.
+Do not infer a retained function argument type through a native meta assignment.
+
+For signature ambiguity checking only, open retained binders in ordinary arrow
+arguments as well as results. Use one fresh opaque runtime Id on both sides of
+the self-check. Scope all fresh Ids over constraint capture and simplification.
+Keep the actual signature retained. This projection supplies no coercion between
+different retained functions. Preserve the structural-unification gate.
+See [Agda's expected-argument and shared-context rules](REFERENCES.md#explicit-higher-order-arguments).
+
 For application of `DepFunTy b result`, first check the runtime argument against
 the binder's domain. Then substitute its index for `b` in the result. The Core
 grammar accepts a local index Id or a saturated tree of constructor workers.

@@ -715,6 +715,24 @@ does not apply to Haskell's bottom and `seq`. GHC must preserve each lambda form
 source arity and its existing usage rules. General native lambda inference is
 not established by this expected-type rule.
 
+### Explicit higher-order arguments
+
+Agda v2.8.0's
+[`checkNamedArg`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L1535-L1553)
+checks a value argument against its supplied domain. The
+[`checkPostponedLambda`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L678-L710)
+rule introduces the Pi binder before checking the body against its codomain.
+These rules also apply when the argument is a function. The lambda rule does
+not require that the Pi be the outer type of the enclosing definition.
+Both links use file blob `02991c9fa0085315cc854d2833a9080af14a7740`.
+
+The Pi telescope and shared-context conversion references under
+[Agda provenance](#agda-provenance) supply binder-scope precedent. GHC retains
+its own ambiguity check. Its argument/result projection opens nested binders
+in one fresh runtime context for that diagnostic check only. It does not change
+the actual signature or establish structural Pi congruence. Haskell's `seq`
+still requires the source arity and non-strict closure-argument behavior below.
+
 ## Haskell evaluation provenance
 
 The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)
