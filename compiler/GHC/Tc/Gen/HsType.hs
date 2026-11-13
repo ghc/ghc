@@ -29,7 +29,7 @@ module GHC.Tc.Gen.HsType (
 
         bindOuterFamEqnTKBndrs_Q_Tv, bindOuterFamEqnTKBndrs,
         tcOuterTKBndrs, scopedSortOuter, outerTyVars, outerTyVarBndrs,
-        tcGadtConTyVarBndrs,
+        tcGadtConTyVarBndrs, tcCheckRetainedConType,
         bindOuterSigTKBndrs_Tv,
         tcExplicitTKBndrs,
         bindNamedWildCardBinders,
@@ -539,6 +539,55 @@ tcCheckRetainedSigType = go typeLevelMode
                    ; return (mkDepFunTy index body_ty) }
               _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
     go mode body kind = tc_check_lhs_type mode body kind
+
+-- | Check the field suffix of a retained GADT constructor signature.
+-- The Boolean selects final domain validation. Kind inference checks only
+-- domain kinds because the datatype constructor knots are not yet available.
+-- Return explicit metadata too: mkDepFunTy can erase a vacuous binder.
+tcCheckRetainedConType :: Bool
+                      -> (HsModifiedFunArr GhcRn -> TcM Mult)
+                      -> LHsType GhcRn -> TcM ([Maybe Id], TcType)
+tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
+  where
+    go mode (L _ (HsParTy _ body)) = go mode body
+    go mode (L loc (HsForEachTy _ bndrs body))
+      = setSrcSpanA loc $
+        do { when (null bndrs) $
+               failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+           ; bind_indices mode bndrs body }
+    go mode (L loc (HsFunTy _ mult arg res))
+      = setSrcSpanA loc $
+        do { arg_ty <- tc_check_lhs_type mode arg liftedTypeKind
+           ; mult_ty <- tc_field_mult mult
+           ; (binders, body_ty) <- go mode res
+           ; return (Nothing : binders, tcMkVisFunTy mult_ty arg_ty body_ty) }
+    go _ (L loc HsForAllTy{}) = unsupported loc
+    go _ (L loc HsQualTy{})   = unsupported loc
+    go mode body@(L loc _)
+      = setSrcSpanA loc $
+        do { res_ty <- tc_check_lhs_type mode body liftedTypeKind
+           ; when (anyFreeVarsOfType isId res_ty) $ unsupported loc
+           ; return ([], res_ty) }
+
+    bind_indices mode [] body = go mode body
+    bind_indices mode (L loc bndr : rest) body
+      = setSrcSpanA loc $
+        case bndr of
+          HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
+            do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
+               ; domain_ty <- liftZonkM $ zonkTcType domain_ty
+               ; when validate_domain $
+                   unless (isNativeIndexType domain_ty) $
+                     failWithTc $ TcRnRetainedQuantificationError
+                                    (RetainedUnsupportedDomain domain_ty)
+               ; let index = mkLocalId name ManyTy domain_ty
+                     mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
+               ; (binders, body_ty) <- bind_indices mode' rest body
+               ; return (Just index : binders, mkDepFunTy index body_ty) }
+          _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+
+    unsupported loc = setSrcSpanA loc $
+      failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration
 
 {- Note [Source retained signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2318,7 +2367,9 @@ tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
              -> return (mkTyConTy tc, tyConKind tc)
 
            AGlobal (AConLike (RealDataCon dc))
-             -> do { when (isDataFamInstTyCon (dataConTyCon dc)) $
+             -> do { unless (null (dataConRepArgBinders dc)) $
+                       failWithTc $ TcRnRetainedQuantificationError RetainedPackagePromotion
+                   ; when (isDataFamInstTyCon (dataConTyCon dc)) $
                        -- see #15245
                        promotionErr name FamDataConPE
                    ; let (_, _, _, theta, _, _) = dataConFullSig dc

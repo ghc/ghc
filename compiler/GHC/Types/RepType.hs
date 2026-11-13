@@ -29,6 +29,7 @@ module GHC.Types.RepType
 import GHC.Prelude
 
 import GHC.Types.Basic (Arity, RepArity)
+import GHC.Types.Var (varType)
 import GHC.Core.DataCon
 import GHC.Core.Coercion
 import GHC.Core.TyCon
@@ -140,9 +141,14 @@ countFunRepArgs n ty
     + countFunRepArgs (n - 1) res
     -- If typePrimRep returns [] that means a void arg,
     -- and we count 1 for that
+  | DepFunTy index res <- unwrapType ty
+  -- See Note [Retained representation arity].
+  = (length (typePrimRep (varType index)) `max` 1)
+    + countFunRepArgs (n - 1) res
   | otherwise
   = pprPanic "countFunRepArgs: arity greater than type can handle" (ppr (n, ty, typePrimRep ty))
 
+-- | Count constructor payload arguments after unarisation, excluding void fields.
 countConRepArgs :: DataCon -> RepArity
 countConRepArgs dc = go (dataConRepArity dc) (dataConRepType dc)
   where
@@ -152,8 +158,27 @@ countConRepArgs dc = go (dataConRepArity dc) (dataConRepType dc)
     go n ty
       | FunTy _ _ arg res <- unwrapType ty
       = length (typePrimRep arg) + go (n - 1) res
+      | DepFunTy index res <- unwrapType ty
+      -- See Note [Retained representation arity].
+      = length (typePrimRep (varType index)) + go (n - 1) res
       | otherwise
       = pprPanic "countConRepArgs: arity greater than type can handle" (ppr (n, ty, typePrimRep ty))
+
+{- Note [Retained representation arity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained Pi binder is an ordinary runtime argument. Count the representation
+of its domain, then count the codomain. Later argument types can mention the
+same runtime Id. Their representations depend on their kinds, not on the
+runtime value of that Id. Do not instantiate an index or inspect its unfolding.
+
+Retained constructor fields have fixed lifted representations. Both arity
+counters must handle their Pi types: constructor worker LFInfo uses
+countFunRepArgs, and constructor allocation checks use countConRepArgs.
+Keep the existing distinction for void arguments. Function calls retain a void
+argument slot, but constructor payloads omit it. See Note [Coercion tokens]
+in GHC.CoreToStg and Note [Retained constructor field telescopes] in
+GHC.Core.DataCon.
+-}
 
 dataConRuntimeRepStrictness :: HasDebugCallStack => DataCon -> [StrictnessMark]
 -- ^ Give the demands on the arguments of a

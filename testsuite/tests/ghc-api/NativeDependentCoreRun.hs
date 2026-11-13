@@ -1097,6 +1097,31 @@ runModuleChecks libdir = do
         ]
         $ \(label, moduleName, producer, consumer, expected) ->
             runModuleCase libdir label moduleName producer consumer expected
+    packedProducer <- readFile "PackedVecLibrary.hs"
+    packedConsumer <- readFile "Main.hs"
+    runModuleCase
+        libdir
+        "packed-vector"
+        "PackedVecLibrary"
+        packedProducer
+        packedConsumer
+        [ "runtime package: (0,[])"
+        , "runtime package: (2,[42,42])"
+        , "runtime package: (3,[42,42,42])"
+        , "constructor with bottom fields: ok"
+        , "repack with bottom fields: ok"
+        , "repack with cyclic fields: ok"
+        , "ignore bottom fields: 42"
+        , "ignore cyclic fields: 42"
+        , "partial length payload head: 42"
+        , "cyclic length payload head: 42"
+        , "demand payload before length: packed-bottom-payload"
+        , "demand stored length: packed-bottom-length"
+        , "ignore bottom package: packed-bottom-package"
+        , "repack bottom package: packed-bottom-package"
+        , "unused whole package: 42"
+        ]
+    putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
 
 -- | Read a producer interface in a fresh one-shot context and link its object.
@@ -2290,7 +2315,8 @@ sourceModuleRejects label code fragment moduleName source = do
     targets <- GHC.getTargets
     result <- GHC.handleSourceError (pure . Left) $ do
         parsed <- parseSourceTarget moduleName source
-        void (GHC.typecheckModule GHC.StartAndStopTcMPlugins parsed)
+        checked <- GHC.typecheckModule GHC.StartAndKeepRunningTcMPlugins parsed
+        void (GHC.desugarModule checked)
         pure (Right ())
     GHC.setTargets targets
     checkSourceRejection label code fragment result
@@ -2320,6 +2346,45 @@ checkSourceRejection label code fragment result =
                     ++ show (map (diagnosticCode . errMsgDiagnostic) messages)
                     ++ "; got:\n"
                     ++ showSDoc flags (vcat (map (pprDiagnostic . errMsgDiagnostic) messages))
+
+-- | Check source package restrictions before or during desugaring.
+runPackageSourceRejectChecks :: GHC.Ghc ()
+runPackageSourceRejectChecks = do
+    forM_
+        [ ("StrictData", 83605, "StrictData", ["StrictData"], package)
+        , ("TypeData", 83605, "retained constructor", ["TypeData"], ["type data PackedVec a where", "  PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a"])
+        , ("Existential", 83605, "existential binders", [], declaration "forall a hidden. foreach (n :: Nat) -> Vec a n -> hidden -> PackedVec a")
+        , ("Equality", 83605, "contexts", [], declaration "forall a. (a ~ Int) => foreach (n :: Nat) -> Vec a n -> PackedVec a")
+        , ("RefinedUniversal", 83605, "equality specifications", [], declaration "foreach (n :: Nat) -> Vec Int n -> PackedVec Int")
+        , ("Promotion", 83605, "Promotion of constructors with retained fields", [], package ++ ["type Bad = 'PackVec"])
+        , ("ConstructorField", 83605, "bare variable fields", [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec Z xs) = 0"])
+        , ("LazyPattern", 83605, "Lazy patterns and pattern bindings", [], package ++ ["bad :: PackedVec a -> Int", "bad ~(PackVec n xs) = 0"])
+        , ("LetPattern", 83605, "Lazy patterns and pattern bindings", [], package ++ ["bad :: PackedVec a -> Int", "bad p = let PackVec n xs = p in 0"])
+        , ("IndexMismatch", 83865, "Couldn't match", [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> PackedVec Int", "bad n m xs = PackVec @Int m xs"])
+        , ("IndexEscape", 83865, "Couldn't match", [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n xs) = xs"])
+        , ("SharedEquations", 94726, "one equation with bare variable fields", [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec n xs) = 0", "bad (PackVec m ys) = 1"])
+        ]
+        $ \(name, code, fragment, extensions, declarations) -> do
+            let moduleName = "NativeSourcePackage" ++ name
+                source =
+                    unlines $
+                        [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll #-}"
+                        , "{-# LANGUAGE GADTs, KindSignatures, RankNTypes, ScopedTypeVariables #-}"
+                        , "{-# LANGUAGE TypeApplications, TypeOperators #-}"
+                        ]
+                            ++ map (\extension -> "{-# LANGUAGE " ++ extension ++ " #-}") extensions
+                            ++ [ "module " ++ moduleName ++ " where"
+                               , "data Nat = Z | S Nat"
+                               , "data Vec a (n :: Nat) where"
+                               , "  VNil :: Vec a Z"
+                               , "  VCons :: a -> Vec a n -> Vec a (S n)"
+                               ]
+                            ++ declarations
+            sourceModuleRejects name code fragment moduleName source
+    liftIO $ putStrLn "package source rejection checks: ok"
+  where
+    declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
+    package = declaration "foreach (n :: Nat) -> Vec a n -> PackedVec a"
 
 -- | Reject index mismatches and malformed retained Nat constructor equations.
 runNatSourceRejectChecks :: GHC.Ghc ()
@@ -2409,7 +2474,6 @@ runSourceRejectChecks = do
         , ("unsigned partial retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["index :: Bool", "index = False", "alias = keep index"]) "42")
         , ("retained type in a type-constructor argument", 43582, "not supported in this type position", [], ["bad :: Maybe (foreach (b :: Bool) -> Select b -> Select b)", "bad = undefined"])
         , ("retained type synonym", 43582, "not supported in this type position", [], ["type Bad = foreach (b :: Bool) -> Select b -> Select b"])
-        , ("retained constructor declaration before source support", 43582, "not supported in this type position", [], ["data Packed where", "  Pack :: foreach (b :: Bool) -> Select b -> Packed"])
         , ("unregistered ordinary term name", 37479, "is a term-level binding", [], ["ordinary :: Bool", "ordinary = False", "type Bad = NativeSourceRejected.ordinary"])
         , ("constructor payload mismatch", 83865, "second argument", [], local [] selection identity "keep True False")
         ,
@@ -2457,6 +2521,7 @@ runSourceRejectChecks = do
             )
         ]
     runNatSourceRejectChecks
+    runPackageSourceRejectChecks
     liftIO $ putStrLn "source rejection checks: ok"
   where
     identity = ["keep b x = x"]

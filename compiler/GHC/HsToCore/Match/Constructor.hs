@@ -22,13 +22,14 @@ import GHC.Hs
 import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
-import GHC.Core.DataCon ( dataConTyCon )
-import GHC.Core.Type ( isNativeIndexType )
+import GHC.Core.DataCon ( dataConTyCon, dataConRepArgBinders )
+import GHC.Core.Type ( isNativeIndexType, isManyTy )
 import GHC.Core.TyCon ( isNewTyCon, newTyConCo )
 import GHC.Tc.Types.Evidence ( isEmptyTcEvBinds, isIdHsWrapper )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
 import GHC.HsToCore.Monad
+import GHC.HsToCore.Errors.Types (DsMessage(DsRetainedPackagePatterns))
 import GHC.HsToCore.Utils
 import GHC.Core ( CoreExpr )
 import GHC.Core.Make ( mkCoreLets )
@@ -39,7 +40,7 @@ import GHC.Types.FieldLabel ( flSelector )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import Control.Monad(liftM)
+import Control.Monad(liftM, unless)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 
@@ -213,13 +214,24 @@ matchOneConLike :: [MatchId]
                 -> NonEmpty EquationInfoNE
                 -> DsM (CaseAlt ConLike)
 matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single constructor
-  = do  { let inst_tys = assert (all tcIsTcTyVar ex_tvs) $
+  = do  { retained_vars <- case con1 of
+            RealDataCon con | not (null (dataConRepArgBinders con)) ->
+              putSrcSpanDsA (getLoc (eqn_pat eqn1)) $
+                do { unless (null eqns && isManyTy mult) package_error
+                   ; case args1 of
+                       PrefixCon _ pats
+                         | Just fields <- traverse bare_field pats -> return (Just fields)
+                       _ -> package_error }
+            _ -> return Nothing
+        ; let inst_tys = assert (all tcIsTcTyVar ex_tvs) $
                            -- ex_tvs can only be tyvars as data types in source
                            -- Haskell cannot mention covar yet (Aug 2018).
                          assert (tvs1 `equalLength` ex_tvs) $
                          arg_tys ++ mkTyVarTys tvs1
 
-              val_arg_tys = conLikeInstOrigArgTys con1 inst_tys
+              val_arg_tys = case retained_vars of
+                Just fields -> map (\v -> Scaled (idMult v) (idType v)) fields
+                Nothing -> conLikeInstOrigArgTys con1 inst_tys
         -- dataConInstOrigArgTys takes the univ and existential tyvars
         -- and returns the types of the *value* args, which is what we want
 
@@ -257,7 +269,9 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
             -- multiplicity because of the invariant that, in Core, binders in a
             -- constructor pattern must be scaled by the multiplicity of the
             -- case. See Note [Case expression invariants].
-        ; arg_vars <- selectConMatchVars scaled_arg_tys args1
+        ; arg_vars <- case retained_vars of
+            Just fields -> return fields
+            Nothing -> selectConMatchVars scaled_arg_tys args1
                 -- Use the first equation as a source of
                 -- suggestions for the new variables
 
@@ -279,6 +293,15 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
+    -- See Note [Checking retained package patterns] in GHC.Tc.Gen.Pat.
+    -- The field types already use these source Ids. An ordinary alias would
+    -- not establish equality between two different runtime index Ids.
+    bare_field :: LPat GhcTc -> Maybe Id
+    bare_field (L _ (VarPat _ (L _ var))) = Just (localiseId var)
+    bare_field _ = Nothing
+    package_error :: DsM a
+    package_error = failWithDs DsRetainedPackagePatterns
+
     con_pat_args :: Pat GhcTc -> HsConPatDetails GhcTc
     con_pat_args (ConPat { pat_args = args }) = args
     con_pat_args p = pprPanic "matchOneConLike" (ppr p)  -- All patterns are ConPats

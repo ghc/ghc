@@ -20,7 +20,7 @@ module GHC.Rename.HsType (
         lookupField, mkHsOpTyRn,
         rnLTyVar,
 
-        rnHsConDeclField,
+        rnHsConDeclField, rnRetainedSigType,
 
         -- Precence related stuff
         NegationHandling(..),

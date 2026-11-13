@@ -22,6 +22,7 @@ source keep/choose True: 42
 source keep/choose False: False
 source indexed payload control bottom (dictionary WHNF): forced
 source choose bottom: raised native-bottom-bool
+package source rejection checks: ok
 source rejection checks: ok
 program keep/choose True: 42
 program keep/choose False: False
@@ -30,6 +31,7 @@ program keep indexed bottom (fully applied): 42
 program indexed payload control bottom (dictionary WHNF): forced
 program choose bottom: raised native-bottom-bool
 program rejection checks: ok
+packed vector module checks: ok
 module execution checks: ok
 module fingerprint/recompilation checks: ok
 native-core-run-ok

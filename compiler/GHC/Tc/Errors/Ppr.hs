@@ -3586,6 +3586,15 @@ pprRetainedQuantificationError reason = case reason of
     text "This result requires a wrapper that is not supported for retained functions yet."
   RetainedIndexExpression ->
     text "A retained argument must be a local index variable or a supported constructor tree."
+  RetainedPackageDeclaration ->
+    vcat [ text "A retained constructor requires a lazy ordinary data declaration with a lifted result kind."
+         , text "Records, contexts, existential binders, equality specifications, and StrictData are not supported."
+         , text "Its erased quantifiers must name exactly the datatype parameters." ]
+  RetainedPackagePromotion ->
+    text "Promotion of constructors with retained fields is not supported yet."
+  RetainedPackagePattern ->
+    vcat [ text "A retained package pattern requires one constructor, bare variable fields, and unrestricted multiplicity."
+         , text "Lazy patterns and pattern bindings are not supported yet." ]
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
 pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $

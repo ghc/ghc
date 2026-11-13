@@ -1173,6 +1173,7 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
       = arg_binders `equalLength` orig_arg_tys
         && null ex_tvs && null eq_spec && null theta && null stupid_theta
         && null fields && isVanillaAlgTyCon rep_tycon
+        && not (isTypeDataTyCon rep_tycon)
         && isLiftedTypeKind (tyConResKind rep_tycon)
         && valid_universals
         && case rep of { NoDataConRep -> True; _ -> False }
@@ -1647,8 +1648,8 @@ field-type thunk. See Note [Retained constructor fields in interfaces] in
 GHC.Iface.Syntax. The ordinary constructor path keeps its existing laziness.
 
 The first subset has no wrapper, existential, constraint, record selector,
-data-family or newtype representation, strict field, or unpacked field. The
-ordinary parent and all fields are lifted. The user quantifiers name exactly
+data-family or newtype representation, "type data" parent, strict field, or
+unpacked field. The ordinary parent and all fields are lifted. The user quantifiers name exactly
 the universal type variables, with no duplicates. A named field has a closed
 native index domain and multiplicity Many. Its Id must be fresh. Only
 earlier retained fields can occur as free runtime Ids in a field type. No
@@ -1664,6 +1665,9 @@ The flat instantiated-field APIs cannot return fresh runtime field binders.
 Reject retained constructors in dataConInstSig, dataConInstArgTys and
 dataConInstOrigArgTys. Use dataConRepInstPat for scoped Core patterns. Raw
 argument-type accessors must be used with dataConRepArgBinders.
+The product splitter declines retained constructors for the same reason.
+Constructor impossibility checking returns False without calling the flat
+signature API. These constructors have no equality specification or context.
 
 Agda constructor telescopes scope earlier fields over later field types.
 This guides the binding representation, not the evaluation rules for lazy
@@ -1940,6 +1944,9 @@ dataConCannotMatch :: [Type] -> DataCon -> Bool
 --                  scrutinee of type (T tys)
 --                  where T is the dcRepTyCon for the data con
 dataConCannotMatch tys con
+  | not (null (dataConRepArgBinders con))
+  = False -- Retained constructors have no equalities or context.
+          -- See Note [Retained constructor field telescopes].
   -- See (U6) in Note [Implementing unsafeCoerce]
   -- in base:Unsafe.Coerce
   | con `hasKnownKey` unsafeReflDataConKey
@@ -2102,6 +2109,7 @@ splitDataProductType_maybe
 splitDataProductType_maybe ty
   | Just (tycon, ty_args) <- splitTyConApp_maybe ty
   , Just con <- tyConSingleDataCon_maybe tycon
+  , null (dataConRepArgBinders con) -- A flat result cannot preserve field scope.
   , null (dataConExTyCoVars con) -- no existentials! See above
   = Just (tycon, ty_args, con, dataConInstArgTys con ty_args)
   | otherwise

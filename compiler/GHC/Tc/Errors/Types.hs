@@ -5332,6 +5332,9 @@ data RetainedQuantificationError
   | RetainedContextPattern
   | RetainedResultWrapper
   | RetainedIndexExpression
+  | RetainedPackageDeclaration
+  | RetainedPackagePromotion
+  | RetainedPackagePattern
 
 -- | An error in the implementation of an abstract datatype using
 -- a type synonym.

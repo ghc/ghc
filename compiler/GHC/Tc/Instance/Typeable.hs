@@ -448,7 +448,11 @@ todoForTyCons mod mod_id tycons = do
             | tc     <- tycons
             , tc'    <- tc : tyConATs tc
               -- We need type representations for any associated types
-            , let promoted = map promoteDataCon (tyConDataCons tc')
+            , let promoted = [ promoteDataCon dc
+                             | dc <- tyConDataCons tc'
+                             , null (dataConRepArgBinders dc) ]
+                  -- Retained fields have no promoted constructor telescope.
+                  -- See Note [Retained constructor field telescopes] in GHC.Core.DataCon.
             , tc''   <- tc' : promoted
               -- Don't make bindings for data-family instance tycons.
               -- Do, however, make them for their promoted datacon (see #13915).

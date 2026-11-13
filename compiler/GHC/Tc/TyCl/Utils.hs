@@ -578,22 +578,39 @@ irDataCon :: DataCon -> RoleM ()
 irDataCon datacon
   = setRoleInferenceVars univ_tvs $
     irExTyVars ex_tvs $ \ ex_var_set ->
-      do mapM_ (irType ex_var_set) (eqSpecPreds eq_spec ++ theta ++ map scaledThing arg_tys)
-         mapM_ (markNominal ex_var_set) (map tyVarKind ex_tvs ++ map scaledMult arg_tys)  -- Field multiplicities are nominal (#18799)
+      do mapM_ (irType ex_var_set) (eqSpecPreds eq_spec ++ theta)
+         if null field_binders
+         then do mapM_ (irType ex_var_set) (map scaledThing arg_tys)
+                 mapM_ (markNominal ex_var_set) (map tyVarKind ex_tvs ++ map scaledMult arg_tys)
+         else do mapM_ (markNominal ex_var_set) (map tyVarKind ex_tvs)
+                 ir_fields ex_var_set field_binders arg_tys
+         -- Field multiplicities are nominal (#18799).
       -- See Note [Role-checking data constructor arguments]
   where
     (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
       = dataConFullSig datacon
+    field_binders = dataConRepArgBinders datacon
+
+    -- See Note [Roles of retained constructor fields].
+    ir_fields _ [] [] = return ()
+    ir_fields scope (binder : binders) (Scaled mult ty : tys)
+      = do { irType scope ty
+           ; markNominal scope mult
+           ; ir_fields (maybe scope (extendVarSet scope) binder) binders tys }
+    ir_fields _ _ _ = pprPanic "irDataCon: misaligned retained fields" (ppr datacon)
 
 irType :: VarSet -> Type -> RoleM ()
 irType = go
   where
     go lcls ty                 | Just ty' <- coreView ty -- #14101
                                = go lcls ty'
-    go _ ty@(TermVarTy {})
-      = pprPanic "irType: unsupported runtime index" (ppr ty)
-    go _ ty@(DepFunTy {})
-      = pprPanic "irType: unsupported retained function" (ppr ty)
+    go lcls ty@(TermVarTy v)
+      | v `elemVarSet` lcls, isNativeIndexId v = markNominal lcls (varType v)
+      | otherwise = pprPanic "irType: invalid runtime index scope" (ppr ty)
+    go lcls ty@(DepFunTy v body)
+      | isNativeIndexId v
+      = markNominal lcls (varType v) >> go (extendVarSet lcls v) body
+      | otherwise = pprPanic "irType: invalid retained binder" (ppr ty)
     go lcls (TyVarTy tv)       = unless (tv `elemVarSet` lcls) $
                                  updateRole Representational tv
     go lcls (AppTy t1 t2)      = go lcls t1 >> markNominal lcls t2
@@ -628,31 +645,47 @@ irExTyVars orig_tvs thing = go emptyVarSet orig_tvs
     go lcls (tv:tvs) = do { markNominal lcls (tyVarKind tv)
                           ; go (extendVarSet lcls tv) tvs }
 
-markNominal :: TyVarSet   -- local variables
+markNominal :: VarSet     -- Local erased variables and runtime indices
             -> Type -> RoleM ()
 markNominal lcls ty = mapM_ (updateRole Nominal) $
-                      nonDetVarSetElems (get_ty_vars ty `minusVarSet` lcls)
+                      nonDetVarSetElems (get_ty_vars lcls ty `minusVarSet` lcls)
   where
      -- get_ty_vars gets all the tyvars (no covars!) from a type *without*
      -- recurring into coercions. Recall: coercions are totally ignored during
      -- role inference. See [Coercions in role inference]
-    get_ty_vars :: Type -> VarSet
-    get_ty_vars t                 | Just t' <- coreView t -- #20999
-                                  = get_ty_vars t'
-    get_ty_vars ty@(TermVarTy {})
-      = pprPanic "markNominal: unsupported runtime index" (ppr ty)
-    get_ty_vars ty@(DepFunTy {})
-      = pprPanic "markNominal: unsupported retained function" (ppr ty)
-    get_ty_vars (TyVarTy tv)      = unitVarSet tv
-    get_ty_vars (AppTy t1 t2)     = get_ty_vars t1 `unionVarSet` get_ty_vars t2
-    get_ty_vars (FunTy _ w t1 t2) = get_ty_vars w `unionVarSet` get_ty_vars t1
-                                                  `unionVarSet` get_ty_vars t2
-    get_ty_vars (TyConApp _ tys)  = mapUnionVarSet get_ty_vars tys
-    get_ty_vars (ForAllTy (Bndr v _) ty) = get_ty_vars (varType v) `unionVarSet`
-                                           (get_ty_vars ty `delVarSet` v)
-    get_ty_vars (LitTy {})        = emptyVarSet
-    get_ty_vars (CastTy ty _)     = get_ty_vars ty
-    get_ty_vars (CoercionTy _)    = emptyVarSet
+    get_ty_vars :: VarSet -> Type -> VarSet
+    get_ty_vars scope t | Just t' <- coreView t = get_ty_vars scope t' -- #20999
+    get_ty_vars scope ty@(TermVarTy v)
+      | v `elemVarSet` scope, isNativeIndexId v = get_ty_vars scope (varType v)
+      | otherwise = pprPanic "markNominal: invalid runtime index scope" (ppr ty)
+    get_ty_vars scope ty@(DepFunTy v body)
+      | isNativeIndexId v
+      = get_ty_vars scope (varType v) `unionVarSet`
+          get_ty_vars (extendVarSet scope v) body
+      | otherwise = pprPanic "markNominal: invalid retained binder" (ppr ty)
+    get_ty_vars _ (TyVarTy tv) = unitVarSet tv
+    get_ty_vars scope (AppTy t1 t2) = get_ty_vars scope t1 `unionVarSet` get_ty_vars scope t2
+    get_ty_vars scope (FunTy _ w t1 t2)
+      = mapUnionVarSet (get_ty_vars scope) [w,t1,t2]
+    get_ty_vars scope (TyConApp _ tys) = mapUnionVarSet (get_ty_vars scope) tys
+    get_ty_vars scope (ForAllTy (Bndr v _) ty)
+      = get_ty_vars scope (varType v) `unionVarSet`
+          (get_ty_vars (extendVarSet scope v) ty `delVarSet` v)
+    get_ty_vars _ (LitTy {}) = emptyVarSet
+    get_ty_vars scope (CastTy ty _) = get_ty_vars scope ty
+    get_ty_vars _ (CoercionTy _) = emptyVarSet
+
+{- Note [Roles of retained constructor fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check constructor fields in telescope order. Extend the local scope after each
+named runtime field. A valid index has a closed native domain, so it contributes
+no ordinary type-parameter role. Check that domain and continue through the
+payload type. In particular, do not omit the element parameter of Vec a n.
+
+Use the same scope rule for retained Pi binders inside field types. Nominal
+traversal returns type variables only; a bound runtime Id is not a role variable.
+Keep this traversal aligned with checkValidRoles in GHC.Tc.TyCl.
+-}
 
 -- like lookupRoles, but with Nominal tags at the end for oversaturated TyConApps
 lookupRolesX :: TyCon -> RoleM [Role]

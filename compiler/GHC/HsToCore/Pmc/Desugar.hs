@@ -36,6 +36,7 @@ import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
 import GHC.HsToCore.Utils (isTrueLHsExpr, selectMatchVar, decideBangHood)
 import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
 import GHC.HsToCore.Monad
+import GHC.HsToCore.Errors.Types (DsMessage(DsRetainedPackagePatterns))
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Type
@@ -332,11 +333,25 @@ desugarListPat x pats = do
 -- | Desugar a constructor pattern
 desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
                  -> [EvVar] -> HsConPatDetails GhcTc -> DsM GrdDag
-desugarConPatOut x con univ_tys ex_tvs dicts = \case
-    PrefixCon _ ps                   -> go_field_pats (zip [0..] ps)
-    InfixCon  _ p1 p2                -> go_field_pats (zip [0..] [p1,p2])
-    RecCon    _ (HsRecFields _ fs _) -> go_field_pats (rec_field_ps fs)
+desugarConPatOut x con univ_tys ex_tvs dicts con_args
+  | RealDataCon dc <- con, not (null (dataConRepArgBinders dc))
+  = case con_args of
+      PrefixCon _ ps
+        | Just fields <- traverse bare_field ps
+        -> go_field_pats (map idType fields) (zip [0..] ps)
+      _ -> failWithDs DsRetainedPackagePatterns
+  | otherwise = case con_args of
+    PrefixCon _ ps                   -> go_field_pats arg_tys (zip [0..] ps)
+    InfixCon  _ p1 p2                -> go_field_pats arg_tys (zip [0..] [p1,p2])
+    RecCon    _ (HsRecFields _ fs _) -> go_field_pats arg_tys (rec_field_ps fs)
   where
+    -- See Note [Checking retained package patterns] in GHC.Tc.Gen.Pat.
+    -- selectMatchVar chooses these same Ids below. Their types already contain
+    -- the preceding retained source field Ids. Keep ordinary PMC enabled.
+    bare_field :: LPat GhcTc -> Maybe Id
+    bare_field (L _ (VarPat _ (L _ var))) = Just (localiseId var)
+    bare_field _ = Nothing
+
     -- The actual argument types (instantiated)
     arg_tys     = map scaledThing $ conLikeInstOrigArgTys con (univ_tys ++ mkTyVarTys ex_tvs)
 
@@ -350,7 +365,7 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
         orig_lbls        = map flSelector $ conLikeFieldLabels con
         lbl_to_index lbl = expectJust $ elemIndex lbl orig_lbls
 
-    go_field_pats tagged_pats = do
+    go_field_pats field_tys tagged_pats = do
       -- The fields that appear might not be in the correct order. So
       --   1. Do the PmCon match
       --   2. Then pattern match on the fields in the order given by the first
@@ -369,7 +384,7 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
             Nothing  -> mkPmId ty
 
       -- 1. the constructor pattern match itself
-      arg_ids <- zipWithM get_pat_id [0..] arg_tys
+      arg_ids <- zipWithM get_pat_id [0..] field_tys
       let con_grd = PmCon x (PmAltConLike con) ex_tvs dicts arg_ids
 
       -- 2. guards from field selector patterns

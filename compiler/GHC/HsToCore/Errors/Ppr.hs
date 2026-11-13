@@ -25,6 +25,9 @@ instance Diagnostic DsMessage where
   diagnosticMessage opts = \case
     DsUnknownMessage (UnknownDiagnostic f _ m)
       -> diagnosticMessage (f opts) m
+    DsRetainedPackagePatterns
+      -> mkSimpleDecorated $
+           text "A retained package constructor currently requires one equation with bare variable fields."
     DsEmptyEnumeration
       -> mkSimpleDecorated $ text "Enumeration is empty"
     DsIdentitiesFound conv_fn type_of_conv
@@ -252,6 +255,7 @@ instance Diagnostic DsMessage where
 
   diagnosticReason = \case
     DsUnknownMessage m          -> diagnosticReason m
+    DsRetainedPackagePatterns   -> ErrorWithoutFlag
     DsEmptyEnumeration          -> WarningWithFlag Opt_WarnEmptyEnumerations
     DsIdentitiesFound{}         -> WarningWithFlag Opt_WarnIdentities
     DsOverflowedLiterals{}      -> WarningWithFlag Opt_WarnOverflowedLiterals
@@ -281,6 +285,7 @@ instance Diagnostic DsMessage where
 
   diagnosticHints = \case
     DsUnknownMessage m          -> diagnosticHints m
+    DsRetainedPackagePatterns   -> noHints
     DsEmptyEnumeration          -> noHints
     DsIdentitiesFound{}         -> noHints
     DsOverflowedLiterals i _tc bounds usingNegLiterals

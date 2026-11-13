@@ -3049,7 +3049,23 @@ pushCoDataCon :: DataCon -> [CoreExpr] -> MCoercionR
 -- The left-hand one must be a T, because exprIsConApp returned True
 -- but the right-hand one might not be.  (Though it usually will.)
 pushCoDataCon dc dc_args MRefl    = Just $! (push_dc_refl dc dc_args)
-pushCoDataCon dc dc_args (MCo co) = push_dc_gen  dc dc_args co (coercionKind co)
+pushCoDataCon dc dc_args (MCo co)
+  | not (null (dataConRepArgBinders dc))
+  , not (isReflCo co)
+  -- See Note [Retained constructor casts].
+  = Nothing
+  | otherwise
+  = push_dc_gen dc dc_args co (coercionKind co)
+
+{- Note [Retained constructor casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ordinary KPush substitution binds erased variables only. A retained field
+also scopes over later field types. Pushing a nonreflexive result cast requires
+a scoped substitution through those fields. The flat zip in push_data_con does
+not provide it. Decline this transformation for retained constructors until a
+scoped rule is available. Reflexive casts preserve the existing field scope.
+See Note [Retained constructor field telescopes] in GHC.Core.DataCon.
+-}
 
 push_dc_refl :: DataCon -> [CoreExpr] -> (DataCon, [Type], [CoreExpr])
 push_dc_refl dc dc_args

@@ -1137,16 +1137,28 @@ ordinary algebraic result, no pending type arguments, and no constraints or
 native template. Leave constructors with concreteness requirements on the
 ordinary instantiation path. Pattern synonyms and ordinary functions do not
 use this fallback. No mutable type variable receives retained syntax. The exact
-result match remains the first choice. See
+result match remains the first choice. Before either match, zonk the native
+expected type. The enclosing application can have filled ordinary payload
+metas during its result check. For example, PackVec n bottomPayload checks
+bottomPayload :: forall m. Vec Int m against Vec alpha n after alpha := Int.
+The pure matcher must see Int instead of the filled alpha node. Otherwise it
+fails and ordinary index instantiation creates a meta that cannot hold n.
+This zonking reads existing assignments. It does not fill a native meta or
+infer the payload before its expected type is available. See
 Note [Immutable retained result instantiation].
 -}
 
--- | Try exact instantiation before a checked data-constructor candidate.
+-- | Expose filled payload metas before exact or candidate immutable matching.
 tcRetainedResultInst :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
                      -> HsExpr GhcTc -> TcSigmaType
                      -> TcM (Maybe ([Type], TcSigmaType))
 tcRetainedResultInst do_ql expected args fun sigma
-  = do { matched <- tcRetainedResultMatch do_ql expected args fun sigma
+  = do { expected <- case (do_ql, expected) of
+           (NoQL, Just rho)
+             | hasNativeDependentExpr (Core.Type rho)
+             -> Just <$> liftZonkM (zonkTcType rho)
+           _ -> return expected
+       ; matched <- tcRetainedResultMatch do_ql expected args fun sigma
        ; case matched of
            Just _ -> return matched
            Nothing -> tcRetainedConResultInst do_ql expected args fun sigma }

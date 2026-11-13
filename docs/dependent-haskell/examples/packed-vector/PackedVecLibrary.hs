@@ -7,7 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
--- | Target source for retained constructor fields. Source checking is pending.
+-- | Store and consume a runtime length with an indexed vector.
 module PackedVecLibrary
     ( Nat (..)
     , Vec (..)

@@ -205,6 +205,7 @@ type GhcDiagnosticCode :: Symbol -> Nat
 type family GhcDiagnosticCode c = n | n -> c where
 
   -- Desugarer diagnostic codes
+  GhcDiagnosticCode "DsRetainedPackagePatterns"                     = 94726
   GhcDiagnosticCode "DsEmptyEnumeration"                            = 10190
   GhcDiagnosticCode "DsIdentitiesFound"                             = 04214
   GhcDiagnosticCode "DsOverflowedLiterals"                          = 97441

@@ -65,7 +65,7 @@ import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Map.Expr
 import GHC.Core.Predicate (typeDeterminesValue, mkNomEqPred)
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
-import GHC.Core.Utils     (exprType)
+import GHC.Core.Utils     (exprType, dataConRepInstPat)
 import GHC.Core.Make      (mkListExpr, mkCharExpr, mkImpossibleExpr)
 
 import GHC.Data.FastString
@@ -1587,7 +1587,14 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
       let gammas = substTheta sigma_ex (eqSpecPreds eq_spec ++ thetas)
       -- (4) Instantiate fresh term variables as arguments to the constructor
       let field_tys' = substTys sigma_ex $ map scaledThing field_tys
-      arg_ids <- mapM mkPmId field_tys'
+      arg_ids <- case con of
+        RealDataCon dc | not (null (dataConRepArgBinders dc)) -> do
+          -- See Note [Retained package fields in PMC].
+          uniqs <- getUniquesM
+          let inst_tys = map (substTyVar sigma_univ) (dataConUnivTyVars dc)
+              (_, fields) = dataConRepInstPat uniqs ManyTy dc inst_tys
+          pure fields
+        _ -> mapM mkPmId field_tys'
       tracePm (hdr "(cts)") $ vcat
         [ ppr x <+> dcolon <+> ppr match_ty
         , text "In WHNF:" <+> ppr (isSourceTypeInWHNF match_ty) <+> ppr norm_match_ty
@@ -1626,6 +1633,19 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
     Nothing -> do
       tracePm (hdr "(match_ty not instance of res_ty) }") empty
       pure (Just nabla) -- Matching against match_ty failed. Inhabited!
+
+{- Note [Retained package fields in PMC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A speculative package constructor needs fresh runtime field Ids too. A flat
+type substitution leaves the declaration's retained field templates free in
+later field types. Use dataConRepInstPat to freshen fields from left to right
+and substitute each retained Id into the remaining types. Retained package
+constructors have no erased existentials or constructor constraints.
+
+The observed source-pattern path instead uses its checked field Ids. See
+Note [Checking retained package patterns] in GHC.Tc.Gen.Pat. Both paths keep
+ordinary coverage checking. They do not evaluate runtime indices or fields.
+-}
                         -- See Note [Instantiating a ConLike].
 
 -- | @matchConLikeResTy _ _ ty K@ tries to match @ty@ against the result

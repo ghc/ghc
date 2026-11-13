@@ -6,7 +6,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 
--- | Target executable for source construction, import, and lazy elimination.
+-- | Check source construction, import, and lazy elimination.
 module Main (main) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)

@@ -37,6 +37,8 @@ import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Core.Multiplicity
+import GHC.Core (Expr(Var))
+import qualified GHC.Core.Subst as CoreSubst
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_kind )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
@@ -1176,6 +1178,9 @@ warnMonoLocalBinds
 tcDataConPat :: LocatedN Name -> DataCon
              -> Scaled ExpSigmaTypeFRR        -- Type of the pattern
              -> Checker (HsConPatDetails GhcRn) (Pat GhcTc)
+tcDataConPat con_name data_con pat_ty_scaled penv arg_pats thing_inside
+  | not (null (dataConRepArgBinders data_con))
+  = tcRetainedDataConPat con_name data_con pat_ty_scaled penv arg_pats thing_inside
 tcDataConPat (L con_span con_name) data_con pat_ty_scaled
              penv arg_pats thing_inside
   = do  { let tycon = dataConTyCon data_con
@@ -1282,6 +1287,87 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
                 }
         ; return (mkHsWrapPat wrap res_pat pat_ty, res)
         } }
+
+-- | Check a package constructor's fields in their runtime telescope order.
+-- See Note [Checking retained package patterns].
+tcRetainedDataConPat :: LocatedN Name -> DataCon
+                     -> Scaled ExpSigmaTypeFRR
+                     -> Checker (HsConPatDetails GhcRn) (Pat GhcTc)
+tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
+  = setSrcSpanA con_span $
+    do { let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig con
+             binders = dataConRepArgBinders con
+             con_like = RealDataCon con
+             pat_mult = scaledMult pat_ty_scaled
+       ; unless (isManyTy pat_mult && null ex_tvs && null eq_spec && null theta
+                 && length (tyConDataCons (dataConTyCon con)) == 1
+                 && binders `equalLength` arg_tys && not (pe_lazy penv)) bad_pattern
+       ; case pe_ctxt penv of
+           LamPat{} -> return ()
+           LetPat{} -> bad_pattern
+       ; (ann, pats) <- case arg_pats of
+           PrefixCon ann pats -> return (ann, pats)
+           _ -> bad_pattern
+       ; check_con_pat_arity con_like (length pats)
+       ; mapM_ check_variable pats
+       ; (wrap, ctxt_res_tys) <- matchExpectedConTy penv (dataConTyCon con) pat_ty_scaled
+       ; unless (isIdHsWrapper wrap) bad_pattern
+       ; pat_ty <- readExpType (scaledThing pat_ty_scaled)
+       ; subst <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
+       ; (pats', res) <- check_fields subst 1 (zipEqual binders arg_tys) pats
+       ; let pat = ConPat { pat_con = L con_span con_like
+                          , pat_args = PrefixCon ann pats'
+                          , pat_con_ext = ConPatTc
+                            { cpt_tvs = [], cpt_dicts = []
+                            , cpt_binds = emptyTcEvBinds
+                            , cpt_arg_tys = ctxt_res_tys
+                            , cpt_wrap = idHsWrapper } }
+       ; return (mkHsWrapPat wrap pat pat_ty, res) }
+  where
+    bad_pattern :: TcM a
+    bad_pattern = failWithTc (TcRnRetainedQuantificationError RetainedPackagePattern)
+
+    check_variable :: LPat GhcRn -> TcM ()
+    check_variable (L _ VarPat{}) = return ()
+    check_variable (L loc _) = setSrcSpanA loc bad_pattern
+
+    check_fields _ _ [] []
+      = do { res <- thing_inside; return ([], res) }
+    check_fields subst position ((mb_binder, arg_ty) : args) (pat : pats)
+      = do { let scaled_ty = scaleScaled (scaledMult pat_ty_scaled) (substScaledTy subst arg_ty)
+           ; subst' <- case mb_binder of
+               Nothing -> return subst
+               Just template -> case unLoc pat of
+                 VarPat _ (L _ name) ->
+                   do { let index = mkLocalId name ManyTy (scaledThing scaled_ty)
+                      ; unless (isManyTy (scaledMult scaled_ty) && isNativeIndexId index) bad_pattern
+                      ; return (CoreSubst.extendIdSubst
+                                  (extendSubstInScope subst index) template (Var index)) }
+                 _ -> bad_pattern
+           ; (pat', (pats', res)) <- tcConArg (RealDataCon con) penv
+                                      (position, pat, scaled_ty) $
+                                      check_fields subst' (position + 1) args pats
+           ; return (pat' : pats', res) }
+    check_fields _ _ _ _ = bad_pattern
+
+{- Note [Checking retained package patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained constructor field binds a runtime Id in the later field types.
+Instantiate these types from left to right. Use the bare source variable's
+Name for the retained Id. tcPatBndr uses that same Name, type, and multiplicity
+when it checks the field. Extend the substitution and its in-scope set before
+checking later fields and the RHS. Do not put this Id among the erased skolems.
+
+The first source subset has one constructor, prefix patterns, and bare variable
+fields in a strict constructor match. The fields themselves stay lazy. Reject
+lazy and let patterns. Match compilation rejects multiple equations for the
+same package constructor before it shares alternative fields. It must use
+these actual source field Ids, not fresh fields followed by ordinary aliases.
+
+Agda's constructor telescope and splitCon provide the scope precedent. See
+docs/dependent-haskell/REFERENCES.md#retained-constructor-field-telescopes.
+The runtime fields retain Haskell's lazy evaluation rules.
+-}
 
 tcPatSynPat :: LocatedN Name -> PatSyn
             -> Scaled ExpSigmaType         -- ^ Type of the pattern
