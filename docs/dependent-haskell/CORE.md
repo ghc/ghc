@@ -395,6 +395,12 @@ Accept runtime Pi types through function arrows. Keep erased inner foralls and
 other polymorphic type arguments gated. This lets a polymorphic bottom or `id`
 receive the already known retained function type without eta expansion.
 
+A constructor branch can transport a captured closure type through a retained
+binder with an unchanged domain. Abstract the outer index only in the body.
+Preserve the inner index scope. Existing FC lifting builds the fixed-domain
+`DepFunCo` from the checked branch proof. Cast the function value without eta
+expansion. Keep changed domains and dependent erased foralls gated.
+
 For signature ambiguity checking only, open retained binders in ordinary arrow
 arguments as well as results. Use one fresh opaque runtime Id on both sides of
 the self-check. Scope all fresh Ids over constraint capture and simplification.

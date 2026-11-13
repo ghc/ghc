@@ -738,6 +738,12 @@ lambda. This is separate from solving a mutable native meta-variable. A runtime
 Pi is a function value; an erased inner forall remains a separate polymorphic
 type-argument boundary.
 
+Constructor transport through a captured retained closure uses the same
+fixed-domain `DepFunCo` rule described under [Agda provenance](#agda-provenance).
+The branch proof changes occurrences of the outer index in the body. The inner
+domain and binder scope stay fixed. FC lifting constructs the proof; a function
+cast preserves Haskell's bottom-function behavior.
+
 ## Haskell evaluation provenance
 
 The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)
