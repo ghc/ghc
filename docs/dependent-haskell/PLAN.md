@@ -802,13 +802,15 @@ signed `alias = lambdaId` without requiring `lambdaId @Int`.
       agreement, contexts, and a genuine bottom worker without eta expansion.
 - [x] Reject captured inner indices, mismatched domains, and inconsistent
       payloads. Keep inferred aliases and general native meta assignment gated.
-- [ ] Verify runtime and interface-only clients, located diagnostics, both-stage
+- [x] Verify runtime and interface-only clients, located diagnostics, both-stage
       builds, registered regressions, compatibility, formatting, and source hashes.
 
 Follow Agda's expected-result implicit insertion and shared-context Pi comparison.
 Use an immutable substitution in this GHC increment. Agda's contextual mutable
 metas require separate scope machinery. See
 [the pinned sources](REFERENCES.md#expected-type-instantiation-of-retained-workers).
+Implementation `dae037074c` passes the
+[verified checkpoint](README.md#expected-type-instantiation-of-retained-workers).
 
 ## Acceptance checks
 

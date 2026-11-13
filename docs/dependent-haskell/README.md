@@ -38,8 +38,8 @@ Last updated: 2026-11-13.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Current increment validation | Both stages and libraries, five registered regressions, 255 imported observations, 13 focused closure observations, and 11 guide blocks pass |
-| Worker instantiation prototype | Complete expected types infer erased worker parameters; bootstrap API/runtime pass 277 imported observations; final self-hosted validation is pending |
+| Current increment validation | Both stages and libraries, five registered regressions, 277 imported observations, 20 focused closure/worker observations, and 12 guide blocks pass |
+| Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Next task | Broader signature positions, native template instantiation, ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native unfolding codecs, and lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
@@ -1431,8 +1431,40 @@ mismatch, and an unsigned alias. A signed bottom worker remains bottom when
 demanded. The API regression also checks a shared-pointer binder/free-index
 case that failed before the matching scope included both input types.
 
-Final self-hosted validation is pending. Artifacts use
-`_build/verification/native-worker-instantiation-`. See
+Implementation `dae037074c` passes the full both-stage build in 9m22s at
+5,872 MiB under 16 GiB. All five registered normal-way regressions pass:
+39 cases, 34 skipped, no unexpected results or framework warnings. The command
+took 1m36s at 2,613 MiB under 8 GiB. The driver took 10.529 seconds. The
+repository requires regression coverage; this change extends both existing
+native Core API fixtures.
+
+The bootstrap API and runtime pass together at 1,098 MiB under 4 GiB. The
+runtime checks 277 imported rows and 146 source-context rows. Separate
+self-hosted processes reproduce the 277 rows. Seven further worker observations
+check bottom-function behavior and runtime class-context dispatch. Four new
+located rejection controls, the previous 13 closure controls, earlier
+lambda/context/proof/linear checks, 177 compatibility rows, and both interface
+rejection directions pass.
+
+All 12 literal guide blocks pass Core and STG Lint. Ordinary typing,
+single-expansion Template Haskell, 14 native function/class observations,
+optimized package/GHCi/Haddock smoke, nested typed splices, and static pointers
+pass. The CLI scope peaked at 302 MiB under 4 GiB. All heavy jobs were serial
+and disabled swap. The full GHC testsuite was not run.
+
+CorePrep shows actual `@Int` applications for captured, constrained, and
+ordinary-leading aliases. STG preserves direct worker aliases. The generic
+bottom worker and its specialization remain thunks. Ordinary partial
+applications can retain CorePrep's existing arity wrappers. The Core forms,
+dictionary ABI, and interface version are unchanged. General native meta
+assignment, unification, and ordinary optimization remain gated.
+
+Artifacts use `_build/verification/native-worker-instantiation-`. Final logs
+are `full-build.log`, `registered.log`, `final-cli.log`, `api-v3.log`, and
+`runtime-v2.log`. The source manifest covers 18 compiler files and two fixtures.
+The bootstrap and isolated compatibility archives contain 27 files each.
+`validation.txt` records the failing freshness regression and its verified fix.
+See
 [the contract](CORE.md#explicit-higher-order-closure-arguments),
 [the tasks](PLAN.md#expected-type-instantiation-of-retained-workers), and
 [Agda provenance](REFERENCES.md#expected-type-instantiation-of-retained-workers).
