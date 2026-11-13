@@ -49,6 +49,7 @@ import GHC.Data.TrieMap
 import GHC.Data.Maybe( orElse )
 
 import Control.Monad
+import Data.Monoid (Any(..))
 import qualified Data.Semigroup as S
 import GHC.Builtin.WiredIn.Prim (fUNTyCon)
 
@@ -85,7 +86,7 @@ of ways.  Here we summarise, but see Note [Specification of unification].
     - MaybeApart      : neither of the above
   See Note [Unification result].
 
-  Four reasons for MaybeApart (see `MaybeApartReason`).  The first two are the
+  Five reasons for MaybeApart (see `MaybeApartReason`).  The first two are the
   big ones!
     * MARTypeFamily:
          Family reduction might make the two types equal
@@ -98,6 +99,9 @@ of ways.  Here we summarise, but see Note [Specification of unification].
     * MARRuntimeIndex:
          An opaque runtime value might equal the other index.
          See Note [Apartness of retained runtime indices].
+    * MARRetainedFunction:
+         Retained-function congruence is not supported by this unifier.
+         See Note [Matching retained function types].
 
 (CU5) We need to take care with kinds.  See Note [tcMatchTy vs tcMatchTyKi]
 
@@ -1020,6 +1024,8 @@ data MaybeApartReason
 
   | MARRuntimeIndex -- ^ An opaque retained runtime value may equal another index.
 
+  | MARRetainedFunction -- ^ Retained-function congruence is not implemented.
+
 
 combineMAR :: MaybeApartReason -> MaybeApartReason -> MaybeApartReason
 -- See (UR1) in Note [Unification result] for why MARInfinite wins
@@ -1027,12 +1033,14 @@ combineMAR MARInfinite         _ = MARInfinite   -- MARInfinite wins
 combineMAR MARTypeFamily       r = r             -- Otherwise it doesn't really matter
 combineMAR MARCast             r = r
 combineMAR MARRuntimeIndex     r = r
+combineMAR MARRetainedFunction r = r
 
 instance Outputable MaybeApartReason where
   ppr MARTypeFamily       = text "MARTypeFamily"
   ppr MARInfinite         = text "MARInfinite"
   ppr MARCast             = text "MARCast"
   ppr MARRuntimeIndex     = text "MARRuntimeIndex"
+  ppr MARRetainedFunction = text "MARRetainedFunction"
 
 instance Semigroup MaybeApartReason where
   (<>) = combineMAR
@@ -1585,7 +1593,45 @@ type OutCoercion = Coercion   -- After applying the RnEnv2
 hasRuntimeIndex :: Type -> Bool
 hasRuntimeIndex = anyFreeVarsOfType (\v -> isId v && not (isCoVar v))
 
-{- Note [Apartness of retained runtime indices]
+-- | Detect retained binders, including those with no free runtime indices.
+hasRetainedFunction :: Type -> Bool
+hasRetainedFunction = getAny . go_ty
+  where
+    (go_ty, _, _, _) = foldTyCo TyCoFolder
+      { tcf_view = coreView
+      , tcf_lit = const mempty
+      , tcf_tyvar = go_ty . varType
+      , tcf_covar = go_ty . varType
+      , tcf_termvar = const mempty
+      , tcf_termbinder = \_ _ -> Any True
+      , tcf_tycobinder = \_ body -> body
+      , tcf_hole = go_ty . varType . coHoleCoVar }
+
+{- Note [Matching retained function types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An unsupported retained-function comparison must return MaybeApart, not panic
+or assert SurelyApart. PMC uses this matcher to filter imported COMPLETE sets.
+It can compare an unrelated constructor result with a retained function type.
+MaybeApart rejects that match without claiming a complete apartness decision.
+
+Process casts and ordinary template variables before the DepFunTy fallback.
+An immutable template substitution can bind a whole retained function type.
+The usual scope check still prevents an enclosing bound variable from escaping.
+The occurs check visits the binder domain and its scoped body. As under a
+forall, do not consult family substitutions under that binder.
+
+This does not descend into a retained function to match its domain and body.
+That operation requires a separate binder and kind audit. It does not assign a
+Tc metavariable or provide solver equality or Pi congruence. See Note [Coverage
+checking retained functions] in GHC.HsToCore.Pmc.Solver and the Agda WHNF
+references in docs/dependent-haskell/REFERENCES.md.
+
+Alpha-equivalent retained types with no free TyCoVars can succeed by tcEqType.
+There are no template variables to bind and no enclosing forall renamings to
+apply. Runtime index Ids remain rigid. This also handles repeated whole-type
+substitutions in the fine-grained unifier. Open types retain MaybeApart.
+
+Note [Apartness of retained runtime indices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 TermVarTy denotes an opaque runtime value. Equal Ids, after renaming, match
 reflexively. Different Ids can denote the same value. An opaque Id can also
@@ -1629,11 +1675,6 @@ unify_ty env ty1 ty2 kco
     -- Now handle the cases we can "look through": synonyms and casts.
   | Just ty1' <- coreView ty1 = unify_ty env ty1' ty2 kco
   | Just ty2' <- coreView ty2 = unify_ty env ty1 ty2' kco
-
-unify_ty _ ty1@(DepFunTy {}) ty2 _
-  = pprPanic "unify_ty: unsupported retained function" (ppr ty1 $$ ppr ty2)
-unify_ty _ ty1 ty2@(DepFunTy {}) _
-  = pprPanic "unify_ty: unsupported retained function" (ppr ty1 $$ ppr ty2)
 
 unify_ty env (CastTy ty1 co1) ty2 kco
   | mentionsForAllBoundTyVarsL env (tyCoVarsOfCo co1)
@@ -1706,6 +1747,14 @@ unify_ty env (TyVarTy tv1) ty2 kco
 unify_ty env ty1 (TyVarTy tv2) kco
   | Unifying <- um_unif env  -- If unifying, can swap args; but not when matching
   = uVarOrFam (umSwapRn env) (TyVarLHS tv2) ty1 (mkSymCo kco)
+
+-- See Note [Matching retained function types].
+unify_ty _ ty1@(DepFunTy {}) ty2@(DepFunTy {}) _
+  | not (anyFreeVarsOfTypes isTyCoVar [ty1, ty2])
+  , tcEqType ty1 ty2
+  = return ()
+unify_ty _ (DepFunTy {}) _ _ = maybeApart MARRetainedFunction
+unify_ty _ _ (DepFunTy {}) _ = maybeApart MARRetainedFunction
 
 -- See Note [Apartness of retained runtime indices].
 unify_ty env (TermVarTy v1) (TermVarTy v2) _kco
@@ -1853,6 +1902,8 @@ uVarOrFam env ty1 ty2 kco
            | (ty1' `mkCastTy` kco) `tcEqType` ty2 -> return ()
            | hasRuntimeIndex ty1' || hasRuntimeIndex ty2
                -> maybeApart MARRuntimeIndex
+           | hasRetainedFunction ty1' || hasRetainedFunction ty2
+               -> maybeApart MARRetainedFunction
            | otherwise                            -> surelyApart
            -- Unifying: recurse into unify_ty
            -- Matching: we /don't/ want to just recurse here, because the range of
@@ -1896,6 +1947,7 @@ uVarOrFam env ty1 ty2 kco
 
       | occurs_check = maybeApart MARInfinite   -- Occurs check
       | hasRuntimeIndex ty2 = maybeApart MARRuntimeIndex
+      | hasRetainedFunction ty2 = maybeApart MARRetainedFunction
       | otherwise    = surelyApart
 
       where
@@ -2026,11 +2078,14 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
        -> Type -> Bool
     go bvs ty | Just ty' <- coreView ty = go bvs ty'
     go _ (TermVarTy {}) = False
-      -- The rigid Id has fixed Bool/Many metadata, with no type variables
-      -- or type-family applications.
+      -- A supported index Id has a closed algebraic domain and Many
+      -- multiplicity. Its type has no type variables or family applications.
       -- See Note [Apartness of retained runtime indices].
-    go _ ty@(DepFunTy {})
-      = pprPanic "uOccursCheck: unsupported retained function" (ppr ty)
+    go bvs (DepFunTy v body)
+      = go bvs (varType v) ||
+        (case lhs of
+           TyVarLHS {} -> go (bvs `extendVarSet` v) body
+           TyFamLHS {} -> False)  -- Lookups do not happen under this binder.
     go bvs (TyVarTy tv) | Just ty' <- lookupVarEnv tv_env tv
                         = go bvs ty'
                         | TyVarLHS tv' <- lhs, tv==tv'

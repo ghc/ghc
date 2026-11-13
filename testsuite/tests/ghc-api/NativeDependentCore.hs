@@ -29,7 +29,7 @@ import GHC.Core.TyCo.Tidy (tidyTopType)
 import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind)
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
-import GHC.Core.Unify (UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchTy, tcMatchTys, tcUnifyTysFG)
+import GHC.Core.Unify (MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchTy, tcMatchTys, tcUnifyTysFG)
 import GHC.Core.Utils (applyTypeToArgs, exprType)
 import GHC.CoreToIface (toIfaceAlt, toIfaceExpr, toIfaceType, toIfaceTypeX)
 import GHC.Data.Bag (bagToList)
@@ -864,6 +864,51 @@ runMatchingChecks dflags = do
     check
         "a repeated template matches one shared runtime index"
         (case tcMatchTys [templateTy, templateTy] [index, index] of Just _ -> True; Nothing -> False)
+
+    let whole = mkTyVar (mkSystemName (unique 203) (mkTyVarOcc "whole")) liftedTypeKind
+        wholeTy = mkTyVarTy whole
+        closedPi = mkDepFunTy b (indexed index)
+        alphaPi = mkDepFunTy other (indexed otherIndex)
+        differentPi = mkDepFunTy other (mkFunctionType ManyTy (indexed otherIndex) boolTy)
+        occursPi = mkDepFunTy b (mkFunctionType ManyTy (indexed index) wholeTy)
+        retainedApart lhs rhs = case fine lhs rhs of
+            MaybeApart MARRetainedFunction _ -> True
+            _ -> False
+    case tcMatchTy wholeTy closedPi >>= (`Subst.lookupTyVar` whole) of
+        Just actual -> checkType dflags "a whole-type template matches a closed retained function" closedPi actual
+        Nothing -> fail "FAIL: a whole-type template did not match a closed retained function"
+    case fine [wholeTy] [closedPi] of
+        Unifiable subst -> case Subst.lookupTyVar subst whole of
+            Just actual -> checkType dflags "fine unification binds a whole-type template to a retained function" closedPi actual
+            Nothing -> fail "FAIL: fine unification omitted the retained function substitution"
+        _ -> fail "FAIL: fine unification did not bind a whole-type template to a retained function"
+    check "an occurs check traverses a retained function body" $ case fine [wholeTy] [occursPi] of
+        MaybeApart MARInfinite _ -> True
+        _ -> False
+    check
+        "a repeated whole-type template matches alpha-equivalent retained functions"
+        (case tcMatchTys [wholeTy, wholeTy] [closedPi, alphaPi] of Just _ -> True; Nothing -> False)
+    check
+        "fine repeated-template unification accepts alpha-equivalent retained functions"
+        (case fine [wholeTy, wholeTy] [closedPi, alphaPi] of Unifiable _ -> True; _ -> False)
+    check
+        "a repeated whole-type template cannot match different retained functions"
+        (case tcMatchTys [wholeTy, wholeTy] [closedPi, differentPi] of Nothing -> True; Just _ -> False)
+    check
+        "different retained-function targets of a repeated template are only maybe apart"
+        (retainedApart [wholeTy, wholeTy] [closedPi, differentPi])
+    check "a constructor type versus a retained function is only maybe apart" (retainedApart [intTy] [closedPi])
+    check "a retained function versus a constructor type is only maybe apart" (retainedApart [closedPi] [intTy])
+
+    let outer = mkTyVar (mkSystemName (unique 204) (mkTyVarOcc "outer")) liftedTypeKind
+        inner = mkTyVar (mkSystemName (unique 205) (mkTyVarOcc "inner")) liftedTypeKind
+        captureTemplate = mkForAllTy (Bndr outer Specified) wholeTy
+        captureTarget =
+            mkForAllTy (Bndr inner Specified) $
+                mkDepFunTy b (mkFunctionType ManyTy (mkTyVarTy inner) (indexed index))
+    check
+        "a whole-type template cannot capture a forall variable through a retained function"
+        (not (matches captureTemplate captureTarget))
 
 -- | Check retained syntax, printing, and compatibility with ordinary identifiers.
 runSyntaxChecks :: DynFlags -> IO ()

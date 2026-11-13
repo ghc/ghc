@@ -386,7 +386,9 @@ retainedNatConsumerSource =
                , "  constructedAppend <- driveNatPairs (\\n m -> observeVec (appendNative @Int (S n) (S m) (replicateNative @Int (S n) 42) (replicateNative @Int (S m) 7)))"
                , "  constructorHead <- driveNat (\\n -> observeInt (headNative @Int n (replicateNative @Int (S n) 42))) bottomNat"
                , "  nestedPrefix <- driveNat (\\n -> pure (show (take 2 (vecList (replicateNative @Int (S (S n)) 42))))) bottomNat"
-               , "  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix])"
+               , "  retainedHead <- driveNat (\\n -> case appendNative @Int n of !_ -> pure \"forced\") bottomNat"
+               , "  ordinaryHead <- driveNat (\\n -> let m = bottomNat in case appendNative @Int n m of !_ -> pure \"forced\") bottomNat"
+               , "  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead])"
                ]
 
 -- | Run Boolean and Nat consumers against separately compiled disk artifacts.
@@ -425,6 +427,8 @@ runModuleChecks libdir = do
                 , "[42,42,42,7,7,7,7]:7"
                 , "42"
                 , "[42,42]"
+                , "forced"
+                , "forced"
                 ]
             )
         ]
@@ -869,6 +873,58 @@ runNatSourceChecks = do
                     | otherwise -> fail ("FAIL: " ++ moduleName ++ "; wrong exception: " ++ displayException exception)
                 Right result -> fail ("FAIL: " ++ moduleName ++ "; expected bottom, got " ++ show result)
     runNatConstructorSourceChecks
+    runNatPartialSourceChecks
+
+-- | Preserve function WHNF while retained binders remain in the result type.
+runNatPartialSourceChecks :: GHC.Ghc ()
+runNatPartialSourceChecks = do
+    let moduleName = "NativeSourcePartialRetained"
+        observation =
+            unlines
+                [ "do inputs <- driveNats (\\n -> case appendNative @Int n of !_ -> pure \"forced\")"
+                , "        bottomIndex <- driveNat (\\n -> case appendNative @Int n of !_ -> pure \"forced\") bottomNat"
+                , "        cyclicIndex <- driveNat (\\n -> case appendNative @Int n of !_ -> pure \"forced\") cyclicNat"
+                , "        mixedArrow <- driveNat (\\n -> case vacuousMiddle @Int n of !_ -> pure \"forced\") bottomNat"
+                , "        mixedRetained <- driveNat (\\n -> case vacuousMiddle @Int n bottomNat of !_ -> pure \"forced\") bottomNat"
+                , "        lazyPayload <- let n = bottomNat; m = bottomNat in case appendNative @Int n m bottomVec of !_ -> pure \"forced\""
+                , "        pure (inputs ++ unlines [bottomIndex,cyclicIndex,mixedArrow,mixedRetained,lazyPayload])"
+                ]
+    expression <- sourceEntry moduleName (retainedNatSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source partial retained functions" expression
+    unless (lines actual == replicate 8 "forced") $
+        fail ("FAIL: source partial retained function demanded an index or payload: " ++ show actual)
+    let emptyName = "NativeSourceRetainedEmpty"
+        emptySource =
+            unlines
+                [ "{-# LANGUAGE EmptyCase #-}"
+                , "{-# OPTIONS_GHC -Werror=incomplete-patterns #-}"
+                ]
+                ++ retainedNatSource
+                    emptyName
+                    "driveNat (\\n -> case appendNative @Int n of {}) bottomNat"
+    targets <- GHC.getTargets
+    result <- GHC.handleSourceError (pure . Left) $ do
+        void (sourceEntry emptyName emptySource)
+        pure (Right ())
+    GHC.setTargets targets
+    checkSourceRejection "empty case on a retained function" 62161 "non-exhaustive" result
+    let boundaryName = "NativeSourceConstructorPiBoundary"
+    boundary <-
+        sourceEntry boundaryName $
+            retainedNatSource
+                boundaryName
+                "let n = bottomNat in case appendNative @Int (S n) of !_ -> pure \"forced\""
+    boundaryEnvironment <- GHC.getSession
+    outcome <- liftIO $ try (execute boundaryEnvironment flags "source remaining retained result" boundary)
+    case outcome of
+        Left (Sorry message)
+            | "cannot transport constructed retained indices through the application result" `isInfixOf` message
+            , "congruence is not supported" `isInfixOf` message ->
+                pure ()
+        Left exception -> fail ("FAIL: source retained-result boundary raised another exception: " ++ show (exception :: GhcException))
+        Right result -> fail ("FAIL: unsupported source retained-result transport returned " ++ show result)
 
 -- | Exercise constructor naming with dependent payloads and lazy nested fields.
 runNatConstructorSourceChecks :: GHC.Ghc ()
@@ -953,6 +1009,11 @@ sourceModuleRejects label code fragment moduleName source = do
         void (GHC.typecheckModule GHC.StartAndStopTcMPlugins parsed)
         pure (Right ())
     GHC.setTargets targets
+    checkSourceRejection label code fragment result
+
+-- | Inspect source errors without accepting an unlocated error or a panic.
+checkSourceRejection :: String -> Int -> String -> Either SourceError () -> GHC.Ghc ()
+checkSourceRejection label code fragment result =
     case result of
         Right () -> fail ("FAIL: source accepted " ++ label)
         Left exception -> do

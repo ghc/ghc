@@ -59,6 +59,7 @@ import GHC.Types.Unique.Supply
 import GHC.Tc.Utils.Monad   (getGblEnv)
 
 import GHC.Core
+import GHC.Core.Dependent   (hasNativeDependentExprRhs)
 import GHC.Core.FVs         (exprFreeVars)
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Map.Expr
@@ -334,6 +335,13 @@ pmTopNormaliseType :: TyState -> Type -> DsM TopNormaliseTypeResult
 -- NB: Normalisation can potentially change kinds, if the head of the type
 -- is a type family with a variable result kind. I (Richard E) can't think
 -- of a way to cause trouble here, though.
+pmTopNormaliseType _ typ
+  | DepFunTy{} <- coreFullView typ
+  = pure (NormalisedByConstraints typ)
+  | FunTy{} <- coreFullView typ
+  , hasNativeDependentExprRhs (Type typ)
+  -- See Note [Coverage checking retained functions].
+  = pure (NormalisedByConstraints typ)
 pmTopNormaliseType (TySt _ inert) typ = {-# SCC "pmTopNormaliseType" #-} do
   env <- dsGetFamInstEnvs
   tracePm "normalise" (ppr typ)
@@ -440,14 +448,40 @@ normaliseSourceTypeWHNF ty_st ty =
 
 -- | Is the source type in WHNF wrt. 'pmTopNormaliseType'?
 --
--- Returns False if the given type is not a TyCon application, or if the TyCon
--- app head is a type family TyCon. (But not for data family TyCons!)
+-- A retained function already has a function head. Otherwise, return False
+-- unless this is a TyCon application whose head is not a type family TyCon.
+-- Data family TyCons are in WHNF here.
 isSourceTypeInWHNF :: Type -> Bool
 isSourceTypeInWHNF ty
+  | DepFunTy{} <- coreFullView ty          = True
   | Just (tc, _) <- splitTyConApp_maybe ty = not (isTypeFamilyTyCon tc)
   | otherwise                              = False
 
-{- Note [Type normalisation]
+{- Note [Coverage checking retained functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+PMC needs the outer shape of a type to look for algebraic constructors. A
+DepFunTy already has a function head. An ordinary FunTy can also contain a
+retained function in its domain or result. Preserve these known function heads
+without asking tcNormalise to rewrite their components. Its rewriteType path
+requires dependent congruence when it encounters DepFunTy, which is not yet
+supported. Reporting that solver restriction from initTcDsForSolver panics.
+
+This is a WHNF rule, not normalization under a dependent binder. Agda 2.8.0
+also returns a Pi head without reducing its domain or codomain. Its full
+normalizer visits both components. See the pinned reduction references in
+docs/dependent-haskell/REFERENCES.md.
+
+Keep the usual conservative inhabitation path for a function type. In
+particular, failure to split an algebraic TyCon must not produce an empty
+constructor set. A function type can have a lambda value even when its result
+type has no constructors. A function expression can also be bottom. This type
+head test does not evaluate an expression or remove a strict wildcard match.
+The desugared Core case must retain its normal forcing behavior.
+
+No solver equality, Pi congruence, or mutable metavariable assignment is added
+by this rule. Types whose heads still require reduction use the existing path.
+
+Note [Type normalisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Constructs like -XEmptyCase or a previous unsuccessful pattern match on a data
 constructor place a non-void constraint on the matched thing. This means that it
