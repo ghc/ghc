@@ -1,0 +1,8 @@
+section: compiler
+issues: #28123
+mrs: !16992
+synopsis:
+  Fix a forall-visibility bug in eta expansion
+description:
+  This bug made GHC generate a coercion on a forall-type whose visibility
+  was back-to-front, leading to a Core Lint error.
