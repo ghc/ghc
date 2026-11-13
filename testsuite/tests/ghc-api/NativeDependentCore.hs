@@ -5,15 +5,16 @@ module Main (main) where
 import Control.Exception (IOException, SomeException, displayException, evaluate, try)
 import Control.Monad (forM_, unless)
 import Control.Monad.IO.Class (liftIO)
-import Data.IORef (modifyIORef', newIORef, readIORef)
+import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.List (find, foldl', isInfixOf, sort)
-import GHC (DynFlags, getSession, getSessionDynFlags, runGhc)
+import GHC (DynFlags, getSession, getSessionDynFlags, runGhc, setSessionDynFlags)
 import GHC.Builtin.WiredIn.Prim (intPrimTy)
 import GHC.Builtin.WiredIn.Types
 import GHC.Core
 import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, eqCoercion, isReflCo, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
-import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConRepArgBinders, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
+import GHC.Core.ConLike (ConLike (RealDataCon))
+import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict, SrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConName, dataConOrigArgTys, dataConRepArgBinders, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
 import GHC.Core.Dependent
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, normaliseType)
@@ -28,7 +29,7 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfCo)
 import GHC.Core.TyCo.Rep (Coercion (..), Scaled (..), TyLit (..), Type (..))
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.TyCo.Tidy (tidyTopType)
-import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind)
+import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind, tyConDataCons, tyConSingleDataCon)
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
@@ -42,6 +43,7 @@ import qualified GHC.Data.TrieMap as Trie
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Env (HscEnv (..), hscUpdateFlags)
+import GHC.Driver.Env.KnotVars (KnotVars (KnotVars))
 import GHC.Driver.Flags (GeneralFlag (Opt_DoCoreLinting))
 import GHC.Driver.Ppr (showSDoc)
 import GHC.Driver.Session (gopt_unset, parseDynamicFlagsCmdLine)
@@ -49,14 +51,14 @@ import GHC.Hs (HsType (..))
 import GHC.Iface.Binary (CompressionIFace (..), TraceBinIFace (..), getWithUserData, putWithUserData)
 import GHC.Iface.Decl (tyThingToIfaceDecl)
 import GHC.Iface.Env (extendIfaceIdEnv)
-import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceConAlt (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, ifCons), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
-import GHC.Iface.Type (IfaceBndr (IfaceIdBndr), IfaceCoercion (IfaceCoVarCo), IfaceType (..), getIfaceType, ifaceBndrName, mkIfLclName)
+import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceBang (IfNoBang, IfStrict), IfaceConAlt (..), IfaceConDecl (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, ifCons, ifKind, ifName, ifParent, ifResKind), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceSrcBang (IfSrcBang), IfaceTyConParent (IfDataInstance), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
+import GHC.Iface.Type (IfaceAppArgs (IA_Nil), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, ifaceBndrName, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
 import GHC.IfaceToCore (tcIfaceDecl, tcIfaceExpr, tcIfaceRules)
 import qualified GHC.Parser as Parser
 import qualified GHC.Parser.Lexer as Lexer
-import GHC.Tc.Utils.Monad (initIfaceLcl, initIfaceLoad)
+import GHC.Tc.Utils.Monad (initIfaceCheck, initIfaceLcl, initIfaceLoad)
 import GHC.Tc.Utils.TcType (noConcreteTyVars)
-import GHC.Types.Basic (OccInfo (..), TailCallInfo (..))
+import GHC.Types.Basic (OccInfo (..), PromotionFlag (IsPromoted, NotPromoted), TailCallInfo (..))
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails (VanillaId), RuleInfo (..))
 import GHC.Types.Id.Make (mkDataConWorkId)
@@ -66,7 +68,8 @@ import GHC.Types.Name (getOccName, mkExternalName, mkSystemName, nameModule)
 import GHC.Types.Name.Occurrence (mkDataConWorkerOcc, mkDataOcc, mkTcOcc, mkTyVarOcc, mkVarOcc, occNameFS)
 import GHC.Types.SourceText (SourceText (NoSourceText))
 import GHC.Types.SrcLoc (mkRealSrcLoc, noLoc, noSrcSpan, unLoc)
-import GHC.Types.TyThing (TyThing (ATyCon, AnId))
+import GHC.Types.TyThing (TyThing (AConLike, ATyCon, AnId))
+import GHC.Types.TypeEnv (mkTypeEnv)
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Unique.FM (sizeUFM)
 import GHC.Types.Var
@@ -392,7 +395,7 @@ runRetainedFieldChecks dflags = do
                 vacuousTy
         rejectsMetadata label binders args result =
             rejectsWith label "mkDataConWithRetainedArgs: invalid telescope" $
-                evaluate (build binders args result)
+                evaluate (dataConWrapperType (build binders args result))
     case nestedFields of
         [field, dependent] -> case idType dependent of
             DepFunTy inner body -> do
@@ -457,6 +460,38 @@ runRetainedFieldChecks dflags = do
     rejectsMetadata "retained metadata must use unrestricted binders" [Just (setIdMult template OneTy), Nothing] originalArgs packageTy
     rejectsMetadata "retained metadata cannot reference an unbound runtime Id" [Nothing, Nothing] originalArgs packageTy
     rejectsMetadata "retained field cannot escape into constructor result" [Just template, Nothing] originalArgs (payloadTy (TermVarTy template))
+    let recursivePackage base constructors =
+            mkAlgTyCon
+                (name base (mkTcOcc ("RecursiveNativePackage" ++ show base)))
+                liftedTypeKind
+                []
+                0
+                liftedTypeKind
+                []
+                Nothing
+                []
+                (mkDataTyConRhs constructors)
+                (VanillaAlgTyCon (name (base + 1) (mkVarOcc ("recursive_package_rep_" ++ show base))))
+                False
+        recursiveConstructor parent base domain =
+            let field = local (base + 3) "recursive_index" (mkTyConTy domain)
+             in buildFor parent base [Just field] [Scaled ManyTy (mkTyConTy domain)] (mkTyConTy parent)
+        selfPackage = recursivePackage 2800 [selfConstructor]
+        selfConstructor = recursiveConstructor selfPackage 2802 selfPackage
+        mutualLeft = recursivePackage 2810 [mutualLeftConstructor]
+        mutualRight = recursivePackage 2820 [mutualRightConstructor]
+        mutualLeftConstructor = recursiveConstructor mutualLeft 2812 mutualRight
+        mutualRightConstructor = recursiveConstructor mutualRight 2822 mutualLeft
+    forM_
+        [("self-recursive", selfConstructor), ("mutually recursive", mutualLeftConstructor)]
+        $ \(label, con) -> do
+            completed <- timeout 2000000 $ try @GhcException (evaluate (dataConWrapperType con))
+            case completed of
+                Nothing -> fail ("FAIL: " ++ label ++ " retained domain validation did not terminate")
+                Just (Left exception) ->
+                    check (label ++ " retained domain is rejected") $
+                        "mkDataConWithRetainedArgs: invalid telescope" `isInfixOf` displayException exception
+                Just (Right _) -> fail ("FAIL: " ++ label ++ " retained domain was accepted")
     rejectsWith "retained constructor cannot be promoted" "promoteDataCon: retained field telescope" $
         evaluate (promoteDataCon constructor)
     rejectsWith "flat signature cannot discard retained field scope" "dataConInstSig: retained constructor field telescope" $
@@ -465,10 +500,111 @@ runRetainedFieldChecks dflags = do
         evaluate (dataConInstArgTys constructor [])
     rejectsWith "flat original fields cannot discard retained scope" "dataConInstOrigArgTys: retained constructor field telescope" $
         evaluate (dataConInstOrigArgTys constructor [])
-    rejectsWith "interface declaration cannot discard retained field scope" "ifaceConDecl: retained constructor field telescope" $
-        case tyThingToIfaceDecl (ATyCon package) of
-            IfaceData{ifCons = IfDataTyCon _ [con]} -> evaluate con >> pure ()
-            _ -> fail "FAIL: native package interface declaration has the wrong shape"
+
+{- | Build an interface package with a Boolean index and a lifted payload.
+The dependent payload is a dictionary function. It is not an executed vector.
+-}
+retainedIfacePackage :: Int -> Bool -> TyCon
+retainedIfacePackage base vacuous = package
+  where
+    modu = mkModule mainUnit (mkModuleName "NativeRetainedIfaceAPI")
+    name n occurrence = mkExternalName (unique n) modu occurrence noSrcSpan
+    label = if vacuous then "IfaceVacuousPackage" else "IfaceNativePackage"
+    field = local base "package_index" boolTy
+    payloadTy = if vacuous then boolTy else indexed (TermVarTy field)
+    args = [Scaled ManyTy boolTy, Scaled ManyTy payloadTy]
+    package =
+        mkAlgTyCon
+            (name (base + 1) (mkTcOcc label))
+            liftedTypeKind
+            []
+            0
+            liftedTypeKind
+            []
+            Nothing
+            []
+            (mkDataTyConRhs [constructor])
+            (VanillaAlgTyCon (name (base + 2) (mkVarOcc ("package_rep_" ++ show base))))
+            False
+    occurrence = mkDataOcc ("Mk" ++ label)
+    constructor =
+        mkDataConWithRetainedArgs
+            [Just field, Nothing]
+            (name (base + 3) occurrence)
+            False
+            (name (base + 4) (mkVarOcc ("constructor_rep_" ++ show base)))
+            (map (const (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)) args)
+            (map (const HsLazy) args)
+            (map (const NotMarkedStrict) args)
+            []
+            []
+            []
+            noConcreteTyVars
+            []
+            []
+            []
+            args
+            (mkTyConTy package)
+            NoPromInfo
+            package
+            1
+            []
+            (mkDataConWorkId (name (base + 5) (mkDataConWorkerOcc occurrence)) constructor)
+            NoDataConRep
+
+-- | Build a polymorphic package with two same-spelling retained fields.
+retainedIfaceParameterizedPackage :: Int -> TyCon
+retainedIfaceParameterizedPackage base = package
+  where
+    modu = mkModule mainUnit (mkModuleName "NativeRetainedIfaceAPI")
+    name n occurrence = mkExternalName (unique n) modu occurrence noSrcSpan
+    label = "IfaceParameterizedPackage"
+    parameter = mkTyVar (mkSystemName (unique (base + 11)) (mkTyVarOcc "a")) liftedTypeKind
+    binders = [mkAnonTyConBinder parameter]
+    otherField = local (base + 10) "package_index" boolTy
+    field = local base "package_index" boolTy
+    payloadTy =
+        mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy field, TermVarTy field]) $
+            mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy otherField, TermVarTy otherField]) (mkTyVarTy parameter)
+    args = [Scaled ManyTy boolTy, Scaled ManyTy boolTy, Scaled ManyTy payloadTy]
+    package =
+        mkAlgTyCon
+            (name (base + 1) (mkTcOcc label))
+            (mkTyConKind binders liftedTypeKind)
+            binders
+            0
+            liftedTypeKind
+            [Representational]
+            Nothing
+            []
+            (mkDataTyConRhs [constructor])
+            (VanillaAlgTyCon (name (base + 2) (mkVarOcc ("package_rep_" ++ show base))))
+            False
+    occurrence = mkDataOcc ("Mk" ++ label)
+    constructor =
+        mkDataConWithRetainedArgs
+            [Just field, Just otherField, Nothing]
+            (name (base + 3) occurrence)
+            False
+            (name (base + 4) (mkVarOcc ("constructor_rep_" ++ show base)))
+            (map (const (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)) args)
+            (map (const HsLazy) args)
+            (map (const NotMarkedStrict) args)
+            []
+            [parameter]
+            []
+            noConcreteTyVars
+            [Bndr parameter Specified]
+            []
+            []
+            args
+            (mkTyConApp package [mkTyVarTy parameter])
+            NoPromInfo
+            package
+            1
+            []
+            (mkDataConWorkId (name (base + 5) (mkDataConWorkerOcc occurrence)) constructor)
+            NoDataConRep
 
 -- | Check recursive constructor indices, substitutions, and field-scoped proofs.
 runNatChecks :: DynFlags -> IO ()
@@ -824,6 +960,8 @@ check label condition = unless condition (fail ("FAIL: " ++ label))
 -- | Check retained types and closed expressions through binary interface tables.
 runIfaceChecks :: FilePath -> IO ()
 runIfaceChecks libdir = runGhc (Just libdir) $ do
+    initialFlags <- getSessionDynFlags
+    _ <- setSessionDynFlags initialFlags
     env <- getSession
     dflags <- getSessionDynFlags
     liftIO $ do
@@ -913,6 +1051,251 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     case rules of
                         [rule'] -> evaluate (ru_rhs rule') >> pure ()
                         _ -> fail "FAIL: interface rule was lost"
+            restorePackage :: HscEnv -> IfaceDecl -> IO TyCon
+            restorePackage = restorePackageWithScope []
+            restorePackageWithScope :: [Id] -> HscEnv -> IfaceDecl -> IO TyCon
+            restorePackageWithScope scope importEnv declaration = do
+                thing <-
+                    initIfaceLoad importEnv
+                        $ initIfaceLcl (nameModule (ifName declaration)) (text "retained constructor interface test") NotBoot
+                        $ extendIfaceIdEnv scope
+                        $ tcIfaceDecl False declaration
+                case thing of
+                    ATyCon package -> pure package
+                    _ -> fail "FAIL: constructor declaration did not reconstruct a TyCon"
+            forcePackage :: TyCon -> IO ()
+            forcePackage package = forM_ (tyConDataCons package) $ \constructor -> do
+                _ <- evaluate (dataConWrapperType constructor)
+                forM_ (dataConOrigArgTys constructor) $ \(Scaled mult ty) -> do
+                    _ <- evaluate (sizeVarSet (tyCoVarsOfType mult))
+                    _ <- evaluate (sizeVarSet (tyCoVarsOfType ty))
+                    pure ()
+            changePackage :: (IfaceConDecl -> IfaceConDecl) -> IfaceDecl -> IfaceDecl
+            changePackage change declaration@IfaceData{ifCons = IfDataTyCon typeData [constructor]} =
+                declaration{ifCons = IfDataTyCon typeData [change constructor]}
+            changePackage _ _ = error "FAIL: constructor interface fixture has the wrong shape"
+            rejectsPackage :: String -> String -> IfaceDecl -> IO ()
+            rejectsPackage = rejectsPackageWithScope []
+            rejectsPackageWithScope :: [Id] -> String -> String -> IfaceDecl -> IO ()
+            rejectsPackageWithScope scope label fragment declaration = do
+                messages <- newIORef []
+                let logger = pushLogHook (\_ _ _ _ message -> modifyIORef' messages (showSDoc dflags message :)) (hsc_logger env)
+                    quietEnv = env{hsc_logger = logger}
+                decoded <- roundtrip NormalCompression declaration
+                outcome <- try @IOEnvFailure $ try @GhcException $ do
+                    completed <- timeout 2000000 (restorePackageWithScope scope quietEnv decoded >>= forcePackage)
+                    case completed of
+                        Just () -> pure ()
+                        Nothing -> fail ("FAIL: " ++ label ++ "; constructor reconstruction did not terminate")
+                case outcome of
+                    Left _ -> pure ()
+                    Right (Left (ProgramError message)) ->
+                        check (label ++ " fork failure") (message == "Cannot continue after interface file error")
+                    Right (Left exception) -> fail ("FAIL: " ++ label ++ "; unexpected exception: " ++ displayException exception)
+                    Right (Right ()) -> fail ("FAIL: " ++ label ++ "; malformed constructor interface succeeded")
+                diagnostics <- unlines <$> readIORef messages
+                check (label ++ "; diagnostic: " ++ diagnostics) (fragment `isInfixOf` diagnostics)
+            rejectsImportedKnots :: String -> [IfaceDecl] -> IO ()
+            rejectsImportedKnots label declarations = do
+                messages <- newIORef []
+                temporaryTypes <- newIORef (mkTypeEnv [])
+                decoded <- mapM (roundtrip NormalCompression) declarations
+                let modu = case decoded of
+                        first : _ -> nameModule (ifName first)
+                        [] -> error "FAIL: recursive interface fixture is empty"
+                    quietEnv =
+                        env
+                            { hsc_logger = pushLogHook (\_ _ _ _ message -> modifyIORef' messages (showSDoc dflags message :)) (hsc_logger env)
+                            , hsc_type_env_vars = KnotVars [modu] (\candidate -> if candidate == modu then Just temporaryTypes else Nothing)
+                            }
+                    importDeclarations =
+                        initIfaceCheck (text "recursive retained interface test") quietEnv $
+                            mapM (\decl -> initIfaceLcl modu (text "recursive retained interface test") NotBoot (tcIfaceDecl False decl)) decoded
+                outcome <- try @IOEnvFailure $ try @GhcException $ do
+                    completed <- timeout 2000000 $ do
+                        imported <- importDeclarations
+                        writeIORef temporaryTypes (mkTypeEnv imported)
+                        forM_ imported $ \thing -> case thing of
+                            ATyCon package -> forcePackage package
+                            _ -> fail "FAIL: recursive interface did not reconstruct a TyCon"
+                    case completed of
+                        Just () -> pure ()
+                        Nothing -> fail ("FAIL: " ++ label ++ "; imported domain validation did not terminate")
+                case outcome of
+                    Left _ -> pure ()
+                    Right (Left (ProgramError message)) ->
+                        check (label ++ " fork failure") (message == "Cannot continue after interface file error")
+                    Right (Left exception) -> fail ("FAIL: " ++ label ++ "; unexpected exception: " ++ displayException exception)
+                    Right (Right ()) -> fail ("FAIL: " ++ label ++ "; recursive retained domain was accepted")
+                diagnostics <- unlines <$> readIORef messages
+                check (label ++ "; diagnostic: " ++ diagnostics) $
+                    "Invalid retained constructor fields in interface:" `isInfixOf` diagnostics
+        let package = retainedIfacePackage 2500 False
+            vacuousPackage = retainedIfacePackage 2520 True
+            declaration = tyThingToIfaceDecl (ATyCon package)
+            vacuousDeclaration = tyThingToIfaceDecl (ATyCon vacuousPackage)
+            originalField = case dataConRepArgBinders (tyConSingleDataCon package) of
+                [Just field, Nothing] -> field
+                _ -> error "FAIL: retained package fixture has the wrong metadata"
+        forM_ (zip [0 :: Int ..] [NormalCompression, MaximumCompression]) $ \(iteration, compression) -> do
+            wire <- roundtrip compression declaration
+            first <- restorePackage env wire
+            secondWire <- roundtrip compression declaration
+            second <- restorePackage env secondWire
+            forcePackage first
+            forcePackage second
+            let firstConstructor = tyConSingleDataCon first
+                secondConstructor = tyConSingleDataCon second
+                packageTy = mkTyConTy first
+                base = 2600 + iteration * 100
+                argument = local base "imported_index" boolTy
+                payload = local (base + 1) "imported_payload" (indexed (TermVarTy argument))
+                scrutinee = local (base + 2) "imported_package" packageTy
+                caseBinder = local (base + 3) "imported_package_case" packageTy
+                answer = local (base + 4) "imported_answer" intTy
+                (existentials, fields) = dataConRepInstPat (map unique [base + 10 .. base + 20]) ManyTy firstConstructor []
+            case (dataConRepArgBinders firstConstructor, dataConRepArgBinders secondConstructor) of
+                ([Just field, Nothing], [Just otherField, Nothing]) -> do
+                    check "constructor interface imports allocate fresh retained Ids" $
+                        field /= originalField && otherField /= originalField && field /= otherField
+                    check "constructor interface retained binder remains a valid local index" (isNativeIndexId field && isNativeIndexId otherField)
+                    case dataConOrigArgTys firstConstructor of
+                        [Scaled _ domain, Scaled _ payloadTy] -> do
+                            checkType dflags "constructor interface retained domain" boolTy domain
+                            checkType dflags "constructor interface payload shares its preceding Id" (indexed (TermVarTy field)) payloadTy
+                        _ -> fail "FAIL: imported retained constructor has the wrong field count"
+                    checkType dflags "constructor interfaces preserve alpha-equivalent worker types" (idType (dataConWorkId firstConstructor)) (idType (dataConWorkId secondConstructor))
+                _ -> fail "FAIL: constructor interface lost retained-field metadata"
+            check "constructor interface does not add erased existentials" (null existentials)
+            lintAccepts dflags "imported native package construction" [argument, payload] $
+                mkApps (Var (dataConWorkId firstConstructor)) [Var argument, Var payload]
+            lintAccepts dflags "imported native package elimination" [scrutinee, answer] $
+                Case (Var scrutinee) caseBinder intTy [Alt (DataAlt firstConstructor) fields (Var answer)]
+            lintAccepts dflags "imported native package repackaging preserves field scope" [scrutinee] $
+                Case (Var scrutinee) caseBinder packageTy [Alt (DataAlt firstConstructor) fields (mkApps (Var (dataConWorkId firstConstructor)) (map Var fields))]
+            vacuous <- restorePackage env =<< roundtrip compression vacuousDeclaration
+            forcePackage vacuous
+            let vacuousConstructor = tyConSingleDataCon vacuous
+            check "constructor interface preserves vacuous retained metadata" $ case dataConRepArgBinders vacuousConstructor of
+                [Just field, Nothing] -> isNativeIndexId field
+                _ -> False
+            check "vacuous constructor worker still has an ordinary arrow" $ case idType (dataConWorkId vacuousConstructor) of
+                FunTy{} -> True
+                _ -> False
+        let constructor = case declaration of
+                IfaceData{ifCons = IfDataTyCon _ [con]} -> con
+                _ -> error "FAIL: retained constructor interface has the wrong shape"
+            firstName = case ifConArgBinders constructor of
+                [Just name, Nothing] -> name
+                _ -> error "FAIL: retained constructor interface has the wrong binder count"
+            dependent = ifConArgTys constructor !! 1
+            typeName = mkIfLclName (fsLit "package_parameter")
+            typeBinder = (typeName, toIfaceType liftedTypeKind)
+            boolCon = case toIfaceType boolTy of
+                IfaceTyConApp con _ -> con
+                _ -> error "FAIL: Boolean interface domain has the wrong shape"
+            many = toIfaceType ManyTy
+            bool = toIfaceType boolTy
+            invalid = "Invalid retained constructor"
+        forM_
+            [ ("constructor interface rejects misaligned binder metadata", invalid, constructor{ifConArgBinders = [Just firstName]})
+            , ("constructor interface rejects duplicate field names", invalid, constructor{ifConArgBinders = [Just firstName, Just firstName]})
+            , ("constructor interface rejects a forward field reference", "Iface id out of scope", constructor{ifConArgBinders = [Nothing, Just firstName], ifConArgTys = [dependent, (many, bool)]})
+            , ("constructor interface rejects a self field reference", "Iface id out of scope", constructor{ifConArgTys = [dependent, (many, bool)]})
+            , ("constructor interface rejects a linear index field", invalid, constructor{ifConArgTys = (toIfaceType OneTy, bool) : drop 1 (ifConArgTys constructor)})
+            , ("constructor interface rejects an unsupported index domain", invalid, constructor{ifConArgTys = (many, toIfaceType intTy) : drop 1 (ifConArgTys constructor)})
+            , ("constructor interface rejects an unlifted field", invalid, constructor{ifConArgTys = take 1 (ifConArgTys constructor) ++ [(many, toIfaceType intPrimTy)]})
+            , ("constructor interface rejects missing user binders", invalid, constructor{ifConUnivTvs = [IfaceTvBndr typeBinder]})
+            , ("constructor interface rejects inconsistent user kinds", invalid, constructor{ifConUnivTvs = [IfaceTvBndr typeBinder], ifConUserTvBinders = [mkIfaceForAllTvBndr Specified (typeName, bool)]})
+            , ("constructor interface rejects implementation strictness", invalid, constructor{ifConStricts = [IfStrict, IfNoBang]})
+            , ("constructor interface rejects source strictness", invalid, constructor{ifConSrcStricts = [IfSrcBang NoSrcUnpack SrcStrict, IfSrcBang NoSrcUnpack NoSrcStrict]})
+            , ("constructor interface cannot discard payload scope", "Iface id out of scope", constructor{ifConArgBinders = []})
+            ]
+            $ \(label, fragment, malformed) -> rejectsPackage label fragment (changePackage (const malformed) declaration)
+        rejectsPackage "constructor interface rejects a data-family parent" invalid $
+            declaration{ifParent = IfDataInstance (ifName declaration) boolCon IA_Nil}
+        rejectsPackage "constructor interface rejects an unlifted parent" invalid $
+            declaration{ifResKind = toIfaceType (typeKind intPrimTy)}
+        rejectsPackage "constructor interface rejects an inconsistent cached kind" invalid $
+            declaration{ifKind = toIfaceType boolTy}
+        let inherited = local 2850 "inherited_index" boolTy
+            inheritedPayload = (many, toIfaceType (indexed (TermVarTy inherited)))
+        rejectsPackageWithScope [inherited] "constructor fields cannot inherit an enclosing index" invalid $
+            changePackage (\con -> con{ifConArgTys = take 1 (ifConArgTys con) ++ [inheritedPayload]}) declaration
+        rejectsPackage "constructor fields cannot inherit sibling field scope" "Iface id out of scope" $
+            declaration{ifCons = IfDataTyCon False [constructor, constructor{ifConName = mkExternalName (unique 2851) (nameModule (ifName declaration)) (mkDataOcc "MkIfaceSibling") noSrcSpan, ifConArgBinders = []}]}
+        let parameterized = tyThingToIfaceDecl (ATyCon (retainedIfaceParameterizedPackage 2860))
+        case parameterized of
+            IfaceData{ifCons = IfDataTyCon _ [con]} -> case ifConArgBinders con of
+                [Just leftName, Just rightName, Nothing] ->
+                    check "tidying distinguishes same-spelling retained fields" (leftName /= rightName)
+                _ -> fail "FAIL: parameterized interface lost retained fields"
+            _ -> fail "FAIL: parameterized interface has the wrong shape"
+        firstParameterized <- restorePackage env =<< roundtrip MaximumCompression parameterized
+        secondParameterized <- restorePackage env =<< roundtrip MaximumCompression parameterized
+        forcePackage firstParameterized
+        forcePackage secondParameterized
+        let firstParameterizedCon = tyConSingleDataCon firstParameterized
+            secondParameterizedCon = tyConSingleDataCon secondParameterized
+        checkType
+            dflags
+            "parameterized constructor imports are alpha equivalent"
+            (dataConWrapperType firstParameterizedCon)
+            (dataConWrapperType secondParameterizedCon)
+        case (dataConRepArgBinders firstParameterizedCon, dataConRepArgBinders secondParameterizedCon) of
+            ([Just left, Just right, Nothing], [Just otherLeft, Just otherRight, Nothing]) -> do
+                check "parameterized field imports are distinct and fresh" $
+                    left /= right && otherLeft /= otherRight && left /= otherLeft && right /= otherRight
+                case dataConOrigArgTys firstParameterizedCon of
+                    [_, _, Scaled _ payloadTy] ->
+                        check "parameterized payload retains both field identities" $
+                            left `elemVarSet` tyCoVarsOfType payloadTy && right `elemVarSet` tyCoVarsOfType payloadTy
+                    _ -> fail "FAIL: parameterized constructor has the wrong field count"
+            _ -> fail "FAIL: parameterized import lost retained fields"
+        let leftIndex = local 2880 "left_index" boolTy
+            rightIndex = local 2881 "right_index" boolTy
+            pairPayloadTy =
+                mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy leftIndex, TermVarTy leftIndex]) $
+                    mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, TermVarTy rightIndex, TermVarTy rightIndex]) intTy
+            pairPayload = local 2882 "pair_payload" pairPayloadTy
+        lintAccepts dflags "imported parameterized package construction" [leftIndex, rightIndex, pairPayload] $
+            mkApps (Var (dataConWorkId firstParameterizedCon)) [Type intTy, Var leftIndex, Var rightIndex, Var pairPayload]
+        let recursiveDeclaration base label =
+                let modu = nameModule (ifName declaration)
+                    renamed = declaration{ifName = mkExternalName (unique base) modu (mkTcOcc label) noSrcSpan}
+                 in changePackage (\con -> con{ifConName = mkExternalName (unique (base + 1)) modu (mkDataOcc ("Mk" ++ label)) noSrcSpan}) renamed
+            withDomain domain = changePackage $ \con ->
+                con
+                    { ifConArgTys = [(many, IfaceTyConApp (IfaceTyCon (ifName domain) (mkIfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil), (many, bool)]
+                    }
+            selfDeclaration = withDomain selfDeclaration (recursiveDeclaration 2900 "IfaceSelfDomain")
+            leftDeclaration = withDomain rightDeclaration (recursiveDeclaration 2910 "IfaceLeftDomain")
+            rightDeclaration = withDomain leftDeclaration (recursiveDeclaration 2920 "IfaceRightDomain")
+        rejectsImportedKnots "self-recursive imported retained domain" [selfDeclaration]
+        rejectsImportedKnots "mutually recursive imported retained domains" [leftDeclaration, rightDeclaration]
+        promotionMessages <- newIORef []
+        temporaryTypes <- newIORef (mkTypeEnv [AConLike (RealDataCon firstParameterizedCon)])
+        let promotionModule = nameModule (dataConName firstParameterizedCon)
+            promotionEnv =
+                env
+                    { hsc_logger = pushLogHook (\_ _ _ _ message -> modifyIORef' promotionMessages (showSDoc dflags message :)) (hsc_logger env)
+                    , hsc_type_env_vars = KnotVars [promotionModule] (\modu -> if modu == promotionModule then Just temporaryTypes else Nothing)
+                    }
+            promotedType = IfaceTyConApp (IfaceTyCon (dataConName firstParameterizedCon) (mkIfaceTyConInfo IsPromoted IfaceNormalTyCon)) IA_Nil
+        promotion <-
+            try @IOEnvFailure
+                $ initIfaceCheck (text "retained promotion test") promotionEnv
+                $ initIfaceLcl promotionModule (text "retained promotion test") NotBoot
+                $ tcIfaceExpr (IfaceType promotedType)
+        case promotion of
+            Left _ -> do
+                diagnostics <- unlines <$> readIORef promotionMessages
+                check ("imported retained constructor rejects promotion; diagnostic: " ++ diagnostics) $
+                    "Retained constructors cannot be promoted." `isInfixOf` diagnostics
+            Right _ -> fail "FAIL: imported retained constructor was promoted"
+        ordinary <- restorePackage env =<< roundtrip NormalCompression (tyThingToIfaceDecl (ATyCon boolTyCon))
+        forcePackage ordinary
+        check "ordinary constructor interface has no retained metadata" (all (null . dataConRepArgBinders) (tyConDataCons ordinary))
         let payload = local 309 "payload" intTy
             caseBinder = local 310 "case_b" boolTy
             index = TermVarTy b

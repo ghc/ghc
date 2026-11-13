@@ -731,11 +731,26 @@ tc_iface_decl _ _
               ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
               ifCons = rdr_cons,
               ifParent = mb_parent })
-  = do { kind' <- tcIfaceType kind
+  = do { let has_retained = case rdr_cons of
+                              IfDataTyCon _ cons -> any (not . null . ifConArgBinders) cons
+                              IfNewTyCon con     -> not (null (ifConArgBinders con))
+                              _                  -> False
+       ; when has_retained $
+           unless (null ctxt && case mb_parent of { IfNoParent -> True; _ -> False }) $
+             failIfM (text "Invalid retained constructor fields in interface:"
+                       <+> ppr tc_name
+                       $$ text "Expected an ordinary data parent with an empty context.")
+       ; kind' <- tcIfaceType kind
        ; tycon <- fixM $ \ tycon -> do
                { cons <- tcIfaceDataCons tc_name tycon rdr_cons
                ; bindIfaceTyConBinders_AT binders $ \ binders' ->
             do { res_kind' <- tcIfaceType res_kind
+               ; when has_retained $ unless (res_kind' `eqType` liftedTypeKind) $
+                   failIfM (text "Invalid retained constructor fields in interface:"
+                             <+> ppr tc_name $$ text "The parent result kind must be Type.")
+               ; when has_retained $ unless (kind' `eqType` mkTyConKind binders' res_kind') $
+                   failIfM (text "Invalid retained constructor fields in interface:"
+                             <+> ppr tc_name $$ text "The parent kind and its binders disagree.")
                ; stupid_theta <- tcIfaceCtxt ctxt
                ; parent' <- tc_parent tc_name mb_parent
                ; return (mkAlgTyCon tc_name kind' binders' nb_eta_binders res_kind'
@@ -1166,23 +1181,35 @@ tcIfaceDataCons tycon_name tycon if_cons
                          ifConUnivTvs = univ_bndrs,
                          ifConExTCvs = ex_bndrs,
                          ifConUserTvBinders = user_bndrs,
-                         ifConName = dc_name,
+                         ifConName = dc_name, ifConWrapper = has_wrapper,
+                         ifConArgBinders = arg_binders,
                          ifConCtxt = ctxt, ifConEqSpec = spec,
                          ifConArgTys = args, ifConFields = lbl_names,
                          ifConStricts = if_stricts,
                          ifConSrcStricts = if_src_stricts})
-     = bindIfaceForAllBndrs user_bndrs $ \ if_user_tvs ->
+     = do { unless (null arg_binders) $
+              check_retained_shape dc_name has_wrapper arg_binders args univ_bndrs user_bndrs
+                ex_bndrs spec ctxt lbl_names if_stricts if_src_stricts
+          ; bindIfaceForAllBndrs user_bndrs $ \ if_user_tvs ->
        let user_tvs = [Bndr tv (ifaceForAllTyFlag vis) | Bndr tv vis <- if_user_tvs] in
        bindDataConBinders   univ_bndrs $ \ univ_tvs ->
        bindDataConBinders   ex_bndrs   $ \ ex_tvs  ->
      do { traceIf (text "Start interface-file tc_con_decl" <+> ppr dc_name)
+        ; unless (null arg_binders) $
+            forM_ [(kind, tv) | (IfaceTvBndr (_, kind), tv) <- zip univ_bndrs univ_tvs] $
+              \(kind, tv) -> do
+              { declared_kind <- tcIfaceType kind
+              ; unless (declared_kind `eqType` varType tv) $
+                  failIfM (text "Invalid retained constructor fields in interface:"
+                            <+> ppr dc_name
+                            $$ text "Universal and user binder kinds disagree:" <+> ppr tv) }
 
         -- Read the context and argument types, but lazily for two reasons
         -- (a) to avoid looking tugging on a recursive use of
         --     the type itself, which is knot-tied
         -- (b) to avoid faulting in the component types unless
         --     they are really needed
-        ; ~(eq_spec, theta, arg_tys, stricts) <- forkM (mk_doc dc_name) $
+        ; ~(eq_spec, theta, retained_binders, arg_tys, stricts) <- forkM (mk_doc dc_name) $
              do { eq_spec <- tcIfaceEqSpec spec
                 ; theta   <- tcIfaceCtxt ctxt
                 -- This fixes #13710.  The enclosing lazy thunk gets
@@ -1191,12 +1218,16 @@ tcIfaceDataCons tycon_name tycon if_cons
                 -- tuple is needed), which causes trouble if one of
                 -- the argument types was recursively defined.
                 -- See also Note [Tying the knot]
-                ; arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys")
-                           $ mapM (\(w, ty) -> mkScaled <$> tcIfaceType w <*> tcIfaceType ty) args
+                ; ~(retained_binders, arg_tys) <-
+                    if null arg_binders
+                    then do { arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys")
+                                        $ mapM (\(w, ty) -> mkScaled <$> tcIfaceType w <*> tcIfaceType ty) args
+                            ; return ([], arg_tys) }
+                    else tc_retained_args dc_name emptyVarSet arg_binders args
                 ; stricts <- mapM tc_strict if_stricts
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
-                ; return (eq_spec, theta, arg_tys, stricts) }
+                ; return (eq_spec, theta, retained_binders, arg_tys, stricts) }
 
         -- Remember, tycon is the representation tycon
         ; let orig_res_ty = mkFamilyTyConApp tycon
@@ -1210,7 +1241,9 @@ tcIfaceDataCons tycon_name tycon if_cons
             -- it'll use these to guide the construction of a worker.
             -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
 
-        ; con <- buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr dc_name))
+        ; con <- buildDataConWithRetainedArgs
+                       (if null arg_binders then [] else retained_binders)
+                       (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr dc_name))
                        bang_opts
                        dc_name is_infix prom_rep_name
                        (map src_strict if_src_stricts)
@@ -1219,7 +1252,73 @@ tcIfaceDataCons tycon_name tycon if_cons
                        eq_spec theta
                        arg_tys orig_res_ty tycon tag_map
         ; traceIf (text "Done interface-file tc_con_decl" <+> ppr dc_name)
-        ; return con }
+        ; return con } }
+
+    -- Check only interface syntax here. The parent TyCon is still knot-tied.
+    check_retained_shape name wrapper binders args univs users exs spec ctxt fields bangs src_bangs
+      = unless (binders `equalLength` args
+                && length names == length (nub names)
+                && all type_binder univs && all (\(Bndr b _) -> type_binder b) users
+                && length univ_names == length (nub univ_names)
+                && length user_names == length (nub user_names)
+                && univ_names `equalLength` user_names
+                && all (`elem` univ_names) user_names
+                && null exs && null spec && null ctxt && null fields
+                && not wrapper && ordinary_data
+                && (null bangs || bangs `equalLength` args)
+                && all lazy_bang bangs
+                && (null src_bangs || src_bangs `equalLength` args)
+                && all lazy_src_bang src_bangs) $
+          failIfM (text "Invalid retained constructor fields in interface:" <+> ppr name
+                   $$ text "Expected aligned distinct field names and a lazy data constructor"
+                   $$ text "without a wrapper, context, existential, or record field."
+                   $$ text "Universal and user type binders must have the same distinct names.")
+      where
+        names = [n | Just n <- binders]
+        univ_names = map ifaceBndrName univs
+        user_names = [ifaceBndrName b | Bndr b _ <- users]
+        ordinary_data = case if_cons of
+                          IfDataTyCon False _ -> True
+                          _                   -> False
+        type_binder (IfaceTvBndr _) = True
+        type_binder _              = False
+        lazy_bang IfNoBang = True
+        lazy_bang _        = False
+        lazy_src_bang (IfSrcBang unpack strict)
+          = not (isSrcUnpacked unpack) && not (isSrcStrict strict)
+
+    -- Allocate the lexical binder skeleton before forcing its domain.
+    -- See Note [Importing retained constructor field telescopes].
+    tc_retained_args _ _ [] [] = return ([], [])
+    tc_retained_args name scope (mb : bs) ((w, ty) : args)
+      = do { ~(mult, field_ty) <- forkM (mk_doc name <+> text "retained field") $
+               do { mult <- tcIfaceType w
+                  ; field_ty <- tcIfaceType ty
+                  ; unless (typeKind mult `eqType` multiplicityTy
+                            && isLiftedTypeKind (typeKind field_ty)
+                            && not (anyFreeVarsOfType
+                                 (\v -> isId v && not (v `elemVarSet` scope)) field_ty)
+                            && case mb of
+                                 Nothing -> True
+                                 Just _  -> isManyTy mult && isNativeIndexType field_ty) $
+                      failIfM (text "Invalid retained constructor fields in interface:" <+> ppr name
+                               $$ text "Expected a lifted field with only earlier runtime indices;"
+                               $$ text "a named field must have multiplicity Many and a fixed index domain.")
+                  ; return (mult, field_ty) }
+           ; case mb of
+               Nothing -> do
+                 { ~(rest, fields) <- tc_retained_args name scope bs args
+                 ; return (Nothing : rest, Scaled mult field_ty : fields) }
+               Just fs -> do
+                 { field_name <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
+                 ; let field = mkLocalId field_name ManyTy field_ty
+                 ; ~(rest, fields) <- extendIfaceIdEnv [field] $
+                     tc_retained_args name (extendVarSet scope field) bs args
+                 ; return (Just field : rest, Scaled mult field_ty : fields) } }
+    tc_retained_args name _ _ _
+      = failIfM (text "Invalid retained constructor fields in interface:" <+> ppr name
+                   $$ text "Field names and argument types are not aligned.")
+
     mk_doc con_name = text "Constructor" <+> ppr con_name
 
     tc_strict :: IfaceBang -> IfL HsImplBang
@@ -1231,6 +1330,32 @@ tcIfaceDataCons tycon_name tycon if_cons
 
     src_strict :: IfaceSrcBang -> HsSrcBang
     src_strict (IfSrcBang unpk bang) = HsSrcBang NoSourceText unpk bang
+
+{- Note [Importing retained constructor field telescopes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Allocate retained field Ids from left to right. Their names scope only over
+later field types. Decode each field type in a separate forkM under that
+lexical environment. Keep the Id skeleton independent of the decoded domain.
+Use literal ManyTy for each named Id. Id construction forces multiplicity,
+so using the deferred decoded multiplicity would also force domain validation.
+Validate the encoded multiplicity in the deferred field decoder instead.
+
+This separation is required for recursive interface knots. The parent TyCon
+can expose its nonempty field metadata before a domain is validated. The native
+index-domain checker rejects that metadata before it inspects the fields.
+Self and mutual retained-domain cycles therefore fail instead of recursively
+forcing their own domain validation. Constructor type validation must not run
+when the DataCon skeleton is allocated. See Note [Retained constructor field
+telescopes] in GHC.Core.DataCon.
+
+The ordinary field decoder keeps its existing lazy boundary. No new field
+name scopes over the constructor result, context, or erased binders. This
+codec does not enable source dependent constructor declarations. Retained
+declarations require an ordinary lifted parent. With no existential or
+equality specification, user and universal binders name the same variables.
+Check their names before binding, then check declared kinds after reuse;
+bindDataConBinders alone reuses names without comparing their kinds.
+-}
 
 bindDataConBinders :: [IfaceBndr] -> ([CoreBndr] -> IfL a) -> IfL a
 bindDataConBinders [] thing_inside
@@ -2234,7 +2359,11 @@ tcIfaceTyCon (IfaceTyCon name _info)
   = do { thing <- tcIfaceGlobal name
        ; case thing of
               ATyCon tc -> return tc
-              AConLike (RealDataCon dc) -> return (promoteDataCon dc)
+              AConLike (RealDataCon dc)
+                -> do { unless (null (dataConRepArgBinders dc)) $
+                          failIfM (text "Invalid retained constructor fields in interface:"
+                                    <+> ppr name $$ text "Retained constructors cannot be promoted.")
+                      ; return (promoteDataCon dc) }
               _ -> pprPanic "tcIfaceTyCon" (ppr thing) }
 
 tcIfaceAxiomRule :: IfaceAxiomRule -> IfL CoAxiomRule

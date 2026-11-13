@@ -1167,18 +1167,29 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
 -- so the error is detected properly... it's just that assertions here
 -- are a little dodgy.
 
-  | null arg_binders || valid_retained_args = con
-  | otherwise = pprPanic "mkDataConWithRetainedArgs: invalid telescope" (ppr name)
+  = con
   where
     valid_retained_args
       = arg_binders `equalLength` orig_arg_tys
         && null ex_tvs && null eq_spec && null theta && null stupid_theta
-        && null fields && not (isNewTyCon rep_tycon)
+        && null fields && isVanillaAlgTyCon rep_tycon
+        && isLiftedTypeKind (tyConResKind rep_tycon)
+        && valid_universals
         && case rep of { NoDataConRep -> True; _ -> False }
         && all lazy_src arg_stricts
         && all lazy_impl impl_bangs && not (any isMarkedStrict str_marks)
         && valid_fields emptyVarSet arg_binders orig_arg_tys
         && not (anyFreeVarsOfType isId orig_res_ty)
+
+    valid_universals
+      = all isTyVar univ_tvs && all isTyVar user_tvs
+        && sizeVarSet univ_set == length univ_tvs
+        && sizeVarSet (mkVarSet user_tvs) == length user_tvs
+        && user_tvs `equalLength` univ_tvs
+        && all (`elemVarSet` univ_set) user_tvs
+      where
+        user_tvs = binderVars user_tvbs
+        univ_set = mkVarSet univ_tvs
 
     lazy_src (HsSrcBang _ unpack strict)
       = not (isSrcUnpacked unpack) && not (isSrcStrict strict)
@@ -1229,11 +1240,13 @@ mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
 
     rep_arg_tys = dataConRepArgTys con
 
-    rep_ty =
-      case rep of
+    rep_ty
+      | not (null arg_binders), not valid_retained_args
+      = pprPanic "mkDataConWithRetainedArgs: invalid telescope" (ppr name)
+      | otherwise = case rep of
         -- If the DataCon has no wrapper, then the worker's type *is* the
         -- user-facing type, so we can simply use dataConWrapperType.
-        NoDataConRep -> dataConWrapperType con
+        NoDataConRep -> dataConWrapperTypeUnchecked con
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
         DCR{} -> mkInfForAllTys univ_tvs $ mkTyCoInvForAllTys ex_tvs $
@@ -1588,7 +1601,13 @@ dataConWrapperType :: DataCon -> Type
 --
 -- NB: If the constructor is part of a data instance, the result type
 -- mentions the family tycon, not the internal one.
-dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
+dataConWrapperType con
+  | null (dataConRepArgBinders con) = dataConWrapperTypeUnchecked con
+  | otherwise                     = dataConRepType con
+
+-- | Rebuild the user type after the retained representation check.
+dataConWrapperTypeUnchecked :: DataCon -> Type
+dataConWrapperTypeUnchecked (MkData { dcUserTyVarBinders = user_tvbs,
                              dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                              dcOrigArgBinders = arg_binders,
                              dcOrigResTy = res_ty,
@@ -1620,10 +1639,18 @@ The original argument types alone cannot record this scope. Store a parallel
 list of optional binders. An empty list preserves the ordinary representation
 and its lazy construction. Validate only the new, nonempty representation.
 
+Keep the constructor and its metadata available before checking field domains.
+Validate the retained telescope when its worker or user type is demanded. An
+imported field domain can refer recursively to this TyCon. Domain validation
+must inspect the nonempty metadata and reject it without reentering the same
+field-type thunk. See Note [Retained constructor fields in interfaces] in
+GHC.Iface.Syntax. The ordinary constructor path keeps its existing laziness.
+
 The first subset has no wrapper, existential, constraint, record selector,
-newtype representation, strict field, or unpacked field. All fields are lifted.
-A named field has a
-closed native index domain and multiplicity Many. Its Id must be fresh. Only
+data-family or newtype representation, strict field, or unpacked field. The
+ordinary parent and all fields are lifted. The user quantifiers name exactly
+the universal type variables, with no duplicates. A named field has a closed
+native index domain and multiplicity Many. Its Id must be fresh. Only
 earlier retained fields can occur as free runtime Ids in a field type. No
 runtime field Id can escape into the constructor result. Rebuild the worker
 and wrapper types with DepFunTy at each named field. The runtime field remains

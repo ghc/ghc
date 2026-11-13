@@ -738,6 +738,7 @@ rnIfaceConDecl
           , ifConEqSpec        = con_eq_spec0
           , ifConCtxt          = con_ctxt0
           , ifConArgTys        = con_arg_tys0
+          , ifConArgBinders    = con_arg_binders
           , ifConFields        = con_fields0
           , ifConStricts       = con_stricts0
           , ifConWrapper       = con_wrapper
@@ -766,6 +767,7 @@ rnIfaceConDecl
         , ifConEqSpec        = con_eq_spec
         , ifConCtxt          = con_ctxt
         , ifConArgTys        = con_arg_tys
+        , ifConArgBinders    = con_arg_binders
         , ifConFields        = con_fields
         , ifConStricts       = con_stricts
         , ifConWrapper       = con_wrapper

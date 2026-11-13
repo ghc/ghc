@@ -2293,9 +2293,9 @@ isNativeIndexType ty = go emptyTyConSet [ty]
       | otherwise = False
 
     con_fields tc con
-      | ([], [], [], [], orig_args, res) <- dataConFullSig con
+      | null (dataConRepArgBinders con)
+      , ([], [], [], [], orig_args, res) <- dataConFullSig con
       , null (dataConStupidTheta con)
-      , null (dataConRepArgBinders con)
       , Nothing <- dataConWrapId_maybe con
       , TyConApp res_tc [] <- coreFullView res, res_tc == tc
       , orig_args `equalLength` rep_args
@@ -2331,10 +2331,13 @@ with one worklist and a visited set. This admits recursive and mutually recursiv
 domains without assuming that their runtime values are finite or total.
 
 Reject parameters, existential variables, constructor constraints, datatype
-contexts, newtypes, type data, and wrappers. Original and representation fields
-must not carry retained field binders. Such constructors need a separate
-promotion rule, even when a named field is unused by the later types. Fields
-must have the same closed domain. Thus a promoted constructor's arguments match
+contexts, newtypes, type data, and wrappers. Retained field constructors need a
+separate promotion rule, even when a named field is unused by the later types.
+Inspect their metadata before the full signature. A recursive interface field
+can otherwise force the same domain thunk which is already being checked.
+
+Original and representation fields must have the same closed domain. Thus a
+promoted constructor's arguments match
 its worker's runtime fields. In particular, do not promote an unpacked payload as
 if it were the original boxed field. Constructor field multiplicities may be One
 or Many; the retained identifier itself must be unrestricted.

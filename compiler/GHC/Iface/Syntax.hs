@@ -379,6 +379,8 @@ data IfaceConDecl
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
         ifConArgTys  :: [(IfaceMult, IfaceType)],-- Arg types
+        ifConArgBinders :: [Maybe IfLclName], -- [] for ordinary fields
+          -- See Note [Retained constructor fields in interfaces].
         ifConFields  :: [FieldLabel],  -- ...ditto... (field labels)
         ifConStricts :: [IfaceBang],
           -- Empty (meaning all lazy),
@@ -387,6 +389,30 @@ data IfaceConDecl
         ifConSrcStricts :: [IfaceSrcBang] } -- empty meaning no src stricts
 
 type IfaceEqSpec = [(IfLclName,IfaceType)]
+
+{- Note [Retained constructor fields in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A named runtime field scopes over the types of later constructor fields.
+Store its local name beside the argument types. The lists have equal length,
+except that an empty binder list denotes an ordinary constructor. A Nothing
+entry does not bind a runtime index. Keep named fields even when they are
+vacuous. They are part of the constructor telescope, not erased existentials.
+
+The writer tidies fields from left to right. It tidies each field type before
+adding that field's binder to the environment. The reader follows the same
+scope order and allocates fresh Ids. It rejects duplicate names, references to
+later fields, and unsupported constructor metadata. Check metadata shape before
+allocating the DataCon. Defer field domains and runtime scope to type demand.
+This keeps metadata available while checking recursive interface declarations.
+Local names add no global dependencies. The field types retain their global
+dependencies.
+
+Agda serializes a telescope as a domain and an abstraction over its tail.
+It uses de Bruijn indices, whereas GHC resolves local interface names to fresh
+Ids. See the Agda telescope serialization sources in
+docs/dependent-haskell/REFERENCES.md#constructor-field-interface-provenance.
+This comparison does not supply a scope checker for malformed interface data.
+-}
 
 -- | This corresponds to an HsImplBang; that is, the final
 -- implementation decision about the data constructor arg
@@ -1207,7 +1233,7 @@ pprIfaceDecl ss decl@(IfaceData { ifName = tycon, ifCType = ctype,
                                   ifCtxt = context, ifKind = kind, ifResKind = res_kind,
                                   ifRoles = roles, ifCons = condecls,
                                   ifParent = parent,
-                                  ifGadtSyntax = gadt,
+                                  ifGadtSyntax = gadt_syntax,
                                   ifBinders = binders })
 
   | gadt      = vcat [ pp_roles
@@ -1220,6 +1246,7 @@ pprIfaceDecl ss decl@(IfaceData { ifName = tycon, ifCType = ctype,
                      , hang (pp_nd <+> pp_lhs) 2 (add_bars pp_cons)
                      , nest 2 $ ppShowIface ss pp_extra ]
   where
+    gadt = gadt_syntax || any (not . null . ifConArgBinders) cons
     is_data_instance = isIfaceDataInstance parent
     -- See Note [Printing foralls in type family instances] in GHC.Iface.Type
     pp_data_inst_forall :: SDoc
@@ -1578,6 +1605,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
         (IfCon { ifConName = name, ifConInfix = is_infix,
                  ifConUnivTvs = univ_tvs, ifConUserTvBinders = user_tvbs,
                  ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys,
+                 ifConArgBinders = arg_binders,
                  ifConStricts = stricts, ifConFields = fields })
   | gadt_style = pp_prefix_con <+> dcolon <+> ppr_gadt_ty
   | otherwise  = ppr_ex_quant pp_h98_con
@@ -1608,13 +1636,23 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
         -- because we don't have a Name for the tycon, only an OccName
-    pp_tau | null fields
+    pp_tau | not (null arg_binders)
+           = pp_retained_args arg_binders arg_tys
+           | null fields
            = case pp_args ++ [pp_gadt_res_ty] of
                 (t:ts) -> fsep (t : zipWithEqual (\(w,_) d -> ppr_arr w <+> d)
                                                  arg_tys ts)
                 []     -> panic "pp_con_taus"
            | otherwise
            = sep [pp_field_args, arrow <+> pp_gadt_res_ty]
+
+    pp_retained_args [] [] = pp_gadt_res_ty
+    pp_retained_args (binder : binders) ((w, ty) : tys)
+      = sep [ case binder of
+                Nothing -> pprPrecIfaceType funPrec ty
+                Just name -> text "foreach" <+> parens (ppr name <+> dcolon <+> ppr ty)
+            , ppr_arr w <+> pp_retained_args binders tys ]
+    pp_retained_args _ _ = panic "pprIfaceConDecl: misaligned retained fields"
 
     -- Constructors are linear by default, but we don't want to show
     -- linear arrows when -XLinearTypes is disabled
@@ -2607,7 +2645,7 @@ instance Binary IfaceConDecls where
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
 
 instance Binary IfaceConDecl where
-    put_ bh (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a9 a10 a11) = do
+    put_ bh (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a13 a9 a10 a11) = do
         putIfaceTopBndr bh a1
         put_ bh a2
         put_ bh a3
@@ -2616,6 +2654,7 @@ instance Binary IfaceConDecl where
         put_ bh a6
         put_ bh a7
         put_ bh a8
+        put_ bh a13
         put_ bh (length a9)
         mapM_ (put_ bh) a9
         put_ bh a10
@@ -2630,12 +2669,13 @@ instance Binary IfaceConDecl where
         a6 <- get bh
         a7 <- get bh
         a8 <- get bh
+        a13 <- get bh
         n_fields <- get bh
         a9 <- replicateM n_fields (get bh)
         a10 <- get bh
         a11 <- get bh
         a12 <- get bh
-        return (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a9 a10 a11)
+        return (IfCon a1 a2 a3 a12 a4 a5 a6 a7 a8 a13 a9 a10 a11)
 
 instance Binary IfaceBang where
     put_ bh IfNoBang        = putByte bh 0
@@ -3193,9 +3233,9 @@ instance NFData IfaceConDecls where
     IfNewTyCon f1 -> rnf f1
 
 instance NFData IfaceConDecl where
-  rnf (IfCon f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12) =
+  rnf (IfCon f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13) =
     rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq`
-    rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` rnf f11 `seq` rnf f12
+    rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` rnf f11 `seq` rnf f12 `seq` rnf f13
 
 instance NFData IfaceSrcBang where
   rnf (IfSrcBang f1 f2) = rnf f1 `seq` rnf f2 `seq` ()
