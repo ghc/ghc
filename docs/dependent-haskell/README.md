@@ -12,6 +12,7 @@ Last updated: 2026-11-13.
 
 - [Implementation plan](PLAN.md): Core extension, port tasks, and acceptance checks.
 - [References](REFERENCES.md): annotated sources, reading order, and status dates.
+- [Packed vector source target](examples/packed-vector/README.md): producer, consumer, required output, and proposed runner; source support is pending.
 - [Historical port](PORT.md): pinned commits, module mapping, and missing rules.
 - [Restricted Core](CORE.md): representation, typing, substitution, and gates.
 - This file: current status, validation results, and instructions to resume work.

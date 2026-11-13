@@ -14,7 +14,7 @@ See [current status](README.md) and [primary references](REFERENCES.md).
 
 Finish the constructor-interface validation already in progress. Then complete
 M10 through Haskell source. The acceptance program must declare Nat, Vec and
-PackedVec in source. It must construct, unpack and repackage stored vectors.
+PackedVec in source. See the [source target](examples/packed-vector/README.md). It must construct, unpack and repackage stored vectors.
 Compile a producer and a consumer as separate modules. Do not require a GHC API
 producer to add native declarations or functions.
 
@@ -895,6 +895,8 @@ Ids; an ordinary value alias does not establish index equality.
 - [ ] Preserve actual field identities during desugaring. `matchOneConLike`
   and PMC's `desugarConPatOut` currently call the gated flat
   `conLikeInstOrigArgTys`. Instantiate fields sequentially in both paths.
+  PMC's speculative `instCon` must also instantiate fresh fields sequentially;
+  its current flat substitution leaves retained template Ids free.
   `selectMatchVar` can retain a bare source field Id for one clause.
   An ordinary `bindMatchId`/`wrapBind` alias does not prove equality of runtime
   indices. Multiple equations require coherent substitution through each typed
