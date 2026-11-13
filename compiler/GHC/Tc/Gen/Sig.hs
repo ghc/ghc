@@ -221,7 +221,7 @@ tcUserTypeSig :: SrcSpan -> LHsSigWcType GhcRn -> Maybe Name -> TcM TcIdSig
 -- Nothing => Expression type signature   <expr> :: type
 tcUserTypeSig loc hs_sig_ty mb_name
   | HsWC { hswc_body = L _ (HsSig { sig_body = body }) } <- hs_sig_ty
-  , HsForEachTy{} <- unLoc (ignoreParens body)
+  , hsHasForEachTy (unLoc body)
   , not (isCompleteHsSig hs_sig_ty)
   = failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
 

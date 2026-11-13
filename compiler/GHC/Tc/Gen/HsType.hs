@@ -505,13 +505,16 @@ tc_lhs_sig_type allow_retained skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = 
       = do { (tidy_env2, exp_kind) <- zonkTidyTcType tidy_env exp_kind
            ; return (tidy_env2, UninfTyCtx_Sig exp_kind full_hs_ty) }
 
--- | Check the retained telescope of a complete value signature.
--- All other positions use the ordinary type checker and its feature gate.
+-- | Check retained telescopes in function positions of a complete signature.
+-- See Note [Higher-order retained signatures].
 tcCheckRetainedSigType :: LHsType GhcRn -> TcKind -> TcM TcType
 tcCheckRetainedSigType = go typeLevelMode
   where
     go :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
     go mode (L _ (HsParTy _ body)) kind = go mode body kind
+    go mode (L loc (HsFunTy _ mult arg res)) kind
+      = setSrcSpanA loc $
+        tc_fun_type_x (go mode) mode mult arg res (Check kind)
     go mode (L loc ty@(HsForEachTy _ bndrs body)) kind
       = setSrcSpanA loc $
         do { when (null bndrs) $
@@ -552,7 +555,8 @@ domain is a value type, so its annotation does not require KindSignatures.
 It must satisfy isNativeIndexType. Each runtime binder has multiplicity Many.
 The ordinary outer-forall checker scopes erased type variables around the
 whole telescope. The result has kind Type. Retained binders in other type
-positions, inner foralls, and Template Haskell remain gated.
+positions use Note [Higher-order retained signatures]. Inner foralls and
+Template Haskell remain gated.
 
 This checks a dependent function directly. Agda's checkPiTelescope checks
 each domain before extending the context for the remaining telescope.
@@ -561,6 +565,27 @@ Agda.TypeChecking.Rules.Term.checkTelescope'. This scope rule does not
 evaluate a runtime argument.
 The runtime Id follows the native representation described in
 Note [Restricted retained dependent types] in GHC.Core.TyCo.Rep.
+-}
+
+{- Note [Higher-order retained signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A complete value signature can put a retained function in an ordinary arrow
+argument or result. Rename and check both children in their original context.
+Each nested retained telescope extends only its own body's index environment.
+It can refer to an outer runtime index. Its binder must not enter the enclosing
+arrow's result. The closure parameter is an ordinary value, not a runtime index.
+
+Use tc_fun_type_x with the signature checker for these children. Keep the
+ordinary open-kind and multiplicity checks. Other type positions still use
+tc_check_lhs_type and its retained-type gate. The renamer and complete-signature
+guard use hsHasForEachTy. Reject partial signatures even when a wildcard lies
+outside the nested Pi.
+
+The application checker supplies the closure's expected type. A source lambda
+uses Note [Checked retained lambdas] in GHC.Tc.Gen.Match. A named function can
+match an alpha-equivalent retained type without structural Pi unification.
+Agda's expected-argument and scoped-Pi rules supply the checking precedent.
+See docs/dependent-haskell/REFERENCES.md#explicit-higher-order-arguments.
 -}
 
 
@@ -1629,20 +1654,27 @@ combinations of extensions.
 ------------------------------------------
 tc_fun_type :: TcTyMode -> HsModifiedFunArr GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind
             -> TcM TcType
-tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
+tc_fun_type mode = tc_fun_type_x (tc_check_lhs_type mode) mode
+
+-- | Check an ordinary arrow with the supplied checker for its child types.
+-- See Note [Higher-order retained signatures].
+tc_fun_type_x :: (LHsType GhcRn -> TcKind -> TcM TcType)
+              -> TcTyMode -> HsModifiedFunArr GhcRn -> LHsType GhcRn -> LHsType GhcRn
+              -> ExpKind -> TcM TcType
+tc_fun_type_x check mode mult ty1 ty2 exp_kind = case mode_tyki mode of
   TypeLevel ->
     do { traceTc "tc_fun_type" (ppr ty1 $$ ppr ty2)
        ; arg_k <- newOpenTypeKind
        ; res_k <- newOpenTypeKind
-       ; ty1'  <- tc_check_lhs_type mode ty1 arg_k
-       ; ty2'  <- tc_check_lhs_type mode ty2 res_k
+       ; ty1'  <- check ty1 arg_k
+       ; ty2'  <- check ty2 res_k
        ; mult' <- fromMaybe manyDataConTy <$> tc_mult mode mult
        ; checkExpKind (HsFunTy noExtField mult ty1 ty2)
                       (tcMkVisFunTy mult' ty1' ty2')
                       liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
-    do { ty1'  <- tc_check_lhs_type mode ty1 liftedTypeKind
-       ; ty2'  <- tc_check_lhs_type mode ty2 liftedTypeKind
+    do { ty1'  <- check ty1 liftedTypeKind
+       ; ty2'  <- check ty2 liftedTypeKind
        ; mult' <- fromMaybe manyDataConTy <$> tc_mult mode mult
        ; checkExpKind (HsFunTy noExtField mult ty1 ty2)
                       (tcMkVisFunTy mult' ty1' ty2')

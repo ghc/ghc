@@ -1236,7 +1236,8 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
   , let (theta, tau) = tcSplitPhiTy body
   , null theta || hasNoConcreteTyVars fun
   , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) tau
-  , isTauTy expected, isTauTy result
+  , isTauTy expected || (hasNoConcreteTyVars fun && isRetainedValueType expected)
+  , isTauTy result
   , not (hasNativeDependentExpr (Core.Type body))
   , Just subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst result expected
   , Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
@@ -1254,6 +1255,44 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
 tcRetainedResultMatch _ _ _ _ _ = return Nothing
+
+-- | Admit known runtime function values without erased polymorphism.
+-- Constraint arrows are supported only below a retained binder.
+isRetainedValueType :: Type -> Bool
+isRetainedValueType = go False
+  where
+    go _ ty | isTauTy ty = True
+    go under_pi ty = case coreFullView ty of
+      DepFunTy index body -> isNativeIndexId index
+                         && typeKind body `eqType` liftedTypeKind
+                         && go True body
+      FunTy flag mult arg res -> isTauTy mult
+                              && (isVisibleFunArg flag || under_pi)
+                              && go under_pi arg && go under_pi res
+      _ -> False
+
+{- Note [Known retained function instantiation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary polymorphic value can be checked at a known retained function type.
+For example, bottomFunction :: forall a. a can instantiate a to the entire Pi.
+Match its ordinary result template against that expected type before allocating
+instantiation metavariables. The pure matcher can bind an outer template variable
+to a whole Pi without structurally unifying the Pi's body.
+
+Keep the ordinary tau expected-result path. The additional path accepts runtime
+function types through ordinary arrows and supported retained binders. It also
+accepts constraint arrows below a retained binder. Reject erased foralls and
+other non-tau type heads. Require a function head without concreteness variables.
+The template remains ordinary and its result remains tau. The existing NoQL,
+type-argument, complete-substitution, kind, runtime-scope and exact-result checks
+still apply. Preserve the original body and its constraints in the substitution.
+The ordinary argument and result subsumption checks still run afterward.
+
+Emit the actual type applications. Do not fill a mutable metavariable with the
+Pi, introduce an equality axiom, or eta-expand the value. In particular, a bottom
+function remains bottom when its function WHNF is demanded. This route also
+allows id applied to a checked lambda when the expected result supplies its Pi.
+-}
 
 -- | Find the saturated result of ordinary visible arrows without constraints.
 tcRetainedOrdinaryResult :: Int -> Type -> Maybe Type

@@ -583,6 +583,7 @@ retainedNatContextDeclarations =
     , "outerOnlyGivenArrow n = proc () -> (case n of { Z -> \\() -> onlyGivenContext n bottomVec; S k -> \\() -> onlyGivenContext n bottomVec }) -< ()"
     ]
         ++ retainedNatLambdaDeclarations
+        ++ retainedNatClosureDeclarations
 
 -- | Check retained lambdas against complete signatures without inferring a Pi.
 retainedNatLambdaDeclarations :: [String]
@@ -648,6 +649,53 @@ retainedNatLambdaExpected =
         ++ replicate 3 "42"
         ++ ["forced", "forced", "forced", "forced", "42", "42", "forced", "42"]
 
+-- | Check ordinary closure arguments with explicitly supplied retained types.
+retainedNatClosureDeclarations :: [String]
+retainedNatClosureDeclarations =
+    [ "applyAt :: forall a. foreach (n :: Nat) -> (foreach (m :: Nat) -> Vec a m -> Vec a m) -> Vec a n -> Vec a n"
+    , "applyAt @a n f xs = f n xs"
+    , "applyFirst :: forall a. (foreach (m :: Nat) -> Vec a m -> Vec a m) -> foreach (n :: Nat) -> Vec a n -> Vec a n"
+    , "applyFirst @a f n xs = f n xs"
+    , "applyCaptured :: foreach (n :: Nat) -> foreach (m :: Nat) -> (foreach (k :: Nat) -> Vec Int n -> Vec Int k -> Vec Int n) -> Vec Int n -> Vec Int m -> Vec Int n"
+    , "applyCaptured n m f xs ys = f m xs ys"
+    , "ignoreClosure :: foreach (n :: Nat) -> (foreach (m :: Nat) -> Vec Int m -> Vec Int m) -> Vec Int n -> Int"
+    , "ignoreClosure n _ _ = 42"
+    , "bottomClosure :: foreach (m :: Nat) -> Vec Int m -> Vec Int m"
+    , "bottomClosure = bottomFunction"
+    , "erasedRuntimeShadow :: forall (n :: Nat). foreach (n :: Nat) -> Vec Int n -> Vec Int n"
+    , "erasedRuntimeShadow @n = \\n xs -> xs"
+    , "nativeViaId :: forall a. foreach (m :: Nat) -> Vec a m -> Vec a m"
+    , "nativeViaId = id (\\m xs -> xs)"
+    , "bumpVec :: Vec Int n -> Vec Int n"
+    , "bumpVec VNil = VNil"
+    , "bumpVec (VCons x xs) = VCons (x + 1) (bumpVec xs)"
+    ]
+
+-- | Pass named and checked closures through shared runtime index producers.
+retainedNatClosureObservation :: [String]
+retainedNatClosureObservation =
+    [ "named <- driveNats (\\n -> observeVec (applyAt @Int n (erasedRuntimeShadow @Z) (replicateNative @Int n 42)))"
+    , "anonymous <- driveNats (\\n -> observeVec (applyAt @Int n (\\m xs -> xs) (replicateNative @Int n 42)))"
+    , "ordinaryFirst <- driveNats (\\n -> observeVec (applyFirst @Int (lambdaId @Int) n (replicateNative @Int n 42)))"
+    , "captured <- driveNatPairs (\\n m -> observeVec (applyCaptured n m (\\k outer _ -> outer) (replicateNative @Int n 42) (replicateNative @Int m 7)))"
+    , "partialBottom <- driveNat (\\n -> force (applyAt @Int n (lambdaId @Int))) bottomNat"
+    , "partialCyclic <- driveNat (\\n -> force (applyAt @Int n (lambdaId @Int))) cyclicNat"
+    , "ignoredBottom <- driveNat (\\n -> observeInt (ignoreClosure n bottomClosure bottomVec)) bottomNat"
+    , "ignoredCyclic <- driveNat (\\n -> observeInt (ignoreClosure n bottomClosure bottomVec)) cyclicNat"
+    , "throughId <- driveNats (\\n -> observeVec (nativeViaId @Int n (replicateNative @Int n 42)))"
+    , "transformed <- driveNats (\\n -> observeVec (applyAt @Int n (\\m xs -> bumpVec xs) (replicateNative @Int n 42)))"
+    , "pure (named ++ anonymous ++ ordinaryFirst ++ captured ++ unlines [partialBottom,partialCyclic,ignoredBottom,ignoredCyclic] ++ throughId ++ transformed)"
+    ]
+
+-- | Preserve previous observations before checking closure applications.
+retainedNatClosureExpected :: [String]
+retainedNatClosureExpected =
+    concat (replicate 3 ["[]:0", "[42,42]:2", "[42,42,42]:3"])
+        ++ ["[]:0", "[]:0", "[42,42]:2", "[42,42]:2"]
+        ++ ["forced", "forced", "42", "42"]
+        ++ ["[]:0", "[42,42]:2", "[42,42,42]:3"]
+        ++ ["[]:0", "[43,43]:2", "[43,43,43]:3"]
+
 -- | Check contextual functions with imported classes and local native workers.
 retainedNatContextSource :: String -> String -> String
 retainedNatContextSource moduleName observation =
@@ -693,7 +741,9 @@ retainedNatContextObservation =
     , "lambdaValues <- do"
     ]
         ++ map ("  " ++) retainedNatLambdaObservation
-        ++ ["pure (rendered ++ constructors ++ guarded ++ viewed ++ lambdas ++ fullPatterns ++ forwarded ++ ignoredVectors ++ equalities ++ constructorEqualities ++ unlines [ignoredBottom,ignoredCyclic,ignoredEqualityBottom,ignoredEqualityCyclic,variablePartialBottom,variablePartialCyclic,constructorPartialBottom,constructorPartialCyclic] ++ pairs ++ unlines [legacy,legacyBang,wildcard,constrained] ++ caseRendered ++ caseEqualities ++ casePrimitiveEqualities ++ casePairs ++ caseFull ++ unlines [caseCyclic,casePartialField,noCaseBottom] ++ lambdaValues)"]
+        ++ ["closureValues <- do"]
+        ++ map ("  " ++) retainedNatClosureObservation
+        ++ ["pure (rendered ++ constructors ++ guarded ++ viewed ++ lambdas ++ fullPatterns ++ forwarded ++ ignoredVectors ++ equalities ++ constructorEqualities ++ unlines [ignoredBottom,ignoredCyclic,ignoredEqualityBottom,ignoredEqualityCyclic,variablePartialBottom,variablePartialCyclic,constructorPartialBottom,constructorPartialCyclic] ++ pairs ++ unlines [legacy,legacyBang,wildcard,constrained] ++ caseRendered ++ caseEqualities ++ casePrimitiveEqualities ++ casePairs ++ caseFull ++ unlines [caseCyclic,casePartialField,noCaseBottom] ++ lambdaValues ++ closureValues)"]
 
 -- | Preserve the contextual observations after all existing imported results.
 retainedNatContextExpected :: [String]
@@ -720,6 +770,7 @@ retainedNatContextExpected =
         ++ ["VNil", "VCons 42 (VCons 42 VNil)", "VCons 42 (VCons 42 (VCons 42 VNil))"]
         ++ replicate 3 "forced"
         ++ retainedNatLambdaExpected
+        ++ retainedNatClosureExpected
 
 -- | Check explicit source cases with dependent results and captured payloads.
 retainedCaseSource :: String -> String -> String
@@ -1914,6 +1965,7 @@ runNatContextSourceChecks = do
         , ("NativeSourceLambdaCaseBottom", "driveNat (\\n -> force (lambdaCase n)) bottomNat", "native-bottom-nat")
         , ("NativeSourceLambdaEmptyBottom", "let v :: LambdaVoid; v = error \"native-bottom-empty\" in force (lambdaEmpty v)", "native-bottom-empty")
         , ("NativeSourceExplicitEmptyCaseBottom", "let v :: LambdaVoid; v = error \"native-bottom-empty\" in force (explicitEmptyCase v)", "native-bottom-empty")
+        , ("NativeSourceClosureBottom", "force bottomClosure", "native-bottom-function")
         ]
         $ \(name, body, marker) -> do
             bottomExpression <- sourceEntry name (retainedNatContextSource name body)
@@ -2014,6 +2066,63 @@ runNatContextSourceChecks = do
             ,
                 [ "badLambda :: foreach (n :: Nat) -> (Add n Z :~: n) %1 -> Int"
                 , "badLambda = \\n p -> case p of Refl -> case p of Refl -> 42"
+                ]
+            )
+        ,
+            ( "NativeSourceClosureWrongLength"
+            , 83865
+            , "Vec"
+            , []
+            ,
+                [ "badClosure :: foreach (n :: Nat) -> Vec Int n -> Vec Int n"
+                , "badClosure n xs = applyAt @Int n (\\m ys -> VCons 42 ys) xs"
+                ]
+            )
+        ,
+            ( "NativeSourceClosureIndexEscape"
+            , 83865
+            , "Vec"
+            , []
+            ,
+                [ "badClosure :: foreach (n :: Nat) -> Vec Int n -> Vec Int n"
+                , "badClosure n xs = applyAt @Int n (\\m ys -> xs) xs"
+                ]
+            )
+        ,
+            ( "NativeSourceFunctionIndexDomain"
+            , 83605
+            , "supported closed first-order algebraic domain"
+            , []
+            ,
+                [ "badFunctionIndex :: foreach (f :: Nat -> Nat) -> Int"
+                , "badFunctionIndex f = 42"
+                ]
+            )
+        ,
+            ( "NativeSourceClosureInference"
+            , 83605
+            , "explicit signature"
+            , []
+            , ["badClosureAlias = applyAt @Int"]
+            )
+        ,
+            ( "NativeSourceClosureAnonymousWildcard"
+            , 83605
+            , "complete type signature"
+            , ["{-# LANGUAGE PartialTypeSignatures #-}"]
+            ,
+                [ "badClosureWildcard :: _ -> (foreach (m :: Nat) -> Vec Int m -> Vec Int m) -> Int"
+                , "badClosureWildcard _ _ = 42"
+                ]
+            )
+        ,
+            ( "NativeSourceClosureNamedWildcard"
+            , 83605
+            , "complete type signature"
+            , ["{-# LANGUAGE NamedWildCards, PartialTypeSignatures #-}"]
+            ,
+                [ "badClosureWildcard :: _payload -> (foreach (m :: Nat) -> Vec Int m -> Vec Int m) -> Int"
+                , "badClosureWildcard _ _ = 42"
                 ]
             )
         ]
@@ -2218,7 +2327,7 @@ runSourceRejectChecks = do
         , ("SPECIALISE expression pragma", 83605, "Optimisation pragmas", [], local ["{-# SPECIALISE keep True #-}"] selection identity "42")
         , ("unsigned retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["alias = keep"]) "42")
         , ("unsigned partial retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["index :: Bool", "index = False", "alias = keep index"]) "42")
-        , ("nested retained type", 43582, "not supported in this type position", [], ["bad :: Int -> (foreach (b :: Bool) -> Select b -> Select b)", "bad = undefined"])
+        , ("retained type in a type-constructor argument", 43582, "not supported in this type position", [], ["bad :: Maybe (foreach (b :: Bool) -> Select b -> Select b)", "bad = undefined"])
         , ("retained type synonym", 43582, "not supported in this type position", [], ["type Bad = foreach (b :: Bool) -> Select b -> Select b"])
         , ("unregistered ordinary term name", 37479, "is a term-level binding", [], ["ordinary :: Bool", "ordinary = False", "type Bad = NativeSourceRejected.ordinary"])
         , ("constructor payload mismatch", 83865, "second argument", [], local [] selection identity "keep True False")

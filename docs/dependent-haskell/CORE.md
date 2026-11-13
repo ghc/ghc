@@ -383,6 +383,9 @@ Reuse retained application and the checked-lambda rule. Preserve source arity,
 usage, and laziness. Ignoring a bottom closure must not evaluate it. Supplying a
 bottom index must not evaluate that index when the selected function ignores it.
 Do not infer a retained function argument type through a native meta assignment.
+An ordinary named worker must already have an alpha-equivalent retained type.
+Explicit type applications can specialize its erased parameters. General
+instantiation through a retained result template remains separate work.
 
 A known retained function result can also determine the outer type arguments of
 an ordinary polymorphic helper. Use the existing immutable result match before

@@ -269,22 +269,32 @@ withRetainedAmbiguityType ty thing_inside
       = do { (indices, body) <- go body
            ; return (indices, mkForAllTy binder body) }
     go (FunTy flag mult arg res)
-      = do { (indices, res) <- go res
-           ; return (indices, FunTy flag mult arg res) }
+      = do { (arg_indices, arg) <- go arg
+           ; (res_indices, res) <- go res
+           ; return (arg_indices ++ res_indices, FunTy flag mult arg res) }
     go ty = return ([], ty)
 
 {- Note [Ambiguity checking retained signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The ambiguity check compares a signature with a fresh instantiation of itself.
 For forall a. foreach n -> a -> Vec a n, the payload metavariable must unify
-with the payload skolem. FC has no retained-function congruence in this
-increment, so ordinary equality cannot compare these two retained functions.
+with the payload skolem. Structural unification under a retained binder remains
+gated, so ordinary equality cannot perform this payload unification.
 
 Open each retained binder with one fresh runtime Id. Use that same opaque Id
 on both sides of the check. Replace the opened binder with an ordinary arrow.
 Keep outer erased quantifiers, so ordinary ambiguity checks still apply to
 their type variables and constraints. Do not replace runtime indices with
 fresh type metavariables: Select b need not determine b.
+
+Project both the argument and result of an ordinary arrow. For example,
+forall a. (foreach m -> Vec a m -> Vec a m) -> Int compares a payload skolem
+with its fresh metavariable inside the argument Pi. Leaving that Pi unchanged
+would prevent the ordinary payload unification. Opening an outer retained
+binder first substitutes its fresh Id through the whole body, including any
+nested argument Pi. Thus an argument closure can still refer to the outer
+runtime index. Keep all fresh runtime Ids in scope for the projected check.
+
 Agda's equalFun and compareDom also compare codomains in one shared extended
 context. See docs/dependent-haskell/REFERENCES.md#agda-provenance.
 

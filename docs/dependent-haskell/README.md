@@ -37,8 +37,9 @@ Last updated: 2026-11-13.
 | Source contexts | Class and equality contexts after retained binders pass variable, constructor, and explicit case checking |
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
-| Current increment validation | Both-stage build, five registered regressions, bootstrap API/runtime, 226 imported CLI observations, ten native guide blocks, and ordinary smoke checks pass |
-| Next task | Explicit higher-order closure arguments; ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native unfolding codecs, and lowering gaps remain open |
+| Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
+| Current increment validation | Bootstrap API/runtime and 249 imported observations pass; final both-stage build, registered tests, and CLI checks are pending |
+| Next task | Broader signature positions, native template instantiation, ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native unfolding codecs, and lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -1317,6 +1318,49 @@ inference, structural Pi unification, and ordinary optimization remain open.
 See [the contract](CORE.md#checked-source-lambdas),
 [the tasks](PLAN.md#checked-retained-lambdas), and
 [Agda's lambda and absurd-lambda rules](REFERENCES.md#checked-retained-lambdas).
+
+## Higher-order retained closures
+
+A retained function can be an ordinary closure argument in a complete signature:
+
+```haskell
+applyNative :: forall a.
+               (foreach (m :: Nat) -> Vec a m -> Vec a m)
+            -> foreach (n :: Nat) -> Vec a n -> Vec a n
+applyNative f n xs = f n xs
+```
+
+This uses the earlier Nat and Vec declarations. The caller can pass an explicitly
+specialized named worker or a lambda checked against the supplied retained type.
+The argument `f` is a function value. It is not a runtime index. An inner
+function type can also capture an enclosing runtime index. Each nested binder
+scopes only its own codomain. Both ordinary-leading and retained-leading
+signatures follow the same arrow traversal.
+
+The ambiguity check opens retained binders in argument and result positions in
+one fresh runtime context. The actual signature stays retained. Ordinary helpers
+can also receive a known retained function type through immutable instantiation.
+This checks `id` around a lambda and a genuine polymorphic bottom without native
+meta assignment or eta expansion. Erased inner foralls and structural Pi
+unification remain gated. Native templates can still require explicit type
+applications. Retained syntax under type constructors, kinds, and other source
+positions remains separate work.
+
+The fixture appends 23 observations to the previous 226. These cover polymorphic
+calls, ordinary-leading functions, checked lambdas, value-changing vector
+closures, captured indices, and erased/runtime shadowing. Unused bottom functions
+and bottom vectors stay lazy. Demanding the signed bottom function raises its
+named exception. Wrong lengths, escaping indices, unsupported domains, unsigned
+aliases, and partial signatures have located diagnostics.
+
+The bootstrap runtime and API kernel pass. Four standalone compilation controls
+also pass, including known function results with class contexts. The full build,
+registered tests, and final CLI checks are pending. Artifacts use
+`_build/verification/native-higher-order-`.
+
+See [the contract](CORE.md#explicit-higher-order-closure-arguments),
+[the tasks](PLAN.md#explicit-higher-order-arguments-follow-up), and
+[Agda provenance](REFERENCES.md#explicit-higher-order-arguments).
 
 ## Verified baseline
 

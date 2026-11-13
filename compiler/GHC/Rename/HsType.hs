@@ -149,7 +149,7 @@ rnHsSigWcType doc (HsWC { hswc_body =
        ; let nwc_rdrs = nubL nwc_rdrs'
        ; bindHsOuterTyVarBndrs doc Nothing imp_tv_nms outer_bndrs $ \outer_bndrs' ->
     do { (wcs, body_ty', fvs) <-
-           if | HsForEachTy{} <- unLoc (ignoreParens body_ty)
+           if | hsHasForEachTy (unLoc body_ty)
               -> do { case doc of
                        TypeSigCtx{} -> pure ()
                        _ -> failWithTc $ TcRnRetainedQuantificationError RetainedUnsupportedContext
@@ -163,13 +163,21 @@ rnHsSigWcType doc (HsWC { hswc_body =
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
               , fvs) } }
 
--- | Rename the retained telescope at the start of a value signature.
+-- | Rename retained telescopes in the arrow positions of a value signature.
 -- See Note [Source retained signatures] in GHC.Tc.Gen.HsType.
 rnRetainedSigType :: HsDocContext -> LHsType GhcPs
                   -> RnM (LHsType GhcRn, FreeNames)
 rnRetainedSigType doc (L loc (HsParTy _ body))
   = do { (body', fvs) <- rnRetainedSigType doc body
        ; pure (L loc (HsParTy noAnn body'), fvs) }
+rnRetainedSigType doc (L loc (HsFunTy x mult arg res))
+  = setSrcSpanA loc $
+    do { (arg', arg_fvs) <- rnRetainedSigType doc arg
+       ; (res', res_fvs) <- rnRetainedSigType doc res
+       ; let env = mkTyKiEnv doc TypeLevel RnTypeBody
+       ; (mult', mult_fvs) <- rnHsModifiedFunArrWith (rnModifier env) mult
+       ; pure (L loc (HsFunTy x mult' arg' res'),
+               plusFNs [arg_fvs, res_fvs, mult_fvs]) }
 rnRetainedSigType doc (L loc (HsForEachTy x bndrs body))
   = setSrcSpanA loc $
     do { level <- getThLevel
