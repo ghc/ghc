@@ -765,16 +765,16 @@ The parameter `f` is an ordinary closure argument. It is not a runtime index.
 - [x] Instantiate ordinary helpers from a known retained function result with
       immutable type arguments. Preserve a genuine bottom closure. Check `id`
       around a lambda under a complete expected type.
-- [ ] Lift checked constructor proofs through fixed-domain retained closure
+- [x] Lift checked constructor proofs through fixed-domain retained closure
       types. Check constructor clauses and explicit case with captured indices.
       Preserve binder scope and transport with casts instead of eta expansion.
-- [ ] Verify separate-module execution with unknown runtime indices. Check that
+- [x] Verify separate-module execution with unknown runtime indices. Check that
       ignoring a bottom function stays lazy. Check unused bottom indices too.
 - [x] Reject wrong vector lengths, escaping indices, unsupported domains, and
       function-valued runtime indices with located diagnostics.
 - [x] Keep inferred aliases, general native meta assignment, Quick Look, and
       structural Pi unification gated. Test explicit outer erased polymorphism.
-- [ ] Complete both-stage builds, registered regressions, separate CLI checks,
+- [x] Complete both-stage builds, registered regressions, separate CLI checks,
       formatting, and the verified checkpoint.
 
 The renamer and signature checker traverse ordinary arrow arguments and results.
@@ -782,6 +782,8 @@ Core Lint and validity check each contained retained telescope recursively.
 Agda's expected-argument and scoped-Pi lambda rules provide the checking
 precedent. See [the pinned sources](REFERENCES.md#explicit-higher-order-arguments).
 Follow [the higher-order contract](CORE.md#explicit-higher-order-closure-arguments).
+Implementation `64044341e8` and `94d7d8f2f3` pass the
+[verified checkpoint](README.md#higher-order-retained-closures).
 
 ## Acceptance checks
 

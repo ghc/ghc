@@ -38,7 +38,7 @@ Last updated: 2026-11-13.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Current increment validation | Bootstrap API/runtime and 249 imported observations pass; final both-stage build, registered tests, and CLI checks are pending |
+| Current increment validation | Both stages and libraries, five registered regressions, 255 imported observations, 13 focused closure observations, and 11 guide blocks pass |
 | Next task | Broader signature positions, native template instantiation, ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native unfolding codecs, and lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
@@ -1357,10 +1357,37 @@ The transport uses the checked branch proof and existing `DepFunCo` lifting.
 It preserves the function value with a cast. Changed domains and dependent
 erased foralls remain gated.
 
-The bootstrap runtime and API kernel pass. Four standalone compilation controls
-also pass, including known function results with class contexts. The full build,
-registered tests, and final CLI checks are pending. Artifacts use
-`_build/verification/native-higher-order-`.
+The implementation is in `64044341e8` and `94d7d8f2f3`. The final both-stage
+build passed in 7m35s at 4,651 MiB under 16 GiB. All five registered normal-way
+regressions passed: 39 cases, 34 skipped, no unexpected results or framework
+warnings. The command took 1m11s at 2,560 MiB under 8 GiB. The driver took
+9.725 seconds. The repository requires regression coverage for compiler changes;
+this change extends the existing runtime fixture.
+
+The bootstrap runtime passes 255 imported rows and 124 source-context rows.
+The API kernel and standalone known-result controls pass. Separate self-hosted
+CLI processes reproduce the 255 rows and check 13 further closure observations.
+These include ignored and returned cast bottom functions. Six new located
+rejections, previous lambda/context/proof/linear controls, 177 earlier
+compatibility rows, and both interface-version rejection directions pass.
+
+All 11 literal guide blocks pass Core and STG Lint. Ordinary typing,
+single-expansion Template Haskell, 14 native function/class observations,
+optimized package/GHCi/Haddock smoke, nested typed splices, and static pointers
+pass. The final CLI scope peaked at 291 MiB under 4 GiB. All heavy jobs were
+serial and disabled swap. The full GHC testsuite was not run.
+
+STG shows ordinary three-argument closure passing in `applyAt` and `applyFirst`.
+`ignoreClosure` has no case. `bottomClosure` remains a bottom thunk.
+`returnCapturedCase` has arity two and returns the original closure after its
+index case. The Core forms, dictionary ABI, and interface version are unchanged.
+General native inference, Quick Look, structural Pi unification, and ordinary
+optimization remain gated.
+
+Artifacts use `_build/verification/native-higher-order-`. The final logs are
+`full-build-v2.log`, `registered-v2.log`, and `final-cli-v2.log`. The
+`validation.txt` record includes the earlier prototype failure, source hashes,
+artifact hashes, and the older compatibility snapshot's stale STG hashes.
 
 See [the contract](CORE.md#explicit-higher-order-closure-arguments),
 [the tasks](PLAN.md#explicit-higher-order-arguments-follow-up), and
