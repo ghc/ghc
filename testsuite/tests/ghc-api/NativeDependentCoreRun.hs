@@ -274,6 +274,56 @@ retainedNatSource moduleName observation =
         , "  in " ++ observation
         ]
 
+-- | Share lifted arithmetic proofs between local and imported source checks.
+retainedNatProofDeclarations :: [String]
+retainedNatProofDeclarations =
+    [ "rightZero :: foreach (n :: Nat) -> Add n Z :~: n"
+    , "rightZero Z = Refl"
+    , "rightZero (S k) = case rightZero k of Refl -> Refl"
+    , "rightUnit :: foreach (n :: Nat) -> Vec Int (Add n Z) -> Vec Int n"
+    , "rightUnit n xs = case rightZero n of Refl -> xs"
+    , "transportWith :: foreach (n :: Nat) -> (Add n Z :~: n) -> Vec Int (Add n Z) -> Vec Int n"
+    , "transportWith n p xs = case p of Refl -> xs"
+    , "ignoreProof :: foreach (n :: Nat) -> (Add n Z :~: n) -> Int"
+    , "ignoreProof n _ = 42"
+    , "bottomProof :: forall n. Add n Z :~: n"
+    , "bottomProof = error \"native-bottom-proof\""
+    ]
+
+-- | Add proof syntax and local workers without changing other Nat source cases.
+retainedNatProofSource :: String -> String -> String
+retainedNatProofSource moduleName observation =
+    unlines $ "{-# LANGUAGE TypeOperators #-}" : concatMap insert (lines (retainedNatSource moduleName observation))
+  where
+    insert line@"import NativeRuntimeHelpers hiding (appendVec)" =
+        [line, "import Data.Type.Equality ((:~:)(Refl))"]
+    insert line@"      run :: Nat -> IO String" =
+        map ("      " ++) retainedNatProofDeclarations ++ [line]
+    insert line = [line]
+
+-- | Observe checked proofs and unused proof thunks through runtime input drivers.
+retainedNatProofObservation :: [String]
+retainedNatProofObservation =
+    [ "proofs <- driveNats (\\n -> case rightZero n of Refl -> pure \"Refl\")"
+    , "transported <- driveNats (\\n -> observeVec (rightUnit n (appendNative @Int n Z (replicateNative @Int n 42) VNil)))"
+    , "supplied <- driveNats (\\n -> observeVec (transportWith n (rightZero n) (appendNative @Int n Z (replicateNative @Int n 42) VNil)))"
+    , "ignored <- driveNats (\\n -> observeInt (ignoreProof n (rightZero n)))"
+    , "ignoredBottom <- driveNat (\\n -> observeInt (ignoreProof n (rightZero n))) bottomNat"
+    , "ignoredProofBottom <- driveNat (\\n -> observeInt (ignoreProof n bottomProof)) bottomNat"
+    , "ignoredCyclic <- driveNat (\\n -> observeInt (ignoreProof n (rightZero n))) cyclicNat"
+    , "partialBottom <- driveNat (\\n -> case rightUnit n of !_ -> pure \"forced\") bottomNat"
+    , "partialCyclic <- driveNat (\\n -> case rightUnit n of !_ -> pure \"forced\") cyclicNat"
+    , "pure (proofs ++ transported ++ supplied ++ ignored ++ unlines [ignoredBottom,ignoredProofBottom,ignoredCyclic,partialBottom,partialCyclic])"
+    ]
+
+-- | Preserve proof evaluation and transport results across source and disk imports.
+retainedNatProofExpected :: [String]
+retainedNatProofExpected =
+    replicate 3 "Refl"
+        ++ concat (replicate 2 ["[]:0", "[42,42]:2", "[42,42,42]:3"])
+        ++ replicate 6 "42"
+        ++ replicate 2 "forced"
+
 -- | Check explicit source cases with dependent results and captured payloads.
 retainedCaseSource :: String -> String -> String
 retainedCaseSource moduleName observation =
@@ -406,7 +456,10 @@ retainedNatLibrarySource :: String
 retainedNatLibrarySource =
     unlines $
         take 1 (lines (retainedNatSource "NativeRetainedNatLibrary" ""))
-            ++ ["module NativeRetainedNatLibrary where"]
+            ++ [ "{-# LANGUAGE TypeOperators #-}"
+               , "module NativeRetainedNatLibrary where"
+               , "import Data.Type.Equality ((:~:)(Refl))"
+               ]
             ++ map generalizeAppend (drop 2 (lines helperSource))
             ++ [ "bottomPolymorphicVec :: forall a n. Vec a n"
                , "bottomPolymorphicVec = error \"native-bottom-vector\""
@@ -433,6 +486,7 @@ retainedNatLibrarySource =
                , "constantAlias = ordinaryNat"
                ]
             ++ retainedCaseDeclarations
+            ++ retainedNatProofDeclarations
   where
     generalizeAppend "appendVec :: Vec Int n -> Vec Int m -> Vec Int (Add n m)" =
         "appendVec :: forall a n m. Vec a n -> Vec a m -> Vec a (Add n m)"
@@ -443,8 +497,10 @@ retainedNatConsumerSource :: String
 retainedNatConsumerSource =
     unlines $
         take 1 (lines retainedNatLibrarySource)
-            ++ [ "module Main (main) where"
+            ++ [ "{-# LANGUAGE TypeOperators #-}"
+               , "module Main (main) where"
                , "import NativeRetainedNatLibrary"
+               , "import Data.Type.Equality ((:~:)(Refl))"
                , "run :: Nat -> IO String"
                , "run n = observeVec (replicateNative @Int n 42)"
                , "runAppend :: Nat -> Nat -> IO String"
@@ -470,8 +526,10 @@ retainedNatConsumerSource =
                , "  constants <- driveNats (\\n -> observeInt (constantAlias n))"
                , "  constantBottom <- driveNat (\\n -> observeInt (constantAlias n)) bottomNat"
                , "  normalizedPartial <- driveNat (\\n -> case leftUnitAppend n of !_ -> pure \"forced\") bottomNat"
-               , "  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead,constructedPartial,nestedPartial] ++ caseValues ++ normalized ++ normalizedAppend ++ constants ++ unlines [constantBottom,normalizedPartial])"
+               , "  proofValues <- do"
                ]
+            ++ map ("    " ++) retainedNatProofObservation
+            ++ ["  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead,constructedPartial,nestedPartial] ++ caseValues ++ normalized ++ normalizedAppend ++ constants ++ unlines [constantBottom,normalizedPartial] ++ proofValues)"]
 
 -- | Run Boolean and Nat consumers against separately compiled disk artifacts.
 runModuleChecks :: FilePath -> IO ()
@@ -489,7 +547,7 @@ runModuleChecks libdir = do
             , "NativeRetainedNatLibrary"
             , retainedNatLibrarySource
             , retainedNatConsumerSource
-            , -- Keep the first 26 observations. Append 12 normalization observations.
+            , -- Keep the first 38 observations. Append lifted proof observations.
               [ "[]:0"
               , "[42,42]:2"
               , "[42,42,42]:3"
@@ -530,6 +588,7 @@ runModuleChecks libdir = do
                    , "42"
                    , "forced"
                    ]
+                ++ retainedNatProofExpected
             )
         ]
         $ \(label, moduleName, producer, consumer, expected) ->
@@ -975,6 +1034,7 @@ runNatSourceChecks = do
     runNatConstructorSourceChecks
     runNatPartialSourceChecks
     runNatNormalizationSourceChecks
+    runNatProofSourceChecks
     runCaseSourceChecks
 
 -- | Observe refined source cases and reject malformed dependent alternatives.
@@ -1201,6 +1261,71 @@ runNatNormalizationSourceChecks = do
                     , "loopAlias = loopNativeId"
                     ]
     sourceModuleRejects "retained normalization reduction depth" 40404 "Reduction stack overflow" loopName loopSource
+
+-- | Force lifted arithmetic proofs while preserving unused proof and index thunks.
+runNatProofSourceChecks :: GHC.Ghc ()
+runNatProofSourceChecks = do
+    let moduleName = "NativeSourceNatProofs"
+        observation = unlines ("do" : map ("        " ++) retainedNatProofObservation)
+    expression <- sourceEntry moduleName (retainedNatProofSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source lifted Nat proofs" expression
+    unless (lines actual == retainedNatProofExpected) $
+        fail ("FAIL: source lifted Nat proofs changed transport or laziness: " ++ show actual)
+    forM_
+        [ ("NativeSourceProofBottomIndex", "driveNat (\\n -> case rightZero n of Refl -> pure \"forced\") bottomNat", "native-bottom-nat")
+        , ("NativeSourceProofPartialIndex", "driveNat (\\n -> case rightZero n of Refl -> pure \"forced\") partialNat", "native-bottom-nat")
+        , ("NativeSourceProofBottomBeforePayload", "driveNat (\\n -> observeVec (transportWith n bottomProof bottomVec)) bottomNat", "native-bottom-proof")
+        , ("NativeSourceProofIndexBeforePayload", "driveNat (\\n -> observeVec (rightUnit n bottomVec)) bottomNat", "native-bottom-nat")
+        , ("NativeSourceProofPayloadBottom", "driveNat (\\n -> observeVec (rightUnit n bottomVec)) Z", "native-bottom-vector")
+        ]
+        $ \(name, body, marker) -> do
+            bottomExpression <- sourceEntry name (retainedNatProofSource name body)
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case outcome of
+                Left exception
+                    | marker `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right value -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show value)
+    forM_
+        [
+            ( "NativeSourceUnprovedRightZero"
+            , "Add"
+            ,
+                [ "badProof :: foreach (n :: Nat) -> Add n Z :~: n"
+                , "badProof n = Refl"
+                ]
+            )
+        ,
+            ( "NativeSourceFalseSuccessorProof"
+            , "S n"
+            ,
+                [ "badProof :: foreach (n :: Nat) -> n :~: S n"
+                , "badProof n = Refl"
+                ]
+            )
+        ,
+            ( "NativeSourceUnusedEqualityProof"
+            , "Add"
+            ,
+                [ "badTransport :: foreach (n :: Nat) -> (Add n Z :~: n) -> Vec Int (Add n Z) -> Vec Int n"
+                , "badTransport n p xs = xs"
+                ]
+            )
+        ,
+            ( "NativeSourceEscapedEqualityProof"
+            , "Add"
+            ,
+                [ "badTransport :: foreach (n :: Nat) -> (Add n Z :~: n) -> Vec Int (Add n Z) -> Vec Int n"
+                , "badTransport n p xs = let checked :: (); checked = case p of Refl -> () in xs"
+                ]
+            )
+        ]
+        $ \(name, fragment, declarations) ->
+            sourceModuleRejects name 83865 fragment name $
+                retainedNatProofSource name "pure \"unused\"" ++ unlines declarations
 
 -- | Exercise constructor naming with dependent payloads and lazy nested fields.
 runNatConstructorSourceChecks :: GHC.Ghc ()

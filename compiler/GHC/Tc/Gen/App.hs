@@ -35,7 +35,7 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Zonk.TcType
 
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys, dataConWorkId )
+import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys, dataConTyCon, dataConWorkId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Utils ( applyTypeToArgs )
@@ -797,7 +797,7 @@ tcInstFunWithExpected expected_rho do_ql inst_final rn_head@(_, fun_lspan)
                 Indirect fun_ty' -> go  fun_orig pos acc fun_ty' args
                 Flexi            -> go1 fun_orig pos acc fun_ty  args }
      | otherwise
-     = do { matched <- tcRetainedResultMatch do_ql expected_rho args fun_ty
+     = do { matched <- tcRetainedResultInst do_ql expected_rho args tc_fun fun_ty
           ; case matched of
               Just (inst_tys, body)
                 -> go fun_orig pos (addArgWrap (mkWpTyApps inst_tys) acc) body args
@@ -1044,13 +1044,13 @@ type arguments are checked and emitted once. Other applications use the
 ordinary path and its existing Quick Look checks.
 -}
 
--- | Instantiate outer invisible binders from an exact retained result match.
+-- | Instantiate outer invisible binders for retained result checking.
 -- The substitution is immutable; retained syntax never enters a meta-variable.
 tcRetainedExpectedInst :: QLFlag -> ExpRhoType -> [HsExprArg 'TcpRn]
                        -> HsExpr GhcTc -> TcSigmaType
                        -> TcM (HsExpr GhcTc, TcSigmaType)
 tcRetainedExpectedInst do_ql expected args fun sigma
-  = do { matched <- tcRetainedResultMatch do_ql expected_rho args sigma
+  = do { matched <- tcRetainedResultInst do_ql expected_rho args fun sigma
        ; case matched of
            Just (inst_tys, body) -> return (mkHsWrap (mkWpTyApps inst_tys) fun, body)
            Nothing -> return (fun, sigma) }
@@ -1058,6 +1058,89 @@ tcRetainedExpectedInst do_ql expected args fun sigma
     expected_rho = case expected of
                      Check rho -> Just rho
                      Infer {}  -> Nothing
+
+{- Note [Retained constructor instantiation candidates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Refl repeats its index in its result. An expected result can contain two
+indices that are equal only under a local Given. For example, the recursive
+step of a right-zero proof expects Add (S k) Z :~: S k. An exact immutable
+match fails before the solver can use the recursive proof Add k Z ~ k.
+Ordinary instantiation would instead create an index meta-variable. The
+native meta-variable fill check correctly rejects that assignment.
+
+For a data constructor, match corresponding result arguments independently.
+Use the first candidate for each outer invisible binder. Require a complete,
+well-kinded substitution and check the local scope of every runtime Id.
+This substitution chooses type arguments. It does not prove that the result
+has the expected type. Repeated occurrences can still require an equality.
+
+Emit WpTyApps and keep the actual substituted constructor type. Both the early
+application route and tcInstFunWithExpected continue to finishAppWithCache.
+Its checkResultTy call checks subsumption against the original expected type
+and emits the required equality evidence. For example, a non-reflexive Refl
+still fails without a suitable Given. Never replace the actual result with
+the expected result, or use a reflexive coercion for this check.
+
+Keep this fallback under NoQL. Require a data constructor head, a saturated
+ordinary algebraic result, no pending type arguments, and no constraints or
+native template. Leave constructors with concreteness requirements on the
+ordinary instantiation path. Pattern synonyms and ordinary functions do not
+use this fallback. No mutable type variable receives retained syntax. The exact
+result match remains the first choice. See
+Note [Immutable retained result instantiation].
+-}
+
+-- | Try exact instantiation before a checked data-constructor candidate.
+tcRetainedResultInst :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
+                     -> HsExpr GhcTc -> TcSigmaType
+                     -> TcM (Maybe ([Type], TcSigmaType))
+tcRetainedResultInst do_ql expected args fun sigma
+  = do { matched <- tcRetainedResultMatch do_ql expected args sigma
+       ; case matched of
+           Just _ -> return matched
+           Nothing -> tcRetainedConResultInst do_ql expected args fun sigma }
+
+-- | Choose immutable constructor type arguments for ordinary result checking.
+tcRetainedConResultInst :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
+                        -> HsExpr GhcTc -> TcSigmaType
+                        -> TcM (Maybe ([Type], TcSigmaType))
+tcRetainedConResultInst NoQL (Just expected) args
+                       (XExpr (ConLikeTc (RealDataCon dc))) sigma
+  | isEmptyNameEnv (dataConConcreteTyVars dc)
+  , hasNativeDependentExpr (Core.Type expected)
+  , not (any is_type_arg args)
+  , (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , not (null tvs)
+  , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) body
+  , isTauTy expected, isTauTy body
+  , not (hasNativeDependentExpr (Core.Type body))
+  , Just (tc, templates) <- splitTyConApp_maybe result
+  , tc == dataConTyCon dc, isAlgTyCon tc
+  , length templates == tyConArity tc
+  , Just (expected_tc, actuals) <- splitTyConApp_maybe expected
+  , tc == expected_tc, templates `equalLength` actuals
+  , let candidates = [ subst | (template, actual) <- zip templates actuals
+                            , Just subst <- [tcMatchTyX_BM (bind_outer tvs)
+                                             Subst.emptySubst template actual] ]
+  , Just inst_tys <- traverse (candidate candidates) tvs
+  , not (any (`elemVarSet` tyCoVarsOfTypes inst_tys) tvs)
+  , let subst = Subst.zipTvSubst tvs inst_tys
+  , and (zipWith (kind_agrees subst) tvs inst_tys)
+  = do { valid <- tcRetainedInstScope inst_tys
+       ; return (if valid then Just (inst_tys, Subst.substTy subst body) else Nothing) }
+  where
+    is_type_arg ETypeArg{} = True
+    is_type_arg _ = False
+
+    bind_outer tvs tv _
+      | tv `elem` tvs = BindMe
+      | otherwise = DontBindMe
+
+    candidate substs tv = listToMaybe [ ty | subst <- substs
+                                         , Just ty <- [Subst.lookupTyVar subst tv] ]
+
+    kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
+tcRetainedConResultInst _ _ _ _ _ = return Nothing
 
 -- | Match a retained expected result without assigning mutable type variables.
 tcRetainedResultMatch :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
@@ -1067,7 +1150,7 @@ tcRetainedResultMatch NoQL (Just expected) args sigma
   , not (any is_type_arg args)
   , (tvs, body) <- tcSplitForAllInvisTyVars sigma
   , not (null tvs)
-  , Just result <- ordinary_result (count isHsValArg args) body
+  , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) body
   , isTauTy expected, isTauTy result
   , not (hasNativeDependentExpr (Core.Type body))
   , Just subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst result expected
@@ -1085,17 +1168,18 @@ tcRetainedResultMatch NoQL (Just expected) args sigma
       | otherwise = DontBindMe
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
-
-    ordinary_result :: Int -> Type -> Maybe Type
-    ordinary_result n ty
-      | Just (_, res') <- splitVisibleFunTy_maybe ty
-      = if n > 0 then ordinary_result (n-1) res' else Nothing
-      | n == 0
-      , not (isForAllTy ty)
-      , not (isFunTy ty)
-      = Just ty
-      | otherwise = Nothing
 tcRetainedResultMatch _ _ _ _ = return Nothing
+
+-- | Find the saturated result of ordinary visible arrows without constraints.
+tcRetainedOrdinaryResult :: Int -> Type -> Maybe Type
+tcRetainedOrdinaryResult n ty
+  | Just (_, res') <- splitVisibleFunTy_maybe ty
+  = if n > 0 then tcRetainedOrdinaryResult (n-1) res' else Nothing
+  | n == 0
+  , not (isForAllTy ty)
+  , not (isFunTy ty)
+  = Just ty
+  | otherwise = Nothing
 
 {- Note [Cached retained argument inference]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
