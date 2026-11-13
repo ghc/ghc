@@ -324,6 +324,69 @@ retainedNatProofExpected =
         ++ replicate 6 "42"
         ++ replicate 2 "forced"
 
+-- | Use ordinary polymorphic consumers with retained proof arguments.
+retainedNatGenericDeclarations :: [String]
+retainedNatGenericDeclarations =
+    [ "ignoreAny :: a -> Int"
+    , "ignoreAny _ = 42"
+    , "forceSupplied :: foreach (n :: Nat) -> (Add n Z :~: n) -> IO String"
+    , "forceSupplied n p = force p"
+    , "linearId :: a %1 -> a"
+    , "linearId x = x"
+    , "nativeProofLinear :: foreach (n :: Nat) -> (Add n Z :~: n) %1 -> Int"
+    , "nativeProofLinear n p = case linearId p of Refl -> 42"
+    ]
+
+-- | Enable linear syntax only for the generic proof consumer source cases.
+retainedNatGenericSource :: String -> String -> String
+retainedNatGenericSource moduleName observation =
+    unlines $ "{-# LANGUAGE LinearTypes #-}" : concatMap insert (lines (retainedNatProofSource moduleName observation))
+  where
+    insert line@"import Data.Type.Equality ((:~:)(Refl))" =
+        [line, "import GHC.Types (Multiplicity(Many))"]
+    insert line@"      run :: Nat -> IO String" =
+        map (("      " ++) . localDeclaration) retainedNatGenericDeclarations ++ [line]
+    insert line = [line]
+
+    -- The local helper must support a consumer that is called many times.
+    -- Its argument still has multiplicity One.
+    localDeclaration "linearId x = x" = "%'Many linearId = \\x -> x"
+    localDeclaration line = line
+
+-- | Check inferred consumer types and preserve lazy argument evaluation.
+retainedNatGenericObservation :: [String]
+retainedNatGenericObservation =
+    [ "proofs <- driveNats (\\n -> force (rightZero n))"
+    , "identities <- driveNats (\\n -> force (id (rightZero n)))"
+    , "wrapped <- driveNats (\\n -> force (Just (rightZero n)))"
+    , "constants <- driveNats (\\n -> force (const (rightZero n) True))"
+    , "emptyConstants <- driveNats (\\n -> force (const (rightZero n) Nothing))"
+    , "ignored <- driveNats (\\n -> observeInt (ignoreAny (rightZero n)))"
+    , "vectors <- driveNats (\\n -> force (replicateNative @Int n 42))"
+    , "linear <- driveNats (\\n -> observeInt (nativeProofLinear n (rightZero n)))"
+    , "ignoredBottom <- driveNat (\\n -> observeInt (ignoreAny (rightZero n))) bottomNat"
+    , "ignoredCyclic <- driveNat (\\n -> observeInt (ignoreAny (rightZero n))) cyclicNat"
+    , "wrappedBottom <- driveNat (\\n -> force (Just (rightZero n))) bottomNat"
+    , "wrappedCyclic <- driveNat (\\n -> force (Just (rightZero n))) cyclicNat"
+    , "constantBottom <- driveNat (\\n -> force (const True (rightZero n))) bottomNat"
+    , "constantCyclic <- driveNat (\\n -> force (const True (rightZero n))) cyclicNat"
+    , "functionBottom <- driveNat (\\n -> force (appendNative @Int n)) bottomNat"
+    , "functionCyclic <- driveNat (\\n -> force (appendNative @Int n)) cyclicNat"
+    , "functionIdentityBottom <- driveNat (\\n -> force (id (appendNative @Int n))) bottomNat"
+    , "functionIdentityCyclic <- driveNat (\\n -> force (id (appendNative @Int n))) cyclicNat"
+    , "pure (proofs ++ identities ++ wrapped ++ constants ++ emptyConstants ++ ignored ++ vectors ++ linear ++ unlines [ignoredBottom,ignoredCyclic,wrappedBottom,wrappedCyclic,constantBottom,constantCyclic,functionBottom,functionCyclic,functionIdentityBottom,functionIdentityCyclic])"
+    ]
+
+-- | Keep the generic observations in the same order for local and imported code.
+retainedNatGenericExpected :: [String]
+retainedNatGenericExpected =
+    replicate 15 "forced"
+        ++ replicate 3 "42"
+        ++ replicate 3 "forced"
+        ++ replicate 3 "42"
+        ++ ["42", "42", "forced", "forced", "forced", "forced"]
+        ++ replicate 4 "forced"
+
 -- | Check explicit source cases with dependent results and captured payloads.
 retainedCaseSource :: String -> String -> String
 retainedCaseSource moduleName observation =
@@ -456,7 +519,7 @@ retainedNatLibrarySource :: String
 retainedNatLibrarySource =
     unlines $
         take 1 (lines (retainedNatSource "NativeRetainedNatLibrary" ""))
-            ++ [ "{-# LANGUAGE TypeOperators #-}"
+            ++ [ "{-# LANGUAGE LinearTypes, TypeOperators #-}"
                , "module NativeRetainedNatLibrary where"
                , "import Data.Type.Equality ((:~:)(Refl))"
                ]
@@ -487,6 +550,7 @@ retainedNatLibrarySource =
                ]
             ++ retainedCaseDeclarations
             ++ retainedNatProofDeclarations
+            ++ retainedNatGenericDeclarations
   where
     generalizeAppend "appendVec :: Vec Int n -> Vec Int m -> Vec Int (Add n m)" =
         "appendVec :: forall a n m. Vec a n -> Vec a m -> Vec a (Add n m)"
@@ -529,7 +593,9 @@ retainedNatConsumerSource =
                , "  proofValues <- do"
                ]
             ++ map ("    " ++) retainedNatProofObservation
-            ++ ["  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead,constructedPartial,nestedPartial] ++ caseValues ++ normalized ++ normalizedAppend ++ constants ++ unlines [constantBottom,normalizedPartial] ++ proofValues)"]
+            ++ ["  genericValues <- do"]
+            ++ map ("    " ++) retainedNatGenericObservation
+            ++ ["  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead,constructedPartial,nestedPartial] ++ caseValues ++ normalized ++ normalizedAppend ++ constants ++ unlines [constantBottom,normalizedPartial] ++ proofValues ++ genericValues)"]
 
 -- | Run Boolean and Nat consumers against separately compiled disk artifacts.
 runModuleChecks :: FilePath -> IO ()
@@ -547,7 +613,7 @@ runModuleChecks libdir = do
             , "NativeRetainedNatLibrary"
             , retainedNatLibrarySource
             , retainedNatConsumerSource
-            , -- Keep the first 38 observations. Append lifted proof observations.
+            , -- Keep the first 55 observations. Append generic consumer observations.
               [ "[]:0"
               , "[42,42]:2"
               , "[42,42,42]:3"
@@ -589,6 +655,7 @@ runModuleChecks libdir = do
                    , "forced"
                    ]
                 ++ retainedNatProofExpected
+                ++ retainedNatGenericExpected
             )
         ]
         $ \(label, moduleName, producer, consumer, expected) ->
@@ -1035,6 +1102,7 @@ runNatSourceChecks = do
     runNatPartialSourceChecks
     runNatNormalizationSourceChecks
     runNatProofSourceChecks
+    runNatGenericSourceChecks
     runCaseSourceChecks
 
 -- | Observe refined source cases and reject malformed dependent alternatives.
@@ -1326,6 +1394,43 @@ runNatProofSourceChecks = do
         $ \(name, fragment, declarations) ->
             sourceModuleRejects name 83865 fragment name $
                 retainedNatProofSource name "pure \"unused\"" ++ unlines declarations
+
+-- | Instantiate ordinary consumers without duplicating linear argument usage.
+runNatGenericSourceChecks :: GHC.Ghc ()
+runNatGenericSourceChecks = do
+    let moduleName = "NativeSourceGenericNatProofs"
+        observation = unlines ("do" : map ("        " ++) retainedNatGenericObservation)
+    expression <- sourceEntry moduleName (retainedNatGenericSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source generic Nat proof consumers" expression
+    unless (lines actual == retainedNatGenericExpected) $
+        fail ("FAIL: generic Nat proof consumers changed types, usage, or laziness: " ++ show actual)
+    forM_
+        [ ("NativeSourceGenericProofBottom", "driveNat (\\n -> force (rightZero n)) bottomNat", "native-bottom-nat")
+        , ("NativeSourceGenericProofPartial", "driveNat (\\n -> force (rightZero n)) partialNat", "native-bottom-nat")
+        , ("NativeSourceGenericIdProofBottom", "driveNat (\\n -> force (id (rightZero n))) bottomNat", "native-bottom-nat")
+        , ("NativeSourceGenericSuppliedProofBottom", "driveNat (\\n -> forceSupplied n bottomProof) bottomNat", "native-bottom-proof")
+        ]
+        $ \(name, body, marker) -> do
+            bottomExpression <- sourceEntry name (retainedNatGenericSource name body)
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case outcome of
+                Left exception
+                    | marker `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right value -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show value)
+    let duplicateName = "NativeSourceDuplicatedLinearProof"
+        duplicateSource =
+            retainedNatGenericSource duplicateName "pure \"unused\""
+                ++ unlines
+                    [ "linearId :: a %1 -> a"
+                    , "linearId x = x"
+                    , "badLinearProof :: foreach (n :: Nat) -> (Add n Z :~: n) %1 -> Int"
+                    , "badLinearProof n p = case linearId p of Refl -> case linearId p of Refl -> 42"
+                    ]
+    sourceModuleRejects "duplicated linear proof argument" 18872 "multiplicity" duplicateName duplicateSource
 
 -- | Exercise constructor naming with dependent payloads and lazy nested fields.
 runNatConstructorSourceChecks :: GHC.Ghc ()

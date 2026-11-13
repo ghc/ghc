@@ -1203,6 +1203,68 @@ enter this route. Inference uses a fresh infer cell at the current TcLevel.
 It can return an exact retained type without assigning a type meta-variable.
 -}
 
+{- Note [Generic retained argument inference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A generic consumer can accept a type that contains a runtime index. For
+example, force :: forall a. a -> IO String can accept rightZero n. The kind
+of a is Type, so the native-index-kind test does not select this argument.
+An ordinary instantiation meta-variable cannot hold the proof's native type.
+
+Keep the native-index-kind route. Add a separate route for named argument
+spines when the call has a native anchor. An anchor is a known Id whose type
+contains native syntax. Look through named applications, type applications,
+parentheses, pragmas, and already expanded expressions to find anchors.
+This permits nested uses such as force (id (rightZero n)). Use read-only
+lookups. Do not call splitHsApps or tcExpand during classification. They can
+expand a Template Haskell splice. The classifier does not execute a splice.
+
+Once a call has an anchor, infer named argument spines whose formal domains
+mention undetermined outer binders. Ordinary variables and constructors can
+supply other bindings, as in const (rightZero n) Nothing. Any fresh variables
+from Nothing remain ordinary meta-variables. Seed the immutable substitution
+from the expected result first. Do not infer a domain whose outer binders
+are already determined by that result.
+
+A top-level lambda, literal, case, let, or do expression keeps its ordinary
+expected-type check. A named application can contain these expressions as
+arguments. Its own application checker supplies their expected types.
+Calls without an anchor keep their ordinary checking behavior. Constructors
+and Ids with concreteness requirements also keep ordinary instantiation.
+
+Use the existing argument cache and subsumption checks. Keep cached entries
+even if matching fails. Emit each saved usage once at the final argument
+multiplicity. Require every outer binder to have a candidate of the correct
+kind and local runtime scope. Use the generic substitution only if it contains
+native syntax. The actual and formal cached types must still match exactly.
+The final result and argument subsumption checks remain in place. No mutable
+type variable receives native syntax. See Note [Cached retained argument inference].
+-}
+
+-- | Classify a named argument spine and find known native Ids without elaboration.
+tcRetainedInferableArg :: LHsExpr GhcRn -> TcM (Bool, Bool)
+tcRetainedInferableArg (L _ expr)
+  = case expr of
+      HsVar _ lname
+        | isDataOcc (nameOccName (unLocWithUserRdr lname))
+        -> do { con <- tcLookupConLike (unLoc lname)
+              ; return (case con of RealDataCon _ -> (True, False)
+                                    _ -> (False, False)) }
+        | otherwise
+        -> do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
+              ; return (case mb_id of
+                          Just var -> (True, hasNativeDependentExpr (Core.Type (varType var)))
+                          Nothing -> (False, False)) }
+      HsApp _ fun arg
+        -> do { (inferable, fun_anchor) <- tcRetainedInferableArg fun
+              ; if not inferable then return (False, False)
+                else do { (_, arg_anchor) <- tcRetainedInferableArg arg
+                        ; return (True, fun_anchor || arg_anchor) } }
+      HsAppType _ fun _ -> tcRetainedInferableArg fun
+      HsPar _ arg -> tcRetainedInferableArg arg
+      HsPragE _ _ arg -> tcRetainedInferableArg arg
+      XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> tcRetainedInferableArg arg
+      _ -> return (False, False)
+
 -- | Arguments inferred once before immutable index instantiation.
 -- The argument position counts source value arguments from one.
 type RetainedArgCache = [(Int, (LHsExpr GhcTc, TcRhoType, UsageEnv))]
@@ -1225,29 +1287,46 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
   | not (any is_type_arg args)
   , (tvs, body) <- tcSplitForAllInvisTyVars sigma
   , let index_tvs = filter (isNativeIndexType . tyVarKind) tvs
-  , not (null index_tvs)
+  , not (null tvs)
   , let (domains, result) = splitFunTys body
   , length domains == count isHsValArg args
   , isTauTy body, not (isFunTy result)
   , not (hasNativeDependentExpr (Core.Type body))
-  = do { cache <- infer_args index_tvs domains 1 args
-       ; actual_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) cache
-       ; let templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- cache ]
-             matched = foldM (\subst (formal, actual) ->
-                         tcMatchTyX_BM (bind_outer tvs) subst formal actual)
-                       (result_subst tvs result) (zip templates actual_tys)
-       ; case matched of
-           Just subst
-             | Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
-             , and (zipWith (kind_agrees subst) tvs inst_tys)
-             , and (zipWith (\formal actual -> eqType (Subst.substTy subst formal) actual)
-                            templates actual_tys)
-             -> do { valid <- tcRetainedInstScope inst_tys
-                   ; if valid
-                     then return (mkHsWrap (mkWpTyApps inst_tys) fun,
-                                  Subst.substTy subst body, cache)
-                     else return (fun, sigma, cache) }
-           _ -> return (fun, sigma, cache) }
+  = do { let index_route = not (null index_tvs)
+             initial_subst = result_subst index_route tvs result
+             needed_tvs | index_route = index_tvs
+                        | otherwise = filter (isNothing . Subst.lookupTyVar initial_subst) tvs
+       ; eligible <- if index_route
+                     then return (Just (repeat True))
+                     else if ordinary_head
+                             && isJust (tcRetainedOrdinaryResult (count isHsValArg args) body)
+                          then do { shapes <- mapM tcRetainedInferableArg
+                                                [arg | EValArg { ea_arg = arg } <- args]
+                                  ; return (if any snd shapes then Just (map fst shapes)
+                                            else Nothing) }
+                          else return Nothing
+       ; case eligible of
+           Nothing -> return (fun, sigma, [])
+           Just inferable -> do
+             { cache <- infer_args needed_tvs inferable domains 1 args
+             ; actual_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) cache
+             ; let templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- cache ]
+                   matched = foldM (\subst (formal, actual) ->
+                               tcMatchTyX_BM (bind_outer tvs) subst formal actual)
+                             initial_subst (zip templates actual_tys)
+             ; case matched of
+                 Just subst
+                   | Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
+                   , index_route || any (hasNativeDependentExpr . Core.Type) inst_tys
+                   , and (zipWith (kind_agrees subst) tvs inst_tys)
+                   , and (zipWith (\formal actual -> eqType (Subst.substTy subst formal) actual)
+                                  templates actual_tys)
+                   -> do { valid <- tcRetainedInstScope inst_tys
+                         ; if valid
+                           then return (mkHsWrap (mkWpTyApps inst_tys) fun,
+                                        Subst.substTy subst body, cache)
+                           else return (fun, sigma, cache) }
+                 _ -> return (fun, sigma, cache) } }
   where
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
@@ -1258,29 +1337,36 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
 
-    result_subst tvs result
+    ordinary_head = case fun of
+                      HsVar _ (L _ var) -> isEmptyNameEnv (idConcreteTvs var)
+                      XExpr (ConLikeTc (RealDataCon dc))
+                        -> isEmptyNameEnv (dataConConcreteTyVars dc)
+                      _ -> False
+
+    result_subst index_route tvs result
       | Check expected_ty <- expected
       , isTauTy expected_ty
-      , hasNativeDependentExpr (Core.Type expected_ty)
+      , not index_route || hasNativeDependentExpr (Core.Type expected_ty)
       , Just subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst result expected_ty
       = subst
       | otherwise = Subst.emptySubst
 
     actual_type (_, ty, _) = ty
 
-    infer_args :: [TyVar] -> [Scaled Type] -> Int -> [HsExprArg 'TcpRn]
+    infer_args :: [TyVar] -> [Bool] -> [Scaled Type] -> Int -> [HsExprArg 'TcpRn]
                -> TcM RetainedArgCache
-    infer_args _ _ _ [] = return []
-    infer_args index_tvs (domain : domains) pos (EValArg { ea_arg = arg } : args)
-      = do { entry <- if any (`elemVarSet` tyCoVarsOfType (scaledThing domain)) index_tvs
+    infer_args _ _ _ _ [] = return []
+    infer_args tvs (inferable : rest) (domain : domains) pos
+               (EValArg { ea_arg = arg } : args)
+      = do { entry <- if inferable && any (`elemVarSet` tyCoVarsOfType (scaledThing domain)) tvs
                       then addArgCtxt pos rn_head arg $
                            do { (usage, (typed, actual)) <- tcCollectingUsage (tcInferRho arg)
                               ; return [(pos, (typed, actual, usage))] }
                       else return []
-           ; rest <- infer_args index_tvs domains (pos+1) args
-           ; return (entry ++ rest) }
-    infer_args index_tvs domains pos (_ : args)
-      = infer_args index_tvs domains pos args
+           ; entries <- infer_args tvs rest domains (pos+1) args
+           ; return (entry ++ entries) }
+    infer_args tvs inferable domains pos (_ : args)
+      = infer_args tvs inferable domains pos args
 tcRetainedArgInstEnabled _ _ _ _ fun sigma = return (fun, sigma, [])
 
 -- | Check that every runtime identifier still has its local index binding.
