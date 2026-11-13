@@ -2071,13 +2071,13 @@ async def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
 async def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
     return await do_compile( name, way, True, top_mod, extra_mods, [], extra_hc_opts)
 
-async def make_depend( name, way, mods, extra_hc_opts ):
-    return await do_compile( name, way, False, Path(' '.join(mods)), [], [], extra_hc_opts, mode = '-M')
+async def make_depend( name: TestName, way: WayName, mods: List[str], extra_hc_opts: str ):
+    return await do_compile( name, way, False, ' '.join(mods), [], [], extra_hc_opts, mode = '-M')
 
 async def do_compile(name: TestName,
                way: WayName,
                should_fail: bool,
-               top_mod: Optional[Path],
+               top_mod: Optional[Union[Path, str]],
                extra_mods: List[str],
                units: List[str],
                extra_hc_opts: str,
@@ -2353,7 +2353,7 @@ async def simple_build(name: Union[TestName, str],
                  way: WayName,
                  extra_hc_opts: str,
                  should_fail: bool,
-                 top_mod: Optional[Path],
+                 top_mod: Optional[Union[Path, str]],
                  units: List[str],
                  link: bool,
                  addsuf: bool,
@@ -2376,7 +2376,7 @@ async def simple_build(name: Union[TestName, str],
         else:
             srcname = add_hs_lhs_suffix(name)
     else:
-        srcname = Path(name)
+        srcname = name
 
     if mode is not None:
         to_do = mode
