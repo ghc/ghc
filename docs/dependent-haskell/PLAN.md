@@ -722,6 +722,28 @@ Implementation: `fe7329d1b6`. See the
 general retained inference, structural Pi unification, native coercion unfolding
 codecs, and ordinary optimization remain open.
 
+### Checked retained lambdas
+
+A complete native signature checks named variable and constructor equations.
+The equivalent anonymous lambda currently fails with located GHC-83865.
+Use one retained match dispatcher for both source forms.
+
+- [ ] Share the retained telescope and constructor dispatcher. Preserve invisible
+      patterns, source match contexts, and named-binding usage scaling.
+- [ ] Check anonymous lambdas under their ambient usage. Keep ordinary lambda
+      checking and inference unchanged.
+- [ ] Check outer erased binders, nested lambdas, later retained binders, source
+      contexts, and both constructor lambda forms.
+- [ ] Check source arity at bottom and cyclic indices. Preserve linear usage and
+      located diagnostics for invalid branches and unsupported inference.
+- [ ] Complete both-stage builds, registered regressions, separate module
+      execution, ordinary controls, formatting, and the checkpoint.
+
+Follow [the contract](CORE.md#checked-source-lambdas) and
+[Agda's expected-Pi and extended-lambda rules](REFERENCES.md#checked-retained-lambdas).
+This step does not enable retained syntax in new type positions or general native
+metavariable assignment. Keep broader inference and optimizer gates.
+
 ## Acceptance checks
 
 | ID | Required result |

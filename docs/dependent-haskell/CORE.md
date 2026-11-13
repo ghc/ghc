@@ -336,6 +336,29 @@ format and dictionary ABI.
 If a runtime lambda's body type mentions a supported runtime binder, its type is
 the canonical retained dependent function. Otherwise its type is an ordinary arrow.
 
+### Checked source lambdas
+
+Check a source lambda against its complete expected retained type. Reuse the
+function-equation rules for its telescope, contexts, and constructor patterns.
+Use each source variable pattern's runtime Id when instantiating the remaining
+types. Preserve outer erased binders and the lambda's ambient usage. Named
+bindings retain their own usage scaling. Do not add unrestricted usage scaling
+around an anonymous lambda.
+
+Preserve the source pattern arity. A `\case` inspects its index when that
+argument arrives, even when the selected branch returns a function. A `\cases`
+with two patterns still waits for its second argument before matching. An
+unapplied lambda remains a function value. Do not eta-expand either form.
+Keep context splitting and constructor evidence transport in their existing
+positions. Keep the current coverage, bare-field, multiplicity, and wrapper
+restrictions. Ordinary lambdas keep their existing checking and inference path.
+
+This rule checks a supplied type. It does not infer a native function type or
+enable new retained type positions. Retained quantification in nested type
+positions and general checking-dependent argument inference remain separate work. Agda's expected-Pi
+lambda rule and extended-lambda function checker supply the checking precedent.
+See [the pinned sources](REFERENCES.md#checked-retained-lambdas).
+
 For application of `DepFunTy b result`, first check the runtime argument against
 the binder's domain. Then substitute its index for `b` in the result. The Core
 grammar accepts a local index Id or a saturated tree of constructor workers.

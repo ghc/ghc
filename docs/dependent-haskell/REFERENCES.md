@@ -669,6 +669,40 @@ original class dictionary; let GHC derive superclass evidence in the branch.
 Agda supplies context scope and specialization precedent. Its normalization and
 eta contraction do not establish Haskell evaluation laws or FC evidence rules.
 
+### Checked retained lambdas
+
+Agda v2.8.0 checks an unannotated lambda with the supplied Pi type. In
+[`useTargetType`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L560-L585),
+the checker uses the expected domain, introduces the source binder with
+`lambdaAddContext`, and checks the body against the scoped codomain.
+[`checkPostponedLambda`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L678-L710)
+repeats this rule for the remaining binders. An
+[unannotated binder](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L1474-L1479)
+has an omitted domain. The expected telescope supplies that domain.
+[`checkNamedArg`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L1535-L1553)
+uses expected-type checking in ordinary argument position.
+
+[`checkExtendedLambda`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L831-L866)
+creates an auxiliary function with the expected type and passes its clauses to
+`checkFunDef'`. It then applies that function to its captured context. This is
+direct prior art for sharing GHC's retained function-equation checker with its
+constructor lambda checker. These links use `Rules/Term.hs` file blob
+`02991c9fa0085315cc854d2833a9080af14a7740`.
+
+The manual's dependent
+[`mySnd` pattern lambda](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/lambda-abstraction.lagda.rst#L137-L141)
+gives a source example. Its
+[internal representation](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/lambda-abstraction.lagda.rst#L171-L184)
+uses fresh auxiliary function definitions. File blob:
+`5162584cecf76e69206da056f4135d892d7ab41a`.
+The hidden-lambda and instance-binder rules above supply context-scope precedent.
+
+Checking a source-written lambda needs no eta transformation. Agda's
+[function eta equality](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/lambda-abstraction.lagda.rst#L69-L78)
+does not apply to Haskell's bottom and `seq`. GHC must preserve each lambda form's
+source arity and its existing usage rules. General native lambda inference is
+not established by this expected-type rule.
+
 ## Haskell evaluation provenance
 
 The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)
