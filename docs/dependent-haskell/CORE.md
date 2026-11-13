@@ -38,7 +38,8 @@ parameters, existential variables, constraints, datatype contexts, newtypes,
 type data, unboxed fields, and constructor wrappers. Original and representation
 fields must have the same domain. Field multiplicities may be `One` or `Many`.
 This policy bounds the Core increment. It is not an Agda language restriction.
-The source checker and interface reader still accept only Boolean indices.
+The source checker and signature reader now use this structural policy. Nat
+source execution and signature import validation are in progress in M9.
 
 ## Scope and equality
 
@@ -291,7 +292,8 @@ does not establish cross-module native types or ordinary optimizer safety.
 `IfaceDepFunTy` stores an `IfaceIdBndr` and a body. `IfaceTermVar` stores an
 `IfLclName` in the local Id namespace. The binder's domain and multiplicity are
 outside its scope. `bindIfaceId` allocates a fresh Id and extends the environment
-for the body. The decoder checks each binder and occurrence against Bool/Many,
+for the body. The decoder checks each binder and occurrence against its supported
+algebraic domain and `Many` multiplicity,
 and requires result kind `Type`. `Constraint` has a lifted representation but
 does not satisfy this result rule. Core Lint, validity checking, and lambda type
 construction use the same exact kind check.
@@ -305,10 +307,13 @@ capture-avoiding substitution in this increment.
 
 Tags 10 and 11 encode the retained function and runtime index. Tag 9 remains
 the ordinary type literal. Unknown tags fail with an IO error. The configured
-fork version is `10.1.20261112.1`, with interface header `1001202611121`.
+fork version is `10.1.20261113.1`, with interface header `1001202611131`.
 The existing whole-file version check runs before type decoding, including for
 `IgnoreHiWay`. Rebuild matching libraries when moving from the old format.
-Normal module unfolding generation remains gated. The expression-table path
+Nat signatures now import and execute through the bootstrap API and rebuilt
+CLI. The preserved Boolean-only reader accepts its old control and rejects the
+new file with both way checks. The new reader rejects the old format. Normal module unfolding
+generation remains gated. The expression-table path
 below reconstructs virtual alternative proofs separately.
 
 The regression uses the real binary tables at all three compression levels.
@@ -389,13 +394,15 @@ index and bottom observations before claiming optimizer preservation.
 
 ## Frontend identity plan
 
-Source `keep` and constructor-based `choose` implement the subsets below.
-Refinement in source `case` expressions remains open. The target signatures are
-explicit retained Boolean telescopes such as `foreach (b :: Bool) -> Select b`.
-They must accept ordinary runtime Boolean bindings. They do not require singleton
-conversion.
+The checker now supports structural domains, outer erased quantification,
+retained telescopes, and bare constructor fields. The bootstrap API executes
+source Nat/Vec functions through bytecode and separate-module machine code.
+The rebuilt CLI and registered self-hosted fixture pass the same module checks.
+Refinement in source `case` expressions remains open. Retained signatures bind
+ordinary runtime values. The Boolean checkpoint below uses signatures such as
+`foreach (b :: Bool) -> Select b`. No singleton conversion is required.
 
-The implementation must preserve one runtime identity through these stages:
+The Boolean checkpoint preserves one runtime identity through these stages:
 
 1. Parse a distinct retained telescope in `Parser/Lexer.x`, `Parser.y`, and
    `Language/Haskell/Syntax/Type.hs`. Reuse located binder syntax and exact source
@@ -485,9 +492,23 @@ than `SurelyApart`. A closed family must not skip an earlier constructor clause
 because an index is unknown. Repeated template-variable targets preserve this
 uncertainty. Ordinary family template variables can still bind indices through
 the immutable matching substitution. This does not assign a Tc metavariable.
-Using `Proxy b` as the payload would instead require assigning a runtime index
-to the constructor's fresh type metavariable. That needs an index escape rule
-and remains outside this first observation.
+Ordinary constructor instantiation must also preserve this scope. The M9 route
+matches an expected indexed result against outer immutable type variables.
+It checks kinds, the exact instantiated result, and the current runtime Ids.
+It emits explicit type applications. After an explicit source type application,
+it can match the remaining erased indices before allocating metavariables.
+An ordinary consumer can instead infer its index-bearing arguments once and
+match their types. The cache retains checked expressions and usage records.
+Payload arguments still use expected-type checking. These routes require
+`NoQL`; argument-directed matching also requires the experimental flag.
+The mutable unifier's index escape checks remain unchanged.
+
+Ambiguity checking opens each retained binder with one shared opaque runtime Id.
+It compares ordinary arrows under those Ids and retains the outer erased
+quantifiers. The check discards its wrapper and evidence. It does not require
+a retained-function coercion. Noninjective erased payload families still fail
+the ordinary ambiguity check. See Note [Ambiguity checking retained signatures]
+in `GHC.Tc.Validity` and the Agda provenance references.
 
 Keep `foreach` an ordinary identifier when the experimental flag is disabled.
 Its proposed syntax can also parse as an ordinary type-variable application.

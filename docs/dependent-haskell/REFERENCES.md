@@ -59,6 +59,40 @@ the manual does not prove those decisions correct in System FC.
   erasure needs a calling-convention specification.
 
 Constructor checking also follows the pinned Agda v2.8.0 implementation.
+Its [`checkPiTelescope` and `checkTelescope'`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L263-L290)
+check each binding before checking the remainder in the extended context.
+The source checker follows that order for retained binder lists and successive
+`foreach` groups. Ordinary outer `forall` binders retain GHC's erased scope.
+The native matcher follows both ordinary arrows and dependent binders because
+Core canonicalises an unused retained binder to an ordinary arrow. The pinned
+`Term.hs` blob is `02991c9fa0085315cc854d2833a9080af14a7740`.
+
+Agda compares Pi codomains under one shared extended context.
+[`equalFun`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L746-L754)
+calls [`compareDom`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L849),
+which checks the domains and extends that context before comparing the bodies.
+The pinned `Conversion.hs` blob is `69423e2c11b6f35bc5eee2d502cf2830efbc005a`.
+The GHC ambiguity check opens each retained binder with one shared opaque runtime
+Id. It compares temporary ordinary arrows under those Ids and retains outer
+erased quantifiers. It discards the wrapper and evidence. This checking-only
+projection is a GHC adaptation. It does not extend FC coercions or disable
+ordinary ambiguity checks. A noninjective payload family remains ambiguous.
+
+Expected-result instantiation uses a separate GHC adaptation. It matches an
+ordinary constructor or helper result against a checked expected type. It binds
+only that function's outer immutable type variables. It checks each type argument's
+kind, the resulting type, and every runtime Id's current local scope. It emits
+explicit type applications. It does not assign a metavariable to a runtime index.
+An erased-index consumer can need an index that is absent from its result.
+For that case, infer its index-bearing arguments once and match their types.
+Cache the checked expressions and usage records. Check payload arguments against
+their expected types. This path requires the experimental flag and `NoQL`.
+It does not replay source checking when matching falls back to ordinary
+instantiation. The mutable unifier's runtime-index escape guard remains active.
+The native application Note states the restrictions. Agda's pattern-context
+substitution below supplies the context discipline; it does not establish the
+correctness of GHC's matcher or its FC evidence.
+
 [`LHSResult`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L548-L566)
 records the pattern-context substitution and specialised body type.
 [`splitCon`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1389-L1414)
@@ -187,6 +221,16 @@ This precedent does not supply GHC's missing alias-transport rule. Naming
 preserve lazy sharing and check transport between these indices. The current
 CorePrep increment reports an explicit unsupported operation at that boundary.
 The M9 source target still requires a solution.
+
+[Koronkevich, Rakow, Ahmed, and Bowman, *ANF preserves dependent types up to
+extensional equality*](https://doi.org/10.1017/S0956796822000090), JFP 32, e12
+(2022), studies this naming problem. Section 4.1 retains the identity of the
+bound computation in continuation typing. Section 7.4 shows why inserting
+coercions alone does not establish the general preservation result. Section 7.6
+also discusses commuting conversions and GHC's monadic form. Its calculus uses
+equality reflection and call-by-value evaluation. Its proof does not establish
+correctness for lazy Haskell or System FC. Use it to guide a checked transport
+rule, with separate scope, erasure, and laziness checks in GHC.
 
 The frontend must preserve these identities through parsing, checking, and
 desugaring. RequiredTypeArguments provides erased type arguments. It cannot

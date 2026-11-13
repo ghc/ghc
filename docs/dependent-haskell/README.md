@@ -25,13 +25,13 @@ Last updated: 2026-11-13.
 | Baseline build | Passed on 2026-11-11 |
 | Singleton reference translation | Validated and retained in `reference/` on 2026-11-11 |
 | Native Core | Closed algebraic domains, retained application, and field-scoped Nat proofs pass the API regression |
-| Execution | Core Nat/Vec and Boolean source programs pass the checked bytecode entry; Boolean source programs also run as machine code |
+| Execution | Nat/Vec and Boolean source programs pass checked bytecode lowering and separate-module machine-code execution |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
-| Native interfaces | Boolean signatures pass binary reconstruction, disk imports, cross-module execution, version rejection, and incremental recompilation |
-| Configured fork version | `10.1.20261112.1`, with interface header `1001202611121` |
-| Source syntax | `ExperimentalDependentTypes` checks one explicit retained Boolean binder; unsupported source positions report GHC-43582 |
+| Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
+| Configured fork version | `10.1.20261113.1`, with interface header `1001202611131`; matching libraries rebuilt |
+| Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, and bare constructor fields pass the source runtime fixture |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | Nat/Vec source elaboration and CorePrep transport in M9; actual unfolding files in M8, source `case`, and broader M6 remain open |
+| Next task | CorePrep constructor-argument transport in M9; actual unfolding files in M8, source `case`, and broader M6 remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -57,7 +57,7 @@ applications, substitution composition, binder cloning, invalid indices, scope
 errors, and boundary gates. It also checks `Select True = Int`,
 `Select False = Bool`, shared-index composition, branch casts, and forged proofs.
 
-The restricted frontend produces native Core for local retained functions. The
+The restricted frontend produces native Core for retained functions. The
 ordinary optimizer and native unfolding serialization remain gated. Program
 compilation has an explicit checked entry for native signatures and ordinary
 exported types. Signature validation is recorded below.
@@ -201,7 +201,7 @@ The compiler and Haddock files retain their existing formatting.
 
 ## Restricted source checking
 
-The frontend accepts one explicit `foreach (b :: Bool)` binder at the start of a
+The verified Boolean checkpoint accepts one explicit `foreach (b :: Bool)` binder at the start of a
 complete monomorphic value signature. A dependent function has one equation with
 a bare retained variable pattern, or one unguarded equation for each Boolean
 constructor. Its result has lifted kind, and its outer match wrapper
@@ -353,7 +353,7 @@ fresh one-shot compiler context and links its `.o`. Its consumer composes import
 observations above. It also checks concrete True/False applications, which need
 the imported family equations. Native expression unfoldings remain gated.
 
-`VERSION_DATE` pins the fork to `10.1.20261112.1`. Its header version is
+The Boolean signature checkpoint pinned the fork to `10.1.20261112.1`. Its header version was
 `1001202611121`, distinct from the previous `100120261109`. Matching libraries
 must be rebuilt. The preserved old reader accepts its old-format control file
 and rejects the new native interface with both `CheckHiWay` and `IgnoreHiWay`.
@@ -503,9 +503,10 @@ a finite vector prefix. `head bottomNat (VCons 42 bottomVec)` returns `42`.
 Fully applying append to bottom indices and vectors raises the vector exception,
 which checks that append does not force its retained lengths first.
 
-These programs pass through the checked bytecode entry. They do not establish
-Nat source elaboration, Nat machine-code lowering, or Nat interface files. The
-source checker and interface reconstruction still accept only Boolean indices.
+These Core programs pass through the checked bytecode entry. The source fixture
+below separately validates source elaboration, machine code, and Nat interface
+imports through the bootstrap API, registered self-hosted tests, and separate CLI
+processes. The checker and signature reconstruction use the structural domain rule.
 CorePrep explicitly rejects a retained constructor-tree argument with fields:
 naming `S k` as an opaque local Id needs checked index transport. Recursive
 replication passes the actual predecessor Id and does not need this conversion.
@@ -529,7 +530,7 @@ measurements have not run.
 
 Logs and peak records use the `native-nat` prefix in `_build/verification/`.
 
-## Next: runtime naturals and vectors
+## Source naturals and vectors
 
 The [M9 target](PLAN.md#m9-runtime-natural-numbers-and-indexed-vectors) is a
 user-defined Peano Nat with `replicate`, `append`, and `head` for indexed vectors.
@@ -537,14 +538,61 @@ Runtime lengths become native indices directly. `replicate` inspects a length;
 `append` can use an ordinary GADT helper without forcing its retained lengths.
 The [pinned Agda definitions](REFERENCES.md#agda-provenance) supply the typing
 and recursion comparison. Generic algebraic Core support is implemented.
-The source Nat/Vec target remains unimplemented.
+Source checkpoint `714689a2fa` checks and executes these definitions:
+
+```haskell
+replicateNative :: forall a. foreach (n :: Nat) -> a -> Vec a n
+replicateNative Z x = VNil
+replicateNative (S k) x = VCons x (replicateNative k x)
+
+headNative :: forall a. foreach (n :: Nat) -> Vec a (S n) -> a
+headNative n (VCons x _) = x
+
+appendNative :: forall a. foreach (n :: Nat) (m :: Nat)
+             -> Vec a n -> Vec a m -> Vec a (Add n m)
+appendNative n m xs ys = appendVec xs ys
+```
+
+`appendVec` is the ordinary polymorphic GADT helper in the M9 target.
+An IORef supplies runtime lengths 0, 2, and 3. The source regression checks
+replication, four append pairs, and head at both `Int` and `Bool`. It also checks
+partial and cyclic Nat values, bottom tails, and unused bottom indices.
+Wrong lengths, unsupported field patterns, and an ambiguous erased payload
+produce located diagnostics. No singleton conversion or wired Nat is used.
+
+A producer owns the actual Nat/Vec declarations and exports the retained
+functions. A fresh one-shot consumer reads only its interface and object.
+The linked executable repeats the runtime length and laziness observations.
+The bootstrap API, registered self-hosted fixture, and separate CLI processes
+pass these checks. The CLI writes the producer interface, imports it, and links
+the object in separate processes. A preserved Boolean-only reader accepts its
+old control and rejects the new interface with both way settings. The new reader
+rejects the old format before type decoding. Its saved binary and control file
+retain their original hashes.
 
 The audit identifies four preservation requirements: field binders before proofs
 that mention them, scoped GADT index instantiation, retained telescopes, and
 CorePrep transport when naming constructor arguments. M9 records source-level
 and cross-module acceptance checks, including partial and cyclic Nat values.
-The runnable Core programs are an intermediate step. They do not complete this
-source target.
+Direct constructor-tree arguments with fields still need checked CorePrep
+transport. `f (S k)` currently reports a named unsupported operation. Bind the
+runtime Nat to a local name before the call. Constructor equations currently
+split one leading retained index. Variable equations can bind several retained
+indices. Source `case` refinement and broader inference remain separate work.
+Producers and consumers must use the same named index. Its defining expression
+does not establish an index equality.
+
+On 2026-11-13, the full both-stage build passed in 15m26s, peaking at 6,616 MiB
+under 16 GiB. The final diagnostic synchronization passed in 8m32s at 5,244 MiB.
+Both used six workers, `--docs=none`, and no swap. The five registered normal-way
+tests passed across the initial run and focused rerun. The latter corrected the
+domain-error span and the expected rigid-variable diagnostic, without compiler
+changes. The test scopes peaked at 2,546 MiB and 1,704 MiB under 8 GiB.
+Separate CLI execution checks ten observations and both version-mismatch
+directions. Ordinary optimized code, Template Haskell, GHCi, package-database,
+and Haddock startup smoke checks also pass. Repository contribution guidance
+requires regressions; this change extends the existing API fixtures and golden.
+The guide's exact Nat/Vec example also compiles with Core and STG Lint.
 
 ## Verified baseline
 

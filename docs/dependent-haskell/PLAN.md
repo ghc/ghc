@@ -5,7 +5,7 @@ work on Richard Eisenberg's historical `nokinds-pi` branch. Port its useful chan
 to current GHC and complete the missing rules. The first working target is a
 retained Boolean argument whose value determines the result type.
 
-Last updated: 2026-11-12. Compiler source baseline:
+Last updated: 2026-11-13. Compiler source baseline:
 `19ff36f2aede0ca2e554016ff22c71e73aa9803b`.
 
 See [current status](README.md) and [primary references](REFERENCES.md).
@@ -388,6 +388,18 @@ work.
 
 ### M9: runtime natural numbers and indexed vectors
 
+Source checkpoint `714689a2fa` extends the verified Core checkpoint
+`df623104fd`. It adds structural domains, outer erased quantification,
+retained telescopes, actual constructor fields, and immutable instantiation.
+The bootstrap API now passes source replication, append, polymorphic head,
+retained telescopes, and the partial/cyclic/bottom observations. It also compiles
+and links a fresh one-shot Nat/Vec consumer from actual producer interfaces and
+objects. The configured signature format is now `10.1.20261113.1`. Both-stage
+builds, registered self-hosted tests, separate CLI processes, and both directions
+of format rejection pass. Keep the acceptance
+gate open for checked CorePrep constructor-argument transport. Native unfolding
+bodies remain separately gated.
+
 The next source target goes beyond Boolean selection. Support first-order
 algebraic runtime indices, with a user-defined Peano `Nat` and length-indexed
 `Vec` as the first program. Use ordinary promoted constructors for constructor
@@ -423,7 +435,7 @@ head :: forall a. foreach (n :: Nat) -> Vec a (S n) -> a
 head n (VCons x _) = x
 ```
 
-These signatures and definitions are targets, not implemented syntax coverage.
+These signatures and definitions now pass the bootstrap source runtime checks.
 The result uses the caller's actual runtime index. A number read from input can
 select a vector length without an explicit existential package. `Add` uses
 ordinary closed-family equations; this does not require arithmetic SMT solving.
@@ -441,16 +453,20 @@ pattern. See [the Agda Nat/Vec references](REFERENCES.md#agda-provenance).
       Preserve the fields at runtime. Erase only the checked proof.
 - [x] Check recursive Core for vector replication with an unknown runtime Nat.
       This is an intermediate gate; it does not complete the source target.
-- [ ] Extend frontend checking to scoped constructor-field indices, outer type
+- [x] Extend frontend checking to scoped constructor-field indices, outer type
       quantification, and multiple retained binders. Support safe GADT constructor
       instantiation without allowing a runtime index to escape through a metavariable.
-- [ ] Compile and run the source `replicate` target, then source `append`, with
+- [x] Compile and run the source `replicate` target, then source `append`, with
       actual input values. Preserve the same index across producer and consumer.
-- [ ] Reject inconsistent vector lengths and escaping predecessor indices with
+- [x] Reject inconsistent vector lengths and escaping predecessor indices with
       located diagnostics. Check lazy recursive fields and unused index arguments.
-- [ ] Transport the resulting signatures and programs across modules. Keep format
+- [x] Transport the resulting signatures and programs across modules. Keep format
       compatibility and any unfinished M8 unfolding work explicit. Pin a new
       configured format before emitting Nat signatures and check `.1` rejection.
+- [ ] Transport constructor-tree arguments with fields through CorePrep naming.
+      Keep later payload types and the final result at the original index.
+      Preserve proof scope and laziness. Keep the current named gate until the
+      checked rule passes prepared-Core and STG validation.
 
 Gate: a source program reads runtime lengths, constructs and appends vectors,
 and consumes the statically indexed results. Check empty and successor inputs.
@@ -469,6 +485,9 @@ Resolve these preservation rules in the implementation:
 - Introduce the complete retained telescope before transporting an equation's
   ordinary argument and result types. Splitting the first index must not require
   the unsupported congruence for a remaining dependent function type.
+  Variable equations now handle the complete telescope. Constructor equations
+  still split one leading retained index. Transport across a remaining dependent
+  function remains a named unsupported operation.
 - Give GADT instantiation an explicit runtime-index scope rule. The current
   metavariable guards are intentional. Removing them without a scope check can
   let a predecessor escape. Evaluate expected-result constructor instantiation
@@ -478,6 +497,14 @@ Resolve these preservation rules in the implementation:
   check alias transport before claiming end-to-end constructor-argument support.
   Do not use an unchecked cast or equality from an unfolding. CorePrep currently
   reports a named unsupported operation before it names this retained argument.
+  A candidate uses a checked DEFAULT alternative to bind the equality between
+  a fresh case binder and the exact constructor index. It must transport later
+  payload arguments as well as the final result. CorePrep must preserve the
+  proof scope, and CoreToStg must erase the proof explicitly. Restrict the first
+  rule to constructor WHNF with atomic fields. Nested constructors need composed
+  transport. A result-only cast is insufficient. This rule is not implemented.
+  The Agda let and dependent ANF references describe the preservation problem;
+  they do not prove this proposed FC rule or its Haskell strictness behavior.
 - Preserve partial and cyclic Haskell values. Check finite vector prefixes for
   `let n = S n`, a head from `replicate (S bottomNat) x`, and failure when its
   remaining spine needs `bottomNat`. Check `head bottomNat (VCons x undefined)`
