@@ -40,7 +40,7 @@ import GHC.Tc.Gen.Do
 import GHC.Tc.Gen.Bind        ( tcLocalBinds )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
-import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches
+import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches, tcRetainedCase
                        , tcGRHSNE, tcDoStmts )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Tc.Zonk.TcType
@@ -530,8 +530,16 @@ tcExpr (HsCase ctxt scrut matches) res_ty
           --     case (\v -> v) of {..}
           -- This design choice is discussed in #17790
         ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase scrut
-        ; matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches res_ty
-        ; return (HsCase ctxt scrut' matches') }
+        ; dependent <- xoptM LangExt.ExperimentalDependentTypes
+        ; retained <- case unLoc (stripParensLHsExpr scrut') of
+            HsVar _ (L _ index) | dependent, isNativeIndexId index ->
+              tcRetainedCase index matches res_ty
+            _ -> return Nothing
+        ; case retained of
+            Just expr -> return expr
+            Nothing -> do
+              { matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches res_ty
+              ; return (HsCase ctxt scrut' matches') } }
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy

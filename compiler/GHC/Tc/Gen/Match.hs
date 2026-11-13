@@ -16,6 +16,7 @@
 module GHC.Tc.Gen.Match
    ( tcFunBindMatches
    , tcCaseMatches
+   , tcRetainedCase
    , tcLambdaMatches
    , tcGRHSNE
    , tcGRHSsPat
@@ -60,9 +61,10 @@ import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 import GHC.Core ( Expr(Var) )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy) )
-import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, splitTyConApp_maybe )
+import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, splitTyConApp_maybe
+                     , anyFreeVarsOfType, mkDepFunTy, typeKind )
 import GHC.Core.Coercion ( mkCoVarCo, mkSymCo, coercionKind )
-import GHC.Core.DataCon ( DataCon, dataConOrigArgTys, dataConTyCon, promoteDataCon )
+import GHC.Core.DataCon ( DataCon, dataConName, dataConOrigArgTys, dataConTyCon, promoteDataCon )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Utils ( applyTypeToArgs )
@@ -80,14 +82,17 @@ import GHC.Utils.Misc
 
 import GHC.Types.Name
 import GHC.Types.Name.Reader
+import GHC.Types.Name.Set
 import GHC.Types.Id
-import GHC.Types.Var ( varType )
+import GHC.Types.Var ( varType, isCoVar )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity )
 import GHC.Data.FastString ( fsLit )
 import GHC.Data.Pair ( pSnd )
+import GHC.Data.Maybe ( catMaybes, fromMaybe )
 
 import qualified GHC.Data.List.NonEmpty as NE
+import Data.Data ( Data, cast, gmapQ, gmapT )
 
 import Control.Monad
 import Control.Arrow ( second )
@@ -177,6 +182,145 @@ hasRetainedFunTy ty = case coreFullView ty of
   DepFunTy{} -> True
   FunTy _ _ _ result -> hasRetainedFunTy result
   _ -> False
+
+-- | Elaborate a checked dependent case through a retained pattern function.
+-- See Note [Source retained case refinement].
+tcRetainedCase :: Id -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
+               -> TcM (Maybe (HsExpr GhcTc))
+tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
+  = do { captures <- fmap catMaybes $ mapM capture (nameSetElemsStable (retainedCaseNames matches))
+       ; if null captures && not (depends result_ty)
+         then return Nothing
+         else setSrcSpanA loc $
+           do { when (retainedCaseHasQuote matches) $
+                  failWithTc (TcRnRetainedQuantificationError RetainedCaseQuotation)
+              ; unless (isLiftedTypeKind (typeKind result_ty)) $
+                  failWithTc (TcRnRetainedQuantificationError (RetainedResultKind result_ty))
+              ; constructors <- mapM constructor alternatives
+              ; let domain_cons = case splitTyConApp_maybe (coreFullView (varType index)) of
+                      Just (tc, []) -> tyConDataCons tc
+                      _ -> []
+                    cons = map fst constructors
+              ; unless (cons `equalLength` domain_cons && all (`elem` cons) domain_cons) case_error
+              ; fresh_name <- newSysName (nameOccName (idName index))
+              ; let fresh_index = mkLocalId fresh_name ManyTy (varType index)
+                    generalize ty = applyTypeToArgs (mkDepFunTy index ty) [Var fresh_index]
+              ; names <- mapM (newSysName . nameOccName . idName) captures
+              ; let capture_names = zip (map idName captures) names
+                    add_arguments (L match_loc match@(Match { m_pats = L pats_loc pats }), (con, fields))
+                      = let extra = map (noLocA . VarPat noExtField . noLocA) names
+                            rewritten = rewriteRetainedCase (idName index) con fields capture_names match
+                        in L match_loc (rewritten { m_ctxt = LamAlt LamSingle
+                                                  , m_pats = L pats_loc (pats ++ extra) })
+                    matches' = matches { mg_alts = L loc (map add_arguments (zip alternatives constructors)) }
+                    arg_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . generalize . varType) captures
+              ; checked <- tcRetainedConMatches fresh_index [] arg_tys
+                             (mkCheckExpType (generalize result_ty)) matches'
+              ; mapM_ (tcEmitBindingUsage . singleUsageUE) captures
+              ; let fun = HsLam noAnn LamSingle checked
+                    arguments = map (noLocA . HsVar noExtField . noLocA) (index : captures)
+              ; return (Just (foldl' (\f a -> HsApp noExtField (noLocA f) a) fun arguments)) } }
+  where
+    depends = anyFreeVarsOfType (== index)
+    capture name
+      = do { thing <- tcLookupLcl_maybe name
+           ; case thing of
+               Just (ATcId { tct_id = var })
+                 | isLocalId var, not (isCoVar var), depends (varType var) ->
+                   do { unless (isManyTy (idMult var)) $
+                          failWithTc (TcRnRetainedQuantificationError (RetainedPatternType (varType var)))
+                      ; return (Just var) }
+               _ -> return Nothing }
+    constructor (L match_loc (Match { m_pats = L _ [pat]
+                                   , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
+      = setSrcSpanA match_loc $
+        do { unless (case_pattern pat) case_error
+           ; con <- retainedCon (varType index) pat
+           ; maybe case_error return con }
+    constructor (L match_loc _) = setSrcSpanA match_loc case_error
+    case_pattern (L _ (ParPat _ pat)) = case_pattern pat
+    case_pattern (L _ ConPat { pat_args = PrefixCon _ fields })
+      = all (\(L _ pat) -> case pat of VarPat{} -> True; _ -> False) fields
+    case_pattern _ = False
+    case_error :: TcM a
+    case_error = failWithTc (TcRnRetainedQuantificationError RetainedCasePatterns)
+tcRetainedCase _ _ _ = return Nothing
+
+-- | Collect resolved names outside quotations and stored free-name sets.
+retainedCaseNames :: Data a => a -> NameSet
+retainedCaseNames thing
+  | Just HsTypedBracket{} <- (cast thing :: Maybe (HsExpr GhcRn)) = emptyNameSet
+  | Just HsUntypedBracket{} <- (cast thing :: Maybe (HsExpr GhcRn)) = emptyNameSet
+  | Just name <- cast thing = unitNameSet name
+  | Just _ <- (cast thing :: Maybe NameSet) = emptyNameSet
+  | otherwise = unionNameSets (gmapQ retainedCaseNames thing)
+
+-- | Detect quotations before a source substitution can change quoted Names.
+retainedCaseHasQuote :: Data a => a -> Bool
+retainedCaseHasQuote thing
+  | Just HsTypedBracket{} <- (cast thing :: Maybe (HsExpr GhcRn)) = True
+  | Just HsUntypedBracket{} <- (cast thing :: Maybe (HsExpr GhcRn)) = True
+  | Just _ <- (cast thing :: Maybe Name) = False
+  | Just _ <- (cast thing :: Maybe NameSet) = False
+  | otherwise = or (gmapQ retainedCaseHasQuote thing)
+
+-- | Apply the checked constructor substitution and rename generalized locals.
+rewriteRetainedCase :: Data a => Name -> DataCon -> [Id] -> [(Name, Name)] -> a -> a
+rewriteRetainedCase index con fields captures = go
+  where
+    rename name = fromMaybe name (lookup name captures)
+    con_expr :: HsExpr GhcRn
+    con_expr = foldl' (\f a -> HsApp noExtField (noLocA f) a)
+                 (HsVar noExtField (noLocA (noUserRdr (dataConName con))))
+                 (map (noLocA . HsVar noExtField . noLocA . noUserRdr . idName) fields)
+    con_type :: HsType GhcRn
+    con_type = foldl' (\f a -> HsAppTy noExtField (noLocA f) a)
+                 (HsTyVar noAnn IsPromoted (noLocA (noUserRdr (dataConName con))))
+                 (map (noLocA . HsTyVar noAnn NotPromoted . noLocA . noUserRdr . idName) fields)
+    replace_name name
+      | name == index = dataConName con : map idName fields
+      | otherwise = [rename name]
+    go :: Data b => b -> b
+    go thing
+      | Just (HsVar _ (L _ (WithUserRdr _ name))) <- (cast thing :: Maybe (HsExpr GhcRn))
+      , name == index
+      = fromMaybe thing (cast con_expr)
+      | Just (HsTyVar _ _ (L _ (WithUserRdr _ name))) <- (cast thing :: Maybe (HsType GhcRn))
+      , name == index
+      = fromMaybe thing (cast con_type)
+      | Just name <- (cast thing :: Maybe Name)
+      = fromMaybe thing (cast (rename name))
+      | Just names <- (cast thing :: Maybe NameSet)
+      = fromMaybe thing (cast (mkNameSet (concatMap replace_name (nameSetElemsStable names))))
+      | otherwise = gmapT go thing
+
+{- Note [Source retained case refinement]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check a dependent source case by abstracting its expected result over a fresh
+runtime index. Generalize each referenced local whose type depends on that
+index as a later value argument. Check the constructor clauses with the existing
+retained match rule, then apply the checked function to the scrutinee and those
+locals. The constructor rule transports both later arguments and the result.
+
+Agda's case_returning_of_ uses an explicit motive and a pattern function applied
+to its scrutinee. Its with-abstraction also generalizes dependent context
+arguments. See the pinned references in docs/dependent-haskell/REFERENCES.md.
+
+Use fresh Names for the motive index and generalized locals. Resolved source
+Names distinguish shadowed fields from the original scrutinee. Substitute the
+checked constructor for direct references to that original scrutinee in each
+branch. Preserve source locations and update stored free-name sets.
+Use a lambda match context for generated clauses. The enclosing source case
+supplies the error context; generated argument patterns must not appear there.
+Reject Template Haskell quotations before substitution. Quoted source Names
+must not become the fresh generalized Names.
+
+Complete unguarded constructor clauses preserve inspection of the scrutinee.
+The generated application supplies every generalized argument. Wildcards and
+defaults need a separate forcing rule; do not turn a strict case into an unused
+function argument. General motive inference and dependent congruence remain
+separate work. No equality comes from a local definition or an unfolding.
+-}
 
 -- | Introduce runtime index identities before checking the remaining patterns.
 tcRetainedVarMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> Type

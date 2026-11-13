@@ -5324,6 +5324,8 @@ data RetainedQuantificationError
   | RetainedUnsupportedContext
   | RetainedStaging
   | RetainedConstructorCoverage
+  | RetainedCasePatterns
+  | RetainedCaseQuotation
   | RetainedConstructorArguments
   | RetainedPatternType Type
   | RetainedVariablePattern

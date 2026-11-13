@@ -258,6 +258,43 @@ retainedNatSource moduleName observation =
         , "  in " ++ observation
         ]
 
+-- | Check explicit source cases with dependent results and captured payloads.
+retainedCaseSource :: String -> String -> String
+retainedCaseSource moduleName observation =
+    unlines $ concatMap insert (lines (retainedNatSource moduleName observation))
+  where
+    insert line@"entry :: IO String" =
+        [ "type family CaseSelect (b :: Bool) where"
+        , "  CaseSelect True = Int"
+        , "  CaseSelect False = Bool"
+        , line
+        ]
+    insert line@"      run :: Nat -> IO String" =
+        map ("      " ++) retainedCaseDeclarations
+            ++ [ "      replicateOriginal :: foreach (n :: Nat) -> Vec Int n"
+               , "      replicateOriginal n = case n of { Z -> replicateNative @Int n 42; S k -> replicateNative @Int n 42 }"
+               , "      replicateShadow :: foreach (n :: Nat) -> Int -> Vec Int n"
+               , "      replicateShadow n x = case n of { Z -> VNil; S n -> VCons x (replicateShadow n x) }"
+               , "      chooseCaseNative :: foreach (b :: Bool) -> CaseSelect b"
+               , "      chooseCaseNative True = 42"
+               , "      chooseCaseNative False = False"
+               , "      observeCaseNative :: foreach (b :: Bool) -> CaseSelect b -> String"
+               , "      observeCaseNative b x = case (b) of { True -> show (x :: Int); False -> if x then \"True\" else \"False\" }"
+               , "      strictCaseNative :: foreach (n :: Nat) -> Vec Int n -> Int -> Int"
+               , "      strictCaseNative n xs = case n of { Z -> \\x -> case xs of { VNil -> x }; S k -> \\x -> case xs of { VCons _ _ -> x } }"
+               , "      ordinaryCase :: Nat -> Int"
+               , "      ordinaryCase n = case n of { Z -> 0; S _ -> 1 }"
+               , line
+               ]
+    insert line = [line]
+
+-- | Share the case worker between source, executable, and interface checks.
+retainedCaseDeclarations :: [String]
+retainedCaseDeclarations =
+    [ "replicateCaseNative :: forall a. foreach (n :: Nat) -> a -> Vec a n"
+    , "replicateCaseNative n x = case n of { Z -> VNil; S k -> VCons x (replicateCaseNative k x) }"
+    ]
+
 -- | Reuse source workers in a self-contained module with an ordinary main.
 retainedProgramSource :: String
 retainedProgramSource =
@@ -269,10 +306,16 @@ retainedProgramSource =
                , "import Data.List (isInfixOf)"
                ]
             ++ drop 2 (lines helperSource)
+            ++ retainedCaseDeclarations
             ++ drop 3 sourceLines
             ++ ["main :: IO ()", "main = entry >>= putStr"]
   where
-    sourceLines = lines $ retainedChooseSource "NativeProgram" retainedProgramObservation
+    sourceLines = lines $ retainedChooseSource "NativeProgram" $ unlines $ concatMap addCases $ lines retainedProgramObservation
+    addCases "       pure (unlines [both, partial, lazy, control, strictText])" =
+        [ "       vectors <- driveNats (\\n -> observeVec (replicateCaseNative n (42 :: Int)))"
+        , "       pure (unlines [both, partial, lazy, control, strictText] ++ vectors)"
+        ]
+    addCases line = [line]
 
 -- | Observe shared runtime indices and distinguish lazy and strict consumers.
 retainedProgramObservation :: String
@@ -359,6 +402,7 @@ retainedNatLibrarySource =
                , "appendNative :: forall a. foreach (n :: Nat) (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)"
                , "appendNative n m xs ys = appendVec xs ys"
                ]
+            ++ retainedCaseDeclarations
   where
     generalizeAppend "appendVec :: Vec Int n -> Vec Int m -> Vec Int (Add n m)" =
         "appendVec :: forall a n m. Vec a n -> Vec a m -> Vec a (Add n m)"
@@ -388,7 +432,8 @@ retainedNatConsumerSource =
                , "  nestedPrefix <- driveNat (\\n -> pure (show (take 2 (vecList (replicateNative @Int (S (S n)) 42))))) bottomNat"
                , "  retainedHead <- driveNat (\\n -> case appendNative @Int n of !_ -> pure \"forced\") bottomNat"
                , "  ordinaryHead <- driveNat (\\n -> let m = bottomNat in case appendNative @Int n m of !_ -> pure \"forced\") bottomNat"
-               , "  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead])"
+               , "  caseValues <- driveNats (\\n -> observeVec (replicateCaseNative @Int n 42))"
+               , "  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead] ++ caseValues)"
                ]
 
 -- | Run Boolean and Nat consumers against separately compiled disk artifacts.
@@ -429,6 +474,9 @@ runModuleChecks libdir = do
                 , "[42,42]"
                 , "forced"
                 , "forced"
+                , "[]:0"
+                , "[42,42]:2"
+                , "[42,42,42]:3"
                 ]
             )
         ]
@@ -680,7 +728,7 @@ runProgramChecks libdir = do
     (status, actual, errors) <- readProcessWithExitCode executablePath [] ""
     unless (status == ExitSuccess) $
         fail ("FAIL: native source program exited with " ++ show status ++ ":\n" ++ errors)
-    let expected = ["42", "False", "forced", "42", "forced", "raised native-bottom-bool"]
+    let expected = ["42", "False", "forced", "42", "forced", "raised native-bottom-bool", "[]:0", "[42,42]:2", "[42,42,42]:3"]
     unless (lines actual == expected) $
         fail ("FAIL: native source program observations: " ++ show actual ++ "; stderr: " ++ errors)
     putStrLn "program keep/choose True: 42"
@@ -874,6 +922,81 @@ runNatSourceChecks = do
                 Right result -> fail ("FAIL: " ++ moduleName ++ "; expected bottom, got " ++ show result)
     runNatConstructorSourceChecks
     runNatPartialSourceChecks
+    runCaseSourceChecks
+
+-- | Observe refined source cases and reject malformed dependent alternatives.
+runCaseSourceChecks :: GHC.Ghc ()
+runCaseSourceChecks = do
+    let moduleName = "NativeSourceCases"
+        observation =
+            unlines
+                [ "do values <- driveNats (\\n -> observeVec (replicateCaseNative @Int n 42))"
+                , "        original <- driveNats (\\n -> observeVec (replicateOriginal n))"
+                , "        shadowed <- driveNats (\\n -> observeVec (replicateShadow n 42))"
+                , "        selected <- driveBoth (\\b -> pure (observeCaseNative b (chooseCaseNative b)))"
+                , "        partialHead <- driveNat (\\n -> observeVecHead (replicateCaseNative @Int n 42)) partialNat"
+                , "        cyclicPrefix <- driveNat (\\n -> observeVecPrefix (replicateCaseNative @Int n 42)) cyclicNat"
+                , "        strict <- driveNats (\\n -> case strictCaseNative n bottomVec of !_ -> pure \"forced\")"
+                , "        strictPartial <- driveNat (\\n -> case strictCaseNative n bottomVec of !_ -> pure \"forced\") partialNat"
+                , "        strictCyclic <- driveNat (\\n -> case strictCaseNative n bottomVec of !_ -> pure \"forced\") cyclicNat"
+                , "        ordinary <- driveNats (\\n -> observeInt (ordinaryCase n))"
+                , "        pure (values ++ original ++ shadowed ++ selected ++ \"\\n\" ++ unlines [partialHead,cyclicPrefix] ++ strict ++ unlines [strictPartial,strictCyclic] ++ ordinary)"
+                ]
+    expression <- sourceEntry moduleName (retainedCaseSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source dependent cases" expression
+    let expected =
+            concat (replicate 3 ["[]:0", "[42,42]:2", "[42,42,42]:3"])
+                ++ ["42", "False", "42", "[42,42,42,42]"]
+                ++ replicate 5 "forced"
+                ++ ["0", "1", "1"]
+    unless (lines actual == expected) $
+        fail ("FAIL: source case refinement, capture, or strictness: " ++ show actual)
+    forM_
+        [ ("NativeSourceCaseBottom", "driveNat (\\n -> observeVecHead (replicateCaseNative @Int n 42)) bottomNat", "native-bottom-nat")
+        , ("NativeSourceCasePartial", "driveNat (\\n -> observeVec (replicateCaseNative @Int n 42)) partialNat", "native-bottom-nat")
+        , ("NativeSourceCaseFunctionBottom", "driveNat (\\n -> case strictCaseNative n bottomVec of !_ -> pure \"forced\") bottomNat", "native-bottom-nat")
+        , ("NativeSourceCasePayloadBottom", "driveNat (\\n -> observeInt (strictCaseNative n bottomVec 42)) Z", "native-bottom-vector")
+        ]
+        $ \(name, body, fragment) -> do
+            bottomExpression <- sourceEntry name (retainedCaseSource name body)
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case outcome of
+                Left exception
+                    | fragment `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right result -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show result)
+    forM_
+        [ ("NativeSourceCaseIncomplete", 83605, "Dependent case refinement requires", "S k -> VCons x (replicateCaseNative k x)")
+        , ("NativeSourceCaseGuarded", 83605, "Dependent case refinement requires", "Z -> VNil; S k | True -> VCons x (replicateCaseNative k x)")
+        , ("NativeSourceCaseWildcard", 83605, "Dependent case refinement requires", "Z -> VNil; S _ -> VCons x VNil")
+        , ("NativeSourceCaseWrongLength", 83865, "Vec", "Z -> VNil; S k -> VNil")
+        , ("NativeSourceCaseEscapingPredecessor", 83865, "Vec", "Z -> VNil; S k -> replicateCaseNative k x")
+        ]
+        $ \(name, code, fragment, alternatives) -> do
+            let original = "      replicateCaseNative n x = case n of { Z -> VNil; S k -> VCons x (replicateCaseNative k x) }"
+                replacement = "      replicateCaseNative n x = case n of { " ++ alternatives ++ " }"
+                source =
+                    unlines
+                        $ map (\line -> if line == original then replacement else line)
+                        $ lines (retainedCaseSource name "pure \"unused\"")
+            sourceModuleRejects name code fragment name source
+    let quoteName = "NativeSourceCaseNameQuotation"
+        source =
+            "{-# LANGUAGE TemplateHaskellQuotes #-}\n"
+                ++ unlines
+                    (map replace (lines (retainedCaseSource quoteName "pure \"unused\"")))
+        replace "      replicateCaseNative n x = case n of { Z -> VNil; S k -> VCons x (replicateCaseNative k x) }" =
+            "      replicateCaseNative n x = case n of { Z -> VNil; S k -> let quoted = ''Int in VCons x (replicateCaseNative k x) }"
+        replace line = line
+    sourceModuleRejects
+        "dependent case name quotation"
+        83605
+        "Dependent case refinement does not support Template Haskell quotations"
+        quoteName
+        source
 
 -- | Preserve function WHNF while retained binders remain in the result type.
 runNatPartialSourceChecks :: GHC.Ghc ()

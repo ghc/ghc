@@ -3569,6 +3569,10 @@ pprRetainedQuantificationError reason = case reason of
     text "Retained quantification in Template Haskell quotations or splices is not supported yet."
   RetainedConstructorCoverage ->
     text "A retained constructor match requires one unguarded equation for each constructor of its domain."
+  RetainedCasePatterns ->
+    text "Dependent case refinement requires one unguarded match for each constructor, with bare variable fields."
+  RetainedCaseQuotation ->
+    text "Dependent case refinement does not support Template Haskell quotations."
   RetainedConstructorArguments ->
     text "Retained constructor fields and later arguments currently require bare variable patterns and unrestricted multiplicities."
   RetainedPatternType ty ->

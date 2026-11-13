@@ -62,8 +62,9 @@ The domain can also be a user-defined closed algebraic type::
       Add (S n) m = S (Add n m)
 
     replicateNative :: forall a. foreach (n :: Nat) -> a -> Vec a n
-    replicateNative Z x = VNil
-    replicateNative (S k) x = VCons x (replicateNative k x)
+    replicateNative n x = case n of
+      Z -> VNil
+      S k -> VCons x (replicateNative k x)
 
     headNative :: forall a. foreach (n :: Nat) -> Vec a (S n) -> a
     headNative n (VCons x _) = x
@@ -102,8 +103,16 @@ functions remain restricted. Dedicated rejection checks report GHC-83605.
 Ordinary payload mismatches use the existing type error. Unsupported type
 positions report GHC-43582.
 
-Refinement in source ``case`` expressions remains unimplemented. The constructor
-rule currently applies to function equations.
+Source ``case`` expressions can refine a named local retained index when the
+result type is checked. The rule also refines referenced local values whose
+types depend on that index. It requires one unguarded branch per constructor
+and bare variable fields. The result must have lifted kind. Parentheses around
+the scrutinee are accepted. Generalized locals require unrestricted
+multiplicities. Guards, defaults, nested constructor patterns,
+Template Haskell quotations, and general motive inference remain unsupported.
+The case inspects its index even when the result is a function. Captured payloads
+remain lazy until the selected branch uses them.
+
 Calls can pass constructor arguments with fields, including ``S n`` and
 ``S (S n)``. These calls do not force ``n`` to check its index. CorePrep checks
 transport of later payloads and the result when it names a constructor argument.
