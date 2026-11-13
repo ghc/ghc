@@ -39,9 +39,11 @@ import GHC.Core.Dependent
 import GHC.Core.Subst
 import GHC.Core.Make
 import GHC.Core.Type
-import GHC.Core.TyCo.Rep ( Type(DepFunTy, TyConApp) )
+import GHC.Core.TyCo.Rep ( Type(..) )
+import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.TyCo.Subst ( isEmptyTypeSubst )
 import GHC.Core.Coercion
+import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr_Prep )
@@ -64,8 +66,10 @@ import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Basic
-import GHC.Types.Name   ( OccName, NamedThing(..), isInternalName )
-import GHC.Types.Name.Occurrence (occNameString)
+import GHC.Types.Name   ( OccName, NamedThing(..), isInternalName, mkSystemName )
+import GHC.Types.Name.Occurrence (occNameString, mkTyVarOccFS)
+import GHC.Types.Var.Env ( mkInScopeSet, mkVarEnv, emptyVarEnv, lookupVarEnv )
+import GHC.Types.Var.Set ( unionVarSet, unionVarSets )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.Unique.Supply
@@ -949,7 +953,9 @@ cpeBodyF env (Case scrut bndr ty alts)
        ; alts'' <- mapM (sat_alt env') alts'
 
        ; case alts'' of
-           [Alt DEFAULT _ rhs] -- See Note [Flatten case-binds]
+           [Alt DEFAULT [] rhs] -- See Note [Flatten case-binds]
+             -- A native alias proof must keep its alternative scope.
+             -- See Note [Retained constructor arguments in CorePrep].
              | let float = mkCaseFloat bndr3 scrut'
              -> return (snocFloat floats float, rhs)
            _ -> return (floats, Case scrut' bndr3 (cpSubstTy env ty) alts'') }
@@ -1078,15 +1084,142 @@ body of the eta-expansion lambda, resulting in
 which is unproblematic.
 -}
 
+-- | Name constructed retained arguments with checked case-alias evidence.
+-- See Note [Retained constructor arguments in CorePrep].
+nameNativeConstructorArgs :: CoreExpr -> UniqSM (Maybe CoreExpr)
+nameNativeConstructorArgs expr
+  = do { head' <- case fun of
+           Cast inner co -> fmap (`mkCast` co) <$> nameNativeConstructorArgs inner
+           Tick tick inner -> fmap (Tick tick) <$> nameNativeConstructorArgs inner
+           _ -> return Nothing
+       ; case head' of
+           Just fun' -> return (Just (mkApps fun' args))
+           Nothing | needs_names (exprType fun) args ->
+             Just <$> build (exprType fun) fun [] id args
+           Nothing -> return Nothing }
+  where
+    (fun, args) = collectArgs expr
+
+    needs_names _ [] = False
+    needs_names ty (arg : rest)
+      | DepFunTy {} <- coreFullView ty
+      , Just (TyConApp _ (_ : _)) <- exprToNativeIndex arg = True
+      | otherwise = needs_names (applyTypeToArgs ty [arg]) rest
+
+    build ty app transport wrap []
+      = do { co <- liftNativeIndexTransport "the application result" transport ty
+           ; return (wrap (mkCast app (mkSubCo co))) }
+    build ty app transport wrap (arg : rest)
+      | DepFunTy index _ <- coreFullView ty
+      = do { (atom, co, wrap_arg) <- name_index arg
+           ; marker <- mkSysLocalM (fsLit "retained_template") ManyTy (varType index)
+           ; let ty' = applyTypeToArgs ty [Var marker]
+           ; build ty' (App app atom) ((marker, co) : transport)
+                   (wrap . wrap_arg) rest }
+      | Type {} <- arg
+      = do { check_erased_binder ty transport
+           ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
+      | Coercion {} <- arg
+      = do { check_erased_binder ty transport
+           ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
+      | Just (_, _, arg_ty, res_ty) <- splitFunTy_maybe ty
+      = do { co <- liftNativeIndexTransport "a later argument" transport arg_ty
+           ; let arg' = mkCast arg (mkSymCo (mkSubCo co))
+           ; build res_ty (App app arg') transport wrap rest }
+      | otherwise = pprPanic "nameNativeConstructorArgs: application type" (ppr ty $$ ppr expr)
+
+    check_erased_binder ty transport
+      | ForAllTy binder _ <- coreFullView ty
+      , any (\(index, _) -> anyFreeVarsOfType (== index) (varType (binderVar binder))) transport
+      = nativeIndexTransportError "a dependent erased binder kind"
+      | otherwise = return ()
+
+    name_index arg
+      | Just index <- exprToNativeIndex arg
+      , (Var worker, fields) <- collectArgs arg
+      , Just con <- isDataConWorkId_maybe worker
+      , not (null fields)
+      = do { named <- mapM name_index fields
+           ; let atoms = [atom | (atom, _, _) <- named]
+                 field_cos = [co | (_, co, _) <- named]
+                 wrap_fields = foldr (.) id [wrap | (_, _, wrap) <- named]
+                 scrut = mkConApp con atoms
+                 scrut_index = expectJust (exprToNativeIndex scrut)
+           ; value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType arg)
+           ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
+                        (mkNomEqPred (TermVarTy value) scrut_index)
+           ; let co = mkTransCo (mkCoVarCo proof)
+                        (mkTyConAppCo Nominal (promoteDataCon con) field_cos)
+                 wrap body = wrap_fields $
+                   Case scrut value (exprType body) [Alt DEFAULT [proof] body]
+           ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
+               return (Var value, co, wrap) }
+      | Just index <- exprToNativeIndex arg
+      = return (arg, mkReflCo Nominal index, id)
+      | otherwise = nativeIndexTransportError "an unsupported retained argument"
+
+-- | Lift prepared-to-original index equalities through an ordinary value type.
+-- Fresh symbolic Ids occur only in this temporary template, never in output Core.
+liftNativeIndexTransport :: String -> [(Id, CoercionN)] -> Type -> UniqSM CoercionN
+liftNativeIndexTransport context transport ty
+  | all (isReflCo . snd) relevant
+  = return (mkReflCo Nominal left_ty)
+  | otherwise
+  = do { templates <- forM relevant $ \(index, _) ->
+           do { unique <- getUniqueM
+              ; return (mkTyVar (mkSystemName unique (mkTyVarOccFS (fsLit "retained")))
+                                (varType index)) }
+       ; template_ty <- case abstract (mkVarEnv (zip (map fst relevant) templates)) ty of
+           Just template_ty -> return template_ty
+           Nothing -> nativeIndexTransportError context
+       ; let co = liftCoSubstWith Nominal templates (map snd relevant) template_ty
+       ; if coercionLKind co `eqType` left_ty && coercionRKind co `eqType` right_ty
+         then return co
+         else pprPanic "liftNativeIndexTransport: endpoints" (ppr co $$ ppr ty) }
+  where
+    relevant = filter (\(index, _) -> anyFreeVarsOfType (== index) ty) transport
+    left_ty = instantiate coercionLKind
+    right_ty = instantiate coercionRKind
+    instantiate endpoint
+      = substTy (Subst in_scope bindings emptyVarEnv emptyVarEnv) ty
+      where
+        in_scope = mkInScopeSet (tyCoVarsOfType ty `unionVarSet`
+                                unionVarSets (map (tyCoVarsOfCo . snd) relevant))
+        bindings = mkVarEnv [(index, mapNativeIndex (const (endpoint co)) (Var index))
+                           | (index, co) <- relevant]
+
+    abstract env ty
+      | not (anyFreeVarsOfType (\v -> isJust (lookupVarEnv env v)) ty) = Just ty
+      | Just ty' <- coreView ty = abstract env ty'
+    abstract env (TermVarTy index) = mkTyVarTy <$> lookupVarEnv env index
+    abstract env (TyConApp con args) = mkTyConApp con <$> mapM (abstract env) args
+    abstract env (AppTy fun arg) = mkAppTy <$> abstract env fun <*> abstract env arg
+    abstract env (FunTy flag mult arg res)
+      = FunTy flag <$> abstract env mult <*> abstract env arg <*> abstract env res
+    abstract _ _ = Nothing
+
+-- | Report the remaining coercion boundary without fabricating index evidence.
+nativeIndexTransportError :: String -> UniqSM a
+nativeIndexTransportError context
+  = throwGhcException (Sorry
+      ("Native dependent Core cannot transport constructed retained indices through "
+       ++ context ++ " in CorePrep. The required type or coercion congruence is not supported."))
+
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeBody)
 -- May return a CpeBody (instead of CpeApp) because of saturating primops
 cpeApp top_env expr
-  = do { let (terminal, args) = collect_args expr
+  = do { named <- if cp_allowNativeDependent (cpe_config top_env)
+                  then nameNativeConstructorArgs expr
+                  else return Nothing
+       ; case named of
+           Just expr' -> cpeBodyF top_env expr'
+           Nothing -> ordinary_app }
+  where
+    ordinary_app = do
+      { let (terminal, args) = collect_args expr
       --  ; pprTraceM "cpeApp" $ (ppr expr)
        ; cpe_app top_env terminal args
        }
-
-  where
     -- We have a nested data structure of the form
     -- e `App` a1 `App` a2 ... `App` an, convert it into
     -- (e, [CpeApp a1, CpeApp a2, ..., CpeApp an], depth)
@@ -1303,7 +1436,7 @@ cpeApp top_env expr
             DepFunTy {}
               | Just (TyConApp _ (_ : _)) <- exprToNativeIndex arg
               -> throwGhcException (Sorry
-                   "Native dependent Core cannot lower a constructor-tree retained argument in CorePrep. Checked index transport for argument naming is not implemented.")
+                   "Native dependent Core cannot transport a constructor-tree retained argument across this application spine in CorePrep.")
             _ -> pure ()
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
                = case (ss, isLazyExpr arg) of
@@ -1329,18 +1462,35 @@ cpeApp top_env expr
 
 {- Note [Retained constructor arguments in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Core index grammar includes S k, but CorePrep must name that application.
-Changing f (S k) to let t = S k in f t changes its result index from 'S k to
-TermVarTy t. Other argument types can still mention 'S k. The current type system
-has no checked let-alias transport between these indices. Reject this application
-before cpeArg introduces the name. Nullary constructors and local runtime Ids
-need no such naming step. Recursive retained workers can pass a predecessor Id.
+Changing f (S k) to let t = S k in f t changes its index from 'S k to TermVarTy t.
+Name the constructor with a checked case alias instead:
 
-This is a temporary lowering boundary, not the source-language target. Agda
-substitutes let definitions after checking and has no internal let construct.
-Haskell must preserve lazy sharing. This precedent does not justify treating
-arbitrary Id unfoldings as equality evidence. See the M9 preservation tasks in
-docs/dependent-haskell/PLAN.md and the provenance in REFERENCES.md.
+  case S k of t { DEFAULT [cv :: TermVarTy t ~# 'S (TermVarTy k)] -> ... }
+
+Core Lint derives this equality from the actual scrutinee and case binder.
+It is not an equality from an unfolding. The scrutinee is constructor WHNF,
+so this strict case does not force k. Name nested constructor fields recursively.
+Compose their equalities with the outer constructor equality. The outer proof
+then mentions the actual prepared fields, while transport recovers the original
+constructor tree. A variable field, including a bottom or cyclic value, stays lazy.
+
+Walk the complete supplied application with fresh symbolic index placeholders.
+For each later ordinary argument, lift the prepared-to-original index equalities
+through its formal type and cast the payload in the inverse direction. Cast the
+final result back to its original index. A result-only cast is insufficient.
+The placeholders occur only in temporary templates. Output contains checked
+type applications and nominal coercion lifting, with no universal axiom.
+
+Build this typed expression before ordinary CorePrep naming. Keep proof-bearing
+DEFAULT cases intact: a CaseBound float has no slot for their alternative proof.
+CoreToStg erases the checked proof and retains the case binder and real fields.
+Residual dependent-function transport still needs Pi congruence. Report that
+operation rather than eta-expanding a possibly bottom partial application.
+
+Agda substitutes local lets and does not preserve their sharing. The dependent
+ANF literature retains the defining computation in continuation typing. Neither
+result proves this lazy FC rule. See Note [Native index alias evidence] in
+GHC.Core.Lint and docs/dependent-haskell/REFERENCES.md#agda-provenance.
 -}
 
 isLazyExpr :: CoreExpr -> Bool

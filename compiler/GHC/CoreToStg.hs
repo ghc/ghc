@@ -491,6 +491,12 @@ coreToStgExpr (Case scrut bndr _ alts)
       = let -- Core Lint checks the final virtual proof. Keep real fields.
             -- Keep ordinary coercion argument slots; see Note [Coercion tokens].
             binders'
+              | isNativeIndexAliasAlt alt
+              , [cv] <- binders
+              , isCoVar cv
+              -- See Note [Native index alias evidence] in GHC.Core.Lint.
+              -- Mandatory native Core Lint checks this exact proof binder.
+              = []
               | isNativeIndexAlt alt
               , DataAlt dc <- con
               , (fields, [cv]) <- splitAt (dataConRepArity dc) binders

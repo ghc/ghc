@@ -371,6 +371,48 @@ runNatChecks dflags = do
         literalCase = Case zeroExpr caseBinder intTy [Alt DEFAULT [] (Var payload), Alt (DataAlt zero) [literalProof] (Var payload)]
     lintAccepts dflags "literal Nat evidence with DEFAULT remains checked" [payload] literalCase
     check "scanner detects literal Nat evidence" (hasNativeDependentExpr literalCase)
+    let alias = local 560 "named_successor" natTy
+        aliasIndex = TermVarTy alias
+        successorIndex = succTy index
+        aliasProof = proof 561 aliasIndex successorIndex
+        aliasDictionary = local 562 "alias_dictionary" (mkTyConApp eqTyCon [natTy, aliasIndex, aliasIndex])
+        predicateCo = mkTyConAppCo Nominal eqTyCon [mkNomReflCo natTy, mkCoVarCo aliasProof, mkCoVarCo aliasProof]
+        transport = mkFunCoNoFTF Representational (mkNomReflCo ManyTy) (mkSubCo predicateCo) (mkReflCo Representational intTy)
+        aliasBody = Cast (Lam aliasDictionary (Var payload)) transport
+        aliasCase = Case (succExpr (Var n)) alias (indexedNat successorIndex) [Alt DEFAULT [aliasProof] aliasBody]
+        literalAliasProof = proof 563 aliasIndex zeroTy
+        literalAlias = Case zeroExpr alias intTy [Alt DEFAULT [literalAliasProof] (Var payload)]
+        wrongAliasProof = proof 564 aliasIndex (succTy (TermVarTy m))
+        reversedAliasProof = proof 565 successorIndex aliasIndex
+        reprAliasProof = mkCoVar (mkSystemName (unique 566) (mkVarOcc "repr_alias")) (mkReprEqPred aliasIndex successorIndex)
+        extraAliasProof = proof 567 aliasIndex successorIndex
+        notProof = local 568 "not_alias_evidence" intTy
+        plainAliasCase cv = Case (succExpr (Var n)) alias intTy [Alt DEFAULT [cv] (Var payload)]
+        outerAliasProof = proof 561 index index
+    lintAccepts dflags "DEFAULT alias evidence transports an indexed result" [n, payload] aliasCase
+    lintAccepts dflags "DEFAULT alias evidence accepts a closed constructor" [payload] literalAlias
+    lintAccepts dflags "DEFAULT alias evidence survives outer index substitution" [m, payload] $
+        CoreSubst.substExpr (indexSubst [m, payload] n (succExpr (Var m))) aliasCase
+    lintAccepts dflags "DEFAULT alias substitution avoids capturing a free index" [alias, payload] $
+        CoreSubst.substExpr (indexSubst [alias, payload] n (Var alias)) aliasCase
+    lintAccepts dflags "DEFAULT alias evidence also names an opaque variable" [n, payload] $
+        Case (Var n) alias intTy [Alt DEFAULT [proof 571 aliasIndex index] (Var payload)]
+    lintAccepts dflags "DEFAULT alias evidence can coexist with an ordinary constructor alternative" [n, payload] $
+        Case (succExpr (Var n)) alias intTy [Alt DEFAULT [aliasProof] (Var payload), Alt (DataAlt zero) [] (Var payload)]
+    check "scanner detects DEFAULT alias evidence with ordinary result" (hasNativeDependentExpr literalAlias)
+    lintRejects dflags "DEFAULT alias evidence must name the actual constructor fields" [n, m, payload] (plainAliasCase wrongAliasProof)
+    lintRejects dflags "DEFAULT alias evidence cannot reverse endpoints" [n, payload] (plainAliasCase reversedAliasProof)
+    lintRejects dflags "DEFAULT alias evidence must be nominal" [n, payload] (plainAliasCase reprAliasProof)
+    lintRejects dflags "DEFAULT alias evidence requires exactly one proof" [n, payload] $
+        Case (succExpr (Var n)) alias intTy [Alt DEFAULT [aliasProof, extraAliasProof] (Var payload)]
+    lintRejects dflags "DEFAULT alias evidence cannot be an ordinary Id" [n, payload] (plainAliasCase notProof)
+    lintRejects dflags "DEFAULT alias evidence must be fresh" [n, payload, outerAliasProof] (plainAliasCase aliasProof)
+    lintRejects dflags "DEFAULT alias binder must be unrestricted" [n, payload] $
+        Case (succExpr (Var n)) (setIdMult alias OneTy) intTy [Alt DEFAULT [aliasProof] (Var payload)]
+    lintRejects dflags "DEFAULT alias binder cannot escape into the result annotation" [n, payload] $
+        Case (succExpr (Var n)) alias (indexedNat aliasIndex) [Alt DEFAULT [aliasProof] (Lam aliasDictionary (Var payload))]
+    lintRejects dflags "DEFAULT alias evidence cannot describe an arbitrary producer" [n, payload] $
+        Case (App (identity 569 natTy) (Var n)) alias intTy [Alt DEFAULT [proof 570 aliasIndex index] (Var payload)]
 
 -- | Construct an index substitution with an explicit scope.
 indexSubst :: [Var] -> Id -> CoreExpr -> Subst.Subst
@@ -714,7 +756,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     (wrap scrut [falseAlt])
                 reject
                     "interface DEFAULT cannot bind proof names"
-                    "Native Boolean interface DEFAULT alternative cannot bind names"
+                    "Native index alias evidence has no interface codec"
                     (wrap scrut [IfaceAlt IfaceDefaultAlt [proofName] rhs, falseAlt, IfaceAlt trueCon [proofName] rhs])
                 reject
                     "interface literal cannot bind proof names"

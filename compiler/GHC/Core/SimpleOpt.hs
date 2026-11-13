@@ -313,6 +313,12 @@ equality has that constructor at both endpoints. Replace the proof with nominal
 reflexivity. Constructor knowledge from an unfolding does not supply this proof.
 Keep variable cases strict and preserve ordinary coercion argument positions.
 
+A DEFAULT index alias proof relates the case binder to the scrutinee index.
+Preserve its explicit case and proof binder. Substitute the scrutinee, result
+type, and alternatives in their scopes. Do not eliminate the DEFAULT branch
+or float its proof out of the case. See Note [Native index alias evidence]
+in GHC.Core.Lint.
+
 Agda's dependent application rule motivates substitution into the codomain.
 Its case-tree reduction and with-abstraction equality motivate constructor
 reduction with an explicit scrutinee equation. See
@@ -460,6 +466,11 @@ simple_opt_expr env expr = go expr
                              (env', Just bind) -> Let bind (simple_opt_expr env' body)
 
     go (Case e b ty as)
+      | soe_native env
+      , any isNativeIndexAliasAlt as
+      -- See Note [Restricted dependent simplification].
+      = Case e' b' (substTyUnchecked subst ty) (map (go_alt env') as)
+
       | soe_native env
       , Just index <- exprToBoolIndex e'
       , Just (tc, []) <- splitTyConApp_maybe index

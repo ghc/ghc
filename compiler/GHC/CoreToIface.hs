@@ -675,6 +675,10 @@ toIfaceTopBind b =
 
 ---------------------
 toIfaceAlt :: CoreAlt -> IfaceAlt
+toIfaceAlt alt
+  | isNativeIndexAliasAlt alt
+  -- See Note [Native index alias evidence in interfaces] in GHC.IfaceToCore.
+  = pprPanic "toIfaceAlt: native index alias evidence has no interface codec" (ppr alt)
 toIfaceAlt alt@(Alt (DataAlt con) bs _)
   | con `hasKey` falseDataConKey || con `hasKey` trueDataConKey
   , not (null bs)

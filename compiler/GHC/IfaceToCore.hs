@@ -1751,6 +1751,11 @@ tcIfaceExpr (IfaceECase scrut ty)
        ; return (castBottomExpr scrut' ty') }
 
 tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
+    -- See Note [Native index alias evidence in interfaces].
+    forM_ alts $ \ (IfaceAlt con names _) -> case con of
+      IfaceDefaultAlt | not (null names) ->
+        failIfM (text "Native index alias evidence has no interface codec:" <+> ppr names)
+      _ -> return ()
     scrut' <- tcIfaceExpr scrut
     -- Check before recovering types or decoding branch bodies.
     -- See Note [Native Boolean evidence in interfaces].
@@ -1860,7 +1865,10 @@ tcIfaceAlt :: CoreExpr -> Mult -> (TyCon, [Type])
            -> IfaceAlt
            -> IfL CoreAlt
 tcIfaceAlt _ _ _ (IfaceAlt IfaceDefaultAlt names rhs)
-  = assert (null names) $ do
+  = do
+    -- See Note [Native index alias evidence in interfaces].
+    unless (null names) $
+      failIfM (text "Native index alias evidence has no interface codec:" <+> ppr names)
     rhs' <- tcIfaceExpr rhs
     return (Alt DEFAULT [] rhs')
 
@@ -1903,6 +1911,21 @@ tcIfaceDataAlt scrut mult con inst_tys arg_strs rhs
                   extendIfaceIdEnv arg_ids      $
                   tcIfaceExpr rhs
         ; return (Alt (DataAlt con) (ex_tvs ++ arg_ids) rhs') }
+
+{- Note [Native index alias evidence in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A DEFAULT index alias alternative binds a CoVar. Its equality relates the
+case binder to the scrutinee index. The current interface expression codec
+cannot reconstruct this proof. Reject every DEFAULT CoVar shape in the writer,
+including malformed shapes. The reader has only local names, without binder
+sorts. Reject any DEFAULT alternative with names before decoding the scrutinee
+or branch body. Do not use the ordinary DEFAULT assertion for these proofs.
+
+This gate applies to expression templates. It does not change the type codec
+or the separate module unfolding gate. Add explicit versioned codec support
+before serializing these proofs. See Note [Native index alias evidence]
+in GHC.Core.Lint.
+-}
 
 {- Note [Native Boolean evidence in interfaces]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

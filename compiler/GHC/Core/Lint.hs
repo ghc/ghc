@@ -1590,6 +1590,13 @@ lintCaseExpr scrut case_bndr alt_ty alts
            lintL (any is_default alts || covers_domain scrut_ty)
              (text "Native index proof alternatives must be exhaustive:" <+> ppr e)
 
+       ; when (any isNativeIndexAliasAlt alts) $
+           do { in_scope <- getInScope
+              ; lintL (isNativeIndexId case_bndr
+                        && not (case_bndr `elemInScopeSet` in_scope))
+                  (text "Native index alias case requires a fresh unrestricted local index binder:"
+                   <+> ppr case_bndr) }
+
        -- Lint the case-binder. Must do this after linting the scrutinee
        -- because the case-binder isn't in scope in the scrutineex
        ; lintBinder CaseBind case_bndr $
@@ -1606,7 +1613,7 @@ lintCaseExpr scrut case_bndr alt_ty alts
        ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
        ; return (alt_ty, case_ue) } }
   where
-    is_default (Alt DEFAULT [] _) = True
+    is_default (Alt DEFAULT _ _) = True
     is_default _ = False
     covers_domain ty
       | isNativeIndexType ty, Just (tc, []) <- splitTyConApp_maybe ty
@@ -1678,7 +1685,11 @@ checkCaseAlts e scrut scrut_ty alts
            _otherwise -> return ()
         }
   where
-    (con_alts, _maybe_deflt) = findDefault alts
+    -- findDefault requires an ordinary DEFAULT with no binders. Check native
+    -- alias proofs and malformed DEFAULT binders in lintCoreAlt instead.
+    con_alts = case alts of
+      Alt DEFAULT _ _ : rest -> rest
+      _ -> alts
 
         -- Check that successive alternatives have strictly increasing tags
     increasing_tag (alt1 : rest@( alt2 : _)) = alt1 `ltAlt` alt2 && increasing_tag rest
@@ -1706,6 +1717,28 @@ lintCoreAlt :: Maybe Type -- Supported native index of the scrutinee
             -> LintM UsageEnv
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
+lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt DEFAULT args rhs)
+  | isNativeIndexAliasAlt alt
+  = addLoc (CaseAlt alt) $ do
+    { index <- case scrut_index of
+        Just index -> return index
+        Nothing -> failWithL (text "Unsupported scrutinee for native index alias evidence")
+    ; cv <- case args of
+        [cv] | isCoVar cv -> return cv
+        _ -> failWithL (text "Native index alias alternative must bind exactly one CoVar")
+    ; in_scope <- getInScope
+    ; lintL (isLocalId cv && not (cv `elemInScopeSet` in_scope))
+        (text "Native index alias evidence requires a fresh local CoVar:" <+> ppr cv)
+    ; ensureEqTys (typeKind index) scrut_ty
+        (text "Native index alias endpoints must have the same domain")
+    ; let expected = mkNomEqPred (TermVarTy case_bndr) index
+    ; ensureEqTys (varType cv) expected
+        (text "Invalid nominal index alias evidence:" <+> ppr cv <+> dcolon <+> ppr (varType cv))
+    ; lintBinder CasePatBind cv $ do
+      { rhs_ue <- lintAltExpr rhs alt_ty
+      ; return (deleteUE (deleteUE rhs_ue cv) case_bndr) }
+    }
+    -- See Note [Native index alias evidence].
 lintCoreAlt _ case_bndr _ scrut_mult alt_ty (Alt DEFAULT args rhs) =
   do { lintL (null args) (mkDefaultArgsMsg args)
      ; rhs_ue <- lintAltExpr rhs alt_ty
@@ -1794,6 +1827,29 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
 
   | otherwise   -- Scrut-ty is wrong shape
   = zeroUE <$ addErrL (mkBadAltMsg scrut_ty alt)
+
+{- Note [Native index alias evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A strict Core case binds the value of its scrutinee to the case binder. A
+DEFAULT alternative can bind one virtual nominal CoVar for this identity:
+cv :: TermVarTy case_bndr ~# index(scrutinee). Derive both endpoints from the
+checked case. Do not trust endpoints supplied by a producer. The case binder
+and proof must be fresh. The case binder must be an unrestricted local Id
+with a supported index domain. The result annotation remains outside their
+scope. The proof is available only in the alternative.
+
+The checker accepts any supported scrutinee index. CorePrep must separately
+preserve evaluation behavior when it inserts such a case. In particular, a
+case on a constructor WHNF does not force its lifted fields. A case on an
+unknown runtime Id can force that Id. CoreToStg removes the virtual proof
+after mandatory native Core Lint. Ordinary coercion slots keep their rules.
+
+Agda substitutes let definitions during checking. Dependent ANF compilation
+must preserve the identity of a named computation. These sources guide this
+explicit identity rule; they do not prove its behavior for lazy Haskell.
+See docs/dependent-haskell/REFERENCES.md#agda-provenance and the ANF reference
+there. This rule does not make ordinary let aliases definitionally equal.
+-}
 
 {- Note [Native algebraic branch evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

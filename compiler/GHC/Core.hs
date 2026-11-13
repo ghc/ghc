@@ -34,7 +34,7 @@ module GHC.Core (
 
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
         varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
-        exprToNativeIndex, mapNativeIndex, isNativeIndexAlt,
+        exprToNativeIndex, mapNativeIndex, isNativeIndexAlt, isNativeIndexAliasAlt,
 
         mkBinds,
 
@@ -352,7 +352,9 @@ type Arg b = Expr b
 
 -- | A case split alternative. Consists of the constructor leading to the alternative,
 -- the variables bound from the constructor, and the expression to be executed given that binding.
--- The default alternative is @(DEFAULT, [], rhs)@
+-- The ordinary default alternative is @(DEFAULT, [], rhs)@. A checked native
+-- index alias binds one virtual CoVar. See Note [Native index alias evidence]
+-- in GHC.Core.Lint.
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
@@ -2649,6 +2651,12 @@ isNativeIndexAlt (Alt (DataAlt con) args _)
   = length args > dataConRepArity con
     && isNativeIndexType (mkTyConTy (dataConTyCon con))
 isNativeIndexAlt _ = False
+
+-- | Detect proof binders on a DEFAULT alternative, including malformed proofs.
+-- Core Lint checks their count, scope, and exact nominal equality type.
+isNativeIndexAliasAlt :: CoreAlt -> Bool
+isNativeIndexAliasAlt (Alt DEFAULT args _) = any isCoVar args
+isNativeIndexAliasAlt _ = False
 
 -- | Convert a Boolean argument through the restricted frontend index language.
 exprToBoolIndex :: CoreExpr -> Maybe Type

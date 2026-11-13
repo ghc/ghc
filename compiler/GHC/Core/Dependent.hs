@@ -122,7 +122,7 @@ scanBind (Rec pairs) = foldMap (\(b, rhs) -> scanBinder b <> scanExpr rhs) pairs
 -- | Inspect a case alternative and its binders.
 scanAlt :: CoreAlt -> NativeScan
 scanAlt alt
-    | isNativeIndexAlt alt = NativeScan (pure True)
+    | isNativeIndexAlt alt || isNativeIndexAliasAlt alt = NativeScan (pure True)
 scanAlt (Alt con bs rhs) =
     scanAltCon con <> foldMap scanBinder bs <> scanExpr rhs
 
