@@ -2423,9 +2423,7 @@ async def simple_build(name: Union[TestName, str],
 
     flags = ' '.join(get_compiler_flags() + config.way_flags[way])
 
-    cmd = ('{cmd_prefix} '
-           '{{compiler}} {to_do} {srcname} {flags} {extra_hc_opts}'
-          ).format(**locals())
+    cmd = f'{cmd_prefix} {{compiler}} {to_do} {srcname} {flags} {extra_hc_opts}'
 
     if filter_with != '':
         cmd = cmd + ' | ' + filter_with
@@ -2624,13 +2622,12 @@ async def interpreter_run(name: TestName,
 
     flags = ' '.join(get_compiler_flags() + config.way_flags[way])
 
-    cmd = ('{{compiler}} {srcname} {flags} {extra_hc_opts}'
-          ).format(**locals())
+    cmd = f'{{compiler}} {srcname} {flags} {extra_hc_opts}'
 
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd);
 
-    cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
+    cmd = f'cd "{opts.testdir}" && {cmd}'
 
     exit_code = await runCmd(cmd, script, stdout, stderr, timeout_multiplier=opts.run_timeout_multiplier)
 
@@ -2828,7 +2825,7 @@ async def check_hp_ok(name: TestName) -> bool:
     opts = getTestOpts()
 
     # do not qualify for hp2ps because we should be in the right directory
-    hp2psCmd = 'cd "{opts.testdir}" && {{hp2ps}} {name}'.format(**locals())
+    hp2psCmd = f'cd "{opts.testdir}" && {{hp2ps}} {name}'
 
     hp2psResult = await runCmd(hp2psCmd, print_output=True)
 
