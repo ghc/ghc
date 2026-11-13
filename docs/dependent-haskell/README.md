@@ -1101,6 +1101,79 @@ See [the contract](CORE.md#retained-class-consumers),
 Source-written class contexts with runtime binders, general inference, and
 Quick Look remain open. This increment adds no interface format or equality axiom.
 
+## Source retained constraints
+
+A signature can put an ordinary class or equality context after its runtime
+binder. The function receives its dictionary after that index. The body can use
+the incoming evidence through normal GHC checking:
+
+```haskell
+renderWith :: foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String
+renderWith n xs = show xs
+
+transportGiven :: foreach (n :: Nat) -> (Add n Z ~ n)
+               => Vec Int (Add n Z) -> Vec Int n
+transportGiven n xs = xs
+
+rightUnitViaContext :: foreach (n :: Nat) -> Vec Int (Add n Z) -> Vec Int n
+rightUnitViaContext n xs = case rightZero n of
+  Refl -> transportGiven n xs
+```
+
+These definitions reuse the Nat, Vec, Add, and proof definitions above. Enable
+`FlexibleContexts` for the class signature. An equality context supplies evidence;
+it does not cause GHC to evaluate `n` or prove the arithmetic identity. The caller
+above supplies that evidence by checking `rightZero n` against `Refl`.
+
+The equation checker keeps suffix patterns, guards, and local bindings under the
+incoming dictionaries. Constructor equations keep their full argument lambdas
+before the constructor case. Each branch transports its dictionaries with the
+existing checked constructor proof. With lazy patterns, an ignored index stays
+lazy. Inspecting the index or rendering a bottom vector can still force it.
+
+Native quantified and irreducible predicates remain gated. A split with remaining
+value patterns requires a nonforcing prefix and excludes `Strict`. A trailing
+context preserves the earlier prefix pattern shapes. Inner retained lambdas,
+general native inference, and ordinary optimization remain separate work.
+Explicit native case refinement still needs to capture incoming class Givens
+alongside the values it specializes. The no-instance control reports a located
+GHC-39999. Its equivalent constructor equations pass.
+
+The implementation checkpoint is `670bcef166`. The shared fixture adds 46
+observations after the previous 131. All 177 pass through interface-only module
+consumers. The new 46 also pass source execution. The fixture checks no-instance
+Givens, tuple-derived evidence, guards, views, local bindings, trailing contexts, and two retained
+indices. Bottom and cyclic indices remain lazy in the tested partial applications.
+Missing instances, missing equality proofs, unsupported predicate families,
+quantified predicates, and strict prefixes produce located errors.
+
+Both compiler stages and matching libraries build. The final build took 8 minutes
+47 seconds and peaked at 4,956 MiB under a 16 GiB cap. All five registered normal-way
+regressions pass: 39 cases, 34 skipped, and five expected passes. The driver reports
+no unexpected results, framework failures, or framework warnings. It took 9.4
+seconds; the command rebuilt test tools and took 1 minute 39 seconds. Its peak
+was 2,430 MiB under an 8 GiB cap. Hadrian's setup
+comparison warns about `lib` versus `lib/.`; both resolve to the same directory.
+
+Separate CLI checks reproduce the 177 rows, earlier proof and linear controls,
+both interface-version rejection directions, and the ordinary bidirectional and
+single-expansion TH controls. The scoped CLI checks add two exception-order
+observations and seven located rejection controls. All eight literal native guide
+blocks and the optimized package/TH, GHCi, and Haddock startup smoke checks pass.
+Missing-documentation warnings are expected with `--docs=none`. The full GHC
+testsuite was not run.
+
+Artifacts use `_build/verification/native-context-`. The final build log is
+`native-context-full-build-v2.log`. Runtime and registered logs are
+`native-context-runtime-v8.log` and `native-context-registered.log`. CLI results
+are in `native-context-final-checks.log` and `native-context-scoped-cli-v2.log`.
+The bootstrap archive `native-context-bootstrap-v8-work/` has 27 file checksums.
+A final comment-only cleanup removes a local Haddock warning. Its targeted
+`-haddock -fno-code` check passes without changing compiler artifacts.
+
+See [the contract](CORE.md#source-retained-constraints) and the
+[pinned Agda telescope sources](REFERENCES.md#source-retained-constraints).
+
 ## Verified baseline
 
 The default Hadrian build passed with six workers and `--docs=none`. The build

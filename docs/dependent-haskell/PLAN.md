@@ -660,8 +660,8 @@ Use ordinary class instances for retained proof and vector types. Follow the
 Native maps are implemented at `1b37399cd5`; scoped class consumers at `17740f7135`.
 See [the contract](CORE.md#retained-class-consumers) and the
 [verified results](README.md#ordinary-class-consumers). Source-written native
-class contexts form the next increment. General meta-variable scope and broader
-inference remain open.
+class contexts are covered by the next increment. General meta-variable scope
+and broader inference remain open.
 
 ### Source context increment
 
@@ -680,7 +680,7 @@ incoming dictionary under the runtime `n` binder. Follow the
       Include trailing contexts. Scope evidence over the whole match and local bindings.
 - [x] Check incoming Givens without global instances, equality transport, and
       partial application at bottom and cyclic indices. Check rejection locations.
-- [ ] Complete both-stage builds, registered regressions, interface-only execution,
+- [x] Complete both-stage builds, registered regressions, interface-only execution,
       ordinary controls, guide, smoke, formatting, and the checkpoint.
 
 Use the existing Core forms and dictionary ABI. Keep the current native signature
@@ -689,6 +689,8 @@ separate work. The split requires nonforcing prefix patterns when value patterns
 remain. This case also excludes `Strict`. A trailing context keeps the old prefix
 shapes. Constructor equations keep their existing coverage and pattern limits.
 See [the contract](CORE.md#source-retained-constraints).
+Implementation: `670bcef166`. See the
+[verified results](README.md#source-retained-constraints).
 
 ### Source case evidence follow-up
 
