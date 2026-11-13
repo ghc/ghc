@@ -25,7 +25,7 @@ module GHC.Tc.Utils.Unify (
 
   -- Various unifications
   uType, unifyType, unifyKind, unifyInvisibleType,
-  tcRetainedBoolCoercion,
+  tcRetainedCoercion,
   unifyExprType, unifyTypeAndEmit, promoteTcType,
   swapOverTyVars, touchabilityTest, checkTopShape, lhsPriority,
   mightEqualLater,
@@ -85,7 +85,7 @@ import GHC.Tc.Utils.TcMType qualified as TcM
 import GHC.Tc.Solver.InertSet
 
 import GHC.Core.ConLike (ConLike(..))
-import GHC.Core.DataCon ( promoteDataCon )
+import GHC.Core.DataCon ( dataConTyCon )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep hiding (Refl)
 import GHC.Core.TyCo.FVs
@@ -3627,32 +3627,35 @@ instance Outputable SimpleUnifyResult where
     SUC_NotSure     -> text "SUC_NotSure"
     SUC_CanUnify    -> text "SUC_CanUnify"
 
--- | Lift a checked Boolean branch proof through a monomorphic type.
--- See Note [Transport through a retained Boolean index].
-tcRetainedBoolCoercion :: Id -> CoercionN -> TcType -> TcM CoercionN
-tcRetainedBoolCoercion index branch_co original_ty
-  = do { unless (isBoolIndexId index
+-- | Lift a checked constructor branch proof through a monomorphic type.
+-- See Note [Transport through a retained index].
+tcRetainedCoercion :: Id -> CoercionN -> TcType -> TcM CoercionN
+tcRetainedCoercion index branch_co original_ty
+  = do { unless (isNativeIndexId index
                  && coercionRole branch_co == Nominal
                  && coercionLKind branch_co `eqType` TermVarTy index
-                 && is_bool_constructor (coercionRKind branch_co)) $
-           pprPanic "tcRetainedBoolCoercion: invalid branch proof"
+                 && is_constructor (coercionRKind branch_co)) $
+           pprPanic "tcRetainedCoercion: invalid branch proof"
              (ppr index $$ ppr branch_co $$ ppr original_ty)
        ; ty <- liftZonkM $ zonkTcType original_ty
        ; name <- newSysName (mkTyVarOcc "retained")
-       ; let template = mkTyVar name boolTy
+       ; let template = mkTyVar name (varType index)
        ; template_ty <- abstract_index (mkTyVarTy template) ty
        ; let co = liftCoSubstWith Nominal [template] [branch_co] template_ty
              rhs = substTyWith [template] [coercionRKind branch_co] template_ty
        ; unless (coercionRole co == Nominal
                  && coercionLKind co `eqType` ty
                  && coercionRKind co `eqType` rhs) $
-           pprPanic "tcRetainedBoolCoercion: invalid lifted proof"
+           pprPanic "tcRetainedCoercion: invalid lifted proof"
              (ppr co $$ ppr ty $$ ppr rhs)
        ; return co }
   where
-    is_bool_constructor ty
-      = ty `eqType` mkTyConTy (promoteDataCon trueDataCon)
-        || ty `eqType` mkTyConTy (promoteDataCon falseDataCon)
+    is_constructor ty
+      | TyConApp tc _ <- coreFullView ty
+      , Just con <- isPromotedDataCon_maybe tc
+      = mkTyConTy (dataConTyCon con) `eqType` varType index
+        && typeKind ty `eqType` varType index
+      | otherwise = False
 
     abstract_index template_ty ty
       | not (anyFreeVarsOfType (== index) ty) = return ty
@@ -3671,11 +3674,12 @@ tcRetainedBoolCoercion index branch_co original_ty
     abstract_index _ _
       = failWithTc $ TcRnRetainedQuantificationError (RetainedPatternType original_ty)
 
-{- Note [Transport through a retained Boolean index]
+{- Note [Transport through a retained index]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A checked Boolean constructor pattern provides b ~# True or b ~# False.
-Abstract the free occurrences of b in a monomorphic type to one fresh,
-immutable Bool TyVar. Use liftCoSubstWith to transport that template along
+A checked constructor pattern provides n ~# 'S k, for example. Its actual
+field identities are in scope when the branch body is checked. Abstract the
+free occurrences of n in a monomorphic type to one fresh, immutable TyVar
+of the index domain. Use liftCoSubstWith to transport that template along
 the branch proof. Existing FC lifting supplies the required congruence.
 The runtime Id remains an Id. The template never enters the checked type.
 

@@ -23,6 +23,7 @@ import GHC.HsToCore.Binds
 import GHC.Core.ConLike
 import GHC.Core.Coercion ( MCoercion(..), coercionLKind, mkUnbranchedAxInstCo )
 import GHC.Core.DataCon ( dataConTyCon )
+import GHC.Core.Type ( isNativeIndexType )
 import GHC.Core.TyCon ( isNewTyCon, newTyConCo )
 import GHC.Tc.Types.Evidence ( isEmptyTcEvBinds, isIdHsWrapper )
 import GHC.Tc.Utils.TcType
@@ -190,6 +191,22 @@ matchPatSyn (var :| vars) ty eqns
 
 type ConArgPats = HsConPatDetails GhcTc
 
+
+{- Note [Retained constructor field scope]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A native index constructor has no existential variables or ordinary evidence.
+Its ConPatTc can carry one virtual branch proof in cpt_dicts. That proof can
+mention the actual runtime fields, as in n ~# 'S k. Put the fields before this
+proof in the Core alternative. Core Lint checks the field identities and the
+exact proof type. CoreToStg erases only the trailing virtual proof.
+
+Bare field patterns retain their renamed Unique values through tcPatBndr and
+selectConMatchVars. The proof therefore names the actual alternative fields.
+Keep the usual existential/evidence/field order for ordinary GADT constructors.
+See Note [Retained constructor matches] in GHC.Tc.Gen.Match and the Agda
+constructor-context provenance in docs/dependent-haskell/REFERENCES.md.
+-}
+
 matchOneConLike :: [MatchId]
                 -> Type
                 -> Mult
@@ -252,7 +269,13 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
         ; match_results <- mapM (match_group arg_vars) groups
 
         ; return $ MkCaseAlt{ alt_pat = con1,
-                              alt_bndrs = tvs1 ++ dicts1 ++ arg_vars,
+                              alt_bndrs = case con1 of
+                                RealDataCon con
+                                  | null tvs1, [_] <- dicts1
+                                  , isNativeIndexType (mkTyConTy (dataConTyCon con))
+                                  -- See Note [Retained constructor field scope].
+                                  -> arg_vars ++ dicts1
+                                _ -> tvs1 ++ dicts1 ++ arg_vars,
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where

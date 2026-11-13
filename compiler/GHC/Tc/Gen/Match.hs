@@ -59,10 +59,11 @@ import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 import GHC.Core ( Expr(Var) )
-import GHC.Core.TyCo.Rep ( Type(DepFunTy, TermVarTy) )
-import GHC.Core.Type ( coreFullView, isManyTy )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy) )
+import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, splitTyConApp_maybe )
 import GHC.Core.Coercion ( mkCoVarCo, mkSymCo, coercionKind )
-import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon )
+import GHC.Core.DataCon ( DataCon, dataConOrigArgTys, dataConTyCon, promoteDataCon )
+import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.Utils ( applyTypeToArgs )
 -- Create chunkified tuple types for monad comprehensions
@@ -80,6 +81,7 @@ import GHC.Utils.Misc
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Id
+import GHC.Types.Var ( varType )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity )
 import GHC.Data.FastString ( fsLit )
@@ -135,31 +137,26 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
 
         ; (wrap_fun, r)
              <- case exp_ty of
-                  Check ty | DepFunTy{} <- coreFullView ty
-                    -- See Note [Retained Boolean matches].
-                    -> do { unless (null invis_pat_tys) $
-                              failWithTc (TcRnRetainedQuantificationError RetainedPolymorphicSignature)
-                          ; mb_pat_name <- case unLoc (mg_alts matches) of
-                              [L _ (Match { m_pats = L _ (L _ (VarPat _ (L _ name)) : _) })]
-                                -> return (Just name)
-                              [L _ (Match { m_pats = L loc (pat : _) })]
-                                | Nothing <- retainedBoolCon pat
-                                -> setSrcSpanA loc $
-                                   failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
-                              _ -> return Nothing
-                          ; pat_id <- case mb_pat_name of
-                              Just name -> return (mkLocalId name ManyTy boolTy)
-                              Nothing -> newSysLocalId (fsLit "retained") ManyTy boolTy
-                          ; let body_ty = applyTypeToArgs ty [Var pat_id]
-                                bool_pat_ty = mkCheckExpFunPatTy (Scaled ManyTy boolTy)
-                          ; (wrap, result) <- matchExpectedFunTys herald ctxt (arity - 1)
-                                                (mkCheckExpType body_ty) $ \ pat_tys rhs_ty ->
-                                                case mb_pat_name of
-                                                  Just _ -> tc_matches (bool_pat_ty : pat_tys) rhs_ty
-                                                  Nothing -> tcScalingUsage mult $
-                                                    tcRetainedConMatches pat_id pat_tys rhs_ty matches
-                          ; unless (isIdHsWrapper wrap) $
-                              failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
+                  Check ty | hasRetainedFunTy ty
+                    -- See Note [Retained argument telescopes].
+                    -> do { result <- case unLoc (mg_alts matches) of
+                              [L _ (Match { m_pats = L _ pats })]
+                                | not (first_constructor pats) ->
+                                  tcRetainedVarMatches herald ctxt ty
+                                    (filter isVisArgLPat pats) tc_matches
+                              _ | DepFunTy binder _ <- coreFullView ty ->
+                                  do { let domain = varType binder
+                                     ; index <- newSysLocalId (fsLit "retained") ManyTy domain
+                                     ; let body_ty = applyTypeToArgs ty [Var index]
+                                     ; (wrap, result) <- matchExpectedFunTys herald ctxt (arity - 1)
+                                           (mkCheckExpType body_ty) $ \pat_tys rhs_ty ->
+                                             tcScalingUsage mult $
+                                               tcRetainedConMatches index invis_pat_tys pat_tys rhs_ty matches
+                                     ; unless (isIdHsWrapper wrap) $
+                                         failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
+                                     ; return result }
+                                | otherwise -> failWithTc $
+                                    TcRnRetainedQuantificationError RetainedConstructorCoverage
                           ; return (idHsWrapper, result) }
                   _ -> matchExpectedFunTys herald ctxt arity exp_ty tc_matches
 
@@ -167,54 +164,114 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
   where
     mctxt  = mkPrefixFunRhs (noLocA fun_name) noAnn
 
-{- Note [Retained Boolean matches]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A retained signature binds a runtime Boolean in its codomain. For one equation
-with a bare variable pattern, instantiate that codomain with an Id made from
-the pattern's renamed Name. tcPatBndr uses the same Name and Unique. Desugaring
-selectMatchVar reuses this Id, so later argument types refer to the actual
-runtime lambda binder. MatchGroupTc needs no extra binder field for this case.
+    first_constructor pats = case filter isVisArgLPat pats of
+      pat : _ -> constructor_pat pat
+      _ -> False
+    constructor_pat (L _ (ParPat _ pat)) = constructor_pat pat
+    constructor_pat (L _ ConPat{}) = True
+    constructor_pat _ = False
 
-Check the remaining arguments with the ordinary matcher. Its wrapper must be
-identity: mkWpFun cannot lift a nonidentity wrapper across the retained binder.
-Keep usage scaling around the whole match, including the Boolean argument.
-See docs/dependent-haskell/REFERENCES.md#agda-provenance for the dependent
-application rule. See docs/dependent-haskell/CORE.md#frontend-identity-plan
-for this source subset.
+-- | Find a retained binder after any canonical ordinary arrows.
+hasRetainedFunTy :: Type -> Bool
+hasRetainedFunTy ty = case coreFullView ty of
+  DepFunTy{} -> True
+  FunTy _ _ _ result -> hasRetainedFunTy result
+  _ -> False
+
+-- | Introduce runtime index identities before checking the remaining patterns.
+tcRetainedVarMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> Type
+                     -> [LPat GhcRn]
+                     -> ([ExpPatType] -> ExpRhoType -> TcM a) -> TcM a
+tcRetainedVarMatches herald ctxt = go []
+  where
+    go acc ty [] thing_inside = thing_inside (reverse acc) (mkCheckExpType ty)
+    go acc ty (pat : pats) thing_inside
+      | DepFunTy binder _ <- coreFullView ty
+      = setSrcSpanA (getLoc pat) $
+        do { name <- case unLoc pat of
+               VarPat _ (L _ name) -> return name
+               _ -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
+           ; let index = mkLocalId name ManyTy (varType binder)
+                 pat_ty = mkCheckExpFunPatTy (Scaled ManyTy (varType binder))
+           ; go (pat_ty : acc) (applyTypeToArgs ty [Var index]) pats thing_inside }
+      | otherwise
+      = do { (wrap, result) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $
+               \pat_tys rhs_ty ->
+                 do { rhs_ty <- readExpType rhs_ty
+                    ; go (reverse pat_tys ++ acc) rhs_ty pats thing_inside }
+           ; unless (isIdHsWrapper wrap) $
+               failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
+           ; return result }
+
+{- Note [Retained argument telescopes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Introduce every retained argument with the Name of its actual variable pattern.
+Instantiate its codomain before reading later argument types. Check the complete
+pattern list only after these identities have been chosen. tcPatBndr and
+selectMatchVar preserve their Unique values. Outer erased forall binders keep
+their ordinary skolemisation and wrapper; do not lift a nonidentity wrapper
+through a retained binder.
+
+mkDepFunTy turns an unused binder into an ordinary arrow. A retained telescope
+can therefore contain both FunTy and DepFunTy. Walk both forms in source order.
+Agda checks a telescope by extending its context before checking the remainder.
+See the pinned Rules.Term and LHSResult sources in
+docs/dependent-haskell/REFERENCES.md#agda-provenance.
 -}
 
--- | Recognise a nullary wired Boolean constructor pattern.
-retainedBoolCon :: LPat GhcRn -> Maybe DataCon
-retainedBoolCon (L _ (ParPat _ pat)) = retainedBoolCon pat
-retainedBoolCon (L _ (ConPat { pat_con = L _ (WithUserRdr _ name), pat_args = PrefixCon _ [] }))
-  | name == dataConName falseDataCon = Just falseDataCon
-  | name == dataConName trueDataCon = Just trueDataCon
-retainedBoolCon _ = Nothing
+-- | Resolve a constructor and its actual closed runtime field identities.
+retainedCon :: Type -> LPat GhcRn -> TcM (Maybe (DataCon, [Id]))
+retainedCon domain (L _ (ParPat _ pat)) = retainedCon domain pat
+retainedCon domain (L _ (ConPat { pat_con = L _ name
+                              , pat_args = PrefixCon _ pats }))
+  = do { con_like <- tcLookupConLike name
+       ; case con_like of
+           RealDataCon con
+             | isNativeIndexType domain
+             , mkTyConTy (dataConTyCon con) `eqType` domain
+             , pats `equalLength` dataConOrigArgTys con ->
+               do { fields <- zipWithM field pats (dataConOrigArgTys con)
+                  ; return (Just (con, fields)) }
+           _ -> return Nothing }
+  where
+    field (L loc (VarPat _ (L _ name))) (Scaled _ ty)
+      = setSrcSpanA loc $ return (mkLocalId name ManyTy ty)
+    field (L loc _) _
+      = setSrcSpanA loc $
+        failWithTc (TcRnRetainedQuantificationError RetainedConstructorArguments)
+retainedCon _ _ = return Nothing
 
--- | Check exhaustive Boolean equations with explicit argument and result transport.
+-- | Check exhaustive constructor equations with argument and result transport.
 -- See Note [Retained constructor matches].
-tcRetainedConMatches :: Id -> [ExpPatType] -> ExpRhoType
+tcRetainedConMatches :: Id -> [ExpPatType] -> [ExpPatType] -> ExpRhoType
                     -> MatchGroup GhcRn (LHsExpr GhcRn)
                     -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
-tcRetainedConMatches index pat_tys rhs_ty
+tcRetainedConMatches index invis_pat_tys pat_tys rhs_ty
                     (MG { mg_alts = L loc matches, mg_ext = (origin, _) })
   = setSrcSpanA loc $
-    do { cons <- mapM constructor matches
-       ; unless (length cons == 2 && falseDataCon `elem` cons && trueDataCon `elem` cons) $
+    do { constructors <- mapM constructor matches
+       ; let cons = map fst constructors
+             domain_cons = case splitTyConApp_maybe (coreFullView (varType index)) of
+               Just (tc, []) -> tyConDataCons tc
+               _ -> []
+       ; unless (cons `equalLength` domain_cons && all (`elem` cons) domain_cons) $
            failWithTc (TcRnRetainedQuantificationError RetainedConstructorCoverage)
        ; arg_tys <- mapM argument_type pat_tys
        ; result_ty <- readExpType rhs_ty
        ; (usages, checked) <- mapAndUnzipM
            (\(con, match) -> tcCollectingUsage (check_match con arg_tys result_ty match))
-           (zip cons matches)
+           (zip constructors matches)
        ; tcEmitBindingUsage (supUEs usages)
        ; return (MG { mg_alts = L loc checked
-                    , mg_ext = MatchGroupTc (Scaled ManyTy boolTy : arg_tys) result_ty origin }) }
+                    , mg_ext = MatchGroupTc (Scaled ManyTy (varType index) : arg_tys) result_ty origin }) }
   where
-    constructor (L match_loc (Match { m_pats = L _ (pat : _)
+    constructor (L match_loc (Match { m_pats = L _ pats
                                    , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
-      | Just con <- retainedBoolCon pat = return con
-      | otherwise = setSrcSpanA match_loc coverage_error
+      = setSrcSpanA match_loc $
+        case filter isVisArgLPat pats of
+          pat : _ -> do { mb_con <- retainedCon (varType index) pat
+                        ; maybe coverage_error return mb_con }
+          _ -> coverage_error
     constructor (L match_loc _) = setSrcSpanA match_loc coverage_error
 
     coverage_error = failWithTc (TcRnRetainedQuantificationError RetainedConstructorCoverage)
@@ -226,17 +283,18 @@ tcRetainedConMatches index pat_tys rhs_ty
            ; return scaled }
     argument_type _ = argument_error
 
-    check_match con arg_tys result_ty match@(L match_loc (Match { m_pats = L _ pats }))
+    check_match (con, fields) arg_tys result_ty match@(L match_loc (Match { m_pats = L _ pats }))
       = setSrcSpanA match_loc $
-        do { unless (all bare_variable (drop 1 pats)) argument_error
-           ; cv <- newEvVar (mkNomEqPred (TermVarTy index) (mkTyConTy (promoteDataCon con)))
-           ; arg_cos <- mapM (tcRetainedBoolCoercion index (mkCoVarCo cv) . scaledThing) arg_tys
-           ; result_co <- tcRetainedBoolCoercion index (mkCoVarCo cv) result_ty
+        do { unless (all bare_variable (drop 1 (filter isVisArgLPat pats))) argument_error
+           ; let constructor_index = mkTyConApp (promoteDataCon con) (map TermVarTy fields)
+           ; cv <- newEvVar (mkNomEqPred (TermVarTy index) constructor_index)
+           ; arg_cos <- mapM (tcRetainedCoercion index (mkCoVarCo cv) . scaledThing) arg_tys
+           ; result_co <- tcRetainedCoercion index (mkCoVarCo cv) result_ty
            ; let refined_args = zipWith (\(Scaled mult _) co ->
                                            mkCheckExpFunPatTy (Scaled mult (pSnd (coercionKind co))))
                                        arg_tys arg_cos
-                 bool_arg = mkCheckExpFunPatTy (Scaled ManyTy boolTy)
-           ; L checked_loc checked <- tcMatch tcBody (bool_arg : refined_args)
+                 index_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType index))
+           ; L checked_loc checked <- tcMatch tcBody (invis_pat_tys ++ index_arg : refined_args)
                                         (mkCheckExpType (pSnd (coercionKind result_co))) match
            ; let Match { m_pats = L pats_loc checked_pats, m_grhss = grhss } = checked
                  checked_pats' = case checked_pats of
@@ -245,7 +303,7 @@ tcRetainedConMatches index pat_tys rhs_ty
                                     (L first_loc (add_proof cv first)))
                      : zipWith3 (\co (Scaled _ ty) (L pat_loc pat) ->
                                    L pat_loc (XPat (CoPat (mkWpCastN co) pat ty))) arg_cos arg_tys rest
-                   [] -> panic "tcRetainedConMatches: no Boolean pattern"
+                   [] -> panic "tcRetainedConMatches: no constructor pattern"
                  cast_rhs (L rhs_loc (GRHS x guards rhs)) =
                    L rhs_loc (GRHS x guards (mkLHsWrapCo (mkSymCo result_co) rhs))
                  grhss' = grhss { grhssGRHSs = fmap cast_rhs (grhssGRHSs grhss) }
@@ -259,7 +317,7 @@ tcRetainedConMatches index pat_tys rhs_ty
     add_proof cv pat@(ConPat { pat_con_ext = ext })
       = assertPpr (null (cpt_dicts ext) && null (cpt_tvs ext)) (ppr pat) $
         pat { pat_con_ext = ext { cpt_dicts = [cv] } }
-    add_proof _ pat = pprPanic "tcRetainedConMatches: not a Boolean constructor" (ppr pat)
+    add_proof _ pat = pprPanic "tcRetainedConMatches: not a data constructor" (ppr pat)
 
 {- Note [Retained constructor matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -268,17 +326,17 @@ argument types and the result type. Agda's splitCon and checkRHS use this rule.
 See docs/dependent-haskell/REFERENCES.md#agda-provenance.
 
 Keep the original argument and result types in MatchGroupTc. Check each branch
-against the specialised types. A fresh nominal Boolean proof transports each
+against the specialised types. A fresh nominal constructor proof transports each
 original argument into its specialised pattern type. The inverse result cast
 transports the checked RHS back to the fixed outer result. Put the proof in
 ConPatTc.cpt_dicts, so it binds these casts inside the strict Core alternative.
 This does not ask the solver to rewrite opaque runtime indices.
 
-Use one hidden Bool/Many Id across the equations. A generated AsPat makes
+Use one hidden unrestricted index Id across the equations. A generated AsPat makes
 selectMatchVar choose this Id. tidy1 removes the identical alias. The retained
 lambda and all its index occurrences therefore have the same Unique, without
 adding a field to MatchGroupTc. Keep exactly one unguarded equation for each
-Boolean constructor. This gives the native proof case complete coverage.
+constructor of the index domain. This gives the native proof case complete coverage.
 Later arguments currently require bare variable patterns and Many multiplicity.
 
 Keep the CoPat even when transport is reflexive. A synonym such as

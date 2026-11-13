@@ -8,7 +8,6 @@ module GHC.Tc.Solver.Equality(
 
 
 import GHC.Prelude
-import GHC.Builtin.WiredIn.Types ( trueDataCon, falseDataCon )
 
 import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
@@ -31,7 +30,7 @@ import qualified GHC.Tc.Utils.Monad    as TcM
 import GHC.Core.Type
 import GHC.Core.Predicate
 import GHC.Core.Class
-import GHC.Core.DataCon ( dataConName, promoteDataCon )
+import GHC.Core.DataCon ( dataConName )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
 import GHC.Core.Coercion
@@ -656,26 +655,23 @@ can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   = do { traceTcS "can_eq_nc catch-all case" (ppr ps_ty1 $$ ppr ps_ty2)
        ; case eq_rel of -- See Note [Unsolved equalities]
             ReprEq -> finishCanWithIrred ReprEqReason ev
-            NomEq | opaque_bool_equality -> finishCanWithIrred IrredShapeReason ev
+            NomEq | opaque_index_equality -> finishCanWithIrred IrredShapeReason ev
                   | otherwise -> finishCanWithIrred ShapeMismatchReason ev }
           -- No need to call canEqSoftFailure/canEqHardFailure because they
           -- rewrite, and the types involved here are already rewritten
   where
-    -- See Note [Opaque Boolean equalities].
-    opaque_bool_equality = case (ty1, ty2) of
-      (TermVarTy v, ty) -> isBoolIndexId v && is_bool_index ty
-      (ty, TermVarTy v) -> isBoolIndexId v && is_bool_index ty
+    -- See Note [Opaque runtime index equalities].
+    opaque_index_equality = case (ty1, ty2) of
+      (TermVarTy v, ty) -> same_domain v ty
+      (ty, TermVarTy v) -> same_domain v ty
       _ -> False
 
-    is_bool_index (TermVarTy v) = isBoolIndexId v
-    is_bool_index ty
-      = ty `eqType` mkTyConTy (promoteDataCon trueDataCon)
-        || ty `eqType` mkTyConTy (promoteDataCon falseDataCon)
+    same_domain v ty = isNativeIndexId v && typeKind ty `eqType` varType v
 
-{- Note [Opaque Boolean equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A runtime Boolean can equal either constructor or another runtime Boolean.
-Failure to rewrite these exact, well-kinded index forms does not establish
+{- Note [Opaque runtime index equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A runtime index can equal a constructor or another index of the same domain.
+Failure to rewrite these well-kinded index forms does not establish
 a contradiction. Retain the equality as a non-insoluble IrredShapeReason.
 This also lets the pattern-match oracle retain a checked constructor proof.
 

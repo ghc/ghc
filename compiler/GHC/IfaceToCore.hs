@@ -1519,18 +1519,20 @@ tcIfaceType = go
       = failIfM (text "Cannot import a diagnostic-only retained index:" <+> ppr v)
     go (IfaceTermVar n)
       = do { v <- tcIfaceLclId n
-           ; unless (isBoolIndexId v) $
-               failIfM (text "Invalid retained Boolean index in interface:" <+> ppr n
-                        $$ text "Expected a local Bool identifier with multiplicity Many."
+           ; unless (isNativeIndexId v) $
+               failIfM (text "Invalid retained index in interface:" <+> ppr n
+                        $$ text "Expected a local identifier with multiplicity Many"
+                        $$ text "and a supported algebraic index domain."
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; return (TermVarTy v) }
     go (IfaceDepFunTy bndr body)
-      -- See Note [Retained Boolean binders in interfaces].
+      -- See Note [Retained binders in interfaces].
       = bindIfaceId bndr $ \ v ->
-        do { unless (isBoolIndexId v) $
-               failIfM (text "Invalid retained Boolean binder in interface:" <+> ppr v
-                        $$ text "Expected a local Bool identifier with multiplicity Many."
+        do { unless (isNativeIndexId v) $
+               failIfM (text "Invalid retained binder in interface:" <+> ppr v
+                        $$ text "Expected a local identifier with multiplicity Many"
+                        $$ text "and a supported algebraic index domain."
                         $$ text "Actual type:" <+> ppr (varType v)
                         $$ text "Actual multiplicity:" <+> ppr (idMult v))
            ; body' <- go body
@@ -1556,18 +1558,23 @@ tcIfaceType = go
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
-{- Note [Retained Boolean binders in interfaces]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Retained binders in interfaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A retained binder is a runtime Id, not a TyVar or an erased forall binder.
 bindIfaceId allocates a fresh VarName and Unique. It decodes the domain and
 multiplicity outside the binder scope, then extends the local Id environment
 for the body. Each IfaceTermVar occurrence looks up that same fresh Id.
 
-Check the fixed Bool/Many invariant before decoding the body. Check each
-index occurrence too, since the local Id environment also contains ordinary
-Ids and CoVars. The result must have kind Type, not Constraint. Use eqType:
-isLiftedTypeKind also accepts Constraint. Malformed native interface data
-must fail before construction of a retained type.
+Check the algebraic index domain and Many multiplicity before decoding the
+body. Check each index occurrence too, since the local Id environment also
+contains ordinary Ids and CoVars. The result must have kind Type, not
+Constraint. Use eqType: isLiftedTypeKind also accepts Constraint. Malformed
+native interface data must fail before construction of a retained type.
+
+Domain validation can force constructor argument types. Keep it within the
+existing deferred declaration decoding. See Note [Positioning of forkM].
+The domain predicate tracks visited TyCons before it follows their fields.
+Thus a recursive Nat domain does not require an infinite field traversal.
 
 IfaceFreeTermVar preserves an open Id only for diagnostics. It cannot enter
 this decoding path. Boolean branch proof reconstruction is described in

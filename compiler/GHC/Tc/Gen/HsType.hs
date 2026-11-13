@@ -505,28 +505,40 @@ tc_lhs_sig_type allow_retained skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = 
       = do { (tidy_env2, exp_kind) <- zonkTidyTcType tidy_env exp_kind
            ; return (tidy_env2, UninfTyCtx_Sig exp_kind full_hs_ty) }
 
--- | Check the single retained argument of a complete value signature.
+-- | Check the retained telescope of a complete value signature.
 -- All other positions use the ordinary type checker and its feature gate.
 tcCheckRetainedSigType :: LHsType GhcRn -> TcKind -> TcM TcType
-tcCheckRetainedSigType (L _ (HsParTy _ body)) kind
-  = tcCheckRetainedSigType body kind
-tcCheckRetainedSigType (L loc ty@(HsForEachTy _ bndrs body)) kind
-  = setSrcSpanA loc $
-    case bndrs of
-      [L _ (HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain))] ->
-        do { domain_ty <- tcCheckLHsType domain liftedTypeKind
-           ; domain_ty <- liftZonkM $ zonkTcType domain_ty
-           ; unless (eqType domain_ty boolTy) $
-               failWithTc $ TcRnRetainedQuantificationError (RetainedDomainNotBool domain_ty)
-           ; let index = mkLocalId name ManyTy boolTy
-                 mode = typeLevelMode { mode_indices = unitNameEnv name index }
-           ; body_ty <- tc_check_lhs_type mode body liftedTypeKind
-           ; checkExpKind ty (mkDepFunTy index body_ty) liftedTypeKind (Check kind) }
-      _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
-tcCheckRetainedSigType body kind = tcCheckLHsType body kind
+tcCheckRetainedSigType = go typeLevelMode
+  where
+    go :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
+    go mode (L _ (HsParTy _ body)) kind = go mode body kind
+    go mode (L loc ty@(HsForEachTy _ bndrs body)) kind
+      = setSrcSpanA loc $
+        do { when (null bndrs) $
+               failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+           ; body_ty <- check_bndrs mode bndrs
+           ; checkExpKind ty body_ty liftedTypeKind (Check kind) }
+      where
+        check_bndrs :: TcTyMode -> [LHsTyVarBndr () GhcRn] -> TcM TcType
+        check_bndrs mode [] = go mode body liftedTypeKind
+        check_bndrs mode (L lb bndr : rest)
+          = setSrcSpanA lb $
+            case bndr of
+              HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
+                do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
+                   ; domain_ty <- liftZonkM $ zonkTcType domain_ty
+                   ; unless (isNativeIndexType domain_ty) $
+                       failWithTc $ TcRnRetainedQuantificationError
+                                      (RetainedUnsupportedDomain domain_ty)
+                   ; let index = mkLocalId name ManyTy domain_ty
+                         mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
+                   ; body_ty <- check_bndrs mode' rest
+                   ; return (mkDepFunTy index body_ty) }
+              _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+    go mode body kind = tc_check_lhs_type mode body kind
 
-{- Note [Source retained Boolean signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Source retained signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A source retained argument denotes one runtime Id. The renamer gives that
 Id a VarName and binds a type-variable occurrence as an alias of the same
 Name. It does not make a TyVar or change the Name's namespace. An ordinary
@@ -534,14 +546,19 @@ inner forall can shadow the alias through its normal type-variable key.
 
 The signature checker registers the Id in mode_indices. Only registered
 Names become TermVarTy. Ordinary term names still use the normal rejection
-path in tcTyVar. The binder domain is a value type, so its annotation does
-not require KindSignatures. The first source subset accepts one Bool/Many
-argument in a complete monomorphic value signature. The body has lifted
-kind. Nested retained signatures and Template Haskell remain gated.
+path in tcTyVar. Check each binder domain before extending this environment.
+Then check the next binder and the body in the extended environment. The
+domain is a value type, so its annotation does not require KindSignatures.
+It must satisfy isNativeIndexType. Each runtime binder has multiplicity Many.
+The ordinary outer-forall checker scopes erased type variables around the
+whole telescope. The result has kind Type. Retained binders in other type
+positions, inner foralls, and Template Haskell remain gated.
 
-This checks a dependent function directly. Agda uses a dependent Pi type
-whose codomain is checked with its argument in scope; see the Agda manual,
-"Function Types", https://agda.readthedocs.io/en/v2.8.0.2/language/function-types.html.
+This checks a dependent function directly. Agda's checkPiTelescope checks
+each domain before extending the context for the remaining telescope.
+See docs/dependent-haskell/REFERENCES.md#agda-provenance and Agda v2.8.0,
+Agda.TypeChecking.Rules.Term.checkTelescope'. This scope rule does not
+evaluate a runtime argument.
 The runtime Id follows the native representation described in
 Note [Restricted retained dependent types] in GHC.Core.TyCo.Rep.
 -}
@@ -2247,7 +2264,7 @@ tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
 -- This does not instantiate. See Note [Do not always instantiate eagerly in types]
 tcTyVar mode name
   | Just index <- lookupNameEnv (mode_indices mode) name
-  = pure (TermVarTy index, boolTy)
+  = pure (TermVarTy index, varType index)
 tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name

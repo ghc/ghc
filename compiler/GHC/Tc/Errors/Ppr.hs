@@ -3530,13 +3530,13 @@ instance Diagnostic TcRnMessage where
 pprRetainedQuantificationError :: RetainedQuantificationError -> SDoc
 pprRetainedQuantificationError reason = case reason of
   RetainedBinderCount ->
-    text "Retained quantification currently requires exactly one argument."
+    text "Retained quantification requires at least one argument."
   RetainedBinderNeedsName ->
     text "A retained argument requires a variable name."
   RetainedBinderNeedsType ->
     text "A retained argument requires an explicit domain type."
-  RetainedDomainNotBool ty ->
-    vcat [ text "A retained argument must have type" <+> quotes (text "Bool")
+  RetainedUnsupportedDomain ty ->
+    vcat [ text "A retained argument requires a supported closed first-order algebraic domain."
          , text "Its declared domain is:" <+> ppr ty ]
   RetainedResultKind ty ->
     vcat [ text "The result of retained quantification must have kind" <+> quotes (text "Type")
@@ -3556,21 +3556,21 @@ pprRetainedQuantificationError reason = case reason of
     vcat [ text "This inferred retained type requires an explicit signature:"
          , ppr ty ]
   RetainedInvalidBinder var ->
-    text "A retained index must be a local, unrestricted Boolean:" <+> ppr var
+    text "A retained index must be a local, unrestricted value of a supported algebraic domain:" <+> ppr var
   RetainedIndexOutOfScope var ->
     text "The runtime index" <+> quotes (ppr var) <+> text "is out of scope here."
   RetainedPartialSignature ->
     text "Retained quantification requires a complete type signature."
   RetainedPolymorphicSignature ->
-    text "Polymorphic retained signatures are not supported yet."
+    text "A forall within the scope of a retained binder is not supported yet."
   RetainedUnsupportedContext ->
     text "Retained quantification is supported only at the start of an explicit value signature."
   RetainedStaging ->
     text "Retained quantification in Template Haskell quotations or splices is not supported yet."
   RetainedConstructorCoverage ->
-    text "A retained constructor match requires one unguarded False equation and one unguarded True equation."
+    text "A retained constructor match requires one unguarded equation for each constructor of its domain."
   RetainedConstructorArguments ->
-    text "Arguments after a retained constructor pattern currently require bare variable patterns and unrestricted multiplicities."
+    text "Retained constructor fields and later arguments currently require bare variable patterns and unrestricted multiplicities."
   RetainedPatternType ty ->
     vcat [ text "Retained constructor refinement does not support this type yet:"
          , ppr ty ]
@@ -3579,7 +3579,7 @@ pprRetainedQuantificationError reason = case reason of
   RetainedResultWrapper ->
     text "This result requires a wrapper that is not supported for retained functions yet."
   RetainedIndexExpression ->
-    text "A retained argument must be a Boolean constructor or a local Boolean variable."
+    text "A retained argument must be a local index variable or a supported constructor tree."
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
 pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $

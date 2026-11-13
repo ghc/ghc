@@ -214,6 +214,50 @@ retainedChooseSource moduleName observation =
         , "  in " ++ observation
         ]
 
+-- | Check retained source workers over the loaded ordinary Nat and Vec types.
+retainedNatSource :: String -> String -> String
+retainedNatSource moduleName observation =
+    unlines
+        [ "{-# LANGUAGE BangPatterns, DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, ScopedTypeVariables, TypeAbstractions, TypeApplications, TypeFamilies #-}"
+        , "module " ++ moduleName ++ " where"
+        , "import NativeRuntimeHelpers hiding (appendVec)"
+        , "entry :: IO String"
+        , "entry ="
+        , "  let appendVec :: forall a n m. Vec a n -> Vec a m -> Vec a (Add n m)"
+        , "      appendVec VNil ys = ys"
+        , "      appendVec (VCons x xs) ys = VCons x (appendVec xs ys)"
+        , "      bottomPolymorphicVec :: forall a n. Vec a n"
+        , "      bottomPolymorphicVec = error \"native-bottom-vector\""
+        , "      replicateNative :: forall a. foreach (n :: Nat) -> a -> Vec a n"
+        , "      replicateNative Z x = VNil"
+        , "      replicateNative (S k) x = VCons x (replicateNative k x)"
+        , "      headNative :: forall a. foreach (n :: Nat) -> Vec a (S n) -> a"
+        , "      headNative n (VCons x _) = x"
+        , "      appendNative :: forall a. foreach (n :: Nat) (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)"
+        , "      appendNative n m xs ys = appendVec xs ys"
+        , "      nested :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a n"
+        , "      nested n m xs ys = xs"
+        , "      vacuousFirst :: forall a. foreach (unused :: Nat) (n :: Nat) -> Vec a n -> Vec a n"
+        , "      vacuousFirst unused n xs = xs"
+        , "      vacuousMiddle :: forall a. foreach (n :: Nat) (unused :: Nat) (m :: Nat) -> Vec a n -> Vec a m -> Vec a n"
+        , "      vacuousMiddle n unused m xs ys = xs"
+        , "      keepErased :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n"
+        , "      keepErased @a n xs = xs"
+        , "      run :: Nat -> IO String"
+        , "      run n = observeVec (replicateNative @Int n 42)"
+        , "      runAppend :: Nat -> Nat -> IO String"
+        , "      runAppend n m = observeVec (appendNative @Int n m (replicateNative @Int n 42) (replicateNative @Int m 7))"
+        , "      runTelescopes :: Nat -> Nat -> IO String"
+        , "      runTelescopes n m ="
+        , "        let unused = bottomNat"
+        , "        in do a <- observeVec (nested @Int n m (replicateNative @Int n 42) (replicateNative @Int m 7))"
+        , "              b <- observeVec (vacuousFirst @Int unused n (replicateNative @Int n 42))"
+        , "              c <- observeVec (vacuousMiddle @Int n unused m (replicateNative @Int n 42) (replicateNative @Int m 7))"
+        , "              d <- observeVec (keepErased @Int n (replicateNative @Int n 42))"
+        , "              pure (unlines [a,b,c,d])"
+        , "  in " ++ observation
+        ]
+
 -- | Reuse source workers in a self-contained module with an ordinary main.
 retainedProgramSource :: String
 retainedProgramSource =
@@ -298,14 +342,80 @@ retainedConsumerSource =
                , "main = entry >>= putStr"
                ]
 
--- | Read a producer interface in a fresh one-shot context and link its object.
+-- | Export retained workers and their ordinary datatype declarations together.
+retainedNatLibrarySource :: String
+retainedNatLibrarySource =
+    unlines $
+        take 1 (lines (retainedNatSource "NativeRetainedNatLibrary" ""))
+            ++ ["module NativeRetainedNatLibrary where"]
+            ++ map generalizeAppend (drop 2 (lines helperSource))
+            ++ [ "bottomPolymorphicVec :: forall a n. Vec a n"
+               , "bottomPolymorphicVec = error \"native-bottom-vector\""
+               , "replicateNative :: forall a. foreach (n :: Nat) -> a -> Vec a n"
+               , "replicateNative Z x = VNil"
+               , "replicateNative (S k) x = VCons x (replicateNative k x)"
+               , "headNative :: forall a. foreach (n :: Nat) -> Vec a (S n) -> a"
+               , "headNative n (VCons x _) = x"
+               , "appendNative :: forall a. foreach (n :: Nat) (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)"
+               , "appendNative n m xs ys = appendVec xs ys"
+               ]
+  where
+    generalizeAppend "appendVec :: Vec Int n -> Vec Int m -> Vec Int (Add n m)" =
+        "appendVec :: forall a n m. Vec a n -> Vec a m -> Vec a (Add n m)"
+    generalizeAppend line = line
+
+-- | Call imported Nat workers without defining retained functions or datatypes.
+retainedNatConsumerSource :: String
+retainedNatConsumerSource =
+    unlines $
+        take 1 (lines retainedNatLibrarySource)
+            ++ [ "module Main (main) where"
+               , "import NativeRetainedNatLibrary"
+               , "run :: Nat -> IO String"
+               , "run n = observeVec (replicateNative @Int n 42)"
+               , "runAppend :: Nat -> Nat -> IO String"
+               , "runAppend n m = observeVec (appendNative @Int n m (replicateNative @Int n 42) (replicateNative @Int m 7))"
+               , "main :: IO ()"
+               , "main = do"
+               , "  values <- driveNats run"
+               , "  appended <- driveNatPairs runAppend"
+               , "  headOnly <- let n = bottomNat in observeInt (headNative @Int n (VCons 42 bottomVec))"
+               , "  boolHead <- let n = bottomNat in observeBool (headNative @Bool n (VCons True (bottomPolymorphicVec @Bool)))"
+               , "  partialAppend <- let n = bottomNat; m = bottomNat in case appendNative @Int n m of !_ -> pure \"forced\""
+               , "  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend])"
+               ]
+
+-- | Run Boolean and Nat consumers against separately compiled disk artifacts.
 runModuleChecks :: FilePath -> IO ()
 runModuleChecks libdir = do
-    directory <- makeAbsolute "NativeDependentCoreRun.modules"
+    forM_
+        [
+            ( "bool"
+            , "NativeRetainedLibrary"
+            , retainedLibrarySource
+            , retainedConsumerSource
+            , ["42", "False", "forced", "42", "forced", "raised native-bottom-bool"]
+            )
+        ,
+            ( "nat"
+            , "NativeRetainedNatLibrary"
+            , retainedNatLibrarySource
+            , retainedNatConsumerSource
+            , ["[]:0", "[42,42]:2", "[42,42,42]:3", "[]:0", "[7,7,7]:3", "[42,42]:2", "[42,42,7,7,7]:5", "42", "True", "forced"]
+            )
+        ]
+        $ \(label, moduleName, producer, consumer, expected) ->
+            runModuleCase libdir label moduleName producer consumer expected
+    putStrLn "module execution checks: ok"
+
+-- | Read a producer interface in a fresh one-shot context and link its object.
+runModuleCase :: FilePath -> String -> String -> String -> String -> [String] -> IO ()
+runModuleCase libdir label moduleName producer consumer expected = do
+    directory <- makeAbsolute ("NativeDependentCoreRun.modules" </> label)
     let producerDirectory = directory </> "producer"
         consumerDirectory = directory </> "consumer"
         artifacts = directory </> "artifacts"
-        producerSource = producerDirectory </> "NativeRetainedLibrary.hs"
+        producerSource = producerDirectory </> (moduleName ++ ".hs")
         consumerSource = consumerDirectory </> "Main.hs"
         executablePath = directory </> ("native-modules" ++ if os == "mingw32" then ".exe" else "")
         configure linkMode output = do
@@ -344,12 +454,12 @@ runModuleChecks libdir = do
                 Just object -> pure object
                 Nothing -> fail ("FAIL: native module produced no object: " ++ path)
     forM_ [producerDirectory, consumerDirectory, artifacts] $ createDirectoryIfMissing True
-    writeFile producerSource retainedLibrarySource
-    writeFile consumerSource retainedConsumerSource
+    writeFile producerSource producer
+    writeFile consumerSource consumer
     producerObject <- GHC.runGhc (Just libdir) $ do
         environment <- configure NoLink Nothing
         liftIO $ compile environment producerSource
-    interfaceExists <- doesFileExist (artifacts </> "NativeRetainedLibrary.hi")
+    interfaceExists <- doesFileExist (artifacts </> (moduleName ++ ".hi"))
     unless interfaceExists (fail "FAIL: native producer wrote no interface")
     GHC.runGhc (Just libdir) $ do
         -- OneShot searches only interfaces. The producer source is outside its import path.
@@ -358,9 +468,8 @@ runModuleChecks libdir = do
             consumerObject <- compile environment consumerSource
             oneShot environment NoStop [(consumerObject, Just StopLn), (producerObject, Just StopLn)]
     (status, actual, errors) <- readProcessWithExitCode executablePath [] ""
-    unless (status == ExitSuccess && lines actual == ["42", "False", "forced", "42", "forced", "raised native-bottom-bool"]) $
-        fail ("FAIL: native cross-module observations: " ++ show (status, actual, errors))
-    putStrLn "module execution checks: ok"
+    unless (status == ExitSuccess && lines actual == expected) $
+        fail ("FAIL: native cross-module observations (" ++ label ++ "): " ++ show (status, actual, errors))
 
 {- Note [Retained signature recompilation checks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -680,11 +789,65 @@ runSourceChecks = do
                 liftIO $ putStrLn "source choose bottom: raised native-bottom-bool"
             | otherwise -> fail ("FAIL: source choose bottom raised another exception: " ++ displayException exception)
         Right actual -> fail ("FAIL: source choose bottom returned " ++ show actual)
+    runNatSourceChecks
+
+-- | Observe source telescopes, constructor refinement, and lazy runtime indices.
+runNatSourceChecks :: GHC.Ghc ()
+runNatSourceChecks = do
+    expression <-
+        sourceEntry "NativeSourceNat"
+            $ retainedNatSource "NativeSourceNat"
+            $ unlines
+                [ "do values <- driveNats run"
+                , "        appended <- driveNatPairs runAppend"
+                , "        headOnly <- let n = bottomNat in observeInt (headNative @Int n (VCons 42 bottomVec))"
+                , "        boolHead <- let n = bottomNat in observeBool (headNative @Bool n (VCons True (bottomPolymorphicVec @Bool)))"
+                , "        empty <- driveNat (\\n -> observeVec (replicateNative @Int n bottomElement)) Z"
+                , "        prefix <- driveNat (\\n -> observeVecPrefix (replicateNative @Int n 42)) cyclicNat"
+                , "        partialHead <- driveNat (\\n -> observeVecHead (replicateNative @Int n 42)) partialNat"
+                , "        partialAppend <- let n = bottomNat; m = bottomNat in case appendNative @Int n m of !_ -> pure \"forced\""
+                , "        telescopes <- driveNatPair runTelescopes (S (S Z), S (S (S Z)))"
+                , "        pure (values ++ appended ++ unlines [headOnly,boolHead,empty,prefix,partialHead,partialAppend] ++ telescopes)"
+                ]
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source Nat/Vec" expression
+    let expected =
+            [ "[]:0"
+            , "[42,42]:2"
+            , "[42,42,42]:3"
+            , "[]:0"
+            , "[7,7,7]:3"
+            , "[42,42]:2"
+            , "[42,42,7,7,7]:5"
+            , "42"
+            , "True"
+            , "[]:0"
+            , "[42,42,42,42]"
+            , "42"
+            , "forced"
+            ]
+                ++ replicate 4 "[42,42]:2"
+    unless (lines actual == expected) $
+        fail ("FAIL: source Nat/Vec runtime or telescope observation: " ++ show actual)
+    forM_
+        [ ("NativeSourceNatBottom", "driveNat (\\n -> observeVec (replicateNative @Int n 42)) bottomNat", "native-bottom-nat")
+        , ("NativeSourceNatPartial", "driveNat (\\n -> observeVec (replicateNative @Int n 42)) partialNat", "native-bottom-nat")
+        , ("NativeSourceNatAppendBottom", "let n = bottomNat; m = bottomNat in case appendNative @Int n m bottomVec bottomVec of !_ -> pure \"forced\"", "native-bottom-vector")
+        ]
+        $ \(moduleName, observation, fragment) -> do
+            bottomExpression <- sourceEntry moduleName $ retainedNatSource moduleName observation
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags moduleName bottomExpression)
+            case outcome of
+                Left exception
+                    | fragment `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ moduleName ++ "; wrong exception: " ++ displayException exception)
+                Right result -> fail ("FAIL: " ++ moduleName ++ "; expected bottom, got " ++ show result)
 
 -- | Require a located source diagnostic, without catching internal failures.
 sourceRejects :: String -> Int -> String -> [String] -> [String] -> GHC.Ghc ()
 sourceRejects label code fragment extensions declarations = do
-    targets <- GHC.getTargets
     let moduleName = "NativeSourceRejected"
         source =
             unlines $
@@ -696,6 +859,12 @@ sourceRejects label code fragment extensions declarations = do
                        , "  Select False = Bool"
                        ]
                     ++ declarations
+    sourceModuleRejects label code fragment moduleName source
+
+-- | Require a located diagnostic from a complete source module.
+sourceModuleRejects :: String -> Int -> String -> String -> String -> GHC.Ghc ()
+sourceModuleRejects label code fragment moduleName source = do
+    targets <- GHC.getTargets
     result <- GHC.handleSourceError (pure . Left) $ do
         parsed <- parseSourceTarget moduleName source
         void (GHC.typecheckModule GHC.StartAndStopTcMPlugins parsed)
@@ -724,19 +893,82 @@ sourceRejects label code fragment extensions declarations = do
                     ++ "; got:\n"
                     ++ showSDoc flags (vcat (map (pprDiagnostic . errMsgDiagnostic) messages))
 
+-- | Reject index mismatches and malformed retained Nat constructor equations.
+runNatSourceRejectChecks :: GHC.Ghc ()
+runNatSourceRejectChecks = do
+    forM_
+        [
+            ( "NativeSourceNatSwap"
+            , 83865
+            , "Vec"
+            , "      runAppend n m = observeVec (appendNative @Int n m (replicateNative @Int n 42) (replicateNative @Int m 7))"
+            , ["      runAppend n m = observeVec (appendNative @Int n m (replicateNative @Int m 42) (replicateNative @Int n 7))"]
+            )
+        ,
+            ( "NativeSourceNatPredecessor"
+            , 83865
+            , "Vec"
+            , "      replicateNative (S k) x = VCons x (replicateNative k x)"
+            , ["      replicateNative (S k) x = replicateNative k x"]
+            )
+        ,
+            ( "NativeSourceNatEscape"
+            , 25897
+            , "Vec"
+            , "      replicateNative (S k) x = VCons x (replicateNative k x)"
+            ,
+                [ "      replicateNative (S k) x = VCons x (replicateNative k x)"
+                , "      leak :: forall a m. foreach (n :: Nat) -> a -> Vec a m"
+                , "      leak Z x = bottomPolymorphicVec"
+                , "      leak (S k) x = replicateNative k x"
+                ]
+            )
+        ,
+            ( "NativeSourceNatCoverage"
+            , 83605
+            , "one unguarded equation for each constructor"
+            , "      replicateNative Z x = VNil"
+            , []
+            )
+        ,
+            ( "NativeSourceNatWildcard"
+            , 83605
+            , "Retained constructor fields and later arguments"
+            , "      replicateNative (S k) x = VCons x (replicateNative k x)"
+            , ["      replicateNative (S _) x = VCons x VNil"]
+            )
+        ]
+        $ \(moduleName, code, fragment, old, replacement) ->
+            sourceModuleRejects moduleName code fragment moduleName $
+                replace_line old replacement (retainedNatSource moduleName "pure \"unused\"")
+    let moduleName = "NativeSourceNatAmbiguous"
+        source =
+            retainedNatSource moduleName "pure \"unused\""
+                ++ unlines
+                    [ "type family Payload a where"
+                    , "  Payload Int = Int"
+                    , "  Payload Bool = Int"
+                    , "ambiguous :: forall a. foreach (n :: Nat) -> Vec (Payload a) n"
+                    , "ambiguous n = undefined"
+                    ]
+    sourceModuleRejects "ambiguous erased payload" 83865 "ambiguity check" moduleName source
+  where
+    replace_line old replacement =
+        unlines . concatMap (\line -> if line == old then replacement else [line]) . lines
+
 -- | Check unsupported source forms without desugaring or starting plugins twice.
 runSourceRejectChecks :: GHC.Ghc ()
 runSourceRejectChecks = do
     mapM_
         check
-        [ ("wrong Bool domain", 83605, "must have type", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
+        [ ("unsupported algebraic domain", 83605, "supported closed first-order algebraic domain", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
         , ("missing domain annotation", 83605, "explicit domain type", [], local [] "foreach b -> Int -> Int" identity "42")
         , ("anonymous retained binder", 83605, "requires a variable name", [], local [] "foreach (_ :: Bool) -> Int -> Int" identity "42")
-        , ("multiple retained binders", 83605, "exactly one argument", [], local [] "foreach (b :: Bool) (c :: Bool) -> Int -> Int" ["keep b c x = x"] "42")
         , ("partial retained signature", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], local [] "foreach (b :: Bool) -> _a -> _a" identity "42")
+        , ("inner erased forall", 83605, "within the scope of a retained binder", ["RankNTypes"], local [] "foreach (b :: Bool) -> forall a. a -> Select b" ["keep b x = x"] "42")
         , ("non-variable retained pattern", 83605, "bare variable pattern", [], local [] selection ["keep _ x = x"] "42")
-        , ("multiple variable equations", 83605, "one unguarded False equation", [], local [] selection (identity ++ identity) "42")
-        , ("producer expression argument", 83605, "Boolean constructor or a local Boolean variable", [], local [] consumer identity "keep (not False) 42")
+        , ("multiple variable equations", 83605, "one unguarded equation for each constructor", [], local [] selection (identity ++ identity) "42")
+        , ("producer expression argument", 83605, "local index variable or a supported constructor tree", [], local [] consumer identity "keep (not False) 42")
         , ("nonreflexive indexed constraint", 83605, "Only reflexive Boolean equality constraints", [], local [] "foreach (b :: Bool) -> ((b ~ True) => Int) -> Int" identity "42")
         , ("general indexed constraint", 83605, "Only reflexive Boolean equality constraints", ["FlexibleContexts"], local [] "foreach (b :: Bool) -> (Show (Select b) => Int) -> Int" identity "42")
         , ("ImpredicativeTypes", 83605, "Quick Look inference", ["ImpredicativeTypes"], local [] consumer ["keep b x = 42"] "keep True 42")
@@ -763,9 +995,9 @@ runSourceRejectChecks = do
         , ("False payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = False"] "42")
         , ("numeric payload at an unknown index", 83865, "Select", [], local [] "foreach (b :: Bool) -> Select b" ["keep b = 42"] "42")
         , ("swapped constructor results", 83865, "Int", [], local [] chooser ["keep True = False", "keep False = 42"] "42")
-        , ("missing constructor equation", 83605, "one unguarded False equation", [], local [] chooser ["keep True = 42"] "42")
-        , ("duplicate constructor equation", 83605, "one unguarded False equation", [], local [] chooser ["keep True = 42", "keep True = 43"] "42")
-        , ("guarded constructor equation", 83605, "one unguarded False equation", [], local [] chooser ["keep True | True = 42", "keep False = False"] "42")
+        , ("missing constructor equation", 83605, "one unguarded equation for each constructor", [], local [] chooser ["keep True = 42"] "42")
+        , ("duplicate constructor equation", 83605, "one unguarded equation for each constructor", [], local [] chooser ["keep True = 42", "keep True = 43"] "42")
+        , ("guarded constructor equation", 83605, "one unguarded equation for each constructor", [], local [] chooser ["keep True | True = 42", "keep False = False"] "42")
         , ("unsupported later constructor argument", 83605, "bare variable patterns and unrestricted multiplicities", [], local [] selection ["keep True _ = 42", "keep False x = x"] "42")
         , ("linear constructor argument", 83605, "bare variable patterns and unrestricted multiplicities", ["LinearTypes"], local [] "foreach (b :: Bool) -> Select b %1 -> Select b" ["keep True x = x", "keep False x = x"] "42")
         ,
@@ -796,6 +1028,7 @@ runSourceRejectChecks = do
                 ]
             )
         ]
+    runNatSourceRejectChecks
     liftIO $ putStrLn "source rejection checks: ok"
   where
     identity = ["keep b x = x"]

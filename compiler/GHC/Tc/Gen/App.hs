@@ -13,7 +13,7 @@ module GHC.Tc.Gen.App
        ( tcApp
        , tcExprPrag ) where
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr, tcInferRho )
 
 import GHC.Hs
 
@@ -23,7 +23,7 @@ import GHC.Tc.Errors.Ppr
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Utils.Env ( tcLookupIdMaybe )
+import GHC.Tc.Utils.Env ( tcLookupIdMaybe, tcLookupConLike )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
@@ -44,14 +44,18 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst ( substTyWithInScope )
+import qualified GHC.Core.TyCo.Subst as Subst
+import GHC.Core.Unify ( tcMatchTyX_BM, BindFlag(..) )
 import GHC.Core.Type
+import GHC.Core.UsageEnv ( UsageEnv )
 import GHC.Core.Coercion
 
-import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy, boolTy, trueDataCon, falseDataCon )
+import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
 import GHC.Types.Var
+import GHC.Types.Var.Set ( elemVarSet )
 import GHC.Types.Var.FV
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -418,9 +422,16 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
 
        -- Step 1: Infer the type of `fun`, the head of the application
        ; let rn_head = (rn_fun, fun_lspan)
-       ; (tc_fun, fun_sigma) <- tcInferAppHead rn_head
+       ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
+       ; (tc_fun1, fun_sigma1) <- tcRetainedExpectedInst do_ql exp_res_ty rn_args
+                                                     tc_fun0 fun_sigma0
+       ; (tc_fun, fun_sigma, arg_cache) <-
+           tcRetainedArgInst do_ql exp_res_ty rn_head rn_args tc_fun1 fun_sigma1
        ; let -- inst_final: top-instantiate the result type of the application,
              -- EXCEPT if we are trying to infer a sigma-type
+             expected_rho = case exp_res_ty of
+                              Check rho -> Just rho
+                              Infer {}  -> Nothing
              inst_final = case exp_res_ty of
                              Check {} -> True
                              Infer (IR {ir_inst=iif}) ->
@@ -436,7 +447,8 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
 
        -- Step 2: Instantiate the function type (taking a quick look at args)
        -- See Note [Quick Look for particular Ids]
-       ; (inst_args, app_res_rho) <- tcInstFun do_ql inst_final rn_head tc_fun fun_sigma rn_args
+       ; (inst_args, app_res_rho) <- tcInstFunWithExpected expected_rho do_ql inst_final
+                                                        rn_head tc_fun fun_sigma rn_args
 
        ; -- Step 3: Take a quick look at the result type
          -- See Note [QuickLook: arguments before result]
@@ -444,8 +456,8 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
             (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
             _                     -> return ()
 
-       ; finishApp do_ql rn_expr fun_lspan rn_fun tc_fun
-                         inst_args app_res_rho exp_res_ty }
+       ; finishAppWithCache arg_cache do_ql rn_expr fun_lspan rn_fun tc_fun
+                                  inst_args app_res_rho exp_res_ty }
 
 finishApp :: QLFlag
           -> HsExpr GhcRn           -- The whole application
@@ -457,8 +469,15 @@ finishApp :: QLFlag
           -> TcM (HsExpr GhcTc)
 -- Instantiation and Quick Look are done.  Now do typechecking,
 -- of both the result type and the arguments, before rebuilding.
-finishApp do_ql rn_expr fun_loc rn_fun tc_fun inst_args
-          app_res_rho exp_res_ty
+finishApp = finishAppWithCache []
+
+-- | Finish an application with arguments inferred for immutable index matching.
+finishAppWithCache :: RetainedArgCache -> QLFlag
+                   -> HsExpr GhcRn -> SrcSpan -> HsExpr GhcRn -> HsExpr GhcTc
+                   -> [HsExprArg 'TcpInst] -> TcRhoType -> ExpRhoType
+                   -> TcM (HsExpr GhcTc)
+finishAppWithCache cache do_ql rn_expr fun_loc rn_fun tc_fun inst_args
+                   app_res_rho exp_res_ty
   = do { -- Step 4.1: monomorphise un-unified QuickLook instantiation variables
          -- Step 4.2: zonk app_res_rho to expose the polymorphism hidden under
          --           instantiation variables in `app_res_rho`
@@ -476,7 +495,7 @@ finishApp do_ql rn_expr fun_loc rn_fun tc_fun inst_args
                                    app_res_rho exp_res_ty
 
          -- Step 6: Typecheck the arguments
-       ; tc_args <- tcValArgs do_ql (rn_fun, fun_loc) inst_args
+       ; tc_args <- tcValArgsWithCache cache do_ql (rn_fun, fun_loc) inst_args
 
          -- Step 7: Horrible special case for tagToEnum#.
        ; res_expr <- if isTagToEnum tc_fun
@@ -518,16 +537,27 @@ checkResultTy rn_expr (tc_fun, fun_loc) inst_args app_res_rho res_ty
         thing_inside
 
 ----------------
-tcValArgs :: QLFlag
-          -> (HsExpr GhcRn, SrcSpan) -- Head of the application chain
-                                     -- (used only for error message generation)
-          -> [HsExprArg 'TcpInst]
-          -> TcM [HsExprArg 'TcpTc]
-tcValArgs do_ql rn_head args = go do_ql 0 args
+-- | Check cached arguments by subsumption and emit each saved usage once.
+tcValArgsWithCache :: RetainedArgCache -> QLFlag
+                   -> (HsExpr GhcRn, SrcSpan) -> [HsExprArg 'TcpInst]
+                   -> TcM [HsExprArg 'TcpTc]
+tcValArgsWithCache cache do_ql rn_head args = go do_ql 0 args
   where
+    go :: QLFlag -> Int -> [HsExprArg 'TcpInst] -> TcM [HsExprArg 'TcpTc]
     go _ _ [] = return []
     go do_ql pos (arg : args)
-      = do { arg'  <- tcValArg do_ql pos' rn_head arg
+      = do { arg'  <- case (arg, lookup pos' cache) of
+               (EValArg { ea_loc_span = lspan, ea_arg = larg
+                        , ea_arg_ty = Scaled mult expected },
+                Just (typed_arg, actual, usage))
+                 -> addArgCtxt pos' rn_head larg $ tcScalingUsage mult $
+                    do { tcEmitBindingUsage usage
+                       ; wrap <- tcSubTypeSigma (exprCtOrigin (unLoc larg))
+                                   GenSigCtxt actual expected
+                       ; return (EValArg { ea_loc_span = lspan
+                                         , ea_arg_ty = noExtField
+                                         , ea_arg = fmap (mkHsWrap wrap) typed_arg }) }
+               _ -> tcValArg do_ql pos' rn_head arg
            ; args' <- go do_ql pos' args
            ; return (arg' : args') }
       where
@@ -674,7 +704,15 @@ tcInstFun :: QLFlag
 -- This crucial function implements the |-inst judgement in Fig 4,
 -- plus the modification in Fig 5, of the QL paper:
 -- "A quick look at impredicativity" (ICFP'20).
-tcInstFun do_ql inst_final rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
+tcInstFun = tcInstFunWithExpected Nothing
+
+-- | Instantiate arguments and use a retained expected result after ordinary VTA.
+tcInstFunWithExpected :: Maybe TcRhoType -> QLFlag -> Bool
+                      -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
+                      -> TcSigmaType -> [HsExprArg 'TcpRn]
+                      -> TcM ([HsExprArg 'TcpInst], TcSigmaType)
+tcInstFunWithExpected expected_rho do_ql inst_final rn_head@(_, fun_lspan)
+                      tc_fun fun_sigma rn_args
   = do { lvl <- getTcLevel
        ; traceTc "tcInstFun" (vcat [ text "tc_fun" <+> ppr tc_fun
                                    , text "rn_fun" <+> ppr rn_head
@@ -759,7 +797,11 @@ tcInstFun do_ql inst_final rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
                 Indirect fun_ty' -> go  fun_orig pos acc fun_ty' args
                 Flexi            -> go1 fun_orig pos acc fun_ty  args }
      | otherwise
-     = go1 fun_orig pos acc fun_ty args
+     = do { matched <- tcRetainedResultMatch do_ql expected_rho args fun_ty
+          ; case matched of
+              Just (inst_tys, body)
+                -> go fun_orig pos (addArgWrap (mkWpTyApps inst_tys) acc) body args
+              Nothing -> go1 fun_orig pos acc fun_ty args }
 
     -- go1: fun_ty is not filled-in instantiation variable
     --      ('go' dealt with that case)
@@ -825,12 +867,12 @@ tcInstFun do_ql inst_final rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
       | otherwise
       = return (reverse acc, fun_ty)
 
-    -- See Note [Retained Boolean application].
+    -- See Note [Retained argument application].
     go1 fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
-      | DepFunTy{} <- coreFullView fun_ty
-      = do { core_arg <- tcRetainedBoolArg arg
-           ; arg' <- skipQuickLook ctxt arg (Scaled ManyTy boolTy)
+      | DepFunTy binder _ <- coreFullView fun_ty
+      = do { core_arg <- tcRetainedArg arg
+           ; arg' <- skipQuickLook ctxt arg (Scaled ManyTy (varType binder))
            ; let body_ty = applyTypeToArgs fun_ty [core_arg]
            ; go fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
 
@@ -932,45 +974,243 @@ tcInstFun do_ql inst_final rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
            _ -> ExpectedFunTyArg (HsExprTcThing tc_fun) arg
 
 
--- | Resolve a supported Boolean argument before its ordinary value check.
-tcRetainedBoolArg :: LHsExpr GhcRn -> TcM Core.CoreExpr
-tcRetainedBoolArg (L loc expr)
-  = setSrcSpanA loc $
-    do { arg_id <- case stripParensHsExpr expr of
-           HsVar _ lname
-             | name <- unLocWithUserRdr lname
-             , name `hasKey` trueDataConKey
-             -> return (dataConWorkId trueDataCon)
-             | name <- unLocWithUserRdr lname
-             , name `hasKey` falseDataConKey
-             -> return (dataConWorkId falseDataCon)
-             | otherwise -> do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
-                               ; case mb_id of
-                                   Just arg_id -> return arg_id
-                                   Nothing -> unsupported }
-           _ -> unsupported
-       ; let core_arg = Core.Var arg_id
-       ; case Core.exprToBoolIndex core_arg of
+-- | Resolve a retained argument without evaluating or typechecking its value.
+tcRetainedArg :: LHsExpr GhcRn -> TcM Core.CoreExpr
+tcRetainedArg arg
+  = setSrcSpanA (getLoc arg) $
+    do { core_arg <- resolve arg
+       ; case Core.exprToNativeIndex core_arg of
            Just _ -> return core_arg
            Nothing -> unsupported }
   where
+    resolve :: LHsExpr GhcRn -> TcM Core.CoreExpr
+    resolve (L loc expr)
+      = setSrcSpanA loc $ case expr of
+          HsPar _ arg -> resolve arg
+          XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> resolve arg
+          HsApp _ fun arg -> Core.App <$> resolve fun <*> resolve arg
+          HsVar _ lname
+            | isDataOcc (nameOccName (unLocWithUserRdr lname))
+            -> do { con <- tcLookupConLike (unLoc lname)
+                  ; case con of
+                      RealDataCon dc -> return (Core.Var (dataConWorkId dc))
+                      _ -> unsupported }
+            | otherwise
+            -> do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
+                  ; case mb_id of
+                      Just arg_id | isNativeIndexId arg_id
+                        -> return (Core.Var arg_id)
+                      _ -> unsupported }
+          _ -> unsupported
+
     unsupported :: TcM a
     unsupported = failWithTc (TcRnRetainedQuantificationError RetainedIndexExpression)
 
-{- Note [Retained Boolean application]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A retained argument is a value. Resolve a local Boolean Id or an exact Boolean
-constructor worker before instantiating the codomain. applyTypeToArgs uses the
+{- Note [Retained argument application]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained argument is a value. Resolve a local unrestricted Id or a saturated
+constructor tree before instantiating the codomain. applyTypeToArgs uses the
 same index substitution as Core type recovery. Do not use tcVDQ: it translates
 an expression into an erased type argument.
 
-Keep a normal EValArg with expected type Bool. tcValArg checks the value once
-and records its runtime usage. Resolving its Id here does not typecheck or
-evaluate it. Later argument types use that same Id, including a lazy Boolean
-binding whose RHS is bottom. No singleton or separate index witness is added.
+Keep a normal EValArg with the binder's domain as its expected type. tcValArg
+checks the value once and records its runtime usage. Resolution does not inspect
+unfoldings or evaluate values. Later argument types use the same runtime Id,
+including a lazy binding whose RHS is bottom. No singleton is added.
 See docs/dependent-haskell/REFERENCES.md#agda-provenance and
 docs/dependent-haskell/CORE.md#laziness-and-eta.
 -}
+
+{- Note [Immutable retained result instantiation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary polymorphic constructor or helper can return an indexed type.
+Match its saturated result against the expected type before creating mutable
+instantiation variables. Restrict matching to its outer invisible binders.
+Free skolems must remain rigid. Each binder must have a substitution of the
+correct kind, and the substituted result must equal the expected result.
+
+Apply the substitution with explicit type applications on the head. Every
+runtime Id in these applications must still name a local unrestricted binding
+with the same Unique and domain. This prevents stale identifiers from entering
+the application. No mutable type variable is filled with retained syntax.
+
+This route requires NoQL and a saturated ordinary function type without
+constraints or retained binders. The early match requires no explicit type
+arguments. tcInstFunWithExpected also attempts the match before IALL allocates
+fresh meta-variables. It waits until all explicit type arguments have been
+consumed by ordinary VTA checking. For example, bottomPolymorphicVec @Bool
+can instantiate its remaining index from the expected vector type. Explicit
+type arguments are checked and emitted once. Other applications use the
+ordinary path and its existing Quick Look checks.
+-}
+
+-- | Instantiate outer invisible binders from an exact retained result match.
+-- The substitution is immutable; retained syntax never enters a meta-variable.
+tcRetainedExpectedInst :: QLFlag -> ExpRhoType -> [HsExprArg 'TcpRn]
+                       -> HsExpr GhcTc -> TcSigmaType
+                       -> TcM (HsExpr GhcTc, TcSigmaType)
+tcRetainedExpectedInst do_ql expected args fun sigma
+  = do { matched <- tcRetainedResultMatch do_ql expected_rho args sigma
+       ; case matched of
+           Just (inst_tys, body) -> return (mkHsWrap (mkWpTyApps inst_tys) fun, body)
+           Nothing -> return (fun, sigma) }
+  where
+    expected_rho = case expected of
+                     Check rho -> Just rho
+                     Infer {}  -> Nothing
+
+-- | Match a retained expected result without assigning mutable type variables.
+tcRetainedResultMatch :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
+                      -> TcSigmaType -> TcM (Maybe ([Type], TcSigmaType))
+tcRetainedResultMatch NoQL (Just expected) args sigma
+  | hasNativeDependentExpr (Core.Type expected)
+  , not (any is_type_arg args)
+  , (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , not (null tvs)
+  , Just result <- ordinary_result (count isHsValArg args) body
+  , isTauTy expected, isTauTy result
+  , not (hasNativeDependentExpr (Core.Type body))
+  , Just subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst result expected
+  , Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
+  , and (zipWith (kind_agrees subst) tvs inst_tys)
+  , eqType (Subst.substTy subst result) expected
+  = do { valid <- tcRetainedInstScope inst_tys
+       ; return (if valid then Just (inst_tys, Subst.substTy subst body) else Nothing) }
+  where
+    is_type_arg ETypeArg{} = True
+    is_type_arg _ = False
+
+    bind_outer tvs tv _
+      | tv `elem` tvs = BindMe
+      | otherwise = DontBindMe
+
+    kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
+
+    ordinary_result :: Int -> Type -> Maybe Type
+    ordinary_result n ty
+      | Just (_, res') <- splitVisibleFunTy_maybe ty
+      = if n > 0 then ordinary_result (n-1) res' else Nothing
+      | n == 0
+      , not (isForAllTy ty)
+      , not (isFunTy ty)
+      = Just ty
+      | otherwise = Nothing
+tcRetainedResultMatch _ _ _ _ = return Nothing
+
+{- Note [Cached retained argument inference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A consumer can quantify over an erased index without returning that index.
+For example, observeVec :: forall n. Vec Int n -> IO String needs the index
+from its argument. Under ExperimentalDependentTypes and NoQL, infer arguments
+whose formal types mention outer invisible index binders. Match their actual
+types against the formal types with an immutable substitution. A retained
+expected result can supply additional bindings. Apply the substitution only
+when every binder is determined and its kind and local runtime scope agree.
+
+Save the typed arguments and their usage environments. tcValArgsWithCache
+checks each saved type by subsumption and emits its usage under the final
+argument multiplicity. It does not typecheck the source expression again.
+Other arguments retain ordinary expected-type checking. If matching fails or
+leaves binders undetermined, ordinary instantiation checks the same cached
+arguments. The ordinary unifier still rejects retained meta-variable fills.
+
+Only saturated ordinary monomorphic arrows without explicit type arguments
+enter this route. Inference uses a fresh infer cell at the current TcLevel.
+It can return an exact retained type without assigning a type meta-variable.
+-}
+
+-- | Arguments inferred once before immutable index instantiation.
+-- The argument position counts source value arguments from one.
+type RetainedArgCache = [(Int, (LHsExpr GhcTc, TcRhoType, UsageEnv))]
+
+-- | Infer index-bearing arguments once and match only outer invisible binders.
+tcRetainedArgInst :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
+                  -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
+                  -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache)
+tcRetainedArgInst do_ql expected rn_head args fun sigma
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; if enabled
+         then tcRetainedArgInstEnabled do_ql expected rn_head args fun sigma
+         else return (fun, sigma, []) }
+
+-- | Match cached index arguments when the experimental extension is enabled.
+tcRetainedArgInstEnabled :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
+                         -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
+                         -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache)
+tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
+  | not (any is_type_arg args)
+  , (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , let index_tvs = filter (isNativeIndexType . tyVarKind) tvs
+  , not (null index_tvs)
+  , let (domains, result) = splitFunTys body
+  , length domains == count isHsValArg args
+  , isTauTy body, not (isFunTy result)
+  , not (hasNativeDependentExpr (Core.Type body))
+  = do { cache <- infer_args index_tvs domains 1 args
+       ; actual_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) cache
+       ; let templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- cache ]
+             matched = foldM (\subst (formal, actual) ->
+                         tcMatchTyX_BM (bind_outer tvs) subst formal actual)
+                       (result_subst tvs result) (zip templates actual_tys)
+       ; case matched of
+           Just subst
+             | Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
+             , and (zipWith (kind_agrees subst) tvs inst_tys)
+             , and (zipWith (\formal actual -> eqType (Subst.substTy subst formal) actual)
+                            templates actual_tys)
+             -> do { valid <- tcRetainedInstScope inst_tys
+                   ; if valid
+                     then return (mkHsWrap (mkWpTyApps inst_tys) fun,
+                                  Subst.substTy subst body, cache)
+                     else return (fun, sigma, cache) }
+           _ -> return (fun, sigma, cache) }
+  where
+    is_type_arg ETypeArg{} = True
+    is_type_arg _ = False
+
+    bind_outer tvs tv _
+      | tv `elem` tvs = BindMe
+      | otherwise = DontBindMe
+
+    kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
+
+    result_subst tvs result
+      | Check expected_ty <- expected
+      , isTauTy expected_ty
+      , hasNativeDependentExpr (Core.Type expected_ty)
+      , Just subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst result expected_ty
+      = subst
+      | otherwise = Subst.emptySubst
+
+    actual_type (_, ty, _) = ty
+
+    infer_args :: [TyVar] -> [Scaled Type] -> Int -> [HsExprArg 'TcpRn]
+               -> TcM RetainedArgCache
+    infer_args _ _ _ [] = return []
+    infer_args index_tvs (domain : domains) pos (EValArg { ea_arg = arg } : args)
+      = do { entry <- if any (`elemVarSet` tyCoVarsOfType (scaledThing domain)) index_tvs
+                      then addArgCtxt pos rn_head arg $
+                           do { (usage, (typed, actual)) <- tcCollectingUsage (tcInferRho arg)
+                              ; return [(pos, (typed, actual, usage))] }
+                      else return []
+           ; rest <- infer_args index_tvs domains (pos+1) args
+           ; return (entry ++ rest) }
+    infer_args index_tvs domains pos (_ : args)
+      = infer_args index_tvs domains pos args
+tcRetainedArgInstEnabled _ _ _ _ fun sigma = return (fun, sigma, [])
+
+-- | Check that every runtime identifier still has its local index binding.
+tcRetainedInstScope :: [Type] -> TcM Bool
+tcRetainedInstScope tys
+  = do { local_env <- getLclTypeEnv
+       ; let valid_runtime_id v
+               | not (isId v) = True
+               | Just (ATcId { tct_id = local_id }) <- lookupNameEnv local_env (getName v)
+               = v == local_id && isNativeIndexId v && isNativeIndexId local_id
+                 && eqType (varType v) (varType local_id)
+                 && isManyTy (idMult v)
+               | otherwise = False
+       ; return (all valid_runtime_id (tyCoVarsOfTypesList tys)) }
 
 -- Is the argument supposed to instantiate a forall?
 --

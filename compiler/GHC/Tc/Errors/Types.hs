@@ -5305,12 +5305,12 @@ data BootMismatchWhat
                          !(NE.NonEmpty BootTyConMismatch)
   deriving Generic
 
--- | Explain a restriction of source retained Boolean quantification.
+-- | Explain a restriction of source retained quantification.
 data RetainedQuantificationError
   = RetainedBinderCount
   | RetainedBinderNeedsName
   | RetainedBinderNeedsType
-  | RetainedDomainNotBool Type
+  | RetainedUnsupportedDomain Type
   | RetainedResultKind Type
   | RetainedSolverType Type
   | RetainedQuickLook Type

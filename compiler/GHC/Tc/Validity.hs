@@ -30,7 +30,7 @@ import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint ( userTypeError_maybe )
-import GHC.Tc.Utils.Env (tcLookupId, tcLookupLcl_maybe)
+import GHC.Tc.Utils.Env (tcLookupId, tcLookupLcl_maybe, tcExtendIdEnv)
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Zonk.TcType
@@ -41,6 +41,8 @@ import GHC.Builtin.Modules( gHC_CLASSES )
 import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 
 import GHC.Core.Type
+import GHC.Core ( Expr(Var) )
+import GHC.Core.Utils ( applyTypeToArgs )
 import GHC.Core.Unify ( typesAreApart, tcMatchTyX_BM, BindFlag(..) )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
@@ -239,9 +241,10 @@ checkAmbiguity ctxt ty
          -- tyvars are skolemised, we can safely use tcSimplifyTop
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; unless allow_ambiguous $
+         withRetainedAmbiguityType ty $ \check_ty ->
          do { (_wrap, wanted) <- addErrCtxt (AmbiguityCheckCtxt ctxt allow_ambiguous) $
                                  captureConstraints $
-                                 tcSubTypeAmbiguity ctxt ty ty
+                                 tcSubTypeAmbiguity ctxt check_ty check_ty
                                  -- See Note [Ambiguity check and deep subsumption]
                                  -- in GHC.Tc.Utils.Unify
             ; simplifyAmbiguityCheck ty wanted }
@@ -250,6 +253,46 @@ checkAmbiguity ctxt ty
 
   | otherwise
   = return ()
+
+-- | Open a retained telescope for the ambiguity check only.
+-- See Note [Ambiguity checking retained signatures].
+withRetainedAmbiguityType :: Type -> (Type -> TcM a) -> TcM a
+withRetainedAmbiguityType ty thing_inside
+  = do { (indices, check_ty) <- go ty
+       ; tcExtendIdEnv indices (thing_inside check_ty) }
+  where
+    go ty@(DepFunTy index _)
+      = do { fresh <- newSysLocalId (getOccFS index) ManyTy (varType index)
+           ; (indices, body) <- go (applyTypeToArgs ty [Var fresh])
+           ; return (fresh : indices, mkVisFunTyMany (varType index) body) }
+    go (ForAllTy binder body)
+      = do { (indices, body) <- go body
+           ; return (indices, mkForAllTy binder body) }
+    go (FunTy flag mult arg res)
+      = do { (indices, res) <- go res
+           ; return (indices, FunTy flag mult arg res) }
+    go ty = return ([], ty)
+
+{- Note [Ambiguity checking retained signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ambiguity check compares a signature with a fresh instantiation of itself.
+For forall a. foreach n -> a -> Vec a n, the payload metavariable must unify
+with the payload skolem. FC has no retained-function congruence in this
+increment, so ordinary equality cannot compare these two retained functions.
+
+Open each retained binder with one fresh runtime Id. Use that same opaque Id
+on both sides of the check. Replace the opened binder with an ordinary arrow.
+Keep outer erased quantifiers, so ordinary ambiguity checks still apply to
+their type variables and constraints. Do not replace runtime indices with
+fresh type metavariables: Select b need not determine b.
+Agda's equalFun and compareDom also compare codomains in one shared extended
+context. See docs/dependent-haskell/REFERENCES.md#agda-provenance.
+
+Scope the fresh Ids over constraint capture and simplification. The check
+discards its wrapper and evidence, as it does for an ordinary signature.
+This projection does not change the signature or produce a Core coercion
+between retained functions. Native metavariable escape checks still apply.
+-}
 
 wantAmbiguityCheck :: UserTypeCtxt -> Bool
 wantAmbiguityCheck ctxt
@@ -749,19 +792,19 @@ check_type :: ValidityEnv -> Type -> TcM ()
 -- Rank is allowed rank for function args
 -- Rank 0 means no for-alls anywhere
 
--- See Note [Validity of retained Boolean binders]
+-- See Note [Validity of retained binders]
 check_type ve (TermVarTy v)
-  = do { unless (isBoolIndexId v) $
+  = do { unless (isNativeIndexId v) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
        ; unless (v `elemVarSet` ve_indices ve) $
          do { mb_thing <- tcLookupLcl_maybe (getName v)
             ; case mb_thing of
                 Just (ATcId { tct_id = v' })
-                  | v == v', isBoolIndexId v' -> return ()
+                  | v == v', isNativeIndexId v' -> return ()
                 _ -> failWithTc $ TcRnRetainedQuantificationError
                                    (RetainedIndexOutOfScope v) } }
 check_type ve (DepFunTy v body)
-  = do { unless (isBoolIndexId v && not (v `elemVarSet` ve_indices ve)) $
+  = do { unless (isNativeIndexId v && not (v `elemVarSet` ve_indices ve)) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
        ; unless (typeKind body `eqType` liftedTypeKind) $
            failWithTc $ TcRnRetainedQuantificationError (RetainedResultKind body)
@@ -855,12 +898,14 @@ check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
 check_type _ ty@(ForAllTy {}) = pprPanic "check_type" (ppr ty)
 check_type _ ty@(CoercionTy {}) = pprPanic "check_type" (ppr ty)
 
-{- Note [Validity of retained Boolean binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Validity of retained binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A retained binder introduces a value argument. Use the ordinary function
 argument and result ranks, and extend the index scope only for its result.
 An index occurrence must refer to that scope or to an already-bound local
-Bool Id in the typechecker environment. Its Id remains unrestricted.
+index Id in the typechecker environment. Its Id remains unrestricted.
+Its domain must satisfy isNativeIndexType. Ordinary outer forall binders
+keep their existing type-variable scope and rank checks.
 Preserve this scope when checking nested constraints and their predicates.
 
 The dependent scope follows the function types described in

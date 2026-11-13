@@ -153,9 +153,6 @@ rnHsSigWcType doc (HsWC { hswc_body =
               -> do { case doc of
                        TypeSigCtx{} -> pure ()
                        _ -> failWithTc $ TcRnRetainedQuantificationError RetainedUnsupportedContext
-                   ; case outer_bndrs' of
-                       HsOuterImplicit [] -> pure ()
-                       _ -> failWithTc $ TcRnRetainedQuantificationError RetainedPolymorphicSignature
                    ; unless (null nwc_rdrs) $
                        failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
                    ; (body', fvs) <- rnRetainedSigType doc body_ty
@@ -166,8 +163,8 @@ rnHsSigWcType doc (HsWC { hswc_body =
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
               , fvs) } }
 
--- | Rename the retained argument at the start of a value signature.
--- See Note [Source retained Boolean signatures] in GHC.Tc.Gen.HsType.
+-- | Rename the retained telescope at the start of a value signature.
+-- See Note [Source retained signatures] in GHC.Tc.Gen.HsType.
 rnRetainedSigType :: HsDocContext -> LHsType GhcPs
                   -> RnM (LHsType GhcRn, FreeNames)
 rnRetainedSigType doc (L loc (HsParTy _ body))
@@ -179,21 +176,33 @@ rnRetainedSigType doc (L loc (HsForEachTy x bndrs body))
        ; case level of
            Comp -> pure ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
-       ; case bndrs of
-           [L lb (HsTvb xb () (HsBndrVar _ (L lv (Unqual occ))) (HsBndrKind _ domain))] ->
-             do { (domain', domain_fvs) <- rnLHsType doc domain
-                ; name <- newLocalBndrRn (L lv (mkRdrUnqual (setOccNameSpace varName occ)))
-                ; (body', body_fvs) <- bindLocalNamesFV [name] $
-                    do { env <- getLocalRdrEnv
-                       ; setLocalRdrEnv (extendLocalRdrEnvWithAlias env occ name) $
-                           rnLHsType doc body }
-                ; let bndr = L lb (HsTvb xb () (HsBndrVar noExtField (L lv name))
-                                               (HsBndrKind noExtField domain'))
-                ; pure (L loc (HsForEachTy x [bndr] body'), domain_fvs `plusFN` body_fvs) }
-           [L _ (HsTvb _ _ HsBndrWildCard{} _)] ->
-             failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsName
-           [_] -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsType
-           _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount }
+       ; when (null bndrs) $
+           failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+       ; checkDupRdrNames (mapMaybe hsLTyVarLocName bndrs)
+       ; ((bndrs', body'), fvs) <- bind_bndrs bndrs
+       ; pure (L loc (HsForEachTy x bndrs' body'), fvs) }
+  where
+    bind_bndrs :: [LHsTyVarBndr () GhcPs]
+               -> RnM (([LHsTyVarBndr () GhcRn], LHsType GhcRn), FreeNames)
+    bind_bndrs []
+      = do { (body', fvs) <- rnRetainedSigType doc body
+           ; pure (([], body'), fvs) }
+    bind_bndrs (L lb bndr : rest)
+      = setSrcSpanA lb $
+        case bndr of
+          HsTvb xb () (HsBndrVar _ (L lv (Unqual occ))) (HsBndrKind _ domain) ->
+            do { (domain', domain_fvs) <- rnLHsType doc domain
+               ; name <- newLocalBndrRn (L lv (mkRdrUnqual (setOccNameSpace varName occ)))
+               ; ((rest', body'), body_fvs) <- bindLocalNamesFV [name] $
+                   do { env <- getLocalRdrEnv
+                      ; setLocalRdrEnv (extendLocalRdrEnvWithAlias env occ name) $
+                          bind_bndrs rest }
+               ; let bndr' = L lb (HsTvb xb () (HsBndrVar noExtField (L lv name))
+                                              (HsBndrKind noExtField domain'))
+               ; pure ((bndr' : rest', body'), domain_fvs `plusFN` body_fvs) }
+          HsTvb _ _ HsBndrWildCard{} _ ->
+            failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsName
+          _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsType
 rnRetainedSigType doc ty = rnLHsType doc ty
 
 rnHsPatSigType :: HsPatSigTypeScoping

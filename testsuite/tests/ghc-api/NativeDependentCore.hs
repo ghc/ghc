@@ -759,8 +759,8 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                 let malformed label fragment binder = do
                         decoded <- roundtrip NormalCompression (IfaceDepFunTy binder body)
                         rejectsIface label fragment [] decoded
-                malformed "non-Bool interface binder" "Invalid retained Boolean binder" (multiplicity, name, toIfaceType intTy)
-                malformed "linear interface binder" "Invalid retained Boolean binder" (toIfaceType OneTy, name, domain)
+                malformed "non-Bool interface binder" "Invalid retained binder" (multiplicity, name, toIfaceType intTy)
+                malformed "linear interface binder" "Invalid retained binder" (toIfaceType OneTy, name, domain)
                 malformed "interface binder outside its own domain scope" "Iface id out of scope" (multiplicity, name, IfaceTermVar name)
             _ -> fail "FAIL: interface conversion did not retain the Boolean binder"
         let constraintResult = DepFunTy b (mkTyConApp eqTyCon [boolTy, TermVarTy b, TermVarTy b])
@@ -770,7 +770,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             badMultiplicity = mkSysLocal (fsLit "badMultiplicity") (unique 306) OneTy boolTy
         forM_ [badType, badMultiplicity] $ \bad -> do
             decoded <- roundtrip NormalCompression (IfaceTermVar (mkIfLclName (occNameFS (getOccName bad))))
-            rejectsIface "invalid local interface index" "Invalid retained Boolean index" [bad] decoded
+            rejectsIface "invalid local interface index" "Invalid retained index" [bad] decoded
         let diagnostic = toIfaceTypeX (unitVarSet b) (TermVarTy b)
         check "free interface index retains diagnostic identity" $ case diagnostic of
             IfaceFreeTermVar free -> free == b
