@@ -694,29 +694,33 @@ Implementation: `670bcef166`. See the
 
 ### Source case evidence follow-up
 
-Native source cases generalize captured values over a fresh index. They do not
-yet generalize incoming class Givens. The no-instance `OnlyGiven n` control fails
-with located GHC-39999 when its case specializes a captured `Vec Int n`.
-The equivalent constructor equations pass.
+Native source cases generalize captured values and incoming index-dependent
+Givens over a fresh index. The no-instance `OnlyGiven n` control now passes when
+its case specializes a captured `Vec Int n`. It previously failed with located
+GHC-39999, while equivalent constructor equations passed.
 
-- [ ] Pass index-dependent Givens with the generalized case captures. Transport
+- [x] Pass index-dependent Givens with the generalized case captures. Transport
       them with each branch proof and preserve the full function arity.
-- [ ] Record lexical native evidence parameters at their scope entry. Preserve
+- [x] Record lexical native evidence parameters at their scope entry. Preserve
       enclosing parameters in nested scopes. Exclude them inside static forms.
       Save and restore the evidence at an arrow scope boundary.
       Restore bracket-entry evidence when checking a nested typed splice.
-- [ ] Generalize predicates with native type substitution. Pass the original
+- [x] Generalize predicates with native type substitution. Pass the original
       evidence after the index and before captured values. Handle CoVars through
       evidence applications and coercion transport.
-- [ ] Check no-instance dictionaries, derived tuple evidence, equality, nested
+- [x] Check no-instance dictionaries, derived tuple evidence, equality, nested
       cases, local bindings, and partial application through explicit source cases.
-- [ ] Complete both-stage builds, registered regressions, interface-only
+- [x] Complete both-stage builds, registered regressions, interface-only
       execution, ordinary controls, formatting, and the checkpoint.
 
 Follow Agda's dependent-context generalization and instance-binder scope. Use
 GHC's existing evidence representation and checked branch proofs. See
 [the case contract](CORE.md#explicit-case-evidence) and
 [the pinned compiler sources](REFERENCES.md#source-case-evidence).
+Implementation: `fe7329d1b6`. See the
+[verified results](README.md#source-case-evidence). Broader case patterns,
+general retained inference, structural Pi unification, native coercion unfolding
+codecs, and ordinary optimization remain open.
 
 ## Acceptance checks
 

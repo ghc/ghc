@@ -34,7 +34,9 @@ Last updated: 2026-11-13.
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |
 | Generic consumers | Ordinary `force`, `id`, `Just`, and `const` accept named retained values; linear proof use and retained-function WHNF pass |
 | Class consumers | Proof/vector `Show`, constrained native results, scoped dictionaries, and equality-Given transport pass |
-| Current increment validation | Class consumers pass both-stage build, five registered regressions, bootstrap API/runtime, 131 imported CLI observations, ordinary typing/TH controls, seven native guide blocks, and smoke checks |
+| Source contexts | Class and equality contexts after retained binders pass variable, constructor, and explicit case checking |
+| Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
+| Current increment validation | Both-stage build, five registered regressions, bootstrap API/runtime, 196 imported CLI observations, ordinary typing/staging controls, nine native guide blocks, and smoke checks pass |
 | Next task | Ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native coercion unfolding codecs, and conservative lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
@@ -1135,9 +1137,8 @@ Native quantified and irreducible predicates remain gated. A split with remainin
 value patterns requires a nonforcing prefix and excludes `Strict`. A trailing
 context preserves the earlier prefix pattern shapes. Inner retained lambdas,
 general native inference, and ordinary optimization remain separate work.
-Explicit native case refinement still needs to capture incoming class Givens
-alongside the values it specializes. The no-instance control reports a located
-GHC-39999. Its equivalent constructor equations pass.
+The next checkpoint adds
+[incoming evidence to explicit native cases](#source-case-evidence).
 
 The implementation checkpoint is `670bcef166`. The shared fixture adds 46
 observations after the previous 131. All 177 pass through interface-only module
@@ -1173,6 +1174,80 @@ A final comment-only cleanup removes a local Haddock warning. Its targeted
 
 See [the contract](CORE.md#source-retained-constraints) and the
 [pinned Agda telescope sources](REFERENCES.md#source-retained-constraints).
+
+## Source case evidence
+
+An explicit dependent case can use the incoming class and equality evidence:
+
+```haskell
+renderCaseWith :: foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String
+renderCaseWith n xs = case n of
+  Z -> show xs
+  S k -> show xs
+
+transportCaseGiven :: foreach (n :: Nat) -> (Add n Z ~ n)
+                   => Vec Int (Add n Z) -> Vec Int n
+transportCaseGiven n xs = case n of
+  Z -> xs
+  S k -> xs
+```
+
+These definitions reuse the earlier Nat, Vec, Add, and Show definitions. The case
+helper receives the original index, dependent evidence, and captured values.
+Each branch transports the evidence with its checked constructor proof. The
+ordinary solver can then derive superclass and tuple evidence. A global instance
+is not needed when the caller supplies a Given. Equality transport still needs
+an equality proof.
+
+The checker records actual lexical evidence parameters, including primitive
+equality CoVars. Static forms exclude enclosing evidence. Arrow heads restore
+their enclosing scope. Nested typed splices restore the bracket-entry scope with
+the outer constraint accumulator. This adds no native quotation support.
+
+An explicit case must inspect its index before it can return a branch function.
+It need not force an unused constructor field or captured vector. The shared
+fixture appends 19 runtime observations to the previous 177. It also checks
+no-instance declarations, tuple evidence, local bindings, nested shadowing,
+boxed equality, primitive GADT equality, and arrow evidence scope. An incoming
+`OnlyGiven (S k)` does not supply `OnlyGiven k`.
+
+The constructor pattern limits remain unchanged: use complete, unguarded
+alternatives with bare field variables. General motive inference, inner retained
+lambdas, native coercion unfolding serialization, and ordinary optimization remain
+separate work. The Core forms, dictionary ABI, and interface format stay unchanged.
+
+The implementation checkpoint is `fe7329d1b6`. Both compiler stages and matching
+libraries build. The full build took 11 minutes 45 seconds and peaked at 6,550 MiB
+under a 16 GiB cap. All five registered normal-way tests pass: 39 cases, 34 skips,
+five expected passes, and no unexpected results or framework failures or warnings.
+The driver took 9.5 seconds. The command took 1 minute 37 seconds and peaked at
+2,616 MiB under an 8 GiB cap. The bootstrap runtime and API kernel also pass.
+
+Separate CLI compilation reproduces all 196 imported observations with Core and
+STG Lint. The no-instance case and outer-Given arrow compile. Eight context
+rejections have the expected codes and source locations. Six strictness controls,
+both interface-version rejection directions, earlier proof and linear controls,
+ordinary bidirectional typing, and single-expansion TH checks pass. All nine
+literal native guide blocks compile. Ordinary nested typed splices, a static
+pointer, optimized package/TH execution, GHCi, and Haddock startup also pass.
+The CLI scope peaked at 269 MiB under a 4 GiB cap. All scopes used no swap.
+The full GHC testsuite was not run.
+
+Artifacts use `_build/verification/native-case-evidence-`. The build log is
+`native-case-evidence-full-build.log`. The runtime log is
+`native-case-evidence-runtime-v5.log`; earlier failures were in new arrow-control
+fixtures and are retained in `native-case-runtime-v2.log` through `v4.log`.
+The registered and final CLI logs end in `registered.log` and `final-cli.log`.
+The bootstrap archive is `native-case-evidence-bootstrap-work/`.
+Compatibility scripts use `native-case-compat-` and separate artifact copies.
+Fixtures pass Fourmolu. Compiler files parse without rewriting; `Splice.hs`
+requires CPP preprocessing in both interpreter branches. Its unchanged source
+reproduces the raw Fourmolu parser failure. The Cabal template passes cabal-gild.
+Missing-documentation warnings are expected with `--docs=none`.
+
+See [the contract](CORE.md#explicit-case-evidence),
+[the task list](PLAN.md#source-case-evidence-follow-up), and
+[the pinned Agda implementation](REFERENCES.md#source-case-evidence).
 
 ## Verified baseline
 
