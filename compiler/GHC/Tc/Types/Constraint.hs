@@ -106,6 +106,7 @@ module GHC.Tc.Types.Constraint (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Coercion
@@ -1860,6 +1861,8 @@ approx_wc incl_nq encl_eqs skol_tvs (WC { wc_simple = simples, wc_impl = implics
            -- See `given_insols` in GHC.Tc.Solver.Solve.solveImplication
        | insolubleCt ct                       = acc  -- See (W5)
        | pred_tvs `intersectsVarSet` skol_tvs = acc
+       | hasNativeDependentExpr (Type pred)    = add_to_no_quant
+           -- See Note [Retained residual constraints].
        | incl_nq || is_quantifiable pred      = add_to_quant
        | otherwise                            = add_to_no_quant
        where
@@ -1899,6 +1902,23 @@ approx_wc incl_nq encl_eqs skol_tvs (WC { wc_simple = simples, wc_impl = implics
       = case tcSplitTyConApp_maybe ty of
           Just (tc, _) -> isTypeFamilyTyCon tc
           _              -> False
+
+{- Note [Retained residual constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained runtime Id is not an ordinary skolem in ic_skols. An application-local
+implication can therefore contain a predicate whose runtime indices are not
+trapped by skol_tvs. Do not float or generalize that predicate through this
+approximation. The inferred binder type can be ordinary String even when its
+residual predicate contains a runtime index, so the inferred-type gate in
+GHC.Tc.Gen.Bind does not suffice.
+
+Exclude native predicates even when incl_nq is True. Add their free variables to
+no_quant so ordinary meta-variables in these predicates stay monomorphic. Leave
+the original Wanted in its implication for solving and located diagnostics.
+Check the full predicate, including closed retained function arguments and
+synonym definitions. A free-runtime-Id check alone would miss those types.
+Ordinary predicates keep the existing approximation rules.
+-}
 
 {- Note [ApproximateWC]
 ~~~~~~~~~~~~~~~~~~~~~~~

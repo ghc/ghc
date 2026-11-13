@@ -12,11 +12,13 @@ import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..))
 import GHC.Core.DataCon (DataCon, dataConFullSig, dataConName, dataConWorkId, eqSpecTyVar, eqSpecType, promoteDataCon)
 import GHC.Core.Dependent (hasNativeDependentExpr)
+import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.FamInstEnv (mkBranchedCoAxiom, mkCoAxBranch)
 import GHC.Core.Lint (lintExpr)
 import GHC.Core.Make (mkCoreConApps, mkIntExpr)
 import GHC.Core.Opt.Arity (etaExpand)
 import GHC.Core.Predicate (mkNomEqPred)
+import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCo.Rep (Type (..), scaledThing)
 import GHC.Core.TyCon
@@ -44,6 +46,7 @@ import GHC.Types.SourceError (SourceError, srcErrorMessages)
 import GHC.Types.SrcLoc (isGoodSrcSpan, noLoc, noSrcSpan)
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Var
+import GHC.Types.Var.Env (mkInScopeSet)
 import GHC.Unit.Module.ModGuts (ModGuts (mg_binds))
 import GHC.Unit.Module.ModIface (mi_hash_fn, mi_mod_hash)
 import GHC.Unit.Types (mainUnit, mkModule, mkModuleName)
@@ -387,6 +390,86 @@ retainedNatGenericExpected =
         ++ ["42", "42", "forced", "forced", "forced", "forced"]
         ++ replicate 4 "forced"
 
+-- | Share ordinary class dictionaries and checked native proof consumers.
+retainedNatClassDeclarations :: [String]
+retainedNatClassDeclarations =
+    [ "instance Show a => Show (Vec a n) where"
+    , "  showsPrec _ VNil = showString \"VNil\""
+    , "  showsPrec d (VCons x xs) = showParen (d > 10) (showString \"VCons \" . showsPrec 11 x . showChar ' ' . showsPrec 11 xs)"
+    , "ignoreShow :: Show a => a -> Int"
+    , "ignoreShow _ = 42"
+    , "renderPair :: (Show a, Show b) => a -> b -> String"
+    , "renderPair p q = show p ++ \"/\" ++ show q"
+    , "sameValue :: forall a b. (a ~ b) => a -> b"
+    , "sameValue x = x"
+    , "viaEquality :: foreach (n :: Nat) -> (Add n Z :~: n) -> Vec Int (Add n Z) -> Vec Int n"
+    , "viaEquality n p xs = case p of Refl -> sameValue xs"
+    , "classId :: forall a. Show a => a -> a"
+    , "classId x = x"
+    , "taggedClassId :: forall tag a. Show a => a -> a"
+    , "taggedClassId x = x"
+    , "lateClassId :: Bool -> forall a. Show a => a -> a"
+    , "lateClassId _ x = x"
+    , "checkedVta :: foreach (n :: Nat) -> (Add n Z :~: n) -> (Add n Z :~: n)"
+    , "checkedVta n p = taggedClassId @Bool p"
+    , "checkedLate :: foreach (n :: Nat) -> (Add n Z :~: n) -> (Add n Z :~: n)"
+    , "checkedLate n p = lateClassId True p"
+    , "showSupplied :: foreach (n :: Nat) -> (Add n Z :~: n) -> String"
+    , "showSupplied n p = show p"
+    , "ignoreSuppliedShow :: foreach (n :: Nat) -> (Add n Z :~: n) -> Int"
+    , "ignoreSuppliedShow n p = ignoreShow p"
+    , "showProofTwice :: foreach (n :: Nat) -> (Add n Z :~: n) -> String"
+    , "showProofTwice n p = renderPair p p"
+    , "showProofPair :: foreach (n :: Nat) (m :: Nat) -> (Add n Z :~: n) -> (Add m Z :~: m) -> String"
+    , "showProofPair n m p q = renderPair p q"
+    , "showProofWithInt :: foreach (n :: Nat) -> (Add n Z :~: n) -> String"
+    , "showProofWithInt n p = let answer = (42 :: Int) in renderPair answer p"
+    ]
+
+-- | Put the class instance at module scope and retain the local Nat workers.
+retainedNatClassSource :: String -> String -> String
+retainedNatClassSource moduleName observation =
+    unlines $ "{-# LANGUAGE RankNTypes #-}" : concatMap insert (lines (retainedNatProofSource moduleName observation))
+  where
+    insert line@"entry :: IO String" = retainedNatClassDeclarations ++ [line]
+    insert line = [line]
+
+-- | Resolve dictionaries without changing proof or vector evaluation.
+retainedNatClassObservation :: [String]
+retainedNatClassObservation =
+    [ "proofs <- driveNats (\\n -> pure (show (rightZero n)))"
+    , "vectors <- driveNats (\\n -> pure (show (replicateNative @Int n 42)))"
+    , "nested <- driveNats (\\n -> pure (show (Just (rightZero n))))"
+    , "ignored <- driveNats (\\n -> observeInt (ignoreShow (rightZero n)))"
+    , "repeated <- driveNats (\\n -> pure (showProofTwice n (rightZero n)))"
+    , "distinct <- driveNatPairs (\\n m -> pure (showProofPair n m (rightZero n) (rightZero m)))"
+    , "mixed <- driveNats (\\n -> pure (showProofWithInt n (rightZero n)))"
+    , "returned <- driveNats (\\n -> pure (show (classId (rightZero n))))"
+    , "visible <- driveNats (\\n -> pure (show (checkedVta n (rightZero n))))"
+    , "late <- driveNats (\\n -> pure (show (checkedLate n (rightZero n))))"
+    , "localRendered <- driveNats (\\n -> let rendered = show (rightZero n) in pure rendered)"
+    , "equalities <- driveNats (\\n -> observeVec (viaEquality n (rightZero n) (appendNative @Int n Z (replicateNative @Int n 42) VNil)))"
+    , "ignoredBottom <- driveNat (\\n -> observeInt (ignoreShow (rightZero n))) bottomNat"
+    , "ignoredCyclic <- driveNat (\\n -> observeInt (ignoreShow (rightZero n))) cyclicNat"
+    , "ignoredProofBottom <- driveNat (\\n -> observeInt (ignoreSuppliedShow n bottomProof)) bottomNat"
+    , "ignoredEqualityBottom <- driveNat (\\n -> observeInt (ignoreShow (viaEquality n bottomProof bottomVec))) bottomNat"
+    , "ignoredEqualityCyclic <- driveNat (\\n -> observeInt (ignoreShow (viaEquality n bottomProof bottomVec))) cyclicNat"
+    , "pure (proofs ++ vectors ++ nested ++ ignored ++ repeated ++ distinct ++ mixed ++ returned ++ visible ++ late ++ localRendered ++ equalities ++ unlines [ignoredBottom,ignoredCyclic,ignoredProofBottom,ignoredEqualityBottom,ignoredEqualityCyclic])"
+    ]
+
+-- | Preserve class observations in local source and interface-only consumers.
+retainedNatClassExpected :: [String]
+retainedNatClassExpected =
+    replicate 3 "Refl"
+        ++ ["VNil", "VCons 42 (VCons 42 VNil)", "VCons 42 (VCons 42 (VCons 42 VNil))"]
+        ++ replicate 3 "Just Refl"
+        ++ replicate 3 "42"
+        ++ replicate 7 "Refl/Refl"
+        ++ replicate 3 "42/Refl"
+        ++ replicate 12 "Refl"
+        ++ ["[]:0", "[42,42]:2", "[42,42,42]:3"]
+        ++ replicate 5 "42"
+
 -- | Check explicit source cases with dependent results and captured payloads.
 retainedCaseSource :: String -> String -> String
 retainedCaseSource moduleName observation =
@@ -519,7 +602,7 @@ retainedNatLibrarySource :: String
 retainedNatLibrarySource =
     unlines $
         take 1 (lines (retainedNatSource "NativeRetainedNatLibrary" ""))
-            ++ [ "{-# LANGUAGE LinearTypes, TypeOperators #-}"
+            ++ [ "{-# LANGUAGE LinearTypes, RankNTypes, TypeOperators #-}"
                , "module NativeRetainedNatLibrary where"
                , "import Data.Type.Equality ((:~:)(Refl))"
                ]
@@ -551,6 +634,7 @@ retainedNatLibrarySource =
             ++ retainedCaseDeclarations
             ++ retainedNatProofDeclarations
             ++ retainedNatGenericDeclarations
+            ++ retainedNatClassDeclarations
   where
     generalizeAppend "appendVec :: Vec Int n -> Vec Int m -> Vec Int (Add n m)" =
         "appendVec :: forall a n m. Vec a n -> Vec a m -> Vec a (Add n m)"
@@ -595,7 +679,9 @@ retainedNatConsumerSource =
             ++ map ("    " ++) retainedNatProofObservation
             ++ ["  genericValues <- do"]
             ++ map ("    " ++) retainedNatGenericObservation
-            ++ ["  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead,constructedPartial,nestedPartial] ++ caseValues ++ normalized ++ normalizedAppend ++ constants ++ unlines [constantBottom,normalizedPartial] ++ proofValues ++ genericValues)"]
+            ++ ["  classValues <- do"]
+            ++ map ("    " ++) retainedNatClassObservation
+            ++ ["  putStr (values ++ appended ++ unlines [headOnly,boolHead,partialAppend] ++ constructed ++ constructedAppend ++ unlines [constructorHead,nestedPrefix,retainedHead,ordinaryHead,constructedPartial,nestedPartial] ++ caseValues ++ normalized ++ normalizedAppend ++ constants ++ unlines [constantBottom,normalizedPartial] ++ proofValues ++ genericValues ++ classValues)"]
 
 -- | Run Boolean and Nat consumers against separately compiled disk artifacts.
 runModuleChecks :: FilePath -> IO ()
@@ -613,7 +699,7 @@ runModuleChecks libdir = do
             , "NativeRetainedNatLibrary"
             , retainedNatLibrarySource
             , retainedNatConsumerSource
-            , -- Keep the first 55 observations. Append generic consumer observations.
+            , -- Keep the first 89 observations. Append class consumer observations.
               [ "[]:0"
               , "[42,42]:2"
               , "[42,42,42]:3"
@@ -656,6 +742,7 @@ runModuleChecks libdir = do
                    ]
                 ++ retainedNatProofExpected
                 ++ retainedNatGenericExpected
+                ++ retainedNatClassExpected
             )
         ]
         $ \(label, moduleName, producer, consumer, expected) ->
@@ -987,9 +1074,17 @@ sourceEntry moduleName source = do
     desugared <- GHC.desugarModule checked
     let bindings = flattenBinds (mg_binds (GHC.coreModule desugared))
     case find ((== "entry") . occNameString . nameOccName . varName . fst) bindings of
-        Just (entry, expression) ->
+        Just (entry, expression) -> do
             let dependencies = filter ((/= entry) . fst) bindings
-             in pure $ if null dependencies then expression else Let (Rec dependencies) expression
+            unless (all (isLocalId . fst) dependencies) $
+                fail "FAIL: source entry dependency is not a local Id"
+            -- Install local binders before substitution updates their occurrences.
+            -- Imported GlobalIds remain external references.
+            let closed = case dependencies of
+                    [] -> expression
+                    _ -> Let (Rec [(GHC.Types.Id.setIdNotExported (localiseId binder), rhs) | (binder, rhs) <- dependencies]) expression
+                subst = CoreSubst.mkEmptySubst (mkInScopeSet (exprFreeVars closed))
+            pure (CoreSubst.substExpr subst closed)
         Nothing -> fail "FAIL: source module has no entry binding"
 
 -- | Run retained source code through checking, desugaring, and native lowering.
@@ -1103,6 +1198,7 @@ runNatSourceChecks = do
     runNatNormalizationSourceChecks
     runNatProofSourceChecks
     runNatGenericSourceChecks
+    runNatClassSourceChecks
     runCaseSourceChecks
 
 -- | Observe refined source cases and reject malformed dependent alternatives.
@@ -1431,6 +1527,79 @@ runNatGenericSourceChecks = do
                     , "badLinearProof n p = case linearId p of Refl -> case linearId p of Refl -> 42"
                     ]
     sourceModuleRejects "duplicated linear proof argument" 18872 "multiplicity" duplicateName duplicateSource
+
+-- | Check scoped class evidence, constrained results, and proof evaluation.
+runNatClassSourceChecks :: GHC.Ghc ()
+runNatClassSourceChecks = do
+    let moduleName = "NativeSourceNatClasses"
+        observation = unlines ("do" : map ("        " ++) retainedNatClassObservation)
+    expression <- sourceEntry moduleName (retainedNatClassSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source Nat class consumers" expression
+    unless (lines actual == retainedNatClassExpected) $
+        fail ("FAIL: Nat class consumers changed evidence scope or laziness: " ++ show actual)
+    forM_
+        [ ("NativeSourceShowProofBottom", "driveNat (\\n -> pure (show (rightZero n))) bottomNat", "native-bottom-nat")
+        , ("NativeSourceShowProofPartial", "driveNat (\\n -> pure (show (rightZero n))) partialNat", "native-bottom-nat")
+        , ("NativeSourceShowSuppliedBottom", "driveNat (\\n -> pure (showSupplied n bottomProof)) bottomNat", "native-bottom-proof")
+        ]
+        $ \(name, body, marker) -> do
+            bottomExpression <- sourceEntry name (retainedNatClassSource name body)
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case outcome of
+                Left exception
+                    | marker `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right value -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show value)
+    forM_
+        [
+            ( "NativeSourceMissingNativeInstance"
+            , 39999
+            , "Missing"
+            ,
+                [ "class Missing a"
+                , "needMissing :: Missing a => a -> Int"
+                , "needMissing _ = 42"
+                , "badMissing :: foreach (n :: Nat) -> (Add n Z :~: n) -> Int"
+                , "badMissing n p = needMissing p"
+                ]
+            )
+        ,
+            ( "NativeSourceMissingLocalStringInstance"
+            , 39999
+            , "Missing"
+            ,
+                [ "class Missing a"
+                , "needMissingString :: Missing a => a -> String"
+                , "needMissingString _ = \"unused\""
+                , "badMissingString :: foreach (n :: Nat) -> (Add n Z :~: n) -> String"
+                , "badMissingString n p = let rendered = needMissingString p in rendered"
+                ]
+            )
+        ,
+            ( "NativeSourceEqualityWithoutProof"
+            , 18872
+            , "Add"
+            ,
+                [ "badEquality :: foreach (n :: Nat) -> Vec Int (Add n Z) -> Vec Int n"
+                , "badEquality n xs = sameValue xs"
+                ]
+            )
+        ,
+            ( "NativeSourceClassDoesNotRefine"
+            , 83865
+            , "Add"
+            ,
+                [ "badTransport :: foreach (n :: Nat) -> (Add n Z :~: n) -> Vec Int (Add n Z) -> Vec Int n"
+                , "badTransport n p xs = let rendered :: String; rendered = show p in xs"
+                ]
+            )
+        ]
+        $ \(name, code, fragment, declarations) ->
+            sourceModuleRejects name code fragment name $
+                retainedNatClassSource name "pure \"unused\"" ++ unlines declarations
 
 -- | Exercise constructor naming with dependent payloads and lazy nested fields.
 runNatConstructorSourceChecks :: GHC.Ghc ()

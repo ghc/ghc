@@ -29,6 +29,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.Constraint (WantedConstraints(wc_simple), ctPred)
 import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..) )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
@@ -445,19 +446,67 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
               , text "fun_sigma:" <+> ppr fun_sigma
               , text "do_ql:" <+> ppr do_ql]
 
-       -- Step 2: Instantiate the function type (taking a quick look at args)
-       -- See Note [Quick Look for particular Ids]
-       ; (inst_args, app_res_rho) <- tcInstFunWithExpected expected_rho do_ql inst_final
-                                                        rn_head tc_fun fun_sigma rn_args
+       ; tcRetainedAppEvidence $
+         do { -- Step 2: Instantiate the function type (taking a quick look at args)
+              -- See Note [Quick Look for particular Ids]
+              (inst_args, app_res_rho) <- tcInstFunWithExpected expected_rho do_ql inst_final
+                                                             rn_head tc_fun fun_sigma rn_args
 
-       ; -- Step 3: Take a quick look at the result type
-         -- See Note [QuickLook: arguments before result]
-         case (do_ql, exp_res_ty) of
-            (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
-            _                     -> return ()
+            ; -- Step 3: Take a quick look at the result type
+              -- See Note [QuickLook: arguments before result]
+              case (do_ql, exp_res_ty) of
+                 (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
+                 _                     -> return ()
 
-       ; finishAppWithCache arg_cache do_ql rn_expr fun_lspan rn_fun tc_fun
-                                  inst_args app_res_rho exp_res_ty }
+            ; finishAppWithCache arg_cache do_ql rn_expr fun_lspan rn_fun tc_fun
+                                       inst_args app_res_rho exp_res_ty } }
+
+-- | Bind native dictionary evidence at the application that needs it.
+tcRetainedAppEvidence :: TcM (HsExpr GhcTc) -> TcM (HsExpr GhcTc)
+tcRetainedAppEvidence thing_inside
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; if not enabled then thing_inside else
+    do { (expr, wanted) <- captureConstraints thing_inside
+       ; if any (hasNativeDependentExpr . Core.Type . ctPred) (wc_simple wanted)
+         then do { tclvl <- getTcLevel
+                 ; (implic, ev_binds) <- buildImplicationFor tclvl RetainedAppSkol [] [] wanted
+                 ; emitImplications implic
+                 ; return (mkHsWrap (mkWpLet ev_binds) expr) }
+         else do { emitConstraints wanted
+                 ; return expr } } }
+
+{- Note [Retained application evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Immutable instantiation can produce Show (Vec Int n), where n is a runtime Id.
+The dictionary expression can contain n in its type arguments. Its binding must
+therefore remain below the runtime lambda that binds n. Checking the type
+arguments at the call site does not establish this evidence scope.
+
+Capture constraint generation for the instantiated application. Inspect the
+actual simple Wanteds after instantiation, not the initial theta. A visible type
+argument or an earlier value argument can expose a later forall whose immutable
+instantiation introduces a native predicate. Nested implications already own
+their evidence and do not require another wrapper.
+
+For a native Wanted, build an
+implication with its own evidence bindings and put WpLet around the application.
+Force this implication even with no type-variable skolems or Givens. The normal
+checkConstraints fast path would omit it. The solver inherits enclosing Givens
+and uses the ordinary instance and equality rules. Do not use StaticFormSkol,
+which deliberately removes enclosing Givens. RetainedAppSkol records the actual
+origin for diagnostics. Residual native predicates must also remain inside this
+implication; see Note [Retained residual constraints] in GHC.Tc.Types.Constraint.
+Keep the current TcLevel. There are no new type-variable binders. Raising the
+level would force an inferred native result through promoteTcType and a mutable
+meta-variable. Applications without native Wanteds emit their original constraints.
+
+This is a context boundary for evidence, not a new equality rule or a way to fill
+native meta-variables. Keep the original theta and the final subsumption checks.
+Agda inserts instance arguments in the current context and postpones their search
+during application checking. The GHC implementation uses delayed FC evidence and
+an expression-local implication. See
+ docs/dependent-haskell/REFERENCES.md#retained-class-consumers.
+-}
 
 finishApp :: QLFlag
           -> HsExpr GhcRn           -- The whole application
@@ -1035,8 +1084,10 @@ with the same Unique and domain. This prevents stale identifiers from entering
 the application. No mutable type variable is filled with retained syntax.
 
 This route requires NoQL and a saturated ordinary function type without
-constraints or retained binders. The early match requires no explicit type
-arguments. tcInstFunWithExpected also attempts the match before IALL allocates
+retained binders. A leading constraint context remains in the substituted
+body. See Note [Constrained immutable instantiation]. The early match requires
+no explicit type arguments. tcInstFunWithExpected also attempts the match
+before IALL allocates
 fresh meta-variables. It waits until all explicit type arguments have been
 consumed by ordinary VTA checking. For example, bottomPolymorphicVec @Bool
 can instantiate its remaining index from the expected vector type. Explicit
@@ -1095,7 +1146,7 @@ tcRetainedResultInst :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
                      -> HsExpr GhcTc -> TcSigmaType
                      -> TcM (Maybe ([Type], TcSigmaType))
 tcRetainedResultInst do_ql expected args fun sigma
-  = do { matched <- tcRetainedResultMatch do_ql expected args sigma
+  = do { matched <- tcRetainedResultMatch do_ql expected args fun sigma
        ; case matched of
            Just _ -> return matched
            Nothing -> tcRetainedConResultInst do_ql expected args fun sigma }
@@ -1142,15 +1193,49 @@ tcRetainedConResultInst NoQL (Just expected) args
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
 tcRetainedConResultInst _ _ _ _ _ = return Nothing
 
--- | Match a retained expected result without assigning mutable type variables.
+{- Note [Constrained immutable instantiation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary consumer can require a dictionary for a type with native syntax.
+For example, show (rightZero n) requires Show (Add n Z :~: n). Split the
+leading constraint context from the ordinary tau type when matching results
+or cached arguments. Match only the tau type. Return the substituted original
+body, including its constraints. Do not return just the substituted tau type.
+
+Apply only the immutable type arguments here. tcInstFunWithExpected then
+finds the instantiated context in IALL. With no outer type variables left,
+instantiateSigmaQL calls instCall to emit the dictionary or equality evidence.
+Keep this ordinary evidence pipeline and the final subsumption checks.
+The early expected-result route uses the same rule even without an argument
+anchor. Every outer binder must still be determined before instantiation.
+
+All newly constrained routes require a known head with no concreteness
+requirements. This includes the exact expected-result route and the existing
+native-index-kind argument route. Otherwise, immutable type applications
+could bypass the representation checks in ordinary instantiation. Keep the
+unconstrained routes unchanged. Constructor candidates remain unconstrained.
+See Note [Immutable retained result instantiation] and
+Note [Generic retained argument inference].
+-}
+
+-- | Check that a known application head has no concreteness requirements.
+hasNoConcreteTyVars :: HsExpr GhcTc -> Bool
+hasNoConcreteTyVars (HsVar _ (L _ var)) = isEmptyNameEnv (idConcreteTvs var)
+hasNoConcreteTyVars (XExpr (ConLikeTc (RealDataCon dc)))
+  = isEmptyNameEnv (dataConConcreteTyVars dc)
+hasNoConcreteTyVars _ = False
+
+-- | Match a retained expected result and preserve its instantiated constraints.
 tcRetainedResultMatch :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
-                      -> TcSigmaType -> TcM (Maybe ([Type], TcSigmaType))
-tcRetainedResultMatch NoQL (Just expected) args sigma
+                      -> HsExpr GhcTc -> TcSigmaType
+                      -> TcM (Maybe ([Type], TcSigmaType))
+tcRetainedResultMatch NoQL (Just expected) args fun sigma
   | hasNativeDependentExpr (Core.Type expected)
   , not (any is_type_arg args)
   , (tvs, body) <- tcSplitForAllInvisTyVars sigma
   , not (null tvs)
-  , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) body
+  , let (theta, tau) = tcSplitPhiTy body
+  , null theta || hasNoConcreteTyVars fun
+  , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) tau
   , isTauTy expected, isTauTy result
   , not (hasNativeDependentExpr (Core.Type body))
   , Just subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst result expected
@@ -1168,7 +1253,7 @@ tcRetainedResultMatch NoQL (Just expected) args sigma
       | otherwise = DontBindMe
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
-tcRetainedResultMatch _ _ _ _ = return Nothing
+tcRetainedResultMatch _ _ _ _ _ = return Nothing
 
 -- | Find the saturated result of ordinary visible arrows without constraints.
 tcRetainedOrdinaryResult :: Int -> Type -> Maybe Type
@@ -1199,8 +1284,9 @@ leaves binders undetermined, ordinary instantiation checks the same cached
 arguments. The ordinary unifier still rejects retained meta-variable fills.
 
 Only saturated ordinary monomorphic arrows without explicit type arguments
-enter this route. Inference uses a fresh infer cell at the current TcLevel.
-It can return an exact retained type without assigning a type meta-variable.
+enter this route. Preserve any leading constraint context as described in
+Note [Constrained immutable instantiation]. Inference uses a fresh infer cell
+at the current TcLevel. It can return an exact retained type without assigning a type meta-variable.
 -}
 
 {- Note [Generic retained argument inference]
@@ -1288,9 +1374,11 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
   , (tvs, body) <- tcSplitForAllInvisTyVars sigma
   , let index_tvs = filter (isNativeIndexType . tyVarKind) tvs
   , not (null tvs)
-  , let (domains, result) = splitFunTys body
+  , let (theta, tau) = tcSplitPhiTy body
+  , null theta || hasNoConcreteTyVars fun
+  , let (domains, result) = splitFunTys tau
   , length domains == count isHsValArg args
-  , isTauTy body, not (isFunTy result)
+  , isTauTy tau, not (isFunTy result)
   , not (hasNativeDependentExpr (Core.Type body))
   = do { let index_route = not (null index_tvs)
              initial_subst = result_subst index_route tvs result
@@ -1298,8 +1386,8 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
                         | otherwise = filter (isNothing . Subst.lookupTyVar initial_subst) tvs
        ; eligible <- if index_route
                      then return (Just (repeat True))
-                     else if ordinary_head
-                             && isJust (tcRetainedOrdinaryResult (count isHsValArg args) body)
+                     else if hasNoConcreteTyVars fun
+                             && isJust (tcRetainedOrdinaryResult (count isHsValArg args) tau)
                           then do { shapes <- mapM tcRetainedInferableArg
                                                 [arg | EValArg { ea_arg = arg } <- args]
                                   ; return (if any snd shapes then Just (map fst shapes)
@@ -1336,12 +1424,6 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
       | otherwise = DontBindMe
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
-
-    ordinary_head = case fun of
-                      HsVar _ (L _ var) -> isEmptyNameEnv (idConcreteTvs var)
-                      XExpr (ConLikeTc (RealDataCon dc))
-                        -> isEmptyNameEnv (dataConConcreteTyVars dc)
-                      _ -> False
 
     result_subst index_route tvs result
       | Check expected_ty <- expected
