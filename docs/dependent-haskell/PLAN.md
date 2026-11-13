@@ -10,6 +10,21 @@ Last updated: 2026-11-13. Compiler source baseline:
 
 See [current status](README.md) and [primary references](REFERENCES.md).
 
+## Current priority: execute from source
+
+Finish the constructor-interface validation already in progress. Then complete
+M10 through Haskell source. The acceptance program must declare Nat, Vec and
+PackedVec in source. It must construct, unpack and repackage stored vectors.
+Compile a producer and a consumer as separate modules. Do not require a GHC API
+producer to add native declarations or functions.
+
+Implement constructor declaration checking, source pattern checking and
+desugaring in that order. Use the same runtime field identity in later field
+types and in generated Core. Check that an unused bottom or cyclic length
+remains unforced. Check demanded vector behavior separately. Preserve the
+existing signature, proof and ordinary Haskell controls. Record any initial
+source restrictions next to the runnable example.
+
 ## Direction and boundaries
 
 The implementation extends Core. It does not require singleton elaboration or
@@ -846,19 +861,41 @@ withPacked (PackVec n xs) k = k n xs
   Record the corrected source-gate harness separately from the first combined
   CLI invocation. See [the verified checkpoint](README.md#retained-constructor-field-checkpoint).
 - [ ] Preserve the telescope in interface declarations. Reject malformed scope
-  and unsupported promotion before constructing metadata. Version the format if
+  and unsupported promotion with interface diagnostics. Version the format if
   the serialized declaration changes. Keep existing archives immutable.
   Encode aligned optional local names. Decode with fresh sequential Ids and
   deferred field checks. Expose metadata before recursive domain validation.
   Check duplicate/forward/self/inherited references, vacuous binders, distinct
   names after tidying, sibling scope and repeated imports. Preserve an immutable
   version-1 reader before configuring version 2.
-- [ ] Check source constructor declarations and patterns in order. Bind the same
-  runtime identity in the later types and Core fields. Add located diagnostics
-  for invalid field domains, escape and unsupported representation features.
+The first source checkpoint uses one package constructor, prefix constructor
+syntax, bare variable patterns for retained fields, and one eliminator equation.
+Reject unsupported forms with located diagnostics. Keep pattern coverage checks
+active. Multiple equations need coherent substitution of their distinct runtime
+Ids; an ordinary value alias does not establish index equality.
+
+- [ ] Check source constructor declarations in order. `mkGadtDecl` already keeps
+  the retained suffix in `con_res_ty`. Rename this suffix with runtime Names;
+  preserve ordinary constructor renaming. Check it as a telescope and apply
+  `rejigConRes` only to its terminal package result. Preserve the source field
+  metadata directly: `mkDepFunTy` can erase a vacuous binder. Keep the complete
+  scoped telescope through generalization, zonking and result substitution.
+  The earlier kind pass must not inspect unfinished Nat constructor graphs.
+  Check domain kinds there and validate supported domains in the final pass.
+- [ ] Traverse retained field scope in role inference and role validity. A
+  scoped runtime index has a fixed closed domain. Continue checking ordinary
+  payload parameters and their roles. Reject source promotion before requesting
+  the cached promoted constructor. Add located diagnostics for unsupported
+  declaration shapes, invalid domains and escaping fields.
+- [ ] Check source constructor patterns sequentially. Substitute each checked
+  retained field Id into the later field types before checking those patterns.
+  Keep runtime fields out of erased existentials. Use ordinary constructor
+  pattern checking for `withPacked`; its retained callback argument does not
+  make the outer function a native-index equation.
 - [ ] Preserve actual field identities during desugaring. `matchOneConLike`
-  currently calls the gated flat `conLikeInstOrigArgTys`. Instantiate fields
-  sequentially. `selectMatchVar` can retain a bare source field Id for one clause.
+  and PMC's `desugarConPatOut` currently call the gated flat
+  `conLikeInstOrigArgTys`. Instantiate fields sequentially in both paths.
+  `selectMatchVar` can retain a bare source field Id for one clause.
   An ordinary `bindMatchId`/`wrapBind` alias does not prove equality of runtime
   indices. Multiple equations require coherent substitution through each typed
   RHS, pattern and evidence, or checked alias transport. Do not route package

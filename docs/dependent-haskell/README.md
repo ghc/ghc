@@ -28,7 +28,7 @@ Last updated: 2026-11-13.
 | Execution | Nat/Vec and Boolean source programs pass checked bytecode lowering and separate-module machine-code execution |
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
-| Configured fork version | `10.1.20261113.1`, with interface header `1001202611131`; matching libraries rebuilt |
+| Configured fork version | `10.1.20261113.2`, with interface header `1001202611132`; matching compiler and libraries are rebuilding |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, bare fields, and checked source `case` pass the runtime fixtures |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |
@@ -38,10 +38,10 @@ Last updated: 2026-11-13.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Current increment validation | Both stages and libraries, five registered regressions, 277 imported observations, 20 focused closure/worker observations, and 12 guide blocks pass |
+| Last verified checkpoint | Both stages and libraries, five registered regressions, 277 imported observations, 20 focused closure/worker observations, and 12 guide blocks pass |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
-| Stored dependent pairs | Core field telescopes, scoped patterns and nonescape pass bootstrap API checks; source declarations, interfaces and runtime execution remain pending |
-| Next task | Retained constructor declaration/pattern checking and interface field scope, then Nat/Vec package execution; broader inference, unification, native unfoldings and optimization remain open |
+| Stored dependent pairs | Core field telescopes, scoped patterns and nonescape pass bootstrap API checks; the interface codec is under validation; source execution remains pending |
+| Next task | Finish in-flight interface validation, then compile and run a two-module Nat/Vec package entirely from Haskell source; declaration checking, source patterns and desugaring have priority |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type

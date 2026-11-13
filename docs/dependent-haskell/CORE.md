@@ -101,6 +101,9 @@ multiplicity Many. Check the encoded multiplicity, fixed domain, lifted field
 kind and free-runtime scope in deferred decoding. Reject inherited, forward
 and self references. Keep field scope out of the result and sibling constructors.
 Report malformed native metadata through `failIfM` with the constructor name.
+Require an ordinary lifted parent. Check that its cached kind matches its
+binders and result kind. Universal and user binders must name the same distinct
+type variables and declare equal kinds. Reject promotion during type lookup.
 
 Expose constructor metadata before semantic domain validation. An imported
 field can refer to its parent TyCon or another recursive declaration. Reject
