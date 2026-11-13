@@ -400,6 +400,68 @@ The experiment records that uncertainty as `MARRuntimeIndex`. It does not
 declare the indices apart or select a later family clause. This preserves the
 distinction between an unavailable refinement and a disproved constructor case.
 
+### Arithmetic equality proofs
+
+This increment uses an ordinary equality proof value. See
+[the Core contract](CORE.md#arithmetic-equality-proofs) and the
+[singletons comparison](#singletons-and-frontend-elaboration).
+It adds no Nat wrapper or singleton conversion.
+
+Agda stdlib v2.3 proves
+[`+-identityʳ` by induction](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Nat/Properties.agda#L551-L556):
+the zero branch uses `refl`; the successor branch uses `cong suc` on the recursive
+proof. The file blob is `3198ad7f4d783a46d30cc70751a198294d350892`.
+Its equality core defines
+[`cong`](https://github.com/agda/agda-stdlib/blob/v2.3/src/Relation/Binary/PropositionalEquality/Core.agda#L54-L55)
+and [`subst`](https://github.com/agda/agda-stdlib/blob/v2.3/src/Relation/Binary/PropositionalEquality/Core.agda#L82-L83)
+by matching `refl`. That file blob is
+`2db2dd64e1a8bbb9bda6410930e3bd15366719d7`.
+Agda v2.8.0's
+[builtin addition](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Nat.agda#L18-L20)
+recurses on the first argument; its file blob is
+`2b4801f18bb487e2d999304729bf38ac14ca8400`.
+The [builtin equality datatype](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Equality.agda#L6-L9)
+has file blob `22d08dc45b843ed4a3bb9410d38a7508383699c2`.
+The right-identity lemma supplies propositional evidence. It does not add a
+family reduction for neutral `n + 0`.
+
+Agda's
+[`checkConstructorApplication`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L1030-L1071)
+reduces the expected target, checks its datatype, and instantiates the constructor
+with the datatype parameter prefix. It then checks the remaining arguments and
+compares the actual result with the target. The file blob is
+`82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+Our bounded path instead selects immutable candidates per result argument,
+then runs full ordinary subsumption. It applies only to DataCon heads with a
+plain result and no Quick Look path. Existing kind and scope guards remain.
+Constructors with concreteness requirements keep ordinary instantiation.
+Candidate selection does not establish index equality. These are different
+algorithms. Our path does not special-case `Refl` or add a general index solver.
+
+Singletons commit `8c9221c164832bfd17878af94d50d8ade706932d` defines
+[`Decision`, `SDecide`, and `%~`](https://github.com/goldfirere/singletons/blob/8c9221c164832bfd17878af94d50d8ade706932d/singletons/src/Data/Singletons/Decide.hs#L52-L80).
+The method returns `Decision (a :~: b)` from singleton inputs. Reuse the
+proof-value convention, not that input ABI. The file blob is
+`d99fd54b97727d39417dd0650772f4827e35c444`.
+GHC baseline `19ff36f2aede0ca2e554016ff22c71e73aa9803b` already provides
+[`Refl`, `castWith`, and `gcastWith`](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/libraries/ghc-internal/src/GHC/Internal/Data/Type/Equality.hs#L61-L88).
+Its equality guarantee requires a terminating value. The file blob is
+`9b5c8adddc2ed4a48fd844ceb1645aef4e63baae`.
+
+In Haskell, matching `Refl` forces the proof before its local CoVar equality
+becomes available. The recursive right-identity proof can force the complete Nat
+spine. Bottom can raise; cyclic input can diverge. An ignored proof thunk can
+remain lazy. A bottom expression with an equality type does not establish that
+equality. This increment adopts neither Agda's totality assumptions nor its
+function eta laws.
+
+The explicit congruence proof and `rightUnit` control compile with the prior
+checker. The rebuilt stage0 compiler accepts the direct recursive `Refl` proof,
+vector transport, and a user-defined equality GADT with Core and STG Lint.
+Unproved successor `Refl` and `n :~: S n` fail at their RHS expressions.
+The self-hosted regression and separate CLI checks also pass proof transport,
+failure order, lazy ignored proofs, and the located rejection controls.
+
 ## Haskell evaluation provenance
 
 The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)

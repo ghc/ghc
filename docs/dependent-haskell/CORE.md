@@ -131,6 +131,54 @@ See Notes [Normalising retained runtime indices] and
 [the scoped Agda normalization sources](REFERENCES.md#agda-provenance).
 Agda's conversion and eta rules do not add a Haskell function eta law.
 
+## Arithmetic equality proofs
+
+The source subset can return an ordinary `Data.Type.Equality.:~:` proof over a
+runtime Nat. `rightZero :: foreach (n :: Nat) -> Add n Z :~: n` uses induction.
+The zero branch returns `Refl`. The successor branch matches the recursive proof
+and returns `Refl` under its local nominal equality. The solver combines that
+equality with the existing Add axiom and successor congruence. The right-unit
+family application at an opaque index remains stuck without a supplied proof.
+
+`Refl` repeats an invisible index in its result. The two expected indices can
+be equal only under a local Given. The exact immutable result matcher cannot
+select the shared type argument in that case. Ordinary instantiation would
+allocate a meta-variable that the retained-index fill check must reject.
+
+The constructor fallback matches corresponding result arguments separately.
+It selects the first candidate for each outer invisible binder. Every binder
+must have a candidate. The complete substitution must satisfy the substituted
+binder kinds and the existing local runtime-index scope check. No template
+binder can remain free in the candidates. The fallback requires NoQL, an actual
+data constructor, a saturated ordinary algebraic result of the same datatype,
+and no pending type arguments, native template, or constraints. Constructors
+with concreteness requirements keep ordinary instantiation.
+
+The fallback emits ordinary type applications and preserves the actual
+substituted constructor type. `finishAppWithCache` still runs `checkResultTy`
+against the original expected type. Ordinary subsumption must prove every
+remaining equality. Candidate selection supplies no evidence. Both a false
+`n :~: S n` proof and an unproved right-unit `Refl` must fail at the expression.
+See Note [Retained constructor instantiation candidates] in `GHC.Tc.Gen.App`.
+
+Generic argument inference for `forall a. a -> ...` still cannot fill `a` with
+a whole type that contains a retained index. Use an explicit `Refl` case to
+observe the proof. This constructor change does not extend that inference path.
+
+The proof is a lifted value. Matching `Refl` forces it and introduces an ordinary
+GADT CoVar only within its alternative. Merely receiving a proof, or checking it
+inside an unused local expression, supplies no equality to the enclosing body.
+The recursive proof can traverse the whole Nat spine. Bottom raises an exception;
+cyclic input can diverge. An ignored proof thunk can stay lazy. A partial
+application of the transport function must keep its index lazy. These rules use
+the existing GADT lowering and add no Core form or interface format change.
+
+The [pinned arithmetic proof sources](REFERENCES.md#arithmetic-equality-proofs)
+record Agda induction, congruence, and transport, expected-target constructor
+checking, singletons proof values, and GHC's equality datatype. Agda selects
+datatype parameters before checking the target. This fallback selects candidates
+per result argument and keeps full ordinary subsumption. The algorithms differ.
+
 ## Lambda and application
 
 If a runtime lambda's body type mentions a supported runtime binder, its type is

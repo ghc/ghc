@@ -31,7 +31,8 @@ Last updated: 2026-11-13.
 | Configured fork version | `10.1.20261113.1`, with interface header `1001202611131`; matching libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, bare fields, and checked source `case` pass the runtime fixtures |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Current increment validation | Family-axiom normalization passes both-stage build, five registered regressions, bootstrap API/runtime, separate CLI, guide, and ordinary smoke checks |
+| Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |
+| Current increment validation | Arithmetic proofs pass both-stage build, five registered regressions, bootstrap API/runtime, separate CLI, guide, and ordinary smoke checks |
 | Next task | Ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native coercion unfolding codecs, and conservative lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
@@ -851,6 +852,85 @@ Logs use `native-pinorm` in `_build/verification/`. Bootstrap-generated files
 and their hashes are retained in `native-pinorm-bootstrap-work/` there.
 Full normalization with ambient Given or plugin evidence remains future work.
 The signature format is unchanged.
+
+## Arithmetic equality proofs
+
+At `89c5ce92bf`, the source subset proves an arithmetic property of an unknown runtime
+Nat and uses it to transport a vector. Enable `TypeOperators` and import
+`Data.Type.Equality ((:~:)(Refl))`. Use the existing `Nat`, `Vec`, `Add`, and
+`appendNative` definitions:
+
+```haskell
+rightZero :: foreach (n :: Nat) -> Add n Z :~: n
+rightZero Z = Refl
+rightZero (S k) = case rightZero k of Refl -> Refl
+
+rightUnit :: foreach (n :: Nat) -> Vec Int (Add n Z) -> Vec Int n
+rightUnit n xs = case rightZero n of Refl -> xs
+
+appendRightUnit :: foreach (n :: Nat) -> Vec Int n -> Vec Int n
+appendRightUnit n xs = rightUnit n (appendNative @Int n Z xs VNil)
+```
+
+`Add Z n` reduces directly. `Add n Z` at an unknown `n` needs the induction
+proof. The successor branch uses the recursive equality under `Refl`; the
+checker combines it with successor congruence and the Add equation. An ordinary
+`congruentSuccessor Refl = Refl` helper can express the same step. This follows
+[Agda's right-identity proof and transport](REFERENCES.md#arithmetic-equality-proofs)
+and the existing Haskell equality datatype. The native function receives the
+actual Nat, with no singleton wrapper.
+
+The constructor checker now selects immutable type arguments from the expected
+result before ordinary subsumption proves the full equality. This permits the
+direct recursive `Refl` spelling. The fallback applies to supported data
+constructor heads. It does not assign retained syntax to a meta-variable.
+See [the checking and evaluation contract](CORE.md#arithmetic-equality-proofs).
+
+Matching `Refl` forces the proof. The recursive proof can force the complete Nat
+spine. An ignored proof remains lazy; a bottom proof establishes no equality.
+The transport therefore has runtime proof work. GHC does not check termination.
+The fixture checks finite unknown lengths 0, 2, and 3, ignored bottom and cyclic
+proofs, lazy partial applications, proof-before-payload failure, and rejection
+when a supplied proof is not matched or its equality leaves its branch.
+
+The focused bootstrap compiler check passes direct and congruence proofs,
+vector transport, and a user-defined equality GADT with Core and STG Lint.
+Unproved successor `Refl` and `n :~: S n` fail with GHC-83865 at the actual RHS.
+The both-stage build passed in 7m58s at 5,191 MiB under 16 GiB. All five
+registered normal-way regressions passed: 39 cases, 34 skipped, no unexpected
+results or framework warnings. The command took 1m11s at 2,419 MiB under 8 GiB.
+The test driver took 8.5 seconds. The bootstrap API and expanded runtime fixture
+pass together at 980 MiB under 4 GiB.
+
+The runtime fixture checks 17 dedicated proof observations, five exception-order
+cases, and four GHC-83865 rejection controls. The interface-only consumer now
+has 55 observations: the previous 38 plus the same 17 proof observations.
+Separate CLI processes pass all 55, five proof exception-order observations,
+the user-defined equality GADT, and four proof negatives at their actual RHS
+lines. The earlier eight partial/application observations, nine standalone
+observations, four source-case strictness observations, ordinary diagnostics,
+and both interface format-rejection directions still pass.
+
+All five literal Nat/Vec guide blocks compile together with Core and STG Lint.
+Ordinary optimized Template Haskell, package, GHCi, and Haddock smoke checks pass.
+The final serial CLI, guide, and smoke scope peaked at 157 MiB under 4 GiB.
+All build and verification scopes disabled swap. Both existing fixtures pass
+canonical Fourmolu. The compiler source passes a nonmutating Fourmolu parse,
+and cabal-gild passes.
+
+Generic `forall a. a -> ...` argument inference still rejects a whole type that
+contains a retained index. The CLI records this GHC-83865 at the actual RHS.
+The proof evaluation checks use explicit `Refl` cases. General retained
+inference and ambient-evidence normalization under Pi remain open.
+
+Successful logs use `native-proof-api`, `native-proof-runtime`,
+`native-proof-registered`, `native-proof-cli`, `native-proof-extra-cli`,
+`native-proof-runtime-cli`, `native-proof-guide`, and `native-proof-smoke` in
+`_build/verification/`. The final CLI scope log is
+`native-proof-cli-after-import-fix.log`. The first wrapper stopped at an import
+collision in its standalone control; the corrected control hides the producer's
+proof names. Bootstrap-generated files and their hashes are retained in
+`native-proof-bootstrap-work/`. The signature format is unchanged.
 
 ## Verified baseline
 

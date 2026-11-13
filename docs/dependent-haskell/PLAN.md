@@ -602,6 +602,25 @@ and three, `append n m (replicate n 42) (replicate m 7)` must observe
 at unknown `n`, a vector at `n` where `S n` is required, and an unrelated runtime
 index. Keep `Add n m` distinct from `Add m n` without a supplied proof.
 
+### Arithmetic proof increment
+
+Use the existing lifted `:~:` datatype to prove `Add n Z :~: n` by induction
+on a retained runtime Nat. Transport a vector only after matching `Refl`.
+Follow [the pinned Agda and singletons sources](REFERENCES.md#arithmetic-equality-proofs).
+
+- [x] Select immutable constructor type arguments from the expected result.
+      Keep full ordinary result checking, kind checks, and runtime-index scope.
+- [x] Run finite proofs and vector transport at unknown lengths 0, 2, and 3.
+      Check direct source execution and interface-only imported execution.
+- [x] Preserve ignored proof and index thunks, including bottom and cyclic input.
+      Check proof failure before vector-payload failure. Keep partial transport lazy.
+- [x] Reject unproved equalities, unused proof arguments, and branch-evidence escape.
+- [x] Complete both-stage build, existing registered regressions, CLI, and guide checks.
+
+See [the Core contract](CORE.md#arithmetic-equality-proofs). This increment adds
+no equality axiom, Core form, singleton wrapper, or interface format change.
+Ambient-evidence normalization under Pi and general retained inference remain open.
+
 ## Acceptance checks
 
 | ID | Required result |
