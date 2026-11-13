@@ -737,13 +737,39 @@ one retained match dispatcher. Previously, the lambda form failed with GHC-83865
       located diagnostics for invalid branches and unsupported inference.
 - [x] Preserve the runtime binder and strictness for empty-domain lambda-cases.
       Keep empty source cases in their original context.
-- [ ] Complete both-stage builds, registered regressions, separate module
+- [x] Complete both-stage builds, registered regressions, separate module
       execution, ordinary controls, formatting, and the checkpoint.
 
 Follow [the contract](CORE.md#checked-source-lambdas) and
 [Agda's expected-Pi and extended-lambda rules](REFERENCES.md#checked-retained-lambdas).
 This step does not enable retained syntax in new type positions or general native
 metavariable assignment. Keep broader inference and optimizer gates.
+Implementation: `a0c493d5f9`. See the
+[verified checkpoint](README.md#checked-retained-lambdas).
+
+### Explicit higher-order arguments follow-up
+
+Start with a closed retained function type in an ordinary argument position:
+`applyAt :: foreach (n :: Nat) -> (foreach (m :: Nat) -> Vec Int m -> Vec Int m)
+-> Vec Int n -> Vec Int n`, with `applyAt n f xs = f n xs`.
+The parameter `f` is an ordinary closure argument. It is not a runtime index.
+
+- [ ] Admit this nested type in complete value signatures. Preserve each nested
+      binder's scope. Keep type-level declaration and index-domain restrictions.
+- [ ] Check named functions and lambdas against the supplied argument type.
+      Use the existing application checker and checked-lambda rule.
+- [ ] Verify separate-module execution with unknown runtime indices. Check that
+      ignoring a bottom function stays lazy. Check unused bottom indices too.
+- [ ] Reject wrong vector lengths, escaping indices, unsupported domains, and
+      function-valued runtime indices with located diagnostics.
+- [ ] Keep inferred aliases, general native meta assignment, Quick Look, and
+      structural Pi unification gated. Assess erased polymorphism separately.
+
+The renamer and signature checker currently reject the nested type. Core Lint
+and validity already check the contained retained telescope recursively.
+Agda's expected-argument and scoped-Pi lambda rules provide the checking
+precedent. See [the pinned sources](REFERENCES.md#checked-retained-lambdas).
+Ordinary-leading higher-order signatures can follow after this bounded case.
 
 ## Acceptance checks
 

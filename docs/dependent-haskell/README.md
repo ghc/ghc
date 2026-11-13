@@ -37,8 +37,8 @@ Last updated: 2026-11-13.
 | Source contexts | Class and equality contexts after retained binders pass variable, constructor, and explicit case checking |
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
-| Current increment validation | Bootstrap API/runtime and 226 imported observations pass; the both-stage build and final registered and CLI checks are pending |
-| Next task | Ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native coercion unfolding codecs, and conservative lowering gaps remain open |
+| Current increment validation | Both-stage build, five registered regressions, bootstrap API/runtime, 226 imported CLI observations, ten native guide blocks, and ordinary smoke checks pass |
+| Next task | Explicit higher-order closure arguments; ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native unfolding codecs, and lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -1280,8 +1280,36 @@ The shared fixture appends 30 observations to the previous 196. It also checks
 four located lambda rejections and two empty-domain bottom exceptions. The
 bootstrap runtime and API kernel pass. Separate probes check explicit outer type
 patterns, linear captures, and the existing inference and type-position limits.
-The final both-stage build, registered tests, and standalone CLI validation are
-pending. Artifacts use `_build/verification/native-checked-lambda-`.
+
+The implementation checkpoint is `a0c493d5f9`. Both compiler stages and matching
+libraries build in 8 minutes 26 seconds. The scope peaks at 4,833 MiB under a
+16 GiB cap. All five registered normal-way tests pass: 39 cases, 34 skips,
+five expected passes, and no unexpected results or framework failures or warnings.
+The driver takes 9.6 seconds. The command takes 1 minute 13 seconds and peaks at
+2,492 MiB under an 8 GiB cap. The final bootstrap scope peaks at 1,000 MiB
+under a 4 GiB cap.
+
+Separate CLI processes reproduce all 226 imported observations with Core and
+STG Lint. Six new lambda rejections have the expected codes and source locations.
+Empty lambdas with trailing class and equality contexts compile. Four strictness
+controls include ordinary empty-case behavior. STG keeps arity one for `\case`
+and arity two for `\cases`. The ignored-index worker has no case.
+
+Earlier proof, linear, source-case, interface-version, and ordinary typing checks
+pass. All ten literal native guide blocks compile. Single-expansion TH, nested
+typed splices, static pointers, optimized package execution, GHCi, and Haddock
+startup pass. The initial CLI scope peaks at 210 MiB under a 4 GiB cap.
+A copied TH fixture used its old counter path. The corrected remaining checks
+pass in a separate scope with a 167 MiB peak. All scopes use no swap.
+The full GHC testsuite was not run.
+
+Artifacts use `_build/verification/native-checked-lambda-`. The final bootstrap
+logs are `runtime-v4.log`, `api.log`, and `bootstrap-v3.log`. Build and registered
+logs end in `full-build.log` and `registered.log`. CLI evidence spans
+`final-cli.log` and `final-remainder.log`; the latter records the corrected TH
+fixture and remaining checks. The bootstrap archive has 27 checksummed files,
+including three STG dumps. The source manifest covers 11 compiler files and both
+API fixtures. Fourmolu, compiler-file parsing, cabal-gild, and diff checks pass.
 
 This checks an expected native type. It adds no new Core form, singleton ABI, or
 interface format. Retained syntax in nested type positions, general native
