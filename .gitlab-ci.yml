@@ -963,6 +963,7 @@ test-primops-label:
       # where we do not have the normal validate jobs. We have the -nightly job
       # below to handle this case.
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
 
 test-primops-nightly:
   extends: .test-primops
