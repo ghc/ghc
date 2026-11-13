@@ -6,7 +6,7 @@ import Control.Exception (IOException, SomeException, displayException, evaluate
 import Control.Monad (forM_, unless)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef (modifyIORef', newIORef, readIORef)
-import Data.List (isInfixOf)
+import Data.List (find, foldl', isInfixOf, sort)
 import GHC (DynFlags, getSession, getSessionDynFlags, runGhc)
 import GHC.Builtin.WiredIn.Prim (intPrimTy)
 import GHC.Builtin.WiredIn.Types
@@ -18,6 +18,7 @@ import GHC.Core.Dependent
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, normaliseType)
 import GHC.Core.Lint (lintExpr)
+import GHC.Core.Map.Type (LooseTypeMap, TypeMap, emptyTypeMap)
 import GHC.Core.Predicate (mkNomEqPred, mkReprEqPred)
 import GHC.Core.Reduction (Reduction (..))
 import GHC.Core.SimpleOpt (simpleOptNativeExpr)
@@ -37,6 +38,7 @@ import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.IOEnv (IOEnvFailure)
 import GHC.Data.StringBuffer (stringToStringBuffer)
+import qualified GHC.Data.TrieMap as Trie
 import GHC.Driver.Config.Core.Lint (initLintConfig)
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Env (HscEnv (..), hscUpdateFlags)
@@ -86,6 +88,7 @@ main = do
             runSyntaxChecks dflags
             runChecks dflags
             runMatchingChecks dflags
+            runTypeMapChecks
             runCaseChecks dflags
             runNatChecks dflags
             runDepFunCoChecks dflags
@@ -116,6 +119,110 @@ keep b n = Lam b (identity n (indexed (TermVarTy b)))
 -- | Build the expected ordinary result of applying keep to an index.
 keepResult :: Type -> Type
 keepResult index = mkFunctionType ManyTy (indexed index) (indexed index)
+
+-- | Check native type keys against equality and exercise all public trie operations.
+runTypeMapChecks :: IO ()
+runTypeMapChecks = do
+    let b = local 700 "b" boolTy
+        c = local 701 "b" boolTy
+        d = local 702 "b" boolTy
+        e = local 703 "b" boolTy
+        free = local 704 "free" boolTy
+        otherFree = local 705 "free" boolTy
+        (nat, _, _) = peanoNat
+        natTy = mkTyConTy nat
+        n = local 706 "n" natTy
+        tv = mkTyVar (mkSystemName (unique 700) (mkTyVarOcc "b")) boolTy
+        at v = mkFunctionType ManyTy (mkTyConApp eqTyCon [varType v, TermVarTy v, TermVarTy v]) intTy
+        atB = at b
+        body x y = mkFunctionType ManyTy x y
+        piB = mkDepFunTy b (body atB atB)
+        piC = mkDepFunTy c (body (at c) (at c))
+        boundFree = mkDepFunTy c (body (at c) atB)
+        piN = mkDepFunTy n (body (at n) (at n))
+        nested x y = mkDepFunTy x (mkDepFunTy y (body (at x) (at y)))
+        nestedFree x y z = mkDepFunTy x (mkDepFunTy y (body (at x) (body (at y) (at z))))
+        predicate = mkTyConApp eqTyCon [boolTy, TermVarTy b, TermVarTy b]
+        entries :: [(Type, Int)]
+        entries =
+            [ (TermVarTy b, 1)
+            , (TermVarTy c, 2)
+            , (piB, 3)
+            , (piN, 4)
+            , (nested b c, 5)
+            , (nestedFree b c free, 6)
+            , (TyVarTy tv, 7)
+            , (predicate, 8)
+            , (intTy, 9)
+            , (boolTy, 10)
+            ]
+        probes =
+            zipWith (\i (ty, _) -> ("inserted key " ++ show i, ty)) [1 :: Int ..] entries
+                ++ [ ("alpha-equivalent binder", piC)
+                   , ("shared bound/free subtree", boundFree)
+                   , ("nested alpha-equivalent binders", nested d e)
+                   , ("nested binder order", mkDepFunTy d (mkDepFunTy e (body (at e) (at d))))
+                   , ("nested shared free identifier", nestedFree d e free)
+                   , ("nested distinct free identifier", nestedFree d e otherFree)
+                   , ("absent free identifier", TermVarTy free)
+                   ]
+        typed = foldl' (\m (ty, value) -> Trie.insertTM ty value m) emptyTypeMap entries
+        loose = foldl' (\m (ty, value) -> Trie.insertTM ty value m) (Trie.emptyTM :: LooseTypeMap Int) entries
+        updated = [(ty, if eqType ty piB then value + 100 else value) | (ty, value) <- entries]
+        deleted = [(ty, value) | (ty, value) <- entries, not (eqType ty (TermVarTy b) || eqType ty piN)]
+        mapped = [(ty, value * 10) | (ty, value) <- entries]
+        filtered = [(ty, value) | (ty, value) <- entries, odd value]
+        partial = [(ty, value + 1000) | (ty, value) <- entries, even value]
+        keepEven value = if even value then Just (value + 1000) else Nothing
+        typedStates :: [(String, [(Type, Int)], TypeMap Int)]
+        typedStates =
+            [ ("multi map", entries, typed)
+            , ("alpha update", updated, Trie.alterTM piC (fmap (+ 100)) typed)
+            , ("delete native keys", deleted, Trie.deleteTM piN (Trie.deleteTM (TermVarTy b) typed))
+            , ("fmap", mapped, fmap (* 10) typed)
+            , ("filter", filtered, Trie.filterTM odd typed)
+            , ("mapMaybe", partial, Trie.mapMaybeTM keepEven typed)
+            , ("empty filter", [], Trie.filterTM (const False) typed)
+            , ("delete all", [], foldl' (flip Trie.deleteTM) typed (map fst entries))
+            ]
+        looseStates :: [(String, [(Type, Int)], LooseTypeMap Int)]
+        looseStates =
+            [ ("multi map", entries, loose)
+            , ("alpha update", updated, Trie.alterTM piC (fmap (+ 100)) loose)
+            , ("delete native keys", deleted, Trie.deleteTM piN (Trie.deleteTM (TermVarTy b) loose))
+            , ("fmap", mapped, fmap (* 10) loose)
+            , ("filter", filtered, Trie.filterTM odd loose)
+            , ("mapMaybe", partial, Trie.mapMaybeTM keepEven loose)
+            , ("empty filter", [], Trie.filterTM (const False) loose)
+            , ("delete all", [], foldl' (flip Trie.deleteTM) loose (map fst entries))
+            ]
+        states =
+            [("TypeMap " ++ label, expected, \ty -> Trie.lookupTM ty m, Trie.foldTM (:) m []) | (label, expected, m) <- typedStates]
+                ++ [("LooseTypeMap " ++ label, expected, \ty -> Trie.lookupTM ty m, Trie.foldTM (:) m []) | (label, expected, m) <- looseStates]
+    check "type map native alpha equality" (eqType piB piC && eqType (nested b c) (nested d e))
+    check "type map bound/free equality differs" (not (eqType piB boundFree))
+    check "type map runtime/type variable namespace differs" (not (eqType (TermVarTy b) (TyVarTy tv)))
+    forM_ states $ \(label, expected, lookupValue, values) -> do
+        forM_ probes $ \(probe, ty) ->
+            check (label ++ ": " ++ probe) (lookupValue ty == fmap snd (find (\(key, _) -> eqType key ty) expected))
+        check (label ++ ": fold values") (sort values == sort (map snd expected))
+    let singletonTyped :: TypeMap Int
+        singletonTyped = Trie.insertTM piB 3 emptyTypeMap
+        singletonLoose = Trie.insertTM piB 3 (Trie.emptyTM :: LooseTypeMap Int)
+    check "TypeMap singleton alpha equality" (Trie.lookupTM piC singletonTyped == Just 3)
+    check "LooseTypeMap singleton alpha equality" (Trie.lookupTM piC singletonLoose == Just 3)
+    check "TypeMap singleton shared bound/free mismatch" (Trie.lookupTM boundFree singletonTyped == Nothing)
+    check "LooseTypeMap singleton shared bound/free mismatch" (Trie.lookupTM boundFree singletonLoose == Nothing)
+    let termSingleton = Trie.insertTM (TermVarTy b) 1 (Trie.emptyTM :: LooseTypeMap Int)
+    check "native singleton distinguishes free identifiers" (Trie.lookupTM (TermVarTy c) termSingleton == Nothing)
+    check "native singleton distinguishes variable namespaces" (Trie.lookupTM (TyVarTy tv) termSingleton == Nothing)
+    let otherKind = TermVarTy (setIdType b natTy)
+        kindMap :: TypeMap Int
+        kindMap = Trie.insertTM otherKind 2 (Trie.insertTM (TermVarTy b) 1 emptyTypeMap)
+    check "TypeMap native keys have distinct kinds" (not (eqType (typeKind (TermVarTy b)) (typeKind otherKind)))
+    check "TypeMap preserves native Bool kind key" (Trie.lookupTM (TermVarTy b) kindMap == Just 1)
+    check "TypeMap preserves native Nat kind key" (Trie.lookupTM otherKind kindMap == Just 2)
+    check "TypeMap folds both native kind entries" (sort (Trie.foldTM (:) kindMap []) == [1, 2])
 
 -- | Construct an ordinary recursive datatype without wired-in constructor Names.
 peanoNat :: (TyCon, DataCon, DataCon)

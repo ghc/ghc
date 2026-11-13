@@ -562,7 +562,7 @@ enclosing Givens. The retained path uses its own origin and preserves them.
 The earlier Note [Reflexive retained equality evidence] records why outer
 evidence bindings were insufficient for runtime indices.
 
-### Future type-map equality
+### Native type-map equality
 
 Agda v2.8.0's
 [`Var` and `Pi` representation](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs#L221-L264)
@@ -574,17 +574,22 @@ compares variable indices. Its
 ignores binder names and weakens bodies when needed. The `Substitute.hs` blob is
 pinned above. The pinned
 [`compareDom`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L849)
-compares domains before extending the context for codomains. These are references
-for future native type-map keys: reuse GHC's `eqDeBruijnVar`, keep native key
-forms distinct, and compare the domain outside the extended body scope. This
-would add no index evaluation or family equations.
+compares domains before extending the context for codomains. The native type-map
+keys reuse GHC's `eqDeBruijnVar`, keep native key forms distinct, and compare the
+domain outside the extended body scope. This adds no index evaluation or family
+equations. See Note [Native type-map keys] in `GHC.Core.Map.Type`.
 
-Native type-map support is not implemented in this increment. Eight stage1
+The generic-consumer checkpoint `c90959323a` did not need native map support. Eight stage1
 adversarial controls include plain and successor mismatches, class constraints,
 let bindings, and repeated generic arguments. They report
 located GHC-83865, GHC-91028, or GHC-83605 errors without a panic. These results
 do not establish rejection behavior for all invalid programs. No type-map change
-was needed for the tested generic inference cases.
+was needed for those generic inference cases. The class-consumer prototype then
+reached dictionary-key comparison and reproduced `eqDeBruijnType: unsupported
+runtime index`. Its log is retained as
+`_build/verification/native-class-prototype-map-panic.log`. The native map
+implementation handles singleton equality and trie lookup, update, mapping,
+filtering, and folding with the same scope rules.
 
 ## Haskell evaluation provenance
 

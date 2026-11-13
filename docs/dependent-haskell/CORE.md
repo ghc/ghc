@@ -255,6 +255,14 @@ between the indices. Transport still requires explicit equality evidence.
 Source-written class contexts containing runtime binders remain outside this
 increment. See [the primary instance-context sources](REFERENCES.md#retained-class-consumers).
 
+Native dictionary predicates also require native type-map keys. Keep `TermVarTy`
+separate from `TyVarTy`. Bound runtime Ids compare by de Bruijn position; free
+Ids compare by Unique. For `DepFunTy`, compare the domain in the outer context
+and the body under the extended context. Keep retained functions separate from
+ordinary arrows and erased foralls. Singleton equality and trie operations must
+use the same rules. Preserve synonym, cast, and kind handling. This support does
+not enable native family-cache reuse under a Pi binder or ordinary optimization.
+
 ## Lambda and application
 
 If a runtime lambda's body type mentions a supported runtime binder, its type is
