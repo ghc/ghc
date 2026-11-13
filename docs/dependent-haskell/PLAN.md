@@ -701,8 +701,20 @@ The equivalent constructor equations pass.
 
 - [ ] Pass index-dependent Givens with the generalized case captures. Transport
       them with each branch proof and preserve the full function arity.
-- [ ] Check no-instance dictionaries, derived tuple evidence, local bindings,
-      and partial application through explicit source cases.
+- [ ] Record lexical native evidence parameters at their scope entry. Preserve
+      enclosing parameters in nested scopes. Exclude them inside static forms.
+- [ ] Generalize predicates with native type substitution. Pass the original
+      evidence after the index and before captured values. Handle CoVars through
+      evidence applications and coercion transport.
+- [ ] Check no-instance dictionaries, derived tuple evidence, equality, nested
+      cases, local bindings, and partial application through explicit source cases.
+- [ ] Complete both-stage builds, registered regressions, interface-only
+      execution, ordinary controls, formatting, and the checkpoint.
+
+Follow Agda's dependent-context generalization and instance-binder scope. Use
+GHC's existing evidence representation and checked branch proofs. See
+[the case contract](CORE.md#explicit-case-evidence) and
+[the pinned compiler sources](REFERENCES.md#source-case-evidence).
 
 ## Acceptance checks
 

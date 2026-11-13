@@ -626,6 +626,49 @@ Checking a source context introduces Givens. Application-side instance search
 supplies arguments. Neither operation evaluates a runtime index to obtain a
 singleton witness.
 
+### Source case evidence
+
+Agda v2.8.0 generalizes dependent instance arguments with the context of a
+with-expression. This supplies scope and substitution prior art for an explicit
+GHC case that captures incoming dictionaries.
+
+- [`withFunctionType`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/With.hs#L101-L173)
+  partitions the original telescope and abstracts the scrutinee from the trailing
+  telescope and result. It does not select arguments by source-name occurrence.
+  File blob: `fb84d352f3c6b2e786a0c095c74c5bee15e533cf`.
+- [`splitTelescope`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Telescope.hs#L238-L258)
+  permutes complete domains. Domain
+  [substitution](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Substitute.hs#L1072-L1077)
+  preserves argument metadata, and
+  [`telePiPath`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Telescope/Path.hs#L42-L59)
+  reconstructs Pi binders with the original domains. An instance binder keeps its
+  instance annotation. File blobs, in link order:
+  `4631c0ea381c47e1fe717f2bbf26b94497f5eb4e`,
+  `1ef41f6d2a0223c8328984903b60dabc2a05a783`, and
+  `0c94c01971a1e140c7e873ca9ef3206cb72a3620`.
+- [`splitCon`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1503-L1531)
+  specializes the whole later telescope and target with the constructor
+  substitution. This includes dependent instance types.
+  File blob: `3779ffa6e418bca99e30c071e189106f82ecbe1b`.
+- [`getContextCands`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/InstanceArguments.hs#L115-L143)
+  obtains instance-marked variables from the current context. This connects the
+  preserved instance annotation to instance lookup.
+  File blob: `d2c8d6d1fd74b1fd8771ab1525fe872c861d22dd`.
+- The [helper substitution](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Def.hs#L1106-L1117)
+  uses all original context arguments. The
+  [helper application](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Def.hs#L1201-L1215)
+  supplies those arguments and checks the generated type without residual
+  constraints. File blob: `0532811dabeb3a7e6dd3f08cfa18c08472072fe1`.
+- The [instance-annotated with-expression](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/with-abstraction.lagda.rst#L344-L358)
+  gives a source example. File blob:
+  `ff0888af84f3101351c501534de087c180dc7afd`.
+
+GHC must pass its actual lexical evidence parameters into the helper. A dictionary
+can be needed without a resolved source `Name` referring to it. Transport the
+original class dictionary; let GHC derive superclass evidence in the branch.
+Agda supplies context scope and specialization precedent. Its normalization and
+eta contraction do not establish Haskell evaluation laws or FC evidence rules.
+
 ## Haskell evaluation provenance
 
 The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)

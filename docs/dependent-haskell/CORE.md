@@ -302,6 +302,30 @@ runtime index's laziness. See the
 hidden-argument scope. Haskell evaluation and GHC dictionary transport use the
 existing local rules. This increment keeps the native interface format unchanged.
 
+### Explicit case evidence
+
+An explicit dependent case must generalize incoming evidence as well as captured
+values. Record the actual lexical evidence parameters while checking their scope.
+Select the parameters whose predicate depends on the scrutinee. Include primitive
+equality CoVars. Substitute the fresh index into these predicates with the native
+type substitution. A predicate has kind `Constraint`; it is not a retained
+function result.
+
+Put the shared evidence parameters after the fresh index and before the captured
+values. Apply the generated helper to the original index, evidence, and values.
+Supply every generated argument before the constructor case can run. Transport
+each predicate with the checked branch proof. Let the ordinary solver derive
+superclasses from the transported dictionaries. Do not search for replacement
+instances or enumerate derived evidence. Static forms must exclude enclosing
+evidence, as on the ordinary constraint solver path.
+
+Keep the existing complete, unguarded constructor pattern rule. An explicit case
+must inspect its index before returning a branch lambda. The evidence transport
+must not inspect a dictionary, a captured value, or an unused constructor field.
+Check no-instance Givens, tuples, equality evidence, nested cases, local bindings,
+and partial application. The implementation must preserve the current interface
+format and dictionary ABI.
+
 ## Lambda and application
 
 If a runtime lambda's body type mentions a supported runtime binder, its type is
