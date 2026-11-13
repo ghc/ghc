@@ -462,6 +462,96 @@ Unproved successor `Refl` and `n :~: S n` fail at their RHS expressions.
 The self-hosted regression and separate CLI checks also pass proof transport,
 failure order, lazy ignored proofs, and the located rejection controls.
 
+### Generic retained argument inference
+
+This increment lets an ordinary polymorphic consumer accept a type that contains
+a runtime index. For example, `force :: forall a. a -> IO String` can accept
+`rightZero n`. See [the Core contract](CORE.md#generic-retained-argument-inference).
+The erased argument `a` has kind `Type`. The earlier native-index-kind cache
+does not select it.
+
+Agda v2.8.0 inserts metas for hidden arguments in
+[`implicitNamedArgs`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Implicit.hs#L70-L101).
+Its [`newMetaArg`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Implicit.hs#L114-L124)
+requests an occurs check. The file blob is
+`55a03200d2300486c91a95798fc8e0c3c9c675cf`.
+The implicit form is `{A : Set} -> A -> ...`; `(A : Set)` is explicit.
+
+[`checkArgumentsE'`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+checks an argument against its Pi domain. It records the checked elimination and
+substitutes the checked term into the codomain.
+[`addCheckedArgs`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L833-L844)
+retains checked arguments on success and postponement.
+[`checkHeadApplication`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L449-L465)
+also checks the actual application result against the expected type. The file
+blob is `82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+[`checkNamedArg` and `inferExpr`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L1535-L1587)
+connect argument checking to expression inference. Their file blob is
+`02991c9fa0085315cc854d2833a9080af14a7740`.
+
+Agda's metas can depend on their creation context.
+[`newValueMeta`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars.hs#L282-L321)
+abstracts over the current telescope. Assignment
+[checks allowed variables](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars.hs#L1005-L1045)
+and [renames the solution into the meta context](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars.hs#L1272-L1313).
+The file blob is `13f52cb7f2a08ac55f62e326564043470e62f6f6`.
+These are scoped mutable assignments. They do not justify native assignments to
+GHC's ordinary type metas. Agda can reduce terms during conversion. This
+experiment keeps runtime indices opaque and does not evaluate a proof to infer
+its type.
+
+Our bounded algorithm uses immutable type applications. It requires NoQL, a
+saturated ordinary tau signature, no visible type arguments, and an ordinary
+head without concreteness requirements. A read-only classifier identifies named
+argument spines and known Ids whose types contain native syntax. It looks through
+applications, type applications, parentheses, pragmas, and already expanded
+expressions. It does not expand syntax or execute a splice. A known native Id
+permits caching other named arguments, including bare constructors such as
+`True` or `Nothing`. Top-level lambdas, literals, cases, and lets retain
+expected-type checking. A nested named application checks its own arguments by
+the ordinary application rules.
+
+The expected result seeds the immutable substitution first. The cache infers
+only eligible domains that mention undetermined outer binders. Every binder must
+have a candidate with the correct kind and runtime scope. Cached actual types
+must match the substituted formal types exactly. The generic route applies its
+substitution only when an actual type argument contains native syntax. It emits
+each saved usage once and retains argument and final-result subsumption. The
+earlier index-kind route remains unchanged.
+
+See `Note [Generic retained argument inference]`,
+`Note [Cached retained argument inference]`, and `Note [Quick Look overview]` in
+[`GHC.Tc.Gen.App`](../../compiler/GHC/Tc/Gen/App.hs).
+Quick Look uses mutable instantiation variables. This bounded NoQL route does
+not implement that algorithm or Agda's meta solver. Bootstrap, self-hosted, and
+separate CLI checks pass as of 2026-11-13. Controls also cover ordinary GADT,
+rank-n, and higher-kinded applications, linear usage rejection, and one-time
+Template Haskell expansion.
+
+### Future type-map equality
+
+Agda v2.8.0's
+[`Var` and `Pi` representation](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs#L221-L264)
+uses de Bruijn indices and explicit binder bodies. The file blob is
+`a6e0938ed369b1f0f5f0b8aa1ff3baeb9aad033b`.
+Its [syntactic equality](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Substitute.hs#L1446-L1458)
+compares variable indices. Its
+[`Abs` equality](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Substitute.hs#L1524-L1533)
+ignores binder names and weakens bodies when needed. The `Substitute.hs` blob is
+pinned above. The pinned
+[`compareDom`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L849)
+compares domains before extending the context for codomains. These are references
+for future native type-map keys: reuse GHC's `eqDeBruijnVar`, keep native key
+forms distinct, and compare the domain outside the extended body scope. This
+would add no index evaluation or family equations.
+
+Native type-map support is not implemented in this increment. Eight stage1
+adversarial controls include plain and successor mismatches, class constraints,
+let bindings, and repeated generic arguments. They report
+located GHC-83865, GHC-91028, or GHC-83605 errors without a panic. These results
+do not establish rejection behavior for all invalid programs. No type-map change
+was needed for the tested generic inference cases.
+
 ## Haskell evaluation provenance
 
 The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)

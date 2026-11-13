@@ -32,7 +32,8 @@ Last updated: 2026-11-13.
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, bare fields, and checked source `case` pass the runtime fixtures |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |
-| Current increment validation | Arithmetic proofs pass both-stage build, five registered regressions, bootstrap API/runtime, separate CLI, guide, and ordinary smoke checks |
+| Generic consumers | Ordinary `force`, `id`, `Just`, and `const` accept named retained values; linear proof use and retained-function WHNF pass |
+| Current increment validation | Generic consumers pass both-stage build, five registered regressions, bootstrap API/runtime, separate CLI, ordinary typing/TH controls, guide, and smoke checks |
 | Next task | Ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native coercion unfolding codecs, and conservative lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
@@ -918,10 +919,10 @@ All build and verification scopes disabled swap. Both existing fixtures pass
 canonical Fourmolu. The compiler source passes a nonmutating Fourmolu parse,
 and cabal-gild passes.
 
-Generic `forall a. a -> ...` argument inference still rejects a whole type that
-contains a retained index. The CLI records this GHC-83865 at the actual RHS.
-The proof evaluation checks use explicit `Refl` cases. General retained
-inference and ambient-evidence normalization under Pi remain open.
+At this checkpoint, generic `forall a. a -> ...` argument inference rejected a
+whole type that contained a retained index. The next increment below accepts
+named argument spines. General retained inference and ambient-evidence
+normalization under Pi remain open.
 
 Successful logs use `native-proof-api`, `native-proof-runtime`,
 `native-proof-registered`, `native-proof-cli`, `native-proof-extra-cli`,
@@ -931,6 +932,91 @@ Successful logs use `native-proof-api`, `native-proof-runtime`,
 collision in its standalone control; the corrected control hides the producer's
 proof names. Bootstrap-generated files and their hashes are retained in
 `native-proof-bootstrap-work/`. The signature format is unchanged.
+
+## Generic retained consumers
+
+At `c90959323a`, ordinary polymorphic functions can consume named values whose types contain
+runtime indices. The inferred erased type argument can be a whole proof type,
+a vector type, or a retained dependent function type. With the preceding Nat
+and proof definitions, these examples use ordinary signatures:
+
+```haskell
+force :: a -> IO String
+force x = x `seq` pure "forced"
+
+ignoreAny :: a -> Int
+ignoreAny _ = 42
+
+forceProof :: Nat -> IO String
+forceProof n = force (id (rightZero n))
+
+forceBoxedProof :: Nat -> IO String
+forceBoxedProof n = force (Just (rightZero n))
+
+ignoreProofValue :: Nat -> Int
+ignoreProofValue n = ignoreAny (rightZero n)
+
+forceRetainedFunction :: Nat -> IO String
+forceRetainedFunction n = force (id (appendNative @Int n))
+```
+
+`forceProof` forces the recursive proof and can force the complete Nat spine.
+`forceBoxedProof` forces only `Just`, so its proof stays lazy at bottom and
+cyclic indices. `ignoreProofValue` returns 42 without forcing its proof.
+`forceRetainedFunction` observes the partial function's closure and keeps its
+index lazy. Inference selects type arguments; it does not evaluate these values.
+
+The checker extends the existing typed-argument cache. A known native Id in a
+named argument spine enables immutable inference for the call. Other named
+arguments can determine remaining binders, including `const proof Nothing`.
+The expected result can determine binders first. Lambdas, literals, and other
+checking-dependent forms keep their expected-type checks. Complete candidates,
+kind and runtime-index scope checks, exact cached-type agreement, and ordinary
+subsumption remain required. Source classification does not expand splices.
+See [the contract](CORE.md#generic-retained-argument-inference) and
+[the pinned Agda application and meta-context sources](REFERENCES.md#generic-retained-argument-inference).
+
+The bootstrap fixture adds 34 generic observations after the previous 55,
+for 89 imported observations. These cover ordinary consumers, linear proof
+consumption, and retained-function values. Generic proof forcing also has
+bottom and partial-index exception controls. Reusing a linear proof is rejected
+with GHC-18872. The local linear helper has an explicit unrestricted let binding;
+the same annotation is needed by the ordinary local-capture control.
+
+The both-stage build passed in 7m30s at 4,573 MiB under 16 GiB. All five
+registered normal-way regressions passed: 39 cases, 34 skipped, no unexpected
+results or framework warnings. The command took 1m11s at 2,565 MiB under 8 GiB.
+The test driver took 8.4 seconds. Bootstrap API and runtime v3 pass at 987 MiB
+under 4 GiB.
+
+Separate CLI processes pass all 89 imported observations, seven proof failure
+observations, the generic equality GADT, four located proof rejections, and the
+located GHC-18872 linear duplication rejection. Earlier partial/application,
+standalone, source-case, and interface-version checks still pass. Eight
+additional invalid applications produce located GHC-83865, GHC-91028, or
+GHC-83605 without a panic. This covers the tested forms; native type-map support
+remains future work.
+
+Ordinary GADT/lambda, rank-n, and literal controls pass with the experimental
+extension enabled. A higher-kinded consumer accepts a wrapped native proof.
+A Template Haskell splice in a native vector argument expands exactly once.
+All six literal Nat/Vec and generic-consumer guide blocks compile together with
+Core and STG Lint. Optimized Template Haskell, package, GHCi, and Haddock smoke
+checks pass. The final CLI/control/smoke scope peaked at 166 MiB under 4 GiB.
+Build and verification scopes disabled swap. Compiler Fourmolu parsing, both
+existing fixtures' canonical Fourmolu checks, and cabal-gild pass.
+
+Successful logs use `native-generic` in `_build/verification/`. In particular,
+`native-generic-cli.log` records 89 imported observations and
+`native-generic-cli-after-path-fix.log` records the final CLI/control/smoke run.
+Its first wrapper stopped at a missing copied standalone-control source; no
+compiler change was needed. `native-generic-guide-final.log` checks the six
+current literal blocks. Bootstrap artifacts and SHA256SUMS are retained in
+`native-generic-bootstrap-work/`. The ordinary linear comparison and its
+explicit unrestricted-binding controls are retained in `native-generic-linear/`.
+
+Native meta-variable assignment, Quick Look, class consumers, and general
+checking-dependent argument inference remain open. The signature format is unchanged.
 
 ## Verified baseline
 

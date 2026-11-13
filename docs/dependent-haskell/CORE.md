@@ -161,9 +161,8 @@ remaining equality. Candidate selection supplies no evidence. Both a false
 `n :~: S n` proof and an unproved right-unit `Refl` must fail at the expression.
 See Note [Retained constructor instantiation candidates] in `GHC.Tc.Gen.App`.
 
-Generic argument inference for `forall a. a -> ...` still cannot fill `a` with
-a whole type that contains a retained index. Use an explicit `Refl` case to
-observe the proof. This constructor change does not extend that inference path.
+The constructor change does not assign retained syntax to ordinary argument
+meta-variables. Generic consumers use the separate immutable route below.
 
 The proof is a lifted value. Matching `Refl` forces it and introduces an ordinary
 GADT CoVar only within its alternative. Merely receiving a proof, or checking it
@@ -178,6 +177,53 @@ record Agda induction, congruence, and transport, expected-target constructor
 checking, singletons proof values, and GHC's equality datatype. Agda selects
 datatype parameters before checking the target. This fallback selects candidates
 per result argument and keeps full ordinary subsumption. The algorithms differ.
+
+## Generic retained argument inference
+
+An ordinary erased argument can denote a whole type that contains a runtime
+index. For example, `force :: forall a. a -> IO String` can consume `rightZero n`.
+Here `a` has kind `Type`. The earlier cache selected only binders whose kinds
+were supported native index domains. The generic route also handles whole proof
+and vector types, and retained dependent functions passed through ordinary `id`.
+
+Keep NoQL, a saturated ordinary tau signature, and no constraints, native
+template, pending type arguments, or head concreteness requirements. Classify
+named argument spines with read-only Id and constructor lookups. A known Id
+whose type contains native syntax must occur in a spine. Look through named
+applications, type applications, parentheses, pragmas, and existing expansions.
+Never call `splitHsApps` or `tcExpand` during classification. They can execute
+a Template Haskell splice. Pattern synonyms do not qualify as constructor heads.
+
+After a native argument has been found, ordinary named arguments can determine
+other binders. For example, `const (rightZero n) Nothing` determines its second
+type argument as `Maybe alpha`, where `alpha` remains an ordinary meta-variable.
+Seed the immutable substitution from the expected result first. Infer only
+eligible argument spines whose formal domains contain undetermined binders.
+Lambdas, literals, cases, lets, and do expressions keep expected-type checking.
+A named application can check such forms within its own argument list.
+
+Infer each selected argument once. Preserve its expression, type, and usage in
+the existing cache, including failed-match paths. All outer binders must have
+candidates. Check their substituted kinds, their runtime Id scope, and exact
+agreement between cached actual types and substituted formal types. The generic
+instantiation must contain native syntax. Emit ordinary type applications.
+Final result and argument subsumption still run. Emit each saved usage once at
+the argument's final multiplicity. Native meta-variable assignment stays gated.
+See Note [Generic retained argument inference] in `GHC.Tc.Gen.App`.
+
+Inference does not force the argument. `force (rightZero n)` forces the proof;
+`force (Just (rightZero n))` forces only `Just`. Ignoring the proof stays lazy.
+Forcing a partial retained `appendNative` through `id` keeps its index lazy.
+The linear control gives the local helper an explicit unrestricted let binding,
+`%'Many linearId = \x -> x`. Its proof argument still has multiplicity `One`.
+Ordinary GHC also requires that binding annotation for the repeated local use
+in this control. Duplicating the linear proof must produce GHC-18872.
+
+This is a bounded application algorithm. General native meta-variable scope,
+checking-dependent argument inference, Quick Look, and class consumers remain
+separate work. The [pinned Agda application and meta-context sources](REFERENCES.md#generic-retained-argument-inference)
+use context-scoped mutable metas. This route uses immutable matching and GHC's
+existing usage cache. It does not adopt Agda's meta-assignment algorithm.
 
 ## Lambda and application
 

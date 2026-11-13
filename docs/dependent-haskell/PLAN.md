@@ -621,6 +621,24 @@ See [the Core contract](CORE.md#arithmetic-equality-proofs). This increment adds
 no equality axiom, Core form, singleton wrapper, or interface format change.
 Ambient-evidence normalization under Pi and general retained inference remain open.
 
+### Generic consumer increment
+
+Infer ordinary erased type arguments from values whose types contain retained
+indices. Start with named argument spines and preserve ordinary expected-type
+checking. Follow [the scoped Agda application sources](REFERENCES.md#generic-retained-argument-inference).
+
+- [x] Extend the existing cache with read-only native argument classification.
+      Keep complete immutable matching, kind and scope checks, and subsumption.
+- [x] Check proof and vector consumers, nested `id` and `const`, and retained
+      function values. Preserve ignored bottom and cyclic arguments.
+- [x] Check linear proof use once and reject duplicated use with GHC-18872.
+- [x] Complete the self-hosted regressions and interface-only CLI execution.
+- [x] Check ordinary bidirectional typing and one Template Haskell expansion.
+- [x] Compile the guide and finish ordinary smoke and formatting checks.
+
+See [the contract](CORE.md#generic-retained-argument-inference). Native
+meta-variable assignment and broader application inference remain open.
+
 ## Acceptance checks
 
 | ID | Required result |
