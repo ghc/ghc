@@ -670,23 +670,37 @@ Check ordinary class and equality contexts after a retained binder. For example,
 incoming dictionary under the runtime `n` binder. Follow the
 [Agda telescope and instance-pattern sources](REFERENCES.md#source-retained-constraints).
 
-- [ ] Admit class and equality predicates through the existing validity checks.
-      Keep native quantified and irreducible predicates gated with located errors.
-- [ ] Split a variable-prefix equation at its first context. Check its remaining
+- [x] Admit class and equality predicates through the existing validity checks.
+      Check constraint-tuple aliases too. Keep native quantified and irreducible
+      predicates gated with located errors.
+- [x] Split a variable-prefix equation at its first context. Check its remaining
       patterns, guards, and local bindings under the ordinary evidence lambdas.
-- [ ] Keep constructor equations at full value and dictionary arity before the
+- [x] Keep constructor equations at full value and dictionary arity before the
       case. Transport incoming dictionaries with the existing constructor proof.
-      Scope branch evidence over the whole match, including local bindings.
-- [ ] Check incoming Givens without global instances, equality transport, and
+      Include trailing contexts. Scope evidence over the whole match and local bindings.
+- [x] Check incoming Givens without global instances, equality transport, and
       partial application at bottom and cyclic indices. Check rejection locations.
 - [ ] Complete both-stage builds, registered regressions, interface-only execution,
       ordinary controls, guide, smoke, formatting, and the checkpoint.
 
 Use the existing Core forms and dictionary ABI. Keep the current native signature
 interface format. Inner retained lambdas and general retained inference remain
-separate work. The variable-prefix split requires bare variable patterns before
-the context. Constructor equations keep their existing coverage and pattern limits.
+separate work. The split requires nonforcing prefix patterns when value patterns
+remain. This case also excludes `Strict`. A trailing context keeps the old prefix
+shapes. Constructor equations keep their existing coverage and pattern limits.
 See [the contract](CORE.md#source-retained-constraints).
+
+### Source case evidence follow-up
+
+Native source cases generalize captured values over a fresh index. They do not
+yet generalize incoming class Givens. The no-instance `OnlyGiven n` control fails
+with located GHC-39999 when its case specializes a captured `Vec Int n`.
+The equivalent constructor equations pass.
+
+- [ ] Pass index-dependent Givens with the generalized case captures. Transport
+      them with each branch proof and preserve the full function arity.
+- [ ] Check no-instance dictionaries, derived tuple evidence, local bindings,
+      and partial application through explicit source cases.
 
 ## Acceptance checks
 

@@ -270,13 +270,21 @@ A source signature can put an ordinary class or equality context after a runtime
 binder. For example, `foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String`
 has the Core argument order `n`, dictionary, vector. Check the predicates with the
 ordinary validity and constraint solver paths. Native quantified and irreducible
-predicates remain gated. Do not introduce a new Core form or equality axiom.
+predicates remain gated, including components hidden by constraint-tuple synonyms.
+Do not introduce a new Core form or equality axiom.
 
 For a single equation with a variable prefix, split the equation at its first
 context. Check the suffix as a generated lambda under the actual prefix binders.
 Keep suffix patterns, guards, and local bindings together. An empty suffix still
-needs this scope. Require bare variable patterns before the context so that the
-split preserves partial-application strictness.
+needs this scope. When value patterns remain, require nonforcing prefix patterns
+and exclude `Strict`. A trailing context keeps the old prefix shapes. These rules
+preserve the order of source value lambdas and prefix matching.
+Consume a known ordinary arrow without skolemising its result. Check its following
+context at the next telescope step, including after the last source value pattern.
+The trailing-context exception retains the old placement of dictionary lambdas
+after any forcing prefix. It establishes no new law for partial dictionary
+application in raw Core. General preservation of dictionary arity with forcing
+prefixes remains separate work.
 
 Constructor equations must put all value and dictionary lambdas before their
 constructor case. Insert shared dictionary patterns at the signature positions.
@@ -764,17 +772,20 @@ types that contain native forms before ordinary binding generalization or
 normalization. An unsigned alias can obtain such a type without assigning a
 type metavariable. Keep complete signatures on their checking path.
 
-A constraint in the result can require a nonidentity match wrapper. For example,
-`foreach (b :: Bool) -> ((b ~ b) => Int) -> ((b ~ b) => Int)` falls outside the
-first identity-wrapper subset. A fully applied laziness observation can instead
-use `foreach (b :: Bool) -> ((b ~ b) => Int) -> Int`. Its body instantiates the
-argument's constraint. It does not require a constrained result wrapper.
+A constraint in the result can require a nonidentity match wrapper. The first
+identity-wrapper subset rejected
+`foreach (b :: Bool) -> ((b ~ b) => Int) -> ((b ~ b) => Int)`.
+The [source-context rule](#source-retained-constraints) now checks this result
+under the actual runtime binder. The earlier fully applied laziness observation
+uses `foreach (b :: Bool) -> ((b ~ b) => Int) -> Int`. Its body instantiates the
+argument's constraint.
 The observation uses checked rigid-index handling and scoped reflexivity.
 Constraint instantiation builds a boxed `(b ~ b)` dictionary directly at its
 call site, with the existing `evDictApp` and nominal reflexivity constructors.
 A Wanted dictionary could receive a solver evidence binding outside the runtime
 lambda. The direct expression preserves its scope. Other index-dependent
-predicates remain gated until the solver has a runtime-index evidence scope.
+predicates were gated in the initial subset. The application and source-context
+rules now give class and equality evidence its runtime-index scope.
 Opaque reflexive rewriting and same-Id equality remain supported in the solver.
 Do not inspect Boolean unfoldings.
 Pure family matching also preserves opaque indices. The same Id matches itself.
