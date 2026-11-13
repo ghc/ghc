@@ -253,7 +253,8 @@ behavior. `Show (a :~: b)` matches `Refl`, so rendering a proof can force it.
 An ignoring consumer can remain lazy. A `Show` dictionary supplies no equality
 between the indices. Transport still requires explicit equality evidence.
 Source-written class contexts containing runtime binders remain outside this
-increment. See [the primary instance-context sources](REFERENCES.md#retained-class-consumers).
+class-consumer increment. The next section specifies their implementation.
+See [the primary instance-context sources](REFERENCES.md#retained-class-consumers).
 
 Native dictionary predicates also require native type-map keys. Keep `TermVarTy`
 separate from `TyVarTy`. Bound runtime Ids compare by de Bruijn position; free
@@ -262,6 +263,36 @@ and the body under the extended context. Keep retained functions separate from
 ordinary arrows and erased foralls. Singleton equality and trie operations must
 use the same rules. Preserve synonym, cast, and kind handling. This support does
 not enable native family-cache reuse under a Pi binder or ordinary optimization.
+
+## Source retained constraints
+
+A source signature can put an ordinary class or equality context after a runtime
+binder. For example, `foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String`
+has the Core argument order `n`, dictionary, vector. Check the predicates with the
+ordinary validity and constraint solver paths. Native quantified and irreducible
+predicates remain gated. Do not introduce a new Core form or equality axiom.
+
+For a single equation with a variable prefix, split the equation at its first
+context. Check the suffix as a generated lambda under the actual prefix binders.
+Keep suffix patterns, guards, and local bindings together. An empty suffix still
+needs this scope. Require bare variable patterns before the context so that the
+split preserves partial-application strictness.
+
+Constructor equations must put all value and dictionary lambdas before their
+constructor case. Insert shared dictionary patterns at the signature positions.
+Keep their original predicate types at the outer lambdas. In each alternative,
+transport these dictionaries with the existing checked constructor proof. Check
+the whole match with the specialised Givens. Bind the transported Givens and
+solver evidence in `ConPatTc.cpt_binds`, within that proof scope. Local bindings
+must have access to this evidence. Keep the existing constructor pattern limits.
+
+An incoming Given must work without a global instance. A caller must supply the
+dictionary through ordinary instance resolution or its own Givens. Equality
+transport still requires equality evidence. Partial application must preserve the
+runtime index's laziness. See the
+[pinned Agda sources](REFERENCES.md#source-retained-constraints) for telescope and
+hidden-argument scope. Haskell evaluation and GHC dictionary transport use the
+existing local rules. This increment keeps the native interface format unchanged.
 
 ## Lambda and application
 

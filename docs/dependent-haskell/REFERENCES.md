@@ -591,6 +591,41 @@ runtime index`. Its log is retained as
 implementation handles singleton equality and trie lookup, update, mapping,
 filtering, and folding with the same scope rules.
 
+### Source retained constraints
+
+Agda v2.8.0 gives a direct example of an instance argument after a visible Nat
+binder. Its
+[`mkFin`](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/instance-arguments.lagda.rst#L357-L377)
+has type `∀ {n} (m : Nat) → {{suc m - n ≡ 0}} → Fin n`.
+Later equations omit the instance pattern. The manual file blob is
+`69c52629a737a8670fe11286a705111b7ba99e9d`.
+The [lambda manual](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/lambda-abstraction.lagda.rst#L85-L93)
+also places `{{monoid-A : Monoid A}}` after the visible binder `A`.
+Its file blob is `5162584cecf76e69206da056f4135d892d7ab41a`.
+
+[`insertHiddenLambdas`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L730-L740)
+constructs a lambda and checks the remainder under `addContext`.
+[`tryInsertHiddenLambda`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L1303-L1338)
+handles both ordinary hidden binders and instance binders.
+The `Rules/Term.hs` blob is `02991c9fa0085315cc854d2833a9080af14a7740`.
+For equations,
+[`insertImplicitPatternsT`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS/Implicit.hs#L88-L104)
+inserts omitted patterns and continues under the current abstraction.
+The `Rules/LHS/Implicit.hs` blob is
+`f47fcb713d3b37af67fa11c3e8293afc73be8d84`.
+
+The GHC prototype keeps source class and equality contexts after a runtime binder
+in that binder's scope. A variable prefix uses a generated nested lambda.
+Ordinary checking then introduces evidence inside the retained binders.
+Constructor equations bind dictionaries before the constructor case.
+Checked branch proofs transport dependent dictionary types into each branch.
+These choices preserve telescope order and evidence scope. They reuse source
+`=>` contexts and ordinary GHC evidence rules. Agda supplies scope prior art;
+it does not establish GHC's dictionary ABI, FC coercions, or Haskell eta laws.
+Checking a source context introduces Givens. Application-side instance search
+supplies arguments. Neither operation evaluates a runtime index to obtain a
+singleton witness.
+
 ## Haskell evaluation provenance
 
 The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)

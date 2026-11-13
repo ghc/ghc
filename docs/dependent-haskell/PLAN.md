@@ -660,7 +660,33 @@ Use ordinary class instances for retained proof and vector types. Follow the
 Native maps are implemented at `1b37399cd5`; scoped class consumers at `17740f7135`.
 See [the contract](CORE.md#retained-class-consumers) and the
 [verified results](README.md#ordinary-class-consumers). Source-written native
-class contexts, general meta-variable scope, and broader inference remain open.
+class contexts form the next increment. General meta-variable scope and broader
+inference remain open.
+
+### Source context increment
+
+Check ordinary class and equality contexts after a retained binder. For example,
+`foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String` must use an
+incoming dictionary under the runtime `n` binder. Follow the
+[Agda telescope and instance-pattern sources](REFERENCES.md#source-retained-constraints).
+
+- [ ] Admit class and equality predicates through the existing validity checks.
+      Keep native quantified and irreducible predicates gated with located errors.
+- [ ] Split a variable-prefix equation at its first context. Check its remaining
+      patterns, guards, and local bindings under the ordinary evidence lambdas.
+- [ ] Keep constructor equations at full value and dictionary arity before the
+      case. Transport incoming dictionaries with the existing constructor proof.
+      Scope branch evidence over the whole match, including local bindings.
+- [ ] Check incoming Givens without global instances, equality transport, and
+      partial application at bottom and cyclic indices. Check rejection locations.
+- [ ] Complete both-stage builds, registered regressions, interface-only execution,
+      ordinary controls, guide, smoke, formatting, and the checkpoint.
+
+Use the existing Core forms and dictionary ABI. Keep the current native signature
+interface format. Inner retained lambdas and general retained inference remain
+separate work. The variable-prefix split requires bare variable patterns before
+the context. Constructor equations keep their existing coverage and pattern limits.
+See [the contract](CORE.md#source-retained-constraints).
 
 ## Acceptance checks
 
