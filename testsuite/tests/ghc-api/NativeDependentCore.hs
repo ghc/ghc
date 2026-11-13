@@ -13,7 +13,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Core
 import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, eqCoercion, isReflCo, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
-import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConWorkId, mkDataCon, promoteDataCon)
+import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConRepArgBinders, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
 import GHC.Core.Dependent
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, normaliseType)
@@ -32,7 +32,7 @@ import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Inject
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
-import GHC.Core.Utils (applyTypeToArgs, exprType)
+import GHC.Core.Utils (applyTypeToArgs, dataConRepFSInstPat, dataConRepInstPat, exprType)
 import GHC.CoreToIface (toIfaceAlt, toIfaceCoercion, toIfaceExpr, toIfaceType, toIfaceTypeX)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
@@ -47,8 +47,9 @@ import GHC.Driver.Ppr (showSDoc)
 import GHC.Driver.Session (gopt_unset, parseDynamicFlagsCmdLine)
 import GHC.Hs (HsType (..))
 import GHC.Iface.Binary (CompressionIFace (..), TraceBinIFace (..), getWithUserData, putWithUserData)
+import GHC.Iface.Decl (tyThingToIfaceDecl)
 import GHC.Iface.Env (extendIfaceIdEnv)
-import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceConAlt (..), IfaceDecl (IfaceId), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
+import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceConAlt (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, ifCons), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
 import GHC.Iface.Type (IfaceBndr (IfaceIdBndr), IfaceCoercion (IfaceCoVarCo), IfaceType (..), getIfaceType, ifaceBndrName, mkIfLclName)
 import GHC.IfaceToCore (tcIfaceDecl, tcIfaceExpr, tcIfaceRules)
 import qualified GHC.Parser as Parser
@@ -65,7 +66,7 @@ import GHC.Types.Name (getOccName, mkExternalName, mkSystemName, nameModule)
 import GHC.Types.Name.Occurrence (mkDataConWorkerOcc, mkDataOcc, mkTcOcc, mkTyVarOcc, mkVarOcc, occNameFS)
 import GHC.Types.SourceText (SourceText (NoSourceText))
 import GHC.Types.SrcLoc (mkRealSrcLoc, noLoc, noSrcSpan, unLoc)
-import GHC.Types.TyThing (TyThing (AnId))
+import GHC.Types.TyThing (TyThing (ATyCon, AnId))
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
 import GHC.Types.Unique.FM (sizeUFM)
 import GHC.Types.Var
@@ -92,6 +93,7 @@ main = do
             runTypeMapChecks
             runCaseChecks dflags
             runNatChecks dflags
+            runRetainedFieldChecks dflags
             runDepFunCoChecks dflags
             runIfaceChecks libdir
             putStrLn "native-core-api-ok"
@@ -272,6 +274,201 @@ peanoNat = (nat, zero, successor)
                 []
                 (mkDataConWorkId (name (n + 1) (mkDataConWorkerOcc occurrence)) con)
                 NoDataConRep
+
+{- | Check a native constructor field telescope with a lifted indexed function.
+The payload is an equality-dictionary function, not an executed vector.
+-}
+runRetainedFieldChecks :: DynFlags -> IO ()
+runRetainedFieldChecks dflags = do
+    let (nat, zero, _) = peanoNat
+        natTy = mkTyConTy nat
+        template = local 2400 "index_template" natTy
+        n = local 2401 "n" natTy
+        m = local 2402 "m" natTy
+        payloadTy ix = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, ix, ix]) intTy
+        originalArgs = [Scaled ManyTy natTy, Scaled ManyTy (payloadTy (TermVarTy template))]
+        modu = mkModule mainUnit (mkModuleName "NativeRetainedFieldAPI")
+        name i occurrence = mkExternalName (unique i) modu occurrence noSrcSpan
+        package =
+            mkAlgTyCon
+                (name 2403 (mkTcOcc "NativePackage"))
+                liftedTypeKind
+                []
+                0
+                liftedTypeKind
+                []
+                Nothing
+                []
+                (mkDataTyConRhs [constructor])
+                (VanillaAlgTyCon (name 2404 (mkVarOcc "package_rep")))
+                False
+        packageTy = mkTyConTy package
+        constructor = build [Just template, Nothing] originalArgs packageTy
+        build = buildFor package 2405
+        buildFor parent base binders args result = con
+          where
+            occurrence = mkDataOcc "NativePackage"
+            con =
+                mkDataConWithRetainedArgs
+                    binders
+                    (name base occurrence)
+                    False
+                    (name (base + 1) (mkVarOcc "constructor_rep"))
+                    (map (const (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)) args)
+                    (map (const HsLazy) args)
+                    (map (const NotMarkedStrict) args)
+                    []
+                    []
+                    []
+                    noConcreteTyVars
+                    []
+                    []
+                    []
+                    args
+                    result
+                    NoPromInfo
+                    parent
+                    1
+                    []
+                    (mkDataConWorkId (name (base + 2) (mkDataConWorkerOcc occurrence)) con)
+                    NoDataConRep
+        expected = mkDepFunTy template (mkFunctionType ManyTy (payloadTy (TermVarTy template)) packageTy)
+        payload = local 2408 "payload" (payloadTy (TermVarTy n))
+        otherPayload = local 2409 "other_payload" (payloadTy (TermVarTy m))
+        answer = local 2410 "answer" intTy
+        consumer = local 2413 "consumer" (mkDepFunTy m (mkFunctionType ManyTy (payloadTy (TermVarTy m)) intTy))
+        scrutinee = local 2411 "package" packageTy
+        caseBinder = local 2412 "package_case" packageTy
+        construction = mkApps (Var (dataConWorkId constructor)) [Var n, Var payload]
+        (existentials, fields) = dataConRepInstPat (map unique [2420 .. 2429]) ManyTy constructor []
+        (otherExistentials, otherFields) =
+            dataConRepFSInstPat (repeat (fsLit "fresh_field")) (map unique [2430 .. 2439]) ManyTy constructor []
+        eliminate args result rhs = Case (Var scrutinee) caseBinder result [Alt (DataAlt constructor) args rhs]
+        nestedBinder = local 2450 "nested_index" natTy
+        nestedPayload =
+            mkDepFunTy nestedBinder $
+                mkFunctionType ManyTy (payloadTy (TermVarTy template)) (payloadTy (TermVarTy nestedBinder))
+        nestedPackage =
+            mkAlgTyCon
+                (name 2460 (mkTcOcc "NestedNativePackage"))
+                liftedTypeKind
+                []
+                0
+                liftedTypeKind
+                []
+                Nothing
+                []
+                (mkDataTyConRhs [nestedConstructor])
+                (VanillaAlgTyCon (name 2461 (mkVarOcc "nested_package_rep")))
+                False
+        nestedConstructor =
+            buildFor
+                nestedPackage
+                2462
+                [Just template, Nothing]
+                [Scaled ManyTy natTy, Scaled ManyTy nestedPayload]
+                (mkTyConTy nestedPackage)
+        (_, nestedFields) = dataConRepInstPat (map unique [2450 .. 2459]) ManyTy nestedConstructor []
+        vacuousPackage =
+            mkAlgTyCon
+                (name 2480 (mkTcOcc "VacuousNativePackage"))
+                liftedTypeKind
+                []
+                0
+                liftedTypeKind
+                []
+                Nothing
+                []
+                (mkDataTyConRhs [vacuousConstructor])
+                (VanillaAlgTyCon (name 2481 (mkVarOcc "vacuous_package_rep")))
+                False
+        vacuousTy = mkTyConTy vacuousPackage
+        vacuousConstructor =
+            buildFor
+                vacuousPackage
+                2482
+                [Just template, Nothing]
+                [Scaled ManyTy natTy, Scaled ManyTy natTy]
+                vacuousTy
+        rejectsMetadata label binders args result =
+            rejectsWith label "mkDataConWithRetainedArgs: invalid telescope" $
+                evaluate (build binders args result)
+    case nestedFields of
+        [field, dependent] -> case idType dependent of
+            DepFunTy inner body -> do
+                check "nested Pi fixture collides with the actual earlier field Unique" (field == nestedBinder)
+                check "field substitution freshens a colliding inner Pi binder" (inner /= field)
+                checkType
+                    dflags
+                    "nested Pi preserves its outer field dependency and inner identity"
+                    (mkFunctionType ManyTy (payloadTy (TermVarTy field)) (payloadTy (TermVarTy inner)))
+                    body
+                check "nested Pi substitution removes the retained template identity" $
+                    not (anyFreeVarsOfType (== template) (idType dependent))
+            _ -> fail "FAIL: retained field substitution lost the nested Pi"
+        _ -> fail "FAIL: nested retained field instantiation returned the wrong arity"
+    check "vacuous retained metadata remains explicit" $
+        case dataConRepArgBinders vacuousConstructor of
+            [Just b, Nothing] -> b == template
+            _ -> False
+    check "vacuous retained constructor is not a native index domain" (not (isNativeIndexType vacuousTy))
+    lintAccepts dflags "vacuous retained constructor has an ordinary runtime payload" [n, m] $
+        mkApps (Var (dataConWorkId vacuousConstructor)) [Var n, Var m]
+    check "ordinary constructor has no retained-field metadata" (null (dataConRepArgBinders zero))
+    check "a retained package is not a native index domain" (not (isNativeIndexType packageTy))
+    check "retained constructor records its actual template binder" $
+        case dataConRepArgBinders constructor of
+            [Just b, Nothing] -> b == template
+            _ -> False
+    checkType dflags "retained constructor worker telescope" expected (idType (dataConWorkId constructor))
+    checkType dflags "retained constructor wrapper telescope" expected (dataConWrapperType constructor)
+    check "retained constructor has no erased existentials" (null existentials && null otherExistentials)
+    case (fields, otherFields) of
+        ([field, dependent], [otherField, otherDependent]) -> do
+            check "retained field instantiation freshens both invocations" $
+                field /= template && otherField /= template && field /= otherField
+            checkType dflags "first dependent field names its actual preceding field" (payloadTy (TermVarTy field)) (idType dependent)
+            checkType dflags "second dependent field names its actual preceding field" (payloadTy (TermVarTy otherField)) (idType otherDependent)
+            check "dependent field does not retain the template identity" $
+                not (anyFreeVarsOfType (== template) (idType dependent))
+            lintAccepts dflags "native package elimination" [scrutinee, answer] $
+                eliminate fields intTy (Var answer)
+            lintAccepts dflags "native package scoped consumer" [scrutinee, consumer] $
+                eliminate fields intTy (mkApps (Var consumer) (map Var fields))
+            lintAccepts dflags "native package repackaging closes its field scope" [scrutinee] $
+                eliminate fields packageTy (mkApps (Var (dataConWorkId constructor)) (map Var fields))
+            lintRejects dflags "native package fields cannot be reversed" [scrutinee, answer] $
+                eliminate [dependent, field] intTy (Var answer)
+            lintRejects dflags "native package index field has the declared domain" [scrutinee, answer] $
+                eliminate [setIdType field boolTy, dependent] intTy (Var answer)
+            lintRejects dflags "native package payload cannot name a stale template" [scrutinee, answer, template] $
+                eliminate [field, setIdType dependent (payloadTy (TermVarTy template))] intTy (Var answer)
+            lintRejects dflags "native package index binder cannot capture an outer Id" [scrutinee, answer, field] $
+                eliminate fields intTy (Var answer)
+            lintRejects dflags "native package field cannot escape into case result" [scrutinee] $
+                eliminate fields (idType dependent) (Var dependent)
+        _ -> fail "FAIL: retained field instantiation returned the wrong arity"
+    lintAccepts dflags "native package construction" [n, payload] construction
+    checkType dflags "native package construction result" packageTy (exprType construction)
+    lintRejects dflags "native package construction checks dependent payload identity" [n, m, otherPayload] $
+        mkApps (Var (dataConWorkId constructor)) [Var n, Var otherPayload]
+    rejectsMetadata "retained metadata must align with fields" [Just template] originalArgs packageTy
+    rejectsMetadata "retained metadata must use the declared field domain" [Just (setIdType template boolTy), Nothing] originalArgs packageTy
+    rejectsMetadata "retained metadata must use unrestricted binders" [Just (setIdMult template OneTy), Nothing] originalArgs packageTy
+    rejectsMetadata "retained metadata cannot reference an unbound runtime Id" [Nothing, Nothing] originalArgs packageTy
+    rejectsMetadata "retained field cannot escape into constructor result" [Just template, Nothing] originalArgs (payloadTy (TermVarTy template))
+    rejectsWith "retained constructor cannot be promoted" "promoteDataCon: retained field telescope" $
+        evaluate (promoteDataCon constructor)
+    rejectsWith "flat signature cannot discard retained field scope" "dataConInstSig: retained constructor field telescope" $
+        evaluate (dataConInstSig constructor [])
+    rejectsWith "flat representation fields cannot discard retained scope" "dataConInstArgTys: retained constructor field telescope" $
+        evaluate (dataConInstArgTys constructor [])
+    rejectsWith "flat original fields cannot discard retained scope" "dataConInstOrigArgTys: retained constructor field telescope" $
+        evaluate (dataConInstOrigArgTys constructor [])
+    rejectsWith "interface declaration cannot discard retained field scope" "ifaceConDecl: retained constructor field telescope" $
+        case tyThingToIfaceDecl (ATyCon package) of
+            IfaceData{ifCons = IfDataTyCon _ [con]} -> evaluate con >> pure ()
+            _ -> fail "FAIL: native package interface declaration has the wrong shape"
 
 -- | Check recursive constructor indices, substitutions, and field-scoped proofs.
 runNatChecks :: DynFlags -> IO ()

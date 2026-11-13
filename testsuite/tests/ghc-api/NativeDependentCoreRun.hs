@@ -2409,6 +2409,7 @@ runSourceRejectChecks = do
         , ("unsigned partial retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["index :: Bool", "index = False", "alias = keep index"]) "42")
         , ("retained type in a type-constructor argument", 43582, "not supported in this type position", [], ["bad :: Maybe (foreach (b :: Bool) -> Select b -> Select b)", "bad = undefined"])
         , ("retained type synonym", 43582, "not supported in this type position", [], ["type Bad = foreach (b :: Bool) -> Select b -> Select b"])
+        , ("retained constructor declaration before source support", 43582, "not supported in this type position", [], ["data Packed where", "  Pack :: foreach (b :: Bool) -> Select b -> Packed"])
         , ("unregistered ordinary term name", 37479, "is a term-level binding", [], ["ordinary :: Bool", "ordinary = False", "type Bad = NativeSourceRejected.ordinary"])
         , ("constructor payload mismatch", 83865, "second argument", [], local [] selection identity "keep True False")
         ,

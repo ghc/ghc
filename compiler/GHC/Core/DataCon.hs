@@ -22,7 +22,7 @@ module GHC.Core.DataCon (
         FieldLabel(..), flLabel, FieldLabelString,
 
         -- ** Type construction
-        mkDataCon, fIRST_TAG,
+        mkDataCon, mkDataConWithRetainedArgs, fIRST_TAG,
 
         -- ** Type deconstruction
         dataConRepType, dataConInstSig, dataConFullSig,
@@ -36,7 +36,7 @@ module GHC.Core.DataCon (
         dataConStupidTheta,
         dataConOtherTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
-        dataConInstOrigArgTys, dataConRepArgTys, dataConResRepTyArgs,
+        dataConInstOrigArgTys, dataConRepArgTys, dataConRepArgBinders, dataConResRepTyArgs,
         dataConInstUnivs,
         dataConFieldLabels, dataConFieldType, dataConFieldType_maybe,
         dataConSrcBangs,
@@ -85,6 +85,7 @@ import GHC.Types.Name
 import GHC.Builtin.KnownKeys
 import GHC.Core.Predicate
 import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Data.FastString
@@ -500,6 +501,8 @@ data DataCon
                 -- the wrapper Id, because that makes it harder to use the wrap-id
                 -- to rebuild values after record selection or in generics.
 
+        dcOrigArgBinders :: [Maybe Id], -- Retained field binders; [] for ordinary fields
+                                       -- See Note [Retained constructor field telescopes].
         dcOrigArgTys :: [Scaled Type],  -- Original argument types
                                         -- (before unboxing and flattening of strict fields)
         dcOrigResTy :: Type,            -- Original result type, as seen by the user
@@ -1113,7 +1116,41 @@ mkDataCon :: Name
           -> DataCon
   -- Can get the tag from the TyCon
 
-mkDataCon name declared_infix prom_info
+mkDataCon = mkDataConWithRetainedArgs []
+
+-- | Build a wrapper-free constructor with a retained field telescope.
+-- An empty binder list selects the ordinary constructor representation.
+-- See Note [Retained constructor field telescopes].
+mkDataConWithRetainedArgs :: [Maybe Id] -- ^ Retained binders, aligned with original fields
+          -> Name
+          -> Bool               -- ^ Is the constructor declared infix?
+          -> TyConRepName       -- ^  TyConRepName for the promoted TyCon
+          -> [HsSrcBang]        -- ^ Strictness/unpack annotations, from user
+          -> [HsImplBang]       -- ^ Strictness/unpack annotations, as inferred by the compiler
+          -> [StrictnessMark]   -- ^ Strictness marks for the DataCon worker's fields in Core
+          -> [FieldLabel]       -- ^ Field labels for the constructor,
+                                -- if it is a record, otherwise empty
+          -> [TyVar]            -- ^ Universals.
+          -> [TyCoVar]          -- ^ Existentials.
+          -> ConcreteTyVars
+                                -- ^ TyVars which must be instantiated with
+                                -- concrete types
+          -> [TyVarBinder]      -- ^ User-written 'TyVarBinder's
+          -> [EqSpec]           -- ^ GADT equalities
+          -> KnotTied ThetaType -- ^ Theta-type occurring before the arguments proper
+          -> [KnotTied (Scaled Type)]    -- ^ Original argument types
+          -> KnotTied Type      -- ^ Original result type
+          -> PromDataConInfo    -- ^ See comments on 'GHC.Core.TyCon.PromDataConInfo'
+          -> KnotTied TyCon     -- ^ Representation type constructor
+          -> ConTag             -- ^ Constructor tag
+          -> ThetaType          -- ^ The "stupid theta", context of the data
+                                -- declaration e.g. @data Eq a => T a ...@
+          -> Id                 -- ^ Worker Id
+          -> DataConRep         -- ^ Representation
+          -> DataCon
+  -- Can get the tag from the TyCon
+
+mkDataConWithRetainedArgs arg_binders name declared_infix prom_info
           arg_stricts  -- Must match orig_arg_tys 1-1
           impl_bangs   -- Must match orig_arg_tys 1-1
           str_marks    -- Must be empty or match dataConRepArgTys 1-1
@@ -1130,8 +1167,37 @@ mkDataCon name declared_infix prom_info
 -- so the error is detected properly... it's just that assertions here
 -- are a little dodgy.
 
-  = con
+  | null arg_binders || valid_retained_args = con
+  | otherwise = pprPanic "mkDataConWithRetainedArgs: invalid telescope" (ppr name)
   where
+    valid_retained_args
+      = arg_binders `equalLength` orig_arg_tys
+        && null ex_tvs && null eq_spec && null theta && null stupid_theta
+        && null fields && not (isNewTyCon rep_tycon)
+        && case rep of { NoDataConRep -> True; _ -> False }
+        && all lazy_src arg_stricts
+        && all lazy_impl impl_bangs && not (any isMarkedStrict str_marks)
+        && valid_fields emptyVarSet arg_binders orig_arg_tys
+        && not (anyFreeVarsOfType isId orig_res_ty)
+
+    lazy_src (HsSrcBang _ unpack strict)
+      = not (isSrcUnpacked unpack) && not (isSrcStrict strict)
+    lazy_impl HsLazy = True
+    lazy_impl _      = False
+
+    valid_fields _ [] [] = True
+    valid_fields scope (mb : bs) (Scaled mult ty : tys)
+      = isLiftedTypeKind (typeKind ty)
+        && not (anyFreeVarsOfType (\v -> isId v && not (v `elemVarSet` scope)) ty)
+        && case mb of
+             Nothing -> valid_fields scope bs tys
+             Just b  -> isNativeIndexId b && isManyTy mult
+                        && varType b `eqType` ty
+                        && not (b `elemVarSet` mkVarSet univ_tvs)
+                        && not (b `elemVarSet` scope)
+                        && valid_fields (extendVarSet scope b) bs tys
+    valid_fields _ _ _ = False
+
     is_vanilla = null ex_tvs && null eq_spec && null theta
     str_marks' | not $ any isMarkedStrict str_marks = []
                | otherwise                          = str_marks
@@ -1145,6 +1211,7 @@ mkDataCon name declared_infix prom_info
                   dcEqSpec = eq_spec,
                   dcOtherTheta = theta,
                   dcStupidTheta = stupid_theta,
+                  dcOrigArgBinders = arg_binders,
                   dcOrigArgTys = orig_arg_tys, dcOrigResTy = orig_res_ty,
                   dcRepTyCon = rep_tycon,
                   dcSrcBangs = arg_stricts, dcImplBangs = impl_bangs,
@@ -1188,8 +1255,12 @@ mkDataCon name declared_infix prom_info
      {- Visible -}     | (n,t) <- dropList theta fresh_names `zip` map scaledThing orig_arg_tys ]
     prom_bndrs       = prom_tv_bndrs ++ prom_arg_bndrs
     prom_res_kind    = orig_res_ty
-    promoted         = mkPromotedDataCon con name prom_info prom_bndrs
-                                         prom_res_kind roles rep_info
+    promoted
+      | not (null arg_binders)
+      = pprPanic "promoteDataCon: retained field telescope" (ppr name)
+      | otherwise
+      = mkPromotedDataCon con name prom_info prom_bndrs
+                         prom_res_kind roles rep_info
 
     roles = map (\tv -> if isTyVar tv then Nominal else Phantom)
                 (univ_tvs ++ ex_tvs)
@@ -1437,6 +1508,10 @@ dataConInstSig
 dataConInstSig con@(MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs
                            , dcOrigArgTys = arg_tys })
                univ_tys
+  | not (null (dataConRepArgBinders con))
+  = pprPanic "dataConInstSig: retained constructor field telescope" (ppr con)
+    -- See Note [Retained constructor field telescopes].
+  | otherwise
   = ( ex_tvs'
     , substTheta subst (dataConTheta con)
     , substTys subst (map scaledThing arg_tys))
@@ -1515,12 +1590,58 @@ dataConWrapperType :: DataCon -> Type
 -- mentions the family tycon, not the internal one.
 dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
                              dcOtherTheta = theta, dcOrigArgTys = arg_tys,
+                             dcOrigArgBinders = arg_binders,
                              dcOrigResTy = res_ty,
                              dcStupidTheta = stupid_theta })
   = mkForAllTys user_tvbs $
     mkInvisFunTys (stupid_theta ++ theta) $
-    mkScaledFunTys arg_tys $
-    res_ty
+    mkRetainedArgTys arg_binders arg_tys res_ty
+
+-- | Return retained binders for representation fields. An empty list denotes
+-- ordinary fields. Retained constructors have no representation wrapper.
+dataConRepArgBinders :: DataCon -> [Maybe Id]
+dataConRepArgBinders = dcOrigArgBinders
+
+-- | Rebuild a constructor field telescope without erasing runtime binders.
+mkRetainedArgTys :: [Maybe Id] -> [Scaled Type] -> Type -> Type
+mkRetainedArgTys [] args res = mkScaledFunTys args res
+mkRetainedArgTys (mb : bs) (arg : args) res
+  = case mb of
+      Nothing -> mkScaledFunTys [arg] body
+      Just b  -> mkDepFunTy b body
+  where
+    body = mkRetainedArgTys bs args res
+mkRetainedArgTys _ _ _ = panic "mkRetainedArgTys: misaligned telescope"
+
+{- Note [Retained constructor field telescopes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained field binds its actual runtime Id in the types of later fields.
+The original argument types alone cannot record this scope. Store a parallel
+list of optional binders. An empty list preserves the ordinary representation
+and its lazy construction. Validate only the new, nonempty representation.
+
+The first subset has no wrapper, existential, constraint, record selector,
+newtype representation, strict field, or unpacked field. All fields are lifted.
+A named field has a
+closed native index domain and multiplicity Many. Its Id must be fresh. Only
+earlier retained fields can occur as free runtime Ids in a field type. No
+runtime field Id can escape into the constructor result. Rebuild the worker
+and wrapper types with DepFunTy at each named field. The runtime field remains
+an ordinary lazy constructor payload slot.
+
+These constructors are not promotable. The promoted TyCon cache must fail
+explicitly if requested; an anonymous promoted telescope would leave runtime
+Ids out of scope. Callers must reject source promotion before requesting it.
+
+The flat instantiated-field APIs cannot return fresh runtime field binders.
+Reject retained constructors in dataConInstSig, dataConInstArgTys and
+dataConInstOrigArgTys. Use dataConRepInstPat for scoped Core patterns. Raw
+argument-type accessors must be used with dataConRepArgBinders.
+
+Agda constructor telescopes scope earlier fields over later field types.
+This guides the binding representation, not the evaluation rules for lazy
+Haskell. See docs/dependent-haskell/REFERENCES.md for the pinned provenance.
+-}
 
 -- | Finds the instantiated types of the arguments required to construct a
 -- 'DataCon' representation
@@ -1534,6 +1655,9 @@ dataConInstArgTys :: DataCon    -- ^ A datacon with no existentials or equality 
                   -> [Scaled Type]
 dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
                               dcExTyCoVars = ex_tvs}) inst_tys
+ | not (null (dataConRepArgBinders dc))
+ = pprPanic "dataConInstArgTys: retained constructor field telescope" (ppr dc)
+ | otherwise
  = assertPpr (univ_tvs `equalLength` inst_tys)
              (text "dataConInstArgTys" <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys) $
    assertPpr (null ex_tvs) (ppr dc) $
@@ -1552,6 +1676,9 @@ dataConInstOrigArgTys
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
                                   dcUnivTyVars = univ_tvs,
                                   dcExTyCoVars = ex_tvs}) inst_tys
+  | not (null (dataConRepArgBinders dc))
+  = pprPanic "dataConInstOrigArgTys: retained constructor field telescope" (ppr dc)
+  | otherwise
   = assertPpr (tyvars `equalLength` inst_tys)
               (text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys) $
     substScaledTys subst arg_tys

@@ -233,7 +233,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCon.Set
 import {-# SOURCE #-} GHC.Core.DataCon
    ( dataConFullSig, dataConRepArgTys, dataConStupidTheta
-   , dataConWrapId_maybe )
+   , dataConWrapId_maybe, dataConRepArgBinders )
 import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-} GHC.Core.Coercion
@@ -2295,6 +2295,7 @@ isNativeIndexType ty = go emptyTyConSet [ty]
     con_fields tc con
       | ([], [], [], [], orig_args, res) <- dataConFullSig con
       , null (dataConStupidTheta con)
+      , null (dataConRepArgBinders con)
       , Nothing <- dataConWrapId_maybe con
       , TyConApp res_tc [] <- coreFullView res, res_tc == tc
       , orig_args `equalLength` rep_args
@@ -2331,6 +2332,8 @@ domains without assuming that their runtime values are finite or total.
 
 Reject parameters, existential variables, constructor constraints, datatype
 contexts, newtypes, type data, and wrappers. Original and representation fields
+must not carry retained field binders. Such constructors need a separate
+promotion rule, even when a named field is unused by the later types. Fields
 must have the same closed domain. Thus a promoted constructor's arguments match
 its worker's runtime fields. In particular, do not promote an unpacked payload as
 if it were the original boxed field. Constructor field multiplicities may be One

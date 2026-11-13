@@ -230,6 +230,12 @@ tyConToIfaceDecl env tycon
         --     (Not sure about UnaryClassTyCon, but easier to treat it uniformly.)
 
     ifaceConDecl data_con
+        | not (null (dataConRepArgBinders data_con))
+        = panic ("ifaceConDecl: retained constructor field telescope: "
+                 ++ getOccString data_con)
+          -- IfaceConDecl has no field binder scope. Do not discard metadata.
+          -- See Note [Retained constructor field telescopes] in GHC.Core.DataCon.
+        | otherwise
         = IfCon   { ifConName    = dataConName data_con,
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),

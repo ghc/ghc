@@ -1547,6 +1547,14 @@ lintTyApp fun_ty arg_ty
 lintValApp :: CoreExpr -> Type -> Type -> UsageEnv -> UsageEnv
            -> LintM (Type, UsageEnv)
 lintValApp arg fun_ty arg_ty fun_ue arg_ue
+  | DepFunTy b res_ty <- coreFullView fun_ty
+  = do { ensureEqTys (varType b) arg_ty (mkAppMsg (varType b) arg_ty arg)
+       ; lintL (isNativeIndexId b && isJust (exprToNativeIndex arg))
+           (text "Unsupported retained constructor field:" <+> ppr arg)
+       ; in_scope <- getInScope
+       ; let subst = Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv
+       ; return (substTy subst res_ty, addUE fun_ue (scaleUE ManyTy arg_ue)) }
+    -- See Note [Linting retained constructor fields].
   | Just (_, w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
   = do { ensureEqTys arg_ty' arg_ty (mkAppMsg arg_ty' arg_ty arg)
        ; let app_ue =  addUE fun_ue (scaleUE w arg_ue)
@@ -1807,10 +1815,21 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
       -- Instantiate the universally quantified
       -- type variables of the data constructor
     ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys
-          ; binderMult (Named _)   = ManyTy
-          ; binderMult (Anon st _) = scaledMult st
           -- See Note [Validating multiplicities in a case]
-          ; multiplicities = map binderMult $ fst $ splitPiTys con_payload_ty }
+          ; multiplicities = constructorMults con_payload_ty
+          ; constructorMults ty = case coreFullView ty of
+              ForAllTy _ body -> ManyTy : constructorMults body
+              DepFunTy _ body -> ManyTy : constructorMults body
+              FunTy { ft_mult = mult, ft_res = body }
+                              -> mult : constructorMults body
+              _               -> [] }
+
+    ; unless (null (dataConRepArgBinders con)) $ do
+      { in_scope <- getInScope
+      ; lintL (all (\v -> isLocalId v && not (isCoVar v)
+                         && not (v `elemInScopeSet` in_scope)) args
+               && sizeVarSet (mkVarSet args) == length args)
+          (text "Retained constructor fields require fresh local Ids:" <+> ppr args) }
 
         -- And now bring the new binders into scope
     ; lintL (multiplicities `equalLength` args)
@@ -1827,6 +1846,21 @@ lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt 
 
   | otherwise   -- Scrut-ty is wrong shape
   = zeroUE <$ addErrL (mkBadAltMsg scrut_ty alt)
+
+{- Note [Linting retained constructor fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Count a retained Pi as one runtime constructor field. Check an alternative's
+fields as sequential applications of the constructor worker. A retained field
+substitutes its actual Id into the remaining telescope. Checking each field
+against a flat list would lose the dependency on the preceding field.
+
+Require fresh local field Ids before extending the alternative's scope. This
+prevents an outer runtime index from being captured by the new field binding.
+The case result annotation is checked outside that scope, so an unpacked index
+cannot escape. See Note [Retained constructor field telescopes] in
+GHC.Core.DataCon and Note [Instantiating retained constructor fields] in
+GHC.Core.Utils.
+-}
 
 {- Note [Native index alias evidence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

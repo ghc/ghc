@@ -120,7 +120,7 @@ import GHC.Utils.Misc
 import Control.Monad       ( guard )
 import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
-import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
+import Data.List           ( sort, sortBy, partition, zipWith4, zip4, mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord            ( comparing )
 import qualified Data.Set as Set
@@ -2944,11 +2944,42 @@ dataConInstPat fss uniqs mult con inst_tys
         kind   = Type.substTyUnchecked subst (varType tv)
 
       -- Make value vars, instantiating types
-    arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
-    mk_id_var uniq fs (Scaled m ty) str
+    arg_ids
+      | null retained_binders
+      = zipWith4 (mk_id_var full_subst) id_uniqs id_fss arg_tys arg_strs
+      | otherwise
+      = snd $ mapAccumL mk_retained_field full_subst $
+          zip retained_binders (zip4 id_uniqs id_fss arg_tys arg_strs)
+    retained_binders = dataConRepArgBinders con
+
+    mk_id_var subst uniq fs (Scaled m ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
         mkUserLocalOrCoVar (mkVarOccFS fs) uniq
-                           (mult `mkMultMul` m) (Type.substTy full_subst ty) noSrcSpan
+                           (mult `mkMultMul` m) (Type.substTy subst ty) noSrcSpan
+
+    -- See Note [Instantiating retained constructor fields].
+    mk_retained_field subst (mb, (uniq, fs, ty, str))
+      = (subst', field)
+      where
+        field = mk_id_var subst uniq fs ty str
+        Subst in_scope ids tvs cvs = subst
+        subst' = Subst (extendInScopeSet in_scope field) ids' tvs cvs
+        ids' = case mb of
+                 Nothing  -> ids
+                 Just old -> extendVarEnv ids old (Var field)
+
+{- Note [Instantiating retained constructor fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained constructor field binds a runtime Id over the types of later fields.
+Freshen fields from left to right. After each retained field, substitute its
+actual pattern Id for the template Id in the remaining field types. Extend the
+in-scope set too, so substitution avoids capture under nested retained binders.
+Do not put these runtime fields among the erased existential binders.
+
+Keep the ordinary constructor path unchanged. The retained subset has no
+representation wrapper, so its metadata and representation fields align.
+See Note [Retained constructor field telescopes] in GHC.Core.DataCon.
+-}
 
 {-
 Note [Mark evaluated arguments]
