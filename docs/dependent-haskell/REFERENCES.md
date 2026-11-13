@@ -822,6 +822,42 @@ use existing retained functions; it does not provide a stored package. The new
 metadata addresses that representation gap. Promotion and interface declaration
 encoding require explicit follow-up work before source constructor support.
 
+### Constructor field interface provenance
+
+Agda v2.8.0 preserves a dependent field telescope in its module interface:
+
+- [`Syntax/Internal.hs`, lines 254–264](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/Internal.hs#L254-L264)
+  represents each telescope domain followed by an abstraction over the rest.
+  Lines 221–229 use integer variable indices; lines 302–308 define abstractions.
+  Blob: `a6e0938ed369b1f0f5f0b8aa1ff3baeb9aad033b`.
+- [`Serialise/Instances/Internal.hs`, lines 27–54](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Serialise/Instances/Internal.hs#L27-L54)
+  encodes and decodes `EmptyTel` and `ExtendTel`. Lines 97–133 preserve
+  abstractions, variable indices and Pi types. Lines 226–238 and 422–447 encode
+  declaration types and datatype, record and constructor metadata.
+  Blob: `d4df2b9480b9721f14b09bdc11980a927f6175e5`.
+- [`Serialise/Instances.hs`, lines 28–34](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Serialise/Instances.hs#L28-L34)
+  serializes the complete module `Interface`.
+  Blob: `cd61f3d60040047ccbb9abfefbd84c2bde07bbcc`.
+- [`Serialise/Base.hs`, lines 254–265](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Serialise/Base.hs#L254-L265)
+  defines the decoder as `StateT St IO`. It does not establish semantic scope
+  validation or fresh local-name rebinding.
+  Blob: `7a6397261097c4cbab36c3f6a4dcfc7d5d429cec`.
+
+GHC uses local names and fresh runtime Ids. The codec therefore adds an optional
+name for each field and reconstructs scope sequentially. Field types already
+encode domains and multiplicities; duplicating these in binder metadata could
+introduce conflicting encodings. Reject duplicate names, unsupported constructor
+shapes and runtime references outside the earlier fields. Optional local names
+introduce no global name dependency. The serialized field schema requires a
+header-version change.
+
+GHC's recursive TyCon import knot requires a separate validation-order decision.
+Expose metadata before forcing field domains, then validate field types lazily
+and check the Core telescope on worker/user type demand. This prevents invalid
+self or mutual native-domain declarations from reentering their own checks.
+Agda's structural serializer does not supply this GHC-specific lazy knot rule.
+The sources establish prior art, not a proof for this implementation.
+
 ## Haskell evaluation provenance
 
 The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)

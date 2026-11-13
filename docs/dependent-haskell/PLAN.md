@@ -848,6 +848,11 @@ withPacked (PackVec n xs) k = k n xs
 - [ ] Preserve the telescope in interface declarations. Reject malformed scope
   and unsupported promotion before constructing metadata. Version the format if
   the serialized declaration changes. Keep existing archives immutable.
+  Encode aligned optional local names. Decode with fresh sequential Ids and
+  deferred field checks. Expose metadata before recursive domain validation.
+  Check duplicate/forward/self/inherited references, vacuous binders, distinct
+  names after tidying, sibling scope and repeated imports. Preserve an immutable
+  version-1 reader before configuring version 2.
 - [ ] Check source constructor declarations and patterns in order. Bind the same
   runtime identity in the later types and Core fields. Add located diagnostics
   for invalid field domains, escape and unsupported representation features.

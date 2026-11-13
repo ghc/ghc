@@ -86,6 +86,36 @@ projections, such as a vector whose index is `fst package`, require a larger
 index-expression grammar. Do not infer record eta laws from Agda. See the
 [pinned Agda and historical provenance](REFERENCES.md#retained-constructor-field-telescopes).
 
+### Constructor field interfaces
+
+Store `ifConArgBinders :: [Maybe IfLclName]` beside `ifConArgTys`.
+The empty list denotes an ordinary constructor. A nonempty list must align
+with its fields. The existing field entry remains the only encoding of its
+type and multiplicity. A name binds only in later fields. The writer tidies
+each field type before extending the tidy environment with its binder.
+
+The reader checks metadata shape, distinct names and unsupported declaration
+features before decoding types. It allocates fresh runtime Ids in field order
+and extends the local Id environment only for later fields. A named field uses
+multiplicity Many. Check the encoded multiplicity, fixed domain, lifted field
+kind and free-runtime scope in deferred decoding. Reject inherited, forward
+and self references. Keep field scope out of the result and sibling constructors.
+Report malformed native metadata through `failIfM` with the constructor name.
+
+Expose constructor metadata before semantic domain validation. An imported
+field can refer to its parent TyCon or another recursive declaration. Reject
+retained metadata before inspecting a domain constructor's full signature.
+Allocate a named field Id with literal Many; `mkLocalId` forces its multiplicity.
+Defer its domain and encoded multiplicity checks together. Validate the Core
+telescope when the worker or user type is demanded. This avoids reentering the
+same recursive validation thunk. Preserve ordinary constructor laziness.
+
+The field schema requires a new interface header version. Preserve an immutable
+reader and interface for the previous format before rebuilding. Verify both
+version-rejection directions. Source constructor syntax and promotion remain
+gated. This codec does not enable native unfolding optimization or source
+package execution. See the [Agda serialization provenance](REFERENCES.md#constructor-field-interface-provenance).
+
 ## Scope and equality
 
 Check `DepFunTy b result` under a context extended by the runtime binder `b`.
