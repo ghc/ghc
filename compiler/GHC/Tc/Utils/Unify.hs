@@ -3628,7 +3628,7 @@ instance Outputable SimpleUnifyResult where
     SUC_NotSure     -> text "SUC_NotSure"
     SUC_CanUnify    -> text "SUC_CanUnify"
 
--- | Lift a checked constructor branch proof through a monomorphic type.
+-- | Lift a checked constructor branch proof through a supported value type.
 -- See Note [Transport through a retained index].
 tcRetainedCoercion :: Id -> CoercionN -> TcType -> TcM CoercionN
 tcRetainedCoercion index branch_co original_ty
@@ -3672,6 +3672,11 @@ tcRetainedCoercion index branch_co original_ty
       = FunTy af <$> abstract_index template_ty mult
                  <*> abstract_index template_ty arg
                  <*> abstract_index template_ty res
+    abstract_index template_ty (DepFunTy binder body)
+      | isNativeIndexId binder
+      , not (anyFreeVarsOfType (== index) (varType binder))
+      , typeKind body `eqType` liftedTypeKind
+      = mkDepFunTy binder <$> abstract_index template_ty body
     abstract_index _ _
       = failWithTc $ TcRnRetainedQuantificationError (RetainedPatternType original_ty)
 
@@ -3679,15 +3684,21 @@ tcRetainedCoercion index branch_co original_ty
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A checked constructor pattern provides n ~# 'S k, for example. Its actual
 field identities are in scope when the branch body is checked. Abstract the
-free occurrences of n in a monomorphic type to one fresh, immutable TyVar
+free occurrences of n in a supported value type to one fresh, immutable TyVar
 of the index domain. Use liftCoSubstWith to transport that template along
 the branch proof. Existing FC lifting supplies the required congruence.
 The runtime Id remains an Id. The template never enters the checked type.
 
-Keep subtrees that do not depend on b unchanged. Reject dependent foralls,
-retained functions, casts, and coercion types. This adds no retained-function
-congruence, axiom, singleton, or general term evaluation. It follows dependent
-pattern specialization; see docs/dependent-haskell/REFERENCES.md#agda-provenance.
+Keep subtrees that do not depend on n unchanged. A retained closure type can
+capture n in its body. Preserve its inner runtime binder and unchanged domain.
+FC lifting then uses the existing fixed-domain DepFunCo rule. It freshens the
+inner binder and preserves its scope over the body proof. Cast the closure;
+eta expansion would change bottom-function behavior in Haskell.
+
+Reject changed domains, dependent erased foralls, casts, and coercion types.
+This adds no axiom, singleton, general Pi unification, or term evaluation.
+It follows dependent pattern specialization; see
+docs/dependent-haskell/REFERENCES.md#agda-provenance.
 The caller uses the nominal proof for argument and inverse result casts.
 -}
 

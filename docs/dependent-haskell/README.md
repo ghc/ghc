@@ -1346,12 +1346,16 @@ unification remain gated. Native templates can still require explicit type
 applications. Retained syntax under type constructors, kinds, and other source
 positions remains separate work.
 
-The fixture appends 23 observations to the previous 226. These cover polymorphic
+The fixture appends 29 observations to the previous 226. These cover polymorphic
 calls, ordinary-leading functions, checked lambdas, value-changing vector
 closures, captured indices, and erased/runtime shadowing. Unused bottom functions
 and bottom vectors stay lazy. Demanding the signed bottom function raises its
 named exception. Wrong lengths, escaping indices, unsupported domains, unsigned
-aliases, and partial signatures have located diagnostics.
+aliases, and partial signatures have located diagnostics. Constructor clauses
+and explicit case transport a captured closure through its fixed-domain Pi.
+The transport uses the checked branch proof and existing `DepFunCo` lifting.
+It preserves the function value with a cast. Changed domains and dependent
+erased foralls remain gated.
 
 The bootstrap runtime and API kernel pass. Four standalone compilation controls
 also pass, including known function results with class contexts. The full build,

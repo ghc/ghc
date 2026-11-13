@@ -669,6 +669,11 @@ retainedNatClosureDeclarations =
     , "bumpVec :: Vec Int n -> Vec Int n"
     , "bumpVec VNil = VNil"
     , "bumpVec (VCons x xs) = VCons (x + 1) (bumpVec xs)"
+    , "caseClosure :: foreach (n :: Nat) -> (foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int n) -> Vec Int n -> Vec Int n"
+    , "caseClosure Z f xs = f Z xs VNil"
+    , "caseClosure (S k) f xs = f Z xs VNil"
+    , "caseClosureBody :: foreach (n :: Nat) -> (foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int n) -> Vec Int n -> Vec Int n"
+    , "caseClosureBody n f xs = case n of { Z -> f Z xs VNil; S k -> f Z xs VNil }"
     ]
 
 -- | Pass named and checked closures through shared runtime index producers.
@@ -684,7 +689,9 @@ retainedNatClosureObservation =
     , "ignoredCyclic <- driveNat (\\n -> observeInt (ignoreClosure n bottomClosure bottomVec)) cyclicNat"
     , "throughId <- driveNats (\\n -> observeVec (nativeViaId @Int n (replicateNative @Int n 42)))"
     , "transformed <- driveNats (\\n -> observeVec (applyAt @Int n (\\m xs -> bumpVec xs) (replicateNative @Int n 42)))"
-    , "pure (named ++ anonymous ++ ordinaryFirst ++ captured ++ unlines [partialBottom,partialCyclic,ignoredBottom,ignoredCyclic] ++ throughId ++ transformed)"
+    , "constructorClosures <- driveNats (\\n -> observeVec (caseClosure n (\\m outer _ -> bumpVec outer) (replicateNative @Int n 42)))"
+    , "explicitCaseClosures <- driveNats (\\n -> observeVec (caseClosureBody n (\\m outer _ -> bumpVec outer) (replicateNative @Int n 42)))"
+    , "pure (named ++ anonymous ++ ordinaryFirst ++ captured ++ unlines [partialBottom,partialCyclic,ignoredBottom,ignoredCyclic] ++ throughId ++ transformed ++ constructorClosures ++ explicitCaseClosures)"
     ]
 
 -- | Preserve previous observations before checking closure applications.
@@ -695,6 +702,7 @@ retainedNatClosureExpected =
         ++ ["forced", "forced", "42", "42"]
         ++ ["[]:0", "[42,42]:2", "[42,42,42]:3"]
         ++ ["[]:0", "[43,43]:2", "[43,43,43]:3"]
+        ++ concat (replicate 2 ["[]:0", "[43,43]:2", "[43,43,43]:3"])
 
 -- | Check contextual functions with imported classes and local native workers.
 retainedNatContextSource :: String -> String -> String
