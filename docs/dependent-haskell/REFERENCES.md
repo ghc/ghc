@@ -772,6 +772,56 @@ This increment does not adopt those mutable metas. It adds a separate opt-in
 matching entry point. Existing unification and apartness entry points retain
 their native gates. Haskell function WHNF still forbids an eta-expansion shortcut.
 
+### Retained constructor field telescopes
+
+Decision: represent a stored dependent pair as an ordinary algebraic datatype
+whose constructor has a retained field telescope. Reuse `DepFunTy` and
+`TermVarTy`. Store field binders separately from erased DataCon existentials.
+Agda v2.8.0 supplies these precedents:
+
+- [`Builtin/Sigma.agda`, lines 7–11](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Sigma.agda#L7-L11)
+  defines an ordinary record with `fst : A` and `snd : B fst`. Its constructor
+  stores the two fields. File blob: `d68aead018bb834aec9a547a7907576005c28dcf`.
+- [`Rules/Record.hs`, lines 119–151](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Record.hs#L119-L151)
+  checks field types, extracts their telescope, and builds the constructor type
+  with `telePi_`. Lines 237–246 install the constructor and its field arity.
+  Lines 653–668 substitute projections of earlier fields into later projection
+  types. File blob: `86300a28d259cbb07833f547cb6533c6cce0dd35`.
+- [`Rules/Data.hs`, lines 362–375](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Data.hs#L362-L375)
+  checks constructor signatures and their datatype result. Lines 1825–1847
+  traverse dependent constructor binders under `underAbstraction`.
+  File blob: `349a3c508d8a77d8f86b41decedec6de9a4d7afc`.
+- [`Rules/Application.hs`, lines 1051–1071](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L1051-L1071)
+  instantiates constructor parameters, checks the remaining argument telescope,
+  and compares the result with the expected type.
+  File blob: `82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+- [`Rules/LHS.hs`, lines 1358–1389](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1358-L1389)
+  obtains the instantiated constructor telescope and source field names.
+  Lines 1503–1531 substitute the constructor through the later context and
+  target. File blob: `3779ffa6e418bca99e30c071e189106f82ecbe1b`.
+
+Agda uses de Bruijn scope. It does not supply GHC's Unique-freshening algorithm.
+The GHC implementation substitutes actual pattern Ids sequentially and extends
+its in-scope set. The first package subset has lazy lifted fields and an
+index-independent result. General projections exceed the current native index
+grammar. Agda record eta laws do not justify eta conversion in lazy Haskell.
+These sources guide the rules; they do not prove preservation for this fork.
+
+The historical
+[`nokinds-pi` DataCon.lhs, lines 644–655](https://github.com/goldfirere/ghc/blob/b64ef80f8002727422c05092f429c38d0527ed0b/compiler/basicTypes/DataCon.lhs#L644-L655)
+counts runtime Ids among `dcExTyCoVars` and builds Pi representation types.
+Its [user-type builder, lines 911–916](https://github.com/goldfirere/ghc/blob/b64ef80f8002727422c05092f429c38d0527ed0b/compiler/basicTypes/DataCon.lhs#L911-L916)
+filters those Ids out. This handling is incomplete. Current GHC existential
+machinery assumes erased TyVars/CoVars. Separate retained field metadata keeps
+that invariant and preserves ordinary constructor callers.
+
+An ordinary existential `forall n. Nat -> Vec a n -> PackedVec a` does not
+relate its Nat field to erased `n`. Type abstractions can name that erased
+witness but cannot establish the missing equality. A continuation consumer can
+use existing retained functions; it does not provide a stored package. The new
+metadata addresses that representation gap. Promotion and interface declaration
+encoding require explicit follow-up work before source constructor support.
+
 ## Haskell evaluation provenance
 
 The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)

@@ -41,6 +41,51 @@ This policy bounds the Core increment. It is not an Agda language restriction.
 The source checker and signature reader now use this structural policy. Nat
 source execution and signature imports pass the M9 regression checks.
 
+## Retained constructor fields
+
+The next source target packages a runtime index with its dependent payload:
+
+```haskell
+-- Target syntax. Constructor declaration checking is not implemented yet.
+data PackedVec a where
+  PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a
+```
+
+Use an ordinary algebraic datatype and the existing `DepFunTy` and `TermVarTy`.
+Do not add a primitive Sigma type. Each retained field binds its actual runtime
+Id over later field types. An optional binder list accompanies the original
+argument types. The empty list preserves the ordinary DataCon representation.
+`mkDataConWithRetainedArgs` validates the nonempty list before construction.
+The worker and user types rebuild the telescope with `mkDepFunTy`.
+Do not store runtime Ids in `dcExTyCoVars`.
+
+The initial Core subset has lazy lifted fields, unrestricted retained binders,
+closed native index domains, and no wrapper, existential, equality constraint,
+dictionary, record selector, newtype, strict field, or unpacked field. A field
+type can refer only to earlier retained fields. The constructor result cannot
+contain a free runtime Id. The package itself does not become a native index
+domain. Its Nat field remains an admissible index.
+
+Instantiate pattern fields in order. Substitute each retained template Id with
+the fresh actual field Id before instantiating later fields. Extend the
+substitution scope after each field. Core Lint checks the fields as sequential
+worker applications. It counts each retained Pi as one runtime field, requires
+fresh local field Ids, and checks the case result outside the field scope.
+Packing and unpacking must preserve the two ordinary runtime payload slots.
+Fields remain lazy; constructor WHNF does not force the index or the vector.
+
+Promotion needs a separate conversion from runtime field binders to promoted
+binders. The initial builder rejects promotion instead of making an ill-scoped
+promoted TyCon. Source checking must reject unsupported promotion with a located
+GHC diagnostic before it can reach this internal gate. Interface declarations
+must encode the field binders before source support is enabled. The current
+anonymous `IfaceConDecl` fields cannot preserve this telescope.
+
+First expose scoped elimination through a retained consumer. General dependent
+projections, such as a vector whose index is `fst package`, require a larger
+index-expression grammar. Do not infer record eta laws from Agda. See the
+[pinned Agda and historical provenance](REFERENCES.md#retained-constructor-field-telescopes).
+
 ## Scope and equality
 
 Check `DepFunTy b result` under a context extended by the runtime binder `b`.

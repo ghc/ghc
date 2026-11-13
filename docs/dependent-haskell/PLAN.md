@@ -812,6 +812,50 @@ metas require separate scope machinery. See
 Implementation `dae037074c` passes the
 [verified checkpoint](README.md#expected-type-instantiation-of-retained-workers).
 
+### M10: retained constructor field telescopes
+
+Package a runtime Nat with a vector indexed by that same field. Follow Agda's
+ordinary dependent constructor telescope. Reuse native Core Pi and index forms.
+The full source target is:
+
+```haskell
+-- Target syntax. Declaration and pattern checking remain pending.
+data PackedVec a where
+  PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a
+
+withPacked :: PackedVec a ->
+              (foreach (n :: Nat) -> Vec a n -> r) -> r
+withPacked (PackVec n xs) k = k n xs
+```
+
+- [x] Inspect Agda Sigma, record/constructor checking, application and LHS
+  substitution. Record pinned sources and the historical DataCon difference.
+- [ ] Add optional retained field binders to DataCon metadata. Preserve the old
+  builder API and ordinary knot laziness. Rebuild worker and wrapper Pi types.
+  Validate ordered scope, fixed domains, multiplicity, representation restrictions
+  and result nonescape. Keep runtime fields out of erased existentials.
+- [ ] Instantiate Core pattern fields sequentially. Substitute actual field Ids
+  in later field types. Check fresh identities, field count, dependent payload
+  identity and result nonescape in Core Lint. Add existing-fixture API coverage.
+- [ ] Preserve the telescope in interface declarations. Reject malformed scope
+  and unsupported promotion before constructing metadata. Version the format if
+  the serialized declaration changes. Keep existing archives immutable.
+- [ ] Check source constructor declarations and patterns in order. Bind the same
+  runtime identity in the later types and Core fields. Add located diagnostics
+  for invalid field domains, escape and unsupported representation features.
+- [ ] Execute packaging, scoped elimination and repackaging of real Nat/Vec
+  values through separate module interfaces. Inspect CorePrep/STG field layout.
+  Check constructor WHNF, unused bottom/cyclic index, bottom vector, and demanded
+  payload behavior. Do not count the API's dictionary-function payload as Vec
+  execution or as proof of backend support.
+- [ ] Validate both stages, focused regressions and existing compatibility
+  controls. Record exact commands, peaks, artifact hashes and remaining gates.
+
+The first checkpoint implements and verifies the Core metadata and pattern
+rules. Source declarations, interfaces and runtime execution remain subsequent
+requirements. General projections, records, strictness transformations, native
+unfoldings and optimizer support remain separate work.
+
 ## Acceptance checks
 
 | ID | Required result |
