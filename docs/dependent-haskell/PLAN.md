@@ -785,6 +785,31 @@ Follow [the higher-order contract](CORE.md#explicit-higher-order-closure-argumen
 Implementation `64044341e8` and `94d7d8f2f3` pass the
 [verified checkpoint](README.md#higher-order-retained-closures).
 
+### Expected-type instantiation of retained workers
+
+Use a complete expected retained function type to infer the outer erased
+parameters of a known worker. Accept `applyAt @Int n lambdaId xs` and a fully
+signed `alias = lambdaId` without requiring `lambdaId @Int`.
+
+- [ ] Add an opt-in immutable Core matcher. Preserve existing entry points,
+      unification, and apartness behavior.
+- [ ] Compare valid same-domain retained binders under paired renaming and
+      bound-variable escape tracking. Preserve family and multiplicity rules.
+- [ ] Add a separate known-native-worker expected-result route. Require NoQL,
+      complete kind/scope-valid type arguments, exact result equality, actual
+      type applications, preserved constraints, and final subsumption.
+- [ ] Check alpha-renamed/nested binders, rigid outer indices, repeated payload
+      agreement, contexts, and a genuine bottom worker without eta expansion.
+- [ ] Reject captured inner indices, mismatched domains, and inconsistent
+      payloads. Keep inferred aliases and general native meta assignment gated.
+- [ ] Verify runtime and interface-only clients, located diagnostics, both-stage
+      builds, registered regressions, compatibility, formatting, and source hashes.
+
+Follow Agda's expected-result implicit insertion and shared-context Pi comparison.
+Use an immutable substitution in this GHC increment. Agda's contextual mutable
+metas require separate scope machinery. See
+[the pinned sources](REFERENCES.md#expected-type-instantiation-of-retained-workers).
+
 ## Acceptance checks
 
 | ID | Required result |

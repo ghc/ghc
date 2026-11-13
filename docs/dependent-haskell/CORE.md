@@ -383,9 +383,9 @@ Reuse retained application and the checked-lambda rule. Preserve source arity,
 usage, and laziness. Ignoring a bottom closure must not evaluate it. Supplying a
 bottom index must not evaluate that index when the selected function ignores it.
 Do not infer a retained function argument type through a native meta assignment.
-An ordinary named worker must already have an alpha-equivalent retained type.
-Explicit type applications can specialize its erased parameters. General
-instantiation through a retained result template remains separate work.
+A known named worker can specialize its outer erased parameters from a complete
+expected retained function type. Keep explicit type applications as an option.
+Use the scoped matching rule below instead of assigning a native meta-variable.
 
 A known retained function result can also determine the outer type arguments of
 an ordinary polymorphic helper. Use the existing immutable result match before
@@ -394,6 +394,21 @@ all type arguments, kind agreement, valid index scope, and exact result equality
 Accept runtime Pi types through function arrows. Keep erased inner foralls and
 other polymorphic type arguments gated. This lets a polymorphic bottom or `id`
 receive the already known retained function type without eta expansion.
+
+For a native worker template, use an opt-in immutable matching entry point.
+Require a known head without concreteness variables, NoQL, no pending type
+applications, supported value types, and a complete expected result. Corresponding
+retained binders must have equal closed domains, `Many`, and bodies of kind
+`Type`. Compare their bodies under paired binder renaming. Register each shared
+binder in the existing escape check. An outer erased parameter must not capture
+an inner runtime index. Keep runtime indices rigid and preserve family rules.
+
+Every outer erased parameter must have a kind-correct, scope-valid solution.
+Require exact equality between the instantiated result and the expected type.
+Preserve the original context and emit actual type applications before ordinary
+argument checking and final subsumption. Do not evaluate indices, inspect
+unfoldings, or eta-expand the worker. General unification and the default matcher
+keep their existing retained-function gates.
 
 A constructor branch can transport a captured closure type through a retained
 binder with an unchanged domain. Abstract the outer index only in the body.
@@ -446,11 +461,13 @@ expression is evaluated. Family-axiom normalization under Pi remains separate
 from coverage classification and ambient-evidence rewriting. See Note
 [Coverage checking retained functions].
 
-The immutable matcher can bind a whole retained function type to a template
+The default immutable matcher can bind a whole retained function type to a template
 variable. It retains the usual occurs and escape checks. Unsupported retained
 comparisons produce `MaybeApart MARRetainedFunction`. Alpha-equivalent retained
 types without free TyCoVars can compare reflexively. This does not add structural
 matching under Pi or assign Tc metavariables. See Note [Matching retained function types].
+The opt-in worker matcher additionally compares fixed-domain retained bodies
+under paired runtime binders. It returns only an immutable substitution.
 
 Type computation and Core Lint must perform the same instantiation. A wrong
 argument type, unsupported expression, or escaping index must fail explicitly.

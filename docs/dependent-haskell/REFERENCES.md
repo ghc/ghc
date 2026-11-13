@@ -744,6 +744,34 @@ The branch proof changes occurrences of the outer index in the body. The inner
 domain and binder scope stay fixed. FC lifting constructs the proof; a function
 cast preserves Haskell's bottom-function behavior.
 
+### Expected-type instantiation of retained workers
+
+Agda v2.8.0 inserts omitted hidden arguments in
+[`implicitNamedArgs`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Implicit.hs#L81-L101).
+It creates an argument and substitutes it into the remaining codomain.
+Blob: `55a03200d2300486c91a95798fc8e0c3c9c675cf`.
+The application checker uses the expected result's hiding when
+[inserting trailing implicit arguments](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L587-L602).
+It then [compares the actual result with the expected type](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L453-L465).
+Blob: `82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+
+Agda's [Pi comparison](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L849)
+checks domains and modalities before comparing codomains under one shared
+context variable. Blob: `69423e2c11b6f35bc5eee2d502cf2830efbc005a`.
+The GHC worker matcher follows this scope rule for equal closed `Many` domains.
+It pairs runtime binders and uses the existing bound-variable escape check.
+Only the worker's outer erased parameters can receive an immutable substitution.
+The application checker requires complete kind/scope-valid arguments and exact
+result equality before it emits type applications and performs final subsumption.
+
+Agda's [meta creation](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars.hs#L295-L321)
+and [solution abstraction](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars.hs#L1281-L1340)
+retain the meta's permitted context. Blob:
+`13f52cb7f2a08ac55f62e326564043470e62f6f6`.
+This increment does not adopt those mutable metas. It adds a separate opt-in
+matching entry point. Existing unification and apartness entry points retain
+their native gates. Haskell function WHNF still forbids an eta-expansion shortcut.
+
 ## Haskell evaluation provenance
 
 The [Haskell 2010 Report, section 6.2](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html)
