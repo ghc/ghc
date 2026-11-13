@@ -12,9 +12,12 @@ See [current status](README.md) and [primary references](REFERENCES.md).
 
 ## Current priority: execute from source
 
-The constructor-interface checkpoint is verified at `6a0bfbf0fd`. Complete
-M10 through Haskell source next. The acceptance program must declare Nat, Vec and
-PackedVec in source. See the [source target](examples/packed-vector/README.md). It must construct, unpack and repackage stored vectors.
+The constructor-interface checkpoint is verified at `6a0bfbf0fd`. Both compiler
+stages now pass the source program's 15 runtime observations and 12 located
+negative checks. M10 source validation is complete. The program
+declares Nat, Vec and PackedVec in source. See the
+[source example](examples/packed-vector/README.md). It constructs, unpacks and
+repackages stored vectors.
 Compile a producer and a consumer as separate modules. Do not require a GHC API
 producer to add native declarations or functions.
 
@@ -24,6 +27,11 @@ types and in generated Core. Check that an unused bottom or cyclic length
 remains unforced. Check demanded vector behavior separately. Preserve the
 existing signature, proof and ordinary Haskell controls. Record any initial
 source restrictions next to the runnable example.
+
+The next source exercise is a filter that returns `PackedVec a`. Construct its
+output length with `Z` and `S` as elements are removed or retained. Compile it
+through a separate module interface and check finite and partial inputs. Reuse
+the current Core forms before extending package patterns or adding projections.
 
 ## Direction and boundaries
 
@@ -834,7 +842,7 @@ ordinary dependent constructor telescope. Reuse native Core Pi and index forms.
 The full source target is:
 
 ```haskell
--- Target syntax. Declaration and pattern checking remain pending.
+-- Compiles and runs in the source package example.
 data PackedVec a where
   PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a
 
@@ -876,61 +884,62 @@ Reject unsupported forms with located diagnostics. Keep pattern coverage checks
 active. Multiple equations need coherent substitution of their distinct runtime
 Ids; an ordinary value alias does not establish index equality.
 
-- [ ] Check source constructor declarations in order. `mkGadtDecl` already keeps
+- [x] Check source constructor declarations in order. `mkGadtDecl` keeps
   the retained suffix in `con_res_ty`. Rename this suffix with runtime Names;
   preserve ordinary constructor renaming. Check it as a telescope and apply
   `rejigConRes` only to its terminal package result. Preserve the source field
   metadata directly: `mkDepFunTy` can erase a vacuous binder. Keep the complete
-  scoped telescope through generalization, zonking and result substitution.
+  scoped telescope through generalization and zonking. Split the fields before
+  result substitution. Substitute each field lazily to preserve the parent
+  datatype knot. Validate the result shape after this knot is complete.
   The earlier kind pass must not inspect unfinished Nat constructor graphs.
   Check domain kinds there and validate supported domains in the final pass.
-- [ ] Traverse retained field scope in role inference and role validity. A
+- [x] Traverse retained field scope in role inference and role validity. A
   scoped runtime index has a fixed closed domain. Continue checking ordinary
   payload parameters and their roles. Reject source promotion before requesting
   the cached promoted constructor. Add located diagnostics for unsupported
-  declaration shapes, invalid domains and escaping fields.
-- [ ] Check source constructor patterns sequentially. Substitute each checked
+  declaration shapes, invalid domains and escaping fields. Automatic Typeable
+  generation and validity recovery skip promotion of retained constructors.
+- [x] Check source constructor patterns sequentially. Substitute each checked
   retained field Id into the later field types before checking those patterns.
   Keep runtime fields out of erased existentials. Use ordinary constructor
   pattern checking for `withPacked`; its retained callback argument does not
   make the outer function a native-index equation.
-- [ ] Preserve actual field identities during desugaring. `matchOneConLike`
-  and PMC's `desugarConPatOut` currently call the gated flat
-  `conLikeInstOrigArgTys`. Instantiate fields sequentially in both paths.
-  PMC's speculative `instCon` must also instantiate fresh fields sequentially;
-  its current flat substitution leaves retained template Ids free.
+- [x] Preserve actual field identities during desugaring. `matchOneConLike`
+  and PMC's `desugarConPatOut` reuse the checked field Ids instead of the gated
+  flat `conLikeInstOrigArgTys`. PMC's speculative `instCon` instantiates fresh
+  fields sequentially.
   `selectMatchVar` can retain a bare source field Id for one clause.
   An ordinary `bindMatchId`/`wrapBind` alias does not prove equality of runtime
   indices. Multiple equations require coherent substitution through each typed
   RHS, pattern and evidence, or checked alias transport. Do not route package
   elimination through the native-index constructor equation checker.
-- [ ] Count retained field Pi binders as runtime arguments in worker LFInfo and
+- [x] Count retained field Pi binders as runtime arguments in worker LFInfo and
   constructor layout checks. `RepType.countFunRepArgs` and `countConRepArgs`
-  currently handle ordinary arrows only. Use each fixed lifted field domain;
+  handle retained binders. Use each fixed lifted field domain;
   do not force its runtime value to determine its representation.
   Constructor impossibility checks must return conservative results before
   calling flat signature APIs. Decline product unpacking for retained packages.
   Nonreflexive constructor-cast pushing also needs scoped field substitution;
   preserve the cast until that rule exists. Profiling remains outside the subset.
-- [ ] Execute packaging, scoped elimination and repackaging of real Nat/Vec
+- [x] Execute packaging, scoped elimination and repackaging of real Nat/Vec
   values through separate module interfaces. Inspect CorePrep/STG field layout.
   Check constructor WHNF, unused bottom/cyclic index, bottom vector, and demanded
   payload behavior. Do not count the API's dictionary-function payload as Vec
   execution or as proof of backend support.
-- [ ] Validate both stages, focused regressions and existing compatibility
+- [x] Validate both stages, focused regressions and existing compatibility
   controls. Record exact commands, peaks, artifact hashes and remaining gates.
 
-Source entry points for the next checkpoint are `mkGadtDecl`,
-`splitLHsGadtTy`/`splitHsFunType`, `rnConDecl`, `kcConDecl`, `tcConDecl` and
-`tcConGADTArgs`. They currently discard or reject the retained field telescope.
-`tcDataConPat`/`tcConValArgs` must replace each template field Id before checking
-the remaining fields. Keep erased existential freshening separate. A source
-constructor regression must retain located GHC-43582 until these paths and the
-interface declaration format are ready.
+The source path starts at `mkGadtDecl`, `rnConDecl`, `kcConDecl` and `tcConDecl`.
+`tcRetainedDataConPat` replaces each template field Id before checking the next
+field. Erased existential freshening stays separate. The source package example
+now compiles unchanged through a separate producer interface and object file.
+Ordinary polymorphic payloads use the existing immutable result matcher. Read
+resolved expected-type metas before this match; do not put a runtime index in
+an ordinary mutable type meta.
 
-The first checkpoint implements and verifies the Core metadata and pattern
-rules. Source declarations, interfaces and runtime execution remain subsequent
-requirements. General projections, records, strictness transformations, native
+Core metadata, interface declarations and the first source package execution
+are implemented. General projections, records, strictness transformations, native
 unfoldings and optimizer support remain separate work.
 
 ## Acceptance checks

@@ -12,7 +12,7 @@ Last updated: 2026-11-13.
 
 - [Implementation plan](PLAN.md): Core extension, port tasks, and acceptance checks.
 - [References](REFERENCES.md): annotated sources, reading order, and status dates.
-- [Packed vector source target](examples/packed-vector/README.md): producer, consumer, required output, and proposed runner; source support is pending.
+- [Packed vector source example](examples/packed-vector/README.md): producer, consumer, runtime observations, and a separate-module runner.
 - [Historical port](PORT.md): pinned commits, module mapping, and missing rules.
 - [Restricted Core](CORE.md): representation, typing, substitution, and gates.
 - This file: current status, validation results, and instructions to resume work.
@@ -39,10 +39,10 @@ Last updated: 2026-11-13.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both stages and libraries, five registered regressions, 277 imported observations, 20 focused closure/worker observations, and 12 guide blocks pass |
+| Last verified checkpoint | Both stages and libraries, five registered regressions, the Core API, and bootstrap runtime pass; source packages add 15 runtime observations and 12 located negative checks |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
-| Stored dependent pairs | Core field telescopes and binary declaration imports preserve scoped fields and fresh identities; source package execution remains pending |
-| Next task | Compile and run the two-module packed-vector example entirely from Haskell source; declaration checking, source patterns, roles, desugaring and runtime argument counting have priority |
+| Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
+| Next task | Implement a source filter that returns a packed vector with a runtime-computed length; then broaden source package patterns |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -1676,3 +1676,61 @@ execute a stored Vec package or establish full on-disk package compilation.
 The next gate is the [standalone source example](examples/packed-vector/README.md).
 Constructor/pattern checking, roles, PMC, desugaring and runtime argument counting
 remain open in M10. Native unfoldings, optimization and profiling remain gated.
+
+## Retained constructor source checkpoint
+
+Implementation: `8e90e0386b`. The [packed-vector example](examples/packed-vector/README.md)
+now compiles from Haskell source through both compiler stages. It declares its
+own Nat, Vec and PackedVec. A separate consumer imports the producer's interface
+and links its object. The producer source is absent from the consumer import path.
+The program constructs, opens and repackages stored vectors without singleton
+reification or a GHC API producer.
+
+Constructor checking preserves each runtime binder through renaming, kind
+checking, generalization and zonking. Field substitution remains lazy until the
+parent datatype knot is complete. Role checking, source patterns, PMC and
+desugaring preserve ordered field scope. Runtime argument counters handle retained
+Pi binders. Automatic Typeable generation skips the unsupported promoted
+constructor and retains the ordinary parent. The existing immutable application
+matcher reads resolved expected-type metas before matching polymorphic payloads.
+See the [Core contract](CORE.md#source-constructor-checking).
+
+Validation on 2026-11-13:
+
+- Both compiler stages and matching libraries build in 26m35s. Peak memory was
+  6,458 MiB under the 16 GiB limit, with swap disabled.
+- Five focused registered regressions pass. The run has 39 cases, 34 skips,
+  no unexpected results, and no framework failures or warnings. Its scope peaked
+  at 2,715 MiB under 8 GiB. The repository MR template requires regression coverage.
+  The existing runtime fixture now reads the two example files directly.
+- All 15 source observations pass in the standalone bootstrap and self-hosted
+  runs and in the runtime fixtures. The Core API and bootstrap runtime regression
+  pass. The final source/runtime scope peaked at 1,058 MiB under 4 GiB.
+- Twelve located negative cases pass: StrictData, type data, existentials,
+  contexts, refined universals, promotion, constructor field patterns, lazy
+  patterns, let patterns, index mismatch, index escape and shared equations.
+  They require GHC-83605, GHC-83865 or GHC-94726 as applicable. Panics and timeouts
+  are failures. The standalone negative scope peaked at 37 MiB under 4 GiB.
+- CorePrep and STG show a constructor with two runtime arguments and two lazy
+  fields. Repacking passes both original fields. `ignorePacked` inspects only
+  the package constructor. The consumer retains its IORef read.
+- Fourmolu parses all 19 changed compiler files and checks the runtime fixture.
+  Its upstream parser needs the fork-only extension pragma removed to parse the
+  example files. The fork compiles the unchanged examples. Cabal-gild ran on an
+  ignored copy of the generated Cabal file. Whitespace checks pass.
+
+Artifacts use `_build/verification/native-source-package-`. The main commands
+are `build.sh`, `native-source-package-registered.sh`,
+`native-source-package-selfhost-run.sh`, `native-source-package-api.sh` and
+`native-source-package-runtime.sh`, with the resource limits above. Successful
+logs are `build-v1.log`, `registered-v1.log`, `selfhost-run.log`, `api-v1.log`,
+`bootstrap-runtime-v2.log` and `negatives-v1.log`. Source, documentation, harness
+and executable-artifact manifests accompany them. The old interface readers and
+archives remain unchanged. This increment does not change the interface schema.
+
+The initial source package has one constructor, bare variable fields and one
+equation per eliminator. Complete signatures and the prototype's O0/interface
+flags remain required. Native unfolding optimization, profiling, records and
+general projections remain separate work. The full GHC suite was not run.
+The next source exercise is a filter that returns a packed vector with a length
+computed at runtime.

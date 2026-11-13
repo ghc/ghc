@@ -43,10 +43,10 @@ source execution and signature imports pass the M9 regression checks.
 
 ## Retained constructor fields
 
-The next source target packages a runtime index with its dependent payload:
+The source package example stores a runtime index with its dependent payload:
 
 ```haskell
--- Target syntax. Constructor declaration checking is not implemented yet.
+-- Compiles in the two-module source example.
 data PackedVec a where
   PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a
 ```
@@ -55,7 +55,8 @@ Use an ordinary algebraic datatype and the existing `DepFunTy` and `TermVarTy`.
 Do not add a primitive Sigma type. Each retained field binds its actual runtime
 Id over later field types. An optional binder list accompanies the original
 argument types. The empty list preserves the ordinary DataCon representation.
-`mkDataConWithRetainedArgs` validates the nonempty list before construction.
+`mkDataConWithRetainedArgs` validates the nonempty list when the worker or user
+type is demanded. It exposes the metadata before this validation.
 The worker and user types rebuild the telescope with `mkDepFunTy`.
 Do not store runtime Ids in `dcExTyCoVars`.
 
@@ -78,8 +79,8 @@ Promotion needs a separate conversion from runtime field binders to promoted
 binders. The initial builder rejects promotion instead of making an ill-scoped
 promoted TyCon. Source checking must reject unsupported promotion with a located
 GHC diagnostic before it can reach this internal gate. Interface declarations
-must encode the field binders before source support is enabled. The current
-anonymous `IfaceConDecl` fields cannot preserve this telescope.
+encode optional field binders beside their argument types. Automatic Typeable
+generation skips the promoted constructor and retains the parent datatype.
 
 First expose scoped elimination through a retained consumer. General dependent
 projections, such as a vector whose index is `fst package`, require a larger
@@ -115,9 +116,30 @@ same recursive validation thunk. Preserve ordinary constructor laziness.
 
 The field schema requires a new interface header version. Preserve an immutable
 reader and interface for the previous format before rebuilding. Verify both
-version-rejection directions. Source constructor syntax and promotion remain
-gated. This codec does not enable native unfolding optimization or source
-package execution. See the [Agda serialization provenance](REFERENCES.md#constructor-field-interface-provenance).
+version-rejection directions. Source packages use this codec for separate-module
+execution. Promotion and native unfolding optimization remain gated. See the
+[Agda serialization provenance](REFERENCES.md#constructor-field-interface-provenance).
+
+### Source constructor checking
+
+Rename a retained suffix with runtime Names. Check its domain kinds during kind
+inference. Inspect each native domain's constructor graph only in final checking.
+An index datatype must be complete before the package's recursive declaration
+group. Domains in that same group have local `TcTyCon` placeholders and are
+rejected before graph inspection.
+Keep explicit field metadata through generalization and zonking. Split the
+telescope before substituting each field type. Keep this substitution lazy while
+the parent datatype knot is incomplete. Validate the constructor result and its
+erased universals after the parent exists.
+
+Role inference and role checking traverse field scope in order. A runtime index
+has a closed domain and cannot become a datatype parameter. Ordinary payload
+parameters keep their inferred roles. Source patterns substitute the actual field
+Id into later field types. Desugaring preserves that Id for one constructor
+equation. PMC uses the same scope rule for checked and speculative fields.
+Reject shared equations until their distinct field identities can be transported.
+See Notes [Source retained constructor declarations] in `GHC.Tc.TyCl` and
+[Roles of retained constructor fields] in `GHC.Tc.TyCl.Utils`.
 
 ## Scope and equality
 
@@ -947,8 +969,8 @@ unfolding equality, or trusted coercion.
 
 Enable the first rule only at the root of a complete explicit value signature.
 Keep the generic `HsForEachTy` rejection for unsupported source positions.
-This prevents native types from reaching synonym, data, class, and role checks
-before those checks support them. Reject partial signatures and embedded retained
+This keeps unsupported native types out of synonym and class checks. Constructor
+declarations use the separate field-telescope path above. Reject partial signatures and embedded retained
 quantification before constructing native types. Start execution with local
 declarations, as specified below.
 `zonkMatchGroup` checks group annotations outside the pattern environment. For
