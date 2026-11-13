@@ -61,9 +61,10 @@ import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 import GHC.Core ( Expr(Var) )
 import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy) )
+import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, isNativeIndexType, splitTyConApp_maybe
-                     , anyFreeVarsOfType, mkDepFunTy, typeKind )
-import GHC.Core.Coercion ( mkCoVarCo, mkSymCo, mkSubCo, coercionKind )
+                     , anyFreeVarsOfType, typeKind )
+import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind )
 import GHC.Core.DataCon ( DataCon, dataConName, dataConOrigArgTys, dataConTyCon, promoteDataCon )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
@@ -85,6 +86,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Id
 import GHC.Types.Var ( EvVar, varType, isCoVar )
+import GHC.Types.Var.Env ( mkInScopeSetList, unitVarEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity )
 import GHC.Data.Bag ( listToBag, unionBags )
@@ -193,7 +195,8 @@ tcRetainedCase :: Id -> MatchGroup GhcRn (LHsExpr GhcRn) -> ExpRhoType
                -> TcM (Maybe (HsExpr GhcTc))
 tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result_ty)
   = do { captures <- fmap catMaybes $ mapM capture (nameSetElemsStable (retainedCaseNames matches))
-       ; if null captures && not (depends result_ty)
+       ; givens <- filter (depends . varType) . tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+       ; if null captures && null givens && not (depends result_ty)
          then return Nothing
          else setSrcSpanA loc $
            do { when (retainedCaseHasQuote matches) $
@@ -208,7 +211,11 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
               ; unless (cons `equalLength` domain_cons && all (`elem` cons) domain_cons) case_error
               ; fresh_name <- newSysName (nameOccName (idName index))
               ; let fresh_index = mkLocalId fresh_name ManyTy (varType index)
-                    generalize ty = applyTypeToArgs (mkDepFunTy index ty) [Var fresh_index]
+                    in_scope = mkInScopeSetList
+                      (fresh_index : tyCoVarsOfTypesList (result_ty : map varType (index : givens ++ captures)))
+                    subst = Subst.mkIdSubst in_scope (unitVarEnv index (Var fresh_index))
+                    generalize = Subst.substTy subst
+              ; dictionaries <- newEvVars (map (generalize . varType) givens)
               ; names <- mapM (newSysName . nameOccName . idName) captures
               ; let capture_names = zip (map idName captures) names
                     add_arguments (L match_loc match@(Match { m_pats = L pats_loc pats }), (con, fields))
@@ -217,13 +224,19 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
                         in L match_loc (rewritten { m_ctxt = LamAlt LamSingle
                                                   , m_pats = L pats_loc (pats ++ extra) })
                     matches' = matches { mg_alts = L loc (map add_arguments (zip alternatives constructors)) }
-                    arg_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . generalize . varType) captures
-              ; checked <- tcRetainedConMatches fresh_index [] arg_tys (map (const Nothing) arg_tys)
+                    dictionary_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . varType) dictionaries
+                    capture_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . generalize . varType) captures
+                    arg_tys = dictionary_tys ++ capture_tys
+                    argument_plan = map Just dictionaries ++ map (const Nothing) captures
+              ; checked <- tcRetainedConMatches fresh_index [] arg_tys argument_plan
                              (mkCheckExpType (generalize result_ty)) matches'
               ; mapM_ (tcEmitBindingUsage . singleUsageUE) captures
               ; let fun = HsLam noAnn LamSingle checked
-                    arguments = map (noLocA . HsVar noExtField . noLocA) (index : captures)
-              ; return (Just (foldl' (\f a -> HsApp noExtField (noLocA f) a) fun arguments)) } }
+                    index_arg = noLocA (HsVar noExtField (noLocA index))
+                    with_evidence = mkHsWrap (mkWpEvVarApps givens)
+                                      (HsApp noExtField (noLocA fun) index_arg)
+                    arguments = map (noLocA . HsVar noExtField . noLocA) captures
+              ; return (Just (foldl' (\f a -> HsApp noExtField (noLocA f) a) with_evidence arguments)) } }
   where
     depends = anyFreeVarsOfType (== index)
     capture name
@@ -305,6 +318,15 @@ runtime index. Generalize each referenced local whose type depends on that
 index as a later value argument. Check the constructor clauses with the existing
 retained match rule, then apply the checked function to the scrutinee and those
 locals. The constructor rule transports both later arguments and the result.
+
+Generalize incoming evidence whose predicate depends on the index, even when no
+source Name refers to that evidence. The lexical native Given scope records the
+actual parameters. Put fresh evidence parameters before the captured values and
+pass the original evidence with an evidence wrapper. This includes primitive
+equality CoVars; these must not become source HsVar applications. Substitute into
+predicates directly. Their kind is Constraint, not a retained result kind.
+Transport the original dictionaries and let the ordinary solver derive their
+superclasses in each branch. Static forms exclude enclosing evidence.
 
 Agda's case_returning_of_ uses an explicit motive and a pattern function applied
 to its scrutinee. Its with-abstraction also generalizes dependent context
@@ -543,7 +565,10 @@ tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty
                then do { checked <- check; return (emptyTcEvBinds, checked) }
                else checkConstraints (PatSkol (RealDataCon con) (m_ctxt match)) [] refined_givens check
            ; let given_binds = zipWith (\given (dict, co) ->
-                                   mkGivenEvBind given (evCast (Var dict) (mkSubCo co)))
+                                   mkGivenEvBind given
+                                     (if isCoVar dict
+                                      then evCoercion (mkCoCast (mkCoVarCo dict) (mkSubCo co))
+                                      else evCast (Var dict) (mkSubCo co)))
                                  refined_givens dictionary_cos
            ; branch_binds <- case ev_binds of
                TcEvBinds binds -> do { mapM_ (addTcEvBind binds) given_binds

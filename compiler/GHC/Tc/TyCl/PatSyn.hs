@@ -420,6 +420,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; (tclvl, wanted, (lpat', (ex_tvs', prov_dicts, args'))) <-
            assertPpr (equalLength arg_names arg_tys) (ppr name $$ ppr arg_names $$ ppr arg_tys) $
            pushLevelAndCaptureConstraints   $
+           tcExtendNativeGivens req_dicts   $
            tcExtendNameTyVarEnv univ_tv_prs $
            tcCheckPat PatSynCtx lpat (unrestricted skol_pat_ty)   $
            do { let in_scope    = mkInScopeSetList skol_univ_tvs

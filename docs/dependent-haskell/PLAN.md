@@ -703,6 +703,8 @@ The equivalent constructor equations pass.
       them with each branch proof and preserve the full function arity.
 - [ ] Record lexical native evidence parameters at their scope entry. Preserve
       enclosing parameters in nested scopes. Exclude them inside static forms.
+      Save and restore the evidence at an arrow scope boundary.
+      Restore bracket-entry evidence when checking a nested typed splice.
 - [ ] Generalize predicates with native type substitution. Pass the original
       evidence after the index and before captured values. Handle CoVars through
       evidence applications and coercion transport.

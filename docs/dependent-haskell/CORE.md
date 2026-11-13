@@ -318,6 +318,11 @@ each predicate with the checked branch proof. Let the ordinary solver derive
 superclasses from the transported dictionaries. Do not search for replacement
 instances or enumerate derived evidence. Static forms must exclude enclosing
 evidence, as on the ordinary constraint solver path.
+An arrow scope must save this evidence with its reader environment and constraint
+accumulator. An escaped arrow head must restore that saved evidence. It must not
+capture evidence from the `proc` pattern.
+At a nested typed splice, restore the bracket-entry evidence with the outer
+constraint accumulator. Quoted-body evidence must not enter an emitted splice.
 
 Keep the existing complete, unguarded constructor pattern rule. An explicit case
 must inspect its index before returning a branch lambda. The evidence transport

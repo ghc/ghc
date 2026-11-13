@@ -44,6 +44,7 @@ import GHC.Types.Name.Reader ( LocalRdrEnv )
 import GHC.Types.Name.Env ( NameEnv )
 import GHC.Types.SrcLoc ( RealSrcSpan )
 import GHC.Types.Basic ( TopLevelFlag )
+import GHC.Types.Var ( EvVar )
 
 import GHC.Types.Error ( Messages )
 
@@ -96,6 +97,10 @@ data TcLclCtxt
         tcl_in_gen_code :: Bool,            -- Are we type checking a generated expression?
         tcl_err_ctxt    :: ErrCtxtStack,
         tcl_tclvl       :: TcLevel,
+        tcl_native_givens :: [EvVar],       -- Lexical native evidence parameters,
+                                            -- including equality CoVars.
+                                            -- See Note [Lexical native Givens]
+                                            -- in GHC.Tc.Utils.Monad.
         tcl_bndrs       :: TcBinderStack,   -- Used for reporting relevant bindings,
                                             -- and for tidying type
 
@@ -250,8 +255,10 @@ Here the call of 'foo' gives rise to a (Foo a) constraint that should not
 be captured by the pattern match on 'Bar'.  Rather it should join the
 constraints from further out.  So we must capture the constraint bag
 from further out in the ArrowCtxt that we push inwards.
+Restore the lexical native Givens as well, so generated evidence applications
+cannot capture dictionaries introduced inside the proc.
 -}
 
 data ArrowCtxt   -- Note [Escaping the arrow scope]
   = NoArrowCtxt
-  | ArrowCtxt LocalRdrEnv (TcRef WantedConstraints)
+  | ArrowCtxt LocalRdrEnv (TcRef WantedConstraints) [EvVar]

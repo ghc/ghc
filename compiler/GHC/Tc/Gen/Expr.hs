@@ -614,6 +614,7 @@ tcExpr (HsStatic free_names expr) res_ty
   = do  { res_ty          <- expTypeToType res_ty
         ; (co, (p_ty, expr_ty)) <- matchExpectedAppTy res_ty
         ; (expr', lie) <- captureConstraints $
+                          updLclCtxt (\ctxt -> ctxt { tcl_native_givens = [] }) $
                           addErrCtxt (StaticFormCtxt expr) $
                           tcCheckPolyExprNC expr expr_ty
 

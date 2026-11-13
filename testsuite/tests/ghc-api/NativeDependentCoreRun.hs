@@ -553,12 +553,40 @@ retainedNatContextDeclarations =
     , "pairCtorContext :: foreach (n :: Nat) -> ContextPair n => Vec Int n -> String"
     , "pairCtorContext Z xs = onlyLabel xs ++ show xs"
     , "pairCtorContext (S k) xs = onlyLabel xs ++ show xs"
+    , "caseOnlyGiven :: foreach (n :: Nat) -> OnlyGiven n => Vec Int n -> String"
+    , "caseOnlyGiven n xs = case n of { Z -> onlyLabel xs; S k -> onlyLabel xs }"
+    , "casePairGiven :: foreach (n :: Nat) -> ContextPair n => Vec Int n -> String"
+    , "casePairGiven n xs = case n of { Z -> onlyLabel xs ++ show xs; S k -> onlyLabel xs ++ show xs }"
+    , "caseOnlyWhere :: foreach (n :: Nat) -> OnlyGiven n => Vec Int n -> String"
+    , "caseOnlyWhere n xs = case n of"
+    , "  Z -> rendered where rendered :: String; rendered = onlyLabel xs"
+    , "  S k -> rendered where rendered :: String; rendered = onlyLabel xs"
+    , "caseNestedOnlyGiven :: foreach (n :: Nat) -> foreach (m :: Nat) -> (OnlyGiven n, OnlyGiven m) => Vec Int n -> Vec Int m -> String"
+    , "caseNestedOnlyGiven n m xs ys = case n of"
+    , "  Z -> case m of { Z -> onlyLabel xs ++ onlyLabel ys; S n -> onlyLabel xs ++ onlyLabel ys }"
+    , "  S n -> case m of { Z -> onlyLabel xs ++ onlyLabel ys; S m -> onlyLabel xs ++ onlyLabel ys }"
+    , "renderCaseContext :: foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String"
+    , "renderCaseContext n xs = case n of { Z -> show xs; S k -> show xs }"
+    , "renderCasePair :: foreach (n :: Nat) -> foreach (m :: Nat) -> (Show (Vec Int n), Show (Vec Int m)) => Vec Int n -> Vec Int m -> String"
+    , "renderCasePair n m xs ys = case n of"
+    , "  Z -> case m of { Z -> show xs ++ \"/\" ++ show ys; S n -> show xs ++ \"/\" ++ show ys }"
+    , "  S n -> case m of { Z -> show xs ++ \"/\" ++ show ys; S m -> show xs ++ \"/\" ++ show ys }"
+    , "caseEqualityContext :: foreach (n :: Nat) -> (Add n Z ~ n) => Vec Int (Add n Z) -> Vec Int n"
+    , "caseEqualityContext n xs = case n of { Z -> xs; S k -> xs }"
+    , "casePrimitiveEquality :: foreach (n :: Nat) -> (Add n Z :~: n) -> Vec Int (Add n Z) -> Vec Int n"
+    , "casePrimitiveEquality n proof xs = case proof of Refl -> case n of { Z -> xs; S k -> xs }"
+    , "casePartial :: foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> Int -> String"
+    , "casePartial n xs = case n of { Z -> \\_ -> show xs; S k -> \\_ -> show xs }"
+    , "noCasePartial :: foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> Int -> String"
+    , "noCasePartial n xs _ = show xs"
+    , "outerOnlyGivenArrow :: foreach (n :: Nat) -> OnlyGiven n => () -> String"
+    , "outerOnlyGivenArrow n = proc () -> (case n of { Z -> \\() -> onlyGivenContext n bottomVec; S k -> \\() -> onlyGivenContext n bottomVec }) -< ()"
     ]
 
 -- | Check contextual functions with imported classes and local native workers.
 retainedNatContextSource :: String -> String -> String
 retainedNatContextSource moduleName observation =
-    unlines $ "{-# LANGUAGE ConstraintKinds, FlexibleContexts, ViewPatterns #-}" : concatMap insert (lines (retainedNatClassSource moduleName observation))
+    unlines $ "{-# LANGUAGE Arrows, ConstraintKinds, FlexibleContexts, ViewPatterns #-}" : concatMap insert (lines (retainedNatClassSource moduleName observation))
   where
     insert line@"entry :: IO String" = retainedNatContextDeclarations ++ [line]
     insert line = [line]
@@ -589,7 +617,15 @@ retainedNatContextObservation =
     , "legacyBang <- drive (\\b -> observeInt (legacyBangContext b 43)) True"
     , "wildcard <- driveNat (\\n -> pure (wildcardContext (error \"unused-context-prefix\") n (replicateNative @Int n 42))) Z"
     , "constrained <- drive (\\b -> observeInt (keepConstrained b 44)) False"
-    , "pure (rendered ++ constructors ++ guarded ++ viewed ++ lambdas ++ fullPatterns ++ forwarded ++ ignoredVectors ++ equalities ++ constructorEqualities ++ unlines [ignoredBottom,ignoredCyclic,ignoredEqualityBottom,ignoredEqualityCyclic,variablePartialBottom,variablePartialCyclic,constructorPartialBottom,constructorPartialCyclic] ++ pairs ++ unlines [legacy,legacyBang,wildcard,constrained])"
+    , "caseRendered <- driveNats (\\n -> pure (renderCaseContext n (replicateNative @Int n 42)))"
+    , "caseEqualities <- driveNats (\\n -> case rightZero n of Refl -> observeVec (caseEqualityContext n (appendNative @Int n Z (replicateNative @Int n 42) VNil)))"
+    , "casePrimitiveEqualities <- driveNats (\\n -> observeVec (casePrimitiveEquality n (rightZero n) (appendNative @Int n Z (replicateNative @Int n 42) VNil)))"
+    , "casePairs <- driveNatPairs (\\n m -> pure (renderCasePair n m (replicateNative @Int n 42) (replicateNative @Int m 7)))"
+    , "caseFull <- driveNats (\\n -> pure (casePartial n (replicateNative @Int n 42) 0))"
+    , "caseCyclic <- driveNat (\\n -> force (casePartial n bottomVec)) cyclicNat"
+    , "casePartialField <- driveNat (\\n -> force (casePartial n bottomVec)) partialNat"
+    , "noCaseBottom <- driveNat (\\n -> force (noCasePartial n bottomVec)) bottomNat"
+    , "pure (rendered ++ constructors ++ guarded ++ viewed ++ lambdas ++ fullPatterns ++ forwarded ++ ignoredVectors ++ equalities ++ constructorEqualities ++ unlines [ignoredBottom,ignoredCyclic,ignoredEqualityBottom,ignoredEqualityCyclic,variablePartialBottom,variablePartialCyclic,constructorPartialBottom,constructorPartialCyclic] ++ pairs ++ unlines [legacy,legacyBang,wildcard,constrained] ++ caseRendered ++ caseEqualities ++ casePrimitiveEqualities ++ casePairs ++ caseFull ++ unlines [caseCyclic,casePartialField,noCaseBottom])"
     ]
 
 -- | Preserve the contextual observations after all existing imported results.
@@ -607,6 +643,15 @@ retainedNatContextExpected =
            , "VCons 42 (VCons 42 VNil)/VCons 7 (VCons 7 (VCons 7 VNil))"
            ]
         ++ ["42", "43", "VNil", "44"]
+        ++ ["VNil", "VCons 42 (VCons 42 VNil)", "VCons 42 (VCons 42 (VCons 42 VNil))"]
+        ++ concat (replicate 2 ["[]:0", "[42,42]:2", "[42,42,42]:3"])
+        ++ [ "VNil/VNil"
+           , "VNil/VCons 7 (VCons 7 (VCons 7 VNil))"
+           , "VCons 42 (VCons 42 VNil)/VNil"
+           , "VCons 42 (VCons 42 VNil)/VCons 7 (VCons 7 (VCons 7 VNil))"
+           ]
+        ++ ["VNil", "VCons 42 (VCons 42 VNil)", "VCons 42 (VCons 42 (VCons 42 VNil))"]
+        ++ replicate 3 "forced"
 
 -- | Check explicit source cases with dependent results and captured payloads.
 retainedCaseSource :: String -> String -> String
@@ -742,7 +787,7 @@ retainedNatLibrarySource :: String
 retainedNatLibrarySource =
     unlines $
         take 1 (lines (retainedNatSource "NativeRetainedNatLibrary" ""))
-            ++ [ "{-# LANGUAGE ConstraintKinds, FlexibleContexts, FlexibleInstances, LinearTypes, RankNTypes, TypeOperators, ViewPatterns #-}"
+            ++ [ "{-# LANGUAGE Arrows, ConstraintKinds, FlexibleContexts, FlexibleInstances, LinearTypes, RankNTypes, TypeOperators, ViewPatterns #-}"
                , "module NativeRetainedNatLibrary where"
                , "import Data.Type.Equality ((:~:)(Refl))"
                ]
@@ -1797,6 +1842,7 @@ runNatContextSourceChecks = do
     forM_
         [ ("NativeSourceContextConstructorBottom", "driveNat (\\n -> pure (renderCtor n bottomVec)) bottomNat", "native-bottom-nat")
         , ("NativeSourceContextPayloadBottom", "driveNat (\\n -> pure (renderCtor n bottomVec)) Z", "native-bottom-vector")
+        , ("NativeSourceContextCasePartialBottom", "driveNat (\\n -> force (casePartial n bottomVec)) bottomNat", "native-bottom-nat")
         ]
         $ \(name, body, marker) -> do
             bottomExpression <- sourceEntry name (retainedNatContextSource name body)
@@ -1816,6 +1862,27 @@ runNatContextSourceChecks = do
             ,
                 [ "badOnlyGiven :: foreach (n :: Nat) -> Vec Int n -> String"
                 , "badOnlyGiven n xs = onlyGivenContext n xs"
+                ]
+            )
+        ,
+            ( "NativeSourceMissingPredecessorGiven"
+            , 39999
+            , "OnlyGiven"
+            , []
+            ,
+                [ "badPredecessorGiven :: foreach (n :: Nat) -> OnlyGiven n => Vec Int n -> String"
+                , "badPredecessorGiven n xs = case n of { Z -> onlyLabel xs; S k -> onlyGivenContext k bottomVec }"
+                ]
+            )
+        ,
+            ( "NativeSourceArrowPatternGivenEscape"
+            , 39999
+            , "OnlyGiven"
+            , []
+            ,
+                [ "data HasGiven (n :: Nat) where HasGiven :: OnlyGiven n => HasGiven n"
+                , "badArrowGiven :: foreach (n :: Nat) -> HasGiven n -> String"
+                , "badArrowGiven n = proc x -> case () of { () | HasGiven <- x -> (case n of { Z -> \\() -> onlyGivenContext n bottomVec; S k -> \\() -> onlyGivenContext n bottomVec }) -< () }"
                 ]
             )
         ,
