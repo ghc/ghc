@@ -68,6 +68,9 @@ The domain can also be a user-defined closed algebraic type::
     headNative :: forall a. foreach (n :: Nat) -> Vec a (S n) -> a
     headNative n (VCons x _) = x
 
+    successorHead :: foreach (n :: Nat) -> Int
+    successorHead n = headNative n (replicateNative (S n) 42)
+
     appendNative :: forall a. foreach (n :: Nat) (m :: Nat)
                  -> Vec a n -> Vec a m -> Vec a (Add n m)
     appendNative n m xs ys = appendVec xs ys
@@ -101,10 +104,13 @@ positions report GHC-43582.
 
 Refinement in source ``case`` expressions remains unimplemented. The constructor
 rule currently applies to function equations.
-Direct retained constructor arguments with fields, such as ``f (S k)``, still
-require checked index transport in CorePrep. Bind that constructor value to a
-local name before the call. Producers and consumers must use that same named
-index. The checker does not equate the name with its defining expression.
+Calls can pass constructor arguments with fields, including ``S n`` and
+``S (S n)``. These calls do not force ``n`` to check its index. CorePrep checks
+transport of later payloads and the result when it names a constructor argument.
+Transport through a result that still contains a dependent function type remains
+unsupported. A strict match on such a partially applied function can also reach
+an internal PMC error. Producers and consumers that use local names must use
+the same named index. The checker does not equate a name with its definition.
 
 To compile an ordinary executable, use
 ``-O0 -fomit-interface-pragmas -fno-write-if-simplified-core``. The restricted

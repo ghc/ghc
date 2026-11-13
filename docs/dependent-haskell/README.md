@@ -31,7 +31,7 @@ Last updated: 2026-11-13.
 | Configured fork version | `10.1.20261113.1`, with interface header `1001202611131`; matching libraries rebuilt |
 | Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, and bare constructor fields pass the source runtime fixture |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | CorePrep constructor-argument transport in M9; actual unfolding files in M8, source `case`, and broader M6 remain open |
+| Next task | M6 PMC diagnostics, Pi congruence, and source `case`; M8 unfolding files and conservative lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -507,9 +507,9 @@ These Core programs pass through the checked bytecode entry. The source fixture
 below separately validates source elaboration, machine code, and Nat interface
 imports through the bootstrap API, registered self-hosted tests, and separate CLI
 processes. The checker and signature reconstruction use the structural domain rule.
-CorePrep explicitly rejects a retained constructor-tree argument with fields:
-naming `S k` as an opaque local Id needs checked index transport. Recursive
-replication passes the actual predecessor Id and does not need this conversion.
+At this Core checkpoint, CorePrep rejected retained constructor-tree arguments
+with fields. Naming `S k` as an opaque local Id needs checked index transport.
+The current implementation is described under constructor-argument transport.
 
 The implementation checkpoint is `df623104fd`. Both-stage default builds pass
 with six workers and `--docs=none`. The final incremental alignment took
@@ -574,9 +574,8 @@ The audit identifies four preservation requirements: field binders before proofs
 that mention them, scoped GADT index instantiation, retained telescopes, and
 CorePrep transport when naming constructor arguments. M9 records source-level
 and cross-module acceptance checks, including partial and cyclic Nat values.
-Direct constructor-tree arguments with fields still need checked CorePrep
-transport. `f (S k)` currently reports a named unsupported operation. Bind the
-runtime Nat to a local name before the call. Constructor equations currently
+Direct constructor-tree arguments now use checked CorePrep transport.
+Constructor equations currently
 split one leading retained index. Variable equations can bind several retained
 indices. Source `case` refinement and broader inference remain separate work.
 Producers and consumers must use the same named index. Its defining expression
@@ -593,6 +592,44 @@ directions. Ordinary optimized code, Template Haskell, GHCi, package-database,
 and Haddock startup smoke checks also pass. Repository contribution guidance
 requires regressions; this change extends the existing API fixtures and golden.
 The guide's exact Nat/Vec example also compiles with Core and STG Lint.
+
+## Constructor-argument transport
+
+The implementation checkpoint is `a2f6553bdf`.
+
+CorePrep accepts direct `S n` and nested `S (S n)` retained arguments. It names
+constructor fields recursively and composes checked nominal equalities. It
+transports later indexed payloads and the result across the supplied telescope.
+The proof cases preserve lazy fields. CoreToStg erases the virtual evidence.
+No singleton witness, unfolding equality, or universal coercion supplies it.
+See [CORE.md](CORE.md) and [the provenance](REFERENCES.md).
+
+The source checks cover `replicateNative (S n) x`,
+`headNative n (replicateNative (S n) x)`, and two-index append with constructed
+arguments. Partial and cyclic fields preserve finite prefixes. A head consumer
+does not force the unused predecessor. Forcing a bottom function still raises.
+
+On 2026-11-13, both compiler stages built in 8m58s, peaking at 5,600 MiB under
+16 GiB. The five registered normal-way tests passed in 1m10s at 2,439 MiB under
+8 GiB: 39 cases, 34 skipped, no unexpected results or framework warnings.
+Bootstrap Core/API and runtime checks passed. A separate CLI producer and
+interface-only consumer passed 19 observations. Both interface-format rejection
+directions passed. The exact guide example and ordinary optimized TH, GHCi,
+package, and Haddock smoke passed. All scopes disabled swap. The CLI, guide,
+and ordinary smoke scope peaked at 162 MiB under 4 GiB.
+
+Remaining dependent-function congruence and dependent erased binder kinds are
+gated. The `lazy`/`noinline`/`nospec` stripping path can bypass preprocessing
+and still reject a constructed retained argument. A strict source match on a
+partially applied retained function can panic in PMC normalization before
+CorePrep. Source `case` refinement and native unfolding files remain open.
+These checks do not establish a general preservation theorem. The full
+testsuite, documentation build, and performance measurements have not run.
+
+Logs use the `native-alias` prefix in `_build/verification/`. Compiler sources
+pass nonmutating Fourmolu parses. Both existing fixtures pass canonical
+Fourmolu. Cabal-gild, diff, and local document link checks pass. The repository
+merge-request template requires the focused regressions.
 
 ## Verified baseline
 
@@ -669,8 +706,8 @@ reproduction recipe are now in [reference/](reference/README.md).
 
 ## How to resume
 
-1. Read this file and the current priority in [the plan](PLAN.md). M9 Nat/Vec is
-   next. Keep the open M6 and M8 work visible while implementing that target.
+1. Read this file and the current priority in [the plan](PLAN.md). The Nat/Vec
+   source target passes. Continue the open M6 and M8 work in bounded steps.
 2. Check `git status`, the current branch, and the source revision. Compare them
    with the baseline above before reusing build results.
 3. Read the relevant primary sources in [the references](REFERENCES.md).

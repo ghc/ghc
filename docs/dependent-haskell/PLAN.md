@@ -396,9 +396,9 @@ retained telescopes, and the partial/cyclic/bottom observations. It also compile
 and links a fresh one-shot Nat/Vec consumer from actual producer interfaces and
 objects. The configured signature format is now `10.1.20261113.1`. Both-stage
 builds, registered self-hosted tests, separate CLI processes, and both directions
-of format rejection pass. Keep the acceptance
-gate open for checked CorePrep constructor-argument transport. Native unfolding
-bodies remain separately gated.
+of format rejection pass. Checked CorePrep constructor-argument transport now
+passes bootstrap execution, including nested fields, dependent payloads, and
+two retained indices. Native unfolding bodies remain separately gated.
 
 The next source target goes beyond Boolean selection. Support first-order
 algebraic runtime indices, with a user-defined Peano `Nat` and length-indexed
@@ -463,10 +463,10 @@ pattern. See [the Agda Nat/Vec references](REFERENCES.md#agda-provenance).
 - [x] Transport the resulting signatures and programs across modules. Keep format
       compatibility and any unfinished M8 unfolding work explicit. Pin a new
       configured format before emitting Nat signatures and check `.1` rejection.
-- [ ] Transport constructor-tree arguments with fields through CorePrep naming.
+- [x] Transport constructor-tree arguments with fields through CorePrep naming.
       Keep later payload types and the final result at the original index.
-      Preserve proof scope and laziness. Keep the current named gate until the
-      checked rule passes prepared-Core and STG validation.
+      Preserve proof scope and laziness. Check prepared Core and STG. Keep
+      unsupported dependent congruence and expression codecs gated.
 
 Gate: a source program reads runtime lengths, constructs and appends vectors,
 and consumes the statically indexed results. Check empty and successor inputs.
@@ -495,14 +495,17 @@ Resolve these preservation rules in the implementation:
 - Check CorePrep naming of constructor arguments. Naming `f (S k)` as
   `let t = S k in f t` changes its recovered index to `TermVarTy t`. Specify and
   check alias transport before claiming end-to-end constructor-argument support.
-  Do not use an unchecked cast or equality from an unfolding. CorePrep currently
-  reports a named unsupported operation before it names this retained argument.
-  A candidate uses a checked DEFAULT alternative to bind the equality between
-  a fresh case binder and the exact constructor index. It must transport later
-  payload arguments as well as the final result. CorePrep must preserve the
-  proof scope, and CoreToStg must erase the proof explicitly. Restrict the first
-  rule to constructor WHNF with atomic fields. Nested constructors need composed
-  transport. A result-only cast is insufficient. This rule is not implemented.
+  Do not use an unchecked cast or equality from an unfolding. The implemented
+  DEFAULT rule binds an equality between a fresh case binder and the exact
+  scrutinee index. CorePrep emits it only for constructor WHNF. It names nested
+  fields recursively and composes their proofs. It transports later payloads
+  and the result across the supplied telescope. CorePrep preserves proof scope,
+  and CoreToStg erases the virtual proof explicitly. A result-only cast is
+  insufficient. Remaining dependent-function congruence stays gated.
+  The `lazy`/`noinline`/`nospec` stripping path can still bypass preprocessing.
+  Strict source matching on a remaining retained function can panic in PMC
+  normalization before CorePrep. Fix that diagnostic under M6; do not catch
+  the panic in an acceptance test or disable PMC to hide it.
   The Agda let and dependent ANF references describe the preservation problem;
   they do not prove this proposed FC rule or its Haskell strictness behavior.
 - Preserve partial and cyclic Haskell values. Check finite vector prefixes for

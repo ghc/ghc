@@ -216,11 +216,16 @@ Agda. The Core Notes name this policy and the fresh-field scope rule.
 Agda's pinned [local-definition reference](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/let-and-where.lagda.rst#L57-L68)
 states that checking substitutes away let definitions; its internal syntax has no
 let construct. The file blob is `eef72940b74f0efa87c55ba9378789d26d7df402`.
-This precedent does not supply GHC's missing alias-transport rule. Naming
+This precedent does not supply GHC's alias-transport rule. Naming
 `f (S k)` as `let t = S k in f t` changes the recovered result index. GHC must
 preserve lazy sharing and check transport between these indices. The current
-CorePrep increment reports an explicit unsupported operation at that boundary.
-The M9 source target still requires a solution.
+CorePrep increment uses a checked case-local equality with the exact scrutinee.
+It composes equalities for nested constructor fields and transports later
+payloads as well as the result. It emits cases only for constructor WHNF.
+This rule is a GHC design choice. It is not copied from Agda's let elimination.
+The tests check lazy and cyclic Haskell values separately. They do not establish
+a general preservation theorem. Remaining dependent-function congruence and
+alias-expression serialization stay gated.
 
 [Koronkevich, Rakow, Ahmed, and Bowman, *ANF preserves dependent types up to
 extensional equality*](https://doi.org/10.1017/S0956796822000090), JFP 32, e12

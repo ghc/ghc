@@ -39,7 +39,7 @@ type data, unboxed fields, and constructor wrappers. Original and representation
 fields must have the same domain. Field multiplicities may be `One` or `Many`.
 This policy bounds the Core increment. It is not an Agda language restriction.
 The source checker and signature reader now use this structural policy. Nat
-source execution and signature import validation are in progress in M9.
+source execution and signature imports pass the M9 regression checks.
 
 ## Scope and equality
 
@@ -68,12 +68,32 @@ Convert the fields recursively and check each field domain. Map workers to their
 ordinary promoted constructors. A variable stays opaque even if its unfolding
 is a known constructor. No index conversion evaluates a value.
 
-CorePrep currently rejects retained constructor arguments with fields. Naming
-`f (S k)` as `let t = S k in f t` changes its recovered index. Checked transport
-between `S k` and the new opaque Id is not implemented. Report a named `Sorry`
-before argument naming. Recursive workers can pass their actual predecessor Id.
-Nullary constructor arguments need no such naming step. This boundary remains
-an open source-target requirement in [M9](PLAN.md#m9-runtime-natural-numbers-and-indexed-vectors).
+CorePrep names a retained constructor argument with a checked case alias:
+`case S k of t { DEFAULT [cv] -> ... }`. Core Lint derives
+`cv :: TermVarTy t ~# 'S (TermVarTy k)` from the exact scrutinee. It requires
+fresh local binders.
+No unfolding or universal coercion supplies evidence. CorePrep emits this rule
+only for a constructor in WHNF. It does not force a variable field. The Core
+case remains strict by its normal semantics.
+
+Nested fields require composed transport. CorePrep names inner constructors
+first and composes their proofs with constructor congruence. It follows the
+complete supplied telescope, casts later payloads back to their expected types,
+and casts the final result to its original type. SimpleOpt and CorePrep preserve
+the proof scope. CoreToStg erases the virtual proof explicitly.
+
+Transport through a remaining dependent function type is gated because Pi
+congruence is not implemented. Eta expansion must not hide a bottom function.
+Erased binder kinds that depend on a named index are also gated. Alias proof
+expressions have no interface codec. See Notes [Native index alias evidence]
+and [Retained constructor arguments in CorePrep] and the provenance in
+[REFERENCES.md](REFERENCES.md).
+
+The `lazy`/`noinline`/`nospec` stripping path can bypass this preprocessing and
+still reject a constructed retained argument. This is a conservative lowering
+gap. Strict source matching on a partially applied retained function can also
+reach an unsupported Pi constraint in PMC normalization and panic before
+CorePrep. Neither boundary is resolved by the constructor-alias rule.
 
 Type computation and Core Lint must perform the same instantiation. A wrong
 argument type, unsupported expression, or escaping index must fail explicitly.
