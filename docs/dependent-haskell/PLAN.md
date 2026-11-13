@@ -644,16 +644,23 @@ meta-variable assignment and broader application inference remain open.
 Use ordinary class instances for retained proof and vector types. Follow the
 [Agda instance-context sources](REFERENCES.md#retained-class-consumers).
 
-- [ ] Match the ordinary argument and result types after the constraint prefix.
+- [x] Match the ordinary argument and result types after the constraint prefix.
       Keep the substituted prefix for ordinary dictionary instantiation.
-- [ ] Put evidence bindings at the application, below its runtime index binders.
+- [x] Put evidence bindings at the application, below its runtime index binders.
       Keep enclosing Givens and report residual native constraints in scope.
-- [ ] Check proof and vector `Show`, multiple native dictionary keys, and lazy
+- [x] Support native type-map keys with scoped equality. Check singleton and
+      trie representations, alpha-equivalence, distinct indices, and map operations.
+- [x] Check proof and vector `Show`, multiple native dictionary keys, and lazy
       consumers at bottom and cyclic indices. Keep Core and STG Lint enabled.
-- [ ] Reject missing instances and transport without equality evidence at the
+- [x] Reject missing instances and transport without equality evidence at the
       source location. Check ordinary class and inference controls.
-- [ ] Complete registered regressions, interface-only execution, guide, smoke,
+- [x] Complete registered regressions, interface-only execution, guide, smoke,
       formatting, and the checkpoint.
+
+Native maps are implemented at `1b37399cd5`; scoped class consumers at `17740f7135`.
+See [the contract](CORE.md#retained-class-consumers) and the
+[verified results](README.md#ordinary-class-consumers). Source-written native
+class contexts, general meta-variable scope, and broader inference remain open.
 
 ## Acceptance checks
 

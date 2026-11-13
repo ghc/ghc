@@ -33,7 +33,8 @@ Last updated: 2026-11-13.
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |
 | Generic consumers | Ordinary `force`, `id`, `Just`, and `const` accept named retained values; linear proof use and retained-function WHNF pass |
-| Current increment validation | Generic consumers pass both-stage build, five registered regressions, bootstrap API/runtime, separate CLI, ordinary typing/TH controls, guide, and smoke checks |
+| Class consumers | Proof/vector `Show`, constrained native results, scoped dictionaries, and equality-Given transport pass |
+| Current increment validation | Class consumers pass both-stage build, five registered regressions, bootstrap API/runtime, 131 imported CLI observations, ordinary typing/TH controls, seven native guide blocks, and smoke checks |
 | Next task | Ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native coercion unfolding codecs, and conservative lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
@@ -1015,8 +1016,90 @@ current literal blocks. Bootstrap artifacts and SHA256SUMS are retained in
 `native-generic-bootstrap-work/`. The ordinary linear comparison and its
 explicit unrestricted-binding controls are retained in `native-generic-linear/`.
 
-Native meta-variable assignment, Quick Look, class consumers, and general
+Native meta-variable assignment, Quick Look, and general
 checking-dependent argument inference remain open. The signature format is unchanged.
+
+## Ordinary class consumers
+
+Native map checkpoint: `1b37399cd5`. Class consumer checkpoint: `17740f7135`.
+
+Ordinary class dictionaries can refer to types that contain a runtime index.
+The existing `Show (a :~: b)` instance can render `rightZero n`. A normal vector
+instance can render a retained vector:
+
+```haskell
+instance Show a => Show (Vec a n) where
+  showsPrec _ VNil = showString "VNil"
+  showsPrec d (VCons x xs) = showParen (d > 10)
+    (showString "VCons " . showsPrec 11 x . showChar ' ' . showsPrec 11 xs)
+
+showProof :: foreach (n :: Nat) -> String
+showProof n = show (rightZero n)
+
+showVector :: foreach (n :: Nat) -> Vec Int n -> String
+showVector n xs = show xs
+
+ignoreShow :: Show a => a -> Int
+ignoreShow _ = 42
+
+ignoreProof :: foreach (n :: Nat) -> Int
+ignoreProof n = ignoreShow (rightZero n)
+```
+
+Rendering the proof forces it. Ignoring the proof remains lazy at bottom and
+cyclic indices. Dictionary selection inspects types. A `Show` dictionary does
+not supply equality evidence for vector transport. An equality-constrained
+consumer can transport a vector after an explicit `Refl` case. It fails without
+that evidence.
+
+Immutable application matching now separates the leading constraints from the
+ordinary body. It retains the substituted constraints for GHC's normal evidence
+generation. An application-local implication binds native dictionary evidence
+below the runtime index lambdas. It preserves enclosing Givens and the current
+type-checking level. Native residual constraints remain in scope for solving or
+a located error. The type maps now support free runtime indices and retained
+binders with scoped alpha-equivalence. Ordinary family and optimizer gates remain.
+
+The implementation passes the source/runtime matrix and the Core API checks. The
+class block adds 42 observations after the previous 89. It checks repeated,
+distinct, and mixed dictionary keys, inferred native results, visible type
+applications, later quantifiers, local lets, and equality-Given transport.
+Missing instances produce located GHC-39999. Equality constraints without proof
+produce GHC-18872; direct failed transport produces GHC-83865.
+
+The full build passes both compiler stages and matching libraries. Hadrian
+reported 13 minutes 14 seconds. Peak memory was 6,953 MiB under a 16 GiB cap.
+The five registered normal-way regressions pass: 39 cases, 34 skipped, five
+expected passes, and no unexpected results or framework warnings. The driver
+took 9.0 seconds; the command also rebuilt test tools and took 1 minute 38 seconds.
+Its peak was 2,556 MiB under an 8 GiB cap.
+
+Separate CLI processes reproduce all 131 imported observations. They also pass
+the earlier proof, partial-application, standalone, and source-case controls;
+three new proof exceptions; four located class/equality rejections; both interface
+version-rejection directions; and ordinary bidirectional, rank-n, higher-kinded,
+and one-expansion Template Haskell controls. Fourteen further observations use
+Nat-indexed class parameters and retained function types with distinct free
+indices, including ignored bottom and cyclic closures. All seven literal native
+guide blocks pass Core and STG Lint. Optimized package/TH, GHCi, and Haddock smoke
+checks pass. The final CLI scope peaked at 223 MiB under a 4 GiB cap. Swap was
+disabled in all heavy scopes. The full GHC testsuite was not run.
+
+Logs and scripts use the prefix `_build/verification/native-class-`. The final
+wrapper is `native-class-final-checks.sh`. The bootstrap runtime and API logs are
+`native-class-runtime-v5.log` and `native-class-api-v2.log`. The archived bootstrap
+outputs and 27 file checksums, including CLI-generated STG dumps, are in
+`native-class-bootstrap-work/`. The registered run's 24 files are saved separately
+in `native-class-registered-work/`. The API
+fixture localizes embedded module binders through ordinary Core substitution;
+Core Lint remains enabled. Earlier prototype logs retain the reproduced map
+panic, fixture export-flag failure, and corrected diagnostic expectation.
+
+See [the contract](CORE.md#retained-class-consumers),
+[instance-context provenance](REFERENCES.md#retained-class-consumers), and
+[native type-map provenance](REFERENCES.md#native-type-map-equality).
+Source-written class contexts with runtime binders, general inference, and
+Quick Look remain open. This increment adds no interface format or equality axiom.
 
 ## Verified baseline
 
