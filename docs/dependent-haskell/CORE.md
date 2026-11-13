@@ -384,6 +384,14 @@ usage, and laziness. Ignoring a bottom closure must not evaluate it. Supplying a
 bottom index must not evaluate that index when the selected function ignores it.
 Do not infer a retained function argument type through a native meta assignment.
 
+A known retained function result can also determine the outer type arguments of
+an ordinary polymorphic helper. Use the existing immutable result match before
+allocating meta-variables. Require a known head without concreteness requirements,
+all type arguments, kind agreement, valid index scope, and exact result equality.
+Accept runtime Pi types through function arrows. Keep erased inner foralls and
+other polymorphic type arguments gated. This lets a polymorphic bottom or `id`
+receive the already known retained function type without eta expansion.
+
 For signature ambiguity checking only, open retained binders in ordinary arrow
 arguments as well as results. Use one fresh opaque runtime Id on both sides of
 the self-check. Scope all fresh Ids over constraint capture and simplification.

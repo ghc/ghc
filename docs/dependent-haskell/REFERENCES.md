@@ -732,6 +732,11 @@ its own ambiguity check. Its argument/result projection opens nested binders
 in one fresh runtime context for that diagnostic check only. It does not change
 the actual signature or establish structural Pi congruence. Haskell's `seq`
 still requires the source arity and non-strict closure-argument behavior below.
+GHC can use a complete expected result to choose immutable type arguments before
+checking an argument. The same expected-argument rule then checks a contained
+lambda. This is separate from solving a mutable native meta-variable. A runtime
+Pi is a function value; an erased inner forall remains a separate polymorphic
+type-argument boundary.
 
 ## Haskell evaluation provenance
 

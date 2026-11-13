@@ -762,6 +762,9 @@ The parameter `f` is an ordinary closure argument. It is not a runtime index.
       Keep erased payload polymorphism and real signature types intact.
 - [ ] Check named functions and lambdas against the supplied argument type.
       Use the existing application checker and checked-lambda rule.
+- [ ] Instantiate ordinary helpers from a known retained function result with
+      immutable type arguments. Preserve a genuine bottom closure. Check `id`
+      around a lambda under a complete expected type.
 - [ ] Verify separate-module execution with unknown runtime indices. Check that
       ignoring a bottom function stays lazy. Check unused bottom indices too.
 - [ ] Reject wrong vector lengths, escaping indices, unsupported domains, and
