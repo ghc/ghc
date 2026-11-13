@@ -426,7 +426,8 @@ The checker now supports structural domains, outer erased quantification,
 retained telescopes, and bare constructor fields. The bootstrap API executes
 source Nat/Vec functions through bytecode and separate-module machine code.
 The rebuilt CLI and registered self-hosted fixture pass the same module checks.
-Refinement in source `case` expressions remains open. Retained signatures bind
+Expected-type-directed source `case` refinement reuses the retained constructor
+rule. Retained signatures bind
 ordinary runtime values. The Boolean checkpoint below uses signatures such as
 `foreach (b :: Bool) -> Select b`. No singleton conversion is required.
 
@@ -476,6 +477,27 @@ Native zonking and the required reflexive unification paths now support this
 source subset. Unsupported source constructs must produce located errors before
 other internal guards. Keep binder-domain, unsupported-index, coverage,
 and branch-result errors at their respective source locations.
+
+With `ExperimentalDependentTypes`, a checked source `case n of ...` can reuse
+this rule. Abstract the expected result over a fresh index. Generalize each
+referenced local whose type depends on `n` as a later argument. For example,
+`xs :: Vec a n` becomes an argument of type `Vec a j` under the fresh index `j`.
+Check constructor clauses with the existing argument and result transports.
+Apply the checked pattern function to `n` and the captured values. Use fresh
+resolved Names and substitute each constructor for direct uses of `n` in its
+branch. Preserve shadowed names and source locations. See Note
+[Source retained case refinement] in `GHC.Tc.Gen.Match` and the
+[Agda provenance](REFERENCES.md).
+
+Complete unguarded clauses and a fully supplied generated application preserve
+strict inspection of the scrutinee. A function-valued result must not defer that
+inspection. Generalized payload arguments remain lazy. Require bare constructor
+fields, unrestricted generalized locals, and a lifted checked result.
+Gate quotations before source substitution.
+General motive inference, guards, defaults, and nested constructor patterns
+remain separate work. This elaboration adds no Core form, singleton argument,
+unfolding equality, or trusted coercion.
+
 Enable the first rule only at the root of a complete explicit value signature.
 Keep the generic `HsForEachTy` rejection for unsupported source positions.
 This prevents native types from reaching synonym, data, class, and role checks
@@ -582,7 +604,7 @@ The runtime regression checks real source `keep` and constructor-based `choose`.
 It observes both runtime Boolean inputs, shared `keep`/`choose` composition, a
 fully applied indexed bottom, both concrete `Select` results, and a partial
 `keep bottom` at function WHNF. A payload-only bang exposes strict `choose`.
-Refinement in source `case` expressions remains open. Interface serialization
-and the ordinary optimizer remain gated. The restricted program entry above
+General source `case` inference and the ordinary optimizer remain gated.
+The restricted program entry above
 supports local workers with ordinary exported types. Existing ordinary GHC
 programs must continue to build.

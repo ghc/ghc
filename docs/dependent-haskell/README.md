@@ -4,7 +4,7 @@ The long-term goal is dependent types in Haskell. The first experiment is a
 retained Boolean argument whose value determines the result type. Extend Core
 from Eisenberg's historical `nokinds-pi` work, ported and completed on current
 GHC. Keep the validated `singletons` encoding as a comparison implementation.
-The next source target is runtime Peano naturals and length-indexed vectors.
+The current source subset includes runtime Peano naturals and length-indexed vectors.
 
 Last updated: 2026-11-13.
 
@@ -29,9 +29,9 @@ Last updated: 2026-11-13.
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
 | Configured fork version | `10.1.20261113.1`, with interface header `1001202611131`; matching libraries rebuilt |
-| Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, and bare constructor fields pass the source runtime fixture |
+| Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, bare fields, and checked source `case` pass the runtime fixtures |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
-| Next task | M6 Pi congruence and source `case`; M8 unfolding files and conservative lowering gaps remain open |
+| Next task | M6 Pi congruence and broader case checking; M8 unfolding files and conservative lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -667,6 +667,66 @@ smoke passed. The final CLI and smoke scope peaked at 165 MiB under 4 GiB.
 All scopes disabled swap. Compiler sources passed nonmutating Fourmolu parses,
 both existing fixtures passed canonical Fourmolu, and cabal-gild passed.
 Logs use the `native-pmc` prefix in `_build/verification/`.
+
+## Source case refinement
+
+At `3621781dc4`, expected-type-directed source `case` expressions reuse the native
+constructor proofs. For example:
+
+```haskell
+replicateCaseNative :: forall a. foreach (n :: Nat) -> a -> Vec a n
+replicateCaseNative n x = case n of
+  Z -> VNil
+  S k -> VCons x (replicateCaseNative k x)
+```
+
+The expected result supplies the motive. Referenced locals such as
+`xs :: Vec a n` become fresh arguments of the generated retained pattern
+function. This refines their types together with the result. Constructor
+substitution also refines direct uses of the original index. Resolved Names
+preserve field shadowing. The elaboration adds no Core form, singleton argument,
+interface codec, or unfolding equality. See Note [Source retained case refinement]
+and [the Agda provenance](REFERENCES.md).
+
+The rule requires a named local scrutinee, complete unguarded constructor
+branches, bare fields, unrestricted captures, and a lifted checked result.
+Parentheses are accepted.
+Unsupported clause shapes and quotations report located GHC-83605. Incorrect
+vector lengths use the existing type mismatch. Ordinary cases keep their
+existing checker. General inference, guards, defaults, nested patterns, and
+Pi congruence remain open.
+
+The bootstrap Core and runtime checks pass. The new source matrix checks
+recursive vectors, captured Boolean payloads, direct index substitution, field
+shadowing, partial and cyclic inputs, and function-result strictness. It checks
+six located rejection cases. The standalone executable has nine observations;
+the separate producer and interface-only consumer have 24. The successful
+runtime scope peaked at 973 MiB under 4 GiB, with swap disabled.
+
+The both-stage build passed in 12m56s at 6,934 MiB under 16 GiB. All five
+registered normal-way regressions passed: 39 cases, 34 skipped, no unexpected
+results or framework warnings. The test command took 8m13s, including a fresh
+bootstrap prerequisite rebuild, and peaked at 5,731 MiB under 8 GiB. The test
+driver itself took eight seconds. Both scopes disabled swap.
+
+Separate CLI processes passed the 24-observation interface-only consumer.
+Four additional machine-code observations check function-result strictness and
+payload laziness. An unsupported constructor field reports GHC-83605 at its
+source location. The previous empty-case diagnostic, constructed partial-result
+restriction, and both interface format-rejection directions still pass.
+The updated guide example compiles with Core and STG Lint. Ordinary optimized
+Template Haskell, package, GHCi, and Haddock smoke checks pass. The guide and
+ordinary smoke scope peaked at 149 MiB under 4 GiB, with swap disabled.
+
+When checking exceptions from `IO String`, force the result inside `try`.
+`observeInt x = pure (show x)` can return a lazy string before it forces `x`.
+The CLI strictness harness now checks that evaluation inside the protected
+action. Core and final STG dumps also preserve payload inspection inside the
+returned lambda. Compiler sources passed nonmutating Fourmolu parses, both
+existing fixtures passed canonical Fourmolu, and cabal-gild passed.
+Logs use `native-case` in `_build/verification/`. Generated bootstrap artifacts
+are retained with hashes in `native-case-bootstrap-work/` under that directory.
+The signature format is unchanged.
 
 ## Verified baseline
 

@@ -238,6 +238,34 @@ constructors. A function expression can still be bottom. Coverage checking must
 retain possible inhabitation, and a strict wildcard must retain its forcing.
 This increment adds no dependent congruence or Tc metavariable assignment.
 
+Agda's [dependent case combinator](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/with-abstraction.lagda.rst#L710-L741)
+checks a pattern function against an explicit motive and applies it to the
+scrutinee. The standard library calls it
+[`case_returning_of_`](https://github.com/agda/agda-stdlib/blob/v2.3/src/Function/Base.agda#L110-L116).
+The manual also states that this combinator does not refine other arguments
+automatically. Agda's
+[with-abstraction context generalization](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/with-abstraction.lagda.rst#L910-L936)
+supplies the separate precedent for abstracting dependent context arguments.
+Its compiler checks an
+[extended lambda against its expected type](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L831-L866),
+then checks an auxiliary function and applies the captured context.
+[`splitCon`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1464-L1532)
+applies constructor substitution to the remaining telescope and target.
+
+The source `case` increment adapts these rules to the existing retained
+constructor checker. The checked result type supplies the motive. Each
+referenced local whose type depends on the scrutinee becomes a fresh later
+argument. Constructor substitution refines direct uses of the original index.
+Fresh resolved Names preserve field shadowing. Template Haskell quotations are
+gated because source substitution must preserve quoted Names. See Note
+[Source retained case refinement] in `GHC.Tc.Gen.Match`.
+
+Complete unguarded constructor clauses preserve strict inspection of the
+Haskell scrutinee. The generated application supplies every generalized
+argument. Bottom, partial constructors, cyclic values, and function-valued
+results require separate Haskell runtime checks. The Agda sources establish
+the typing precedent. They do not prove these evaluation properties.
+
 Agda's pinned [local-definition reference](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/let-and-where.lagda.rst#L57-L68)
 states that checking substitutes away let definitions; its internal syntax has no
 let construct. The file blob is `eef72940b74f0efa87c55ba9378789d26d7df402`.

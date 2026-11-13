@@ -247,7 +247,7 @@ with branch proofs in the existing typed constructor pattern. A generated
 `AsPat` preserves one runtime Id across the equations. Later arguments require
 bare variable patterns and unrestricted multiplicities. The source target
 is `observe b (keep b (choose b))`, with one shared runtime Boolean. Source
-dependent `case` expressions require a separate context-refinement rule.
+dependent `case` expressions use the context-refinement rule below.
 
 - [x] Add an experimental opt-in flag, syntax, AST representation, and diagnostics.
 - [x] Support native zonking, rigid signature generalization, scoped validity,
@@ -267,7 +267,17 @@ Gate: the source target and a runtime-unknown Boolean example compile and execut
 directly. Their implementation uses no singleton ABI or reification step. These
 checks pass through the bootstrap API and rebuilt compiler at `dfe9637939`.
 The default both-stage rebuild and all five registered normal-way checks pass.
-Dependent source `case` expressions remain separate work.
+The source `case` increment derives a motive from a checked result type.
+It generalizes referenced dependent locals as later arguments of a fresh
+retained pattern function, then applies that function to the original values.
+Constructor substitution refines both the result and those argument types.
+This follows Agda's dependent case combinator and context generalization.
+See [the provenance](REFERENCES.md) and Note [Source retained case refinement].
+The current rule requires a named local scrutinee, complete unguarded constructor
+clauses, bare fields, unrestricted captures, and a lifted checked result.
+Parentheses are accepted.
+Quotations, guards, defaults, nested patterns, and general motive inference
+remain outside this rule. Ordinary cases retain their existing checker.
 
 ### M8: support interfaces and validate the compiler change
 
@@ -552,8 +562,10 @@ and module integration. M3 through M5 validate native Core construction and the
 restricted bytecode path. The singleton probe supplies comparison evidence for
 some values and laziness cases. Restricted source `keep`, constructor equations,
 and their composition now execute through bytecode and machine-code module
-compilation. Source `case` refinement, ordinary optimization, and cross-module
-native interfaces remain open.
+compilation. Expected-type-directed source `case` refinement now reuses the
+constructor rule. Ordinary optimization, broader case refinement, and native
+unfolding serialization remain open. Restricted native signature interfaces
+and interface-only consumers pass as described in M8.
 
 ## Further work
 
