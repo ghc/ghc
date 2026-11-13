@@ -31,7 +31,7 @@ import GHC.Core.TyCo.Tidy (tidyTopType)
 import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Injectivity (..), PromDataConInfo (NoPromInfo), TyCon, mkAlgTyCon, mkAnonTyConBinder, mkDataTyConRhs, mkFamilyTyCon, mkSynonymTyCon, mkTyConKind)
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
-import GHC.Core.Unify (MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchTy, tcMatchTys, tcUnifyTysFG)
+import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
 import GHC.Core.Utils (applyTypeToArgs, exprType)
 import GHC.CoreToIface (toIfaceAlt, toIfaceCoercion, toIfaceExpr, toIfaceType, toIfaceTypeX)
 import GHC.Data.Bag (bagToList)
@@ -67,6 +67,7 @@ import GHC.Types.SourceText (SourceText (NoSourceText))
 import GHC.Types.SrcLoc (mkRealSrcLoc, noLoc, noSrcSpan, unLoc)
 import GHC.Types.TyThing (TyThing (AnId))
 import GHC.Types.Unique (Unique, mkUniqueGrimilyWithTag)
+import GHC.Types.Unique.FM (sizeUFM)
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -1109,6 +1110,71 @@ runMatchingChecks dflags = do
     check
         "a whole-type template cannot capture a forall variable through a retained function"
         (not (matches captureTemplate captureTarget))
+
+    let payloadTemplate = mkTyVar (mkSystemName (unique 206) (mkTyVarOcc "payload")) liftedTypeKind
+        rigidPayload = mkTyVar (mkSystemName (unique 207) (mkTyVarOcc "rigid")) liftedTypeKind
+        payloadTy = mkTyVarTy payloadTemplate
+        rigidTy = mkTyVarTy rigidPayload
+        allowed = unitVarSet payloadTemplate
+        (nat, _, _) = peanoNat
+        n = local 208 "n" (mkTyConTy nat)
+        m = local 209 "m" (mkTyConTy nat)
+        at payload var =
+            mkFunctionType ManyTy (mkTyConApp eqTyCon [varType var, TermVarTy var, TermVarTy var]) payload
+        arrow = mkFunctionType ManyTy
+        telescope var payload = mkDepFunTy var (arrow (at payload var) (at payload var))
+        openPi = telescope b payloadTy
+        intPi = telescope other intTy
+        nested var inner payload = mkDepFunTy var (mkDepFunTy inner (arrow (at payload var) (arrow (at payload inner) payload)))
+        openNested = nested b n payloadTy
+        intNested = nested other m intTy
+        bindAllowed var _ = if var `elemVarSet` allowed then BindMe else DontBindMe
+        initial lhs rhs = Subst.mkEmptySubst (mkInScopeSet (tyCoVarsOfType lhs `unionVarSet` tyCoVarsOfType rhs))
+        scoped lhs rhs = tcMatchRetainedTyX_BM bindAllowed (initial lhs rhs) lhs rhs
+        defaultMatch lhs rhs = tcMatchTyX_BM bindAllowed (initial lhs rhs) lhs rhs
+        rejectsScoped label lhs rhs = check label $ case scoped lhs rhs of Nothing -> True; Just _ -> False
+        expectPayload label lhs rhs = case scoped lhs rhs of
+            Nothing -> fail ("FAIL: " ++ label ++ "; scoped retained matching failed")
+            Just subst -> do
+                case Subst.lookupTyVar subst payloadTemplate of
+                    Nothing -> fail ("FAIL: " ++ label ++ "; payload substitution missing")
+                    Just actual -> checkType dflags (label ++ " (payload)") intTy actual
+                check (label ++ " (only the allowed template binds)") $
+                    sizeUFM (Subst.getTvSubstEnv subst) == 1
+                        && isEmptyVarEnv (Subst.getIdSubstEnv subst)
+                        && isEmptyVarEnv (Subst.getCvSubstEnv subst)
+                checkType dflags (label ++ " (instantiated telescope)") rhs (Subst.substTy subst lhs)
+                check (label ++ " (no bound index escapes)") (isEmptyVarSet (Subst.getSubstRangeTyCoFVs subst))
+    expectPayload "scoped matching infers an erased payload under alpha-renamed native binders" openPi intPi
+    expectPayload "scoped matching infers one payload under nested Bool and Nat binders" openNested intNested
+    let rigidTemplate = mkDepFunTy b (arrow (at payloadTy b) (at rigidTy b))
+        rigidTarget = mkDepFunTy other (arrow (at intTy other) (at rigidTy other))
+        changedRigid = mkDepFunTy other (arrow (at intTy other) (at boolTy other))
+        disagreeingPayload = mkDepFunTy other (arrow (at intTy other) (at boolTy other))
+        boundFreeTarget = mkDepFunTy other (arrow (at intTy other) (at intTy b))
+        capturingTemplate = mkDepFunTy b (arrow (at payloadTy b) payloadTy)
+        localPayload = at intTy other
+        capturingTarget = mkDepFunTy other (arrow (at localPayload other) localPayload)
+    expectPayload "scoped matching preserves an unbindable outer payload variable" rigidTemplate rigidTarget
+    rejectsScoped "scoped matching cannot bind a rigid outer template variable" rigidTemplate changedRigid
+    rejectsScoped "scoped matching rejects repeated payload disagreement" openPi disagreeingPayload
+    rejectsScoped "scoped matching rejects different runtime domains" openPi (telescope m intTy)
+    rejectsScoped "scoped matching distinguishes a bound index from the same free Id" openPi boundFreeTarget
+    rejectsScoped "an outer payload cannot capture an inner runtime index" capturingTemplate capturingTarget
+    let freeShared = mkDepFunTy b (arrow (indexed index) (indexed otherIndex))
+        boundShared = mkDepFunTy other (arrow (indexed otherIndex) (indexed otherIndex))
+    check "empty-scope retained matching freshens a target binder shared with a free template Id" $
+        case tcMatchRetainedTyX_BM bindAllowed Subst.emptySubst freeShared boundShared of
+            Nothing -> True
+            Just _ -> False
+    check "default explicit-template matching still rejects an open retained telescope" $ case defaultMatch openPi intPi of
+        Nothing -> True
+        Just _ -> False
+    check "fine unification remains conservative for an open retained telescope" (retainedApart [openPi] [intPi])
+    forM_ [("default", defaultMatch), ("scoped", scoped)] $ \(label, match) ->
+        check (label ++ " matching preserves closed retained alpha reflexivity") $ case match closedPi alphaPi of
+            Just subst -> Subst.isEmptySubst subst
+            Nothing -> False
 
 -- | Check retained syntax, printing, and compatibility with ordinary identifiers.
 runSyntaxChecks :: DynFlags -> IO ()

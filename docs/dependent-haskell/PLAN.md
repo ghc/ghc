@@ -791,16 +791,16 @@ Use a complete expected retained function type to infer the outer erased
 parameters of a known worker. Accept `applyAt @Int n lambdaId xs` and a fully
 signed `alias = lambdaId` without requiring `lambdaId @Int`.
 
-- [ ] Add an opt-in immutable Core matcher. Preserve existing entry points,
+- [x] Add an opt-in immutable Core matcher. Preserve existing entry points,
       unification, and apartness behavior.
-- [ ] Compare valid same-domain retained binders under paired renaming and
+- [x] Compare valid same-domain retained binders under paired renaming and
       bound-variable escape tracking. Preserve family and multiplicity rules.
-- [ ] Add a separate known-native-worker expected-result route. Require NoQL,
+- [x] Add a separate known-native-worker expected-result route. Require NoQL,
       complete kind/scope-valid type arguments, exact result equality, actual
       type applications, preserved constraints, and final subsumption.
-- [ ] Check alpha-renamed/nested binders, rigid outer indices, repeated payload
+- [x] Check alpha-renamed/nested binders, rigid outer indices, repeated payload
       agreement, contexts, and a genuine bottom worker without eta expansion.
-- [ ] Reject captured inner indices, mismatched domains, and inconsistent
+- [x] Reject captured inner indices, mismatched domains, and inconsistent
       payloads. Keep inferred aliases and general native meta assignment gated.
 - [ ] Verify runtime and interface-only clients, located diagnostics, both-stage
       builds, registered regressions, compatibility, formatting, and source hashes.

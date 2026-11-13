@@ -39,6 +39,7 @@ Last updated: 2026-11-13.
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
 | Current increment validation | Both stages and libraries, five registered regressions, 255 imported observations, 13 focused closure observations, and 11 guide blocks pass |
+| Worker instantiation prototype | Complete expected types infer erased worker parameters; bootstrap API/runtime pass 277 imported observations; final self-hosted validation is pending |
 | Next task | Broader signature positions, native template instantiation, ambient-evidence rewriting, structural Pi unification, retained inference, broader cases, native unfolding codecs, and lowering gaps remain open |
 
 The current direction is native dependent Core. The historical branch is
@@ -1392,6 +1393,49 @@ artifact hashes, and the older compatibility snapshot's stale STG hashes.
 See [the contract](CORE.md#explicit-higher-order-closure-arguments),
 [the tasks](PLAN.md#explicit-higher-order-arguments-follow-up), and
 [Agda provenance](REFERENCES.md#explicit-higher-order-arguments).
+
+## Expected-type instantiation of retained workers
+
+A complete expected retained function type can supply a known worker's erased
+type arguments. This uses the Nat and Vec types and `applyNative` from above:
+
+```haskell
+polyIdentity :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n
+polyIdentity n xs = xs
+
+identityInt :: foreach (k :: Nat) -> Vec Int k -> Vec Int k
+identityInt = polyIdentity
+
+applyIdentityInt :: foreach (n :: Nat) -> Vec Int n -> Vec Int n
+applyIdentityInt n xs = applyNative @Int polyIdentity n xs
+```
+
+The expected type determines `a = Int`. The worker receives an ordinary type
+application. Its retained runtime binder stays intact. Nested telescopes,
+ordinary-leading aliases, and contexts follow the same checking rule. Explicit
+type applications remain available.
+
+The new immutable matcher is opt-in. It pairs equal closed-domain `Many`
+binders, seeds their scope with input free variables, and rejects solutions
+that capture an inner index. Default matching and general unification retain
+their existing native gates. Require a known head without concreteness
+requirements, NoQL, all erased arguments, kind/scope agreement, exact result
+equality, and ordinary final subsumption. The compiler does not guess a runtime
+index or eta-expand the worker.
+
+The bootstrap API and runtime pass. The runtime fixture appends 22 rows to the
+previous 255. These cover implicit worker arguments, polymorphic and monomorphic
+aliases, ordinary-leading and applied aliases, nested telescopes, and laziness.
+The source checks reject inconsistent payloads, inner-index capture, domain
+mismatch, and an unsigned alias. A signed bottom worker remains bottom when
+demanded. The API regression also checks a shared-pointer binder/free-index
+case that failed before the matching scope included both input types.
+
+Final self-hosted validation is pending. Artifacts use
+`_build/verification/native-worker-instantiation-`. See
+[the contract](CORE.md#explicit-higher-order-closure-arguments),
+[the tasks](PLAN.md#expected-type-instantiation-of-retained-workers), and
+[Agda provenance](REFERENCES.md#expected-type-instantiation-of-retained-workers).
 
 ## Verified baseline
 

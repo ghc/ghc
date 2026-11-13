@@ -674,6 +674,28 @@ retainedNatClosureDeclarations =
     , "caseClosure (S k) f xs = f Z xs VNil"
     , "caseClosureBody :: foreach (n :: Nat) -> (foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int n) -> Vec Int n -> Vec Int n"
     , "caseClosureBody n f xs = case n of { Z -> f Z xs VNil; S k -> f Z xs VNil }"
+    , "workerAlias :: foreach (n :: Nat) -> Vec Int n -> Vec Int n"
+    , "workerAlias = lambdaId"
+    , "workerPolyAlias :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n"
+    , "workerPolyAlias = lambdaId"
+    , "workerOrdinaryAlias :: (foreach (m :: Nat) -> Vec Int m -> Vec Int m) -> foreach (n :: Nat) -> Vec Int n -> Vec Int n"
+    , "workerOrdinaryAlias = applyFirst"
+    , "workerAppliedAlias :: foreach (n :: Nat) -> Vec Int n -> Vec Int n"
+    , "workerAppliedAlias = applyFirst lambdaId"
+    , "genericNestedWorker :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a n"
+    , "genericNestedWorker n m xs ys = xs"
+    , "workerNested :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int n"
+    , "workerNested = genericNestedWorker"
+    , "genericContextWorker :: forall a. foreach (n :: Nat) -> OnlyGiven n => a -> Vec Int n -> String"
+    , "genericContextWorker n _ xs = onlyLabel xs"
+    , "workerContextAlias :: foreach (n :: Nat) -> OnlyGiven n => Int -> Vec Int n -> String"
+    , "workerContextAlias = genericContextWorker"
+    , "workerContextClient :: foreach (n :: Nat) -> OnlyGiven n => Int -> Vec Int n -> String"
+    , "workerContextClient n dummy xs = workerContextAlias n dummy xs"
+    , "genericBottomWorker :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n"
+    , "genericBottomWorker = bottomFunction"
+    , "workerBottomAlias :: foreach (n :: Nat) -> Vec Int n -> Vec Int n"
+    , "workerBottomAlias = genericBottomWorker"
     ]
 
 -- | Pass named and checked closures through shared runtime index producers.
@@ -691,7 +713,16 @@ retainedNatClosureObservation =
     , "transformed <- driveNats (\\n -> observeVec (applyAt @Int n (\\m xs -> bumpVec xs) (replicateNative @Int n 42)))"
     , "constructorClosures <- driveNats (\\n -> observeVec (caseClosure n (\\m outer _ -> bumpVec outer) (replicateNative @Int n 42)))"
     , "explicitCaseClosures <- driveNats (\\n -> observeVec (caseClosureBody n (\\m outer _ -> bumpVec outer) (replicateNative @Int n 42)))"
-    , "pure (named ++ anonymous ++ ordinaryFirst ++ captured ++ unlines [partialBottom,partialCyclic,ignoredBottom,ignoredCyclic] ++ throughId ++ transformed ++ constructorClosures ++ explicitCaseClosures)"
+    , "implicitWorker <- driveNats (\\n -> observeVec (applyAt @Int n lambdaId (replicateNative @Int n 42)))"
+    , "aliasedWorker <- driveNats (\\n -> observeVec (workerAlias n (replicateNative @Int n 42)))"
+    , "polymorphicWorker <- driveNats (\\n -> observeVec (workerPolyAlias @Int n (replicateNative @Int n 42)))"
+    , "ordinaryWorker <- driveNats (\\n -> observeVec (workerOrdinaryAlias lambdaId n (replicateNative @Int n 42)))"
+    , "appliedWorker <- driveNats (\\n -> observeVec (workerAppliedAlias n (replicateNative @Int n 42)))"
+    , "nestedWorker <- driveNatPairs (\\n m -> observeVec (workerNested n m (replicateNative @Int n 42) (replicateNative @Int m 7)))"
+    , "implicitPartial <- driveNat (\\n -> force (applyAt @Int n lambdaId)) bottomNat"
+    , "implicitBottom <- driveNat (\\n -> observeInt (ignoreClosure n genericBottomWorker bottomVec)) bottomNat"
+    , "implicitCyclic <- driveNat (\\n -> observeInt (ignoreClosure n genericBottomWorker bottomVec)) cyclicNat"
+    , "pure (named ++ anonymous ++ ordinaryFirst ++ captured ++ unlines [partialBottom,partialCyclic,ignoredBottom,ignoredCyclic] ++ throughId ++ transformed ++ constructorClosures ++ explicitCaseClosures ++ implicitWorker ++ aliasedWorker ++ polymorphicWorker ++ ordinaryWorker ++ appliedWorker ++ nestedWorker ++ unlines [implicitPartial,implicitBottom,implicitCyclic])"
     ]
 
 -- | Preserve previous observations before checking closure applications.
@@ -703,6 +734,9 @@ retainedNatClosureExpected =
         ++ ["[]:0", "[42,42]:2", "[42,42,42]:3"]
         ++ ["[]:0", "[43,43]:2", "[43,43,43]:3"]
         ++ concat (replicate 2 ["[]:0", "[43,43]:2", "[43,43,43]:3"])
+        ++ concat (replicate 5 ["[]:0", "[42,42]:2", "[42,42,42]:3"])
+        ++ ["[]:0", "[]:0", "[42,42]:2", "[42,42]:2"]
+        ++ ["forced", "42", "42"]
 
 -- | Check contextual functions with imported classes and local native workers.
 retainedNatContextSource :: String -> String -> String
@@ -1974,6 +2008,7 @@ runNatContextSourceChecks = do
         , ("NativeSourceLambdaEmptyBottom", "let v :: LambdaVoid; v = error \"native-bottom-empty\" in force (lambdaEmpty v)", "native-bottom-empty")
         , ("NativeSourceExplicitEmptyCaseBottom", "let v :: LambdaVoid; v = error \"native-bottom-empty\" in force (explicitEmptyCase v)", "native-bottom-empty")
         , ("NativeSourceClosureBottom", "force bottomClosure", "native-bottom-function")
+        , ("NativeSourceWorkerBottom", "force workerBottomAlias", "native-bottom-function")
         ]
         $ \(name, body, marker) -> do
             bottomExpression <- sourceEntry name (retainedNatContextSource name body)
@@ -2132,6 +2167,43 @@ runNatContextSourceChecks = do
                 [ "badClosureWildcard :: _payload -> (foreach (m :: Nat) -> Vec Int m -> Vec Int m) -> Int"
                 , "badClosureWildcard _ _ = 42"
                 ]
+            )
+        ,
+            ( "NativeSourceWorkerPayloadMismatch"
+            , 83865
+            , "Vec"
+            , []
+            ,
+                [ "badWorker :: foreach (n :: Nat) -> Vec Int n -> Vec Bool n"
+                , "badWorker = lambdaId"
+                ]
+            )
+        ,
+            ( "NativeSourceWorkerIndexCapture"
+            , 83865
+            , "Vec"
+            , []
+            ,
+                [ "badWorker :: foreach (n :: Nat) -> Vec (Vec Int n) n -> Vec (Vec Int n) n"
+                , "badWorker = lambdaId"
+                ]
+            )
+        ,
+            ( "NativeSourceWorkerDomainMismatch"
+            , 83865
+            , "Bool"
+            , []
+            ,
+                [ "badWorker :: foreach (b :: Bool) -> b :~: b"
+                , "badWorker = lambdaId"
+                ]
+            )
+        ,
+            ( "NativeSourceWorkerInference"
+            , 83605
+            , "explicit signature"
+            , []
+            , ["badWorkerAlias = lambdaId"]
             )
         ]
         $ \(name, code, fragment, pragmas, declarations) ->

@@ -46,7 +46,7 @@ import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst ( substTyWithInScope )
 import qualified GHC.Core.TyCo.Subst as Subst
-import GHC.Core.Unify ( tcMatchTyX_BM, BindFlag(..) )
+import GHC.Core.Unify ( tcMatchTyX_BM, tcMatchRetainedTyX_BM, BindFlag(..) )
 import GHC.Core.Type
 import GHC.Core.UsageEnv ( UsageEnv )
 import GHC.Core.Coercion
@@ -1254,7 +1254,47 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
       | otherwise = DontBindMe
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
-tcRetainedResultMatch _ _ _ _ _ = return Nothing
+tcRetainedResultMatch do_ql expected args fun sigma
+  = tcRetainedWorkerResultMatch do_ql expected args fun sigma
+
+-- | Specialize a known retained worker from its complete expected result.
+-- See Note [Expected retained worker instantiation].
+tcRetainedWorkerResultMatch :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
+                           -> HsExpr GhcTc -> TcSigmaType
+                           -> TcM (Maybe ([Type], TcSigmaType))
+tcRetainedWorkerResultMatch NoQL (Just expected) args fun sigma
+  | hasNoConcreteTyVars fun
+  , hasNativeDependentExpr (Core.Type expected)
+  , not (any is_type_arg args)
+  , (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , not (null tvs)
+  , let (_, tau) = tcSplitPhiTy body
+  , hasNativeDependentExpr (Core.Type tau)
+  , isRetainedValueType expected, isRetainedValueType tau
+  , Just result <- worker_result (count isHsValArg args) tau
+  , isRetainedValueType result
+  , Just subst <- tcMatchRetainedTyX_BM (bind_outer tvs) Subst.emptySubst result expected
+  , Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
+  , not (any (`elemVarSet` tyCoVarsOfTypes inst_tys) tvs)
+  , and (zipWith (kind_agrees subst) tvs inst_tys)
+  , eqType (Subst.substTy subst result) expected
+  = do { valid <- tcRetainedInstScope inst_tys
+       ; return (if valid then Just (inst_tys, Subst.substTy subst body) else Nothing) }
+  where
+    is_type_arg ETypeArg{} = True
+    is_type_arg _ = False
+
+    bind_outer tvs tv _
+      | tv `elem` tvs = BindMe
+      | otherwise = DontBindMe
+
+    kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
+    worker_result 0 ty = Just ty
+    worker_result n ty
+      | Just (_, res) <- splitVisibleFunTy_maybe ty
+      = worker_result (n-1) res
+      | otherwise = Nothing
+tcRetainedWorkerResultMatch _ _ _ _ _ = return Nothing
 
 -- | Admit known runtime function values without erased polymorphism.
 -- Constraint arrows are supported only below a retained binder.
@@ -1270,6 +1310,37 @@ isRetainedValueType = go False
                               && (isVisibleFunArg flag || under_pi)
                               && go under_pi arg && go under_pi res
       _ -> False
+
+{- Note [Expected retained worker instantiation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A known worker can have a type such as forall a. foreach n -> Vec a n -> Vec a n.
+When checking it against a complete retained function type, infer a from that
+expected type before ordinary instantiation creates metavariables. For example,
+applyAt @Int n lambdaId xs should not require lambdaId @Int.
+
+Keep this route separate from ordinary immutable result instantiation. Require
+a known head without concreteness variables, NoQL, and no pending explicit type
+arguments. Consume only the written ordinary value arguments. An unapplied
+ordinary arrow can remain part of the expected function value. Do not consume
+or guess a retained runtime argument here.
+
+tcMatchRetainedTyX_BM compares fixed-domain retained bodies under paired runtime
+binders. Its existing escape check prevents an outer erased parameter from
+capturing an inner index. Default matching and general unification retain their
+native gates. See Note [Matching retained function types] in GHC.Core.Unify.
+
+Require every outer parameter, agreement of its substituted kind, valid runtime
+scope, and exact equality of the instantiated result with the expected type.
+Preserve the original context and emit the actual type applications. Ordinary
+argument checking and final subsumption still run. Do not fill a native meta,
+inspect an unfolding, evaluate an index, or eta-expand the worker. A bottom
+worker must remain bottom when its function WHNF is demanded.
+
+Agda inserts hidden arguments from the expected result and compares Pi bodies
+under one shared context. This route uses an immutable substitution instead of
+contextual mutable metas. See docs/dependent-haskell/REFERENCES.md under
+Expected-type instantiation of retained workers.
+-}
 
 {- Note [Known retained function instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

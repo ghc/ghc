@@ -399,7 +399,8 @@ For a native worker template, use an opt-in immutable matching entry point.
 Require a known head without concreteness variables, NoQL, no pending type
 applications, supported value types, and a complete expected result. Corresponding
 retained binders must have equal closed domains, `Many`, and bodies of kind
-`Type`. Compare their bodies under paired binder renaming. Register each shared
+`Type`. Seed the matching scope with free variables of both input types.
+Compare their bodies under paired binder renaming. Register each shared
 binder in the existing escape check. An outer erased parameter must not capture
 an inner runtime index. Keep runtime indices rigid and preserve family rules.
 
