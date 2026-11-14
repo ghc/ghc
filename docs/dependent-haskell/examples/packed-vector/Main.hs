@@ -1609,6 +1609,158 @@ runGenericOverapplicationChecks = do
             putStrLn "generic application vector shares original payload: True"
         _ -> fail "generic application sharing vector has the wrong length"
 
+-- | Select a value after one explicit leading type argument.
+selectVTA :: forall tag value. tag -> (value, Bool) -> value
+selectVTA _ (value, _) = value
+
+-- | Select a value after two explicit leading type arguments.
+selectTwoVTA :: forall tag flag value. tag -> flag -> (value, Bool) -> value
+selectTwoVTA _ _ (value, _) = value
+
+-- | Demand a tag through a context between the forall groups.
+selectContextVTA :: forall tag. (Eq tag) => forall flag value. tag -> flag -> (value, Bool) -> value
+selectContextVTA tag _ (value, _) = if tag == tag then value else value
+
+-- | Compare partial leading type applications at an ordinary runtime index.
+{-# NOINLINE driveLeadingVTA #-}
+driveLeadingVTA :: Nat -> IO String
+driveLeadingVTA input = do
+    indexCell <- newIORef input
+    n <- readIORef indexCell
+    effects <- newIORef (0 :: Int)
+    let vector = replicateNative @Int n 7
+        pair = ((vector,), False)
+        action = modifyIORef' effects (+ 1) >> pure pair
+        partial = action >>= \stored -> pure (selectVTA @Bool True stored (42 :: Int))
+        omitted = action >>= \stored -> pure (selectVTA True stored (42 :: Int))
+        named =
+            action >>= \stored ->
+                let selected = selectVTA @Bool True stored
+                 in pure (selected (42 :: Int))
+        multiple = action >>= \stored -> pure (selectTwoVTA @Bool @Int True 0 stored (42 :: Int))
+        contextual = action >>= \stored -> pure (selectContextVTA @Bool @Int True 0 stored (42 :: Int))
+    before <- readIORef effects
+    first <- partial
+    count1 <- readIORef effects
+    second <- omitted
+    count2 <- readIORef effects
+    third <- named
+    count3 <- readIORef effects
+    fourth <- multiple
+    count4 <- readIORef effects
+    fifth <- contextual
+    count5 <- readIORef effects
+    pure
+        ( show
+            ( natToInt n
+            ,
+                [ (snd first, toList (fst first))
+                , (snd second, toList (fst second))
+                , (snd third, toList (fst third))
+                , (snd fourth, toList (fst fourth))
+                , (snd fifth, toList (fst fifth))
+                ]
+            , [before, count1, count2, count3, count4, count5]
+            )
+        )
+
+-- | Check leading type applications without changing demand or sharing.
+runLeadingVTAChecks :: IO ()
+runLeadingVTAChecks = do
+    forM_
+        [ (Z, "(0,[(42,[]),(42,[]),(42,[]),(42,[]),(42,[])],[0,1,2,3,4,5])")
+        , (S Z, "(1,[(42,[7]),(42,[7]),(42,[7]),(42,[7]),(42,[7])],[0,1,2,3,4,5])")
+        , (S (S Z), "(2,[(42,[7,7]),(42,[7,7]),(42,[7,7]),(42,[7,7]),(42,[7,7])],[0,1,2,3,4,5])")
+        , (S (S (S Z)), "(3,[(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7])],[0,1,2,3,4,5])")
+        ]
+        $ \(input, expected) -> do
+            actual <- driveLeadingVTA input
+            assertEqual "runtime leading VTA" expected actual
+            putStrLn ("runtime leading VTA: " ++ actual)
+    ignoredIndex <- pure bottomLength
+    effects <- newIORef (0 :: Int)
+    let ignoredVector = replicateNative @Int ignoredIndex bottomElement
+        ignoredPair = ((ignoredVector,), False)
+        action = modifyIORef' effects (+ 1) >> pure ignoredPair
+        compute = action >>= \stored -> pure (selectVTA @Bool True stored (42 :: Int))
+    before <- readIORef effects
+    assertEqual "leading VTA construction has no effects" 0 before
+    putStrLn "leading VTA construction has no effects: 0"
+    result <- compute
+    once <- readIORef effects
+    assertEqual "leading VTA action executes once" 1 once
+    putStrLn "leading VTA action executes once: 1"
+    _ <- compute
+    twice <- readIORef effects
+    assertEqual "leading VTA action executes again" 2 twice
+    putStrLn "leading VTA action executes again: 2"
+    assertEqual "leading VTA function WHNF ignores index" () =<< (evaluate (selectVTA @Bool True ignoredPair) >> pure ())
+    putStrLn "leading VTA function WHNF ignores index: ok"
+    assertEqual "leading VTA result WHNF ignores index" () =<< (evaluate result >> pure ())
+    putStrLn "leading VTA result WHNF ignores index: ok"
+    assertEqual "leading VTA later field ignores index" 42 (snd result)
+    putStrLn "leading VTA later field ignores index: 42"
+    expectMarker "leading VTA retains index demand" "packed-bottom-length" $
+        evaluate (sum (toList (fst result)))
+    finiteIndex <- pure (S (S Z))
+    let payload :: Vec Int finiteIndex
+        payload = bottomPayload
+        payloadPair = ((payload,), False)
+        payloadResult = selectVTA @Bool True payloadPair (42 :: Int)
+    assertEqual "leading VTA ignores bottom payload" 42 (snd payloadResult)
+    putStrLn "leading VTA ignores bottom payload: 42"
+    expectMarker "leading VTA retains payload error" "packed-bottom-payload" $
+        evaluate (sum (toList (fst payloadResult)))
+    let vector = replicateNative @Int finiteIndex 7
+        pair = ((vector,), False)
+        bottomTag :: Bool
+        bottomTag = error "native-vta-bottom-tag"
+    assertEqual "unconstrained VTA ignores bottom tag" 42 (snd (selectVTA @Bool bottomTag pair (42 :: Int)))
+    putStrLn "unconstrained VTA ignores bottom tag: 42"
+    expectMarker "constrained VTA demands bottom tag" "native-vta-bottom-tag" $
+        evaluate (selectContextVTA @Bool @Int bottomTag 0 pair (42 :: Int))
+    let bottomFunction :: Int -> (Vec Int finiteIndex, Int)
+        bottomFunction = error "native-vta-bottom-function"
+        functionPair = (bottomFunction, False)
+    assertEqual "unused VTA selection ignores bottom function" 42 (const (42 :: Int) (selectVTA @Bool bottomTag functionPair))
+    putStrLn "unused VTA selection ignores bottom function: 42"
+    expectMarker "leading VTA demands bottom function" "native-vta-bottom-function" $
+        evaluate (selectVTA @Bool True functionPair (42 :: Int))
+    partialIndex <- pure (S bottomLength)
+    let partialVector = replicateNative @Int partialIndex 7
+        partialPair = ((partialVector,), False)
+    assertEqual "leading VTA partial index prefix" [7] (take 1 (toList (fst (selectVTA @Bool True partialPair (42 :: Int)))))
+    putStrLn "leading VTA partial index prefix: [7]"
+    cyclicIndex <- pure cyclicLength
+    let cyclicVector = replicateNative @Int cyclicIndex 7
+        cyclicPair = ((cyclicVector,), False)
+    assertEqual "leading VTA cyclic index prefix" [7, 7] (take 2 (toList (fst (selectVTA @Bool True cyclicPair (42 :: Int)))))
+    putStrLn "leading VTA cyclic index prefix: [7,7]"
+    sharedPayload <- newIORef (7 :: Int)
+    let sharingVector = replicateNative @(IORef Int) finiteIndex sharedPayload
+        sharingPair = ((sharingVector,), False)
+    originalVector <- evaluate sharingVector
+    leftVector <- evaluate (fst (selectVTA @Bool True sharingPair (42 :: Int)))
+    rightVector <- evaluate (fst (selectVTA @Bool True sharingPair (43 :: Int)))
+    originalName <- makeStableName originalVector
+    leftName <- makeStableName leftVector
+    rightName <- makeStableName rightVector
+    assertEqual "leading VTA selections share captured vector" True (originalName == leftName && leftName == rightName)
+    putStrLn "leading VTA selections share captured vector: True"
+    case toList leftVector of
+        [first, second] -> do
+            original <- evaluate sharedPayload
+            firstValue <- evaluate first
+            secondValue <- evaluate second
+            originalPayloadName <- makeStableName original
+            firstName <- makeStableName firstValue
+            secondName <- makeStableName secondValue
+            assertEqual "leading VTA vector shares original payload" True (originalPayloadName == firstName && firstName == secondName)
+            putStrLn "leading VTA vector shares original payload: True"
+        _ -> fail "leading VTA sharing vector has the wrong length"
+    assertEqual "full ordinary VTA control" 43 (selectVTA @Bool @(Int -> Int) True ((+ 1), False) 42)
+    putStrLn "full ordinary VTA control: 43"
+
 -- | Run finite observations and bounded strictness checks.
 main :: IO ()
 main = do
@@ -2159,3 +2311,4 @@ main = do
     runTupleInferenceChecks
     runTupleSectionChecks
     runGenericOverapplicationChecks
+    runLeadingVTAChecks

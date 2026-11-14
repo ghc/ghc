@@ -1591,6 +1591,28 @@ runModuleChecks libdir = do
         , "generic application cyclic index prefix: [7,7]"
         , "generic applications share captured vector: True"
         , "generic application vector shares original payload: True"
+        , "runtime leading VTA: (0,[(42,[]),(42,[]),(42,[]),(42,[]),(42,[])],[0,1,2,3,4,5])"
+        , "runtime leading VTA: (1,[(42,[7]),(42,[7]),(42,[7]),(42,[7]),(42,[7])],[0,1,2,3,4,5])"
+        , "runtime leading VTA: (2,[(42,[7,7]),(42,[7,7]),(42,[7,7]),(42,[7,7]),(42,[7,7])],[0,1,2,3,4,5])"
+        , "runtime leading VTA: (3,[(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7])],[0,1,2,3,4,5])"
+        , "leading VTA construction has no effects: 0"
+        , "leading VTA action executes once: 1"
+        , "leading VTA action executes again: 2"
+        , "leading VTA function WHNF ignores index: ok"
+        , "leading VTA result WHNF ignores index: ok"
+        , "leading VTA later field ignores index: 42"
+        , "leading VTA retains index demand: packed-bottom-length"
+        , "leading VTA ignores bottom payload: 42"
+        , "leading VTA retains payload error: packed-bottom-payload"
+        , "unconstrained VTA ignores bottom tag: 42"
+        , "constrained VTA demands bottom tag: native-vta-bottom-tag"
+        , "unused VTA selection ignores bottom function: 42"
+        , "leading VTA demands bottom function: native-vta-bottom-function"
+        , "leading VTA partial index prefix: [7]"
+        , "leading VTA cyclic index prefix: [7,7]"
+        , "leading VTA selections share captured vector: True"
+        , "leading VTA vector shares original payload: True"
+        , "full ordinary VTA control: 43"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2920,7 +2942,20 @@ runPackageSourceRejectChecks = do
         , ("GenericOverapplicationHigherRankWrongExtra", 25897, "rigid type variable", ["TupleSections"], [], localActions ++ ["acceptPoly :: (forall a. a -> a) -> Int", "acceptPoly value = value 42", "bad :: Nat -> IO Int", "bad n = pure (fst (acceptPoly,localVector n) (const (42 :: Int)))"])
         , ("GenericOverapplicationLocalResultEscape", 83605, "out of scope here", ["TupleSections"], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let result = let { k :: Nat; k = n } in fst ((localVector k,),True) (42 :: Int) in pure 42"])
         , ("GenericOverapplicationMissingDictionary", 39999, "Eq NoEq", ["TupleSections"], [], localActions ++ ["selectEq :: forall a b. Eq b => (a,b) -> a", "selectEq (value,tag) = if tag == tag then value else value", "data NoEq = NoEq", "bad :: Nat -> IO Int", "bad n = pure (snd (selectEq ((localVector n,),NoEq) (42 :: Int)))"])
-        , ("GenericOverapplicationVTAResidualPrefix", 83865, "untouchable", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: Nat -> IO (PackedVec Int)", "bad n = pure (PackVec n (fst (selectVTA @Bool True ((localVector n,),False) (42 :: Int))))"])
+        , ("LeadingVTAWrongExtraArgument", 83865, "fourth argument", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: foreach (n :: Nat) -> Vec Int n -> (Vec Int n,Int)", "bad n xs = selectVTA @Bool True ((xs,),False) 'x'"])
+        , ("LeadingVTAWrongFinalIndex", 83865, "Vec Int m", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> (Vec Int m,Int)", "bad n m xs = selectVTA @Bool True ((xs,),False) (42 :: Int)"])
+        , ("LeadingVTAWrongTag", 83865, "second argument", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: Nat -> IO (PackedVec Int)", "bad n = pure (PackVec n (fst (selectVTA @Bool (7 :: Int) ((localVector n,),False) (42 :: Int))))"])
+        , ("LeadingVTAWrongKind", 83865, "Expecting one more argument", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: Nat -> IO (PackedVec Int)", "bad n = pure (PackVec n (fst (selectVTA @Maybe True ((localVector n,),False) (42 :: Int))))"])
+        , ("LeadingVTAConflictingPrefix", 83865, "untouchable", ["TupleSections", "TypeApplications"], [], localActions ++ ["chooseTagged :: forall tag value. tag -> value -> value -> value", "chooseTagged _ _ right = right", "bad :: Nat -> Nat -> IO Int", "bad n m = pure (snd (chooseTagged @Bool True (localVector n,) (localVector m,) (42 :: Int)))"])
+        , ("LeadingVTACallbackLocalEscape", 83605, "outside the application scope", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: Nat -> IO Int", "bad n = let compute = pure (localVector n) >>= \\xs -> let { k :: Nat; k = n } in pure (selectVTA @Bool True ((localVector k,),False) (42 :: Int)) in pure 42"])
+        , ("LeadingVTALocalResultEscape", 83605, "out of scope here", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: Nat -> IO Int", "bad n = let result = let { k :: Nat; k = n } in selectVTA @Bool True ((localVector k,),False) (42 :: Int) in pure 42"])
+        , ("LeadingVTAMissingDictionary", 39999, "Eq NoEq", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectEq :: forall tag. Eq tag => forall value. tag -> (value,Bool) -> value", "selectEq tag (value,_) = if tag == tag then value else value", "data NoEq = NoEq", "bad :: Nat -> IO Int", "bad n = pure (snd (selectEq @NoEq NoEq ((localVector n,),False) (42 :: Int)))"])
+        , ("LeadingVTALinearCaptureTwice", 18872, "multiplicity", ["TupleSections", "TypeApplications", "LinearTypes"], [], localActions ++ ["selectLinear :: forall tag value. tag -> value %1 -> value", "selectLinear _ value = value", "bad :: foreach (n :: Nat) -> Vec Int n %1 -> ((Vec Int n,Int),(Vec Int n,Int))", "bad n xs = let section = (xs,) in (selectLinear @Bool True section (42 :: Int),selectLinear @Bool True section (43 :: Int))"])
+        , ("LeadingVTAHigherRankWrongExtra", 25897, "rigid type variable", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectFirst :: forall tag a b. tag -> (a,b) -> a", "selectFirst _ (first,_) = first", "acceptPoly :: (forall a. a -> a) -> Int", "acceptPoly value = value 42", "bad :: Nat -> IO Int", "bad n = pure (selectFirst @Bool True (acceptPoly,localVector n) (const (42 :: Int)))"])
+        , ("LeadingVTAInterleavedVTA", 83865, "untouchable", ["TupleSections", "TypeApplications"], [], localActions ++ ["interleaved :: forall tag. tag -> forall value. (value,Bool) -> value", "interleaved _ (value,_) = value", "bad :: Nat -> IO (PackedVec Int)", "bad n = pure (PackVec n (fst (interleaved @Bool True @_ ((localVector n,),False) (42 :: Int))))"])
+        , ("LeadingVTAGeneratedTypeArgWrongExtra", 18872, "selecting the field", ["TupleSections", "TypeApplications", "OverloadedRecordDot"], [], ["data Holder = Holder { field :: Int -> Int }", "bad :: Int", "bad = (Holder (+1)).field True"])
+        , ("LeadingVTAQuickLookGate", 83605, "Quick Look inference", ["TupleSections", "TypeApplications", "ImpredicativeTypes"], [], ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: foreach (n :: Nat) -> Vec Int n -> (Vec Int n,Int)", "bad n xs = selectVTA @Bool True ((xs,),False) (42 :: Int)"])
+        , ("LeadingVTAInferredPrefixAnnotation", 83865, "'x' :: Bool", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: Nat -> IO (PackedVec Int)", "bad n = pure (PackVec n (fst (selectVTA @Bool True ((localVector n,),('x' :: Bool)) (42 :: Int))))"])
         , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureAliasIndex", 83605, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
