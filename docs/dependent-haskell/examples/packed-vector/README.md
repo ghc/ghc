@@ -1,12 +1,12 @@
 # Packed vector source example
 
-Both compiler stages pass all 180 observations below with Core Lint and
-STG Lint enabled. The consumer imports the library interface with the
-producer source absent from its import path. The bootstrap and registered
-runtime fixtures pass all 34 package/bound rejections. Seven standalone
-sum/append errors have pinned codes and source tokens in both stages.
-A declaration-only producer also passes separate imports, partial VTA and
-an unused retained field. All five focused registered regressions pass.
+Both compiler stages pass all 209 observations below with Core Lint and
+STG Lint enabled. This includes the previous 180 observations and 29
+retained-field pattern observations. The consumer imports the library interface
+with the producer source absent from its import path. The bootstrap and
+registered runtime fixtures pass 40 package/bound rejections. Seven pattern
+errors and seven sum/append errors have pinned codes and primary source tokens
+in both stages. All five focused registered regressions pass.
 
 `PackedVecLibrary.hs` stores a runtime `Nat` and a `Vec` indexed by that same
 field. `PackVec` has two ordinary runtime fields. It has no singleton argument.
@@ -19,10 +19,10 @@ when `xs :: Vec Int n` and `m` and `n` are independent runtime bindings. Opening
 a package gives the consumer a fresh scoped index. Its vector cannot escape as
 `Vec Int m` for an unrelated index. Both rejections are regression checks.
 
-The source subset has one package constructor. Retained index fields require
-bare variable patterns. Ordinary fields admit GHC patterns, including nested
-vector/proof constructors and wildcards. The
-length domain is the closed first-order datatype `Nat`. The element parameter
+The source subset has one package constructor. Retained index fields accept
+bare variables or one constructor layer with bare variable subfields.
+Ordinary fields admit GHC patterns, including nested vector/proof constructors
+and wildcards. The length domain is the closed first-order datatype `Nat`. The element parameter
 `a` remains an erased universal. Retained binders have unrestricted multiplicity.
 Ordinary fields keep GHC's constructor multiplicities. This example uses
 unrestricted eliminators. Strict fields, record fields, existential binders, constructor
@@ -143,11 +143,12 @@ catchall order. Named errors show that nested vector/proof patterns demand
 their selected field before an unused length. Bottom packages still fail
 when their constructor is inspected. A nested vector cannot escape as
 `Vec Int m` for an unrelated outer index: the source mutation rejects at
-`VCons x xs` with GHC-05617. Wildcards and constructors in the retained length
-field still reject with GHC-83605. No Core form or interface format changes.
+`VCons x xs` with GHC-05617. A wildcard in the retained length field still
+rejects with GHC-83605. The constructor-pattern subset below adds one layer
+with bare variable subfields. No Core form or interface format changes.
 
-General projections and constructor patterns in retained index fields remain
-separate work. This increment does not establish totality or proof erasure.
+General projections remain separate work. These patterns do not establish
+totality or proof erasure.
 
 ## Uncons with a runtime predecessor
 
@@ -155,14 +156,14 @@ The source worker inspects the stored length and returns a packed tail:
 
 ```haskell
 unconsPacked :: PackedVec a -> Maybe (a, PackedVec a)
-unconsPacked (PackVec n xs) = case n of
-    Z -> Nothing
-    S k -> case xs of
-        VCons x rest -> Just (x, PackVec k rest)
+unconsPacked (PackVec Z _) = Nothing
+unconsPacked (PackVec (S k) (VCons x rest)) = Just (x, PackVec k rest)
 ```
 
-The checked case rule transports captured `xs` into the `S k` branch at
-`Vec a (S k)`. The ordinary vector pattern then relates its tail to `k`.
+The public worker now matches the stored length directly in each equation.
+Its predecessor used explicit nested cases. The `S k` pattern refines the
+later vector field to `Vec a (S k)`. The ordinary vector pattern relates its
+tail to `k`.
 The tail package stores that actual runtime predecessor. Agda's
 [indexed uncons and case abstraction](../../REFERENCES.md#source-vector-uncons)
 provide the relation and scope precedent. No runtime value is reconstructed
@@ -188,10 +189,65 @@ substitutes expressions, types and coercions together. CorePrep's existing
 native guard keeps the aliases. The failing expression remains in the program.
 The index grammar, Core forms and interface format stay unchanged.
 
-Packaging the tail with the original, successor or an independent length
-rejects at the payload with located GHC-25897. Existing retained-field and
+Earlier tail-packaging probes using the original, successor or an independent
+length rejected at the payload with located GHC-25897. Existing retained-field and
 scope restrictions remain in force. Some diagnostics still show generated
 captured bindings in their relevant-binding details.
+
+## Constructor patterns in retained index fields
+
+The source checker accepts `Z` and `S k` directly in a retained package field.
+This subset allows one constructor layer with bare variable subfields.
+Parentheses are permitted. Nested index constructors, wildcard index fields,
+lazy package patterns and package let patterns remain unsupported. Package
+elimination remains unrestricted and uses a single package constructor.
+Ordinary payload fields keep their existing GHC pattern support.
+
+For an index constructor pattern, the checker generates an outer as-pattern
+with a fresh Id for the whole stored index. Match selection uses that exact
+Id. The inner constructor alternative binds checked nominal equality between
+that index and the constructor applied to its actual fields. The checker
+transports later field types under this equality. Coercion patterns retain
+the original outer types. The equality scopes over the later patterns and
+RHS, within the selected constructor branch. It does not identify fields
+from different equations through plain aliases. See the
+[pinned constructor-telescope and matching sources](../../REFERENCES.md#source-package-patterns).
+
+The two `unconsPacked` equations above retain the original field demand.
+`PackVec Z _` ignores the vector. An explicit `PackVec Z VNil` pattern instead
+demands its constructor. `S k` demands the stored outer Nat constructor and
+leaves `k` lazy. A later `VCons x rest` pattern demands the vector constructor,
+then leaves its head and tail lazy.
+
+`Main.hs` also checks two independent retained fields and a stored proof:
+
+```haskell
+data EqualLengths where
+    EqualLengths :: foreach (n :: Nat) -> foreach (m :: Nat) -> (n :~: m) -> EqualLengths
+
+equalTails :: EqualLengths -> PackedVec Int
+equalTails (EqualLengths Z Z Refl) = PackVec Z VNil
+equalTails (EqualLengths (S k) (S j) Refl) = PackVec k (replicateNative @Int j 42)
+```
+
+Both constructor patterns refine their later types. Matching the ordinary
+`Refl` field supplies the equality needed to align `k` and `j`. The pattern
+demands the proof before constructing the result package. It does not demand
+either predecessor merely to obtain that equality.
+
+Each equation retains its own runtime Ids and ordinary failure continuation.
+A constructor mismatch tries the next row; a demanded bottom does not.
+Match compilation preserves source order across index and vector patterns,
+later argument patterns, views and guards. It does not move index patterns
+into RHS cases. An earlier mismatch can therefore
+skip a later view or guard argument. A failed guard can reach the catchall
+without reusing the earlier row's index identity.
+
+The source rule reuses existing Core constructor evidence and CorePrep/STG
+case lowering. It adds no Core form, runtime field or interface codec.
+Stored equality proofs remain ordinary lifted fields. The 29 new observations
+check these scopes and demands, including partial and cyclic fields. They
+do not establish totality or general pattern support.
 
 ## Runtime equality and aligned zip
 
@@ -588,6 +644,35 @@ append first head ignores left tail: 42
 append demands left tail: zip-left-vector
 append finite left ignores cyclic right: 42
 append cyclic right bounded prefix: [42,42,42]
+runtime equal tail patterns: (0,[])
+runtime equal tail patterns: (1,[42])
+equal patterns demand proof: append-bottom-proof
+equal patterns ignore predecessors before proof: append-bottom-proof
+equal patterns keep partial tail package: ok
+equal patterns demand tail vector: packed-bottom-length
+equal patterns demand tail length: packed-bottom-length
+equal patterns demand first index: packed-bottom-length
+equal patterns demand second index: equality-right-length
+sum zero pattern ignores proof: 0
+sum successor pattern ignores predecessor and proof: 1
+sum pattern demands stored index: packed-bottom-length
+index zero vector pattern: True
+explicit zero vector pattern demands payload: packed-bottom-payload
+index pattern before payload: packed-bottom-length
+successor pattern ignores predecessor and vector: False
+index pattern before later argument: packed-bottom-length
+zero pattern then later argument: pattern-flag
+vector pattern before later argument: packed-bottom-payload
+zero pattern selects first row: 0
+successor pattern selects element: 1
+later argument mismatch reaches catchall: 42
+index pattern before later view: packed-bottom-length
+zero pattern then later view: pattern-view
+index mismatch skips later view: 1
+index guard ignores cyclic fields: 42
+index guard failure reaches catchall: 99
+index mismatch skips guard argument: 0
+index pattern before guard: packed-bottom-length
 ```
 
 These observations check this source subset. They do not establish a general

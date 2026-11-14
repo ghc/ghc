@@ -1202,8 +1202,9 @@ type-meta assignment for the runtime index.
 
 ## Source package patterns
 
-Decision: allow ordinary nested patterns in non-retained package fields. Keep
-each retained field as a bare source variable. Compile package equations in
+Decision: allow ordinary nested patterns in non-retained package fields.
+Retained fields accept bare variables or one closed constructor layer with
+bare variable subfields. Compile package equations in
 source order with a separate case for each equation. Each case keeps that
 equation's actual runtime index Ids. Reuse GHC's `MatchResult` failure
 continuations and checked outer field pattern types. This avoids aliases
@@ -1233,6 +1234,46 @@ catchall must prevent later patterns from forcing a payload. The Haskell `LE`
 field remains an ordinary lazy field. General retained-index patterns and
 projections remain separate work. See Note [Retained package equation scope]
 in `GHC.HsToCore.Match.Constructor`.
+
+### Retained constructor fields in source patterns
+
+M17 extends the M13 field checker with `PackVec Z _` and
+`PackVec (S k) (VCons x rest)`. It shares the closed constructor resolver
+with retained function and case checking. It keeps a fresh whole-field Id,
+the actual source subfield Ids, and the existing nominal constructor proof.
+Later field types receive the accumulated transport in telescope order.
+Checked coercion patterns preserve their original outer types. The existing
+match compiler keeps each row's failure continuation. Core Lint and lowering
+already accept the scoped proof and an ordinary DEFAULT alternative.
+
+The Agda v2.8.0 sources above supply the telescope precedent. More precisely,
+[`LHSResult`, lines 594–620](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L594-L620)
+records the checked context, patterns and specialized RHS type. Constructor
+index unification is at
+[lines 1427–1450](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1427-L1450).
+The `splitCon` substitution through the later telescope, equations and target
+is at
+[lines 1503–1532](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1503-L1532).
+The exact file blob is `3779ffa6e418bca99e30c071e189106f82ecbe1b`.
+
+[`Def.hs`, lines 712–749](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Def.hs#L712-L749)
+consumes that result and scopes the pattern bindings.
+[Lines 825–852](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Def.hs#L825-L852)
+check an expression RHS against its specialized type. File blob:
+`0532811dabeb3a7e6dd3f08cfa18c08472072fe1`.
+Exact snapshots of these two files and `Compile.hs` are saved under
+`_build/verification/native-index-pattern-prior-art/`. Their Git blob hashes
+match these pinned upstream files.
+
+The fresh whole-field Id, generated as-pattern and primitive equality binder
+are GHC adaptations. Agda's case-tree checks do not establish Haskell demand
+behavior. The
+[Haskell 2010 Report, sections 3.13 and 3.17.2](https://www.haskell.org/onlinereport/haskell2010/haskellch3.html)
+defines ordered alternatives, field matching and bottom. Moving a retained
+pattern into an RHS case could evaluate a later argument, view or guard first.
+The source observations check those orders, proof demand, partial fields and
+ordinary row failure separately. These runtime observations do not prove
+preservation or totality for this fork.
 
 ## Source vector uncons
 
@@ -1462,3 +1503,48 @@ certificate checker, and GHC evidence bridge. Core would continue to trust that
 bridge unless the result were reconstructed through existing checked coercion
 rules. No end-to-end checked solver integration was implemented or validated in
 this research.
+
+## Length-preserving reverse: next source probe
+
+Status: unverified source plan. Retain the package's original runtime `n` and
+return `Vec a n`. Use the existing `Add` family and ordinary equality proofs.
+
+Agda stdlib v2.3 supplies:
+
+- [`Vec.Base`, lines 197–209](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L197-L209):
+  the indexed `FoldlOp` and `foldl`. Recursion changes the motive from `B` to
+  `B` composed with successor.
+- [`Vec.Base`, lines 325–333](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L325-L333):
+  `reverse` through that fold, followed by reverse-append. File blob for both
+  ranges: `8c03fb8a83e6cec1fa7b8e1f64bb7e606c531cb8`.
+- [`Nat.Properties`, lines 540–542](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Nat/Properties.agda#L540-L542):
+  `+-suc`, which proves `m + suc n` equal to `suc (m + n)` by induction on `m`.
+- [`Nat.Properties`, lines 554–556](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Nat/Properties.agda#L554-L556):
+  right identity for addition, also by induction and successor congruence.
+  File blob for both proof ranges:
+  `3198ad7f4d783a46d30cc70751a198294d350892`.
+
+The proposed Haskell worker has result `Vec a (Add n m)`. In a successor
+step, an explicit `Add k (S m) :~: S (Add k m)` proof permits the recursive
+call with a larger accumulator. A final `Add n Z :~: n` proof gives the
+length-preserving worker. The package wrapper stores the original `n`.
+No runtime sum package or new Core equality rule is proposed. Agda's changing
+fold motive avoids these explicit arithmetic casts. The Haskell adaptation
+uses the fixed `Add` result instead.
+
+Erased GADT indices cannot supply runtime Nat values. Ordinary GADTs can
+still express length-preserving reverse, for example through a recursive
+snoc operation. Arithmetic proofs could instead induct on a visible vector
+spine. Runtime witnesses are needed by this proposed Nat-induction algorithm;
+they are not an inherent requirement of length preservation.
+
+The proposed wrapper can return package WHNF without evaluating either field.
+Demanding the reversed vector first demands the complete finite Nat spine
+through the right-identity proof, then the vector spine. Elements remain lazy.
+Even an empty vector is inspected by its explicit `VNil` pattern. Partial or
+cyclic indices can prevent vector observation from returning. Ordinary proof
+matching forces proof values. Repeated proof induction can traverse the
+remaining index at each accumulator step. An accumulator does not establish
+linear total runtime. Totality, proof erasure and reversal correctness remain
+separate claims. The signature relates lengths; element order needs its own
+checks or specification.

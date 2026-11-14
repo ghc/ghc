@@ -30,7 +30,7 @@ Last updated: 2026-11-14.
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
 | Configured fork version | `10.1.20261113.2`, with interface header `1001202611132`; matching compiler and libraries rebuilt |
-| Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, and nested ordinary package-field patterns; retained fields remain bare variables |
+| Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, nested ordinary fields, and one constructor layer on retained package fields |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |
 | Generic consumers | Ordinary `force`, `id`, `Just`, and `const` accept named retained values; linear proof use and retained-function WHNF pass |
@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 180 runtime observations and the runtime fixtures check 34 package/bound rejections |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 209 runtime observations and the runtime fixtures check 40 package/bound rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -48,7 +48,8 @@ Last updated: 2026-11-14.
 | Source vector tails | Source uncons and repeated draining use the actual runtime predecessor; partial fields stay lazy and the tested cyclic input produces a bounded prefix |
 | Source equality and zip | Both compiler stages pass 136 observations; ordinary `Refl` aligns independently computed lengths; four equality-scope errors have pinned codes and source locations |
 | Source append | Both stages pass 180 observations; a runtime sum and ordinary equality witness determine the result length; declaration-only imports, partial VTA and unused retained fields pass |
-| Next task | Probe retained constructor patterns in source package fields |
+| Retained field patterns | Both stages pass 209 source observations, including constructor refinement through later fields, proof demand, views, guards and row order |
+| Next task | Probe length-preserving source reverse using the original stored index and checked arithmetic proofs |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2107,3 +2108,68 @@ The proof is an ordinary lifted field. Totality, proof erasure, native
 optimization and general index expressions remain separate work. The full
 GHC suite was not run. Next, probe constructor patterns on retained package
 fields in [M17](PLAN.md#m17-constructor-patterns-on-retained-package-fields).
+
+
+## Retained field constructor pattern checkpoint
+
+Compiler implementation: `ab985a150e`; import cleanup: `f423a0ce97`.
+Source and runtime fixture: `e54802bcfd`. Both compiler stages pass 209 source
+observations with Core Lint and STG Lint. The separate consumer uses only the
+producer interface and object. The bootstrap and registered runtime fixtures
+pass 40 package/bound rejections. Seven new standalone pattern errors and the
+seven existing sum/append errors have pinned codes and primary source tokens
+in both stages. All five focused registered regressions pass.
+
+The public source worker now reads:
+
+```haskell
+unconsPacked :: PackedVec a -> Maybe (a, PackedVec a)
+unconsPacked (PackVec Z _) = Nothing
+unconsPacked (PackVec (S k) (VCons x rest)) = Just (x, PackVec k rest)
+```
+
+The second row refines the vector using the actual stored length and packages
+its tail with the actual predecessor `k`. The zero row leaves the vector lazy.
+A separate `PackVec Z VNil` check confirms that an explicit vector pattern
+forces that vector. The 29 new observations also cover two retained fields,
+ordinary equality proof demand, partial predecessors, other arguments, views,
+guards and fallback rows. A failed pattern can try another row. A demanded
+bottom cannot.
+
+`tcRetainedCon` is shared by retained function, case and package pattern
+checking. A fresh whole-field Id sits in an outer generated as-pattern.
+The inner constructor alternative binds the existing nominal index equality
+using the actual source subfield Ids. Later field types receive that transport
+in telescope order. Checked coercion patterns retain their original outer
+types. Ordinary pattern checking keeps GADT evidence in scope. Existing
+per-equation match compilation preserves source row order. No Core rule,
+interface schema or backend lowering rule changes in this increment.
+See [the pinned Agda LHS and RHS sources](REFERENCES.md#retained-constructor-fields-in-source-patterns).
+
+Retained fields currently admit bare variables or one constructor layer with
+bare variable subfields. Nested retained constructors, wildcards and source
+as-patterns remain gated. This restriction does not apply to ordinary vector
+or proof fields. The proof fields remain ordinary lazy Haskell fields. These
+runtime observations do not prove totality, preservation or general proof
+erasure. The full GHC suite was not run.
+
+Artifacts use `_build/verification/native-index-pattern-`. The final compiler
+input manifest is `build-input-v6.SHA256SUMS` with 26 paths. Exact Agda source
+snapshots are in `prior-art/`. The initial rejection and three failed
+bootstrap builds remain saved. `bootstrap-run-v4.log` and
+`selfhost-run-v1.log` record the final source output. The final runtime log is
+`bootstrap-runtime-v2.log`. Pattern diagnostics use `negatives-v4/` and
+`negatives-v5/`; sum diagnostics use `legacy-negatives-v3/` and
+`legacy-negatives-v4/`. Source, documentation, harness and output manifests
+identify the checkpoint. M16's 26 harness and 326 output hashes still match.
+The protected previous-format reader retains its original three hashes.
+
+The self-hosted compiler target and dependencies took 10m40s and peaked at
+5,640 MiB under 16 GiB. That build reported the redundant imports. The final
+cleanup build rebuilt both stages in 1m54s and peaked at 3,883 MiB under
+16 GiB, with no source warnings. Final source, bootstrap runtime and both
+stages' diagnostic checks peaked at 1,030 MiB under 4 GiB. All five registered
+tests passed: 39 cases, 34 skipped, no framework warnings or failures. The
+driver took 12.844 seconds and peaked at 1,622 MiB under 8 GiB. The resource
+wrapper disables swap. Next, probe [M18 source reverse](PLAN.md#m18-source-reverse-with-the-original-stored-length).
+That plan remains unverified.

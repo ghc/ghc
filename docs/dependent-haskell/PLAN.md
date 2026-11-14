@@ -55,6 +55,13 @@ standalone errors have pinned codes and primary source tokens in both stages.
 A declaration-only producer passes separate imports, partial type applications
 and an unused retained field. All five focused registered regressions pass.
 
+M17's compiler change is `ab985a150e`, with import cleanup at `f423a0ce97` and
+source/fixture at `e54802bcfd`. Both stages pass 209 source observations and
+14 standalone rejection checks. The runtime fixtures pass 40 package/bound
+rejections. All five focused registered regressions pass. Source uncons now
+matches the stored Nat directly in its package pattern. Next, probe M18's
+length-preserving reverse with the original stored runtime index.
+
 ## Direction and boundaries
 
 The implementation extends Core. It does not require singleton elaboration or
@@ -1290,34 +1297,67 @@ appendPacked :: PackedVec a -> PackedVec a -> PackedVec a
 
 ### M17: constructor patterns on retained package fields
 
-This target is unverified. Start with `PackVec Z _` and
-`PackVec (S k) (VCons x xs)` equations for source uncons. The zero row must
-keep ignoring the vector field. Probe `PackVec Z VNil` separately because
-that explicit vector pattern must demand its constructor. Reuse the existing
-checked native constructor equality. Keep each equation's runtime Ids and
-source-order failure continuation.
+Compiler implementation: `ab985a150e`; import cleanup: `f423a0ce97`.
+Source and runtime fixture: `e54802bcfd`. Both compiler stages pass 209 source
+observations, including the previous 180. The bootstrap and registered runtime
+fixtures pass 40 package/bound rejections. Seven new pattern errors and the
+seven existing sum/append errors have pinned codes and primary source tokens
+in both stages. All five focused registered regressions pass.
 
-The initial source probe rejects the index constructor at its original span
-with GHC-83605. Share the existing closed constructor-pattern resolver with
-pattern checking. For a constructor field, bind a fresh whole-field Id with
-an outer generated as-pattern. Attach its nominal constructor proof to the
-inner constructor alternative. Transport later field types with the existing
-native coercion checker and keep their original types in coercion patterns.
-Retain each package equation's existing match compilation and failure path.
-The backend already accepts this proof and an ordinary DEFAULT continuation.
+Source uncons uses `PackVec Z _` and `PackVec (S k) (VCons x rest)` equations.
+The zero row keeps ignoring the vector field. The separate `PackVec Z VNil`
+probe demands its constructor. The implementation reuses the checked native
+constructor equality. Each equation keeps its runtime Ids and source-order
+failure continuation.
 
-- [ ] Probe a constructor head with bare variable subfields. Preserve a fresh
+The initial source probe rejected the index constructor at its original span
+with GHC-83605. Pattern checking now shares the existing closed constructor
+resolver. An outer generated as-pattern binds a fresh whole-field Id. The
+inner constructor alternative carries its nominal constructor proof. Later
+field types use the existing native coercion checker. Coercion patterns keep
+their original outer types. Each package equation keeps its existing match
+compilation and failure path. The backend already accepts this proof and an
+ordinary DEFAULT continuation.
+
+- [x] Probe a constructor head with bare variable subfields. Preserve a fresh
   Id for the whole stored index, then scope its nominal constructor equality
   over subsequent field patterns and the RHS. Use the actual predecessor.
-- [ ] Reuse native coercion checking. Preserve original outer field types
+- [x] Reuse native coercion checking. Preserve original outer field types
   through checked pattern coercions. Follow the pinned Agda later-telescope
   substitution in [source package patterns](REFERENCES.md#source-package-patterns).
-- [ ] Preserve matching order across other arguments, guards and views.
+- [x] Preserve matching order across other arguments, guards and views.
   Moving fields into RHS cases can change that order. Keep ordinary row
   failure instead of requiring complete source-case alternatives.
-- [ ] Check bottom indices, lazy elements, first-row failure, repeated
+- [x] Check bottom indices, lazy elements, first-row failure, repeated
   equations and scope errors. Keep diagnostics on the original patterns.
   Preserve the existing rejection of lazy package patterns.
+- [x] Run the final self-hosted source checks and all five registered
+  regressions. Freeze the build inputs, source, provenance and output evidence.
+
+### M18: source reverse with the original stored length
+
+This target is unverified. Add `reverseNative :: forall a. foreach (n :: Nat)
+-> Vec a n -> Vec a n`, then package its result with the original stored `n`.
+Use a reverse-append accumulator with result `Vec a (Add n m)`. Follow the
+[pinned Agda reverse and addition proofs](REFERENCES.md#length-preserving-reverse-next-source-probe).
+No new Core rule is proposed.
+
+- [ ] Probe `Add n Z :~: n` and `Add n (S m) :~: S (Add n m)` by runtime
+  Nat induction. Match the proofs before changing the accumulator's index.
+  Reuse the existing right-zero proof precedent in the runtime fixture.
+- [ ] Run finite lengths through IORefs and a separate producer interface.
+  Check result lengths and reversed element order independently. The native
+  worker's signature relates the lengths. It does not specify element order.
+- [ ] Preserve package WHNF and lazy elements. Check demanded partial indices,
+  input spines and proofs with named errors. Do not claim productivity for
+  cyclic lengths or erasure for ordinary `:~:` fields.
+- [ ] Reject a wrong result index and a missing arithmetic transport at their
+  source expressions. Preserve the existing source and ordinary Haskell checks.
+
+The first proof implementation can traverse the remaining Nat spine at each
+accumulator step. Do not claim linear total runtime. Ordinary GADTs can also
+express length-preserving reverse. This probe tests composition with retained
+runtime indices and the existing source proof path.
 
 ## Further work
 

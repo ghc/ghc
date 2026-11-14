@@ -135,8 +135,9 @@ erased universals after the parent exists.
 Role inference and role checking traverse field scope in order. A runtime index
 has a closed domain and cannot become a datatype parameter. Ordinary payload
 parameters keep their inferred roles. Source patterns substitute the actual field
-Id into later field types. Retained fields require bare variables. Ordinary
-fields use GHC's pattern checker and can contain nested GADT patterns. Desugar
+Id into later field types. Retained fields accept bare variables or a closed
+constructor with bare variable subfields. Ordinary fields use GHC's pattern
+checker and can contain nested GADT patterns. Desugar
 each package equation into its own case on the shared scrutinee. Combine the
 failure continuations in source order. Each equation keeps its actual field
 Ids; no alias substitutes one runtime index for another. PMC uses checked
@@ -151,6 +152,24 @@ Check each field at `Many`. A syntactic `isManyTy` test would reject the fresh
 variable before constraint solving. Linear and rigid multiplicities retain
 GHC's ordinary located diagnostics. See
 Note [Checking retained package patterns] in `GHC.Tc.Gen.Pat`.
+
+A retained constructor pattern binds a fresh Id for the whole stored field.
+An outer generated as-pattern preserves that exact Id. Its inner constructor
+alternative binds the existing nominal index equality. Use the actual source
+subfield Ids in that equality. Transport each later field type through the
+accumulated equalities in telescope order. A checked coercion pattern keeps
+the field's original outer type. The continuation remains inside the ordinary
+pattern checker, so nested GADT evidence scopes over later fields and the RHS.
+
+For `PackVec (S k) (VCons x rest)`, the tail has the actual predecessor `k`.
+No runtime predecessor is reconstructed from an erased vector index.
+`PackVec Z _` leaves the vector lazy. `PackVec Z VNil` demands its constructor.
+Ordinary failure continues to the next source row. A demanded bottom remains
+bottom. Other arguments, views and guards keep their matching order. These
+patterns add no Core rule, interface field or backend lowering rule. The
+existing constructor equality and DEFAULT continuation suffice. Retained
+wildcards, source as-patterns and nested retained constructor subfields remain
+outside this initial subset.
 
 The source filter uses these same constructor and case forms. It opens the
 recursive result as `PackVec n ys`. Its retained branch stores `S n` with
