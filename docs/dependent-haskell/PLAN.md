@@ -1666,6 +1666,12 @@ immutable matching. This does not require evaluating the index.
   A failed match is not a partial match. Native index parameters still require
   immutable choices, and native results cannot fill ordinary metas. Check a
   local do expression whose ordinary result has no complete expected type.
+- [ ] If result-seeded generic matching fails, try a separate exact joint
+  argument match from the empty substitution. Inline `pure` can infer
+  `f (Vec Int n)` before ordinary checking assigns `f := IO`. Preserve that
+  actual head and let final result subsumption solve ordinary head/result
+  metas. Do not reuse a failed argument match or weaken index equality.
+  Do not freshen a missing binder whose substituted kind is a native domain.
 - [ ] Preserve kind, scope, exact-domain,
   concreteness, NoQL, once-only usage and local evidence safeguards. Keep final
   argument checking and result subsumption authoritative.

@@ -1881,6 +1881,13 @@ zonker. An empty infer cell must remain empty. A genuinely unknown ordinary
 continuation result also needs a fresh ordinary parameter while the native
 input stays fixed. GHC's `newMetaTyVarX` supplies existing telescope-order
 freshening with substituted kinds. No native type may enter those metas.
+The normalization increment `d0e9085d79` fixes four saved-action probes. The
+ordinary-parameter increment `e64655aa18` also fixes both local inferred
+computations. Inline `pure` still fails: its trace infers `f (Vec Int n)` with
+an ordinary head meta before the enclosing bind checks an `IO` result. A
+separate exact joint argument match can preserve that actual head. Final
+ordinary result subsumption must still resolve it or reject the program.
+Reject fresh binders whose substituted kinds are native domains.
 Preserve the existing
 native-meta and general Quick Look gates, immutable kind/scope/concreteness
 checks, once-only usage, local evidence and final subsumption. M24 must support
