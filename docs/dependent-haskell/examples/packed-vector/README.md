@@ -1,8 +1,9 @@
 # Packed vector source example
 
-The bootstrap and self-hosted compilers compile and run these two source files. The consumer
-imports the library interface with the producer source absent from its import
-path. All 15 observations below pass with Core Lint and STG Lint enabled.
+The bootstrap and self-hosted compilers compile and run this source example.
+The consumer imports the library interface with the producer source absent
+from its import path. All 36 observations below pass with Core Lint and STG
+Lint enabled.
 
 `PackedVecLibrary.hs` stores a runtime `Nat` and a `Vec` indexed by that same
 field. `PackVec` has two ordinary runtime fields. It has no singleton argument.
@@ -31,6 +32,39 @@ repackaging, unused bottom and cyclic fields, demanded payloads, and a bottom
 package. It reads one payload constructor at a partial or cyclic length. It does
 not fully evaluate an infinite length or a cyclic bottom payload. Exception
 checks catch only `ErrorCall` and require the named marker.
+
+## Filter with a computed result length
+
+`filterVec` takes an ordinary Boolean predicate and a vector. It returns
+`PackedVec a`, whose stored length depends on the predicate results at runtime.
+Its retained branch opens the recursive package:
+
+```haskell
+then case filterVec predicate xs of
+    PackVec n ys -> PackVec (S n) (VCons x ys)
+```
+
+Here `ys :: Vec a n`. The new head gives `VCons x ys :: Vec a (S n)`, so the new
+package must store `S n`. Storing `n` instead fails with a located GHC-05617
+diagnostic. This checks the relation between the result fields. Correct predicate
+selection and element order still need separate checks.
+
+The consumer reads cutoffs 0, 1, and 3 through an IORef. Filtering `[1,2,3]`
+with `(> cutoff)` produces lengths 3, 2, and 0. The filter scans the finite
+input spine before returning a package. An empty vector does not demand the
+predicate. A constant predicate can reject or retain an undefined element.
+Reading the stored length does not demand a retained element. Demanding the
+element still raises its original error. A partial input spine remains partial.
+
+This follows Agda's `Vec≤` filter structure for its length and vector fields.
+See the [pinned references](../../REFERENCES.md#source-vector-filter). The bound
+proof and productive filtering of infinite inputs remain separate work.
+
+The same source file checks left and right operator sections. It disables
+`PostfixOperators` so a left section keeps its implicit lambda. Both section
+forms remain in WHNF with an undefined operator or operand. Applying each
+section demands the corresponding error. These checks cover the required
+expansion of GHC's temporary section helpers before code generation.
 
 ## Separate-module runner
 
@@ -90,8 +124,29 @@ demand stored length: packed-bottom-length
 ignore bottom package: packed-bottom-package
 repack bottom package: packed-bottom-package
 unused whole package: 42
+runtime filter: (3,[1,2,3])
+runtime filter: (2,[2,3])
+runtime filter: (0,[])
+filter empty ignores predicate: (0,[])
+filter rejects bottom element: (0,[])
+filter retains bottom element: ok
+filter retained length: 1
+filter demands retained element: packed-filter-bottom-element
+filter payload before length: packed-bottom-payload
+filter predicate before tail: packed-filter-bottom-predicate
+filter scans partial tail: packed-bottom-length
+filter demands package: packed-bottom-package
+unused filtered package: 42
+left section with bottom operator: ok
+right section with bottom operator: ok
+left section with bottom operand: ok
+right section with bottom operand: ok
+applied left section demands operator: packed-section-bottom-operator
+applied right section demands operator: packed-section-bottom-operator
+applied left section demands operand: packed-filter-bottom-element
+applied right section demands operand: packed-filter-bottom-element
 ```
 
-These observations are requirements. They are not verified results. They do not
-establish a general existential package implementation, optimizer support, or
-support for all dependent constructor telescopes.
+These observations check this source subset. They do not establish a general
+existential package implementation, optimizer support, or support for all
+dependent constructor telescopes.

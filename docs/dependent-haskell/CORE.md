@@ -141,6 +141,21 @@ Reject shared equations until their distinct field identities can be transported
 See Notes [Source retained constructor declarations] in `GHC.Tc.TyCl` and
 [Roles of retained constructor fields] in `GHC.Tc.TyCl.Utils`.
 
+An ordinary source `case` starts with a fresh multiplicity variable. Constrain
+it to admit an unrestricted package pattern with the existing `tcSubMult` rule.
+Check each field at `Many`. A syntactic `isManyTy` test would reject the fresh
+variable before constraint solving. Linear and rigid multiplicities retain
+GHC's ordinary located diagnostics. See
+Note [Checking retained package patterns] in `GHC.Tc.Gen.Pat`.
+
+The source filter uses these same constructor and case forms. It opens the
+recursive result as `PackVec n ys`. Its retained branch stores `S n` with
+`VCons x ys :: Vec a (S n)`. The result has one runtime length and one vector
+field. No additional Core form or singleton witness is required. The filter
+scans the finite input spine before returning its package. Element demand
+depends on the predicate and the consumer. See
+[the source example](examples/packed-vector/README.md#filter-with-a-computed-result-length).
+
 ## Scope and equality
 
 Check `DepFunTy b result` under a context extended by the runtime binder `b`.

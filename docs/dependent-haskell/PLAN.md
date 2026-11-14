@@ -5,33 +5,26 @@ work on Richard Eisenberg's historical `nokinds-pi` branch. Port its useful chan
 to current GHC and complete the missing rules. The first working target is a
 retained Boolean argument whose value determines the result type.
 
-Last updated: 2026-11-13. Upstream compiler base:
+Last updated: 2026-11-14. Upstream compiler base:
 `19ff36f2aede0ca2e554016ff22c71e73aa9803b`.
 
 See [current status](README.md) and [primary references](REFERENCES.md).
 
 ## Current priority: execute from source
 
-The constructor-interface checkpoint is verified at `6a0bfbf0fd`. Both compiler
-stages now pass the source program's 15 runtime observations and 12 located
-negative checks. M10 source validation is complete. The program
-declares Nat, Vec and PackedVec in source. See the
-[source example](examples/packed-vector/README.md). It constructs, unpacks and
-repackages stored vectors.
-Compile a producer and a consumer as separate modules. Do not require a GHC API
-producer to add native declarations or functions.
+The source constructor checkpoint is verified at `8e90e0386b`; the source filter
+is verified at `c9aa3545c0`. Both compiler stages run the
+[source example](examples/packed-vector/README.md) through a separate producer
+interface and object file. It declares Nat, Vec and PackedVec in source. It
+constructs, opens, repackages and filters vectors. Its output length is computed
+with `Z` and `S` from runtime predicate results.
 
-Implement constructor declaration checking, source pattern checking and
-desugaring in that order. Use the same runtime field identity in later field
-types and in generated Core. Check that an unused bottom or cyclic length
-remains unforced. Check demanded vector behavior separately. Preserve the
-existing signature, proof and ordinary Haskell controls. Record any initial
-source restrictions next to the runnable example.
-
-The next source exercise is a filter that returns `PackedVec a`. Construct its
-output length with `Z` and `S` as elements are removed or retained. Compile it
-through a separate module interface and check finite and partial inputs. Reuse
-the current Core forms before extending package patterns or adding projections.
+All 36 package, filter and section observations pass. Sixteen located rejection
+checks, the five focused registered regressions, Core API and bootstrap runtime
+also pass. See [the recorded evidence](README.md#source-vector-filter-checkpoint).
+The next source exercise is M12's length-bound proof. Reuse the current Core
+forms before broader package patterns or projections. Preserve the existing
+signature, proof, laziness and ordinary Haskell controls.
 
 ## Direction and boundaries
 
@@ -941,6 +934,72 @@ an ordinary mutable type meta.
 Core metadata, interface declarations and the first source package execution
 are implemented. General projections, records, strictness transformations, native
 unfoldings and optimizer support remain separate work.
+
+### M11: source filter with a runtime result length
+
+Follow Agda's `Vec≤` filter for the stored length and vector. Keep the bound
+proof separate. See [the pinned sources](REFERENCES.md#source-vector-filter).
+
+- [x] Implement `filterVec` and `filterPacked` in the source example. Construct
+  `S n` with `VCons` when the predicate retains an element. Return the recursive
+  package when it rejects an element. Reuse existing Core and interface forms.
+- [x] Accept direct package `case` patterns with a fresh multiplicity meta.
+  Use GHC's ordinary `tcSubMult` check. Keep linear and rigid rejection checks.
+- [x] Expand only the compiler-owned section helper compulsory unfoldings in
+  native simplification. Reuse GHC's templates and substitution. Check both
+  partial section WHNF and later application demand.
+- [x] Check bootstrap separate-module execution with Core and STG Lint. Observe
+  lengths 3, 2, and 0 for runtime cutoffs. Check element order, empty input,
+  bottom elements, bottom predicate, partial spine and unused packages.
+  Reject a wrong retained-branch length with a located GHC-05617 diagnostic.
+- [x] Build the self-hosted compiler and run the same source program. Run the
+  focused registered regressions, Core API and bootstrap runtime fixture.
+  Record commands, resource peaks, artifact hashes and remaining source limits.
+
+The current filter scans a finite input spine before returning a package. Its
+stored elements and length fields remain lazy. Productive infinite filtering,
+the output-length bound proof and broader package patterns remain later work.
+
+### M12: source filter with a checked length bound
+
+Proposed next source exercise. Complete the bound component of Agda's `Vec≤`
+result before broader package patterns. Keep this source-level if the current
+constructor and proof machinery supports it. The source probe must establish
+that support before it becomes a verified claim.
+
+```haskell
+data LE (n :: Nat) (m :: Nat) where
+  LEZ :: LE Z m
+  LES :: LE n m -> LE (S n) (S m)
+
+data BoundedVec a (limit :: Nat) where
+  PackBounded :: foreach (len :: Nat) ->
+                 Vec a len -> LE len limit -> BoundedVec a limit
+
+filterBounded :: forall a limit.
+                 (a -> Bool) -> Vec a limit -> BoundedVec a limit
+```
+
+- [ ] Probe these declarations from source. Check all three runtime fields and
+  their ordered scope through a separate interface. Reuse ordinary GADTs for
+  `LE`; add no primitive dependent-pair form.
+- [ ] Construct `LEZ` for empty input and `LES proof` for a retained element.
+  For a rejected element, use structural right weakening
+  `LE n m -> LE n (S m)`. General transitivity and an external solver are not
+  required for this proof.
+- [ ] Observe the vector, computed length and finite proof separately. Reject
+  an incorrectly reconstructed bound with a located diagnostic. Check that
+  package WHNF and vector observation can leave the proof unevaluated.
+- [ ] Validate source execution and the existing compatibility controls. Record
+  any newly exposed source gate before changing compiler rules.
+
+Agda's bound field is irrelevant. The proposed Haskell `LE` field is an ordinary
+lazy runtime field. General proof erasure remains separate work.
+A bound interpretation requires terminating indices and a terminating `LE`
+proof. Bottom and cyclic proofs remain valid
+Haskell expressions. This exercise does not establish totality, predicate
+selection correctness or productivity on infinite input. See
+[the Agda filter provenance](REFERENCES.md#source-vector-filter).
 
 ## Acceptance checks
 

@@ -6,7 +6,7 @@ from Eisenberg's historical `nokinds-pi` work, ported and completed on current
 GHC. Keep the validated `singletons` encoding as a comparison implementation.
 The current source subset includes runtime Peano naturals and length-indexed vectors.
 
-Last updated: 2026-11-13.
+Last updated: 2026-11-14.
 
 ## Project documents
 
@@ -39,10 +39,11 @@ Last updated: 2026-11-13.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both stages and libraries, five registered regressions, the Core API, and bootstrap runtime pass; source packages add 15 runtime observations and 12 located negative checks |
+| Last verified checkpoint | Both compiler stages, five registered regressions, the Core API and bootstrap runtime pass; the source filter has 36 runtime observations and 16 located rejection checks |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
-| Next task | Implement a source filter that returns a packed vector with a runtime-computed length; then broaden source package patterns |
+| Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
+| Next task | Add a checked length-bound proof to the source filter; then broaden package patterns |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -1732,5 +1733,65 @@ The initial source package has one constructor, bare variable fields and one
 equation per eliminator. Complete signatures and the prototype's O0/interface
 flags remain required. Native unfolding optimization, profiling, records and
 general projections remain separate work. The full GHC suite was not run.
-The next source exercise is a filter that returns a packed vector with a length
-computed at runtime.
+The following checkpoint implements the filter with a length computed at runtime.
+
+## Source vector filter checkpoint
+
+Implementation: `c9aa3545c0`. The [source example](examples/packed-vector/README.md#filter-with-a-computed-result-length)
+now filters `[1,2,3]` with cutoffs read through an IORef. It returns lengths 3,
+2 and 0, with the corresponding vectors. Each retained element constructs
+`PackVec (S n) (VCons x ys)`. Storing `n` instead rejects with GHC-05617 at the
+constructor application. The compiler checks agreement between the output
+fields. Element selection and order have separate runtime checks.
+
+Direct package `case` patterns use GHC's existing multiplicity constraints.
+Their fresh multiplicity variable can resolve to `Many`; linear and rigid
+multiplicities retain ordinary diagnostics. Native simplification also expands
+the two wired-in section helpers through their existing compulsory templates.
+This prevents the representation-polymorphic temporary for `(> cutoff)` from
+reaching code generation. Partial sections keep their lambda and remain lazy.
+Both changes have GHC Notes. The [references](REFERENCES.md#source-vector-filter)
+record the Agda filter structure and the GHC-specific lowering rules.
+
+Validation on 2026-11-14:
+
+- Both stages compile and run the separate-module source example with Core and
+  STG Lint. The consumer imports only the producer interface and links its object.
+  All 36 observations pass: 15 package, 13 filter and 8 section checks.
+- The resumed self-hosted compiler target and its dependencies build in 4m12s.
+  This is an incremental build after the requested pause, not a clean build.
+  Peak memory was 4,718 MiB under 16 GiB, with swap disabled.
+- All five focused registered tests pass: 39 cases, 34 skips, no unexpected
+  results, and no framework failures or warnings. The driver took 20.624s; the
+  complete job took 3m24s and peaked at 3,904 MiB under 8 GiB.
+- The bootstrap Core API and runtime fixture pass. The initial combined job
+  passed the source executable and API, then stopped on a diagnostic-text
+  expectation: API printing retains the tick in `'S`, while CLI printing omits
+  it. The fixture now checks the constructor expression, code and location.
+  The corrected runtime run peaked at 1,045 MiB under 4 GiB.
+- Sixteen source rejections pass. The four additions cover linear clause and
+  case patterns (GHC-18872), rigid multiplicity (GHC-25897), and wrong filter
+  length (GHC-05617). The standalone negative run peaked at 38 MiB under 4 GiB.
+- CorePrep/STG retain the two runtime package fields and the filter recursion.
+  The temporary section helpers are absent. The immutable previous-format
+  reader's three hashes still match. No interface schema change was needed.
+- Fourmolu parses the two compiler files, checks the fixture, and checks the
+  examples with their existing leading-comma style. Its upstream parser needs
+  only the fork extension pragma omitted; the fork compiles the actual sources.
+  Cabal-gild ran on an ignored copy of the generated Cabal file. Whitespace
+  checks pass. The repository MR template requires regression coverage.
+
+Artifacts use `_build/verification/native-filter-source-`. Successful logs are
+`selfhost-build-v2.log`, `selfhost-run-v1.log`, `api-v1.log`,
+`bootstrap-runtime-v2.log`, `registered-v1.log` and `negatives-v2.log`.
+`build-input.SHA256SUMS`, `source.SHA256SUMS`, `docs.SHA256SUMS` and
+`harness.SHA256SUMS` identify the inputs. The source work directories contain
+their own output manifests. The first failed expectation remains in
+`bootstrap-runtime-v1.log`.
+
+This filter scans a finite input spine before it returns a package. It leaves
+retained elements lazy when the predicate permits it. It does not prove the
+output-length bound or predicate correctness. M12 proposes a source `LE` proof
+for the bound. That source probe is not implemented yet. Broader package
+patterns, general projections, native optimization and proof erasure remain
+separate work. The full GHC suite was not run.
