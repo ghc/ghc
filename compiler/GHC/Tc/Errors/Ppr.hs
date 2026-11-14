@@ -3593,7 +3593,8 @@ pprRetainedQuantificationError reason = case reason of
   RetainedPackagePromotion ->
     text "Promotion of constructors with retained fields is not supported yet."
   RetainedPackagePattern ->
-    vcat [ text "A retained package pattern requires one constructor, bare variable retained fields, and unrestricted multiplicity."
+    vcat [ text "A retained package pattern requires one constructor and unrestricted multiplicity."
+         , text "Retained fields require bare variables or constructor patterns for their index domain, with bare variable fields."
          , text "Lazy patterns and pattern bindings are not supported yet." ]
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc

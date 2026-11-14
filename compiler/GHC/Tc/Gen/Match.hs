@@ -283,7 +283,7 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
                                    , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
       = setSrcSpanA match_loc $
         do { unless (case_pattern pat) case_error
-           ; con <- retainedCon (varType index) pat
+           ; con <- tcRetainedCon (varType index) pat
            ; maybe case_error return con }
     constructor (L match_loc _) = setSrcSpanA match_loc case_error
     case_pattern (L _ (ParPat _ pat)) = case_pattern pat
@@ -512,29 +512,7 @@ docs/dependent-haskell/REFERENCES.md#agda-provenance.
 -}
 
 -- | Resolve a constructor and its actual closed runtime field identities.
-retainedCon :: Type -> LPat GhcRn -> TcM (Maybe (DataCon, [Id]))
-retainedCon domain (L _ (ParPat _ pat)) = retainedCon domain pat
-retainedCon domain (L _ (ConPat { pat_con = L _ name
-                              , pat_args = PrefixCon _ pats }))
-  = do { con_like <- tcLookupConLike name
-       ; case con_like of
-           RealDataCon con
-             | isNativeIndexType domain
-             , mkTyConTy (dataConTyCon con) `eqType` domain
-             , pats `equalLength` dataConOrigArgTys con ->
-               do { fields <- zipWithM field pats (dataConOrigArgTys con)
-                  ; return (Just (con, fields)) }
-           _ -> return Nothing }
-  where
-    field (L loc (VarPat _ (L _ name))) (Scaled _ ty)
-      = setSrcSpanA loc $ return (mkLocalId name ManyTy ty)
-    field (L loc _) _
-      = setSrcSpanA loc $
-        failWithTc (TcRnRetainedQuantificationError RetainedConstructorArguments)
-retainedCon _ _ = return Nothing
 
--- | Check exhaustive constructor equations with argument and result transport.
--- See Note [Retained constructor matches].
 tcRetainedConMatches :: Id -> [ExpPatType] -> [ExpPatType] -> [Maybe EvVar] -> ExpRhoType
                     -> MatchGroup GhcRn (LHsExpr GhcRn)
                     -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
@@ -578,7 +556,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty
                                    , m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
       = setSrcSpanA match_loc $
         case filter isVisArgLPat pats of
-          pat : _ -> do { mb_con <- retainedCon (varType index) pat
+          pat : _ -> do { mb_con <- tcRetainedCon (varType index) pat
                         ; maybe coverage_error return mb_con }
           _ -> coverage_error
     constructor (L match_loc _) = setSrcSpanA match_loc coverage_error
