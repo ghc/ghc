@@ -1696,3 +1696,47 @@ For meaningful negative probes, both indices must occur free in their types.
 its binder occurs free in the body. Note `[Restricted retained dependent types]`
 states this invariant. Otherwise the binder becomes an ordinary unrestricted
 value arrow. This inherited simplification keeps the runtime argument.
+
+
+## Ordered variable fallback equations
+
+Status: unverified M21 implementation plan. Agda v2.8.0
+[`CompiledClause/Compile.hs`, lines 126–172](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/CompiledClause/Compile.hs#L126-L172)
+keeps a catchall branch and terminal `Done`/`Fail` clauses.
+[Lines 179–244](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/CompiledClause/Compile.hs#L179-L244)
+select a split from left to right and treat `VarP` as nonsplitting.
+[Lines 314–343](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/CompiledClause/Compile.hs#L314-L343)
+preserve or expand catchalls in relation to following constructor clauses.
+[Lines 381–396](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/CompiledClause/Compile.hs#L381-L396)
+substitute an expanded constructor into the RHS. File blob:
+`962a80bbaee38601c392a2f9bfd2af8ea0f972d1`.
+
+Agda's [`LHS.hs`, lines 282–310](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L282-L310)
+treats an all-variable problem as solved. Its constructor substitution remains
+as pinned above at lines 1427–1451. File blob:
+`3779ffa6e418bca99e30c071e189106f82ecbe1b`.
+These sources support terminal variable rows. They do not prove Haskell
+laziness or the scope of GHC's virtual constructor CoVars.
+
+GHC's ordinary [`Match.hs`, lines 176–209](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/HsToCore/Match.hs#L176-L209)
+keeps ordered constructor and variable blocks. Its
+[variable matcher, lines 243–246](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/HsToCore/Match.hs#L243-L246)
+drops a column without demanding it.
+[Lines 412–420](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/HsToCore/Match.hs#L412-L420)
+tidy variable and AsPat bindings through `bindMatchId`.
+The file is unchanged from base `19ff36f2aede0ca2e554016ff22c71e73aa9803b`;
+its blob is `f6c63c37c5cfae10d11a9dde22829ae25adf3106`.
+
+[`Utils.hs`, lines 230–240](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/HsToCore/Utils.hs#L230-L240)
+combines the next block with a failed match.
+[Lines 253–262](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/HsToCore/Utils.hs#L253-L262)
+omit a redundant same-Id alias.
+[Lines 906–913](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/HsToCore/Utils.hs#L906-L913)
+bind the shared failure thunk outside the preceding constructor case. Its
+unchanged blob is `c3ae336c9b2a0f9f55a0fc879905480414be544a`.
+
+M21 will reuse those paths. Before TC, rename a fallback's two source variable
+Names to the shared whole-index Names. Keep its checked VarPats unwrapped and
+check its RHS without constructor proofs. A fresh alias would not establish
+native index identity. M20's separate constructor rows keep their actual
+fields and proofs. No new backend or Core rule is proposed.

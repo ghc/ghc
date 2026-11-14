@@ -1476,6 +1476,17 @@ This target is unverified. Express the same worker with `Z/Z`, recursive
 and nested-case versions as references. This initial probe does not add
 arbitrary wildcard matrices, guards or interior contexts.
 
+Represent each row as an optional constructor pair. A constructor row keeps
+M20's two proofs. The final variable row uses zero proofs and reflexive
+transports. Rename both variable Names to the shared whole-index Names before
+checking. Keep those typed VarPats unwrapped. Use GHC's existing `PgCon` and
+`PgAny` blocks and failure continuation. No backend or Core form is needed.
+Reject an earlier or repeated variable fallback at a source pattern. Retain
+constructor-pair uniqueness and require complete pairs when no fallback exists.
+Test a missing first constructor that reaches fallback without demanding the
+second index. Repackage fallback payloads with their original indices to check
+identity, not aliases. Reject a forged fallback `Refl` and wrong-index payloads.
+
 - [ ] Follow the pinned Agda coverage split-tree and LHS substitution code in
   [two-index constructor equations](REFERENCES.md#two-index-constructor-equations).
   Inspect GHC's ordered match groups and failure continuations before choosing
