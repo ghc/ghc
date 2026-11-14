@@ -1837,6 +1837,7 @@ tcRetainedArgInst do_ql expected rn_head args fun sigma
          else return (fun, sigma, [], Nothing) }
 
 -- | Match cached index arguments when the experimental extension is enabled.
+-- See Note [Available expected types in native applications].
 tcRetainedArgInstEnabled :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
                          -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
                          -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache, RetainedInstPlan)
@@ -1852,8 +1853,10 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
   , length domains == count isHsValArg args
   , isTauTy tau, not (isFunTy result)
   , not (hasNativeDependentExpr (Core.Type body))
-  = do { let index_route = not (null index_tvs)
-             initial_subst = result_subst index_route tvs result
+  = do { expected_ty <- readExpType_maybe expected
+       ; expected_ty <- mapM (liftZonkM . zonkTcType) expected_ty
+       ; let index_route = not (null index_tvs)
+             initial_subst = result_subst expected_ty index_route tvs result
              needed_tvs | index_route = index_tvs
                         | otherwise = filter (isNothing . Subst.lookupTyVar initial_subst) tvs
        ; eligible <- if index_route
@@ -1900,8 +1903,8 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
 
-    result_subst index_route tvs result
-      | Check expected_ty <- expected
+    result_subst expected index_route tvs result
+      | Just expected_ty <- expected
       , isTauTy expected_ty
       , not index_route || hasNativeDependentExpr (Core.Type expected_ty)
       , Just subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst result expected_ty
@@ -1925,6 +1928,21 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstEnabled _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+
+{- Note [Available expected types in native applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An ordinary enclosing application can supply an expected type through filled
+meta-variables. For example, a do bind can check against m beta after m and
+beta have already been assigned IO and [Int]. Immutable matching must read
+those assignments before matching the known action IO (Vec Int n). Otherwise
+it treats the expected metas as rigid, misses the exact native input, and
+falls back to ordinary instantiation that cannot hold that input type.
+
+Read an available expected type with readExpType_maybe, then use the within-TC
+zonker. Do not force or allocate an empty inference cell. This only exposes
+existing assignments. Keep the final result subsumption, argument cache and
+scope checks. No native type is assigned to a meta-variable.
+-}
 
 -- | Check runtime identifiers against their current lexical or module bindings.
 -- Normalize type and multiplicity metadata without changing identifier identity.
