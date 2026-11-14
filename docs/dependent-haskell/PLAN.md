@@ -1852,7 +1852,8 @@ argument.
 
 - [ ] Admit a nonempty declared argument prefix under the existing native,
   NoQL, VTA, template and concreteness guards. Require a native anchor in that
-  prefix. Preserve the exactly saturated route.
+  prefix. Preserve the exactly saturated route. Keep native-index-kind
+  instantiation exactly saturated.
 - [ ] Infer and cache prefix arguments once. Start prefix matching with an
   empty substitution. Do not seed its intermediate result from the final
   expected result after extra arguments. Keep exact domain, kind and scope
