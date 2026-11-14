@@ -2470,10 +2470,37 @@ GHC already gives `DepFunTy` kind `Type`. Its `isTauTy` classifies both
 all native-meta restrictions. Reuse the mode-preserving retained checker
 for checked source type arguments instead of adding special cases for `~`
 or the library datatype `:~:`. Their arguments follow the same checked type
-formation. Retained kinds remain gated. Trace the resulting equality before
-changing Given canonicalization. Preserve ordinary erased-forall restrictions.
+formation. Literal `foreach` kind syntax remains gated. A complete closed Pi
+alias can be a kind through explicit specified kind instantiation. The
+ordinary inferred kind-meta path still rejects it. This follows GHC's existing
+Note `[Recursion through the kinds]` in `GHC.Tc.Gen.HsType`: kinds are types.
+It does not add universe levels or general native kind inference. Preserve
+ordinary erased-forall restrictions.
 
 Nine Agda and nine GHC baseline files have verified Git blobs in
 `native-pi-operand-prior-art-v1/provenance.json`. The GHC baseline is
-`de3186ee88870533570fcc667e77197511d3ded3`. This section records the design;
-implementation and new runtime validation are pending.
+`de3186ee88870533570fcc667e77197511d3ded3`. Source formation is implemented in `6963da76a7` and `826f47d880`. The first
+compiler change alone still hit the renaming gate. Both stages must preserve
+that failed observation.
+
+After formation, direct Given and `Refl` examples compile. The direct Given
+can match while it remains `CIrredCan{cteImpredicative}`. A separate example
+under another retained binder fails. Commit `050d928510` recursively checks
+the native Pi RHS on the immutable Given path and uses `mkDepFunRedn` to
+scope the full body reduction. The trace then records `PuOK` and an inert
+`EqCt`. A recursive `a ~ (foreach n -> Vec a n)` still records
+`CIrredCan{cteInsolubleOccurs}`. It cannot justify transport. Native family
+cycle breaking, Wanted decomposition and mutable native fills stay blocked.
+
+The bootstrap source executable passes 562 observations, with the previous
+532 as an exact prefix. The API fixture passes 210 package and 291 total
+source rejections, plus 22 quiet positive cases. Bare `Refl` and an `error`
+result at a native equality type hit ordinary meta guards. Their callers now
+write complete type applications. The transitive-Given control uses
+`AllowAmbiguousTypes`; its ordinary ambiguity check otherwise attempts a
+native meta fill. The unrelated-proof and representational controls also
+use that extension, then fail at the intended body expression.
+
+Self-hosted and registered validation remain pending. These source results
+and bounded Haskell demand observations do not prove preservation, totality
+or correspondence with Agda.

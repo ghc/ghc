@@ -2030,11 +2030,11 @@ proof-case reconstruction before enabling transformations.
 
 ### M33: retained function types as equality operands
 
-The six-case baseline agrees in both stages. It accepts ordinary-arrow Givens and identical
-retained functions. It rejects these three retained equality operands with
-GHC-43582 at `foreach`: a Given whose RHS is a retained Pi, an explicit
-`:~:` witness with that RHS, and a Given whose retained RHS captures an outer
-runtime index. A return without any proof rejects with GHC-91028 at `f`.
+The pre-M33 six-case baseline agrees in both stages. Ordinary-arrow Givens
+and identical retained functions compile. These three retained equality
+operands reject with GHC-43582 at `foreach`: a Given whose RHS is a retained
+Pi, a `:~:` witness with that RHS, and a Given whose retained RHS captures an
+outer runtime index. A return without proof rejects with GHC-91028 at `f`.
 Both stages pin the diagnostic code, fragment and source position.
 
 ```haskell
@@ -2042,36 +2042,62 @@ fromGivenPi :: forall value.
                value ~ (foreach (n :: Nat) -> Vec Int n)
             => value -> (foreach (n :: Nat) -> Vec Int n)
 fromGivenPi f = f
+
+liftExposedPi :: forall value.
+                value ~ (foreach (n :: Nat) -> Vec Int n)
+             => (foreach (m :: Nat) -> (value, Vec Bool m))
+             -> (foreach (m :: Nat) ->
+                   ((foreach (n :: Nat) -> Vec Int n), Vec Bool m))
+liftExposedPi f = f
 ```
 
-The first obstacle is a source type-position restriction. Do not describe
-these three failures as observed solver failures. The current native Given
-checker also rejects `DepFunTy`; it is a later boundary to trace after the
-source gate is removed. An ordinary type-variable assignment must stay
-separate from checking an existing equality assumption.
+The first obstacle was source formation in both renaming and typechecking.
+Commits `6963da76a7` and `826f47d880` reuse the existing retained telescope
+checkers. Admit checked Pi expressions in ordinary type-argument positions.
+Do not special-case equality constructor names. Preserve the caller's index
+environment, fresh binder Names, complete types, staging, closed domains,
+`Many` multiplicity, lifted bodies and source spans. Check the whole visible
+type argument for named, anonymous and generated holes. Keep ordinary
+wildcard inference unchanged.
 
-- [ ] Pin Agda's treatment of Pi types as equality operands and its universe
-  rules. Audit GHC's distinction between retained Pi types and erased
-  polymorphic types. Preserve the fixed closed domain and `Many` binder.
-- [ ] Admit checked retained Pi expressions in ordinary type-argument positions,
-  including equality operands. Reuse the existing retained binder checker.
-  Preserve its mode instead of reconstructing the signature environment.
-  Do not special-case the printed names of equality constructors. Keep
-  retained Pi types out of kind positions. Preserve ambient index Names,
-  binder scope, kind checks and located diagnostics. Do not widen ordinary
-  impredicative inference or native meta assignment.
-- [ ] Trace the resulting Given and explicit-witness cases. Admit a native Pi
-  RHS only in the existing immutable Given-checking path if the trace requires
-  it. Preserve occurs checks and opaque runtime Ids. Keep native family cycle
-  breaking disabled. Audit coercion scope before allowing its inert rewrite.
-- [ ] Preserve the no-proof rejection. Add missing, unrelated and escaping
-  proof controls. Compare imported direct transport with the pointwise form.
-  Check bottom-function WHNF, proof demand, ignored indices and sharing.
-- [ ] Rebuild both stages. Run the focused source, API and registered checks.
-  Pin code, fragment and source position for each failure. Preserve M32's
-  source outputs and frozen evidence.
+This formation rule also admits type synonyms. Existing native scanners
+inspect synonym RHSs. Ordinary native-meta filling remains blocked through
+aliases. Literal `foreach` kind syntax remains gated. A complete closed Pi
+alias can be used as a kind through an explicit specified kind argument.
+GHC already treats kinds as types. Implicit kind-meta filling with that alias
+still rejects. These controls do not establish general dependent inference
+or introduce universe levels.
 
-This task does not add runtime index evaluation, function eta equality,
+Direct Given and `Refl` transport already compile after source formation.
+The direct Given can match as an irreducible constraint. It does not require
+a solver change. In contrast, `liftExposedPi` rejects because the Pi Given
+remains impredicative and cannot rewrite beneath `m`. Commit `050d928510`
+checks its RHS recursively on the existing immutable Given path. It forms
+the scoped reduction with `mkDepFunRedn`. It preserves occurs and coercion
+checks, opaque runtime Ids and the M32 inert-rewrite filter. Native family
+cycle breaking and mutable native assignments remain blocked.
+
+The transitive-Given signature needs `AllowAmbiguousTypes`. Its ordinary
+ambiguity check attempts a native meta fill. Explicit type arguments are
+also required for native `Refl` operands and a bottom equality value made
+with `error`. Keep these restrictions instead of widening inference.
+
+- [x] Pin Agda's Pi sorts and equality transport. Preserve GHC's non-tau
+  classification of retained Pi and erased forall types.
+- [x] Implement mode-preserving renaming and checked type formation. Preserve
+  index scope, kind checks, complete arguments and located diagnostics.
+- [x] Trace direct matching and the later beneath-binder failure separately.
+  Check existing native Pi Givens without assignment. A recursive Pi Given
+  remains an occurs-check failure and cannot justify a rewrite.
+- [x] Pass 562 bootstrap source observations through separate interfaces with
+  Core and STG Lint. Preserve M32's 532 outputs as an exact prefix. Check
+  finite IORef inputs, proof demand, ignored indices, partial spines and
+  function/vector sharing. Prepare 42 source cases: 21 positive and 21 negative.
+- [ ] Rebuild the self-hosted stage. Run both strict source matrices, retained
+  regressions, API checks and all five registered tests. Preserve M32 evidence.
+
+See [the pinned prior art](REFERENCES.md#retained-function-types-as-equality-operands).
+This task adds no runtime index evaluation, function eta equality,
 structural retained unification or optimizer transformations.
 
 ## Further work
