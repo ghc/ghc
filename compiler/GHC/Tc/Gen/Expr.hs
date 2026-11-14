@@ -459,7 +459,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
              _ -> return False
        ; if native_infer
          then do { checkTupSize (length tup_args)
-                 ; let con = wrapGenSpan (HsVar noExtField
+                 ; let con = wrapGenSpan (mkHsVar
                                (noLocA (dataConName (tupleDataCon Boxed (length tup_args)))))
                        app = foldl' (\fun arg -> wrapGenSpan (HsApp noExtField fun arg))
                                     con [arg | Present _ arg <- tup_args]
