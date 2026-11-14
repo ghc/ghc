@@ -1672,6 +1672,11 @@ immutable matching. This does not require evaluating the index.
   actual head and let final result subsumption solve ordinary head/result
   metas. Do not reuse a failed argument match or weaken index equality.
   Do not freshen a missing binder whose substituted kind is a native domain.
+- [ ] Use a matched native expected-result choice as an anchor, including a
+  partial result seed. Check polymorphic bottom payloads at their known native
+  domains instead of inferring fresh indices. Match result kinds before result
+  types to determine representation parameters immutably for `error`. Preserve
+  its original HasCallStack evidence and all concreteness checks.
 - [ ] Preserve kind, scope, exact-domain,
   concreteness, NoQL, once-only usage and local evidence safeguards. Keep final
   argument checking and result subsumption authoritative.

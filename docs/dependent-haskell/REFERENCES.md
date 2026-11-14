@@ -1888,6 +1888,15 @@ an ordinary head meta before the enclosing bind checks an `IO` result. A
 separate exact joint argument match can preserve that actual head. Final
 ordinary result subsumption must still resolve it or reject the program.
 Reject fresh binders whose substituted kinds are native domains.
+The full source probe also exposes missing expected-result anchors for
+polymorphic bottom payloads. A successfully matched native result choice can
+anchor generic instantiation even when no argument's uninstantiated type has
+native syntax. Existing `needed_tvs` then leaves determined domains for normal
+expected checking. For `error`, match the result kind before the result type
+with the same outer-binder predicate. GHC's existing dollar helper uses this
+two-step immutable match. Core.Unify's Note `[tcMatchTy vs tcMatchTyKi]`
+explains why the type-only matcher can leave a runtime-representation binder
+undetermined. Keep the original HasCallStack theta and concreteness gates.
 Preserve the existing
 native-meta and general Quick Look gates, immutable kind/scope/concreteness
 checks, once-only usage, local evidence and final subsumption. M24 must support
