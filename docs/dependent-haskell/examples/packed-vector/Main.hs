@@ -5,8 +5,9 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE NoPostfixOperators #-}
 
--- | Check source construction, import, and lazy elimination.
+-- | Check source packages, filtering, and evaluation demand.
 module Main (main) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
@@ -48,6 +49,40 @@ drive input = do
     cell <- newIORef input
     n <- readIORef cell
     pure (renderPacked (repack (makePacked n)))
+
+-- | Filter with a cutoff read at runtime.
+{-# NOINLINE driveFilter #-}
+driveFilter :: Int -> IO String
+driveFilter input = do
+    cell <- newIORef input
+    cutoff <- readIORef cell
+    pure (renderPacked (filterPacked (> cutoff) samplePacked))
+
+-- | A finite input with three distinct elements.
+samplePacked :: PackedVec Int
+samplePacked = PackVec (S (S (S Z))) (VCons 1 (VCons 2 (VCons 3 VNil)))
+
+-- | Test payload demand independently of predicate and length demand.
+singletonBottom :: PackedVec Int
+singletonBottom = PackVec (S Z) (VCons bottomElement VNil)
+
+{-# NOINLINE bottomElement #-}
+
+-- | A named error in a stored element.
+bottomElement :: Int
+bottomElement = error "packed-filter-bottom-element"
+
+{-# NOINLINE bottomPredicate #-}
+
+-- | A bottom function that an empty input must not evaluate.
+bottomPredicate :: Int -> Bool
+bottomPredicate = error "packed-filter-bottom-predicate"
+
+{-# NOINLINE bottomOperator #-}
+
+-- | Check section closure demand independently of operator demand.
+bottomOperator :: Int -> Int -> Bool
+bottomOperator = error "packed-section-bottom-operator"
 
 -- | Check a deterministic result.
 assertEqual :: (Eq a, Show a) => String -> a -> a -> IO ()
@@ -129,3 +164,46 @@ main = do
         evaluate (repack bottomPackage)
     assertEqual "unused whole package" 42 (const (42 :: Int) bottomPackage)
     putStrLn "unused whole package: 42"
+    forM_
+        [ (0, "(3,[1,2,3])")
+        , (1, "(2,[2,3])")
+        , (3, "(0,[])")
+        ]
+        $ \(cutoff, expected) -> do
+            actual <- driveFilter cutoff
+            assertEqual "runtime filter" expected actual
+            putStrLn ("runtime filter: " ++ actual)
+    let empty = filterPacked bottomPredicate (makePacked Z)
+        rejected = filterPacked (const False) singletonBottom
+        retained = filterPacked (const True) singletonBottom
+    assertEqual "filter empty ignores predicate" "(0,[])" (renderPacked empty)
+    putStrLn "filter empty ignores predicate: (0,[])"
+    assertEqual "filter rejects bottom element" "(0,[])" (renderPacked rejected)
+    putStrLn "filter rejects bottom element: (0,[])"
+    assertWhnf "filter retains bottom element" retained
+    assertEqual "filter retained length" 1 (withPacked retained (\n xs -> natToInt n))
+    putStrLn "filter retained length: 1"
+    expectMarker "filter demands retained element" "packed-filter-bottom-element" $
+        evaluate (firstPacked retained)
+    expectMarker "filter payload before length" "packed-bottom-payload" $
+        evaluate (filterPacked (const True) (lazyPacked bottomLength))
+    expectMarker "filter predicate before tail" "packed-filter-bottom-predicate" $
+        evaluate (filterPacked bottomPredicate (makePacked (S bottomLength)))
+    expectMarker "filter scans partial tail" "packed-bottom-length" $
+        evaluate (filterPacked (const False) (makePacked (S bottomLength)))
+    expectMarker "filter demands package" "packed-bottom-package" $
+        evaluate (filterPacked (const True) bottomPackage)
+    assertEqual "unused filtered package" 42 (const (42 :: Int) (filterPacked bottomPredicate bottomPackage))
+    putStrLn "unused filtered package: 42"
+    assertWhnf "left section with bottom operator" (1 `bottomOperator`)
+    assertWhnf "right section with bottom operator" (`bottomOperator` 1)
+    assertWhnf "left section with bottom operand" (bottomElement +)
+    assertWhnf "right section with bottom operand" (+ bottomElement)
+    expectMarker "applied left section demands operator" "packed-section-bottom-operator" $
+        evaluate ((1 `bottomOperator`) 2)
+    expectMarker "applied right section demands operator" "packed-section-bottom-operator" $
+        evaluate ((`bottomOperator` 1) 2)
+    expectMarker "applied left section demands operand" "packed-filter-bottom-element" $
+        evaluate ((bottomElement +) 0)
+    expectMarker "applied right section demands operand" "packed-filter-bottom-element" $
+        evaluate ((+ bottomElement) 0)

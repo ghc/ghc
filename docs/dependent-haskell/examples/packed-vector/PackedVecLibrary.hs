@@ -16,6 +16,8 @@ module PackedVecLibrary
     , withPacked
     , repack
     , ignorePacked
+    , filterVec
+    , filterPacked
     , toList
     , natToInt
     ) where
@@ -48,6 +50,32 @@ repack (PackVec n xs) = PackVec n xs
 -- | Inspect the package constructor without evaluating either stored field.
 ignorePacked :: PackedVec a -> Int
 ignorePacked (PackVec n xs) = 42
+
+-- | Filter a vector and store its computed length with the result.
+filterVec :: forall a n. (a -> Bool) -> Vec a n -> PackedVec a
+filterVec predicate VNil = PackVec Z VNil
+filterVec predicate (VCons x xs) =
+    if predicate x
+        then case filterVec predicate xs of
+            PackVec n ys -> PackVec (S n) (VCons x ys)
+        else filterVec predicate xs
+
+-- | Filter a stored vector without inspecting its stored length.
+filterPacked :: forall a. (a -> Bool) -> PackedVec a -> PackedVec a
+filterPacked predicate (PackVec n xs) = filterVec predicate xs
+
+{- Note [Filtering a packed vector]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Agda's Data.Vec.filter returns Vec≤ with a hidden output length, a vector
+at that length, and a bound proof. PackVec stores the first two components.
+The retained branch constructs S n and VCons together. The rejected branch
+returns the recursive package. See REFERENCES.md#source-vector-filter.
+
+This implementation inspects each predicate before the recursive result.
+It scans the finite input spine before returning its package. Retained
+elements and stored index fields remain lazy. A bound proof and productive
+filtering of infinite inputs require further work.
+-}
 
 -- | Observe a finite vector without reading its stored length.
 toList :: Vec a n -> [a]

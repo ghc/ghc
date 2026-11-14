@@ -1120,6 +1120,27 @@ runModuleChecks libdir = do
         , "ignore bottom package: packed-bottom-package"
         , "repack bottom package: packed-bottom-package"
         , "unused whole package: 42"
+        , "runtime filter: (3,[1,2,3])"
+        , "runtime filter: (2,[2,3])"
+        , "runtime filter: (0,[])"
+        , "filter empty ignores predicate: (0,[])"
+        , "filter rejects bottom element: (0,[])"
+        , "filter retains bottom element: ok"
+        , "filter retained length: 1"
+        , "filter demands retained element: packed-filter-bottom-element"
+        , "filter payload before length: packed-bottom-payload"
+        , "filter predicate before tail: packed-filter-bottom-predicate"
+        , "filter scans partial tail: packed-bottom-length"
+        , "filter demands package: packed-bottom-package"
+        , "unused filtered package: 42"
+        , "left section with bottom operator: ok"
+        , "right section with bottom operator: ok"
+        , "left section with bottom operand: ok"
+        , "right section with bottom operand: ok"
+        , "applied left section demands operator: packed-section-bottom-operator"
+        , "applied right section demands operator: packed-section-bottom-operator"
+        , "applied left section demands operand: packed-filter-bottom-element"
+        , "applied right section demands operand: packed-filter-bottom-element"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2351,20 +2372,24 @@ checkSourceRejection label code fragment result =
 runPackageSourceRejectChecks :: GHC.Ghc ()
 runPackageSourceRejectChecks = do
     forM_
-        [ ("StrictData", 83605, "StrictData", ["StrictData"], package)
-        , ("TypeData", 83605, "retained constructor", ["TypeData"], ["type data PackedVec a where", "  PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a"])
-        , ("Existential", 83605, "existential binders", [], declaration "forall a hidden. foreach (n :: Nat) -> Vec a n -> hidden -> PackedVec a")
-        , ("Equality", 83605, "contexts", [], declaration "forall a. (a ~ Int) => foreach (n :: Nat) -> Vec a n -> PackedVec a")
-        , ("RefinedUniversal", 83605, "equality specifications", [], declaration "foreach (n :: Nat) -> Vec Int n -> PackedVec Int")
-        , ("Promotion", 83605, "Promotion of constructors with retained fields", [], package ++ ["type Bad = 'PackVec"])
-        , ("ConstructorField", 83605, "bare variable fields", [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec Z xs) = 0"])
-        , ("LazyPattern", 83605, "Lazy patterns and pattern bindings", [], package ++ ["bad :: PackedVec a -> Int", "bad ~(PackVec n xs) = 0"])
-        , ("LetPattern", 83605, "Lazy patterns and pattern bindings", [], package ++ ["bad :: PackedVec a -> Int", "bad p = let PackVec n xs = p in 0"])
-        , ("IndexMismatch", 83865, "Couldn't match", [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> PackedVec Int", "bad n m xs = PackVec @Int m xs"])
-        , ("IndexEscape", 83865, "Couldn't match", [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n xs) = xs"])
-        , ("SharedEquations", 94726, "one equation with bare variable fields", [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec n xs) = 0", "bad (PackVec m ys) = 1"])
+        [ ("StrictData", 83605, "StrictData", ["StrictData"], [], package)
+        , ("TypeData", 83605, "retained constructor", ["TypeData"], [], ["type data PackedVec a where", "  PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a"])
+        , ("Existential", 83605, "existential binders", [], [], declaration "forall a hidden. foreach (n :: Nat) -> Vec a n -> hidden -> PackedVec a")
+        , ("Equality", 83605, "contexts", [], [], declaration "forall a. (a ~ Int) => foreach (n :: Nat) -> Vec a n -> PackedVec a")
+        , ("RefinedUniversal", 83605, "equality specifications", [], [], declaration "foreach (n :: Nat) -> Vec Int n -> PackedVec Int")
+        , ("Promotion", 83605, "Promotion of constructors with retained fields", [], [], package ++ ["type Bad = 'PackVec"])
+        , ("ConstructorField", 83605, "bare variable fields", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec Z xs) = 0"])
+        , ("LazyPattern", 83605, "Lazy patterns and pattern bindings", [], [], package ++ ["bad :: PackedVec a -> Int", "bad ~(PackVec n xs) = 0"])
+        , ("LetPattern", 83605, "Lazy patterns and pattern bindings", [], [], package ++ ["bad :: PackedVec a -> Int", "bad p = let PackVec n xs = p in 0"])
+        , ("IndexMismatch", 83865, "Couldn't match", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> PackedVec Int", "bad n m xs = PackVec @Int m xs"])
+        , ("IndexEscape", 83865, "Couldn't match", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n xs) = xs"])
+        , ("LinearClause", 18872, "arising from a pattern", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
+        , ("LinearCase", 18872, "arising from multiplicity", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad p = case p of PackVec n xs -> PackVec n xs"])
+        , ("RigidMultiplicity", 25897, "is a rigid type variable", ["LinearTypes"], ["import GHC.Types (Multiplicity)"], package ++ ["bad :: forall (p :: Multiplicity) a. PackedVec a %p -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
+        , ("FilterWrongLength", 5617, "PackVec m (VCons x ys)", [], [], package ++ ["filterVec :: forall a n. (a -> Bool) -> Vec a n -> PackedVec a", "filterVec predicate VNil = PackVec Z VNil", "filterVec predicate (VCons x xs) =", "  if predicate x", "    then case filterVec predicate xs of", "      PackVec m ys -> PackVec m (VCons x ys)", "    else filterVec predicate xs"])
+        , ("SharedEquations", 94726, "one equation with bare variable fields", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec n xs) = 0", "bad (PackVec m ys) = 1"])
         ]
-        $ \(name, code, fragment, extensions, declarations) -> do
+        $ \(name, code, fragment, extensions, imports, declarations) -> do
             let moduleName = "NativeSourcePackage" ++ name
                 source =
                     unlines $
@@ -2373,8 +2398,9 @@ runPackageSourceRejectChecks = do
                         , "{-# LANGUAGE TypeApplications, TypeOperators #-}"
                         ]
                             ++ map (\extension -> "{-# LANGUAGE " ++ extension ++ " #-}") extensions
-                            ++ [ "module " ++ moduleName ++ " where"
-                               , "data Nat = Z | S Nat"
+                            ++ ["module " ++ moduleName ++ " where"]
+                            ++ imports
+                            ++ [ "data Nat = Z | S Nat"
                                , "data Vec a (n :: Nat) where"
                                , "  VNil :: Vec a Z"
                                , "  VCons :: a -> Vec a n -> Vec a (S n)"

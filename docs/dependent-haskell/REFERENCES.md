@@ -1123,6 +1123,49 @@ preserve that non-strict behavior without requiring singleton reification.
   [`GHC.CoreToStg`](../../compiler/GHC/CoreToStg.hs) identify serialization and erasure
   obligations. A calculus prototype does not discharge these compiler obligations.
 
+## Source vector filter
+
+Agda's standard library v2.3 supplies the program structure for the source
+filter. [`Data.Vec.filter`](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec.agda#L43-L45)
+returns `Vec≤ A n`. Its result stores the output length and a vector indexed by
+that length. It also stores an irrelevant proof that the output length is at
+most the input length. See the
+[`Vec≤` fields](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Bounded/Base.agda#L42-L46)
+and its
+[cons operation](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Bounded/Base.agda#L106-L110).
+
+The Haskell example follows the length and vector fields. `PackVec n xs` stores
+one runtime `Nat` and a `Vec a n`. A retained element constructs `S n` and
+`VCons x xs`. A rejected element returns the recursive package. This increment
+uses an ordinary Boolean predicate. It does not implement Agda's `Decidable P`
+predicate or the bound proof. The type checks the relation between the output
+fields. It does not prove that the predicate selected the correct elements.
+
+Haskell demand behavior needs separate checks. The current filter checks the
+predicate before the recursive call. It opens each recursive package before
+returning its own package. It therefore scans a finite input spine before it
+returns a package constructor. It can leave each element and the stored length
+unevaluated. It does not produce a package from an infinite input. Agda's
+termination rules do not establish these Haskell properties.
+
+Source `case` also uses GHC's existing multiplicity check. Its fresh multiplicity
+variable must admit the unrestricted package pattern. `tcSubMult Many pat_mult`
+uses the same rule as ordinary `checkManyPattern`. Linear and rigid multiplicities
+remain subject to that check. See
+[Note [Checking retained package patterns]](../../compiler/GHC/Tc/Gen/Pat.hs).
+
+The runtime predicate `(> cutoff)` also exercises GHC's existing section
+translation. See
+[Note [Left and right sections]](../../compiler/GHC/Rename/Expr.hs) and
+[the wired-in helper templates](../../compiler/GHC/Builtin/WiredIn/Ids.hs).
+These representation-polymorphic helpers have no runtime definitions. The
+native path must expand their compulsory unfoldings before code generation.
+It uses the existing substitution rules and preserves the remaining lambda.
+The source checks keep undefined operators and operands lazy at section WHNF.
+They then demand each section application. These checks use ordinary section
+syntax with `PostfixOperators` disabled. See
+[Note [Restricted dependent simplification]](../../compiler/GHC/Core/SimpleOpt.hs).
+
 ## Later solver and proof-certificate work
 
 These references concern additional equality reasoning. None is required for the

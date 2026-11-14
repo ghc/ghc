@@ -304,8 +304,19 @@ analysis again. Do not create join points from pre-existing occurrence metadata.
 Boolean beta reduction substitutes an optimized local variable or exact
 constructor into terms and types together. Retain the redex for an unsupported
 producer. A lazy let for a retained argument could let its index escape.
-Disable compulsory unfolding too: unfolding a valid variable index can expose
-an unsupported producer. Do not push casts through native lambdas.
+Disable general compulsory unfolding too: unfolding a valid variable index can
+expose an unsupported producer. Do not push casts through native lambdas.
+
+The wired-in leftSectionId and rightSectionId are exceptions. These helpers
+have no runtime definitions. Their representation-polymorphic types must not
+reach code generation. Expand their existing compulsory templates with the
+same substitution and beta rules. Keep their lambda binders and multiplicities.
+With PostfixOperators disabled, a source left section supplies one value
+argument to leftSectionId. A source right section supplies two value arguments
+to rightSectionId. Both leave a
+lambda, so the section does not force its operator or operand at WHNF.
+See Note [Left and right sections] in GHC.Rename.Expr and
+Note [Wired-in Ids for rebindable syntax] in GHC.Builtin.WiredIn.Ids.
 
 A virtual Boolean proof is not a constructor field. Reduce its case only when
 the scrutinee is an exact constructor and the substituted primitive nominal
@@ -533,6 +544,8 @@ simple_app env (Var v) as
   = simple_app (soeSetInScope (soeInScope env) env') e as
 
   | not (soe_native env)
+    || v `hasKey` leftSectionKey
+    || v `hasKey` rightSectionKey
   , let unf = idUnfolding v
   , isCompulsoryUnfolding unf
   , isAlwaysActive (idInlineActivation v)

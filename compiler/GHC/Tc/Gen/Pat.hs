@@ -1299,7 +1299,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
              binders = dataConRepArgBinders con
              con_like = RealDataCon con
              pat_mult = scaledMult pat_ty_scaled
-       ; unless (isManyTy pat_mult && null ex_tvs && null eq_spec && null theta
+       ; unless (null ex_tvs && null eq_spec && null theta
                  && length (tyConDataCons (dataConTyCon con)) == 1
                  && binders `equalLength` arg_tys && not (pe_lazy penv)) bad_pattern
        ; case pe_ctxt penv of
@@ -1310,6 +1310,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
            _ -> bad_pattern
        ; check_con_pat_arity con_like (length pats)
        ; mapM_ check_variable pats
+       ; tcSubMult (pe_orig penv) ManyTy pat_mult
        ; (wrap, ctxt_res_tys) <- matchExpectedConTy penv (dataConTyCon con) pat_ty_scaled
        ; unless (isIdHsWrapper wrap) bad_pattern
        ; pat_ty <- readExpType (scaledThing pat_ty_scaled)
@@ -1334,7 +1335,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
     check_fields _ _ [] []
       = do { res <- thing_inside; return ([], res) }
     check_fields subst position ((mb_binder, arg_ty) : args) (pat : pats)
-      = do { let scaled_ty = scaleScaled (scaledMult pat_ty_scaled) (substScaledTy subst arg_ty)
+      = do { let scaled_ty = scaleScaled ManyTy (substScaledTy subst arg_ty)
            ; subst' <- case mb_binder of
                Nothing -> return subst
                Just template -> case unLoc pat of
@@ -1363,6 +1364,15 @@ fields in a strict constructor match. The fields themselves stay lazy. Reject
 lazy and let patterns. Match compilation rejects multiple equations for the
 same package constructor before it shares alternative fields. It must use
 these actual source field Ids, not fresh fields followed by ordinary aliases.
+
+An ordinary case starts with a fresh multiplicity metavariable. Require Many
+with tcSubMult, as checkManyPattern does for other nonlinear patterns. A
+syntactic isManyTy check would reject this metavariable before it can unify.
+tcSubMult rejects linear or rigid multiplicities through the ordinary
+multiplicity constraints. It also requires reflexive multiplicity evidence;
+see Note [Coercion errors in tcSubMult] in GHC.Tc.Utils.Unify. Check the fields
+at Many immediately. Do not put the unresolved outer multiplicity in a
+retained field Id, whose metadata requires Many.
 
 Agda's constructor telescope and splitCon provide the scope precedent. See
 docs/dependent-haskell/REFERENCES.md#retained-constructor-field-telescopes.
