@@ -538,6 +538,8 @@ getRegister' config plat expr =
               addr_code `snocOL`
               LDU format (OpReg width dst) (OpAddr addr))
                               )
+        -- A vector from Haskell reaches this panic: see the BUG at the vector
+        -- arithmetic primops in GHC.StgToCmm.Prim's emitPrimOp.
         _ -> pprPanic ("Unknown width to load: " ++ show width) (pdoc plat expr)
 
     CmmStackSlot _ _  -> pprPanic "getRegister' (CmmStackSlot): " (pdoc plat expr)
@@ -547,6 +549,29 @@ getRegister' config plat expr =
                                 nilOL
                          )
 
+    -- BUG: neither case truncates the sum to a sub-word register's width,
+    -- the first going to MO_Add's case for a literal of 12 bits, which at
+    -- 8 and 16 bits sign-extends its operand in the operand's own register
+    -- and does not truncate, where intOp truncates a sub-word MO_Add; and
+    -- cmmMachOpFoldM in GHC.Cmm.Opt folds a sub-word register plus or minus a
+    -- literal into a CmmRegOff. In the first case, the bits above the width
+    -- break the invariant stated under "Signed arithmetic on LoongArch64"
+    -- above getRegister', harmlessly, each reader of a sub-word register here
+    -- that the printer accepts extending or masking it first, or reading its
+    -- low bits alone; but where the operand is also the first operand of one
+    -- of genCondJump's unsigned comparisons, which zero-extends that register
+    -- ahead of the second operand's code, the extension in place undoes the
+    -- zero extension, and the branch compares the sign-extended value: wrong
+    -- code on LoongArch, from Haskell at -O and -O2, where the code for x < x
+    -- + 5 on a Word8 gives False for x from 128 to 250. Most other cases of
+    -- an operation of 8 or 16 bits extend or mask its operand in place too,
+    -- among them those of the shifts, of MO_And, MO_Or and MO_Xor and of the
+    -- operations intOp lowers; a sign extension there undoes genCondJump's
+    -- zero extension likewise, and a zero extension the sign extension it
+    -- makes for a signed comparison, from Haskell at -O and -O2 too, where the
+    -- code for x < x * 3 on a Word8 gives False for x from 129 to 170. The
+    -- second case's ADD of two registers of 8 or 16 bits is a compiler panic in
+    -- GHC.CmmToAsm.LA64.Ppr, which prints such an ADD at 32 and 64 bits alone.
     CmmRegOff reg off | isNbitEncodeable 12 (fromIntegral off) -> do
       getRegister' config plat
         $ CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
@@ -1329,6 +1354,11 @@ getRegister' config plat expr =
         CSET NE (OpReg W64 dst) (OpReg W64 hi)  (OpReg W64 lo)
                                  )
 
+    -- BUG: MULW is given operands of 64 bits, which GHC.CmmToAsm.LA64.Ppr
+    -- prints at 32 bits alone, so MO_S_MulMayOflo at 32 bits is a compiler
+    -- panic ("LA64.ppr: MULW error") on LoongArch, at -O0 and -O; only
+    -- hand-written Cmm reaches it, StgToCmm emitting the MachOp at the word's
+    -- width.
     do_mul_may_oflo W32 x y = do
         (reg_x, _format_x, code_x) <- getSomeReg x
         (reg_y, _format_y, code_y) <- getSomeReg y
@@ -2220,6 +2250,18 @@ genCondFarJump cond op1 op2 far_target = do
                 $ BCOND cond op1 op2 (TBlock far_target)
                 ]
 
+-- BUG: replace_jump rewrites BCOND1 alone, never BEQZ or BNEZ, which
+-- genCondJump also emits and which reach 4 MiB each way; instr_size counts a
+-- MOV that prints as li.d as one instruction, where the assembler expands li.d
+-- to up to four; and replace_jump advances its position by two for each BCOND1
+-- it rewrites, where instr_size counted one, which shortens the estimate of a
+-- forward branch's distance by one for each BCOND1 rewritten before the branch,
+-- and each one rewritten between the branch and its target lengthens the
+-- distance by one that the estimate leaves out. So a conditional branch beyond
+-- its reach can be left as it is. LLVM's assembler (clang 18) then rejects the
+-- module, as it did at a beqz, and at a bltu that the undercount of many li.d,
+-- or 40 BCOND1 rewritten before it or between it and its target, left as it
+-- was; GNU as 2.42 lengthens the branch instead.
 makeFarBranches ::
   Platform ->
   LabelMap RawCmmStatics ->

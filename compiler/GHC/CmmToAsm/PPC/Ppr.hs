@@ -396,6 +396,8 @@ pprInstr platform instr = case instr of
                II64 -> text "d"
                FF32 -> text "fs"
                FF64 -> text "fd"
+               -- A vector from Haskell reaches this panic: see the BUG at the
+               -- vector arithmetic primops in GHC.StgToCmm.Prim's emitPrimOp.
                VecFormat {} -> panic "PPC pprInstr: VecFormat"
                ),
            case addr of AddrRegImm _ _ -> empty

@@ -1,4 +1,9 @@
 -- | Register coalescing.
+--
+-- TODO: no module imports this one. Its pass ran before graph allocation
+-- (-fregs-graph) until 2007, when it was taken out of the pipeline in favour of
+-- the coalescing that GHC.Data.Graph.Color.colorGraph does, and it has had no
+-- caller since.
 module GHC.CmmToAsm.Reg.Graph.Coalesce (
         regCoalesce,
         slurpJoinMovs

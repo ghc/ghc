@@ -402,6 +402,15 @@ pprFrameBlock platform (DwarfFrameBlock hasInfo uws0) =
 
             changed = Map.toList $ Map.mapMaybeWithKey isChanged uws
 
+        -- BUG: a point whose table differs from the one before gets a
+        -- DW_CFA_set_loc even where it is the procedure's first, so where
+        -- that point's table differs from the CIE's, as for a procedure
+        -- entered with arguments on the stack, the frame description entry
+        -- opens with a set_loc to its own initial location, which the DWARF
+        -- standard requires to be greater than the current one: wrong debugging
+        -- information under -g, which llvm-dwarfdump refuses to decode into
+        -- rows, shown at -O0 and -O from Haskell on x86-64 and from Cmm on
+        -- i386.
         in if oldUws == uws
              then (empty, oldUws)
              else let -- see Note [Info Offset]

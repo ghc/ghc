@@ -1581,6 +1581,13 @@ emitPrimOp cfg primop =
 
 -- Vector ops
 
+-- BUG: the vector arithmetic, bitwise and FMA primops below, VecAddOp to
+-- VecFNMSub, call no checkVecCompatibility, which the cases of VecBroadcastOp
+-- to VecShuffleOp above call, so such a primop that the target cannot compile
+-- reaches the native code generator, which panics where the check would give a
+-- "sorry" error: a failed compilation either way, but a panic, from Haskell, as
+-- plusDoubleX2# gives at -O0 and -O on RISC-V, LoongArch and 64-bit PowerPC,
+-- and plusDoubleX4# on AArch64.
   (VecAddOp  FloatVec n w) -> opTranslate (MO_VF_Add  n w)
   (VecSubOp  FloatVec n w) -> opTranslate (MO_VF_Sub  n w)
   (VecMulOp  FloatVec n w) -> opTranslate (MO_VF_Mul  n w)

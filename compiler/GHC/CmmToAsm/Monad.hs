@@ -309,8 +309,10 @@ this assumption. A store generates and emits the code of its value before the
 code of its address, whose amode it then takes from 'getAmode' (see the Rule
 of the Game (tm) for Amodes in GHC.CmmToAsm.X86.CodeGen); where code must come
 between an amode and its use, 'getNonClobberedAmode' keeps the address valid
-across it, unless that code writes a virtual register the amode names, which the
-caller must guard against (as genTrivialCode does).
+across it, unless that code writes a virtual register the amode names,
+which the caller must guard against (as genTrivialCode does, and as
+genXchg and genAtomicRMW's cmpxchg_code do not: see the BUGs at them in
+GHC.CmmToAsm.X86.CodeGen).
 
 The combinators look up the current block in the CFG, so it must be a node of
 the CFG. The CFG only has the blocks that are reachable from the entry, and the
@@ -504,6 +506,10 @@ data RegCode64 code = RegCode64
   !Reg -- ^ Lower part
 
 -- | Return a virtual 64-bit register
+--
+-- BUG #28125: the high half can be the high half of a 64-bit Cmm local too
+-- (localReg64), and writing one then overwrites the other, which is wrong code
+-- on i386 and 32-bit PowerPC: see getHiVirtualRegFromLo in GHC.Platform.Reg.
 getNewReg64 :: NatM Reg64
 getNewReg64 = do
   let rep = II32
@@ -517,6 +523,10 @@ getNewReg64 = do
 -- | Convert a 64-bit LocalReg into two virtual 32-bit regs.
 --
 -- Used to handle 64-bit "registers" on 32-bit architectures
+--
+-- BUG #28125: the high half can be the high half of a 64-bit NCG temporary too
+-- (getNewReg64), and writing one then overwrites the other, which is wrong code
+-- on i386 and 32-bit PowerPC: see getHiVirtualRegFromLo in GHC.Platform.Reg.
 localReg64 :: HasDebugCallStack => LocalReg -> Reg64
 localReg64 (LocalReg vu ty)
   | isWord64 ty = let lo = RegVirtual (VirtualRegI vu)

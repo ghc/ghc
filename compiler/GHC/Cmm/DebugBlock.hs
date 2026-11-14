@@ -111,6 +111,14 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
 
       -- Analyse tick scope structure: Each one is either a top-level
       -- tick scope, or the child of another.
+      -- BUG: blockCtxs and scopeMap are maps keyed by CmmTickScope,
+      -- whose Ord compares the scopes' uniques, and detRenameCmmTick in
+      -- GHC.Cmm.UniqueRenamer leaves those uniques as they are under
+      -- -fobject-determinism. So the order of the top scopes and of each
+      -- scope's nested ones, and with it the order of the lexical-block
+      -- DIEs that dwarfGen emits, follows the unique supply: under -g an
+      -- object's .debug_info differs between values of -dinitial-unique and
+      -- -dunique-increment, against Note [Norms of the NCG] in GHC.CmmToAsm.
       (topScopes, childScopes)
         = partitionEithers $ map (\(k, a) -> findP (k, a) k) $ Map.toList blockCtxs
 
@@ -242,6 +250,7 @@ cmmDebugLabels is_valid_label isMeta nats = seqList lbls lbls
         -- consist of meta instructions -- we will declare them missing,
         -- and cmmDebugLink then skips debug data generation for them and
         -- for every block and procedure nested under them.
+        -- See the BUG at cmmDebugLink.
         lbls = filter is_valid_label $ map blockId $ filter (not . allMeta) $ concatMap getBlocks nats
         getBlocks (CmmProc _ _ _ (ListGraph bs)) = bs
         getBlocks _other                         = []
@@ -257,6 +266,19 @@ cmmDebugLink labels unwindPts blocks = mapMaybe link blocks
         link block = case mapLookup (dblLabel block) blockPos of
           -- filter dead blocks: we generated debug infos from Cmm blocks but
           -- asm-shortcutting may remove some blocks later (#22792)
+          --
+          -- BUG: this drops a block missing from labels with every block and
+          -- procedure nested under it, and cmmDebugLabels declares missing a
+          -- block that holds only meta instructions. Where that is a
+          -- procedure's entry block, under -g dwarfGen emits no DIEs and no
+          -- unwinding records for the procedure and those nested under it.
+          -- This is reached for an entry block that holds no more than
+          -- moves of the arguments and a jump: to the heap check, where
+          -- -fcmm-control-flow is off, on x86-64 and 64-bit PowerPC at -O0 and
+          -- on these, i386, RISC-V and LoongArch at -O1 -fno-cmm-control-flow;
+          -- and, with the flag on or off, to the header of the procedure's
+          -- loop, which has two predecessors, at -O1 and -O2 on 64-bit PowerPC
+          -- and on x86-64 under -fno-block-layout-cfg.
           Nothing  -> Nothing
           pos      -> Just $ block
                          { dblPosition = pos

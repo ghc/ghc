@@ -359,6 +359,12 @@ callClobberedRegs platform
    -- Only xmm0-5 are caller-saves registers on 64-bit windows.
    -- For details check the Win64 ABI:
    -- https://docs.microsoft.com/en-us/cpp/build/x64-software-conventions
+   -- BUG: a Windows callee saves only the low 128 bits of xmm6 to xmm15 (the
+   -- document above gives the upper half of ymm6 to ymm15 as volatile), and
+   -- this list names those registers at no width, so the register allocators
+   -- can keep a 256-bit or 512-bit value in ymm6 to ymm15 or zmm6 to zmm15
+   -- across a C call, whose callee can destroy the value's bits above 127. This
+   -- is wrong code on x86-64 Windows, under -mavx2 and -mavx512f.
    ++ map xmm [0 .. 5]
  | otherwise
     -- all xmm regs are caller-saves

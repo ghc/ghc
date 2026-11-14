@@ -257,4 +257,8 @@ dwarfReturnRegNo p
     ArchAArch64 -> 30
     ArchRISCV64 -> 1 -- ra (return address)
     ArchLoongArch64 -> 1 -- ra (return address)
+    -- BUG #11261: no case for 32-bit PowerPC or for 64-bit PowerPC with the
+    -- ELFv1 ABI, where ncgDwarfEnabled holds under -g on ELF: there -g can
+    -- make the compiler panic on a module with code. dwarfRegNo has no case for
+    -- 32-bit PowerPC either.
     _other     -> error "dwarfReturnRegNo: Unsupported platform!"

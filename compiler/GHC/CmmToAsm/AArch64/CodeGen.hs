@@ -902,6 +902,10 @@ getRegister' config plat expr
               format = cmmTypeFormat rep
           return (Any format (\dst -> imm_code `snocOL` (annExpr expr $ LDR format (OpReg (formatToWidth format) dst) op)))
 
+        -- BUG #28126: compiling a label at an offset from -2048 to -1 stops
+        -- with check_off's error. isNbitEncodeable 12 admits offsets from -2048
+        -- to 2047, but the printer adds the offset as an immediate, which
+        -- check_off in GHC.CmmToAsm.AArch64.Ppr accepts only from 0 to 4095.
         CmmLabelOff _lbl off | isNbitEncodeable 12 (fromIntegral off) -> do
           (op, imm_code) <- litToImm' lit
           let rep = cmmLitType plat lit
@@ -1298,6 +1302,9 @@ getRegister' config plat expr
             let format = case (l, scalarWidth) of
                   (4, W32) -> VecFormat 4 FmtFloat
                   (2, W64) -> VecFormat 2 FmtDouble
+                  -- A vector from Haskell reaches this panic: see the BUG
+                  -- at the vector arithmetic primops in GHC.StgToCmm.Prim's
+                  -- emitPrimOp.
                   _ -> pprPanic "floatVecOp: invalid vector format" (ppr l <+> ppr scalarWidth)
             return $ Any format (\dst -> code_x `appOL` code_y `appOL` op format (OpReg W128 dst) (OpReg W128 reg_x) (OpReg W128 reg_y))
 
@@ -3016,6 +3023,15 @@ out of range jumps with the sequence of instructions described above.
 data BlockInRange = InRange | NotInRange Target
 
 -- See Note [AArch64 far jumps]
+-- BUG: instr_pos counts an LDR of a label as one instruction, where it prints
+-- as two, or three with an offset (GHC.CmmToAsm.AArch64.Ppr), and the meta
+-- instructions DELTA, PUSH_STACK_FRAME, POP_STACK_FRAME and, in a DEBUG
+-- compiler, MULTILINE_COMMENT as one each, where replace_jump, which gives
+-- the branch's position, counts them as none. So the estimate of a branch's
+-- distance can fall short, that of a backward branch by at least one for each
+-- of them before its target, and a conditional branch beyond its reach is left
+-- as it is. LLVM's assembler (clang 18) and GNU as 2.42 then reject the module,
+-- as they did at a cbz and at a backward cbnz.
 makeFarBranches :: Platform -> LabelMap RawCmmStatics -> [NatBasicBlock Instr]
                 -> UniqDSM [NatBasicBlock Instr]
 makeFarBranches {- only used when debugging -} _platform statics basic_blocks = do

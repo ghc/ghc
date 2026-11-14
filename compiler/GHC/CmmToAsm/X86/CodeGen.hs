@@ -152,6 +152,15 @@ cmmTopCodeGen (CmmData sec dat) =
 -}
 
 -- Verifying basic blocks is cheap, but not cheap enough to enable it unconditionally.
+-- BUG: a block whose last jump is missing is caught only where that jump alone
+-- would cover one of the block's edges in the CFG: sanityCheckCfg, where the
+-- CFG is kept and under -dasm-lint or in a DEBUG compiler, checks that the
+-- block's jumps and its edges, a call's aside, agree, so a block with no such
+-- edge, as one meant to end in a tail call or a return, goes unchecked; this
+-- checks, in a DEBUG compiler, only that nothing but jumps follows a jump. A
+-- block that did not end in one would run on into whichever block the layout
+-- puts after it, which is wrong code; no instruction selector is known to make
+-- one.
 verifyBasicBlock :: Platform -> [Instr] -> ()
 verifyBasicBlock platform instrs
   | debugIsOn     = go False instrs
@@ -812,6 +821,14 @@ iselExpr64 (CmmMachOp (MO_Not _) [e1]) = do
 
 iselExpr64 (CmmRegOff r i) = iselExpr64 (mangleIndexTree r i)
 
+-- BUG: no case for MO_V_Extract, so on i386 each extraction of a 64-bit integer
+-- lane that reaches iselExpr64 panics here: at -O0 that of every unpackInt64X2#
+-- and unpackWord64X2# any of whose lanes is used, and of the 256-bit ones under
+-- -mavx2 and the 512-bit ones under -mavx512f. At -O1 and -O2 the extraction
+-- of a 128-bit vector's lane that Cmm sinking puts into the operand of a
+-- broadcast or an insert, packs included, reaches the case for MO_V_Extract in
+-- getRegister' instead, through the BUG at its case for MO_V_Broadcast, and the
+-- assembler rejects the module.
 iselExpr64 expr
    = do
       platform <- getPlatform
@@ -856,6 +873,14 @@ getRegister' platform is32Bit (CmmReg reg)
               reg_fmt = cmmTypeFormat ty
           in return $ Fixed reg_fmt (getRegisterReg platform reg) nilOL
 
+-- BUG: neither mangleIndexTree nor add_int, which add_code takes for the
+-- sum at W16 and wider where n fits in 32 bits, narrows n to r's width, and
+-- cmmMachOpFoldM in GHC.Cmm.Opt folds a sub-word register plus or minus
+-- literals into a CmmRegOff whose n can lie outside the width. At W16 add_int's
+-- LEA is printed as an ADD of an immediate where its result takes r's register,
+-- and the assembler shortens an immediate outside 16 bits to the value meant,
+-- warning only where its magnitude reaches 2^16. This costs at most the
+-- warning, on x86 and x86-64.
 getRegister' platform is32Bit (CmmRegOff r n)
   = getRegister' platform is32Bit $ mangleIndexTree r n
 
@@ -1079,6 +1104,15 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
         -> vector_float_broadcast_avx l w x
         | otherwise
         -> vector_float_broadcast_sse l w x
+      -- BUG: on i386, for 64-bit lanes, vector_int64x2_broadcast and
+      -- vector_int_broadcast_avx2 here, and vector_int64x2_insert_sse2 and
+      -- vector_int_insert_pinsr for MO_V_Insert, compile the 64-bit integer by
+      -- getNonClobberedReg, into one 32-bit register where iselExpr64 gives the
+      -- two that hold it, and move it by MOVD or PINSR at II64, printed movq
+      -- or pinsrq, which the assembler rejects there. So each such broadcast
+      -- or insert, packInt64X2#'s included, fails to compile: the assembler
+      -- rejects the module at -O0, and at -O the compiler panics where the
+      -- operand is a load, as a function's argument is.
       MO_V_Broadcast l w
         | avx2, l * widthInBits w `elem` [128, 256] -- AVX-512 is not supported for now
         -> vector_int_broadcast_avx2 l w x
@@ -1086,6 +1120,10 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_V_Broadcast 8 W16 -> vector_int16x8_broadcast x
       MO_V_Broadcast 4 W32 -> vector_int32x4_broadcast x
       MO_V_Broadcast 2 W64 -> vector_int64x2_broadcast x
+      -- BUG: every 512-bit integer broadcast reaches this panic under
+      -- -mavx512f, the case for vector_int_broadcast_avx2 taking 128 and
+      -- 256 bits alone; under -mavx2 such a vector is rejected first, as an
+      -- unimplemented feature.
       MO_V_Broadcast {}
         -> pprPanic "Unsupported integer vector broadcast operation for: " (pdoc platform x)
 
@@ -1351,6 +1389,13 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
         vector_float_broadcast_avx len w expr = do
           (dst, exp) <- getSomeReg expr
           let fmt = VecFormat len (floatScalarFormat w)
+              -- BUG #27767: VSHUF with immediate 0 copies, within each 128 bits
+              -- of dst, the first element of those 128 bits, so for a 256-bit
+              -- or 512-bit vector only the low 128 bits hold the scalar, and
+              -- each higher 128 bits hold copies of their own first element.
+              -- This is wrong code, under -mavx2 for broadcastDoubleX4#
+              -- and broadcastFloatX8#, and under -mavx512f for the 512-bit
+              -- broadcasts.
               code = VSHUF fmt (ImmInt 0) (OpReg dst) dst dst
           return $ Fixed fmt dst (exp `snocOL` code)
 
@@ -1364,6 +1409,9 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
               code = SHUF fmt (ImmInt 0) (OpReg dst) dst
           return $ Fixed fmt dst (exp `snocOL` code)
 
+        -- BUG: for a 256-bit vector, MOVD's destination and VPBROADCAST's
+        -- source take fmt, so both are printed as a ymm register, and the
+        -- assembler rejects the module.
         vector_int_broadcast_avx2 :: Length
                                   -> Width
                                   -> CmmExpr
@@ -1518,6 +1566,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_V_Extract 8 W16 -> vector_int_extract_pextr 8 W16 x y -- PEXTRW (SSE2)
       MO_V_Extract 4 W32 | sse4_1 -> vector_int_extract_pextr 4 W32 x y
                          | otherwise -> vector_int32x4_extract_sse2 x y
+      -- On i386 the case for 2 W64 gives assembly the assembler rejects: see
+      -- the BUG at iselExpr64's last clause.
       MO_V_Extract 2 W64 | sse4_1 -> vector_int_extract_pextr 2 W64 x y
                          | otherwise -> vector_int64x2_extract_sse2 x y
       -- SIMD NCG TODO: 256/512-bit vector
@@ -1933,6 +1983,11 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                       -> NatM Register
     vector_op_sse_reg instr format expr1 expr2 = do
       config <- getConfig
+      -- BUG #28179: exp1_code is generated before exp2_code but emitted after
+      -- it. On i386 alone, where both split a block, as a 64-bit shift's code
+      -- does, the CFG has the splits the other way round. Where each runs,
+      -- addNodesBetween panics if the linear allocator puts a fixup block on an
+      -- edge the CFG lacks, and otherwise sanityCheckCfg does.
       exp1_code <- getAnyReg expr1
       (reg2, exp2_code) <- getSomeReg expr2 -- vector registers are never clobbered by an instruction
       tmp <- getNewRegNat format
@@ -1952,6 +2007,11 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                          -> CmmExpr
                          -> CmmExpr
                          -> NatM Register
+    -- BUG #27422: VPSHUFD with the lane as its immediate selects, by the
+    -- immediate's two low bits, a lane of the vector's low 128 bits, so lane k
+    -- of a FloatX8# or a FloatX16# gives lane k mod 4. This is wrong code, on
+    -- x86-64, under -mavx2 for lanes 4 to 7 of a FloatX8# and under -mavx512f
+    -- for lanes 4 to 15 of a FloatX16#.
     vector_float_extract l W32 expr (CmmLit lit) = do
       (r, exp) <- getSomeReg expr
       let format   = VecFormat l FmtFloat
@@ -1962,6 +2022,11 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                 CmmInt _ _ -> exp `snocOL` (VPSHUFD format imm (OpReg r) dst)
                 _          -> pprPanic "Unsupported AVX floating-point vector extract offset" (ppr lit)
       return (Any FF32 code)
+    -- BUG: this takes the offsets 0 and 1 alone, so extracting any other lane
+    -- of a DoubleX4# or a DoubleX8# panics, a failed compilation, on x86-64
+    -- under -mavx2 and -mavx512f, and at -O1 and -O2 under -mavx; at -O0, where
+    -- an unpack extracts every lane, every unpackDoubleX4# and unpackDoubleX8#
+    -- any of whose lanes is used panics.
     vector_float_extract _ W64 expr (CmmLit lit) = do
       (r, exp) <- getSomeReg expr
       let code dst
@@ -2613,6 +2678,12 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
           if ssse3
             then vector_op_sse (`PALIGNR` (ImmInt amountInBytes)) fmt v1 v2
             else do
+              -- BUG #28179: exp1 is generated before exp2 but emitted after
+              -- it. On i386 alone, where both split a block, the CFG has the
+              -- splits the other way round, as at vector_op_sse_reg. Where each
+              -- runs, addNodesBetween panics if the linear allocator puts a
+              -- fixup block on an edge the CFG lacks, and otherwise
+              -- sanityCheckCfg does.
               exp1 <- getAnyReg v1
               exp2 <- getAnyReg v2
               tmp <- getNewRegNat fmt
@@ -3028,6 +3099,8 @@ getRegister' platform _is32Bit (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
       MO_V_Insert 8 W16 -> vector_int_insert_pinsr 8 W16 x y z -- PINSRW (SSE2)
       MO_V_Insert 4 W32 | sse4_1 -> vector_int_insert_pinsr 4 W32 x y z
                         | otherwise -> vector_int32x4_insert_sse2 x y z
+      -- On i386 the case for 2 W64 fails to compile: see the BUG at the case
+      -- for MO_V_Broadcast in getRegister'.
       MO_V_Insert 2 W64 | sse4_1 -> vector_int_insert_pinsr 2 W64 x y z
                         | otherwise -> vector_int64x2_insert_sse2 x y z
       MO_V_Insert _ _ -> sorry "Unsupported integer vector insert operation; please use -fllvm"
@@ -3483,6 +3556,8 @@ getAmode e = do
 
       -- This is all just ridiculous, since it carefully undoes
       -- what mangleIndexTree has just done.
+      -- BUG #28105: for i = -2^31 the displacement -i does not fit in 32 bits,
+      -- and the x86-64 assembler rejects the module.
       CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)]
          | is32BitLit platform lit
          -- assert (rep == II32)???
@@ -3508,6 +3583,12 @@ getAmode e = do
          -> getAmode (CmmMachOp (MO_Add rep) [b,a])
 
       -- Matches: (x + offset) + (y << shift)
+      -- BUG #28105: offset is not checked to fit in 32 bits; where it does not,
+      -- the x86-64 assembler rejects the module.
+      -- BUG: nor is offset narrowed to x's width, which matters on i386 alone:
+      -- there the assembler shortens an offset outside 32 bits modulo 2^32, to
+      -- the address meant, warning only where its magnitude reaches 2^32. This
+      -- costs at most the warning.
       CmmMachOp (MO_Add _) [CmmRegOff x offset, CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)]]
          | shift == 0 || shift == 1 || shift == 2 || shift == 3
          -> x86_complex_amode (CmmReg x) y shift (fromIntegral offset)
@@ -3516,6 +3597,14 @@ getAmode e = do
          | shift == 0 || shift == 1 || shift == 2 || shift == 3
          -> x86_complex_amode x y shift 0
 
+      -- BUG #28105: && binds tighter than ||, so the guard checks offset only
+      -- at shift 3; where offset does not fit in 32 bits, the x86-64 assembler
+      -- rejects the module.
+      -- BUG: nor is offset narrowed to x's width at shift 0 to 2, which matters
+      -- on i386 alone: there the assembler shortens an offset outside 32 bits
+      -- modulo 2^32, to the address meant, warning where its magnitude reaches
+      -- 2^32, as hand-written Cmm shows at -O0 and -O. This costs at most the
+      -- warning.
       CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Add _) [CmmMachOp (MO_Shl _)
                                                     [y, CmmLit (CmmInt shift _)], CmmLit (CmmInt offset _)]]
          | shift == 0 || shift == 1 || shift == 2 || shift == 3
@@ -3716,6 +3805,11 @@ addAlignmentCheck align reg =
       Fixed fmt reg code -> Fixed fmt reg (code `appOL` check fmt reg)
       Any fmt f          -> Any fmt (\reg -> f reg `appOL` check fmt reg)
   where
+    -- BUG: the jump names mkBadAlignmentLabel bare, where under -dynamic an
+    -- ordinary jump to the RTS goes through the GOT. On i386 under -dynamic the
+    -- assembler relocates it as R_386_PC32, and a shared object linked from the
+    -- code carries a text relocation, which GNU ld warns of and rejects under
+    -- -z text; x86-64's assembler makes the jump R_X86_64_PLT32, which links.
     check :: Format -> Reg -> InstrBlock
     check fmt reg =
         assert (isIntFormat fmt) $
@@ -3961,6 +4055,17 @@ condIntCode' platform cond (CmmMachOp (MO_And _) [x,o2]) (CmmLit (CmmInt 0 ty))
       return (CondCode False cond code)
 
 -- anything vs zero
+-- TODO #27738: this emits the TEST even on a path where the instruction that
+-- computed x has already set ZF and SF from it, as the dec ending the body
+-- of a loop that counts down does on the back edge into the loop's test. The
+-- loop's entry reaches that test too: after a dec of its own in the issue's
+-- program, and with none in the worker of loop :: Int -> Int -> Int; loop 0 acc
+-- = acc; loop n acc = loop (n - 1) (acc + n) at -O. condIntCode' gets only the
+-- comparison, here of x with 0, and none of these paths; where one of them sets
+-- no flags, dropping the TEST from the others takes the test duplicated into
+-- them. And a dec writes OF and leaves CF, both of which TEST clears, so only a
+-- condition that reads ZF and SF alone, such as the jne of that worker and not
+-- the jg of the issue's program, could use the dec's flags.
 condIntCode' _ cond x (CmmLit (CmmInt 0 ty)) = do
     (x_reg, x_code) <- getSomeReg x
     let
@@ -6239,6 +6344,11 @@ invertCondBranches (Just cfg) keep bs =
       , CmmSource {trans_cmmNode = cmmCondBranch} <- transitionSource edgeInfo1
 
       --Int comparisons are invertable
+      -- TODO: so are floating-point ones. maybeInvertCond pairs each condition
+      -- it inverts with its complement on the flags (see the flags at
+      -- Cond's constructors), so the inverted jump goes where the old pair
+      -- went, whatever comparison set the flags; that includes each shape
+      -- genCondBranch' emits for a floating-point comparison.
       , CmmCondBranch (CmmMachOp op _args) _ _ _ <- cmmCondBranch
       , Just _ <- maybeIntComparison op
       , Just invCond <- maybeInvertCond cond1
@@ -6311,6 +6421,13 @@ genAtomicRMW width amop dst addr n = do
       where
         -- Simulate operation that lacks a dedicated instruction using
         -- cmpxchg.
+        -- BUG: where dst_r is a register that the amode names, as in (x) =
+        -- prim %fetch_and64(x, y) in a loop of hand-written Cmm where x is
+        -- the address after Cmm sinking (-fcmm-sink, on at -O1 and -O2), the
+        -- retry loop's MOV into dst_r overwrites the address before the CMPXCHG
+        -- uses it. On x86-64, where getSimpleAmode returns an amode of virtual
+        -- registers as it is, this is wrong code. StgToCmm's result local is
+        -- never the address's, so only hand-written Cmm reaches it.
         cmpxchg_code :: (Operand -> Operand -> OrdList Instr)
                      -> NatM (OrdList Instr)
         cmpxchg_code instrs = do
@@ -6686,6 +6803,11 @@ genByteSwap width dst src = do
         --
         -- NB: if dst_hi == rhi, we must make sure to preserve the contents
         -- of rhi before writing to dst_hi (#25601).
+        --
+        -- BUG #28125: dst_hi == rhi with dst_lo /= rlo happens where
+        -- a Cmm local and an NCG temporary share a number, and such
+        -- sharing gives wrong code on i386 (see getHiVirtualRegFromLo in
+        -- GHC.Platform.Reg). The branch below for that case swaps correctly.
         let shuffle = if dst_hi == rhi && dst_lo == rlo then
                         toOL [ MOV II32 (OpReg rhi) (OpReg tmp),
                                MOV II32 (OpReg rlo) (OpReg dst_hi),
@@ -7073,6 +7195,15 @@ genXchg width dst addr value = do
   (newval, newval_code) <- getSomeReg value
   let format   = intFormat width
   let dst_r    = getLocalRegReg dst
+  -- BUG: where dst_r is a register that the amode names and newval another,
+  -- as in (x) = prim %xchg64(x, y) in a loop of hand-written Cmm where x
+  -- is the address after Cmm sinking (-fcmm-sink, on at -O1 and -O2), the
+  -- MOV overwrites the address before the XCHG uses it. On x86-64, where
+  -- getSimpleAmode returns an amode of virtual registers as it is, this
+  -- is wrong code at 64 bits; at 8, 16 and 32 bits the assembler rejects
+  -- the XCHG whatever its operands (the BUG at pprInstr's case for XCHG in
+  -- GHC.CmmToAsm.X86.Ppr). StgToCmm's result local is never the address's, so
+  -- only hand-written Cmm reaches it.
   -- Copy the value into the target register, perform the exchange.
   let code     = toOL
                  [ MOV format (OpReg newval) (OpReg dst_r)

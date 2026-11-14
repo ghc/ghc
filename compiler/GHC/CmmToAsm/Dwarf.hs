@@ -178,6 +178,14 @@ procToDwarf config prc
                     , dwName     = case dblSourceTick prc of
                          Just s@SourceNote{} -> case sourceName s of
                             LexicalFastString s -> unpackFS s
+                         -- BUG: show of a Label gives its unique as a number,
+                         -- such as L7133701809754871424, where ppr gave the
+                         -- block's name, such as c1uU, before 05550a5abc, so
+                         -- under -g the DIE of a procedure with no source note
+                         -- is named by a number that no label of the assembly
+                         -- carries: only a misled reader of the debugging
+                         -- information, at -O0 and -O, from Haskell, on every
+                         -- target that emits DWARF.
                          _otherwise -> show (dblLabel prc)
                     , dwLabel    = dblCLabel prc
                     , dwParent   = fmap mkAsmTempDieLabel
@@ -226,6 +234,18 @@ debugFrame p u procs
     initUws = Map.fromList [(Sp, Just (UwReg (GlobalRegUse Sp $ bWord p) 0))]
 
 -- | Generates unwind information for a procedure debug block
+--
+-- BUG: dwFdeProc is the label of the procedure's entry block, and pprFrameProc
+-- in GHC.CmmToAsm.Dwarf.Types ends the frame description entry at that label's
+-- procedure end label, which X86's, PowerPC's, RV64's and LA64's pprBasicBlock
+-- print after the block itself. Under -g the entry then ends after the
+-- procedure's first block and leaves out the code and the rows of its other
+-- blocks, so that a debugger finds no entry for a pc there. procToDwarf's
+-- DIE and mkDwarfARange's range take the same end, and the compile unit's
+-- range ends after its last procedure's first block. This is wrong debugging
+-- information, reached under -g, -g1 included, on x86, x86-64, 64-bit PowerPC
+-- with the ELFv2 ABI, RISC-V and LoongArch, for every procedure of more than
+-- one block.
 procToFrame :: UnwindTable -> DebugBlock -> DwarfFrameProc
 procToFrame initUws blk
   = DwarfFrameProc { dwFdeProc    = dblCLabel blk
@@ -263,6 +283,15 @@ blockToFrame blk uws
                     , dwFdeUnwind     = uws
                     }
 
+-- BUG: a table that does not name Sp is given Sp's rule at the procedure's
+-- entry, and the table that X86's addSpUnwindings adds where the C stack
+-- pointer moves, as around a C call, names MachSp alone. Up to the next table
+-- that names Sp, DWARF then gives the canonical frame address by Sp's rule at
+-- entry, rbp+0 on x86-64, where before a call it can be another offset, such as
+-- rbp+16, and a debugger unwinding from there finds the wrong frame. Where such
+-- a row lies past the procedure's first block, the frame description entry
+-- leaves it out (the BUG at procToFrame), so that no debugger consults it. This
+-- is reached under -g on ELF targets, on x86 and x86-64.
 addDefaultUnwindings :: UnwindTable -> [UnwindPoint] -> [UnwindPoint]
 addDefaultUnwindings tbl pts =
     [ UnwindPoint lbl (tbl' `mappend` tbl)

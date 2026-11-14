@@ -393,6 +393,11 @@ iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
         mov_lo = MR rlo expr_reg
     return $ RegCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
                        rhi rlo
+-- BUG: no case for a conversion to 64 bits from fewer than 32 or for a 64-bit
+-- multiply, shift or logical operation, so each panics here, on 32-bit PowerPC.
+-- StgToCmm emits the Int64# and Word64# primops for these operations as callish
+-- MachOps on this target (stgToCmmAllowArith64), so only hand-written Cmm is
+-- known to reach these.
 iselExpr64 expr
    = do
      platform <- getPlatform

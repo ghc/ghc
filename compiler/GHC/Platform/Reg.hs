@@ -126,6 +126,18 @@ classOfVirtualReg arch vr
 -- Determine the upper-half vreg for a 64-bit quantity on a 32-bit platform
 -- when supplied with the vreg for the lower-half of the quantity.
 -- (NB. Not reversible).
+--
+-- BUG #28125: the result keeps the number of the low half's unique. So a 64-bit
+-- Cmm local numbered k (localReg64 in GHC.CmmToAsm.Monad) and a 64-bit NCG
+-- temporary numbered k (getNewReg64) have the same high half, and where both
+-- are live, writing one overwrites the other's high 32 bits. This gives wrong
+-- code on i386 and 32-bit PowerPC. Equal numbers occur, as the NCG's uniques
+-- count from 0 in each Haskell module and, in a .cmm file, continue the supply
+-- its Cmm pipeline used: in a .cmm file that a ghc process compiles first,
+-- whose parser numbers its locals from 1 on; under -fobject-determinism, which
+-- renumbers a Haskell module's Cmm locals from 54 on; and in any other Haskell
+-- module or .cmm file once the NCG's count reaches the numbers that the global
+-- unique counter gave its Cmm locals.
 getHiVirtualRegFromLo :: VirtualReg -> VirtualReg
 getHiVirtualRegFromLo reg
  = case reg of

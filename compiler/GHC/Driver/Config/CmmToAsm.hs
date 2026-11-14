@@ -19,6 +19,11 @@ initNCGConfig dflags this_mod = NCGConfig
    { ncgPlatform              = targetPlatform dflags
    , ncgThisModule            = this_mod
    , ncgAsmContext            = initSDocContext dflags PprCode
+   -- BUG: the value is not checked, so one that is not a power of 2 or is over
+   -- 512 makes mkAlignment panic in X86's, RV64's and LA64's pprProcAlignment,
+   -- on x86, x86-64, RISC-V and LoongArch, where the flag could be rejected;
+   -- AArch64's and PowerPC's printers do not use the field, so there
+   -- -fproc-alignment has no effect.
    , ncgProcAlignment         = cmmProcAlignment dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
    , ncgPIC                   = positionIndependent dflags

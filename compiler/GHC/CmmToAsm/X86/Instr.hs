@@ -1251,6 +1251,11 @@ mkRegRegMoveInstr config fmt src dst =
     -- This ensures the upper part of the register is properly cleared
     -- and avoids partial register stalls.
     --
+    -- TODO: not for a float or a double. scalarMoveFormat copies those by
+    -- MOV FF64, printed movsd, which keeps the destination's upper half (see
+    -- MOV in regUsageOfInstr). The copy then depends on the destination's
+    -- previous value, where a full-register move would not.
+    --
     -- See also the 'ArithInt8' and 'ArithWord8' tests,
     -- which fail without this logic.
   where
@@ -1284,6 +1289,18 @@ takeRegRegMoveInstr platform = \case
     -- When used with vector registers, MOV only moves the lower part,
     -- so it is not a real move. For example, MOVSS/MOVSD between xmm registers
     -- preserves the upper half, and MOVQ between xmm registers zeroes the upper half.
+    -- BUG: the guard tests the move's format alone, so a MOV of a scalar
+    -- format from a vector register, which vector_float_extract in
+    -- GHC.CmmToAsm.X86.CodeGen emits to extract lane 0, is returned as a
+    -- move of the whole register. The graph allocators then coalesce the
+    -- vector's virtual register into the scalar's, with every register that
+    -- slurpReloadCoalesce in GHC.CmmToAsm.Reg.Liveness joins to it through
+    -- a spill slot, the vector's later reloads among them, and reload the
+    -- vector at the scalar's format, which drops its upper lanes: wrong code
+    -- on x86-64 under -fregs-graph and -fregs-iterative, at -O1 and -O2, from
+    -- Haskell. The linear allocator, which gives the scalar the vector's
+    -- register only where the vector dies and renames no reload of it, is
+    -- spared.
     | not $ isVecFormat fmt
     -- Don't eliminate a move between e.g. RAX and XMM:
     -- even though we might be using XMM to store a scalar integer value,
@@ -1534,6 +1551,14 @@ shortcutJump fn insn = shortcutJump' fn (setEmpty :: LabelSet) insn
             Just (DestBlockId id') -> shortcutJump' fn seen' (JXX cc id')
             Just (DestImm imm)     -> shortcutJump' fn seen' (JXX_GBL cc imm)
         where seen' = setInsert id seen
+    -- BUG: updateBlock applies fn once, where the case for JXX above follows
+    -- the chain of shortcuts, as shortBlockId does for the table's entries
+    -- and shortcutWeightMap in GHC.CmmToAsm.CFG for the CFG's edges (see
+    -- the comment at apply_mapping in GHC.CmmToAsm). Where a table's target
+    -- is shortcut to a block that is shortcut in turn, the JMP_TBL keeps
+    -- a removed block while the CFG has the edge to the chain's end, and
+    -- sanityCheckCfg panics, under -dasm-lint or in a DEBUG compiler; the
+    -- emitted table is right.
     shortcutJump' fn _ (JMP_TBL addr blocks section table_lbl rel_lbl) =
         let updateBlock (Just (DestBlockId bid))  =
                 case fn bid of
@@ -1563,6 +1588,17 @@ shortcutStatic fn (CmmStaticLit (CmmLabelDiffOff lbl1 lbl2 off w))
   = CmmStaticLit (CmmLabelDiffOff (shortcutLabel fn lbl1) lbl2 off w)
         -- slightly dodgy, we're ignoring the second label, but this
         -- works with the way we use CmmLabelDiffOff for jump tables now.
+        -- BUG #28138: under -fPIC or -fPIE the entries of a jump table are
+        -- relative to the label of the block that jumps through it, in the
+        -- procedure's section (Note [Jump tables] in GHC.CmmToAsm.X86.CodeGen),
+        -- not to the table's. An entry retargeted to a label in another
+        -- section, an imported procedure's or, under -fsplit-sections, another
+        -- procedure's, is a difference the assembler cannot resolve, and it
+        -- rejects the module. This is reached under -fasm-shortcutting, on
+        -- x86 and x86-64, not on Darwin, under -g only for a jump-only block
+        -- to which -g adds nothing, and under -dynamic, outside Windows, only
+        -- for a jump to another procedure of the same Haskell module under
+        -- -fsplit-sections.
 shortcutStatic _ other_static
         = other_static
 

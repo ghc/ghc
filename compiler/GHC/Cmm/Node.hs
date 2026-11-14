@@ -367,6 +367,8 @@ sequence.
 A foreign call is defined to clobber any GlobalRegs that are mapped to
 caller-saves machine registers (according to the prevailing C ABI).
 GHC.StgToCmm.Utils.callerSaves tells you which GlobalRegs are caller-saves.
+It names no vector register: see the BUG at callerSaves in
+compiler/CodeGen.Platform.h.
 
 This is a design choice that makes it easier to generate code later.
 We could instead choose to say that foreign calls do *not* clobber

@@ -162,6 +162,9 @@ pprSizeDecl platform lbl
    then line (text "\t.size" <+> pprAsmLabel platform lbl <> text ", .-" <> pprAsmLabel platform lbl)
    else empty
 
+-- TODO #27668: after the procedure's start, which pprNatCmmDecl aligns, a block
+-- is aligned only if it has an info table, by pprAlignForSection before the
+-- table. Any other block, a loop head included, gets no alignment directive.
 pprBasicBlock :: IsDoc doc => NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> doc
 pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $
@@ -930,6 +933,11 @@ pprInstr platform i = case i of
    SETCC cond op
       -> pprCondInstr (text "set") cond (pprOperand platform II8 op)
 
+   -- BUG: pprFormatOpReg prints val at the word's format, not at the
+   -- exchange's, so at 8 and 16 bits, and on x86-64 at 32, the register does
+   -- not match the suffix, and the assembler rejects the module whatever the
+   -- operands. Only hand-written Cmm reaches it, StgToCmm emitting MO_Xchg at
+   -- the word's width alone.
    XCHG format src val
       -> pprFormatOpReg (text "xchg") format src val
 
