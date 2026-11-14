@@ -1186,6 +1186,23 @@ This target does not add runtime-index evaluation to the solver, a refutation
 proof, proof erasure, native optimization or a totality claim. Keep the
 original Tidy failure and previous-format reader artifacts unchanged.
 
+The full source observer exposes two checking boundaries that the worker
+probe did not cover. IO reads used inside local lets fail the native index
+grammar check. The resolver checks raw Id metadata; assigned type or
+multiplicity variables can hide a supported unrestricted domain. Normalize
+only that metadata with the within-typechecker zonker. Preserve Name, Unique
+and lexical identity. Do not default an unresolved variable or use the final
+zonker's recursive Id environment.
+
+The immutable instantiation scope check also searches only the local type
+environment. Same-module top-level LocalIds can instead be in the global
+type environment. Check the authoritative binding in both environments and
+compare normalized metadata. Keep imported GlobalIds, stale identities,
+linear indices and unsupported domains rejected. Preserve the original
+source observer. Retest generic `evaluate` and polymorphic vector fields
+before extending any expected-type inference rule. No native type may enter
+a mutable type variable.
+
 ## Further work
 
 After M8, review broader retained kinds, nested and higher-order dependence,
