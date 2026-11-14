@@ -2311,10 +2311,12 @@ The separate source archive is `native-joint-prefix-prior-art-v1`.
 M32 implements existing Given evidence under a fixed-domain retained Pi.
 Commit `a00972ede9` adds the scoped rewrite filter. Commit `9764958bf4`
 permits checked native-index Givens to reach it without mutable cycle breaking.
-The bootstrap compile/Lint matrix passes 23 cases: sixteen positive and seven
-negative. These include outer native-index Givens and family-cycle controls.
-The source target of 532 observations (527 plus five) and the 180-case API
-rejection matrix are prepared, not verified. Self-host validation is pending.
+Both stages pass the compile/Lint matrix with 39 cases: twenty-two positive and seventeen
+negative. These include outer native-index Givens, family-cycle controls and
+complete visible type arguments. Each source run passes 532 observations
+with the previous 503 outputs preserved. The API fixture passes 190 package
+rejections. Both stages and all five registered regressions pass. The full GHC suite
+was not run.
 
 The M31 six-case baseline accepted pointwise transport under `a ~ b` but
 rejected returning the whole dependent function. This was an evidence
@@ -2391,7 +2393,7 @@ The pinned GHC proof and downstream sources are:
 
 All paths and file blobs are recorded in
 `native-pi-given-prior-art-v1/provenance.json`. These are baseline snapshots.
-The two M32 commits above describe the subsequent implementation.
+The M32 implementation commits describe the subsequent changes.
 Keep plugins, inert-family rewrites, family-cache access, Wanted rewrites and
 coercion zapping disabled beneath retained binders. Keep `rewrite_co` as
 zonking only. Preserve ordinary proof scope and Haskell runtime demand.
@@ -2399,8 +2401,9 @@ zonking only. Preserve ordinary proof scope and Haskell runtime demand.
 The first full source run also exposed a call-site restriction. A complete
 local signature can capture runtime `k`, but the existing VTA renamer rejects
 `@(Vec Int k)`. Omitting the type argument requires a forbidden native meta
-assignment. M32 shares the existing lexical alias and checked-Id mechanisms
-with complete visible type arguments. Preserve the actual Name and Id.
+assignment. Commit `d69cedb848` shares the existing lexical alias and checked-Id mechanisms
+with complete visible type arguments. Commit `5d6016da94` keeps the shared
+failure helper result-polymorphic. Preserve the actual Name and Id.
 Existing erased type variables take precedence. Captured partial types and
 quotations reject. The typechecker retains `HM_VTA`, kind and validity checks,
 and the ordinary ITYARG/IALL order. This is a GHC namespace adaptation of the
@@ -2414,3 +2417,24 @@ The demand harness initially placed a dependent function inside `IO` through
 polytype instantiation. The corrected check uses the existing `checkWhnf`
 and returns `IO ()`. It still forces the function to WHNF before reporting an
 expected error. It does not apply the function or weaken the demand assertion.
+
+
+The review probes exposed a generated-wildcard bypass. The parsed type
+`Vec $(pure WildCardT) k` has no anonymous wildcard until the splice runs.
+The ordinary splice control compiles with the target external interpreter.
+The native capture case also compiled before the correction. Commit
+`eaf1df5478` rejects `HsWildCardTy` under `HM_VTA` with a nonempty
+`mode_indices`, before wildcard or kind meta allocation. The same ordinary
+splice still compiles. The source span identifies the splice that generated
+the wildcard. The probe also checks that an inner runtime `k` cannot alias
+an outer `k` with the same spelling.
+
+This follows GHC's existing typechecking stages. Note `[Partial Type Splices]`
+in `GHC.Rename.Splice` explains why expansion runs once during renaming.
+Note `[Wildcards in visible type application]` in `GHC.Tc.Gen.HsType`
+explains that `hswc_ext` contains named wildcards only. Anonymous wildcards
+remain in the body. A check of that extension alone cannot enforce this rule.
+The complete `GHC.Rename.Splice` snapshot and blob are recorded in the same
+provenance file. The initial probe without `-fexternal-interpreter` stopped
+at interpreter configuration. It is retained as a failed setup, not a located
+type-system rejection.

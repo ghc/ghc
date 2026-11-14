@@ -1983,10 +1983,10 @@ rejections. All five registered regressions pass. The full GHC suite was not run
 
 ### M32: outer equality evidence under a retained Pi
 
-The six-case baseline agrees in both stages. Ordinary function transport under
+The pre-M32 six-case baseline agrees in both stages. Ordinary function transport under
 `a ~ b`, identical retained functions, pointwise retained transport, and global
 family-axiom normalization compile with Core and STG Lint. Whole retained
-function transport under `a ~ b` rejects with GHC-83865 at the returned `f`:
+function transport under `a ~ b` formerly rejected with GHC-83865 at the returned `f`:
 
 ```haskell
 transportElement :: forall a b. a ~ b
@@ -1999,9 +1999,9 @@ The pointwise definition `transportElement f n = f n` compiles. Removing the
 equality proof rejects. This isolates an evidence boundary under the Pi.
 It is separate from argument-prefix inference and source signature support.
 
-- [ ] Pin Agda's conversion/context rules and the GHC inert-rewrite paths.
+- [x] Pin Agda's conversion/context rules and the GHC inert-rewrite paths.
   Audit the existing `DepFunCo` proof and its free runtime Ids.
-- [ ] Admit only outer ordinary equality evidence that cannot contain the new
+- [x] Admit only outer ordinary equality evidence that cannot contain the new
   runtime binder. Preserve the fixed closed domain, role and location context.
   Track all active retained runtime Ids in the rewrite environment. Require a
   Given candidate's predicate, canonical RHS and evidence coercion to have no
@@ -2021,12 +2021,55 @@ It is separate from argument-prefix inference and source signature support.
   type-argument errors. Preserve the native-meta restriction.
   Keep plugins, family-cache access, fresh dependent Wanteds and mutable native
   fills gated. Update Note `[Rewriting retained dependent functions]`.
-- [ ] Compare direct and pointwise transport through a separate interface.
+- [x] Compare direct and pointwise transport through a separate interface.
   Check proof scope, absent proofs, nested binders, demand and sharing. Pin
   located failures, rebuild both stages and run the registered regressions.
 
 Optimizer support remains separate. Audit substitution, occurrence scope and
 proof-case reconstruction before enabling transformations.
+
+### M33: retained function types as equality operands
+
+The six-case baseline agrees in both stages. It accepts ordinary-arrow Givens and identical
+retained functions. It rejects these three retained equality operands with
+GHC-43582 at `foreach`: a Given whose RHS is a retained Pi, an explicit
+`:~:` witness with that RHS, and a Given whose retained RHS captures an outer
+runtime index. A return without any proof rejects with GHC-91028 at `f`.
+Both stages pin the diagnostic code, fragment and source position.
+
+```haskell
+fromGivenPi :: forall value.
+               value ~ (foreach (n :: Nat) -> Vec Int n)
+            => value -> (foreach (n :: Nat) -> Vec Int n)
+fromGivenPi f = f
+```
+
+The first obstacle is a source type-position restriction. Do not describe
+these three failures as observed solver failures. The current native Given
+checker also rejects `DepFunTy`; it is a later boundary to trace after the
+source gate is removed. An ordinary type-variable assignment must stay
+separate from checking an existing equality assumption.
+
+- [ ] Pin Agda's treatment of Pi types as equality operands and its universe
+  rules. Audit GHC's distinction between retained Pi types and erased
+  polymorphic types. Preserve the fixed closed domain and `Many` binder.
+- [ ] Admit a checked retained Pi in the selected equality-operand positions.
+  Reuse the existing retained binder checker. Preserve ambient index Names,
+  binder scope, kind checks and located diagnostics. Do not widen ordinary
+  impredicative inference or native meta assignment.
+- [ ] Trace the resulting Given and explicit-witness cases. Admit a native Pi
+  RHS only in the existing immutable Given-checking path if the trace requires
+  it. Preserve occurs checks and opaque runtime Ids. Keep native family cycle
+  breaking disabled. Audit coercion scope before allowing its inert rewrite.
+- [ ] Preserve the no-proof rejection. Add missing, unrelated and escaping
+  proof controls. Compare imported direct transport with the pointwise form.
+  Check bottom-function WHNF, proof demand, ignored indices and sharing.
+- [ ] Rebuild both stages. Run the focused source, API and registered checks.
+  Pin code, fragment and source position for each failure. Preserve M32's
+  source outputs and frozen evidence.
+
+This task does not add runtime index evaluation, function eta equality,
+structural retained unification or optimizer transformations.
 
 ## Further work
 

@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 503 runtime observations and the runtime fixtures check 173 source rejection cases |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 532 runtime observations and the runtime fixture checks 190 package rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -62,7 +62,9 @@ Last updated: 2026-11-14.
 | Leading visible type applications | Remaining generic binders infer after leading VTA; checked type arguments, evidence order, usage and diagnostic positions are preserved |
 | Native-index VTA | Remaining Nat-kinded parameters infer after leading VTA; index demand, contexts and argument positions pass |
 | Joint prefix inference | Index-bearing arguments determine expected domains before independent payload inference; selected ordinary and retained functions accept further arguments directly |
-| Next task | M32: use safe outer equality evidence beneath a fixed-domain retained Pi |
+| Outer Given evidence | Existing scoped equalities normalize retained function bodies; direct transport preserves bottom-function WHNF and runtime identity |
+| Written runtime index types | Complete visible type arguments capture lexical indices; shadowing, generated wildcards and staging checks pass |
+| Next task | M33: admit checked retained Pi types as equality operands; the current source-position gate rejects with GHC-43582 |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -3056,3 +3058,81 @@ under `a ~ b`, and family-axiom normalization compile in both stages. Returning
 the whole retained function under `a ~ b` rejects with GHC-83865 at `f`.
 The corresponding no-proof control also rejects. See the
 [M32 plan](PLAN.md#m32-outer-equality-evidence-under-a-retained-pi).
+
+
+## M32: outer equality evidence under retained functions
+
+Whole dependent functions now reuse an existing `a ~ b` Given beneath a
+retained binder. The direct definition preserves the runtime function:
+
+```haskell
+transportElement :: forall a b. a ~ b
+                 => (foreach (n :: Nat) -> Vec a n)
+                 -> (foreach (n :: Nat) -> Vec b n)
+transportElement f = f
+```
+
+The pointwise control `transportElement f n = f n` remains useful for demand
+comparison. Direct transport of a bottom function is bottom at function WHNF.
+The pointwise form returns a lambda until application. No eta equality or Core
+form was added. A separate helper eliminates an explicit `Refl` proof with a
+case expression. It preserves proof-before-function demand.
+
+Evidence can also mention an outer runtime index, as in `a ~ Vec Int k`, while
+the returned function binds an independent `n`. The source caller writes
+`transportOuterIndex @(Vec Int k) k original`. Complete visible type arguments
+now use the lexical capture rules from complete local signatures. They retain
+the existing Name and Unique. Erased variables take precedence. Native meta
+assignment remains restricted. Captured partial types, globals, unsupported
+index domains, linear indices and quotations remain outside this capture path.
+
+The rewrite environment records every active retained Id. A Given's predicate,
+canonical RHS and evidence must have no deep free occurrence of those Ids.
+The check includes variable kinds and coercion metadata. It rejects coercion
+holes. Existing flavour, role and dependency rules still apply. Ordinary
+rewriting avoids these extra scans. The native Given checker accepts opaque
+runtime indices without assignment. It disables family cycle breaking because
+restoration later writes a metavariable. See Notes `[Rewriting retained
+dependent functions]`, `[Rigid retained indices]` and `[Runtime indices in
+visible type arguments]`.
+
+Both stages pass 532 observations. The previous 503 outputs
+remain an exact prefix. New checks cover IORef-fed comparisons, proof scope,
+bottom and cyclic indices, function identity, named-result sharing, original
+IORef payloads and outer captured-vector identity. Separate calls do not imply
+sharing of newly generated vectors. Each compile/Lint matrix passes
+39 cases: twenty-two positive and seventeen located rejections. The API fixture
+passes 190 package rejections, with 272 rejection checks in total. Five old
+cases now report a concrete constraint mismatch with GHC-05617 instead of
+GHC-25897. Their source declarations and location checks are unchanged.
+Each stage passes all 156 located standalone rejections, including the 139
+retained M31 programs. Four ordinary runtime controls still print `42`.
+Both failure-phase traces report one `prefixProbe` elaboration. All five
+registered regressions pass; 34 cases are skipped. There are no unexpected
+failures or framework warnings.
+
+The final 37-file compiler input archive is `native-pi-given-inputs-v5`.
+The bootstrap build took 25.24 seconds and peaked at 1811 MiB under 16 GiB.
+The final self-host build took 6m29s and peaked at 4334 MiB under 16 GiB.
+The API fixture peaked at 1015 MiB under 4 GiB. The registered run peaked at
+1930 MiB under 8 GiB. Swap was disabled. The full GHC suite was not run.
+The `native-pi-given-*.SHA256SUMS` manifests bind the source, documentation,
+harness and outputs. Earlier milestone evidence remains frozen.
+
+Agda's pinned Pi comparison and context extension motivate the scope rule.
+Its explicit equality rewrite explains the proof-elimination comparison.
+GHC's Given, role and cycle-breaker rules determine the FC implementation.
+See [the provenance and implementation references](REFERENCES.md#outer-given-evidence-beneath-a-retained-pi)
+and [the runtime source example](examples/packed-vector/README.md#outer-equality-evidence-under-retained-functions).
+
+
+Review also pins same-name runtime shadowing and generated wildcards. A type
+splice can introduce `_` after the parsed completeness scan. Checking the
+actual `HsWildCardTy` under a captured VTA rejects it before meta allocation.
+The ordinary spliced-wildcard control still compiles. The final matrix records
+these cases with the target external interpreter.
+
+The next six-case baseline accepts two controls. Three retained equality
+operands reject at the source type-position gate with GHC-43582. A return
+without proof rejects with GHC-91028. See the
+[M33 plan](PLAN.md#m33-retained-function-types-as-equality-operands).

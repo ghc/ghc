@@ -259,14 +259,29 @@ Family axioms reduce at nominal and representational roles. At phantom role,
 the existing `reduceTyFamApp_maybe` policy leaves family heads unreduced.
 Ordinary forall binder kinds still normalize at nominal role.
 
-The solver enables `re_native_binder` throughout the recursive body rewrite.
-Global family axioms still reduce. Ordinary type meta-variables can be read and
-zonked. This mode suppresses plugins, inert equality lookup for families and
-type variables, family-cache reads and writes, and coercion zapping. These paths
+The solver records every active retained Id in `re_native_binders` during body
+rewriting. Global family axioms still reduce. Ordinary type meta-variables can
+be read and zonked. Type variables can follow existing inert Givens whose
+predicate, RHS and coercion have no deep free occurrence of an active Id.
+Check variable kinds and CoVar metadata. Reject coercion holes in this metadata.
+The evidence can mention an outer runtime index. Preserve ordinary flavour,
+role and dependency-recording rules.
+
+This mode suppresses plugins, inert equality lookup for families, Wanted
+rewrites, family-cache reads and writes, and coercion zapping. These paths
 could otherwise emit or retain evidence outside the runtime binder's scope.
 Keep the current role, reduction depth, and diagnostic location. Nested retained
-binders inherit the mode. No local index enters an outer inert set or cache.
+binders extend the active set; returning restores the previous set. No bound
+index enters an outer inert set or cache.
 The ordinary `ForAllTy` binder-kind paths remain unchanged.
+
+Canonicalizing an existing Given does not assign a type metavariable.
+`checkTypeEqNoUnification` accepts valid opaque runtime indices in a native RHS
+only for a Given with a type-variable LHS. It disables family cycle breaking
+there because cycle-breaker restoration writes a metavariable. Keep ordinary
+occurs checks and reject retained-function RHSs in this check. All Wanted,
+unification and concreteness checks retain their native-syntax restrictions.
+See Note [Rigid retained indices] in `GHC.Tc.Utils.Unify`.
 
 After both equality endpoints have been rewritten, `can_eq_nc` checks same-Id
 runtime indices and `tcEqType` equality of retained functions. Rewriting returns
@@ -276,14 +291,25 @@ normalized types. It neither decomposes a retained function nor assigns a
 meta-variable. See Note [Reflexivity after retained normalization] in
 `GHC.Tc.Solver.Equality`.
 
-This is genuine family reduction under the binder. It does not provide ambient
-Given-based normalization, structural retained unification, retained inference,
-or runtime index evaluation. Opaque indices remain stuck where a family needs
+This supports family reduction and eligible ambient Given normalization under
+the binder. It does not provide structural retained unification or runtime
+index evaluation. Opaque indices remain stuck where a family needs
 constructor discrimination, including bottom and cyclic runtime values.
 See Notes [Normalising retained runtime indices] and
 [Rewriting retained dependent functions], and
 [the scoped Agda normalization sources](REFERENCES.md#agda-provenance).
 Agda's conversion and eta rules do not add a Haskell function eta law.
+
+Complete visible type arguments can refer to an already-bound runtime index,
+as in `f @(Vec Int k)`. The renamer reuses lexical aliases from local signatures.
+The typechecker validates the actual Id and seeds the VTA checking mode with it.
+Erased type variables take precedence. Global terms, unsupported or linear
+values, captured partial types and quotations reject. Ordinary wildcard type
+arguments keep their existing behavior. Check anonymous wildcard nodes after
+type-splice expansion as well as before renaming. Reject them in a VTA mode
+that contains captured indices, before allocating wildcard metas. No runtime value is evaluated or
+assigned to a native meta-variable. See Note
+[Runtime indices in visible type arguments] in `GHC.Rename.HsType`.
 
 ## Arithmetic equality proofs
 

@@ -1241,3 +1241,96 @@ See Notes `[Cached retained argument inference]` and
 `[Generic retained argument inference]` in
 [GHC.Tc.Gen.App](../../../../compiler/GHC/Tc/Gen/App.hs), and the
 [joint-prefix references](../../REFERENCES.md#joint-native-index-prefix-inference-and-result-overapplication).
+
+## Outer equality evidence under retained functions
+
+Both stages pass M32's 39 compile/Lint cases: twenty-two positive and seventeen
+located rejections. Each source program passes 532 observations. Its 29 additions
+preserve the previous 503 outputs. Both compiler stages build. All five registered
+regressions pass. The API fixture passes 190 package rejections. The full GHC
+suite was not run.
+
+```haskell
+transportElement :: forall a b. (a ~ b)
+                 => (foreach (n :: Nat) -> Vec a n)
+                 -> (foreach (n :: Nat) -> Vec b n)
+transportElement f = f
+
+transportElementEta :: forall a b. (a ~ b)
+                    => (foreach (n :: Nat) -> Vec a n)
+                    -> (foreach (n :: Nat) -> Vec b n)
+transportElementEta f n = f n
+
+transportElementWith :: forall a b. (a :~: b)
+                     -> (foreach (n :: Nat) -> Vec a n)
+                     -> (foreach (n :: Nat) -> Vec b n)
+transportElementWith proof f = case proof of
+    Refl -> f
+```
+
+The direct definition reuses an outer Given equality through the retained
+function type. It does not expand the function to a lambda or add eta equality.
+At function WHNF, direct transport of a bottom function raises its original
+error. The eta control returns a lambda and raises that error after application.
+The case-expression helper demands its explicit equality proof before
+returning the function. A bottom proof raises its own error before a bottom
+returned function. An unused whole transport does not demand the proof.
+A top-level equation with `Refl` as a constructor pattern remains outside
+the supported retained-function equation subset.
+
+[runPiGivenChecks](Main.hs) checks IORef-fed finite comparisons, ignored
+bottom/cyclic indices, vector/element demand and productive prefixes. Direct
+transport preserves the original function's StableName after WHNF. A reused
+named result retains vector identity, and its elements retain the original
+IORef payload. Separate function calls need not share newly generated vectors.
+
+[transportOuterIndex](PackedVecLibrary.hs) uses `a ~ Vec Int k` beneath a new
+retained binder `n`. Its caller can write the runtime name in a complete VTA:
+
+```haskell
+let payload = replicateNative @Int k 9
+    original :: foreach (index :: Nat) -> (Vec Int k, Vec Bool index)
+    original index = (payload, replicateNative @Bool index True)
+    moved :: foreach (index :: Nat) -> (Vec Int k, Vec Bool index)
+    moved = transportOuterIndex @(Vec Int k) k original
+    result :: (Vec Int k, Vec Bool n)
+    result = moved n
+    first :: Vec Int k
+    first = fst result
+    second :: Vec Bool n
+    second = snd result
+```
+
+Here `k` and `n` are already-bound runtime Nat values. The result and both
+fields have complete local signatures. The written VTA retains the actual
+lexical `k` Name and Unique. An erased type variable with the same spelling
+takes precedence. Global term names are not captured. Unavailable names,
+unsupported index domains, linear indices and capture inside quotations stay
+rejected. A type argument that captures an index must be complete:
+`@(Vec _ k)` is rejected. Named wildcards keep their ordinary meaning and
+are not captured as runtime names. Ordinary `@_` remains on its existing path.
+See Note `[Runtime indices in visible type arguments]` in
+[GHC.Rename.HsType](../../../../compiler/GHC/Rename/HsType.hs).
+
+The evidence can mention outer `k`; it cannot identify `k` with `n`. The
+outer-index checks preserve the original captured payload vector's identity
+and ignore an unused bottom outer index. Deep scope checks exclude active
+retained binders from the predicate, RHS and evidence. Ordinary role checks
+remain: `Coercible a b` alone does not justify the nominal identity transport.
+Global family axioms
+can still reduce. Native RHS Givens cannot use family cycle breaking that
+later writes a meta-variable. An unused cyclic Given does not prove an
+unrelated result type. Wanted rewriting, plugins, family caches and mutable
+native fills remain gated. No Core or interface form changes.
+
+See Note `[Rewriting retained dependent functions]` in
+[GHC.Tc.Solver.Rewrite](../../../../compiler/GHC/Tc/Solver/Rewrite.hs) and the
+[outer-Given references](../../REFERENCES.md#outer-given-evidence-beneath-a-retained-pi).
+
+
+The generated-wildcard check also applies after type-splice expansion.
+`@(Vec $(pure WildCardT) k)` rejects with the same complete-type-argument
+error. The ordinary type-splice wildcard control still compiles. The
+standalone splice probes use the target external interpreter. A same-name
+shadowing control accepts the inner index and rejects a vector at the outer
+index.
