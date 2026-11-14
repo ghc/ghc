@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 269 runtime observations and the runtime fixtures check 55 package/bound rejections |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 301 runtime observations and the runtime fixtures check 63 package/bound rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -51,7 +51,8 @@ Last updated: 2026-11-14.
 | Retained field patterns | Both stages pass 209 source observations, including constructor refinement through later fields, proof demand, views, guards and row order |
 | Source reverse | Both compiler stages preserve the original runtime length through source reverse, with checked arithmetic proofs and 40 new demand/order observations |
 | Later retained equations | Both compiler stages pass 269 observations, including mixed argument/evidence order, local captures and checked arithmetic constructor equations |
-| Next task | M20: express sameNat as four constructor equations over both retained indices |
+| Two-index equations | Both compiler stages pass four-clause sameNat and payload transport through two constructor proofs |
+| Next task | M21: check an ordered trailing variable fallback equation; unverified |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2294,6 +2295,81 @@ run took 13.905708 s and peaked at 1726 MiB under 8 GiB. The wrapper sets
 
 M18's 31 harness and 372 output hashes, M17's 42 harness and 499 output hashes,
 and the original reader's three hashes remain unchanged. The final source,
-docs, harness, output and directory manifests are frozen separately. Next,
-[M20](PLAN.md#m20-constructor-equations-over-two-runtime-indices) probes a
-complete two-index constructor matrix for `sameNat`. That target is unverified.
+docs, harness, output and directory manifests are frozen separately.
+[M20](PLAN.md#m20-constructor-equations-over-two-runtime-indices) below continues
+with a complete two-index constructor matrix for `sameNat`.
+
+
+## M20: source equations over two runtime indices
+
+Both compiler stages and all five registered regressions pass.
+`PackedVecLibrary.sameNat` now has four source equations. Each row refines
+both runtime indices. The `S/S` row calls the same worker on its actual
+predecessors. It must match the recursive `Refl` before returning `Just Refl`.
+The source result stays `Maybe (n :~: m)`. `zipPacked` consumes that evidence
+before calling the equal-length vector zipper.
+
+The checker keeps shared whole-argument Ids and each row's actual field Ids.
+It lifts the first constructor proof through a type. It lifts the second
+proof through that result, then composes the coercions. Each proof sits on
+its own inner `ConPat`, beneath the shared whole-argument `AsPat`. Payloads
+keep their original outer types. Each RHS casts back beneath both proofs.
+The existing one-column path remains. Desugaring compiles proof-bearing rows
+separately. All source argument lambdas precede discrimination. This change adds no Core or
+interface forms or equality axioms.
+
+Both compiler stages pass 301 observations through separate producer
+and importer compilations with Core and STG lint. The previous 269 lines stay
+in order. Sixteen IORef comparisons check lengths 0 through 3 against a private
+nested-case worker and an independent expected table. Ten checks compare
+partial WHNF, bottom order, lazy mismatches and bounded cyclic mismatch.
+Four payload matrix cases place an ordinary vector argument before the second
+retained column. Two more checks cover partial WHNF and index-before-payload
+demand. The API/runtime fixture passes 63 package/bound rejections.
+
+The initial matrix requires two constructor columns, complete unique pairs,
+one unguarded RHS per row and bare constructor subfields. Other retained
+positions keep M19's bare-variable rule. Contexts within this matrix telescope,
+mixed constructor/variable rows and deeper constructor fields reject. This
+restriction applies to dependent checking. `mkDepFunTy` turns an unused retained
+binder into an ordinary unrestricted arrow and keeps the runtime argument.
+The coverage probes use `Maybe (n :~: m)` even when every RHS is `Nothing`.
+
+The eight new standalone probes check incomplete and duplicate pairs, a wrong
+domain, a nested field, both false zero/successor proofs, a missing recursive
+proof and an interior context. The existing eight later-index and seven
+reverse probes also pass in both stages. The old mixed `LaterConstructor`
+probe now reports the matrix pattern error at its later variable.
+
+The pinned [Agda equality example and split-tree compiler](REFERENCES.md#two-index-constructor-equations)
+supply the program and compilation precedents. `Nothing` carries no refutation.
+Equal cyclic inputs have no termination claim. The next source probe is an
+ordered trailing variable fallback. It must preserve proof scope and the
+same demand order before this pattern restriction can be relaxed.
+
+
+Validation uses `_build/verification/native-index-matrix-*`. Final compiler
+bytes are in `build-input-v3.SHA256SUMS` with 27 selected inputs. Three input
+archives preserve both failed compiler attempts and the final implementation.
+The initial compiler probes found a pretty-printing `(<>)` collision and a
+list/`NonEmpty` mismatch. Both are fixed. Direct `evaluate` and `seq` reference
+probes reported GHC-91028. The final reference checks use a generic WHNF helper
+with fixed `IO ()` result. A global `ImpredicativeTypes` probe hit the existing
+index-expression gate. It is not part of the accepted source flags.
+The first coverage probe returned `Int` and used ordinary checking. The
+corrected dependent result rejects at the first equation's group location.
+All failed probes remain in the evidence. The full GHC suite was not run.
+
+The final bootstrap compiler rebuild took 1m27s and peaked at 1823 MiB under
+16 GiB. The self-hosted build took 12m49s and peaked at 5182 MiB under 16 GiB.
+It reports pre-existing warnings in `App.hs`, `Constructor.hs` and `Passes.hs`.
+The final bootstrap source run peaked at 146 MiB under 4 GiB. Bootstrap
+matrix/API/runtime checks peaked at 993 MiB under 4 GiB. Self-hosted source
+and all located errors peaked at 144 MiB under 4 GiB. The registered run took
+12.425778 s and peaked at 1723 MiB under 8 GiB. The wrapper disables swap.
+
+M19's 40 harness and 596 output hashes, M18's 31 harness and 372 output hashes,
+M17's 42 harness and 499 output hashes, and the original reader's three hashes
+remain unchanged. M19's 34 source and five document hashes also match commit
+`7e2d2a6224`. Final M20 source, docs, harness, output and directory manifests
+are frozen separately.

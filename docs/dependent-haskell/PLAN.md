@@ -1431,7 +1431,8 @@ frontend identity handling. No new Core equality rule is proposed.
 
 ### M20: constructor equations over two runtime indices
 
-This target is unverified. Rewrite the existing nested-case `sameNat` as four
+Both compiler stages and all five registered regressions pass. Rewrite the
+existing nested-case `sameNat` as four
 constructor equations for `Z/Z`, `Z/S`, `S/Z` and `S/S`. Its result remains
 `Maybe (n :~: m)`. The recursive success branch eliminates the predecessor
 proof before it returns `Just Refl`. Keep the case implementation as a reference.
@@ -1441,24 +1442,53 @@ as the existing path. Compose the first nominal transport with a second
 transport over its result type. Locate duplicate pairs at their later row,
 missing pairs at the group, and unsupported patterns at that pattern.
 
-- [ ] Admit an initial complete matrix of two retained constructor columns.
+- [x] Admit an initial complete matrix of two retained constructor columns.
   Require bare constructor subfields, unique constructor pairs and no overlap.
   Keep contexts outside this initial matrix subset until all transported
   bindings can sit beneath every proof they reference.
-- [ ] Keep shared whole-argument Ids. Bind each row's actual subfield Ids and
+- [x] Keep shared whole-argument Ids. Bind each row's actual subfield Ids and
   one checked nominal constructor proof per index. Compose refinements in
   telescope order for later types and the expected RHS.
-- [ ] Preserve each row through desugaring. Ordinary constructor grouping can
+- [x] Preserve each row through desugaring. Ordinary constructor grouping can
   alias distinct native field/proof Ids. Extend the existing separate-row case
-  strategy for proof-bearing native alternatives, or prove an equivalent
-  canonicalisation of each matrix prefix. Do not assume aliases give equality.
-- [ ] Preserve all source argument lambdas and left-before-right demand.
+  strategy for proof-bearing native alternatives. Keep each actual row
+  field/proof Id. Do not assume aliases give equality.
+- [x] Preserve all source argument lambdas and left-before-right demand.
   Compare finite equality results, partial WHNF, error markers and mismatches
   with lazy successor predecessors. Equal cyclic inputs have no termination
   claim. Reject incomplete/duplicate matrices and false `Refl` branches.
 
 Follow [the pinned four-clause Agda example and case-tree compiler](REFERENCES.md#two-index-constructor-equations).
 No new equality rule is proposed.
+
+- [x] Run self-hosted source and located errors, then all five registered
+  regressions. Freeze final inputs, source, harness and outputs.
+
+An unused retained binder becomes an ordinary arrow. Keep both indices free
+in rejection result types. A proof result such as `Maybe (n :~: m)` checks the
+dependent path even when every RHS returns `Nothing`.
+
+
+### M21: ordered trailing variable fallback
+
+This target is unverified. Express the same worker with `Z/Z`, recursive
+`S/S`, and a final both-variable row returning `Nothing`. Keep the four-clause
+and nested-case versions as references. This initial probe does not add
+arbitrary wildcard matrices, guards or interior contexts.
+
+- [ ] Follow the pinned Agda coverage split-tree and LHS substitution code in
+  [two-index constructor equations](REFERENCES.md#two-index-constructor-equations).
+  Inspect GHC's ordered match groups and failure continuations before choosing
+  a row representation. A variable row needs no constructor equality proof.
+- [ ] Preserve each constructor row's actual fields and each variable row's
+  shared whole-index identities. Check its unspecialized RHS without assuming
+  equality from aliases. Keep fallback execution outside failed row proofs.
+- [ ] Check coverage with the terminal fallback and reject unsupported row
+  arrangements at source positions. Preserve all argument lambdas and row
+  order. Compare finite equality results, partial WHNF and bottom demand with
+  both source references. Re-run the existing false-proof rejections.
+- [ ] Run both compiler stages and the five registered regressions. Keep M20
+  evidence frozen and collect separate M21 inputs and outputs.
 
 ## Further work
 

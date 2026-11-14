@@ -1656,7 +1656,8 @@ context selects the retained checker. Exact GHC and Agda files are saved under
 
 ## Two-index constructor equations
 
-Status: unverified M20 plan. Agda stdlib v2.3
+Status: M20 implemented. Both compiler stages and all five registered
+regressions pass. Agda stdlib v2.3
 [`Decidability.agda`, lines 67–73](https://github.com/agda/agda-stdlib/blob/v2.3/doc/README/Design/Decidability.agda#L67-L73)
 defines `_≟₀_` with four Nat constructor pairs. Its successor/successor clause
 recursively checks the predecessors and lifts successful equality with
@@ -1664,7 +1665,7 @@ recursively checks the predecessors and lifts successful equality with
 This is the program precedent for four source `sameNat` equations.
 Agda returns `Dec (m ≡ n)` with a refutation on failure. Haskell `Nothing`
 contains no refutation. [Lines 75–89](https://github.com/agda/agda-stdlib/blob/v2.3/doc/README/Design/Decidability.agda#L75-L89)
-describe a separate decision/proof implementation. The proposed Haskell worker
+describe a separate decision/proof implementation. The Haskell worker
 still inspects the recursive result before returning successful `Just`.
 
 The production stdlib [`Nat.Properties`, lines 93–109](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Nat/Properties.agda#L93-L109)
@@ -1681,3 +1682,17 @@ The LHS substitution ranges above supply successive scoped refinements through
 later patterns and the RHS target. These sources do not establish Haskell
 field identity, row demand, proof erasure or totality. The GHC probe must check
 those boundaries separately. Both actual runtime lambdas must precede matching.
+
+
+M20 uses shared runtime Ids and one nominal constructor proof per selected
+index. Its transports compose in telescope order. GHC Notes
+`[Retained constructor matrices]` and `[Retained constructor equation scope]`
+state the frontend and desugaring invariants. No Core equality rule or
+interface schema changed. The local six-file Agda/GHC snapshot is copied from
+M19 into `_build/verification/native-index-matrix-prior-art/`.
+
+For meaningful negative probes, both indices must occur free in their types.
+[`mkDepFunTy`](../../compiler/GHC/Core/TyCo/Rep.hs) keeps a `DepFunTy` only when
+its binder occurs free in the body. Note `[Restricted retained dependent types]`
+states this invariant. Otherwise the binder becomes an ordinary unrestricted
+value arrow. This inherited simplification keeps the runtime argument.

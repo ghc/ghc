@@ -1,10 +1,11 @@
 # Packed vector source example
 
-Both compiler stages pass all 269 source observations with Core Lint and STG
-Lint. M19 adds 20 observations for constructor equations with later retained
-arguments. The runtime fixtures pass 55 package/bound rejections. Eight new
-located errors, the previous seven reverse errors and all five focused
-registered regressions pass.
+Both M20 compiler stages pass all 301 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 63 package/bound rejections.
+All five registered regressions pass.
+M20 adds 32 observations for two constructor columns. It preserves all 269
+M19 observations. The eight new matrix errors and the previous fifteen
+later-index/reverse errors pass in both compiler stages.
 
 At M18, both compiler stages passed the first 249 observations with Core Lint
 and STG Lint enabled. These included the previous 209 observations and 40
@@ -265,15 +266,12 @@ The source workers are:
 
 ```haskell
 sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
-sameNat n m = case n of
-    Z -> case m of
-        Z -> Just Refl
-        S q -> Nothing
-    S p -> case m of
-        Z -> Nothing
-        S q -> case sameNat p q of
-            Nothing -> Nothing
-            Just Refl -> Just Refl
+sameNat Z Z = Just Refl
+sameNat Z (S right) = Nothing
+sameNat (S left) Z = Nothing
+sameNat (S left) (S right) = case sameNat left right of
+    Nothing -> Nothing
+    Just Refl -> Just Refl
 
 -- | Pair elements of ordinary vectors with one shared length index.
 zipVec :: Vec a n -> Vec b n -> Vec (a, b) n
@@ -861,3 +859,28 @@ runtime leading context: ([42,42],[7])
 These observations check this source subset. They do not establish a general
 existential package implementation, optimizer support, or support for all
 dependent constructor telescopes.
+
+
+## Two constructor columns
+
+M20 checks `sameNat` as four constructor equations. The successor/successor
+row uses its recursive `Refl`. Returning `Just Refl` without that evidence
+rejects. `Main.sameNatByCase` keeps the previous nested-case algorithm as a
+reference. Sixteen independent IORef input pairs cover lengths 0 through 3.
+Both implementations must agree with an independent result table. Demand
+checks force successful evidence, preserve partial function WHNF, compare
+left-before-right exceptions and leave mismatched successor predecessors lazy.
+A cyclic successor can mismatch zero after one constructor. Equal cyclic
+inputs have no termination claim.
+
+`matrixPayload` places a vector argument between its two retained indices.
+Four runtime cases check both returned vectors. Partial WHNF and bottom order
+checks cover its four source argument lambdas. This exercises transport
+before and after the second selected constructor column.
+
+The initial dependent matrix requires complete unique constructor pairs and
+bare subfields. Interior contexts, mixed constructor/variable rows and nested
+constructor fields reject with source diagnostics. Other retained columns
+remain bare variables. An unused `foreach` binder can become an ordinary
+value arrow, so coverage probes keep both indices in `Maybe (n :~: m)`.
+The next source target is a checked trailing variable fallback.
