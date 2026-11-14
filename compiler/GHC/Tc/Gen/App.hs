@@ -1586,11 +1586,14 @@ Other arguments retain ordinary expected-type checking. If matching fails or
 leaves index binders undetermined, ordinary instantiation checks the same cached
 arguments. The ordinary unifier still rejects retained meta-variable fills.
 
-On heads without concreteness requirements, infer independent ordinary
-parameters from eligible prefix domains too. Keep index-bearing domains on
-their existing inference path. Classify other domains with
-tcRetainedInferableArg. Parameters fixed by the expected result retain their
-expected-type checks. Concrete heads keep exact, index-only inference.
+First match index-bearing domains. On heads without concreteness requirements,
+infer eligible independent domains only for parameters that remain unknown.
+For filterBounded (const False) xs, the vector fixes the predicate's element
+type before the predicate is checked. Inferring the predicate first could
+leave a rigid placeholder in the immutable candidate. Classify independent
+domains with tcRetainedInferableArg and skip already cached positions.
+Parameters fixed by the result or index arguments retain expected checking.
+Concrete heads keep exact, index-only inference.
 Require every index-route choice before instantiation; do not allocate native
 meta-variables. For leading type arguments,
 see Note [Native inference after visible type applications].
@@ -1976,7 +1979,7 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
                            | otherwise = result_subst expected_ty index_route tvs result
              result_anchor = any (hasNativeDependentExpr . Core.Type)
                                [ty | tv <- tvs, Just ty <- [Subst.lookupTyVar initial_subst tv]]
-             needed_tvs | index_route && not (hasNoConcreteTyVars fun) = index_tvs
+             needed_tvs | index_route = index_tvs
                         | otherwise = filter (isNothing . Subst.lookupTyVar initial_subst) tvs
        ; eligible <- if index_route
                      then if hasNoConcreteTyVars fun
@@ -2001,12 +2004,12 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
              { initial_cache <- infer_args needed_tvs inferable domains 1 args
              ; initial_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) initial_cache
              ; let initial_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- initial_cache ]
-                   match_args subst = foldM (\subst (formal, actual) ->
+                   match_args subst pairs = foldM (\subst (formal, actual) ->
                                         tcMatchTyX_BM (bind_outer tvs) subst formal actual)
-                                      subst (zip initial_templates initial_tys)
+                                      subst pairs
                    -- See Note [Ordinary heads in native argument matching].
              ; initial_match <- if index_route
-                                then return (match_args initial_subst)
+                                then return (match_args initial_subst (zip initial_templates initial_tys))
                                 else do
                                   { matched <- tcRetainedMatchArgs tvs initial_subst
                                                  (zip initial_templates initial_tys)
@@ -2015,6 +2018,14 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
                                                    (zip initial_templates initial_tys)
                                       other -> return other }
              ; (matched, cache) <- case initial_match of
+                   Just subst | index_route, hasNoConcreteTyVars fun ->
+                     do { let missing = filter (isNothing . Subst.lookupTyVar subst) tvs
+                              remaining = zipWith (\pos eligible -> eligible && isNothing (lookup pos initial_cache))
+                                                  [1..] inferable
+                        ; extra_cache <- infer_args missing remaining domains 1 args
+                        ; extra_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) extra_cache
+                        ; let extra_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- extra_cache ]
+                        ; return (match_args subst (zip extra_templates extra_tys), initial_cache ++ extra_cache) }
                    Just subst | not index_route ->
                      tcRetainedCallbackArgs tvs domains args subst initial_cache
                    _ -> return (initial_match, initial_cache)
