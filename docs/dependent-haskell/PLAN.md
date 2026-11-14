@@ -1757,6 +1757,14 @@ rejects with GHC-83865. `(,) (42 :: Int) xs` and an ordinary polymorphic `pair`
 helper compile with Core/STG lint. These are compile controls, not runtime
 validation. Preserve the failing syntax as the implementation target.
 
+The implementation will expand only an `Infer` result under
+`ExperimentalDependentTypes` when a field has a native anchor. It will
+preserve `checkTupSize`. The read-only classifier will admit a complete
+boxed tuple like a named application. Its ordinary fields can use the
+existing fresh ordinary parameters. Known expected types will keep
+component checking. `mkExpandedExpr` and generated application spans will
+retain the original tuple context and field locations.
+
 - [ ] Inspect `Tc.Gen.Expr`'s complete `ExplicitTuple` path at the M25
   checkpoint. It calls `expTypeToType` and allocates component metas before
   checking fields. The boxed `tcInferTupArgs` path also allocates metas.
