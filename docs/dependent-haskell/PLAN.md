@@ -1036,6 +1036,44 @@ passes the bootstrap kernel and runtime checks; its broader verification is
 pending. Restricted native signature interfaces
 and interface-only consumers pass as described in M8.
 
+### M13: nested source package patterns
+
+Use a complete source consumer before extending the match compiler:
+
+```haskell
+headPacked :: PackedVec a -> Maybe a
+headPacked (PackVec n VNil) = Nothing
+headPacked (PackVec n (VCons x xs)) = Just x
+```
+
+Follow Agda's constructor telescope and source clause discrimination. Preserve
+Haskell's clause order and field demand. See
+[the primary sources](REFERENCES.md#source-package-patterns).
+
+- [ ] Keep retained index fields as bare source variables. Check ordinary
+  fields with `tcConArg`, including nested GADT patterns and wildcards. Keep
+  the one-constructor, prefix, unrestricted and strict-package restrictions.
+- [ ] Compile each retained package equation with its own actual field Ids.
+  Match the original shared scrutinee and combine failure continuations in
+  source order. Do not merge clause-local index Ids with ordinary let aliases.
+  Keep ordinary constructor-family compilation unchanged.
+- [ ] Use checked outer field pattern types in PMC desugaring. Retain the
+  existing sequential speculative constructor instantiation. Add no new Core
+  or interface representation.
+- [ ] Execute nested vector and proof patterns, wildcard proof fields and a
+  runtime failed guard. Check partial tails/elements, unused bottom indices,
+  demanded payload/proof, catchall order and bottom packages. Reject an index
+  escape through a nested pattern with a located diagnostic.
+- [ ] Validate both compiler stages, separate source interfaces, Core/STG Lint,
+  focused registered regressions and the existing API/runtime controls. Record
+  source restrictions, commands, resource peaks and artifact provenance.
+
+Separate cases avoid rewriting typed patterns, evidence and RHSs to a shared
+index binder. A later row reuses the already shared scrutinee. This can produce
+more cases than a decision tree with shared fields. Optimization remains
+separate work. General projections and constructor patterns in retained index
+fields remain outside this increment.
+
 ## Further work
 
 After M8, review broader retained kinds, nested and higher-order dependence,

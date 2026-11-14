@@ -1166,6 +1166,40 @@ They then demand each section application. These checks use ordinary section
 syntax with `PostfixOperators` disabled. See
 [Note [Restricted dependent simplification]](../../compiler/GHC/Core/SimpleOpt.hs).
 
+## Source package patterns
+
+Decision: allow ordinary nested patterns in non-retained package fields. Keep
+each retained field as a bare source variable. Compile package equations in
+source order with a separate case for each equation. Each case keeps that
+equation's actual runtime index Ids. Reuse GHC's `MatchResult` failure
+continuations and checked outer field pattern types. This avoids aliases
+between different index Ids. No new Core form or interface format is required.
+
+Agda v2.8.0 supplies these precedents:
+
+- [`LHS.hs`, lines 1358–1389](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1358-L1389)
+  instantiates the constructor telescope and adopts source field names.
+  Lines 1427–1446 describe index unification. Lines 1503–1532 substitute the
+  constructor through the later context and target. File blob:
+  `3779ffa6e418bca99e30c071e189106f82ecbe1b`.
+- [`Compile.hs`, lines 53–80](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/CompiledClause/Compile.hs#L53-L80)
+  builds a case tree from source clauses and coverage information. Lines
+  179–208 select the first non-lazy match in the first clause. Lines 314–343
+  preserve catchall priority during expansion. File blob:
+  `962a80bbaee38601c392a2f9bfd2af8ea0f972d1`.
+- [The function-definition manual, lines 50–64](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/function-definitions.lagda.rst#L50-L64)
+  describes source clauses and coverage/termination checks. Lines 207–245
+  explain how case-tree choices affect definitional equations. File blob:
+  `3c7e86cd7e6b88d67f35e8882455ee28f7da6d4d`.
+
+Separate per-equation cases are a Haskell implementation choice. Agda does not
+supply GHC's Unique handling or justify changing Haskell field demand. Nested
+vector and proof patterns must force only the matched fields. An earlier
+catchall must prevent later patterns from forcing a payload. The Haskell `LE`
+field remains an ordinary lazy field. General retained-index patterns and
+projections remain separate work. See Note [Retained package equation scope]
+in `GHC.HsToCore.Match.Constructor`.
+
 ### Source filter bound proof
 
 The M12 source probe follows Agda standard library v2.3. Its
