@@ -63,6 +63,8 @@ import GHC.Types.Unique.DSM (UniqDSM)
   * Based on the CFG and loop information refine the edge weights
     in the CFG and normalize them relative to the most often visited
     node. (See `mkGlobalWeights`)
+    This step and the loop analysis run for the layout only under
+    -fcmm-static-pred, on at -O1 and -O2.
   * Feed this CFG into the block layout code (`sequenceTop`) in this
     module. Which will then produce a code layout based on the input weights.
 
@@ -264,6 +266,12 @@ import GHC.Types.Unique.DSM (UniqDSM)
     next to each other. This is not true for conditional branch edges.
     We apply a small modifier to them to ensure edges for which we can
     eliminate the overhead completely are considered first. See also #18053.
+
+    TODO #27799: where buildChains skips the branch's other edge because
+    it would close a cycle, as it can skip a loop latch's back edge, not
+    fusing this edge leaves an unconditional jump as well. The modifier then
+    under-prices this edge, and an unconditional edge of nearly equal weight
+    from another predecessor can be fused with the target first.
 
   * Edges constituted by a call are ignored while the chains are built, and
     count a 64th of their weight when the chains are merged at the end.
@@ -714,6 +722,10 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
           where
             deadEdge :: CfgEdge -> Bool
             deadEdge (CfgEdge from to _) = let e = (from,to) in Set.member e combined || Set.member e builtEdges
+            -- TODO: unlike directEdges' relevantWeight, which drops calls
+            -- and lowers the weight of an edge into an info table and of a
+            -- conditional or switch edge, this one only divides a call's weight
+            -- by 64.
             relevantWeight :: CfgEdge -> EdgeWeight
             relevantWeight (CfgEdge _ _ edgeInfo)
                 | EdgeInfo (CmmSource { trans_cmmNode = CmmCall {}}) _ <- edgeInfo
@@ -765,6 +777,10 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
 {-# SCC dropJumps #-}
 -- | Remove redundant jumps between blocks when we can rely on
 -- fall through.
+--
+-- TODO: the test looks one block ahead only. A block that only jumps to the
+-- next block is left as an empty label, and a jump over it to that next block
+-- is kept.
 dropJumps :: forall a i. Instruction i => LabelMap a -> [GenBasicBlock i]
           -> [GenBasicBlock i]
 dropJumps _    [] = []

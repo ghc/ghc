@@ -4200,6 +4200,10 @@ genCondBranch' _ bid id false bool = do
                   JXX cond id,
                   JXX ALWAYS false
                 ]
+        -- The false edge weighs 3 more, so that where the two edges would
+        -- otherwise tie, block layout places the false target next. That is
+        -- the side GHC.Cmm.ContFlowOpt arranges to fall through where it can
+        -- (Note [Invert Cmm conditionals]).
         updateCfgNat (\cfg -> adjustEdgeWeight cfg (+3) bid false)
         return (cond_code `appOL` code)
 
