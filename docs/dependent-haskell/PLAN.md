@@ -1342,6 +1342,12 @@ Use a reverse-append accumulator with result `Vec a (Add n m)`. Follow the
 [pinned Agda reverse and addition proofs](REFERENCES.md#length-preserving-reverse-next-source-probe).
 No new Core rule is proposed.
 
+- [ ] Admit complete expression signatures during native-anchored argument
+  inference. The full consumer exposes `const (42 :: Int) (rightZero n)`:
+  nested inference has no expected result to determine the first parameter.
+  Keep classification read-only. Exclude wildcards, written quantifiers,
+  contexts and type splices. Infer and cache the signed expression once.
+  Keep complete immutable matching and final argument/result checks.
 - [ ] Probe `Add n Z :~: n` and `Add n (S m) :~: S (Add n m)` by runtime
   Nat induction. Match the proofs before changing the accumulator's index.
   Reuse the existing right-zero proof precedent in the runtime fixture.
