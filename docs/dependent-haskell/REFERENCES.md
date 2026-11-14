@@ -2021,14 +2021,41 @@ start at lines 830 and 295. Generated head/application spans preserve field
 locations and the original tuple context. The rule has one owner in
 `[Inference of native tuple fields]`; the classifier refers to it.
 
-M27 remains unverified. An ordinary unit case returning the tuple and the
-equivalent full constructor application compile with Lint. An applied native
-tuple section rejects with GHC-83865. The present-field branch of
-`tcInferTupArgs` and the classifier's complete-tuple guard are the next
-source boundaries. These baseline controls do not establish runtime behavior.
+The M26 baseline compiled an ordinary unit case returning the tuple and the
+equivalent full constructor application with Lint. An applied native
+tuple section rejected with GHC-83865. M27 now verifies the separate section
+path, including runtime behavior. The original compile/Lint failures remain.
 
 A GHC tuple with component `Vec Int outerN` still refers to that outer index.
 The tuple does not bind a new index in its second field type. A callback-local
 Nat cannot escape by returning an ordinary tuple. Use the explicit dependent
 package for that relation. Preserve Haskell lazy fields and usage separately;
 Agda's product and constructor rules do not establish those properties.
+
+## Native tuple sections and application spines
+
+M27 rechecks the three Agda blobs above and `Rules.Term` blob
+`02991c9fa0085315cc854d2833a9080af14a7740`.
+[Term.hs, lines 685–710](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L685-L710)
+checks a lambda against its expected domain and codomain under the extended
+context. This supports checking a section against known component types.
+An ordinary product still does not bind a runtime index. Agda's rules do not
+establish Haskell field demand, sharing or linear usage.
+
+GHC's own section implementation supplies those operational rules. At
+`6224c625d7abf5c777e447faa0ece2b4e8833672`, `GHC.HsToCore.Expr` lines 393–408
+fold missing fields into lambdas in source order. Present expressions remain
+inside their body. There is no new sharing let. M27 keeps this AST and
+desugaring. `GHC.Tc.Utils.Unify` lines 1443–1495 retain the whole-function
+wrapper; projection must not discard a domain/result cast or a forall/context.
+`testsuite/tests/linear/should_compile/LinearConstructors.hs` supplies the
+existing four combinations of One/Many hole multiplicities. Pinned source
+files, Git blob checks and decisions are in the M27 prior-art artifacts.
+
+The M28 baseline isolates a different application-spine boundary. A named
+`fst pair` projection and later application compile; the direct flattened
+application rejects in both stages. The pinned Agda `Rules.Application`
+argument-checking and codomain-substitution rule supports consuming a spine
+in stages. The GHC adaptation must infer the declared argument prefix before
+checking extra arguments. A final expected result after those arguments is
+not the intermediate result used to choose `fst`'s erased parameter.

@@ -1,9 +1,9 @@
 # Packed vector source example
 
-Both M26 compiler stages pass all 395 source observations with Core Lint
-and STG Lint. The API/runtime fixture passes 113 package/bound rejections.
-All five registered regressions pass. M26 adds 18 observations and keeps the
-previous 377 lines in order. Both stages pass 79 standalone rejection cases
+Both M27 compiler stages pass all 417 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 122 package/bound rejections.
+All five registered regressions pass. M27 adds 22 observations and keeps the
+previous 395 lines in order. Both stages pass 88 standalone rejection cases
 and four ordinary-Haskell controls.
 
 At M20, both stages and all five regressions passed 301 observations and
@@ -1041,5 +1041,32 @@ The compiler expands only complete boxed tuples that need inference and have
 a native anchor. Known expected types retain component checking. A tuple
 does not bind a dependent index. A local index cannot escape in `(k, vectorK)`.
 The source/API fixtures retain located scope and multiplicity rejections.
-Native tuple sections remain unsupported. The equivalent full constructor
-application compiles; [M27](../../PLAN.md#m27-native-tuple-sections) is unverified.
+M27 extends the separate tuple-section path below.
+
+## Native tuple sections
+
+```haskell
+let action = pure (replicateNative @Int n 7)
+    compute = action >>= \xs ->
+        let section = (xs,)
+         in pure (section (42 :: Int))
+```
+
+`driveTupleSectionInference` compares stored/applied sections and complete
+constructor applications at IORef lengths 0 through 3. Each action executes
+once per call. `runTupleSectionChecks` checks lazy construction, section and
+tuple WHNF, later-field access, demanded errors, missing native fields, hole
+order, partial/cyclic prefixes and captured vector/IORef sharing.
+
+Present expressions remain inside the missing-field lambdas. A repeated
+application can evaluate a present expression again. The sharing checks use
+a named captured vector and its original payload; they do not require fresh
+tuple closures or present-expression results to share. The compiler retains
+ordinary missing-field multiplicities and checks the whole expected function.
+Wrong indices, escaping scopes, duplicate linear captures and unlifted native
+fields have located rejection controls. Native forall under a retained binder
+remains gated.
+
+A nested section can be projected into a named local before application.
+Direct `(fst pair) (42 :: Int)` remains the separate
+[M28 application-spine target](../../PLAN.md#m28-native-generic-result-overapplication).

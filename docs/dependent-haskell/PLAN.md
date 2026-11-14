@@ -85,7 +85,10 @@ inference with 377 observations, 69 located rejection cases, four ordinary
 controls and 103 API rejections in both-stage validation. All five registered
 regressions pass. M26 verifies boxed tuple inference with 395 observations,
 79 located rejection cases, four ordinary controls and 113 API rejections.
-All five registered regressions pass. M27 targets native tuple sections.
+All five registered regressions pass. M27 verifies native tuple sections with
+417 source observations, 88 located rejections, four ordinary controls and
+122 API rejections in both stages. All five registered regressions pass.
+M28 targets native results from generic overapplication.
 
 ## Direction and boundaries
 
@@ -1793,11 +1796,12 @@ implementation path. No Core or interface representation change was needed.
 
 ### M27: native tuple sections
 
-This target is unverified. The M26 baseline compiles an inferred callback
-whose ordinary unit case returns `pure ((42 :: Int), xs)`. It also compiles
+This target is verified. The M26 baseline compiled an inferred callback
+whose ordinary unit case returned `pure ((42 :: Int), xs)`. It also compiled
 the fully applied constructor `((,) xs) (42 :: Int)`. Applying the section
-`(xs,) (42 :: Int)` rejects with GHC-83865. The known expected native section
-control also retains its rejection. These are compile/Lint observations.
+`(xs,) (42 :: Int)` rejected with GHC-83865. The known expected native section
+control also rejected. M27 admits both section forms and verifies their runtime
+behavior. The original failures remain as compile/Lint evidence.
 
 Keep `ExplicitTuple` and its existing desugaring. Present expressions remain
 inside the missing-field lambdas, in source order. Do not add a sharing let.
@@ -1810,24 +1814,56 @@ section function against the original expected type. This retains required
 domain/result coercions. Other expected shapes keep their existing path.
 Generalize the existing tuple checker rather than add a second traversal.
 
-- [ ] Inspect `tcInferTupArgs` and the complete-tuple classifier guard.
+- [x] Inspect `tcInferTupArgs` and the complete-tuple classifier guard.
   The boxed present-field path checks against a fresh whole-field meta.
   Establish section rules for both inference and known expected functions.
   Prefer reuse of the existing tuple AST and constructor checking. Partial
   constructor applications also need to satisfy existing saturation rules.
-- [ ] Keep missing-field types, multiplicities and runtime representations
+- [x] Keep missing-field types, multiplicities and runtime representations
   under ordinary GHC checks. Use exact native present-field types without
   assigning them to metas. Preserve expected higher-rank checking. Do not
   expand to a lambda without checking the existing section desugaring and
   its treatment of present fields.
-- [ ] Preserve outer index scope, once-only usage and lazy present fields.
+- [x] Preserve outer index scope, once-only usage and lazy present fields.
   A section cannot hide an inner index or duplicate a linear capture.
   Keep ordinary case inference separate from branch-local index and GADT
   escape. Reuse the owning tuple Note for shared rules.
-- [ ] Compare sections with constructor controls at runtime IORef inputs.
+- [x] Compare sections with constructor controls at runtime IORef inputs.
   Check repeated application, field demand, partial/cyclic prefixes and
   original vector/payload sharing. Pin scope and usage diagnostics in both
   stages and rerun the existing registered regressions.
+
+The source client passes 417 observations in each stage. The strict compile
+matrix has ten positive and ten negative section cases. Existing checks bring
+the rejection total to 88 per stage. The API fixture checks 122 package/bound
+rejections. All five registered regressions pass. Native forall under a
+retained binder remains gated; the higher-rank control is ordinary Haskell.
+The lifted-kind negative reaches the field check through an ordinary unboxed
+helper applied to a native argument. It does not stop at a signature gate.
+
+### M28: native generic result overapplication
+
+This target is unverified. Both M27 stages compile a named projection of a
+stored section, then its application. Direct `(fst pair) (42 :: Int)` rejects
+with located GHC-83865. The argument-instantiation route requires all written
+value arguments to exactly saturate the declared domains. Here `fst` declares
+one domain; its chosen result must become a function before checking the extra
+argument.
+
+- [ ] Admit a nonempty declared argument prefix under the existing native,
+  NoQL, VTA, template and concreteness guards. Require a native anchor in that
+  prefix. Preserve the exactly saturated route.
+- [ ] Infer and cache prefix arguments once. Start prefix matching with an
+  empty substitution. Do not seed its intermediate result from the final
+  expected result after extra arguments. Keep exact domain, kind and scope
+  validation. Reuse ordinary completion of unchosen erased parameters.
+- [ ] Instantiate the original head and pass the full argument list to the
+  existing application checker. Let that checker consume extra arguments and
+  enforce evidence order, saturation, multiplicities and final subsumption.
+- [ ] Compare direct and named projections at runtime indices. Preserve wrong
+  extra argument/result, conflicting prefix, scope, VTA and higher-rank gates.
+  Test an anchor only after the prefix and once-only elaboration/usage.
+  Record one owning Note and reuse the existing application-spine prior art.
 
 ## Further work
 

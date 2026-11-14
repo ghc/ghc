@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 395 runtime observations and the runtime fixtures check 113 package/bound rejections |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 417 runtime observations and the runtime fixtures check 122 package/bound rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -57,7 +57,8 @@ Last updated: 2026-11-14.
 | Native IO binds | Saved and inline actions preserve native inputs through do and explicit bind; ordinary local computation results infer, with effects, demand and sharing controls |
 | Scoped source inference | Local monomorphic vectors/actions and native callback results infer at existing outer runtime indices; deep metadata scope and callback escape checks apply |
 | Native boxed tuples | Complete boxed tuples infer exact native field types through ordinary constructor applications; runtime syntax, constructor and helper comparisons pass |
-| Next task | M27: tuple sections with native present fields; the applied section rejects, while the equivalent constructor application and ordinary unit case compile |
+| Native tuple sections | Inferred and expected boxed sections preserve exact native fields, hole multiplicities, field laziness and captured vector sharing |
+| Next task | M28: infer native generic results before consuming extra arguments; direct `fst pair 42` rejects while a named `fst pair` result works |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2755,3 +2756,59 @@ The next baseline compiles an ordinary unit case returning the tuple.
 It also compiles `((,) xs) (42 :: Int)`. Applying `(xs,)` still reports
 GHC-83865. These are compile/Lint controls, not runtime validation.
 [M27](PLAN.md#m27-native-tuple-sections) targets that separate section path.
+
+## M27: native tuple sections
+
+Both compiler stages accept inferred and expected boxed tuple sections:
+
+```haskell
+n <- readIORef cell
+let action = pure (replicateNative @Int n 7)
+    compute = action >>= \xs ->
+        let section = (xs,)
+         in pure (section (42 :: Int))
+pair <- compute
+pure (PackVec n (fst pair))
+```
+
+The checker retains `ExplicitTuple` and its existing desugaring. It infers an
+anchored native present field once with its exact type and checks its lifted
+kind. Inference keeps ordinary missing-field metas. A known native function
+type supplies the tuple components and hole multiplicities. Whole-function
+subsumption checks the reconstructed section against that expected type, so
+input and result casts stay connected. Projection crosses only ordinary
+visible arrows. Other expected shapes retain their existing path.
+The owning `[Inference of native tuple fields]` Note records these rules.
+Core and the interface version are unchanged.
+
+Both source clients pass 417 observations, preserving the previous 395 outputs.
+The 22 additions compare sections and constructor applications at IORef lengths
+0 through 3. They check effects, repeated applications, hole order, ignored and
+demanded bottom fields, partial/cyclic prefixes, and sharing of a named captured
+vector and its original IORef payload. Existing desugaring places present
+expressions inside the missing-field lambdas. It adds no sharing let; repeated
+applications need not share a newly evaluated present expression.
+
+Both stages pass 88 located rejections and four ordinary runtime controls.
+The old section rejection is now positive; the other 78 M26 cases remain.
+Ten new cases check scope, independent indices, mismatched holes/fields,
+linear usage, generalization, lifted kinds and the existing native forall gate.
+Ten section compile controls cover inferred and expected sections, multiple
+holes, nested storage, linear captures, all ordinary hole multiplicities and
+ordinary higher-rank checking. The API/runtime fixture passes 122 package/bound
+rejections. All five registered tests pass, with 34 skipped ways and no
+unexpected results or framework warnings. The full GHC suite was not run.
+
+Evidence uses `_build/verification/native-tuple-section-*`. Two compiler input
+archives contain 32 selected paths each. The self-hosted build took 7m00s and
+peaked at 4674 MiB under 16 GiB. Bootstrap source/API checks peaked at 1063 MiB
+under 4 GiB; the remaining both-stage checks peaked at 242 MiB under 4 GiB.
+Registered tests took 13.68s and peaked at 1917 MiB under 8 GiB. Swap was
+disabled. Failed discovery probes and all earlier frozen evidence remain.
+The [pinned prior art](REFERENCES.md#native-tuple-sections-and-application-spines)
+distinguishes Agda's typing precedent from GHC's demand and sharing behavior.
+
+The next compile/Lint baseline stores a section in a pair. Naming `fst pair`
+before applying it compiles; direct `(fst pair) (42 :: Int)` reports GHC-83865
+in both stages. This is the separate generic overapplication path in
+[M28](PLAN.md#m28-native-generic-result-overapplication), not section creation.
