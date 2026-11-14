@@ -1,12 +1,12 @@
 # Packed vector source example
 
-Both compiler stages pass all 209 observations below with Core Lint and
-STG Lint enabled. This includes the previous 180 observations and 29
-retained-field pattern observations. The consumer imports the library interface
-with the producer source absent from its import path. The bootstrap and
-registered runtime fixtures pass 40 package/bound rejections. Seven pattern
-errors and seven sum/append errors have pinned codes and primary source tokens
-in both stages. All five focused registered regressions pass.
+Both compiler stages pass all 249 observations below with Core Lint and STG
+Lint enabled. This includes the previous 209 observations and 40 reverse,
+arithmetic proof and demand observations. The bootstrap and registered runtime
+fixtures pass 47 package/bound rejections. Seven standalone reverse errors have
+pinned codes and primary source tokens in both stages. Signed argument controls
+and all five focused registered regressions pass. The consumer imports the
+library interface with the producer source absent from its import path.
 
 `PackedVecLibrary.hs` stores a runtime `Nat` and a `Vec` indexed by that same
 field. `PackVec` has two ordinary runtime fields. It has no singleton argument.
@@ -421,6 +421,90 @@ first length can diverge during `sumNat`. These are separate demand checks,
 not totality or general productivity claims. The proof remains an ordinary
 lazy Haskell value; this example does not establish proof erasure.
 
+## Reverse with the original stored length
+
+`reverseAppendNative` reverses its first vector onto the accumulator and
+returns a vector at `Add n m`. `addSucc` transports the recursive result
+across the successor equation. `rightZero` transports the final result from
+`Add n Z` to `n`. `reversePacked` stores that original runtime `n` and delays
+the reversed vector:
+
+```haskell
+addSucc :: foreach (n :: Nat) -> foreach (m :: Nat) -> Add n (S m) :~: S (Add n m)
+addSucc n m = case n of
+    Z -> Refl
+    S k -> case addSucc k m of
+        Refl -> Refl
+
+-- | Prove the right identity of addition by runtime Nat induction.
+rightZero :: foreach (n :: Nat) -> Add n Z :~: n
+rightZero Z = Refl
+rightZero (S k) = case rightZero k of
+    Refl -> Refl
+
+-- | Reverse the first vector onto the second vector.
+reverseAppendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)
+reverseAppendNative n m xs acc = case n of
+    Z -> case xs of
+        VNil -> acc
+    S k -> case xs of
+        VCons x rest -> case addSucc k m of
+            Refl -> reverseAppendNative @a k (S m) rest (VCons x acc)
+
+-- | Reverse a vector while preserving its retained length.
+reverseNative :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n
+reverseNative n xs = case rightZero n of
+    Refl -> reverseAppendNative @a n Z xs VNil
+
+-- | Keep the original stored index and delay the reversed vector.
+reversePacked :: PackedVec a -> PackedVec a
+reversePacked (PackVec n xs) = PackVec n (reverseNative n xs)
+```
+
+The worker signature checks the length relation. It does not specify element
+order. The consumer checks that separately. IORef lengths 0, 2 and 3 produce
+`(0,[])`, `(2,[42,42])` and `(3,[42,42,42])`. Filtering `[1,2,3]` with runtime
+cutoffs 0, 1 and 3 before reversal produces `[3,2,1]`, `[3,2]` and `[]`.
+Reverse-append preserves the accumulator after those reversed elements:
+`(5,[3,2,1,7,7])`, `(3,[3,2,7])` and `(2,[7,7])`.
+
+Both arithmetic proofs are ordinary lifted values. Matching `Refl` supplies
+local equality; the solver does not evaluate a runtime Nat. Agda's indexed
+fold, reverse and arithmetic lemmas provide the
+[pinned prior art](../../REFERENCES.md#length-preserving-reverse-next-source-probe).
+Agda changes the fold motive at each step. This worker instead uses the fixed
+`Add` family with explicit proofs. `addSucc` binds both retained variables
+before its case. Constructor equations with a later retained binder remain
+unsupported; this example does not extend that clause subset.
+
+Package WHNF leaves the stored index and reversed vector lazy. Reading the
+stored index does not evaluate the vector or its proofs. Demanding the
+reversed vector first forces the complete finite Nat spine through
+`rightZero`, then scans the vector spine. The explicit `VNil` pattern even
+inspects an empty input vector. Elements remain lazy. The observations check
+that the complete input spine precedes the first output head and that later
+head values retain their separate errors.
+
+The direct reverse-append worker has a distinct demand order. Its successor
+branch inspects the input vector constructor before the predecessor proof.
+That proof can force the remaining Nat spine before the recursive tail is
+inspected. An empty first vector can return the accumulator without demanding
+the accumulator's runtime length. Partial function applications and ignored proof values
+remain lazy. Bottom and cyclic fields have separate bounded demand checks.
+No cyclic reversal is claimed productive.
+
+Each `addSucc` can traverse the remaining Nat spine again. Repeated proof
+induction can therefore be quadratic. An accumulator does not establish
+linear total runtime. These observations do not establish totality or proof
+erasure, and the implementation adds no Core rule.
+
+The consumer also uses `const (42 :: Int) (rightZero n)` under a native anchor.
+The complete expression signature supplies the literal's checking type.
+The classifier reads its syntax without elaborating it. The existing
+expression-signature checker checks it through the same once-only argument
+cache. Kind, scope, exact-domain and final subsumption checks remain in force.
+This does not enable general native meta-variable assignment.
+
 ## Separate-module runner
 
 Run this from the repository root with matching compiler libraries.
@@ -673,6 +757,46 @@ index guard ignores cyclic fields: 42
 index guard failure reaches catchall: 99
 index mismatch skips guard argument: 0
 index pattern before guard: packed-bottom-length
+runtime reverse: (0,[])
+runtime reverse: (2,[42,42])
+runtime reverse: (3,[42,42,42])
+runtime filtered reverse: (3,[3,2,1])
+runtime filtered reverse: (2,[3,2])
+runtime filtered reverse: (0,[])
+runtime reverse append: (5,[3,2,1,7,7])
+runtime reverse append: (3,[3,2,7])
+runtime reverse append: (2,[7,7])
+runtime reverse arithmetic proofs: Refl
+reverse constructor with bottom fields: ok
+reverse constructor with cyclic fields: ok
+reverse keeps stored length: 2
+reverse keeps partial stored constructor: 42
+reverse stored length demands index: packed-bottom-length
+reverse index before payload: packed-bottom-length
+reverse partial index before payload: packed-bottom-length
+reverse zero inspects payload: packed-bottom-payload
+reverse successor inspects payload: packed-bottom-payload
+reverse complete spine before head: packed-bottom-payload
+reverse lazy element result: ok
+reverse demands element: packed-filter-bottom-element
+reverse preserves last element: 7
+reverse later element demand: packed-filter-bottom-element
+reverse bottom package: packed-bottom-package
+unused reverse package: 42
+partial reverse ignores bottom index: ok
+partial reverse ignores cyclic index: ok
+partial reverse append ignores indices: ok
+partial reverse append ignores payload: ok
+empty reverse append inspects first vector: zip-left-vector
+empty reverse append ignores right index: zip-right-vector
+successor proof zero ignores right index: Refl
+successor proof demands first index: packed-bottom-length
+successor proof demands remaining index: packed-bottom-length
+right zero proof demands index: packed-bottom-length
+ignored reverse proof stays lazy: 42
+reverse append payload before predecessor: packed-bottom-payload
+reverse append proof before tail: packed-bottom-length
+reverse append ignores right fields: 42
 ```
 
 These observations check this source subset. They do not establish a general

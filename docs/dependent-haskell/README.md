@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 209 runtime observations and the runtime fixtures check 40 package/bound rejections |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 249 runtime observations and the runtime fixtures check 47 package/bound rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -49,7 +49,8 @@ Last updated: 2026-11-14.
 | Source equality and zip | Both compiler stages pass 136 observations; ordinary `Refl` aligns independently computed lengths; four equality-scope errors have pinned codes and source locations |
 | Source append | Both stages pass 180 observations; a runtime sum and ordinary equality witness determine the result length; declaration-only imports, partial VTA and unused retained fields pass |
 | Retained field patterns | Both stages pass 209 source observations, including constructor refinement through later fields, proof demand, views, guards and row order |
-| Next task | Probe length-preserving source reverse using the original stored index and checked arithmetic proofs |
+| Source reverse | Both compiler stages preserve the original runtime length through source reverse, with checked arithmetic proofs and 40 new demand/order observations |
+| Next task | M19: support constructor equations with later retained arguments |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2171,5 +2172,70 @@ cleanup build rebuilt both stages in 1m54s and peaked at 3,883 MiB under
 stages' diagnostic checks peaked at 1,030 MiB under 4 GiB. All five registered
 tests passed: 39 cases, 34 skipped, no framework warnings or failures. The
 driver took 12.844 seconds and peaked at 1,622 MiB under 8 GiB. The resource
-wrapper disables swap. Next, probe [M18 source reverse](PLAN.md#m18-source-reverse-with-the-original-stored-length).
-That plan remains unverified.
+wrapper disables swap. [M18 source reverse](PLAN.md#m18-source-reverse-with-the-original-stored-length)
+is verified below.
+
+
+## Source reverse with a preserved length checkpoint
+
+Compiler implementation: `12bfbef0b3`. Source and runtime fixture:
+`9fefa1a496`. Both compiler stages pass 249 source observations with Core Lint
+and STG Lint. The bootstrap and registered runtime fixtures pass 47
+package/bound rejections. Seven standalone reverse errors have pinned codes
+and primary source tokens in both stages. The source consumer uses the
+producer's interface and object with the producer source absent from its
+import path. All five registered regressions pass: 39 cases, 34 normal-way
+skips and five expected passes, with no framework warnings or failures.
+
+`reverseAppendNative` reverses one vector onto an accumulator and returns
+`Vec a (Add n m)`. The ordinary equality proofs `addSucc` and `rightZero`
+follow Agda's addition lemmas. Matching `Refl` permits the accumulator step
+and the final result at `n`. `reversePacked` stores the original runtime `n`
+with the delayed vector. The native worker's signature relates input and
+output lengths. It does not specify reversal order. Separate finite observations
+check distinct elements selected by runtime predicates and an independently
+sized accumulator.
+
+The wrapper can return package WHNF without evaluating either field. Reading
+the stored length does not demand the reversed payload. Demanding that payload
+first completes the right-zero proof over the Nat spine, then scans the vector
+spine. Elements remain lazy. The reverse-append worker has its own demand order:
+it inspects the current vector constructor before its recursive successor proof.
+The observations distinguish those demands and partial applications. Repeated
+proof induction can traverse the remaining Nat spine at each step. This is not
+a linear-time or totality claim. These proofs remain ordinary lifted values.
+
+The consumer exposed `const (42 :: Int) (rightZero n)` under nested inference.
+The signed literal was not eligible for immutable argument inference. Skipping
+it left the first parameter unknown; ordinary fallback could not instantiate
+the native proof type. Complete signed expressions now enter the existing
+infer-once cache. A read-only syntax guard excludes wildcards, outer quantified
+variables, written inner quantifiers, retained binders, contexts and type
+splices. Normal signature checking and all final argument/result checks remain.
+A signature supplies a checking type, not an equality proof. Both signed
+argument positions and a signed function pass the controls in both compiler
+stages. A wrong annotation still produces a located GHC-83865 error. See
+[the exact source precedent](REFERENCES.md#signed-expression-arguments-in-native-inference).
+
+The first proof used constructor equations with two retained arguments.
+That form still rejects with the misleading result-wrapper diagnostic.
+The source uses the existing explicit-case form, which binds both runtime
+indices before discrimination. [M19](PLAN.md#m19-constructor-equations-with-later-retained-arguments)
+records the required shared-identity extension and its source-error obligations.
+No Core rule or interface schema changed in M18. Optimization, arbitrary index
+expressions, general inference, totality and proof erasure remain separate work.
+The full GHC suite was not run.
+
+Artifacts use `_build/verification/native-reverse-source-`. Final compiler
+inputs are in `build-input-v1.SHA256SUMS`, with 26 paths. Initial clause and
+consumer failures remain saved. Five exact prior-art snapshots are in
+`prior-art/`. The source, documentation, harness, outputs and per-directory
+files have separate SHA-256 manifests. M17's 42 harness hashes, 499 output
+hashes and the original three reader hashes remain unchanged.
+
+The bootstrap compiler build took 25.73 s and peaked at 1898 MiB under 16 GiB.
+The self-host build took 9m30s and peaked at 5172 MiB under 16 GiB. The final
+bootstrap checks peaked at 1054 MiB under 4 GiB; the self-host source, reverse
+errors and annotation controls peaked at 145 MiB under 4 GiB. The registered
+run took 12.255137 s and peaked at 1718 MiB under 8 GiB. The resource wrapper
+sets `MemorySwapMax=0`. Initial failures and final logs remain saved.

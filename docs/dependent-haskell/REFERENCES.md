@@ -1506,8 +1506,12 @@ this research.
 
 ## Length-preserving reverse: next source probe
 
-Status: unverified source plan. Retain the package's original runtime `n` and
-return `Vec a n`. Use the existing `Add` family and ordinary equality proofs.
+Status: both compiler stages pass 249 source observations and seven standalone
+reverse errors with pinned codes and source tokens. The runtime fixtures pass
+47 package/bound rejections. Signed argument controls and all five registered
+regressions pass.
+The worker retains the original runtime `n` and returns `Vec a n`. It uses
+the existing `Add` family and ordinary equality proofs.
 
 Agda stdlib v2.3 supplies:
 
@@ -1524,21 +1528,21 @@ Agda stdlib v2.3 supplies:
   File blob for both proof ranges:
   `3198ad7f4d783a46d30cc70751a198294d350892`.
 
-The proposed Haskell worker has result `Vec a (Add n m)`. In a successor
+The Haskell worker has result `Vec a (Add n m)`. In a successor
 step, an explicit `Add k (S m) :~: S (Add k m)` proof permits the recursive
 call with a larger accumulator. A final `Add n Z :~: n` proof gives the
 length-preserving worker. The package wrapper stores the original `n`.
-No runtime sum package or new Core equality rule is proposed. Agda's changing
-fold motive avoids these explicit arithmetic casts. The Haskell adaptation
+The reverse wrapper needs no runtime sum package or new Core equality rule.
+Agda's changing fold motive avoids these explicit arithmetic casts. The Haskell adaptation
 uses the fixed `Add` result instead.
 
 Erased GADT indices cannot supply runtime Nat values. Ordinary GADTs can
 still express length-preserving reverse, for example through a recursive
 snoc operation. Arithmetic proofs could instead induct on a visible vector
-spine. Runtime witnesses are needed by this proposed Nat-induction algorithm;
+spine. Runtime witnesses are needed by this Nat-induction algorithm;
 they are not an inherent requirement of length preservation.
 
-The proposed wrapper can return package WHNF without evaluating either field.
+The wrapper can return package WHNF without evaluating either field.
 Demanding the reversed vector first demands the complete finite Nat spine
 through the right-identity proof, then the vector spine. Elements remain lazy.
 Even an empty vector is inspected by its explicit `VNil` pattern. Partial or
@@ -1548,3 +1552,50 @@ remaining index at each accumulator step. An accumulator does not establish
 linear total runtime. Totality, proof erasure and reversal correctness remain
 separate claims. The signature relates lengths; element order needs its own
 checks or specification.
+
+
+## Signed expression arguments in native inference
+
+The complete source consumer exposed `const (42 :: Int) (rightZero n)` inside
+another generic application. Inference of `const` had no expected result.
+The native proof supplied its second parameter, but the classifier skipped the
+signed first argument. The remaining incomplete substitution led to ordinary
+instantiation and GHC-83865 at the proof. The earlier failure is saved under
+`_build/verification/native-reverse-source-bootstrap-run-v1.log`.
+
+GHC already treats a signature as an inferable application head. In the pinned
+upstream base, [`Head.hs`, lines 435–440](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/Tc/Gen/Head.hs#L435-L440)
+recognizes `ExprWithTySig`.
+[Lines 511–524](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/Tc/Gen/Head.hs#L511-L524)
+check the user signature and value, then return the declared type. File blob:
+`8cfe20304d8e54d1a32791f06711034f82a3709f`.
+
+Agda uses a different surface form. Stdlib v2.3
+[`Function.Base`, lines 173–177](https://github.com/agda/agda-stdlib/blob/v2.3/src/Function/Base.agda#L173-L177)
+offers `_∋_ : (A : Set a) → A → A` for subexpression annotations. Its explicit
+first argument supplies the checking type for the following value. File blob:
+`1f8f3f0b18ee0f90f1475226cba59b31c35696e9`.
+Agda v2.8.0
+[`Application.hs`, lines 773–808](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L773-L808)
+checks an argument against its Pi domain and instantiates the codomain.
+[Lines 261–279](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L261-L279)
+return the application's resulting type during inference. File blob:
+`82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+This supports using a declared type for checking. Agda's contextual meta-solving
+does not justify changing this fork's immutable native substitution rules.
+
+The classifier now admits complete signed expressions with no outer quantified
+variables. It rejects written inner quantifiers, retained binders, contexts and
+type splices, including those in kinds and multiplicities. It performs no
+elaboration. Normal `tcInferRho` checks and caches the signed value once.
+Existing matching, kind, scope, exact-domain and final subsumption checks remain.
+Type synonyms can hide polymorphism; this is a syntactic gate. Unsigned literals
+and lambdas keep their expected-checking route. The annotation supplies no index
+equality proof. Both signed argument positions and a signed function value pass
+the controls in both compiler stages. An incorrect annotation still fails
+with a located GHC-83865 error.
+
+Five exact primary-source snapshots are saved in
+`_build/verification/native-reverse-source-prior-art/`. They cover vector reverse,
+addition proofs, Agda's annotation helper and application checker, and GHC's
+signature checker. Their Git blob hashes match the pinned files above.

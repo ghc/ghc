@@ -365,6 +365,20 @@ Final result and argument subsumption still run. Emit each saved usage once at
 the argument's final multiplicity. Native meta-variable assignment stays gated.
 See Note [Generic retained argument inference] in `GHC.Tc.Gen.App`.
 
+A complete expression signature can also supply an argument's checking type.
+For example, nested inference of `const (42 :: Int) (rightZero n)` has no
+expected result to determine the first parameter. Classify the signed argument
+without elaborating it, then infer and cache it once with the other arguments.
+Reuse `isCompleteHsSig`. Require no outer quantified variables. Reject written
+inner quantifiers, retained binders, contexts and type splices in the source
+type, including its kinds and multiplicities. Stop traversal at Names and
+embedded Core types. Type synonyms can hide polymorphism; normal signature
+checking remains responsible for their actual types. This is a syntactic
+eligibility test, not evidence of type equality. Keep the existing complete
+substitution, kind, runtime scope, exact-domain and final subsumption checks.
+Calls without a native anchor retain their ordinary path. See
+[the signature and application precedent](REFERENCES.md#signed-expression-arguments-in-native-inference).
+
 Dictionary selectors can place another invisible forall after a context.
 For example, `(>>)` has `forall m. Monad m => forall a b. m a -> m b -> m b`.
 For matching, collect only the invisible prefix before the first visible arrow.

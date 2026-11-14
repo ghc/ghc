@@ -59,8 +59,14 @@ M17's compiler change is `ab985a150e`, with import cleanup at `f423a0ce97` and
 source/fixture at `e54802bcfd`. Both stages pass 209 source observations and
 14 standalone rejection checks. The runtime fixtures pass 40 package/bound
 rejections. All five focused registered regressions pass. Source uncons now
-matches the stored Nat directly in its package pattern. Next, probe M18's
-length-preserving reverse with the original stored runtime index.
+matches the stored Nat directly in its package pattern.
+
+M18's source reverse is committed at `9fefa1a496`, with signed-argument
+inference at `12bfbef0b3`. Both compiler stages pass 249 source observations
+and seven standalone reverse rejections. The runtime fixtures pass 47
+package/bound rejections. All five registered regressions pass. The source
+wrapper stores the original runtime length with its reversed vector. Next,
+M19 extends constructor equations that have later retained arguments.
 
 ## Direction and boundaries
 
@@ -1336,34 +1342,72 @@ ordinary DEFAULT continuation.
 
 ### M18: source reverse with the original stored length
 
-This target is unverified. Add `reverseNative :: forall a. foreach (n :: Nat)
--> Vec a n -> Vec a n`, then package its result with the original stored `n`.
-Use a reverse-append accumulator with result `Vec a (Add n m)`. Follow the
-[pinned Agda reverse and addition proofs](REFERENCES.md#length-preserving-reverse-next-source-probe).
-No new Core rule is proposed.
+Compiler implementation: `12bfbef0b3`. Source and runtime fixture:
+`9fefa1a496`. Both compiler stages pass 249 source observations and seven
+standalone reverse errors with pinned codes and primary source tokens. The
+runtime fixtures pass 47 package/bound rejections. Signed argument controls
+and all five registered regressions pass. Exact inputs and source evidence
+are frozen under `_build/verification/native-reverse-source-`.
 
-- [ ] Admit complete expression signatures during native-anchored argument
+`reverseNative :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n` preserves
+the worker's input index. The wrapper stores that original runtime `n`.
+The reverse-append accumulator has result `Vec a (Add n m)`. It follows the
+[pinned Agda reverse and addition proofs](REFERENCES.md#length-preserving-reverse-next-source-probe).
+No new Core rule was added.
+
+- [x] Admit complete expression signatures during native-anchored argument
   inference. The full consumer exposes `const (42 :: Int) (rightZero n)`:
   nested inference has no expected result to determine the first parameter.
-  Keep classification read-only. Exclude wildcards, written quantifiers,
-  contexts and type splices. Infer and cache the signed expression once.
+  Keep classification read-only. Exclude wildcards, outer quantified
+  variables, written inner quantifiers, retained binders, contexts and type
+  splices. Infer and cache the signed expression once.
   Keep complete immutable matching and final argument/result checks.
-- [ ] Probe `Add n Z :~: n` and `Add n (S m) :~: S (Add n m)` by runtime
+- [x] Probe `Add n Z :~: n` and `Add n (S m) :~: S (Add n m)` by runtime
   Nat induction. Match the proofs before changing the accumulator's index.
   Reuse the existing right-zero proof precedent in the runtime fixture.
-- [ ] Run finite lengths through IORefs and a separate producer interface.
+- [x] Run finite lengths through IORefs and a separate producer interface.
   Check result lengths and reversed element order independently. The native
   worker's signature relates the lengths. It does not specify element order.
-- [ ] Preserve package WHNF and lazy elements. Check demanded partial indices,
+- [x] Preserve package WHNF and lazy elements. Check demanded partial indices,
   input spines and proofs with named errors. Do not claim productivity for
-  cyclic lengths or erasure for ordinary `:~:` fields.
-- [ ] Reject a wrong result index and a missing arithmetic transport at their
+  cyclic lengths or erasure for ordinary `:~:` values.
+- [x] Reject a wrong result index and a missing arithmetic transport at their
   source expressions. Preserve the existing source and ordinary Haskell checks.
 
 The first proof implementation can traverse the remaining Nat spine at each
 accumulator step. Do not claim linear total runtime. Ordinary GADTs can also
 express length-preserving reverse. This probe tests composition with retained
 runtime indices and the existing source proof path.
+
+- [x] Run the final self-hosted source checks, annotation controls and all
+  five registered regressions. Freeze the compiler inputs and source evidence.
+
+### M19: constructor equations with later retained arguments
+
+This target is unverified. The first M18 probe used `addSucc Z m` and
+`addSucc (S k) m`. It failed with GHC-83605 at the first clause because
+`tcRetainedConArgs` does not consume a later `DepFunTy`. The result-wrapper
+message describes the wrong limitation. The saved probe is
+`_build/verification/native-reverse-source-probes-v1/`.
+
+- [ ] Choose a shared runtime Id for each later retained argument and
+  instantiate its codomain in telescope order. Require bare variable patterns
+  initially. Do not represent distinct source Ids as equal through aliases.
+- [ ] Preserve each row's resolved source names through a checked renaming
+  step. Cover RHSs, guards, local bindings and stored free-name sets. Inspect
+  the existing `rewriteRetainedCase` precedent. Keep quotation exclusions and
+  accurate source spelling and spans.
+- [ ] Keep all source argument lambdas before constructor discrimination.
+  Preserve dictionary order, later field transport and primitive proof scope.
+  A bare later retained argument must keep its actual shared Id at the lambda.
+- [ ] Compare constructor equations with the existing explicit-case source
+  worker. Check partial applications, bottom indices, payload order, two rows
+  with different variable names, scope escape and wrong proofs. Use located
+  diagnostics for unsupported later patterns and quotation cases.
+
+Follow the pinned Agda constructor telescope and specialized RHS checking in
+[source package patterns](REFERENCES.md#source-package-patterns). This requires
+frontend identity handling. No new Core equality rule is proposed.
 
 ## Further work
 
