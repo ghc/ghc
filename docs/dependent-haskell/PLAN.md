@@ -2171,6 +2171,12 @@ This blocks the existing exact immutable matching route before proof demand
 can be tested. The function-identity client already works; it is not evidence
 for this proposed extension.
 
+The fresh three-case baseline agrees in both stages. A known qualified copy
+compiles. The `Refl` caller reports GHC-91028 at both `withQ` and `Refl`.
+The bottom-proof caller reports GHC-91028 at both `withQ` and `error`.
+Keep these commands, sources and locations under `native-pi-container-*`.
+The M34 prefix is frozen.
+
 - [ ] Preserve the measured `Refl` and bottom-proof failures. Pin the Agda
   argument-checking comparison and the existing GHC matching rules.
 - [ ] Extend only `isRetainedValueType` eligibility for exactly saturated
