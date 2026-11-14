@@ -851,13 +851,13 @@ getRegister' config plat expr =
     -- 1. Compute Reg +/- n directly.
     --    For Add/Sub we can directly encode 12bits, or 12bits lsl #12.
     CmmMachOp (MO_Add w) [CmmReg reg, CmmLit (CmmInt n _)]
-      | fitsIn12bitImm n -> return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ADD (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+      | fitsIn12bitImm n -> return $ Any (intFormat w) (\d -> unitOL (annExpr expr (ADD (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n)))) `appOL` truncateReg w w d)
       where
         -- TODO: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
         w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
         r' = getRegisterReg plat reg
     CmmMachOp (MO_Sub w) [CmmReg reg, CmmLit (CmmInt n _)]
-      | fitsIn12bitImm n -> return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (SUB (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+      | fitsIn12bitImm n -> return $ Any (intFormat w) (\d -> unitOL (annExpr expr (SUB (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n)))) `appOL` truncateReg w w d)
       where
         -- TODO: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
         w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
@@ -911,6 +911,9 @@ getRegister' config plat expr =
                 `appOL` truncateReg w w dst
           )
     -- 3. Logic &&, ||
+    -- MO_And needs no truncateReg: the first operand is already zero-extended
+    -- (subword invariant), and AND can only clear bits, so the result stays in
+    -- range however `andi` sign-extends its immediate.
     CmmMachOp (MO_And w) [CmmReg reg, CmmLit (CmmInt n _)]
       | fitsIn12bitImm n ->
           return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (AND (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
@@ -919,7 +922,7 @@ getRegister' config plat expr =
         r' = getRegisterReg plat reg
     CmmMachOp (MO_Or w) [CmmReg reg, CmmLit (CmmInt n _)]
       | fitsIn12bitImm n ->
-          return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ORI (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+          return $ Any (intFormat w) (\d -> unitOL (annExpr expr (ORI (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n)))) `appOL` truncateReg w w d)
       where
         w' = formatToWidth (cmmTypeFormat (cmmRegType reg))
         r' = getRegisterReg plat reg

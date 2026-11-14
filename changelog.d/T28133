@@ -1,0 +1,16 @@
+section: compiler
+synopsis: Fix the RISC-V NCG failing to truncate the result of immediate subword add/sub/or operations
+issues: #28133
+mrs: !17000
+
+description: {
+  The immediate fast paths for ``MO_Add``, ``MO_Sub`` and ``MO_Or`` emitted the
+  operation without truncating the result to the operation width. For subword
+  widths this violated the zero-extended subword invariant whenever the first
+  operand was a subword local, so a later zero-extending widening conversion
+  (a plain ``MOV`` on RV64) exposed the stray high bits.
+
+  The results are now truncated, as the immediate shift fast paths already did.
+  ``MO_And`` needs no change: its operands are zero-extended and ``andi`` always
+  leaves a result that is already in range.
+}

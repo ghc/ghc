@@ -245,6 +245,10 @@ test('MulMayOflo_full',
         ignore_stdout],
      multi_compile_and_run,
      ['MulMayOflo', [('MulMayOflo_full.cmm', '')], ''])
+test('SubwordImmArith',
+     [ req_cmm
+     ], multi_compile_and_run,
+     ['SubwordImmArith', [('SubwordImmArith_cmm.cmm', '')], ''])
 test('T24264run', normal, compile_and_run, [''])
 test('T24295a', normal, compile_and_run, ['-O -floopification'])
 test('T24295b', normal, compile_and_run, ['-O -floopification -fpedantic-bottoms'])

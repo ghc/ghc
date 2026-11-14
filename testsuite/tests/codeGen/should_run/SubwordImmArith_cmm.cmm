@@ -1,0 +1,73 @@
+#include "Cmm.h"
+
+/* Regression test for missing truncation of the result of the immediate
+ * MO_Add / MO_Sub / MO_Or fast paths in the RV64 NCG.  Each function keeps a
+ * live sub-word-size local across the operation and returns it zero-extended.
+ * The zero-extension lowers to a plain widening MOV on RV64, so any stray high
+ * bits left in the register by the operation become visible in the result.
+ *
+ * See Note [Signed arithmetic on RISCV64] in GHC.CmmToAsm.RV64.CodeGen.
+ */
+
+runAddImmSubword8zh (W_ x) {
+    I8 a;
+    a = %lobits8(x);
+    a = a + (1::I8);
+    return (%zx64(a));
+}
+
+runAddImmSubword16zh (W_ x) {
+    I16 a;
+    a = %lobits16(x);
+    a = a + (1::I16);
+    return (%zx64(a));
+}
+
+runAddImmSubword32zh (W_ x) {
+    I32 a;
+    a = %lobits32(x);
+    a = a + (1::I32);
+    return (%zx64(a));
+}
+
+runSubImmSubword8zh (W_ x) {
+    I8 a;
+    a = %lobits8(x);
+    a = a - (1::I8);
+    return (%zx64(a));
+}
+
+runSubImmSubword16zh (W_ x) {
+    I16 a;
+    a = %lobits16(x);
+    a = a - (1::I16);
+    return (%zx64(a));
+}
+
+runSubImmSubword32zh (W_ x) {
+    I32 a;
+    a = %lobits32(x);
+    a = a - (1::I32);
+    return (%zx64(a));
+}
+
+runOrImmSubword8zh (W_ x) {
+    I8 a;
+    a = %lobits8(x);
+    a = a | (-1::I8);
+    return (%zx64(a));
+}
+
+runOrImmSubword16zh (W_ x) {
+    I16 a;
+    a = %lobits16(x);
+    a = a | (-1::I16);
+    return (%zx64(a));
+}
+
+runOrImmSubword32zh (W_ x) {
+    I32 a;
+    a = %lobits32(x);
+    a = a | (-1::I32);
+    return (%zx64(a));
+}
