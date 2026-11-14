@@ -22,7 +22,7 @@ module GHC.Types.Unique.Set (
         addOneToUniqSet, addListToUniqSet, strictAddOneToUniqSet_C,
         delOneFromUniqSet, delOneFromUniqSet_Directly, delListFromUniqSet,
         delListFromUniqSet_Directly,
-        unionUniqSets, unionManyUniqSets,
+        unionUniqSets, unionUniqSetsShared, unionManyUniqSets,
         strictUnionUniqSets_C, strictUnionManyUniqSets_C,
         minusUniqSet, minusUniqSet_C,
         uniqSetMinusUFM, uniqSetMinusUDFM,
@@ -81,6 +81,7 @@ import Data.Coerce
 import Data.Data
 import qualified Data.Semigroup as Semi
 import Control.DeepSeq
+import qualified GHC.Data.Word64Map as M
 import qualified GHC.Data.Word64Set as S
 
 -- Note [UniqSet invariant]
@@ -137,6 +138,12 @@ delListFromUniqSet_Directly (UniqSet s) l =
 
 unionUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 unionUniqSets (UniqSet s) (UniqSet t) = UniqSet (plusUFM s t)
+
+-- | 'unionUniqSets', returning the second set itself where the first adds
+-- nothing to it: see 'GHC.Data.Word64Map.unionShared'.
+unionUniqSetsShared :: UniqSet a -> UniqSet a -> UniqSet a
+unionUniqSetsShared (UniqSet s) (UniqSet t) =
+  UniqSet (unsafeIntMapToUFM (M.unionShared (ufmToIntMap t) (ufmToIntMap s)))
 
 strictUnionUniqSets_C :: (a -> a -> a) -> UniqSet a -> UniqSet a -> UniqSet a
 strictUnionUniqSets_C f (UniqSet s) (UniqSet t) =
