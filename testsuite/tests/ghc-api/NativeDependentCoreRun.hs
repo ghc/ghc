@@ -1495,6 +1495,23 @@ runModuleChecks libdir = do
         , "local signature partial index head: 7"
         , "local signature payload demand: packed-bottom-payload"
         , "local signature IO action: (0,1,[7])"
+        , "runtime action binds: (0,[[],[],[],[],[],[]],[1,2,3,4,5,6])"
+        , "runtime action binds: (1,[[7],[7],[7],[7],[7],[7]],[1,2,3,4,5,6])"
+        , "runtime action binds: (2,[[7,7],[7,7],[7,7],[7,7],[7,7],[7,7]],[1,2,3,4,5,6])"
+        , "runtime action binds: (3,[[7,7,7],[7,7,7],[7,7,7],[7,7,7],[7,7,7],[7,7,7]],[1,2,3,4,5,6])"
+        , "action construction has no effects: 0"
+        , "action ignores bottom index and payload: 42"
+        , "action executes once: 1"
+        , "saved computation executes again: 2"
+        , "saved action ignores bottom payload: 42"
+        , "action retains original payload error: packed-bottom-payload"
+        , "action effect before payload error: 1"
+        , "bottom action executes: native-action-bottom"
+        , "action partial index prefix: [7]"
+        , "action cyclic index prefix: [7,7]"
+        , "inline action ignores bottom index: 42"
+        , "explicit bind ignores bottom payload: 42"
+        , "action repeated payload sharing: True"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2779,6 +2796,13 @@ runPackageSourceRejectChecks = do
         , ("MatrixFallbackWildcardsPayloadMismatch", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad _ _ xs ys = PackVec Z xs"])
         , ("MatrixFallbackLeftVariablePayloadMismatch", 83865, "ys", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad first _ xs ys = PackVec first ys"])
         , ("MatrixFallbackRightVariablePayloadMismatch", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad _ second xs ys = PackVec second xs"])
+        , ("ActionIndependentIndices", 83865, "xs", [], [], localActions ++ ["bad :: Nat -> Nat -> IO (PackedVec Int)", "bad n m = let { action :: IO (Vec Int n); action = pure (localVector n) } in action >>= \\xs -> pure (PackVec m xs)"])
+        , ("ActionWrongIOMonad", 83865, "IO", [], [], localActions ++ ["bad :: Nat -> Maybe [Int]", "bad n = let { action :: IO (Vec Int n); action = pure (localVector n) } in action >>= \\xs -> Just (toListLocal xs)"])
+        , ("ActionWrongMaybeMonad", 83865, "Maybe", [], [], localActions ++ ["bad :: Nat -> IO [Int]", "bad n = let { action :: Maybe (Vec Int n); action = Just (localVector n) } in do { xs <- action; pure (toListLocal xs) }"])
+        , ("ActionConflictingArguments", 83865, "second", [], [], localActions ++ ["consume :: forall a. IO a -> IO a -> IO [Int]", "consume first second = pure []", "bad :: Nat -> Nat -> IO [Int]", "bad n m = let { first :: IO (Vec Int n); first = pure (localVector n); second :: IO (Vec Int m); second = pure (localVector m) } in consume first second"])
+        , ("ActionNativeResultInference", 83865, "untouchable", [], [], localActions ++ ["bad :: Nat -> IO (PackedVec Int)", "bad n = let { action :: IO (Vec Int n); action = pure (localVector n); compute = do { xs <- action; pure xs } } in compute >>= \\xs -> pure (PackVec n xs)"])
+        , ("ActionMissingSignature", 83605, "explicit signature", [], [], localActions ++ ["bad :: Nat -> IO [Int]", "bad n = let action = pure (localVector n) in do { xs <- action; pure (toListLocal xs) }"])
+        , ("ActionLinearCapture", 18872, "multiplicity", ["LinearTypes"], [], localActions ++ ["bad :: () %1 -> Nat -> IO [Int]", "bad token n = let { action :: IO (Vec Int n); action = pure (localVector n) } in action >>= \\xs -> pure (case token of () -> toListLocal xs)"])
         , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureAliasIndex", 83605, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
@@ -2841,6 +2865,12 @@ runPackageSourceRejectChecks = do
             ++ [ "localVector :: foreach (n :: Nat) -> Vec Int n"
                , "localVector Z = VNil"
                , "localVector (S k) = VCons 7 (localVector k)"
+               ]
+    localActions =
+        localSignatures
+            ++ [ "toListLocal :: Vec a index -> [a]"
+               , "toListLocal VNil = []"
+               , "toListLocal (VCons x xs) = x : toListLocal xs"
                ]
     equalityImports = ["import Data.Type.Equality ((:~:)(Refl))"]
     sums =

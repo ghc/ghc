@@ -16,7 +16,7 @@ module Main (main) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (forM_, unless)
-import Data.IORef (modifyIORef', newIORef, readIORef)
+import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
 import Data.Type.Equality ((:~:) (Refl))
 import PackedVecLibrary
@@ -972,6 +972,136 @@ runLaterIndexChecks = do
             assertEqual "runtime leading context" expected actual
             putStrLn ("runtime leading context: " ++ actual)
 
+-- | Compare saved and inline action binds at one runtime index.
+{-# NOINLINE driveActionBinds #-}
+driveActionBinds :: Nat -> IO String
+driveActionBinds input = do
+    indexCell <- newIORef input
+    n <- readIORef indexCell
+    effects <- newIORef (0 :: Int)
+    let action :: IO (Vec Int n)
+        action = modifyIORef' effects (+ 1) >> pure (replicateNative @Int n 7)
+        computeDo = do
+            xs <- action
+            pure (toList xs)
+        computeBind = action >>= \xs -> pure (toList xs)
+    savedDo <- do
+        xs <- action
+        pure (toList xs)
+    count1 <- readIORef effects
+    savedBind <- action >>= \xs -> pure (toList xs)
+    count2 <- readIORef effects
+    localDo <- computeDo
+    count3 <- readIORef effects
+    localBind <- computeBind
+    count4 <- readIORef effects
+    inlineDo <- do
+        modifyIORef' effects (+ 1)
+        xs <- pure (replicateNative @Int n 7)
+        pure (toList xs)
+    count5 <- readIORef effects
+    inlineBind <- do
+        modifyIORef' effects (+ 1)
+        pure (replicateNative @Int n 7) >>= \xs -> pure (toList xs)
+    count6 <- readIORef effects
+    pure (show (natToInt n, [savedDo, savedBind, localDo, localBind, inlineDo, inlineBind], [count1, count2, count3, count4, count5, count6]))
+
+-- | Check action execution, payload demand and sharing without native results.
+runActionBindChecks :: IO ()
+runActionBindChecks = do
+    forM_
+        [ (Z, "(0,[[],[],[],[],[],[]],[1,2,3,4,5,6])")
+        , (S Z, "(1,[[7],[7],[7],[7],[7],[7]],[1,2,3,4,5,6])")
+        , (S (S Z), "(2,[[7,7],[7,7],[7,7],[7,7],[7,7],[7,7]],[1,2,3,4,5,6])")
+        , (S (S (S Z)), "(3,[[7,7,7],[7,7,7],[7,7,7],[7,7,7],[7,7,7],[7,7,7]],[1,2,3,4,5,6])")
+        ]
+        $ \(input, expected) -> do
+            actual <- driveActionBinds input
+            assertEqual "runtime action binds" expected actual
+            putStrLn ("runtime action binds: " ++ actual)
+    ignoredIndex <- pure bottomLength
+    effects <- newIORef (0 :: Int)
+    let ignoredAction :: IO (Vec Int ignoredIndex)
+        ignoredAction = modifyIORef' effects (+ 1) >> pure bottomPayload
+        compute = do
+            xs <- ignoredAction
+            pure (42 :: Int)
+    before <- readIORef effects
+    assertEqual "action construction has no effects" 0 before
+    putStrLn "action construction has no effects: 0"
+    ignored <- compute
+    assertEqual "action ignores bottom index and payload" 42 ignored
+    putStrLn "action ignores bottom index and payload: 42"
+    once <- readIORef effects
+    assertEqual "action executes once" 1 once
+    putStrLn "action executes once: 1"
+    _ <- compute
+    twice <- readIORef effects
+    assertEqual "saved computation executes again" 2 twice
+    putStrLn "saved computation executes again: 2"
+    finiteIndex <- pure (S Z)
+    let lazyAction :: IO (Vec Int finiteIndex)
+        lazyAction = pure bottomPayload
+    lazyResult <- do
+        xs <- lazyAction
+        pure (42 :: Int)
+    assertEqual "saved action ignores bottom payload" 42 lazyResult
+    putStrLn "saved action ignores bottom payload: 42"
+    demandedEffects <- newIORef (0 :: Int)
+    let demandedAction :: IO (Vec Int finiteIndex)
+        demandedAction = modifyIORef' demandedEffects (+ 1) >> pure bottomPayload
+    expectMarker "action retains original payload error" "packed-bottom-payload" $ do
+        elements <- do
+            xs <- demandedAction
+            pure (toList xs)
+        evaluate (sum elements)
+    demandedCount <- readIORef demandedEffects
+    assertEqual "action effect before payload error" 1 demandedCount
+    putStrLn "action effect before payload error: 1"
+    let bottomAction :: IO (Vec Int finiteIndex)
+        bottomAction = error "native-action-bottom"
+    expectMarker "bottom action executes" "native-action-bottom" $ do
+        xs <- bottomAction
+        pure (42 :: Int)
+    partialIndex <- pure (S bottomLength)
+    let partialAction :: IO (Vec Int partialIndex)
+        partialAction = pure (replicateNative @Int partialIndex 7)
+    partial <- do
+        xs <- partialAction
+        pure (take 1 (toList xs))
+    assertEqual "action partial index prefix" [7] partial
+    putStrLn "action partial index prefix: [7]"
+    cyclicIndex <- pure cyclicLength
+    let cyclicAction :: IO (Vec Int cyclicIndex)
+        cyclicAction = pure (replicateNative @Int cyclicIndex 7)
+    cyclic <- cyclicAction >>= \xs -> pure (take 2 (toList xs))
+    assertEqual "action cyclic index prefix" [7, 7] cyclic
+    putStrLn "action cyclic index prefix: [7,7]"
+    inlineIgnored <- do
+        xs <- pure (replicateNative @Int ignoredIndex 7)
+        pure (42 :: Int)
+    assertEqual "inline action ignores bottom index" 42 inlineIgnored
+    putStrLn "inline action ignores bottom index: 42"
+    explicitIgnored <- lazyAction >>= \xs -> pure (42 :: Int)
+    assertEqual "explicit bind ignores bottom payload" 42 explicitIgnored
+    putStrLn "explicit bind ignores bottom payload: 42"
+    sharingIndex <- pure (S (S Z))
+    payload <- newIORef (7 :: Int)
+    let sharingAction :: IO (Vec (IORef Int) sharingIndex)
+        sharingAction = pure (replicateNative @(IORef Int) sharingIndex payload)
+    elements <- do
+        xs <- sharingAction
+        pure (toList xs)
+    case elements of
+        [first, second] -> do
+            firstValue <- evaluate first
+            secondValue <- evaluate second
+            firstName <- makeStableName firstValue
+            secondName <- makeStableName secondValue
+            assertEqual "action repeated payload sharing" True (firstName == secondName)
+            putStrLn "action repeated payload sharing: True"
+        _ -> fail "action sharing vector has the wrong length"
+
 -- | Run finite observations and bounded strictness checks.
 main :: IO ()
 main = do
@@ -1517,3 +1647,4 @@ main = do
     runFallbackMatrixChecks
     runWildcardMatrixChecks
     runLocalSignatureChecks
+    runActionBindChecks
