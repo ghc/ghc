@@ -5,6 +5,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -1336,6 +1337,134 @@ runTupleInferenceChecks = do
             putStrLn "tuple vector shares original payload: True"
         _ -> fail "tuple sharing vector has the wrong length"
 
+-- | Compare repeated tuple section applications with a constructor control.
+{-# NOINLINE driveTupleSectionInference #-}
+driveTupleSectionInference :: Nat -> IO String
+driveTupleSectionInference input = do
+    indexCell <- newIORef input
+    n <- readIORef indexCell
+    effects <- newIORef (0 :: Int)
+    let vector = replicateNative @Int n 7
+        action = modifyIORef' effects (+ 1) >> pure vector
+        compute =
+            action >>= \xs ->
+                let section = (xs,)
+                 in pure (section (42 :: Int), section (43 :: Int))
+        constructor = action >>= \xs -> pure (((,) xs) (42 :: Int))
+    before <- readIORef effects
+    first <- compute
+    count1 <- readIORef effects
+    second <- compute
+    count2 <- readIORef effects
+    control <- constructor
+    count3 <- readIORef effects
+    let observations =
+            [ (snd (fst first), toList (fst (fst first)))
+            , (snd (snd first), toList (fst (snd first)))
+            , (snd (fst second), toList (fst (fst second)))
+            , (snd (snd second), toList (fst (snd second)))
+            , (snd control, toList (fst control))
+            ]
+    pure (show (natToInt n, observations, [before, count1, count2, count3]))
+
+-- | Check tuple section holes, lazy fields, effects, and captured sharing.
+runTupleSectionChecks :: IO ()
+runTupleSectionChecks = do
+    forM_
+        [ (Z, "(0,[(42,[]),(43,[]),(42,[]),(43,[]),(42,[])],[0,1,2,3])")
+        , (S Z, "(1,[(42,[7]),(43,[7]),(42,[7]),(43,[7]),(42,[7])],[0,1,2,3])")
+        , (S (S Z), "(2,[(42,[7,7]),(43,[7,7]),(42,[7,7]),(43,[7,7]),(42,[7,7])],[0,1,2,3])")
+        , (S (S (S Z)), "(3,[(42,[7,7,7]),(43,[7,7,7]),(42,[7,7,7]),(43,[7,7,7]),(42,[7,7,7])],[0,1,2,3])")
+        ]
+        $ \(input, expected) -> do
+            actual <- driveTupleSectionInference input
+            assertEqual "runtime tuple sections" expected actual
+            putStrLn ("runtime tuple sections: " ++ actual)
+    ignoredIndex <- pure bottomLength
+    effects <- newIORef (0 :: Int)
+    let ignoredVector = replicateNative @Int ignoredIndex bottomElement
+        action = modifyIORef' effects (+ 1) >> pure ignoredVector
+        compute = action >>= \xs -> pure (xs,)
+    before <- readIORef effects
+    assertEqual "section construction has no effects" 0 before
+    putStrLn "section construction has no effects: 0"
+    section <- compute
+    assertEqual "section WHNF ignores bottom index" () =<< (evaluate section >> pure ())
+    putStrLn "section WHNF ignores bottom index: ok"
+    let ignoredTuple = section (42 :: Int)
+    assertEqual "section tuple WHNF ignores bottom index" () =<< (evaluate ignoredTuple >> pure ())
+    putStrLn "section tuple WHNF ignores bottom index: ok"
+    assertEqual "section later field ignores bottom index" 42 (snd ignoredTuple)
+    putStrLn "section later field ignores bottom index: 42"
+    once <- readIORef effects
+    assertEqual "section action executes once" 1 once
+    putStrLn "section action executes once: 1"
+    expectMarker "section vector retains index demand" "packed-bottom-length" $
+        evaluate (sum (toList (fst ignoredTuple)))
+    finiteIndex <- pure (S (S Z))
+    let vector = replicateNative @Int finiteIndex 7
+        fill :: Vec Int finiteIndex -> (Int, Vec Int finiteIndex)
+        fill = ((42 :: Int),)
+        known = fill vector
+    assertEqual "section checks native missing field" (42, [7, 7]) (fst known, toList (snd known))
+    putStrLn "section checks native missing field: (42,[7,7])"
+    let payload :: Vec Int finiteIndex
+        payload = bottomPayload
+        bottomSection = (payload,)
+        bottomTuple = bottomSection (42 :: Int)
+    assertEqual "section WHNF ignores bottom present field" () =<< (evaluate bottomSection >> pure ())
+    putStrLn "section WHNF ignores bottom present field: ok"
+    assertEqual "section tuple WHNF ignores bottom present field" () =<< (evaluate bottomTuple >> pure ())
+    putStrLn "section tuple WHNF ignores bottom present field: ok"
+    assertEqual "section later field ignores bottom present field" 42 (snd bottomTuple)
+    putStrLn "section later field ignores bottom present field: 42"
+    expectMarker "section first field retains payload error" "packed-bottom-payload" $
+        evaluate (sum (toList (fst bottomTuple)))
+    expectMarker "section second field retains payload error" "packed-bottom-payload" $
+        evaluate (sum (toList (snd (fill payload))))
+    let holes = (vector,,)
+        ordered = holes (42 :: Int) True
+        bottomHoles :: Int -> Bool -> (Vec Int finiteIndex, Int, Bool)
+        bottomHoles = (payload,,)
+    case ordered of
+        (xs, value, flag) -> do
+            assertEqual "section hole order" ([7, 7], 42, True) (toList xs, value, flag)
+            putStrLn "section hole order: ([7,7],42,True)"
+    assertEqual "partial section ignores present field" () =<< (evaluate (bottomHoles 42) >> pure ())
+    putStrLn "partial section ignores present field: ok"
+    partialIndex <- pure (S bottomLength)
+    let partialVector = replicateNative @Int partialIndex 7
+        partialSection = (partialVector,)
+    assertEqual "section partial index prefix" [7] (take 1 (toList (fst (partialSection (42 :: Int)))))
+    putStrLn "section partial index prefix: [7]"
+    cyclicIndex <- pure cyclicLength
+    let cyclicVector = replicateNative @Int cyclicIndex 7
+        cyclicSection = (cyclicVector,)
+    assertEqual "section cyclic index prefix" [7, 7] (take 2 (toList (fst (cyclicSection (42 :: Int)))))
+    putStrLn "section cyclic index prefix: [7,7]"
+    sharedPayload <- newIORef (7 :: Int)
+    let sharingVector = replicateNative @(IORef Int) finiteIndex sharedPayload
+        sharingSection = (sharingVector,)
+    originalVector <- evaluate sharingVector
+    leftVector <- evaluate (fst (sharingSection (42 :: Int)))
+    rightVector <- evaluate (fst (sharingSection (43 :: Int)))
+    originalName <- makeStableName originalVector
+    leftName <- makeStableName leftVector
+    rightName <- makeStableName rightVector
+    assertEqual "section applications share captured vector" True (originalName == leftName && leftName == rightName)
+    putStrLn "section applications share captured vector: True"
+    case toList leftVector of
+        [first, second] -> do
+            original <- evaluate sharedPayload
+            firstValue <- evaluate first
+            secondValue <- evaluate second
+            originalPayloadName <- makeStableName original
+            firstName <- makeStableName firstValue
+            secondName <- makeStableName secondValue
+            assertEqual "section vector shares original payload" True (originalPayloadName == firstName && firstName == secondName)
+            putStrLn "section vector shares original payload: True"
+        _ -> fail "section sharing vector has the wrong length"
+
 -- | Run finite observations and bounded strictness checks.
 main :: IO ()
 main = do
@@ -1884,3 +2013,4 @@ main = do
     runActionBindChecks
     runSourceInferenceChecks
     runTupleInferenceChecks
+    runTupleSectionChecks
