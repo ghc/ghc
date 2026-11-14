@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 249 runtime observations and the runtime fixtures check 47 package/bound rejections |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 269 runtime observations and the runtime fixtures check 55 package/bound rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -50,7 +50,8 @@ Last updated: 2026-11-14.
 | Source append | Both stages pass 180 observations; a runtime sum and ordinary equality witness determine the result length; declaration-only imports, partial VTA and unused retained fields pass |
 | Retained field patterns | Both stages pass 209 source observations, including constructor refinement through later fields, proof demand, views, guards and row order |
 | Source reverse | Both compiler stages preserve the original runtime length through source reverse, with checked arithmetic proofs and 40 new demand/order observations |
-| Next task | M19: support constructor equations with later retained arguments |
+| Later retained equations | Both compiler stages pass 269 observations, including mixed argument/evidence order, local captures and checked arithmetic constructor equations |
+| Next task | M20: express sameNat as four constructor equations over both retained indices |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2218,9 +2219,9 @@ stages. A wrong annotation still produces a located GHC-83865 error. See
 [the exact source precedent](REFERENCES.md#signed-expression-arguments-in-native-inference).
 
 The first proof used constructor equations with two retained arguments.
-That form still rejects with the misleading result-wrapper diagnostic.
-The source uses the existing explicit-case form, which binds both runtime
-indices before discrimination. [M19](PLAN.md#m19-constructor-equations-with-later-retained-arguments)
+At M18, that form rejected with the misleading result-wrapper diagnostic.
+The M18 source used the explicit-case form, which binds both runtime
+indices before discrimination. M19 below now supports those equations. [M19](PLAN.md#m19-constructor-equations-with-later-retained-arguments)
 records the required shared-identity extension and its source-error obligations.
 No Core rule or interface schema changed in M18. Optimization, arbitrary index
 expressions, general inference, totality and proof erasure remain separate work.
@@ -2239,3 +2240,60 @@ bootstrap checks peaked at 1054 MiB under 4 GiB; the self-host source, reverse
 errors and annotation controls peaked at 145 MiB under 4 GiB. The registered
 run took 12.255137 s and peaked at 1718 MiB under 8 GiB. The resource wrapper
 sets `MemorySwapMax=0`. Initial failures and final logs remain saved.
+
+
+## Constructor equations with later retained indices checkpoint
+
+Compiler: `fdf23acaea`, with local-comment cleanup at `a367bd0a7a`.
+Source and runtime fixture: `dc44d9d25c`, with the missing-proof rejection at
+`6f7d5f7e5f`. Both compiler stages pass 269 source observations. The bootstrap
+and registered runtime fixtures pass 55 package/bound rejections. Eight new
+errors have pinned GHC-83605/GHC-83865 codes and primary source tokens in both
+stages; the previous seven reverse errors also pass. All five registered
+regressions pass: 39 cases, 34 skips and five expected passes, with no framework
+warnings or failures.
+
+The existing `addSucc` and `reverseAppendNative` now use constructor equations.
+Their later argument has different source names in each row. The checker
+renames those resolved Names to one shared runtime identity per position,
+including local captures and stored free-name sets. It preserves source spelling,
+spans and original equations for diagnostic context. Shared indices remain
+outermost lambda variables. Ordinary payloads still receive the existing
+constructor transport, and evidence has separate specialised Givens.
+
+Twenty new source observations cover multiple later indices, ordinary values
+between retained positions, local captures, shadowing, partial applications
+and demand order. A primitive equality context between retained binders checks
+that the branch can use its transported evidence. A leading `Show` context
+checks ordinary class dictionaries before the retained telescope. This required
+the signature selector, renamer and kind checker to continue through qualified
+bodies with their existing constraint routines. [References](REFERENCES.md#later-retained-arguments-in-constructor-equations)
+pin the Agda telescope rules and ordinary GHC context routines.
+
+Later retained patterns still require bare variables. Both quotation forms
+reject at the quotation expression before resolved Names can change. Wrong
+result indices still reject, and an error in the second row prints that row's
+original variable names. Unsupported ordinary patterns point at that pattern.
+No Core rule or interface schema changed. The full GHC suite was not run.
+
+Artifacts use `_build/verification/native-later-index-`. Final selected compiler
+inputs are in `build-input-v5.SHA256SUMS`, with 27 paths. All five historical
+input versions have exact archived bytes and verified hashes. The initial failed
+build and the qualified-body source failure remain saved. Six exact prior-art
+snapshots cover Agda telescopes, clause compilation, the next equality example,
+and GHC's ordinary qualified-signature routines.
+
+The initial self-host build took 12m08s and peaked at 5002 MiB under 16 GiB.
+It reported the new local Haddock warning and pre-existing warnings in App,
+Match/Constructor and Main/Passes. The final cleanup rebuilt both compiler
+stages in 1m33s, at 2653 MiB under 16 GiB, without source warnings. Final
+bootstrap source/API/runtime checks peaked at 1048 MiB under 4 GiB. Self-hosted
+source and both diagnostic groups peaked at 147 MiB under 4 GiB. The registered
+run took 13.905708 s and peaked at 1726 MiB under 8 GiB. The wrapper sets
+`MemorySwapMax=0`.
+
+M18's 31 harness and 372 output hashes, M17's 42 harness and 499 output hashes,
+and the original reader's three hashes remain unchanged. The final source,
+docs, harness, output and directory manifests are frozen separately. Next,
+[M20](PLAN.md#m20-constructor-equations-over-two-runtime-indices) probes a
+complete two-index constructor matrix for `sameNat`. That target is unverified.

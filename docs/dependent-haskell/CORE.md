@@ -1192,3 +1192,30 @@ General source `case` inference and the ordinary optimizer remain gated.
 The restricted program entry above
 supports local workers with ordinary exported types. Existing ordinary GHC
 programs must continue to build.
+
+
+## Constructor equations with later retained indices
+
+The frontend consumes later retained binders in telescope order. Each position
+gets one shared unrestricted runtime Id. The checker instantiates that binder's
+codomain before reading the next argument. An argument plan distinguishes
+ordinary payloads, evidence and retained indices.
+
+Each equation must use bare variables at later retained positions. The checker
+renames those resolved Names across patterns, RHSs, local bindings and stored
+free-name sets. It preserves source spans and `WithUserRdr` spelling. It stops
+at embedded Core types. Quotations reject at their expression spans before
+renaming. Error contexts retain the original source equation.
+
+Shared index patterns remain outermost variable patterns. Their closed domains
+require reflexive constructor transport. A coercion pattern would allocate a
+fresh outer lambda Id and lose runtime identity. Evidence keeps its separate
+specialised Givens. Ordinary payloads and results keep nominal constructor
+transport. All source argument and dictionary lambdas precede discrimination.
+
+A qualified signature can contain another retained binder. The syntax selector,
+renamer and kind checker continue through its body. Existing context routines
+check its constraints in the current index scope. Later binders enter only the
+body. Ordinary qualified bodies without retained syntax use the existing kind
+checker. See [the exact provenance](REFERENCES.md#later-retained-arguments-in-constructor-equations).
+No new Core rule or interface schema is required.

@@ -1,12 +1,19 @@
 # Packed vector source example
 
-Both compiler stages pass all 249 observations below with Core Lint and STG
-Lint enabled. This includes the previous 209 observations and 40 reverse,
-arithmetic proof and demand observations. The bootstrap and registered runtime
-fixtures pass 47 package/bound rejections. Seven standalone reverse errors have
-pinned codes and primary source tokens in both stages. Signed argument controls
-and all five focused registered regressions pass. The consumer imports the
-library interface with the producer source absent from its import path.
+Both compiler stages pass all 269 source observations with Core Lint and STG
+Lint. M19 adds 20 observations for constructor equations with later retained
+arguments. The runtime fixtures pass 55 package/bound rejections. Eight new
+located errors, the previous seven reverse errors and all five focused
+registered regressions pass.
+
+At M18, both compiler stages passed the first 249 observations with Core Lint
+and STG Lint enabled. These included the previous 209 observations and 40
+reverse, arithmetic proof and demand observations. The bootstrap and registered
+runtime fixtures passed 47 package/bound rejections. Seven standalone reverse
+errors had pinned codes and primary source tokens in both stages. Signed
+argument controls and all five focused registered regressions passed. The
+consumer imports the library interface with the producer source absent from
+its import path.
 
 `PackedVecLibrary.hs` stores a runtime `Nat` and a `Vec` indexed by that same
 field. `PackVec` has two ordinary runtime fields. It has no singleton argument.
@@ -431,10 +438,9 @@ the reversed vector:
 
 ```haskell
 addSucc :: foreach (n :: Nat) -> foreach (m :: Nat) -> Add n (S m) :~: S (Add n m)
-addSucc n m = case n of
-    Z -> Refl
-    S k -> case addSucc k m of
-        Refl -> Refl
+addSucc Z right = Refl
+addSucc (S k) later = case addSucc k later of
+    Refl -> Refl
 
 -- | Prove the right identity of addition by runtime Nat induction.
 rightZero :: foreach (n :: Nat) -> Add n Z :~: n
@@ -444,12 +450,11 @@ rightZero (S k) = case rightZero k of
 
 -- | Reverse the first vector onto the second vector.
 reverseAppendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)
-reverseAppendNative n m xs acc = case n of
-    Z -> case xs of
-        VNil -> acc
-    S k -> case xs of
-        VCons x rest -> case addSucc k m of
-            Refl -> reverseAppendNative @a k (S m) rest (VCons x acc)
+reverseAppendNative Z right xs acc = case xs of
+    VNil -> acc
+reverseAppendNative (S k) later xs acc = case xs of
+    VCons x rest -> case addSucc k later of
+        Refl -> reverseAppendNative @a k (S later) rest (VCons x acc)
 
 -- | Reverse a vector while preserving its retained length.
 reverseNative :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n
@@ -473,9 +478,9 @@ local equality; the solver does not evaluate a runtime Nat. Agda's indexed
 fold, reverse and arithmetic lemmas provide the
 [pinned prior art](../../REFERENCES.md#length-preserving-reverse-next-source-probe).
 Agda changes the fold motive at each step. This worker instead uses the fixed
-`Add` family with explicit proofs. `addSucc` binds both retained variables
-before its case. Constructor equations with a later retained binder remain
-unsupported; this example does not extend that clause subset.
+`Add` family with explicit proofs. M19 changes `addSucc` and
+`reverseAppendNative` to constructor equations with a later retained binder.
+The checker still binds both runtime arguments before constructor discrimination.
 
 Package WHNF leaves the stored index and reversed vector lazy. Reading the
 stored index does not evaluate the vector or its proofs. Demanding the
@@ -504,6 +509,40 @@ The classifier reads its syntax without elaborating it. The existing
 expression-signature checker checks it through the same once-only argument
 cache. Kind, scope, exact-domain and final subsumption checks remain in force.
 This does not enable general native meta-variable assignment.
+
+## Constructor equations with later retained arguments
+
+The `addSucc` and `reverseAppendNative` equations above name their second
+retained argument `right` in the zero row and `later` in the successor row.
+The checker chooses one shared runtime Id for that argument across the rows.
+It instantiates the later telescope with that Id before checking payload types
+and results. It renames each row's resolved source references and stored
+free-name sets. A let alias does not supply index equality.
+
+Local functions can capture the later index. An ordinary local variable that
+shadows its source spelling keeps its own identity. The private `forwardLater`
+helper tests these scopes. Its telescope places an ordinary vector argument
+before two later retained arguments. `keepWithLaterEvidence` also places an
+ordinary equality dictionary between retained arguments. `leadingContext`
+checks a `Show a` context before the first retained binder. Its dictionary
+remains before both runtime indices. The checker preserves these value and
+dictionary positions. Constructor evidence specializes later payload types
+and results within the selected branch.
+
+All source argument lambdas precede constructor discrimination. Partial
+applications can remain in function WHNF with bottom or cyclic supplied
+indices and bottom payloads. With all arguments supplied, these equations
+inspect the first index before any selected payload. Tuple and package WHNF
+can leave later indices and vectors lazy. Separate checks demand each stored
+index or vector and require its own error marker.
+
+Later retained arguments currently require bare variable patterns, fixed
+closed domains and unrestricted multiplicity. Constructor equations with later
+retained arguments reject Template Haskell quotations before source renaming.
+The [pinned Agda telescope rules](../../REFERENCES.md#later-retained-arguments-in-constructor-equations)
+provide scope prior art. Haskell demand checks remain necessary. This increment
+adds no Core equality rule. Its 20 expected output lines follow the M18 output
+below; both compiler stages pass all 20 additions.
 
 ## Separate-module runner
 
@@ -797,6 +836,26 @@ ignored reverse proof stays lazy: 42
 reverse append payload before predecessor: packed-bottom-payload
 reverse append proof before tail: packed-bottom-length
 reverse append ignores right fields: 42
+runtime later indices: (2,[7,7])|(3,[9,9,9])|42
+runtime later indices: (3,[7,7,7])|(0,[])|42
+runtime later evidence: ([],[9,9])
+runtime later evidence: ([7,7],[9,9,9])
+later partial ignores first index: ok
+later partial ignores cyclic first index: ok
+later partial ignores all supplied fields: ok
+later tuple ignores later fields: ok
+later left package ignores partial index: ok
+later right package ignores cyclic first index: ok
+later first index before payloads: packed-bottom-length
+later left stored index demand: packed-bottom-length
+later right stored index demand: equality-right-length
+later left payload demand: zip-left-vector
+later right payload demand: zip-right-vector
+later ordinary shadowing: 42
+later evidence partial ignores indices: ok
+later evidence first index before payloads: packed-bottom-length
+runtime leading context: ([],[7])
+runtime leading context: ([42,42],[7])
 ```
 
 These observations check this source subset. They do not establish a general

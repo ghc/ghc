@@ -66,7 +66,11 @@ inference at `12bfbef0b3`. Both compiler stages pass 249 source observations
 and seven standalone reverse rejections. The runtime fixtures pass 47
 package/bound rejections. All five registered regressions pass. The source
 wrapper stores the original runtime length with its reversed vector. Next,
-M19 extends constructor equations that have later retained arguments.
+M19's compiler is `fdf23acaea`, with comment cleanup at `a367bd0a7a`.
+Both compiler stages pass 269 source observations, and the runtime fixtures
+pass 55 package/bound rejections. All five registered regressions pass.
+Constructor equations accept later retained variables and preserve contexts.
+Next, M20 probes four constructor equations for `sameNat` over both indices.
 
 ## Direction and boundaries
 
@@ -1384,11 +1388,18 @@ runtime indices and the existing source proof path.
 
 ### M19: constructor equations with later retained arguments
 
-This target is unverified. Keep the complete M18 source program as the
+Compiler implementation: `fdf23acaea`. Source/runtime fixture: `dc44d9d25c`.
+Both compiler stages pass 269 source observations and eight new pinned source
+errors. The previous seven reverse errors pass too. The runtime fixtures pass
+55 package/bound rejections. All five registered regressions pass. Local-comment
+cleanup is `a367bd0a7a`; the missing-proof rejection is `6f7d5f7e5f`. Keep the complete M18 source program as the
 reference. Convert `addSucc` to constructor equations only after the compiler
 accepts them. Record ordinary value, dictionary and retained index positions
 separately. Keep original source equations for error contexts after renaming.
 Reject quotations at their expression spans before a resolved-name rewrite.
+The context-order probe also requires the signature selector, renamer and kind
+checker to continue through qualified bodies. Keep ordinary constraint checks.
+Check a leading class context as well as evidence between retained binders.
 
 The first M18 probe used `addSucc Z m` and
 `addSucc (S k) m`. It failed with GHC-83605 at the first clause because
@@ -1396,17 +1407,17 @@ The first M18 probe used `addSucc Z m` and
 message describes the wrong limitation. The saved probe is
 `_build/verification/native-reverse-source-probes-v1/`.
 
-- [ ] Choose a shared runtime Id for each later retained argument and
+- [x] Choose a shared runtime Id for each later retained argument and
   instantiate its codomain in telescope order. Require bare variable patterns
   initially. Do not represent distinct source Ids as equal through aliases.
-- [ ] Preserve each row's resolved source names through a checked renaming
+- [x] Preserve each row's resolved source names through a checked renaming
   step. Cover RHSs, guards, local bindings and stored free-name sets. Inspect
   the existing `rewriteRetainedCase` precedent. Keep quotation exclusions and
   accurate source spelling and spans.
-- [ ] Keep all source argument lambdas before constructor discrimination.
+- [x] Keep all source argument lambdas before constructor discrimination.
   Preserve dictionary order, later field transport and primitive proof scope.
   A bare later retained argument must keep its actual shared Id at the lambda.
-- [ ] Compare constructor equations with the existing explicit-case source
+- [x] Compare constructor equations with the existing explicit-case source
   worker. Check partial applications, bottom indices, payload order, two rows
   with different variable names, scope escape and wrong proofs. Use located
   diagnostics for unsupported later patterns and quotation cases.
@@ -1414,6 +1425,35 @@ message describes the wrong limitation. The saved probe is
 Follow the pinned Agda constructor telescope and specialized RHS checking in
 [source package patterns](REFERENCES.md#source-package-patterns). This requires
 frontend identity handling. No new Core equality rule is proposed.
+
+- [x] Run the self-hosted source program and exact-location errors. Run all
+  five registered regressions. Freeze final input, source and output evidence.
+
+### M20: constructor equations over two runtime indices
+
+This target is unverified. Rewrite the existing nested-case `sameNat` as four
+constructor equations for `Z/Z`, `Z/S`, `S/Z` and `S/S`. Its result remains
+`Maybe (n :~: m)`. The recursive success branch eliminates the predecessor
+proof before it returns `Just Refl`. Keep the case implementation as a reference.
+
+- [ ] Admit an initial complete matrix of two retained constructor columns.
+  Require bare constructor subfields, unique constructor pairs and no overlap.
+  Keep contexts outside this initial matrix subset until all transported
+  bindings can sit beneath every proof they reference.
+- [ ] Keep shared whole-argument Ids. Bind each row's actual subfield Ids and
+  one checked nominal constructor proof per index. Compose refinements in
+  telescope order for later types and the expected RHS.
+- [ ] Preserve each row through desugaring. Ordinary constructor grouping can
+  alias distinct native field/proof Ids. Extend the existing separate-row case
+  strategy for proof-bearing native alternatives, or prove an equivalent
+  canonicalisation of each matrix prefix. Do not assume aliases give equality.
+- [ ] Preserve all source argument lambdas and left-before-right demand.
+  Compare finite equality results, partial WHNF, error markers and mismatches
+  with lazy successor predecessors. Equal cyclic inputs have no termination
+  claim. Reject incomplete/duplicate matrices and false `Refl` branches.
+
+Follow [the pinned four-clause Agda example and case-tree compiler](REFERENCES.md#two-index-constructor-equations).
+No new equality rule is proposed.
 
 ## Further work
 

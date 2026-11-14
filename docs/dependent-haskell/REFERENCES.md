@@ -1603,7 +1603,9 @@ signature checker. Their Git blob hashes match the pinned files above.
 
 ## Later retained arguments in constructor equations
 
-Status: unverified M19 implementation plan. The source reverse proof needs
+Status: both compiler stages pass 269 source observations and eight new located
+errors. The runtime fixtures pass 55 package/bound rejections. The previous
+seven reverse errors and all five registered regressions pass. The source reverse proof uses
 `addSucc Z m` and `addSucc (S k) m`. The checker must consume the later retained
 binder before it checks the specialised RHS. Reuse the existing native index
 and nominal constructor proof rules.
@@ -1626,10 +1628,56 @@ check the RHS against its specialised target. File blob:
 The exact files are already saved in M17's frozen prior-art directory.
 
 These sources justify consistent telescope specialization. They do not supply
-GHC's shared runtime Id representation or Haskell demand semantics. M19 must
-keep all source argument lambdas before constructor discrimination. It must
-rename resolved source references and stored free-name sets consistently, keep
-original source equations for diagnostics, and exclude quotations before that
-rewrite. Each shared retained argument must keep the same closed domain and
-remain an outermost variable pattern. Ordinary payload transport remains
+GHC's shared runtime Id representation or Haskell demand semantics. M19 keeps
+all source argument lambdas before constructor discrimination. It renames
+resolved source references and stored free-name sets consistently, keeps
+original source equations for diagnostics, and excludes quotations before that
+rewrite. Each shared retained argument keeps the same closed domain and
+remains an outermost variable pattern. Ordinary payload transport remains
 inside the constructor proof scope. No alias supplies index equality.
+
+
+The evidence-order probe exposed a separate signature-walker boundary at a
+qualified body. The implementation now uses the ordinary context routines,
+then recurses through the body with the retained signature walker.
+At upstream GHC base `19ff36f2aede0ca2e554016ff22c71e73aa9803b`,
+[`Rename/HsType.hs`, lines 600–607](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/Rename/HsType.hs#L600-L607)
+uses `rnTyKiContext` before renaming the qualified body. File blob:
+`01d0688febd8cee4493a176fce13ed80e08fa72f`.
+[`Tc/Gen/HsType.hs`, lines 1192–1211](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/Tc/Gen/HsType.hs#L1192-L1211)
+uses `tc_hs_context` and `tcMkPhiTy` for a qualified value type. File blob:
+`cacb81f68ffcc9061370399171d10eba664754f4`.
+M19 retains those constraint checks and evidence arrows. Its retained body has
+kind `Type`. Later retained binders do not scope over preceding constraints.
+The syntax selector must also traverse qualified bodies so a leading class
+context selects the retained checker. Exact GHC and Agda files are saved under
+`_build/verification/native-later-index-prior-art/`.
+
+
+## Two-index constructor equations
+
+Status: unverified M20 plan. Agda stdlib v2.3
+[`Decidability.agda`, lines 67–73](https://github.com/agda/agda-stdlib/blob/v2.3/doc/README/Design/Decidability.agda#L67-L73)
+defines `_≟₀_` with four Nat constructor pairs. Its successor/successor clause
+recursively checks the predecessors and lifts successful equality with
+`cong suc`. File blob: `c6f086424f11ddd18ce7bb8f91526dda5472f300`.
+This is the program precedent for four source `sameNat` equations.
+Agda returns `Dec (m ≡ n)` with a refutation on failure. Haskell `Nothing`
+contains no refutation. [Lines 75–89](https://github.com/agda/agda-stdlib/blob/v2.3/doc/README/Design/Decidability.agda#L75-L89)
+describe a separate decision/proof implementation. The proposed Haskell worker
+still inspects the recursive result before returning successful `Just`.
+
+The production stdlib [`Nat.Properties`, lines 93–109](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Nat/Properties.agda#L93-L109)
+uses Boolean comparison and proof generation. It is a different algorithm.
+That file's pinned blob is `3198ad7f4d783a46d30cc70751a198294d350892`.
+
+Agda v2.8.0
+[`CompiledClause/Compile.hs`, lines 53–91](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/CompiledClause/Compile.hs#L53-L91)
+obtains a coverage split tree for checked clauses.
+[Lines 126–162](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/CompiledClause/Compile.hs#L126-L162)
+compile its branches recursively. File blob:
+`962a80bbaee38601c392a2f9bfd2af8ea0f972d1`.
+The LHS substitution ranges above supply successive scoped refinements through
+later patterns and the RHS target. These sources do not establish Haskell
+field identity, row demand, proof erasure or totality. The GHC probe must check
+those boundaries separately. Both actual runtime lambdas must precede matching.
