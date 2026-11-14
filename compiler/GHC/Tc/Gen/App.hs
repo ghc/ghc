@@ -32,6 +32,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types ( TcGblEnv(tcg_type_env) )
+import GHC.Tc.Types.TcRef ( TcRef )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint (WantedConstraints(wc_simple), ctPred)
 import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..) )
@@ -463,9 +464,18 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
        ; tcRetainedAppEvidence $
          do { -- Step 2: Instantiate the function type (taking a quick look at args)
               -- See Note [Quick Look for particular Ids]
-              (inst_args, app_res_rho) <-
-                tcInstFunWithExpected expected_rho inst_plan do_ql inst_final
-                                      rn_head tc_fun fun_sigma rn_args
+              vta_cache <- case do_ql of
+                NoQL | not (null [() | ETypeArg{} <- rn_args])
+                  -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+                        ; if enabled then Just <$> newTcRef Nothing
+                          else return Nothing }
+                _ -> return Nothing
+            ; (inst_args, app_res_rho) <-
+                tcInstFunWithExpectedCache vta_cache expected_rho inst_plan do_ql inst_final
+                                           rn_head tc_fun fun_sigma rn_args
+            ; extra_cache <- case vta_cache of
+                Nothing -> return []
+                Just ref -> fromMaybe [] <$> readTcRef ref
 
             ; -- Step 3: Take a quick look at the result type
               -- See Note [QuickLook: arguments before result]
@@ -473,7 +483,7 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
                  (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
                  _                     -> return ()
 
-            ; finishAppWithCache arg_cache do_ql rn_expr fun_lspan rn_fun tc_fun
+            ; finishAppWithCache (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan rn_fun tc_fun
                                        inst_args app_res_rho exp_res_ty } }
 
 -- | Bind native dictionary evidence at the application that needs it.
@@ -605,12 +615,12 @@ checkResultTy rn_expr (tc_fun, fun_loc) inst_args app_res_rho res_ty
 tcValArgsWithCache :: RetainedArgCache -> QLFlag
                    -> (HsExpr GhcRn, SrcSpan) -> [HsExprArg 'TcpInst]
                    -> TcM [HsExprArg 'TcpTc]
-tcValArgsWithCache cache do_ql rn_head args = go do_ql 0 args
+tcValArgsWithCache cache do_ql rn_head args = go do_ql 0 0 args
   where
-    go :: QLFlag -> Int -> [HsExprArg 'TcpInst] -> TcM [HsExprArg 'TcpTc]
-    go _ _ [] = return []
-    go do_ql pos (arg : args)
-      = do { arg'  <- case (arg, lookup pos' cache) of
+    go :: QLFlag -> Int -> Int -> [HsExprArg 'TcpInst] -> TcM [HsExprArg 'TcpTc]
+    go _ _ _ [] = return []
+    go do_ql pos value_pos (arg : args)
+      = do { arg'  <- case (arg, lookup value_pos' cache) of
                (EValArg { ea_loc_span = lspan, ea_arg = larg
                         , ea_arg_ty = Scaled mult expected },
                 Just (typed_arg, actual, usage))
@@ -622,9 +632,13 @@ tcValArgsWithCache cache do_ql rn_head args = go do_ql 0 args
                                          , ea_arg_ty = noExtField
                                          , ea_arg = fmap (mkHsWrap wrap) typed_arg }) }
                _ -> tcValArg do_ql pos' rn_head arg
-           ; args' <- go do_ql pos' args
+           ; args' <- go do_ql pos' value_pos' args
            ; return (arg' : args') }
       where
+        -- See Note [Native inference after visible type applications].
+        !value_pos' | EValArg{} <- arg = value_pos + 1
+                    | EValArgQL{} <- arg = value_pos + 1
+                    | otherwise = value_pos
         -- Increment position if the argument is user-written type or value argument
         !pos' | user_visible arg = pos + 1
               | otherwise        = pos
@@ -772,12 +786,48 @@ tcInstFun = tcInstFunWithExpected Nothing Nothing
 
 -- | Instantiate arguments in telescope order, with optional immutable choices
 -- and a retained expected result after ordinary VTA.
+-- See Note [Native inference after visible type applications].
 tcInstFunWithExpected :: Maybe TcRhoType -> RetainedInstPlan -> QLFlag -> Bool
                       -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
                       -> TcSigmaType -> [HsExprArg 'TcpRn]
                       -> TcM ([HsExprArg 'TcpInst], TcSigmaType)
-tcInstFunWithExpected expected_rho inst_plan do_ql inst_final rn_head@(_, fun_lspan)
-                      tc_fun fun_sigma rn_args
+tcInstFunWithExpected = tcInstFunWithExpectedCache Nothing
+
+{- Note [Native inference after visible type applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ITYARG checks each written type argument once. After leading type arguments,
+use the substituted signature to infer native generic arguments before IALL
+allocates the remaining type variables. Keep the original head and checked
+type arguments. Pass immutable choices to IALL so that type applications and
+dictionaries retain their telescope order. Require NoQL, no consumed value
+arguments, no pending type arguments, and the existing generic inference guards.
+Native-index-kind instantiation keeps its existing prepass.
+
+Only tcApp enables this step. It retains the inferred argument cache even when
+matching fails. The public tcInstFun caller cannot consume a cache and leaves
+this step disabled. The optional reference records whether inference was
+attempted, so further IALL steps cannot infer an argument again. The mode
+argument gives the diagnostic offset of the consumed written type arguments.
+Ordinary calls without written type arguments do not allocate the reference.
+
+Cache keys count value arguments. Diagnostic positions also count written type
+arguments. Keep separate counters in tcValArgsWithCache; otherwise a written
+@Bool shifts the cache lookup and repeats argument checking or uses another
+argument's cached expression. Generated type arguments do not change diagnostic
+positions. Emit each saved usage once at the argument's actual multiplicity.
+See Note [Generic retained argument inference] for prefix matching and final
+subsumption. These rules do not assign native syntax to a type meta-variable.
+-}
+
+-- | Retain post-VTA argument inference for callers that consume its cache.
+-- See Note [Native inference after visible type applications].
+tcInstFunWithExpectedCache :: Maybe (TcRef (Maybe RetainedArgCache))
+                          -> Maybe TcRhoType -> RetainedInstPlan -> QLFlag -> Bool
+                          -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
+                          -> TcSigmaType -> [HsExprArg 'TcpRn]
+                          -> TcM ([HsExprArg 'TcpInst], TcSigmaType)
+tcInstFunWithExpectedCache vta_cache expected_rho inst_plan do_ql inst_final
+                          rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
   = do { lvl <- getTcLevel
        ; traceTc "tcInstFun" (vcat [ text "tc_fun" <+> ppr tc_fun
                                    , text "rn_fun" <+> ppr rn_head
@@ -869,7 +919,32 @@ tcInstFunWithExpected expected_rho inst_plan do_ql inst_final rn_head@(_, fun_ls
           ; case matched of
               Just (inst_tys, body)
                 -> go plan fun_orig pos (addArgWrap (mkWpTyApps inst_tys) acc) body args
-              Nothing -> go1 plan fun_orig pos acc fun_ty args }
+              Nothing -> do
+                { inferred <- case vta_cache of
+                    Just ref
+                      | pos == 1
+                      , any is_type_arg acc
+                      , not (any is_type_arg args)
+                      , hasNoConcreteTyVars tc_fun
+                      -> do { attempted <- readTcRef ref
+                            ; case attempted of
+                                Just _ -> return Nothing
+                                Nothing -> do
+                                  { (_, _, cache, choices) <-
+                                      tcRetainedArgInstEnabled (Just (count written_type_arg acc))
+                                        do_ql expected_rho
+                                        rn_head args tc_fun fun_ty
+                                  ; writeTcRef ref (Just cache)
+                                  ; return choices } }
+                    _ -> return Nothing
+                ; go1 inferred fun_orig pos acc fun_ty args } }
+
+    is_type_arg ETypeArg{} = True
+    is_type_arg _ = False
+
+    written_type_arg (ETypeArg { ea_loc_span = loc })
+      = not (isGeneratedSrcSpan (locA loc))
+    written_type_arg _ = False
 
     -- go1: fun_ty is not filled-in instantiation variable
     --      ('go' dealt with that case)
@@ -1856,21 +1931,24 @@ tcRetainedArgInst :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
 tcRetainedArgInst do_ql expected rn_head args fun sigma
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
        ; if enabled
-         then tcRetainedArgInstEnabled do_ql expected rn_head args fun sigma
+         then do { expected <- readExpType_maybe expected
+                 ; tcRetainedArgInstEnabled Nothing do_ql expected rn_head args fun sigma }
          else return (fun, sigma, [], Nothing) }
 
 -- | Match cached index arguments when the experimental extension is enabled.
 -- See Note [Available expected types in native applications].
 -- See Note [Generic retained argument inference] for overapplication.
-tcRetainedArgInstEnabled :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
+-- See Note [Native inference after visible type applications] for the mode argument.
+tcRetainedArgInstEnabled :: Maybe Int -> QLFlag -> Maybe TcRhoType -> (HsExpr GhcRn, SrcSpan)
                          -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
                          -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache, RetainedInstPlan)
-tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
+tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
   | not (any is_type_arg args)
   , (outer_tvs, body) <- tcSplitForAllInvisTyVars sigma
   , let (tvs, theta, tau) = tcRetainedInstTelescope sigma
         nested = length tvs /= length outer_tvs
   , let index_tvs = filter (isNativeIndexType . tyVarKind) tvs
+  , isNothing after_vta || null index_tvs
   , not (null tvs)
   , null theta || hasNoConcreteTyVars fun
   , let (domains, result) = splitFunTys tau
@@ -1881,8 +1959,7 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
     || (overapplied && arity > 0 && null index_tvs)
   , isTauTy tau, not (isFunTy result)
   , not (hasNativeDependentExpr (Core.Type body))
-  = do { expected_ty <- readExpType_maybe expected
-       ; expected_ty <- mapM (liftZonkM . zonkTcType) expected_ty
+  = do { expected_ty <- mapM (liftZonkM . zonkTcType) expected
        ; let index_route = not (null index_tvs)
              initial_subst | overapplied = Subst.emptySubst
                            | otherwise = result_subst expected_ty index_route tvs result
@@ -1937,7 +2014,7 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
                                   templates actual_tys)
                    -> do { valid <- tcRetainedInstScope inst_tys
                          ; if valid
-                           then if nested
+                           then if nested || isJust after_vta
                                 then return (fun, sigma, cache, Just inst_tys)
                                 else return (mkHsWrap (mkWpTyApps inst_tys) fun,
                                              Subst.substTy subst body, cache, Nothing)
@@ -1969,7 +2046,7 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
     infer_args tvs (inferable : rest) (domain : domains) pos
                (EValArg { ea_arg = arg } : args)
       = do { entry <- if inferable && any (`elemVarSet` tyCoVarsOfType (scaledThing domain)) tvs
-                      then addArgCtxt pos rn_head arg $
+                      then addArgCtxt (pos + fromMaybe 0 after_vta) rn_head arg $
                            do { (usage, (typed, actual)) <- tcCollectingUsage (tcInferRho arg)
                               ; return [(pos, (typed, actual, usage))] }
                       else return []
@@ -1977,7 +2054,7 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
            ; return (entry ++ entries) }
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
-tcRetainedArgInstEnabled _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+tcRetainedArgInstEnabled _ _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
 
 -- | Match complete generic argument candidates after ordinary head inference.
 -- See Note [Ordinary action heads in native inference].
