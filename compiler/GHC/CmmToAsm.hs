@@ -383,6 +383,25 @@ is known which side of a branch is likely, and lists the trade-offs made with
 that knowledge.
 -}
 
+{- Note [Proposed principles of the NCG]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note proposes two principles to GHC's developers. The native code generator
+does not keep the second: the BUG statements whose bug leads to wrong code or a
+failed compilation mark departures from semantic correctness, and none of them
+is labelled BUG TODO, so the labels mark none of them as a member of the
+second principle's TODO set but one: the BUG #27619 at livenessSCCs in
+GHC.CmmToAsm.Reg.Liveness, whose cause, Regs' Eq instance, TODO #27619 marks in
+GHC.CmmToAsm.Reg.Regs.
+
+* Correctness first. Semantic correctness is not traded for a measured gain
+  that an incorrect form gives by accident, until a form that has both has been
+  looked for and the trade has been agreed in review.
+* One TODO set. A departure from correctness that is left in place is marked
+  TODO, as a member of one set, so that the whole set is re-investigated
+  together. A bug so marked is understood, accepted for now and worked
+  around, not due to be fixed (Note [Labels in NCG comments]).
+-}
+
 --------------------
 nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle
               -> CgStream RawCmmGroup a
