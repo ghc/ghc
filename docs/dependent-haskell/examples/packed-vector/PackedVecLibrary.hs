@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ExperimentalDependentTypes #-}
 {-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE ExperimentalDependentTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
@@ -10,43 +10,43 @@
 {-# LANGUAGE TypeOperators #-}
 
 -- | Store and consume a runtime length with an indexed vector.
-module PackedVecLibrary
-    ( Nat (..)
-    , Vec (..)
-    , PackedVec (..)
-    , LE (..)
-    , BoundedVec (..)
-    , Add
-    , Sum (..)
-    , replicateNative
-    , withPacked
-    , repack
-    , ignorePacked
-    , headPacked
-    , unconsPacked
-    , toListPacked
-    , sameNat
-    , zipVec
-    , zipPacked
-    , sumNat
-    , appendNative
-    , appendPacked
-    , addSucc
-    , rightZero
-    , reverseAppendNative
-    , reverseNative
-    , reversePacked
-    , proofDepthBounded
-    , repackWithoutProof
-    , guardedRepack
-    , filterVec
-    , filterPacked
-    , filterBounded
-    , withBounded
-    , weakenRight
-    , toList
-    , natToInt
-    ) where
+module PackedVecLibrary (
+    Nat (..),
+    Vec (..),
+    PackedVec (..),
+    LE (..),
+    BoundedVec (..),
+    Add,
+    Sum (..),
+    replicateNative,
+    withPacked,
+    repack,
+    ignorePacked,
+    headPacked,
+    unconsPacked,
+    toListPacked,
+    sameNat,
+    zipVec,
+    zipPacked,
+    sumNat,
+    appendNative,
+    appendPacked,
+    addSucc,
+    rightZero,
+    reverseAppendNative,
+    reverseNative,
+    reversePacked,
+    proofDepthBounded,
+    repackWithoutProof,
+    guardedRepack,
+    filterVec,
+    filterPacked,
+    filterBounded,
+    withBounded,
+    weakenRight,
+    toList,
+    natToInt,
+) where
 
 import Data.Type.Equality ((:~:) (Refl))
 
@@ -197,15 +197,12 @@ toListPacked package = case unconsPacked package of
 
 -- | Compare runtime lengths and return equality evidence on success.
 sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
-sameNat n m = case n of
-    Z -> case m of
-        Z -> Just Refl
-        S q -> Nothing
-    S p -> case m of
-        Z -> Nothing
-        S q -> case sameNat p q of
-            Nothing -> Nothing
-            Just Refl -> Just Refl
+sameNat Z Z = Just Refl
+sameNat Z (S right) = Nothing
+sameNat (S left) Z = Nothing
+sameNat (S left) (S right) = case sameNat left right of
+    Nothing -> Nothing
+    Just Refl -> Just Refl
 
 -- | Pair elements of ordinary vectors with one shared length index.
 zipVec :: Vec a n -> Vec b n -> Vec (a, b) n

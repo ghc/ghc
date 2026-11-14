@@ -1421,6 +1421,38 @@ runModuleChecks libdir = do
         , "later evidence first index before payloads: packed-bottom-length"
         , "runtime leading context: ([],[7])"
         , "runtime leading context: ([42,42],[7])"
+        , "runtime equality matrix (0,0): same"
+        , "runtime equality matrix (0,1): different"
+        , "runtime equality matrix (0,2): different"
+        , "runtime equality matrix (0,3): different"
+        , "runtime equality matrix (1,0): different"
+        , "runtime equality matrix (1,1): same"
+        , "runtime equality matrix (1,2): different"
+        , "runtime equality matrix (1,3): different"
+        , "runtime equality matrix (2,0): different"
+        , "runtime equality matrix (2,1): different"
+        , "runtime equality matrix (2,2): same"
+        , "runtime equality matrix (2,3): different"
+        , "runtime equality matrix (3,0): different"
+        , "runtime equality matrix (3,1): different"
+        , "runtime equality matrix (3,2): different"
+        , "runtime equality matrix (3,3): same"
+        , "matrix partial ignores bottom index: ok"
+        , "matrix partial ignores cyclic index: ok"
+        , "matrix first index before second: packed-bottom-length"
+        , "matrix zero demands second index: equality-right-length"
+        , "matrix zero successor ignores predecessor: different"
+        , "matrix successor zero ignores predecessor: different"
+        , "matrix recursive left before right: packed-bottom-length"
+        , "matrix recursive right demand: equality-right-length"
+        , "matrix shared bottom still demanded: packed-bottom-length"
+        , "matrix cyclic successor zero mismatch: different"
+        , "runtime payload matrix (0,0): ([],[])"
+        , "runtime payload matrix (0,1): ([],[9])"
+        , "runtime payload matrix (1,0): ([7],[])"
+        , "runtime payload matrix (1,1): ([7],[9])"
+        , "payload matrix partial ignores fields: ok"
+        , "payload matrix first index before payloads: packed-bottom-length"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2686,7 +2718,15 @@ runPackageSourceRejectChecks = do
         , ("ReverseIndexEscape", 83865, "reverseNative", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n xs) = reverseNative @Int n xs"])
         , ("ReverseWrongPredecessor", 25897, "rest", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)", "bad n m xs acc = case n of", "  Z -> case xs of VNil -> acc", "  S k -> case xs of VCons x rest -> reverseAppendNative @a (S k) m rest acc"])
         , ("LaterWildcard", 83605, "bare variable pattern", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z _ xs ys = ys", "bad (S k) later xs ys = ys"])
-        , ("LaterConstructor", 83605, "bare variable pattern", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z Z xs ys = ys", "bad (S k) later xs ys = ys"])
+        , ("LaterConstructor", 83605, "constructor patterns in both selected index columns", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z Z xs ys = ys", "bad (S k) later xs ys = ys"])
+        , ("MatrixIncomplete", 83605, "each pair of constructors", [], [], ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Int", "bad Z Z = 0", "bad Z (S right) = 1", "bad (S left) Z = 2"])
+        , ("MatrixDuplicate", 83605, "matched by an earlier equation", [], [], ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Int", "bad Z Z = 0", "bad Z (S right) = 1", "bad (S left) Z = 2", "bad (S left) (S right) = 3", "bad Z Z = 4"])
+        , ("MatrixWrongDomain", 83605, "constructor patterns in both selected index columns", [], [], ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Int", "bad Z True = 0", "bad Z (S right) = 1", "bad (S left) Z = 2", "bad (S left) (S right) = 3"])
+        , ("MatrixNestedField", 83605, "bare variable", [], [], ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Int", "bad Z Z = 0", "bad Z (S (S right)) = 1", "bad (S left) Z = 2", "bad (S left) (S right) = 3"])
+        , ("MatrixFalseZeroSuccessor", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad Z (S right) = Just Refl", "bad (S left) Z = Nothing", "bad (S left) (S right) = Nothing"])
+        , ("MatrixFalseSuccessorZero", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad Z (S right) = Nothing", "bad (S left) Z = Just Refl", "bad (S left) (S right) = Nothing"])
+        , ("MatrixMissingRecursiveEvidence", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad Z (S right) = Nothing", "bad (S left) Z = Nothing", "bad (S left) (S right) = Just Refl"])
+        , ("MatrixContext", 83605, "Constraints within a retained constructor matrix", ["FlexibleContexts"], [], ["bad :: foreach (n :: Nat) -> Show Int => foreach (m :: Nat) -> Int", "bad Z Z = 0", "bad Z (S right) = 1", "bad (S left) Z = 2", "bad (S left) (S right) = 3"])
         , ("LaterUntypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = let ignored = [| 42 :: Int |] in ys", "bad (S k) later xs ys = ys"])
         , ("LaterTypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = let ignored = [|| 42 :: Int ||] in ys", "bad (S k) later xs ys = ys"])
         , ("LaterWrongResult", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = xs", "bad (S k) later xs ys = ys"])
@@ -2753,15 +2793,12 @@ runPackageSourceRejectChecks = do
         ]
     equality =
         [ "sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)"
-        , "sameNat n m = case n of"
-        , "  Z -> case m of"
-        , "    Z -> Just Refl"
-        , "    S q -> Nothing"
-        , "  S p -> case m of"
-        , "    Z -> Nothing"
-        , "    S q -> case sameNat p q of"
-        , "      Nothing -> Nothing"
-        , "      Just Refl -> Just Refl"
+        , "sameNat Z Z = Just Refl"
+        , "sameNat Z (S right) = Nothing"
+        , "sameNat (S left) Z = Nothing"
+        , "sameNat (S left) (S right) = case sameNat left right of"
+        , "  Nothing -> Nothing"
+        , "  Just Refl -> Just Refl"
         ]
     zipper =
         [ "zipVec :: Vec a n -> Vec b n -> Vec (a, b) n"
