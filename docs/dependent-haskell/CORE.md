@@ -135,9 +135,13 @@ erased universals after the parent exists.
 Role inference and role checking traverse field scope in order. A runtime index
 has a closed domain and cannot become a datatype parameter. Ordinary payload
 parameters keep their inferred roles. Source patterns substitute the actual field
-Id into later field types. Desugaring preserves that Id for one constructor
-equation. PMC uses the same scope rule for checked and speculative fields.
-Reject shared equations until their distinct field identities can be transported.
+Id into later field types. Retained fields require bare variables. Ordinary
+fields use GHC's pattern checker and can contain nested GADT patterns. Desugar
+each package equation into its own case on the shared scrutinee. Combine the
+failure continuations in source order. Each equation keeps its actual field
+Ids; no alias substitutes one runtime index for another. PMC uses checked
+outer pattern types and the existing scope rule for speculative fields.
+See Note [Retained package equation scope] in `GHC.HsToCore.Match.Constructor`.
 See Notes [Source retained constructor declarations] in `GHC.Tc.TyCl` and
 [Roles of retained constructor fields] in `GHC.Tc.TyCl.Utils`.
 

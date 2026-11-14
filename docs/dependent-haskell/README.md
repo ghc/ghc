@@ -30,7 +30,7 @@ Last updated: 2026-11-14.
 | Program entry | Ordinary single-module executable passes the bootstrap API, self-hosted CLI, and registered regression |
 | Native interfaces | Nat/Vec and Boolean signatures pass disk imports and cross-module execution; CLI reads check both format-rejection directions |
 | Configured fork version | `10.1.20261113.2`, with interface header `1001202611132`; matching compiler and libraries rebuilt |
-| Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, bare fields, and checked source `case` pass the runtime fixtures |
+| Source syntax | Algebraic domains, outer erased `forall`, retained telescopes, checked source `case`, and nested ordinary package-field patterns; retained fields remain bare variables |
 | Historical starting point | `nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`, dated 2014-08-19 |
 | Arithmetic proofs | Runtime Nat induction returns ordinary `:~:` evidence and transports vectors; ignored proofs and partial transport stay lazy |
 | Generic consumers | Ordinary `force`, `id`, `Just`, and `const` accept named retained values; linear proof use and retained-function WHNF pass |
@@ -39,12 +39,13 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages, five registered regressions, the Core API and bootstrap runtime pass; the bounded source filter has 58 runtime observations and 19 package/bound rejection checks |
+| Last verified checkpoint | Both compiler stages, five registered regressions, the Core API and bootstrap runtime pass; the source example has 81 runtime observations and 20 package/bound rejection checks |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
 | Bounded source filter | Both compiler stages run the three-field source package; the filter constructs a checked LE proof while unused, partial and cyclic proof fields retain their tested laziness |
-| Next task | Broaden source package patterns, with a concrete source target before changing the match compiler |
+| Source package patterns | Nested vector/proof patterns, wildcard proof fields and guarded clauses pass in both stages; separate cases preserve each row's runtime index Ids |
+| Next task | Repackage a source vector tail with its actual runtime predecessor |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -1855,3 +1856,70 @@ and a terminating proof. This does not establish totality, predicate selection
 correctness or general proof erasure. Native optimization, broader package
 patterns and general projections remain separate work. The full GHC suite was
 not run.
+
+## Nested source package pattern checkpoint
+
+Implementation: `7a98362197`; source target and provenance: `0b87e9fe16`.
+The [source library](examples/packed-vector/README.md#nested-package-patterns)
+now checks complete consumers with nested vector and proof patterns:
+
+```haskell
+headPacked :: PackedVec a -> Maybe a
+headPacked (PackVec n VNil) = Nothing
+headPacked (PackVec m (VCons x xs)) = Just x
+```
+
+Retained fields remain bare source variables. Ordinary fields use `tcConArg`,
+so nested GADT evidence scopes over later fields and the RHS. Each package
+equation compiles to its own case on the shared scrutinee. Existing
+`MatchResult` failure continuations preserve source clause order. The compiler
+does not merge different index Ids through let aliases. PMC uses each checked
+outer pattern type and retains sequential speculative field instantiation.
+Ordinary constructor-family compilation keeps its existing path. Core and
+interface formats are unchanged. See Note [Retained package equation scope]
+in `GHC.HsToCore.Match.Constructor` and the
+[pinned Agda sources](REFERENCES.md#source-package-patterns).
+
+Validation on 2026-11-14:
+
+- Both compiler stages compile and run separate producer and interface-only
+  consumer modules with Core and STG Lint. All 81 observations pass: the
+  previous 58 plus 23 nested-pattern, wildcard and clause-order observations.
+  Runtime cutoffs produce heads `Just 1`, `Just 2`, `Nothing` and proof depths
+  3, 2, 0. The source snapshots match the committed examples exactly.
+- The runtime fixtures check 20 package/bound rejections. The previous shared
+  equation restriction is replaced by positive guarded clauses. New checks
+  reject a nested index escape with located GHC-05617 and a retained-field
+  wildcard with GHC-83605. A standalone harness pins those results and the
+  retained-field constructor rejection. No GHC API producer adds the examples.
+- The successful bootstrap compiler build took 22.14s and peaked at 1,876 MiB.
+  The self-hosted compiler target and dependencies built in 17m26s and peaked
+  at 4,844 MiB. Both jobs used serial 16 GiB caps with swap disabled.
+- The bootstrap source run peaked at 96 MiB under 4 GiB. The self-hosted
+  source, Core API, bootstrap runtime and pinned negative checks pass together
+  at 1,203 MiB under 4 GiB.
+- All five focused registered tests pass: 39 cases, 34 skips, no unexpected
+  results, and no framework failures or warnings. The driver took 25.560s.
+  The full job took 3m41s and peaked at 3,029 MiB under 8 GiB.
+- CorePrep/STG preserve distinct `n` and `m` fields in separate cases on the
+  shared scrutinee. Proof/wildcard and catchall observations preserve the
+  checked field demand. The previous-format reader's three hashes are
+  unchanged. Fourmolu checks, compiler parsing, an ignored Cabal-gild copy and
+  whitespace checks pass. The Default MR template requires regression coverage.
+
+Artifacts use `_build/verification/native-package-pattern-`. Successful logs
+are `bootstrap-build-v2.log`, `bootstrap-run-v1.log`, `selfhost-build-v1.log`,
+`selfhost-run-v1.log`, `api-v1.log`, `bootstrap-runtime-v1.log`,
+`negatives-v2.log` and `registered-v1.log`. Input, source, documentation,
+harness and output manifests identify this checkpoint. The saved Agda
+`Compile.hs` has Git blob `962a80bbaee38601c392a2f9bfd2af8ea0f972d1`.
+The initial build log records a missing `hsPatType` import, fixed before v2.
+The first probe needed its imported interface copied to the one-shot hidir;
+the corrected baseline probes are in `probes-v2/`. These are separate from
+the passing source execution and final negative checks.
+
+Retained index constructor patterns, lazy package patterns, pattern bindings,
+linear package elimination and general projections remain gated. Native
+optimization, proof erasure and totality remain separate work. The full GHC
+suite was not run. Next, probe a source `unconsPacked` that packages the vector
+tail with the actual runtime predecessor from the stored length.

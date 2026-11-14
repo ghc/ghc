@@ -24,9 +24,15 @@ checks, the five focused registered regressions, Core API and bootstrap runtime
 also pass. See [the recorded evidence](README.md#source-vector-filter-checkpoint).
 M12's length-bound proof is verified at `7eae40be91`, with the nested-context
 instantiation fix at `4ad47fdeca`. Both stages pass all 58 source observations;
-the runtime fixtures also check 19 package/bound rejections. Broader package
-patterns are next. Preserve the existing signature, proof, laziness and ordinary
-Haskell controls.
+the runtime fixtures also check 19 package/bound rejections. Preserve the
+existing signature, proof, laziness and ordinary Haskell controls.
+
+M13 is verified at `7a98362197`. Its source run passes 81 observations in both
+stages. Ordinary package fields admit nested vector/proof patterns and wildcards.
+Separate per-equation cases preserve retained field identity and source clause
+order. The API and runtime controls pass with 20 package/bound rejection checks.
+All five focused registered regressions pass. The next source target repackages
+a vector tail with its actual runtime predecessor.
 
 ## Direction and boundaries
 
@@ -996,7 +1002,7 @@ filterBounded :: forall a limit.
 - [x] Validate source execution and the existing compatibility controls. Record
   any newly exposed source gate before changing compiler rules.
 
-Agda's bound field is irrelevant. The proposed Haskell `LE` field is an ordinary
+Agda's bound field is irrelevant. The Haskell `LE` field is an ordinary
 lazy runtime field. General proof erasure remains separate work.
 A bound interpretation requires terminating indices and a terminating `LE`
 proof. Bottom and cyclic proofs remain valid
@@ -1050,21 +1056,21 @@ Follow Agda's constructor telescope and source clause discrimination. Preserve
 Haskell's clause order and field demand. See
 [the primary sources](REFERENCES.md#source-package-patterns).
 
-- [ ] Keep retained index fields as bare source variables. Check ordinary
+- [x] Keep retained index fields as bare source variables. Check ordinary
   fields with `tcConArg`, including nested GADT patterns and wildcards. Keep
   the one-constructor, prefix, unrestricted and strict-package restrictions.
-- [ ] Compile each retained package equation with its own actual field Ids.
+- [x] Compile each retained package equation with its own actual field Ids.
   Match the original shared scrutinee and combine failure continuations in
   source order. Do not merge clause-local index Ids with ordinary let aliases.
   Keep ordinary constructor-family compilation unchanged.
-- [ ] Use checked outer field pattern types in PMC desugaring. Retain the
+- [x] Use checked outer field pattern types in PMC desugaring. Retain the
   existing sequential speculative constructor instantiation. Add no new Core
   or interface representation.
-- [ ] Execute nested vector and proof patterns, wildcard proof fields and a
+- [x] Execute nested vector and proof patterns, wildcard proof fields and a
   runtime failed guard. Check partial tails/elements, unused bottom indices,
   demanded payload/proof, catchall order and bottom packages. Reject an index
   escape through a nested pattern with a located diagnostic.
-- [ ] Validate both compiler stages, separate source interfaces, Core/STG Lint,
+- [x] Validate both compiler stages, separate source interfaces, Core/STG Lint,
   focused registered regressions and the existing API/runtime controls. Record
   source restrictions, commands, resource peaks and artifact provenance.
 
@@ -1073,6 +1079,14 @@ index binder. A later row reuses the already shared scrutinee. This can produce
 more cases than a decision tree with shared fields. Optimization remains
 separate work. General projections and constructor patterns in retained index
 fields remain outside this increment.
+
+The implementation and validation are recorded in
+[the checkpoint](README.md#nested-source-package-pattern-checkpoint).
+Next, probe `unconsPacked :: PackedVec a -> Maybe (a, PackedVec a)`. Match the
+stored length with `Z` and `S k`. In the successor branch, match the vector
+and package its tail at actual runtime `k`. Keep the predecessor, head and
+tail lazy until a consumer demands them. This source target is not verified
+yet. It must use the current checked case rule before a new rule is proposed.
 
 ## Further work
 
