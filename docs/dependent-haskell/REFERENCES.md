@@ -1265,6 +1265,16 @@ File blob: `ff0888af84f3101351c501534de087c180dc7afd`.
 These sources motivate the captured-context transport. They do not supply
 Haskell's evaluation rules or prove preservation for this fork.
 
+The full observer also exposed a GHC adaptation at Core Tidy. `tidyTopPair`
+converts top-level LocalIds to GlobalIds. A retained constructor tree can
+mention such an Id before this conversion. Native indices still require local
+Ids afterward. Create lazy local aliases before tidying native RHSs and
+substitute expressions, types and coercions together. Keep alias RHSs outside
+that substitution. Reuse GHC's deterministic free-variable traversal,
+`Core.Subst.substExpr`, and the CorePrep native alias guard. This is a Haskell
+representation requirement, not a rule taken from Agda. See
+Note [Local indices across Core Tidy] in `GHC.Iface.Tidy`.
+
 The Haskell zero branch must ignore its vector. The successor branch must
 inspect the vector constructor. Returning the result, pair and tail package
 must leave predecessor, head and tail fields lazy. A terminating finite input

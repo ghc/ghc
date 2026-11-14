@@ -1120,6 +1120,15 @@ See [the pinned sources](REFERENCES.md#source-vector-uncons).
   and STG Lint. Update the existing runtime regression and run its registered
   normal way. Record exact commands, resource peaks and artifact hashes.
 
+The full source observer exposed a later boundary: Tidy globalises top-level
+Ids that typechecking accepted while they were local. `S bottomLength` then
+fails Core Lint. Before tidying a native RHS, create lazy local aliases for
+its free top-level index Ids and substitute the complete RHS, including types
+and coercions. Keep the alias RHSs as references to the original top bindings.
+Use GHC's existing deterministic FV traversal, Core substitution and CorePrep
+alias guard. Keep ordinary RHSs and the local-index grammar unchanged.
+Preserve the failing source expression as a regression observation.
+
 This exercise does not infer a runtime predecessor from an erased type. It
 does not add general projections, retained index patterns or proof erasure.
 Finite results and bounded partial/cyclic observations do not prove totality.
