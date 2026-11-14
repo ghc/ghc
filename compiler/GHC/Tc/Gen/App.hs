@@ -1615,7 +1615,6 @@ tcRetainedInferableArg (L _ expr)
                         ; return (True, fun_anchor || arg_anchor) } }
       HsAppType _ fun _ -> tcRetainedInferableArg fun
       ExplicitTuple _ args Boxed
-        | all tupArgPresent args
         -> do { shapes <- mapM tcRetainedInferableArg [arg | Present _ arg <- args]
               ; return (True, any snd shapes) }
       ExprWithTySig _ arg sig@(HsWC { hswc_body = L _ (HsSig { sig_bndrs = bndrs
