@@ -1227,6 +1227,18 @@ the right operand's saved usage once under its final multiplicity. Other
 Quick Look calls keep their current path. No native type enters a mutable
 type variable or a Quick Look instantiation variable.
 
+The full retest clears the IO-let and polymorphic vector-field errors. Its
+five dollar/proof observations remain in discarded `do` statements. Such a
+statement has expected type `IO alpha` before its result is discarded.
+If this expected result is incomplete, read the named first operand's
+declared ordinary signature without elaborating it. A result independent of
+its outer invisible binders can supply the complete dollar result. For
+`expectMarker label marker`, the result after those two arguments and the
+dollar operand is `IO ()`. Require a known tau result without mutable
+variables. Keep the original expected type for final `checkResultTy`.
+Do not infer the first operand, expand a splice or choose a result that
+depends on an undetermined template binder.
+
 ## Further work
 
 After M8, review broader retained kinds, nested and higher-order dependence,
