@@ -1059,6 +1059,47 @@ mkGlobalWeights root localCfg
     fromVertex :: Int -> BlockId
     fromVertex vertex   = blockMapping ! vertex
 
+{- Note [Where a branch's likely side is known]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Which side of a conditional branch runs more often is known in one of three
+places, and the code generator treats each case differently:
+
+* Where the branch is made. GHC.StgToCmm annotates some branches with their
+  likely side, and getCfg sets the weights of an annotated branch's edges from
+  the annotation. One such branch is that of a heap or stack check to the
+  garbage collector, which GHC.StgToCmm.Heap marks as unlikely (`Just False`).
+  getCfg tags such a branch HeapStackCheck, and staticBranchPrediction leaves
+  alone the weights of any branch with an edge so tagged. getCfg recognises the
+  branch by the registers its condition reads, not by the annotation, so other
+  tests of the same registers are tagged too (a BUG at getCfg). Of the third
+  case's heuristics, two reach any other annotated branch: lehPredicts combines
+  its prediction with the weights the branch has by then, and the back edge rule
+  replaces them where the branch has both a back edge and another edge (the BUG
+  in Note [Static Branch Prediction]). ohPredicts skips an annotated branch.
+
+* Upstream, and not carried down. Core and STG know which constructor a tag
+  test selects, but the test that chooses a case alternative carries no
+  annotation: cgAlts in GHC.StgToCmm.Expr makes it a CmmSwitch, which
+  GHC.Cmm.Switch.Implement turns into CmmCondBranches without one. So ohPredicts
+  treats it like any comparison with a constant (a BUG TODO there).
+
+* Nowhere. Under -fcmm-static-pred, staticBranchPrediction applies its
+  heuristics to every other two-way branch: a loop is not left (lehPredicts), a
+  comparison with a literal is unequal (ohPredicts), and a back edge is taken
+  (Note [Static Branch Prediction]).
+
+The code generator keeps these trade-offs with that knowledge, each for the
+reason given:
+
+* GHC.Cmm.ContFlowOpt inverts a condition so that the likely side falls through,
+  even where not inverting would be faster: telling those cases apart is neither
+  easy nor cheap, and inverting gives smaller binaries and code that is as fast
+  on average (Note [Invert Cmm conditionals]).
+* The layout leaves out edges across calls when it builds chains (directEdges
+  in GHC.CmmToAsm.BlockLayout): control returns from a call to its continuation
+  through the continuation's info table, not by falling through.
+-}
+
 {- Note [Static Branch Prediction]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The work here has been based on the paper

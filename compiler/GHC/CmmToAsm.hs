@@ -167,6 +167,23 @@ It also lists the older TODOs and the sentences that only mention a label. With
 mentions, as no older comment in these files uses either word.
 -}
 
+{- Note [Norms of the NCG]
+   ~~~~~~~~~~~~~~~~~~~~~~~~
+GHC's own documents hold the native code generator to these norms:
+
+* Under -fobject-determinism, the output is bit-for-bit the same for the same
+  inputs (Note [Unique Determinism and code generation] in GHC.Types.Unique). So
+  an order that code takes from uniques is a question for review: see
+  Note [Unique order in the linear allocator] in GHC.CmmToAsm.Reg.Linear.
+* The testsuite passes -dcmm-lint to GHC by default (TEST_HC_OPTS in
+  testsuite/mk/test.mk). So a test written in Cmm must be one that Cmm lint
+  accepts.
+
+Note [Where a branch's likely side is known] in GHC.CmmToAsm.CFG says where the
+code generator learns which side of a branch is likely, and lists the trade-offs
+made with that knowledge.
+-}
+
 --------------------
 nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle
               -> CgStream RawCmmGroup a
