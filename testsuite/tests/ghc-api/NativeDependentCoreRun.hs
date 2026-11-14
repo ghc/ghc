@@ -2952,6 +2952,8 @@ Conversion must retain each constraint arrow and its predicate. A known
 monomorphic variable can use its checked type without Quick Look inference.
 The negative head and local-alias cases record current inference restrictions.
 They do not specify that these source forms must always reject.
+Alias checks distinguish an unused synonym parameter from an occurrence in
+the expanded predicate.
 
 The local alias has separate inference and Quick Look diagnostics. Check both
 located envelopes from one compilation. The standalone matrix pins their exact
@@ -3161,6 +3163,7 @@ runPackageSourceRejectChecks = do
         , ("QualifiedPiPolymorphicHeadUnsupported", 83605, "Quick Look inference", qualifiedPiExtensions, [], ["polyHead :: (foreach (n :: Nat) -> Eq Int => Vec Int n)", "polyHead = undefined"])
         , ("QualifiedPiAppliedHeadUnsupported", 83605, "Quick Look inference", qualifiedPiExtensions, [], ["sameQ :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "sameQ f = f", "applied :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "applied f = sameQ f"])
         , ("QualifiedPiLeadingDictionaryUnsupported", 83605, "Quick Look inference", qualifiedPiExtensions, [], ["leading :: (Eq Int => (foreach (n :: Nat) -> Eq Int => Vec Int n)) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "leading f = f"])
+        , ("QualifiedAliasPredicateOccurrence", 83865, "Couldn't match expected type", qualifiedPiExtensions, [], ["type Cycle value = foreach (n :: Nat) -> Eq value => Vec Int n", "badAliasCycle :: forall value. value ~ Cycle value => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Eq value => Vec Bool n), Vec Bool m))", "badAliasCycle f = f"])
         , ("MatrixFallbackUntypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad (S left) (S right) = Nothing", "bad first second = let ignored = [| 42 :: Int |] in Nothing"])
         , ("MatrixFallbackTypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad (S left) (S right) = Nothing", "bad first second = let ignored = [|| 42 :: Int ||] in Nothing"])
         , ("LaterUntypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = let ignored = [| 42 :: Int |] in ys", "bad (S k) later xs ys = ys"])
@@ -3240,6 +3243,8 @@ runPackageSourceRejectChecks = do
         , ("CapturedQualifiedGiven", qualifiedPiExtensions, [], ["capturedGiven :: forall value. foreach (k :: Nat) -> value ~ (foreach (n :: Nat) -> Eq (Vec Int k) => Vec Int n) => value -> (foreach (n :: Nat) -> Eq (Vec Int k) => Vec Int n)", "capturedGiven k f = f"])
         , ("CapturedQualifiedGivenBeneathBinder", qualifiedPiExtensions, [], ["capturedLift :: forall value. foreach (k :: Nat) -> value ~ (foreach (n :: Nat) -> Eq (Vec Int k) => Vec Int n) => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Eq (Vec Int k) => Vec Int n), Vec Bool m))", "capturedLift k f = f"])
         , ("OrdinaryImpredicativeList", qualifiedPiExtensions, [], ["ids :: [forall a. a -> a]", "ids = [id, id]"])
+        , ("QualifiedAliasBeneathBinder", qualifiedPiExtensions, [], ["type Q = foreach (n :: Nat) -> Eq Int => Vec Int n", "type Lift = foreach (m :: Nat) -> Vec Bool m -> Q", "aliasLift :: forall value. value ~ Q => (foreach (m :: Nat) -> Vec Bool m -> value) -> Lift", "aliasLift f = f"])
+        , ("ForgetfulQualifiedAlias", qualifiedPiExtensions, [], ["type Forget value = foreach (n :: Nat) -> Eq Int => Vec Int n", "forgetful :: forall value. value ~ Forget value => (foreach (m :: Nat) -> Vec Bool m -> value) -> (foreach (m :: Nat) -> Vec Bool m -> Forget value)", "forgetful f = f"])
         ]
         $ \(name, extensions, imports, declarations) -> do
             let moduleName = "NativeSourcePiOperand" ++ name
