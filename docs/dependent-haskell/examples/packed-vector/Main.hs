@@ -182,9 +182,9 @@ runIndexMatrixChecks = do
         assertEqual (label ++ " reference") wanted reference
         assertEqual label wanted actual
         putStrLn (label ++ ": " ++ actual)
-    _ <- evaluate (sameNatByCase bottomLength `seq` ())
+    checkWhnf (sameNatByCase bottomLength)
     assertWhnf "matrix partial ignores bottom index" (sameNat bottomLength)
-    _ <- evaluate (sameNatByCase cyclicLength `seq` ())
+    checkWhnf (sameNatByCase cyclicLength)
     assertWhnf "matrix partial ignores cyclic index" (sameNat cyclicLength)
     check_marker
         "matrix first index before second"
@@ -525,6 +525,12 @@ assertEqual :: (Eq a, Show a) => String -> a -> a -> IO ()
 assertEqual label expected actual =
     unless (expected == actual) $
         fail (label ++ ": expected " ++ show expected ++ ", got " ++ show actual)
+
+-- | Evaluate a value without adding a printed observation.
+checkWhnf :: a -> IO ()
+checkWhnf value = do
+    _ <- evaluate value
+    pure ()
 
 -- | Check constructor or function weak-head normal form.
 assertWhnf :: String -> a -> IO ()
