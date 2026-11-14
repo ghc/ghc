@@ -112,6 +112,7 @@ module GHC.Data.Word64Map.Internal (
 
     -- ** Union
     , union
+    , unionShared
     , unionWith
     , unionWithKey
     , unions
@@ -312,7 +313,7 @@ import GHC.Utils.Containers.Internal.StrictPair
 import Data.Coerce
 import Data.Data (Data(..), Constr, mkConstr, constrIndex, Fixity(Prefix),
                   DataType, mkDataType, gcast1)
-import GHC.Exts (build)
+import GHC.Exts (build, isTrue#, reallyUnsafePtrEquality#)
 import qualified GHC.Exts as GHCExts
 import Text.Read
 import qualified Control.Category as Category
@@ -1148,6 +1149,54 @@ unionsWith f ts
 union :: Word64Map a -> Word64Map a -> Word64Map a
 union m1 m2
   = mergeWithKey' Bin const id id m1 m2
+
+-- | \(O(n+m)\). The (left-biased) union of two maps, as 'union', returning
+-- the first map itself where the second adds nothing to it.
+--
+-- For all @m1@ and @m2@, @unionShared m1 m2 == union m1 m2@: the same keys,
+-- with @m1@'s value where both maps have the key.
+--
+-- The walk goes down both maps together while the part of @m2@ lies
+-- within one half of the subtree of @m1@ or has the subtree's prefix
+-- and switching bit. It stops at a part that is the subtree itself, by
+-- 'GHC.Exts.reallyUnsafePtrEquality#', a key the subtree has or empty, and
+-- hands any other part, which has a key outside the subtree's range, to 'union'
+-- with the subtree. Each subtree of @m1@ that the walk reaches with a part of
+-- @m2@ that has no key the subtree lacks is in the result unchanged, and so,
+-- where @m2@ has no key that @m1@ lacks, is @m1@ itself. That holds where the
+-- pointer test answers True for the same object; it may answer False, and the
+-- result is then still equal, with less of @m1@ in it. Where @m1@ and @m2@ were
+-- made from one map by /k/ insertions and deletions in all and @m2@ has no key
+-- that @m1@ lacks, the walk takes \(O(k \cdot \min(n,W))\), if the pointer test
+-- answers True for the subtrees they share.
+--
+-- > unionShared (fromList [(5, "a"), (3, "b")]) (fromList [(5, "A"), (7, "C")]) == fromList [(3, "b"), (5, "a"), (7, "C")]
+
+unionShared :: Word64Map a -> Word64Map a -> Word64Map a
+unionShared = go
+  where
+    go !a !b | isTrue# (reallyUnsafePtrEquality# a b) = a
+    go a@(Bin p1 m1 l1 r1) b@(Bin p2 m2 l2 r2)
+      | m1 == m2, p1 == p2 = node a p1 m1 (go l1 l2) l1 (go r1 r2) r1
+      | shorter m1 m2, not (nomatch p2 p1 m1) = into a p1 m1 l1 r1 p2 b
+    go a@(Bin p1 m1 l1 r1) b@(Tip k _)
+      | not (nomatch k p1 m1) = into a p1 m1 l1 r1 k b
+    go a@(Tip k1 _) (Tip k2 _) | k1 == k2 = a
+    go a Nil = a
+    -- noinline: SpecConstr makes at most three specialisations of a function
+    -- (-fspec-constr-count). Called plainly here, union got call patterns that
+    -- took all three and left none for its own recursion, and union_info grew
+    -- from 2359 to 2895 bytes, on GHC 10.1.20261111.
+    go a b = GHCExts.noinline union a b
+    -- b's keys under a's switching bit m on one side
+    into a p m l r k b
+      | zero k m  = node a p m (go l b) l r r
+      | otherwise = node a p m l l (go r b) r
+    -- a itself where l and r are its own subtrees l0 and r0
+    node a p m !l l0 !r r0
+      | isTrue# (reallyUnsafePtrEquality# l l0)
+      , isTrue# (reallyUnsafePtrEquality# r r0) = a
+      | otherwise = Bin p m l r
 
 -- | \(O(n+m)\). The union with a combining function.
 --

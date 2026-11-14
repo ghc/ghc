@@ -120,6 +120,7 @@ module GHC.Data.Word64Map.Lazy (
 
     -- ** Union
     , union
+    , unionShared
     , unionWith
     , unionWithKey
     , unions

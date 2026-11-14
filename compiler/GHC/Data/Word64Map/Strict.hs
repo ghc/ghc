@@ -137,6 +137,7 @@ module GHC.Data.Word64Map.Strict (
 
     -- ** Union
     , union
+    , unionShared
     , unionWith
     , unionWithKey
     , unions
