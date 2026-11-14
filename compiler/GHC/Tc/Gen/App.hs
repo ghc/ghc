@@ -28,6 +28,7 @@ import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
 import GHC.Tc.Utils.TcMType
+import GHC.Tc.Types ( TcGblEnv(tcg_type_env) )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint (WantedConstraints(wc_simple), ctPred)
 import GHC.Tc.Types.ErrCtxt ( FunAppCtxtFunArg(..) )
@@ -55,6 +56,8 @@ import GHC.Builtin.WiredIn.Types ( multiplicityTy, runtimeRepTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.KnownKeys
 
+import GHC.Types.TyThing ( TyThing(AnId) )
+import GHC.Types.TypeEnv ( lookupTypeEnv )
 import GHC.Types.Var
 import GHC.Types.Var.Set ( elemVarSet )
 import GHC.Types.Var.FV
@@ -413,7 +416,7 @@ tcApp :: HsExpr GhcRn        -- ^ The whole application (For error messages)
 -- See Note [tcApp: typechecking applications]
 -- See Note [splitHsApps] in GHC.Tc.Head
 tcApp rn_expr rn_fun rn_args exp_res_ty
-  = do { do_ql     <- wantQuickLook rn_fun
+  = do { wanted_ql <- wantQuickLook rn_fun
        ; fun_lspan <- getFunSrcSpan rn_args
        ; traceTc "tcApp {" $
            vcat [ text "rn_fun:" <+> ppr rn_fun
@@ -424,11 +427,17 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
        -- Step 1: Infer the type of `fun`, the head of the application
        ; let rn_head = (rn_fun, fun_lspan)
        ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
-       ; (tc_fun1, fun_sigma1) <- tcRetainedExpectedInst do_ql exp_res_ty rn_args
+       ; (tc_fun1, fun_sigma1) <- tcRetainedExpectedInst wanted_ql exp_res_ty rn_args
                                                      tc_fun0 fun_sigma0
-       ; (tc_fun, fun_sigma, arg_cache, inst_plan) <-
-           tcRetainedArgInst do_ql exp_res_ty rn_head rn_args tc_fun1 fun_sigma1
-       ; let -- inst_final: top-instantiate the result type of the application,
+       ; (tc_fun2, fun_sigma2, initial_cache, inst_plan) <-
+           tcRetainedArgInst wanted_ql exp_res_ty rn_head rn_args tc_fun1 fun_sigma1
+       ; (dollar_inst, dollar_cache) <-
+           tcRetainedDollarInst exp_res_ty rn_head rn_args tc_fun2 fun_sigma2
+       ; let (tc_fun, fun_sigma) = fromMaybe (tc_fun2, fun_sigma2) dollar_inst
+             arg_cache = initial_cache ++ dollar_cache
+             do_ql | null dollar_cache = wanted_ql
+                   | otherwise = NoQL
+             -- inst_final: top-instantiate the result type of the application,
              -- EXCEPT if we are trying to infer a sigma-type
              expected_rho = case exp_res_ty of
                               Check rho -> Just rho
@@ -1068,8 +1077,11 @@ tcRetainedArg arg
             | otherwise
             -> do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
                   ; case mb_id of
-                      Just arg_id | isNativeIndexId arg_id
-                        -> return (Core.Var arg_id)
+                      Just arg_id
+                        -> do { arg_id <- liftZonkM (zonkId arg_id)
+                              ; if isNativeIndexId arg_id
+                                then return (Core.Var arg_id)
+                                else unsupported }
                       _ -> unsupported }
           _ -> unsupported
 
@@ -1131,8 +1143,8 @@ tcRetainedExpectedInst do_ql expected args fun sigma
                      Check rho -> Just rho
                      Infer {}  -> Nothing
 
-{- Note [Retained constructor instantiation candidates]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Retained instantiation candidates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Refl repeats its index in its result. An expected result can contain two
 indices that are equal only under a local Given. For example, the recursive
 step of a right-zero proof expects Add (S k) Z :~: S k. An exact immutable
@@ -1140,24 +1152,31 @@ match fails before the solver can use the recursive proof Add k Z ~ k.
 Ordinary instantiation would instead create an index meta-variable. The
 native meta-variable fill check correctly rejects that assignment.
 
-For a data constructor, match corresponding result arguments independently.
-Use the first candidate for each outer invisible binder. Require a complete,
-well-kinded substitution and check the local scope of every runtime Id.
+For a known ordinary Id or data constructor, match corresponding result
+arguments independently. Use the first candidate for each outer invisible
+binder. Require a complete, well-kinded substitution and check the local scope
+of every runtime Id.
 This substitution chooses type arguments. It does not prove that the result
 has the expected type. Repeated occurrences can still require an equality.
 
-Emit WpTyApps and keep the actual substituted constructor type. Both the early
+For example, leftVector :: forall n. Vec Int n can be checked against
+Vec alpha bottomLength while the ordinary payload meta alpha is unresolved.
+The whole-result match cannot bind alpha. The independent index argument
+provides n := bottomLength. Keep Vec Int bottomLength as the actual result;
+final subsumption can fill the ordinary alpha with Int. It must still reject
+an incompatible expected index. Candidate selection is not equality evidence.
+
+Emit WpTyApps and keep the actual substituted function type. Both the early
 application route and tcInstFunWithExpected continue to finishAppWithCache.
 Its checkResultTy call checks subsumption against the original expected type
 and emits the required equality evidence. For example, a non-reflexive Refl
 still fails without a suitable Given. Never replace the actual result with
 the expected result, or use a reflexive coercion for this check.
 
-Keep this fallback under NoQL. Require a data constructor head, a saturated
-ordinary algebraic result, no pending type arguments, and no constraints or
-native template. Leave constructors with concreteness requirements on the
-ordinary instantiation path. Pattern synonyms and ordinary functions do not
-use this fallback. No mutable type variable receives retained syntax. The exact
+Keep this fallback under NoQL. Require a known head without concreteness
+requirements, a saturated ordinary algebraic result, no pending type arguments,
+and no constraints or native template. Pattern synonyms do not use this
+fallback. No mutable type variable receives retained syntax. The exact
 result match remains the first choice. Before either match, zonk the native
 expected type. The enclosing application can have filled ordinary payload
 metas during its result check. For example, PackVec n bottomPayload checks
@@ -1182,15 +1201,15 @@ tcRetainedResultInst do_ql expected args fun sigma
        ; matched <- tcRetainedResultMatch do_ql expected args fun sigma
        ; case matched of
            Just _ -> return matched
-           Nothing -> tcRetainedConResultInst do_ql expected args fun sigma }
+           Nothing -> tcRetainedResultCandidate do_ql expected args fun sigma }
 
--- | Choose immutable constructor type arguments for ordinary result checking.
-tcRetainedConResultInst :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
-                        -> HsExpr GhcTc -> TcSigmaType
-                        -> TcM (Maybe ([Type], TcSigmaType))
-tcRetainedConResultInst NoQL (Just expected) args
-                       (XExpr (ConLikeTc (RealDataCon dc))) sigma
-  | isEmptyNameEnv (dataConConcreteTyVars dc)
+-- | Choose immutable type arguments from independent algebraic result arguments.
+-- Keep the actual result type for the subsequent subsumption check.
+tcRetainedResultCandidate :: QLFlag -> Maybe TcRhoType -> [HsExprArg 'TcpRn]
+                         -> HsExpr GhcTc -> TcSigmaType
+                         -> TcM (Maybe ([Type], TcSigmaType))
+tcRetainedResultCandidate NoQL (Just expected) args fun sigma
+  | hasNoConcreteTyVars fun
   , hasNativeDependentExpr (Core.Type expected)
   , not (any is_type_arg args)
   , (tvs, body) <- tcSplitForAllInvisTyVars sigma
@@ -1199,7 +1218,11 @@ tcRetainedConResultInst NoQL (Just expected) args
   , isTauTy expected, isTauTy body
   , not (hasNativeDependentExpr (Core.Type body))
   , Just (tc, templates) <- splitTyConApp_maybe result
-  , tc == dataConTyCon dc, isAlgTyCon tc
+  , isAlgTyCon tc
+  , case fun of
+      HsVar{} -> True
+      XExpr (ConLikeTc (RealDataCon dc)) -> tc == dataConTyCon dc
+      _ -> False
   , length templates == tyConArity tc
   , Just (expected_tc, actuals) <- splitTyConApp_maybe expected
   , tc == expected_tc, templates `equalLength` actuals
@@ -1224,7 +1247,7 @@ tcRetainedConResultInst NoQL (Just expected) args
                                          , Just ty <- [Subst.lookupTyVar subst tv] ]
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
-tcRetainedConResultInst _ _ _ _ _ = return Nothing
+tcRetainedResultCandidate _ _ _ _ _ = return Nothing
 
 {- Note [Constrained immutable instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1398,15 +1421,29 @@ function remains bottom when its function WHNF is demanded. This route also
 allows id applied to a checked lambda when the expected result supplies its Pi.
 -}
 
--- | Find the saturated result of ordinary visible arrows without constraints.
+{- Note [Remaining ordinary arrows in retained result matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An expected result can determine all erased arguments after only some source
+value arguments. For example, expectMarker label marker can be checked at
+IO nativeProof -> IO (). Its remaining result is an ordinary tau arrow.
+The exact immutable matcher can use that whole result without eta expansion.
+Require tau syntax throughout the remaining arrow: no erased forall or
+constraint below it. Emit the selected type arguments and preserve the actual
+remaining function type for final subsumption.
+
+Cached argument inference still requires all ordinary value arguments and
+explicitly rejects a remaining function result. The algebraic result candidate
+route still requires a saturated TyConApp, so it cannot use this arrow case.
+-}
+
+-- | Find the result after the written ordinary value arguments. A remaining
+-- visible arrow is allowed, but erased foralls and constraint arrows are not.
 tcRetainedOrdinaryResult :: Int -> Type -> Maybe Type
+tcRetainedOrdinaryResult 0 ty
+  | isTauTy ty = Just ty
 tcRetainedOrdinaryResult n ty
-  | Just (_, res') <- splitVisibleFunTy_maybe ty
-  = if n > 0 then tcRetainedOrdinaryResult (n-1) res' else Nothing
-  | n == 0
-  , not (isForAllTy ty)
-  , not (isFunTy ty)
-  = Just ty
+  | n > 0, Just (_, res') <- splitVisibleFunTy_maybe ty
+  = tcRetainedOrdinaryResult (n-1) res'
   | otherwise = Nothing
 
 {- Note [Cached retained argument inference]
@@ -1524,6 +1561,180 @@ tcRetainedInferableArg (L _ expr)
       HsPragE _ _ arg -> tcRetainedInferableArg arg
       XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> tcRetainedInferableArg arg
       _ -> return (False, False)
+
+-- | Specialize the wired-in dollar operator from a checked result and one
+-- cached native-anchored RHS. Keep its original type and evidence application.
+-- See Note [Immutable native dollar applications].
+tcRetainedDollarInst :: ExpRhoType -> (HsExpr GhcRn, SrcSpan)
+                    -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
+                    -> TcM (Maybe (HsExpr GhcTc, TcSigmaType), RetainedArgCache)
+tcRetainedDollarInst (Check expected) rn_head@(HsVar _ (L _ (WithUserRdr _ name)), _)
+                    args fun@(HsVar _ (L _ dollar)) sigma
+  | name `hasKey` dollarIdKey, dollar `hasKey` dollarIdKey
+  , not (any is_type_arg args)
+  , [lhs, rhs] <- [arg | EValArg { ea_arg = arg } <- args]
+  , (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , not (null tvs)
+  , ([_, domain], result) <- splitFunTys body
+  , isTauTy body, not (hasNativeDependentExpr (Core.Type body))
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; result_ty <- if not enabled then return Nothing else
+           do { expected <- liftZonkM (zonkTcType expected)
+              ; if complete_result expected then return (Just expected)
+                else declared_result 1 lhs }
+       ; case result_ty of
+           Nothing -> return (Nothing, [])
+           Just expected -> do
+           { (inferable, anchor) <- tcRetainedInferableArg rhs
+           ; tau_domains <- if inferable && anchor then rhs_tau_domains rhs
+                            else return False
+           ; if not tau_domains then return (Nothing, []) else
+        do { (usage, (typed_rhs, rhs_ty)) <- addArgCtxt 2 rn_head rhs $
+               tcCollectingUsage (tcInferRho rhs)
+           ; rhs_ty <- liftZonkM (zonkTcType rhs_ty)
+           ; let cache = [(2, (typed_rhs, rhs_ty, usage))]
+                 concrete_tvs = idConcreteTvs dollar
+                 matched = do
+                   subst <- match_type tvs Subst.emptySubst result expected
+                   match_type tvs subst (scaledThing domain) rhs_ty
+           ; case matched of
+               Just subst
+                 | Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
+                 , not (any (`elemVarSet` tyCoVarsOfTypes inst_tys) tvs)
+                 , and (zipWith (kind_agrees subst) tvs inst_tys)
+                 , eqType (Subst.substTy subst result) expected
+                 , eqType (Subst.substTy subst (scaledThing domain)) rhs_ty
+                 , isEmptyNameEnv (delListFromNameEnv concrete_tvs (map getName tvs))
+                 , and [ isConcreteType ty
+                       | (tv, ty) <- zip tvs inst_tys
+                       , isJust (lookupNameEnv concrete_tvs (getName tv)) ]
+                 -> do { valid <- tcRetainedInstScope inst_tys
+                       ; return (if valid
+                                 then Just (mkHsWrap (mkWpTyApps inst_tys) fun,
+                                            Subst.substTy subst body)
+                                 else Nothing, cache) }
+               _ -> return (Nothing, cache) } } }
+  where
+    -- Preserve expected checking for a head with higher-rank callback domains.
+    -- Outer retained binders are function arguments, not callback domains.
+    rhs_tau_domains (L _ expr)
+      = case expr of
+          HsApp _ fun _ -> rhs_tau_domains fun
+          HsAppType _ fun _ -> rhs_tau_domains fun
+          HsPar _ fun -> rhs_tau_domains fun
+          HsPragE _ _ fun -> rhs_tau_domains fun
+          XExpr (ExpandedThingRn (HSE { hse_exp = fun })) -> rhs_tau_domains fun
+          HsVar _ lname
+            | isDataOcc (nameOccName (unLocWithUserRdr lname))
+            -> do { con <- tcLookupConLike (unLoc lname)
+                  ; case con of
+                      RealDataCon dc -> check_domains (varType (dataConWorkId dc))
+                      _ -> return False }
+            | otherwise
+            -> do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
+                  ; maybe (return False) (check_domains . varType) mb_id }
+          _ -> return False
+
+    check_domains ty = tau_domains <$> liftZonkM (zonkTcType ty)
+
+    tau_domains ty
+      | Just ty' <- coreView ty = tau_domains ty'
+    tau_domains (ForAllTy _ body) = tau_domains body
+    tau_domains (CastTy ty _) = tau_domains ty
+    tau_domains (DepFunTy binder body) = isTauTy (varType binder) && tau_domains body
+    tau_domains (FunTy { ft_arg = domain, ft_res = result })
+      = isTauTy domain && tau_domains result
+    tau_domains _ = True
+
+    complete_result ty
+      = isTauTy ty && not (anyFreeVarsOfType (\v -> isTyVar v && isMetaTyVar v) ty)
+
+    -- Read the declared result after the written arguments and dollar's RHS.
+    -- Do not instantiate the first operand or inspect its argument expressions.
+    declared_result n (L _ expr)
+      = case expr of
+          HsApp _ fun _ -> declared_result (n+1) fun
+          HsPar _ fun -> declared_result n fun
+          HsVar _ lname
+            | not (isDataOcc (nameOccName (unLocWithUserRdr lname)))
+            -> do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
+                  ; case mb_id of
+                      Just var | isEmptyNameEnv (idConcreteTvs var)
+                        -> do { sigma <- liftZonkM (zonkTcType (varType var))
+                              ; let (tvs, body) = tcSplitForAllInvisTyVars sigma
+                              ; return $ do
+                                  guard (isTauTy body
+                                         && not (hasNativeDependentExpr (Core.Type body)))
+                                  result <- tcRetainedOrdinaryResult n body
+                                  guard (complete_result result
+                                         && not (any (`elemVarSet` tyCoVarsOfType result) tvs))
+                                  return result }
+                      _ -> return Nothing }
+          _ -> return Nothing
+
+    is_type_arg ETypeArg{} = True
+    is_type_arg _ = False
+
+    bind_outer tvs tv _
+      | tv `elem` tvs = BindMe
+      | otherwise = DontBindMe
+
+    match_type tvs subst template actual
+      = do { subst <- tcMatchTyX_BM (bind_outer tvs) subst (typeKind template) (typeKind actual)
+           ; tcMatchTyX_BM (bind_outer tvs) subst template actual }
+
+    kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
+tcRetainedDollarInst _ _ _ _ _ = return (Nothing, [])
+
+{- Note [Immutable native dollar applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The wired-in ($) uses Quick Look. quickLookArg1 can instantiate evaluate's
+argument before its native RHS is inferred. For example,
+  expectMarker label marker $ evaluate (sameNat n Z)
+then tries to fill an ordinary meta-variable with Maybe (n :~: Z).
+Do not enable native syntax in mutable instantiation variables.
+
+For this operator only, accept exactly two value arguments without VTA and a
+complete known tau result. Prefer the expected result. A discarded do statement
+can instead supply IO alpha for an unresolved ordinary alpha. In that case,
+read the first operand's named declared signature without instantiation. Peel
+its written value arguments and the dollar RHS. Require the resulting type to
+be complete and independent of every outer forall binder. For example,
+expectMarker label marker has the fixed result IO () after the RHS argument.
+Reject VTA, constrained or native templates, and heads with concreteness
+requirements on this fallback. Do not expand or typecheck the first operand.
+Keep the original expected type for final checkResultTy; it can fill the
+ordinary alpha with (). This fallback does not assign a native type to a meta.
+
+Require a named, native-anchored RHS under ExperimentalDependentTypes.
+Before inference, inspect its head's declared argument domains. Reject a
+higher-rank or retained callback domain. For example, withBounded's callback
+needs an expected IO result before checking evaluate proof >> pure (). Keep
+that call on its existing Quick Look path. Do this before inferring anything;
+a fallback after inference would already have lost the expected shape.
+Outer retained arguments such as sameNat's Nat binders and ordinary Vec
+domains containing indices remain eligible. Infer an eligible RHS once and
+save its usage in argument cache position two. Match the original operator's result and second domain
+immutably. Match their kinds before their types with the same substitution:
+type matching alone does not determine the representation binders of ($).
+Require every forall binder, its substituted kind, both exact types and every
+runtime binding to agree. Check all original idConcreteTvs choices with
+isConcreteType; this checks representation choices, not the native payload.
+
+Apply WpTyApps to the original operator. Do not rewrite ($) to a beta redex or
+infer its first operand. Check that operand against the complete ordinary
+arrow, including the native RHS type. Use NoQL for instantiation, result
+checking and finishAppWithCache. The existing argument cache emits RHS usage
+once, and ordinary final subsumption still runs. No evaluation order changes.
+
+If immutable matching fails after inference, retain that cache and use NoQL
+for this attempted call's ordinary fallback too. Re-entering Quick Look could
+partially typecheck the RHS again, including nested splices and usage. Calls
+that fail the eligibility checks before inference keep their existing path.
+No general Quick Look rule or native meta-fill restriction changes. See
+Note [Quick Look for particular Ids] and
+docs/dependent-haskell/REFERENCES.md#runtime-equality-and-aligned-zip-next-source-probe.
+-}
 
 -- | Immutable choices for successive invisible binder groups. Nothing uses
 -- ordinary instantiation. Just [] records a fully consumed immutable plan.
@@ -1644,18 +1855,60 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstEnabled _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
 
--- | Check that every runtime identifier still has its local index binding.
+-- | Check runtime identifiers against their current lexical or module bindings.
+-- Normalize type and multiplicity metadata without changing identifier identity.
+-- See Note [Native index bindings during typechecking].
 tcRetainedInstScope :: [Type] -> TcM Bool
 tcRetainedInstScope tys
   = do { local_env <- getLclTypeEnv
-       ; let valid_runtime_id v
-               | not (isId v) = True
-               | Just (ATcId { tct_id = local_id }) <- lookupNameEnv local_env (getName v)
-               = v == local_id && isNativeIndexId v && isNativeIndexId local_id
-                 && eqType (varType v) (varType local_id)
-                 && isManyTy (idMult v)
-               | otherwise = False
-       ; return (all valid_runtime_id (tyCoVarsOfTypesList tys)) }
+       ; global_env <- tcg_type_env <$> getGblEnv
+       ; let current_binding v
+               = case lookupNameEnv local_env (getName v) of
+                   Just (ATcId { tct_id = local_id }) -> Just local_id
+                   Just _ -> Nothing
+                   Nothing -> case lookupTypeEnv global_env (getName v) of
+                     Just (AnId module_id) -> Just module_id
+                     _ -> Nothing
+             valid_runtime_id v
+               | not (isId v) = return True
+               | Just binding <- current_binding v
+               = do { occurrence <- liftZonkM (zonkId v)
+                    ; binding <- liftZonkM (zonkId binding)
+                    ; return (occurrence == binding
+                              && isNativeIndexId occurrence && isNativeIndexId binding
+                              && eqType (varType occurrence) (varType binding)
+                              && isManyTy (idMult occurrence) && isManyTy (idMult binding)) }
+               | otherwise = return False
+       ; and <$> mapM valid_runtime_id (tyCoVarsOfTypesList tys) }
+
+{- Note [Native index bindings during typechecking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A source IO binding such as n <- readIORef cell can still have type or
+multiplicity metadata that contains filled meta-variables. Before testing its
+native index domain and Many multiplicity, use the within-TC zonkId to read
+those assignments. This updates only the Id's type and multiplicity. It does
+not clone the Name or Unique, allocate a new index, or fill a native meta.
+Do not use the final zonker's zonkIdOcc here.
+
+Immutable instantiation must also validate each free runtime index against
+its current binding. Lexical bindings are ATcIds in the local environment.
+Same-module top-level LocalIds can instead be AnIds in tcg_type_env. For
+example, evaluate (sameNat bottomLength Z) and PackVec bottomLength leftVector
+need immutable instantiation at the actual bottomLength index. Checking only
+the local environment would reject that binding and fall back to a forbidden
+native meta-variable fill.
+
+Look in the local environment first, then the existing module type environment.
+Do not load interfaces for a missing or stale name. Normalize both the index
+occurrence and its authoritative binding before checking their identity,
+closed native domain and Many multiplicity. Imported GlobalIds, unresolved or
+rigid domains, linear indices and missing bindings still fail. The existing
+Core Tidy alias step keeps accepted module indices local when Tidy globalises
+their top-level bindings. Keep the Core index grammar unchanged.
+
+See docs/dependent-haskell/PLAN.md and
+docs/dependent-haskell/REFERENCES.md#runtime-equality-and-aligned-zip-next-source-probe.
+-}
 
 -- Is the argument supposed to instantiate a forall?
 --
