@@ -1297,7 +1297,9 @@ tcRetainedResultMatch NoQL (Just expected) args fun sigma
   , isTauTy expected || (hasNoConcreteTyVars fun && isRetainedValueType expected)
   , isTauTy result
   , not (hasNativeDependentExpr (Core.Type body))
-  , Just subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst result expected
+  , Just kind_subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst
+                                   (typeKind result) (typeKind expected)
+  , Just subst <- tcMatchTyX_BM (bind_outer tvs) kind_subst result expected
   , Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
   , and (zipWith (kind_agrees subst) tvs inst_tys)
   , eqType (Subst.substTy subst result) expected
@@ -1859,6 +1861,8 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
        ; expected_ty <- mapM (liftZonkM . zonkTcType) expected_ty
        ; let index_route = not (null index_tvs)
              initial_subst = result_subst expected_ty index_route tvs result
+             result_anchor = any (hasNativeDependentExpr . Core.Type)
+                               [ty | tv <- tvs, Just ty <- [Subst.lookupTyVar initial_subst tv]]
              needed_tvs | index_route = index_tvs
                         | otherwise = filter (isNothing . Subst.lookupTyVar initial_subst) tvs
        ; eligible <- if index_route
@@ -1867,7 +1871,8 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
                              && isJust (tcRetainedOrdinaryResult (count isHsValArg args) tau)
                           then do { shapes <- mapM tcRetainedInferableArg
                                                 [arg | EValArg { ea_arg = arg } <- args]
-                                  ; return (if any snd shapes then Just (map fst shapes)
+                                  ; return (if result_anchor || any snd shapes
+                                            then Just (map fst shapes)
                                             else Nothing) }
                           else return Nothing
        ; case eligible of
@@ -2009,6 +2014,19 @@ Read an available expected type with readExpType_maybe, then use the within-TC
 zonker. Do not force or allocate an empty inference cell. This only exposes
 existing assignments. Keep the final result subsumption, argument cache and
 scope checks. No native type is assigned to a meta-variable.
+
+A matched native expected-result choice also anchors generic instantiation.
+For pure bottomPayload at IO (Vec Int n), it determines the argument domain
+before the polymorphic payload is checked. For (>>) it can leave an ordinary
+input parameter to infer from the first action. Do not require a complete
+result seed or infer an argument whose parameters are already determined.
+
+The exact expected-result matcher checks kinds before types, with the same
+outer-binder predicate. For error :: forall r (a :: TYPE r). HasCallStack =>
+String -> a, this determines r := LiftedRep before a := IO (Vec Int n).
+Keep the original theta, IALL evidence order and concreteness checks. This is
+the same two-step match used for native dollar applications, not a special
+rewrite of error. See Note [tcMatchTy vs tcMatchTyKi] in GHC.Core.Unify.
 -}
 
 -- | Check runtime identifiers against their current lexical or module bindings.
