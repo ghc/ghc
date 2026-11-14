@@ -52,7 +52,12 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgEnableInterModuleFarJumps = gopt Opt_InterModuleFarJumps dflags
    , ncgComputeUnwinding    = debugLevel dflags > 0
    , ncgEnableDeadCodeElimination = not (gopt Opt_InfoTableMap dflags)
-                                     -- Disable when -finfo-table-map is on (#20428)
+                                     -- TODO #28170: off under -finfo-table-map
+                                     -- since 55a6377a5d, a workaround for
+                                     -- #20428, and with it, from the liveness
+                                     -- pass on, every use of the CFG that can
+                                     -- change the code (see livenessCfg in
+                                     -- GHC.CmmToAsm)
                                      && backendMaintainsCfg (targetPlatform dflags)
                                      -- Enable if the platform maintains the CFG
    }

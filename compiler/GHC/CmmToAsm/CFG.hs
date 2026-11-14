@@ -122,7 +122,10 @@ instance Eq CfgEdge where
   (==) (CfgEdge from1 to1 _) (CfgEdge from2 to2 _)
     = from1 == from2 && to1 == to2
 
--- | Edges are sorted ascending by weight, source and destination
+-- | Edges are sorted ascending by weight, source and destination.
+-- TODO: edges of equal weight are thus ordered by their labels, which carry no
+-- meaning for the layout: sequenceChain sorts its directEdges descending by
+-- this instance, and so fuses edges of equal weight from the larger label down.
 instance Ord CfgEdge where
   compare (CfgEdge from1 to1 (EdgeInfo {edgeWeight = weight1}))
           (CfgEdge from2 to2 (EdgeInfo {edgeWeight = weight2}))
@@ -307,12 +310,27 @@ are not stored in the CFG.
 
 In that case we simply delete the edge A -> B.
 
+BUG: the case of an immediate arises with tables next to code, as x86's
+canShortcut accepts a jump to an immediate: a block that is only a tail call's
+jump to a label is removed, and the edge A -> B with it. A's branch then has
+one target fewer in the CFG than in the code. This costs only speed, on x86 and
+x86-64 under -fasm-shortcutting, not on Darwin, not under -finfo-table-map, not
+for a jump through a symbol pointer, and under -g only for a jump-only block to
+which -g adds nothing.
+
 In terms of implementation the native backend first builds a mapping
 from blocks suitable for shortcutting to their jump targets.
 Then it redirects all jump instructions to these blocks using the
 built up mapping.
 This function (shortcutWeightMap) takes the same mapping and
 applies the mapping to the CFG in the way laid out above.
+
+BUG TODO: where a redirected edge A -> C coincides with an edge A -> C already
+there, or with another redirected edge, only one EdgeInfo is kept, chosen by
+the order of the fold over A's targets in update_from_edge; the weights are not
+summed. This costs only speed, on x86 and x86-64 under -fasm-shortcutting, not
+on Darwin, not under -finfo-table-map, and under -g only for a jump-only block
+to which -g adds nothing.
 
 -}
 shortcutWeightMap :: LabelMap (Maybe BlockId) -> CFG -> CFG
@@ -661,6 +679,12 @@ addNodesBetween weights m updates =
           address. This reduces the chance that we return to the same
           cache line further.
 
+  Where the CFG is kept (x86 and x86-64, not under -finfo-table-map),
+  under -fcmm-static-pred (on at -O1 and -O2), static prediction turns
+  these weights into estimated frequencies before the layout uses them
+  (Note [Static Branch Prediction]); these are the frequencies of
+  Note [Layout relevant edge weights] in GHC.CmmToAsm.BlockLayout.
+
 -}
 -- | Generate weights for a Cmm proc based on some simple heuristics.
 getCfgProc :: Platform -> Weights -> GenCmmDecl d h CmmGraph -> CFG
@@ -718,6 +742,17 @@ getCfg platform weights graph =
           let switchTargets = switchTargetsToList ids
               --Compiler performance hack - for very wide switches don't
               --consider targets for layout.
+              -- TODO: where the CFG is kept (x86 and x86-64, not under
+              -- -finfo-table-map), the layout considers these edges nonetheless
+              -- under -fblock-layout-cfg, on at -O1 and -O2: sequenceChain
+              -- builds them into chains like the others, after the heavier
+              -- ones. Without it, sequenceBlocks follows one of them only
+              -- under -fcmm-static-pred, also on at -O1 and -O2, whose static
+              -- prediction replaces their weights before the layout, and only
+              -- where they go to at most two blocks: it follows no edge out of
+              -- a block with more than two successors, whatever its weight, nor
+              -- one of weight at most 0, which the hack's -1 is. What the hack
+              -- saves has not been measured.
               adjustedWeight =
                 if (length switchTargets > 10) then -1 else switchWeight
           in map (\x -> mkEdge x adjustedWeight) switchTargets
@@ -735,6 +770,14 @@ getCfg platform weights graph =
         mkEdge target weight = ((bid,target), mkEdgeInfo weight)
         branch = lastNode block :: CmmNode O C
 
+    -- BUG #28088: the CFG gets only the blocks reachable from the entry.
+    -- cmmToCmm runs after the Cmm pipeline has removed the unreachable blocks
+    -- and turns a branch on a constant into a jump; instruction selection still
+    -- covers the blocks this makes unreachable, which the CFG lacks. Where the
+    -- selector splits such a block in the CFG (addImmediateSuccessor), as the
+    -- x86 selector's cmpxchg loop for an atomic and, or, xor or nand does,
+    -- getSuccessorEdges panics with "Block does not exist". This is reached on
+    -- x86 and x86-64, at any optimisation level.
     blocks = revPostorder graph :: [CmmBlock]
 
 --Find back edges by a depth-first search (classifyEdges)

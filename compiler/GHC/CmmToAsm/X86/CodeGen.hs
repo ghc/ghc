@@ -4226,6 +4226,8 @@ genCondBranch' _ id false bool = do
         -- We can fall through the false branch. Which makes it
         -- beneficial to bias code layout towards placing the
         -- false target after the jump.
+        -- The false edge weighs 3 more, so that where the two edges would
+        -- otherwise tie, block layout ranks the false edge above the true one.
         increaseEdgeWeight false 3
         return (cond_code `appOL` code)
 

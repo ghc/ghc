@@ -33,6 +33,12 @@ defaultWeights = Weights
    , backEdgeBonus      = 400
    }
 
+-- BUG: a setting without "=" or of an unknown name panics, and a value is
+-- read lazily, so a non-numeric one is accepted where the compilation uses no
+-- weight it sets and otherwise panics later, "Prelude.read: no parse": a failed
+-- compilation reported as a panic of the compiler, with its request for a bug
+-- report, where the flag's parser could report a usage error; from the command
+-- line, at -O0 and -O, under the native code generator.
 parseWeights :: String -> Weights -> Weights
 parseWeights s oldWeights =
         foldl' (\cfg (n,v) -> update n v cfg) oldWeights assignments
