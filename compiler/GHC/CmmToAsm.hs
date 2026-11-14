@@ -174,6 +174,28 @@ It also lists the older TODOs and the sentences that only mention a label. With
 mentions, as no older comment in these files writes either word in capitals.
 -}
 
+{- Note [Norms of the NCG]
+   ~~~~~~~~~~~~~~~~~~~~~~~
+GHC's own documents and testsuite hold the native code generator to these norms:
+
+* Under -fobject-determinism, the output is to be bit-for-bit the same
+  for the same inputs (Note [Unique Determinism and code generation]
+  in GHC.Types.Unique). So an order that code takes from uniques is a
+  question for review: see Note [Unique order in the linear allocator] in
+  GHC.CmmToAsm.Reg.Linear.
+* The testsuite passes -dcmm-lint to GHC by default (runTestGhcFlags
+  in hadrian/src/Settings/Builders/RunTest.hs, and TEST_HC_OPTS in
+  testsuite/mk/test.mk, which Makefile tests use and make test hands to the
+  driver). So a .cmm file that a test compiles with the ghc program must be
+  one that Cmm lint accepts, unless the test turns the lints off (no_lint in
+  testsuite/driver/testlib.py, for a test the driver compiles; a Makefile test,
+  by leaving out $(TEST_HC_OPTS)).
+
+Note [Where a branch's likely side is known] in GHC.CmmToAsm.CFG says where it
+is known which side of a branch is likely, and lists the trade-offs made with
+that knowledge.
+-}
+
 --------------------
 nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle
               -> CgStream RawCmmGroup a
