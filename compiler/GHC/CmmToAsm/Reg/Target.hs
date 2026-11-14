@@ -1,13 +1,9 @@
 
 -- | Hard wired things related to registers.
---      This is module is preventing the native code generator being able to
---      emit code for non-host architectures.
 --
 --      TODO: Do a better job of the overloading, and eliminate this module.
 --      We'd probably do better with a Register type class, and hook this to
 --      Instruction somehow.
---
---      TODO: We should also make arch specific versions of RegAlloc.Graph.TrivColorable
 module GHC.CmmToAsm.Reg.Target (
         targetVirtualRegSqueeze,
         targetRealRegSqueeze,

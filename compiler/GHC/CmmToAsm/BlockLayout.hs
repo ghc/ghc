@@ -56,26 +56,29 @@ import GHC.Types.Unique.DSM (UniqDSM)
   * Compute a CFG based on the Cmm AST, see getCfgProc.
     This CFG will have edge weights representing a guess
     on how important they are.
-  * After we convert Cmm to Asm we run `optimizeCFG` which
-    adds a few more "educated guesses" to the equation.
+  * After register allocation and shortcutting, where the CFG is kept (x86 and
+    x86-64, not under -finfo-table-map), we run `optimizeCFG` which adds a few
+    more "educated guesses" to the equation.
   * Then we run loop analysis on the CFG (`loopInfo`) which tells us
     about loop headers, loop nesting levels and the sort.
   * Based on the CFG and loop information refine the edge weights
-    in the CFG and normalize them relative to the most often visited
+    in the CFG and normalize them relative to the entry
     node. (See `mkGlobalWeights`)
+    This step and the loop analysis run for the layout only under
+    -fcmm-static-pred, on at -O1 and -O2.
   * Feed this CFG into the block layout code (`sequenceTop`) in this
     module. Which will then produce a code layout based on the input weights.
 
   It's worth mentioning that instead of maintaining a CFG in the backend we
-  could re-create one from the assembly. But a naive version of this would lose
-  some essential information, like whether or not a branch is known to be
-  likely/unlikely. It would also lose the transition source of each edge, which
-  the later passes read: `staticBranchPrediction` leaves a heap or stack check
-  alone (`isHeapOrStackCheck`), `ohPredicts` looks at the `CmmCondBranch`
-  behind an edge, and `sequenceChain` and `addPreentryBlock` recognise call
-  edges by their `CmmCall` source. We could get a similar effect by encoding
-  the relevant information directly in the instruction stream as meta
-  instructions or similar.
+  could re-create one from the assembly. But a naive version of this would
+  lose some essential information, like whether or not a branch is known to
+  be likely/unlikely. It would also lose the transition source of each edge,
+  which the later passes read: `staticBranchPrediction` leaves a heap or stack
+  check alone (`isHeapOrStackCheck`), `ohPredicts` looks at the `CmmCondBranch`
+  behind an edge, `sequenceChain` recognises call edges by their `CmmCall`
+  source, and `addPreentryBlock` by a `CmmCall` or `CmmForeignCall` one. We
+  could get a similar effect by encoding the relevant information directly in
+  the instruction stream as meta instructions or similar.
 
   Note [Chain based CFG serialization]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -123,8 +126,7 @@ import GHC.Types.Unique.DSM (UniqDSM)
   We do so by:
 
   *)  Ignore edges which represent instructions which can not be replaced
-      by fall through control flow. Primarily calls and edges to blocks which
-      are prefixed by a info table we have to jump across.
+      by fall through control flow: calls.
 
   *)  Then process remaining edges in order of frequency taken and:
 
@@ -153,9 +155,9 @@ import GHC.Types.Unique.DSM (UniqDSM)
   Creating singleton chains is required for situations where we have code of the
   form:
 
-    A: goto B:
+    A: call f, returning to B
     <infoTable>
-    B: goto C:
+    B: call g, returning to C
     <infoTable>
     C: ...
 
@@ -164,29 +166,7 @@ import GHC.Types.Unique.DSM (UniqDSM)
   this way.
 
   -----------------------------------------------------------------------------
-     2) We also try to fuse chains.
-  -----------------------------------------------------------------------------
-
-  As a result from the above step we still end up with multiple chains which
-  represent sequential control flow chunks. But they are not yet suitable for
-  code layout as we need to place *all* blocks into a single sequence.
-
-  In this step we combine chains result from the above step via these steps:
-
-  *)  Look at the ranked list of *all* edges, including calls/jumps across info tables
-      and the like.
-
-  *)  Look at each edge and
-
-    +) Given an edge (A -> B) try to find two chains for which
-      * Block A is at the end of one chain
-      * Block B is at the front of the other chain.
-    +) If we find such a chain we "fuse" them into a single chain, remove the
-       edge from working set and continue.
-    +) If we can't find such chains we skip the edge and continue.
-
-  -----------------------------------------------------------------------------
-     3) Place indirect successors (neighbours) after each other
+     2) Place indirect successors (neighbours) after each other
   -----------------------------------------------------------------------------
 
   We might have chains [A,B,C,X],[E] in a CFG of the sort:
@@ -196,6 +176,27 @@ import GHC.Types.Unique.DSM (UniqDSM)
 
   While E does not follow X it's still beneficial to place them near each other.
   This can be advantageous if eg C,X,E will end up in the same cache line.
+
+  -----------------------------------------------------------------------------
+     3) We also try to fuse chains.
+  -----------------------------------------------------------------------------
+
+  As a result from the above steps we still end up with multiple chains which
+  represent sequential control flow chunks. But they are not yet suitable for
+  code layout as we need to place *all* blocks into a single sequence.
+
+  In this step we combine chains result from the above steps via these steps:
+
+  *)  Look at the ranked list of *all* edges, including calls/jumps across
+      info tables and the like.
+
+  *)  Look at each edge and
+
+    +) Given an edge (A -> B) find the chains holding A and B.
+    +) If these are different chains we "fuse" them into a single chain, the
+       chain of A first, whether or not A ends its chain and B starts its own,
+       remove the edge from working set and continue.
+    +) If A and B are in the same chain we skip the edge and continue.
 
 
   Note [Triangle Control Flow]
@@ -275,7 +276,9 @@ import GHC.Types.Unique.DSM (UniqDSM)
     We apply a small modifier to them to ensure edges for which we can
     eliminate the overhead completely are considered first. See also #18053.
 
-  * Edges constituted by a call are ignored.
+  * Edges constituted by a call are ignored while the chains are built and while
+    neighbouring chains are combined, and count a 64th of their weight when the
+    chains are merged at the end.
 
     Considering these hardly helped with performance and ignoring
     them helps quite a bit to improve compiler performance.
@@ -291,11 +294,12 @@ import GHC.Types.Unique.DSM (UniqDSM)
 neighbourOverlapp :: Int
 neighbourOverlapp = 2
 
--- | Maps blocks near the end of a chain to it's chain AND
--- the other blocks near the end.
--- [A,B,C,D,E] Gives entries like (B -> ([A,B], [A,B,C,D,E]))
--- where [A,B] are blocks in the end region of a chain.
--- This is cheaper then recomputing the ends multiple times.
+-- | Maps each block near one end of a chain to the blocks near that end and
+-- the chain: combineNeighbourhood keeps one map for the ends (getEnds, last
+-- block first) and one for the fronts (getFronts).
+-- [A,B,C,D,E] gives entries such as (B -> ([A,B], [A,B,C,D,E])) in the fronts'
+-- map and (D -> ([E,D], [A,B,C,D,E])) in the ends' map.
+-- This is cheaper than recomputing the ends multiple times.
 type FrontierMap = LabelMap ([BlockId],BlockChain)
 
 -- | A non empty ordered sequence of basic blocks.

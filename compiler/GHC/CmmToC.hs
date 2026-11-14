@@ -128,7 +128,7 @@ pprTop platform = \case
 -- --------------------------------------------------------------------------
 -- BasicBlocks are self-contained entities: they always end in a jump.
 --
--- Like nativeGen/AsmCodeGen, we could probably reorder blocks to turn
+-- Like GHC.CmmToAsm.BlockLayout, we could probably reorder blocks to turn
 -- as many jumps as possible into fallthroughs.
 --
 
@@ -141,7 +141,8 @@ pprBBlock platform block =
 
 -- --------------------------------------------------------------------------
 -- Info tables. Just arrays of words.
--- See codeGen/ClosureInfo, and nativeGen/PprMach
+-- See mkInfoTable in GHC.Cmm.Info, which lays them out, and pprNatCmmDecl
+-- in each GHC.CmmToAsm.*.Ppr, which prints them.
 
 pprWordArray :: Platform -> Bool -> CLabel -> [CmmStatic] -> SDoc
 pprWordArray platform is_ro lbl ds

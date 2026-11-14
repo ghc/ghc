@@ -742,7 +742,8 @@ makeImportsDoc config imports
             $$
             -- On recent versions of Darwin, the linker supports
             -- dead-stripping of code and data on a per-symbol basis.
-            -- There's a hack to make this work in PprMach.pprNatCmmDecl.
+            -- There's a hack to make this work in the printers' pprNatCmmDecl:
+            -- see Note [Subsections Via Symbols] in GHC.CmmToAsm.X86.Ppr.
             (if platformHasSubsectionsViaSymbols platform
              then line $ text ".subsections_via_symbols"
              else Outputable.empty)
@@ -891,8 +892,8 @@ apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
 -- -----------------------------------------------------------------------------
 -- Instruction selection
 
--- Native code instruction selection for a chunk of stix code.  For
--- this part of the computation, we switch from the UniqSM monad to
+-- Native code instruction selection for a chunk of Cmm.  For
+-- this part of the computation, we switch from the UniqDSM monad to
 -- the NatM monad.  The latter carries not only a Unique, but also an
 -- Int denoting the current C stack pointer offset in the generated
 -- code; this is needed for creating correct spill offsets on

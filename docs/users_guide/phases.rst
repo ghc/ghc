@@ -835,18 +835,16 @@ Options affecting code generation
     ``-dynamic-too`` is ignored if :ghc-flag:`-dynamic` is also specified.
 
 .. ghc-flag:: -fexpose-internal-symbols
-    :shortdesc: Produce symbols for all functions, including internal functions.
+    :shortdesc: Make the native code generator for x86 and x86-64 produce
+        symbols for all functions, including internal functions.
     :type: dynamic
     :category: codegen
 
     Request that GHC emits verbose symbol tables which include local symbols
     for module-internal functions. These can be useful for tools like
     `perf <https://perf.wiki.kernel.org/>`__ but increase object file sizes.
-    This is implied by :ghc-flag:`-g2 <-g>` and above.
-
-    :ghc-flag:`-fno-expose-internal-symbols <-fexpose-internal-symbols>`
-    suppresses all non-global symbol table entries, resulting in smaller object
-    file sizes at the expense of debuggability.
+    This is implied by :ghc-flag:`-g3 <-g>` and above.
+    It has an effect only in the native code generator for x86 and x86-64.
 
 
 .. ghc-flag:: -fprefer-byte-code

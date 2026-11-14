@@ -7,26 +7,30 @@ usable by most UNIX debugging tools.
 
 .. ghc-flag:: -g
               -g⟨n⟩
-    :shortdesc: Produce DWARF debug information in compiled object files.
-        ⟨n⟩ can be 0, 1, or 2, with higher numbers producing richer
-        output. If ⟨n⟩ is omitted, level 2 is assumed.
+    :shortdesc: Produce DWARF debug information in compiled object files from
+        the native code generator, on some ELF targets. ⟨n⟩ can be 0, 1, 2, or
+        3, with higher numbers producing richer output. If ⟨n⟩ is omitted,
+        level 2 is assumed.
     :type: dynamic
     :category: debugging
 
     :since: 7.10, numeric levels since 8.0
-    :implies: :ghc-flag:`-fexpose-internal-symbols` when ⟨n⟩ >= 2.
+    :implies: :ghc-flag:`-fexpose-internal-symbols` when ⟨n⟩ >= 3.
 
-    Emit debug information in object code. Currently only DWARF debug
-    information is supported on x86-64 and i386. Currently debug levels 0
-    through 3 are accepted:
+    Emit debug information in object code. Currently only the native code
+    generator emits it, as DWARF, and only for ELF on x86-64, i386, 64-bit
+    PowerPC with the ELFv2 ABI, RISC-V and LoongArch; its unwinding records
+    follow the Haskell stack pointer only on x86-64 and i386, and there at most
+    through a function's first block. The debug levels are 0 through 3; a higher
+    level acts as 3 and a negative one as 0:
 
      * ``-g0``: no debug information produced
      * ``-g1``: produces stack unwinding records for top-level functions (sufficient for basic backtraces)
-     * ``-g2``: produces stack unwinding records for top-level functions as well
-       as inner blocks (allowing more precise backtraces than with ``-g1``).
-     * ``-g3``: produces GHC-specific DWARF information for use by more
-       sophisticated Haskell-aware debugging tools (see :ref:`dwarf-dies` for
-       details)
+     * ``-g2``: produces, besides the same stack unwinding records as ``-g1``,
+       ``DW_TAG_lexical_block`` DIEs for the blocks inside functions.
+     * ``-g3``: produces, besides what ``-g2`` produces, ``DW_TAG_ghc_src_note``
+       DIEs: GHC-specific DWARF information for use by more sophisticated
+       Haskell-aware debugging tools (see :ref:`dwarf-dies` for details)
 
     If ⟨n⟩ is omitted, level 2 is assumed.
 
@@ -66,22 +70,10 @@ GHC that we want debug information,
     $ ghc -g -rtsopts fib.hs
 
 Here we used the ``-g`` option to inform GHC that it should add debugging
-information in the produced binary. There are three levels of debugging
+information in the produced binary. There are four levels of debugging
 output: ``-g0`` (no debugging information, the default), ``-g1`` (sufficient for
-basic backtraces), ``-g2`` (or just ``-g`` for short; emitting everything GHC knows).
-Note that this debugging information does not affect the optimizations performed
-by GHC.
-
-.. tip::
-   Under Mac OS X debug information is kept apart from the executable. After
-   compiling the executable you'll need to use the ``dsymutil`` utility to
-   extract the debugging information and place them in the debug archive,
-
-   .. code-block:: sh
-
-      $ dsymutil fib
-
-   This should produce a file named ``fib.dSYM``.
+basic backtraces), ``-g2`` (or just ``-g`` for short; a description of the
+blocks inside functions as well) and ``-g3`` (GHC's source notes as well).
 
 Now let's have a look at the flow of control. For this we can just start our
 program under ``gdb`` (or an equivalent debugger) as we would any other native
@@ -162,7 +154,7 @@ this point in the program,
     provided by GDB. While these locations will usually be in some sense
     "correct", they aren't always useful. This is why profiling tools targeting
     Haskell should supplement the standard source location information with
-    GHC-specific annotations (emitted with ``-g2``) when assigning costs.
+    GHC-specific annotations (emitted with ``-g3``) when assigning costs.
 
 Indeed, we can even set breakpoints,
 
@@ -250,7 +242,7 @@ Implementor's notes: DWARF annotations
    This discussion is primarily targeted at tooling authors who need to
    interpret the GHC-specific DWARF annotations contained in compiled binaries.
 
-When invoked with the ``-g`` flag GHC will produce standard `DWARF v4
+When invoked with the ``-g`` flag GHC will produce standard `DWARF v3
 <https://dwarfstd.org/>`__ debugging information. This format is used by nearly
 all POSIX-compliant targets and can be used by debugging and performance tools
 (e.g. ``gdb``, ``lldb``, and ``perf``) to understand the structure of
@@ -259,23 +251,24 @@ GHC-compiled programs.
 In particular GHC produces the following DWARF sections,
 
 ``.debug_info``
-  Debug information entities (DIEs) describing all of the basic blocks in the
-  compiled program.
+  Debug information entities (DIEs) describing the functions of the compiled
+  program and, from ``-g2``, the blocks inside them.
 
 ``.debug_line``
   Line number information necessary to map instruction addresses to line numbers
   in the source program.
 
   Note that the line information in this section is not nearly as rich as the
-  information provided in ``.debug_info``. Whereas ``.debug_line`` requires that
-  each instruction is assigned exactly one source location, the DIEs in
-  ``.debug_info`` can be used to identify all relevant sources locations.
+  source notes that ``-g3`` adds to ``.debug_info``. Whereas ``.debug_line``
+  requires that each instruction is assigned exactly one source location, the
+  ``DW_TAG_ghc_src_note`` DIEs can be used to identify all relevant sources
+  locations.
 
-``.debug_frames``
+``.debug_frame``
   Call frame information (CFI) necessary for stack unwinding to produce a call
   stack trace.
 
-``.debug_arange``
+``.debug_aranges``
   Address range information necessary for efficient lookup in debug information.
 
 .. _dwarf-dies:
@@ -315,7 +308,7 @@ the tag and attribute space.
 ``DW_TAG_ghc_src_note``
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-``DW_TAG_ghc_src_note`` DIEs (tag 0x5b01) are found as children of
+``DW_TAG_ghc_src_note`` DIEs (tag 0x5b00) are found as children of
 ``DW_TAG_lexical_block`` DIEs. They describe source spans which gave rise to the
 block; formally these spans are causally responsible for produced code: changes
 to code in the given span may change the code within the block; conversely

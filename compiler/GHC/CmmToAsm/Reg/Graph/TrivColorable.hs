@@ -37,11 +37,6 @@ import GHC.Utils.Panic
 --      If the graph doesn't color then the allocator will panic, but it won't
 --              generate bad object code or anything nasty like that.
 --
---      There is an allocatableRegsInClass :: RegClass -> Int, but doing
---      the unboxing is too slow for us here.
---      TODO: Is that still true? Could we use allocatableRegsInClass
---      without losing performance now?
---
 --      Look at rts/include/stg/MachRegs.h to get the numbers.
 --
 
@@ -159,8 +154,10 @@ allocatableRegs arch rc =
 
 -- Specification Code ----------------------------------------------------------
 --
---      The trivColorable function for each particular architecture should
---      implement the following function, but faster.
+--      trivColorable, given each architecture's virtualRegSqueeze and
+--      realRegSqueeze, should implement the following function, but faster. The
+--      function is a sketch: it calls regClass and applies Reg's constructor
+--      RealReg, both removed from GHC in 2009.
 --
 
 {-
@@ -187,7 +184,7 @@ trivColorable classN conflicts exclusions
 --      node N of classN has n neighbors of class C.
 --
 --      We currently only have RcInteger and RcFloatOrVector, which don't conflict at all.
---      This is a bit boring compared to what's in RegArchX86.
+--      This is a bit boring compared to what's in GHC.CmmToAsm.Reg.Graph.X86.
 --
 worst :: Int -> RegClass -> RegClass -> Int
 worst n classN classC

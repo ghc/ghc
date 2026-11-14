@@ -124,7 +124,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     -- ^ given the instruction sequence of a block, produce a list of
     -- the block's 'UnwindPoint's
     -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock"
-    -- and Note [Unwinding information in the NCG] in this module.
+    -- and Note [Unwinding information in the NCG] in "GHC.CmmToAsm".
     invertCondBranches        :: Maybe CFG -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
                               -> [NatBasicBlock instr]
     -- ^ Turn the sequence of @jcc l1; jmp l2@ into @jncc l2; \<block_l1>@
@@ -302,22 +302,29 @@ expression, and every statement that was not a branch at the Cmm level, ends
 in a single block. That block becomes the current block.
 
 The order of these monadic actions must match the order of the generated
-instructions: the CFG updates assume that the instructions of a child
-expression are placed before the instructions of its parent. Code that
-emits the instructions of two children in the reverse order of their
-generation breaks this assumption. A store emits the code of its address
-before the code of its value, so it takes the address from
-'getNonClobberedAmode' (see the Rule of the Game (tm) for Amodes in
-GHC.CmmToAsm.X86.CodeGen), which stays valid across the value code.
+instructions: the CFG updates assume that the instructions of a child expression
+are placed before the instructions of its parent. Code that emits the
+instructions of two children in the reverse order of their generation breaks
+this assumption. A store generates and emits the code of its value before the
+code of its address, whose amode it then takes from 'getAmode' (see the Rule
+of the Game (tm) for Amodes in GHC.CmmToAsm.X86.CodeGen); where code must come
+between an amode and its use, 'getNonClobberedAmode' keeps the address valid
+across it, unless that code writes a virtual register the amode names, which the
+caller must guard against (as genTrivialCode does).
 
-The combinators look up the current block in the CFG, so it must be a node
-of the CFG. The CFG only has the blocks that are reachable from the entry,
-and the Cmm to Cmm pass of the NCG can make a block unreachable (a branch on
-a literal becomes a jump). Thus 'cmmNativeGen' removes the unreachable
-blocks before it builds the CFG and generates code.
+The combinators look up the current block in the CFG, so it must be a node of
+the CFG. The CFG only has the blocks that are reachable from the entry, and the
+Cmm to Cmm pass of the NCG can make a block unreachable (a branch on a literal
+becomes a jump). Thus 'cmmNativeGen' would have to remove the unreachable
+blocks before it builds the CFG and generates code. It does not (#28088): no
+pass drops them before instruction selection, so the combinators that split a
+block ('continueInNewBlock', and through it 'addCondBlock' and 'addDiamondFlow')
+panic in 'getSuccessorEdges' when called in such a block.
 
-The CFG is checked against the final instruction stream by 'sanityCheckCfg'
-when assembly linting (-dasm-lint) is enabled.
+The CFG is checked against the code before block layout by 'sanityCheckCfg'
+when assembly linting (-dasm-lint) is enabled or in a DEBUG compiler, and
+only where 'ncgEnableDeadCodeElimination' holds: on x86 and x86-64, without
+-finfo-table-map.
 -}
 
 -- | The block instructions are currently being generated for.

@@ -7,30 +7,30 @@
 
   Things outside this module which are related to this:
 
-  + module CLabel
+  + GHC.Cmm.CLabel
     - PIC base label (pretty printed as local label 1)
     - DynamicLinkerLabels - several kinds:
         CodeStub, SymbolPtr, GotSymbolPtr, GotSymbolOffset
     - labelDynamic predicate
-  + module Cmm
+  + GHC.Cmm.Reg and GHC.Cmm.Expr
     - The GlobalReg datatype has a PicBaseReg constructor
     - The CmmLit datatype has a CmmLabelDiffOff constructor
   + codeGen & RTS
     - When tablesNextToCode, no absolute addresses are stored in info tables
       any more. Instead, offsets from the info label are used.
-    - For Win32 only, SRTs might contain addresses of __imp_ symbol pointers
-      because Win32 doesn't support external references in data sections.
-      TODO: make sure this still works, it might be bitrotted
   + NCG
-    - The cmmToCmm pass in AsmCodeGen calls cmmMakeDynamicReference for all
-      labels.
-    - nativeCodeGen calls pprImportedSymbol and pprGotDeclaration to output
-      all the necessary stuff for imported symbols.
+    - cmmToCmm in GHC.Cmm.GenericOpt calls cmmMakeDynamicReference for all
+      labels in procedures' code.
+    - makeImportsDoc in GHC.CmmToAsm calls pprImportedSymbol and
+      pprGotDeclaration to output all the necessary stuff for imported
+      symbols.
     - The NCG monad keeps track of a list of imported symbols.
-    - MachCodeGen invokes initializePicBase to generate code to initialize
-      the PIC base register when needed.
-    - MachCodeGen calls cmmMakeDynamicReference whenever it uses a CLabel
-      that wasn't in the original Cmm code (e.g. floating point literals).
+    - The x86 and PowerPC instruction selectors invoke initializePicBase_x86
+      and initializePicBase_ppc to generate code to initialize the PIC base
+      register when needed.
+    - The instruction selectors call cmmMakeDynamicReference for some of the
+      CLabels they use that weren't in the original Cmm code, such as those of
+      floating point literals on i386 and PowerPC.
 -}
 
 module GHC.CmmToAsm.PIC (
@@ -75,15 +75,15 @@ import GHC.Data.FastString
 
 
 --------------------------------------------------------------------------------
--- It gets called by the cmmToCmm pass for every CmmLabel in the Cmm
--- code. It does The Right Thing(tm) to convert the CmmLabel into a
+-- It gets called by the cmmToCmm pass for every CmmLabel in a
+-- procedure's code. It does The Right Thing(tm) to convert the CmmLabel into a
 -- position-independent, dynamic-linking-aware reference to the thing
 -- in question.
--- Note that this also has to be called from MachCodeGen in order to
--- access static data like floating point literals (labels that were
--- created after the cmmToCmm pass).
--- The function must run in a monad that can keep track of imported symbols
--- A function for recording an imported symbol must be passed in:
+-- Note that the instruction selectors also call this for some labels created
+-- after the cmmToCmm pass, such as those of floating point literals on i386 and
+-- PowerPC.
+-- The function must run in a monad that can keep track of imported symbols,
+-- an instance of CmmMakeDynamicReferenceM, whose addImport records one:
 -- - addImportCmmOpt for the CmmOptM monad
 -- - addImportNat for the NatM monad.
 
@@ -692,9 +692,10 @@ pprImportedSymbol config importedLbl = case (arch,os) of
 --------------------------------------------------------------------------------
 -- Generate code to calculate the address that should be put in the
 -- PIC base register.
--- This is called by MachCodeGen for every CmmProc that accessed the
--- PIC base register. It adds the appropriate instructions to the
--- top of the CmmProc.
+-- This is called by cmmTopCodeGen, on i386 and on 32-bit PowerPC but not
+-- AIX, for every CmmProc that accessed the PIC base register. It adds the
+-- appropriate instructions to the top of the CmmProc and, on ELF, to the top
+-- of each block with an info table.
 
 -- It is assumed that the first NatCmmDecl in the input list is a Proc
 -- and the rest are CmmDatas.
@@ -789,8 +790,8 @@ initializePicBase_ppc _ _ _ _
 -- which pretty-prints as:
 --              call 1f
 -- 1:           popl %picReg
---              addl __GLOBAL_OFFSET_TABLE__+.-1b, %picReg
--- (See PprMach.hs)
+--              addl $_GLOBAL_OFFSET_TABLE_+(.-1b), %picReg
+-- (See GHC.CmmToAsm.X86.Ppr)
 
 initializePicBase_x86
         :: OS -> Reg

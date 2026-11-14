@@ -321,8 +321,12 @@ stmtToInstrs stmt = do
 
       CmmBranch id          -> return $ genBranch id
 
-      --We try to arrange blocks such that the likely branch is the fallthrough
-      --in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
+      -- GHC.Cmm.ContFlowOpt inverts a condition, and its likelihood with it,
+      -- only where the condition can be inverted and its true target has one
+      -- predecessor, and there inverts a likely-false condition if its false
+      -- target has more than one predecessor (Note [Invert Cmm conditionals]),
+      -- so the condition may be likely true here. genCondBranch does not use
+      -- the likelihood.
       CmmCondBranch arg true false _ -> genCondBranch true false arg
       CmmSwitch arg ids -> genSwitch arg ids
       CmmCall { cml_target = arg
@@ -401,7 +405,9 @@ anything in between, lest it overwrite some of those registers.  If
 you need to do some other computation between the code part and use of
 the addr bit, use getNonClobberedAmode. It stores the effective address
 from the amode in a temporary when a register of the amode could be
-clobbered, so that the other computation can go in between:
+clobbered, so that the other computation can go in between, unless that
+computation writes a virtual register the amode names, which the caller must
+guard against (as genTrivialCode does):
 
     code
     LEA amode, tmp
@@ -3493,8 +3499,11 @@ getAmode e = do
             let off = litToImm lit
             return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
-      -- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be
-      -- recognised by the next rule.
+      -- Turn (e << n) + lit into lit + (e << n), for a lit that the clause for
+      -- x + lit above does not take (on x86-64: a W64 integer that does not
+      -- fit in 32 bits; on Windows also any label, with or without an offset;
+      -- elsewhere also a label's offset that does not fit in 32 bits), so that
+      -- the clause for x + (y << shift) below takes it, or else that for x + y.
       CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _), b@(CmmLit _)]
          -> getAmode (CmmMachOp (MO_Add rep) [b,a])
 
@@ -3558,10 +3567,10 @@ getAmode e = do
 
 
 -- | Like 'getAmode', but the amode stays valid across the code of other
--- expressions: if a register of the amode could be clobbered, the
--- effective address is computed into a new temporary. Use this when code
--- must be emitted between the code of the amode and its use. See the
--- Rule of the Game (tm) for Amodes.
+-- expressions that write no register it names: if a register of the amode could
+-- be clobbered, the effective address is computed into a new temporary. Use
+-- this when code must be emitted between the code of the amode and its use. See
+-- the Rule of the Game (tm) for Amodes.
 --
 -- This can give worse code than 'getAmode': an extra LEA and an extra
 -- register. If possible, generate the other code first and use 'getAmode'

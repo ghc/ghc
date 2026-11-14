@@ -6,8 +6,9 @@
 --           PLDI 2004
 --
 --   These general versions are not used in GHC proper because they are too slow.
---   Instead, hand written optimised versions are provided for each architecture
---   in MachRegs*.hs
+--   Instead, hand written optimised versions are provided for each
+--   architecture: the virtualRegSqueeze and realRegSqueeze of its Regs module,
+--   which trivColorable in GHC.CmmToAsm.Reg.Graph.TrivColorable takes.
 --
 --   This code is here because we can test the architecture specific code against
 --   it.
@@ -34,7 +35,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 
 -- Some basic register classes.
 --      These aren't necessarily in 1-to-1 correspondence with the allocatable
---      RegClasses in MachRegs.hs
+--      RegClasses of GHC.Platform.Reg.Class
 data RegClass
         -- general purpose regs
         = ClassG32      -- 32 bit GPRs
@@ -96,9 +97,8 @@ worst regsOfClass regAlias neighbors classN classC
  = let  regAliasS regs  = unionManyUniqSets
                         $ map regAlias
                         $ nonDetEltsUniqSet regs
-                        -- This is non-deterministic but we do not
-                        -- currently support deterministic code-generation.
-                        -- See Note [Unique Determinism and code generation]
+                        -- The union does not depend on the order
+                        -- (Note [Unique Determinism and code generation])
 
         -- all the regs in classes N, C
         regsN           = regsOfClass classN

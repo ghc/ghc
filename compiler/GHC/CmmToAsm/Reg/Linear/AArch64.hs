@@ -72,7 +72,8 @@ allocateReg (RealRegSingle r) (FreeRegs g f)
     | r > 31 = panic $ "Linear.AArch64.allocReg: double allocation of float reg v" ++ show (r - 32) ++ "; " ++ showBits f
     | otherwise = pprPanic "Linear.AArch64.allocReg" $ text ("double allocation of gp reg x" ++ show r ++ "; " ++ showBits g)
 
--- we start from 28 downwards... the logic is similar to the ppc logic.
+-- getFreeRegs starts from x18 downwards (x19 to x28 hold STG's registers,
+-- below) and from v31 downwards... the logic is similar to the ppc logic.
 -- 31 is Stack Pointer
 -- 30 is Link Register
 -- 29 is Stack Frame (by convention)

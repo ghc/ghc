@@ -189,8 +189,8 @@ import qualified Data.Semigroup as S
 
   - By the C-- AST to identify labels
 
-  - By the unregisterised C code generator (\"PprC\") for naming functions (hence
-    the name 'CLabel')
+  - By the unregisterised C code generator (\"GHC.CmmToC\") for naming functions
+    (hence the name 'CLabel')
 
   - By the native and LLVM code generators to identify labels
 
@@ -1606,11 +1606,11 @@ pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]
 
 -- Note [Internal proc labels]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Some tools (e.g. the `perf` utility on Linux) rely on the symbol table
--- for resolution of function names. To help these tools we provide the
--- (enabled by default) -fexpose-all-symbols flag which causes GHC to produce
--- symbols even for symbols with are internal to a module (although such
--- symbols will have only local linkage).
+-- Some tools (e.g. the `perf` utility on Linux) rely on the symbol table for
+-- resolution of function names. To help these tools we provide the (off by
+-- default) -fexpose-internal-symbols flag which causes the x86 and x86-64 code
+-- generator to produce symbols even for symbols which are internal to a module
+-- (although such symbols will have only local linkage).
 --
 -- Note that these labels are *not* referred to by code. They are strictly for
 -- diagnostics purposes.
@@ -1620,8 +1620,8 @@ pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]
 -- knowledge of the current Module. Consequently, we have to pass this around
 -- explicitly.
 
--- | Generate a label for a procedure internal to a module (if
--- 'Opt_ExposeAllSymbols' is enabled).
+-- | Generate a label for a procedure internal to a module, which the x86 and
+-- x86-64 code generator emits where 'Opt_ExposeInternalSymbols' is enabled.
 -- See Note [Internal proc labels].
 ppInternalProcLabel :: IsLine doc
                     => Module     -- ^ the current module

@@ -273,7 +273,7 @@ data Instr
                                  -- pretty-prints as
                                  --       call 1f
                                  -- 1:    popl %reg
-                                 --       addl __GLOBAL_OFFSET_TABLE__+.-1b, %reg
+                                 --       addl $_GLOBAL_OFFSET_TABLE_+(.-1b), %reg
         | FETCHPC     Reg        -- pseudo-insn for Darwin position-independent code
                                  -- pretty-prints as
                                  --       call 1f
@@ -449,13 +449,17 @@ regUsageOfInstr platform instr
       , OpReg {} <- src
       , OpReg {} <- dst
       -> readOp dst_fmt src <.> modifyOp dst_fmt dst
-      -- other MOV instructions zero any remaining upper part of the destination
-      -- (largely to avoid partial register stalls)
+      -- The usage of the other MOV instructions has a register destination
+      -- written, not read. Some of them zero the upper part of the destination
+      -- (largely to avoid partial register stalls), such as a 32-bit MOV into
+      -- a general register and, up to bit 127, a load at FF32 or FF64; others
+      -- keep it, such as a MOV between registers at FF32 or FF64 (movss, movsd)
+      -- and an 8-bit or 16-bit MOV into a general register.
       | otherwise
       -> readOp dst_fmt src <.> writeOp dst_fmt dst
     MOVD fmt1 fmt2 src dst    ->
-      -- NB: MOVD and MOVQ always zero any remaining upper part of destination,
-      -- so the destination is "written" not "modified".
+      -- NB: MOVD and MOVQ zero the destination's upper part up to bit 127, so
+      -- the destination is "written" not "modified".
       readOp fmt1 src <.> writeOp fmt2 dst
     CMOV _ fmt src dst             -> readOp fmt src <.> modifyReg fmt dst
     MOVZxL fmt src dst             -> readOp fmt src <.> writeOp fmt dst

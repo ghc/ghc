@@ -56,9 +56,10 @@ addRegMaxFmt :: Regs -> RegWithFormat -> Regs
 addRegMaxFmt = coerce $ strictAddOneToUniqSet_C maxRegWithFormat
   -- Don't build up thunks when combining with 'maxRegWithFormat'
 
--- | Remove 2nd argument registers from the 1st argument, but only
--- if the format in the second argument is at least as large as the format
--- in the first argument.
+-- | Remove 2nd argument registers from the 1st argument: one at a scalar
+-- format in the first whatever its format in the second, and one at a vector
+-- format only if its format in the second is at least as large by Format's
+-- derived Ord.
 minusCoveredRegs :: Regs -> Regs -> Regs
 minusCoveredRegs = coerce $ minusUniqSet_C f
   where
@@ -90,8 +91,9 @@ intersectRegsMaxFmt :: Regs -> Regs -> Regs
 intersectRegsMaxFmt = coerce $ strictIntersectUniqSets_C maxRegWithFormat
   -- Don't build up thunks when combining with 'maxRegWithFormat'
 
--- | Computes the set of registers in both arguments whose size is smaller in
--- the second argument than in the first.
+-- | Computes the registers of the first argument that are not in the second,
+-- and, at the second's format, those whose format ranks lower in the second
+-- than in the first by Format's derived Ord.
 shrinkingRegs :: Regs -> Regs -> Regs
 shrinkingRegs = coerce $ minusUniqSet_C f
   where

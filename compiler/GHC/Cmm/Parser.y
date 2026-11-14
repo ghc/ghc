@@ -857,8 +857,6 @@ default :: { Maybe (CmmParse ()) }
         -- 'default' branches
         | {- empty -}                   { Nothing }
 
--- Note: OldCmm doesn't support a first class 'else' statement, though
--- CmmNode does.
 else    :: { CmmParse () }
         : {- empty -}                   { return () }
         | 'else' '{' body '}'           { withSourceNote $2 $4 $3 }

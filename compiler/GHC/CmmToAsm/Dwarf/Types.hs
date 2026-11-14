@@ -434,7 +434,7 @@ pprFrameBlock platform (DwarfFrameBlock hasInfo uws0) =
 --
 -- We apply this offset in several places:
 --
---  * unwind information in .debug_frames
+--  * unwind information in .debug_frame
 --  * the subprogram and lexical_block DIEs in .debug_info
 --  * the ranges in .debug_aranges
 --

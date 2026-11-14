@@ -373,8 +373,12 @@ stmtToInstrs stmt = do
         ty = cmmExprType platform src
         format = cmmTypeFormat ty
     CmmBranch id -> genBranch id
-    -- We try to arrange blocks such that the likely branch is the fallthrough
-    -- in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
+    -- GHC.Cmm.ContFlowOpt inverts a condition, and its likelihood with it,
+    -- only where the condition can be inverted and its true target has one
+    -- predecessor, and there inverts a likely-false condition if its false
+    -- target has more than one predecessor (Note [Invert Cmm conditionals]),
+    -- so the condition may be likely true here. genCondBranch does not use the
+    -- likelihood.
     CmmCondBranch arg true false _prediction ->
       genCondBranch true false arg
     CmmSwitch arg ids -> genSwitch config arg ids
@@ -543,9 +547,9 @@ opRegWidth w = pprPanic "opRegWidth" (text "Unsupported width" <+> ppr w)
 --
 -- CmmGlobal @PicBaseReg@'s are generated in @GHC.CmmToAsm.PIC@ in the
 -- @cmmMakePicReference@.  This is in turn called from @cmmMakeDynamicReference@
--- also in @Cmm.CmmToAsm.PIC@ from where it is also exported.  There are two
--- callsites for this. One is in this module to produce the @target@ in @genCCall@
--- the other is in @GHC.CmmToAsm@ in @cmmExprNative@.
+-- also in @GHC.CmmToAsm.PIC@ from where it is also exported.  This module
+-- calls @cmmMakeDynamicReference@ in @genSwitch@ and, to produce the @target@,
+-- in @genCCall@; @GHC.Cmm.GenericOpt@ calls it in @cmmExprNative@.
 --
 -- Conceptually we do not want any special PicBaseReg to be used on RV64. If
 -- we want to distinguish between symbol loading, we need to address this through

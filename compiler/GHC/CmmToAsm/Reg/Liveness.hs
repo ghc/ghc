@@ -522,9 +522,9 @@ slurpReloadCoalesce live
                 = listToUFM_Directly
                 $ [ (k, r1)
                   | (k, r1) <- nonDetUFMToList map1
-                  -- This is non-deterministic but we do not
-                  -- currently support deterministic code-generation.
-                  -- See Note [Unique Determinism and code generation]
+                  -- Each entry is kept or dropped on its own and the list
+                  -- becomes a map again, so its order does not matter
+                  -- (Note [Unique Determinism and code generation])
                   , case lookupUFM_Directly map2 k of
                           Nothing -> False
                           Just r2 -> r1 == r2 ]
@@ -788,11 +788,11 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
         getOutEdges instrs = concatMap jumpDestsOfInstr instrs
 
         -- This is truly ugly, but I don't see a good alternative.
-        -- Digraph just has the wrong API.  We want to identify nodes
-        -- by their keys (BlockId), but Digraph requires the whole
-        -- node: (NatBasicBlock, BlockId, [BlockId]).  This takes
-        -- advantage of the fact that Digraph only looks at the key,
-        -- even though it asks for the whole triple.
+        -- GHC.Data.Graph.Directed just has the wrong API.  We want to
+        -- identify nodes by their keys (BlockId), but it requires the whole
+        -- node: (NatBasicBlock, BlockId, [BlockId]).  This takes advantage of
+        -- the fact that it only looks at the key, even though it asks for the
+        -- whole triple.
         roots = [DigraphNode (panic "sccBlocks") b (panic "sccBlocks")
                 | b <- entries ]
 

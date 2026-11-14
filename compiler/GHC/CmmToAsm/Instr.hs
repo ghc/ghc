@@ -31,7 +31,16 @@ class Instruction instr where
 
         -- | Get the registers that are being used by this instruction.
         --      regUsage doesn't need to do any trickery for jumps and such.
-        --      Just state precisely the regs read and written by that insn.
+        --      State the regs read and written by that insn as the register
+        --      allocators are to use them, which need not be what the hardware
+        --      does. Among other things, x86's regUsageOfInstr records an XOR,
+        --      VXOR, PXOR or VPXOR whose operands are all one register as
+        --      reading nothing, and at the format FF32 or FF64 a MOV between
+        --      registers or a MOVHLPS as not reading its destination, whose
+        --      upper part the hardware keeps; it records the float and vector
+        --      registers that callClobberedRegs names at the format FF64
+        --      whatever their width, and leaves out the real registers the
+        --      allocators do not hand out.
         --      The consequences of control flow transfers, as far as register
         --      allocation goes, are taken care of by the register allocator.
         --

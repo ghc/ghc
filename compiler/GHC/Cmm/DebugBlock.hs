@@ -240,8 +240,8 @@ cmmDebugLabels is_valid_label isMeta nats = seqList lbls lbls
         --
         -- Note that we might encounter blocks that are missing or only
         -- consist of meta instructions -- we will declare them missing,
-        -- which will skip debug data generation without messing up the
-        -- block hierarchy.
+        -- and cmmDebugLink then skips debug data generation for them and
+        -- for every block and procedure nested under them.
         lbls = filter is_valid_label $ map blockId $ filter (not . allMeta) $ concatMap getBlocks nats
         getBlocks (CmmProc _ _ _ (ListGraph bs)) = bs
         getBlocks _other                         = []
@@ -383,7 +383,8 @@ The flow of unwinding information through the compiler is a bit convoluted:
 
  * The unwind nodes are carried through the sinking pass. Currently this is
    guaranteed not to invalidate unwind information since it won't touch stores
-   to Sp, but this will need revisiting if CmmSink gets smarter in the future.
+   to Sp, but this will need revisiting if GHC.Cmm.Sink gets smarter in the
+   future.
 
  * Eventually we make it to the native code generator backend which can then
    preserve the unwind nodes in its machine-specific instructions. In so doing
