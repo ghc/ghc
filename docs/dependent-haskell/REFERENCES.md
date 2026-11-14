@@ -1800,11 +1800,34 @@ stores the value and type with `makeOpen` in the lexical let environment.
 File blob: `98e50ce60319dcb47a542ac7c04b4b3e491a64e9`.
 The full tagged sources and their blob checks are retained with M22 evidence.
 
-The proposed GHC adaptation uses the actual local runtime Id in TermVarTy.
-Agda's context discipline supplies the scope precedent. Its transparent lets
-and totality rules do not justify unfolding Haskell values or equating aliases.
-The implementation must preserve Haskell laziness and ordinary type-variable
-shadowing. It needs a source-name capture rule and a checked local index
-environment. Existing foreach-local signature environments start empty outside
-their own telescope, so an ambient `xs :: Vec Int n` is currently unsupported.
-No inference, Core, backend or interface extension is proposed for M23.
+Agda's context discipline supplies scope prior art. Its transparent lets and
+totality rules do not justify unfolding Haskell values or equating aliases.
+The proposed GHC adaptation captures the actual already-bound local runtime
+Name for a complete local value signature under `ExperimentalDependentTypes`.
+An in-scope erased type variable takes precedence. Otherwise, consider only
+unqualified free type-variable spellings in the local term reader environment.
+Install a signature-local lookup alias before implicit forall collection. The
+actual Name remains in the value namespace and a free signature dependency.
+Explicit and nested type binders keep normal scope. No local term candidate
+means ordinary type-variable handling continues.
+
+GHC's `rnLocalValBindsAndThen` brings the whole recursive group's Names into
+scope before signature renaming. The `LocalBindCtxt` group set must therefore
+exclude same-group capture. `TypeSigCtx` alone is insufficient. Never recover
+an outer term binder hidden by a newer same-spelling binder. Globals, future
+bindings and unavailable group binders do not supply ambient runtime indices.
+TC must find the selected Name's actual local Id, read its assigned metadata
+without changing its Unique, and validate its closed domain and Many
+multiplicity. Reject CoVars and nonlocal Ids. Do not create a prototype index
+or recover from invalid capture by inventing an erased forall.
+
+Use complete renamed signatures, with no named or anonymous holes. Top-level,
+class, declaration, expression and pattern signatures keep their existing
+behavior. Unsigned native inference and native meta assignment remain unsupported.
+Unavailable or invalid captured indices need located source diagnostics;
+wrong-index payloads retain ordinary type errors. Flag-off and erased-variable
+controls must keep ordinary Haskell behavior. Signature capture must not force
+an index, payload or runtime IO action. Existing foreach-local environments
+start empty outside their own telescope, so ambient payload signatures remain
+unsupported until M23 is implemented and verified. No Core, backend or
+interface extension is proposed. Verification remains pending.

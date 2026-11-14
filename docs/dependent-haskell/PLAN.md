@@ -1558,21 +1558,51 @@ let xs :: Vec Int n
 Agda checks the declared type in the current context, then checks the value
 against it. Follow [the pinned checked-let rules](REFERENCES.md#checked-local-payload-signatures).
 GHC must use the actual local index Id. Do not unfold the index's RHS or derive
-index equality from a let alias. Unsigned inference remains a separate task.
+index equality from a let alias. Unsigned inference remains unsupported by M23.
 
-- [ ] Resolve an otherwise-unbound local signature index against an eligible,
-  already-bound local term Name. Preserve erased type-variable precedence,
-  lexical shadowing and normal behavior outside the experimental flag. Do not
-  infer a fresh erased forall for a captured runtime index.
-- [ ] Check the actual local Id's scope, supported domain and unrestricted
-  multiplicity before constructing its TermVarTy. Reject globals, forward
-  references and same-group unavailable binders at their source locations.
-  Keep the existing inferred-type and native-meta restrictions. Add a GHC Note
-  that states these scope rules and the distinction from definitional equality.
+Restrict capture to complete local value signatures under the experimental
+flag. The binding renamer supplies `LocalBindCtxt` and the current group Names;
+`TypeSigCtx` alone does not identify a local binding group. Do not enable this
+capture for top-level, class, declaration, expression or pattern signatures.
+Preserve all existing type-position, forall, context and staging restrictions.
+
+An existing erased type-variable binding takes precedence. Otherwise, consider
+only unqualified free type-variable spellings with a local term Name in the
+current lexical reader environment. Install a signature-local lookup alias
+before collecting implicit forall variables. Keep the actual Name in the value
+namespace and record it as a free dependency of the signature. Explicit and
+nested type binders keep their normal scope. Names with no local capture
+candidate keep ordinary type-variable handling.
+
+Exclude current-group Names using the binding context's group set. A recursive
+local group already places these Names in the reader environment. Do not treat
+them as earlier checked indices. Do not fall back to an outer same-spelling
+term binder hidden by a current binder. Globals and future bindings are not
+capture sources. Preserve the selected Name through TC; do not invent an Id
+or silently replace failed runtime capture with erased quantification.
+
+TC must find the actual already-bound local Id in its local environment.
+Read assigned type and multiplicity metadata with the existing zonker, keeping
+the Name and Unique. Require a non-CoVar local Id, a supported closed index
+domain and unrestricted multiplicity before constructing `TermVarTy`. Scope
+and metadata checks supply no equality and perform no runtime evaluation.
+
+- [ ] Capture signature-local Names before implicit forall collection, with
+  erased-variable precedence, lexical shadowing and current-group exclusion.
+  Preserve ordinary behavior with the flag off and outside local signatures.
+- [ ] Admit captured indices only for a complete renamed signature. Reject
+  named and anonymous signature holes when capture is requested. Validate
+  actual local Ids without native meta assignment or unsigned inference.
+  Report unavailable or invalid captured indices at their source occurrence;
+  preserve ordinary type errors for wrong-index payloads. Add a GHC Note
+  stating these scope rules and the distinction from definitional equality.
 - [ ] Use the signed local payload twice after reading its index from IORef.
   Check wrong-index payloads, shadowed Names, bottom and cyclic indices,
-  payload sharing and signature errors. Preserve source demand, both compiler
-  stages and the existing registered regressions. No Core change is planned.
+  payload sharing and signature errors. Cover unavailable same-group indices,
+  partial signatures and unsigned aliases with located errors. Check an
+  ordinary implicit forall, erased-variable shadowing and flag-off behavior.
+  Preserve source demand, both compiler stages and the existing registered
+  regressions. No Core change is planned.
 
 ## Further work
 
