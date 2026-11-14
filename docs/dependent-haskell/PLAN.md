@@ -83,7 +83,9 @@ observations, 60 located errors, four ordinary controls and 94 API rejections.
 All five registered regressions pass. M25 verifies scoped native source
 inference with 377 observations, 69 located rejection cases, four ordinary
 controls and 103 API rejections in both-stage validation. All five registered
-regressions pass. M26 targets boxed tuple syntax inference.
+regressions pass. M26 verifies boxed tuple inference with 395 observations,
+79 located rejection cases, four ordinary controls and 113 API rejections.
+All five registered regressions pass. M27 targets native tuple sections.
 
 ## Direction and boundaries
 
@@ -1751,43 +1753,70 @@ of an ordinary GHC callback must instead reject a free callback-local index.
 
 ### M26: boxed tuple source inference
 
-This target is unverified. The M25 tuple baseline checks three versions of a
+This target is verified. The M25 tuple baseline checked three versions of a
 callback that returns `(42 :: Int, xs)` at an outer runtime index. Tuple syntax
-rejects with GHC-83865. `(,) (42 :: Int) xs` and an ordinary polymorphic `pair`
-helper compile with Core/STG lint. These are compile controls, not runtime
-validation. Preserve the failing syntax as the implementation target.
+rejected with GHC-83865. Constructor and helper forms compiled. M26 runs all
+three forms at finite runtime inputs, with demand, effects and sharing checks.
 
-The implementation will expand only an `Infer` result under
-`ExperimentalDependentTypes` when a field has a native anchor. It will
-preserve `checkTupSize`. The read-only classifier will admit a complete
+The implementation expands only an `Infer` result under
+`ExperimentalDependentTypes` when a field has a native anchor. It
+preserves `checkTupSize`. The read-only classifier admits a complete
 boxed tuple like a named application. Its ordinary fields can use the
-existing fresh ordinary parameters. Known expected types will keep
-component checking. `mkExpandedExpr` and generated application spans will
-retain the original tuple context and field locations.
+existing fresh ordinary parameters. Known expected types keep
+component checking. `mkExpandedExpr` and generated application spans
+retain the original tuple context and field locations. Note
+`[Inference of native tuple fields]` owns this rule in `GHC.Tc.Gen.Expr`.
 
-- [ ] Inspect `Tc.Gen.Expr`'s complete `ExplicitTuple` path at the M25
+- [x] Inspect `Tc.Gen.Expr`'s complete `ExplicitTuple` path at the M25
   checkpoint. It calls `expTypeToType` and allocates component metas before
   checking fields. The boxed `tcInferTupArgs` path also allocates metas.
   Reuse the existing ordinary tuple-constructor application machinery for an
   anchored boxed tuple that needs inference. Keep the original tuple syntax
   and source spans in diagnostics, using the existing expansion wrapper.
-- [ ] Extend the read-only native-argument classifier to recognize complete
+- [x] Extend the read-only native-argument classifier to recognize complete
   boxed tuple syntax with a native anchor. Do not execute splices or elaborate
   components during classification. Preserve checking when an expected tuple
   shape is available. Keep tuple sections, unboxed fields and representations
   on their existing paths until their inference rules are established.
-- [ ] Preserve exact field types, outer runtime Id scope, ordinary field
+- [x] Preserve exact field types, outer runtime Id scope, ordinary field
   multiplicities and once-only usage. A tuple does not bind an existential
   runtime index. Returning a callback-local index with its vector still needs
   an explicit package. Do not infer a Sigma type for an ordinary tuple.
-- [ ] Run the syntax, constructor and helper forms at finite IORef inputs.
+- [x] Run the syntax, constructor and helper forms at finite IORef inputs.
   Check effect counts, bottom fields, partial/cyclic values and sharing. Reject
   independent indices and callback/inner-index escape with located errors.
   Verify both compiler stages and the existing registered regressions.
 
 Use [Agda's constant product family](REFERENCES.md#boxed-tuple-inference-prior-art)
 as the product precedent. Existing GHC constructor checking supplies the
-implementation path. No Core or interface representation change is proposed.
+implementation path. No Core or interface representation change was needed.
+
+### M27: native tuple sections
+
+This target is unverified. The M26 baseline compiles an inferred callback
+whose ordinary unit case returns `pure ((42 :: Int), xs)`. It also compiles
+the fully applied constructor `((,) xs) (42 :: Int)`. Applying the section
+`(xs,) (42 :: Int)` rejects with GHC-83865. The known expected native section
+control also retains its rejection. These are compile/Lint observations.
+
+- [ ] Inspect `tcInferTupArgs` and the complete-tuple classifier guard.
+  The boxed present-field path checks against a fresh whole-field meta.
+  Establish section rules for both inference and known expected functions.
+  Prefer reuse of the existing tuple AST and constructor checking. Partial
+  constructor applications also need to satisfy existing saturation rules.
+- [ ] Keep missing-field types, multiplicities and runtime representations
+  under ordinary GHC checks. Use exact native present-field types without
+  assigning them to metas. Preserve expected higher-rank checking. Do not
+  expand to a lambda without checking the existing section desugaring and
+  its treatment of present fields.
+- [ ] Preserve outer index scope, once-only usage and lazy present fields.
+  A section cannot hide an inner index or duplicate a linear capture.
+  Keep ordinary case inference separate from branch-local index and GADT
+  escape. Reuse the owning tuple Note for shared rules.
+- [ ] Compare sections with constructor controls at runtime IORef inputs.
+  Check repeated application, field demand, partial/cyclic prefixes and
+  original vector/payload sharing. Pin scope and usage diagnostics in both
+  stages and rerun the existing registered regressions.
 
 ## Further work
 

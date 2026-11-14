@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 377 runtime observations and the runtime fixtures check 103 package/bound rejections |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 395 runtime observations and the runtime fixtures check 113 package/bound rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -56,7 +56,8 @@ Last updated: 2026-11-14.
 | Local payload signatures | Complete local signatures capture eligible already-bound runtime indices; both stages pass sharing, scope, demand and ordinary-Haskell controls |
 | Native IO binds | Saved and inline actions preserve native inputs through do and explicit bind; ordinary local computation results infer, with effects, demand and sharing controls |
 | Scoped source inference | Local monomorphic vectors/actions and native callback results infer at existing outer runtime indices; deep metadata scope and callback escape checks apply |
-| Next task | M26: boxed tuple syntax with native components; constructor/helper controls compile, tuple syntax still rejects |
+| Native boxed tuples | Complete boxed tuples infer exact native field types through ordinary constructor applications; runtime syntax, constructor and helper comparisons pass |
+| Next task | M27: tuple sections with native present fields; the applied section rejects, while the equivalent constructor application and ordinary unit case compile |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2703,4 +2704,54 @@ no source-level exploit is claimed. Core and the interface version are unchanged
 
 The next failure is `pure ((42 :: Int), xs)` inside the inferred callback.
 Equivalent `(,)` and ordinary polymorphic helper applications compile.
-[M26](PLAN.md#m26-boxed-tuple-source-inference) targets tuple syntax inference.
+[M26](PLAN.md#m26-boxed-tuple-source-inference) completes tuple syntax inference.
+
+## M26: inferred boxed tuples
+
+Both compiler stages accept native fields in complete boxed tuple syntax:
+
+```haskell
+n <- readIORef cell
+let action = pure (replicateNative @Int n 7)
+    compute = action >>= \xs -> pure ((42 :: Int), xs)
+pair <- compute
+pure (PackVec n (snd pair))
+```
+
+For an `Infer` result under `ExperimentalDependentTypes`, a read-only native
+anchor permits expansion to the ordinary tuple data constructor. The existing
+application checker caches fields and chooses native types immutably. Ordinary
+fields can use fresh ordinary parameters. The tuple-size check remains.
+The expansion retains the written tuple context and field locations.
+Known expected types retain component checking. Tuple sections and unboxed
+tuples retain their existing paths. Core and the interface version are unchanged.
+
+Note `[Inference of native tuple fields]` in `GHC.Tc.Gen.Expr` owns the rule.
+The argument classifier refers to that Note.
+[Agda product, Sigma and constructor references](REFERENCES.md#boxed-tuple-inference-prior-art)
+record the precedent. An ordinary tuple does not bind a new runtime index.
+Returning an inner index with its vector still requires an explicit package.
+
+Both source clients pass 395 observations. The previous 377 remain unchanged.
+The 18 additions compare syntax, constructor and helper forms at IORef inputs
+0 through 3. They check effects, lazy tuple fields, original errors, partial
+and cyclic prefixes, and sharing of the vector and original IORef payload.
+Both stages pass 79 located rejection cases and four ordinary controls.
+Ten new rejections cover index escape, independent indices, linear usage,
+generalization, field mismatch, GADT escape and the unsupported native section.
+Ten tuple compile controls cover nested tuples, unsigned literals, linear
+lets, known expected types, ordinary higher-rank fields, sections and unboxed
+tuples. The API/runtime fixture passes 113 package/bound rejections.
+All five registered regressions pass, with 34 skipped ways and no framework
+warnings or unexpected results. Full GHC tests were not run.
+
+Evidence uses `_build/verification/native-boxed-tuple-*`. Three archives contain
+32 selected compiler inputs each. The self-hosted build took 6m16s and peaked
+at 7210 MiB under 16 GiB. Final source/API checks peaked at 1047 MiB under
+4 GiB. Registered tests took 13.10s and peaked at 1907 MiB under 8 GiB.
+Swap was disabled. Failed setup runs and the original M25 evidence remain.
+
+The next baseline compiles an ordinary unit case returning the tuple.
+It also compiles `((,) xs) (42 :: Int)`. Applying `(xs,)` still reports
+GHC-83865. These are compile/Lint controls, not runtime validation.
+[M27](PLAN.md#m27-native-tuple-sections) targets that separate section path.

@@ -1991,8 +1991,10 @@ scope check across metadata; no source-level exploit is claimed.
 
 ## Boxed tuple inference prior art
 
-M26 is unverified. The M25 baseline compiles `(,) (42 :: Int) xs` and an
-ordinary polymorphic `pair` helper, but rejects tuple syntax with GHC-83865.
+M26 is verified in both compiler stages with 395 source observations,
+79 located rejection cases and 113 API package/bound rejections. All five
+registered regressions pass. The M25 baseline compiled constructor/helper
+forms but rejected tuple syntax with GHC-83865.
 At `6cca33589e`, `Tc.Gen.Expr` lines 451–465 first converts the expected type
 to a Type and matches the tuple TyCon, creating component metas. Its boxed
 `tcInferTupArgs` branch at lines 915–920 also checks fields against fresh
@@ -2009,7 +2011,21 @@ defines its two stored fields and constructor. File blob:
 supplies the existing argument-checking and codomain-substitution precedent;
 its file blob is `82ba94ac864d19b947d4c92b9af252b0fe81347a`.
 Exact source files, Git blob checks and retrieval metadata are recorded with
-the M25 prior-art artifacts.
+the M25 and M26 prior-art artifacts. M26 rechecks all three Git blob hashes.
+
+M26 reuses GHC's constructor application inference. `mkExpandedExpr` in
+`GHC.Rename.Utils`, `splitHsApps` in `GHC.Tc.Gen.Head`, and
+`[Typechecking by expansion: overview]` in `GHC.Tc.Gen.Expand` supply the
+source-context precedent. At M25 commit `e0e3e893bd`, the helper and split
+start at lines 830 and 295. Generated head/application spans preserve field
+locations and the original tuple context. The rule has one owner in
+`[Inference of native tuple fields]`; the classifier refers to it.
+
+M27 remains unverified. An ordinary unit case returning the tuple and the
+equivalent full constructor application compile with Lint. An applied native
+tuple section rejects with GHC-83865. The present-field branch of
+`tcInferTupArgs` and the classifier's complete-tuple guard are the next
+source boundaries. These baseline controls do not establish runtime behavior.
 
 A GHC tuple with component `Vec Int outerN` still refers to that outer index.
 The tuple does not bind a new index in its second field type. A callback-local

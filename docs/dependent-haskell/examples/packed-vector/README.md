@@ -1,9 +1,9 @@
 # Packed vector source example
 
-Both M25 compiler stages pass all 377 source observations with Core Lint
-and STG Lint. The API/runtime fixture passes 103 package/bound rejections.
-All five registered regressions pass. M25 adds 17 observations and keeps the
-previous 360 lines in order. Both stages pass 69 standalone rejection cases
+Both M26 compiler stages pass all 395 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 113 package/bound rejections.
+All five registered regressions pass. M26 adds 18 observations and keeps the
+previous 377 lines in order. Both stages pass 79 standalone rejection cases
 and four ordinary-Haskell controls.
 
 At M20, both stages and all five regressions passed 301 observations and
@@ -1019,6 +1019,27 @@ native bindings, pattern bindings and partial signatures retain their gates.
 The API fixture passes 103 rejection cases. Standalone checks pin codes and
 source tokens for 69 cases in each stage. Callback escapes report GHC-83605
 at the body. The existing GADT, multiplicity and wrong-index diagnostics remain.
-`pure ((42 :: Int), xs)` is a preserved tuple-syntax inference failure.
-Equivalent constructor and polymorphic helper applications compile.
-[M26](../../PLAN.md#m26-boxed-tuple-source-inference) is unverified.
+M26 admits the previously failing tuple syntax.
+
+## Inferred boxed tuples
+
+```haskell
+let action = pure (replicateNative @Int n 7)
+    compute = action >>= \xs -> pure ((42 :: Int), xs)
+pair <- compute
+pure (PackVec n (snd pair))
+```
+
+`driveTupleInference` compares tuple syntax, `(,)` and an ordinary helper at
+runtime lengths 0 through 3. Its counters require `[0,1,2,3]`. Further checks
+force the pair before its fields, demand each bottom field separately, and
+check partial/cyclic prefixes. StableName checks compare returned vectors
+with the original vector and compare element IORefs with the original IORef.
+They do not require new pair closures to share.
+
+The compiler expands only complete boxed tuples that need inference and have
+a native anchor. Known expected types retain component checking. A tuple
+does not bind a dependent index. A local index cannot escape in `(k, vectorK)`.
+The source/API fixtures retain located scope and multiplicity rejections.
+Native tuple sections remain unsupported. The equivalent full constructor
+application compiles; [M27](../../PLAN.md#m27-native-tuple-sections) is unverified.
