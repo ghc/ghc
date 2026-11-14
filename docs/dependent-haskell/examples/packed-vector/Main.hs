@@ -1465,6 +1465,150 @@ runTupleSectionChecks = do
             putStrLn "section vector shares original payload: True"
         _ -> fail "section sharing vector has the wrong length"
 
+-- | Project a function through an ordinary equality-constrained helper.
+constrainedProjection :: (Eq b) => (a, b) -> a
+constrainedProjection (first, tag) = if tag == tag then first else first
+
+-- | Compare directly applied generic results with a named projection.
+{-# NOINLINE driveGenericOverapplication #-}
+driveGenericOverapplication :: Nat -> IO String
+driveGenericOverapplication input = do
+    indexCell <- newIORef input
+    n <- readIORef indexCell
+    effects <- newIORef (0 :: Int)
+    let vector = replicateNative @Int n 7
+        pair = ((vector,), True)
+        action = modifyIORef' effects (+ 1) >> pure pair
+        direct = action >>= \stored -> pure ((fst stored) (42 :: Int))
+        named =
+            action >>= \stored ->
+                let projected = fst stored
+                 in pure (projected (42 :: Int))
+        identity = action >>= \stored -> pure ((id (fst stored)) (42 :: Int))
+        constant = action >>= \stored -> pure ((const (fst stored) False) (42 :: Int))
+        constrained = action >>= \stored -> pure ((constrainedProjection stored) (42 :: Int))
+    before <- readIORef effects
+    first <- direct
+    count1 <- readIORef effects
+    second <- named
+    count2 <- readIORef effects
+    third <- identity
+    count3 <- readIORef effects
+    fourth <- constant
+    count4 <- readIORef effects
+    fifth <- constrained
+    count5 <- readIORef effects
+    pure
+        ( show
+            ( natToInt n
+            ,
+                [ (snd first, toList (fst first))
+                , (snd second, toList (fst second))
+                , (snd third, toList (fst third))
+                , (snd fourth, toList (fst fourth))
+                , (snd fifth, toList (fst fifth))
+                ]
+            , [before, count1, count2, count3, count4, count5]
+            )
+        )
+
+-- | Check demand, effects, and captured sharing through generic results.
+runGenericOverapplicationChecks :: IO ()
+runGenericOverapplicationChecks = do
+    forM_
+        [ (Z, "(0,[(42,[]),(42,[]),(42,[]),(42,[]),(42,[])],[0,1,2,3,4,5])")
+        , (S Z, "(1,[(42,[7]),(42,[7]),(42,[7]),(42,[7]),(42,[7])],[0,1,2,3,4,5])")
+        , (S (S Z), "(2,[(42,[7,7]),(42,[7,7]),(42,[7,7]),(42,[7,7]),(42,[7,7])],[0,1,2,3,4,5])")
+        , (S (S (S Z)), "(3,[(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7])],[0,1,2,3,4,5])")
+        ]
+        $ \(input, expected) -> do
+            actual <- driveGenericOverapplication input
+            assertEqual "runtime generic overapplication" expected actual
+            putStrLn ("runtime generic overapplication: " ++ actual)
+    ignoredIndex <- pure bottomLength
+    effects <- newIORef (0 :: Int)
+    let ignoredVector = replicateNative @Int ignoredIndex bottomElement
+        ignoredPair = ((ignoredVector,), True)
+        action = modifyIORef' effects (+ 1) >> pure ignoredPair
+        compute = action >>= \stored -> pure ((fst stored) (42 :: Int))
+    before <- readIORef effects
+    assertEqual "generic application construction has no effects" 0 before
+    putStrLn "generic application construction has no effects: 0"
+    result <- compute
+    once <- readIORef effects
+    assertEqual "generic application action executes once" 1 once
+    putStrLn "generic application action executes once: 1"
+    _ <- compute
+    twice <- readIORef effects
+    assertEqual "generic application action executes again" 2 twice
+    putStrLn "generic application action executes again: 2"
+    assertEqual "generic projection WHNF ignores index" () =<< (evaluate (fst ignoredPair) >> pure ())
+    putStrLn "generic projection WHNF ignores index: ok"
+    assertEqual "generic application WHNF ignores index" () =<< (evaluate result >> pure ())
+    putStrLn "generic application WHNF ignores index: ok"
+    assertEqual "generic application later field ignores index" 42 (snd result)
+    putStrLn "generic application later field ignores index: 42"
+    expectMarker "generic application retains index demand" "packed-bottom-length" $
+        evaluate (sum (toList (fst result)))
+    finiteIndex <- pure (S (S Z))
+    let payload :: Vec Int finiteIndex
+        payload = bottomPayload
+        payloadPair = ((payload,), True)
+        payloadResult = (fst payloadPair) (42 :: Int)
+    assertEqual "generic application ignores bottom payload" 42 (snd payloadResult)
+    putStrLn "generic application ignores bottom payload: 42"
+    expectMarker "generic application retains payload error" "packed-bottom-payload" $
+        evaluate (sum (toList (fst payloadResult)))
+    let bottomFunction :: Int -> (Vec Int finiteIndex, Int)
+        bottomFunction = error "native-projection-bottom-function"
+        functionPair = (bottomFunction, True)
+        bottomPair :: (Int -> (Vec Int finiteIndex, Int), Bool)
+        bottomPair = error "native-projection-bottom-pair"
+    assertEqual "unused generic projection ignores bottom function" 42 (const (42 :: Int) (fst functionPair))
+    putStrLn "unused generic projection ignores bottom function: 42"
+    expectMarker "generic application demands bottom function" "native-projection-bottom-function" $
+        evaluate ((fst functionPair) (42 :: Int))
+    assertEqual "unused generic projection ignores bottom pair" 42 (const (42 :: Int) (fst bottomPair))
+    putStrLn "unused generic projection ignores bottom pair: 42"
+    expectMarker "generic application demands bottom pair" "native-projection-bottom-pair" $
+        evaluate ((fst bottomPair) (42 :: Int))
+    let vector = replicateNative @Int finiteIndex 7
+        tagPair = ((vector,), error "native-projection-bottom-tag" :: Bool)
+    expectMarker "constrained projection retains tag demand" "native-projection-bottom-tag" $
+        evaluate ((constrainedProjection tagPair) (42 :: Int))
+    partialIndex <- pure (S bottomLength)
+    let partialVector = replicateNative @Int partialIndex 7
+        partialPair = ((partialVector,), True)
+    assertEqual "generic application partial index prefix" [7] (take 1 (toList (fst ((fst partialPair) (42 :: Int)))))
+    putStrLn "generic application partial index prefix: [7]"
+    cyclicIndex <- pure cyclicLength
+    let cyclicVector = replicateNative @Int cyclicIndex 7
+        cyclicPair = ((cyclicVector,), True)
+    assertEqual "generic application cyclic index prefix" [7, 7] (take 2 (toList (fst ((fst cyclicPair) (42 :: Int)))))
+    putStrLn "generic application cyclic index prefix: [7,7]"
+    sharedPayload <- newIORef (7 :: Int)
+    let sharingVector = replicateNative @(IORef Int) finiteIndex sharedPayload
+        sharingPair = ((sharingVector,), True)
+    originalVector <- evaluate sharingVector
+    leftVector <- evaluate (fst ((fst sharingPair) (42 :: Int)))
+    rightVector <- evaluate (fst ((fst sharingPair) (43 :: Int)))
+    originalName <- makeStableName originalVector
+    leftName <- makeStableName leftVector
+    rightName <- makeStableName rightVector
+    assertEqual "generic applications share captured vector" True (originalName == leftName && leftName == rightName)
+    putStrLn "generic applications share captured vector: True"
+    case toList leftVector of
+        [first, second] -> do
+            original <- evaluate sharedPayload
+            firstValue <- evaluate first
+            secondValue <- evaluate second
+            originalPayloadName <- makeStableName original
+            firstName <- makeStableName firstValue
+            secondName <- makeStableName secondValue
+            assertEqual "generic application vector shares original payload" True (originalPayloadName == firstName && firstName == secondName)
+            putStrLn "generic application vector shares original payload: True"
+        _ -> fail "generic application sharing vector has the wrong length"
+
 -- | Run finite observations and bounded strictness checks.
 main :: IO ()
 main = do
@@ -2014,3 +2158,4 @@ main = do
     runSourceInferenceChecks
     runTupleInferenceChecks
     runTupleSectionChecks
+    runGenericOverapplicationChecks

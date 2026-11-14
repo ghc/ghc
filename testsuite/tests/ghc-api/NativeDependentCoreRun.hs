@@ -1569,6 +1569,28 @@ runModuleChecks libdir = do
         , "section cyclic index prefix: [7,7]"
         , "section applications share captured vector: True"
         , "section vector shares original payload: True"
+        , "runtime generic overapplication: (0,[(42,[]),(42,[]),(42,[]),(42,[]),(42,[])],[0,1,2,3,4,5])"
+        , "runtime generic overapplication: (1,[(42,[7]),(42,[7]),(42,[7]),(42,[7]),(42,[7])],[0,1,2,3,4,5])"
+        , "runtime generic overapplication: (2,[(42,[7,7]),(42,[7,7]),(42,[7,7]),(42,[7,7]),(42,[7,7])],[0,1,2,3,4,5])"
+        , "runtime generic overapplication: (3,[(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7])],[0,1,2,3,4,5])"
+        , "generic application construction has no effects: 0"
+        , "generic application action executes once: 1"
+        , "generic application action executes again: 2"
+        , "generic projection WHNF ignores index: ok"
+        , "generic application WHNF ignores index: ok"
+        , "generic application later field ignores index: 42"
+        , "generic application retains index demand: packed-bottom-length"
+        , "generic application ignores bottom payload: 42"
+        , "generic application retains payload error: packed-bottom-payload"
+        , "unused generic projection ignores bottom function: 42"
+        , "generic application demands bottom function: native-projection-bottom-function"
+        , "unused generic projection ignores bottom pair: 42"
+        , "generic application demands bottom pair: native-projection-bottom-pair"
+        , "constrained projection retains tag demand: native-projection-bottom-tag"
+        , "generic application partial index prefix: [7]"
+        , "generic application cyclic index prefix: [7,7]"
+        , "generic applications share captured vector: True"
+        , "generic application vector shares original payload: True"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2888,6 +2910,17 @@ runPackageSourceRejectChecks = do
         , ("TupleSectionGeneralizedSection", 83605, "explicit signature", ["TupleSections", "NoMonoLocalBinds"], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let section = (localVector n,) in pure 42"])
         , ("TupleSectionUnliftedAnchoredField", 83865, "IntRep", ["TupleSections", "MagicHash"], ["import GHC.Exts (Int#)"], localActions ++ ["unboxed :: forall a. a -> Int#", "unboxed _ = 7#", "bad :: Nat -> IO Int", "bad n = let section = (unboxed (localVector n),) in pure 42"])
         , ("TupleSectionNativePolyBoundary", 83605, "forall within the scope", ["TupleSections", "ImpredicativeTypes"], [], [] ++ ["good :: foreach (n :: Nat) -> Vec Int n -> Int -> (forall a. a -> a, Vec Int n, Int)", "good n xs = (id, xs,)"])
+        , ("GenericOverapplicationWrongExtraArgument", 83865, "Char", ["TupleSections"], [], localActions ++ ["bad :: foreach (n :: Nat) -> Vec Int n -> (Vec Int n,Int)", "bad n xs = fst ((xs,),True) 'x'"])
+        , ("GenericOverapplicationWrongFinalIndex", 83865, "fst", ["TupleSections"], [], localActions ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> (Vec Int m,Int)", "bad n m xs = fst ((xs,),True) (42 :: Int)"])
+        , ("GenericOverapplicationSelectedNonFunction", 83865, "localVector n", ["TupleSections"], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = pure (fst (localVector n,True) (42 :: Int))"])
+        , ("GenericOverapplicationConflictingPrefix", 83865, "localVector m", ["TupleSections"], [], localActions ++ ["same :: forall a. a -> a -> a", "same left _ = left", "bad :: Nat -> Nat -> IO Int", "bad n m = pure (snd (same (localVector n,) (localVector m,) (42 :: Int)))"])
+        , ("GenericOverapplicationAnchorOnlyAfterPrefix", 83865, "localVector n", ["TupleSections"], [], localActions ++ ["unknownResult :: forall a. Int -> a", "unknownResult _ = error \"unknown-result\"", "bad :: Nat -> IO Int", "bad n = pure (unknownResult (42 :: Int) (localVector n))"])
+        , ("GenericOverapplicationCallbackLocalEscape", 83605, "outside the application scope", ["TupleSections"], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let compute = pure (localVector n) >>= \\xs -> let { k :: Nat; k = n } in pure (fst ((localVector k,),True) (42 :: Int)) in pure 42"])
+        , ("GenericOverapplicationLinearCaptureTwice", 18872, "multiplicity", ["TupleSections", "LinearTypes"], [], localActions ++ ["linearIdentity :: forall a. a %1 -> a", "linearIdentity value = value", "bad :: foreach (n :: Nat) -> Vec Int n %1 -> ((Vec Int n,Int),(Vec Int n,Int))", "bad n xs = let section = (xs,) in (linearIdentity section (42 :: Int),linearIdentity section (43 :: Int))"])
+        , ("GenericOverapplicationHigherRankWrongExtra", 25897, "rigid type variable", ["TupleSections"], [], localActions ++ ["acceptPoly :: (forall a. a -> a) -> Int", "acceptPoly value = value 42", "bad :: Nat -> IO Int", "bad n = pure (fst (acceptPoly,localVector n) (const (42 :: Int)))"])
+        , ("GenericOverapplicationLocalResultEscape", 83605, "out of scope here", ["TupleSections"], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let result = let { k :: Nat; k = n } in fst ((localVector k,),True) (42 :: Int) in pure 42"])
+        , ("GenericOverapplicationMissingDictionary", 39999, "Eq NoEq", ["TupleSections"], [], localActions ++ ["selectEq :: forall a b. Eq b => (a,b) -> a", "selectEq (value,tag) = if tag == tag then value else value", "data NoEq = NoEq", "bad :: Nat -> IO Int", "bad n = pure (snd (selectEq ((localVector n,),NoEq) (42 :: Int)))"])
+        , ("GenericOverapplicationVTAResidualPrefix", 83865, "untouchable", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: Nat -> IO (PackedVec Int)", "bad n = pure (PackVec n (fst (selectVTA @Bool True ((localVector n,),False) (42 :: Int))))"])
         , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureAliasIndex", 83605, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
