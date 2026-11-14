@@ -3713,6 +3713,20 @@ syntax. In particular, do not promote an index Id as if it were a TyVar.
 Report a conservative RHS-check failure instead of allowing an index to
 escape its binder. General native unification remains unsupported.
 
+Checking an existing Given is different from assigning a metavariable.
+For a Given with a type-variable LHS and native syntax in its RHS,
+checkTypeEqNoUnification enables tefTyVar_allowRuntimeIndices. Accept an opaque
+TermVarTy only when isNativeIndexId validates its closed unrestricted domain.
+Keep the ordinary occurs check. Do not accept DepFunTy in this check.
+The Given already belongs to a checked implication scope. No runtime Id is
+created, promoted or assigned. The scoped rewrite filter separately checks
+its use beneath a retained binder.
+
+Disable family cycle breaking on this Given path. A cycle breaker saves its
+RHS and later restores it with writeMetaTyVar. That route must not assign
+native syntax. An occurs cycle remains irreducible. Every Wanted, unification,
+defaulting and concreteness check keeps this option disabled.
+
 See docs/dependent-haskell/REFERENCES.md#agda-provenance for dependent
 binding and application. These checks add no evaluation or runtime uses;
 Haskell evaluation follows
@@ -3950,6 +3964,9 @@ data TyEqFlags m a
         -- ^ Level check
     , tefTyVar_concreteCheck  :: ConcreteCheck m
         -- ^ Concreteness check
+    , tefTyVar_allowRuntimeIndices :: Bool
+        -- ^ Check an existing native Given without assigning a metavariable.
+        -- See Note [Rigid retained indices].
     , tef_fam_app :: TyEqFamApp m a
         -- ^ How to deal with type family applications
     }
@@ -4111,6 +4128,7 @@ notUnifying_TEFTask occ_prob = \case
       { tefTyVar_occursCheck   = OC_Check (tyVarName tv) occ_prob
       , tefTyVar_levelCheck    = LC_None
       , tefTyVar_concreteCheck = CC_None
+      , tefTyVar_allowRuntimeIndices = False
       , tef_fam_app            = TEFA_Recurse
      }
     -- We need an occurs-check here, but no level check.
@@ -4127,6 +4145,7 @@ unifyingLHSMetaTyVar_TEFTask ev lhs_tv =
     , tefTyVar_levelCheck    = LC_Promote { lc_lvlp = tcTyVarLevel lhs_tv
                                           , lc_deep = False }
     , tefTyVar_concreteCheck = mkConcreteCheck lhs_tv
+    , tefTyVar_allowRuntimeIndices = False
     , tef_fam_app            = mkTEFA_Break ev NomEq (BreakWanted ev lhs_tv)
     }
 
@@ -4141,6 +4160,7 @@ defaulting_TEFTask lhs_tv =
               -- LC_Promote: promote deeper unification variables (DE4)
               -- lc_deep =  True: ...including under type families (DE5)
     , tefTyVar_concreteCheck = mkConcreteCheck lhs_tv
+    , tefTyVar_allowRuntimeIndices = False
     , tef_fam_app = TEFA_Recurse
     }
 
@@ -4163,6 +4183,7 @@ pureTyEqFlags_LHSMetaTyVar lhs_tv =
     , tefTyVar_concreteCheck = case isConcreteTyVar_maybe lhs_tv of
                                   Nothing -> CC_None
                                   Just {} -> CC_Check   -- No promotion
+    , tefTyVar_allowRuntimeIndices = False
     , tef_fam_app = TEFA_Recurse }
 
 
@@ -4248,7 +4269,7 @@ instance Outputable (TyEqFlags m a) where
         hcat [ ppr occ
              , ppr (mkTyConApp tc tys)
              , ppr fam_app ] )
-    TEFTyVar occ lc conc fam_app ->
+    TEFTyVar occ lc conc native fam_app ->
       text "TEFTyVar" <> braces (hcat (punctuate comma fields))
       where
         fields = [ text "OccursCheck:" <+> ppr occ ]
@@ -4256,6 +4277,8 @@ instance Outputable (TyEqFlags m a) where
                  [ text "LevelCheck:" <+> ppr lc ]
                    ++
                  [ text "ConcreteCheck:" <+> ppr conc ]
+                   ++
+                 [ text "RuntimeIndices:" <+> ppr native ]
                    ++
                  [ text "FamApp:" <+> ppr fam_app ]
 
@@ -4418,7 +4441,12 @@ check_ty_eq_rhs :: forall m a
 check_ty_eq_rhs flags ty
   = case ty of
       -- See Note [Rigid retained indices]
-      TermVarTy {} -> return $ PuFail (cteProblem cteSkolemEscape)
+      TermVarTy v
+        | TEFTyVar { tefTyVar_allowRuntimeIndices = True } <- flags
+        , isNativeIndexId v
+        -> return $ okCheckRefl ty
+        | otherwise
+        -> return $ PuFail (cteProblem cteSkolemEscape)
       DepFunTy {}  -> return $ PuFail impredicativeProblem
       LitTy {}        -> return $ okCheckRefl ty
       TyConApp tc tys -> checkTyConApp flags ty tc tys
@@ -5012,6 +5040,7 @@ makeTypeConcrete occ_fs conc_orig ty =
                   -- LHS is a fresh meta-tyvar: no occurs check needed
               , tefTyVar_levelCheck    = LC_None
               , tefTyVar_concreteCheck = CC_Promote conc_orig
+              , tefTyVar_allowRuntimeIndices = False
               , tef_fam_app            = TEFA_Recurse
               }
 

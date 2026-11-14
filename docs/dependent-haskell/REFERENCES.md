@@ -2349,3 +2349,18 @@ These are the existing GHC proof and substitution mechanisms. Keep plugins,
 inert-family rewrites, family-cache access, Wanted rewrites and coercion zapping
 disabled beneath retained binders. Keep `rewrite_co` as zonking only.
 The source archive is `native-pi-given-prior-art-v1`.
+
+The first M32 implementation accepts ordinary `a ~ b` transport but the
+outer-index case still rejects. Its trace shows `a ~ Vec Int k` becoming
+`CIrredCan{cteSkolemEscape}` in `checkTypeEqNoUnification`, before the scoped
+rewrite filter runs. The correction enables opaque runtime indices only while
+checking an existing Given with a type-variable LHS. It preserves the ordinary
+occurs check and still rejects `DepFunTy`. Mutable assignment remains forbidden.
+The owning Note is `[Rigid retained indices]` in `GHC.Tc.Utils.Unify`.
+
+This Given mode disables family cycle breaking. `famAppBreaker BreakGiven`
+saves a family application behind a fresh cycle-breaker variable.
+`restoreCycleBreakers` in `GHC.Tc.Solver.Monad` later restores it with
+`writeMetaTyVar`. A native RHS must not enter that route. Ordinary Givens keep
+their existing cycle-breaking behavior. This distinction comes from GHC's
+evidence and mutable-variable implementation, not Agda's conversion rules.

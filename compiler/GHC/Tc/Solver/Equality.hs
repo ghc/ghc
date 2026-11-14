@@ -31,6 +31,7 @@ import GHC.Core.Type
 import GHC.Core.Predicate
 import GHC.Core.Class
 import GHC.Core.DataCon ( dataConName )
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
 import GHC.Core.Coercion
@@ -2424,7 +2425,14 @@ checkTypeEqNoUnification ev eq_rel lhs rhs =
         -- See Note [Don't cycle-break Wanteds when not unifying]
 
     given_flags :: TyEqFlags TcM (TcTyVar, TcType)
-    given_flags = wanted_flags { tef_fam_app = mkTEFA_Break ev eq_rel BreakGiven }
+    given_flags
+      -- See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+      | TyVarLHS {} <- lhs
+      , hasNativeDependentExpr (Type rhs)
+      = wanted_flags { tefTyVar_allowRuntimeIndices = True
+                     , tef_fam_app = TEFA_Recurse }
+      | otherwise
+      = wanted_flags { tef_fam_app = mkTEFA_Break ev eq_rel BreakGiven }
         -- TEFA_Break used for: [G] a ~ Maybe (F a)
         --                   or [G] F a ~ Maybe (F a)
 
