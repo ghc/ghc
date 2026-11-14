@@ -1186,6 +1186,27 @@ runModuleChecks libdir = do
         , "nested proof bottom package: bounded-bottom-package"
         , "wildcard repack bottom package: bounded-bottom-package"
         , "guard fallback bottom package: packed-bottom-package"
+        , "runtime uncons: Nothing"
+        , "runtime uncons: 42:(1,[42])"
+        , "runtime uncons: 42:(2,[42,42])"
+        , "runtime drain filtered: [1,2,3]"
+        , "runtime drain filtered: [2,3]"
+        , "runtime drain filtered: []"
+        , "uncons zero ignores payload: Nothing"
+        , "drain zero ignores payload: []"
+        , "uncons index before payload: packed-bottom-length"
+        , "uncons successor demands vector: packed-bottom-payload"
+        , "uncons partial result: ok"
+        , "uncons partial pair: ok"
+        , "uncons partial tail package: ok"
+        , "uncons demands head: packed-filter-bottom-element"
+        , "uncons demands predecessor: packed-bottom-length"
+        , "uncons demands tail payload: packed-bottom-payload"
+        , "uncons cyclic predecessor result: ok"
+        , "uncons cyclic predecessor tail package: ok"
+        , "uncons cyclic predecessor head: 42"
+        , "uncons cyclic bounded prefix: [42,42,42]"
+        , "uncons bottom package: packed-bottom-package"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2430,6 +2451,8 @@ runPackageSourceRejectChecks = do
         , ("IndexMismatch", 83865, "Couldn't match", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> PackedVec Int", "bad n m xs = PackVec @Int m xs"])
         , ("IndexEscape", 83865, "Couldn't match", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n xs) = xs"])
         , ("NestedIndexEscape", 5617, "VCons x xs", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n (VCons x xs)) = VCons x xs"])
+        , ("UnconsOriginalLength", 25897, "rest", [], [], package ++ ["bad :: forall a. PackedVec a -> Maybe (a, PackedVec a)", "bad (PackVec n xs) = case n of", "  Z -> Nothing", "  S k -> case xs of", "    VCons x rest -> Just (x, PackVec n rest)"])
+        , ("UnconsIndependentLength", 25897, "rest", [], [], package ++ ["bad :: forall a. foreach (m :: Nat) -> PackedVec a -> Maybe (a, PackedVec a)", "bad m (PackVec n xs) = case n of", "  Z -> Nothing", "  S k -> case xs of", "    VCons x rest -> Just (x, PackVec m rest)"])
         , ("LinearClause", 18872, "arising from a pattern", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
         , ("LinearCase", 18872, "arising from multiplicity", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad p = case p of PackVec n xs -> PackVec n xs"])
         , ("RigidMultiplicity", 25897, "is a rigid type variable", ["LinearTypes"], ["import GHC.Types (Multiplicity)"], package ++ ["bad :: forall (p :: Multiplicity) a. PackedVec a %p -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])

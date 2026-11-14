@@ -19,6 +19,8 @@ module PackedVecLibrary
     , repack
     , ignorePacked
     , headPacked
+    , unconsPacked
+    , toListPacked
     , proofDepthBounded
     , repackWithoutProof
     , guardedRepack
@@ -73,6 +75,34 @@ ignorePacked (PackVec n xs) = 42
 headPacked :: PackedVec a -> Maybe a
 headPacked (PackVec n VNil) = Nothing
 headPacked (PackVec m (VCons x xs)) = Just x
+
+-- | Inspect the stored length and return the head with its packed tail.
+unconsPacked :: PackedVec a -> Maybe (a, PackedVec a)
+unconsPacked (PackVec n xs) = case n of
+    Z -> Nothing
+    S k -> case xs of
+        VCons x rest -> Just (x, PackVec k rest)
+
+-- | Follow runtime predecessors and collect a finite package's elements.
+toListPacked :: PackedVec a -> [a]
+toListPacked package = case unconsPacked package of
+    Nothing -> []
+    Just (x, rest) -> x : toListPacked rest
+
+{- Note [Uncons with a runtime predecessor]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Match the stored Nat before the vector. Z returns Nothing without evaluating
+the payload. S k provides the actual runtime predecessor used by PackVec.
+The vector pattern checks its constructor and supplies ordinary GADT evidence
+for the tail type. It does not reconstruct k from an erased type argument.
+
+Returning Just leaves the predecessor, head, and tail fields lazy. The finite
+drain follows the stored predecessors. Its functional specification assumes
+finite consistent lengths and vectors. Separate bottom and cyclic checks
+describe demand; they do not establish general infinite productivity.
+See REFERENCES.md#source-vector-uncons for Agda's vector operations and
+dependent context generalization.
+-}
 
 -- | Match and count a stored proof without evaluating the vector or length.
 proofDepthBounded :: BoundedVec a limit -> Int

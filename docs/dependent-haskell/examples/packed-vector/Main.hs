@@ -89,6 +89,28 @@ drivePatterns input = do
         bounded = withPacked samplePacked (\n xs -> proofDepthBounded (filterBounded (> cutoff) xs))
     pure (show (headPacked filtered, bounded))
 
+-- | Render the returned head and the stored length and vector of its tail.
+renderUncons :: PackedVec Int -> String
+renderUncons package = case unconsPacked package of
+    Nothing -> "Nothing"
+    Just (x, rest) -> show x ++ ":" ++ renderPacked rest
+
+-- | Check that the returned tail stores the actual runtime predecessor.
+{-# NOINLINE driveUncons #-}
+driveUncons :: Nat -> IO String
+driveUncons input = do
+    cell <- newIORef input
+    n <- readIORef cell
+    pure (renderUncons (makePacked n))
+
+-- | Drain a filtered package with distinct elements and a runtime cutoff.
+{-# NOINLINE driveDrainFilter #-}
+driveDrainFilter :: Int -> IO String
+driveDrainFilter input = do
+    cell <- newIORef input
+    cutoff <- readIORef cell
+    pure (show (toListPacked (filterPacked (> cutoff) samplePacked)))
+
 -- | Exercise both guarded rows after reading the guard at runtime.
 {-# NOINLINE driveGuardedRepack #-}
 driveGuardedRepack :: Bool -> IO String
@@ -378,3 +400,50 @@ main = do
         evaluate (repackWithoutProof (error "bounded-bottom-package" :: BoundedVec Int (S Z)))
     expectMarker "guard fallback bottom package" "packed-bottom-package" $
         evaluate (guardedRepack False bottomPackage)
+    forM_
+        [ (Z, "Nothing")
+        , (S (S Z), "42:(1,[42])")
+        , (S (S (S Z)), "42:(2,[42,42])")
+        ]
+        $ \(input, expected) -> do
+            actual <- driveUncons input
+            assertEqual "runtime uncons" expected actual
+            putStrLn ("runtime uncons: " ++ actual)
+    forM_ [(0, "[1,2,3]"), (1, "[2,3]"), (3, "[]")] $ \(cutoff, expected) -> do
+        actual <- driveDrainFilter cutoff
+        assertEqual "runtime drain filtered" expected actual
+        putStrLn ("runtime drain filtered: " ++ actual)
+    case unconsPacked (lazyPacked Z) of
+        Nothing -> putStrLn "uncons zero ignores payload: Nothing"
+        Just _ -> fail "uncons zero ignores payload: expected Nothing"
+    assertEqual "drain zero ignores payload" [] (toListPacked (lazyPacked Z))
+    putStrLn "drain zero ignores payload: []"
+    expectMarker "uncons index before payload" "packed-bottom-length" $
+        evaluate (unconsPacked (lazyPacked bottomLength))
+    expectMarker "uncons successor demands vector" "packed-bottom-payload" $
+        evaluate (unconsPacked (lazyPacked (S bottomLength)))
+    let partial = unconsPacked (PackVec (S bottomLength) (VCons bottomElement bottomPayload))
+    assertWhnf "uncons partial result" partial
+    case partial of
+        Nothing -> fail "uncons partial result: expected Just"
+        Just pair -> do
+            assertWhnf "uncons partial pair" pair
+            let (x, rest) = pair
+            assertWhnf "uncons partial tail package" rest
+            expectMarker "uncons demands head" "packed-filter-bottom-element" (evaluate x)
+            expectMarker "uncons demands predecessor" "packed-bottom-length" $
+                evaluate (withPacked rest (\n xs -> natToInt n))
+            expectMarker "uncons demands tail payload" "packed-bottom-payload" $
+                evaluate (headPacked rest)
+    let cyclic = unconsPacked (makePacked (S cyclicLength))
+    assertWhnf "uncons cyclic predecessor result" cyclic
+    case cyclic of
+        Nothing -> fail "uncons cyclic predecessor: expected Just"
+        Just (x, rest) -> do
+            assertWhnf "uncons cyclic predecessor tail package" rest
+            assertEqual "uncons cyclic predecessor head" 42 x
+            putStrLn "uncons cyclic predecessor head: 42"
+            assertEqual "uncons cyclic bounded prefix" [42, 42, 42] (take 3 (toListPacked rest))
+            putStrLn "uncons cyclic bounded prefix: [42,42,42]"
+    expectMarker "uncons bottom package" "packed-bottom-package" $
+        evaluate (unconsPacked bottomPackage)
