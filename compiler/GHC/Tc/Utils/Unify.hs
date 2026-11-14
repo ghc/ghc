@@ -3727,6 +3727,11 @@ its multiplicity, predicate and result with the same flags, and keep the
 complete FunTy reduction. This does not discharge a dictionary obligation
 or turn class evidence into equality evidence. Ordinary Given checks and
 every mutable check still reject these impredicative RHSs.
+Expand type synonyms on this path before checking their complete RHS. A
+retained Pi synonym is not a tau TyCon, but it needs the same immutable
+checks as the written Pi. Recurse after expansion so occurrences in a
+predicate or result remain visible. Keep the ordinary synonym policy for
+all other checks. See Note [Forgetful synonyms in checkTyConApp].
 The Given already belongs to a checked implication scope. No runtime Id is
 created, promoted or assigned. The scoped rewrite filter separately checks
 its use beneath a retained binder.
@@ -4682,6 +4687,11 @@ checkTyConApp flags tc_app tc tys
        -- e.g. S a  where  type S a = F [a]
        --             or   type S a = Int
        -- See Note [Forgetful synonyms in checkTyConApp]
+  = check_ty_eq_rhs flags ty'
+
+  | TEFTyVar { tefTyVar_allowNativeGivenRhs = True } <- flags
+  , Just ty' <- coreView tc_app
+       -- See Note [Rigid retained indices].
   = check_ty_eq_rhs flags ty'
 
   | not (isTauTyCon tc)
