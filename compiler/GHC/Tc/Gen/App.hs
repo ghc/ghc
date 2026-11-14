@@ -1540,9 +1540,6 @@ expected-type check. A named application can contain these expressions as
 arguments. Its own application checker supplies their expected types.
 Calls without an anchor keep their ordinary checking behavior. Constructors
 and Ids with concreteness requirements also keep ordinary instantiation.
-Complete boxed tuples can also supply an anchor through their fields.
-In inference mode, they use the ordinary tuple-constructor application path.
-See Note [Inference of native tuple fields] in GHC.Tc.Gen.Expr.
 
 A complete expression signature supplies its own checking type. Infer signed
 arguments such as (42 :: Int) through the same cache. In nested inference,
@@ -1597,6 +1594,7 @@ The existing flat routes still apply their type arguments directly.
 -}
 
 -- | Classify named, completely signed or boxed tuple arguments without elaboration.
+-- See Note [Inference of native tuple fields] in GHC.Tc.Gen.Expr for tuples.
 tcRetainedInferableArg :: LHsExpr GhcRn -> TcM (Bool, Bool)
 tcRetainedInferableArg (L _ expr)
   = case expr of
