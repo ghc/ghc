@@ -2308,10 +2308,18 @@ The separate source archive is `native-joint-prefix-prior-art-v1`.
 
 ## Outer Given evidence beneath a retained Pi
 
-M32 targets existing equality evidence under a fixed-domain retained Pi.
-The M31 six-case baseline accepts pointwise transport under `a ~ b` but rejects
-returning the whole dependent function. This is an evidence restriction in
-normalization. It does not require function eta equality or a new Core form.
+M32 implements existing Given evidence under a fixed-domain retained Pi.
+Commit `a00972ede9` adds the scoped rewrite filter. Commit `9764958bf4`
+permits checked native-index Givens to reach it without mutable cycle breaking.
+The bootstrap compile/Lint matrix passes 23 cases: sixteen positive and seven
+negative. These include outer native-index Givens and family-cycle controls.
+The source target of 532 observations (527 plus five) and the 180-case API
+rejection matrix are prepared, not verified. Self-host validation is pending.
+
+The M31 six-case baseline accepted pointwise transport under `a ~ b` but
+rejected returning the whole dependent function. This was an evidence
+restriction in normalization. M32 needs no function eta equality or new Core
+form. It preserves the fixed closed domain and `Many` binder.
 
 Agda v2.8.0 [Pi comparison](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L746-L754)
 uses [domain comparison and context extension](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L849)
@@ -2335,32 +2343,74 @@ through its inert rewrite machinery. Agda's extensional term comparison does
 not establish Haskell eta or `seq` laws.
 
 The GHC baseline is commit `8e58f91009a2e789571513c3207922d43333b5b6`.
-`rewrite_tyvar2` in `GHC.Tc.Solver.Rewrite` blocks all inert rewrites beneath
-a retained binder. The M32 design replaces only this exclusion with a Given
-filter. Track every active retained runtime Id. Require deep free variables
-of the predicate, canonical RHS and coercion to exclude those Ids. Check kinds,
-CoVar metadata and coercion holes. Preserve `eqCanRewriteFR`, role conversion
-and `recordRewriter`. Evidence may contain an outer runtime index.
+Its `rewrite_tyvar2` in `GHC.Tc.Solver.Rewrite` blocked all inert rewrites
+beneath a retained binder. M32 tracks active runtime Ids in the VarSet field
+`re_native_binders`. `withNativeBinder` extends that set. Returning from the
+body restores the previous environment.
 
-`GHC.Core.TyCo.FVs` includes runtime Ids and deep variable types.
-`DepFunCo` binds the runtime Id throughout the body proof.
-`mkDepFunRedn` reconstructs both endpoints with `mkDepFunTy`.
-These are the existing GHC proof and substitution mechanisms. Keep plugins,
-inert-family rewrites, family-cache access, Wanted rewrites and coercion zapping
-disabled beneath retained binders. Keep `rewrite_co` as zonking only.
-The source archive is `native-pi-given-prior-art-v1`.
+A candidate must remain eligible under `eqCanRewriteFR`. Beneath a retained
+binder, require Given evidence. Collect deep free variables from its predicate,
+canonical RHS and coercion. Require them to be disjoint from every active
+retained Id. Include variable kinds and CoVar predicates. Reject coercion
+holes in the predicate, RHS and collected variable types. Preserve role
+conversion and `recordRewriter`. An outer runtime index is allowed; an active
+inner index cannot enter through the evidence or its metadata.
 
-The first M32 implementation accepts ordinary `a ~ b` transport but the
-outer-index case still rejects. Its trace shows `a ~ Vec Int k` becoming
-`CIrredCan{cteSkolemEscape}` in `checkTypeEqNoUnification`, before the scoped
-rewrite filter runs. The correction enables opaque runtime indices only while
-checking an existing Given with a type-variable LHS. It preserves the ordinary
-occurs check and still rejects `DepFunTy`. Mutable assignment remains forbidden.
-The owning Note is `[Rigid retained indices]` in `GHC.Tc.Utils.Unify`.
+The first implementation admitted ordinary `a ~ b` but the outer-index case
+still rejected. Its trace showed `a ~ Vec Int k` becoming
+`CIrredCan{cteSkolemEscape}` in `checkTypeEqNoUnification`, before rewriting.
+The correction sets `tefTyVar_allowRuntimeIndices = True` only for an existing
+Given with a type-variable LHS and native syntax in its RHS. The checker
+accepts an opaque `TermVarTy` only when `isNativeIndexId` validates its domain
+and multiplicity. It preserves the ordinary occurs check and rejects
+`DepFunTy`. It creates, promotes and assigns no runtime Id. Every Wanted,
+unification, defaulting and concreteness check keeps this option disabled.
+See Note `[Rigid retained indices]` in `GHC.Tc.Utils.Unify`.
 
-This Given mode disables family cycle breaking. `famAppBreaker BreakGiven`
-saves a family application behind a fresh cycle-breaker variable.
-`restoreCycleBreakers` in `GHC.Tc.Solver.Monad` later restores it with
-`writeMetaTyVar`. A native RHS must not enter that route. Ordinary Givens keep
-their existing cycle-breaking behavior. This distinction comes from GHC's
-evidence and mutable-variable implementation, not Agda's conversion rules.
+On this Given path, `tef_fam_app = TEFA_Recurse` disables family cycle breaking.
+`famAppBreaker BreakGiven` otherwise creates a cycle-breaker variable and
+saves its family application. `restoreTyVarCycles` in `GHC.Tc.Solver.Monad`
+later restores that RHS with `TcM.writeMetaTyVar`. A native RHS must not enter
+this mutable route. Ordinary Givens keep their existing cycle breaking.
+This rule comes from GHC's canonicalization and mutable-variable invariants,
+not Agda's conversion algorithm.
+
+The pinned GHC proof and downstream sources are:
+
+- `compiler/GHC/Core/TyCo/FVs.hs`, lines 219–241: deep type and coercion free
+  variables, including the variable metadata used by the filter.
+- `compiler/GHC/Core/TyCo/Subst.hs`, `substNativeIndexBndr` at line 835, and
+  `compiler/GHC/Core/Coercion.hs`, lines 1775–1780: binder substitution and
+  lifting under the scoped runtime Id.
+- `compiler/GHC/Core/TyCo/Rep.hs`, lines 272–294, and
+  `compiler/GHC/Core/Reduction.hs`, lines 361–366: `DepFunCo` binds the complete
+  body proof; `mkDepFunRedn` canonicalizes each endpoint independently.
+- `compiler/GHC/Tc/Utils/Unify.hs`, lines 4198–4204, and
+  `compiler/GHC/Tc/Solver/Monad.hs`, lines 2332–2335: Given cycle-breaker
+  creation and later mutable restoration.
+
+All paths and file blobs are recorded in
+`native-pi-given-prior-art-v1/provenance.json`. These are baseline snapshots.
+The two M32 commits above describe the subsequent implementation.
+Keep plugins, inert-family rewrites, family-cache access, Wanted rewrites and
+coercion zapping disabled beneath retained binders. Keep `rewrite_co` as
+zonking only. Preserve ordinary proof scope and Haskell runtime demand.
+
+The first full source run also exposed a call-site restriction. A complete
+local signature can capture runtime `k`, but the existing VTA renamer rejects
+`@(Vec Int k)`. Omitting the type argument requires a forbidden native meta
+assignment. M32 shares the existing lexical alias and checked-Id mechanisms
+with complete visible type arguments. Preserve the actual Name and Id.
+Existing erased type variables take precedence. Captured partial types and
+quotations reject. The typechecker retains `HM_VTA`, kind and validity checks,
+and the ordinary ITYARG/IALL order. This is a GHC namespace adaptation of the
+same context discipline cited above. It does not add Agda syntax or mutable
+native inference. Note `[Runtime indices in visible type arguments]` in
+`GHC.Rename.HsType` owns this rule. Type-argument diagnostics distinguish it
+from the local-signature restriction.
+
+The demand harness initially placed a dependent function inside `IO` through
+`evaluate`. Its outer polymorphic consumer then required an unsupported native
+polytype instantiation. The corrected check uses the existing `checkWhnf`
+and returns `IO ()`. It still forces the function to WHNF before reporting an
+expected error. It does not apply the function or weaken the demand assertion.

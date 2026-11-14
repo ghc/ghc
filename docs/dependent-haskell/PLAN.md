@@ -2014,6 +2014,11 @@ It is separate from argument-prefix inference and source signature support.
   mode. Disable family cycle breaking there. Preserve all Wanted, unification
   and concreteness restrictions. Record this distinction in Note
   `[Rigid retained indices]`.
+  Make the outer-index call expressible with a complete visible type argument,
+  such as `@(Vec Int k)`. Reuse lexical runtime-name capture from local
+  signatures, preserve erased-variable shadowing and VTA hole checking, and
+  reject captured partial types and quotations. Report invalid captures as
+  type-argument errors. Preserve the native-meta restriction.
   Keep plugins, family-cache access, fresh dependent Wanteds and mutable native
   fills gated. Update Note `[Rewriting retained dependent functions]`.
 - [ ] Compare direct and pointwise transport through a separate interface.

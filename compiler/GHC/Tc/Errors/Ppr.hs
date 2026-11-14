@@ -3564,6 +3564,8 @@ pprRetainedQuantificationError reason = case reason of
     text "The runtime index" <+> quotes (ppr var) <+> text "is out of scope here."
   RetainedPartialSignature ->
     text "Retained quantification requires a complete type signature."
+  RetainedPartialTypeArgument ->
+    text "A visible type argument that captures a runtime index must be complete."
   RetainedPolymorphicSignature ->
     text "A forall within the scope of a retained binder is not supported yet."
   RetainedUnsupportedContext ->
@@ -3605,6 +3607,8 @@ pprRetainedQuantificationError reason = case reason of
     text "A retained argument must be a local index variable or a supported constructor tree."
   RetainedLocalSignatureIndex ->
     text "A retained local signature index must refer to an already-bound unrestricted local value of a supported index domain."
+  RetainedTypeArgumentIndex ->
+    text "A runtime index in a visible type argument must refer to an already-bound unrestricted local value of a supported index domain."
   RetainedPackageDeclaration ->
     vcat [ text "A retained constructor requires a lazy ordinary data declaration with a lifted result kind."
          , text "Records, contexts, existential binders, equality specifications, and StrictData are not supported."

@@ -5321,6 +5321,7 @@ data RetainedQuantificationError
   | RetainedInvalidBinder Id
   | RetainedIndexOutOfScope Id
   | RetainedPartialSignature
+  | RetainedPartialTypeArgument
   | RetainedPolymorphicSignature
   | RetainedUnsupportedContext
   | RetainedStaging
@@ -5340,6 +5341,7 @@ data RetainedQuantificationError
   | RetainedResultWrapper
   | RetainedIndexExpression
   | RetainedLocalSignatureIndex
+  | RetainedTypeArgumentIndex
   | RetainedPackageDeclaration
   | RetainedPackagePromotion
   | RetainedPackagePattern

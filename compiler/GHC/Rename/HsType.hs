@@ -13,7 +13,7 @@ module GHC.Rename.HsType (
         rnModifier, rnModifierWith,
         rnModifierContext, rnModifiersContext, rnModifiersContextAndWarn,
         rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType, rnHsModifiedFunArrWith,
+        rnHsSigType, rnHsWcType, rnHsTypeApp, rnHsModifiedFunArrWith,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnLocalHsSigWcType,
         rnHsPatSigType, rnHsPatSigKind,
         newTyVarNameRn,
@@ -147,8 +147,27 @@ data HsPatSigTypeScoping
 rnLocalHsSigWcType :: NameSet -> HsDocContext -> LHsSigWcType GhcPs
                   -> RnM (LHsSigWcType GhcRn, FreeNames)
 rnLocalHsSigWcType bound_names doc ty@(HsWC { hswc_body = sig_ty })
+  = do { free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
+       ; rnWithRetainedAliases bound_names RetainedPartialSignature free_vars sig_ty $
+           rnHsSigWcType doc ty }
+
+-- | Rename a visible type argument with aliases for lexical runtime indices.
+-- See Note [Runtime indices in visible type arguments].
+rnHsTypeApp :: LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeNames)
+rnHsTypeApp ty@(HsWC { hswc_body = hs_ty })
+  = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; if experimental
+         then do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
+                 ; rnWithRetainedAliases emptyNameSet RetainedPartialTypeArgument free_vars hs_ty $
+                     rnHsWcType HsTypeCtx ty }
+         else rnHsWcType HsTypeCtx ty }
+
+-- | Scope aliases for complete types that capture lexical runtime Names.
+-- The excluded Names belong to an unavailable signature binding group.
+rnWithRetainedAliases :: Data a => NameSet -> RetainedQuantificationError -> FreeKiTyVars -> a
+                      -> RnM b -> RnM b
+rnWithRetainedAliases bound_names partial_error free_vars syntax action
   = do { env <- getLocalRdrEnv
-       ; free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
        ; named_wildcards <- xoptM LangExt.NamedWildCards
        ; aliases <- fmap catMaybes $ mapM (candidate env named_wildcards) free_vars
        ; unless (null aliases) $
@@ -157,14 +176,14 @@ rnLocalHsSigWcType bound_names doc ty@(HsWC { hswc_body = sig_ty })
                   Comp -> return ()
                   _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
               ; (wildcards, _) <- partition_nwcs free_vars
-              ; case anonymous_wildcard sig_ty `mplus`
+              ; case anonymous_wildcard syntax `mplus`
                      (getLocA <$> listToMaybe wildcards) of
                   Nothing -> return ()
                   Just loc -> setSrcSpan loc $
-                    failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature }
+                    failWithTc $ TcRnRetainedQuantificationError partial_error }
        ; let env' = foldl' (\env (occ, name) -> extendLocalRdrEnvWithAlias env occ name)
                           env aliases
-       ; setLocalRdrEnv env' $ rnHsSigWcType doc ty }
+       ; setLocalRdrEnv env' action }
   where
     candidate env named_wildcards (L loc rdr)
       | Unqual occ <- rdr
@@ -187,6 +206,23 @@ rnLocalHsSigWcType bound_names doc ty@(HsWC { hswc_body = sig_ty })
       | Just (L _ XHsType{}) <- (cast thing :: Maybe (LHsType GhcPs))
       = Nothing
       | otherwise = msum (gmapQ anonymous_wildcard thing)
+
+{- Note [Runtime indices in visible type arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With ExperimentalDependentTypes, a complete visible type argument can refer to
+an already-bound runtime index, for example f @(Vec Int n). Use the same lexical
+aliases as complete local signatures. Keep the actual term Name and Unique.
+Existing erased type variables take precedence. Do not capture named wildcards,
+global terms, or Names inside quotations. Reject partial types when they capture
+an index. Ordinary visible type arguments keep their existing wildcard rules.
+
+The typechecker validates each captured Id and seeds only mode_indices. It keeps
+HM_VTA, kind checking, validity checking, and the normal type application order.
+No type metavariable receives a runtime index. Unlike a local signature, an
+expression type argument has no unavailable signature binding group to exclude.
+See Note [Local retained signature aliases] and
+Note [Local runtime indices in signatures] in GHC.Tc.Gen.HsType.
+-}
 
 {- Note [Local retained signature aliases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

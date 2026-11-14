@@ -506,15 +506,15 @@ tc_lhs_sig_type allow_retained skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = 
       = do { (tidy_env2, exp_kind) <- zonkTidyTcType tidy_env exp_kind
            ; return (tidy_env2, UninfTyCtx_Sig exp_kind full_hs_ty) }
 
--- | Check retained telescopes in function positions of a complete signature.
--- See Note [Higher-order retained signatures].
-tcCheckRetainedSigType :: LHsType GhcRn -> TcKind -> TcM TcType
-tcCheckRetainedSigType hs_ty kind
+-- | Resolve free runtime Names to their existing lexical index Ids.
+-- See Note [Local runtime indices in signatures] and
+-- Note [Runtime indices in visible type arguments] in GHC.Rename.HsType.
+tcRetainedAmbientIndices :: RetainedQuantificationError -> LHsType GhcRn -> TcM (NameEnv Id)
+tcRetainedAmbientIndices invalid_reason hs_ty
   = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
-       ; indices <- if experimental
-                    then catMaybes <$> mapM check_index (ambient_names hs_ty)
-                    else return []
-       ; go (typeLevelMode { mode_indices = mkNameEnv indices }) hs_ty kind }
+       ; if experimental
+         then mkNameEnv . catMaybes <$> mapM check_index (ambient_names hs_ty)
+         else return emptyNameEnv }
   where
     check_index (span, name) = setSrcSpan span $
       do { thing <- tcLookupLcl_maybe name
@@ -529,7 +529,7 @@ tcCheckRetainedSigType hs_ty kind
                       _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
                   ; return (Just (name, index)) }
              _ -> invalid_index }
-    invalid_index = failWithTc $ TcRnRetainedQuantificationError RetainedLocalSignatureIndex
+    invalid_index = failWithTc $ TcRnRetainedQuantificationError invalid_reason
 
     -- Keep only free runtime occurrences. Telescope binders have their own Ids.
     ambient_names :: Data a => a -> [(SrcSpan, Name)]
@@ -544,6 +544,13 @@ tcCheckRetainedSigType hs_ty kind
       | Just _ <- (cast thing :: Maybe Type) = []
       | otherwise = concat (gmapQ ambient_names thing)
 
+-- | Check retained telescopes in function positions of a complete signature.
+-- See Note [Higher-order retained signatures].
+tcCheckRetainedSigType :: LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckRetainedSigType hs_ty kind
+  = do { indices <- tcRetainedAmbientIndices RetainedLocalSignatureIndex hs_ty
+       ; go (typeLevelMode { mode_indices = indices }) hs_ty kind }
+  where
     go :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
     go mode (L _ (HsParTy _ body)) kind = go mode body kind
     go mode (L loc ty@(HsQualTy _ ctxt body)) kind
@@ -967,12 +974,14 @@ tcHsTypeApp wc_ty kind
   | HsWC { hswc_ext = sig_wcs, hswc_body = hs_ty } <- wc_ty
   = do { mode <- mkHoleMode TypeLevel HM_VTA
                  -- HM_VTA: See Note [Wildcards in visible type application]
+       ; indices <- tcRetainedAmbientIndices RetainedTypeArgumentIndex hs_ty
+       ; let mode' = mode { mode_indices = indices }
        ; ty <- addTypeCtxt hs_ty                  $
                solveEqualities "tcHsTypeApp" $
                -- We are looking at a user-written type, very like a
                -- signature so we want to solve its equalities right now
                bindNamedWildCardBinders sig_wcs $ \ _ ->
-               tc_check_lhs_type mode hs_ty kind
+               tc_check_lhs_type mode' hs_ty kind
 
        -- We do not kind-generalize type applications: we just
        -- instantiate with exactly what the user says.
