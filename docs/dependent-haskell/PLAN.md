@@ -1384,7 +1384,13 @@ runtime indices and the existing source proof path.
 
 ### M19: constructor equations with later retained arguments
 
-This target is unverified. The first M18 probe used `addSucc Z m` and
+This target is unverified. Keep the complete M18 source program as the
+reference. Convert `addSucc` to constructor equations only after the compiler
+accepts them. Record ordinary value, dictionary and retained index positions
+separately. Keep original source equations for error contexts after renaming.
+Reject quotations at their expression spans before a resolved-name rewrite.
+
+The first M18 probe used `addSucc Z m` and
 `addSucc (S k) m`. It failed with GHC-83605 at the first clause because
 `tcRetainedConArgs` does not consume a later `DepFunTy`. The result-wrapper
 message describes the wrong limitation. The saved probe is

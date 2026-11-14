@@ -1599,3 +1599,37 @@ Five exact primary-source snapshots are saved in
 `_build/verification/native-reverse-source-prior-art/`. They cover vector reverse,
 addition proofs, Agda's annotation helper and application checker, and GHC's
 signature checker. Their Git blob hashes match the pinned files above.
+
+
+## Later retained arguments in constructor equations
+
+Status: unverified M19 implementation plan. The source reverse proof needs
+`addSucc Z m` and `addSucc (S k) m`. The checker must consume the later retained
+binder before it checks the specialised RHS. Reuse the existing native index
+and nominal constructor proof rules.
+
+Agda v2.8.0 [`LHS.hs`, lines 1289–1297](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1289-L1297)
+separates the earlier telescope, split argument and later dependent telescope.
+[Lines 1427–1450](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1427-L1450)
+describe the constructor substitution and its lifting over later arguments.
+[Lines 1503–1532](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1503-L1532)
+apply that substitution to `delta2`, remaining patterns, target and equations.
+[Lines 594–620](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L594-L620)
+retain the checked telescope, specialised body type and pattern substitution.
+File blob: `3779ffa6e418bca99e30c071e189106f82ecbe1b`.
+
+[`Def.hs`, lines 712–749](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Def.hs#L712-L749)
+consume that result and scope inherited/as-pattern bindings.
+[Lines 825–852](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Def.hs#L825-L852)
+check the RHS against its specialised target. File blob:
+`0532811dabeb3a7e6dd3f08cfa18c08472072fe1`.
+The exact files are already saved in M17's frozen prior-art directory.
+
+These sources justify consistent telescope specialization. They do not supply
+GHC's shared runtime Id representation or Haskell demand semantics. M19 must
+keep all source argument lambdas before constructor discrimination. It must
+rename resolved source references and stored free-name sets consistently, keep
+original source equations for diagnostics, and exclude quotations before that
+rewrite. Each shared retained argument must keep the same closed domain and
+remain an outermost variable pattern. Ordinary payload transport remains
+inside the constructor proof scope. No alias supplies index equality.
