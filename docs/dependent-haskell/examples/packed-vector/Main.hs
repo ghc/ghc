@@ -8,8 +8,8 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE NoPostfixOperators #-}
 {-# LANGUAGE NoNamedWildCards #-}
+{-# LANGUAGE NoPostfixOperators #-}
 
 -- | Check source packages, filtering, and evaluation demand.
 module Main (main) where
@@ -476,7 +476,7 @@ underscoreLocalSignature :: Nat -> [Int]
 underscoreLocalSignature _n =
     let xs :: Vec Int _n
         xs = replicateNative @Int _n 7
-    in toList xs
+     in toList xs
 
 -- | Check local payload signatures at actual runtime index identities.
 runLocalSignatureChecks :: IO ()
