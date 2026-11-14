@@ -35,6 +35,7 @@ import GHC.Core ( CoreExpr )
 import GHC.Core.Make ( mkCoreLets )
 import GHC.Utils.Misc
 import GHC.Types.Id
+import GHC.Types.Var ( isCoVar )
 import GHC.Types.Name.Env
 import GHC.Types.FieldLabel ( flSelector )
 import GHC.Types.SrcLoc
@@ -114,7 +115,12 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
   | RealDataCon dc <- con1
   , not (null (dataConRepArgBinders dc))
   = do { unless (null other_groups) (failWithDs DsRetainedPackagePatterns)
-       ; results <- mapM match_package_row group1
+       ; results <- mapM match_retained_row group1
+       ; return (foldr1 combineMatchResults results) }
+
+  -- See Note [Retained constructor equation scope].
+  | any (any has_native_proof) groups
+  = do { results <- mapM match_retained_row (foldr1 (<>) groups)
        ; return (foldr1 combineMatchResults results) }
 
   | otherwise
@@ -129,11 +135,20 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
   where
     ConPat { pat_con = L _ con1 } = firstPat (NE.head group1)
 
-    -- | Compile one equation with its own runtime index binders.
-    match_package_row :: EquationInfoNE -> DsM (MatchResult CoreExpr)
-    match_package_row eqn
+    -- Compile one equation with its own runtime index binders.
+    match_retained_row :: EquationInfoNE -> DsM (MatchResult CoreExpr)
+    match_retained_row eqn
       = do { alt <- matchOneConLike vars ty (matchIdMult var) (eqn :| [])
            ; return (mkDataConCase var ty (toRealAlt alt :| [])) }
+
+    -- Identify a checked native constructor pattern with its virtual proof.
+    has_native_proof :: EquationInfoNE -> Bool
+    has_native_proof eqn
+      | ConPat { pat_con = L _ (RealDataCon con)
+               , pat_con_ext = ConPatTc { cpt_tvs = [], cpt_dicts = [cv] } }
+          <- firstPat eqn
+      = isCoVar cv && isNativeIndexType (mkTyConTy (dataConTyCon con))
+      | otherwise = False
 
     toRealAlt alt = case alt_pat alt of
         RealDataCon dcon -> alt{ alt_pat = dcon }
@@ -240,6 +255,27 @@ than field sharing. Ordinary constructor families retain their current path.
 Agda supplies the constructor-telescope and clause-discrimination precedent.
 Separate cases preserve Haskell's field demand and source clause order.
 See docs/dependent-haskell/REFERENCES.md#source-package-patterns.
+-}
+
+{- Note [Retained constructor equation scope]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Several rows can match the same native index constructor. Each row's virtual
+proof names that row's actual fields. For example, two S patterns bind distinct
+fields k1 and k2 and proofs n ~# 'S k1 and n ~# 'S k2. Ordinary constructor
+grouping shares the first row's fields and introduces evidence aliases. Those
+aliases do not substitute the runtime Ids in later proof types or RHS types.
+
+Use the separate-row strategy from Note [Retained package equation scope] when
+a checked native constructor pattern carries a virtual proof. Compile each row
+with its own fields and proof. Keep source order within each constructor group.
+Different constructors do not overlap. Each case uses the existing DEFAULT
+failure path for other constructors. A failed later column or guard tries the
+next row. An infallible row discards later rows for the same constructor.
+
+All cases inspect the same shared scrutinee. Re-casing does not evaluate its
+fields. Later pattern columns keep their ordinary demand and failure order.
+Ordinary GADT constructors keep the existing shared-field path: the native
+index-domain predicate excludes their existentials and equality constraints.
 -}
 
 matchOneConLike :: [MatchId]

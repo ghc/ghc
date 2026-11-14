@@ -64,7 +64,7 @@ import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind )
-import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo )
+import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo, mkTransCo )
 import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
@@ -554,11 +554,197 @@ See the pinned Rules.Term and LHSResult sources in
 docs/dependent-haskell/REFERENCES.md#agda-provenance.
 -}
 
+-- | Select a later retained constructor column without counting dictionaries.
+retainedMatrixColumn :: [RetainedConArg]
+                     -> MatchGroup GhcRn (LHsExpr GhcRn) -> Maybe (Int, Id)
+retainedMatrixColumn plan (MG { mg_alts = L _ rows })
+  = case [(column, shared)
+         | L _ (Match { m_pats = L _ pats }) <- rows
+         , ((column, RetainedConIndex shared), pat) <-
+             zip (filter source_argument (zip [0..] plan))
+                 (drop 1 (filter isVisArgLPat pats))
+         , constructor_pattern pat] of
+      first : _ -> Just first
+      [] -> Nothing
+  where
+    source_argument (_, RetainedConDict _) = False
+    source_argument _ = True
+    constructor_pattern :: LPat GhcRn -> Bool
+    constructor_pattern (L _ (ParPat _ pat)) = constructor_pattern pat
+    constructor_pattern (L _ ConPat{}) = True
+    constructor_pattern _ = False
+
+-- | Check a complete two-index constructor matrix with successive row proofs.
+-- See Note [Retained constructor matrices].
+tcRetainedMatrixMatches :: Id -> (Int, Id) -> [ExpPatType] -> [ExpPatType]
+                       -> [RetainedConArg] -> ExpRhoType
+                       -> MatchGroup GhcRn (LHsExpr GhcRn)
+                       -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
+tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
+                       pat_tys plan rhs_ty
+                       (MG { mg_alts = L loc matches, mg_ext = (origin, _) })
+  = setSrcSpanA loc $
+    do { when (any dictionary plan) $
+           failWithTc (TcRnRetainedQuantificationError RetainedMatrixContext)
+       ; rows <- mapM constructors matches
+       ; _ <- foldM unique_pair [] (zip rows matches)
+       ; let pairs = [(fst first, fst second) | (first, second) <- rows]
+             expected = [(first, second) | first <- domain_cons first_index
+                                         , second <- domain_cons second_index]
+       ; unless (pairs `equalLength` expected && all (`elem` pairs) expected) coverage_error
+       ; arg_tys <- mapM argument_type pat_tys
+       ; result_ty <- readExpType rhs_ty
+       ; (usages, checked) <- mapAndUnzipM
+           (\(row, match) -> tcCollectingUsage (check_row row arg_tys result_ty match))
+           (zip rows matches)
+       ; tcEmitBindingUsage (supUEs usages)
+       ; return (MG { mg_alts = L loc checked
+                    , mg_ext = MatchGroupTc (Scaled ManyTy (varType first_index) : arg_tys)
+                                result_ty origin }) }
+  where
+    dictionary RetainedConDict{} = True
+    dictionary _ = False
+    domain_cons index = case splitTyConApp_maybe (coreFullView (varType index)) of
+      Just (tc, []) -> tyConDataCons tc
+      _ -> []
+    coverage_error = failWithTc (TcRnRetainedQuantificationError RetainedMatrixCoverage)
+    pattern_error = failWithTc (TcRnRetainedQuantificationError RetainedMatrixPattern)
+    argument_error = failWithTc (TcRnRetainedQuantificationError RetainedConstructorArguments)
+
+    row_patterns (Match { m_pats = L _ pats })
+      = case filter isVisArgLPat pats of
+          first : later -> case drop second_column later of
+            second : _ -> return (first, second)
+            _ -> pattern_error
+          _ -> pattern_error
+
+    constructors (L match_loc match@(Match
+      { m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
+      = setSrcSpanA match_loc $
+        do { (first, second) <- row_patterns match
+           ; one <- resolve first_index first
+           ; two <- resolve second_index second
+           ; return (one, two) }
+    constructors (L match_loc _) = setSrcSpanA match_loc coverage_error
+
+    resolve index pat = setSrcSpanA (getLoc pat) $
+      do { con <- tcRetainedCon (varType index) pat
+         ; maybe pattern_error return con }
+
+    unique_pair seen ((first, second), L match_loc match)
+      = setSrcSpanA match_loc $
+        do { let pair = (fst first, fst second)
+           ; when (pair `elem` seen) $
+               do { (_, pat) <- row_patterns match
+                  ; setSrcSpanA (getLoc pat) $
+                      failWithTc (TcRnRetainedQuantificationError RetainedMatrixDuplicate) }
+           ; return (pair : seen) }
+
+    argument_type (ExpFunPatTy ty)
+      = do { scaled@(Scaled mult _) <- readScaledExpType ty
+           ; unless (isManyTy mult) argument_error
+           ; return scaled }
+    argument_type _ = argument_error
+
+    check_row ((first_con, first_fields), (second_con, second_fields))
+              arg_tys result_ty (L match_loc match@(Match { m_pats = L _ pats }))
+      = setSrcSpanA match_loc $
+        do { names <- check_later 0 plan (drop 1 (filter isVisArgLPat pats))
+           ; unless (null names) $
+               case retainedMatchQuotation match of
+                 Nothing -> return ()
+                 Just span -> setSrcSpan span $
+                   failWithTc (TcRnRetainedQuantificationError RetainedConstructorQuotation)
+           ; first_cv <- newEvVar (mkNomEqPred (TermVarTy first_index)
+                           (mkTyConApp (promoteDataCon first_con) (map TermVarTy first_fields)))
+           ; second_cv <- newEvVar (mkNomEqPred (TermVarTy second_index)
+                            (mkTyConApp (promoteDataCon second_con) (map TermVarTy second_fields)))
+           ; let transport ty = do
+                   one <- tcRetainedCoercion first_index (mkCoVarCo first_cv) ty
+                   two <- tcRetainedCoercion second_index (mkCoVarCo second_cv) (pSnd (coercionKind one))
+                   return (mkTransCo one two)
+           ; arg_cos <- mapM (transport . scaledThing) arg_tys
+           ; result_co <- transport result_ty
+           ; sequence_ [unless (isReflCo co) $
+                          failWithTc (TcRnRetainedQuantificationError (RetainedPatternType ty))
+                       | (RetainedConIndex _, co, Scaled _ ty) <- zip3 plan arg_cos arg_tys]
+           ; let refined_args = zipWith3 (\argument (Scaled mult ty) co ->
+                                   mkCheckExpFunPatTy (Scaled mult (case argument of
+                                     RetainedConValue -> pSnd (coercionKind co)
+                                     _ -> ty))) plan arg_tys arg_cos
+                 first_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType first_index))
+                 renamed = renameRetainedMatch names match
+           ; L checked_loc checked <- tcMatchWithSource tcBody
+                 (invis_pat_tys ++ first_arg : refined_args)
+                 (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc renamed)
+           ; let Match { m_pats = L pats_loc checked_pats, m_grhss = grhss } = checked
+                 wrap_index index cv (L pat_loc pat)
+                   = L pat_loc (AsPat noExtField (noLocA index)
+                       (L pat_loc (addRetainedConProof cv emptyTcEvBinds pat)))
+                 wrap_later column argument co (Scaled _ ty) pat@(L pat_loc inner)
+                   | column == second_column = wrap_index second_index second_cv pat
+                   | RetainedConValue <- argument = L pat_loc (XPat (CoPat (mkWpCastN co) inner ty))
+                   | otherwise = pat
+                 checked_pats' = case checked_pats of
+                   first : rest -> wrap_index first_index first_cv first :
+                     zipWith4 (\(column, argument) co ty pat -> wrap_later column argument co ty pat)
+                       (zip [0..] plan) arg_cos arg_tys rest
+                   [] -> panic "tcRetainedMatrixMatches: missing first pattern"
+                 cast_rhs (L rhs_loc (GRHS x guards rhs))
+                   = L rhs_loc (GRHS x guards (mkLHsWrapCo (mkSymCo result_co) rhs))
+           ; return (L checked_loc (checked { m_pats = L pats_loc checked_pats'
+                       , m_grhss = grhss { grhssGRHSs = fmap cast_rhs (grhssGRHSs grhss) } })) }
+
+    check_later _ [] [] = return []
+    check_later column (argument : args) (pat@(L pat_loc inner) : pats)
+      | column == second_column = check_later (column+1) args pats
+      | RetainedConIndex shared <- argument
+      = setSrcSpanA pat_loc $
+        do { name <- case inner of
+               VarPat _ (L _ name) -> return name
+               _ -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
+           ; names <- check_later (column+1) args pats
+           ; return ((name, idName shared) : names) }
+      | otherwise
+      = do { case unLoc pat of
+               VarPat{} -> return ()
+               _ -> setSrcSpanA pat_loc argument_error
+           ; check_later (column+1) args pats }
+    check_later _ _ _ = argument_error
+
+{- Note [Retained constructor matrices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A complete two-index matrix needs one proof for each matched index in each row.
+Keep both shared whole-argument Ids. Resolve their constructor patterns with the
+actual source field Ids. Lift the first nominal constructor equality through a
+payload or result type, then lift the second equality through that result.
+Compose the two coercions. Check the specialised RHS and cast it back to the
+original result. No equality follows from an alias or a shared source spelling.
+
+Attach each proof to its own ConPat, inside an outer AsPat for its whole Id.
+Keep the original MatchGroupTc types and all source argument lambdas. Ordinary
+payload CoPats preserve their outer types. A payload before the second index
+cannot mention that binder; its second transport is reflexive. Retained domains
+must have reflexive transport. Contexts in this initial matrix telescope reject:
+combined dictionary bindings would need the scope of both constructor proofs.
+
+Check unique complete constructor pairs, not the first column alone. Reject
+mixed variable/constructor rows and keep bare subfields. Ordinary grouping of
+repeated constructors would alias distinct native fields and proofs. Desugar
+proof-bearing rows separately as described in GHC.HsToCore.Match.Constructor,
+Note [Retained constructor equation scope]. This preserves row failure and
+left-before-right demand. Agda supplies the constructor substitution and split
+tree precedents in docs/dependent-haskell/REFERENCES.md#two-index-constructor-equations.
+-}
+
 -- | Resolve a constructor and its actual closed runtime field identities.
 
 tcRetainedConMatches :: Id -> [ExpPatType] -> [ExpPatType] -> [RetainedConArg] -> ExpRhoType
                     -> MatchGroup GhcRn (LHsExpr GhcRn)
                     -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
+tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty group
+  | Just second <- retainedMatrixColumn argument_plan group
+  = tcRetainedMatrixMatches index second invis_pat_tys pat_tys argument_plan rhs_ty group
 tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                     (MG { mg_alts = L loc matches, mg_ext = (origin, _) })
   = setSrcSpanA loc $
@@ -663,7 +849,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                  checked_pats' = case checked_pats of
                    L first_loc first : rest ->
                      L first_loc (AsPat noExtField (noLocA index)
-                                    (L first_loc (add_proof cv branch_binds first)))
+                                    (L first_loc (addRetainedConProof cv branch_binds first)))
                      : zipWith4 (\dictionary co (Scaled _ ty) (L pat_loc pat) ->
                                    case dictionary of
                                      RetainedConValue -> L pat_loc (XPat (CoPat (mkWpCastN co) pat ty))
@@ -708,15 +894,17 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
     bare_variable (L _ VarPat{}) = True
     bare_variable _ = False
 
-    add_proof cv binds (ParPat x (L pat_loc pat))
-      = ParPat x (L pat_loc (add_proof cv binds pat))
-    add_proof cv binds pat@(ConPat { pat_con_ext = ext })
-      = assertPpr (null (cpt_dicts ext) && null (cpt_tvs ext) && empty_binds (cpt_binds ext)) (ppr pat) $
-        pat { pat_con_ext = ext { cpt_dicts = [cv], cpt_binds = binds } }
-    add_proof _ _ pat = pprPanic "tcRetainedConMatches: not a data constructor" (ppr pat)
-
-    empty_binds binds@EvBinds{} = isEmptyTcEvBinds binds
+-- | Bind checked nominal constructor evidence on its actual pattern fields.
+addRetainedConProof :: EvVar -> TcEvBinds -> Pat GhcTc -> Pat GhcTc
+addRetainedConProof cv binds (ParPat x (L loc pat))
+  = ParPat x (L loc (addRetainedConProof cv binds pat))
+addRetainedConProof cv binds pat@(ConPat { pat_con_ext = ext })
+  = assertPpr (null (cpt_dicts ext) && null (cpt_tvs ext) && empty_binds (cpt_binds ext)) (ppr pat) $
+    pat { pat_con_ext = ext { cpt_dicts = [cv], cpt_binds = binds } }
+  where
+    empty_binds ev@EvBinds{} = isEmptyTcEvBinds ev
     empty_binds TcEvBinds{} = False
+addRetainedConProof _ _ pat = pprPanic "addRetainedConProof: not a data constructor" (ppr pat)
 
 {- Note [Retained constructor matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

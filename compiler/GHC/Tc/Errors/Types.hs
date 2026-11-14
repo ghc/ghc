@@ -5324,6 +5324,10 @@ data RetainedQuantificationError
   | RetainedUnsupportedContext
   | RetainedStaging
   | RetainedConstructorCoverage
+  | RetainedMatrixCoverage
+  | RetainedMatrixDuplicate
+  | RetainedMatrixPattern
+  | RetainedMatrixContext
   | RetainedCasePatterns
   | RetainedCaseQuotation
   | RetainedConstructorQuotation
