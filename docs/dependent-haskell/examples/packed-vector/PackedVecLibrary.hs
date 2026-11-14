@@ -135,10 +135,8 @@ headPacked (PackVec m (VCons x xs)) = Just x
 
 -- | Inspect the stored length and return the head with its packed tail.
 unconsPacked :: PackedVec a -> Maybe (a, PackedVec a)
-unconsPacked (PackVec n xs) = case n of
-    Z -> Nothing
-    S k -> case xs of
-        VCons x rest -> Just (x, PackVec k rest)
+unconsPacked (PackVec Z _) = Nothing
+unconsPacked (PackVec (S k) (VCons x rest)) = Just (x, PackVec k rest)
 
 -- | Follow runtime predecessors and collect a finite package's elements.
 toListPacked :: PackedVec a -> [a]

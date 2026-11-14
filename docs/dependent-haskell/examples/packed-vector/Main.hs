@@ -6,6 +6,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE NoPostfixOperators #-}
 
 -- | Check source packages, filtering, and evaluation demand.
@@ -170,6 +171,63 @@ lazySum n = Sum n bottomEquality
 -- | A named error for demand of the ordinary equality field.
 bottomEquality :: forall n m. n :~: m
 bottomEquality = error "append-bottom-proof"
+
+-- | Demand an explicit empty vector pattern after matching its stored index.
+zeroVector :: PackedVec a -> Bool
+zeroVector (PackVec Z VNil) = True
+zeroVector (PackVec (S k) xs) = False
+
+-- | Match a stored index and vector before a later Boolean argument.
+indexThenFlag :: PackedVec Int -> Bool -> Int
+indexThenFlag (PackVec Z _) False = 0
+indexThenFlag (PackVec (S k) (VCons x xs)) True = x
+indexThenFlag (PackVec n xs) flag = 42
+
+-- | A view whose demand has a distinct error marker.
+viewFlag :: Bool -> Bool
+viewFlag flag = error "pattern-view"
+
+-- | Keep index discrimination before a view in the next argument.
+indexBeforeView :: PackedVec Int -> Bool -> Int
+indexBeforeView (PackVec Z _) (viewFlag -> True) = 0
+indexBeforeView (PackVec (S k) xs) flag = 1
+
+-- | Preserve guarded-row failure with separate retained field identities.
+guardedByIndex :: PackedVec Int -> Bool -> Int
+guardedByIndex (PackVec (S k) xs) takeFirst
+    | takeFirst = 42
+guardedByIndex (PackVec Z _) takeFirst = 0
+guardedByIndex (PackVec n xs) takeFirst = 99
+
+-- | Store two runtime lengths and equality evidence between them.
+data EqualLengths where
+    EqualLengths :: foreach (n :: Nat) -> foreach (m :: Nat) -> (n :~: m) -> EqualLengths
+
+-- | Store one input in both retained fields with reflexivity evidence.
+makeEqualLengths :: Nat -> EqualLengths
+makeEqualLengths n = EqualLengths n n Refl
+
+-- | Leave the equality field undefined at two independently stored indices.
+lazyEqualLengths :: Nat -> Nat -> EqualLengths
+lazyEqualLengths n m = EqualLengths n m bottomEquality
+
+-- | Use two constructor refinements and their shared proof to align tails.
+equalTails :: EqualLengths -> PackedVec Int
+equalTails (EqualLengths Z Z Refl) = PackVec Z VNil
+equalTails (EqualLengths (S k) (S j) Refl) = PackVec k (replicateNative @Int j 42)
+
+-- | Send both equality patterns through one runtime input worker.
+{-# NOINLINE driveEqualTails #-}
+driveEqualTails :: Nat -> IO String
+driveEqualTails input = do
+    cell <- newIORef input
+    n <- readIORef cell
+    pure (renderPacked (equalTails (makeEqualLengths n)))
+
+-- | Match a stored sum constructor without inspecting its proof or predecessor.
+sumTag :: Sum n m -> Int
+sumTag (Sum Z proof) = 0
+sumTag (Sum (S k) proof) = 1
 
 -- | A second ordered vector with different element values.
 rightSamplePacked :: PackedVec Int
@@ -709,3 +767,61 @@ main = do
     putStrLn "append finite left ignores cyclic right: 42"
     assertEqual "append cyclic right bounded prefix" [42, 42, 42] (take 3 (toListPacked (appendPacked (makePacked Z) (makePacked cyclicLength))))
     putStrLn "append cyclic right bounded prefix: [42,42,42]"
+    forM_ [(Z, "(0,[])"), (S (S Z), "(1,[42])")] $ \(input, expected) -> do
+        actual <- driveEqualTails input
+        assertEqual "runtime equal tail patterns" expected actual
+        putStrLn ("runtime equal tail patterns: " ++ actual)
+    expectMarker "equal patterns demand proof" "append-bottom-proof" $
+        evaluate (equalTails (lazyEqualLengths (S Z) (S Z)))
+    expectMarker "equal patterns ignore predecessors before proof" "append-bottom-proof" $
+        evaluate (equalTails (lazyEqualLengths (S bottomLength) (S bottomRightLength)))
+    let partialEqualTail = equalTails (makeEqualLengths (S bottomLength))
+    assertWhnf "equal patterns keep partial tail package" partialEqualTail
+    expectMarker "equal patterns demand tail vector" "packed-bottom-length" $
+        evaluate (firstPacked partialEqualTail)
+    expectMarker "equal patterns demand tail length" "packed-bottom-length" $
+        evaluate (withPacked partialEqualTail (\n xs -> natToInt n))
+    expectMarker "equal patterns demand first index" "packed-bottom-length" $
+        evaluate (equalTails (lazyEqualLengths bottomLength bottomRightLength))
+    expectMarker "equal patterns demand second index" "equality-right-length" $
+        evaluate (equalTails (lazyEqualLengths Z bottomRightLength))
+    assertEqual "sum zero pattern ignores proof" 0 (sumTag (lazySum Z))
+    putStrLn "sum zero pattern ignores proof: 0"
+    assertEqual "sum successor pattern ignores predecessor and proof" 1 (sumTag (lazySum (S bottomLength)))
+    putStrLn "sum successor pattern ignores predecessor and proof: 1"
+    expectMarker "sum pattern demands stored index" "packed-bottom-length" $
+        evaluate (sumTag (lazySum bottomLength))
+    assertEqual "index zero vector pattern" True (zeroVector (makePacked Z))
+    putStrLn "index zero vector pattern: True"
+    expectMarker "explicit zero vector pattern demands payload" "packed-bottom-payload" $
+        evaluate (zeroVector (lazyPacked Z))
+    expectMarker "index pattern before payload" "packed-bottom-length" $
+        evaluate (zeroVector (lazyPacked bottomLength))
+    assertEqual "successor pattern ignores predecessor and vector" False (zeroVector (lazyPacked (S bottomLength)))
+    putStrLn "successor pattern ignores predecessor and vector: False"
+    expectMarker "index pattern before later argument" "packed-bottom-length" $
+        evaluate (indexThenFlag (lazyPacked bottomLength) (error "pattern-flag"))
+    expectMarker "zero pattern then later argument" "pattern-flag" $
+        evaluate (indexThenFlag (lazyPacked Z) (error "pattern-flag"))
+    expectMarker "vector pattern before later argument" "packed-bottom-payload" $
+        evaluate (indexThenFlag (lazyPacked (S Z)) (error "pattern-flag"))
+    assertEqual "zero pattern selects first row" 0 (indexThenFlag (makePacked Z) False)
+    putStrLn "zero pattern selects first row: 0"
+    assertEqual "successor pattern selects element" 1 (indexThenFlag samplePacked True)
+    putStrLn "successor pattern selects element: 1"
+    assertEqual "later argument mismatch reaches catchall" 42 (indexThenFlag samplePacked False)
+    putStrLn "later argument mismatch reaches catchall: 42"
+    expectMarker "index pattern before later view" "packed-bottom-length" $
+        evaluate (indexBeforeView (lazyPacked bottomLength) True)
+    expectMarker "zero pattern then later view" "pattern-view" $
+        evaluate (indexBeforeView (lazyPacked Z) True)
+    assertEqual "index mismatch skips later view" 1 (indexBeforeView (lazyPacked (S bottomLength)) True)
+    putStrLn "index mismatch skips later view: 1"
+    assertEqual "index guard ignores cyclic fields" 42 (guardedByIndex (cyclicPacked cyclicLength) True)
+    putStrLn "index guard ignores cyclic fields: 42"
+    assertEqual "index guard failure reaches catchall" 99 (guardedByIndex (lazyPacked (S Z)) False)
+    putStrLn "index guard failure reaches catchall: 99"
+    assertEqual "index mismatch skips guard argument" 0 (guardedByIndex (lazyPacked Z) (error "pattern-flag"))
+    putStrLn "index mismatch skips guard argument: 0"
+    expectMarker "index pattern before guard" "packed-bottom-length" $
+        evaluate (guardedByIndex (lazyPacked bottomLength) True)

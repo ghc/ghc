@@ -1332,6 +1332,35 @@ runModuleChecks libdir = do
         , "append demands left tail: zip-left-vector"
         , "append finite left ignores cyclic right: 42"
         , "append cyclic right bounded prefix: [42,42,42]"
+        , "runtime equal tail patterns: (0,[])"
+        , "runtime equal tail patterns: (1,[42])"
+        , "equal patterns demand proof: append-bottom-proof"
+        , "equal patterns ignore predecessors before proof: append-bottom-proof"
+        , "equal patterns keep partial tail package: ok"
+        , "equal patterns demand tail vector: packed-bottom-length"
+        , "equal patterns demand tail length: packed-bottom-length"
+        , "equal patterns demand first index: packed-bottom-length"
+        , "equal patterns demand second index: equality-right-length"
+        , "sum zero pattern ignores proof: 0"
+        , "sum successor pattern ignores predecessor and proof: 1"
+        , "sum pattern demands stored index: packed-bottom-length"
+        , "index zero vector pattern: True"
+        , "explicit zero vector pattern demands payload: packed-bottom-payload"
+        , "index pattern before payload: packed-bottom-length"
+        , "successor pattern ignores predecessor and vector: False"
+        , "index pattern before later argument: packed-bottom-length"
+        , "zero pattern then later argument: pattern-flag"
+        , "vector pattern before later argument: packed-bottom-payload"
+        , "zero pattern selects first row: 0"
+        , "successor pattern selects element: 1"
+        , "later argument mismatch reaches catchall: 42"
+        , "index pattern before later view: packed-bottom-length"
+        , "zero pattern then later view: pattern-view"
+        , "index mismatch skips later view: 1"
+        , "index guard ignores cyclic fields: 42"
+        , "index guard failure reaches catchall: 99"
+        , "index mismatch skips guard argument: 0"
+        , "index pattern before guard: packed-bottom-length"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2569,8 +2598,14 @@ runPackageSourceRejectChecks = do
         , ("Equality", 83605, "contexts", [], [], declaration "forall a. (a ~ Int) => foreach (n :: Nat) -> Vec a n -> PackedVec a")
         , ("RefinedUniversal", 83605, "equality specifications", [], [], declaration "foreach (n :: Nat) -> Vec Int n -> PackedVec Int")
         , ("Promotion", 83605, "Promotion of constructors with retained fields", [], [], package ++ ["type Bad = 'PackVec"])
-        , ("ConstructorField", 83605, "bare variable retained fields", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec Z xs) = 0"])
-        , ("RetainedWildcard", 83605, "bare variable retained fields", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec _ xs) = 0"])
+        , ("PatternWrongPredecessor", 25897, "rest", [], [], package ++ ["bad :: PackedVec Int -> PackedVec Int", "bad (PackVec (S k) (VCons x rest)) = PackVec (S k) rest"])
+        , ("PatternIndependent", 25897, "rest", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> PackedVec Int", "bad m (PackVec (S k) (VCons x rest)) = PackVec m rest"])
+        , ("PatternGuardScope", 83865, "xs", [], [], package ++ ["bad :: PackedVec Int -> PackedVec Int", "bad (PackVec (S k) (VCons x rest)) | False = PackVec k rest", "bad (PackVec n xs) = PackVec (S n) xs"])
+        , ("PatternFieldEscape", 25897, "rest", [], [], package ++ ["bad :: PackedVec Int -> Vec Int n", "bad (PackVec (S k) (VCons x rest)) = rest"])
+        , ("PatternNestedField", 83605, "bare variable patterns", [], [], package ++ ["bad :: PackedVec Int -> Int", "bad (PackVec (S (S k)) xs) = 0"])
+        , ("PatternWrongDomain", 83605, "index domain", [], [], package ++ ["bad :: PackedVec Int -> Int", "bad (PackVec True xs) = 0"])
+        , ("PatternWrongArity", 83605, "Retained fields require bare variables", [], [], package ++ ["bad :: PackedVec Int -> Int", "bad (PackVec (S k j) xs) = 0"])
+        , ("RetainedWildcard", 83605, "Retained fields require bare variables", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec _ xs) = 0"])
         , ("LazyPattern", 83605, "Lazy patterns and pattern bindings", [], [], package ++ ["bad :: PackedVec a -> Int", "bad ~(PackVec n xs) = 0"])
         , ("LetPattern", 83605, "Lazy patterns and pattern bindings", [], [], package ++ ["bad :: PackedVec a -> Int", "bad p = let PackVec n xs = p in 0"])
         , ("IndexMismatch", 83865, "Couldn't match", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> PackedVec Int", "bad n m xs = PackVec @Int m xs"])
