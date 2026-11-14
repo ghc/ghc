@@ -69,6 +69,13 @@ class Instruction instr where
 
         -- | Apply a given mapping to all the register references in this
         --      instruction.
+        --
+        --      TODO: the mapping takes a register to a register, so
+        --      an instruction that reads a spilled virtual register
+        --      reads it from a register: both allocators reload it
+        --      first (loadTemp in GHC.CmmToAsm.Reg.Linear, spillRead in
+        --      GHC.CmmToAsm.Reg.Graph.Spill), even at its last read, where an
+        --      x86 instruction could read the stack slot.
         patchRegsOfInstr
                 :: HasDebugCallStack
                 => Platform

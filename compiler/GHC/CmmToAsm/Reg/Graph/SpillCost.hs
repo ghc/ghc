@@ -91,6 +91,11 @@ slurpSpillCostInfo platform cfg cmm
                 $ flattenSCCs sccs
             where
                 LiveInfo _ entries _ _ = info
+                -- WIP: no spill choice depends on these frequencies. They scale
+                -- only the counts of uses and definitions, while chooseSpill
+                -- uses spillCost_length, a function of the lifetimes alone;
+                -- spillCost_chaitin, which would read the counts, is commented
+                -- out.
                 freqMap = (fst . mkGlobalWeights (head entries)) <$> cfg
 
         -- Lookup the regs that are live on entry to this block in
@@ -297,6 +302,10 @@ pprSpillCostRecord
         -> SpillCostRecord
         -> SDoc
 
+-- BUG: this binds the record as (reg, uses, defs, life), where its second field
+-- counts the writes and its third the reads, as the comments of SpillCostRecord
+-- say. Only the names are wrong: the counts are printed in the record's order,
+-- under no names, and their sum is the same; and nothing in GHC calls this.
 pprSpillCostRecord regClass pprReg graph (reg, uses, defs, life)
         =  hsep
         [ pprReg (RegVirtual reg)

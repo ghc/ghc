@@ -71,6 +71,14 @@ regAlloc config regsFree slotsFree slotsCount code cfg
                         triv
                         regsFree slotsFree slotsCount [] code cfg
 
+        -- BUG: the preallocated slots are reserved a second time. slotsCount',
+        -- returned here as the stack needed, is the highest slot number,
+        -- which counts the preallocated slots, whereas the linear allocator's
+        -- regAlloc returns only the slots beyond maxSpillSlots; the driver
+        -- passes either to ncgAllocMoreStack. This costs C stack space and,
+        -- where a target's mkStackAllocInstr needs more instructions for
+        -- a larger amount, code at entry and exit, under -fregs-graph or
+        -- -fregs-iterative.
         let needStack
                 | slotsCount == slotsCount'
                 = Nothing
