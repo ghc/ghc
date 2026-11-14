@@ -1504,8 +1504,9 @@ tcRetainedWorkerResultMatch NoQL (Just expected) args fun sigma
     constructor_result _ _ = Nothing
 tcRetainedWorkerResultMatch _ _ _ _ _ = return Nothing
 
--- | Admit known runtime function values without erased polymorphism.
+-- | Admit known retained values without erased polymorphism.
 -- Constraint arrows are supported only below a retained binder.
+-- See Note [Known retained function instantiation].
 isRetainedValueType :: Type -> Bool
 isRetainedValueType = go False
   where
@@ -1517,6 +1518,11 @@ isRetainedValueType = go False
       FunTy flag mult arg res -> isTauTy mult
                               && (isVisibleFunArg flag || under_pi)
                               && go under_pi arg && go under_pi res
+      TyConApp tc args
+        | isAlgTyCon tc, not (isClassTyCon tc)
+        , length args == tyConArity tc
+        , typeKind ty `eqType` liftedTypeKind
+        -> all (go under_pi) args
       _ -> False
 
 {- Note [Expected retained worker instantiation]
@@ -1558,6 +1564,8 @@ Preserve the original context and emit the actual type applications. Ordinary
 argument checking and final subsumption still run. Do not fill a native meta,
 inspect an unfolding, evaluate an index, or eta-expand the worker. A bottom
 worker must remain bottom when its function WHNF is demanded.
+The eligibility check also applies to algebraic containers. See
+Note [Known retained function instantiation].
 
 Agda inserts hidden arguments from the expected result and compares Pi bodies
 under one shared context. This route uses an immutable substitution instead of
@@ -1575,8 +1583,16 @@ to a whole Pi without structurally unifying the Pi's body.
 
 Keep the ordinary tau expected-result path. The additional path accepts runtime
 function types through ordinary arrows and supported retained binders. It also
-accepts constraint arrows below a retained binder. Reject erased foralls and
-other non-tau type heads. Require a function head without concreteness variables.
+accepts constraint arrows below a retained binder. An exactly saturated
+algebraic container of kind Type can hold these values. A Refl witness for a
+retained function type needs the complete expected equality type to select
+its erased arguments.
+Recurse through each container argument with the incoming under_pi flag.
+A Pi in one argument must not admit a qualified type in a sibling argument.
+The ordinary tau fast path remains unchanged. Reject newly non-tau class,
+family, unsaturated and nonlifted heads, and reject erased foralls. This changes
+only eligibility for the existing exact matcher. Require a known head without
+concreteness variables.
 The template remains ordinary and its result remains tau. The existing NoQL,
 type-argument, complete-substitution, kind, runtime-scope and exact-result checks
 still apply. Preserve the original body and its constraints in the substitution.
