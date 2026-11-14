@@ -1507,8 +1507,9 @@ Other arguments retain ordinary expected-type checking. If matching fails or
 leaves index binders undetermined, ordinary instantiation checks the same cached
 arguments. The ordinary unifier still rejects retained meta-variable fills.
 
-Only saturated ordinary monomorphic arrows without explicit type arguments
-enter this route. Preserve any leading constraint context as described in
+The declared ordinary monomorphic domains must be saturated, without explicit
+type arguments. See Note [Generic retained argument inference] for extra
+arguments on the generic route. Preserve any leading context as described in
 Note [Constrained immutable instantiation]. Inference uses a fresh infer cell
 at the current TcLevel. It can return an exact retained type without assigning a type meta-variable.
 -}
