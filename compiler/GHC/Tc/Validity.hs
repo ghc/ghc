@@ -809,8 +809,12 @@ check_type ve (TermVarTy v)
        ; unless (v `elemVarSet` ve_indices ve) $
          do { mb_thing <- tcLookupLcl_maybe (getName v)
             ; case mb_thing of
-                Just (ATcId { tct_id = v' })
-                  | v == v', isNativeIndexId v' -> return ()
+                Just (ATcId { tct_id = v' }) ->
+                  do { binding <- liftZonkM (zonkId v')
+                     ; unless (v == binding && isNativeIndexId binding
+                               && eqType (varType v) (varType binding)) $
+                         failWithTc $ TcRnRetainedQuantificationError
+                                        (RetainedIndexOutOfScope v) }
                 _ -> failWithTc $ TcRnRetainedQuantificationError
                                    (RetainedIndexOutOfScope v) } }
 check_type ve (DepFunTy v body)
@@ -914,6 +918,10 @@ A retained binder introduces a value argument. Use the ordinary function
 argument and result ranks, and extend the index scope only for its result.
 An index occurrence must refer to that scope or to an already-bound local
 index Id in the typechecker environment. Its Id remains unrestricted.
+Zonk the lexical binding's type and multiplicity before testing it. IO-bound
+indices can retain filled meta-variables in that metadata. Keep the same Unique
+and require the occurrence and binding domains to agree. This follows
+GHC.Tc.Gen.App, Note [Native index bindings during typechecking].
 Its domain must satisfy isNativeIndexType. Ordinary outer forall binders
 keep their existing type-variable scope and rank checks.
 Preserve this scope when checking nested constraints and their predicates.
