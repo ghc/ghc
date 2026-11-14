@@ -1901,6 +1901,11 @@ instance Diagnostic TcRnMessage where
            what = case ty_or_ki of
              TypeLevel -> text "type"
              KindLevel -> text "kind"
+    TcRnRetainedQuantificationNotImplemented
+      -> mkSimpleDecorated $
+         text "Retained quantification is not supported in this type position yet."
+    TcRnRetainedQuantificationError reason
+      -> mkSimpleDecorated $ pprRetainedQuantificationError reason
     TcRnInvalidRecordField con field
       -> mkSimpleDecorated $
          hsep [text "Constructor" <+> quotes (ppr con),
@@ -2681,6 +2686,10 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnTypeApplicationsDisabled{}
       -> ErrorWithoutFlag
+    TcRnRetainedQuantificationNotImplemented{}
+      -> ErrorWithoutFlag
+    TcRnRetainedQuantificationError{}
+      -> ErrorWithoutFlag
     TcRnInvalidRecordField{}
       -> ErrorWithoutFlag
     TcRnTupleTooLarge{}
@@ -3426,6 +3435,10 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnTypeApplicationsDisabled{}
       -> [suggestExtension LangExt.TypeApplications]
+    TcRnRetainedQuantificationNotImplemented{}
+      -> noHints
+    TcRnRetainedQuantificationError{}
+      -> noHints
     TcRnInvalidRecordField{}
       -> noHints
     TcRnTupleTooLarge{}
@@ -3512,6 +3525,96 @@ instance Diagnostic TcRnMessage where
       -> noHints
 
   diagnosticCode = constructorCode @GHC
+
+-- | Print the checked restriction that prevents retained source elaboration.
+pprRetainedQuantificationError :: RetainedQuantificationError -> SDoc
+pprRetainedQuantificationError reason = case reason of
+  RetainedBinderCount ->
+    text "Retained quantification requires at least one argument."
+  RetainedBinderNeedsName ->
+    text "A retained argument requires a variable name."
+  RetainedBinderNeedsType ->
+    text "A retained argument requires an explicit domain type."
+  RetainedUnsupportedDomain ty ->
+    vcat [ text "A retained argument requires a supported closed first-order algebraic domain."
+         , text "Its declared domain is:" <+> ppr ty ]
+  RetainedResultKind ty ->
+    vcat [ text "The result of retained quantification must have kind" <+> quotes (text "Type")
+         , text "The result type is:" <+> ppr ty ]
+  RetainedSolverType ty ->
+    vcat [ text "Constraint solving for this retained function type is not supported yet:"
+         , ppr ty ]
+  RetainedQuickLook ty ->
+    vcat [ text "Quick Look inference does not support this retained type yet:"
+         , ppr ty ]
+  RetainedConstraintType ty ->
+    vcat [ text "Only class and equality constraints can depend on a retained index yet:"
+         , ppr ty ]
+  RetainedPragma ->
+    text "Optimisation pragmas for retained functions are not supported yet."
+  RetainedInference ty ->
+    vcat [ text "This inferred retained type requires an explicit signature:"
+         , ppr ty ]
+  RetainedCallbackResult ty ->
+    vcat [ text "The inferred callback result contains a runtime index outside the application scope:"
+         , ppr ty ]
+  RetainedInvalidBinder var ->
+    text "A retained index must be a local, unrestricted value of a supported algebraic domain:" <+> ppr var
+  RetainedIndexOutOfScope var ->
+    text "The runtime index" <+> quotes (ppr var) <+> text "is out of scope here."
+  RetainedPartialSignature ->
+    text "Retained quantification requires a complete type signature."
+  RetainedPolymorphicSignature ->
+    text "A forall within the scope of a retained binder is not supported yet."
+  RetainedUnsupportedContext ->
+    text "Retained quantification is supported only at the start of an explicit value signature."
+  RetainedStaging ->
+    text "Retained quantification in Template Haskell quotations or splices is not supported yet."
+  RetainedConstructorCoverage ->
+    text "A retained constructor match requires one unguarded clause for each constructor of its domain."
+  RetainedMatrixCoverage ->
+    vcat [text "A retained constructor matrix requires one unguarded clause for each pair of constructors of its two index domains."
+         ,text "A final equation with bare variables or wildcards in both index columns can cover the remaining pairs."]
+  RetainedMatrixDuplicate ->
+    text "This retained constructor pair is matched by an earlier equation."
+  RetainedMatrixFallback ->
+    text "A retained constructor matrix permits only one final equation with bare variables or wildcards in both selected index columns."
+  RetainedMatrixPattern ->
+    vcat [text "A retained constructor matrix requires constructor patterns in both selected index columns, with bare variable fields."
+         ,text "One final equation can use bare variables or wildcards in both columns."]
+  RetainedMatrixContext ->
+    text "Constraints within a retained constructor matrix are not supported yet."
+  RetainedCasePatterns ->
+    text "Dependent case refinement requires one unguarded match for each constructor, with bare variable fields."
+  RetainedCaseQuotation ->
+    text "Dependent case refinement does not support Template Haskell quotations."
+  RetainedConstructorQuotation ->
+    text "Constructor equations with later retained arguments do not support Template Haskell quotations yet."
+  RetainedConstructorArguments ->
+    text "Retained constructor fields and later arguments currently require bare variable patterns and unrestricted multiplicities."
+  RetainedPatternType ty ->
+    vcat [ text "Retained constructor refinement does not support this type yet:"
+         , ppr ty ]
+  RetainedVariablePattern ->
+    text "The retained argument currently requires a bare variable pattern."
+  RetainedContextPattern ->
+    text "A strict prefix pattern before a retained context is not supported when later value patterns remain."
+  RetainedResultWrapper ->
+    text "This result requires a wrapper that is not supported for retained functions yet."
+  RetainedIndexExpression ->
+    text "A retained argument must be a local index variable or a supported constructor tree."
+  RetainedLocalSignatureIndex ->
+    text "A retained local signature index must refer to an already-bound unrestricted local value of a supported index domain."
+  RetainedPackageDeclaration ->
+    vcat [ text "A retained constructor requires a lazy ordinary data declaration with a lifted result kind."
+         , text "Records, contexts, existential binders, equality specifications, and StrictData are not supported."
+         , text "Its erased quantifiers must name exactly the datatype parameters." ]
+  RetainedPackagePromotion ->
+    text "Promotion of constructors with retained fields is not supported yet."
+  RetainedPackagePattern ->
+    vcat [ text "A retained package pattern requires one constructor and unrestricted multiplicity."
+         , text "Retained fields require bare variables or constructor patterns for their index domain, with bare variable fields."
+         , text "Lazy patterns and pattern bindings are not supported yet." ]
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
 pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $

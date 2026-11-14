@@ -4,6 +4,7 @@ module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
   , TcRnMessageOpts(..)
+  , RetainedQuantificationError(..)
   , mkTcRnUnknownMessage
   , TcRnMessageDetailed(..), ErrInfo(..)
   , TypeDataForbids(..)
@@ -4088,6 +4089,13 @@ data TcRnMessage where
                                -> !TypeOrKind
                                -> TcRnMessage
 
+  {-| TcRnRetainedQuantificationNotImplemented rejects retained quantification
+      in unsupported source type positions.
+  -}
+  TcRnRetainedQuantificationNotImplemented :: TcRnMessage
+
+  TcRnRetainedQuantificationError :: RetainedQuantificationError -> TcRnMessage
+
   {-| TcRnInvalidRecordField is an error indicating that a record field was
     used that doesn't exist in a constructor.
 
@@ -5296,6 +5304,45 @@ data BootMismatchWhat
                          !TyCon -- ^ real 'TyCon'
                          !(NE.NonEmpty BootTyConMismatch)
   deriving Generic
+
+-- | Explain a restriction of source retained quantification.
+data RetainedQuantificationError
+  = RetainedBinderCount
+  | RetainedBinderNeedsName
+  | RetainedBinderNeedsType
+  | RetainedUnsupportedDomain Type
+  | RetainedResultKind Type
+  | RetainedSolverType Type
+  | RetainedQuickLook Type
+  | RetainedConstraintType Type
+  | RetainedPragma
+  | RetainedInference Type
+  | RetainedCallbackResult Type
+  | RetainedInvalidBinder Id
+  | RetainedIndexOutOfScope Id
+  | RetainedPartialSignature
+  | RetainedPolymorphicSignature
+  | RetainedUnsupportedContext
+  | RetainedStaging
+  | RetainedConstructorCoverage
+  | RetainedMatrixCoverage
+  | RetainedMatrixDuplicate
+  | RetainedMatrixFallback
+  | RetainedMatrixPattern
+  | RetainedMatrixContext
+  | RetainedCasePatterns
+  | RetainedCaseQuotation
+  | RetainedConstructorQuotation
+  | RetainedConstructorArguments
+  | RetainedPatternType Type
+  | RetainedVariablePattern
+  | RetainedContextPattern
+  | RetainedResultWrapper
+  | RetainedIndexExpression
+  | RetainedLocalSignatureIndex
+  | RetainedPackageDeclaration
+  | RetainedPackagePromotion
+  | RetainedPackagePattern
 
 -- | An error in the implementation of an abstract datatype using
 -- a type synonym.

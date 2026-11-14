@@ -1346,6 +1346,9 @@ rn_ty_pat tv@(HsTyVar an prom lrdr) = do
     check_data_kinds tv
   pure (HsTyVar an prom (L l $ WithUserRdr (unLoc lrdr) name))
 
+rn_ty_pat HsForEachTy{} =
+  liftRn $ failWithTc TcRnRetainedQuantificationNotImplemented
+
 rn_ty_pat (HsForAllTy an tele body) = liftTPRnRaw $ \ctxt locals thing_inside ->
   bindHsForAllTelescope ctxt tele $ \tele' -> do
     let

@@ -1,0 +1,2021 @@
+# Native dependent Core implementation plan
+
+Implement dependent types in Haskell through a native extension to Core. Base the
+work on Richard Eisenberg's historical `nokinds-pi` branch. Port its useful changes
+to current GHC and complete the missing rules. The first working target is a
+retained Boolean argument whose value determines the result type.
+
+Last updated: 2026-11-14. Upstream compiler base:
+`19ff36f2aede0ca2e554016ff22c71e73aa9803b`.
+
+See [current status](README.md) and [primary references](REFERENCES.md).
+
+## Current priority: execute from source
+
+The source constructor checkpoint is verified at `8e90e0386b`; the source filter
+is verified at `c9aa3545c0`. Both compiler stages run the
+[source example](examples/packed-vector/README.md) through a separate producer
+interface and object file. It declares Nat, Vec and PackedVec in source. It
+constructs, opens, repackages and filters vectors. Its output length is computed
+with `Z` and `S` from runtime predicate results.
+
+All 36 package, filter and section observations pass. Sixteen located rejection
+checks, the five focused registered regressions, Core API and bootstrap runtime
+also pass. See [the recorded evidence](README.md#source-vector-filter-checkpoint).
+M12's length-bound proof is verified at `7eae40be91`, with the nested-context
+instantiation fix at `4ad47fdeca`. Both stages pass all 58 source observations;
+the runtime fixtures also check 19 package/bound rejections. Preserve the
+existing signature, proof, laziness and ordinary Haskell controls.
+
+M13 is verified at `7a98362197`. Its source run passes 81 observations in both
+stages. Ordinary package fields admit nested vector/proof patterns and wildcards.
+Separate per-equation cases preserve retained field identity and source clause
+order. The API and runtime controls pass with 20 package/bound rejection checks.
+All five focused registered regressions pass.
+
+M14 is verified at `ed5b0f56e4`. Both compiler stages pass 102 source observations
+after the Core Tidy alias fix. Source uncons packages a vector tail with its
+actual runtime predecessor. Repeated uncons preserves finite element order and
+produces a bounded prefix from the tested cyclic input. The Core API and runtime
+fixture pass with 22 package/bound rejections. All five registered regressions
+pass. The original Core Lint failure remains in the verification artifacts.
+
+M15's source workers are verified at `f3350988c3`, with application checking
+at `78460ce4f4`. Both compiler stages pass all 136 source observations. The
+bootstrap runtime fixture and registered runtime test pass 27 package/bound
+rejections. Four standalone equality-scope errors have pinned codes and source
+locations in both stages. All five focused registered regressions pass.
+The new source uses ordinary `:~:` evidence to
+align independently computed runtime lengths before zipping their vectors.
+
+M16 source workers are committed at `fba00f8f0c`, with compiler changes at
+`491c5fb0c9`. Both compiler stages pass 180 source observations. The bootstrap
+and registered runtime fixtures pass 34 package/bound rejections. Seven
+standalone errors have pinned codes and primary source tokens in both stages.
+A declaration-only producer passes separate imports, partial type applications
+and an unused retained field. All five focused registered regressions pass.
+
+M17's compiler change is `ab985a150e`, with import cleanup at `f423a0ce97` and
+source/fixture at `e54802bcfd`. Both stages pass 209 source observations and
+14 standalone rejection checks. The runtime fixtures pass 40 package/bound
+rejections. All five focused registered regressions pass. Source uncons now
+matches the stored Nat directly in its package pattern.
+
+M18's source reverse is committed at `9fefa1a496`, with signed-argument
+inference at `12bfbef0b3`. Both compiler stages pass 249 source observations
+and seven standalone reverse rejections. The runtime fixtures pass 47
+package/bound rejections. All five registered regressions pass. The source
+wrapper stores the original runtime length with its reversed vector. Next,
+M19's compiler is `fdf23acaea`, with comment cleanup at `a367bd0a7a`.
+Both compiler stages pass 269 source observations, and the runtime fixtures
+pass 55 package/bound rejections. All five registered regressions pass.
+Constructor equations accept later retained variables and preserve contexts.
+M20 verifies four constructor equations for `sameNat`; M21 verifies a final
+named fallback. M22 verifies anonymous fallback columns with 331 source
+observations, 76 API package/bound rejections and 42 standalone located errors
+in both stages. All five registered regressions pass. The original 316 source
+outputs remain unchanged. M23 implements complete local payload signatures
+that refer to an already-bound runtime index. Both stages pass 343 source
+observations, 53 standalone located errors and four ordinary controls. The
+API/runtime fixture passes 87 package/bound rejections. All five registered
+regressions pass. M24 verifies ordinary native action binds with 360 source
+observations, 60 located errors, four ordinary controls and 94 API rejections.
+All five registered regressions pass. M25 verifies scoped native source
+inference with 377 observations, 69 located rejection cases, four ordinary
+controls and 103 API rejections in both-stage validation. All five registered
+regressions pass. M26 verifies boxed tuple inference with 395 observations,
+79 located rejection cases, four ordinary controls and 113 API rejections.
+All five registered regressions pass. M27 verifies native tuple sections with
+417 source observations, 88 located rejections, four ordinary controls and
+122 API rejections in both stages. All five registered regressions pass.
+M28 verifies native generic result overapplication with 439 source observations,
+99 located rejection cases, four ordinary controls and 133 API rejection cases.
+Both stages pass the failed-match cache trace. All five registered regressions
+pass. M29 verifies native generic inference after leading visible type applications
+with 461 observations, 112 located rejections, four ordinary controls and 146
+API rejections. Both stages pass the cache trace and all five registered tests.
+M30 verifies native-index-kind inference after leading VTA with 479 source
+observations, 126 located rejections, four ordinary controls and 160 API
+rejections. Both stages and all five registered regressions pass. M31 verifies
+joint native-index/payload inference and result overapplication with 503 source
+observations, 139 located rejections, four ordinary controls and 173 API
+rejections. Both stages and all five registered regressions pass. M32 targets
+safe outer equality evidence under fixed-domain retained Pi types.
+
+## Direction and boundaries
+
+The implementation extends Core. It does not require singleton elaboration or
+explicit Boolean reification at ordinary runtime call sites. Keep the validated
+singleton translation as a comparison implementation for the overlapping subset.
+It supplies expected results, but it does not prove the native extension.
+
+The historical starting point is
+[`nokinds-pi` at `b64ef80f8002727422c05092f429c38d0527ed0b`](https://github.com/goldfirere/ghc/tree/b64ef80f8002727422c05092f429c38d0527ed0b),
+dated 2014-08-19. It introduces `PiTy`, independent binder attributes, and a sketch
+of dependent application checking. It is unfinished. Its type-computation utility
+still discards runtime arguments, and its case checker uses one fixed result type.
+Updating this branch requires semantic work as well as API changes.
+
+Use the later D/DC, roles, and graded-usage research to evaluate the port. Their
+formal results do not automatically apply to the historical branch or this GHC
+implementation. Keep existing FC coercion checks. Do not add trusted universal
+coercions to make incomplete dependent rules pass.
+
+Start with visible, retained, unrestricted Boolean binders. Results have fixed
+lifted runtime representations. Source index expressions initially use Boolean
+constructors and named runtime Boolean variables. A producer can supply the value
+of such a variable. The type checker does not evaluate that producer or equate
+separate variables because their definitions look equal.
+
+The internal index representation must remain valid under compiler substitution.
+A source restriction to variables and constructors is insufficient: inlining can
+replace a variable with an arbitrary expression. Either represent the substituted
+expression safely or preserve its binding and restrict the relevant transformation.
+Settle this rule before enabling dependent optimization.
+
+Defer general term evaluation in types, automatic promotion, retained linear
+binders, dependent runtime representations, and general dependent inference.
+Keep arithmetic and SMT integration separate from this Core work.
+
+## First source target
+
+These examples describe the M7 target. The `foreach` spelling follows the design
+proposal. Restricted source `keep`, constructor-based `choose`, and their shared
+runtime composition now check and execute through the native bytecode entry.
+
+```haskell
+type family Select (b :: Bool) where
+  Select True = Int
+  Select False = Bool
+
+choose :: foreach (b :: Bool) -> Select b
+choose True = 1
+choose False = False
+
+keep :: foreach (b :: Bool) -> Select b -> Select b
+keep b x = x
+
+again :: foreach (b :: Bool) -> Select b
+again b = keep b (choose b)
+```
+
+The native target must also accept an existing runtime Boolean as an index.
+Multiple dependent calls must refer to the same binding. Branches can consume the
+selected value after checked Boolean refinement. A locally bound index cannot
+escape its scope without a specified dependent result or existential package.
+Passing a runtime Boolean must not insert a strict singleton conversion.
+
+## Task sequence
+
+M0 through M5 provide the internal Core and bytecode path. After the first
+restricted M6 step passes, implement source `keep` through that path in M7.
+This gives an early parse-to-execution check. Complete the remaining M6 work
+before enabling the ordinary optimizer. M8 still controls interface and program
+integration.
+
+### M0: completed preparation
+
+- [x] Update and build the current GHC baseline.
+- [x] Inspect the proposals, roadmap, and implementation research.
+- [x] Validate a singleton comparison implementation on the baseline compiler.
+- [x] Record the native Core direction and initial tasks.
+
+### M1: audit and pin the historical port
+
+- [x] Retain the historical branch and exact commit as a local reference.
+- [x] Inventory the relevant commits. Separate work already incorporated into GHC
+      from retained-dependent changes. Map old modules to current equivalents.
+- [x] Record incomplete rules and unavailable validation. Preserve commit provenance
+      when porting changes. Keep current buildable GHC as the development base.
+- [x] Retain the temporary singleton comparison program in a reproducible location.
+
+Gate: a port inventory identifies reusable code, required adaptations, and new
+semantic work. We have inspected the historical source but have not built it.
+See [the port inventory](PORT.md) and [comparison programs](reference/README.md).
+
+### M2: specify the restricted Core extension
+
+- [x] Define retained Boolean binders, term indices, lambda, application, and case
+      typing. State scope, substitution, erasure, and non-strictness rules.
+- [x] Choose how runtime terms occur in types. Compare historical promotion with
+      a checked index-expression representation. Require substitution closure.
+- [x] Keep dependence, visibility, retention, and multiplicity distinct. Prefer a
+      dedicated retained-dependent form that preserves existing `FunTy` and
+      `ForAllTy` fast paths, unless the audit gives a concrete reason to change them.
+- [x] Define nominal equality, constructor discrimination, and checked reductions.
+      State which index comparisons remain opaque.
+- [x] Specify a dependent motive or explicit branch-equality mechanism for cases.
+      The existing case annotation lies outside the case binder's scope.
+- [x] Explain how the rules fit FC, roles, multiplicities, and fixed runtime
+      representations. Record the remaining formal proof obligations.
+
+Gate: written rules and positive and negative Core examples. Resolve representation
+choices before implementation. Cover bottom, partial application, and `seq`.
+The first increment follows [the restricted Core specification](CORE.md).
+
+### M3: port binders and implement dependent lambda and application
+
+- [x] Add the retained binder and index representation to current type code.
+- [x] Update free variables, capture avoidance, term/type substitution, equality,
+      kinding, pretty-printing, and relevant traversals together.
+- [x] Update `exprType`, function-result calculation, and Core Lint consistently.
+      Runtime dependent application substitutes its argument into the result.
+- [x] Check binder renaming, aliases, shadowing, supported index substitution, and
+      scoped lets. Ordinary optimizer reduction remains gated until M6.
+- [x] Keep ordinary GHC programs building while the feature remains gated.
+
+Gate: hand-built Core for identity and retained application passes Lint. Lint and
+type computation agree before and after supported substitutions. No frontend
+syntax is required for this milestone.
+
+### M4: implement dependent Boolean elimination and evidence
+
+- [x] Implement the M2 case motive or branch-equality design.
+- [x] Instantiate branch results under checked `True` and `False` refinements.
+- [x] Update case scope in substitution, free variables, and Lint.
+- [x] Preserve nominal index equality. Reject invalid casts and escaping binders.
+- [x] Restrict refinement to strict constructor discrimination. Reject unsupported
+      evidence producers and incomplete proof-bearing cases. Runtime bottom
+      checks remain part of M5's execution gate.
+
+Gate: native Core for `choose`, `keep`, and shared-index composition passes Lint.
+Mismatched branches and forged refinements fail. Evidence follows checked rules;
+it does not rely on `unsafeCoerce` or plugin axioms.
+
+### M5: execute through the existing backend
+
+The [lowering audit](CORE.md#lowering-audit-for-m5) specifies the restricted
+CorePrep-to-STG path. It preserves native type metadata and checks each runtime
+argument's representation before bytecode generation.
+
+- [x] Carry the restricted extension through the minimum mandatory Core pipeline.
+- [x] Update CorePrep and CoreToStg to preserve native typing and erase virtual
+      proof binders. The retained Boolean remains one ordinary runtime argument.
+- [x] Reject unsupported forms explicitly. Do not silently pass them to the backend
+      or enable transformations that violate their invariants.
+- [x] Inspect Core and STG for duplicate witnesses and inserted forcing.
+
+Gate: native examples execute with the specified values and termination behavior
+through a restricted pipeline. This does not establish optimizer safety. Even an
+unoptimized build runs mandatory transformations that need an audit.
+
+The restricted entry is `hscCompileCoreExpr` through bytecode. It skips ordinary
+simplification and forces Core Lint before and after CorePrep, then STG Lint.
+CorePrep disables speculative evaluation and optional argument arity analysis.
+It keeps a lazy local index when its RHS cannot replace an index. The boundary
+scanner includes synonym definitions and original arguments. M5 retains the
+normal program, optimizer, and interface gates. JavaScript and native machine-code
+execution are outside M5. M8 adds a separate checked module entry.
+
+`NativeDependentCoreRun` supplies both Boolean values through one compiled worker.
+It covers `choose`, shared `keep`/`choose`, retained eta expansion, partial
+`keepSelect bottom`, fully applied dictionary-index `keep bottom`, a lazy local
+index from a global thunk, and strict `choose bottom`. See [validation](README.md#native-execution).
+
+### M6: preserve dependencies through optimization
+
+The first increment uses an explicit restricted SimpleOpt entry. It omits
+occurrence analysis, general inlining, dead-binding removal, and eta reduction.
+These passes do not yet preserve runtime indices. Beta reduction must substitute
+the same supported Boolean argument in terms and types. A literal Boolean case
+can replace its branch proof with checked nominal reflexivity. Constructor
+knowledge from an unfolding cannot justify that replacement for an opaque index.
+Keep variable cases and lazy producer bindings. Require Core Lint before and
+after this step in the bytecode entry.
+
+This restricted entry is implemented at `0bbc32d396`. The registered Core API
+and bytecode regressions passed. The default rebuild and ordinary smoke checks
+also passed. The broader optimizer tasks below remain open.
+
+PMC now recognizes a known retained function head without rewriting its domain
+and codomain. It also preserves an ordinary function head that contains a
+retained type. The immutable matcher handles whole-type templates with its
+existing scope checks and a retained-aware occurs check. Unsupported retained
+comparisons remain `MaybeApart`; this matcher does not construct Pi congruence.
+Source regressions check strict partial applications and located incomplete
+empty-case diagnostics.
+
+The fixed-domain congruence increment adds `DepFunCo Id Coercion`. It binds one
+shared `Many` runtime index under an unchanged supported closed domain. Both
+body endpoints have kind `Type`. The proof inherits its body's FC role and keeps
+the binder scoped through intermediate proof types. Each endpoint separately
+canonicalizes a vacuous binder to an ordinary arrow. Keep value casts instead
+of eta-expanding a partial function. See
+[the Core rule](CORE.md#fixed-domain-retained-congruence) and
+[the Agda and D/DC provenance](REFERENCES.md#agda-provenance).
+
+- [x] Add binder-aware coercion substitution, lifting, free variables, zonking,
+      tidying, and Lint checks. Preserve proof-only index dependencies.
+- [x] Transport constructed arguments through a remaining fixed-domain retained
+      function result in CorePrep. Preserve function WHNF and delayed payloads.
+- [x] Check signed source `appendAfterSuccessor n = appendNative @Int (S n)`
+      with one source pattern, then apply its remaining arguments.
+- [x] Pass bootstrap kernel and runtime regressions. The interface-only consumer
+      checks 26 observations. Unsigned aliases still report located GHC-83605.
+- [x] Complete both-stage, registered regression, and separate CLI verification.
+      Five registered regressions pass. Separate CLI checks cover 26 interface
+      observations, eight partial/application observations, and nine standalone
+      observations. Strictness, diagnostics, format rejection, guide, and ordinary
+      compiler smoke checks pass. See the [checkpoint](README.md#fixed-domain-retained-congruence).
+
+General Pi matching, ambient-evidence normalization, changed domains or multiplicities,
+dependent erased binder kinds, and native coercion unfolding serialization
+remain gated. Non-reflexive eta-cast handling also remains unsupported.
+
+The next increment normalizes family axioms under the fixed-domain retained
+binder. See [the Core contract](CORE.md#family-axiom-normalization-under-retained-binders)
+and [the pinned Agda sources](REFERENCES.md#agda-provenance).
+
+- [x] Normalize the Core body under a scoped lifting context. Permit only shared
+      valid same-domain variable alpha-renaming for runtime indices.
+- [x] Add `mkDepFunRedn` and canonicalize both endpoints independently. Preserve
+      intermediate proof dependencies beneath the runtime binder.
+- [x] Add solver `re_native_binder` mode. Keep global family axioms, ordinary
+      meta-variable reading, roles, reduction depth, and locations. Suppress
+      plugins, inert lookup, family-cache reads and writes, and coercion zapping.
+- [x] Compile the bootstrap compiler in 2m10s. Logs use `native-pinorm` in
+      `_build/verification/`.
+- [x] Verify the kernel normalization checks and signed aliases with no source
+      argument patterns: `leftUnit = nativeId`, `leftUnitAppend = appendNative @Int`,
+      and `constantAlias = ordinaryNat` after reducing `ConstantNat`.
+- [x] Verify 17 dedicated source observations and 38 imported observations
+      (26 previous observations plus 12 new normalization observations).
+- [x] Reject opaque `Add n Z` right-unit transport with GHC-83865 and report
+      reduction-depth failure with GHC-40404. Check roles and binder freshening.
+- [x] Complete both-stage, registered, CLI, guide, and ordinary smoke validation.
+      The CLI checks the actual RHS lines for GHC-83865 and GHC-40404.
+      All five registered regressions pass. See the
+      [verified checkpoint](README.md#family-axiom-normalization).
+
+This increment leaves ordinary `ForAllTy` binder-kind handling unchanged.
+Family axioms reduce at nominal and representational roles; phantom family
+heads remain unreduced. Ordinary forall binder kinds normalize at nominal role.
+After rewriting both equality endpoints, recheck same-Id index reflexivity and
+`tcEqType` equality of retained functions. The existing rewriting evidence
+justifies this step. See Note [Reflexivity after retained normalization].
+This adds neither structural retained decomposition nor meta-variable assignment.
+Full scoped rewriting with ambient Given or plugin evidence remains future
+work. Do not replace actual family reductions with a reflexive bypass.
+
+The audit found separate blockers in the full simplifier. Its type substitution
+can omit runtime Id mappings. Its case reconstruction treats virtual proofs as
+constructor fields. Occurrence analysis does not track runtime index scope.
+Keep the ordinary optimizer gated until those rules are implemented. Agda supplies
+the application and constructor rules; Haskell's bottom and `seq` constrain which
+reductions preserve behavior. See [decision provenance](REFERENCES.md).
+
+- [ ] Audit simplification, beta/eta transformations, inlining, unfoldings, and
+      substitution into types and coercions.
+- [ ] Audit case simplification, case-of-case, join points, occurrence analysis, and
+      let floating. A binder used only in a type still has a scope dependency.
+- [ ] Audit demand analysis, worker/wrapper, specialization, and arity changes.
+      Preserve laziness and the fixed runtime representation restriction.
+- [ ] Enable transformations in bounded steps. Run Core Lint after each relevant
+      pass and compare optimized and unoptimized behavior.
+
+Gate: the Boolean examples pass at `-O0` and `-O2` with Core Lint. Record which
+transformations were exercised and which remain gated. A passing executable does
+not establish safety for untested forms.
+
+### M7: expose the restricted source language
+
+Start this task with the local experimental flag
+`ExperimentalDependentTypes`. It is disabled by default and implies no other
+extensions. Reserve `foreach` only when the flag is enabled. Parse its telescope
+into a distinct `HsForEachTy` node. Do not reuse an erased `HsForAllTy` node.
+Preserve source annotations, printing, and AST traversal. The initial syntax
+increment rejected all retained types. Keep GHC-43582 for source positions that
+remain unsupported: "Retained quantification is not supported in this type position yet."
+Keep `foreach` available as an ordinary identifier when the flag is disabled.
+Check parsing and printing through the existing native Core API regression.
+Add source regressions for the diagnostic and the flag-disabled identifier.
+
+The checking increment implements one complete monomorphic Boolean signature,
+one bare retained variable pattern, and value application. It uses the existing
+checked bytecode entry. The constructor increment adds source `choose`, a
+constructor-based consumer, and composition under one runtime Boolean.
+
+The constructor increment checks exactly one unguarded equation for each Boolean
+constructor. It specialises later argument types and the result, following
+Agda's pattern-context substitution. It uses explicit argument and result casts,
+with branch proofs in the existing typed constructor pattern. A generated
+`AsPat` preserves one runtime Id across the equations. Later arguments require
+bare variable patterns and unrestricted multiplicities. The source target
+is `observe b (keep b (choose b))`, with one shared runtime Boolean. Source
+dependent `case` expressions use the context-refinement rule below.
+
+- [x] Add an experimental opt-in flag, syntax, AST representation, and diagnostics.
+- [x] Support native zonking, rigid signature generalization, scoped validity,
+      opaque index rewriting, and same-Id equality for the first source rule.
+- [x] Extend renaming and checking for explicit retained Boolean signatures.
+      Track one runtime binder when it occurs in both terms and types.
+- [x] Start with one equation and a bare retained variable pattern. Reuse its
+      renamed `Name` in the expected type and existing pattern/desugaring path.
+      Support native zonking and require an identity result wrapper.
+- [x] Elaborate constructor and retained-variable applications into native Core.
+- [x] Elaborate dependent Boolean constructor equations and source `choose`.
+- [x] Accept ordinary runtime Booleans under shared bindings. Reject unsupported
+      index expressions and inferred aliases with precise diagnostics.
+- [x] Update source printers and extension documentation.
+
+Gate: the source target and a runtime-unknown Boolean example compile and execute
+directly. Their implementation uses no singleton ABI or reification step. These
+checks pass through the bootstrap API and rebuilt compiler at `dfe9637939`.
+The default both-stage rebuild and all five registered normal-way checks pass.
+The source `case` increment derives a motive from a checked result type.
+It generalizes referenced dependent locals as later arguments of a fresh
+retained pattern function, then applies that function to the original values.
+Constructor substitution refines both the result and those argument types.
+This follows Agda's dependent case combinator and context generalization.
+See [the provenance](REFERENCES.md) and Note [Source retained case refinement].
+The current rule requires a named local scrutinee, complete unguarded constructor
+clauses, bare fields, unrestricted captures, and a lifted checked result.
+Parentheses are accepted.
+Quotations, guards, defaults, nested patterns, and general motive inference
+remain outside this rule. Ordinary cases retain their existing checker.
+
+### M8: support interfaces and validate the compiler change
+
+Start with an ordinary single-module executable at `-O0`. Keep native workers
+local to an ordinary `main :: IO ()`. Omit interface pragmas and simplified Core
+while native interface serialization remains gated. This checks machine-code
+execution before adding cross-module transport; it does not satisfy the interface
+gate below.
+
+The module path uses a checked native branch before `core2core`, native
+SimpleOpt over RHSs with top-level identities preserved, and Core Lint around
+module tidying. Program CorePrep needs an explicit native opt-in with speculation
+and optional arity analysis disabled. Force Core Lint before and after CorePrep,
+then STG Lint. Program CorePrep skips ordinary occurrence analysis in
+`deFloatTop`. Keep profiling, plugins, and optional STG transformations outside
+this first path. Gate native-containing unfolding construction before its
+ordinary optimizer calls. Reuse the existing CoreToStg erasure rule. The
+bootstrap API and self-hosted CLI now compile, link, and run the ordinary source
+executable with the shared Boolean and bottom observations. The default
+both-stage build and all five registered normal-way tests pass at compiler
+source commit `300eefffd1`. Eight negative cases require the expected unsupported
+phase instead of accepting a generic failed load or panic. See the validation
+details in [the status](README.md#ordinary-executable-integration).
+
+Handle native interface signatures and expression unfoldings separately. Encode
+runtime binders and occurrences through the interface's local Id environment,
+not its TyVar environment. Preserve existing DataKinds constructor encoding.
+Reconstruct Boolean alternative proofs from the scrutinee and constructor, then
+check the resulting Core. New type tags require an explicit format distinction:
+the original decoder treated unknown tags as literals, and the header version does
+not identify a source commit. Check real file round trips in fresh processes,
+fingerprints, malformed scope/proof rejection, and cross-module execution.
+
+Use the existing whole-file version check before enabling the new wire tags.
+Give the fork a deliberately distinct configured snapshot version and rebuild
+matching target libraries. Record the exact chosen version and old-reader
+rejection. Snapshot dates do not distinguish incompatible builds made on the
+same day. Do not use profile tags as schema versions: `IgnoreHiWay` bypasses
+that check. Reject unknown type tags explicitly in the new reader as well.
+
+The signature increment uses `VERSION_DATE` set to `20261112.1`. Configure the
+fork as `10.1.20261112.1`; its existing header version becomes `1001202611121`.
+The final component distinguishes this native format from an ordinary dated
+snapshot. Rebuild matching libraries. Preserve an old reader and interface to
+check both version-mismatch directions, including `IgnoreHiWay`.
+
+Encode a retained binder as `IfaceIdBndr` and its body. Encode index occurrences
+as local Id names. Keep raw free Ids in a diagnostic-only form. Decode the domain
+and multiplicity outside the binder scope, then allocate a fresh Bool/Many Id
+for the body. Require result kind `Type`, not `Constraint`. Test real binary
+round trips with sharing, fresh identities, tidied nested binders, malformed
+scope and annotations, and unknown tags. Keep native unfoldings gated while
+enabling signature-only cross-module calls through the ordinary object ABI.
+
+Signature transport now passes the binary-table checks, actual `.hi` imports,
+cross-module execution in fresh contexts and separate CLI processes, concrete
+constructor applications, and old/new header rejection. Both compiler stages
+build with the new version. The ordinary compatibility smoke and all five
+registered normal-way tests pass. See
+[the validation results](README.md#native-interface-signatures).
+
+Use the existing declaration dependency fingerprints for retained signatures.
+The consumer imports `choose` and `keep` without naming `Select`. Rebuild the
+producer with fresh runtime Ids, then change only a function body with unfoldings
+omitted. Require stable module and declaration ABI hashes and skipped consumer
+code generation. Next, change `Select True` from `Int` to `Bool` without changing
+the text of the retained signatures. Require changed `choose` and `keep` hashes,
+an unchanged independent-function hash, and a located `GHC-83865` when the
+unforced consumer compile rechecks its stale `Int` application. Use fresh
+one-shot contexts and separate producer sources and interface search paths.
+The bootstrap and all five registered normal-way tests pass. See the
+[fingerprint validation](README.md#signature-fingerprints-and-recompilation).
+
+For native unfoldings, first extend expression reconstruction under the existing
+module gate. Reconstruct a Boolean alternative's virtual CoVar from its
+scrutinee index and promoted constructor. Preserve ordinary binder-free Boolean
+alternatives. Check malformed binder counts, unsupported scrutinees, scope, and
+coverage with precise interface errors. Reject branch-local result escape before
+`coreAltsType` can panic. Require Core Lint for each native imported unfolding,
+including nested unfoldings, even when optional interface linting is disabled.
+Compare its recovered type with the declared signature. Classify native forms
+in either the RHS or the declared signature.
+
+Do not enable the unfolding writer after changing only the alternative codec.
+`mkCoreUnfolding` runs ordinary occurrence analysis on its template. Introduce a
+checked construction path that preserves runtime index dependencies. Its scan
+must include stable unfolding/rule/dictionary metadata that occurrence analysis
+would traverse. Leave unused unstable unfolding templates deferred. Use a
+separate own-RHS scan for deferred native validation. Gate native rule and
+dictionary payloads before their ordinary occurrence-analysis paths. Preserve
+the lazy RHS contract from `Note [Lazily checking Unfoldings]` and the cached
+fields from `Note [Tying the 'CoreUnfolding' knot]` in `GHC.IfaceToCore`.
+Validate expression round trips and malformed proofs before enabling module
+unfoldings. Then test actual imported templates and cross-module execution.
+
+This expression-table and declaration-reconstruction increment adds no wire
+constructors. Normal module unfolding generation remains gated. Low-level
+`writeIface` and `writeBinIface` APIs can construct files outside that gate.
+Before enabling module generation, give proof-bearing expression interfaces a
+new format distinction and verify rejection by the signature-only fork reader.
+Do not claim compatibility with the old `.1` reader for such expression bodies.
+
+- [x] Compile and run the source target as an ordinary vanilla executable through
+      checked module simplification, tidying, CorePrep, and machine-code lowering.
+- [x] Encode retained signature binders and indices with scoped local Id names.
+- [x] Check signature round trips, disk imports, cross-module calls, and version rejection.
+- [x] Check signature fingerprints and recompilation after a producer signature change.
+- [x] Check expression-table reconstruction, deferred template validation, and lazy
+      native unfolding construction through the GHC API.
+- [ ] Emit native expression unfoldings in actual module interface files with a
+      distinct format version.
+- [ ] Check imported unfoldings and malformed proof rejection.
+- [ ] Add focused compiler regression cases. Reuse existing testsuite conventions
+      and golden tests where appropriate.
+- [ ] Run relevant type-checker, simplifier, interface, and code-generation tests.
+      Rebuild and bootstrap the compiler with the feature disabled.
+- [ ] Record exact revisions, commands, results, and proof boundaries.
+- [ ] Before publication, add the required changelog fragment with actual issue
+      and merge-request references. Follow the
+      [changelog guide](../../utils/changelog-d/README.md).
+
+Gate: the experiment works across modules, ordinary programs remain compatible,
+and the modified compiler builds itself. General dependent Haskell remains further
+work.
+
+### M9: runtime natural numbers and indexed vectors
+
+Source checkpoint `714689a2fa` extends the verified Core checkpoint
+`df623104fd`. It adds structural domains, outer erased quantification,
+retained telescopes, actual constructor fields, and immutable instantiation.
+The bootstrap API now passes source replication, append, polymorphic head,
+retained telescopes, and the partial/cyclic/bottom observations. It also compiles
+and links a fresh one-shot Nat/Vec consumer from actual producer interfaces and
+objects. The configured signature format is now `10.1.20261113.1`. Both-stage
+builds, registered self-hosted tests, separate CLI processes, and both directions
+of format rejection pass. Checked CorePrep constructor-argument transport now
+passes bootstrap execution, including nested fields, dependent payloads, and
+two retained indices. Native unfolding bodies remain separately gated.
+
+The next source target goes beyond Boolean selection. Support first-order
+algebraic runtime indices, with a user-defined Peano `Nat` and length-indexed
+`Vec` as the first program. Use ordinary promoted constructors for constructor
+indices. A runtime input remains a retained value. Do not add singleton conversion.
+Keep fixed lifted runtime representations and the checked `-O0` pipeline while
+the broader optimizer work in M6 remains open.
+
+```haskell
+data Nat = Z | S Nat
+
+data Vec a (n :: Nat) where
+  VNil  :: Vec a Z
+  VCons :: a -> Vec a n -> Vec a (S n)
+
+type family Add (n :: Nat) (m :: Nat) where
+  Add Z m = m
+  Add (S n) m = S (Add n m)
+
+replicate :: forall a. foreach (n :: Nat) -> a -> Vec a n
+replicate Z x = VNil
+replicate (S n) x = VCons x (replicate n x)
+
+append :: forall a.
+          foreach (n :: Nat) -> foreach (m :: Nat)
+       -> Vec a n -> Vec a m -> Vec a (Add n m)
+append n m xs ys = appendVec xs ys
+
+appendVec :: Vec a n -> Vec a m -> Vec a (Add n m)
+appendVec VNil ys = ys
+appendVec (VCons x xs) ys = VCons x (appendVec xs ys)
+
+head :: forall a. foreach (n :: Nat) -> Vec a (S n) -> a
+head n (VCons x _) = x
+```
+
+These signatures and definitions now pass the bootstrap source runtime checks.
+The result uses the caller's actual runtime index. A number read from input can
+select a vector length without an explicit existential package. `Add` uses
+ordinary closed-family equations; this does not require arithmetic SMT solving.
+The ordinary GADT helper keeps append independent of runtime length evaluation.
+Its constructor pattern exposes an erased predecessor index, not a runtime Nat.
+The retained wrapper must instantiate the helper with the caller's runtime
+indices. `replicate` supplies the actual predecessor value through its Nat
+pattern. See [the Agda Nat/Vec references](REFERENCES.md#agda-provenance).
+
+- [x] Generalize native index kinding and identifier validation from `Bool` to
+      supported lifted algebraic domains. Keep scope and multiplicity checks.
+- [x] Represent saturated constructor indices such as `S n`. Preserve their
+      runtime field identities through substitution, tidying, and type recovery.
+- [x] Refine constructor alternatives with both real fields and a virtual proof.
+      Preserve the fields at runtime. Erase only the checked proof.
+- [x] Check recursive Core for vector replication with an unknown runtime Nat.
+      This is an intermediate gate; it does not complete the source target.
+- [x] Extend frontend checking to scoped constructor-field indices, outer type
+      quantification, and multiple retained binders. Support safe GADT constructor
+      instantiation without allowing a runtime index to escape through a metavariable.
+- [x] Compile and run the source `replicate` target, then source `append`, with
+      actual input values. Preserve the same index across producer and consumer.
+- [x] Reject inconsistent vector lengths and escaping predecessor indices with
+      located diagnostics. Check lazy recursive fields and unused index arguments.
+- [x] Transport the resulting signatures and programs across modules. Keep format
+      compatibility and any unfinished M8 unfolding work explicit. Pin a new
+      configured format before emitting Nat signatures and check `.1` rejection.
+- [x] Transport constructor-tree arguments with fields through CorePrep naming.
+      Keep later payload types and the final result at the original index.
+      Preserve proof scope and laziness. Check prepared Core and STG. Keep
+      changed-domain congruence and unsupported expression codecs gated.
+
+Gate: a source program reads runtime lengths, constructs and appends vectors,
+and consumes the statically indexed results. Check empty and successor inputs.
+Check that observing the first element of a replication at `S undefined` does
+not force its predecessor. A hand-built Core example alone does not satisfy M9.
+
+Resolve these preservation rules in the implementation:
+
+- In source pattern lowering for `S k`, put the actual field binder before the
+  virtual proof that mentions it. The current `cpt_dicts` insertion precedes
+  runtime fields and is insufficient. Preserve ordinary GADT evidence positions.
+- Apply the structural Core domain check in the frontend. Start with closed,
+  promotable, first-order data domains. Preserve lazy fields.
+  Exclude existential, constrained, newtype, and unboxed index constructors in
+  this increment. Do not give the user-defined `Nat` a wired compiler identity.
+- Introduce the complete retained telescope before transporting an equation's
+  ordinary argument and result types. Variable equations walk their supplied
+  patterns and may leave a retained function result. Constructor equations still
+  split one leading retained index. Transport across a remaining retained
+  function now uses `DepFunCo` under its unchanged closed domain and `Many`
+  binder. Changed domains and dependent erased binder kinds remain unsupported.
+- Give GADT instantiation an explicit runtime-index scope rule. The current
+  metavariable guards are intentional. Removing them without a scope check can
+  let a predecessor escape. Evaluate expected-result constructor instantiation
+  and scoped meta-assignment against Agda's context rules.
+- Check CorePrep naming of constructor arguments. Naming `f (S k)` as
+  `let t = S k in f t` changes its recovered index to `TermVarTy t`. Specify and
+  check alias transport before claiming end-to-end constructor-argument support.
+  Do not use an unchecked cast or equality from an unfolding. The implemented
+  DEFAULT rule binds an equality between a fresh case binder and the exact
+  scrutinee index. CorePrep emits it only for constructor WHNF. It names nested
+  fields recursively and composes their proofs. It transports later payloads
+  and the result across the supplied telescope. CorePrep preserves proof scope,
+  and CoreToStg erases the virtual proof explicitly. A result-only cast is
+  insufficient. A remaining fixed-domain retained function now uses `DepFunCo`.
+  Preserve a cast on the partial function value; eta expansion can hide bottom.
+  The `lazy`/`noinline`/`nospec` stripping path can still bypass preprocessing.
+  Known partial-function heads now pass PMC without component rewriting.
+  Source tests require a located incomplete-pattern diagnostic for an empty
+  match on such a function. Check saved constructed partial results at unknown,
+  bottom, and cyclic indices, then apply their later payloads. Do not catch
+  panics or disable PMC in tests.
+  The Agda let and dependent ANF references describe the preservation problem;
+  they do not prove this proposed FC rule or its Haskell strictness behavior.
+- Preserve partial and cyclic Haskell values. Check finite vector prefixes for
+  `let n = S n`, a head from `replicate (S bottomNat) x`, and failure when its
+  remaining spine needs `bottomNat`. Check `head bottomNat (VCons x undefined)`
+  returns `x`. Agda's termination assumptions do not establish these properties.
+
+Use one compiled worker with unknown `n` and `m` from IORefs. For lengths two
+and three, `append n m (replicate n 42) (replicate m 7)` must observe
+`[42,42,7,7,7]`. Also check zero and successor inputs. Reject a constant `VNil`
+at unknown `n`, a vector at `n` where `S n` is required, and an unrelated runtime
+index. Keep `Add n m` distinct from `Add m n` without a supplied proof.
+
+### Arithmetic proof increment
+
+Use the existing lifted `:~:` datatype to prove `Add n Z :~: n` by induction
+on a retained runtime Nat. Transport a vector only after matching `Refl`.
+Follow [the pinned Agda and singletons sources](REFERENCES.md#arithmetic-equality-proofs).
+
+- [x] Select immutable constructor type arguments from the expected result.
+      Keep full ordinary result checking, kind checks, and runtime-index scope.
+- [x] Run finite proofs and vector transport at unknown lengths 0, 2, and 3.
+      Check direct source execution and interface-only imported execution.
+- [x] Preserve ignored proof and index thunks, including bottom and cyclic input.
+      Check proof failure before vector-payload failure. Keep partial transport lazy.
+- [x] Reject unproved equalities, unused proof arguments, and branch-evidence escape.
+- [x] Complete both-stage build, existing registered regressions, CLI, and guide checks.
+
+See [the Core contract](CORE.md#arithmetic-equality-proofs). This increment adds
+no equality axiom, Core form, singleton wrapper, or interface format change.
+Ambient-evidence normalization under Pi and general retained inference remain open.
+
+### Generic consumer increment
+
+Infer ordinary erased type arguments from values whose types contain retained
+indices. Start with named argument spines and preserve ordinary expected-type
+checking. Follow [the scoped Agda application sources](REFERENCES.md#generic-retained-argument-inference).
+
+- [x] Extend the existing cache with read-only native argument classification.
+      Keep complete immutable matching, kind and scope checks, and subsumption.
+- [x] Check proof and vector consumers, nested `id` and `const`, and retained
+      function values. Preserve ignored bottom and cyclic arguments.
+- [x] Check linear proof use once and reject duplicated use with GHC-18872.
+- [x] Complete the self-hosted regressions and interface-only CLI execution.
+- [x] Check ordinary bidirectional typing and one Template Haskell expansion.
+- [x] Compile the guide and finish ordinary smoke and formatting checks.
+
+See [the contract](CORE.md#generic-retained-argument-inference). Native
+meta-variable assignment and broader application inference remain open.
+
+### Class consumer increment
+
+Use ordinary class instances for retained proof and vector types. Follow the
+[Agda instance-context sources](REFERENCES.md#retained-class-consumers).
+
+- [x] Match the ordinary argument and result types after the constraint prefix.
+      Keep the substituted prefix for ordinary dictionary instantiation.
+- [x] Put evidence bindings at the application, below its runtime index binders.
+      Keep enclosing Givens and report residual native constraints in scope.
+- [x] Support native type-map keys with scoped equality. Check singleton and
+      trie representations, alpha-equivalence, distinct indices, and map operations.
+- [x] Check proof and vector `Show`, multiple native dictionary keys, and lazy
+      consumers at bottom and cyclic indices. Keep Core and STG Lint enabled.
+- [x] Reject missing instances and transport without equality evidence at the
+      source location. Check ordinary class and inference controls.
+- [x] Complete registered regressions, interface-only execution, guide, smoke,
+      formatting, and the checkpoint.
+
+Native maps are implemented at `1b37399cd5`; scoped class consumers at `17740f7135`.
+See [the contract](CORE.md#retained-class-consumers) and the
+[verified results](README.md#ordinary-class-consumers). Source-written native
+class contexts are covered by the next increment. General meta-variable scope
+and broader inference remain open.
+
+### Source context increment
+
+Check ordinary class and equality contexts after a retained binder. For example,
+`foreach (n :: Nat) -> Show (Vec Int n) => Vec Int n -> String` must use an
+incoming dictionary under the runtime `n` binder. Follow the
+[Agda telescope and instance-pattern sources](REFERENCES.md#source-retained-constraints).
+
+- [x] Admit class and equality predicates through the existing validity checks.
+      Check constraint-tuple aliases too. Keep native quantified and irreducible
+      predicates gated with located errors.
+- [x] Split a variable-prefix equation at its first context. Check its remaining
+      patterns, guards, and local bindings under the ordinary evidence lambdas.
+- [x] Keep constructor equations at full value and dictionary arity before the
+      case. Transport incoming dictionaries with the existing constructor proof.
+      Include trailing contexts. Scope evidence over the whole match and local bindings.
+- [x] Check incoming Givens without global instances, equality transport, and
+      partial application at bottom and cyclic indices. Check rejection locations.
+- [x] Complete both-stage builds, registered regressions, interface-only execution,
+      ordinary controls, guide, smoke, formatting, and the checkpoint.
+
+Use the existing Core forms and dictionary ABI. Keep the current native signature
+interface format. Inner retained lambdas and general retained inference remain
+separate work. The split requires nonforcing prefix patterns when value patterns
+remain. This case also excludes `Strict`. A trailing context keeps the old prefix
+shapes. Constructor equations keep their existing coverage and pattern limits.
+See [the contract](CORE.md#source-retained-constraints).
+Implementation: `670bcef166`. See the
+[verified results](README.md#source-retained-constraints).
+
+### Source case evidence follow-up
+
+Native source cases generalize captured values and incoming index-dependent
+Givens over a fresh index. The no-instance `OnlyGiven n` control now passes when
+its case specializes a captured `Vec Int n`. It previously failed with located
+GHC-39999, while equivalent constructor equations passed.
+
+- [x] Pass index-dependent Givens with the generalized case captures. Transport
+      them with each branch proof and preserve the full function arity.
+- [x] Record lexical native evidence parameters at their scope entry. Preserve
+      enclosing parameters in nested scopes. Exclude them inside static forms.
+      Save and restore the evidence at an arrow scope boundary.
+      Restore bracket-entry evidence when checking a nested typed splice.
+- [x] Generalize predicates with native type substitution. Pass the original
+      evidence after the index and before captured values. Handle CoVars through
+      evidence applications and coercion transport.
+- [x] Check no-instance dictionaries, derived tuple evidence, equality, nested
+      cases, local bindings, and partial application through explicit source cases.
+- [x] Complete both-stage builds, registered regressions, interface-only
+      execution, ordinary controls, formatting, and the checkpoint.
+
+Follow Agda's dependent-context generalization and instance-binder scope. Use
+GHC's existing evidence representation and checked branch proofs. See
+[the case contract](CORE.md#explicit-case-evidence) and
+[the pinned compiler sources](REFERENCES.md#source-case-evidence).
+Implementation: `fe7329d1b6`. See the
+[verified results](README.md#source-case-evidence). Broader case patterns,
+general retained inference, structural Pi unification, native coercion unfolding
+codecs, and ordinary optimization remain open.
+
+### Checked retained lambdas
+
+A complete native signature checks named equations and anonymous lambdas through
+one retained match dispatcher. Previously, the lambda form failed with GHC-83865.
+
+- [x] Share the retained telescope and constructor dispatcher. Preserve invisible
+      patterns, source match contexts, and named-binding usage scaling.
+- [x] Check anonymous lambdas under their ambient usage. Keep ordinary lambda
+      checking and inference unchanged.
+- [x] Check outer erased binders, nested lambdas, later retained binders, source
+      contexts, and both constructor lambda forms.
+- [x] Check source arity at bottom and cyclic indices. Preserve linear usage and
+      located diagnostics for invalid branches and unsupported inference.
+- [x] Preserve the runtime binder and strictness for empty-domain lambda-cases.
+      Keep empty source cases in their original context.
+- [x] Complete both-stage builds, registered regressions, separate module
+      execution, ordinary controls, formatting, and the checkpoint.
+
+Follow [the contract](CORE.md#checked-source-lambdas) and
+[Agda's expected-Pi and extended-lambda rules](REFERENCES.md#checked-retained-lambdas).
+This step does not enable retained syntax in new type positions or general native
+metavariable assignment. Keep broader inference and optimizer gates.
+Implementation: `a0c493d5f9`. See the
+[verified checkpoint](README.md#checked-retained-lambdas).
+
+### Explicit higher-order arguments follow-up
+
+Admit a retained function type in an ordinary argument position:
+`applyAt :: foreach (n :: Nat) -> (foreach (m :: Nat) -> Vec Int m -> Vec Int m)
+-> Vec Int n -> Vec Int n`, with `applyAt n f xs = f n xs`.
+The parameter `f` is an ordinary closure argument. It is not a runtime index.
+
+- [x] Admit this nested type in complete value signatures. Preserve each nested
+      binder's scope. Keep type-level declaration and index-domain restrictions.
+- [x] Admit ordinary-leading arrow signatures through the same traversal.
+      Reject partial signatures even when their wildcard is outside the Pi.
+- [x] Project both ordinary arrow arguments and results for ambiguity checking.
+      Keep erased payload polymorphism and real signature types intact.
+- [x] Check named functions and lambdas against the supplied argument type.
+      Use the existing application checker and checked-lambda rule.
+- [x] Instantiate ordinary helpers from a known retained function result with
+      immutable type arguments. Preserve a genuine bottom closure. Check `id`
+      around a lambda under a complete expected type.
+- [x] Lift checked constructor proofs through fixed-domain retained closure
+      types. Check constructor clauses and explicit case with captured indices.
+      Preserve binder scope and transport with casts instead of eta expansion.
+- [x] Verify separate-module execution with unknown runtime indices. Check that
+      ignoring a bottom function stays lazy. Check unused bottom indices too.
+- [x] Reject wrong vector lengths, escaping indices, unsupported domains, and
+      function-valued runtime indices with located diagnostics.
+- [x] Keep inferred aliases, general native meta assignment, Quick Look, and
+      structural Pi unification gated. Test explicit outer erased polymorphism.
+- [x] Complete both-stage builds, registered regressions, separate CLI checks,
+      formatting, and the verified checkpoint.
+
+The renamer and signature checker traverse ordinary arrow arguments and results.
+Core Lint and validity check each contained retained telescope recursively.
+Agda's expected-argument and scoped-Pi lambda rules provide the checking
+precedent. See [the pinned sources](REFERENCES.md#explicit-higher-order-arguments).
+Follow [the higher-order contract](CORE.md#explicit-higher-order-closure-arguments).
+Implementation `64044341e8` and `94d7d8f2f3` pass the
+[verified checkpoint](README.md#higher-order-retained-closures).
+
+### Expected-type instantiation of retained workers
+
+Use a complete expected retained function type to infer the outer erased
+parameters of a known worker. Accept `applyAt @Int n lambdaId xs` and a fully
+signed `alias = lambdaId` without requiring `lambdaId @Int`.
+
+- [x] Add an opt-in immutable Core matcher. Preserve existing entry points,
+      unification, and apartness behavior.
+- [x] Compare valid same-domain retained binders under paired renaming and
+      bound-variable escape tracking. Preserve family and multiplicity rules.
+- [x] Add a separate known-native-worker expected-result route. Require NoQL,
+      complete kind/scope-valid type arguments, exact result equality, actual
+      type applications, preserved constraints, and final subsumption.
+- [x] Check alpha-renamed/nested binders, rigid outer indices, repeated payload
+      agreement, contexts, and a genuine bottom worker without eta expansion.
+- [x] Reject captured inner indices, mismatched domains, and inconsistent
+      payloads. Keep inferred aliases and general native meta assignment gated.
+- [x] Verify runtime and interface-only clients, located diagnostics, both-stage
+      builds, registered regressions, compatibility, formatting, and source hashes.
+
+Follow Agda's expected-result implicit insertion and shared-context Pi comparison.
+Use an immutable substitution in this GHC increment. Agda's contextual mutable
+metas require separate scope machinery. See
+[the pinned sources](REFERENCES.md#expected-type-instantiation-of-retained-workers).
+Implementation `dae037074c` passes the
+[verified checkpoint](README.md#expected-type-instantiation-of-retained-workers).
+
+### M10: retained constructor field telescopes
+
+Package a runtime Nat with a vector indexed by that same field. Follow Agda's
+ordinary dependent constructor telescope. Reuse native Core Pi and index forms.
+The full source target is:
+
+```haskell
+-- Compiles and runs in the source package example.
+data PackedVec a where
+  PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a
+
+withPacked :: PackedVec a ->
+              (foreach (n :: Nat) -> Vec a n -> r) -> r
+withPacked (PackVec n xs) k = k n xs
+```
+
+- [x] Inspect Agda Sigma, record/constructor checking, application and LHS
+  substitution. Record pinned sources and the historical DataCon difference.
+- [x] Add optional retained field binders to DataCon metadata. Preserve the old
+  builder API and ordinary knot laziness. Rebuild worker and wrapper Pi types.
+  Validate ordered scope, fixed domains, multiplicity, representation restrictions
+  and result nonescape. Keep runtime fields out of erased existentials.
+- [x] Instantiate Core pattern fields sequentially. Substitute actual field Ids
+  in later field types. Check fresh identities, field count, dependent payload
+  identity and result nonescape in Core Lint. Add existing-fixture API coverage.
+  Flat instantiated-field APIs reject retained metadata. Interface declarations
+  now preserve field scope in the codec step below. Even a vacuous retained constructor
+  stays outside native index domains. The API fixture checks nested Pi capture,
+  scoped consumption and repackaging with a dictionary-function payload.
+- [x] Verify the Core checkpoint in both compiler stages and the bootstrap API,
+  registered tests, runtime fixture and standalone compatibility controls.
+  Record the corrected source-gate harness separately from the first combined
+  CLI invocation. See [the verified checkpoint](README.md#retained-constructor-field-checkpoint).
+- [x] Preserve the telescope in interface declarations. Reject malformed scope
+  and unsupported promotion with interface diagnostics. Version the format if
+  the serialized declaration changes. Keep existing archives immutable.
+  Encode aligned optional local names. Decode with fresh sequential Ids and
+  deferred field checks. Expose metadata before recursive domain validation.
+  Check duplicate/forward/self/inherited references, vacuous binders, distinct
+  names after tidying, sibling scope and repeated imports. Preserve an immutable
+  version-1 reader before configuring version 2. Verified binary declaration
+  round trips, recursive-domain rejection and both header-version directions.
+  See [the interface checkpoint](README.md#retained-constructor-interface-checkpoint).
+The first source checkpoint uses one package constructor, prefix constructor
+syntax, bare variable patterns for retained fields, and one eliminator equation.
+Reject unsupported forms with located diagnostics. Keep pattern coverage checks
+active. Multiple equations need coherent substitution of their distinct runtime
+Ids; an ordinary value alias does not establish index equality.
+
+- [x] Check source constructor declarations in order. `mkGadtDecl` keeps
+  the retained suffix in `con_res_ty`. Rename this suffix with runtime Names;
+  preserve ordinary constructor renaming. Check it as a telescope and apply
+  `rejigConRes` only to its terminal package result. Preserve the source field
+  metadata directly: `mkDepFunTy` can erase a vacuous binder. Keep the complete
+  scoped telescope through generalization and zonking. Split the fields before
+  result substitution. Substitute each field lazily to preserve the parent
+  datatype knot. Validate the result shape after this knot is complete.
+  The earlier kind pass must not inspect unfinished Nat constructor graphs.
+  Check domain kinds there and validate supported domains in the final pass.
+- [x] Traverse retained field scope in role inference and role validity. A
+  scoped runtime index has a fixed closed domain. Continue checking ordinary
+  payload parameters and their roles. Reject source promotion before requesting
+  the cached promoted constructor. Add located diagnostics for unsupported
+  declaration shapes, invalid domains and escaping fields. Automatic Typeable
+  generation and validity recovery skip promotion of retained constructors.
+- [x] Check source constructor patterns sequentially. Substitute each checked
+  retained field Id into the later field types before checking those patterns.
+  Keep runtime fields out of erased existentials. Use ordinary constructor
+  pattern checking for `withPacked`; its retained callback argument does not
+  make the outer function a native-index equation.
+- [x] Preserve actual field identities during desugaring. `matchOneConLike`
+  and PMC's `desugarConPatOut` reuse the checked field Ids instead of the gated
+  flat `conLikeInstOrigArgTys`. PMC's speculative `instCon` instantiates fresh
+  fields sequentially.
+  `selectMatchVar` can retain a bare source field Id for one clause.
+  An ordinary `bindMatchId`/`wrapBind` alias does not prove equality of runtime
+  indices. Multiple equations require coherent substitution through each typed
+  RHS, pattern and evidence, or checked alias transport. Do not route package
+  elimination through the native-index constructor equation checker.
+- [x] Count retained field Pi binders as runtime arguments in worker LFInfo and
+  constructor layout checks. `RepType.countFunRepArgs` and `countConRepArgs`
+  handle retained binders. Use each fixed lifted field domain;
+  do not force its runtime value to determine its representation.
+  Constructor impossibility checks must return conservative results before
+  calling flat signature APIs. Decline product unpacking for retained packages.
+  Nonreflexive constructor-cast pushing also needs scoped field substitution;
+  preserve the cast until that rule exists. Profiling remains outside the subset.
+- [x] Execute packaging, scoped elimination and repackaging of real Nat/Vec
+  values through separate module interfaces. Inspect CorePrep/STG field layout.
+  Check constructor WHNF, unused bottom/cyclic index, bottom vector, and demanded
+  payload behavior. Do not count the API's dictionary-function payload as Vec
+  execution or as proof of backend support.
+- [x] Validate both stages, focused regressions and existing compatibility
+  controls. Record exact commands, peaks, artifact hashes and remaining gates.
+
+The source path starts at `mkGadtDecl`, `rnConDecl`, `kcConDecl` and `tcConDecl`.
+`tcRetainedDataConPat` replaces each template field Id before checking the next
+field. Erased existential freshening stays separate. The source package example
+now compiles unchanged through a separate producer interface and object file.
+Ordinary polymorphic payloads use the existing immutable result matcher. Read
+resolved expected-type metas before this match; do not put a runtime index in
+an ordinary mutable type meta.
+
+Core metadata, interface declarations and the first source package execution
+are implemented. General projections, records, strictness transformations, native
+unfoldings and optimizer support remain separate work.
+
+### M11: source filter with a runtime result length
+
+Follow Agda's `Vec≤` filter for the stored length and vector. Keep the bound
+proof separate. See [the pinned sources](REFERENCES.md#source-vector-filter).
+
+- [x] Implement `filterVec` and `filterPacked` in the source example. Construct
+  `S n` with `VCons` when the predicate retains an element. Return the recursive
+  package when it rejects an element. Reuse existing Core and interface forms.
+- [x] Accept direct package `case` patterns with a fresh multiplicity meta.
+  Use GHC's ordinary `tcSubMult` check. Keep linear and rigid rejection checks.
+- [x] Expand only the compiler-owned section helper compulsory unfoldings in
+  native simplification. Reuse GHC's templates and substitution. Check both
+  partial section WHNF and later application demand.
+- [x] Check bootstrap separate-module execution with Core and STG Lint. Observe
+  lengths 3, 2, and 0 for runtime cutoffs. Check element order, empty input,
+  bottom elements, bottom predicate, partial spine and unused packages.
+  Reject a wrong retained-branch length with a located GHC-05617 diagnostic.
+- [x] Build the self-hosted compiler and run the same source program. Run the
+  focused registered regressions, Core API and bootstrap runtime fixture.
+  Record commands, resource peaks, artifact hashes and remaining source limits.
+
+The current filter scans a finite input spine before returning a package. Its
+stored elements and length fields remain lazy. Productive infinite filtering,
+the output-length bound proof and broader package patterns remain later work.
+
+### M12: source filter with a checked length bound
+
+The source example implements the bound component of Agda's `Vec≤` result.
+It uses the current constructor and proof forms. Both compiler stages pass
+all 58 source observations. The runtime fixtures check 19 package/bound
+rejections. The focused registered regressions and Core API also pass. See
+[the checkpoint](README.md#source-filter-bound-proof-checkpoint).
+
+```haskell
+data LE (n :: Nat) (m :: Nat) where
+  LEZ :: LE Z m
+  LES :: LE n m -> LE (S n) (S m)
+
+data BoundedVec a (limit :: Nat) where
+  PackBounded :: foreach (len :: Nat) ->
+                 Vec a len -> LE len limit -> BoundedVec a limit
+
+filterBounded :: forall a limit.
+                 (a -> Bool) -> Vec a limit -> BoundedVec a limit
+```
+
+- [x] Probe these declarations from source. Check all three runtime fields and
+  their ordered scope through a separate interface. Reuse ordinary GADTs for
+  `LE`; add no primitive dependent-pair form.
+- [x] Construct `LEZ` for empty input and `LES proof` for a retained element.
+  For a rejected element, use structural right weakening
+  `LE n m -> LE n (S m)`. General transitivity and an external solver are not
+  required for this proof.
+- [x] Observe the vector, computed length and finite proof separately. Reject
+  an incorrectly reconstructed bound with a located diagnostic. Check that
+  package WHNF and vector observation can leave the proof unevaluated.
+- [x] Validate source execution and the existing compatibility controls. Record
+  any newly exposed source gate before changing compiler rules.
+
+Agda's bound field is irrelevant. The Haskell `LE` field is an ordinary
+lazy runtime field. General proof erasure remains separate work.
+A bound interpretation requires terminating indices and a terminating `LE`
+proof. Bottom and cyclic proofs remain valid
+Haskell expressions. This exercise does not establish totality, predicate
+selection correctness or productivity on infinite input. See
+[the Agda filter provenance](REFERENCES.md#source-vector-filter).
+
+## Acceptance checks
+
+| ID | Required result |
+| --- | --- |
+| B01 | `choose True` returns an `Int`; `choose False` returns a `Bool`. |
+| B02 | A runtime-unknown Boolean selects and consumes the correct result. |
+| B03 | `keep b (choose b)` reuses one runtime binding and one index. |
+| B04 | Boolean branches supply checked nominal refinement. |
+| B05 | Mismatched arguments and branch result types are rejected. |
+| B06 | Separate opaque Boolean bindings do not become equal from equal-looking definitions. |
+| B07 | Aliases and shadowing preserve the specified binder identity and scope. |
+| B08 | An index cannot escape a local or existential binding. |
+| B09 | An ignored bottom Boolean stays non-strict, including partial application and `seq`. |
+| B10 | Inspecting a bottom Boolean diverges. Index knowledge does not replace its runtime value. |
+| B11 | Substitution and beta reduction preserve types without capture. |
+| B12 | Case transformation and let floating preserve dependency scope. |
+| B13 | Invalid coercions and representational substitutions cannot forge nominal index equality. |
+| B14 | Unoptimized and optimized compilation pass Core Lint and agree on defined results and tested termination behavior. |
+| B15 | Interfaces round-trip and cross-module execution passes; feature-disabled programs remain compatible. |
+
+Distinguish Core construction, frontend behavior, optimization, runtime execution,
+and module integration. M3 through M5 validate native Core construction and the
+restricted bytecode path. The singleton probe supplies comparison evidence for
+some values and laziness cases. Restricted source `keep`, constructor equations,
+and their composition now execute through bytecode and machine-code module
+compilation. Expected-type-directed source `case` refinement now reuses the
+constructor rule. Ordinary optimization, broader case refinement, and native
+coercion unfolding serialization remain open. Fixed-domain retained congruence
+passes the bootstrap kernel and runtime checks; its broader verification is
+pending. Restricted native signature interfaces
+and interface-only consumers pass as described in M8.
+
+### M13: nested source package patterns
+
+Use a complete source consumer before extending the match compiler:
+
+```haskell
+headPacked :: PackedVec a -> Maybe a
+headPacked (PackVec n VNil) = Nothing
+headPacked (PackVec n (VCons x xs)) = Just x
+```
+
+Follow Agda's constructor telescope and source clause discrimination. Preserve
+Haskell's clause order and field demand. See
+[the primary sources](REFERENCES.md#source-package-patterns).
+
+- [x] Keep retained index fields as bare source variables. Check ordinary
+  fields with `tcConArg`, including nested GADT patterns and wildcards. Keep
+  the one-constructor, prefix, unrestricted and strict-package restrictions.
+- [x] Compile each retained package equation with its own actual field Ids.
+  Match the original shared scrutinee and combine failure continuations in
+  source order. Do not merge clause-local index Ids with ordinary let aliases.
+  Keep ordinary constructor-family compilation unchanged.
+- [x] Use checked outer field pattern types in PMC desugaring. Retain the
+  existing sequential speculative constructor instantiation. Add no new Core
+  or interface representation.
+- [x] Execute nested vector and proof patterns, wildcard proof fields and a
+  runtime failed guard. Check partial tails/elements, unused bottom indices,
+  demanded payload/proof, catchall order and bottom packages. Reject an index
+  escape through a nested pattern with a located diagnostic.
+- [x] Validate both compiler stages, separate source interfaces, Core/STG Lint,
+  focused registered regressions and the existing API/runtime controls. Record
+  source restrictions, commands, resource peaks and artifact provenance.
+
+Separate cases avoid rewriting typed patterns, evidence and RHSs to a shared
+index binder. A later row reuses the already shared scrutinee. This can produce
+more cases than a decision tree with shared fields. Optimization remains
+separate work. General projections and constructor patterns in retained index
+fields remain outside this increment.
+
+The implementation and validation are recorded in
+[the checkpoint](README.md#nested-source-package-pattern-checkpoint).
+Next, probe `unconsPacked :: PackedVec a -> Maybe (a, PackedVec a)`. Match the
+stored length with `Z` and `S k`. In the successor branch, match the vector
+and package its tail at actual runtime `k`. Keep the predecessor, head and
+tail lazy until a consumer demands them. This source target is verified in
+M14 below. It uses the existing checked case rule.
+
+### M14: source vector uncons at an actual runtime predecessor
+
+The initial source probe compiles with Core and STG Lint in the existing
+self-hosted compiler. No compiler change is required by that probe.
+
+```haskell
+unconsPacked :: forall a. PackedVec a -> Maybe (a, PackedVec a)
+unconsPacked (PackVec n xs) = case n of
+  Z -> Nothing
+  S k -> case xs of
+    VCons x rest -> Just (x, PackVec k rest)
+```
+
+Follow Agda's indexed vector `uncons` relation. Use the actual runtime `k`
+from `S k`, rather than reconstructing it from the erased vector index.
+The existing checked case rule transports captured `xs` into the successor
+branch. Ordinary GADT evidence then relates the vector tail to `k`.
+See [the pinned sources](REFERENCES.md#source-vector-uncons).
+
+- [x] Add the source worker and a source consumer that repeatedly opens its
+  tail packages. Keep Core, interface formats and compiler rules unchanged
+  unless a concrete source failure requires a change.
+- [x] Check IORef inputs, empty and nonempty results, finite element order and
+  tail lengths. Observe the result, pair and tail package separately. Check
+  predecessor, head and tail demand independently. The zero branch must not
+  force its vector; a successor branch must inspect the vector constructor.
+- [x] Reject a tail packaged with an incorrect or independent runtime index
+  using a located diagnostic. Probe the diagnostic before pinning it.
+- [x] Run both compiler stages through separate source interfaces with Core
+  and STG Lint. Update the existing runtime regression and run its registered
+  normal way. Record exact commands, resource peaks and artifact hashes.
+
+The full source observer exposed a later boundary: Tidy globalises top-level
+Ids that typechecking accepted while they were local. `S bottomLength` then
+fails Core Lint. Before tidying a native RHS, create lazy local aliases for
+its free top-level index Ids and substitute the complete RHS, including types
+and coercions. Keep the alias RHSs as references to the original top bindings.
+Use GHC's existing deterministic FV traversal, Core substitution and CorePrep
+alias guard. Keep ordinary RHSs and the local-index grammar unchanged.
+Preserve the failing source expression as a regression observation.
+
+This exercise does not infer a runtime predecessor from an erased type. It
+does not add general projections, retained index patterns or proof erasure.
+Finite results and bounded partial/cyclic observations do not prove totality.
+
+The next source probe compares two independent runtime lengths and returns
+`Maybe (n :~: m)`. Reuse ordinary `Data.Type.Equality` evidence. A matching
+`Refl` branch should permit a source consumer to zip the two vectors and
+package the result. This target is not verified. `Nothing` would carry no
+refutation proof. Preserve payload laziness on a length mismatch. Probe the
+current equality-Given path before proposing a compiler rule. See the
+[pinned comparison, congruence and zip sources](REFERENCES.md#runtime-equality-and-aligned-zip-next-source-probe).
+
+### M15: source runtime equality and aligned vector zip
+
+Source workers: `f3350988c3`. Application checking: `78460ce4f4`.
+Both compiler stages pass 136 source observations with Core and STG Lint.
+The bootstrap and registered runtime fixtures pass 27 package/bound
+rejections. Four standalone equality-scope errors have pinned codes and source
+locations in both stages. All five focused registered regressions pass.
+
+```haskell
+sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
+zipVec :: Vec a n -> Vec b n -> Vec (a, b) n
+zipPacked :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))
+```
+
+`sameNat` uses one variable equation with nested cases. Its recursive
+`Just Refl` branch proves successor equality by ordinary congruence.
+`zipPacked` matches that proof before passing two captured vectors to
+`zipVec`. The solver keeps runtime indices opaque. Core and interface rules
+are unchanged. Follow the [pinned Agda equality and vector relations](REFERENCES.md#runtime-equality-and-aligned-zip-next-source-probe).
+The Haskell result carries positive evidence only. `Nothing` carries no
+refutation proof. Equal-length success compares both finite Nat spines before
+returning `Just`. Vector fields, tuple components and tails remain lazy until
+the consumer demands them.
+
+- [x] Add source workers, exports, Haddock comments and a GHC Note with proof
+  scope, Haskell demand and Agda provenance.
+- [x] Read both lengths independently through IORefs. Check equal and unequal
+  finite inputs, empty vectors and element order after runtime filtering.
+- [x] Observe comparison, result and package WHNF, vector tags, pair components
+  and tails separately. Mismatches ignore both vectors. Partial predecessors
+  remain lazy until comparison needs them. Preserve package-pattern order.
+  Do not force an equal cyclic comparison.
+- [x] Pin located errors for independent `Refl`, zip without equality,
+  unmatched proof values, branch-local equality escape and a linear index.
+- [x] Complete both compiler stages through separate source interfaces with
+  Core/STG Lint. Run the updated runtime fixture and focused registered normal
+  way. Record commands, resource peaks and artifact hashes. Preserve the
+  previous-format reader and failed probes.
+
+The full consumer required three bounded application-checking changes:
+
+1. Normalize Id type and multiplicity metadata with the within-TC `zonkId`.
+   Validate immutable index choices against the authoritative local or
+   same-module binding. Preserve Name, Unique, local identity, equal closed
+   domain and Many multiplicity. Reject imported GlobalIds, unresolved or
+   rigid domains, linear indices and missing bindings. Do not use the final
+   zonker's recursive Id environment.
+2. Reuse algebraic result-candidate matching for known ordinary Ids. Select a
+   complete index substitution while an ordinary payload type is unresolved.
+   Preserve the actual instantiated type. Final subsumption solves ordinary
+   payload equalities and checks every index equality. Expected matching can
+   retain an ordinary tau arrow after the written arguments. Argument
+   inference still requires saturation.
+3. Specialize a fully applied wired-in `($)` only when a complete result is
+   known and its named right operand has a native anchor. A result independent
+   of the named first operand's invisible binders can supply the result for a
+   discarded `do` statement. Read that signature without elaborating operands
+   or expanding splices. Infer and cache the right operand once. Match kinds
+   before types to determine both representation binders. Require complete
+   choices, kind agreement, exact result/domain types, valid runtime scope
+   and concrete original `idConcreteTvs` choices. Apply the choices to the
+   original operator and use NoQL through instantiation, result checking and
+   cache resumption. Final checking retains the original expected type.
+
+Decide dollar eligibility before right-operand inference. Higher-rank
+callback domains retain their existing expected-checking path. In particular,
+`withBounded` needs an expected result before checking its retained callback.
+If an attempted immutable match fails after inference, keep the cached
+operand and use ordinary NoQL checking. Do not elaborate that operand again.
+Emit its saved usage once under the final argument multiplicity. Other Quick
+Look applications keep their current path.
+
+The original source observer is unchanged. These routes do not put native
+syntax in mutable type or Quick Look variables. They add no equality axiom,
+refutation proof, proof erasure, native optimization or totality claim.
+
+### M16: source append with a computed result length
+
+Both compiler stages pass 180 source observations at `fba00f8f0c`, with
+compiler changes at `491c5fb0c9`. The runtime fixtures pass 34 package/bound
+rejections. Seven standalone errors have pinned codes and source tokens in
+both stages. All five focused registered regressions pass. Return a runtime
+sum with ordinary equality evidence, then use that evidence to package an
+appended vector. Follow
+the [pinned addition, vector append and congruence definitions](REFERENCES.md#computed-length-append-next-source-probe).
+
+Native module classification includes local retained constructor worker
+types before simplification, tidying and code generation. This covers a
+declaration-only producer before implicit workers are generated. Existing
+native option restrictions remain. Constructor result projection applies
+only to a fully applied real constructor with validated retained metadata.
+It traverses the current signature in metadata order. A vacuous retained
+binder can use its canonical ordinary Many arrow with the same closed
+domain. Only outer erased parameters receive immutable choices. The actual
+instantiated telescope and normal field checks remain. Arbitrary functions
+and partial constructors keep their previous path.
+
+```haskell
+data Sum (n :: Nat) (m :: Nat) where
+  Sum :: foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m
+
+sumNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Sum n m
+appendPacked :: PackedVec a -> PackedVec a -> PackedVec a
+```
+
+- [x] Probe the declaration and `Sum m Refl :: Sum Z m` separately.
+  Construction must instantiate the erased `m` with the captured runtime
+  index before allocating mutable instantiation variables. Preserve the
+  original failed probes. Use the constructor-only result match with
+  existing kind, scope and final subsumption checks. Check partial VTA
+  against the current signature and an unused retained field.
+- [x] Define `Add` and source append by recursion on the first length.
+  Define `sumNat` with the same recursion. In the successor case, match
+  recursive `Refl` before constructing `Sum (S p) Refl`. Reuse family
+  reduction and ordinary equality congruence.
+- [x] Open both packages, match `Sum p Refl`, and repackage the appended
+  vector at `p`. Reject forged sums, missing equality elimination, swapped
+  indices without a lemma, and an escaping result index.
+- [x] Check independent runtime inputs and finite element order. Observe
+  package, equality, length and vector demand separately. This
+  `sumNat` forces the entire first Nat spine before returning a constructor.
+  Do not claim productivity for a cyclic first length. Check that a finite
+  first length can leave the second length and vector fields lazy.
+- [x] Validate both compiler stages, existing controls and resource limits.
+  Record provenance, located errors and reproducible artifacts.
+
+### M17: constructor patterns on retained package fields
+
+Compiler implementation: `ab985a150e`; import cleanup: `f423a0ce97`.
+Source and runtime fixture: `e54802bcfd`. Both compiler stages pass 209 source
+observations, including the previous 180. The bootstrap and registered runtime
+fixtures pass 40 package/bound rejections. Seven new pattern errors and the
+seven existing sum/append errors have pinned codes and primary source tokens
+in both stages. All five focused registered regressions pass.
+
+Source uncons uses `PackVec Z _` and `PackVec (S k) (VCons x rest)` equations.
+The zero row keeps ignoring the vector field. The separate `PackVec Z VNil`
+probe demands its constructor. The implementation reuses the checked native
+constructor equality. Each equation keeps its runtime Ids and source-order
+failure continuation.
+
+The initial source probe rejected the index constructor at its original span
+with GHC-83605. Pattern checking now shares the existing closed constructor
+resolver. An outer generated as-pattern binds a fresh whole-field Id. The
+inner constructor alternative carries its nominal constructor proof. Later
+field types use the existing native coercion checker. Coercion patterns keep
+their original outer types. Each package equation keeps its existing match
+compilation and failure path. The backend already accepts this proof and an
+ordinary DEFAULT continuation.
+
+- [x] Probe a constructor head with bare variable subfields. Preserve a fresh
+  Id for the whole stored index, then scope its nominal constructor equality
+  over subsequent field patterns and the RHS. Use the actual predecessor.
+- [x] Reuse native coercion checking. Preserve original outer field types
+  through checked pattern coercions. Follow the pinned Agda later-telescope
+  substitution in [source package patterns](REFERENCES.md#source-package-patterns).
+- [x] Preserve matching order across other arguments, guards and views.
+  Moving fields into RHS cases can change that order. Keep ordinary row
+  failure instead of requiring complete source-case alternatives.
+- [x] Check bottom indices, lazy elements, first-row failure, repeated
+  equations and scope errors. Keep diagnostics on the original patterns.
+  Preserve the existing rejection of lazy package patterns.
+- [x] Run the final self-hosted source checks and all five registered
+  regressions. Freeze the build inputs, source, provenance and output evidence.
+
+### M18: source reverse with the original stored length
+
+Compiler implementation: `12bfbef0b3`. Source and runtime fixture:
+`9fefa1a496`. Both compiler stages pass 249 source observations and seven
+standalone reverse errors with pinned codes and primary source tokens. The
+runtime fixtures pass 47 package/bound rejections. Signed argument controls
+and all five registered regressions pass. Exact inputs and source evidence
+are frozen under `_build/verification/native-reverse-source-`.
+
+`reverseNative :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n` preserves
+the worker's input index. The wrapper stores that original runtime `n`.
+The reverse-append accumulator has result `Vec a (Add n m)`. It follows the
+[pinned Agda reverse and addition proofs](REFERENCES.md#length-preserving-reverse-next-source-probe).
+No new Core rule was added.
+
+- [x] Admit complete expression signatures during native-anchored argument
+  inference. The full consumer exposes `const (42 :: Int) (rightZero n)`:
+  nested inference has no expected result to determine the first parameter.
+  Keep classification read-only. Exclude wildcards, outer quantified
+  variables, written inner quantifiers, retained binders, contexts and type
+  splices. Infer and cache the signed expression once.
+  Keep complete immutable matching and final argument/result checks.
+- [x] Probe `Add n Z :~: n` and `Add n (S m) :~: S (Add n m)` by runtime
+  Nat induction. Match the proofs before changing the accumulator's index.
+  Reuse the existing right-zero proof precedent in the runtime fixture.
+- [x] Run finite lengths through IORefs and a separate producer interface.
+  Check result lengths and reversed element order independently. The native
+  worker's signature relates the lengths. It does not specify element order.
+- [x] Preserve package WHNF and lazy elements. Check demanded partial indices,
+  input spines and proofs with named errors. Do not claim productivity for
+  cyclic lengths or erasure for ordinary `:~:` values.
+- [x] Reject a wrong result index and a missing arithmetic transport at their
+  source expressions. Preserve the existing source and ordinary Haskell checks.
+
+The first proof implementation can traverse the remaining Nat spine at each
+accumulator step. Do not claim linear total runtime. Ordinary GADTs can also
+express length-preserving reverse. This probe tests composition with retained
+runtime indices and the existing source proof path.
+
+- [x] Run the final self-hosted source checks, annotation controls and all
+  five registered regressions. Freeze the compiler inputs and source evidence.
+
+### M19: constructor equations with later retained arguments
+
+Compiler implementation: `fdf23acaea`. Source/runtime fixture: `dc44d9d25c`.
+Both compiler stages pass 269 source observations and eight new pinned source
+errors. The previous seven reverse errors pass too. The runtime fixtures pass
+55 package/bound rejections. All five registered regressions pass. Local-comment
+cleanup is `a367bd0a7a`; the missing-proof rejection is `6f7d5f7e5f`. Keep the complete M18 source program as the
+reference. Convert `addSucc` to constructor equations only after the compiler
+accepts them. Record ordinary value, dictionary and retained index positions
+separately. Keep original source equations for error contexts after renaming.
+Reject quotations at their expression spans before a resolved-name rewrite.
+The context-order probe also requires the signature selector, renamer and kind
+checker to continue through qualified bodies. Keep ordinary constraint checks.
+Check a leading class context as well as evidence between retained binders.
+
+The first M18 probe used `addSucc Z m` and
+`addSucc (S k) m`. It failed with GHC-83605 at the first clause because
+`tcRetainedConArgs` does not consume a later `DepFunTy`. The result-wrapper
+message describes the wrong limitation. The saved probe is
+`_build/verification/native-reverse-source-probes-v1/`.
+
+- [x] Choose a shared runtime Id for each later retained argument and
+  instantiate its codomain in telescope order. Require bare variable patterns
+  initially. Do not represent distinct source Ids as equal through aliases.
+- [x] Preserve each row's resolved source names through a checked renaming
+  step. Cover RHSs, guards, local bindings and stored free-name sets. Inspect
+  the existing `rewriteRetainedCase` precedent. Keep quotation exclusions and
+  accurate source spelling and spans.
+- [x] Keep all source argument lambdas before constructor discrimination.
+  Preserve dictionary order, later field transport and primitive proof scope.
+  A bare later retained argument must keep its actual shared Id at the lambda.
+- [x] Compare constructor equations with the existing explicit-case source
+  worker. Check partial applications, bottom indices, payload order, two rows
+  with different variable names, scope escape and wrong proofs. Use located
+  diagnostics for unsupported later patterns and quotation cases.
+
+Follow the pinned Agda constructor telescope and specialized RHS checking in
+[source package patterns](REFERENCES.md#source-package-patterns). This requires
+frontend identity handling. No new Core equality rule is proposed.
+
+- [x] Run the self-hosted source program and exact-location errors. Run all
+  five registered regressions. Freeze final input, source and output evidence.
+
+### M20: constructor equations over two runtime indices
+
+Both compiler stages and all five registered regressions pass. Rewrite the
+existing nested-case `sameNat` as four
+constructor equations for `Z/Z`, `Z/S`, `S/Z` and `S/S`. Its result remains
+`Maybe (n :~: m)`. The recursive success branch eliminates the predecessor
+proof before it returns `Just Refl`. Keep the case implementation as a reference.
+The second constructor column can follow ordinary value arguments. Other
+retained positions keep M19's bare-variable rule. Keep the one-column checker
+as the existing path. Compose the first nominal transport with a second
+transport over its result type. Locate duplicate pairs at their later row,
+missing pairs at the group, and unsupported patterns at that pattern.
+
+- [x] Admit an initial complete matrix of two retained constructor columns.
+  Require bare constructor subfields, unique constructor pairs and no overlap.
+  Keep contexts outside this initial matrix subset until all transported
+  bindings can sit beneath every proof they reference.
+- [x] Keep shared whole-argument Ids. Bind each row's actual subfield Ids and
+  one checked nominal constructor proof per index. Compose refinements in
+  telescope order for later types and the expected RHS.
+- [x] Preserve each row through desugaring. Ordinary constructor grouping can
+  alias distinct native field/proof Ids. Extend the existing separate-row case
+  strategy for proof-bearing native alternatives. Keep each actual row
+  field/proof Id. Do not assume aliases give equality.
+- [x] Preserve all source argument lambdas and left-before-right demand.
+  Compare finite equality results, partial WHNF, error markers and mismatches
+  with lazy successor predecessors. Equal cyclic inputs have no termination
+  claim. Reject incomplete/duplicate matrices and false `Refl` branches.
+
+Follow [the pinned four-clause Agda example and case-tree compiler](REFERENCES.md#two-index-constructor-equations).
+No new equality rule is proposed.
+
+- [x] Run self-hosted source and located errors, then all five registered
+  regressions. Freeze final inputs, source, harness and outputs.
+
+An unused retained binder becomes an ordinary arrow. Keep both indices free
+in rejection result types. A proof result such as `Maybe (n :~: m)` checks the
+dependent path even when every RHS returns `Nothing`.
+
+
+### M21: ordered trailing variable fallback
+
+Both compiler stages and all five registered regressions pass. Express the same worker with `Z/Z`, recursive
+`S/S`, and a final both-variable row returning `Nothing`. Keep the four-clause
+and nested-case versions as references. This initial probe does not add
+arbitrary wildcard matrices, guards or interior contexts.
+
+Represent each row as an optional constructor pair. A constructor row keeps
+M20's two proofs. The final variable row uses zero proofs and reflexive
+transports. Rename both variable Names to the shared whole-index Names before
+checking. Keep those typed VarPats unwrapped. Use GHC's existing `PgCon` and
+`PgAny` blocks and failure continuation. No backend or Core form is needed.
+Reject an earlier or repeated variable fallback at a source pattern. Retain
+constructor-pair uniqueness and require complete pairs when no fallback exists.
+Test a missing first constructor that reaches fallback without demanding the
+second index. Repackage fallback payloads with their original indices to check
+identity, not aliases. Reject a forged fallback `Refl` and wrong-index payloads.
+
+- [x] Follow the pinned Agda coverage split-tree and LHS substitution code in
+  [two-index constructor equations](REFERENCES.md#two-index-constructor-equations).
+  Inspect GHC's ordered match groups and failure continuations before choosing
+  a row representation. A variable row needs no constructor equality proof.
+- [x] Preserve each constructor row's actual fields and each variable row's
+  shared whole-index identities. Check its unspecialized RHS without assuming
+  equality from aliases. Keep fallback execution outside failed row proofs.
+- [x] Check coverage with the terminal fallback and reject unsupported row
+  arrangements at source positions. Preserve all argument lambdas and row
+  order. Compare finite equality results, partial WHNF and bottom demand with
+  both source references. Re-run the existing false-proof rejections.
+- [x] Run both compiler stages and the five registered regressions. Keep M20
+  evidence frozen and collect separate M21 inputs and outputs.
+
+### M22: anonymous terminal fallback
+
+Verified with frontend `7b7586bfe0` and source/fixture `2435b1a7df`. Both
+compiler stages and all five registered regressions pass. Permit `VarPat` or `WildPat` in each selected
+index column of the one terminal fallback. This includes `_ _`, `left _`
+and `_ right`. Keep constructor/variable and constructor/wildcard rows,
+guards and interior contexts outside this probe. Preserve M21 evidence.
+
+Before TC, replace each selected wildcard with a `VarPat` carrying that
+column's existing shared whole-index Name. Do not allocate a fresh index Id
+or add a let alias. Named columns keep M21's resolved-name substitution.
+Anonymous columns introduce no source-visible name. Keep both typed index
+VarPats outermost and unwrapped. This lets the existing pattern checker and
+match-variable selector preserve the Ids used by later types and the result.
+
+The fallback uses no constructor proofs. Its transports remain reflexive.
+Check its RHS against the incoming unspecialized result type. Failed prefix
+rows supply no evidence to it. Preserve source argument lambda order and
+ordinary match failure and demand. Check quotations on every fallback row,
+even when both selected columns are anonymous and no name substitution is
+needed. Use `tcMatchWithSource` to retain the original Match for errors.
+Keep wildcard and RHS locations. Existing constructor, ordinary argument and
+unselected retained-pattern restrictions remain in force.
+
+Follow [the pinned anonymous-context and GHC wildcard rules](REFERENCES.md#anonymous-terminal-fallback-equations).
+No new Core, backend, interface or equality rule is proposed.
+
+- [x] Inspect Agda's anonymous variable handling and GHC's wildcard tidying.
+  Record the provenance before selecting generated index binders. A wildcard
+  must preserve the shared whole-index identity without introducing equality.
+- [x] Check final variable/wildcard combinations against the original result
+  type. Keep diagnostics at the source wildcard or RHS. Reject a forged
+  fallback `Refl` and preserve payload scope.
+- [x] Compare the wildcard worker with named fallback, four-clause and case
+  references. Preserve partial WHNF, missing-constructor demand and the order
+  of failures. Run both compiler stages and the five registered regressions.
+
+### M23: checked local payload signatures
+
+Implemented with frontend `d45eac2a85` and lexical validity metadata fix
+`da16ec16e6`. Source/API checks are in `58fe0a1e10`, with formatting at
+`e4766d99ac`. Both stages pass all 343 source observations, preserving the
+previous 331. Each passes 53 standalone located errors and four ordinary
+controls. The API/runtime fixture passes 87 package/bound rejections. All five
+registered regressions pass. Use a complete local value signature that mentions an
+already-bound eligible runtime index under `ExperimentalDependentTypes`:
+
+```haskell
+n <- readIORef cell
+let xs :: Vec Int n
+    xs = replicateNative @Int n 7
+```
+
+Agda checks the declared type in the current context, then checks the value
+against it. Follow [the pinned checked-let rules](REFERENCES.md#checked-local-payload-signatures).
+GHC must use the actual local index Id. Do not unfold the index's RHS or derive
+index equality from a let alias. Unsigned inference remains unsupported by M23.
+
+Restrict capture to complete local value signatures under the experimental
+flag. The binding renamer supplies `LocalBindCtxt` and the current group Names;
+`TypeSigCtx` alone does not identify a local binding group. Do not enable this
+capture for top-level, class, declaration, expression or pattern signatures.
+Preserve all existing type-position, forall, context and staging restrictions.
+
+An existing erased type-variable binding takes precedence. Otherwise, consider
+only unqualified free type-variable spellings with a local term Name in the
+current lexical reader environment. Install a signature-local lookup alias
+before collecting implicit forall variables. Keep the actual Name in the value
+namespace and record it as a free dependency of the signature. Explicit and
+nested type binders keep their normal scope. Names with no local capture
+candidate keep ordinary type-variable handling.
+
+Exclude current-group Names using the binding context's group set. A recursive
+local group already places these Names in the reader environment. Do not treat
+them as earlier checked indices. Do not fall back to an outer same-spelling
+term binder hidden by a current binder. Globals and future bindings are not
+capture sources. Preserve the selected Name through TC; do not invent an Id
+or silently replace failed runtime capture with erased quantification.
+
+TC must find the actual already-bound local Id in its local environment.
+Read assigned type and multiplicity metadata with the existing zonker, keeping
+the Name and Unique. Require a non-CoVar local Id, a supported closed index
+domain and unrestricted multiplicity before constructing `TermVarTy`. Scope
+and metadata checks supply no equality and perform no runtime evaluation.
+Validity also zonks the raw lexical Id before comparing it with the captured
+occurrence. Assigned IO-bound metadata must not cause a false scope failure.
+Keep the same Unique and require both domains to agree.
+
+Compatibility is intentional under the experimental flag. If runtime `m` is
+in scope, free `m` in `depth :: LE n m -> Int` captures that index. Write
+`depth :: forall n m. LE n m -> Int` to retain erased polymorphic intent.
+The explicit binders take precedence. RequiredTypeArguments already selects
+term-variable capture in upstream GHC; preserve that independent behavior.
+
+- [x] Capture signature-local Names before implicit forall collection, with
+  erased-variable precedence, lexical shadowing and current-group exclusion.
+  Preserve ordinary behavior with the flag off and outside local signatures.
+- [x] Admit captured indices only for a complete renamed signature. Reject
+  named and anonymous signature holes when capture is requested. Validate
+  actual local Ids without native meta assignment or unsigned inference.
+  Report unavailable or invalid captured indices at their source occurrence;
+  preserve ordinary type errors for wrong-index payloads. Add a GHC Note
+  stating these scope rules and the distinction from definitional equality.
+- [x] Use the signed local payload twice after reading its index from IORef.
+  Check wrong-index payloads, shadowed Names, bottom and cyclic indices,
+  payload sharing and signature errors. Cover unavailable same-group indices,
+  partial signatures and unsigned aliases with located errors. Check an
+  ordinary implicit forall, erased-variable shadowing and flag-off behavior.
+  Bootstrap checks preserve the source demand controls. No Core change was
+  needed.
+- [x] Run self-hosted source, located errors and ordinary controls, then the
+  existing registered regressions. Keep frozen M22 evidence unchanged.
+
+### M24: direct do bind of a saved native action
+
+Verified in both compiler stages with 360 source observations, 60 standalone
+located errors and four ordinary controls. The API/runtime fixture passes 94
+package/bound rejections. All five registered regressions pass. The ordinary
+source program retains its actual index without a conversion or package:
+
+```haskell
+n <- readIORef cell
+let action :: IO (Vec Int n)
+    action = pure (replicateNative @Int n 7)
+xs <- action
+pure (toList xs)
+```
+
+The signed action checks. Nine isolated baseline probes at `0e979288f8` fail
+with GHC-83865. They cover saved and direct actions, do and explicit bind,
+checked and inferred ordinary results, ignored payloads, and a native-result
+inference boundary. The full target keeps the known action's actual native
+payload index through ordinary do expansion and the continuation binder.
+Evidence uses `_build/verification/native-action-bind-*`.
+
+At fork commit `da16ec16e6`, `GHC.Tc.Gen.Expr` at line 582 expands ordinary
+`HsDo` through `expandDoStmts`.
+`GHC.Tc.Gen.Do` at line 101 translates a bind to the ordinary operator applied
+to the action and a generated continuation. Inspect the application checker,
+not the legacy syntax-operator path. In `tcRetainedArgInstEnabled`, line 1872
+zonks cached actual types. Lines 1903–1908 seed `result_subst` from the raw
+expected type. In the isolated `SavedChecked` trace, result and monad metas
+are assigned `[Int]` and `IO` at lines 1274 and 1303 before the action bind at
+line 2304. The action's exact native type is cached, but matching falls back
+to fresh mutable input parameters. Read existing expected assignments before
+immutable matching. This does not require evaluating the index.
+
+- [x] Isolate direct action binding and preserve its current source failure.
+  Inspect the expanded `(>>=) action (\xs -> rest)` and immutable candidates.
+- [x] Read an available expected type with `readExpType_maybe`, then zonk it
+  before seeding immutable matching. Leave an empty infer cell untouched.
+  Check this increment against the saved baseline probes before extending it.
+- [x] For a successful partial match anchored by a known native input, retain
+  its fixed choices and instantiate undetermined ordinary result parameters
+  with standard fresh TauTvs in telescope order. Preserve substituted kinds.
+  A failed match is not a partial match. Native index parameters still require
+  immutable choices, and native results cannot fill ordinary metas. Check a
+  local do expression whose ordinary result has no complete expected type.
+- [x] If result-seeded generic matching fails, try a separate exact joint
+  argument match from the empty substitution. Inline `pure` can infer
+  `f (Vec Int n)` before ordinary checking assigns `f := IO`. Preserve that
+  actual head and let final result subsumption solve ordinary head/result
+  metas. Do not reuse a failed argument match or weaken index equality.
+  Do not freshen a missing binder whose substituted kind is a native domain.
+- [x] Use a matched native expected-result choice as an anchor, including a
+  partial result seed. Check polymorphic bottom payloads at their known native
+  domains instead of inferring fresh indices. Match result kinds before result
+  types to determine representation parameters immutably for `error`. Preserve
+  its original HasCallStack evidence and all concreteness checks.
+- [x] Preserve kind, scope, exact-domain,
+  concreteness, NoQL, once-only usage and local evidence safeguards. Keep final
+  argument checking and result subsumption authoritative.
+- [x] Keep the ordinary bind operator, generated continuation and dictionary
+  order. Add no special runtime index witness, equality rule or do syntax.
+  Preserve unsupported unsigned native inference and general Quick Look gates.
+- [x] Compare direct and saved actions with explicit bind syntax. Check finite
+  IORef inputs, shared payloads, wrong-index errors and delayed index/payload
+  demand. Run both compiler stages and the existing registered regressions.
+
+Follow [the pinned Agda do translation](REFERENCES.md#direct-do-bind-of-a-saved-native-action).
+It supplies syntax and context prior art. Haskell IO sequencing, laziness and
+failure behavior need separate source tests. No Core change is proposed.
+
+### M25: scoped native source inference
+
+This target is verified in both compiler stages. M24 preserved two separate
+failures: `ActionMissingSignature` rejected an unsigned local native action
+with GHC-83605; `ActionNativeResultInference` rejected `pure xs` in an inferred
+local computation with GHC-83865. Both source forms now compile without native
+meta assignment or runtime-index escape. The source example passes 377
+observations; see [M25 evidence](README.md#m25-scoped-native-source-inference).
+
+- [x] Reuse `tcMonoBinds`' existing single nonrecursive FunBind path at
+  `Tc.Gen.Bind:1330`. It calls `runInferRhoFRR` before it allocates the Id.
+  Admit a local NoGen binding with one zero-argument equation and an exact
+  native monotype. Use the existing inferred-signature validity context to
+  validate each free runtime index against its actual outer binding. Keep
+  ordinary head metas, FRR and multiplicity checks. No DepFunTy is inferred.
+  Validate deep free runtime Ids too. The structural validity walk skips
+  variable kinds and coercions; use its existing deep free-variable list and
+  lexical index check. Exclude bound indices and erased CoVars.
+- [x] Keep the separate InferGen guard at `Tc.Gen.Bind:731`. Do not remove
+  inferred-type guards globally. Recursive groups, pattern bindings, partial
+  signatures and inferred native function telescopes need separate designs.
+  Preserve infer-cell promotion and branch-joining checks.
+- [x] With an action's input type fixed, use the existing match checker to
+  synthesize the continuation body through an infer cell. Start with one
+  ordinary unrestricted lambda argument, a variable pattern and one
+  unguarded equation. This includes the generated do continuation.
+  Determine its native result choice before creating an ordinary result meta.
+  A synthesized ordinary monad head can remain unknown; extract the payload
+  and retain final subsumption to resolve that head. Whole-type immutable
+  matching against a fixed IO head is not sufficient by itself.
+- [x] Preserve unsigned effectful actions such as `effect >> pure vector`.
+  Matching the first action fixes IO; the second can still infer a head meta.
+  In the generic route only, unify ordinary head types that contain neither
+  native syntax nor outer templates, then repeat exact whole-argument
+  matching. Keep native choices immutable and keep the native-index route.
+- [x] Reject a synthesized result that mentions the continuation's own input
+  Id or an inner local Id. Returning `IO (Vec Int outerN)` is in scope;
+  returning `IO (Vec Int n)` from an ordinary inner Nat binder would escape.
+  Validate against the outer call-site environment and report the actual
+  source occurrence. Do not infer a dependent arrow or package implicitly.
+- [x] Turn both preserved failures into positive source/runtime cases. Keep
+  sharing, action counts and bottom behavior. Add independent-index,
+  callback-index escape and GADT escape rejections. Verify both stages and
+  the registered regressions.
+
+The source pointers above use `75c628aa8d`. See
+[scoped source inference provenance](REFERENCES.md#scoped-native-source-inference).
+Agda's pinned let checker and lexical context insertion supply prior art.
+Its transparent lets do not justify equating runtime aliases or bypassing
+Haskell scope checks. Agda's dependent lambda codomain is explicit; synthesis
+of an ordinary GHC callback must instead reject a free callback-local index.
+
+### M26: boxed tuple source inference
+
+This target is verified. The M25 tuple baseline checked three versions of a
+callback that returns `(42 :: Int, xs)` at an outer runtime index. Tuple syntax
+rejected with GHC-83865. Constructor and helper forms compiled. M26 runs all
+three forms at finite runtime inputs, with demand, effects and sharing checks.
+
+The implementation expands only an `Infer` result under
+`ExperimentalDependentTypes` when a field has a native anchor. It
+preserves `checkTupSize`. The read-only classifier admits a complete
+boxed tuple like a named application. Its ordinary fields can use the
+existing fresh ordinary parameters. Known expected types keep
+component checking. `mkExpandedExpr` and generated application spans
+retain the original tuple context and field locations. Note
+`[Inference of native tuple fields]` owns this rule in `GHC.Tc.Gen.Expr`.
+
+- [x] Inspect `Tc.Gen.Expr`'s complete `ExplicitTuple` path at the M25
+  checkpoint. It calls `expTypeToType` and allocates component metas before
+  checking fields. The boxed `tcInferTupArgs` path also allocates metas.
+  Reuse the existing ordinary tuple-constructor application machinery for an
+  anchored boxed tuple that needs inference. Keep the original tuple syntax
+  and source spans in diagnostics, using the existing expansion wrapper.
+- [x] Extend the read-only native-argument classifier to recognize complete
+  boxed tuple syntax with a native anchor. Do not execute splices or elaborate
+  components during classification. Preserve checking when an expected tuple
+  shape is available. Keep tuple sections, unboxed fields and representations
+  on their existing paths until their inference rules are established.
+- [x] Preserve exact field types, outer runtime Id scope, ordinary field
+  multiplicities and once-only usage. A tuple does not bind an existential
+  runtime index. Returning a callback-local index with its vector still needs
+  an explicit package. Do not infer a Sigma type for an ordinary tuple.
+- [x] Run the syntax, constructor and helper forms at finite IORef inputs.
+  Check effect counts, bottom fields, partial/cyclic values and sharing. Reject
+  independent indices and callback/inner-index escape with located errors.
+  Verify both compiler stages and the existing registered regressions.
+
+Use [Agda's constant product family](REFERENCES.md#boxed-tuple-inference-prior-art)
+as the product precedent. Existing GHC constructor checking supplies the
+implementation path. No Core or interface representation change was needed.
+
+### M27: native tuple sections
+
+This target is verified. The M26 baseline compiled an inferred callback
+whose ordinary unit case returned `pure ((42 :: Int), xs)`. It also compiled
+the fully applied constructor `((,) xs) (42 :: Int)`. Applying the section
+`(xs,) (42 :: Int)` rejected with GHC-83865. The known expected native section
+control also rejected. M27 admits both section forms and verifies their runtime
+behavior. The original failures remain as compile/Lint evidence.
+
+Keep `ExplicitTuple` and its existing desugaring. Present expressions remain
+inside the missing-field lambdas, in source order. Do not add a sharing let.
+Infer an anchored native present field once with its exact type and require
+a lifted kind. Keep ordinary missing-field metas for inference. For a known
+native expected visible-arrow function with a boxed tuple result, check
+fields against the tuple components and use the expected hole multiplicities.
+Store each hole's tuple component type, then check the reconstructed whole
+section function against the original expected type. This retains required
+domain/result coercions. Other expected shapes keep their existing path.
+Generalize the existing tuple checker rather than add a second traversal.
+
+- [x] Inspect `tcInferTupArgs` and the complete-tuple classifier guard.
+  The boxed present-field path checks against a fresh whole-field meta.
+  Establish section rules for both inference and known expected functions.
+  Prefer reuse of the existing tuple AST and constructor checking. Partial
+  constructor applications also need to satisfy existing saturation rules.
+- [x] Keep missing-field types, multiplicities and runtime representations
+  under ordinary GHC checks. Use exact native present-field types without
+  assigning them to metas. Preserve expected higher-rank checking. Do not
+  expand to a lambda without checking the existing section desugaring and
+  its treatment of present fields.
+- [x] Preserve outer index scope, once-only usage and lazy present fields.
+  A section cannot hide an inner index or duplicate a linear capture.
+  Keep ordinary case inference separate from branch-local index and GADT
+  escape. Reuse the owning tuple Note for shared rules.
+- [x] Compare sections with constructor controls at runtime IORef inputs.
+  Check repeated application, field demand, partial/cyclic prefixes and
+  original vector/payload sharing. Pin scope and usage diagnostics in both
+  stages and rerun the existing registered regressions.
+
+The source client passes 417 observations in each stage. The strict compile
+matrix has ten positive and ten negative section cases. Existing checks bring
+the rejection total to 88 per stage. The API fixture checks 122 package/bound
+rejections. All five registered regressions pass. Native forall under a
+retained binder remains gated; the higher-rank control is ordinary Haskell.
+The lifted-kind negative reaches the field check through an ordinary unboxed
+helper applied to a native argument. It does not stop at a signature gate.
+
+### M28: native generic result overapplication
+
+This target is verified. Both M27 stages compiled a named projection of a
+stored section, then its application. Direct `(fst pair) (42 :: Int)` rejected
+with located GHC-83865. The argument-instantiation route required all written
+value arguments to exactly saturate the declared domains. Here `fst` declares
+one domain; its chosen result must become a function before checking the extra
+argument.
+
+- [x] Admit a nonempty declared argument prefix under the existing native,
+  NoQL, VTA, template and concreteness guards. Require a native anchor in that
+  prefix. Preserve the exactly saturated route. Keep native-index-kind
+  instantiation exactly saturated.
+- [x] Infer and cache prefix arguments once. Start prefix matching with an
+  empty substitution. Do not seed its intermediate result from the final
+  expected result after extra arguments. Keep exact domain, kind and scope
+  validation. Reuse ordinary completion of unchosen erased parameters.
+- [x] Instantiate the original head and pass the full argument list to the
+  existing application checker. Let that checker consume extra arguments and
+  enforce evidence order, saturation, multiplicities and final subsumption.
+- [x] Compare direct and named projections at runtime indices. Preserve wrong
+  extra argument/result, conflicting prefix, scope, VTA and higher-rank gates.
+  Test an anchor only after the prefix and once-only elaboration/usage.
+  Record one owning Note and reuse the existing application-spine prior art.
+
+Both source clients pass 439 observations. Nine new positive compile controls
+and eleven located rejections pass in both stages. The retained cases bring
+the rejection total to 99 per stage. A separate failed joint-prefix match has
+one `prefixProbe` head elaboration in the TC trace. The API fixture passes
+133 source rejections. All five registered regressions pass. The owning
+`[Generic retained argument inference]` Note and its cache reference record
+the saturation distinction. No Core or interface form changed.
+
+### M29: native generic inference after leading VTA
+
+Verified in both stages. The original M28 baseline rejected partial `@Bool`
+with located GHC-83865. M29 accepts this generic route and preserves omitted
+and complete ordinary VTA. The original native-index-kind prepass is unchanged.
+
+- [x] Use the existing ITYARG step to check leading written type arguments
+  once. Before IALL creates metas for the remaining binders, attempt native
+  argument-directed inference from the substituted signature. Keep NoQL,
+  extension, known-head/concreteness, prefix-anchor, kind and scope guards.
+  Start before any value argument and require no remaining written VTA.
+- [x] Preserve the recorded checked type arguments and original head. Feed
+  immutable choices through IALL's existing plan and evidence order. Do not
+  prepend remaining type applications ahead of the written `@Bool`.
+- [x] Return inferred argument caches to `tcApp` and `finishAppWithCache`,
+  including failed-match caches. Preserve the public `tcInstFun` interface
+  where possible. Separate cache value positions from diagnostic source
+  positions. `RetainedArgCache` keys count only value arguments. Generated
+  type arguments advance neither cache keys nor source diagnostic positions.
+- [x] Compare omitted, partial and complete VTA from source. Check wrong tags
+  and kinds, extra arguments/results, conflicting prefix choices, contexts,
+  scope and linear usage. Trace once-only elaboration on failure. Preserve
+  generated/written argument positions and located diagnostics. Leave VTA
+  interleaved after values outside this increment. Reuse the pinned spine
+  precedent and give shared rules one owning Note.
+
+
+### M30: native-index-kind inference after leading VTA
+
+Verified in both stages. The M29 baseline compiled `observe vector` and
+`observe @Int @Z VNil`, but rejected the following partial-VTA form with
+GHC-83865. M30 accepts it without evaluating its inferred runtime index:
+
+```haskell
+observe :: forall a (index :: Nat). Vec a index -> Int
+observe _ = 42
+bad n = pure (observe @Int (localVector n))
+```
+
+- [x] Reuse the native-index-kind matcher after ITYARG substitutes leading
+  arguments. Keep its exact-saturation, kind, native-meta and lexical-scope
+  guards. Require NoQL, the extension, the original eligible head, no consumed
+  value arguments and no remaining type arguments. Generic overapplication
+  stays separate.
+- [x] Return immutable choices for the remaining telescope through IALL.
+  Preserve written type arguments and dictionary order. Retain successful
+  and failed-match caches. Use the existing separate value/source counters
+  and preserve the public cache-discarding wrapper.
+- [x] Compare omitted, partial and complete ordinary VTA from source. Cover
+  runtime Nat indices, nested contexts, multiple remaining parameters, scope,
+  kinds, mismatched indices and linear usage. Check that ignored native index
+  arguments stay lazy. Preserve original payload sharing and action counts.
+- [x] Update the owning Note and pinned Agda/GHC provenance. Pin emitted
+  diagnostics and primary source tokens in both stages. Rebuild both stages,
+  run the focused registered regressions, and preserve the frozen M29 evidence.
+
+
+### M31: joint native-index argument inference and result overapplication
+
+M30 passed a named exact-saturated selection from `(Vec a index, value)`,
+where `value` is a native function. Direct application rejected. A helper
+with separate vector and payload arguments also rejected, including an
+ordinary function payload. M31 accepts these forms:
+
+```haskell
+selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value
+selectIndex _ value = value
+good n = pure (selectIndex @Int (localVector n) ((+1) :: Int -> Int) 42)
+```
+
+Infer index-bearing arguments first. Their immutable match determines the
+expected domains of ordinary arguments such as predicates. Then infer eligible
+independent domains for parameters that remain unknown. Match the nonempty
+declared prefix before checking extra arguments. The former strict baseline
+had two accepted and four rejected forms; all six now compile in both stages.
+Both stages pass 503 source observations, 139 located rejections, four ordinary
+controls and both failed-match cache traces. The API fixture passes 173
+rejections. All five registered regressions pass. The full GHC suite was not run.
+
+- [x] Match native-index and ordinary payload choices jointly from the
+  nonempty declared argument prefix. Infer independent parameters needed by
+  that prefix, while preserving known expected domains. Require complete
+  immutable native-index choices. Preserve kind, head/concreteness, exact
+  cached-domain and lexical scope checks; keep native mutable fills forbidden.
+- [x] Allow ordinary extra arguments after that prefix. Start overapplication
+  matching with an empty substitution, since the final expected result comes
+  after those arguments. Reuse IALL, final subsumption and dictionary order.
+  Keep both leading-VTA and existing no-VTA routes consistent.
+- [x] Compare named/direct calls and ordinary/native function payloads from
+  source. Cover runtime indices, contexts, sharing, effects and demand. Pin
+  conflicting choices, undetermined indices, extra-only anchors, scopes,
+  kinds, dictionaries and linear use. Trace once-only elaboration on failure.
+- [x] Update the owning Notes and pinned Agda/GHC provenance. Rebuild both
+  stages, run the focused regressions, and preserve the frozen M30 evidence.
+
+### M32: outer equality evidence under a retained Pi
+
+The six-case baseline agrees in both stages. Ordinary function transport under
+`a ~ b`, identical retained functions, pointwise retained transport, and global
+family-axiom normalization compile with Core and STG Lint. Whole retained
+function transport under `a ~ b` rejects with GHC-83865 at the returned `f`:
+
+```haskell
+transportElement :: forall a b. a ~ b
+                 => (foreach (n :: Nat) -> Vec a n)
+                 -> (foreach (n :: Nat) -> Vec b n)
+transportElement f = f
+```
+
+The pointwise definition `transportElement f n = f n` compiles. Removing the
+equality proof rejects. This isolates an evidence boundary under the Pi.
+It is separate from argument-prefix inference and source signature support.
+
+- [ ] Pin Agda's conversion/context rules and the GHC inert-rewrite paths.
+  Audit the existing `DepFunCo` proof and its free runtime Ids.
+- [ ] Admit only outer ordinary equality evidence that cannot contain the new
+  runtime binder. Preserve the fixed closed domain, role and location context.
+  Keep plugins, family-cache access, fresh dependent Wanteds and mutable native
+  fills gated. Update Note `[Rewriting retained dependent functions]`.
+- [ ] Compare direct and pointwise transport through a separate interface.
+  Check proof scope, absent proofs, nested binders, demand and sharing. Pin
+  located failures, rebuild both stages and run the registered regressions.
+
+Optimizer support remains separate. Audit substitution, occurrence scope and
+proof-case reconstruction before enabling transformations.
+
+## Further work
+
+After M8, review broader retained kinds, nested and higher-order dependence,
+source inference, arbitrary index expressions, roles involving dependent
+functions, linear retained binders, and dependent runtime representations.
+Use separate tasks for each extension. SMT reasoning and proof-certificate
+checking remain separate work within the longer-term program.

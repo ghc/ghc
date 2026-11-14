@@ -379,6 +379,16 @@ renameModifiedFunArr (HsModifiedFunArr _ mods arr) = do
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of
+  HsForEachTy{hst_bndrs = bndrs, hst_body = ltype} -> do
+    bndrs' <- mapM (renameLTyVarBndr return) bndrs
+    ltype' <- renameLType ltype
+    return
+      ( HsForEachTy
+          { hst_xforeach = noAnn
+          , hst_bndrs = bndrs'
+          , hst_body = ltype'
+          }
+      )
   HsForAllTy{hst_tele = tele, hst_body = ltype} -> do
     tele' <- renameHsForAllTelescope tele
     ltype' <- renameLType ltype

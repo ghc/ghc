@@ -766,6 +766,8 @@ collectStgFArgTypes = go []
     go bs (TyConApp{}) = reverse bs
     go bs (LitTy{}) = reverse bs
     go bs (TyVarTy{}) = reverse bs
+    go  _ (TermVarTy{}) = panic "collectStgFArgTypes: native dependent FFI types are not implemented"
+    go  _ (DepFunTy{}) = panic "collectStgFArgTypes: native dependent FFI types are not implemented"
     go  _ (CastTy{}) = panic "myCollectTypeArgs: CastTy"
     go  _ (CoercionTy{}) = panic "myCollectTypeArgs: CoercionTy"
     go bs (FunTy {ft_arg = arg, ft_res=res}) =

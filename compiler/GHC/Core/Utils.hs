@@ -78,6 +78,7 @@ import GHC.Core.Ppr
 import GHC.Core.FVs( exprFreeVars, bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
+import GHC.Core.TyCo.Rep ( Type(DepFunTy) )
 import GHC.Core.Predicate( isEqPred )
 import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.FamInstEnv
@@ -119,7 +120,7 @@ import GHC.Utils.Misc
 import Control.Monad       ( guard )
 import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
-import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
+import Data.List           ( sort, sortBy, partition, zipWith4, zip4, mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord            ( comparing )
 import qualified Data.Set as Set
@@ -142,7 +143,11 @@ exprType (Coercion co)       = coercionType co
 exprType (Let bind body)
   | NonRec tv rhs <- bind    -- See Note [Type bindings]
   , Type ty <- rhs           = substTyWithUnchecked [tv] [ty] (exprType body)
-  | otherwise                = exprType body
+  | otherwise
+  = let body_ty = exprType body
+    in if any (\b -> isNonCoVarId b && b `elemVarSet` tyCoVarsOfType body_ty) (bindersOf bind)
+       then pprPanic "exprType: let-bound runtime index escapes its scope" (ppr body_ty)
+       else body_ty
 exprType (Case _ _ ty _)     = ty
 exprType (Cast _ co)         = coercionRKind co
 exprType (Tick _ e)          = exprType e
@@ -185,6 +190,12 @@ mkLamType v body_ty
    , v `elemVarSet` tyCoVarsOfType body_ty
      -- See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep
    = mkForAllTy (Bndr v coreTyLamForAllTyFlag) body_ty
+
+   | anyFreeVarsOfType (== v) body_ty
+   , isNativeIndexId v
+   = assertPpr (isNativeIndexId v && typeKind body_ty `eqType` liftedTypeKind)
+       (text "Unsupported retained dependent lambda:" <+> ppr v <+> dcolon <+> ppr body_ty) $
+     DepFunTy v body_ty
 
    | otherwise
    = mkFunctionType (idMult v) (idType v) body_ty
@@ -237,6 +248,11 @@ applyTypeToArgs op_ty args
     go op_ty []                   = op_ty
     go op_ty (Type ty : args)     = go_ty_args op_ty [ty] args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
+    go op_ty (arg : args)
+      | DepFunTy b res_ty <- coreFullView op_ty
+      , Just _ <- exprToNativeIndex arg
+      = let in_scope = mkInScopeSet (tyCoVarsOfType res_ty `unionVarSet` exprFreeVars arg)
+        in go (substTy (Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv) res_ty) args
     go op_ty (_ : args)           | Just (_, _, _, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
     go _ args = pprPanic "applyTypeToArgs" (panic_msg args)
@@ -2928,11 +2944,42 @@ dataConInstPat fss uniqs mult con inst_tys
         kind   = Type.substTyUnchecked subst (varType tv)
 
       -- Make value vars, instantiating types
-    arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
-    mk_id_var uniq fs (Scaled m ty) str
+    arg_ids
+      | null retained_binders
+      = zipWith4 (mk_id_var full_subst) id_uniqs id_fss arg_tys arg_strs
+      | otherwise
+      = snd $ mapAccumL mk_retained_field full_subst $
+          zip retained_binders (zip4 id_uniqs id_fss arg_tys arg_strs)
+    retained_binders = dataConRepArgBinders con
+
+    mk_id_var subst uniq fs (Scaled m ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
         mkUserLocalOrCoVar (mkVarOccFS fs) uniq
-                           (mult `mkMultMul` m) (Type.substTy full_subst ty) noSrcSpan
+                           (mult `mkMultMul` m) (Type.substTy subst ty) noSrcSpan
+
+    -- See Note [Instantiating retained constructor fields].
+    mk_retained_field subst (mb, (uniq, fs, ty, str))
+      = (subst', field)
+      where
+        field = mk_id_var subst uniq fs ty str
+        Subst in_scope ids tvs cvs = subst
+        subst' = Subst (extendInScopeSet in_scope field) ids' tvs cvs
+        ids' = case mb of
+                 Nothing  -> ids
+                 Just old -> extendVarEnv ids old (Var field)
+
+{- Note [Instantiating retained constructor fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained constructor field binds a runtime Id over the types of later fields.
+Freshen fields from left to right. After each retained field, substitute its
+actual pattern Id for the template Id in the remaining field types. Extend the
+in-scope set too, so substitution avoids capture under nested retained binders.
+Do not put these runtime fields among the erased existential binders.
+
+Keep the ordinary constructor path unchanged. The retained subset has no
+representation wrapper, so its metadata and representation fields align.
+See Note [Retained constructor field telescopes] in GHC.Core.DataCon.
+-}
 
 {-
 Note [Mark evaluated arguments]

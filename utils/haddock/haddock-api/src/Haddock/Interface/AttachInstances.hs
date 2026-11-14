@@ -366,6 +366,8 @@ simplify (AppTy t1 t2) = SimpleType s (ts ++ maybeToList (simplify_maybe t2))
   where
     (SimpleType s ts) = simplify t1
 simplify (TyVarTy v) = SimpleType (SName (tyVarName v)) []
+simplify (TermVarTy{}) = error "simplify: native runtime index is not supported"
+simplify (DepFunTy{}) = error "simplify: native dependent function is not supported"
 simplify (TyConApp tc ts) =
   SimpleType
     (SName (tyConName tc))

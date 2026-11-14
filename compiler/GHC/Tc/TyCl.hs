@@ -76,6 +76,7 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Unify
 
+import GHC.Types.SourceText ( SourceText(NoSourceText) )
 import GHC.Types.ForeignCall ( typeCheckCType )
 import GHC.Types.Id
 import GHC.Types.Id.Make
@@ -1389,6 +1390,8 @@ swizzleTcTyConBndrs tc_infos
 
     swizzleMapper :: TyCoMapper StrictIdentity
     swizzleMapper = TyCoMapper { tcm_tyvar = swizzle_tv
+                               , tcm_termvar = \v -> pprPanic "swizzleMapper: native term index not implemented" (ppr v)
+                               , tcm_termbinder = \v _ -> pprPanic "swizzleMapper: native dependent binder not implemented" (ppr v)
                                , tcm_covar = swizzle_cv
                                , tcm_hole  = swizzle_hole
                                , tcm_tycobinder = swizzle_bndr
@@ -2263,6 +2266,24 @@ kcConDecl new_or_data tc_res_kind
          -- We don't need to check the telescope here,
          -- because that's done in tcConDecl
        }
+
+kcConDecl new_or_data _
+          (ConDeclGADT { con_names = names
+                       , con_outer_bndrs = L _ outer_bndrs
+                       , con_inner_bndrs = inner_bndrs
+                       , con_mb_cxt = cxt, con_g_args = args
+                       , con_res_ty = res_ty })
+  | hsHasForEachTy (unLoc res_ty)
+  = addErrCtxt (DataConDefCtxt names) $
+    discardResult $ bindOuterSigTKBndrs_Tv outer_bndrs $
+    bindExplicitTKBndrs_Tv (gadtTelescopeBndrs inner_bndrs) $
+    do { checkRetainedConShape new_or_data cxt args res_ty
+       ; case args of
+           PrefixConGADT _ _ -> do
+             { _ <- kcConGADTArgs (TheKind liftedTypeKind) args
+             ; _ <- tcCheckRetainedConType False (tcDataConMult IsPrefixConGADT) res_ty
+             ; return () }
+           _ -> failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration }
 
 kcConDecl new_or_data _tc_res_kind
                       -- NB: _tc_res_kind is unused.   See (KCD3) in
@@ -4176,6 +4197,54 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
 
        ; return (NE.singleton dc) }
 
+tcConDecl new_or_data dd_info rep_tycon tc_bndrs _ tag_map
+          (ConDeclGADT { con_names = names
+                       , con_outer_bndrs = L _ outer_bndrs
+                       , con_inner_bndrs = inner_bndrs
+                       , con_mb_cxt = cxt, con_g_args = args
+                       , con_res_ty = hs_res_ty })
+  | hsHasForEachTy (unLoc hs_res_ty)
+  = addErrCtxt (DataConDefCtxt names) $
+    do { let L _ name :| _ = names
+       ; checkRetainedConShape new_or_data cxt args hs_res_ty
+       ; case dd_info of
+           DDataType -> return ()
+           _ -> failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration
+       ; skol_info <- mkSkolemInfo (DataConSkol name)
+       ; (tclvl, wanted, (tvbs, (retained, full_ty))) <-
+           pushLevelAndSolveEqualitiesX "tcConDecl:retained" $
+           tcGadtConTyVarBndrs skol_info outer_bndrs inner_bndrs $
+           do { prefix <- tcConGADTArgs (TheKind liftedTypeKind) args
+              ; (retained, suffix_ty) <-
+                  tcCheckRetainedConType True (tcDataConMult IsPrefixConGADT) hs_res_ty
+              ; return (replicate (length prefix) Nothing ++ retained,
+                        tcMkScaledFunTys (map fst prefix) suffix_ty) }
+       ; inf_tkvs <- kindGeneralizeAll skol_info (mkForAllTys tvbs full_ty)
+       ; reportUnsolvedEqualities skol_info inf_tkvs tclvl wanted
+       ; let inf_bndrs = mkTyVarBinders Inferred inf_tkvs
+       ; (inf_bndrs, tvbs, retained, full_ty) <- initZonkEnv NoFlexi $
+           runZonkBndrT (zonkTyVarBindersX inf_bndrs) $ \ inf_bndrs ->
+           runZonkBndrT (zonkTyVarBindersX tvbs) $ \ tvbs ->
+             do { full_ty <- zonkTcTypeToTypeX full_ty
+                ; return (inf_bndrs, tvbs, retained, full_ty) }
+       ; let (arg_tys, res_ty) = splitRetainedConFields retained full_ty
+             res_tmpl = mkDDHeaderTy dd_info rep_tycon tc_bndrs
+             (univ_tvs, ex_tvs, user_bndrs, eq_preds, arg_subst)
+               = rejigConRes tc_bndrs res_tmpl inf_bndrs tvbs res_ty
+             arg_tys' = map (substScaledTy arg_subst) arg_tys
+             res_ty' = substTy arg_subst res_ty
+             -- Keep the field list spine independent of the knot-tied rejig.
+             -- See Note [Source retained constructor declarations].
+       ; fam_envs <- tcGetFamInstEnvs
+       ; dflags <- getDynFlags
+       ; let build_one (L loc con_name) = setSrcSpanA loc $
+               do { rep_nm <- newTyConRepName con_name
+                  ; buildDataConWithRetainedArgs retained fam_envs
+                      (SrcBangOpts (initBangOpts dflags)) con_name False rep_nm
+                      (map (const (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)) arg_tys)
+                      [] univ_tvs ex_tvs user_bndrs eq_preds [] arg_tys' res_ty' rep_tycon tag_map }
+       ; mapM build_one names }
+
 tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   -- NB: don't use res_kind here, as it's ill-scoped. Instead,
   -- we get the res_kind by typechecking the result type.
@@ -4264,6 +4333,62 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                   --      that way checkValidDataCon can complain if it's wrong.
              }
        ; mapM buildOneDataCon names }
+
+-- | Check the syntax admitted for a retained constructor field telescope.
+checkRetainedConShape :: NewOrData -> Maybe (LHsContext GhcRn)
+                      -> HsConDeclGADTDetails GhcRn -> LHsType GhcRn -> TcM ()
+checkRetainedConShape new_or_data ctxt args res_ty
+  = setSrcSpanA (getLoc res_ty) $
+    do { strict_data <- xoptM LangExt.StrictData
+       ; unless (not strict_data && new_or_data /= NewType
+                 && maybe True (null . hsc_ctxt . unLoc) ctxt && plain_prefix args) $
+           failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration }
+  where
+    plain_prefix (PrefixConGADT _ fields) = all plain_field fields
+    plain_prefix _ = False
+    plain_field (CDF _ unpack strict _ _ _)
+      = not (isSrcUnpacked unpack) && not (isSrcStrict strict)
+
+-- | Split fields with their explicit metadata, including vacuous binders.
+splitRetainedConFields :: [Maybe Id] -> Type -> ([Scaled Type], Type)
+splitRetainedConFields [] ty = ([], ty)
+splitRetainedConFields (mb : rest) ty
+  = case (mb, coreFullView ty) of
+      (Just b, DepFunTy b' body)
+        | b == b' -> add (Scaled ManyTy (varType b)) body
+      (_, FunTy { ft_mult = mult, ft_arg = arg, ft_res = body })
+        -> add (Scaled mult arg) body
+      _ -> pprPanic "splitRetainedConFields" (ppr ty)
+  where
+    add arg body = let (args, result) = splitRetainedConFields rest body
+                   in (arg : args, result)
+
+{- Note [Source retained constructor declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The parser leaves a foreach suffix intact in con_res_ty. Check that suffix
+as a telescope, not as the constructor result. Keep explicit field metadata:
+mkDepFunTy turns an unused retained binder into an ordinary arrow. Carry the
+full telescope through generalisation and zonking. Native domains are closed
+and zonked before metadata allocation, so zonking preserves each metadata Id
+and its domain.
+
+Split the zonked telescope before applying the result substitution. Map that
+substitution lazily over the field types. Field counts and list spines must
+not force rejigConRes while the parent TyCon is still knot-tied. The terminal
+result has no free runtime Ids, and rejigConRes substitutes only erased type
+variables. It cannot rename or capture the retained field Ids. Keep its
+existential and equality metadata until checkValidDataCon can reject it after
+the parent knot is complete.
+
+Kind inference checks domain kinds without inspecting unfinished datatype
+constructor graphs. Final checking validates the fixed native index domain.
+Erased outer quantifiers keep their ordinary GADT scope. The retained Ids
+are fields, not existential type variables. This subset has no existential,
+equality specification, context, record field, strict field, or newtype.
+Reject StrictData rather than changing its field evaluation rules.
+See Note [Retained constructor field telescopes] in GHC.Core.DataCon and
+Note [Source retained signatures] in GHC.Tc.Gen.HsType.
+-}
 
 {- Note [GADT return types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4875,7 +5000,12 @@ checkValidTyCl tc
       | isClassTyCon tc = tc   -- Ugh! Note [Recover from validity error]
       | otherwise       = makeRecoveryTyCon tc
 
-    child_tycons tc = tyConATs tc ++ map promoteDataCon (tyConDataCons tc)
+    child_tycons tc = tyConATs tc ++
+                      [ promoteDataCon dc
+                      | dc <- tyConDataCons tc
+                      , null (dataConRepArgBinders dc) ]
+      -- Retained fields have no promoted TyCon, including during recovery.
+      -- See Note [Retained constructor field telescopes] in GHC.Core.DataCon.
 
 {- Note [Recover from validity error]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5151,6 +5281,20 @@ checkValidDataCon dflags existential_ok tc con
               res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
               arg_tys     = dataConOrigArgTys con
               orig_res_ty = dataConOrigResTy  con
+
+        ; unless (null (dataConRepArgBinders con)) $
+          do { let univ_tvs = dataConUnivTyVars con
+                   user_tvs = binderVars (dataConUserTyVarBinders con)
+                   (_, _, eq_spec, _, _, _) = dataConFullSig con
+             ; unless (isBoxedDataTyCon tc && isLiftedAlgTyCon tc
+                       && isVanillaAlgTyCon tc && not (isTypeDataTyCon tc)
+                       && null (dataConExTyCoVars con)
+                       && null eq_spec
+                       && null (dataConOtherTheta con)
+                       && length user_tvs == length univ_tvs
+                       && sizeVarSet (mkVarSet user_tvs) == length user_tvs
+                       && all (`elemVarSet` mkVarSet univ_tvs) user_tvs) $
+                 failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration }
 
         ; traceTc "checkValidDataCon" (vcat
               [ ppr con, ppr tc, ppr tc_tvs
@@ -5874,7 +6018,10 @@ checkValidRoles tc
     check_dc_roles datacon
       = do { traceTc "check_dc_roles" (ppr datacon <+> ppr (tyConRoles tc))
            ; mapM_ (check_ty_roles role_env Representational) $
-             eqSpecPreds eq_spec ++ theta ++ map scaledThing arg_tys }
+             eqSpecPreds eq_spec ++ theta
+           ; if null field_binders
+             then mapM_ (check_ty_roles role_env Representational) (map scaledThing arg_tys)
+             else check_fields role_env field_binders arg_tys }
                     -- See Note [Role-checking data constructor arguments] in GHC.Tc.TyCl.Utils
       where
         (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
@@ -5883,10 +6030,30 @@ checkValidRoles tc
               -- zipVarEnv uses zipEqual, but we don't want that for ex_tvs
         ex_roles   = mkVarEnv (map (, Nominal) ex_tvs)
         role_env   = univ_roles `plusVarEnv` ex_roles
+        field_binders = dataConRepArgBinders datacon
+
+    -- See Note [Roles of retained constructor fields] in GHC.Tc.TyCl.Utils.
+    check_fields _ [] [] = return ()
+    check_fields env (binder : binders) (Scaled mult ty : tys)
+      = do { check_ty_roles env Nominal mult
+           ; check_ty_roles env Representational ty
+           ; let env' = maybe env (\v -> extendVarEnv env v Nominal) binder
+           ; check_fields env' binders tys }
+    check_fields _ _ _ = pprPanic "checkValidRoles: misaligned retained fields" (ppr tc)
 
     check_ty_roles env role ty
       | Just ty' <- coreView ty -- #14101
       = check_ty_roles env role ty'
+
+    check_ty_roles env _ ty@(TermVarTy v)
+      | Just Nominal <- lookupVarEnv env v, isNativeIndexId v
+      = check_ty_roles env Nominal (varType v)
+      | otherwise = pprPanic "check_ty_roles: invalid runtime index scope" (ppr ty)
+    check_ty_roles env role ty@(DepFunTy v body)
+      | isNativeIndexId v
+      = check_ty_roles env Nominal (varType v) >>
+          check_ty_roles (extendVarEnv env v Nominal) role body
+      | otherwise = pprPanic "check_ty_roles: invalid retained binder" (ppr ty)
 
     check_ty_roles env role (TyVarTy tv)
       = case lookupVarEnv env tv of

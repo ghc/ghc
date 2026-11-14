@@ -369,6 +369,13 @@ data RewriteEnv
           --
           -- See Note [Computing coercion dependencies] in GHC.Tc.Solver.Rewrite.
 
+       , re_native_binder :: !Bool
+          -- ^ Normalize beneath a retained runtime binder without external
+          -- evidence or cache effects. New evidence must not escape with a
+          -- free occurrence of the bound runtime Id.
+          -- See Note [Rewriting retained dependent functions]
+          -- in GHC.Tc.Solver.Rewrite.
+
        , re_zap_coercions :: !Bool
           -- ^ Whether to perform coercion zapping.
           --

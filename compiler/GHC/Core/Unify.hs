@@ -6,7 +6,7 @@ module GHC.Core.Unify (
         tcMatchTy, tcMatchTyKi,
         tcMatchTys, tcMatchTyKis,
         tcMatchTyX, tcMatchTysX, tcMatchTyKisX,
-        tcMatchTyX_BM, ruleMatchTyKiX,
+        tcMatchTyX_BM, tcMatchRetainedTyX_BM, ruleMatchTyKiX,
 
         -- Side-effect free unification
         AmIUnifying(..),
@@ -33,7 +33,7 @@ import GHC.Core.Predicate( CanEqLHS(..), canEqLHS_maybe )
 import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare ( eqType, tcEqType, tcEqTyConAppArgs )
-import GHC.Core.TyCo.Subst   ( mkTvSubst, deepSubstTy )
+import GHC.Core.TyCo.Subst   ( mkTvSubst, deepSubstTy, extendSubstInScopeSet )
 import GHC.Core.Map.Type
 import GHC.Core.Multiplicity
 
@@ -49,6 +49,7 @@ import GHC.Data.TrieMap
 import GHC.Data.Maybe( orElse )
 
 import Control.Monad
+import Data.Monoid (Any(..))
 import qualified Data.Semigroup as S
 import GHC.Builtin.WiredIn.Prim (fUNTyCon)
 
@@ -85,7 +86,7 @@ of ways.  Here we summarise, but see Note [Specification of unification].
     - MaybeApart      : neither of the above
   See Note [Unification result].
 
-  Four reasons for MaybeApart (see `MaybeApartReason`).  The first two are the
+  Five reasons for MaybeApart (see `MaybeApartReason`).  The first two are the
   big ones!
     * MARTypeFamily:
          Family reduction might make the two types equal
@@ -95,6 +96,12 @@ of ways.  Here we summarise, but see Note [Specification of unification].
          See Note [Infinitary substitutions]
     * MARCast (obscure):
          See (KCU2) in Note [Kind coercions in Unify]
+    * MARRuntimeIndex:
+         An opaque runtime value might equal the other index.
+         See Note [Apartness of retained runtime indices].
+    * MARRetainedFunction:
+         Retained-function congruence is not supported by this unifier.
+         See Note [Matching retained function types].
 
 (CU5) We need to take care with kinds.  See Note [tcMatchTy vs tcMatchTyKi]
 
@@ -193,7 +200,7 @@ Examples
        where  type family Loop where Loop = Maybe Loop
 
 Wrinkle (UR1): see `combineMAR`
-   There is the possibility that two types are MaybeApart for *both* reasons:
+   There is the possibility that two types are MaybeApart for several reasons:
 
    * (a, F Int) ~ (Maybe a, Bool)
 
@@ -599,6 +606,17 @@ tcMatchTyX_BM :: HasDebugCallStack
 tcMatchTyX_BM bind_tv subst ty1 ty2
   = tc_match_tys_x bind_tv IgnoreOuterKinds subst [ty1] [ty2]
 
+-- | Extend an immutable match through supported fixed-domain retained binders.
+-- The binder predicate still controls which outer template variables can bind.
+-- See Note [Matching retained function types].
+tcMatchRetainedTyX_BM :: HasDebugCallStack
+                      => BindTvFun -> Subst
+                      -> Type -> Type -> Maybe Subst
+tcMatchRetainedTyX_BM bind_tv subst ty1 ty2
+  = tc_match_tys_x_retained True bind_tv IgnoreOuterKinds subst' [ty1] [ty2]
+  where
+    subst' = extendSubstInScopeSet subst (tyCoVarsOfTypes [ty1, ty2])
+
 -- | Like 'tcMatchTy', but allows the kinds of the types to differ,
 -- and thus matches them as well.
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -677,8 +695,14 @@ tc_match_tys_x :: HasDebugCallStack
                -> [Type]
                -> [Type]
                -> Maybe Subst
-tc_match_tys_x bind_tv match_kis (Subst in_scope id_env tv_env cv_env) tys1 tys2
-  = case tc_unify_tys neverBindFam  -- (ATF7) in Note [Apartness and type families]
+tc_match_tys_x = tc_match_tys_x_retained False
+
+-- | Select retained binder traversal for an immutable matching operation.
+tc_match_tys_x_retained :: HasDebugCallStack
+                       => Bool -> BindTvFun -> OuterKindsFlag -> Subst
+                       -> [Type] -> [Type] -> Maybe Subst
+tc_match_tys_x_retained retained bind_tv match_kis (Subst in_scope id_env tv_env cv_env) tys1 tys2
+  = case tc_unify_tys retained neverBindFam  -- (ATF7) in Note [Apartness and type families]
                       bind_tv
                       Matching  -- Matching, not unifying
                       False     -- Not an injectivity check
@@ -700,7 +724,7 @@ ruleMatchTyKiX
   -> Maybe TvSubstEnv
 ruleMatchTyKiX tmpl_tvs rn_env tenv tmpl target
 -- See Note [Kind coercions in Unify]
-  = case tc_unify_tys neverBindFam (matchBindTv tmpl_tvs)
+  = case tc_unify_tys False neverBindFam (matchBindTv tmpl_tvs)
       -- neverBindFam: a type family probably shouldn't appear
       -- on the LHS of a RULE, although we don't currently prevent it.
       -- But even if it did, (ATF8) in Note [Apartness and type families]
@@ -818,7 +842,7 @@ tcUnifyTysForInjectivity
 -- The code is incorporated with the standard unifier for convenience, but
 -- its operation should match the specification in the paper.
 tcUnifyTysForInjectivity unif tys1 tys2
-  = case tc_unify_tys alwaysBindFam alwaysBindTv
+  = case tc_unify_tys False alwaysBindFam alwaysBindTv
                        unif   -- Am I unifying?
                        True   -- Do injectivity checks
                        IgnoreOuterKinds  -- Don't check outermost kinds
@@ -874,7 +898,7 @@ tc_unify_tys_fg :: OuterKindsFlag
                 -> [Type] -> [Type]
                 -> UnifyResult
 tc_unify_tys_fg match_kis bind_fam bind_tv tys1 tys2
-  = do { (tv_env, _) <- tc_unify_tys bind_fam bind_tv
+  = do { (tv_env, _) <- tc_unify_tys False bind_fam bind_tv
                                   Unifying
                                   False      -- Not doing an injectivity check
                                   match_kis  -- Match outer kinds
@@ -888,7 +912,8 @@ tc_unify_tys_fg match_kis bind_fam bind_tv tys1 tys2
 
 -- | This function is actually the one to call the unifier -- a little
 -- too general for outside clients, though.
-tc_unify_tys :: BindFamFun -> BindTvFun
+tc_unify_tys :: Bool           -- ^ Permit fixed-domain retained matching
+             -> BindFamFun -> BindTvFun
              -> AmIUnifying    -- ^ Unifying or matching
              -> Bool           -- ^ True <=> doing an injectivity check
              -> OuterKindsFlag -- ^ Check outer kinds or not
@@ -909,7 +934,7 @@ tc_unify_tys :: BindFamFun -> BindTvFun
 -- pair equal. Yet, we still don't need a separate pass to unify the kinds
 -- of these types, so it's appropriate to use the Ty variant of unification.
 -- See also Note [tcMatchTy vs tcMatchTyKi].
-tc_unify_tys bind_fam bind_tv unif inj_check match_kis match_mults rn_env tv_env cv_env tys1 tys2
+tc_unify_tys retained bind_fam bind_tv unif inj_check match_kis match_mults rn_env tv_env cv_env tys1 tys2
   = initUM tv_env cv_env $
     do { case match_kis of
             CheckOuterKinds  -> unify_tys env kis1 kis2
@@ -920,6 +945,7 @@ tc_unify_tys bind_fam bind_tv unif inj_check match_kis match_mults rn_env tv_env
                 , um_bind_fam_fun = bind_fam
                 , um_foralls      = emptyVarSet
                 , um_unif         = unif
+                , um_match_retained = retained
                 , um_inj_tf       = inj_check
                 , um_arr_mult     = match_mults
                 , um_rn_env       = rn_env }
@@ -1015,17 +1041,25 @@ data MaybeApartReason
   | MARCast         -- ^ Very obscure.
     -- See (KCU2) in Note [Kind coercions in Unify]
 
+  | MARRuntimeIndex -- ^ An opaque retained runtime value may equal another index.
+
+  | MARRetainedFunction -- ^ Retained-function congruence is not implemented.
+
 
 combineMAR :: MaybeApartReason -> MaybeApartReason -> MaybeApartReason
 -- See (UR1) in Note [Unification result] for why MARInfinite wins
 combineMAR MARInfinite         _ = MARInfinite   -- MARInfinite wins
 combineMAR MARTypeFamily       r = r             -- Otherwise it doesn't really matter
 combineMAR MARCast             r = r
+combineMAR MARRuntimeIndex     r = r
+combineMAR MARRetainedFunction r = r
 
 instance Outputable MaybeApartReason where
   ppr MARTypeFamily       = text "MARTypeFamily"
   ppr MARInfinite         = text "MARInfinite"
   ppr MARCast             = text "MARCast"
+  ppr MARRuntimeIndex     = text "MARRuntimeIndex"
+  ppr MARRetainedFunction = text "MARRetainedFunction"
 
 instance Semigroup MaybeApartReason where
   (<>) = combineMAR
@@ -1574,6 +1608,87 @@ data AmIUnifying = Matching | Unifying
 type InType      = Type       -- Before applying the RnEnv2
 type OutCoercion = Coercion   -- After applying the RnEnv2
 
+-- | Test for a runtime index dependency, excluding ordinary coercion variables.
+hasRuntimeIndex :: Type -> Bool
+hasRuntimeIndex = anyFreeVarsOfType (\v -> isId v && not (isCoVar v))
+
+-- | Detect retained binders, including those with no free runtime indices.
+hasRetainedFunction :: Type -> Bool
+hasRetainedFunction = getAny . go_ty
+  where
+    (go_ty, _, _, _) = foldTyCo TyCoFolder
+      { tcf_view = coreView
+      , tcf_lit = const mempty
+      , tcf_tyvar = go_ty . varType
+      , tcf_covar = go_ty . varType
+      , tcf_termvar = const mempty
+      , tcf_termbinder = \_ _ -> Any True
+      , tcf_tycobinder = \_ body -> body
+      , tcf_hole = go_ty . varType . coHoleCoVar }
+
+{- Note [Matching retained function types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An unsupported retained-function comparison must return MaybeApart, not panic
+or assert SurelyApart. PMC uses this matcher to filter imported COMPLETE sets.
+It can compare an unrelated constructor result with a retained function type.
+MaybeApart rejects that match without claiming a complete apartness decision.
+
+Process casts and ordinary template variables before the DepFunTy fallback.
+An immutable template substitution can bind a whole retained function type.
+The usual scope check still prevents an enclosing bound variable from escaping.
+The occurs check visits the binder domain and its scoped body. As under a
+forall, do not consult family substitutions under that binder.
+
+The default policy does not descend into a retained function. Keep that policy
+for all existing matching, unification, injectivity and PMC callers. The separate
+tcMatchRetainedTyX_BM entry point opts in to immutable matching through supported
+runtime binders. Both binders must be local unrestricted native index Ids with
+the same closed domain. Both bodies must have kind Type, and the accumulated
+kind coercion must be reflexive. Compare the domains; do not infer them.
+
+Use umRnBndr2 to compare the bodies in one shared binder scope. TermVarTy uses
+that renaming. The existing bound-variable escape check sees free runtime Ids,
+so an outer template variable cannot capture either runtime binder. Keep ordinary
+occurs checks and family matching unchanged. As under a forall, family
+substitution lookups do not occur under the runtime binder. The template-variable
+predicate still restricts which outer variables can bind.
+
+Seed the new entry point's in-scope set with free variables of both input types.
+The paired renamer must avoid a free runtime Id even when the supplied
+substitution is empty. Otherwise, a target binder shared with a free template
+Id can become the common binder and falsely match that free occurrence.
+
+The opt-in path does not assign a Tc metavariable or provide solver equality or
+Pi congruence. Unsupported comparisons keep MaybeApart. See Note [Coverage
+checking retained functions] in GHC.HsToCore.Pmc.Solver and the Agda WHNF
+references in docs/dependent-haskell/REFERENCES.md.
+
+Alpha-equivalent retained types with no free TyCoVars can succeed by tcEqType.
+There are no template variables to bind and no enclosing forall renamings to
+apply. Runtime index Ids remain rigid. This also handles repeated whole-type
+substitutions in the fine-grained unifier. Open types retain MaybeApart.
+
+Note [Apartness of retained runtime indices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TermVarTy denotes an opaque runtime value. Equal Ids, after renaming, match
+reflexively. Different Ids can denote the same value. An opaque Id can also
+denote a constructor index, including S (TermVarTy v) for a cyclic Nat v.
+These comparisons must return MaybeApart,
+not SurelyApart. Otherwise a closed family could skip a possible earlier
+constructor equation. See (U3) and (U4) in Note [Specification of unification].
+
+Handle ordinary TyVars first. A family template variable can match a runtime
+index through the immutable matching substitution. This does not assign a Tc
+metavariable. When matching a repeated template variable, keep the same
+uncertainty if its previous target and its next target contain runtime indices.
+Do not equate those targets or change the existing substitution.
+
+Process casts before these rigid-index cases to preserve the kind coercion.
+Do not inspect Id unfoldings or evaluate an index. Retained-function congruence
+remains unsupported. See Note [Restricted retained dependent types] in
+GHC.Core.TyCo.Rep and docs/dependent-haskell/REFERENCES.md#agda-provenance.
+-}
+
 
 unify_ty :: UMEnv
          -> InType -> InType  -- Types to be unified
@@ -1669,6 +1784,30 @@ unify_ty env (TyVarTy tv1) ty2 kco
 unify_ty env ty1 (TyVarTy tv2) kco
   | Unifying <- um_unif env  -- If unifying, can swap args; but not when matching
   = uVarOrFam (umSwapRn env) (TyVarLHS tv2) ty1 (mkSymCo kco)
+
+-- See Note [Matching retained function types].
+unify_ty env (DepFunTy b1 body1) (DepFunTy b2 body2) kco
+  | Matching <- um_unif env
+  , um_match_retained env
+  , isNativeIndexId b1, isNativeIndexId b2
+  , tcEqType (varType b1) (varType b2)
+  , typeKind body1 `eqType` liftedTypeKind
+  , typeKind body2 `eqType` liftedTypeKind
+  , isReflCo kco
+  = unify_ty (umRnBndr2 env b1 b2) body1 body2 kco
+unify_ty _ ty1@(DepFunTy {}) ty2@(DepFunTy {}) _
+  | not (anyFreeVarsOfTypes isTyCoVar [ty1, ty2])
+  , tcEqType ty1 ty2
+  = return ()
+unify_ty _ (DepFunTy {}) _ _ = maybeApart MARRetainedFunction
+unify_ty _ _ (DepFunTy {}) _ = maybeApart MARRetainedFunction
+
+-- See Note [Apartness of retained runtime indices].
+unify_ty env (TermVarTy v1) (TermVarTy v2) _kco
+  | rnOccL (um_rn_env env) v1 == rnOccR (um_rn_env env) v2
+  = return ()
+unify_ty _ (TermVarTy {}) _ _ = maybeApart MARRuntimeIndex
+unify_ty _ _ (TermVarTy {}) _ = maybeApart MARRuntimeIndex
 
 -- Deal with TyConApps
 unify_ty env ty1 ty2 kco
@@ -1807,6 +1946,10 @@ uVarOrFam env ty1 ty2 kco
       = -- We already have a substitution for tv1
         if | Unifying <- um_unif env              -> unify_ty env ty1' ty2 kco
            | (ty1' `mkCastTy` kco) `tcEqType` ty2 -> return ()
+           | hasRuntimeIndex ty1' || hasRuntimeIndex ty2
+               -> maybeApart MARRuntimeIndex
+           | hasRetainedFunction ty1' || hasRetainedFunction ty2
+               -> maybeApart MARRetainedFunction
            | otherwise                            -> surelyApart
            -- Unifying: recurse into unify_ty
            -- Matching: we /don't/ want to just recurse here, because the range of
@@ -1849,6 +1992,8 @@ uVarOrFam env ty1 ty2 kco
       = go IsSwapped substs lhs2 (mkTyVarTy tv1) (mkSymCo kco)
 
       | occurs_check = maybeApart MARInfinite   -- Occurs check
+      | hasRuntimeIndex ty2 = maybeApart MARRuntimeIndex
+      | hasRetainedFunction ty2 = maybeApart MARRetainedFunction
       | otherwise    = surelyApart
 
       where
@@ -1978,6 +2123,15 @@ uOccursCheck (UMState { um_tv_env = tv_env, um_fam_env = fam_env }) bvs lhs ty
     go :: TyCoVarSet   -- Bound by enclosing foralls; see (OCU1)
        -> Type -> Bool
     go bvs ty | Just ty' <- coreView ty = go bvs ty'
+    go _ (TermVarTy {}) = False
+      -- A supported index Id has a closed algebraic domain and Many
+      -- multiplicity. Its type has no type variables or family applications.
+      -- See Note [Apartness of retained runtime indices].
+    go bvs (DepFunTy v body)
+      = go bvs (varType v) ||
+        (case lhs of
+           TyVarLHS {} -> go (bvs `extendVarSet` v) body
+           TyFamLHS {} -> False)  -- Lookups do not happen under this binder.
     go bvs (TyVarTy tv) | Just ty' <- lookupVarEnv tv_env tv
                         = go bvs ty'
                         | TyVarLHS tv' <- lhs, tv==tv'
@@ -2076,6 +2230,10 @@ sleeping dogs lie for now.
 data UMEnv
   = UMEnv { um_unif :: AmIUnifying
 
+          , um_match_retained :: Bool
+            -- Opt in to fixed-domain Pi matching; never used when unifying.
+            -- See Note [Matching retained function types].
+
           , um_inj_tf :: Bool
             -- Checking for injectivity?
             -- See (SI1) in Note [Specification of unification]
@@ -2090,7 +2248,7 @@ data UMEnv
             -- See (CU2) in Note [The Core unifier]
 
           , um_foralls :: TyVarSet
-            -- OutTyVars bound by a forall in this unification;
+            -- OutVars bound by a forall or an opted-in retained match;
             -- Do not bind these in the substitution!
             -- See the function tvBindFlag
 
@@ -2307,6 +2465,8 @@ ty_co_match :: MatchEnv   -- ^ ambient helpful info
    -- ^ Just env ==> liftCoSubst Nominal env ty == co, modulo roles.
    -- Also: Just env ==> lsubst(ty) == lty and rsubst(ty) == rty,
    -- where lsubst = lcSubstLeft(env) and rsubst = lcSubstRight(env)
+ty_co_match _ _ (TermVarTy {}) _ _ _ = Nothing
+ty_co_match _ _ (DepFunTy {}) _ _ _ = Nothing
 ty_co_match menv subst ty co lkco rkco
   | Just ty' <- coreView ty = ty_co_match menv subst ty' co lkco rkco
 
@@ -2358,6 +2518,10 @@ ty_co_match menv subst (TyVarTy tv1) co lkco rkco
   where
     rn_env = me_env menv
     tv1' = rnOccL rn_env tv1
+
+  -- Structural matching under a retained runtime binder is not supported.
+  -- A template type variable can still bind to the whole coercion above.
+ty_co_match _ _ _ (DepFunCo {}) _ _ = Nothing
 
   -- just look through SubCo's. We don't really care about roles here.
 ty_co_match menv subst ty (SubCo co) lkco rkco

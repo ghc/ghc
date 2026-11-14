@@ -8,6 +8,17 @@ paraphrase a slice of the language, useful for exposition. The document here
 contains the official description of the language, as it is implemented in
 GHC.
 
+Experimental retained Boolean types
+-----------------------------------
+
+The internal DepFunTy and TermVarTy experiment is specified separately in
+../dependent-haskell/CORE.md. It adds runtime Boolean indices and retained
+dependent application. Its optimizer, backend, and interface paths are gated.
+The Ott rules and the PDF in this directory do not cover that experiment.
+Do not attribute their guarantees to the new forms. The Boolean branch-evidence
+rule also has a separate specification and API checks. It has no preservation
+proof in this formalism. Non-reflexive dependent congruence remains unsupported.
+
 Building
 --------
 

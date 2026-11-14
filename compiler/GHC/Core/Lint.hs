@@ -50,7 +50,7 @@ import GHC.Core.Lint.SubstTypeLets( substTypeLets )
 import GHC.Core.Ppr
 import GHC.Core.Coercion
 import GHC.Core.Type as Type
-import GHC.Core.Predicate( isCoVarType )
+import GHC.Core.Predicate( isCoVarType, mkNomEqPred )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
@@ -126,6 +126,10 @@ to decouple the safety of the resulting program from the type inference algorith
 However, do note point (4) above. Core Lint does not check for incomplete case-matches;
 see Note [Case expression invariants] in GHC.Core, invariant (4). As explained there,
 an incomplete case-match might slip by Core Lint and cause trouble at runtime.
+
+The experimental native dependent forms are outside this guarantee. They cannot
+enter the ordinary optimizer or backend. Their Boolean proof alternatives have
+an additional coverage check. See Note [Native algebraic branch evidence].
 
 Note [GHC Formalism]
 ~~~~~~~~~~~~~~~~~~~~
@@ -531,6 +535,8 @@ lintRecBindings top_lvl pairs thing_inside
 lintLetBody :: LintLocInfo -> [Id] -> CoreExpr -> LintM (Type, UsageEnv)
 lintLetBody loc bndrs body
   = do { (body_ty, body_ue) <- addLoc loc (lintCoreExpr body)
+       ; lintL (not (any (\b -> isNonCoVarId b && b `elemVarSet` tyCoVarsOfType body_ty) bndrs))
+           (text "Let-bound runtime index escapes its scope:" <+> ppr body_ty)
        ; mapM_ (lintJoinBndrType body_ty) bndrs
        ; return (body_ty, body_ue) }
 
@@ -955,6 +961,7 @@ lintCoreExpr e@(App _ _)
 
        ; runrw_pr <- lintApp (text "runRW# expression")
                                lintTyArg lint_rw_cont
+                               (Just id)
                                (idType fun) [ty_arg1,ty_arg2,cont_arg] zeroUE
        ; lintCoreArgs runrw_pr rest }
 
@@ -1440,7 +1447,7 @@ subtype of the required type, as one would expect.
 -- e.g. f :: Int -> Bool -> Int would return `Int` as result type.
 lintCoreArgs  :: (Type, UsageEnv) -> [CoreExpr] -> LintM (Type, UsageEnv)
 lintCoreArgs (fun_ty, fun_ue) args
-  = lintApp (text "expression") lintTyArg lintValArg fun_ty args fun_ue
+  = lintApp (text "expression") lintTyArg lintValArg (Just id) fun_ty args fun_ue
 
 lintTyArg :: CoreExpr -> LintM Type
 
@@ -1540,6 +1547,14 @@ lintTyApp fun_ty arg_ty
 lintValApp :: CoreExpr -> Type -> Type -> UsageEnv -> UsageEnv
            -> LintM (Type, UsageEnv)
 lintValApp arg fun_ty arg_ty fun_ue arg_ue
+  | DepFunTy b res_ty <- coreFullView fun_ty
+  = do { ensureEqTys (varType b) arg_ty (mkAppMsg (varType b) arg_ty arg)
+       ; lintL (isNativeIndexId b && isJust (exprToNativeIndex arg))
+           (text "Unsupported retained constructor field:" <+> ppr arg)
+       ; in_scope <- getInScope
+       ; let subst = Subst in_scope (unitVarEnv b arg) emptyVarEnv emptyVarEnv
+       ; return (substTy subst res_ty, addUE fun_ue (scaleUE ManyTy arg_ue)) }
+    -- See Note [Linting retained constructor fields].
   | Just (_, w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
   = do { ensureEqTys arg_ty' arg_ty (mkAppMsg arg_ty' arg_ty arg)
        ; let app_ue =  addUE fun_ue (scaleUE w arg_ue)
@@ -1579,6 +1594,16 @@ lintCaseExpr scrut case_bndr alt_ty alts
        ; addLoc (CaseTy scrut) $ lintValueType alt_ty
 
        ; checkCaseAlts e scrut scrut_ty alts
+       ; when (any isNativeIndexAlt alts) $
+           lintL (any is_default alts || covers_domain scrut_ty)
+             (text "Native index proof alternatives must be exhaustive:" <+> ppr e)
+
+       ; when (any isNativeIndexAliasAlt alts) $
+           do { in_scope <- getInScope
+              ; lintL (isNativeIndexId case_bndr
+                        && not (case_bndr `elemInScopeSet` in_scope))
+                  (text "Native index alias case requires a fresh unrestricted local index binder:"
+                   <+> ppr case_bndr) }
 
        -- Lint the case-binder. Must do this after linting the scrutinee
        -- because the case-binder isn't in scope in the scrutineex
@@ -1592,9 +1617,18 @@ lintCaseExpr scrut case_bndr alt_ty alts
          -- See GHC.Core Note [Case expression invariants] item (7)
 
        ; -- Check the alternatives
-       ; alt_ues <- mapM (lintCoreAlt case_bndr scrut_ty scrut_mult alt_ty) alts
+       ; alt_ues <- mapM (lintCoreAlt (exprToNativeIndex scrut) case_bndr scrut_ty scrut_mult alt_ty) alts
        ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
        ; return (alt_ty, case_ue) } }
+  where
+    is_default (Alt DEFAULT _ _) = True
+    is_default _ = False
+    covers_domain ty
+      | isNativeIndexType ty, Just (tc, []) <- splitTyConApp_maybe ty
+      = all (\con -> any (has_con con) alts) (tyConDataCons tc)
+      | otherwise = False
+    has_con expected (Alt (DataAlt con) _ _) = con == expected
+    has_con _ _ = False
 
 checkCaseAlts :: CoreExpr -> CoreExpr -> Type -> [CoreAlt] -> LintM ()
 -- a) Check that the alts are non-empty
@@ -1659,7 +1693,11 @@ checkCaseAlts e scrut scrut_ty alts
            _otherwise -> return ()
         }
   where
-    (con_alts, _maybe_deflt) = findDefault alts
+    -- findDefault requires an ordinary DEFAULT with no binders. Check native
+    -- alias proofs and malformed DEFAULT binders in lintCoreAlt instead.
+    con_alts = case alts of
+      Alt DEFAULT _ _ : rest -> rest
+      _ -> alts
 
         -- Check that successive alternatives have strictly increasing tags
     increasing_tag (alt1 : rest@( alt2 : _)) = alt1 `ltAlt` alt2 && increasing_tag rest
@@ -1678,7 +1716,8 @@ lintAltExpr expr ann_ty
        ; return ue }
          -- See GHC.Core Note [Case expression invariants] item (6)
 
-lintCoreAlt :: Id         -- Case binder
+lintCoreAlt :: Maybe Type -- Supported native index of the scrutinee
+            -> Id         -- Case binder
             -> Type       -- Type of scrutinee
             -> Mult          -- Multiplicity of scrutinee
             -> Type       -- Type of the alternative
@@ -1686,7 +1725,29 @@ lintCoreAlt :: Id         -- Case binder
             -> LintM UsageEnv
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreAlt case_bndr _ scrut_mult alt_ty (Alt DEFAULT args rhs) =
+lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt DEFAULT args rhs)
+  | isNativeIndexAliasAlt alt
+  = addLoc (CaseAlt alt) $ do
+    { index <- case scrut_index of
+        Just index -> return index
+        Nothing -> failWithL (text "Unsupported scrutinee for native index alias evidence")
+    ; cv <- case args of
+        [cv] | isCoVar cv -> return cv
+        _ -> failWithL (text "Native index alias alternative must bind exactly one CoVar")
+    ; in_scope <- getInScope
+    ; lintL (isLocalId cv && not (cv `elemInScopeSet` in_scope))
+        (text "Native index alias evidence requires a fresh local CoVar:" <+> ppr cv)
+    ; ensureEqTys (typeKind index) scrut_ty
+        (text "Native index alias endpoints must have the same domain")
+    ; let expected = mkNomEqPred (TermVarTy case_bndr) index
+    ; ensureEqTys (varType cv) expected
+        (text "Invalid nominal index alias evidence:" <+> ppr cv <+> dcolon <+> ppr (varType cv))
+    ; lintBinder CasePatBind cv $ do
+      { rhs_ue <- lintAltExpr rhs alt_ty
+      ; return (deleteUE (deleteUE rhs_ue cv) case_bndr) }
+    }
+    -- See Note [Native index alias evidence].
+lintCoreAlt _ case_bndr _ scrut_mult alt_ty (Alt DEFAULT args rhs) =
   do { lintL (null args) (mkDefaultArgsMsg args)
      ; rhs_ue <- lintAltExpr rhs alt_ty
      ; let (case_bndr_usage, rhs_ue') = popUE rhs_ue case_bndr
@@ -1695,7 +1756,7 @@ lintCoreAlt case_bndr _ scrut_mult alt_ty (Alt DEFAULT args rhs) =
      ; ensureSubUsage case_bndr_usage scrut_mult err_msg
      ; return rhs_ue' }
 
-lintCoreAlt case_bndr scrut_ty _ alt_ty (Alt (LitAlt lit) args rhs)
+lintCoreAlt _ case_bndr scrut_ty _ alt_ty (Alt (LitAlt lit) args rhs)
   | litIsLifted lit
   = failWithL integerScrutinisedMsg
   | otherwise
@@ -1707,7 +1768,41 @@ lintCoreAlt case_bndr scrut_ty _ alt_ty (Alt (LitAlt lit) args rhs)
   where
     lit_ty = literalType lit
 
-lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rhs)
+lintCoreAlt scrut_index case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rhs)
+  | isNativeIndexAlt alt
+  = addLoc (CaseAlt alt) $ do
+    { index <- case scrut_index of
+        Just index -> return index
+        Nothing -> failWithL (text "Unsupported scrutinee for native index evidence")
+    ; (fields, cv) <- case splitAt (dataConRepArity con) args of
+        (fields, [cv]) -> return (fields, cv)
+        _ -> failWithL (text "Native index alternative must bind its fields followed by one CoVar")
+    ; in_scope <- getInScope
+    ; let field_set = mkVarSet fields
+    ; lintL (all isNativeIndexId fields
+             && all (\v -> not (v `elemInScopeSet` in_scope)) fields
+             && sizeVarSet field_set == length fields)
+        (text "Native index fields must be fresh unrestricted local identifiers:" <+> ppr fields)
+    ; lintL (isCoVar cv && isLocalId cv && not (cv `elemInScopeSet` in_scope)
+             && not (cv `elemVarSet` field_set))
+        (text "Native index evidence requires a fresh local CoVar:" <+> ppr cv)
+    ; ensureEqTys scrut_ty (mkTyConTy (dataConTyCon con))
+        (mkBadPatMsg scrut_ty (mkTyConTy (dataConTyCon con)))
+    ; let payload_ty = dataConRepType con
+          multiplicities = map scaledMult (dataConRepArgTys con)
+    ; lintBinders CasePatBind fields $ do
+      { let expected = mkNomEqPred index
+                         (mkTyConApp (promoteDataCon con) (map TermVarTy fields))
+      ; ensureEqTys (varType cv) expected
+          (text "Invalid nominal index branch evidence:" <+> ppr cv <+> dcolon <+> ppr (varType cv))
+      ; lintBinder CasePatBind cv $ do
+        { rhs_ue <- lintAltExpr rhs alt_ty
+        ; rhs_ue' <- allowDeadOccs $ addLoc (CasePat alt) $
+                      lintAltBinders (deleteUE rhs_ue cv) case_bndr scrut_ty payload_ty
+                                     (zipEqual multiplicities fields)
+        ; return (deleteUE rhs_ue' case_bndr) } }
+    }
+    -- See Note [Native algebraic branch evidence].
   | isNewTyCon (dataConTyCon con)            -- (DALT1) in Note [DataAlt restrictions] in GHC.Core
   = zeroUE <$ addErrL (mkNewTyDataConAltMsg scrut_ty alt)
   | isUnaryClassTyCon (dataConTyCon con)     -- (DALT3) in Note [DataAlt restrictions] in GHC.Core
@@ -1720,12 +1815,25 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
       -- Instantiate the universally quantified
       -- type variables of the data constructor
     ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys
-          ; binderMult (Named _)   = ManyTy
-          ; binderMult (Anon st _) = scaledMult st
           -- See Note [Validating multiplicities in a case]
-          ; multiplicities = map binderMult $ fst $ splitPiTys con_payload_ty }
+          ; multiplicities = constructorMults con_payload_ty
+          ; constructorMults ty = case coreFullView ty of
+              ForAllTy _ body -> ManyTy : constructorMults body
+              DepFunTy _ body -> ManyTy : constructorMults body
+              FunTy { ft_mult = mult, ft_res = body }
+                              -> mult : constructorMults body
+              _               -> [] }
+
+    ; unless (null (dataConRepArgBinders con)) $ do
+      { in_scope <- getInScope
+      ; lintL (all (\v -> isLocalId v && not (isCoVar v)
+                         && not (v `elemInScopeSet` in_scope)) args
+               && sizeVarSet (mkVarSet args) == length args)
+          (text "Retained constructor fields require fresh local Ids:" <+> ppr args) }
 
         -- And now bring the new binders into scope
+    ; lintL (multiplicities `equalLength` args)
+        (text "Wrong number of constructor alternative binders:" <+> ppr alt)
     ; lintBinders CasePatBind args $ do
       { rhs_ue <- lintAltExpr rhs alt_ty
       ; rhs_ue' <- allowDeadOccs $  -- See Note [Dead occurrences]
@@ -1738,6 +1846,66 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
 
   | otherwise   -- Scrut-ty is wrong shape
   = zeroUE <$ addErrL (mkBadAltMsg scrut_ty alt)
+
+{- Note [Linting retained constructor fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Count a retained Pi as one runtime constructor field. Check an alternative's
+fields as sequential applications of the constructor worker. A retained field
+substitutes its actual Id into the remaining telescope. Checking each field
+against a flat list would lose the dependency on the preceding field.
+
+Require fresh local field Ids before extending the alternative's scope. This
+prevents an outer runtime index from being captured by the new field binding.
+The case result annotation is checked outside that scope, so an unpacked index
+cannot escape. See Note [Retained constructor field telescopes] in
+GHC.Core.DataCon and Note [Instantiating retained constructor fields] in
+GHC.Core.Utils.
+-}
+
+{- Note [Native index alias evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A strict Core case binds the value of its scrutinee to the case binder. A
+DEFAULT alternative can bind one virtual nominal CoVar for this identity:
+cv :: TermVarTy case_bndr ~# index(scrutinee). Derive both endpoints from the
+checked case. Do not trust endpoints supplied by a producer. The case binder
+and proof must be fresh. The case binder must be an unrestricted local Id
+with a supported index domain. The result annotation remains outside their
+scope. The proof is available only in the alternative.
+
+The checker accepts any supported scrutinee index. CorePrep must separately
+preserve evaluation behavior when it inserts such a case. In particular, a
+case on a constructor WHNF does not force its lifted fields. A case on an
+unknown runtime Id can force that Id. CoreToStg removes the virtual proof
+after mandatory native Core Lint. Ordinary coercion slots keep their rules.
+
+Agda substitutes let definitions during checking. Dependent ANF compilation
+must preserve the identity of a named computation. These sources guide this
+explicit identity rule; they do not prove its behavior for lazy Haskell.
+See docs/dependent-haskell/REFERENCES.md#agda-provenance and the ANF reference
+there. This rule does not make ordinary let aliases definitionally equal.
+-}
+
+{- Note [Native algebraic branch evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A refining alternative binds its ordinary runtime fields, then one virtual
+CoVar. For Nat, S k cv has cv :: index(scrutinee) ~# 'S (TermVarTy k). Strict
+constructor discrimination justifies this nominal equality. Bring the real
+fields into scope before checking the proof. The proof is not a worker argument.
+Check the fields through lintAltBinders and erase only the proof in CoreToStg.
+An ordinary S k alternative has no virtual proof and keeps its existing rule.
+
+Require fresh fields as well as a fresh CoVar. If k captured the scrutinee's
+identifier, the expected equality would refer to the field on both sides.
+Retain the actual scrutinee index; do not substitute the case binder for it.
+The result annotation stays outside all alternative binders. lintCaseExpr checks
+coverage against the domain's ordinary constructors before admitting evidence.
+
+Agda's constructor splitting is the precedent for a refined field context.
+Here fields remain lazy Haskell values. Constructor discrimination does not prove
+that the predecessor terminates or that a recursive runtime value is finite.
+The ordinary optimizer remains gated. See docs/dependent-haskell/CORE.md and
+the Agda provenance in docs/dependent-haskell/REFERENCES.md.
+-}
 
 {-
 Note [Validating multiplicities in a case]
@@ -1929,6 +2097,24 @@ lintType (TyVarTy tv)
   | otherwise
   = lintVarOcc tv
 
+lintType (TermVarTy v)
+  = do { in_scope <- getInScope
+       ; lintL (isNativeIndexId v
+                 && maybe False (\b -> isNativeIndexId b && varType b `eqType` varType v)
+                                (lookupInScope in_scope v))
+           (text "Invalid runtime index:" <+> ppr v <+> dcolon <+> ppr (varType v))
+       ; lintVarOcc v }
+
+lintType (DepFunTy b body)
+  = do { lintL (isNativeIndexId b)
+           (text "Invalid retained runtime binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
+       ; lintL (b `elemVarSet` tyCoVarsOfType body)
+           (text "Vacuous retained dependent binder:" <+> ppr b)
+       ; lintBinder LambdaBind b $
+         do { lintType body
+            ; lintL (typeKind body `eqType` liftedTypeKind)
+                (text "Retained dependent result must have kind Type:" <+> ppr body) } }
+
 lintType ty@(AppTy t1 t2)
   | TyConApp {} <- t1
   = failWithL $ text "TyConApp to the left of AppTy:" <+> ppr ty
@@ -2092,6 +2278,7 @@ lint_tyco_app msg fun_kind arg_tys
     -- See Note [Avoiding compiler perf traps when constructing error messages.]
   = do { _ <- lintApp msg (\ty     -> do { lintType ty; return ty })
                           (\ty _ _ -> do { lintType ty; return (typeKind ty,()) })
+                          Nothing
                           fun_kind arg_tys ()
        ; return () }
 
@@ -2100,6 +2287,7 @@ lintApp :: forall a acc. Outputable a =>
              SDoc
           -> (a -> LintM Type)                        -- Lint the thing and return its value
           -> (a -> Mult -> acc -> LintM (Kind, acc))  -- Lint the thing and return its type
+          -> Maybe (a -> CoreExpr)                  -- Runtime arguments only
           -> Type
           -> [a]                          -- The arguments
           -> acc                          -- Used (only) for UsageEnv in /term/ applications
@@ -2120,7 +2308,7 @@ lintApp :: forall a acc. Outputable a =>
 {-# INLINE lintApp #-}    -- INLINE: very few call sites;
                           -- not recursive; specialised at its call sites
 
-lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
+lintApp msg lint_forall_arg lint_arrow_arg runtime_arg !orig_fun_ty all_args acc
     = do { !in_scope <- getInScope
          -- We need the in_scope set to satisfy the invariant in
          -- Note [The substitution invariant] in GHC.Core.TyCo.Subst
@@ -2146,6 +2334,20 @@ lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
                                 2 (ppr arg' <+> dcolon <+> ppr karg'))
                       ; go subst' body_ty acc args }
 
+               go subst (DepFunTy b body_ty) acc (arg:args)
+                 = case runtime_arg of
+                     Nothing -> failWithL (text "Retained runtime binder in a type application")
+                     Just to_core -> do
+                       { (arg_ty, acc') <- lint_arrow_arg arg ManyTy acc
+                       ; ensureEqTys (varType b) arg_ty
+                           (text "Retained runtime argument has the wrong type:" <+> ppr arg)
+                       ; let arg_expr = to_core arg
+                       ; lintL (isJust (exprToNativeIndex arg_expr))
+                           (text "Unsupported retained runtime argument:" <+> ppr arg)
+                       ; let Subst in_scope ids tvs cvs = subst
+                             subst' = Subst in_scope (extendVarEnv ids b arg_expr) tvs cvs
+                       ; go subst' body_ty acc' args }
+
                go subst fun_ty@(FunTy _ mult exp_arg_ty res_ty) acc (arg:args)
                  = do { (arg_ty, acc') <- lint_arrow_arg arg (substTy subst mult) acc
                       ; ensureEqTys (substTy subst exp_arg_ty) arg_ty $
@@ -2159,7 +2361,7 @@ lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
                  | Just fun_ty' <- coreView fun_ty
                  = go subst fun_ty' acc args
 
-                 | not (isEmptyTCvSubst subst)  -- See Note [Care with kind instantiation]
+                 | not (isEmptySubst subst)  -- See Note [Care with kind instantiation]
                  = go init_subst (substTy subst fun_ty) acc args
 
                  | otherwise
@@ -2374,6 +2576,16 @@ lintCoercion co@(AppCo co1 co2)
          else lintRole co Nominal r2 }
 
 ----------
+lintCoercion co@(DepFunCo b body_co)
+  = do { lintL (isNativeIndexId b)
+           (text "Invalid retained coercion binder:" <+> ppr b <+> dcolon <+> ppr (varType b))
+       ; lintBinder LambdaBind b $
+         do { lintCoercion body_co
+            ; let Pair left right = coercionKind body_co
+            ; lintL (typeKind left `eqType` liftedTypeKind
+                      && typeKind right `eqType` liftedTypeKind)
+                (text "Retained coercion results must have kind Type:" <+> ppr co) } }
+
 lintCoercion co@(ForAllCo {})
 -- See Note [ForAllCo] in GHC.Core.TyCo.Rep for the typing rule for ForAllCo
   = do { _ <- go [] co; return () }

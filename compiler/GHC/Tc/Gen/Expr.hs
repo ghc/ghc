@@ -40,7 +40,7 @@ import GHC.Tc.Gen.Do
 import GHC.Tc.Gen.Bind        ( tcLocalBinds )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
-import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches
+import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches, tcRetainedCase
                        , tcGRHSNE, tcDoStmts )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Tc.Zonk.TcType
@@ -56,6 +56,8 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Errors.Types hiding (HoleError)
 
 import GHC.Core.Multiplicity
+import qualified GHC.Core as Core
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.UsageEnv
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.ConLike
@@ -450,7 +452,23 @@ tcExpr (ExplicitList _ exprs) res_ty
 
 tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
   | all tupArgPresent tup_args
-  = do { let arity  = length tup_args
+  = do { native_infer <- case res_ty of
+             Infer _ | Boxed <- boxity
+               -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+                     ; if enabled
+                       then snd <$> tcRetainedInferableArg (noLocA expr)
+                       else return False }
+             _ -> return False
+       ; if native_infer
+         then do { checkTupSize (length tup_args)
+                 ; let con = wrapGenSpan (mkHsVar
+                               (noLocA (dataConName (tupleDataCon Boxed (length tup_args)))))
+                       app = foldl' (\fun arg -> wrapGenSpan (HsApp noExtField fun arg))
+                                    con [arg | Present _ arg <- tup_args]
+                 -- See Note [Inference of native tuple fields].
+                 ; tcCollectApp (mkExpandedExpr expr (unLoc app)) res_ty }
+         else do
+       { let arity  = length tup_args
              tup_tc = tupleTyCon boxity arity
                -- NB: tupleTyCon doesn't flatten 1-tuples
                -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
@@ -461,12 +479,31 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
                            -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
        ; let arg_tys' = case boxity of Unboxed -> drop arity arg_tys
                                        Boxed   -> arg_tys
-       ; tup_args1 <- tcCheckExplicitTuple tup_args arg_tys'
-       ; return $ mkHsWrapCo coi (ExplicitTuple x tup_args1 boxity) }
+       ; tup_args1 <- tcCheckExplicitTuple [] tup_args arg_tys'
+       ; return $ mkHsWrapCo coi (ExplicitTuple x tup_args1 boxity) } }
 
   | otherwise
   = -- The tup_args are a mixture of Present and Missing (for tuple sections).
-    do { (tup_args1, arg_tys) <- tcInferTupArgs boxity tup_args
+    do { known_tys <- case (boxity, res_ty) of
+             (Boxed, Check expected)
+               -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+                     ; if not enabled then return Nothing else
+                  do { expected <- liftZonkM (zonkTcType expected)
+                     ; let known
+                             | hasNativeDependentExpr (Core.Type expected)
+                             , Right (missing, result) <- tcSplitFunTysN
+                                 (count (not . tupArgPresent) tup_args) expected
+                             , Just (tc, tys) <- tcSplitTyConApp_maybe result
+                             , tc == tupleTyCon Boxed (length tup_args)
+                             = Just (map scaledMult missing, tys)
+                             | otherwise = Nothing
+                     ; return known } }
+             _ -> return Nothing
+       ; (tup_args1, arg_tys) <- case known_tys of
+             Just (mults, tys)
+               -> do { args <- tcCheckExplicitTuple mults tup_args tys
+                     ; return (args, tys) }
+             Nothing -> tcInferTupArgs boxity tup_args
 
        ; let expr'       = ExplicitTuple x tup_args1 boxity
              missing_tys = [Scaled mult ty | (Missing (Scaled mult _), ty) <- zip tup_args1 arg_tys]
@@ -530,8 +567,16 @@ tcExpr (HsCase ctxt scrut matches) res_ty
           --     case (\v -> v) of {..}
           -- This design choice is discussed in #17790
         ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRhoFRR FRRCase scrut
-        ; matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches res_ty
-        ; return (HsCase ctxt scrut' matches') }
+        ; dependent <- xoptM LangExt.ExperimentalDependentTypes
+        ; retained <- case unLoc (stripParensLHsExpr scrut') of
+            HsVar _ (L _ index) | dependent, isNativeIndexId index ->
+              tcRetainedCase index matches res_ty
+            _ -> return Nothing
+        ; case retained of
+            Just expr -> return expr
+            Nothing -> do
+              { matches' <- tcCaseMatches ctxt tcBody (Scaled mult scrut_ty) matches res_ty
+              ; return (HsCase ctxt scrut' matches') } }
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy
@@ -606,6 +651,7 @@ tcExpr (HsStatic free_names expr) res_ty
   = do  { res_ty          <- expTypeToType res_ty
         ; (co, (p_ty, expr_ty)) <- matchExpectedAppTy res_ty
         ; (expr', lie) <- captureConstraints $
+                          updLclCtxt (\ctxt -> ctxt { tcl_native_givens = [] }) $
                           addErrCtxt (StaticFormCtxt expr) $
                           tcCheckPolyExprNC expr expr_ty
 
@@ -869,26 +915,32 @@ arithSeqEltType (Just fl) res_ty
 
 -- | Typecheck an explicit tuple @(a,b,c)@ or @(\#a,b,c\#)@.
 --
--- Does not handle tuple sections.
-tcCheckExplicitTuple :: [HsTupArg GhcRn]
+-- The first argument gives missing-field multiplicities in source order.
+tcCheckExplicitTuple :: [Mult]
+                     -> [HsTupArg GhcRn]
                      -> [TcSigmaType]
                           -- ^ Argument types.
                           -- This function ensures they all have
                           -- a fixed runtime representation.
                      -> TcM [HsTupArg GhcTc]
-tcCheckExplicitTuple args tys
+tcCheckExplicitTuple mults args tys
   = do massert (equalLength args tys)
        checkTupSize (length args)
-       zipWith3M go [1,2..] args tys
+       go 1 mults args tys
   where
-    go :: Int -> HsTupArg GhcRn -> TcType -> TcM (HsTupArg GhcTc)
-    go i (Missing {})     arg_ty
-      = pprPanic "tcCheckExplicitTuple: tuple sections not handled here"
-          (ppr i $$ ppr arg_ty)
-    go i (Present x expr) arg_ty
+    -- | Check fields and consume missing-field multiplicities in source order.
+    go :: Int -> [Mult] -> [HsTupArg GhcRn] -> [TcType] -> TcM [HsTupArg GhcTc]
+    go _ [] [] [] = return []
+    go i (mult : mults) (Missing{} : args) (arg_ty : tys)
+      = do { hasFixedRuntimeRep_syntactic (FRRUnboxedTupleSection i) arg_ty
+           ; args' <- go (i+1) mults args tys
+           ; return (Missing (Scaled mult arg_ty) : args') }
+    go i mults (Present x expr : args) (arg_ty : tys)
       = do { expr' <- tcCheckPolyExpr expr arg_ty
            ; (co, _) <- hasFixedRuntimeRep (FRRUnboxedTuple i) arg_ty
-           ; return (Present x (mkLHsWrap (mkWpCastN co) expr')) }
+           ; args' <- go (i+1) mults args tys
+           ; return (Present x (mkLHsWrap (mkWpCastN co) expr') : args') }
+    go _ _ _ _ = panic "tcCheckExplicitTuple: field or multiplicity count"
 
 -- | Typecheck an explicit tuple or tuple section by performing type inference.
 tcInferTupArgs :: Boxity
@@ -906,9 +958,18 @@ tcInferTupArgs boxity args
   tc_infer_tup_arg i (Present x lexpr@(L l expr))
     = do { (expr', arg_ty) <- case boxity of
              Unboxed -> runInferRhoFRR (FRRUnboxedTuple i) (tcPolyExpr expr)
-             Boxed   -> do { arg_ty <- newFlexiTyVarTy liftedTypeKind
-                           ; L _ expr' <- tcCheckPolyExpr lexpr arg_ty
-                           ; return (expr', arg_ty) }
+             Boxed   -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+                           ; (inferable, anchor) <- if enabled
+                               then tcRetainedInferableArg lexpr
+                               else return (False, False)
+                           ; if inferable && anchor
+                             then do { (expr', arg_ty) <- tcInferRhoFRR (FRRUnboxedTuple i) lexpr
+                                     ; _ <- setSrcSpanA l $ addExprCtxt expr $
+                                              unifyType Nothing (typeKind arg_ty) liftedTypeKind
+                                     ; return (unLoc expr', arg_ty) }
+                             else do { arg_ty <- newFlexiTyVarTy liftedTypeKind
+                                     ; L _ expr' <- tcCheckPolyExpr lexpr arg_ty
+                                     ; return (expr', arg_ty) } }
          ; return (Present x (L l expr'), arg_ty) }
 
   new_arg_ty :: Int -> TcM TcTypeFRR
@@ -916,6 +977,47 @@ tcInferTupArgs boxity args
     case boxity of
       Unboxed -> newOpenFlexiFRRTyVarTy (FRRUnboxedTupleSection i)
       Boxed   -> newFlexiTyVarTy liftedTypeKind
+
+{- Note [Inference of native tuple fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If xs :: Vec Int n, inferring (42, xs) must retain that exact second field
+type. The ordinary tuple path first allocates component meta-variables.
+Those variables cannot contain a runtime Id such as n.
+
+Under ExperimentalDependentTypes, expand a complete boxed tuple to its
+ordinary data constructor when the result is an InferResult and a field
+has a native anchor. Use tcRetainedInferableArg to classify the fields
+without checking them or running splices. The application checker infers
+and caches native fields, chooses their types immutably, and checks the
+other fields normally. It retains scope, kind, usage and subsumption checks.
+
+Use the existing expansion wrapper and generated application spans. Keep
+the original tuple context and the user-written field spans in diagnostics.
+A known expected type still uses component checking, including higher-rank
+fields. Unboxed tuples keep their existing paths.
+
+Keep ExplicitTuple for sections. Infer an anchored native present field once
+and retain its exact type. Check its lifted kind as well as its fixed runtime
+representation. Other present fields and missing-field metas keep ordinary
+inference. Missing fields supply no native anchor.
+
+A native expected visible-arrow function with a boxed tuple result supplies
+component types and hole multiplicities. Check present fields at those types.
+Store a missing field's tuple component type and the corresponding arrow
+multiplicity. Reconstruct the whole section function, then use the existing
+tcWrapResultMono against the original expected type. It keeps any required
+domain and result coercions. A tuple-result cast cannot wrap the section AST,
+which denotes a function. Other expected shapes keep the ordinary path.
+
+The existing desugaring creates missing-field lambdas in source order.
+Present expressions stay inside their tuple body. Do not add a sharing let
+or move an expression outside those lambdas. Named captured values retain
+their original sharing. Keep field usage and scope checks unchanged.
+
+The ordinary product does not bind a runtime index. Returning (n, xs) cannot
+hide a free callback-local n. Use an explicit package for that purpose.
+See docs/dependent-haskell/REFERENCES.md#boxed-tuple-inference-prior-art.
+-}
 
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary

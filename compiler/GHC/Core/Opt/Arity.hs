@@ -65,6 +65,7 @@ import GHC.Core.Subst    as Core
 import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
 import GHC.Core.TyCo.Compare( eqType, eqTypeIgnoringMultiplicity )
+import GHC.Core.TyCo.Rep ( Type(DepFunTy) )
 
 import GHC.Types.Demand
 import GHC.Types.Cpr( CprSig, mkCprSig, botCpr )
@@ -207,6 +208,9 @@ typeOneShots ty
 
       | Just (_,_,arg,res) <- splitFunTy_maybe ty
       = typeOneShot arg : go rec_nts res
+
+      | DepFunTy _ res <- coreFullView ty
+      = NoOneShotInfo : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
@@ -2305,7 +2309,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        -> Subst -> Type   -- We are really looking at subst(ty)
        -> (InScopeSet, EtaInfo)
     -- (go [o1,..,on] subst ty) = (in_scope, EI [b1,..,bn] co)
-    --    co :: subst(ty) ~ b1_ty -> ... -> bn_ty -> tr
+    --    co :: subst(ty) ~ mkLamTypes [b1,..,bn] tr
 
     go _ [] subst _
        ----------- Done!  No more expansion needed
@@ -2321,6 +2325,18 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
          -- we consume one of the [OneShotInfo]
        , (in_scope, EI bs mco) <- go n oss' subst' ty'
        = (in_scope, EI (tcv' : bs) (mkEtaForAllMCo (Bndr tcv' vis) ty' mco))
+
+       ----------- Retained dependent functions
+       | DepFunTy b res_ty <- coreFullView ty
+       , (subst', eta_id) <- freshEtaId n subst (Scaled ManyTy (varType b))
+       , let eta_id' = eta_id `setIdOneShotInfo` one_shot
+             subst'' = Core.extendIdSubst subst' b (Var eta_id')
+       , (in_scope, EI bs mco) <- go (n+1) oss1 subst'' res_ty
+       = case checkReflexiveMCo mco of
+           MRefl -> (in_scope, EI (eta_id' : bs) MRefl)
+           MCo co -> pprPanic "mkEtaWW: native dependent congruence not implemented"
+                       (ppr b $$ ppr co)
+         -- Later argument types must use this eta binder's identity.
 
        ----------- Function types  (t1 -> t2)
        | Just (_af, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
@@ -2955,7 +2971,9 @@ pushCoValArg co
   | Just (ty, _) <- isReflCo_maybe co
   = Just (ty, MRefl, MRefl)
 
-  | isFunTy tyL
+  | isFunTy tyL, isFunTy tyR
+  -- A retained coercion can have only one ordinary function endpoint.
+  -- Keep that cast intact; SelFun does not project retained functions.
   , (_, co1, co2) <- decomposeFunCo co
       -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
       -- then co1 :: tyL1 ~ tyR1
@@ -3031,7 +3049,23 @@ pushCoDataCon :: DataCon -> [CoreExpr] -> MCoercionR
 -- The left-hand one must be a T, because exprIsConApp returned True
 -- but the right-hand one might not be.  (Though it usually will.)
 pushCoDataCon dc dc_args MRefl    = Just $! (push_dc_refl dc dc_args)
-pushCoDataCon dc dc_args (MCo co) = push_dc_gen  dc dc_args co (coercionKind co)
+pushCoDataCon dc dc_args (MCo co)
+  | not (null (dataConRepArgBinders dc))
+  , not (isReflCo co)
+  -- See Note [Retained constructor casts].
+  = Nothing
+  | otherwise
+  = push_dc_gen dc dc_args co (coercionKind co)
+
+{- Note [Retained constructor casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ordinary KPush substitution binds erased variables only. A retained field
+also scopes over later field types. Pushing a nonreflexive result cast requires
+a scoped substitution through those fields. The flat zip in push_data_con does
+not provide it. Decline this transformation for retained constructors until a
+scoped rule is available. Reflexive casts preserve the existing field scope.
+See Note [Retained constructor field telescopes] in GHC.Core.DataCon.
+-}
 
 push_dc_refl :: DataCon -> [CoreExpr] -> (DataCon, [Type], [CoreExpr])
 push_dc_refl dc dc_args
@@ -3147,7 +3181,8 @@ collectBindersPushingCo e
 
       | isId b
       , let Pair tyL tyR = coercionKind co
-      , assert (isFunTy tyL) $ isFunTy tyR
+      , isFunTy tyL, isFunTy tyR
+      -- Retained function casts must keep their scoped runtime binder.
       , (co_mult, co_arg, co_res) <- decomposeFunCo co
       , isReflCo co_mult -- See Note [collectBindersPushingCo]
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]

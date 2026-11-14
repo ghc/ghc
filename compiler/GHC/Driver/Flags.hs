@@ -203,6 +203,7 @@ extensionName = \case
   LangExt.Modifiers -> "Modifiers"
   LangExt.LinearTypes -> "LinearTypes"
   LangExt.RequiredTypeArguments -> "RequiredTypeArguments"    -- Visible forall (VDQ) in types of terms
+  LangExt.ExperimentalDependentTypes -> "ExperimentalDependentTypes"
   LangExt.StandaloneDeriving -> "StandaloneDeriving"
   LangExt.DeriveDataTypeable -> "DeriveDataTypeable"
   LangExt.AutoDeriveTypeable -> "AutoDeriveTypeable"       -- Automatic derivation of Typeable

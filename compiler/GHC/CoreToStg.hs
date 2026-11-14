@@ -28,6 +28,7 @@ import GHC.Stg.Make
 import GHC.Stg.Utils (allowTopLevelConApp)
 
 import GHC.Types.RepType
+import GHC.Types.Var ( isCoVar )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.CostCentre
@@ -486,9 +487,23 @@ coreToStgExpr (Case scrut bndr _ alts)
        ; return (StgCase scrut2 bndr (mkStgAltType bndr alts) alts2) }
   where
     vars_alt :: CoreAlt -> CtsM StgAlt
-    vars_alt (Alt con binders rhs)
-      = let     -- Remove type variables
-            binders' = filterStgBinders binders
+    vars_alt alt@(Alt con binders rhs)
+      = let -- Core Lint checks the final virtual proof. Keep real fields.
+            -- Keep ordinary coercion argument slots; see Note [Coercion tokens].
+            binders'
+              | isNativeIndexAliasAlt alt
+              , [cv] <- binders
+              , isCoVar cv
+              -- See Note [Native index alias evidence] in GHC.Core.Lint.
+              -- Mandatory native Core Lint checks this exact proof binder.
+              = []
+              | isNativeIndexAlt alt
+              , DataAlt dc <- con
+              , (fields, [cv]) <- splitAt (dataConRepArity dc) binders
+              , isCoVar cv
+              = filterStgBinders fields
+              | otherwise
+              = filterStgBinders binders
         in
         extendVarEnvCts [(b, LambdaBound) | b <- binders'] $ do
         rhs2 <- coreToStgExpr rhs

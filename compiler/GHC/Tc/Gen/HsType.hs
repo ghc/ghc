@@ -29,7 +29,7 @@ module GHC.Tc.Gen.HsType (
 
         bindOuterFamEqnTKBndrs_Q_Tv, bindOuterFamEqnTKBndrs,
         tcOuterTKBndrs, scopedSortOuter, outerTyVars, outerTyVarBndrs,
-        tcGadtConTyVarBndrs,
+        tcGadtConTyVarBndrs, tcCheckRetainedConType,
         bindOuterSigTKBndrs_Tv,
         tcExplicitTKBndrs,
         bindNamedWildCardBinders,
@@ -100,6 +100,9 @@ import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Class
+import qualified GHC.Core as Core
+import GHC.Core.Dependent ( hasNativeDependentExpr )
+import GHC.Core.Predicate ( getClassPredTys_maybe, isCTupleClass )
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
@@ -110,6 +113,7 @@ import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Error
+import GHC.Types.Id ( mkLocalId )
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Var
@@ -140,6 +144,7 @@ import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.List ( mapAccumL )
 import Control.Monad
+import Data.Data (Data, cast, gmapQ)
 import Data.Tuple( swap )
 
 {-
@@ -410,7 +415,7 @@ tcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM Type
 tcClassSigType names sig_ty
   = addSigCtxt sig_ctxt (UserLHsSigType sig_ty) $
     do { skol_info <- mkSkolemInfo skol_info_anon
-       ; (implic, ty) <- tc_lhs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
+       ; (implic, ty) <- tc_lhs_sig_type False skol_info sig_ty (TheKind liftedTypeKind)
        ; emitImplication implic
        ; return ty }
        -- Do not zonk-to-Type, nor perform a validity check
@@ -441,7 +446,10 @@ tcHsSigType ctxt sig_ty
     do { traceTc "tcHsSigType {" (ppr sig_ty)
        ; skol_info <- mkSkolemInfo skol_info
           -- Generalise here: see Note [Kind generalisation]
-       ; (implic, ty) <- tc_lhs_sig_type skol_info sig_ty  (expectedKindInCtxt ctxt)
+       ; let allow_retained = case ctxt of
+               FunSigCtxt{} -> True
+               _ -> False
+       ; (implic, ty) <- tc_lhs_sig_type allow_retained skol_info sig_ty (expectedKindInCtxt ctxt)
 
        -- Float out constraints, failing fast if not possible
        -- See Note [Failure in local type signatures] in GHC.Tc.Solver
@@ -455,7 +463,7 @@ tcHsSigType ctxt sig_ty
   where
     skol_info = SigTypeSkol ctxt
 
-tc_lhs_sig_type :: SkolemInfo -> LHsSigType GhcRn
+tc_lhs_sig_type :: Bool -> SkolemInfo -> LHsSigType GhcRn
                -> ContextKind -> TcM (Implication, TcType)
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
@@ -463,7 +471,7 @@ tc_lhs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 -- This will never emit constraints, as it uses solveEqualities internally.
 -- No validity checking or zonking
 -- Returns also an implication for the unsolved constraints
-tc_lhs_sig_type skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
+tc_lhs_sig_type allow_retained skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
                                                    , sig_body = hs_ty })) ctxt_kind
   = setSrcSpanA loc $
     do { (tc_lvl, wanted, (exp_kind, (outer_bndrs, ty)))
@@ -472,7 +480,8 @@ tc_lhs_sig_type skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
                  do { exp_kind <- newExpectedKind ctxt_kind
                           -- See Note [Escaping kind in type signatures]
                     ; stuff <- tcOuterTKBndrs skol_info hs_outer_bndrs $
-                               tcCheckLHsType hs_ty exp_kind
+                               (if allow_retained then tcCheckRetainedSigType
+                                                  else tcCheckLHsType) hs_ty exp_kind
                     ; return (exp_kind, stuff) }
 
        -- Default any unconstrained variables free in the kind
@@ -496,6 +505,212 @@ tc_lhs_sig_type skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
     err_ctx exp_kind tidy_env
       = do { (tidy_env2, exp_kind) <- zonkTidyTcType tidy_env exp_kind
            ; return (tidy_env2, UninfTyCtx_Sig exp_kind full_hs_ty) }
+
+-- | Check retained telescopes in function positions of a complete signature.
+-- See Note [Higher-order retained signatures].
+tcCheckRetainedSigType :: LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckRetainedSigType hs_ty kind
+  = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; indices <- if experimental
+                    then catMaybes <$> mapM check_index (ambient_names hs_ty)
+                    else return []
+       ; go (typeLevelMode { mode_indices = mkNameEnv indices }) hs_ty kind }
+  where
+    check_index (span, name) = setSrcSpan span $
+      do { thing <- tcLookupLcl_maybe name
+         ; case thing of
+             Just ATyVar{} -> return Nothing
+             Just (ATcId { tct_id = index }) ->
+               do { index <- liftZonkM (zonkId index)
+                  ; unless (not (isExternalName name) && isNativeIndexId index) invalid_index
+                  ; level <- getThLevel
+                  ; case level of
+                      Comp -> return ()
+                      _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
+                  ; return (Just (name, index)) }
+             _ -> invalid_index }
+    invalid_index = failWithTc $ TcRnRetainedQuantificationError RetainedLocalSignatureIndex
+
+    -- Keep only free runtime occurrences. Telescope binders have their own Ids.
+    ambient_names :: Data a => a -> [(SrcSpan, Name)]
+    ambient_names thing
+      | Just (L loc (HsTyVar _ _ (L _ (WithUserRdr _ name))))
+          <- (cast thing :: Maybe (LHsType GhcRn))
+      , isVarName name = [(locA loc, name)]
+      | Just (L _ (HsForEachTy _ bndrs _)) <- (cast thing :: Maybe (LHsType GhcRn))
+      = let bound = mapMaybe hsLTyVarName bndrs
+        in filter (\(_, name) -> name `notElem` bound) (concat (gmapQ ambient_names thing))
+      | Just _ <- (cast thing :: Maybe Name) = []
+      | Just _ <- (cast thing :: Maybe Type) = []
+      | otherwise = concat (gmapQ ambient_names thing)
+
+    go :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
+    go mode (L _ (HsParTy _ body)) kind = go mode body kind
+    go mode (L loc ty@(HsQualTy _ ctxt body)) kind
+      | hsHasForEachTy (unLoc body)
+      = setSrcSpanA loc $
+        do { theta <- tc_hs_context mode ctxt
+           ; body_ty <- go mode body liftedTypeKind
+           ; checkExpKind ty (tcMkPhiTy theta body_ty) liftedTypeKind (Check kind) }
+    go mode (L loc (HsFunTy _ mult arg res)) kind
+      = setSrcSpanA loc $
+        tc_fun_type_x (go mode) mode mult arg res (Check kind)
+    go mode (L loc ty@(HsForEachTy _ bndrs body)) kind
+      = setSrcSpanA loc $
+        do { when (null bndrs) $
+               failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+           ; body_ty <- check_bndrs mode bndrs
+           ; checkExpKind ty body_ty liftedTypeKind (Check kind) }
+      where
+        check_bndrs :: TcTyMode -> [LHsTyVarBndr () GhcRn] -> TcM TcType
+        check_bndrs mode [] = go mode body liftedTypeKind
+        check_bndrs mode (L lb bndr : rest)
+          = setSrcSpanA lb $
+            case bndr of
+              HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
+                do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
+                   ; domain_ty <- liftZonkM $ zonkTcType domain_ty
+                   ; unless (isNativeIndexType domain_ty) $
+                       failWithTc $ TcRnRetainedQuantificationError
+                                      (RetainedUnsupportedDomain domain_ty)
+                   ; let index = mkLocalId name ManyTy domain_ty
+                         mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
+                   ; body_ty <- check_bndrs mode' rest
+                   ; return (mkDepFunTy index body_ty) }
+              _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+    go mode body kind = tc_check_lhs_type mode body kind
+
+{- Note [Local runtime indices in signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A complete local value signature can mention an already-bound runtime index,
+for example xs :: Vec Int n under a do-bound n. The binding renamer adds a
+signature-local type lookup alias for the actual term Name. Preserve that Name
+and find its existing ATcId in the local type environment. Zonk its type and
+multiplicity without changing its Unique. Require a local unrestricted Id of
+a supported closed index domain. Do not look through a global environment or
+create a replacement Id when the local lookup fails.
+
+Seed mode_indices with only the runtime Names referenced by this signature.
+Registering all ambient index Ids would activate retained forall and context
+restrictions for unrelated ordinary signatures. Exclude the signature's own
+foreach binders; check_bndrs introduces those Ids in telescope order. Leave
+ATyVar occurrences on their ordinary path. Renaming retains erased-variable
+precedence, rejects unavailable current-group terms and gates partial capture.
+
+Check the RHS with the ordinary complete-signature rules. The captured Id is
+opaque. A let alias supplies no equality between different runtime indices.
+Agda checks a local declaration in its current context before extending that
+context with its value. Its transparent lets do not establish Haskell equality
+or demand. Keep ambient capture outside quotations, as for foreach signatures.
+See docs/dependent-haskell/REFERENCES.md#checked-local-payload-signatures.
+-}
+
+-- | Check the field suffix of a retained GADT constructor signature.
+-- The Boolean selects final domain validation. Kind inference checks only
+-- domain kinds because the datatype constructor knots are not yet available.
+-- Return explicit metadata too: mkDepFunTy can erase a vacuous binder.
+tcCheckRetainedConType :: Bool
+                      -> (HsModifiedFunArr GhcRn -> TcM Mult)
+                      -> LHsType GhcRn -> TcM ([Maybe Id], TcType)
+tcCheckRetainedConType validate_domain tc_field_mult = go typeLevelMode
+  where
+    go mode (L _ (HsParTy _ body)) = go mode body
+    go mode (L loc (HsForEachTy _ bndrs body))
+      = setSrcSpanA loc $
+        do { when (null bndrs) $
+               failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+           ; bind_indices mode bndrs body }
+    go mode (L loc (HsFunTy _ mult arg res))
+      = setSrcSpanA loc $
+        do { arg_ty <- tc_check_lhs_type mode arg liftedTypeKind
+           ; mult_ty <- tc_field_mult mult
+           ; (binders, body_ty) <- go mode res
+           ; return (Nothing : binders, tcMkVisFunTy mult_ty arg_ty body_ty) }
+    go _ (L loc HsForAllTy{}) = unsupported loc
+    go _ (L loc HsQualTy{})   = unsupported loc
+    go mode body@(L loc _)
+      = setSrcSpanA loc $
+        do { res_ty <- tc_check_lhs_type mode body liftedTypeKind
+           ; when (anyFreeVarsOfType isId res_ty) $ unsupported loc
+           ; return ([], res_ty) }
+
+    bind_indices mode [] body = go mode body
+    bind_indices mode (L loc bndr : rest) body
+      = setSrcSpanA loc $
+        case bndr of
+          HsTvb _ () (HsBndrVar _ (L _ name)) (HsBndrKind _ domain) ->
+            do { domain_ty <- tc_check_lhs_type mode domain liftedTypeKind
+               ; domain_ty <- liftZonkM $ zonkTcType domain_ty
+               ; when validate_domain $
+                   unless (isNativeIndexType domain_ty) $
+                     failWithTc $ TcRnRetainedQuantificationError
+                                    (RetainedUnsupportedDomain domain_ty)
+               ; let index = mkLocalId name ManyTy domain_ty
+                     mode' = mode { mode_indices = extendNameEnv (mode_indices mode) name index }
+               ; (binders, body_ty) <- bind_indices mode' rest body
+               ; return (Just index : binders, mkDepFunTy index body_ty) }
+          _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
+
+    unsupported loc = setSrcSpanA loc $
+      failWithTc $ TcRnRetainedQuantificationError RetainedPackageDeclaration
+
+{- Note [Source retained signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A source retained argument denotes one runtime Id. The renamer gives that
+Id a VarName and binds a type-variable occurrence as an alias of the same
+Name. It does not make a TyVar or change the Name's namespace. An ordinary
+inner forall can shadow the alias through its normal type-variable key.
+
+The signature checker registers the Id in mode_indices. Only registered
+Names become TermVarTy. Ordinary term names still use the normal rejection
+path in tcTyVar. Check each binder domain before extending this environment.
+Then check the next binder and the body in the extended environment. The
+domain is a value type, so its annotation does not require KindSignatures.
+It must satisfy isNativeIndexType. Each runtime binder has multiplicity Many.
+The ordinary outer-forall checker scopes erased type variables around the
+whole telescope. The result has kind Type. Retained binders in other type
+positions use Note [Higher-order retained signatures]. Inner foralls and
+Template Haskell remain gated.
+
+This checks a dependent function directly. Agda's checkPiTelescope checks
+each domain before extending the context for the remaining telescope.
+See docs/dependent-haskell/REFERENCES.md#agda-provenance and Agda v2.8.0,
+Agda.TypeChecking.Rules.Term.checkTelescope'. This scope rule does not
+evaluate a runtime argument.
+The runtime Id follows the native representation described in
+Note [Restricted retained dependent types] in GHC.Core.TyCo.Rep.
+-}
+
+{- Note [Higher-order retained signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A qualified signature can have further retained binders in its body. Keep the
+retained signature walker through HsQualTy. Rename and check its constraints
+with the ordinary context routines in the current index environment. Then
+check the body with the retained walker and build the usual evidence arrows.
+Later binders scope over the body, not the preceding constraints. The syntax
+selector hsHasForEachTy must also traverse qualified bodies. This permits a
+leading class context and a context between retained arguments. Ordinary
+qualified bodies without retained syntax keep the ordinary kind checker.
+See docs/dependent-haskell/REFERENCES.md#later-retained-arguments-in-constructor-equations.
+
+A complete value signature can put a retained function in an ordinary arrow
+argument or result. Rename and check both children in their original context.
+Each nested retained telescope extends only its own body's index environment.
+It can refer to an outer runtime index. Its binder must not enter the enclosing
+arrow's result. The closure parameter is an ordinary value, not a runtime index.
+
+Use tc_fun_type_x with the signature checker for these children. Keep the
+ordinary open-kind and multiplicity checks. Other type positions still use
+tc_check_lhs_type and its retained-type gate. The renamer and complete-signature
+guard use hsHasForEachTy. Reject partial signatures even when a wildcard lies
+outside the nested Pi.
+
+The application checker supplies the closure's expected type. A source lambda
+uses Note [Checked retained lambdas] in GHC.Tc.Gen.Match. A named function can
+match an alpha-equivalent retained type without structural Pi unification.
+Agda's expected-argument and scoped-Pi rules supply the checking precedent.
+See docs/dependent-haskell/REFERENCES.md#explicit-higher-order-arguments.
+-}
 
 
 
@@ -999,7 +1214,8 @@ tcModifiersMult = tc_modifiers_mult typeLevelMode
 -- This data type is purely local, not exported from this module
 data TcTyMode
   = TcTyMode { mode_tyki :: TypeOrKind
-             , mode_holes :: HoleInfo   }
+             , mode_holes :: HoleInfo
+             , mode_indices :: NameEnv Id }
 
 -- See Note [Levels for wildcards]
 -- Nothing <=> no wildcards expected
@@ -1017,7 +1233,8 @@ data HoleMode = HM_Sig      -- Partial type signatures: f :: _ -> Int
                             --   case x of Con @_ @t v -> ...
 
 mkMode :: TypeOrKind -> TcTyMode
-mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing }
+mkMode tyki = TcTyMode { mode_tyki = tyki, mode_holes = Nothing
+                      , mode_indices = emptyNameEnv }
 
 typeLevelMode, kindLevelMode :: TcTyMode
 -- These modes expect no wildcards (holes) in the type
@@ -1028,7 +1245,8 @@ mkHoleMode :: TypeOrKind -> HoleMode -> TcM TcTyMode
 mkHoleMode tyki hm
   = do { lvl <- getTcLevel
        ; return (TcTyMode { mode_tyki  = tyki
-                          , mode_holes = Just (lvl,hm) }) }
+                          , mode_holes = Just (lvl,hm)
+                          , mode_indices = emptyNameEnv }) }
 
 instance Outputable HoleMode where
   ppr HM_Sig      = text "HM_Sig"
@@ -1037,9 +1255,9 @@ instance Outputable HoleMode where
   ppr HM_TyAppPat = text "HM_TyAppPat"
 
 instance Outputable TcTyMode where
-  ppr (TcTyMode { mode_tyki = tyki, mode_holes = hm })
+  ppr (TcTyMode { mode_tyki = tyki, mode_holes = hm, mode_indices = indices })
     = text "TcTyMode" <+> braces (sep [ ppr tyki <> comma
-                                      , ppr hm ])
+                                      , ppr hm, ppr (nonDetNameEnvElts indices) ])
 
 {-
 Note [Bidirectional type checking]
@@ -1164,6 +1382,13 @@ tcHsType mode (HsOpTy _ ty1 tyop ty2) exp_kind
   = tc_fun_type mode (HsModifiedFunArr noExtField [] $ HsStandardArr noExtField) ty1 ty2 exp_kind
 
 --------- Foralls
+tcHsType _ HsForEachTy{} _
+  = failWithTc TcRnRetainedQuantificationNotImplemented
+
+tcHsType mode HsForAllTy{} _
+  | not (isEmptyNameEnv (mode_indices mode))
+  = failWithTc $ TcRnRetainedQuantificationError RetainedPolymorphicSignature
+
 tcHsType mode t@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
   | HsForAllInvis{} <- tele
   = tc_hs_forall_ty tele ty exp_kind
@@ -1553,20 +1778,27 @@ combinations of extensions.
 ------------------------------------------
 tc_fun_type :: TcTyMode -> HsModifiedFunArr GhcRn -> LHsType GhcRn -> LHsType GhcRn -> ExpKind
             -> TcM TcType
-tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
+tc_fun_type mode = tc_fun_type_x (tc_check_lhs_type mode) mode
+
+-- | Check an ordinary arrow with the supplied checker for its child types.
+-- See Note [Higher-order retained signatures].
+tc_fun_type_x :: (LHsType GhcRn -> TcKind -> TcM TcType)
+              -> TcTyMode -> HsModifiedFunArr GhcRn -> LHsType GhcRn -> LHsType GhcRn
+              -> ExpKind -> TcM TcType
+tc_fun_type_x check mode mult ty1 ty2 exp_kind = case mode_tyki mode of
   TypeLevel ->
     do { traceTc "tc_fun_type" (ppr ty1 $$ ppr ty2)
        ; arg_k <- newOpenTypeKind
        ; res_k <- newOpenTypeKind
-       ; ty1'  <- tc_check_lhs_type mode ty1 arg_k
-       ; ty2'  <- tc_check_lhs_type mode ty2 res_k
+       ; ty1'  <- check ty1 arg_k
+       ; ty2'  <- check ty2 res_k
        ; mult' <- fromMaybe manyDataConTy <$> tc_mult mode mult
        ; checkExpKind (HsFunTy noExtField mult ty1 ty2)
                       (tcMkVisFunTy mult' ty1' ty2')
                       liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
-    do { ty1'  <- tc_check_lhs_type mode ty1 liftedTypeKind
-       ; ty2'  <- tc_check_lhs_type mode ty2 liftedTypeKind
+    do { ty1'  <- check ty1 liftedTypeKind
+       ; ty2'  <- check ty2 liftedTypeKind
        ; mult' <- fromMaybe manyDataConTy <$> tc_mult mode mult
        ; checkExpKind (HsFunTy noExtField mult ty1 ty2)
                       (tcMkVisFunTy mult' ty1' ty2')
@@ -1709,8 +1941,8 @@ tcInferTyAppHead :: TcTyMode -> LHsType GhcRn -> TcM (TcType, TcKind)
 -- application. In particular, for a HsTyVar (which includes type
 -- constructors, it does not zoom off into tcInferTyApps and family
 -- saturation
-tcInferTyAppHead _ (L _ (HsTyVar _ _ (L _ (WithUserRdr _ tv))))
-  = tcTyVar tv
+tcInferTyAppHead mode (L _ (HsTyVar _ _ (L _ (WithUserRdr _ tv))))
+  = tcTyVar mode tv
 tcInferTyAppHead mode ty
   = tc_infer_lhs_type mode ty
 
@@ -1808,7 +2040,8 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
              ; arg_mode <- mkHoleMode KindLevel HM_VTA
                    -- HM_VKA: see Note [Wildcards in visible kind application]
              ; ki_arg <- addErrCtxt (FunAppCtxt (FunAppCtxtTy orig_hs_ty hs_ki_arg) n) $
-                         tc_check_lhs_type arg_mode hs_ki_arg exp_kind
+                         tc_check_lhs_type (arg_mode { mode_indices = mode_indices mode })
+                                           hs_ki_arg exp_kind
 
              ; traceTc "tcInferTyApps (vis kind app)" (ppr exp_kind)
              ; (subst', fun') <- mkAppTyM subst fun ki_binder ki_arg
@@ -2154,14 +2387,50 @@ tc_hs_context :: TcTyMode -> LHsContext GhcRn -> TcM [PredType]
 tc_hs_context mode ctxt = mapM (tc_lhs_pred mode) (hsc_ctxt $ unLoc ctxt)
 
 tc_lhs_pred :: TcTyMode -> LHsType GhcRn -> TcM PredType
-tc_lhs_pred mode pred = tc_check_lhs_type mode pred constraintKind
+tc_lhs_pred mode pred@(L loc _)
+  = setSrcSpanA loc $
+    do { pred_ty <- tc_check_lhs_type mode pred constraintKind
+       ; unless (isEmptyNameEnv (mode_indices mode)) $
+         do { pred_ty <- liftZonkM $ zonkTcType pred_ty
+            ; unless (supported_predicate pred_ty) $
+                failWithTc $ TcRnRetainedQuantificationError
+                             (RetainedConstraintType pred_ty) }
+       ; pure pred_ty }
+  where
+    -- Check native components hidden by constraint-tuple synonyms too.
+    supported_predicate :: PredType -> Bool
+    supported_predicate ty
+      | not (hasNativeDependentExpr (Core.Type ty)) = True
+      | Just (cls, args) <- getClassPredTys_maybe ty
+      = not (isCTupleClass cls) || all supported_predicate args
+      | otherwise = False
+
+{- Note [Retained source constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check each predicate in the registered runtime-index environment. Permit ordinary
+class and equality predicates. The retained equation checker introduces their
+Given dictionaries below the runtime binders. Application checking keeps native
+Wanted evidence at its call site. See Note [Retained application evidence] in
+GHC.Tc.Gen.App. The solver uses its ordinary instance and equality rules.
+
+Keep native quantified and irreducible predicates gated at their source span.
+Check constraint-tuple components after synonym expansion as well. A tuple class
+must not hide an unsupported native predicate in one of its components.
+Those unsupported predicates need separate solver scope and termination checks.
+Predicates without native syntax keep the ordinary checking rules. This rule does
+not evaluate an index or infer equality between different runtime Ids. See
+docs/dependent-haskell/REFERENCES.md#source-retained-constraints.
+-}
 
 ---------------------------
-tcTyVar :: Name -> TcM (TcType, TcKind)
+tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
 -- See Note [Type checking recursive type and class declarations]
 -- in GHC.Tc.TyCl
 -- This does not instantiate. See Note [Do not always instantiate eagerly in types]
-tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
+tcTyVar mode name
+  | Just index <- lookupNameEnv (mode_indices mode) name
+  = pure (TermVarTy index, varType index)
+tcTyVar _ name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
        ; case thing of
@@ -2172,7 +2441,9 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
              -> return (mkTyConTy tc, tyConKind tc)
 
            AGlobal (AConLike (RealDataCon dc))
-             -> do { when (isDataFamInstTyCon (dataConTyCon dc)) $
+             -> do { unless (null (dataConRepArgBinders dc)) $
+                       failWithTc $ TcRnRetainedQuantificationError RetainedPackagePromotion
+                   ; when (isDataFamInstTyCon (dataConTyCon dc)) $
                        -- see #15245
                        promotionErr name FamDataConPE
                    ; let (_, _, _, theta, _, _) = dataConFullSig dc
@@ -3662,7 +3933,8 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
   = do { traceTc "bindExplicitTKBndrs" (ppr hs_tvs)
        ; go hs_tvs }
   where
-    tc_ki_mode = TcTyMode { mode_tyki = KindLevel, mode_holes = hole_info }
+    tc_ki_mode = TcTyMode { mode_tyki = KindLevel, mode_holes = hole_info
+                         , mode_indices = emptyNameEnv }
                  -- Inherit the HoleInfo from the context
 
     go [] = do { res <- thing_inside

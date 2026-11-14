@@ -46,6 +46,8 @@ import GHC.Tc.Utils.Env
 import GHC.Core
 import GHC.Core.Unfold
 import GHC.Core.FVs
+import GHC.Core.Dependent ( hasNativeDependentExprRhs )
+import qualified GHC.Core.Subst as CoreSubst
 import GHC.Core.Tidy
 import GHC.Core.Seq         ( seqBinds )
 import GHC.Core.Opt.Arity   ( exprArity, typeArity, exprBotStrictness_maybe )
@@ -410,7 +412,8 @@ tidyProgram opts (ModGuts { mg_module           = mod
   (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds imp_rules
   let (trimmed_binds, trimmed_rules) = findExternalRules opts binds imp_rules unfold_env
 
-  (tidy_env, tidy_binds) <- tidyTopBinds unfold_env boot_exports tidy_occ_env trimmed_binds
+  local_index_binds <- localiseNativeTopIndices (opt_name_cache opts) trimmed_binds
+  (tidy_env, tidy_binds) <- tidyTopBinds unfold_env boot_exports tidy_occ_env local_index_binds
 
   -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
   (spt_entries, mcstub, tidy_binds') <- case opt_static_ptr_opts opts of
@@ -1166,6 +1169,68 @@ tidyTopName mod name_cache maybe_ref occ_env id
 \subsection{Step 2: top-level tidying}
 *                                                                      *
 ************************************************************************
+-}
+
+-- | Keep native index occurrences local when Core Tidy globalises top binders.
+-- See Note [Local indices across Core Tidy].
+localiseNativeTopIndices :: NameCache -> CoreProgram -> IO CoreProgram
+localiseNativeTopIndices name_cache binds = mapM localise_bind binds
+  where
+    top_binders = mkVarSet (bindersOfBinds binds)
+
+    localise_bind (NonRec bndr rhs)
+      = do { (bndr', rhs') <- localise_pair (bndr, rhs)
+           ; return (NonRec bndr' rhs') }
+    localise_bind (Rec pairs) = Rec <$> mapM localise_pair pairs
+
+    localise_pair pair@(bndr, rhs)
+      | not (hasNativeDependentExprRhs rhs) = return pair
+      | null indices = return pair
+      | otherwise
+      = assertPpr (not (anyFreeVarsOfType (`elemVarSet` index_set) (idType bndr)))
+                  (text "localiseNativeTopIndices: escaping top-level index" $$ ppr bndr) $
+        do { aliases <- mapM new_alias indices
+           ; let in_scope = mkInScopeSet (extendVarSetList (exprFreeVars rhs) aliases)
+                 subst = CoreSubst.extendIdSubstList (CoreSubst.mkEmptySubst in_scope)
+                           (zip indices (map Var aliases))
+                 alias_binds = zipWith (\index alias -> NonRec alias (Var index))
+                                       indices aliases
+           ; return (bndr, mkLets alias_binds (CoreSubst.substExpr subst rhs)) }
+      where
+        indices = filter (\v -> v `elemVarSet` top_binders && isNativeIndexId v)
+                         (exprFreeVarsList rhs)
+        index_set = mkVarSet indices
+
+    new_alias index
+      = do { uniq <- takeUniqFromNameCache name_cache
+           ; let name = mkInternalName uniq (getOccName index) (nameSrcSpan (idName index))
+           ; return (mkLocalId name (idMult index) (idType index)) }
+
+{- Note [Local indices across Core Tidy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Core Tidy turns top-level LocalIds into GlobalIds. A native argument such as
+S bottomLength can therefore pass the earlier checks but fail after Tidy:
+exprToNativeIndex requires each variable leaf to be a local unrestricted Id.
+Do not extend that grammar to arbitrary GlobalIds.
+
+Before tidyTopBinds, give each native RHS lazy local aliases for its free
+native top-level Ids. Use the deterministic exprFreeVarsList order. Substitute
+the whole RHS, including type and coercion occurrences, with Core.Subst.
+Wrap the aliases outside this substituted body. Their RHSs still refer to the
+original top-level Ids. Tidy then globalises those references and keeps each
+alias local. Local binder and type tidying already share the same environment.
+
+The top binder and its type do not change. A selected index must not escape
+through that type. Source signature and inference checks already exclude
+that escape. The alias has the original closed domain and Many multiplicity.
+The lazy binding does not evaluate the index or change the function arity.
+Ordinary RHSs take the existing path. This late step runs after simplification;
+no simplifier can inline an alias before Tidy globalises its RHS. CorePrep's
+native cpeBind guard then keeps aliases whose global RHS is outside the index
+grammar. Keep the native unfolding and interface restrictions in force.
+
+This is a GHC scope adaptation, not a new dependent equality rule. See
+docs/dependent-haskell/REFERENCES.md#source-vector-uncons.
 -}
 
 -- TopTidyEnv: when tidying we need to know

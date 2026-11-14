@@ -162,6 +162,13 @@ zonkEqTypes ev eq_rel ty1 ty2
     go (TyVarTy tv1) ty2           = tyvar NotSwapped tv1 ty2
     go ty1 (TyVarTy tv2)           = tyvar IsSwapped  tv2 ty1
 
+    -- No index reduction or retained-function congruence is needed here.
+    -- See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+    go ty1@(TermVarTy v1) (TermVarTy v2)
+      | v1 == v2 = return (Right ty1)
+    go ty1@DepFunTy{} ty2@DepFunTy{}
+      | ty1 `tcEqType` ty2 = return (Right ty1)
+
     -- We handle FunTys explicitly here despite the fact that they could also be
     -- treated as an application. Why? Well, for one it's cheaper to just look
     -- at two types (the argument and result types) than four (the argument,
@@ -337,6 +344,20 @@ The key function `can_eq_nc` tries to make progress with a type equality t1~t2.
 (EQNC7) Give up. Make the (fully-rewrittten) constraint into an Irred and put it
   in the inerts.  See `finishCanWithIrred`.
 
+Note [Reflexivity after retained normalization]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Rewriting returns to can_eq_nc without repeating zonkEqTypes. A family equation
+can expose a shared runtime index or make two retained functions alpha-equal.
+For example, normalize Vec Int (Add Z n) under foreach n to Vec Int n.
+Recheck reflexivity after both sides have been rewritten. The rewriting evidence
+already relates the original constraint to these normalized endpoints.
+
+This check does not decompose a retained function or assign a meta-variable.
+Opaque runtime indices stay rigid. In particular, Add n Z does not reduce
+without constructor information about n. See Note [Rewriting retained dependent
+functions] in GHC.Tc.Solver.Rewrite and Note [Rigid retained indices] in
+GHC.Tc.Utils.Unify.
+
 Note [CanEqState]
 ~~~~~~~~~~~~~~~~~
 In `can_eq_nc` we want to avoid repeated attempts to rewrite or unwrap newtypes.
@@ -439,6 +460,14 @@ can_eq_nc _ces _rdr_env _envs ev eq_rel ty1@(TyConApp tc1 []) _ps_ty1 (TyConApp 
 can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   | Just ty1' <- coreView ty1 = can_eq_nc ces rdr_env envs ev eq_rel ty1' ps_ty1 ty2  ps_ty2
   | Just ty2' <- coreView ty2 = can_eq_nc ces rdr_env envs ev eq_rel ty1  ps_ty1 ty2' ps_ty2
+
+-- See Note [Reflexivity after retained normalization].
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@(TermVarTy v1) _ (TermVarTy v2) _
+  | bothRewritten ces, v1 == v2
+  = canEqReflexive ev eq_rel ty1
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1@DepFunTy{} _ ty2@DepFunTy{} _
+  | bothRewritten ces, ty1 `tcEqType` ty2
+  = canEqReflexive ev eq_rel ty1
 
 -- (EQNC2) Eager newtype decomposition (ReprEq only).
 -- Look for (N s1 .. sn) ~R# (N t1 .. tn)
@@ -644,13 +673,36 @@ can_eq_nc ces _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 ----------------------------
 
 -- (EQNC7) We've rewritten and the types don't match. Give up.
-can_eq_nc _ _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
+can_eq_nc _ _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   = do { traceTcS "can_eq_nc catch-all case" (ppr ps_ty1 $$ ppr ps_ty2)
        ; case eq_rel of -- See Note [Unsolved equalities]
             ReprEq -> finishCanWithIrred ReprEqReason ev
-            NomEq  -> finishCanWithIrred ShapeMismatchReason ev }
+            NomEq | opaque_index_equality -> finishCanWithIrred IrredShapeReason ev
+                  | otherwise -> finishCanWithIrred ShapeMismatchReason ev }
           -- No need to call canEqSoftFailure/canEqHardFailure because they
           -- rewrite, and the types involved here are already rewritten
+  where
+    -- See Note [Opaque runtime index equalities].
+    opaque_index_equality = case (ty1, ty2) of
+      (TermVarTy v, ty) -> same_domain v ty
+      (ty, TermVarTy v) -> same_domain v ty
+      _ -> False
+
+    same_domain v ty = isNativeIndexId v && typeKind ty `eqType` varType v
+
+{- Note [Opaque runtime index equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A runtime index can equal a constructor or another index of the same domain.
+Failure to rewrite these well-kinded index forms does not establish
+a contradiction. Retain the equality as a non-insoluble IrredShapeReason.
+This also lets the pattern-match oracle retain a checked constructor proof.
+
+This rule does not solve the equality or rewrite the runtime index. A Given
+remains an inert irreducible equality. addIrredToCans still calls updGivenEqs,
+which records its level and prevents unsafe outer metavariable assignments.
+See Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet and
+Note [Apartness of retained runtime indices] in GHC.Core.Unify.
+-}
 
 {- Note [Unsolved equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

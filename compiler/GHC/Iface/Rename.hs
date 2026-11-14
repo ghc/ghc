@@ -738,6 +738,7 @@ rnIfaceConDecl
           , ifConEqSpec        = con_eq_spec0
           , ifConCtxt          = con_ctxt0
           , ifConArgTys        = con_arg_tys0
+          , ifConArgBinders    = con_arg_binders
           , ifConFields        = con_fields0
           , ifConStricts       = con_stricts0
           , ifConWrapper       = con_wrapper
@@ -766,6 +767,7 @@ rnIfaceConDecl
         , ifConEqSpec        = con_eq_spec
         , ifConCtxt          = con_ctxt
         , ifConArgTys        = con_arg_tys
+        , ifConArgBinders    = con_arg_binders
         , ifConFields        = con_fields
         , ifConStricts       = con_stricts
         , ifConWrapper       = con_wrapper
@@ -896,6 +898,8 @@ rnIfaceCo :: Rename IfaceCoercion
 rnIfaceCo (IfaceReflCo ty)              = IfaceReflCo <$> rnIfaceType ty
 rnIfaceCo (IfaceGReflCo role ty mco)    = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
 rnIfaceCo (IfaceFunCo role w co1 co2)   = IfaceFunCo role <$> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceDepFunCo bndr co)
+    = IfaceDepFunCo <$> rnIfaceIdBndr bndr <*> rnIfaceCo co
 rnIfaceCo (IfaceTyConAppCo role tc cos) = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
 rnIfaceCo (IfaceAppCo co1 co2)          = IfaceAppCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceFreeCoVar c)            = pure (IfaceFreeCoVar c)
@@ -934,7 +938,11 @@ rnIfaceIdDetails details
 
 rnIfaceType :: Rename IfaceType
 rnIfaceType (IfaceFreeTyVar n) = pure (IfaceFreeTyVar n)
+rnIfaceType (IfaceFreeTermVar n) = pure (IfaceFreeTermVar n)
 rnIfaceType (IfaceTyVar   n)   = pure (IfaceTyVar n)
+rnIfaceType (IfaceTermVar n)   = pure (IfaceTermVar n)
+rnIfaceType (IfaceDepFunTy bndr body)
+    = IfaceDepFunTy <$> rnIfaceIdBndr bndr <*> rnIfaceType body
 rnIfaceType (IfaceAppTy t1 t2)
     = IfaceAppTy <$> rnIfaceType t1 <*> rnIfaceAppArgs t2
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)

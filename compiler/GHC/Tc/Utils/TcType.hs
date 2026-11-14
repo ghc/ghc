@@ -1004,6 +1004,9 @@ tcTyFamInstsAndVisX = go
     go is_invis_arg ty
       | Just exp_ty <- coreView ty     = go is_invis_arg exp_ty
     go _ (TyVarTy _)                   = []
+    go is_invis_arg (TermVarTy v)      = go is_invis_arg (varType v)
+    go is_invis_arg (DepFunTy v ty)    = go is_invis_arg (varType v)
+                                         ++ go is_invis_arg ty
     go is_invis_arg (TyConApp tc tys)
       | isTypeFamilyTyCon tc
       = [(is_invis_arg, tc, take (tyConArity tc) tys)]
@@ -1091,6 +1094,9 @@ any_rewritable role tv_pred tc_pred ty
       | otherwise
       = go_tc under_fam bvs rl tc tys
 
+    go _ _ _ (TermVarTy {}) = False
+    go uf bvs rl (DepFunTy v ty)
+      = go uf bvs NomEq (varType v) || go uf (bvs `extendVarSet` v) rl ty
     go uf bvs rl (TyVarTy tv)        = go_tv uf bvs rl tv
     go _  _    _ (LitTy {})          = False
     go uf bvs rl (AppTy fun arg)     = go uf bvs rl fun || go uf bvs NomEq arg
@@ -1467,6 +1473,8 @@ getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to
                                 -- construct a dictionary function name
 getDFunTyKey ty | Just ty' <- coreView ty = getDFunTyKey ty'
 getDFunTyKey (TyVarTy tv)            = getOccName tv
+getDFunTyKey ty@(TermVarTy {})       = pprPanic "getDFunTyKey: unsupported runtime index" (ppr ty)
+getDFunTyKey ty@(DepFunTy {})        = pprPanic "getDFunTyKey: unsupported retained function" (ppr ty)
 getDFunTyKey (TyConApp tc _)         = getOccName tc
 getDFunTyKey (LitTy x)               = getDFunTyLitKey x
 getDFunTyKey (AppTy fun _)           = getDFunTyKey fun
@@ -2385,6 +2393,10 @@ pSizeTypes = pSizeTypesX emptyVarSet pSizeZero
 -- This ignores coercions, as coercions aren't user-written
 pSizeTypeX :: VarSet -> Type -> PatersonSize
 pSizeTypeX bvs ty | Just exp_ty <- coreView ty = pSizeTypeX bvs exp_ty
+pSizeTypeX _ ty@(TermVarTy {})
+  = pprPanic "pSizeTypeX: unsupported runtime index" (ppr ty)
+pSizeTypeX _ ty@(DepFunTy {})
+  = pprPanic "pSizeTypeX: unsupported retained function" (ppr ty)
 pSizeTypeX bvs (TyVarTy tv)
   | tv `elemVarSet` bvs                  = pSizeOne
   | otherwise                            = PS_Vanilla { ps_tvs = [tv], ps_size = 1 }

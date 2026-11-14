@@ -1915,10 +1915,26 @@ toHieForAllTele (HsForAllVis { hsf_vis_bndrs = bndrs }) loc =
 toHieForAllTele (HsForAllInvis { hsf_invis_bndrs = bndrs }) loc =
   toHie $ tvScopes (ResolvedScopes []) (mkScope loc) bndrs
 
+-- | Record a retained binder as a value binding and visit its domain type.
+toHieRetainedBndr :: Scope -> LHsTyVarBndr () GhcRn -> HieM [HieAST Type]
+toHieRetainedBndr sc (L span bndr) =
+  concatM $ makeNodeA bndr span : (name' ++ kind')
+  where
+    name' = case hsBndrVar bndr of
+      HsBndrWildCard _ -> []
+      HsBndrVar _ var -> [toHie $ C (ValBind RegularBind sc Nothing) var]
+    kind' = case hsBndrKind bndr of
+      HsBndrNoKind _ -> []
+      HsBndrKind _ ty -> [toHie ty]
+
 instance ToHie (LocatedA (HsType GhcRn)) where
   toHie (L span t) = concatM $ makeNode t (locA span) : case t of
       HsForAllTy _ tele body ->
         [ toHieForAllTele tele (getLocA body)
+        , toHie body
+        ]
+      HsForEachTy _ bndrs body ->
+        [ concatM $ map (toHieRetainedBndr (mkScope body)) bndrs
         , toHie body
         ]
       HsQualTy _ ctx body ->

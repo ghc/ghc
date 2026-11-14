@@ -80,7 +80,7 @@ module GHC.Hs.Type (
         splitLHsSigmaTyInvis, splitLHsGadtTy,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
-        ignoreParens, hsSigWcType, hsPatSigType,
+        ignoreParens, hsHasForEachTy, hsSigWcType, hsPatSigType,
         hsTyKindSig,
         setHsTyVarBndrFlag, hsTyVarBndrFlag, updateHsTyVarBndrFlag,
 
@@ -453,6 +453,7 @@ type instance XModifier GhcRn = ModifierPrintsAs
 type instance XModifier GhcTc = ModifierPrintsAs
 
 type instance XForAllTy        (GhcPass _) = NoExtField
+type instance XForEachTy       (GhcPass _) = (EpToken "foreach", TokRarrow)
 type instance XQualTy          (GhcPass _) = NoExtField
 type instance XTyVar           (GhcPass _) = EpToken "'"
 type instance XAppTy           (GhcPass _) = NoExtField
@@ -673,6 +674,16 @@ hsTyKindSig lty =
 ignoreParens :: LHsType (GhcPass p) -> LHsType (GhcPass p)
 ignoreParens (L _ (HsParTy _ ty)) = ignoreParens ty
 ignoreParens ty                   = ty
+
+-- | Find retained binders through parentheses, contexts and function arrows.
+-- See Note [Higher-order retained signatures] in GHC.Tc.Gen.HsType.
+hsHasForEachTy :: HsType (GhcPass p) -> Bool
+hsHasForEachTy HsForEachTy{} = True
+hsHasForEachTy (HsParTy _ ty) = hsHasForEachTy (unLoc ty)
+hsHasForEachTy (HsQualTy _ _ ty) = hsHasForEachTy (unLoc ty)
+hsHasForEachTy (HsFunTy _ _ arg res)
+  = hsHasForEachTy (unLoc arg) || hsHasForEachTy (unLoc res)
+hsHasForEachTy _ = False
 
 {-
 ************************************************************************
@@ -1463,6 +1474,9 @@ ppr_mono_ty :: forall p. (OutputableBndrId p) => HsType (GhcPass p) -> SDoc
 ppr_mono_ty (HsForAllTy { hst_tele = tele, hst_body = ty })
   = sep [pprHsForAll tele Nothing, ppr_mono_lty ty]
 
+ppr_mono_ty (HsForEachTy { hst_bndrs = bndrs, hst_body = ty })
+  = sep [text "foreach" <+> interppSP bndrs <+> arrow, ppr_mono_lty ty]
+
 ppr_mono_ty (HsQualTy { hst_ctxt = ctxt, hst_body = ty })
   = sep [pprLHsContextAlways ctxt, ppr_mono_lty ty]
 
@@ -1560,6 +1574,7 @@ hsTypeNeedsParens :: forall p. IsPass p => PprPrec -> HsType (GhcPass p) -> Bool
 hsTypeNeedsParens p = go_hs_ty
   where
     go_hs_ty (HsForAllTy{})           = p >= funPrec
+    go_hs_ty (HsForEachTy{})          = p >= funPrec
     go_hs_ty (HsQualTy{})             = p >= funPrec
     go_hs_ty (HsTyVar{})              = False
     go_hs_ty (HsFunTy{})              = p >= funPrec
@@ -1599,6 +1614,8 @@ hsTypeNeedsParens p = go_hs_ty
       GhcRn -> go_core_ty t
 
     go_core_ty (TyVarTy{})    = False
+    go_core_ty (TermVarTy{})  = False
+    go_core_ty (DepFunTy{})   = p >= funPrec
     go_core_ty (AppTy{})      = p >= appPrec
     go_core_ty (TyConApp _ args)
       | null args             = False

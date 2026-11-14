@@ -57,7 +57,8 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Zonk.Type
 
-import GHC.Core( hasSomeUnfolding )
+import GHC.Core( Expr(Type), hasSomeUnfolding )
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate
@@ -219,6 +220,11 @@ tcUserTypeSig :: SrcSpan -> LHsSigWcType GhcRn -> Maybe Name -> TcM TcIdSig
 -- Just n  => Function type signature       name :: type
 -- Nothing => Expression type signature   <expr> :: type
 tcUserTypeSig loc hs_sig_ty mb_name
+  | HsWC { hswc_body = L _ (HsSig { sig_body = body }) } <- hs_sig_ty
+  , hsHasForEachTy (unLoc body)
+  , not (isCompleteHsSig hs_sig_ty)
+  = failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
+
   | isCompleteHsSig hs_sig_ty
   = do { sigma_ty <- tcHsSigWcType ctxt_no_rrc hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
@@ -265,6 +271,7 @@ lhsSigTypeContextSpan (L _ HsSig { sig_body = sig_ty }) = go sig_ty
   where
     go (L _ (HsQualTy { hst_ctxt = L span _ })) = WantRRC $ locA span -- Found it!
     go (L _ (HsForAllTy { hst_body = hs_ty })) = go hs_ty  -- Look under foralls
+    go (L _ HsForEachTy{}) = NoRRC  -- A retained binder introduces a value argument
     go (L _ (HsParTy _ hs_ty)) = go hs_ty  -- Look under parens
     go _ = NoRRC  -- Did not find it
 
@@ -309,6 +316,8 @@ no_anon_wc_ty lty = go lty
       HsForAllTy { hst_tele = tele
                  , hst_body = ty } -> no_anon_wc_tele tele
                                         && go ty
+      HsForEachTy { hst_bndrs = bndrs
+                  , hst_body = ty } -> all no_anon_wc_tvb bndrs && go ty
       HsQualTy { hst_ctxt = ctxt
                , hst_body = ty }  -> gos (hsc_ctxt $ unLoc ctxt) && go ty
       HsSpliceTy (HsUntypedSpliceTop _ ty) _ -> go ty
@@ -629,7 +638,14 @@ lhsBindVisArity _ env = env        -- PatBind/VarBind
 addInlinePrags :: TcId -> [LSig GhcRn] -> TcM TcId
 addInlinePrags poly_id prags_for_me
   | inl@(L _ prag) : inls <- inl_prags
-  = do { traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
+  = do { -- See Note [Retained optimisation pragmas].
+         case [ loc | L loc p <- inl_prags
+                    , isInlinePragma p || isInlinablePragma p ] of
+           loc : _ | hasNativeDependentExpr (Type (idType poly_id))
+             -> setSrcSpanA loc $
+                failWithTc (TcRnRetainedQuantificationError RetainedPragma)
+           _ -> return ()
+       ; traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
        ; unless (null inls) (warn_multiple_inlines inl inls)
        ; return (poly_id `setInlinePragma` prag) }
   | otherwise
@@ -650,6 +666,15 @@ addInlinePrags poly_id prags_for_me
          let dia = TcRnMultipleInlinePragmas poly_id inl1 (inl2 NE.:| inls)
          in addDiagnosticTc dia
 
+
+{- Note [Retained optimisation pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INLINE and INLINABLE create ordinary unfoldings during desugaring. SPECIALISE
+uses ordinary specialisation and rule code. These paths do not support retained
+types. Reject these supplied pragmas at their own source locations before
+entering those paths. Keep NOINLINE, OPAQUE, and unrelated pragmas unchanged.
+The native scanner also finds retained indices inside an ordinary arrow type.
+-}
 
 {- Note [Pattern synonym inline arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -962,6 +987,12 @@ tcSpecPrags :: Id -> [LSig GhcRn]
 -- Reason: required by tcSubExp
 tcSpecPrags poly_id prag_sigs
   = do { traceTc "tcSpecPrags" (ppr poly_id <+> ppr spec_sigs)
+       ; -- See Note [Retained optimisation pragmas].
+         case spec_sigs of
+           L loc _ : _ | hasNativeDependentExpr (Type (idType poly_id))
+             -> setSrcSpanA loc $
+                failWithTc (TcRnRetainedQuantificationError RetainedPragma)
+           _ -> return ()
        ; whenIsJust (NE.nonEmpty bad_sigs) warn_discarded_sigs
        ; pss <- mapAndRecoverM (wrapLocMA (tcSpecPrag poly_id)) spec_sigs
        ; return $ concatMap (\(L l ps) -> map (L (locA l)) ps) pss }

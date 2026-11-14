@@ -448,7 +448,11 @@ todoForTyCons mod mod_id tycons = do
             | tc     <- tycons
             , tc'    <- tc : tyConATs tc
               -- We need type representations for any associated types
-            , let promoted = map promoteDataCon (tyConDataCons tc')
+            , let promoted = [ promoteDataCon dc
+                             | dc <- tyConDataCons tc'
+                             , null (dataConRepArgBinders dc) ]
+                  -- Retained fields have no promoted constructor telescope.
+                  -- See Note [Retained constructor field telescopes] in GHC.Core.DataCon.
             , tc''   <- tc' : promoted
               -- Don't make bindings for data-family instance tycons.
               -- Do, however, make them for their promoted datacon (see #13915).
@@ -620,6 +624,8 @@ kindIsTypeable ty
 kindIsTypeable ty
   | isLiftedTypeKind ty             = True
 kindIsTypeable (TyVarTy _)          = True
+kindIsTypeable (TermVarTy {})       = False
+kindIsTypeable (DepFunTy {})        = False
 kindIsTypeable (AppTy a b)          = kindIsTypeable a && kindIsTypeable b
 kindIsTypeable (FunTy _ w a b)      = kindIsTypeable w &&
                                       kindIsTypeable a &&
@@ -749,6 +755,11 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
     new_kind_rep ki  -- Expand synonyms
       | Just ki' <- coreView ki
       = new_kind_rep ki'
+
+    new_kind_rep ki@(TermVarTy {})
+      = pprPanic "mkKindRepRhs: unsupported runtime index" (ppr ki)
+    new_kind_rep ki@(DepFunTy {})
+      = pprPanic "mkKindRepRhs: unsupported retained function" (ppr ki)
 
     new_kind_rep (TyVarTy v)
       | Just idx <- lookupCME in_scope v

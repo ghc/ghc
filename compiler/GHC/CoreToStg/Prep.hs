@@ -32,12 +32,18 @@ import GHC.Builtin.WiredIn.Ids ( realWorldPrimId )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
-import GHC.Core.Lint    ( EndPassConfig(..), endPassIO )
+import GHC.Core.Lint    ( EndPassConfig(..), LintPassResultConfig(..)
+                        , endPassIO, lintPassResult )
 import GHC.Core hiding( FloatBind(..) )
+import GHC.Core.Dependent
 import GHC.Core.Subst
 import GHC.Core.Make
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep ( Type(..) )
+import GHC.Core.TyCo.Compare ( eqType )
+import GHC.Core.TyCo.Subst ( isEmptyTypeSubst )
 import GHC.Core.Coercion
+import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr_Prep )
@@ -60,8 +66,10 @@ import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Basic
-import GHC.Types.Name   ( OccName, NamedThing(..), isInternalName )
-import GHC.Types.Name.Occurrence (occNameString)
+import GHC.Types.Name   ( OccName, NamedThing(..), isInternalName, mkSystemName )
+import GHC.Types.Name.Occurrence (occNameString, mkTyVarOccFS)
+import GHC.Types.Var.Env ( mkInScopeSet, mkVarEnv, emptyVarEnv, lookupVarEnv, delVarEnv )
+import GHC.Types.Var.Set ( unionVarSet, unionVarSets )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.Unique.Supply
@@ -204,12 +212,12 @@ So our plan is:
 
   * So generally the TCvSubst is empty
 
-  * Apply the substitution to type and coercion arguments in Core; but
-    happily `substTy` has a no-op short-cut for an empty TCvSubst, so this
-    is usually very cheap.
+  * Apply the substitution to type and coercion arguments in Core.
+    `substTy` skips empty substitutions for types without runtime indices.
+    Runtime indices also use the Id substitution when an index Id is cloned.
 
-  * In `cpCloneBndr`, for a tyvar/covar binder, check for an empty substitution;
-    in that case just do nothing
+  * In `cpCloneBndr`, for a tyvar/covar binder, skip substitution only if
+    neither the TyCoVar environment nor a runtime index needs an update.
 -}
 
 type CpeArg  = CoreExpr    -- Non-terminal 'arg'
@@ -239,21 +247,64 @@ corePrepPgm logger cp_cfg pgm_cfg
     withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\a -> a `seqList` ()) $ do
+    let native = hasNativeDependentProgram binds []
+        end_pass_cfg = cpPgm_endPassConfig pgm_cfg
+    -- See Note [CorePrep for retained dependent programs].
+    checked_end_pass_cfg <- if native
+      then do
+        unless (cp_allowNativeDependent cp_cfg) $
+          rejectNativeDependentProgram "CorePrep" binds []
+        when (cp_specEval cp_cfg || cp_specEvalDFun cp_cfg
+              || isJust (cp_arityOpts cp_cfg)) $
+          throwGhcExceptionIO (Sorry
+            "Native dependent Core requires CorePrep speculation and optional arity analysis to be disabled.")
+        case ep_lintPassResult end_pass_cfg of
+          Nothing -> throwGhcExceptionIO (Sorry
+            "Native dependent Core requires CorePrep program Lint before and after preparation.")
+          Just lint_cfg -> do
+            let checked_lint_cfg = lint_cfg { lpr_preSubst = False }
+            lintPassResult logger
+              (checked_lint_cfg { lpr_passPpr = text "before native CorePrep" })
+              binds
+            return (end_pass_cfg { ep_lintPassResult = Just checked_lint_cfg })
+      else return end_pass_cfg
     let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
 
     us <- mkSplitUniqSupply StgTag
     let
         floats = initUs_ us $
                  corePrepTopBinds initialCorePrepEnv binds
-        binds_out = deFloatTop floats
+        binds_out = deFloatTop native floats
 
-    endPassIO logger (cpPgm_endPassConfig pgm_cfg)
+    endPassIO logger checked_end_pass_cfg
               binds_out []
 
     return binds_out
 
+{- Note [CorePrep for retained dependent programs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The native program path preserves retained algebraic types until CoreToStg.
+The caller must disable speculation and optional arity analysis. It must
+also supply the CorePrep Lint configuration, including its weak-join rules.
+CorePrep checks the input and output even without -dcore-lint. These checks
+inspect the actual program. They do not substitute type lets first.
+
+deFloatTop must also preserve bindings that occur only in native type
+indices. Ordinary occurrence analysis does not count these runtime Ids.
+It can delete their bindings and leave an index out of scope. The native
+path therefore skips occurAnalyseExpr_Prep. corePrepExpr does not call
+deFloatTop and needs no corresponding change.
+
+This restriction preserves lazy bindings. Agda's application and runtime
+irrelevance rules do not justify forcing a Haskell runtime index. See
+docs/dependent-haskell/REFERENCES.md#agda-provenance and
+docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
+-}
+
 corePrepExpr :: Logger -> CorePrepConfig -> CoreExpr -> IO CoreExpr
 corePrepExpr logger config expr = do
+    unless (cp_allowNativeDependent config) $
+      rejectNativeDependentExpr "CorePrep" expr
     withTiming logger (text "CorePrep [expr]") (\e -> e `seq` ()) $ do
       us <- mkSplitUniqSupply StgTag
       let initialCorePrepEnv = mkInitialCorePrepEnv config
@@ -591,6 +642,11 @@ cpeBind top_lvl env (NonRec bndr rhs)
                                    dmd lev env bndr1 rhs
        -- See Note [Inlining in CorePrep]
        ; let triv_rhs = exprIsTrivial rhs1
+                     -- Keep a lazy local index when its RHS is outside the
+                     -- supported index grammar. Types still refer to the Id.
+                     && (not (cp_allowNativeDependent (cpe_config env))
+                         || not (isNativeIndexId bndr)
+                         || isJust (exprToNativeIndex rhs1))
              env2    | triv_rhs  = extendCorePrepEnvExpr env1 bndr rhs1
                      | otherwise = env1
              floats1 | triv_rhs, isInternalName (idName bndr)
@@ -897,7 +953,9 @@ cpeBodyF env (Case scrut bndr ty alts)
        ; alts'' <- mapM (sat_alt env') alts'
 
        ; case alts'' of
-           [Alt DEFAULT _ rhs] -- See Note [Flatten case-binds]
+           [Alt DEFAULT [] rhs] -- See Note [Flatten case-binds]
+             -- A native alias proof must keep its alternative scope.
+             -- See Note [Retained constructor arguments in CorePrep].
              | let float = mkCaseFloat bndr3 scrut'
              -> return (snocFloat floats float, rhs)
            _ -> return (floats, Case scrut' bndr3 (cpSubstTy env ty) alts'') }
@@ -1026,15 +1084,145 @@ body of the eta-expansion lambda, resulting in
 which is unproblematic.
 -}
 
+-- | Name constructed retained arguments with checked case-alias evidence.
+-- See Note [Retained constructor arguments in CorePrep].
+nameNativeConstructorArgs :: CoreExpr -> UniqSM (Maybe CoreExpr)
+nameNativeConstructorArgs expr
+  = do { head' <- case fun of
+           Cast inner co -> fmap (`mkCast` co) <$> nameNativeConstructorArgs inner
+           Tick tick inner -> fmap (Tick tick) <$> nameNativeConstructorArgs inner
+           _ -> return Nothing
+       ; case head' of
+           Just fun' -> return (Just (mkApps fun' args))
+           Nothing | needs_names (exprType fun) args ->
+             Just <$> build (exprType fun) fun [] id args
+           Nothing -> return Nothing }
+  where
+    (fun, args) = collectArgs expr
+
+    needs_names _ [] = False
+    needs_names ty (arg : rest)
+      | DepFunTy {} <- coreFullView ty
+      , Just (TyConApp _ (_ : _)) <- exprToNativeIndex arg = True
+      | otherwise = needs_names (applyTypeToArgs ty [arg]) rest
+
+    build ty app transport wrap []
+      = do { co <- liftNativeIndexTransport "the application result" transport ty
+           ; return (wrap (mkCast app (mkSubCo co))) }
+    build ty app transport wrap (arg : rest)
+      | DepFunTy index _ <- coreFullView ty
+      = do { (atom, co, wrap_arg) <- name_index arg
+           ; marker <- mkSysLocalM (fsLit "retained_template") ManyTy (varType index)
+           ; let ty' = applyTypeToArgs ty [Var marker]
+           ; build ty' (App app atom) ((marker, co) : transport)
+                   (wrap . wrap_arg) rest }
+      | Type {} <- arg
+      = do { check_erased_binder ty transport
+           ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
+      | Coercion {} <- arg
+      = do { check_erased_binder ty transport
+           ; build (applyTypeToArgs ty [arg]) (App app arg) transport wrap rest }
+      | Just (_, _, arg_ty, res_ty) <- splitFunTy_maybe ty
+      = do { co <- liftNativeIndexTransport "a later argument" transport arg_ty
+           ; let arg' = mkCast arg (mkSymCo (mkSubCo co))
+           ; build res_ty (App app arg') transport wrap rest }
+      | otherwise = pprPanic "nameNativeConstructorArgs: application type" (ppr ty $$ ppr expr)
+
+    check_erased_binder ty transport
+      | ForAllTy binder _ <- coreFullView ty
+      , any (\(index, _) -> anyFreeVarsOfType (== index) (varType (binderVar binder))) transport
+      = nativeIndexTransportError "a dependent erased binder kind"
+      | otherwise = return ()
+
+    name_index arg
+      | Just index <- exprToNativeIndex arg
+      , (Var worker, fields) <- collectArgs arg
+      , Just con <- isDataConWorkId_maybe worker
+      , not (null fields)
+      = do { named <- mapM name_index fields
+           ; let atoms = [atom | (atom, _, _) <- named]
+                 field_cos = [co | (_, co, _) <- named]
+                 wrap_fields = foldr (.) id [wrap | (_, _, wrap) <- named]
+                 scrut = mkConApp con atoms
+                 scrut_index = expectJust (exprToNativeIndex scrut)
+           ; value <- mkSysLocalM (fsLit "retained_arg") ManyTy (exprType arg)
+           ; proof <- mkSysLocalOrCoVarM (fsLit "retained_alias") ManyTy
+                        (mkNomEqPred (TermVarTy value) scrut_index)
+           ; let co = mkTransCo (mkCoVarCo proof)
+                        (mkTyConAppCo Nominal (promoteDataCon con) field_cos)
+                 wrap body = wrap_fields $
+                   Case scrut value (exprType body) [Alt DEFAULT [proof] body]
+           ; assertPpr (coercionRKind co `eqType` index) (ppr co $$ ppr arg) $
+               return (Var value, co, wrap) }
+      | Just index <- exprToNativeIndex arg
+      = return (arg, mkReflCo Nominal index, id)
+      | otherwise = nativeIndexTransportError "an unsupported retained argument"
+
+-- | Lift index equalities through value types and fixed-domain retained binders.
+-- Fresh symbolic Ids occur only in this temporary template, never in output Core.
+liftNativeIndexTransport :: String -> [(Id, CoercionN)] -> Type -> UniqSM CoercionN
+liftNativeIndexTransport context transport ty
+  | all (isReflCo . snd) relevant
+  = return (mkReflCo Nominal left_ty)
+  | otherwise
+  = do { templates <- forM relevant $ \(index, _) ->
+           do { unique <- getUniqueM
+              ; return (mkTyVar (mkSystemName unique (mkTyVarOccFS (fsLit "retained")))
+                                (varType index)) }
+       ; template_ty <- case abstract (mkVarEnv (zip (map fst relevant) templates)) ty of
+           Just template_ty -> return template_ty
+           Nothing -> nativeIndexTransportError context
+       ; let co = liftCoSubstWith Nominal templates (map snd relevant) template_ty
+       ; if coercionLKind co `eqType` left_ty && coercionRKind co `eqType` right_ty
+         then return co
+         else pprPanic "liftNativeIndexTransport: endpoints" (ppr co $$ ppr ty) }
+  where
+    relevant = filter (\(index, _) -> anyFreeVarsOfType (== index) ty) transport
+    left_ty = instantiate coercionLKind
+    right_ty = instantiate coercionRKind
+    instantiate endpoint
+      = substTy (Subst in_scope bindings emptyVarEnv emptyVarEnv) ty
+      where
+        in_scope = mkInScopeSet (tyCoVarsOfType ty `unionVarSet`
+                                unionVarSets (map (tyCoVarsOfCo . snd) relevant))
+        bindings = mkVarEnv [(index, mapNativeIndex (const (endpoint co)) (Var index))
+                           | (index, co) <- relevant]
+
+    abstract env ty
+      | not (anyFreeVarsOfType (\v -> isJust (lookupVarEnv env v)) ty) = Just ty
+      | Just ty' <- coreView ty = abstract env ty'
+    abstract env (TermVarTy index) = mkTyVarTy <$> lookupVarEnv env index
+    abstract env (DepFunTy index body)
+      | not (anyFreeVarsOfType (\v -> isJust (lookupVarEnv env v)) (varType index))
+      = mkDepFunTy index <$> abstract (delVarEnv env index) body
+    abstract env (TyConApp con args) = mkTyConApp con <$> mapM (abstract env) args
+    abstract env (AppTy fun arg) = mkAppTy <$> abstract env fun <*> abstract env arg
+    abstract env (FunTy flag mult arg res)
+      = FunTy flag <$> abstract env mult <*> abstract env arg <*> abstract env res
+    abstract _ _ = Nothing
+
+-- | Report the remaining coercion boundary without fabricating index evidence.
+nativeIndexTransportError :: String -> UniqSM a
+nativeIndexTransportError context
+  = throwGhcException (Sorry
+      ("Native dependent Core cannot transport constructed retained indices through "
+       ++ context ++ " in CorePrep. The required type or coercion congruence is not supported."))
+
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeBody)
 -- May return a CpeBody (instead of CpeApp) because of saturating primops
 cpeApp top_env expr
-  = do { let (terminal, args) = collect_args expr
+  = do { named <- if cp_allowNativeDependent (cpe_config top_env)
+                  then nameNativeConstructorArgs expr
+                  else return Nothing
+       ; case named of
+           Just expr' -> cpeBodyF top_env expr'
+           Nothing -> ordinary_app }
+  where
+    ordinary_app = do
+      { let (terminal, args) = collect_args expr
       --  ; pprTraceM "cpeApp" $ (ppr expr)
        ; cpe_app top_env terminal args
        }
-
-  where
     -- We have a nested data structure of the form
     -- e `App` a1 `App` a2 ... `App` an, convert it into
     -- (e, [CpeApp a1, CpeApp a2, ..., CpeApp an], depth)
@@ -1245,6 +1433,14 @@ cpeApp top_env expr
            co' = cpSubstCo env co
 
       AIApp arg -> do
+        -- See Note [Retained constructor arguments in CorePrep].
+        when (cp_allowNativeDependent (cpe_config env)) $
+          case coreFullView (exprType fun') of
+            DepFunTy {}
+              | Just (TyConApp _ (_ : _)) <- exprToNativeIndex arg
+              -> throwGhcException (Sorry
+                   "Native dependent Core cannot transport a constructor-tree retained argument across this application spine in CorePrep.")
+            _ -> pure ()
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
                = case (ss, isLazyExpr arg) of
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
@@ -1266,6 +1462,42 @@ cpeApp top_env expr
         | otherwise
         -- See [Floating Ticks in CorePrep]
         -> rebuild_app' env as fun' (snocFloat floats (FloatTick tickish)) ss rt_ticks req_depth
+
+{- Note [Retained constructor arguments in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Changing f (S k) to let t = S k in f t changes its index from 'S k to TermVarTy t.
+Name the constructor with a checked case alias instead:
+
+  case S k of t { DEFAULT [cv :: TermVarTy t ~# 'S (TermVarTy k)] -> ... }
+
+Core Lint derives this equality from the actual scrutinee and case binder.
+It is not an equality from an unfolding. The scrutinee is constructor WHNF,
+so this strict case does not force k. Name nested constructor fields recursively.
+Compose their equalities with the outer constructor equality. The outer proof
+then mentions the actual prepared fields, while transport recovers the original
+constructor tree. A variable field, including a bottom or cyclic value, stays lazy.
+
+Walk the complete supplied application with fresh symbolic index placeholders.
+For each later ordinary argument, lift the prepared-to-original index equalities
+through its formal type and cast the payload in the inverse direction. Cast the
+final result back to its original index. A result-only cast is insufficient.
+The placeholders occur only in temporary templates. Output contains checked
+type applications and nominal coercion lifting, with no universal axiom.
+
+Build this typed expression before ordinary CorePrep naming. Keep proof-bearing
+DEFAULT cases intact: a CaseBound float has no slot for their alternative proof.
+CoreToStg erases the checked proof and retains the case binder and real fields.
+For a remaining dependent function, lift the result equality under its unchanged
+closed domain with DepFunCo. Preserve a cast around the partial application.
+Do not eta-expand it: a lambda could hide a bottom function. Dependent erased
+binder kinds and transport through a changed runtime domain remain unsupported.
+See Note [Retained dependent function coercions] in GHC.Core.TyCo.Rep.
+
+Agda substitutes local lets and does not preserve their sharing. The dependent
+ANF literature retains the defining computation in continuation typing. Neither
+result proves this lazy FC rule. See Note [Native index alias evidence] in
+GHC.Core.Lint and docs/dependent-haskell/REFERENCES.md#agda-provenance.
+-}
 
 isLazyExpr :: CoreExpr -> Bool
 -- See Note [lazyId magic] in GHC.Types.Id.Make
@@ -2377,9 +2609,9 @@ wrapBinds floats body
       = mkTickCpe tickish body
 
 -- | Put floats at top-level
-deFloatTop :: Floats -> [CoreBind]
+deFloatTop :: Bool -> Floats -> [CoreBind]
 -- Precondition: No Strict or LazyContextFloatable 'FloatInfo', no ticks!
-deFloatTop floats
+deFloatTop native floats
   = foldrOL get [] (getFloats floats)
   where
     get (Float b _ TopLvlFloatable) bs
@@ -2387,6 +2619,8 @@ deFloatTop floats
     get b _  = pprPanic "deFloatTop" (ppr b)
 
     -- See Note [Dead code in CorePrep]
+    -- See Note [CorePrep for retained dependent programs].
+    get_bind bind | native = bind
     get_bind (NonRec x e) = NonRec x (occurAnalyseExpr_Prep e)
     get_bind (Rec xes)    = Rec [(x, occurAnalyseExpr_Prep e) | (x, e) <- xes]
 
@@ -2580,6 +2814,10 @@ data CorePrepConfig = CorePrepConfig
   -- cases. This is helpful when debugging demand analysis or type
   -- checker bugs which can sometimes manifest as segmentation faults.
 
+  , cp_allowNativeDependent    :: !Bool
+  -- ^ Allow checked native dependent expressions and programs.
+  -- See Note [CorePrep for retained dependent programs].
+
   , cp_platform                :: Platform
 
   , cp_arityOpts               :: !(Maybe ArityOpts)
@@ -2649,11 +2887,9 @@ enterRecGroupRHSs env grp
 
 cpSubstTy :: CorePrepEnv -> Type -> Type
 cpSubstTy (CPE { cpe_subst = subst }) ty = substTy subst ty
-          -- substTy has a short-cut if the TCvSubst is empty
 
 cpSubstCo :: CorePrepEnv -> Coercion -> Coercion
 cpSubstCo (CPE { cpe_subst = subst }) co = substCo subst co
-          -- substCo has a short-cut if the TCvSubst is empty
 
 -- | See Note [Binder context]
 pushBinderContext :: Id -> CorePrepEnv -> CorePrepEnv
@@ -2685,7 +2921,7 @@ cpCloneBndr  :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
 -- See Note [Cloning in CorePrep]
 cpCloneBndr env@(CPE { cpe_subst = subst }) bndr
   | isTyCoVar bndr  -- See Note [Cloning CoVars and TyVars]
-  = if isEmptyTCvSubst subst    -- The common case
+  = if isEmptyTypeSubst subst [varType bndr] []
     then return (env { cpe_subst = extendSubstInScope subst bndr }, bndr)
     else -- No need to clone the Unique; but we must apply the substitution
          let bndr1  = updateVarType (substTy subst) bndr

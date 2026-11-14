@@ -928,6 +928,8 @@ getTyDescription ty
   = case (tcSplitSigmaTy ty) of { (_, _, tau_ty) ->
     case tau_ty of
       TyVarTy _              -> "*"
+      TermVarTy {}           -> pprPanic "getTyDescription: unsupported runtime index" (ppr tau_ty)
+      DepFunTy {}            -> pprPanic "getTyDescription: unsupported retained function" (ppr tau_ty)
       AppTy fun _            -> getTyDescription fun
       TyConApp tycon _       -> getOccString tycon
       FunTy {}              -> '-' : fun_result tau_ty

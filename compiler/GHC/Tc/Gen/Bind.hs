@@ -42,6 +42,8 @@ import GHC.Tc.Solver
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
+import GHC.Core ( Expr(Type) )
+import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.UsageEnv ( bottomUE )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Pat
@@ -478,7 +480,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc closed bind_list
     ; let plan = decideGeneralisationPlan dflags top_lvl closed sig_fn bind_list
     ; traceTc "Generalisation plan" (ppr plan)
     ; result@(_, scaled_poly_ids) <- case plan of
-         NoGen              -> tcPolyNoGen rec_tc prag_fn sig_fn bind_list
+         NoGen              -> tcPolyNoGen top_lvl rec_tc prag_fn sig_fn bind_list
          InferGen           -> tcPolyInfer top_lvl rec_tc prag_fn sig_fn bind_list
          CheckGen lbind sig -> tcPolyCheck prag_fn sig lbind
 
@@ -533,19 +535,30 @@ forall_a_a = mkSpecForAllTys [alphaTyVar] alphaTy
 ********************************************************************* -}
 
 tcPolyNoGen     -- No generalisation whatsoever
-  :: RecFlag       -- Whether it's recursive after breaking
+  :: TopLevelFlag
+  -> RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
   -> TcPragEnv -> TcSigFun
   -> [LHsBind GhcRn]
   -> TcM (LHsBinds GhcTc, [Scaled TcId])
 
-tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
+tcPolyNoGen top_lvl rec_tc prag_fn tc_sig_fn bind_list
   = do { (binds', mono_infos) <- tcMonoBinds rec_tc tc_sig_fn
                                              (LetGblBndr prag_fn)
                                              bind_list
+       ; checkInferredRetainedTypes local_value mono_infos
        ; mono_ids' <- mapM tc_mono_info mono_infos
        ; return (binds', mono_ids') }
   where
+    -- See Note [Scoped inferred native values].
+    local_value
+      | NotTopLevel <- top_lvl
+      , NonRecursive <- rec_tc
+      , [L _ (FunBind { fun_matches = MG { mg_alts = L _
+            [L _ (Match { m_pats = L _ [] })] } })] <- bind_list
+      = True
+      | otherwise = False
+
     tc_mono_info (MBI { mbi_poly_name = name, mbi_mono_id = mono_id, mbi_mono_mult = mult })
       = do { _specs <- tcSpecPrags mono_id (lookupPragEnv prag_fn name)
            ; return $ Scaled mult mono_id }
@@ -725,6 +738,7 @@ tcPolyInfer top_lvl rec_tc prag_fn tc_sig_fn bind_list
              <- pushLevelAndCaptureConstraints  $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
 
+       ; checkInferredRetainedTypes False mono_infos
        ; apply_mr <- checkMonomorphismRestriction mono_infos bind_list
 
        -- AbsBinds which are PatBinds can't be linear.
@@ -1282,6 +1296,60 @@ data MonoBindInfo = MBI { mbi_poly_name :: Name
                         , mbi_sig       :: Maybe TcIdSigInst
                         , mbi_mono_id   :: TcId
                         , mbi_mono_mult :: Mult }
+
+-- | Check inferred retained types before ordinary binding inference.
+-- See Note [Inference of retained types].
+checkInferredRetainedTypes :: Bool -> [MonoBindInfo] -> TcM ()
+checkInferredRetainedTypes local_value infos
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; when enabled $ mapM_ check_info infos }
+  where
+    check_info (MBI { mbi_sig = Just (TISI { sig_inst_sig = TcCompleteSig{} }) })
+      = return ()
+    check_info info@(MBI { mbi_poly_name = name, mbi_mono_id = mono_id })
+      = setSrcSpan (nameSrcSpan name) $
+        do { ty <- liftZonkM $ zonkTcType (idType mono_id)
+           ; when (hasNativeDependentExpr (Type ty)) $
+               if local_value && isNothing (mbi_sig info) && isTauTy ty
+               then checkValidType (InfSigCtxt name) ty
+               else failWithTc $ TcRnRetainedQuantificationError (RetainedInference ty) }
+
+{- Note [Inference of retained types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An unsigned binding can infer a retained type without assigning a metavariable.
+For example, alias = keep copies the type of a retained function directly into
+an InferResult. The ordinary metavariable escape checks do not reject it.
+Ordinary generalisation does not support retained types.
+
+Check inferred binder types after tcMonoBinds, before ordinary inference.
+Zonk first to expose native syntax behind filled metavariables. Check NoGen
+bindings too, with the exception in Note [Scoped inferred native values]. Keep
+complete signatures on their checking path, including those in a binding group.
+Ordinary inferred functions whose types contain no native syntax are unchanged.
+See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+
+Note [Scoped inferred native values]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A single unsigned nonrecursive FunBind infers its RHS before allocating its
+Id. runInferRhoFRR can store an exact native type in an InferResult without
+assigning that type to a meta-variable. For example, in the scope of n :: Nat,
+
+    let action = pure (replicateNative n 7)
+
+can infer f (Vec Int n). The ordinary head f can still be a meta-variable.
+For a local NoGen binding with one zero-argument equation, admit this monotype
+after checkValidType validates every runtime index against its actual lexical
+binding. This also checks the index domain and multiplicity. The binder's
+ordinary FRR and usage checks still apply. No runtime index is evaluated.
+
+Do not generalise the result. Keep the rejection for recursive groups, pattern
+bindings, partial signatures and retained function telescopes. isTauTy rejects
+DepFunTy as well as forall and predicate arrows. Existing infer-cell promotion
+and branch joining remain responsible for type-variable and GADT escape.
+Agda's lexical let context supplies prior art; it does not justify transparent
+Haskell index aliases. See docs/dependent-haskell/REFERENCES.md,
+"Scoped native source inference".
+-}
 
 tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking purposes
                         -- i.e. the binders are mentioned in their RHSs, and

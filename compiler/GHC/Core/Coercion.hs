@@ -37,7 +37,7 @@ module GHC.Core.Coercion (
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
         mkNakedForAllCo, mkForAllCo, mkForAllVisCos,
-        mkHomoForAllCo, mkHomoForAllCos,
+        mkHomoForAllCo, mkHomoForAllCos, mkDepFunCo,
         mkPhantomCo, mkAxiomCo,
         mkHoleCo, mkUnivCo, mkUnivCoFromDeps, mkUnivCoAddTypeDeps,
         checkUnivCoDepsInv,
@@ -1018,6 +1018,8 @@ setNominalRole_maybe r co
       = TransCo <$> setNominalRole_maybe_helper co1 <*> setNominalRole_maybe_helper co2
     setNominalRole_maybe_helper (AppCo co1 co2)
       = AppCo <$> setNominalRole_maybe_helper co1 <*> pure co2
+    setNominalRole_maybe_helper (DepFunCo b co)
+      = mkDepFunCo b <$> setNominalRole_maybe_helper co
     setNominalRole_maybe_helper co@(ForAllCo { fco_visL = visL, fco_visR = visR, fco_body = body_co })
       | visL `eqForAllVis` visR -- See (FC3) in Note [ForAllCo] in GHC.Core.TyCo.Rep
       = do { body_co' <- setNominalRole_maybe_helper body_co
@@ -1199,6 +1201,8 @@ promoteCoercion co = case co of
             -- the first equation above.  Hence `assert False`
          mkNomReflCo liftedTypeKind
 
+    DepFunCo {} -> mkNomReflCo liftedTypeKind
+
     FunCo {} -> mkKindCo co
        -- We can get Type~Constraint or Constraint~Type
        -- from FunCo {} :: (a -> (b::Type)) ~ (a -=> (b'::Constraint))
@@ -1352,6 +1356,10 @@ mkFunResCo :: Role -> Id -> Coercion -> Coercion
 --   mkFunResCo r m arg res_co :: (arg -> res1) ~r (arg -> res2)
 -- Reflexive in the multiplicity argument
 mkFunResCo role id res_co
+  | isNonCoVarId id
+  , id `elemVarSet` tyCoVarsOfCo res_co
+  = mkDepFunCo id res_co
+  | otherwise
   = mkFunCoNoFTF role mult arg_co res_co
   where
     arg_co = mkReflCo role (varType id)
@@ -1764,6 +1772,12 @@ ty_co_subst !lc role ty
     go Phantom ty           = lift_phantom ty
     go r (TyVarTy tv)       = expectJust $
                               liftCoSubstTyVar lc r tv
+    go r ty@(TermVarTy {})  = lift_native r ty
+    go r (DepFunTy b body)
+      = let LC subst env = lc
+            (subst', b') = substNativeIndexBndr subst b
+            lc' = LC subst' (delVarEnv env b)
+        in mkDepFunCo b' (ty_co_subst lc' r body)
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys)  = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)
     go r (FunTy af w t1 t2) = mkFunCo r af (go Nominal w) (go r t1) (go r t2)
@@ -1787,6 +1801,13 @@ ty_co_subst !lc role ty
     go r (CoercionTy co)   = mkProofIrrelCo r kco (substLeftCo lc co)
                                                   (substRightCo lc co)
       where kco = go Nominal (coercionType co)
+
+    lift_native r ty
+      | lty `eqType` rty = mkReflCo r lty
+      | otherwise = pprPanic "ty_co_subst: native dependent congruence not implemented" (ppr ty)
+      where
+        lty = substTy (lcSubstLeft lc) ty
+        rty = substTy (lcSubstRight lc) ty
 
     lift_phantom ty = mkPhantomCo (go Nominal (typeKind ty))
                                   (substTy (lcSubstLeft  lc) ty)
@@ -1877,8 +1898,10 @@ liftCoSubstVarBndrUsing :: (r -> CoercionN)              -- ^ coercion getter
 liftCoSubstVarBndrUsing view_co fun lc old_var
   | isTyVar old_var
   = liftCoSubstTyVarBndrUsing view_co fun lc old_var
-  | otherwise
+  | isCoVar old_var
   = liftCoSubstCoVarBndrUsing view_co fun lc old_var
+  | otherwise
+  = pprPanic "liftCoSubstVarBndrUsing: native dependent binder not implemented" (ppr old_var)
 
 -- Works for tyvar binder
 liftCoSubstTyVarBndrUsing :: (r -> CoercionN)              -- ^ coercion getter
@@ -2065,6 +2088,7 @@ coercion_lr_kind which orig_co
     go (GRefl _ ty (MCo co1)) = pickLR which (ty, mkCastTy ty co1)
     go (TyConAppCo _ tc cos)  = mkTyConApp tc (map go cos)
     go (AppCo co1 co2)        = mkAppTy (go co1) (go co2)
+    go (DepFunCo b co)        = mkDepFunTy b (go co)
     go (CoVarCo cv)           = go_covar cv
     go (HoleCo h)             = go_covar (coHoleCoVar h)
     go (SymCo co)             = pickLR which (coercionRKind co, coercionLKind co)
@@ -2224,6 +2248,7 @@ coercionRole = go
     go (GRefl r _ _)                = r
     go (TyConAppCo r _ _)           = r
     go (AppCo co1 _)                = go co1
+    go (DepFunCo _ co)              = go co
     go (ForAllCo { fco_body = co }) = go co
     go (FunCo { fco_role = r })     = r
     go (CoVarCo cv)                 = coVarRole cv
@@ -2275,6 +2300,16 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
                   { TyVarTy tv2 -> tv1 == tv2
                   ; _           -> False      }) $
         mkNomReflCo ty1
+
+    go ty1@(TermVarTy {}) ty2
+      | ty1 `eqType` ty2 = mkNomReflCo ty1
+      | otherwise = pprPanic "buildCoercion: native term-index congruence not implemented"
+                      (ppr ty1 $$ ppr ty2)
+
+    go ty1@(DepFunTy {}) ty2
+      | ty1 `eqType` ty2 = mkNomReflCo ty1
+      | otherwise = pprPanic "buildCoercion: native dependent congruence not implemented"
+                      (ppr ty1 $$ ppr ty2)
 
     go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
        (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
@@ -2362,6 +2397,8 @@ has_co_hole_ty :: Type -> Monoid.Any
     folder :: TyCoFolder Monoid.Any
     folder = TyCoFolder { tcf_view  = noView
                         , tcf_tyvar = const (Monoid.Any False)
+                        , tcf_termvar = has_co_hole_ty . varType
+                        , tcf_termbinder = \ _ x -> x
                         , tcf_covar = const (Monoid.Any False)
                         , tcf_hole  = const (Monoid.Any True)
                         , tcf_lit   = const (Monoid.Any False)

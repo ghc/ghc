@@ -32,6 +32,13 @@ The following syntax is stolen:
     <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0193-forall-keyword.rst>`__.
 
 
+``foreach``
+    .. index::
+       single: foreach
+
+    Reserved by :extension:`ExperimentalDependentTypes`. It remains an ordinary
+    identifier when the extension is disabled.
+
 ``mdo``
     .. index::
        single: mdo

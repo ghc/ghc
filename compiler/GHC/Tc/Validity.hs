@@ -30,7 +30,7 @@ import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint ( userTypeError_maybe )
-import GHC.Tc.Utils.Env (tcLookupId)
+import GHC.Tc.Utils.Env (tcLookupId, tcLookupLcl_maybe, tcExtendIdEnv)
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Zonk.TcType
@@ -41,6 +41,8 @@ import GHC.Builtin.Modules( gHC_CLASSES )
 import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 
 import GHC.Core.Type
+import GHC.Core ( Expr(Var) )
+import GHC.Core.Utils ( applyTypeToArgs )
 import GHC.Core.Unify ( typesAreApart, tcMatchTyX_BM, BindFlag(..) )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
@@ -66,7 +68,8 @@ import GHC.Types.FieldLabel (flSelector)
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar, tyVarName )
+import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar, tyVarName
+                        , isId, isCoVar )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
@@ -239,9 +242,10 @@ checkAmbiguity ctxt ty
          -- tyvars are skolemised, we can safely use tcSimplifyTop
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; unless allow_ambiguous $
+         withRetainedAmbiguityType ty $ \check_ty ->
          do { (_wrap, wanted) <- addErrCtxt (AmbiguityCheckCtxt ctxt allow_ambiguous) $
                                  captureConstraints $
-                                 tcSubTypeAmbiguity ctxt ty ty
+                                 tcSubTypeAmbiguity ctxt check_ty check_ty
                                  -- See Note [Ambiguity check and deep subsumption]
                                  -- in GHC.Tc.Utils.Unify
             ; simplifyAmbiguityCheck ty wanted }
@@ -250,6 +254,56 @@ checkAmbiguity ctxt ty
 
   | otherwise
   = return ()
+
+-- | Open a retained telescope for the ambiguity check only.
+-- See Note [Ambiguity checking retained signatures].
+withRetainedAmbiguityType :: Type -> (Type -> TcM a) -> TcM a
+withRetainedAmbiguityType ty thing_inside
+  = do { (indices, check_ty) <- go ty
+       ; tcExtendIdEnv indices (thing_inside check_ty) }
+  where
+    go ty@(DepFunTy index _)
+      = do { fresh <- newSysLocalId (getOccFS index) ManyTy (varType index)
+           ; (indices, body) <- go (applyTypeToArgs ty [Var fresh])
+           ; return (fresh : indices, mkVisFunTyMany (varType index) body) }
+    go (ForAllTy binder body)
+      = do { (indices, body) <- go body
+           ; return (indices, mkForAllTy binder body) }
+    go (FunTy flag mult arg res)
+      = do { (arg_indices, arg) <- go arg
+           ; (res_indices, res) <- go res
+           ; return (arg_indices ++ res_indices, FunTy flag mult arg res) }
+    go ty = return ([], ty)
+
+{- Note [Ambiguity checking retained signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ambiguity check compares a signature with a fresh instantiation of itself.
+For forall a. foreach n -> a -> Vec a n, the payload metavariable must unify
+with the payload skolem. Structural unification under a retained binder remains
+gated, so ordinary equality cannot perform this payload unification.
+
+Open each retained binder with one fresh runtime Id. Use that same opaque Id
+on both sides of the check. Replace the opened binder with an ordinary arrow.
+Keep outer erased quantifiers, so ordinary ambiguity checks still apply to
+their type variables and constraints. Do not replace runtime indices with
+fresh type metavariables: Select b need not determine b.
+
+Project both the argument and result of an ordinary arrow. For example,
+forall a. (foreach m -> Vec a m -> Vec a m) -> Int compares a payload skolem
+with its fresh metavariable inside the argument Pi. Leaving that Pi unchanged
+would prevent the ordinary payload unification. Opening an outer retained
+binder first substitutes its fresh Id through the whole body, including any
+nested argument Pi. Thus an argument closure can still refer to the outer
+runtime index. Keep all fresh runtime Ids in scope for the projected check.
+
+Agda's equalFun and compareDom also compare codomains in one shared extended
+context. See docs/dependent-haskell/REFERENCES.md#agda-provenance.
+
+Scope the fresh Ids over constraint capture and simplification. The check
+discards its wrapper and evidence, as it does for an ordinary signature.
+This projection does not change the signature or produce a Core coercion
+between retained functions. Native metavariable escape checks still apply.
+-}
 
 wantAmbiguityCheck :: UserTypeCtxt -> Bool
 wantAmbiguityCheck ctxt
@@ -409,16 +463,21 @@ checkValidType ctxt ty
                  _              -> panic "checkValidType"
                                           -- Can't happen; not used for *user* sigs
 
-       ; env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
+       ; let fvs = tyCoVarsOfTypeList ty
+       ; env <- liftZonkM $ tcInitOpenTidyEnv fvs
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
-                             , ve_rank = rank, ve_expand = expand }
+                             , ve_rank = rank, ve_expand = expand
+                             , ve_indices = emptyVarSet }
 
        -- Check the internal validity of the type itself
        -- Fail if bad things happen, else we misleading
        -- (and more complicated) errors in checkAmbiguity
        ; checkNoErrs $
-         do { check_type ve ty
+         do { -- See Note [Validity of retained binders].
+              mapM_ (check_type ve . TermVarTy)
+                [v | v <- fvs, isId v, not (isCoVar v)]
+            ; check_type ve ty
             ; checkUserTypeError ctxt ty
             ; traceTc "done ct" (ppr ty) }
 
@@ -435,7 +494,8 @@ checkValidMonoType ty
   = do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = SigmaCtxt
-                             , ve_rank = MustBeMonoType, ve_expand = expand }
+                             , ve_rank = MustBeMonoType, ve_expand = expand
+                             , ve_indices = emptyVarSet }
        ; check_type ve ty }
 
 checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()
@@ -446,7 +506,7 @@ checkTySynRhs ctxt ty
          then  when (isConstraintLikeKind actual_kind)
                     (do { dflags <- getDynFlags
                         ; expand <- initialExpandMode
-                        ; check_pred_ty emptyTidyEnv dflags ctxt expand ty })
+                        ; check_pred_ty emptyVarSet emptyTidyEnv dflags ctxt expand ty })
          else addErrTcM ( emptyTidyEnv
                         , TcRnIllegalConstraintSynonymOfKind (tidyType emptyTidyEnv actual_kind)
                         ) }
@@ -727,7 +787,8 @@ data ValidityEnv = ValidityEnv
   { ve_tidy_env :: TidyEnv
   , ve_ctxt     :: UserTypeCtxt
   , ve_rank     :: Rank
-  , ve_expand   :: ExpandMode }
+  , ve_expand   :: ExpandMode
+  , ve_indices  :: VarSet }
 
 instance Outputable ValidityEnv where
   ppr (ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
@@ -746,6 +807,31 @@ check_type :: ValidityEnv -> Type -> TcM ()
 -- Rank is allowed rank for function args
 -- Rank 0 means no for-alls anywhere
 
+-- See Note [Validity of retained binders]
+check_type ve (TermVarTy v)
+  = do { unless (isNativeIndexId v) $
+           failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
+       ; unless (v `elemVarSet` ve_indices ve) $
+         do { mb_thing <- tcLookupLcl_maybe (getName v)
+            ; case mb_thing of
+                Just (ATcId { tct_id = v' }) ->
+                  do { binding <- liftZonkM (zonkId v')
+                     ; unless (v == binding && isNativeIndexId binding
+                               && eqType (varType v) (varType binding)) $
+                         failWithTc $ TcRnRetainedQuantificationError
+                                        (RetainedIndexOutOfScope v) }
+                _ -> failWithTc $ TcRnRetainedQuantificationError
+                                   (RetainedIndexOutOfScope v) } }
+check_type ve (DepFunTy v body)
+  = do { unless (isNativeIndexId v && not (v `elemVarSet` ve_indices ve)) $
+           failWithTc $ TcRnRetainedQuantificationError (RetainedInvalidBinder v)
+       ; unless (typeKind body `eqType` liftedTypeKind) $
+           failWithTc $ TcRnRetainedQuantificationError (RetainedResultKind body)
+       ; check_type (ve { ve_rank = arg_rank }) (varType v)
+       ; check_type (ve { ve_rank = res_rank
+                        , ve_indices = ve_indices ve `extendVarSet` v }) body }
+  where
+    (arg_rank, res_rank) = funArgResRank (ve_rank ve)
 check_type _ (TyVarTy _)
   = return ()
 
@@ -802,7 +888,7 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env
                 -- Reject visible, dependent quantification in the type of a
                 -- term (e.g., `f :: forall a -> a -> Maybe a`)
 
-        ; check_valid_theta env' SigmaCtxt expand theta
+        ; check_valid_theta (ve_indices ve) env' SigmaCtxt expand theta
                 -- Allow     type T = ?x::Int => Int -> Int
                 -- but not   type T = ?x::Int
 
@@ -830,6 +916,33 @@ check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
 
 check_type _ ty@(ForAllTy {}) = pprPanic "check_type" (ppr ty)
 check_type _ ty@(CoercionTy {}) = pprPanic "check_type" (ppr ty)
+
+{- Note [Validity of retained binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained binder introduces a value argument. Use the ordinary function
+argument and result ranks, and extend the index scope only for its result.
+An index occurrence must refer to that scope or to an already-bound local
+index Id in the typechecker environment. Its Id remains unrestricted.
+Zonk the lexical binding's type and multiplicity before testing it. IO-bound
+indices can retain filled meta-variables in that metadata. Keep the same Unique
+and require the occurrence and binding domains to agree. This follows
+GHC.Tc.Gen.App, Note [Native index bindings during typechecking].
+Its domain must satisfy isNativeIndexType. Ordinary outer forall binders
+keep their existing type-variable scope and rank checks.
+Preserve this scope when checking nested constraints and their predicates.
+
+checkValidType also checks all deep free runtime Ids through this lexical
+check. The structural validity walk skips coercions and variable kinds.
+Those can contain runtime indices, including in an inferred local type.
+Reuse the deep free-variable list already needed for tidying. It excludes
+properly bound retained indices and follows kind and coercion metadata.
+Exclude CoVars: these Ids are erased evidence, not runtime indices.
+
+The dependent scope follows the function types described in
+docs/dependent-haskell/REFERENCES.md#agda-provenance. This check does not
+evaluate an index. Haskell laziness still applies; see
+docs/dependent-haskell/REFERENCES.md#haskell-evaluation-provenance.
+-}
 
 ----------------------------------------
 check_syn_tc_app :: ValidityEnv
@@ -1186,17 +1299,17 @@ checkValidTheta ctxt theta
   = addErrCtxt (ThetaCtxt ctxt theta) $
     do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
        ; expand <- initialExpandMode
-       ; check_valid_theta env ctxt expand theta }
+       ; check_valid_theta emptyVarSet env ctxt expand theta }
 
 -------------------------
-check_valid_theta :: TidyEnv -> UserTypeCtxt -> ExpandMode
+check_valid_theta :: VarSet -> TidyEnv -> UserTypeCtxt -> ExpandMode
                   -> [PredType] -> TcM ()
-check_valid_theta _ _ _ []
+check_valid_theta _ _ _ _ []
   = return ()
-check_valid_theta env ctxt expand theta
+check_valid_theta indices env ctxt expand theta
   = do { dflags <- getDynFlags
        ; traceTc "check_valid_theta" (ppr theta)
-       ; mapM_ (check_pred_ty env dflags ctxt expand) theta }
+       ; mapM_ (check_pred_ty indices env dflags ctxt expand) theta }
 
 -------------------------
 {- Note [Validity checking for constraints]
@@ -1223,11 +1336,11 @@ to avoid requiring language extensions at the use site.  Main example
 We don't want to require ConstraintKinds in module B.
 -}
 
-check_pred_ty :: TidyEnv -> DynFlags -> UserTypeCtxt -> ExpandMode
+check_pred_ty :: VarSet -> TidyEnv -> DynFlags -> UserTypeCtxt -> ExpandMode
               -> PredType -> TcM ()
 -- Check the validity of a predicate in a signature
 -- See Note [Validity checking for constraints]
-check_pred_ty env dflags ctxt expand pred
+check_pred_ty indices env dflags ctxt expand pred
   = do { check_type ve pred
        ; check_pred_help False env dflags ctxt pred }
   where
@@ -1240,7 +1353,8 @@ check_pred_ty env dflags ctxt expand pred
     ve = ValidityEnv{ ve_tidy_env = env
                     , ve_ctxt     = SigmaCtxt
                     , ve_rank     = rank
-                    , ve_expand   = expand }
+                    , ve_expand   = expand
+                    , ve_indices  = indices }
 
 check_pred_help :: Bool    -- True <=> under a type synonym
                 -> TidyEnv
@@ -2062,7 +2176,7 @@ checkValidInstance ctxt hs_type ty = case tau of
 
         ; env0 <- liftZonkM $ tcInitTidyEnv
         ; expand <- initialExpandMode
-        ; check_valid_theta env0 ctxt expand theta
+        ; check_valid_theta emptyVarSet env0 ctxt expand theta
 
         -- The Termination and Coverage Conditions
         -- Check that instance inference will terminate (if we care)

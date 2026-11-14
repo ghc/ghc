@@ -33,7 +33,8 @@ module GHC.Core (
         mkDoubleLit,
 
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
-        varToCoreExpr, varsToCoreExprs,
+        varToCoreExpr, varsToCoreExprs, exprToBoolIndex,
+        exprToNativeIndex, mapNativeIndex, isNativeIndexAlt, isNativeIndexAliasAlt,
 
         mkBinds,
 
@@ -101,9 +102,12 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep ( Type(TermVarTy, TyConApp), Scaled(..) )
+import GHC.Builtin.KnownKeys ( boolTyConKey )
 import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Core.DataCon
+import GHC.Core.TyCon ( isPromotedDataCon_maybe )
 import GHC.Unit.Module
 
 import GHC.Types.InlinePragma
@@ -111,6 +115,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Var.Env( InScopeSet )
 import GHC.Types.Var
+import {-# SOURCE #-} GHC.Types.Id ( isDataConWorkId_maybe )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.Basic
@@ -347,7 +352,9 @@ type Arg b = Expr b
 
 -- | A case split alternative. Consists of the constructor leading to the alternative,
 -- the variables bound from the constructor, and the expression to be executed given that binding.
--- The default alternative is @(DEFAULT, [], rhs)@
+-- The ordinary default alternative is @(DEFAULT, [], rhs)@. A checked native
+-- index alias binds one virtual CoVar. See Note [Native index alias evidence]
+-- in GHC.Core.Lint.
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
@@ -786,6 +793,11 @@ Note [Case expression invariants]
 Case expressions are one of the more complicated elements of the Core
 language, and come with a number of invariants.  All of them should be
 checked by Core Lint.
+
+Experimental native algebraic alternatives can bind one virtual coercion variable
+after their ordinary fields. They require checked coverage and branch evidence.
+The ordinary optimizer remains gated. See Note [Native algebraic branch evidence]
+in GHC.Core.Lint.
 
 1. The list of alternatives may be empty;
    See Note [Empty case alternatives]
@@ -2583,7 +2595,79 @@ mkTyBind tv ty      = NonRec tv (Type ty)
 mkCoBind :: CoVar -> Coercion -> CoreBind
 mkCoBind cv co      = NonRec cv (Coercion co)
 
--- | Convert a binder into either a 'Var' or 'Type' 'Expr' appropriately
+-- | Convert a local value or saturated constructor tree to a native index.
+-- Do not evaluate the expression or inspect identifier unfoldings.
+exprToNativeIndex :: CoreExpr -> Maybe Type
+exprToNativeIndex expr
+  | Var v <- expr, isNativeIndexId v
+  = Just (TermVarTy v)
+  | (Var worker, args) <- collectArgs expr
+  , Just con <- isDataConWorkId_maybe worker
+  , isNativeIndexType (mkTyConTy (dataConTyCon con))
+  , args `lengthIs` dataConSourceArity con
+  = do { indices <- traverse exprToNativeIndex args
+       ; if nativeIndexArgKinds con indices
+         then Just (mkTyConApp (promoteDataCon con) indices)
+         else Nothing }
+  | otherwise = Nothing
+
+-- | Check the domains of a saturated promoted constructor's field indices.
+nativeIndexArgKinds :: DataCon -> [Type] -> Bool
+nativeIndexArgKinds con indices
+  = and (zipWith same_domain indices (dataConRepArgTys con))
+  where
+    same_domain index (Scaled _ ty)
+      | TyConApp index_tc [] <- coreFullView (typeKind index)
+      , TyConApp field_tc [] <- coreFullView ty
+      = index_tc == field_tc
+      | otherwise = False
+
+-- | Substitute in a supported runtime index without evaluating its value.
+-- Leave expressions outside the supported index language unchanged.
+mapNativeIndex :: (Type -> Type) -> CoreExpr -> CoreExpr
+mapNativeIndex subst expr
+  | Just index <- exprToNativeIndex expr
+  = let index' = subst index
+    in case from_index index' of
+         Just expr' -> expr'
+         Nothing -> pprPanic "mapNativeIndex: unsupported substituted index" (ppr index')
+  | otherwise = expr
+  where
+    from_index (TermVarTy v)
+      | isNativeIndexId v = Just (Var v)
+    from_index (TyConApp tc args)
+      | Just con <- isPromotedDataCon_maybe tc
+      , isNativeIndexType (mkTyConTy (dataConTyCon con))
+      , args `lengthIs` dataConSourceArity con
+      , nativeIndexArgKinds con args
+      = do { args' <- traverse from_index args
+           ; return (mkConApp con args') }
+    from_index _ = Nothing
+
+-- | Detect extra proof slots on a supported algebraic alternative.
+-- Core Lint checks their count, scope, and nominal equality type.
+isNativeIndexAlt :: Alt b -> Bool
+isNativeIndexAlt (Alt (DataAlt con) args _)
+  = length args > dataConRepArity con
+    && isNativeIndexType (mkTyConTy (dataConTyCon con))
+isNativeIndexAlt _ = False
+
+-- | Detect proof binders on a DEFAULT alternative, including malformed proofs.
+-- Core Lint checks their count, scope, and exact nominal equality type.
+isNativeIndexAliasAlt :: CoreAlt -> Bool
+isNativeIndexAliasAlt (Alt DEFAULT args _) = any isCoVar args
+isNativeIndexAliasAlt _ = False
+
+-- | Convert a Boolean argument through the restricted frontend index language.
+exprToBoolIndex :: CoreExpr -> Maybe Type
+exprToBoolIndex expr
+  | Just index <- exprToNativeIndex expr
+  , TyConApp tc [] <- coreFullView (typeKind index)
+  , tc `hasKey` boolTyConKey
+  = Just index
+  | otherwise = Nothing
+
+-- | Convert a binder into its variable, type, or coercion expression.
 varToCoreExpr :: CoreBndr -> Expr b
 varToCoreExpr v | isTyVar v = Type (mkTyVarTy v)
                 | isCoVar v = Coercion (mkCoVarCo v)

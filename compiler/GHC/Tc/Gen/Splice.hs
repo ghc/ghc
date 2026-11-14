@@ -573,7 +573,10 @@ RENAMER (rnTypedSplice): the renamer adds a SplicePointName, spn:
 
 TYPECHECKER (tcTypedBracket):
 
-* Set the ThLevel to (Brack s (TcPending ps_var lie_var quote_wrapper))
+* Set the ThLevel to (Brack s (TcPending ps_var lie_var native_givens quote_wrapper))
+  Save the outer lexical native Givens with the outer constraint accumulator.
+  Restore both when checking a nested splice. Evidence parameters introduced
+  inside the quoted body must not enter the emitted splice expression.
 
 * Typecheck the body, and keep the elaborated result (despite never using it!, todo: it should be stored in the AST)
 
@@ -691,6 +694,8 @@ tcTypedBracket rn_expr expr res_ty
                                        -- should get thrown into the constraint set
                                        -- from outside the bracket
 
+       ; native_givens <- tcl_native_givens . tcl_lcl_ctxt <$> getLclEnv
+
        -- Make a new type variable for the type of the overall quote
        ; m_var <- mkTyVarTy <$> mkMetaTyVar
        -- Make sure the type variable satisfies Quote
@@ -703,7 +708,8 @@ tcTypedBracket rn_expr expr res_ty
        -- The typechecked expression won't be used, so we just discard it
        --   (See Note [The life cycle of a TH quotation] in GHC.Hs.Expr)
        -- We'll typecheck it again when we splice it in somewhere
-       ; (tc_expr, expr_ty) <- setThLevel (Brack cur_lvl (TcPending ps_var lie_var wrapper)) $
+       ; (tc_expr, expr_ty) <- setThLevel
+                                (Brack cur_lvl (TcPending ps_var lie_var native_givens wrapper)) $
                                 tcScalingUsage ManyTy $
                                 -- Scale by Many, TH lifting is currently nonlinear (#18465)
                                 tcInferRhoNC expr
@@ -943,8 +949,10 @@ tcTypedSplice (HsTypedSpliceNested sp) expr res_ty
     setSrcSpan loc    $ do
       lvl <- getThLevel
       case lvl of
-        Brack _ (TcPending ps_var lie_var q) -> do
-          tc_splice <- setConstraintVar lie_var $ tcPendingSpliceTyped q sp expr res_ty
+        Brack _ (TcPending ps_var lie_var native_givens q) -> do
+          tc_splice <- setConstraintVar lie_var $
+                       updLclCtxt (\ctxt -> ctxt { tcl_native_givens = native_givens }) $
+                       tcPendingSpliceTyped q sp expr res_ty
           updTcRef ps_var (tc_splice : )
           -- stubNestedSplice: the returned expression is ignored; it's in the pending splices.
           --
@@ -2713,6 +2721,8 @@ reifyType :: TyCoRep.Type -> TcM TH.Type
 reifyType ty                | tcIsLiftedTypeKind ty = return TH.StarT
   -- Make sure to use tcIsLiftedTypeKind here, since we don't want to confuse it
   -- with Constraint (#14869).
+reifyType ty@(TermVarTy {}) = pprPanic "reifyType: unsupported runtime index" (ppr ty)
+reifyType ty@(DepFunTy {}) = pprPanic "reifyType: unsupported retained function" (ppr ty)
 reifyType ty@(ForAllTy (Bndr _ argf) _)
                             = reify_for_all argf ty
 reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }

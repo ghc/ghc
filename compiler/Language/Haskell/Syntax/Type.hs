@@ -917,6 +917,21 @@ All in all, we have the following forms of type variable binders in the language
 The forms {_}, {_ :: k} are representable but never valid, see
 Note [Wildcard binders in disallowed contexts] in GHC.Hs.Type -}
 
+{- Note [Retained quantification syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+HsForEachTy represents the experimental syntax `foreach (b :: Bool) -> ty`.
+The binder denotes a retained runtime Id that can occur in the result type.
+HsForAllTy denotes erased quantification, including visible `forall a -> ty`.
+Keep these constructors separate. Reuse HsTyVarBndr only for binder syntax.
+
+The lexer recognizes `foreach` only with ExperimentalDependentTypes.
+Without this extension, `foreach` remains an ordinary identifier.
+The spelling is experimental. The parser does not establish its typing rules.
+See docs/dependent-haskell/REFERENCES.md#agda-provenance for the Agda function
+types that inform dependent binding and application. Haskell evaluation rules
+still apply to retained arguments.
+-}
+
 -- | Haskell Type
 data HsType pass
   = HsForAllTy   -- See Note [HsType binders]
@@ -924,6 +939,12 @@ data HsType pass
       , hst_tele    :: HsForAllTelescope pass
                                      -- Explicit, user-supplied 'forall a {b} c'
       , hst_body    :: LHsType pass  -- body type
+      }
+
+  | HsForEachTy -- See Note [Retained quantification syntax]
+      { hst_xforeach :: XForEachTy pass
+      , hst_bndrs    :: [LHsTyVarBndr () pass]
+      , hst_body     :: LHsType pass
       }
 
   | HsQualTy   -- See Note [HsType binders]

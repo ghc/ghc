@@ -4025,6 +4025,15 @@ instance ExactPrint (HsType GhcPs) where
     return (HsForAllTy { hst_xforall = an
                        , hst_tele = tele', hst_body = ty' })
 
+  exact (HsForEachTy { hst_xforeach = (f,r)
+                    , hst_bndrs = bndrs, hst_body = ty }) = do
+    f' <- markEpToken f
+    bndrs' <- mapM markAnnotated bndrs
+    r' <- markEpUniToken r
+    ty' <- markAnnotated ty
+    return (HsForEachTy { hst_xforeach = (f',r')
+                       , hst_bndrs = bndrs', hst_body = ty' })
+
   exact (HsQualTy x ctxt ty) = do
     ctxt' <- markAnnotated ctxt
     ty' <- markAnnotated ty

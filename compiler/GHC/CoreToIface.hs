@@ -66,6 +66,7 @@ import GHC.Core.TyCo.Tidy
 
 import GHC.Builtin.WiredIn.Prim ( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.WiredIn.Types ( heqTyCon )
+import GHC.Builtin.KnownKeys ( falseDataConKey, trueDataConKey )
 import GHC.Builtin.WiredIn.Ids ( noinlineIdName, noinlineConstraintIdName )
 
 import GHC.Iface.Syntax
@@ -77,6 +78,7 @@ import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
 import GHC.Types.Literal
 import GHC.Types.Name
+import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Var
 import GHC.Types.Var.Env
@@ -194,6 +196,12 @@ toIfaceTypeX :: VarSet -> Type -> IfaceType
 toIfaceTypeX fr (TyVarTy tv)   -- See Note [Free TyVars and CoVars in IfaceType] in GHC.Iface.Type
   | tv `elemVarSet` fr         = IfaceFreeTyVar tv
   | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
+toIfaceTypeX fr (TermVarTy var)
+  | var `elemVarSet` fr = IfaceFreeTermVar var
+  | otherwise = IfaceTermVar (mkIfLclName (occNameFS (getOccName var)))
+toIfaceTypeX fr (DepFunTy var res)
+  = IfaceDepFunTy (toIfaceIdBndrX fr var)
+                  (toIfaceTypeX (fr `delVarSet` var) res)
 toIfaceTypeX fr ty@(AppTy {})  =
   -- Flatten as many argument AppTys as possible, then turn them into an
   -- IfaceAppArgs list.
@@ -323,6 +331,16 @@ toIfaceCoercionX fr co
     go (FunCo { fco_role = r, fco_mult = w, fco_arg = co1, fco_res = co2 })
       = IfaceFunCo r (go w) (go co1) (go co2)
 
+    go (DepFunCo var co)
+      = IfaceDepFunCo bndr
+                      (toIfaceCoercionX (fr `delVarSet` var) co)
+      where
+        bndr | isId var = toIfaceIdBndrX fr var
+             -- Lint must also print malformed binders. A TyVar has no multiplicity.
+             | otherwise = ( many_ty
+                           , mkIfLclName (occNameFS (getOccName var))
+                           , toIfaceTypeX fr (varType var) )
+
     go (ForAllCo tv visL visR k co)
       = IfaceForAllCo (toIfaceBndr tv)
                       (IfaceForAllTyFlag visL)
@@ -379,6 +397,8 @@ toIfaceAppArgsX fr kind ty_args
     go env ty                  ts
       | Just ty' <- coreView ty
       = go env ty' ts
+    go _ ty@(DepFunTy {}) (_:_)
+      = pprPanic "toIfaceAppArgsX: native dependent kind application not implemented" (ppr ty)
     go env (ForAllTy (Bndr tv vis) res) (t:ts)
       = IA_Arg t' (IfaceForAllTyFlag vis) ts'
       where
@@ -665,6 +685,17 @@ toIfaceTopBind b =
 
 ---------------------
 toIfaceAlt :: CoreAlt -> IfaceAlt
+toIfaceAlt alt
+  | isNativeIndexAliasAlt alt
+  -- See Note [Native index alias evidence in interfaces] in GHC.IfaceToCore.
+  = pprPanic "toIfaceAlt: native index alias evidence has no interface codec" (ppr alt)
+toIfaceAlt alt@(Alt (DataAlt con) bs _)
+  | con `hasKey` falseDataConKey || con `hasKey` trueDataConKey
+  , not (null bs)
+  , not (case bs of [cv] -> isCoVar cv && isLocalId cv; _ -> False)
+  = pprPanic "toIfaceAlt: invalid native Boolean proof binder" (ppr alt)
+  -- The reader reconstructs the proof type from the scrutinee and constructor.
+  -- See Note [Native Boolean evidence in interfaces] in GHC.IfaceToCore.
 toIfaceAlt (Alt c bs r) = IfaceAlt (toIfaceCon c) (map (mkIfLclName . getOccFS) bs) (toIfaceExpr r)
 
 ---------------------

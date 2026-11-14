@@ -15,6 +15,7 @@ module GHC.Tc.Gen.Pat
    , LetBndrSpec(..)
    , tcCheckPat, tcCheckPat_O, tcInferPat
    , tcMatchPats
+   , tcRetainedCon
    , addDataConStupidTheta
    , zipPatsBndrs
    )
@@ -37,10 +38,13 @@ import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Core.Multiplicity
+import GHC.Core (Expr(Var))
+import qualified GHC.Core.Subst as CoreSubst
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_kind )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Core.TyCo.Ppr ( pprTyVars )
+import GHC.Core.TyCo.Rep ( Type(TermVarTy) )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Gen.HsType
@@ -50,6 +54,7 @@ import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.Predicate ( mkNomEqPred )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
@@ -64,6 +69,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
 import Control.Monad
 import GHC.Data.FastString
+import GHC.Data.Pair ( pSnd )
 import qualified Data.List.NonEmpty as NE
 
 import GHC.Data.List.SetOps ( getNth )
@@ -1176,6 +1182,9 @@ warnMonoLocalBinds
 tcDataConPat :: LocatedN Name -> DataCon
              -> Scaled ExpSigmaTypeFRR        -- Type of the pattern
              -> Checker (HsConPatDetails GhcRn) (Pat GhcTc)
+tcDataConPat con_name data_con pat_ty_scaled penv arg_pats thing_inside
+  | not (null (dataConRepArgBinders data_con))
+  = tcRetainedDataConPat con_name data_con pat_ty_scaled penv arg_pats thing_inside
 tcDataConPat (L con_span con_name) data_con pat_ty_scaled
              penv arg_pats thing_inside
   = do  { let tycon = dataConTyCon data_con
@@ -1282,6 +1291,165 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
                 }
         ; return (mkHsWrapPat wrap res_pat pat_ty, res)
         } }
+
+-- | Resolve a closed index constructor and its bare runtime field binders.
+tcRetainedCon :: Type -> LPat GhcRn -> TcM (Maybe (DataCon, [Id]))
+tcRetainedCon domain (L _ (ParPat _ pat)) = tcRetainedCon domain pat
+tcRetainedCon domain (L _ (ConPat { pat_con = L _ name
+                              , pat_args = PrefixCon _ pats }))
+  = do { con_like <- tcLookupConLike name
+       ; case con_like of
+           RealDataCon con
+             | isNativeIndexType domain
+             , mkTyConTy (dataConTyCon con) `eqType` domain
+             , pats `equalLength` dataConOrigArgTys con ->
+               do { fields <- zipWithM field pats (dataConOrigArgTys con)
+                  ; return (Just (con, fields)) }
+           _ -> return Nothing }
+  where
+    field (L loc (VarPat _ (L _ name))) (Scaled _ ty)
+      = setSrcSpanA loc $ return (mkLocalId name ManyTy ty)
+    field (L loc _) _
+      = setSrcSpanA loc $
+        failWithTc (TcRnRetainedQuantificationError RetainedConstructorArguments)
+tcRetainedCon _ _ = return Nothing
+
+-- | Check a package constructor's fields in their runtime telescope order.
+-- See Note [Checking retained package patterns].
+tcRetainedDataConPat :: LocatedN Name -> DataCon
+                     -> Scaled ExpSigmaTypeFRR
+                     -> Checker (HsConPatDetails GhcRn) (Pat GhcTc)
+tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
+  = setSrcSpanA con_span $
+    do { let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig con
+             binders = dataConRepArgBinders con
+             con_like = RealDataCon con
+             pat_mult = scaledMult pat_ty_scaled
+       ; unless (null ex_tvs && null eq_spec && null theta
+                 && length (tyConDataCons (dataConTyCon con)) == 1
+                 && binders `equalLength` arg_tys && not (pe_lazy penv)) bad_pattern
+       ; case pe_ctxt penv of
+           LamPat{} -> return ()
+           LetPat{} -> bad_pattern
+       ; (ann, pats) <- case arg_pats of
+           PrefixCon ann pats -> return (ann, pats)
+           _ -> bad_pattern
+       ; check_con_pat_arity con_like (length pats)
+       ; tcSubMult (pe_orig penv) ManyTy pat_mult
+       ; (wrap, ctxt_res_tys) <- matchExpectedConTy penv (dataConTyCon con) pat_ty_scaled
+       ; unless (isIdHsWrapper wrap) bad_pattern
+       ; pat_ty <- readExpType (scaledThing pat_ty_scaled)
+       ; subst <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
+       ; (pats', res) <- check_fields subst [] 1 (zipEqual binders arg_tys) pats
+       ; let pat = ConPat { pat_con = L con_span con_like
+                          , pat_args = PrefixCon ann pats'
+                          , pat_con_ext = ConPatTc
+                            { cpt_tvs = [], cpt_dicts = []
+                            , cpt_binds = emptyTcEvBinds
+                            , cpt_arg_tys = ctxt_res_tys
+                            , cpt_wrap = idHsWrapper } }
+       ; return (mkHsWrapPat wrap pat pat_ty, res) }
+  where
+    bad_pattern :: TcM a
+    bad_pattern = failWithTc (TcRnRetainedQuantificationError RetainedPackagePattern)
+
+    check_fields _ _ _ [] []
+      = do { res <- thing_inside; return ([], res) }
+    check_fields subst refinements position ((mb_binder, arg_ty) : args) (pat : pats)
+      = setSrcSpanA (getLoc pat) $
+        do { let original_ty = scaleScaled ManyTy (substScaledTy subst arg_ty)
+           ; co <- refine_type refinements (scaledThing original_ty)
+           ; let scaled_ty = Scaled (scaledMult original_ty) (pSnd (coercionKind co))
+                 wrap_pat (L loc checked) = L loc $
+                   mkHsWrapPat (mkWpCastN co) checked (scaledThing original_ty)
+           ; case mb_binder of
+               Nothing ->
+                 do { (pat', (pats', res)) <- tcConArg (RealDataCon con) penv
+                           (position, pat, scaled_ty) $
+                           check_fields subst refinements (position + 1) args pats
+                    ; return (wrap_pat pat' : pats', res) }
+               Just template ->
+                 do { name <- case unLoc pat of
+                        VarPat _ (L _ name) -> return name
+                        _ -> newSysName (mkVarOcc "retained_field")
+                    ; let index = mkLocalId name ManyTy (scaledThing scaled_ty)
+                          subst' = CoreSubst.extendIdSubst
+                            (extendSubstInScope subst index) template (Var index)
+                    ; unless (isManyTy (scaledMult scaled_ty) && isNativeIndexId index
+                              && scaledThing original_ty `eqType` scaledThing scaled_ty) bad_pattern
+                    ; case unLoc pat of
+                        VarPat{} ->
+                          do { (pat', (pats', res)) <- tcConArg (RealDataCon con) penv
+                                  (position, pat, scaled_ty) $
+                                  check_fields subst' refinements (position + 1) args pats
+                             ; return (pat' : pats', res) }
+                        _ ->
+                          do { info <- tcRetainedCon (varType index) pat
+                             ; (index_con, fields) <- maybe bad_pattern return info
+                             ; let constructor_index = mkTyConApp (promoteDataCon index_con)
+                                                         (map TermVarTy fields)
+                             ; cv <- newEvVar (mkNomEqPred (TermVarTy index) constructor_index)
+                             ; (pat', (pats', res)) <- tcConArg (RealDataCon con) penv
+                                     (position, pat, scaled_ty) $
+                                     check_fields subst' (refinements ++ [(index, mkCoVarCo cv)])
+                                       (position + 1) args pats
+                             ; let L loc checked = pat'
+                                   field_pat = AsPat noExtField (noLocA index)
+                                                 (L loc (add_proof cv checked))
+                             ; return (L loc field_pat : pats', res) } } }
+    check_fields _ _ _ _ _ = bad_pattern
+
+    refine_type [] ty = return (mkNomReflCo ty)
+    refine_type ((index, branch_co) : rest) ty
+      = do { co <- tcRetainedCoercion index branch_co ty
+           ; later <- refine_type rest (pSnd (coercionKind co))
+           ; return (mkTransCo co later) }
+
+    add_proof cv (ParPat x (L loc pat)) = ParPat x (L loc (add_proof cv pat))
+    add_proof cv pat@(ConPat { pat_con_ext = ext })
+      = assertPpr (null (cpt_dicts ext) && null (cpt_tvs ext)) (ppr pat) $
+          pat { pat_con_ext = ext { cpt_dicts = [cv] } }
+    add_proof _ pat = pprPanic "tcRetainedDataConPat: not an index constructor" (ppr pat)
+
+{- Note [Checking retained package patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained constructor field binds a runtime Id in the later field types.
+Instantiate these types from left to right. Use the bare source variable's
+Name for the retained Id. tcPatBndr uses that same Name, type, and multiplicity
+when it checks the field. Extend the substitution and its in-scope set before
+checking later fields and the RHS. Do not put this Id among the erased skolems.
+
+Retained fields accept bare variables or closed constructor patterns with
+bare variable subfields. A constructor pattern receives a fresh whole-field
+Id in an outer generated as-pattern. Its inner ConPat carries the nominal
+whole-index equality. Keep the actual source subfield Ids. Transport each
+later field type under that equality with tcRetainedCoercion, then retain
+the original outer field type in a coercion pattern. The proof stays under
+the inner constructor alternative. The whole-field as-pattern must remain
+outermost so match selection uses its exact Id. Ordinary row failure keeps
+the existing equation order; no complete source-case group is required.
+See docs/dependent-haskell/REFERENCES.md#source-package-patterns.
+
+Check ordinary fields with
+tcConArg. Nested GADT evidence then scopes over the later fields and the RHS.
+Keep one constructor and prefix patterns in a strict constructor match. The
+fields themselves stay lazy. Reject lazy package and let patterns. Match
+compilation keeps each equation's actual source field Ids in a separate case.
+See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
+
+An ordinary case starts with a fresh multiplicity metavariable. Require Many
+with tcSubMult, as checkManyPattern does for other nonlinear patterns. A
+syntactic isManyTy check would reject this metavariable before it can unify.
+tcSubMult rejects linear or rigid multiplicities through the ordinary
+multiplicity constraints. It also requires reflexive multiplicity evidence;
+see Note [Coercion errors in tcSubMult] in GHC.Tc.Utils.Unify. Check the fields
+at Many immediately. Do not put the unresolved outer multiplicity in a
+retained field Id, whose metadata requires Many.
+
+Agda's constructor telescope and splitCon provide the scope precedent. See
+docs/dependent-haskell/REFERENCES.md#retained-constructor-field-telescopes.
+The runtime fields retain Haskell's lazy evaluation rules.
+-}
 
 tcPatSynPat :: LocatedN Name -> PatSyn
             -> Scaled ExpSigmaType         -- ^ Type of the pattern

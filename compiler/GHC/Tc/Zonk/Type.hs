@@ -62,7 +62,7 @@ import GHC.Core.PatSyn (PatSyn(..))
 import GHC.Core.TyCo.Ppr ( pprTyVar )
 import GHC.Core.Type
 import GHC.Core.TyCon
-import GHC.Core.TyCo.Rep( CoercionPlusHoles(..) )
+import GHC.Core.TyCo.Rep( CoercionPlusHoles(..), Type(TermVarTy) )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -505,6 +505,9 @@ zonkCoHole hole@(CH { ch_ref = ref, ch_co_var = cv })
 zonk_tycomapper :: TyCoMapper ZonkTcM
 zonk_tycomapper = TyCoMapper
     { tcm_tyvar      = zonkTyVarOcc
+    , tcm_termvar    = pure . TermVarTy
+    , tcm_termbinder = \v k -> runZonkBndrT (zonkIdBndrX v) k
+        -- See Note [Zonking retained Boolean indices] in GHC.Tc.Zonk.TcType
     , tcm_covar      = zonkCoVarOcc
     , tcm_hole       = zonkCoHole
     , tcm_tycobinder = \ tcv _vis k -> runZonkBndrT (zonkTyBndrX tcv) k
