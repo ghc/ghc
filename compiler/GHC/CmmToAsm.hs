@@ -331,6 +331,23 @@ code generator learns which side of a branch is likely, and lists the trade-offs
 made with that knowledge.
 -}
 
+{- Note [Proposed principles of the NCG]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note proposes two principles to GHC's developers. The native code generator
+does not keep them yet: the BUG statements whose bug leads to wrong code or a
+failed compilation mark departures from semantic correctness, and the labels
+mark no set of them to be re-investigated together.
+
+* Correctness first. Semantic correctness is not traded for a measured gain
+  that an incorrect form gives by accident, until a form that has both has been
+  looked for and the trade has been agreed in review.
+* One TODO set. A departure from correctness that is left in place is marked
+  TODO, as a member of one set, so that the whole set is re-investigated
+  together. A bug so marked is understood, accepted for now and worked
+  around; the label marks it as accepted for now, not as due to be fixed
+  (Note [Labels in NCG comments]).
+-}
+
 --------------------
 nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle
               -> CgStream RawCmmGroup a
