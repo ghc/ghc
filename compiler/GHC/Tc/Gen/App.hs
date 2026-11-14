@@ -808,7 +808,7 @@ matching fails. The public tcInstFun caller cannot consume a cache and leaves
 this step disabled. The optional reference records whether inference was
 attempted, so further IALL steps cannot infer an argument again. The mode
 argument gives the diagnostic offset of the consumed written type arguments.
-Ordinary calls without written type arguments do not allocate the reference.
+Calls without type arguments do not allocate the reference.
 
 Cache keys count value arguments. Diagnostic positions also count written type
 arguments. Keep separate counters in tcValArgsWithCache; otherwise a written
