@@ -1876,9 +1876,13 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
              { cache <- infer_args needed_tvs inferable domains 1 args
              ; actual_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) cache
              ; let templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- cache ]
-                   matched = foldM (\subst (formal, actual) ->
-                               tcMatchTyX_BM (bind_outer tvs) subst formal actual)
-                             initial_subst (zip templates actual_tys)
+                   match_args subst = foldM (\subst (formal, actual) ->
+                                        tcMatchTyX_BM (bind_outer tvs) subst formal actual)
+                                      subst (zip templates actual_tys)
+                   -- See Note [Ordinary heads in native argument matching].
+                   matched = case match_args initial_subst of
+                               Nothing | not index_route -> match_args Subst.emptySubst
+                               other -> other
              ; choices <- case matched of
                             Just subst -> tcRetainedArgChoices index_route tvs subst
                             Nothing -> return Nothing
@@ -1943,14 +1947,15 @@ tcRetainedArgChoices index_route tvs subst
   | not index_route
   , any (hasNativeDependentExpr . Core.Type)
         [ty | tv <- tvs, Just ty <- [Subst.lookupTyVar subst tv]]
-  = do { (subst, choices) <- mapAccumLM choose subst tvs
-       ; return (Just (subst, choices)) }
+  = go subst [] tvs
   | otherwise = return Nothing
   where
-    choose subst tv
-      | Just ty <- Subst.lookupTyVar subst tv = return (subst, ty)
+    go subst choices [] = return (Just (subst, reverse choices))
+    go subst choices (tv : tvs)
+      | Just ty <- Subst.lookupTyVar subst tv = go subst (ty : choices) tvs
+      | isNativeIndexType (Subst.substTy subst (tyVarKind tv)) = return Nothing
       | otherwise = do { (subst, tv) <- newMetaTyVarX subst tv
-                       ; return (subst, mkTyVarTy tv) }
+                       ; go subst (mkTyVarTy tv : choices) tvs }
 
 {- Note [Ordinary parameters in native applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1963,11 +1968,32 @@ already made. Check the continuation against Vec Int n -> IO beta. Its body
 can then determine beta := [Int] without assigning a native type to a meta.
 
 Complete only a successful partial match containing a native choice. Keep
-index binders on the existing complete immutable route. A failed match still
-fails. Preserve kind, exact cached-domain, runtime scope and concreteness
-checks, the ordinary evidence order and once-only cached usage. Native result
+index binders on the existing complete immutable route. Check each missing
+binder's substituted kind before allocation; it must not be a native domain.
+A failed joint argument match still fails. Preserve kind, exact cached-domain,
+runtime scope and concreteness checks, the ordinary evidence order and
+once-only cached usage. Native result
 inference still cannot fill beta with Vec Int n. Final subsumption remains
 authoritative. See Note [Immutable instantiation of nested contexts].
+-}
+
+{- Note [Ordinary heads in native argument matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Inline pure (replicateNative n x) can infer f (Vec Int n) with an ordinary
+head meta f. An expected IO result seeds m := IO for the enclosing bind, but
+immutable matching cannot assign the actual f to IO. The native payload is
+already known; ordinary result checking should determine this ordinary head.
+
+If result-seeded generic matching fails, independently match all cached formal
+and actual argument types from the empty substitution. This can choose m := f
+and a := Vec Int n exactly. Complete ordinary parameters as described in
+Note [Ordinary parameters in native applications]. Final result subsumption
+can then assign f := IO and beta := [Int] without a native meta-variable fill.
+
+This is a separate joint candidate, not a successful prefix of a failed match.
+Conflicting cached arguments still reject. Preserve exact domain, kind, scope
+and concreteness checks, expected checking of continuations and all final
+subsumption checks. Native index matching keeps its existing result seed.
 -}
 
 {- Note [Available expected types in native applications]
