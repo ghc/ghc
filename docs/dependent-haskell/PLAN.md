@@ -1147,6 +1147,45 @@ refutation proof. Preserve payload laziness on a length mismatch. Probe the
 current equality-Given path before proposing a compiler rule. See the
 [pinned comparison, congruence and zip sources](REFERENCES.md#runtime-equality-and-aligned-zip-next-source-probe).
 
+### M15: source runtime equality and aligned vector zip
+
+The initial source probe passes Core and STG Lint in the current self-hosted
+compiler. Keep the existing Core and interface rules. Use ordinary `:~:` and
+match `Refl` to introduce scoped equality evidence.
+
+```haskell
+sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
+zipVec :: Vec a n -> Vec b n -> Vec (a, b) n
+zipPacked :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))
+```
+
+Define `sameNat` with one variable equation and nested cases. Compare the
+successor fields recursively. A `Just Refl` branch proves successor equality
+by ordinary congruence. `zipPacked` must match that proof before passing the
+two captured vectors to `zipVec`. Follow the pinned Agda equality and vector
+relations. The Haskell result carries positive evidence only. `Nothing` is
+not Agda's negative `Dec` evidence.
+
+- [ ] Add the three source workers, exports, Haddock comments and a GHC Note
+  that records proof scope, Haskell field demand and the Agda provenance.
+- [ ] Read both lengths independently through IORefs. Check equal and unequal
+  finite inputs, empty vectors and element order after runtime filtering.
+- [ ] Observe length comparison, result and package WHNF, vector tags, pair
+  components and tails separately. A mismatch must ignore both vector
+  payloads. Partial predecessors must remain lazy until comparison needs them.
+  Preserve package-pattern order. Do not force an equal cyclic comparison.
+- [ ] Probe and pin located errors for independent `Refl`, zip without
+  equality, an unmatched proof value, and equality used outside its branch.
+- [ ] Compile separate producer and interface-only consumer modules with
+  both compiler stages and Core/STG Lint. Update the existing runtime fixture.
+  Run the focused registered normal-way checks. Record artifact hashes and
+  capped resource peaks. Reuse the M14 compiler builds unless a demonstrated
+  compiler defect requires a change.
+
+This target does not add runtime-index evaluation to the solver, a refutation
+proof, proof erasure, native optimization or a totality claim. Keep the
+original Tidy failure and previous-format reader artifacts unchanged.
+
 ## Further work
 
 After M8, review broader retained kinds, nested and higher-order dependence,
