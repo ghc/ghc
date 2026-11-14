@@ -6,6 +6,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
 -- | Store and consume a runtime length with an indexed vector.
@@ -15,6 +16,8 @@ module PackedVecLibrary
     , PackedVec (..)
     , LE (..)
     , BoundedVec (..)
+    , Add
+    , Sum (..)
     , replicateNative
     , withPacked
     , repack
@@ -25,6 +28,9 @@ module PackedVecLibrary
     , sameNat
     , zipVec
     , zipPacked
+    , sumNat
+    , appendNative
+    , appendPacked
     , proofDepthBounded
     , repackWithoutProof
     , guardedRepack
@@ -59,6 +65,51 @@ data LE (n :: Nat) (m :: Nat) where
 -- | Store a vector and evidence that its length is within the input bound.
 data BoundedVec a (limit :: Nat) where
     PackBounded :: foreach (len :: Nat) -> Vec a len -> LE len limit -> BoundedVec a limit
+
+-- | Add erased length indices by recursion on the first operand.
+type family Add (n :: Nat) (m :: Nat) :: Nat where
+    Add Z m = m
+    Add (S n) m = S (Add n m)
+
+-- | Store a runtime sum and evidence that it matches the erased addition.
+data Sum (n :: Nat) (m :: Nat) where
+    Sum :: foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m
+
+-- | Compute a runtime sum and its equality witness.
+sumNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Sum n m
+sumNat n m = case n of
+    Z -> Sum m Refl
+    S k -> case sumNat k m of
+        Sum p Refl -> Sum (S p) Refl
+
+-- | Append two vectors with an erased sum index.
+appendVec :: Vec a n -> Vec a m -> Vec a (Add n m)
+appendVec VNil ys = ys
+appendVec (VCons x xs) ys = VCons x (appendVec xs ys)
+
+-- | Append vectors indexed by two retained runtime lengths.
+appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)
+appendNative n m xs ys = appendVec xs ys
+
+-- | Compute the sum length before packaging the appended vector.
+appendPacked :: PackedVec a -> PackedVec a -> PackedVec a
+appendPacked (PackVec n xs) (PackVec m ys) = case sumNat n m of
+    Sum p Refl -> PackVec p (appendNative n m xs ys)
+
+{- Note [Computed runtime sum and vector append]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Agda's builtin addition and indexed vector append recurse on the first
+operand. Add and appendVec use that shape. sumNat computes a runtime p with
+ordinary equality evidence p :~: Add n m. The recursive Refl branch permits
+successor congruence. appendPacked matches that evidence before repackaging
+the appended vector at p. The solver does not evaluate runtime indices.
+
+The recursive witness forces the whole first length before returning Sum.
+A finite first length can leave the second length and vector fields lazy.
+The proof is an ordinary lifted field. Matching Refl forces it. Haskell
+permits bottom and cyclic inputs; this is not a totality or erasure claim.
+See docs/dependent-haskell/REFERENCES.md#computed-length-append-next-source-probe.
+-}
 
 -- | Build a vector from a runtime length.
 replicateNative :: forall a. foreach (n :: Nat) -> a -> Vec a n

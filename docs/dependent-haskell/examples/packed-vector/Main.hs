@@ -143,6 +143,34 @@ driveFilteredZip left right = do
     rightCutoff <- readIORef rightCell
     pure (renderZip (zipPacked (filterPacked (> leftCutoff) samplePacked) (filterPacked (> rightCutoff) rightSamplePacked)))
 
+-- | Read independent runtime lengths and append their packaged vectors.
+{-# NOINLINE driveAppend #-}
+driveAppend :: Nat -> Nat -> IO String
+driveAppend left right = do
+    leftCell <- newIORef left
+    rightCell <- newIORef right
+    n <- readIORef leftCell
+    m <- readIORef rightCell
+    pure (renderPacked (appendPacked (PackVec n (replicateNative @Int n 42)) (PackVec m (replicateNative @Int m 7))))
+
+-- | Append vectors selected by independent runtime predicates.
+{-# NOINLINE driveFilteredAppend #-}
+driveFilteredAppend :: Int -> Int -> IO String
+driveFilteredAppend left right = do
+    leftCell <- newIORef left
+    rightCell <- newIORef right
+    leftCutoff <- readIORef leftCell
+    rightCutoff <- readIORef rightCell
+    pure (renderPacked (appendPacked (filterPacked (> leftCutoff) samplePacked) (filterPacked (> rightCutoff) rightSamplePacked)))
+
+-- | Store undefined equality evidence without evaluating it.
+lazySum :: foreach (n :: Nat) -> Sum n Z
+lazySum n = Sum n bottomEquality
+
+-- | A named error for demand of the ordinary equality field.
+bottomEquality :: forall n m. n :~: m
+bottomEquality = error "append-bottom-proof"
+
 -- | A second ordered vector with different element values.
 rightSamplePacked :: PackedVec Int
 rightSamplePacked = PackVec (S (S (S Z))) (VCons 10 (VCons 20 (VCons 30 VNil)))
@@ -590,3 +618,94 @@ main = do
             Just (_, rest) ->
                 expectMarker "zip demands right tail" "zip-right-vector" $
                     evaluate (firstPair rest)
+    forM_
+        [ (Z, Z, "(0,[])")
+        , (Z, S (S Z), "(2,[7,7])")
+        , (S (S Z), Z, "(2,[42,42])")
+        , (S (S Z), S (S Z), "(4,[42,42,7,7])")
+        , (S (S Z), S (S (S Z)), "(5,[42,42,7,7,7])")
+        , (S (S (S Z)), S (S Z), "(5,[42,42,42,7,7])")
+        , (S (S (S Z)), S (S (S Z)), "(6,[42,42,42,7,7,7])")
+        ]
+        $ \(left, right, expected) -> do
+            actual <- driveAppend left right
+            assertEqual "runtime append" expected actual
+            putStrLn ("runtime append: " ++ actual)
+    forM_
+        [ (0, 0, "(6,[1,2,3,10,20,30])")
+        , (1, 10, "(4,[2,3,20,30])")
+        , (1, 0, "(5,[2,3,10,20,30])")
+        , (3, 30, "(0,[])")
+        ]
+        $ \(left, right, expected) -> do
+            actual <- driveFilteredAppend left right
+            assertEqual "runtime filtered append" expected actual
+            putStrLn ("runtime filtered append: " ++ actual)
+    assertWhnf "partial sum keeps bottom left" (sumNat bottomLength)
+    assertWhnf "partial sum keeps cyclic left" (sumNat cyclicLength)
+    assertWhnf "sum zero ignores right bottom" (sumNat Z bottomRightLength)
+    assertWhnf "sum successors ignore right bottom" (sumNat (S (S Z)) bottomRightLength)
+    assertWhnf "sum ignores cyclic right" (sumNat (S Z) cyclicLength)
+    expectMarker "sum demands left length" "packed-bottom-length" $
+        evaluate (sumNat bottomLength Z)
+    expectMarker "sum demands left predecessor" "packed-bottom-length" $
+        evaluate (sumNat (S bottomLength) Z)
+    case sumNat (S Z) bottomRightLength of
+        Sum p proof -> do
+            assertWhnf "sum proof ignores right bottom" proof
+            case p of
+                S q -> putStrLn "sum length head ignores right bottom: S"
+                Z -> fail "sum length head: expected S"
+            expectMarker "sum length demands right bottom" "equality-right-length" $
+                evaluate (natToInt p)
+    assertWhnf "sum constructor ignores bottom fields" (lazySum bottomLength)
+    case lazySum bottomLength of
+        Sum p proof -> do
+            expectMarker "sum stored length demand" "packed-bottom-length" $
+                evaluate (natToInt p)
+            expectMarker "sum stored proof demand" "append-bottom-proof" $
+                evaluate proof
+    case lazySum Z of
+        Sum p proof -> do
+            assertEqual "sum length ignores proof" 0 (natToInt p)
+            putStrLn "sum length ignores proof: 0"
+    assertEqual "unused append" 42 (const (42 :: Int) (appendPacked bottomPackage bottomPackage))
+    putStrLn "unused append: 42"
+    expectMarker "append demands left package first" "packed-bottom-package" $
+        evaluate (appendPacked bottomPackage (error "append-right-package" :: PackedVec Int))
+    expectMarker "append demands right package before lengths" "append-right-package" $
+        evaluate (appendPacked (lazyPacked bottomLength) (error "append-right-package" :: PackedVec Int))
+    expectMarker "append demands left length before vectors" "packed-bottom-length" $
+        evaluate (appendPacked (lazyPacked bottomLength) (lazyPacked Z))
+    expectMarker "append scans first length" "packed-bottom-length" $
+        evaluate (appendPacked (lazyPacked (S bottomLength)) (lazyPacked Z))
+    let zeroAppend = appendPacked (PackVec Z VNil) (PackVec bottomRightLength rightVector)
+    assertWhnf "append zero ignores right length and vector" zeroAppend
+    expectMarker "append zero demands right vector" "zip-right-vector" $
+        evaluate (firstPacked zeroAppend)
+    expectMarker "append zero length demands right length" "equality-right-length" $
+        evaluate (withPacked zeroAppend (\n xs -> natToInt n))
+    let undefinedAppend = appendPacked (PackVec (S Z) leftVector) (PackVec (S Z) rightVector)
+    assertWhnf "append package ignores vectors" undefinedAppend
+    assertEqual "append length ignores vectors" 2 (withPacked undefinedAppend (\n xs -> natToInt n))
+    putStrLn "append length ignores vectors: 2"
+    expectMarker "append vector demands left tag" "zip-left-vector" $
+        evaluate (firstPacked undefinedAppend)
+    let deferredRight = appendPacked (makePacked (S Z)) (PackVec (S Z) rightVector)
+    assertEqual "append first head ignores right vector" 42 (firstPacked deferredRight)
+    putStrLn "append first head ignores right vector: 42"
+    expectMarker "append tail demands right vector" "zip-right-vector" $
+        evaluate (sum (toListPacked deferredRight))
+    let undefinedHead = appendPacked singletonBottom (makePacked Z)
+    assertWhnf "append package ignores left element" undefinedHead
+    expectMarker "append demands left element" "packed-filter-bottom-element" $
+        evaluate (firstPacked undefinedHead)
+    let deferredLeftTail = appendPacked (PackVec (S (S Z)) (VCons 42 leftVector)) (makePacked Z)
+    assertEqual "append first head ignores left tail" 42 (firstPacked deferredLeftTail)
+    putStrLn "append first head ignores left tail: 42"
+    expectMarker "append demands left tail" "zip-left-vector" $
+        evaluate (sum (take 2 (toListPacked deferredLeftTail)))
+    assertEqual "append finite left ignores cyclic right" 42 (firstPacked (appendPacked (makePacked (S Z)) (cyclicPacked cyclicLength)))
+    putStrLn "append finite left ignores cyclic right: 42"
+    assertEqual "append cyclic right bounded prefix" [42, 42, 42] (take 3 (toListPacked (appendPacked (makePacked Z) (makePacked cyclicLength))))
+    putStrLn "append cyclic right bounded prefix: [42,42,42]"

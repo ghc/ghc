@@ -1097,6 +1097,53 @@ runModuleChecks libdir = do
         ]
         $ \(label, moduleName, producer, consumer, expected) ->
             runModuleCase libdir label moduleName producer consumer expected
+    runModuleCase
+        libdir
+        "sum-declaration"
+        "NativeSumDeclaration"
+        ( unlines
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, TypeFamilies, TypeOperators #-}"
+            , "module NativeSumDeclaration where"
+            , "import Data.Type.Equality ((:~:))"
+            , "data Nat = Z | S Nat"
+            , "type family Add (n :: Nat) (m :: Nat) :: Nat where"
+            , "  Add Z m = m"
+            , "  Add (S n) m = S (Add n m)"
+            , "data Sum (n :: Nat) (m :: Nat) where"
+            , "  Sum :: foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m"
+            , "data SumUnused (n :: Nat) (m :: Nat) where"
+            , "  SumUnused :: foreach (unused :: Nat) (p :: Nat) -> (p :~: Add n m) -> SumUnused n m"
+            ]
+        )
+        ( unlines
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, TypeApplications, TypeOperators #-}"
+            , "module Main where"
+            , "import NativeSumDeclaration"
+            , "import Data.IORef"
+            , "import Data.Type.Equality ((:~:)(Refl))"
+            , "zero :: foreach (m :: Nat) -> Sum Z m"
+            , "zero m = Sum m Refl"
+            , "zeroVTA :: foreach (m :: Nat) -> Sum Z m"
+            , "zeroVTA m = Sum @Z m Refl"
+            , "zeroUnused :: foreach (m :: Nat) -> SumUnused Z m"
+            , "zeroUnused m = SumUnused Z m Refl"
+            , "render :: Nat -> String"
+            , "render Z = \"Z\""
+            , "render (S n) = \"S \" ++ render n"
+            , "observe :: Sum n m -> String"
+            , "observe (Sum p Refl) = render p"
+            , "observeUnused :: SumUnused n m -> String"
+            , "observeUnused (SumUnused unused p Refl) = render p"
+            , "main :: IO ()"
+            , "main = do"
+            , "  cell <- newIORef (S Z)"
+            , "  m <- readIORef cell"
+            , "  putStrLn (observe (zero m))"
+            , "  putStrLn (observe (zeroVTA m))"
+            , "  putStrLn (observeUnused (zeroUnused m))"
+            ]
+        )
+        ["S Z", "S Z", "S Z"]
     packedProducer <- readFile "PackedVecLibrary.hs"
     packedConsumer <- readFile "Main.hs"
     runModuleCase
@@ -1241,6 +1288,50 @@ runModuleChecks libdir = do
         , "zip tail package ignores tails: ok"
         , "zip demands left tail: zip-left-vector"
         , "zip demands right tail: zip-right-vector"
+        , "runtime append: (0,[])"
+        , "runtime append: (2,[7,7])"
+        , "runtime append: (2,[42,42])"
+        , "runtime append: (4,[42,42,7,7])"
+        , "runtime append: (5,[42,42,7,7,7])"
+        , "runtime append: (5,[42,42,42,7,7])"
+        , "runtime append: (6,[42,42,42,7,7,7])"
+        , "runtime filtered append: (6,[1,2,3,10,20,30])"
+        , "runtime filtered append: (4,[2,3,20,30])"
+        , "runtime filtered append: (5,[2,3,10,20,30])"
+        , "runtime filtered append: (0,[])"
+        , "partial sum keeps bottom left: ok"
+        , "partial sum keeps cyclic left: ok"
+        , "sum zero ignores right bottom: ok"
+        , "sum successors ignore right bottom: ok"
+        , "sum ignores cyclic right: ok"
+        , "sum demands left length: packed-bottom-length"
+        , "sum demands left predecessor: packed-bottom-length"
+        , "sum proof ignores right bottom: ok"
+        , "sum length head ignores right bottom: S"
+        , "sum length demands right bottom: equality-right-length"
+        , "sum constructor ignores bottom fields: ok"
+        , "sum stored length demand: packed-bottom-length"
+        , "sum stored proof demand: append-bottom-proof"
+        , "sum length ignores proof: 0"
+        , "unused append: 42"
+        , "append demands left package first: packed-bottom-package"
+        , "append demands right package before lengths: append-right-package"
+        , "append demands left length before vectors: packed-bottom-length"
+        , "append scans first length: packed-bottom-length"
+        , "append zero ignores right length and vector: ok"
+        , "append zero demands right vector: zip-right-vector"
+        , "append zero length demands right length: equality-right-length"
+        , "append package ignores vectors: ok"
+        , "append length ignores vectors: 2"
+        , "append vector demands left tag: zip-left-vector"
+        , "append first head ignores right vector: 42"
+        , "append tail demands right vector: zip-right-vector"
+        , "append package ignores left element: ok"
+        , "append demands left element: packed-filter-bottom-element"
+        , "append first head ignores left tail: 42"
+        , "append demands left tail: zip-left-vector"
+        , "append finite left ignores cyclic right: 42"
+        , "append cyclic right bounded prefix: [42,42,42]"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2492,6 +2583,13 @@ runPackageSourceRejectChecks = do
         , ("ZipUnmatchedProof", 83865, "zipVec xs ys", [], equalityImports, package ++ equality ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = case sameNat n m of", "  Nothing -> Nothing", "  Just proof -> Just (PackVec n (zipVec xs ys))"])
         , ("ZipNothingBranch", 83865, "zipVec xs ys", [], equalityImports, package ++ equality ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = case sameNat n m of", "  Just Refl -> Just (PackVec n (zipVec xs ys))", "  Nothing -> Just (PackVec n (zipVec xs ys))"])
         , ("LinearIndex", 83605, "local index variable", ["LinearTypes"], [], package ++ ["bad :: Nat %1 -> PackedVec Int", "bad n = PackVec n (error \"unused\")"])
+        , ("SumForged", 83865, "Refl", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (p :: Nat) -> Sum n m", "bad n m p = Sum p Refl"])
+        , ("SumWrongEvidence", 83865, "proof", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (p :: Nat) -> (p :~: n) -> Sum n m", "bad n m p proof = Sum p proof"])
+        , ("AppendUnmatchedProof", 83865, "appendNative n m xs ys", ["TypeFamilies"], equalityImports, package ++ sums ++ ["bad :: PackedVec a -> PackedVec a -> PackedVec a", "bad (PackVec n xs) (PackVec m ys) = case sumNat n m of", "  Sum p proof -> PackVec p (appendNative n m xs ys)"])
+        , ("SumSwapped", 5617, "Sum p Refl", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Sum m n", "bad n m = case sumNat n m of", "  Sum p Refl -> Sum p Refl"])
+        , ("SumEscape", 5617, "replicateNative p 42", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (q :: Nat) -> Sum n m -> Vec Int q", "bad q (Sum p Refl) = replicateNative p 42"])
+        , ("SumAlias", 83865, "alias m Refl", ["TypeFamilies"], equalityImports, sums ++ ["alias :: forall (n :: Nat) (m :: Nat). foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m", "alias p proof = Sum p proof", "bad :: foreach (m :: Nat) -> Sum Z m", "bad m = alias m Refl"])
+        , ("SumPartial", 83865, "Sum m", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (m :: Nat) -> (m :~: m) -> Sum Z m", "bad m = Sum m"])
         , ("LinearClause", 18872, "arising from a pattern", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
         , ("LinearCase", 18872, "arising from multiplicity", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad p = case p of PackVec n xs -> PackVec n xs"])
         , ("RigidMultiplicity", 25897, "is a rigid type variable", ["LinearTypes"], ["import GHC.Types (Multiplicity)"], package ++ ["bad :: forall (p :: Multiplicity) a. PackedVec a %p -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
@@ -2523,6 +2621,26 @@ runPackageSourceRejectChecks = do
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
     package = declaration "foreach (n :: Nat) -> Vec a n -> PackedVec a"
     equalityImports = ["import Data.Type.Equality ((:~:)(Refl))"]
+    sums =
+        [ "type family Add (n :: Nat) (m :: Nat) :: Nat where"
+        , "  Add Z m = m"
+        , "  Add (S n) m = S (Add n m)"
+        , "data Sum (n :: Nat) (m :: Nat) where"
+        , "  Sum :: foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m"
+        , "sumNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Sum n m"
+        , "sumNat n m = case n of"
+        , "  Z -> Sum m Refl"
+        , "  S k -> case sumNat k m of"
+        , "    Sum p Refl -> Sum (S p) Refl"
+        , "appendVec :: Vec a n -> Vec a m -> Vec a (Add n m)"
+        , "appendVec VNil ys = ys"
+        , "appendVec (VCons x xs) ys = VCons x (appendVec xs ys)"
+        , "appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)"
+        , "appendNative n m xs ys = appendVec xs ys"
+        , "replicateNative :: forall a. foreach (n :: Nat) -> a -> Vec a n"
+        , "replicateNative Z x = VNil"
+        , "replicateNative (S k) x = VCons x (replicateNative k x)"
+        ]
     equality =
         [ "sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)"
         , "sameNat n m = case n of"
