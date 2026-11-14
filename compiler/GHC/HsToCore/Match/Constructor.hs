@@ -41,7 +41,7 @@ import GHC.Types.FieldLabel ( flSelector )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import Control.Monad(liftM, unless)
+import Control.Monad(liftM, unless, join)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 
@@ -120,7 +120,7 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
 
   -- See Note [Retained constructor equation scope].
   | any (any has_native_proof) groups
-  = do { results <- mapM match_retained_row (concatMap NE.toList groups)
+  = do { results <- mapM match_retained_row (join groups)
        ; return (foldr1 combineMatchResults results) }
 
   | otherwise
