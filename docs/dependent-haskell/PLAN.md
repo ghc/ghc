@@ -1709,6 +1709,9 @@ assignment or runtime-index escape.
   native monotype. Use the existing inferred-signature validity context to
   validate each free runtime index against its actual outer binding. Keep
   ordinary head metas, FRR and multiplicity checks. No DepFunTy is inferred.
+  Validate deep free runtime Ids too. The structural validity walk skips
+  variable kinds and coercions; use its existing deep free-variable list and
+  lexical index check. Exclude bound indices and erased CoVars.
 - [ ] Keep the separate InferGen guard at `Tc.Gen.Bind:731`. Do not remove
   inferred-type guards globally. Recursive groups, pattern bindings, partial
   signatures and inferred native function telescopes need separate designs.

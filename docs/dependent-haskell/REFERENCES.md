@@ -1978,3 +1978,10 @@ require a head meta. Repeat exact whole-argument matching afterwards. Keep
 native payload choices immutable. This uses ordinary GHC unification; Agda's
 contextual metas do not justify native assignment. Preserve the failed run
 and the source programs while validating this increment.
+
+The validity audit at `fecdc2a991` finds that the structural `check_type` walk
+skips `TyVarTy` kinds and `CastTy` coercions. Reuse `checkValidType`'s existing
+deep free-variable list for lexical runtime-index validation before its
+structural walk. `TyCo.FVs` follows kind/coercion metadata and excludes bound
+retained indices. Exclude CoVars explicitly. This establishes the required
+scope check across metadata; no source-level exploit is claimed.

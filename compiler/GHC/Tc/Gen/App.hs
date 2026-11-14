@@ -2117,8 +2117,7 @@ kind, concreteness and Quick Look guards.
 Agda expands a do bind to ordinary application and a lambda. Its local
 context stores the checked term and type. This implementation keeps GHC's
 runtime Ids opaque and keeps Haskell evaluation unchanged. See
-docs/dependent-haskell/REFERENCES.md#direct-do-bind-of-a-saved-native-action
-and #checked-local-payload-signatures in the same file.
+docs/dependent-haskell/REFERENCES.md#scoped-native-source-inference.
 -}
 
 -- | Preserve matched native choices and freshen undetermined ordinary binders.
@@ -2156,8 +2155,8 @@ index binders on the existing complete immutable route. Check each missing
 binder's substituted kind before allocation; it must not be a native domain.
 A failed joint argument match still fails. Preserve kind, exact cached-domain,
 runtime scope and concreteness checks, the ordinary evidence order and
-once-only cached usage. Native result
-inference still cannot fill beta with Vec Int n. Final subsumption remains
+once-only cached usage. A native result must be determined before allocating
+beta; see Note [Scoped native callback results]. Final subsumption remains
 authoritative. See Note [Immutable instantiation of nested contexts].
 -}
 

@@ -68,7 +68,8 @@ import GHC.Types.FieldLabel (flSelector)
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar, tyVarName )
+import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar, tyVarName
+                        , isId, isCoVar )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
@@ -462,7 +463,8 @@ checkValidType ctxt ty
                  _              -> panic "checkValidType"
                                           -- Can't happen; not used for *user* sigs
 
-       ; env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
+       ; let fvs = tyCoVarsOfTypeList ty
+       ; env <- liftZonkM $ tcInitOpenTidyEnv fvs
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                              , ve_rank = rank, ve_expand = expand
@@ -472,7 +474,10 @@ checkValidType ctxt ty
        -- Fail if bad things happen, else we misleading
        -- (and more complicated) errors in checkAmbiguity
        ; checkNoErrs $
-         do { check_type ve ty
+         do { -- See Note [Validity of retained binders].
+              mapM_ (check_type ve . TermVarTy)
+                [v | v <- fvs, isId v, not (isCoVar v)]
+            ; check_type ve ty
             ; checkUserTypeError ctxt ty
             ; traceTc "done ct" (ppr ty) }
 
@@ -925,6 +930,13 @@ GHC.Tc.Gen.App, Note [Native index bindings during typechecking].
 Its domain must satisfy isNativeIndexType. Ordinary outer forall binders
 keep their existing type-variable scope and rank checks.
 Preserve this scope when checking nested constraints and their predicates.
+
+checkValidType also checks all deep free runtime Ids through this lexical
+check. The structural validity walk skips coercions and variable kinds.
+Those can contain runtime indices, including in an inferred local type.
+Reuse the deep free-variable list already needed for tidying. It excludes
+properly bound retained indices and follows kind and coercion metadata.
+Exclude CoVars: these Ids are erased evidence, not runtime indices.
 
 The dependent scope follows the function types described in
 docs/dependent-haskell/REFERENCES.md#agda-provenance. This check does not
