@@ -1,0 +1,502 @@
+{
+  "schema_version": 1,
+  "cache_directory": "_build/verification/dependent-haskell-papers-2026-11-14",
+  "storage_note": "PDFs and extraction artifacts remain in the ignored cache. This manifest records references and reading coverage only.",
+  "verification": {
+    "verified_utc": "2026-11-14T21:51:26Z",
+    "pdf_reader": "pypdf 7.1.0",
+    "checks": "All eight cached PDFs match the recorded SHA256 and byte counts. PDF page counts were checked with pypdf.",
+    "work_count": 6,
+    "pdf_count": 8
+  },
+  "reading_scope_note": "Reading scopes come from the six cached metadata records. No full-thesis reading, full-appendix audit or formal proof replay is claimed. These readings do not certify the compiler implementation.",
+  "works": [
+    {
+      "id": "haskell2012-singletons",
+      "title": "Dependently Typed Programming with Singletons",
+      "authors": [
+        "Richard A. Eisenberg",
+        "Stephanie Weirich"
+      ],
+      "year": 2012,
+      "venue": "Haskell Symposium 2012; ACM SIGPLAN Notices 47 (12)",
+      "doi": "10.1145/2430532.2364522",
+      "bibliography_source_url": "https://repository.brynmawr.edu/compsci_pubs/10/",
+      "published_extent": "The institutional citation gives pages 117–130.",
+      "version_note": "The author draft and university mirror each contain 13 PDF pages. The mirror prints pages 117–129. Neither cached PDF is asserted to be identical to the version described by the institutional citation.",
+      "reading_metadata": "haskell2012-metadata.json",
+      "versions": [
+        {
+          "id": "author-draft",
+          "description": "Author-hosted submission draft dated 23 July 2012.",
+          "pdf_filename": "haskell2012-singletons.pdf",
+          "source_url": "https://richarde.dev/papers/2012/singletons/paper.pdf",
+          "sha256": "c40833b63bfccc837cf7fe68f71c9299de29d62e20d6edcf985d9e845ed87e27",
+          "bytes": 300100,
+          "pdf_pages": 13,
+          "accessed_utc": "2026-11-14T21:37:50.113432Z",
+          "access_time_basis": "Download completion time inferred from the cached file modification time; no HTTP response access timestamp was recorded.",
+          "reading_scope": {
+            "summary": "Selected sections read; this was not a complete paper audit.",
+            "pdf_pages": [
+              2,
+              3,
+              4,
+              12
+            ],
+            "sections": [
+              "Sections 1.1–1.3",
+              "Sections 2.1–2.6",
+              "Relevant parts of section 7"
+            ],
+            "excluded": [
+              "The full database and translation sections were not audited."
+            ]
+          }
+        },
+        {
+          "id": "university-mirror",
+          "description": "University-hosted mirror with publisher-style pagination.",
+          "pdf_filename": "haskell2012-singletons-published.pdf",
+          "source_url": "https://www.cs.tufts.edu/~nr/cs257/archive/richard-eisenberg/dep-singleton.pdf",
+          "sha256": "9a111cd133670fa47c16060e8f5cb7bcb6113f84b7573c241be3939dec9eda3e",
+          "bytes": 640446,
+          "pdf_pages": 13,
+          "accessed_utc": "2026-11-14T21:45:48.838103Z",
+          "access_time_basis": "Download completion time inferred from the cached file modification time; no HTTP response access timestamp was recorded.",
+          "reading_scope": {
+            "summary": "Selected sections and bibliography read; this was not a complete paper audit.",
+            "pdf_pages": [
+              1,
+              2,
+              3,
+              4,
+              12,
+              13
+            ],
+            "printed_pages": [
+              117,
+              118,
+              119,
+              120,
+              128,
+              129
+            ],
+            "sections": [
+              "Introduction",
+              "Sections 2.1–2.6",
+              "Relevant parts of section 7",
+              "Sections 8–9 and bibliography"
+            ],
+            "excluded": [
+              "The full database and translation sections were not audited."
+            ]
+          },
+          "printed_pages": "117–129"
+        }
+      ]
+    },
+    {
+      "id": "icfp2013-explicit-kind-equality",
+      "title": "System FC with Explicit Kind Equality",
+      "authors": [
+        "Stephanie Weirich",
+        "Justin Hsu",
+        "Richard A. Eisenberg"
+      ],
+      "year": 2013,
+      "venue": "ICFP 2013",
+      "doi": "10.1145/2500365.2500599",
+      "reading_metadata": "icfp2013-metadata.json",
+      "versions": [
+        {
+          "id": "author-paper",
+          "description": "Twelve-page author-hosted main paper.",
+          "pdf_filename": "icfp2013-fckinds.pdf",
+          "source_url": "https://richarde.dev/papers/2013/fckinds/fckinds.pdf",
+          "sha256": "291ae3acda2bd5fd1c5f9d2239316f28dc9ae4260db48dd8bb70bebb42bef739",
+          "bytes": 354653,
+          "pdf_pages": 12,
+          "accessed_utc": "2026-11-14T21:45:09.706788Z",
+          "access_time_basis": "The reading record gives this access time for a previously supplied PDF. No replacement download was performed.",
+          "reading_scope": {
+            "summary": "All 12 cached main-paper pages, including references, were read.",
+            "pdf_pages": "1–12",
+            "sections": [
+              "Abstract and sections 1–8",
+              "Acknowledgments and references"
+            ],
+            "visual_checks": [
+              "Figure 4 on PDF page 6: CT_ALLT, CT_ALLC and CT_NTH."
+            ],
+            "excluded": [
+              "The extended paper and full proofs were not read."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "eisenberg2016-thesis",
+      "title": "Dependent Types in Haskell: Theory and Practice",
+      "authors": [
+        "Richard A. Eisenberg"
+      ],
+      "supervisor": "Stephanie Weirich",
+      "supervisor_note": "The supervisor is not a coauthor.",
+      "year": 2016,
+      "venue": "PhD dissertation, University of Pennsylvania",
+      "doi": null,
+      "doi_note": "No DOI was recorded in the reading metadata.",
+      "reading_metadata": "eisenberg2016-reading-metadata.json",
+      "versions": [
+        {
+          "id": "author-dissertation",
+          "description": "Author-hosted dissertation.",
+          "pdf_filename": "eisenberg2016-thesis.pdf",
+          "source_url": "https://richarde.dev/papers/2016/thesis/eisenberg-thesis.pdf",
+          "sha256": "df4b010054bc49f590f8b37e3168045082af380f036c9634a5e827f8962198af",
+          "bytes": 2243422,
+          "pdf_pages": 351,
+          "accessed_utc": "2026-11-14T21:37:05.216885Z",
+          "access_time_basis": "Access time recorded during the PDF download.",
+          "reading_scope": {
+            "summary": "Selected text extraction only: 42 numbered pages and nine front-matter pages. The full 351-page thesis was not read.",
+            "pdf_page_ranges": [
+              [
+                63,
+                64
+              ],
+              [
+                69,
+                74
+              ],
+              [
+                78,
+                80
+              ],
+              [
+                83,
+                88
+              ],
+              [
+                94,
+                95
+              ],
+              [
+                103,
+                105
+              ],
+              [
+                121,
+                122
+              ],
+              [
+                124,
+                125
+              ],
+              [
+                156,
+                158
+              ],
+              [
+                165,
+                169
+              ],
+              [
+                175,
+                176
+              ],
+              [
+                191,
+                192
+              ],
+              [
+                201,
+                204
+              ]
+            ],
+            "printed_page_ranges": [
+              [
+                48,
+                49
+              ],
+              [
+                54,
+                59
+              ],
+              [
+                63,
+                65
+              ],
+              [
+                68,
+                73
+              ],
+              [
+                79,
+                80
+              ],
+              [
+                88,
+                90
+              ],
+              [
+                106,
+                107
+              ],
+              [
+                109,
+                110
+              ],
+              [
+                141,
+                143
+              ],
+              [
+                150,
+                154
+              ],
+              [
+                160,
+                161
+              ],
+              [
+                176,
+                177
+              ],
+              [
+                186,
+                189
+              ]
+            ],
+            "front_matter_pdf_pages": [
+              1,
+              2,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13
+            ],
+            "numbered_pages_read": 42,
+            "page_numbering": "For Arabic-numbered pages, the one-based PDF page is the printed page plus 15. Front matter uses Roman labels.",
+            "excluded": [
+              "Appendices and proof details were not read.",
+              "Figures 4.1 and 5.9 were read as extracted text, not inspected visually."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "icfp2017-specification",
+      "title": "A Specification for Dependent Types in Haskell",
+      "authors": [
+        "Stephanie Weirich",
+        "Antoine Voizard",
+        "Pedro Henrique Azevedo de Amorim",
+        "Richard A. Eisenberg"
+      ],
+      "year": 2017,
+      "venue": "Proceedings of the ACM on Programming Languages 1 (ICFP), article 31",
+      "doi": "10.1145/3110275",
+      "bibliography_source_url": "https://dl.acm.org/doi/10.1145/3110275",
+      "published_extent": "ACM lists 29 pages, article pages 1–29.",
+      "version_note": "The cached author PDF contains 30 pages and prints 31:1–31:30. No identity or page correspondence with the 29-page ACM version was established.",
+      "reading_metadata": "icfp2017-metadata.json",
+      "versions": [
+        {
+          "id": "author-paper",
+          "description": "Thirty-page author-hosted PDF.",
+          "pdf_filename": "icfp2017-spec.pdf",
+          "source_url": "https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf",
+          "sha256": "86c8496096a036aa6662ef9369de8ba668f977110759a744da7e723c5c2cd18e",
+          "bytes": 860277,
+          "pdf_pages": 30,
+          "accessed_utc": "2026-11-14T21:37:10.031931Z",
+          "access_time_basis": "Access time recorded during the PDF download.",
+          "reading_scope": {
+            "summary": "Main text, sections 1–9, read on PDF pages 1–27.",
+            "pdf_pages": "1–27",
+            "printed_pages": "31:1–31:27",
+            "visual_checks": [
+              "Figure 8 on PDF page 16.",
+              "Figure 10 on PDF page 19."
+            ],
+            "excluded": [
+              "Bibliography pages 28–30 were not read in detail.",
+              "Coq proof sources were not read and the mechanization was not rebuilt."
+            ]
+          },
+          "printed_pages": "31:1–31:30"
+        }
+      ]
+    },
+    {
+      "id": "icfp2019-dependent-roles",
+      "title": "A Role for Dependent Types in Haskell",
+      "authors": [
+        "Stephanie Weirich",
+        "Pritam Choudhury",
+        "Antoine Voizard",
+        "Richard A. Eisenberg"
+      ],
+      "year": 2019,
+      "venue": "Proceedings of the ACM on Programming Languages 3 (ICFP), article 101",
+      "doi": "10.1145/3341705",
+      "bibliography_source_url": "https://richarde.dev/pubs.html",
+      "version_note": "The 29-page conference paper and 42-page extended arXiv version are separate cached versions. The extended draft footer is not the final conference publication record.",
+      "reading_metadata": "icfp2019-metadata.json",
+      "versions": [
+        {
+          "id": "conference-paper",
+          "description": "Author-hosted ICFP paper, published in August 2019.",
+          "pdf_filename": "icfp2019-roles.pdf",
+          "source_url": "https://richarde.dev/papers/2019/dep-roles/dep-roles.pdf",
+          "sha256": "ab36a1c11b817a313a96bec7e46ab3dd895e7cf288b33d658721a83597fdb842",
+          "bytes": 795978,
+          "pdf_pages": 29,
+          "accessed_utc": "2026-11-14T21:37:38Z",
+          "access_time_basis": "Access time recorded during the PDF download.",
+          "reading_scope": {
+            "summary": "Introduction, selected roles discussion and sections 3–7 read.",
+            "pdf_page_ranges": [
+              [
+                1,
+                3
+              ],
+              [
+                6,
+                25
+              ]
+            ],
+            "printed_page_ranges": [
+              "101:1–101:3",
+              "101:6–101:25"
+            ],
+            "sections": [
+              "Title, abstract and introduction",
+              "Discern example and sections 2.4–2.5",
+              "Sections 3–7"
+            ],
+            "excluded": [
+              "References were not read in detail.",
+              "Coq source was not audited or replayed."
+            ]
+          },
+          "printed_pages": "101:1–101:29"
+        },
+        {
+          "id": "extended-arxiv-v1",
+          "description": "Extended version, arXiv 1905.13706v1, submitted on 31 May 2019.",
+          "pdf_filename": "icfp2019-roles-extended.pdf",
+          "source_url": "https://arxiv.org/pdf/1905.13706v1",
+          "sha256": "fd35d7ad5205542b45ba8c01fc7336ff979c45843a70fecc0113feeb80483637",
+          "bytes": 566521,
+          "pdf_pages": 42,
+          "accessed_utc": "2026-11-14T21:37:39Z",
+          "access_time_basis": "Access time recorded during the PDF download.",
+          "reading_scope": {
+            "summary": "Selected appendix material only; the entire extended version was not read.",
+            "pdf_pages": [
+              30,
+              37,
+              38
+            ],
+            "printed_pages": [
+              "1:30",
+              "1:37",
+              "1:38"
+            ],
+            "sections": [
+              "Appendix A introduction",
+              "Selected appendix E.4 typing and equality rules"
+            ],
+            "rules": [
+              "E-Assn",
+              "E-Wff",
+              "E-Sub",
+              "E-PiCong",
+              "E-AppCong",
+              "E-PiSnd",
+              "E-CPiCong"
+            ],
+            "visual_checks": [
+              "PDF pages 37 and 38."
+            ],
+            "excluded": [
+              "Most appendix rules were not read.",
+              "Coq source was not audited or replayed."
+            ]
+          },
+          "printed_pages": "1:1–1:42"
+        }
+      ]
+    },
+    {
+      "id": "popl2021-usage-aware",
+      "title": "A Graded Dependent Type System with a Usage-Aware Semantics",
+      "authors": [
+        "Pritam Choudhury",
+        "Harley Eades III",
+        "Richard A. Eisenberg",
+        "Stephanie Weirich"
+      ],
+      "year": 2021,
+      "venue": "Proceedings of the ACM on Programming Languages 5 (POPL), article 50",
+      "doi": "10.1145/3434331",
+      "reading_metadata": "popl2021-metadata.json",
+      "versions": [
+        {
+          "id": "author-conference-paper",
+          "description": "Thirty-two-page author-hosted conference paper.",
+          "pdf_filename": "popl2021-grad.pdf",
+          "source_url": "https://richarde.dev/papers/2021/grad/grad.pdf",
+          "sha256": "cbb1b8e1a6ad71b7588197c0f607967f5f31fd36394c916c07725bdaa8a3f45b",
+          "bytes": 434156,
+          "pdf_pages": 32,
+          "accessed_utc": "2026-11-14T21:37:49.004565Z",
+          "access_time_basis": "Download completion time inferred from the cached file modification time; no HTTP response access timestamp was recorded.",
+          "reading_scope": {
+            "summary": "Selected sections and introductory excerpts read; this was not a full-paper audit.",
+            "pdf_pages": [
+              9,
+              11,
+              17,
+              18,
+              19,
+              20,
+              21,
+              25,
+              26,
+              27,
+              30
+            ],
+            "introduction_excerpt_pdf_pages": [
+              1,
+              2,
+              3
+            ],
+            "sections": [
+              "Sections 5.1–5.2",
+              "Sections 6–7",
+              "Theorem 8.9",
+              "Sections 9.1–9.2",
+              "Section 11"
+            ],
+            "visual_checks": [
+              "Figure 3 on PDF page 20."
+            ],
+            "excluded": [
+              "The extended version was not read.",
+              "The Coq artifact was not audited or replayed."
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
