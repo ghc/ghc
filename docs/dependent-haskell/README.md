@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 417 runtime observations and the runtime fixtures check 122 package/bound rejections |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 439 runtime observations and the runtime fixtures check 133 source rejection cases |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -58,7 +58,8 @@ Last updated: 2026-11-14.
 | Scoped source inference | Local monomorphic vectors/actions and native callback results infer at existing outer runtime indices; deep metadata scope and callback escape checks apply |
 | Native boxed tuples | Complete boxed tuples infer exact native field types through ordinary constructor applications; runtime syntax, constructor and helper comparisons pass |
 | Native tuple sections | Inferred and expected boxed sections preserve exact native fields, hole multiplicities, field laziness and captured vector sharing |
-| Next task | M28: infer native generic results before consuming extra arguments; direct `fst pair 42` rejects while a named `fst pair` result works |
+| Generic result application | A native-anchored declared argument prefix determines a generic function result before ordinary checking consumes extra arguments |
+| Next task | M29: reuse prefix inference after leading visible type applications; a partial `@Bool` still blocks the native generic route |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2812,3 +2813,57 @@ The next compile/Lint baseline stores a section in a pair. Naming `fst pair`
 before applying it compiles; direct `(fst pair) (42 :: Int)` reports GHC-83865
 in both stages. This is the separate generic overapplication path in
 [M28](PLAN.md#m28-native-generic-result-overapplication), not section creation.
+
+## M28: applying native generic results
+
+Both compiler stages accept direct application of a projected native function:
+
+```haskell
+n <- readIORef cell
+let vector = replicateNative @Int n 7
+    action = pure ((vector,), True)
+    compute = action >>= \stored -> pure (fst stored (42 :: Int))
+pair <- compute
+pure (PackVec n (fst pair))
+```
+
+`fst` declares one argument domain. Its result becomes a function after the
+checker infers the stored pair. The generic route now uses that nonempty
+declared prefix under the existing NoQL, native-anchor, VTA, kind, scope and
+concreteness guards. Prefix matching starts with an empty substitution because
+the final expected result follows the extra arguments. Exact saturation keeps
+its existing result seed. Native-index-kind instantiation stays exactly
+saturated. The original application pipeline checks extra arguments, evidence,
+multiplicities and the final result. Core and the interface version are unchanged.
+`[Generic retained argument inference]` owns the rule; the cache Note refers to it.
+
+Both source clients pass 439 observations, preserving the previous 417 outputs.
+The 22 additions compare direct/named `fst`, `id`, `const` and an Eq-constrained
+projection at runtime IORef lengths 0 through 3. Counters check one action per
+call. Demand checks distinguish unused and applied bottom functions/pairs,
+ignored and demanded vector fields, the constrained tag, partial/cyclic
+prefixes and sharing of captured vectors and original IORefs.
+
+Both stages pass 99 located rejection cases and four ordinary runtime controls.
+The new matrix has nine compile controls and eleven rejections. It covers
+multiple extra arguments, cache position two, nested contexts, known final
+types, linear captures and expected higher-rank extra domains. Wrong arguments,
+results, joint prefix choices, scopes, dictionaries and linear usage reject.
+A separate failed-match trace counts one `prefixProbe` application elaboration
+in each stage. The API/runtime fixture passes 133 source rejection cases.
+All five registered regressions pass, with 34 skipped ways and no unexpected
+results or framework warnings. The full GHC suite was not run.
+
+Evidence uses `_build/verification/native-generic-overapp-*`. Two input archives
+contain 32 selected compiler paths each. The self-hosted build took 6m21s and
+peaked at 6386 MiB under 16 GiB. Bootstrap source/API checks peaked at 1069 MiB
+under 4 GiB; final both-stage checks peaked at 350 MiB under 4 GiB. Registered
+tests took 12.71s and peaked at 1872 MiB under 8 GiB. Swap was disabled.
+Earlier frozen evidence, the initial VTA probe and trace-parser failures remain.
+[Pinned Agda and upstream GHC sources](REFERENCES.md#generic-result-overapplication-prior-art)
+record the application-spine precedent and the limits of TH counter evidence.
+
+The next compile/Lint baseline omits or supplies a leading `@Bool`. The omitted
+form works; partial VTA still reports located GHC-83865 in both stages.
+Complete ordinary VTA works. [M29](PLAN.md#m29-native-generic-inference-after-leading-vta)
+will attempt prefix inference after GHC checks the written type arguments.

@@ -2052,10 +2052,47 @@ wrapper; projection must not discard a domain/result cast or a forall/context.
 existing four combinations of One/Many hole multiplicities. Pinned source
 files, Git blob checks and decisions are in the M27 prior-art artifacts.
 
-The M28 baseline isolates a different application-spine boundary. A named
-`fst pair` projection and later application compile; the direct flattened
-application rejects in both stages. The pinned Agda `Rules.Application`
+The M28 baseline isolated a different application-spine boundary. A named
+`fst pair` projection and later application compiled; the direct flattened
+application rejected in both M27 stages. M28 now verifies the direct form.
+The pinned Agda `Rules.Application`
 argument-checking and codomain-substitution rule supports consuming a spine
 in stages. The GHC adaptation must infer the declared argument prefix before
 checking extra arguments. A final expected result after those arguments is
 not the intermediate result used to choose `fst`'s erased parameter.
+
+## Generic result overapplication prior art
+
+M28 rechecks the pinned Agda `Rules.Application` and `Rules.Term` blobs above.
+`Application.hs` lines 774–808 check the argument against the current Pi domain,
+then continue with `absApp b u`. This supplies the precedent for consuming
+the application spine in stages. The GHC adaptation chooses erased parameters
+from a declared argument prefix, then checks extra arguments at the selected
+function type. It does not assign native syntax to an ordinary meta.
+
+Upstream GHC commit `19ff36f2aede0ca2e554016ff22c71e73aa9803b` supplies the existing
+pipeline in `GHC.Tc.Gen.App`. See `[Application chains and heads]`,
+`[tcApp: typechecking applications]` and `tcApp` lines 399–448. Instantiation,
+result checking and argument checking retain their original sequence.
+M28 keeps the full application spine and original evidence pipeline. Its
+owning `[Generic retained argument inference]` Note records the empty prefix
+substitution and generic-only saturation rule. The earlier cache Note refers
+to that owner. Source snapshots and Git blob checks are in the M28 prior-art
+archive, including the M27 checker used for the failing baseline.
+
+The cache check uses `tcApp:inferAppHead` trace blocks to count one elaboration
+of a named prefix application after joint prefix matching fails. A TH `runIO`
+counter alone would not establish that property. In the pinned M27 source,
+`GHC.Rename.Splice` lines 489–498 execute untyped splices during renaming.
+`GHC.Tc.Module` checks errors before zonking and finalizers, so typed splices
+and finalizers cannot measure this failing TC path. Preserve the normal
+trace's tentative messages separately from emitted error diagnostics.
+Linear positive/negative controls check usage independently.
+
+The M29 baseline keeps the same selector and adds `@Bool`. Omitted VTA and
+complete ordinary VTA compile, while the partial native form rejects in both
+stages. GHC's ITYARG step already checks the written type argument. The next
+adaptation should reuse that substituted signature and IALL's binder/evidence
+order. Cache keys and diagnostic positions need separate counters before
+native caches can include written VTA. These are unverified implementation
+tasks, not a new type-theoretic rule.

@@ -88,7 +88,10 @@ regressions pass. M26 verifies boxed tuple inference with 395 observations,
 All five registered regressions pass. M27 verifies native tuple sections with
 417 source observations, 88 located rejections, four ordinary controls and
 122 API rejections in both stages. All five registered regressions pass.
-M28 targets native results from generic overapplication.
+M28 verifies native generic result overapplication with 439 source observations,
+99 located rejection cases, four ordinary controls and 133 API rejection cases.
+Both stages pass the failed-match cache trace. All five registered regressions
+pass. M29 targets native generic inference after leading visible type applications.
 
 ## Direction and boundaries
 
@@ -1843,28 +1846,64 @@ helper applied to a native argument. It does not stop at a signature gate.
 
 ### M28: native generic result overapplication
 
-This target is unverified. Both M27 stages compile a named projection of a
-stored section, then its application. Direct `(fst pair) (42 :: Int)` rejects
-with located GHC-83865. The argument-instantiation route requires all written
+This target is verified. Both M27 stages compiled a named projection of a
+stored section, then its application. Direct `(fst pair) (42 :: Int)` rejected
+with located GHC-83865. The argument-instantiation route required all written
 value arguments to exactly saturate the declared domains. Here `fst` declares
 one domain; its chosen result must become a function before checking the extra
 argument.
 
-- [ ] Admit a nonempty declared argument prefix under the existing native,
+- [x] Admit a nonempty declared argument prefix under the existing native,
   NoQL, VTA, template and concreteness guards. Require a native anchor in that
   prefix. Preserve the exactly saturated route. Keep native-index-kind
   instantiation exactly saturated.
-- [ ] Infer and cache prefix arguments once. Start prefix matching with an
+- [x] Infer and cache prefix arguments once. Start prefix matching with an
   empty substitution. Do not seed its intermediate result from the final
   expected result after extra arguments. Keep exact domain, kind and scope
   validation. Reuse ordinary completion of unchosen erased parameters.
-- [ ] Instantiate the original head and pass the full argument list to the
+- [x] Instantiate the original head and pass the full argument list to the
   existing application checker. Let that checker consume extra arguments and
   enforce evidence order, saturation, multiplicities and final subsumption.
-- [ ] Compare direct and named projections at runtime indices. Preserve wrong
+- [x] Compare direct and named projections at runtime indices. Preserve wrong
   extra argument/result, conflicting prefix, scope, VTA and higher-rank gates.
   Test an anchor only after the prefix and once-only elaboration/usage.
   Record one owning Note and reuse the existing application-spine prior art.
+
+Both source clients pass 439 observations. Nine new positive compile controls
+and eleven located rejections pass in both stages. The retained cases bring
+the rejection total to 99 per stage. A separate failed joint-prefix match has
+one `prefixProbe` head elaboration in the TC trace. The API fixture passes
+133 source rejections. All five registered regressions pass. The owning
+`[Generic retained argument inference]` Note and its cache reference record
+the saturation distinction. No Core or interface form changed.
+
+### M29: native generic inference after leading VTA
+
+This target is unverified. Both M28 stages accept a selector without VTA and
+reject its otherwise equivalent partial `@Bool` form with located GHC-83865.
+Complete ordinary VTA remains valid. The native prepass excludes written type
+arguments, so it cannot use the remaining generic binders after partial VTA.
+
+- [ ] Use the existing ITYARG step to check leading written type arguments
+  once. Before IALL creates metas for the remaining binders, attempt native
+  argument-directed inference from the substituted signature. Keep NoQL,
+  extension, known-head/concreteness, prefix-anchor, kind and scope guards.
+  Start before any value argument and require no remaining written VTA.
+- [ ] Preserve the recorded checked type arguments and original head. Feed
+  immutable choices through IALL's existing plan and evidence order. Do not
+  prepend remaining type applications ahead of the written `@Bool`.
+- [ ] Return inferred argument caches to `tcApp` and `finishAppWithCache`,
+  including failed-match caches. Preserve the public `tcInstFun` interface
+  where possible. Separate cache value positions from diagnostic source
+  positions: `tcValArgsWithCache` currently counts written type arguments,
+  while `RetainedArgCache` keys count only value arguments. Earlier VTA
+  guards kept this difference outside native cache use.
+- [ ] Compare omitted, partial and complete VTA from source. Check wrong tags
+  and kinds, extra arguments/results, conflicting prefix choices, contexts,
+  scope and linear usage. Trace once-only elaboration on failure. Preserve
+  generated/written argument positions and located diagnostics. Leave VTA
+  interleaved after values outside this increment. Reuse the pinned spine
+  precedent and give shared rules one owning Note.
 
 ## Further work
 

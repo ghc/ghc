@@ -1,9 +1,9 @@
 # Packed vector source example
 
-Both M27 compiler stages pass all 417 source observations with Core Lint
-and STG Lint. The API/runtime fixture passes 122 package/bound rejections.
-All five registered regressions pass. M27 adds 22 observations and keeps the
-previous 395 lines in order. Both stages pass 88 standalone rejection cases
+Both M28 compiler stages pass all 439 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 133 source rejection cases.
+All five registered regressions pass. M28 adds 22 observations and keeps the
+previous 417 lines in order. Both stages pass 99 standalone rejection cases
 and four ordinary-Haskell controls.
 
 At M20, both stages and all five regressions passed 301 observations and
@@ -1068,5 +1068,34 @@ fields have located rejection controls. Native forall under a retained binder
 remains gated.
 
 A nested section can be projected into a named local before application.
-Direct `(fst pair) (42 :: Int)` remains the separate
-[M28 application-spine target](../../PLAN.md#m28-native-generic-result-overapplication).
+M28 admits direct `(fst pair) (42 :: Int)` as described below.
+
+## Applying generic function results
+
+```haskell
+let vector = replicateNative @Int n 7
+    action = pure ((vector,), True)
+    compute = action >>= \stored -> pure (fst stored (42 :: Int))
+pair <- compute
+pure (PackVec n (fst pair))
+```
+
+`driveGenericOverapplication` compares direct/named `fst`, `id`, `const` and
+`constrainedProjection` at runtime IORef lengths 0 through 3. Counters require
+`[0,1,2,3,4,5]`. `runGenericOverapplicationChecks` distinguishes constructing
+the computation from executing it. It checks unused and applied bottom
+functions/pairs, original field errors, partial/cyclic prefixes and sharing
+of the captured vector and original IORef payload. The constrained helper
+demands its tag; that error must remain observable.
+
+The checker infers the declared prefix to select a native function type,
+then checks extra arguments normally. The compile controls include a known
+higher-rank extra domain and a linear prefix. New rejection cases pin wrong
+extra arguments/results, conflicting prefixes, scope escapes, missing
+dictionaries, linear duplication and the partial-VTA boundary. A separate
+TC trace counts one prefix elaboration on failed matching.
+
+The remaining source boundary is a leading partial type application, such as
+`selectVTA @Bool ...`. The same native call without VTA compiles. Complete
+ordinary VTA also compiles. See the
+[M29 plan](../../PLAN.md#m29-native-generic-inference-after-leading-vta).
