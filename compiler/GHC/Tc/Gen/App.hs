@@ -816,7 +816,8 @@ Cache keys count value arguments. Diagnostic positions also count written type
 arguments. Keep separate counters in tcValArgsWithCache; otherwise a written
 @Bool shifts the cache lookup and repeats argument checking or uses another
 argument's cached expression. Generated type arguments do not change diagnostic
-positions. Emit each saved usage once at the argument's actual multiplicity.
+positions. Use the written-type-argument offset for Quick Look contexts too.
+Emit each saved usage once at the argument's actual multiplicity.
 See Note [Generic retained argument inference] for prefix matching and final
 subsumption. These rules do not assign native syntax to a type meta-variable.
 -}
@@ -1110,7 +1111,8 @@ tcInstFunWithExpectedCache vta_cache expected_rho inst_plan do_ql inst_final
                 matchActualFunTy herald
                   (Just $ HsExprTcThing tc_fun)
                   (n_val_args, fun_sigma) fun_ty
-           ; arg' <- quickLookArg do_ql pos ctxt rn_head arg arg_ty
+           ; arg' <- quickLookArg do_ql (pos + count written_type_arg acc)
+                                  ctxt rn_head arg arg_ty
            ; let acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
            ; go plan fun_orig (pos+1) acc' res_ty rest_args }
 
@@ -1584,9 +1586,10 @@ Other arguments retain ordinary expected-type checking. If matching fails or
 leaves index binders undetermined, ordinary instantiation checks the same cached
 arguments. The ordinary unifier still rejects retained meta-variable fills.
 
-The declared ordinary monomorphic domains must be saturated, without explicit
-type arguments. See Note [Generic retained argument inference] for extra
-arguments on the generic route. Preserve any leading context as described in
+The native-index route requires exact saturation. See Note [Native inference
+after visible type applications] for leading type arguments, and
+Note [Generic retained argument inference] for extra arguments on the generic
+route. Preserve any leading context as described in
 Note [Constrained immutable instantiation]. Inference uses a fresh infer cell
 at the current TcLevel. It can return an exact retained type without assigning a type meta-variable.
 -}
