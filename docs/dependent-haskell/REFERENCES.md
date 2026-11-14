@@ -1787,9 +1787,13 @@ observations and 42 standalone located errors. The API/runtime fixture passes
 
 ## Checked local payload signatures
 
-Status: unverified M23 plan. A complete local signature should refer to an
-eligible runtime index that is already in lexical scope. Unsigned local values
-remain outside this target.
+Status: both M23 stages pass 343 source observations, 53 standalone located
+errors and four ordinary controls. The API/runtime fixture passes 87
+package/bound rejections. The previous 331 source outputs remain unchanged.
+All five registered regressions pass. Frontend: `d45eac2a85`; lexical validity metadata normalization:
+`da16ec16e6`; source/API: `58fe0a1e10`; formatting: `e4766d99ac`.
+Complete local signatures can capture eligible indices already in lexical
+scope. Unsigned native inference remains outside this target.
 
 Agda v2.8.0 [`Rules/Term.hs`, lines 1662–1672](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L1662-L1672)
 checks a let binding's declared type in the current context. It checks the RHS
@@ -1802,7 +1806,7 @@ The full tagged sources and their blob checks are retained with M22 evidence.
 
 Agda's context discipline supplies scope prior art. Its transparent lets and
 totality rules do not justify unfolding Haskell values or equating aliases.
-The proposed GHC adaptation captures the actual already-bound local runtime
+The GHC adaptation captures the actual already-bound local runtime
 Name for a complete local value signature under `ExperimentalDependentTypes`.
 An in-scope erased type variable takes precedence. Otherwise, consider only
 unqualified free type-variable spellings in the local term reader environment.
@@ -1827,7 +1831,50 @@ behavior. Unsigned native inference and native meta assignment remain unsupporte
 Unavailable or invalid captured indices need located source diagnostics;
 wrong-index payloads retain ordinary type errors. Flag-off and erased-variable
 controls must keep ordinary Haskell behavior. Signature capture must not force
-an index, payload or runtime IO action. Existing foreach-local environments
-start empty outside their own telescope, so ambient payload signatures remain
-unsupported until M23 is implemented and verified. No Core, backend or
-interface extension is proposed. Verification remains pending.
+an index, payload or runtime IO action. Validity zonks the raw lexical binding
+before comparing its metadata with the captured occurrence. This preserves its
+Unique and checks that both domains agree. M23 adds no Core, backend or
+interface extension. Both compiler stages are verified.
+
+Free type-variable spellings can change meaning under the experimental flag.
+With runtime `m` in scope, `depth :: LE n m -> Int` captures `m`. Use explicit
+`forall n m.` to retain erased polymorphic intent. Explicit type binders win.
+Upstream GHC already selects term-variable capture for RequiredTypeArguments:
+[`Rename/HsType.hs`, lines 2005–2012](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/Rename/HsType.hs#L2005-L2012).
+File blob: `01d0688febd8cee4493a176fce13ed80e08fa72f`.
+The full baseline file is copied into `native-local-signature-prior-art`.
+Preserve that flag's existing behavior independently of M23's local extension.
+
+
+## Direct do bind of a saved native action
+
+Status: unverified M24 plan. A saved action with a checked native payload type
+must retain its actual index through an ordinary do bind. First isolate the
+bind failure from the additional `_n` error in the saved M23 client.
+
+Agda v2.8.0 [`Syntax/DoNotation.hs`, lines 79–100](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/DoNotation.hs#L79-L100)
+translates local lets and distinguishes simple binders from matching patterns.
+[Lines 131–134](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/DoNotation.hs#L131-L134)
+build the ordinary bind application with a lambda for a simple binder.
+[Lines 114–123](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/DoNotation.hs#L114-L123)
+use an extended lambda for pattern matching. File blob:
+`9694ea38208a3179044428ef6c76600149c59e53`.
+The full tagged file is saved in `native-local-signature-prior-art`.
+The [manual translation table, lines 132–155](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/syntactic-sugar.lagda.rst#L132-L155)
+shows ordinary bind, pattern bind and let expansion.
+[Lines 270–284](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/syntactic-sugar.lagda.rst#L270-L284)
+use checked indexed results in do notation. Manual file blob:
+`a0ccea26ab40c6ca30d54f304eee6828f5d12e88`.
+These are syntax and context precedents. They do not establish Haskell IO
+sequencing, bottom demand, eta laws or GHC's immutable matching algorithm.
+
+At fork commit `da16ec16e6`, `Tc.Gen.Expr` at line 582 and `Tc.Gen.Do` at line 101 expand the
+ordinary bind into an operator application and continuation. In `Tc.Gen.App`,
+`tcRetainedArgInstEnabled` zonks cached actual types at line 1872, but
+`result_subst` uses the raw expected type at lines 1903–1908. Expected-type
+zonking is an investigation hypothesis. The combined client does not prove
+that this difference is the sole cause. Trace candidate scope, assigned
+metadata and exact runtime Ids before selecting a fix. Preserve the existing
+native-meta and general Quick Look gates, immutable kind/scope/concreteness
+checks, once-only usage, local evidence and final subsumption. M24 must support
+the direct source bind, without a singleton or package conversion workaround.

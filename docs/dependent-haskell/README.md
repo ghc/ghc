@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 331 runtime observations and the runtime fixtures check 76 package/bound rejections |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 343 runtime observations and the runtime fixtures check 87 package/bound rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -53,7 +53,8 @@ Last updated: 2026-11-14.
 | Later retained equations | Both compiler stages pass 269 observations, including mixed argument/evidence order, local captures and checked arithmetic constructor equations |
 | Two-index equations | Both compiler stages pass four-clause sameNat and payload transport through two constructor proofs |
 | Terminal variable equations | Both compiler stages pass three-clause sameNat, original-index repackaging and non-strict fallback of an unmatched second column |
-| Next task | M23: check complete local payload signatures against an already-bound runtime index; unverified |
+| Local payload signatures | Complete local signatures capture eligible already-bound runtime indices; both stages pass sharing, scope, demand and ordinary-Haskell controls |
+| Next task | M24: preserve a saved action's native payload through ordinary do binding; unverified |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2500,9 +2501,9 @@ guards, contexts and other pattern extensions remain outside this probe.
 
 The first source run used unsigned local vector bindings. The existing inferred
 retained-type gate rejected both at their source Names. The final probe uses
-inline payload expressions. A complete ambient-index local signature is also
-unsupported today; [M23](PLAN.md#m23-checked-local-payload-signatures) targets
-that separate source-scope rule. The initial failure remains in the artifacts.
+inline payload expressions. Complete ambient-index local signatures were also
+unsupported at M22. M23 below implements that source-scope rule. The initial
+failure remains in the artifacts.
 
 Evidence uses `_build/verification/native-index-wildcard-*`. The 28 selected
 compiler inputs are archived in `inputs-v1` with `build-input-v1.SHA256SUMS`.
@@ -2521,4 +2522,64 @@ M21's 26 manifest bytes, 42 harness hashes and 600 output hashes remain
 unchanged. Its 35 source hashes and five document hashes match `cdd782d28e`.
 M20, M19, M18 and M17 harness/output evidence and the original reader's three
 hashes remain intact. M22 source, docs, harness and outputs are frozen
-separately. M23 remains unverified.
+separately.
+
+## M23: local signatures at runtime indices
+
+Both compiler stages and all five registered regressions pass. A complete
+local value signature can refer to an eligible
+already-bound runtime index under `ExperimentalDependentTypes`:
+
+```haskell
+n <- readIORef cell
+let xs :: Vec Int n
+    xs = replicateNative @Int n 7
+```
+
+The signature uses the actual runtime `n`. The renamer adds a signature-local
+lookup alias before implicit forall collection. The checker validates the
+existing unrestricted local Id and its closed index domain. It reads assigned
+metadata without assigning a native metavariable, inventing equality or
+evaluating `n`. Validity applies the same metadata normalization to the lexical
+binding. Notes `[Local retained signature aliases]` and
+`[Local runtime indices in signatures]` state these rules.
+
+An erased type variable or explicit `forall` binder takes precedence. Under
+the experimental flag, a free `m` in `depth :: LE n m -> Int` captures a local
+runtime `m`. Use `forall n m.` to preserve erased polymorphic intent. The
+example's proof observer now states that intent. Named wildcards keep their
+ordinary meaning; a runtime `_n` requires `NoNamedWildCards`. This extension
+does not infer unsigned local native bindings or capture globals and members
+of the same recursive group.
+
+Both source clients pass 343 observations, preserving the previous 331.
+Twelve additions check finite IORef indices, repeated payload sharing, runtime
+shadowing, erased-variable precedence, `_n`, partial and cyclic indices,
+payload demand and deferred IO effects. The API/runtime fixture passes 87
+package/bound rejections. Standalone probes pass 53 located errors, including
+eleven new signature cases. Four ordinary-Haskell controls pass in both stages,
+including RequiredTypeArguments capture of an erased variable. Source
+compilation uses separate producer and importer modules with Core and STG Lint.
+
+Evidence uses `_build/verification/native-local-signature-*`. Compiler inputs
+are archived in `inputs-v1` and `inputs-v2`; the latter records the lexical
+validity fix. The specification is `b84462b0bc`, frontend `d45eac2a85`, validity
+fix `da16ec16e6`, source/API fixture `58fe0a1e10` and source formatting
+`e4766d99ac`. Initial source failures remain recorded. No Core, backend or
+interface extension was needed.
+
+The final bootstrap rebuild took 21.90s and peaked at 1774 MiB. The self-hosted
+build took 12m53s and peaked at 5200 MiB. Both used 16 GiB caps. Final bootstrap
+source execution peaked at 149 MiB under 4 GiB. Its API/control run peaked at
+1018 MiB. Self-hosted source, errors and both-stage ordinary controls peaked
+at 231 MiB under 4 GiB. The registered run took 12.63s and peaked at 1725 MiB
+under 8 GiB: five passes, 34 skipped ways and no unexpected results. Swap was
+disabled for all jobs. Existing GHC and Cabal warnings remain. The full GHC
+suite was not run. Source, docs, harness and outputs are frozen separately;
+the M22 evidence and earlier runtime/interface records remain unchanged.
+
+The saved direct `xs <- action` client still fails when `action :: IO (Vec Int n)`.
+[M24](PLAN.md#m24-direct-do-bind-of-a-saved-native-action) will first isolate
+that failure, then preserve the known payload type through ordinary bind
+application and its generated continuation. The current example packages the
+action result. That control does not verify the direct native bind target.

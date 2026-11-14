@@ -1,10 +1,10 @@
 # Packed vector source example
 
-Both M21 compiler stages pass all 316 source observations with Core Lint
-and STG Lint. The API/runtime fixture passes 70 package/bound rejections.
-All five registered regressions pass. M21 adds 15 observations and
-keeps the previous 301 lines in order. Seven new fallback errors and the
-previous 23 standalone errors pass in both stages.
+Both M23 compiler stages pass all 343 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 87 package/bound rejections.
+All five registered regressions pass. M23 adds 12 observations and keeps the
+previous 331 lines in order. Both stages pass 53 standalone located errors
+and four ordinary-Haskell controls.
 
 At M20, both stages and all five regressions passed 301 observations and
 63 package/bound rejections. The complete four-clause worker remains in Main
@@ -926,6 +926,31 @@ index. `zeroOnlyAnonymous` checks a both-wildcard fallback against `zeroOnly`.
 Four runtime pairs and eleven demand observations check finite results, partial
 function WHNF, lazy payload fields and selective index demand.
 
-Unsigned local vector bindings still reject inferred retained types. The probe
-passes inline payload expressions to the workers. Complete local payload
-signatures that mention an ambient runtime index remain the next source task.
+At M22, unsigned local vector bindings rejected inferred retained types. The
+probe used inline payload expressions. M23 below adds complete local payload
+signatures that mention an ambient runtime index.
+
+## Local signatures at runtime indices
+
+Both M23 source clients pass 343 observations; all previous 331 remain in
+order. All five registered regressions pass. The fallback probes now bind payloads
+with complete local signatures:
+
+```haskell
+n <- readIORef cell
+let xs :: Vec Int n
+    xs = replicateNative @Int n 7
+```
+
+The signature refers to this runtime `n`. It adds no singleton or proof of
+equality. Finite inputs check both contents and StableName sharing. Further
+observations check shadowed runtime names, an existing erased index, `_n`
+with `NoNamedWildCards`, bottom and cyclic indices, partial-index payload
+demand and delayed IO effects. The source proof observer uses an explicit
+`forall n m.` to retain polymorphism when runtime `m` is also in scope.
+
+The API/runtime fixture passes 87 package/bound rejections. Standalone probes
+pass 53 located errors. Unsigned local native inference remains unsupported.
+The delayed action returns `PackedVec Int`; direct binding of a saved action
+at `IO (Vec Int n)` is the unverified M24 target. See the
+[implementation plan](../../PLAN.md#m24-direct-do-bind-of-a-saved-native-action).

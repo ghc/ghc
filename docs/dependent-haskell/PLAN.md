@@ -74,8 +74,12 @@ M20 verifies four constructor equations for `sameNat`; M21 verifies a final
 named fallback. M22 verifies anonymous fallback columns with 331 source
 observations, 76 API package/bound rejections and 42 standalone located errors
 in both stages. All five registered regressions pass. The original 316 source
-outputs remain unchanged. M23 next addresses complete local payload signatures
-that refer to an already-bound runtime index.
+outputs remain unchanged. M23 implements complete local payload signatures
+that refer to an already-bound runtime index. Both stages pass 343 source
+observations, 53 standalone located errors and four ordinary controls. The
+API/runtime fixture passes 87 package/bound rejections. All five registered
+regressions pass. M24 next investigates a direct do bind of a saved action
+with a native payload type.
 
 ## Direction and boundaries
 
@@ -1545,9 +1549,13 @@ No new Core, backend, interface or equality rule is proposed.
 
 ### M23: checked local payload signatures
 
-This target is unverified. Support a complete local value signature that
-mentions an already-bound eligible runtime index. Use ordinary local signature
-syntax under `ExperimentalDependentTypes`:
+Implemented with frontend `d45eac2a85` and lexical validity metadata fix
+`da16ec16e6`. Source/API checks are in `58fe0a1e10`, with formatting at
+`e4766d99ac`. Both stages pass all 343 source observations, preserving the
+previous 331. Each passes 53 standalone located errors and four ordinary
+controls. The API/runtime fixture passes 87 package/bound rejections. All five
+registered regressions pass. Use a complete local value signature that mentions an
+already-bound eligible runtime index under `ExperimentalDependentTypes`:
 
 ```haskell
 n <- readIORef cell
@@ -1586,23 +1594,79 @@ Read assigned type and multiplicity metadata with the existing zonker, keeping
 the Name and Unique. Require a non-CoVar local Id, a supported closed index
 domain and unrestricted multiplicity before constructing `TermVarTy`. Scope
 and metadata checks supply no equality and perform no runtime evaluation.
+Validity also zonks the raw lexical Id before comparing it with the captured
+occurrence. Assigned IO-bound metadata must not cause a false scope failure.
+Keep the same Unique and require both domains to agree.
 
-- [ ] Capture signature-local Names before implicit forall collection, with
+Compatibility is intentional under the experimental flag. If runtime `m` is
+in scope, free `m` in `depth :: LE n m -> Int` captures that index. Write
+`depth :: forall n m. LE n m -> Int` to retain erased polymorphic intent.
+The explicit binders take precedence. RequiredTypeArguments already selects
+term-variable capture in upstream GHC; preserve that independent behavior.
+
+- [x] Capture signature-local Names before implicit forall collection, with
   erased-variable precedence, lexical shadowing and current-group exclusion.
   Preserve ordinary behavior with the flag off and outside local signatures.
-- [ ] Admit captured indices only for a complete renamed signature. Reject
+- [x] Admit captured indices only for a complete renamed signature. Reject
   named and anonymous signature holes when capture is requested. Validate
   actual local Ids without native meta assignment or unsigned inference.
   Report unavailable or invalid captured indices at their source occurrence;
   preserve ordinary type errors for wrong-index payloads. Add a GHC Note
   stating these scope rules and the distinction from definitional equality.
-- [ ] Use the signed local payload twice after reading its index from IORef.
+- [x] Use the signed local payload twice after reading its index from IORef.
   Check wrong-index payloads, shadowed Names, bottom and cyclic indices,
   payload sharing and signature errors. Cover unavailable same-group indices,
   partial signatures and unsigned aliases with located errors. Check an
   ordinary implicit forall, erased-variable shadowing and flag-off behavior.
-  Preserve source demand, both compiler stages and the existing registered
-  regressions. No Core change is planned.
+  Bootstrap checks preserve the source demand controls. No Core change was
+  needed.
+- [x] Run self-hosted source, located errors and ordinary controls, then the
+  existing registered regressions. Keep frozen M22 evidence unchanged.
+
+### M24: direct do bind of a saved native action
+
+This target is unverified. Preserve this ordinary source program, without a
+singleton conversion or an existential package workaround:
+
+```haskell
+n <- readIORef cell
+let action :: IO (Vec Int n)
+    action = pure (replicateNative @Int n 7)
+xs <- action
+pure (toList xs)
+```
+
+The signed action checks, but the saved M23 `cli-v3` client failed at its bind.
+That client also reported an `_n` error. First isolate the bind in a minimal
+source module. Do not treat every error in the combined client as one cause.
+The full target keeps the known action's actual native payload index through
+ordinary do expansion and the continuation binder.
+
+At fork commit `da16ec16e6`, `GHC.Tc.Gen.Expr` at line 582 expands ordinary
+`HsDo` through `expandDoStmts`.
+`GHC.Tc.Gen.Do` at line 101 translates a bind to the ordinary operator applied
+to the action and a generated continuation. Inspect the application checker,
+not the legacy syntax-operator path. In `tcRetainedArgInstEnabled`, line 1872
+zonks cached actual types. Lines 1903–1908 seed `result_subst` from the raw
+expected type. Expected-type zonking is a hypothesis, not a proven sole cause.
+Trace the expected and actual types, assigned metadata and runtime Ids first.
+
+- [ ] Isolate direct action binding and preserve its current source failure.
+  Inspect the expanded `(>>=) action (\xs -> rest)` and immutable candidates.
+- [ ] Establish the mismatch cause before changing matching. Read assigned
+  metadata without native meta assignment. Preserve kind, scope, exact-domain,
+  concreteness, NoQL, once-only usage and local evidence safeguards. Keep final
+  argument checking and result subsumption authoritative.
+- [ ] Keep the ordinary bind operator, generated continuation and dictionary
+  order. Add no special runtime index witness, equality rule or do syntax.
+  Preserve unsupported unsigned native inference and general Quick Look gates.
+- [ ] Compare direct and saved actions with explicit bind syntax. Check finite
+  IORef inputs, shared payloads, wrong-index errors and delayed index/payload
+  demand. Run both compiler stages and the existing registered regressions.
+
+Follow [the pinned Agda do translation](REFERENCES.md#direct-do-bind-of-a-saved-native-action).
+It supplies syntax and context prior art. Haskell IO sequencing, laziness and
+failure behavior need separate source tests. No Core change is proposed.
 
 ## Further work
 
