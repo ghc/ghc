@@ -1721,6 +1721,11 @@ assignment or runtime-index escape.
   A synthesized ordinary monad head can remain unknown; extract the payload
   and retain final subsumption to resolve that head. Whole-type immutable
   matching against a fixed IO head is not sufficient by itself.
+- [ ] Preserve unsigned effectful actions such as `effect >> pure vector`.
+  Matching the first action fixes IO; the second can still infer a head meta.
+  In the generic route only, unify ordinary head types that contain neither
+  native syntax nor outer templates, then repeat exact whole-argument
+  matching. Keep native choices immutable and keep the native-index route.
 - [ ] Reject a synthesized result that mentions the continuation's own input
   Id or an inner local Id. Returning `IO (Vec Int outerN)` is in scope;
   returning `IO (Vec Int n)` from an ordinary inner Nat binder would escape.

@@ -1969,3 +1969,12 @@ inference-cell level, promotion, branch-joining and GADT escape checks.
 Determine the native payload before allocating an ordinary callback-result
 parameter. Final ordinary subsumption must still resolve an inferred monad
 head. Keep usage collection and typed-argument caching once per argument.
+
+The first M25 source run exposes `effect >> pure vector`: the first action
+fixes IO, while the second infers an ordinary head meta. The pure immutable
+matcher rejects those heads in both complete candidates. Use GHC's existing
+`unifyType` only on head types without native syntax or outer templates, and
+require a head meta. Repeat exact whole-argument matching afterwards. Keep
+native payload choices immutable. This uses ordinary GHC unification; Agda's
+contextual metas do not justify native assignment. Preserve the failed run
+and the source programs while validating this increment.

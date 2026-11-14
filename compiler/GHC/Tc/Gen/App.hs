@@ -1887,9 +1887,15 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
                                         tcMatchTyX_BM (bind_outer tvs) subst formal actual)
                                       subst (zip initial_templates initial_tys)
                    -- See Note [Ordinary heads in native argument matching].
-                   initial_match = case match_args initial_subst of
-                               Nothing | not index_route -> match_args Subst.emptySubst
-                               other -> other
+             ; initial_match <- if index_route
+                                then return (match_args initial_subst)
+                                else do
+                                  { matched <- tcRetainedMatchArgs tvs initial_subst
+                                                 (zip initial_templates initial_tys)
+                                  ; case matched of
+                                      Nothing -> tcRetainedMatchArgs tvs Subst.emptySubst
+                                                   (zip initial_templates initial_tys)
+                                      other -> return other }
              ; (matched, cache) <- case initial_match of
                    Just subst | not index_route ->
                      tcRetainedCallbackArgs tvs domains args subst initial_cache
@@ -1949,6 +1955,55 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstEnabled _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+
+-- | Match complete generic argument candidates after ordinary head inference.
+-- See Note [Ordinary action heads in native inference].
+tcRetainedMatchArgs :: [TyVar] -> Subst.Subst -> [(Type, Type)]
+                    -> TcM (Maybe Subst.Subst)
+tcRetainedMatchArgs tvs = go
+  where
+    go subst [] = return (Just subst)
+    go subst ((formal, actual) : rest)
+      = do { formal <- liftZonkM (zonkTcType (Subst.substTy subst formal))
+           ; actual <- liftZonkM (zonkTcType actual)
+           ; case match subst formal actual of
+               Just subst' -> go subst' rest
+               Nothing
+                 | Just (formal_head, _) <- splitAppTy_maybe formal
+                 , Just (actual_head, _) <- splitAppTy_maybe actual
+                 , ordinary_head formal_head, ordinary_head actual_head
+                 , meta_head formal_head || meta_head actual_head
+                 -> do { _ <- unifyType Nothing formal_head actual_head
+                       ; formal <- liftZonkM (zonkTcType formal)
+                       ; actual <- liftZonkM (zonkTcType actual)
+                       ; case match subst formal actual of
+                           Just subst' -> go subst' rest
+                           Nothing -> return Nothing }
+                 | otherwise -> return Nothing }
+
+    match = tcMatchTyX_BM bind_outer
+    bind_outer tv _ | tv `elem` tvs = BindMe
+                    | otherwise = DontBindMe
+    ordinary_head ty = not (hasNativeDependentExpr (Core.Type ty))
+                    && not (any (`elemVarSet` tyCoVarsOfType ty) tvs)
+    meta_head ty | TyVarTy tv <- coreFullView ty = isMetaTyVar tv
+                 | otherwise = False
+
+{- Note [Ordinary action heads in native inference]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In effect >> pure vector, effect fixes the ordinary monad head to IO.
+The second argument can infer f (Vec Int n), with an ordinary head meta f.
+Immutable matching cannot equate IO and f. A fresh complete candidate has
+the same conflict. Do not discard the second argument or use a prefix of a
+failed candidate.
+
+The generic route can use ordinary unification on those head types only.
+Require a head meta, no native syntax in either head or its metadata, and no
+outer template variables. Then repeat exact matching of the whole argument.
+The payload and runtime index remain immutable choices. Keep the separate
+native-index route, all cached arguments, usage and final subsumption checks.
+If an ordinary head cannot unify, normal type errors still apply.
+-}
 
 -- | Infer a callback result after earlier arguments determine its input type.
 -- Keep each checked callback and its usage in the ordinary argument cache.
