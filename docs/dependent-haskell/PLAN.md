@@ -1203,6 +1203,30 @@ source observer. Retest generic `evaluate` and polymorphic vector fields
 before extending any expected-type inference rule. No native type may enter
 a mutable type variable.
 
+The metadata retest removes the IO-let grammar failures. Client probes show
+that direct `observe (evaluate (sameNat n Z))` works, while the equivalent
+`observe $ evaluate (sameNat n Z)` fails after Quick Look caches ordinary
+instantiation variables. Preserve the original dollar applications.
+
+Extend the existing immutable algebraic result candidate selection to known
+ordinary Id heads. Choose the complete index substitution even if an ordinary
+payload type is unresolved. Keep the actual instantiated result. Final
+subsumption must solve ordinary payload equalities and verify every index
+equality. Expected-result matching may retain an ordinary tau arrow after
+the written arguments. Argument inference still requires saturation.
+
+For a fully applied wired-in `($)` with no explicit type applications, a
+complete expected result and a named native-anchored right operand, infer
+and cache that operand once. Match the result and operand types against the
+original dollar signature. Require every invisible choice, kind agreement,
+authoritative runtime scope and concrete choices for its fixed runtime
+representation variables. Apply the immutable choices to the original Id.
+Use NoQL for that fully instantiated application, result checking and cache
+resumption. Check the first operand against the now-known arrow type. Emit
+the right operand's saved usage once under its final multiplicity. Other
+Quick Look calls keep their current path. No native type enters a mutable
+type variable or a Quick Look instantiation variable.
+
 ## Further work
 
 After M8, review broader retained kinds, nested and higher-order dependence,
