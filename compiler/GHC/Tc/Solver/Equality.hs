@@ -2429,7 +2429,7 @@ checkTypeEqNoUnification ev eq_rel lhs rhs =
       -- See Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
       | TyVarLHS {} <- lhs
       , hasNativeDependentExpr (Type rhs)
-      = wanted_flags { tefTyVar_allowRuntimeIndices = True
+      = wanted_flags { tefTyVar_allowNativeGivenRhs = True
                      , tef_fam_app = TEFA_Recurse }
       | otherwise
       = wanted_flags { tef_fam_app = mkTEFA_Break ev eq_rel BreakGiven }
