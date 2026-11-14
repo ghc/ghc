@@ -1848,9 +1848,10 @@ Preserve that flag's existing behavior independently of M23's local extension.
 
 ## Direct do bind of a saved native action
 
-Status: unverified M24 plan. A saved action with a checked native payload type
-must retain its actual index through an ordinary do bind. First isolate the
-bind failure from the additional `_n` error in the saved M23 client.
+Status: M24 verified in both stages. Each passes 360 source observations, 60
+standalone located errors and four ordinary controls. The API/runtime fixture
+passes 94 package/bound rejections. All five registered regressions pass. A
+saved action retains its actual native payload index through ordinary do bind.
 
 Agda v2.8.0 [`Syntax/DoNotation.hs`, lines 79–100](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/Syntax/DoNotation.hs#L79-L100)
 translates local lets and distinguishes simple binders from matching patterns.
@@ -1867,6 +1868,34 @@ use checked indexed results in do notation. Manual file blob:
 `a0ccea26ab40c6ca30d54f304eee6828f5d12e88`.
 These are syntax and context precedents. They do not establish Haskell IO
 sequencing, bottom demand, eta laws or GHC's immutable matching algorithm.
+
+Agda v2.8.0 [`Rules/Term.hs`, lines 560–585](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L560-L585)
+checks a lambda domain, extends the context with `lambdaAddContext`, and
+checks the body against the scoped codomain.
+[Lines 678–710](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L678-L710)
+continue this process for remaining binders. File blob:
+`02991c9fa0085315cc854d2833a9080af14a7740`.
+This supplies the precedent for checking the generated continuation after its
+native input domain is fixed.
+
+[`Implicit.hs`, lines 81–101](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Implicit.hs#L81-L101)
+inserts omitted arguments in telescope order and substitutes each into the
+remaining codomain. [Lines 114–124](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Implicit.hs#L114-L124)
+create unification metas with an occurs check. File blob:
+`55a03200d2300486c91a95798fc8e0c3c9c675cf`.
+[`MetaVars.hs`, lines 282–321](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars.hs#L282-L321)
+records the current telescope and applies a new meta to its context arguments.
+File blob: `13f52cb7f2a08ac55f62e326564043470e62f6f6`.
+[`Rules/Application.hs`, lines 774–808](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+checks a Pi argument and substitutes the checked argument into the codomain.
+File blob: `82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+The five exact tagged Haskell sources are copied into
+`native-action-bind-prior-art` and checked by blob and SHA256.
+
+Agda uses contextual mutable metas. M24 instead preserves native choices in
+an immutable substitution and uses GHC's existing `newMetaTyVarX` only for
+ordinary unresolved parameters. Agda's inference rules do not justify native
+meta assignment, Haskell strictness, evidence movement or index equality.
 
 At fork commit `da16ec16e6`, `Tc.Gen.Expr` at line 582 and `Tc.Gen.Do` at line 101 expand the
 ordinary bind into an operator application and continuation. In `Tc.Gen.App`,

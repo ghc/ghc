@@ -78,8 +78,10 @@ outputs remain unchanged. M23 implements complete local payload signatures
 that refer to an already-bound runtime index. Both stages pass 343 source
 observations, 53 standalone located errors and four ordinary controls. The
 API/runtime fixture passes 87 package/bound rejections. All five registered
-regressions pass. M24 next investigates a direct do bind of a saved action
-with a native payload type.
+regressions pass. M24 verifies ordinary native action binds with 360 source
+observations, 60 located errors, four ordinary controls and 94 API rejections.
+All five registered regressions pass. M25 next investigates scoped native
+source inference.
 
 ## Direction and boundaries
 
@@ -1625,8 +1627,10 @@ term-variable capture in upstream GHC; preserve that independent behavior.
 
 ### M24: direct do bind of a saved native action
 
-This target is unverified. Preserve this ordinary source program, without a
-singleton conversion or an existential package workaround:
+Verified in both compiler stages with 360 source observations, 60 standalone
+located errors and four ordinary controls. The API/runtime fixture passes 94
+package/bound rejections. All five registered regressions pass. The ordinary
+source program retains its actual index without a conversion or package:
 
 ```haskell
 n <- readIORef cell
@@ -1657,39 +1661,76 @@ immutable matching. This does not require evaluating the index.
 
 - [x] Isolate direct action binding and preserve its current source failure.
   Inspect the expanded `(>>=) action (\xs -> rest)` and immutable candidates.
-- [ ] Read an available expected type with `readExpType_maybe`, then zonk it
+- [x] Read an available expected type with `readExpType_maybe`, then zonk it
   before seeding immutable matching. Leave an empty infer cell untouched.
   Check this increment against the saved baseline probes before extending it.
-- [ ] For a successful partial match anchored by a known native input, retain
+- [x] For a successful partial match anchored by a known native input, retain
   its fixed choices and instantiate undetermined ordinary result parameters
   with standard fresh TauTvs in telescope order. Preserve substituted kinds.
   A failed match is not a partial match. Native index parameters still require
   immutable choices, and native results cannot fill ordinary metas. Check a
   local do expression whose ordinary result has no complete expected type.
-- [ ] If result-seeded generic matching fails, try a separate exact joint
+- [x] If result-seeded generic matching fails, try a separate exact joint
   argument match from the empty substitution. Inline `pure` can infer
   `f (Vec Int n)` before ordinary checking assigns `f := IO`. Preserve that
   actual head and let final result subsumption solve ordinary head/result
   metas. Do not reuse a failed argument match or weaken index equality.
   Do not freshen a missing binder whose substituted kind is a native domain.
-- [ ] Use a matched native expected-result choice as an anchor, including a
+- [x] Use a matched native expected-result choice as an anchor, including a
   partial result seed. Check polymorphic bottom payloads at their known native
   domains instead of inferring fresh indices. Match result kinds before result
   types to determine representation parameters immutably for `error`. Preserve
   its original HasCallStack evidence and all concreteness checks.
-- [ ] Preserve kind, scope, exact-domain,
+- [x] Preserve kind, scope, exact-domain,
   concreteness, NoQL, once-only usage and local evidence safeguards. Keep final
   argument checking and result subsumption authoritative.
-- [ ] Keep the ordinary bind operator, generated continuation and dictionary
+- [x] Keep the ordinary bind operator, generated continuation and dictionary
   order. Add no special runtime index witness, equality rule or do syntax.
   Preserve unsupported unsigned native inference and general Quick Look gates.
-- [ ] Compare direct and saved actions with explicit bind syntax. Check finite
+- [x] Compare direct and saved actions with explicit bind syntax. Check finite
   IORef inputs, shared payloads, wrong-index errors and delayed index/payload
   demand. Run both compiler stages and the existing registered regressions.
 
 Follow [the pinned Agda do translation](REFERENCES.md#direct-do-bind-of-a-saved-native-action).
 It supplies syntax and context prior art. Haskell IO sequencing, laziness and
 failure behavior need separate source tests. No Core change is proposed.
+
+### M25: scoped native source inference
+
+This target is unverified. M24 preserves two separate failures:
+`ActionMissingSignature` rejects an unsigned local native action with
+GHC-83605; `ActionNativeResultInference` rejects `pure xs` in an inferred local
+computation with GHC-83865. Recover both source forms without native meta
+assignment or runtime-index escape.
+
+- [ ] Reuse `tcMonoBinds`' existing single nonrecursive FunBind path at
+  `Tc.Gen.Bind:1330`. It calls `runInferRhoFRR` before it allocates the Id.
+  Investigate admission of a local NoGen binding with one zero-argument
+  equation and an exact native monotype. Validate each free runtime index
+  against its actual outer binding. Preserve FRR and multiplicity checks.
+- [ ] Keep the separate InferGen guard at `Tc.Gen.Bind:731`. Do not remove
+  inferred-type guards globally. Recursive groups, pattern bindings, partial
+  signatures and inferred native function telescopes need separate designs.
+  Preserve infer-cell promotion and branch-joining checks.
+- [ ] With an action's input type fixed, use the existing match checker to
+  investigate synthesis of the continuation body through an infer cell.
+  Determine its native result choice before creating an ordinary result meta.
+  A synthesized ordinary monad head can remain unknown; extract the payload
+  and retain final subsumption to resolve that head. Whole-type immutable
+  matching against a fixed IO head is not sufficient by itself.
+- [ ] Reject a synthesized result that mentions the continuation's own input
+  Id or an inner local Id. Returning `IO (Vec Int outerN)` is in scope;
+  returning `IO (Vec Int n)` from an ordinary inner Nat binder would escape.
+  Validate against the outer call-site environment and report the actual
+  source occurrence. Do not infer a dependent arrow or package implicitly.
+- [ ] Turn both preserved failures into positive source/runtime cases. Keep
+  sharing, action counts and bottom behavior. Add independent-index,
+  callback-index escape and GADT escape rejections. Verify both stages and
+  the registered regressions.
+
+The source pointers above use `75c628aa8d`. Agda's pinned let checker and
+lexical context insertion supply prior art. Its transparent lets do not
+justify equating runtime aliases or bypassing Haskell scope checks.
 
 ## Further work
 

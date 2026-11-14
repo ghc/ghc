@@ -1,9 +1,9 @@
 # Packed vector source example
 
-Both M23 compiler stages pass all 343 source observations with Core Lint
-and STG Lint. The API/runtime fixture passes 87 package/bound rejections.
-All five registered regressions pass. M23 adds 12 observations and keeps the
-previous 331 lines in order. Both stages pass 53 standalone located errors
+Both M24 compiler stages pass all 360 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 94 package/bound rejections.
+All five registered regressions pass. M24 adds 17 observations and keeps the
+previous 343 lines in order. Both stages pass 60 standalone located errors
 and four ordinary-Haskell controls.
 
 At M20, both stages and all five regressions passed 301 observations and
@@ -949,8 +949,42 @@ with `NoNamedWildCards`, bottom and cyclic indices, partial-index payload
 demand and delayed IO effects. The source proof observer uses an explicit
 `forall n m.` to retain polymorphism when runtime `m` is also in scope.
 
+Here `n` has type `Nat`, defined as `Z | S Nat`. Finite values cannot be
+negative. External `Int` input needs a runtime conversion that rejects
+negatives. GHC checks the vector relationship at compile time for an unknown
+`n`; it does not run a typechecker when `readIORef` executes. The value read
+into `n` is immutable even if the cell changes later. Partial and infinite
+values remain possible. The indexed type does not prove termination.
+
 The API/runtime fixture passes 87 package/bound rejections. Standalone probes
 pass 53 located errors. Unsigned local native inference remains unsupported.
 The delayed action returns `PackedVec Int`; direct binding of a saved action
-at `IO (Vec Int n)` is the unverified M24 target. See the
+at `IO (Vec Int n)` was the next M24 target. See the
 [implementation plan](../../PLAN.md#m24-direct-do-bind-of-a-saved-native-action).
+
+## Ordinary binds with native payloads
+
+Both M24 compiler stages and all five registered regressions pass. The client
+now uses direct native actions:
+
+```haskell
+n <- readIORef cell
+let action :: IO (Vec Int n)
+    action = pure (replicateNative @Int n 7)
+xs <- action
+pure (toList xs)
+```
+
+Four IORef-fed lengths compare saved do, explicit bind, inferred local do and
+bind computations, and inline actions. Every form produces the expected list.
+Counters increase once per call. Thirteen further observations check delayed
+effects, ignored bottom indices and payloads, original demanded errors,
+partial and cyclic prefixes and repeated IORef payload sharing. The client
+passes 360 observations; the original 343 remain unchanged.
+
+The API fixture passes 94 package/bound rejections. Each compiler stage passes
+60 standalone located errors and four ordinary controls. The seven new errors
+check independent indices, wrong monads, conflicting cached inputs, native
+result inference, unsigned native actions and linear capture. Native results
+with an unknown expected type and unsigned native local bindings remain
+[M25 inference targets](../../PLAN.md#m25-scoped-native-source-inference).
