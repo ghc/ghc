@@ -131,6 +131,49 @@ import Control.Monad
 import System.IO
 import System.Directory ( getCurrentDirectory )
 
+{- Note [Labels in NCG comments]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A comment or Note added to the native code generator since this Note shows the
+kind of each statement it makes by a label at the head of the statement, or by
+having none:
+
+* BUG #nnn, or BUG where no issue is filed: the code behaves wrongly, lacks
+  a check it needs or misleads its reader, as the statement describes. The
+  statement says in short what the fault leads to (wrong code, wrong debugging
+  information, a panic or another failed compilation, assembly the assembler
+  rejects, only slower or larger code, only a warning from the assembler, only
+  more C stack space, or only a misled reader) and, where the code shows it,
+  under which flags and on which targets it is reached.
+* WIP: the work is half done.
+* TODO #nnn, or TODO where no issue is filed: the code is likely to change,
+  whether it is correct or buggy, for instance for performance. A bug marked
+  TODO alone is understood, accepted for now and worked around, not due to be
+  fixed.
+* BUG TODO, or BUG TODO #nnn: both, where both are to be stressed.
+* No label: the code is meant to stay as the statement describes it. A statement
+  that cites a labelled statement is of that statement's kind. A statement of a
+  trade-off that is kept says in a sentence why it is kept.
+
+The TODO, ToDo, FIXME and XXX of comments older than this Note predate these
+meanings. Leaving an older comment without a label was not a check of it, so the
+lack of a label on such a comment does not say that the code is meant to stay.
+
+A change that fixes or alters what a labelled statement describes removes or
+rewrites the statement, and each statement that cites it, in the same change. A
+BUG, TODO or BUG TODO statement gains the number of its issue when the issue is
+filed. Run from the top of the tree, this command lists the lines that carry a
+label:
+
+  git grep -nwE 'BUG|WIP|TODO' -- 'compiler/GHC/CmmToAsm*' \
+    compiler/GHC/Driver/Config/CmmToAsm.hs compiler/GHC/Platform/Reg.hs \
+    compiler/CodeGen.Platform.h compiler/GHC/Cmm/Node.hs \
+    compiler/GHC/Cmm/DebugBlock.hs compiler/GHC/StgToCmm/Prim.hs
+
+It also lists the older TODOs and the sentences that only mention a label. With
+'BUG|WIP' as the pattern, it lists only the BUG and WIP statements and such
+mentions, as no older comment in these files writes either word in capitals.
+-}
+
 --------------------
 nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle
               -> CgStream RawCmmGroup a
