@@ -426,7 +426,7 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
        ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
        ; (tc_fun1, fun_sigma1) <- tcRetainedExpectedInst do_ql exp_res_ty rn_args
                                                      tc_fun0 fun_sigma0
-       ; (tc_fun, fun_sigma, arg_cache) <-
+       ; (tc_fun, fun_sigma, arg_cache, inst_plan) <-
            tcRetainedArgInst do_ql exp_res_ty rn_head rn_args tc_fun1 fun_sigma1
        ; let -- inst_final: top-instantiate the result type of the application,
              -- EXCEPT if we are trying to infer a sigma-type
@@ -449,8 +449,9 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
        ; tcRetainedAppEvidence $
          do { -- Step 2: Instantiate the function type (taking a quick look at args)
               -- See Note [Quick Look for particular Ids]
-              (inst_args, app_res_rho) <- tcInstFunWithExpected expected_rho do_ql inst_final
-                                                             rn_head tc_fun fun_sigma rn_args
+              (inst_args, app_res_rho) <-
+                tcInstFunWithExpected expected_rho inst_plan do_ql inst_final
+                                      rn_head tc_fun fun_sigma rn_args
 
             ; -- Step 3: Take a quick look at the result type
               -- See Note [QuickLook: arguments before result]
@@ -753,14 +754,15 @@ tcInstFun :: QLFlag
 -- This crucial function implements the |-inst judgement in Fig 4,
 -- plus the modification in Fig 5, of the QL paper:
 -- "A quick look at impredicativity" (ICFP'20).
-tcInstFun = tcInstFunWithExpected Nothing
+tcInstFun = tcInstFunWithExpected Nothing Nothing
 
--- | Instantiate arguments and use a retained expected result after ordinary VTA.
-tcInstFunWithExpected :: Maybe TcRhoType -> QLFlag -> Bool
+-- | Instantiate arguments in telescope order, with optional immutable choices
+-- and a retained expected result after ordinary VTA.
+tcInstFunWithExpected :: Maybe TcRhoType -> RetainedInstPlan -> QLFlag -> Bool
                       -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
                       -> TcSigmaType -> [HsExprArg 'TcpRn]
                       -> TcM ([HsExprArg 'TcpInst], TcSigmaType)
-tcInstFunWithExpected expected_rho do_ql inst_final rn_head@(_, fun_lspan)
+tcInstFunWithExpected expected_rho inst_plan do_ql inst_final rn_head@(_, fun_lspan)
                       tc_fun fun_sigma rn_args
   = do { lvl <- getTcLevel
        ; traceTc "tcInstFun" (vcat [ text "tc_fun" <+> ppr tc_fun
@@ -773,7 +775,7 @@ tcInstFunWithExpected expected_rho do_ql inst_final rn_head@(_, fun_lspan)
            NoQL -> return ()
            DoQL -> setSrcSpan fun_lspan $ rejectNativeQuickLook fun_sigma
        ; fun_origin <- mk_origin rn_head
-       ; res@(_, fun_ty) <- go fun_origin 1 [] fun_sigma rn_args
+       ; res@(_, fun_ty) <- go inst_plan fun_origin 1 [] fun_sigma rn_args
        ; traceTc "tcInstFun:ret" (ppr fun_ty)
        ; return res
        }
@@ -831,39 +833,42 @@ tcInstFunWithExpected expected_rho do_ql inst_final rn_head@(_, fun_lspan)
     inst_fun _                = isInferredForAllTyFlag
 
     -----------
-    go, go1 :: CtOrigin                 -- Of the function
+    go, go1 :: RetainedInstPlan          -- Immutable choices in binder order
+            -> CtOrigin                 -- Of the function
             -> Int                      -- Value-argument position of next arg
             -> [HsExprArg 'TcpInst]     -- Accumulator, reversed
             -> TcSigmaType -> [HsExprArg 'TcpRn]
             -> TcM ([HsExprArg 'TcpInst], TcSigmaType)
 
     -- go: If fun_ty=kappa, look it up in Theta
-    go fun_orig pos acc fun_ty args
+    go plan fun_orig pos acc fun_ty args
       | Just kappa <- getTyVar_maybe fun_ty
       , isQLInstTyVar kappa
       = do { cts <- readMetaTyVar kappa
            ; case cts of
-                Indirect fun_ty' -> go  fun_orig pos acc fun_ty' args
-                Flexi            -> go1 fun_orig pos acc fun_ty  args }
+                Indirect fun_ty' -> go plan fun_orig pos acc fun_ty' args
+                Flexi            -> go1 plan fun_orig pos acc fun_ty  args }
+     | isJust plan
+     = go1 plan fun_orig pos acc fun_ty args
      | otherwise
      = do { matched <- tcRetainedResultInst do_ql expected_rho args tc_fun fun_ty
           ; case matched of
               Just (inst_tys, body)
-                -> go fun_orig pos (addArgWrap (mkWpTyApps inst_tys) acc) body args
-              Nothing -> go1 fun_orig pos acc fun_ty args }
+                -> go plan fun_orig pos (addArgWrap (mkWpTyApps inst_tys) acc) body args
+              Nothing -> go1 plan fun_orig pos acc fun_ty args }
 
     -- go1: fun_ty is not filled-in instantiation variable
     --      ('go' dealt with that case)
 
     -- Handle out-of-scope functions gracefully
-    go1 fun_orig pos acc fun_ty (arg : rest_args)
+    go1 plan fun_orig pos acc fun_ty (arg : rest_args)
       | fun_is_out_of_scope, looks_like_type_arg arg   -- See Note [VTA for out-of-scope functions]
-      = go fun_orig pos acc fun_ty rest_args
+      = go plan fun_orig pos acc fun_ty rest_args
 
     -- Rule IALL from Fig 4 of the QL paper; applies even if args = []
     -- Instantiate invisible foralls and dictionaries.
     -- c.f. GHC.Tc.Utils.Instantiate.topInstantiate
-    go1 fun_orig pos acc fun_ty args
+    go1 plan fun_orig pos acc fun_ty args
       | (tvs,   body1) <- tcSplitSomeForAllTyVars (inst_fun args) fun_ty
       , (theta, body2) <- if inst_fun args Inferred
                           then tcSplitPhiTy body1
@@ -874,11 +879,25 @@ tcInstFunWithExpected expected_rho do_ql inst_final rn_head@(_, fun_lspan)
       , let no_tvs   = null tvs
             no_theta = null theta
       , not (no_tvs && no_theta)
-      = do { (wrap, fun_rho) <-
+      = do { (wrap, fun_rho, rest_plan) <-
                 -- setSrcSpan of the function: important for the class constraints
                 -- that may be emitted from instantiating fun_sigma
                 setSrcSpan fun_lspan $
-                instantiateSigmaQL do_ql fun_orig fun_conc_tvs tvs theta body2
+                case plan of
+                  Nothing -> do { (wrap, rho) <- instantiateSigmaQL do_ql fun_orig
+                                                  fun_conc_tvs tvs theta body2
+                                ; return (wrap, rho, Nothing) }
+                  Just choices -> do
+                    { let (inst_tys, rest) = splitAt (length tvs) choices
+                          subst = Subst.zipTvSubst tvs inst_tys
+                    ; unless (tvs `equalLength` inst_tys
+                              && and (zipWith (\tv ty ->
+                                   eqType (Subst.substTy subst (tyVarKind tv))
+                                          (typeKind ty)) tvs inst_tys)) $
+                        pprPanic "tcInstFun: invalid retained instantiations"
+                                 (ppr tvs $$ ppr choices)
+                    ; wrap <- instCall fun_orig inst_tys (substTheta subst theta)
+                    ; return (wrap, substTy subst body2, Just rest) }
 
                   -- See Note [Representation-polymorphism checking built-ins]
                   -- in GHC.Tc.Utils.Concrete.
@@ -892,12 +911,14 @@ tcInstFunWithExpected expected_rho do_ql inst_final rn_head@(_, fun_lspan)
                   -- argument of (#,#) to @LiftedRep, but want to rule out the
                   -- second instantiation @r.
 
-           ; go fun_orig pos (addArgWrap wrap acc) fun_rho args }
+           ; go rest_plan fun_orig pos (addArgWrap wrap acc) fun_rho args }
                 -- Going around again means we deal easily with
                 -- nested  forall a. Eq a => forall b. Show b => blah
 
     -- Rule IRESULT from Fig 4 of the QL paper; no more arguments
-    go1 _fun_orig _pos acc fun_ty []
+    go1 plan _fun_orig _pos acc fun_ty []
+       | Just (_ : _) <- plan
+       = pprPanic "tcInstFun: unused retained instantiations" (ppr plan)
        | XExpr (ConLikeTc (RealDataCon dc)) <- tc_fun
        , isNewDataCon dc
        , [Scaled _ orig_arg_ty] <- dataConOrigArgTys dc
@@ -917,39 +938,39 @@ tcInstFunWithExpected expected_rho do_ql inst_final rn_head@(_, fun_lspan)
       = return (reverse acc, fun_ty)
 
     -- See Note [Retained argument application].
-    go1 fun_orig pos acc fun_ty
+    go1 plan fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       | DepFunTy binder _ <- coreFullView fun_ty
       = do { core_arg <- tcRetainedArg arg
            ; arg' <- skipQuickLook ctxt arg (Scaled ManyTy (varType binder))
            ; let body_ty = applyTypeToArgs fun_ty [core_arg]
-           ; go fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
+           ; go plan fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
 
     -- Rule ITVDQ from the GHC Proposal #281
-    go1 fun_orig pos acc fun_ty ((EValArg { ea_arg = arg }) : rest_args)
+    go1 plan fun_orig pos acc fun_ty ((EValArg { ea_arg = arg }) : rest_args)
       | Just (tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty
       = assertPpr (isVisibleForAllTyFlag (binderFlag tvb)) (ppr fun_ty $$ ppr arg) $
         -- Any invisible binders have been instantiated by IALL above,
         -- so this forall must be visible (i.e. Required)
         do { (ty_arg, inst_body) <- tcVDQ fun_conc_tvs (tvb, body) arg
            ; let wrap = mkWpTyApps [ty_arg]
-           ; go fun_orig (pos+1) (addArgWrap wrap acc) inst_body rest_args }
+           ; go plan fun_orig (pos+1) (addArgWrap wrap acc) inst_body rest_args }
 
-    go1 fun_orig pos acc fun_ty (EWrap w : args)
-      = go1 fun_orig pos (EWrap w : acc) fun_ty args
+    go1 plan fun_orig pos acc fun_ty (EWrap w : args)
+      = go1 plan fun_orig pos (EWrap w : acc) fun_ty args
 
-    go1 fun_orig pos acc fun_ty (EPrag sp prag : args)
-      = go1 fun_orig pos (EPrag sp prag : acc) fun_ty args
+    go1 plan fun_orig pos acc fun_ty (EPrag sp prag : args)
+      = go1 plan fun_orig pos (EPrag sp prag : acc) fun_ty args
 
     -- Rule ITYARG from Fig 4 of the QL paper
-    go1 fun_orig pos acc fun_ty ( ETypeArg { ea_loc_span = ctxt, ea_hs_ty = hs_ty }
+    go1 plan fun_orig pos acc fun_ty ( ETypeArg { ea_loc_span = ctxt, ea_hs_ty = hs_ty }
                                   : rest_args )
       = do { (ty_arg, inst_ty) <- tcVTA fun_conc_tvs fun_ty hs_ty
            ; let arg' = ETypeArg { ea_loc_span = ctxt, ea_hs_ty = hs_ty, ea_ty_arg = ty_arg }
-           ; go fun_orig pos (arg' : acc) inst_ty rest_args }
+           ; go plan fun_orig pos (arg' : acc) inst_ty rest_args }
 
     -- Rule IVAR from Fig 4 of the QL paper:
-    go1 fun_orig pos acc fun_ty args@(EValArg {} : _)
+    go1 plan fun_orig pos acc fun_ty args@(EValArg {} : _)
       | Just kappa <- getTyVar_maybe fun_ty
       , isQLInstTyVar kappa
       = -- Function type was of form   f :: forall a b. t1 -> t2 -> b
@@ -981,10 +1002,10 @@ tcInstFunWithExpected expected_rho do_ql inst_final rn_head@(_, fun_lspan)
                  -- Then fun_ty :: kk, fun_ty' :: Type, kind_co :: Type ~ kk
                  --      co_wrap :: (fun_ty' |> kind_co) ~ fun_ty'
 
-           ; go fun_orig pos acc' fun_ty' args }
+           ; go plan fun_orig pos acc' fun_ty' args }
 
     -- Rule IARG from Fig 4 of the QL paper:
-    go1 fun_orig pos acc fun_ty
+    go1 plan fun_orig pos acc fun_ty
         (EValArg { ea_arg = arg, ea_loc_span = ctxt } : rest_args)
       = do { let herald = mk_herald fun_orig tc_fun (unLoc arg)
            ; (fun_co, arg_ty, res_ty) <-
@@ -1000,7 +1021,7 @@ tcInstFunWithExpected expected_rho do_ql inst_final rn_head@(_, fun_lspan)
                   (n_val_args, fun_sigma) fun_ty
            ; arg' <- quickLookArg do_ql pos ctxt rn_head arg arg_ty
            ; let acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
-           ; go fun_orig (pos+1) acc' res_ty rest_args }
+           ; go plan fun_orig (pos+1) acc' res_ty rest_args }
 
     new_arg_ty :: CtOrigin -> LHsExpr GhcRn -> Int -> TcM (Scaled TcType)
     -- Make a fresh nus for each argument in rule IVAR
@@ -1448,6 +1469,37 @@ The final result and argument subsumption checks remain in place. No mutable
 type variable receives native syntax. See Note [Cached retained argument inference].
 -}
 
+{- Note [Immutable instantiation of nested contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Dictionary selectors have nested invisible telescopes. For example, (>>) has
+  forall m. Monad m => forall a b. m a -> m b -> m b
+See Note [Dictionary selectors] in GHC.Types.Id.Make. In a retained callback,
+  evaluate proof >> pure ()
+can need a := LE n bound, where n is the actual runtime index. Splitting only
+one forall/context group misses a and creates an ordinary meta-variable that
+cannot hold this native type.
+
+For matching, collect consecutive invisible forall/context groups before the
+first visible arrow. Keep the existing saturation, native anchor, inference,
+concreteness, complete substitution, kind, runtime scope and exact domain
+checks. A nested plan must contain native syntax. Do not collect binders under
+visible arrows or enable higher-rank argument inference.
+
+Keep the original function type. Pass the immutable choices to IALL instead
+of applying all type arguments at once. IALL consumes each original group and
+uses instCall for that group's substituted constraints. Thus type applications
+and evidence applications retain their original order. Constraint generation
+stays inside tcRetainedAppEvidence. Argument cache usage and final subsumption
+checks stay unchanged.
+
+Store choices in binder order, not by the original TyVar Unique. Substitution
+of an earlier group can freshen later binders. Positional consumption survives
+this freshening. Recheck the instantiated kinds at each group and require that
+all choices are consumed. Nothing retains ordinary instantiation; Just []
+retains the completed immutable mode and cannot allocate another type meta.
+The existing flat routes still apply their type arguments directly.
+-}
+
 -- | Classify a named argument spine and find known native Ids without elaboration.
 tcRetainedInferableArg :: LHsExpr GhcRn -> TcM (Bool, Bool)
 tcRetainedInferableArg (L _ expr)
@@ -1473,6 +1525,21 @@ tcRetainedInferableArg (L _ expr)
       XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> tcRetainedInferableArg arg
       _ -> return (False, False)
 
+-- | Immutable choices for successive invisible binder groups. Nothing uses
+-- ordinary instantiation. Just [] records a fully consumed immutable plan.
+type RetainedInstPlan = Maybe [Type]
+
+-- | Collect invisible foralls and contexts before the first visible argument.
+-- Keep their original order in the application; this split is for matching only.
+tcRetainedInstTelescope :: Type -> ([TyVar], ThetaType, Type)
+tcRetainedInstTelescope sigma
+  | (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , (theta, tau) <- tcSplitPhiTy body
+  , not (null tvs && null theta)
+  = let (rest_tvs, rest_theta, result) = tcRetainedInstTelescope tau
+    in (tvs ++ rest_tvs, theta ++ rest_theta, result)
+  | otherwise = ([], [], sigma)
+
 -- | Arguments inferred once before immutable index instantiation.
 -- The argument position counts source value arguments from one.
 type RetainedArgCache = [(Int, (LHsExpr GhcTc, TcRhoType, UsageEnv))]
@@ -1480,23 +1547,24 @@ type RetainedArgCache = [(Int, (LHsExpr GhcTc, TcRhoType, UsageEnv))]
 -- | Infer index-bearing arguments once and match only outer invisible binders.
 tcRetainedArgInst :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
                   -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
-                  -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache)
+                  -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache, RetainedInstPlan)
 tcRetainedArgInst do_ql expected rn_head args fun sigma
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
        ; if enabled
          then tcRetainedArgInstEnabled do_ql expected rn_head args fun sigma
-         else return (fun, sigma, []) }
+         else return (fun, sigma, [], Nothing) }
 
 -- | Match cached index arguments when the experimental extension is enabled.
 tcRetainedArgInstEnabled :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
                          -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
-                         -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache)
+                         -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache, RetainedInstPlan)
 tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
   | not (any is_type_arg args)
-  , (tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , (outer_tvs, body) <- tcSplitForAllInvisTyVars sigma
+  , let (tvs, theta, tau) = tcRetainedInstTelescope sigma
+        nested = length tvs /= length outer_tvs
   , let index_tvs = filter (isNativeIndexType . tyVarKind) tvs
   , not (null tvs)
-  , let (theta, tau) = tcSplitPhiTy body
   , null theta || hasNoConcreteTyVars fun
   , let (domains, result) = splitFunTys tau
   , length domains == count isHsValArg args
@@ -1516,7 +1584,7 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
                                             else Nothing) }
                           else return Nothing
        ; case eligible of
-           Nothing -> return (fun, sigma, [])
+           Nothing -> return (fun, sigma, [], Nothing)
            Just inferable -> do
              { cache <- infer_args needed_tvs inferable domains 1 args
              ; actual_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) cache
@@ -1528,15 +1596,18 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
                  Just subst
                    | Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
                    , index_route || any (hasNativeDependentExpr . Core.Type) inst_tys
+                   , not nested || any (hasNativeDependentExpr . Core.Type) inst_tys
                    , and (zipWith (kind_agrees subst) tvs inst_tys)
                    , and (zipWith (\formal actual -> eqType (Subst.substTy subst formal) actual)
                                   templates actual_tys)
                    -> do { valid <- tcRetainedInstScope inst_tys
                          ; if valid
-                           then return (mkHsWrap (mkWpTyApps inst_tys) fun,
-                                        Subst.substTy subst body, cache)
-                           else return (fun, sigma, cache) }
-                 _ -> return (fun, sigma, cache) } }
+                           then if nested
+                                then return (fun, sigma, cache, Just inst_tys)
+                                else return (mkHsWrap (mkWpTyApps inst_tys) fun,
+                                             Subst.substTy subst body, cache, Nothing)
+                           else return (fun, sigma, cache, Nothing) }
+                 _ -> return (fun, sigma, cache, Nothing) } }
   where
     is_type_arg ETypeArg{} = True
     is_type_arg _ = False
@@ -1571,7 +1642,7 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
            ; return (entry ++ entries) }
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
-tcRetainedArgInstEnabled _ _ _ _ fun sigma = return (fun, sigma, [])
+tcRetainedArgInstEnabled _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
 
 -- | Check that every runtime identifier still has its local index binding.
 tcRetainedInstScope :: [Type] -> TcM Bool
