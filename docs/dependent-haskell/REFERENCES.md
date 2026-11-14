@@ -2438,3 +2438,42 @@ The complete `GHC.Rename.Splice` snapshot and blob are recorded in the same
 provenance file. The initial probe without `-fexternal-interpreter` stopped
 at interpreter configuration. It is retained as a failed setup, not a located
 type-system rejection.
+
+
+## Retained function types as equality operands
+
+M33 starts from three located GHC-43582 source gates and the no-proof
+GHC-91028 rejection. Both M32 stages agree. These are observed source
+boundaries, not evidence of a solver failure after Pi formation.
+
+Agda v2.8.0 computes a dependent function's sort with
+[piSort](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/sort-system.lagda.rst#L467-L502).
+If the domain and each codomain inhabit `Set`, the Pi type inhabits `Set`.
+[Builtin equality](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Equality.agda#L5-L9)
+accepts operands at any universe. Equality between `A : Set` and a Pi type
+uses the carrier `Set : Set₁`; the equality inhabits `Set₁`. This does not
+require `Set : Set`. The
+[Pi checker](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L106-L131)
+checks the telescope, forms the scoped body and checks the resulting sort.
+
+The stdlib v2.3
+[subst](https://github.com/agda/agda-stdlib/blob/v2.3/src/Relation/Binary/PropositionalEquality/Core.agda#L82-L86)
+transports a value by matching `refl`. This supports the intended proof
+elimination. The separate
+[extensionality assumption](https://github.com/agda/agda-stdlib/blob/v2.3/src/Axiom/Extensionality/Propositional.agda#L20-L53)
+is not needed to transport along an existing equality between types.
+These sources guide Pi formation and proof scope. They do not establish GHC's
+inference, universe or runtime invariants.
+
+GHC already gives `DepFunTy` kind `Type`. Its `isTauTy` classifies both
+`DepFunTy` and erased `ForAllTy` as non-tau. Preserve that classification and
+all native-meta restrictions. Reuse the mode-preserving retained checker
+for checked source type arguments instead of adding special cases for `~`
+or the library datatype `:~:`. Their arguments follow the same checked type
+formation. Retained kinds remain gated. Trace the resulting equality before
+changing Given canonicalization. Preserve ordinary erased-forall restrictions.
+
+Nine Agda and nine GHC baseline files have verified Git blobs in
+`native-pi-operand-prior-art-v1/provenance.json`. The GHC baseline is
+`de3186ee88870533570fcc667e77197511d3ded3`. This section records the design;
+implementation and new runtime validation are pending.

@@ -2053,8 +2053,11 @@ separate from checking an existing equality assumption.
 - [ ] Pin Agda's treatment of Pi types as equality operands and its universe
   rules. Audit GHC's distinction between retained Pi types and erased
   polymorphic types. Preserve the fixed closed domain and `Many` binder.
-- [ ] Admit a checked retained Pi in the selected equality-operand positions.
-  Reuse the existing retained binder checker. Preserve ambient index Names,
+- [ ] Admit checked retained Pi expressions in ordinary type-argument positions,
+  including equality operands. Reuse the existing retained binder checker.
+  Preserve its mode instead of reconstructing the signature environment.
+  Do not special-case the printed names of equality constructors. Keep
+  retained Pi types out of kind positions. Preserve ambient index Names,
   binder scope, kind checks and located diagnostics. Do not widen ordinary
   impredicative inference or native meta assignment.
 - [ ] Trace the resulting Given and explicit-witness cases. Admit a native Pi
