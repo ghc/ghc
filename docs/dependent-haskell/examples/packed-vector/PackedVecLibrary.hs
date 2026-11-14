@@ -254,7 +254,7 @@ proofDepthBounded :: BoundedVec a limit -> Int
 proofDepthBounded (PackBounded n xs LEZ) = 0
 proofDepthBounded (PackBounded m ys (LES proof)) = 1 + depth proof
   where
-    depth :: LE n m -> Int
+    depth :: forall n m. LE n m -> Int
     depth LEZ = 0
     depth (LES rest) = 1 + depth rest
 

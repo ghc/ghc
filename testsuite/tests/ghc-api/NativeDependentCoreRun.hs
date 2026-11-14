@@ -1483,6 +1483,18 @@ runModuleChecks libdir = do
         , "wildcard right partial ignores fields: ok"
         , "wildcard left retains payload demand: packed-bottom-payload"
         , "wildcard right retains payload demand: packed-bottom-payload"
+        , "runtime local signature 0: (0,[],[],True)"
+        , "runtime local signature 1: (1,[7],[7],True)"
+        , "runtime local signature 2: (2,[7,7],[7,7],True)"
+        , "runtime local signature 3: (3,[7,7,7],[7,7,7],True)"
+        , "local signature shadowed indices: ([7],[9,9])"
+        , "local signature erased variable precedence: [42]"
+        , "local signature underscore index: [7]"
+        , "local signature bottom index package: ok"
+        , "local signature cyclic prefix: [7,7]"
+        , "local signature partial index head: 7"
+        , "local signature payload demand: packed-bottom-payload"
+        , "local signature IO action: (0,1,[7])"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2767,6 +2779,17 @@ runPackageSourceRejectChecks = do
         , ("MatrixFallbackWildcardsPayloadMismatch", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad _ _ xs ys = PackVec Z xs"])
         , ("MatrixFallbackLeftVariablePayloadMismatch", 83865, "ys", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad first _ xs ys = PackVec first ys"])
         , ("MatrixFallbackRightVariablePayloadMismatch", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad _ second xs ys = PackVec second xs"])
+        , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
+        , ("LocalSignatureAliasIndex", 83605, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
+        , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
+        , ("LocalSignatureGlobalIndex", 25897, "localVector globalIndex", [], [], localSignatures ++ ["globalIndex :: Nat", "globalIndex = Z", "bad :: PackedVec Int", "bad = let { xs :: Vec Int globalIndex; xs = localVector globalIndex } in PackVec globalIndex xs"])
+        , ("LocalSignatureUnsupportedDomain", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Int -> PackedVec Int", "bad n = let { xs :: Vec Int n; xs = VNil } in PackVec Z xs"])
+        , ("LocalSignatureLinearIndex", 83605, "already-bound unrestricted local value", ["LinearTypes"], [], localSignatures ++ ["bad :: Nat %1 -> PackedVec Int", "bad n = let { xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
+        , ("LocalSignatureAnonymousPartial", 83605, "complete type signature", ["PartialTypeSignatures"], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let { xs :: Vec _ n; xs = localVector n } in PackVec n xs"])
+        , ("LocalSignatureUnderscoreNamedHole", 83865, "localVector _n", ["NamedWildCards", "PartialTypeSignatures"], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad _n = let { xs :: Vec Int _n; xs = localVector _n } in PackVec _n xs"])
+        , ("LocalSignatureNamedPartial", 83605, "complete type signature", ["PartialTypeSignatures", "NamedWildCards"], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let { xs :: Vec _element n; xs = localVector n } in PackVec n xs"])
+        , ("LocalSignatureTypedQuotation", 83605, "Template Haskell", ["TemplateHaskellQuotes"], ["import Language.Haskell.TH.Syntax (Code, Q)"], localSignatures ++ ["bad :: Nat -> Code Q (PackedVec Int)", "bad n = [|| let { xs :: Vec Int n; xs = localVector n } in PackVec n xs ||]"])
+        , ("LocalSignatureUntypedQuotation", 83605, "Template Haskell", ["TemplateHaskellQuotes"], ["import Language.Haskell.TH.Syntax (Exp, Q)"], localSignatures ++ ["bad :: Nat -> Q Exp", "bad n = [| let { xs :: Vec Int n; xs = localVector n } in PackVec n xs |]"])
         , ("MatrixFallbackPayloadMismatch", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad first second xs ys = PackVec second xs"])
         , ("MatrixFallbackUntypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad (S left) (S right) = Nothing", "bad first second = let ignored = [| 42 :: Int |] in Nothing"])
         , ("MatrixFallbackTypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad (S left) (S right) = Nothing", "bad first second = let ignored = [|| 42 :: Int ||] in Nothing"])
@@ -2813,6 +2836,12 @@ runPackageSourceRejectChecks = do
   where
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
     package = declaration "foreach (n :: Nat) -> Vec a n -> PackedVec a"
+    localSignatures =
+        package
+            ++ [ "localVector :: foreach (n :: Nat) -> Vec Int n"
+               , "localVector Z = VNil"
+               , "localVector (S k) = VCons 7 (localVector k)"
+               ]
     equalityImports = ["import Data.Type.Equality ((:~:)(Refl))"]
     sums =
         [ "type family Add (n :: Nat) (m :: Nat) :: Nat where"

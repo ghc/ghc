@@ -4,20 +4,23 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE NoPostfixOperators #-}
+{-# LANGUAGE NoNamedWildCards #-}
 
 -- | Check source packages, filtering, and evaluation demand.
 module Main (main) where
 
 import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (forM_, unless)
-import Data.IORef (newIORef, readIORef)
+import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
 import Data.Type.Equality ((:~:) (Refl))
 import PackedVecLibrary
+import System.Mem.StableName (makeStableName)
 
 -- | Construct a package from an ordinary runtime input.
 makePacked :: Nat -> PackedVec Int
@@ -421,13 +424,17 @@ runWildcardMatrixChecks = do
             rightCell <- newIORef rightInput
             n <- readIORef leftCell
             m <- readIORef rightCell
-            let equality = case zeroOnlyAnonymous n m of
+            let xs :: Vec Int n
+                xs = replicateNative @Int n 7
+                ys :: Vec Int m
+                ys = replicateNative @Int m 9
+                equality = case zeroOnlyAnonymous n m of
                     Nothing -> "different"
                     Just Refl -> "same"
                 reference = case zeroOnly n m of
                     Nothing -> "different"
                     Just Refl -> "same"
-                actual = renderPacked (fallbackFirst n (replicateNative @Int n 7) m (replicateNative @Int m 9)) ++ "|" ++ renderPacked (fallbackSecond n (replicateNative @Int n 7) m (replicateNative @Int m 9)) ++ "|" ++ equality
+                actual = renderPacked (fallbackFirst n xs m ys) ++ "|" ++ renderPacked (fallbackSecond n xs m ys) ++ "|" ++ equality
                 label = "runtime wildcard fallback " ++ show (natToInt n, natToInt m)
             assertEqual (label ++ " named reference") reference equality
             assertEqual label expected actual
@@ -449,6 +456,104 @@ runWildcardMatrixChecks = do
         evaluate (withPacked (fallbackFirst Z bottomPayload (S bottomLength) bottomPayload) (\n xs -> sum (toList xs)))
     expectMarker "wildcard right retains payload demand" "packed-bottom-payload" $
         evaluate (withPacked (fallbackSecond (S bottomLength) bottomPayload Z bottomPayload) (\n xs -> sum (toList xs)))
+
+-- | Compare thunk identity without evaluating either argument.
+sameObject :: a -> a -> IO Bool
+sameObject first second = do
+    left <- makeStableName first
+    right <- makeStableName second
+    pure (left == right)
+
+-- | Keep an erased type variable ahead of an identically named runtime value.
+erasedLocalSignature :: forall (n :: Nat). Vec Int n -> Nat -> [Int]
+erasedLocalSignature xs n =
+    let ys :: Vec Int n
+        ys = xs
+     in toList ys
+
+-- | Treat an underscore-prefixed index as a value when NamedWildCards is off.
+underscoreLocalSignature :: Nat -> [Int]
+underscoreLocalSignature _n =
+    let xs :: Vec Int _n
+        xs = replicateNative @Int _n 7
+    in toList xs
+
+-- | Check local payload signatures at actual runtime index identities.
+runLocalSignatureChecks :: IO ()
+runLocalSignatureChecks = do
+    forM_
+        [ (Z, "(0,[],[],True)")
+        , (S Z, "(1,[7],[7],True)")
+        , (S (S Z), "(2,[7,7],[7,7],True)")
+        , (S (S (S Z)), "(3,[7,7,7],[7,7,7],True)")
+        ]
+        $ \(input, expected) -> do
+            cell <- newIORef input
+            n <- readIORef cell
+            let xs :: Vec Int n
+                xs = replicateNative @Int n 7
+                ys :: Vec Int n
+                ys = xs
+            shared <- sameObject xs ys
+            let actual = show (natToInt n, toList xs, toList ys, shared)
+                label = "runtime local signature " ++ show (natToInt n)
+            assertEqual label expected actual
+            putStrLn (label ++ ": " ++ actual)
+    outerCell <- newIORef (S Z)
+    innerCell <- newIORef (S (S Z))
+    n <- readIORef outerCell
+    let outer :: Vec Int n
+        outer = replicateNative @Int n 7
+    innerPackage <- do
+        n <- readIORef innerCell
+        let inner :: Vec Int n
+            inner = replicateNative @Int n 9
+        pure (PackVec n inner)
+    let shadowed = show (toList outer, withPacked innerPackage (\n xs -> toList xs))
+    assertEqual "local signature shadowed indices" "([7],[9,9])" shadowed
+    putStrLn ("local signature shadowed indices: " ++ shadowed)
+    let erased = erasedLocalSignature (VCons 42 VNil) bottomLength
+    assertEqual "local signature erased variable precedence" [42] erased
+    putStrLn ("local signature erased variable precedence: " ++ show erased)
+    assertEqual "local signature underscore index" [7] (underscoreLocalSignature (S Z))
+    putStrLn "local signature underscore index: [7]"
+    bottomCell <- newIORef bottomLength
+    n <- readIORef bottomCell
+    let deferred :: Vec Int n
+        deferred = replicateNative @Int n 7
+    assertWhnf "local signature bottom index package" (PackVec n deferred)
+    cyclicCell <- newIORef cyclicLength
+    n <- readIORef cyclicCell
+    let cyclic :: Vec Int n
+        cyclic = replicateNative @Int n 7
+    assertEqual "local signature cyclic prefix" [7, 7] (take 2 (toList cyclic))
+    putStrLn "local signature cyclic prefix: [7,7]"
+    partialCell <- newIORef (S bottomLength)
+    n <- readIORef partialCell
+    let partial :: Vec Int n
+        partial = replicateNative @Int n 7
+    assertEqual "local signature partial index head" 7 (case partial of VCons x xs -> x)
+    putStrLn "local signature partial index head: 7"
+    let missing :: Vec Int n
+        missing = bottomPayload
+    expectMarker "local signature payload demand" "packed-bottom-payload" $
+        evaluate (sum (toList missing))
+    actionCell <- newIORef (S Z)
+    effects <- newIORef (0 :: Int)
+    n <- readIORef actionCell
+    let action :: IO (PackedVec Int)
+        action = do
+            modifyIORef' effects (+ 1)
+            let xs :: Vec Int n
+                xs = replicateNative @Int n 7
+            pure (PackVec n xs)
+    before <- readIORef effects
+    package <- action
+    after <- readIORef effects
+    assertEqual "local signature IO action before execution" 0 before
+    assertEqual "local signature IO action executes once" 1 after
+    assertEqual "local signature IO action payload" [7] (withPacked package (\n xs -> toList xs))
+    putStrLn "local signature IO action: (0,1,[7])"
 
 -- | Read two independent lengths before comparing and pairing their vectors.
 {-# NOINLINE driveEqualityZip #-}
@@ -1411,3 +1516,4 @@ main = do
     runIndexMatrixChecks
     runFallbackMatrixChecks
     runWildcardMatrixChecks
+    runLocalSignatureChecks
