@@ -94,12 +94,12 @@ The native application Note states the restrictions. Agda's pattern-context
 substitution below supplies the context discipline; it does not establish the
 correctness of GHC's matcher or its FC evidence.
 
-[`LHSResult`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L548-L566)
+[`LHSResult`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L594-L620)
 records the pattern-context substitution and specialised body type.
-[`splitCon`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1389-L1414)
+[`splitCon`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1503-L1532)
 applies the constructor substitution to the later argument telescope, target,
 and remaining pattern equations.
-[`checkRHS`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Def.hs#L747-L774)
+[`checkRHS`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Def.hs#L825-L852)
 checks the body against that target. Thus refinement must update argument types
 as well as result types. The native frontend uses explicit coercion patterns
 and inverse result casts to connect these specialised types to the outer types.

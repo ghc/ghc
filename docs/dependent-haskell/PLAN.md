@@ -1297,6 +1297,15 @@ that explicit vector pattern must demand its constructor. Reuse the existing
 checked native constructor equality. Keep each equation's runtime Ids and
 source-order failure continuation.
 
+The initial source probe rejects the index constructor at its original span
+with GHC-83605. Share the existing closed constructor-pattern resolver with
+pattern checking. For a constructor field, bind a fresh whole-field Id with
+an outer generated as-pattern. Attach its nominal constructor proof to the
+inner constructor alternative. Transport later field types with the existing
+native coercion checker and keep their original types in coercion patterns.
+Retain each package equation's existing match compilation and failure path.
+The backend already accepts this proof and an ordinary DEFAULT continuation.
+
 - [ ] Probe a constructor head with bare variable subfields. Preserve a fresh
   Id for the whole stored index, then scope its nominal constructor equality
   over subsequent field patterns and the RHS. Use the actual predecessor.
