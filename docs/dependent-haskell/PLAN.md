@@ -1799,6 +1799,17 @@ the fully applied constructor `((,) xs) (42 :: Int)`. Applying the section
 `(xs,) (42 :: Int)` rejects with GHC-83865. The known expected native section
 control also retains its rejection. These are compile/Lint observations.
 
+Keep `ExplicitTuple` and its existing desugaring. Present expressions remain
+inside the missing-field lambdas, in source order. Do not add a sharing let.
+Infer an anchored native present field once with its exact type and require
+a lifted kind. Keep ordinary missing-field metas for inference. For a known
+expected visible-arrow telescope with a native boxed tuple result, check
+fields against the tuple components and use the expected hole multiplicities.
+Store each hole's tuple component type, then check the reconstructed whole
+section function against the original expected type. This retains required
+domain/result coercions. Other expected shapes keep their existing path.
+Generalize the existing tuple checker rather than add a second traversal.
+
 - [ ] Inspect `tcInferTupArgs` and the complete-tuple classifier guard.
   The boxed present-field path checks against a fresh whole-field meta.
   Establish section rules for both inference and known expected functions.
