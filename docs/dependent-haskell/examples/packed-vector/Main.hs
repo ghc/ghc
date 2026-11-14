@@ -131,6 +131,27 @@ sameNatByCase n m = case n of
             Nothing -> Nothing
             Just Refl -> Just Refl
 
+-- | Keep the four-clause equality algorithm as an independent reference.
+sameNatByMatrix :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
+sameNatByMatrix Z Z = Just Refl
+sameNatByMatrix Z (S right) = Nothing
+sameNatByMatrix (S left) Z = Nothing
+sameNatByMatrix (S left) (S right) = case sameNatByMatrix left right of
+    Nothing -> Nothing
+    Just Refl -> Just Refl
+
+-- | Preserve whole indices in the final package fallback.
+fallbackPacked :: foreach (n :: Nat) -> Vec Int n -> foreach (m :: Nat) -> Vec Int m -> (PackedVec Int, PackedVec Int)
+fallbackPacked Z zeroLeft Z zeroRight = (PackVec Z zeroLeft, PackVec Z zeroRight)
+fallbackPacked (S leftPredecessor) successorLeft (S rightPredecessor) successorRight =
+    (PackVec (S leftPredecessor) successorLeft, PackVec (S rightPredecessor) successorRight)
+fallbackPacked first firstPayload second secondPayload = (PackVec first firstPayload, PackVec second secondPayload)
+
+-- | Return equality only for the first constructor pair.
+zeroOnly :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
+zeroOnly Z Z = Just Refl
+zeroOnly left right = Nothing
+
 -- | Preserve payloads on both sides of the second retained index column.
 matrixPayload :: foreach (n :: Nat) -> Vec Int n -> foreach (m :: Nat) -> Vec Int m -> (Vec Int n, Vec Int m)
 matrixPayload Z leftZeroZero Z rightZeroZero = (leftZeroZero, rightZeroZero)
@@ -140,7 +161,7 @@ matrixPayload (S firstPredecessor) leftSuccessorSuccessor (S secondPredecessor) 
 
 -- | Read independent lengths and force each successful equality proof.
 {-# NOINLINE driveIndexMatrix #-}
-driveIndexMatrix :: Nat -> Nat -> IO (String, String)
+driveIndexMatrix :: Nat -> Nat -> IO (String, String, String)
 driveIndexMatrix left right = do
     leftCell <- newIORef left
     rightCell <- newIORef right
@@ -152,7 +173,10 @@ driveIndexMatrix left right = do
         reference = case sameNatByCase n m of
             Nothing -> "different"
             Just Refl -> "same"
-    pure (actual, reference)
+        matrixReference = case sameNatByMatrix n m of
+            Nothing -> "different"
+            Just Refl -> "same"
+    pure (actual, reference, matrixReference)
 
 -- | Compare finite results and evaluation demand against nested source cases.
 runIndexMatrixChecks :: IO ()
@@ -177,24 +201,29 @@ runIndexMatrixChecks = do
             , "same"
             ]
     forM_ (zip [(n, m) | n <- inputs, m <- inputs] expected) $ \((n, m), wanted) -> do
-        (actual, reference) <- driveIndexMatrix n m
+        (actual, reference, matrixReference) <- driveIndexMatrix n m
         let label = "runtime equality matrix " ++ show (natToInt n, natToInt m)
         assertEqual (label ++ " reference") wanted reference
+        assertEqual (label ++ " four-clause reference") wanted matrixReference
         assertEqual label wanted actual
         putStrLn (label ++ ": " ++ actual)
     checkWhnf (sameNatByCase bottomLength)
+    checkWhnf (sameNatByMatrix bottomLength)
     assertWhnf "matrix partial ignores bottom index" (sameNat bottomLength)
     checkWhnf (sameNatByCase cyclicLength)
+    checkWhnf (sameNatByMatrix cyclicLength)
     assertWhnf "matrix partial ignores cyclic index" (sameNat cyclicLength)
     check_marker
         "matrix first index before second"
         "packed-bottom-length"
         (evaluate (sameNatByCase bottomLength bottomRightLength) >> pure ())
+        (evaluate (sameNatByMatrix bottomLength bottomRightLength) >> pure ())
         (evaluate (sameNat bottomLength bottomRightLength) >> pure ())
     check_marker
         "matrix zero demands second index"
         "equality-right-length"
         (evaluate (sameNatByCase Z bottomRightLength) >> pure ())
+        (evaluate (sameNatByMatrix Z bottomRightLength) >> pure ())
         (evaluate (sameNat Z bottomRightLength) >> pure ())
     let zeroSuccessor = case sameNat Z (S bottomRightLength) of
             Nothing -> True
@@ -202,6 +231,10 @@ runIndexMatrixChecks = do
         zeroSuccessorReference = case sameNatByCase Z (S bottomRightLength) of
             Nothing -> True
             Just _ -> False
+    let zeroSuccessorMatrix = case sameNatByMatrix Z (S bottomRightLength) of
+            Nothing -> True
+            Just _ -> False
+    assertEqual "matrix four-clause zeroSuccessor" True zeroSuccessorMatrix
     assertEqual "matrix zero successor reference" True zeroSuccessorReference
     assertEqual "matrix zero successor" True zeroSuccessor
     putStrLn "matrix zero successor ignores predecessor: different"
@@ -211,6 +244,10 @@ runIndexMatrixChecks = do
         successorZeroReference = case sameNatByCase (S bottomLength) Z of
             Nothing -> True
             Just _ -> False
+    let successorZeroMatrix = case sameNatByMatrix (S bottomLength) Z of
+            Nothing -> True
+            Just _ -> False
+    assertEqual "matrix four-clause successorZero" True successorZeroMatrix
     assertEqual "matrix successor zero reference" True successorZeroReference
     assertEqual "matrix successor zero" True successorZero
     putStrLn "matrix successor zero ignores predecessor: different"
@@ -218,16 +255,19 @@ runIndexMatrixChecks = do
         "matrix recursive left before right"
         "packed-bottom-length"
         (evaluate (sameNatByCase (S bottomLength) (S bottomRightLength)) >> pure ())
+        (evaluate (sameNatByMatrix (S bottomLength) (S bottomRightLength)) >> pure ())
         (evaluate (sameNat (S bottomLength) (S bottomRightLength)) >> pure ())
     check_marker
         "matrix recursive right demand"
         "equality-right-length"
         (evaluate (sameNatByCase (S Z) (S bottomRightLength)) >> pure ())
+        (evaluate (sameNatByMatrix (S Z) (S bottomRightLength)) >> pure ())
         (evaluate (sameNat (S Z) (S bottomRightLength)) >> pure ())
     check_marker
         "matrix shared bottom still demanded"
         "packed-bottom-length"
         (evaluate (sameNatByCase bottomLength bottomLength) >> pure ())
+        (evaluate (sameNatByMatrix bottomLength bottomLength) >> pure ())
         (evaluate (sameNat bottomLength bottomLength) >> pure ())
     let cyclicMismatch = case sameNat cyclicLength Z of
             Nothing -> True
@@ -235,6 +275,10 @@ runIndexMatrixChecks = do
         cyclicMismatchReference = case sameNatByCase cyclicLength Z of
             Nothing -> True
             Just _ -> False
+    let cyclicMismatchMatrix = case sameNatByMatrix cyclicLength Z of
+            Nothing -> True
+            Just _ -> False
+    assertEqual "matrix four-clause cyclicMismatch" True cyclicMismatchMatrix
     assertEqual "matrix cyclic mismatch reference" True cyclicMismatchReference
     assertEqual "matrix cyclic mismatch" True cyclicMismatch
     putStrLn "matrix cyclic successor zero mismatch: different"
@@ -259,8 +303,14 @@ runIndexMatrixChecks = do
     expectMarker "payload matrix first index before payloads" "packed-bottom-length" $
         evaluate (matrixPayload bottomLength bottomPayload bottomRightLength bottomPayload)
   where
-    check_marker :: String -> String -> IO () -> IO () -> IO ()
-    check_marker label marker reference actual = do
+    check_marker :: String -> String -> IO () -> IO () -> IO () -> IO ()
+    check_marker label marker reference matrixReference actual = do
+        matrixResult <- try @ErrorCall matrixReference
+        case matrixResult of
+            Left exception
+                | marker `isInfixOf` displayException exception -> pure ()
+            Left exception -> fail (label ++ ": unexpected four-clause error: " ++ displayException exception)
+            Right () -> fail (label ++ ": four-clause reference did not raise " ++ marker)
         result <- try @ErrorCall reference
         case result of
             Left exception
@@ -268,6 +318,60 @@ runIndexMatrixChecks = do
                     expectMarker label marker actual
             Left exception -> fail (label ++ ": unexpected reference error: " ++ displayException exception)
             Right () -> fail (label ++ ": reference did not raise " ++ marker)
+
+-- | Check ordered variable fallback without constructor equality evidence.
+runFallbackMatrixChecks :: IO ()
+runFallbackMatrixChecks = do
+    forM_
+        [ (Z, Z, "(0,[])|(0,[])")
+        , (Z, S Z, "(0,[])|(1,[9])")
+        , (S Z, Z, "(1,[7])|(0,[])")
+        , (S Z, S Z, "(1,[7])|(1,[9])")
+        ]
+        $ \(leftInput, rightInput, expected) -> do
+            leftCell <- newIORef leftInput
+            rightCell <- newIORef rightInput
+            n <- readIORef leftCell
+            m <- readIORef rightCell
+            case fallbackPacked n (replicateNative @Int n 7) m (replicateNative @Int m 9) of
+                (left, right) -> do
+                    let actual = renderPacked left ++ "|" ++ renderPacked right
+                        label = "runtime fallback package " ++ show (natToInt n, natToInt m)
+                    assertEqual label expected actual
+                    putStrLn (label ++ ": " ++ actual)
+    forM_
+        [ (Z, Z, "same")
+        , (Z, S Z, "different")
+        , (S Z, Z, "different")
+        , (S Z, S Z, "different")
+        ]
+        $ \(leftInput, rightInput, expected) -> do
+            leftCell <- newIORef leftInput
+            rightCell <- newIORef rightInput
+            n <- readIORef leftCell
+            m <- readIORef rightCell
+            let actual = case zeroOnly n m of
+                    Nothing -> "different"
+                    Just Refl -> "same"
+                label = "runtime zero-only fallback " ++ show (natToInt n, natToInt m)
+            assertEqual label expected actual
+            putStrLn (label ++ ": " ++ actual)
+    assertEqual "fallback skips second index" True (case zeroOnly (S bottomLength) bottomRightLength of Nothing -> True; Just Refl -> False)
+    putStrLn "fallback skips second index: different"
+    expectMarker "fallback zero demands second index" "equality-right-length" $
+        evaluate (zeroOnly Z bottomRightLength)
+    expectMarker "fallback first index before second" "packed-bottom-length" $
+        evaluate (zeroOnly bottomLength bottomRightLength)
+    assertWhnf "fallback partial ignores first index" (zeroOnly bottomLength)
+    case fallbackPacked Z bottomPayload (S bottomLength) bottomPayload of
+        (left, right) -> do
+            checkWhnf right
+            assertWhnf "fallback zero successor packages stay lazy" left
+    case fallbackPacked (S bottomLength) bottomPayload Z bottomPayload of
+        (left, right) -> do
+            checkWhnf right
+            assertWhnf "fallback successor zero packages stay lazy" left
+    assertWhnf "fallback package partial ignores fields" (fallbackPacked bottomLength bottomPayload bottomRightLength)
 
 -- | Read two independent lengths before comparing and pairing their vectors.
 {-# NOINLINE driveEqualityZip #-}
@@ -1228,3 +1332,4 @@ main = do
     putStrLn "reverse append ignores right fields: 42"
     runLaterIndexChecks
     runIndexMatrixChecks
+    runFallbackMatrixChecks

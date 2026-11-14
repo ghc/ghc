@@ -198,11 +198,10 @@ toListPacked package = case unconsPacked package of
 -- | Compare runtime lengths and return equality evidence on success.
 sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
 sameNat Z Z = Just Refl
-sameNat Z (S right) = Nothing
-sameNat (S left) Z = Nothing
 sameNat (S left) (S right) = case sameNat left right of
     Nothing -> Nothing
     Just Refl -> Just Refl
+sameNat left right = Nothing
 
 -- | Pair elements of ordinary vectors with one shared length index.
 zipVec :: Vec a n -> Vec b n -> Vec (a, b) n
