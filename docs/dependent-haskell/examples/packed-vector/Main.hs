@@ -1216,6 +1216,126 @@ runSourceInferenceChecks = do
             putStrLn "inferred vector shares original payload: True"
         _ -> fail "inferred sharing vector has the wrong length"
 
+-- | Construct an ordinary pair for the tuple inference control.
+tuplePair :: a -> b -> (a, b)
+tuplePair first second = (first, second)
+
+-- | Compare tuple syntax with constructor and ordinary helper applications.
+{-# NOINLINE driveTupleInference #-}
+driveTupleInference :: Nat -> IO String
+driveTupleInference input = do
+    indexCell <- newIORef input
+    n <- readIORef indexCell
+    effects <- newIORef (0 :: Int)
+    let vector = replicateNative @Int n 7
+        action = modifyIORef' effects (+ 1) >> pure vector
+        syntax = do
+            xs <- action
+            pure (42, xs)
+        constructor = action >>= \xs -> pure ((,) (42 :: Int) xs)
+        helper = action >>= \xs -> pure (tuplePair (42 :: Int) xs)
+    before <- readIORef effects
+    first <- syntax
+    count1 <- readIORef effects
+    second <- constructor
+    count2 <- readIORef effects
+    third <- helper
+    count3 <- readIORef effects
+    pure
+        ( show
+            ( natToInt n
+            , [(fst first, toList (snd first)), (fst second, toList (snd second)), (fst third, toList (snd third))]
+            , [before, count1, count2, count3]
+            )
+        )
+
+-- | Check lazy fields, effects, and sharing through inferred tuples.
+runTupleInferenceChecks :: IO ()
+runTupleInferenceChecks = do
+    forM_
+        [ (Z, "(0,[(42,[]),(42,[]),(42,[])],[0,1,2,3])")
+        , (S Z, "(1,[(42,[7]),(42,[7]),(42,[7])],[0,1,2,3])")
+        , (S (S Z), "(2,[(42,[7,7]),(42,[7,7]),(42,[7,7])],[0,1,2,3])")
+        , (S (S (S Z)), "(3,[(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7])],[0,1,2,3])")
+        ]
+        $ \(input, expected) -> do
+            actual <- driveTupleInference input
+            assertEqual "runtime tuple inference" expected actual
+            putStrLn ("runtime tuple inference: " ++ actual)
+    ignoredIndex <- pure bottomLength
+    effects <- newIORef (0 :: Int)
+    let ignoredVector = replicateNative @Int ignoredIndex bottomElement
+        ignoredAction = modifyIORef' effects (+ 1) >> pure ignoredVector
+        ignoredCompute = ignoredAction >>= \xs -> pure (42 :: Int, xs)
+    before <- readIORef effects
+    assertEqual "tuple construction has no effects" 0 before
+    putStrLn "tuple construction has no effects: 0"
+    ignored <- ignoredCompute
+    assertEqual "tuple WHNF ignores bottom index" () =<< (evaluate ignored >> pure ())
+    putStrLn "tuple WHNF ignores bottom index: ok"
+    assertEqual "tuple first field ignores bottom index" 42 (fst ignored)
+    putStrLn "tuple first field ignores bottom index: 42"
+    once <- readIORef effects
+    assertEqual "tuple action executes once" 1 once
+    putStrLn "tuple action executes once: 1"
+    expectMarker "tuple vector retains index demand" "packed-bottom-length" $
+        evaluate (sum (toList (snd ignored)))
+    finiteIndex <- pure (S Z)
+    payloadEffects <- newIORef (0 :: Int)
+    let payload :: Vec Int finiteIndex
+        payload = bottomPayload
+        payloadAction = modifyIORef' payloadEffects (+ 1) >> pure payload
+        payloadCompute = payloadAction >>= \xs -> pure (error "native-tuple-first-bottom" :: Int, xs)
+    bottomFields <- payloadCompute
+    assertEqual "tuple WHNF ignores bottom fields" () =<< (evaluate bottomFields >> pure ())
+    putStrLn "tuple WHNF ignores bottom fields: ok"
+    payloadCount <- readIORef payloadEffects
+    assertEqual "tuple effect precedes field demand" 1 payloadCount
+    putStrLn "tuple effect precedes field demand: 1"
+    expectMarker "tuple first field retains error" "native-tuple-first-bottom" $
+        evaluate (fst bottomFields)
+    expectMarker "tuple second field retains payload error" "packed-bottom-payload" $
+        evaluate (sum (toList (snd bottomFields)))
+    partialIndex <- pure (S bottomLength)
+    let partialCompute = pure (replicateNative @Int partialIndex 7) >>= \xs -> pure (42 :: Int, xs)
+    partial <- partialCompute
+    assertEqual "tuple partial index prefix" [7] (take 1 (toList (snd partial)))
+    putStrLn "tuple partial index prefix: [7]"
+    cyclicIndex <- pure cyclicLength
+    let cyclicCompute = pure (replicateNative @Int cyclicIndex 7) >>= \xs -> pure (42 :: Int, xs)
+    cyclic <- cyclicCompute
+    assertEqual "tuple cyclic index prefix" [7, 7] (take 2 (toList (snd cyclic)))
+    putStrLn "tuple cyclic index prefix: [7,7]"
+    let nativeFirstCompute = pure ignoredVector >>= \xs -> pure (xs, 42 :: Int)
+    nativeFirst <- nativeFirstCompute
+    assertEqual "tuple later field ignores native first field" 42 (snd nativeFirst)
+    putStrLn "tuple later field ignores native first field: 42"
+    sharingIndex <- pure (S (S Z))
+    sharedPayload <- newIORef (7 :: Int)
+    let sharingVector = replicateNative @(IORef Int) sharingIndex sharedPayload
+        sharingCompute = pure sharingVector >>= \xs -> pure (42 :: Int, xs)
+    left <- sharingCompute
+    right <- sharingCompute
+    originalVector <- evaluate sharingVector
+    leftVector <- evaluate (snd left)
+    rightVector <- evaluate (snd right)
+    originalName <- makeStableName originalVector
+    leftName <- makeStableName leftVector
+    rightName <- makeStableName rightVector
+    assertEqual "tuple computations share original vector" True (originalName == leftName && leftName == rightName)
+    putStrLn "tuple computations share original vector: True"
+    case toList leftVector of
+        [first, second] -> do
+            original <- evaluate sharedPayload
+            firstValue <- evaluate first
+            secondValue <- evaluate second
+            originalPayloadName <- makeStableName original
+            firstName <- makeStableName firstValue
+            secondName <- makeStableName secondValue
+            assertEqual "tuple vector shares original payload" True (originalPayloadName == firstName && firstName == secondName)
+            putStrLn "tuple vector shares original payload: True"
+        _ -> fail "tuple sharing vector has the wrong length"
+
 -- | Run finite observations and bounded strictness checks.
 main :: IO ()
 main = do
@@ -1763,3 +1883,4 @@ main = do
     runLocalSignatureChecks
     runActionBindChecks
     runSourceInferenceChecks
+    runTupleInferenceChecks

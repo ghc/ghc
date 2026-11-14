@@ -1529,6 +1529,24 @@ runModuleChecks libdir = do
         , "inferred cyclic index prefix: [7,7]"
         , "inferred computation shares vector: True"
         , "inferred vector shares original payload: True"
+        , "runtime tuple inference: (0,[(42,[]),(42,[]),(42,[])],[0,1,2,3])"
+        , "runtime tuple inference: (1,[(42,[7]),(42,[7]),(42,[7])],[0,1,2,3])"
+        , "runtime tuple inference: (2,[(42,[7,7]),(42,[7,7]),(42,[7,7])],[0,1,2,3])"
+        , "runtime tuple inference: (3,[(42,[7,7,7]),(42,[7,7,7]),(42,[7,7,7])],[0,1,2,3])"
+        , "tuple construction has no effects: 0"
+        , "tuple WHNF ignores bottom index: ok"
+        , "tuple first field ignores bottom index: 42"
+        , "tuple action executes once: 1"
+        , "tuple vector retains index demand: packed-bottom-length"
+        , "tuple WHNF ignores bottom fields: ok"
+        , "tuple effect precedes field demand: 1"
+        , "tuple first field retains error: native-tuple-first-bottom"
+        , "tuple second field retains payload error: packed-bottom-payload"
+        , "tuple partial index prefix: [7]"
+        , "tuple cyclic index prefix: [7,7]"
+        , "tuple later field ignores native first field: 42"
+        , "tuple computations share original vector: True"
+        , "tuple vector shares original payload: True"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2829,6 +2847,16 @@ runPackageSourceRejectChecks = do
         , ("SourceInferenceGeneralizedNativeValue", 83605, "explicit signature", ["NoMonoLocalBinds"], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let xs = localVector n in pure 42"])
         , ("SourceInferencePartialNativeValue", 83865, "untouchable", ["PartialTypeSignatures"], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let { xs :: _; xs = localVector n } in pure 42"])
         , ("SourceInferenceCallbackLinearCapture", 18872, "multiplicity", ["LinearTypes"], [], localActions ++ ["bad :: Nat -> Int %1 -> IO [Int]", "bad n value = let { action = pure (localVector n); compute = action >>= \\xs -> const (pure xs) value } in compute >>= \\ys -> pure (toListLocal ys)"])
+        , ("BoxedTupleCallbackLocalPairEscape", 83605, "outside the application scope", [], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let { action :: IO (Vec Int n); action = pure (localVector n); compute = action >>= \\xs -> let { k :: Nat; k = n } in pure (k, localVector k) } in pure 42"])
+        , ("BoxedTupleCallbackInputPairEscape", 83605, "outside the application scope", [], [], localActions ++ ["withAux :: forall a b c. IO a -> IO c -> (a -> IO b) -> IO b", "withAux action auxiliary callback = action >>= callback", "bad :: Nat -> IO Int", "bad n = let compute = withAux (pure (S Z)) (pure (localVector n)) (\\k -> pure (k, localVector k)) in pure 42"])
+        , ("BoxedTupleIndependentIndex", 83865, "snd pair", [], [], localActions ++ ["bad :: Nat -> Nat -> IO (PackedVec Int)", "bad n m = let { action = pure (localVector n); compute = action >>= \\xs -> pure ((42 :: Int), xs) } in compute >>= \\pair -> pure (PackVec m (snd pair))"])
+        , ("BoxedTupleLocalTupleEscape", 83605, "out of scope here", [], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let pair = (let { k :: Nat; k = n } in (k, localVector k)) in pure 42"])
+        , ("BoxedTupleLinearCapture", 18872, "multiplicity", ["LinearTypes"], [], localActions ++ ["bad :: Nat -> Int %1 -> IO Int", "bad n value = let compute = pure (localVector n) >>= \\xs -> pure (value, xs) in compute >>= \\pair -> pure 42"])
+        , ("BoxedTupleLinearDuplicate", 18872, "multiplicity", ["LinearTypes"], [], localActions ++ ["bad :: foreach (n :: Nat) -> Vec Int n %1 -> (Vec Int n, Vec Int n)", "bad n xs = let pair = (xs, xs) in pair"])
+        , ("BoxedTupleGeneralizedTuple", 83605, "explicit signature", ["NoMonoLocalBinds"], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let pair = ((42 :: Int), localVector n) in pure 42"])
+        , ("BoxedTupleNativeTupleSection", 83865, "xs", ["TupleSections"], [], localActions ++ ["bad :: foreach (n :: Nat) -> Vec Int n -> Int -> (Vec Int n, Int)", "bad n xs = (xs,)"])
+        , ("BoxedTupleTupleFieldMismatch", 83865, "Char", [], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let { action :: IO (Vec Int n); action = pure (localVector n); compute = action >>= \\xs -> pure (('x' :: Int), xs) } in pure 42"])
+        , ("BoxedTupleTupleGadtEscape", 83865, "untouchable", [], [], localActions ++ ["data Hidden where Hidden :: forall a. a -> Hidden", "bad :: Nat -> Hidden -> IO Int", "bad n hidden = let { action :: IO (Vec Int n); action = pure (localVector n); compute = action >>= \\xs -> case hidden of Hidden value -> pure (value, xs) } in pure 42"])
         , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureAliasIndex", 83605, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
