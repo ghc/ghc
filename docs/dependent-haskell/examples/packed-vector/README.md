@@ -1,11 +1,14 @@
 # Packed vector source example
 
-Both M20 compiler stages pass all 301 source observations with Core Lint
-and STG Lint. The API/runtime fixture passes 63 package/bound rejections.
-All five registered regressions pass.
-M20 adds 32 observations for two constructor columns. It preserves all 269
-M19 observations. The eight new matrix errors and the previous fifteen
-later-index/reverse errors pass in both compiler stages.
+Both M21 compiler stages pass all 316 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 70 package/bound rejections.
+All five registered regressions pass. M21 adds 15 observations and
+keeps the previous 301 lines in order. Seven new fallback errors and the
+previous 23 standalone errors pass in both stages.
+
+At M20, both stages and all five regressions passed 301 observations and
+63 package/bound rejections. The complete four-clause worker remains in Main
+as a source reference.
 
 At M18, both compiler stages passed the first 249 observations with Core Lint
 and STG Lint enabled. These included the previous 209 observations and 40
@@ -267,11 +270,10 @@ The source workers are:
 ```haskell
 sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
 sameNat Z Z = Just Refl
-sameNat Z (S right) = Nothing
-sameNat (S left) Z = Nothing
 sameNat (S left) (S right) = case sameNat left right of
     Nothing -> Nothing
     Just Refl -> Just Refl
+sameNat left right = Nothing
 
 -- | Pair elements of ordinary vectors with one shared length index.
 zipVec :: Vec a n -> Vec b n -> Vec (a, b) n
@@ -884,3 +886,26 @@ constructor fields reject with source diagnostics. Other retained columns
 remain bare variables. An unused `foreach` binder can become an ordinary
 value arrow, so coverage probes keep both indices in `Maybe (n :~: m)`.
 The next source target is a checked trailing variable fallback.
+
+
+## Ordered final variable equation
+
+M21 replaces the two explicit mismatch equations with a final variable row.
+The checker gives this row no constructor equality. It checks its RHS at the
+original `Maybe (n :~: m)` type. Its two source variable Names become the
+shared whole-index Names before TC. The checked index VarPats stay unwrapped.
+A fallback `Just Refl` rejects because the two original indices are independent.
+
+`sameNatByMatrix` keeps the four-clause reference. The existing finite equality
+and demand observations compare it with the case and fallback workers.
+`fallbackPacked` places a payload before the second retained column and
+repackages both vectors with their original indices in fallback. Four runtime
+pairs check stored lengths and contents. `zeroOnly` has only `Z/Z` before
+fallback. Four finite pairs and seven demand checks establish that an absent
+first constructor can leave the second index untouched. They also check
+partial function WHNF and package laziness at partial mismatch indices.
+
+Only one final row with bare variables in both selected index columns is
+supported here. Constructor pairs before it remain unique. A row with one
+constructor and one variable still rejects. Anonymous `_` patterns remain
+the next source task. No equality follows from a let alias or a failed row.

@@ -1471,7 +1471,7 @@ dependent path even when every RHS returns `Nothing`.
 
 ### M21: ordered trailing variable fallback
 
-This target is unverified. Express the same worker with `Z/Z`, recursive
+Both compiler stages and all five registered regressions pass. Express the same worker with `Z/Z`, recursive
 `S/S`, and a final both-variable row returning `Nothing`. Keep the four-clause
 and nested-case versions as references. This initial probe does not add
 arbitrary wildcard matrices, guards or interior contexts.
@@ -1487,19 +1487,35 @@ Test a missing first constructor that reaches fallback without demanding the
 second index. Repackage fallback payloads with their original indices to check
 identity, not aliases. Reject a forged fallback `Refl` and wrong-index payloads.
 
-- [ ] Follow the pinned Agda coverage split-tree and LHS substitution code in
+- [x] Follow the pinned Agda coverage split-tree and LHS substitution code in
   [two-index constructor equations](REFERENCES.md#two-index-constructor-equations).
   Inspect GHC's ordered match groups and failure continuations before choosing
   a row representation. A variable row needs no constructor equality proof.
-- [ ] Preserve each constructor row's actual fields and each variable row's
+- [x] Preserve each constructor row's actual fields and each variable row's
   shared whole-index identities. Check its unspecialized RHS without assuming
   equality from aliases. Keep fallback execution outside failed row proofs.
-- [ ] Check coverage with the terminal fallback and reject unsupported row
+- [x] Check coverage with the terminal fallback and reject unsupported row
   arrangements at source positions. Preserve all argument lambdas and row
   order. Compare finite equality results, partial WHNF and bottom demand with
   both source references. Re-run the existing false-proof rejections.
-- [ ] Run both compiler stages and the five registered regressions. Keep M20
+- [x] Run both compiler stages and the five registered regressions. Keep M20
   evidence frozen and collect separate M21 inputs and outputs.
+
+### M22: anonymous terminal fallback
+
+This target is unverified. Permit bare wildcard patterns in the final fallback,
+including `sameNat _ _ = Nothing`. Keep mixed constructor/variable rows,
+guards and interior contexts outside this probe. Preserve M21 evidence.
+
+- [ ] Inspect Agda's anonymous variable handling and GHC's wildcard tidying.
+  Record the provenance before selecting generated index binders. A wildcard
+  must preserve the shared whole-index identity without introducing equality.
+- [ ] Check final variable/wildcard combinations against the original result
+  type. Keep diagnostics at the source wildcard or RHS. Reject a forged
+  fallback `Refl` and preserve payload scope.
+- [ ] Compare the wildcard worker with named fallback, four-clause and case
+  references. Preserve partial WHNF, missing-constructor demand and the order
+  of failures. Run both compiler stages and the five registered regressions.
 
 ## Further work
 

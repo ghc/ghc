@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 301 runtime observations and the runtime fixtures check 63 package/bound rejections |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 316 runtime observations and the runtime fixtures check 70 package/bound rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -52,7 +52,8 @@ Last updated: 2026-11-14.
 | Source reverse | Both compiler stages preserve the original runtime length through source reverse, with checked arithmetic proofs and 40 new demand/order observations |
 | Later retained equations | Both compiler stages pass 269 observations, including mixed argument/evidence order, local captures and checked arithmetic constructor equations |
 | Two-index equations | Both compiler stages pass four-clause sameNat and payload transport through two constructor proofs |
-| Next task | M21: check an ordered trailing variable fallback equation; unverified |
+| Terminal variable equations | Both compiler stages pass three-clause sameNat, original-index repackaging and non-strict fallback of an unmatched second column |
+| Next task | M22: permit anonymous wildcard patterns in the final fallback; unverified |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2373,3 +2374,92 @@ M17's 42 harness and 499 output hashes, and the original reader's three hashes
 remain unchanged. M19's 34 source and five document hashes also match commit
 `7e2d2a6224`. Final M20 source, docs, harness, output and directory manifests
 are frozen separately.
+
+
+## M21: an ordered variable fallback from source
+
+Both compiler stages and all five registered regressions pass.
+The library now uses the ordinary ordered fallback form:
+
+```haskell
+sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
+sameNat Z Z = Just Refl
+sameNat (S left) (S right) = case sameNat left right of
+    Nothing -> Nothing
+    Just Refl -> Just Refl
+sameNat left right = Nothing
+```
+
+The final equation has no constructor proof. The checker renames both source
+variable Names to the shared whole-index Names before TC. It checks the RHS
+against the original result type and keeps its index VarPats unwrapped.
+It uses reflexive transports, without calling the constructor-only lifting
+helper. Constructor rows keep their actual fields and M20's two proofs.
+GHC's existing ordered `PgCon` and `PgAny` blocks put fallback execution
+outside failed row proofs. The backend and Core/interface forms stay the same.
+Note `[Retained variable fallback]` records these invariants. The
+[Agda catchall and GHC failure-continuation sources](REFERENCES.md#ordered-variable-fallback-equations)
+record their exact blobs and ranges.
+
+Both stages pass 316 observations through separate producer/importer
+compilations with Core and STG lint. The first 301 lines remain unchanged.
+The existing 16 finite equality pairs and ten demand checks now also compare
+with a private four-clause worker. The nested-case reference remains.
+Four new runtime package pairs repackage vectors under the actual fallback
+indices. Four `zeroOnly` pairs check a worker with only `Z/Z` before fallback.
+Seven new demand checks cover an untouched second index when the first
+constructor is absent, the opposite demand, first-before-second errors,
+partial function WHNF and lazy packages at mismatched partial indices.
+
+The API/runtime fixture passes 70 package/bound rejections. Seven new
+standalone errors reject an earlier fallback, a repeated fallback, wildcard
+patterns, a forged `Refl`, a wrong-index payload and both quotation forms.
+Their exact source positions are pinned. The previous 23 located errors
+also pass in both stages. The earlier/repeated fallback error points to the
+first misplaced variable pattern. A fallback has no equality between its
+original indices. It cannot inherit evidence from an earlier failed row.
+
+The initial extension accepts only one final equation with bare variables in
+both selected index columns. Constructor pairs before it must remain unique.
+Without it, constructor-pair coverage must remain complete. A row with one
+constructor and one variable, an anonymous wildcard, guards and interior
+contexts remain unsupported. Other retained columns retain their existing
+bare-variable rule. Quotations reject before source Name renaming.
+The next source task is an anonymous final fallback such as `sameNat _ _`.
+
+
+M21 evidence uses `_build/verification/native-index-fallback-*`. The final
+`build-input-v2.SHA256SUMS` has 28 selected inputs. It includes the original
+`compiler/ghc.cabal.in` template. Compiler changes are `c3a068a7fe`; source and
+runtime-fixture changes are `571ae3d690`. The implementation plan and pinned
+Agda/GHC provenance were committed first in `80ba85869f`.
+
+Compiler and source checks passed on the first attempt. A formatter check
+used cabal-gild's positional in-place mode and changed the Cabal template's
+formatting. The original bytes were restored from HEAD. The diff and formatted
+bytes remain as evidence. The corrected command writes a separate output.
+Both compiler targets then passed a verification build in 54.83 s, with no
+compiler modules recompiled. Fresh producer/importer source executions in both
+stages and the fresh API fixture pass against the restored template. The final
+source and Cabal input bytes are pinned separately from the initial 27 inputs.
+
+The bootstrap compiler build took 3m06s and peaked at 2710 MiB under 16 GiB.
+The self-hosted build took 12m15s and peaked at 5009 MiB under 16 GiB. Existing
+warnings remain in `App.hs`, `Constructor.hs` and `Passes.hs`. The verification
+build peaked at 742 MiB under 16 GiB. Initial bootstrap source execution peaked
+at 144 MiB under 4 GiB; source rejections and API/runtime checks peaked at
+995 MiB. Self-hosted source and located errors peaked at 145 MiB under 4 GiB.
+The final restored-state source/API checks peaked at 1111 MiB under 4 GiB.
+The wrapper disables swap. The full GHC suite was not run.
+
+M20's 42 harness and 514 output hashes, M19's 40 harness and 596 output hashes,
+M18's 31 harness and 372 output hashes, M17's 42 harness and 499 output hashes,
+and the original reader's three hashes remain unchanged. M20 and M19 source
+and document hashes match commits `74cf40fd57` and `7e2d2a6224`. Final M21
+source, docs, harness, output and directory manifests are frozen separately.
+
+
+The final registered run took 13.666040 s and peaked at 1667 MiB under 8 GiB:
+five tests, 39 cases, 34 skips and five passes. The earlier run also passed
+in 13.129000 s at 1708 MiB. The complete compiler, source and registered checks
+pass with the restored Cabal template. No Cabal file change remains.

@@ -1700,7 +1700,8 @@ value arrow. This inherited simplification keeps the runtime argument.
 
 ## Ordered variable fallback equations
 
-Status: unverified M21 implementation plan. Agda v2.8.0
+Status: M21 implemented. Both compiler stages, the located-error checks and
+all five registered regressions pass. Agda v2.8.0
 [`CompiledClause/Compile.hs`, lines 126–172](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/CompiledClause/Compile.hs#L126-L172)
 keeps a catchall branch and terminal `Done`/`Fail` clauses.
 [Lines 179–244](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/CompiledClause/Compile.hs#L179-L244)
@@ -1735,8 +1736,8 @@ omit a redundant same-Id alias.
 bind the shared failure thunk outside the preceding constructor case. Its
 unchanged blob is `c3ae336c9b2a0f9f55a0fc879905480414be544a`.
 
-M21 will reuse those paths. Before TC, rename a fallback's two source variable
+M21 reuses those paths. Before TC, rename a fallback's two source variable
 Names to the shared whole-index Names. Keep its checked VarPats unwrapped and
 check its RHS without constructor proofs. A fresh alias would not establish
 native index identity. M20's separate constructor rows keep their actual
-fields and proofs. No new backend or Core rule is proposed.
+fields and proofs. This change adds no backend or Core rule.
