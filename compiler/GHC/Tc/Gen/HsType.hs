@@ -550,7 +550,12 @@ tcRetainedAmbientIndices invalid_reason hs_ty
 tcCheckRetainedSigType :: LHsType GhcRn -> TcKind -> TcM TcType
 tcCheckRetainedSigType hs_ty kind
   = do { indices <- tcRetainedAmbientIndices RetainedLocalSignatureIndex hs_ty
-       ; go (typeLevelMode { mode_indices = indices }) hs_ty kind }
+       ; tcCheckRetainedType (typeLevelMode { mode_indices = indices }) hs_ty kind }
+
+-- | Check a retained type without changing the caller's index environment.
+-- See Note [Retained Pi type arguments].
+tcCheckRetainedType :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
+tcCheckRetainedType = go
   where
     go :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
     go mode (L _ (HsParTy _ body)) kind = go mode body kind
@@ -565,7 +570,11 @@ tcCheckRetainedSigType hs_ty kind
         tc_fun_type_x (go mode) mode mult arg res (Check kind)
     go mode (L loc ty@(HsForEachTy _ bndrs body)) kind
       = setSrcSpanA loc $
-        do { when (null bndrs) $
+        do { level <- getThLevel
+           ; case level of
+               Comp -> return ()
+               _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
+           ; when (null bndrs) $
                failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
            ; body_ty <- check_bndrs mode bndrs
            ; checkExpKind ty body_ty liftedTypeKind (Check kind) }
@@ -708,8 +717,8 @@ It can refer to an outer runtime index. Its binder must not enter the enclosing
 arrow's result. The closure parameter is an ordinary value, not a runtime index.
 
 Use tc_fun_type_x with the signature checker for these children. Keep the
-ordinary open-kind and multiplicity checks. Other type positions still use
-tc_check_lhs_type and its retained-type gate. The renamer and complete-signature
+ordinary open-kind and multiplicity checks. Other type positions use
+tc_check_lhs_type; see Note [Retained Pi type arguments]. The renamer and complete-signature
 guard use hsHasForEachTy. Reject partial signatures even when a wildcard lies
 outside the nested Pi.
 
@@ -718,6 +727,25 @@ uses Note [Checked retained lambdas] in GHC.Tc.Gen.Match. A named function can
 match an alpha-equivalent retained type without structural Pi unification.
 Agda's expected-argument and scoped-Pi rules supply the checking precedent.
 See docs/dependent-haskell/REFERENCES.md#explicit-higher-order-arguments.
+-}
+
+{- Note [Retained Pi type arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A retained function is a value type of kind Type. A checked type argument can
+therefore contain a supported Pi, including an operand of a type equality.
+Use tcCheckRetainedType with the caller's mode. Reconstructing the signature
+mode would lose ambient runtime indices and the current wildcard policy.
+Each telescope extends only its body's environment. Check its closed domain,
+Many multiplicity, body kind and staging with the existing signature rules.
+Keep the original source span when entering this checker through tcHsType.
+
+Do not select this rule by the printed name of an equality constructor.
+Ordinary checked type applications share the same type formation. This does
+not permit a retained Pi as a kind. It does not change isTauTy, erased forall
+checking or the restrictions on mutable type-variable assignment. Checking
+an existing Given is separate; see Note [Rigid retained indices] in
+GHC.Tc.Utils.Unify. Agda's Pi formation and equality transport motivate this
+rule. See docs/dependent-haskell/REFERENCES.md#retained-function-types-as-equality-operands.
 -}
 
 
@@ -1392,7 +1420,13 @@ tcHsType mode (HsOpTy _ ty1 tyop ty2) exp_kind
   = tc_fun_type mode (HsModifiedFunArr noExtField [] $ HsStandardArr noExtField) ty1 ty2 exp_kind
 
 --------- Foralls
-tcHsType _ HsForEachTy{} _
+tcHsType mode ty@HsForEachTy{} exp_kind
+  | TypeLevel <- mode_tyki mode
+  = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; unless experimental $ failWithTc TcRnRetainedQuantificationNotImplemented
+       ; ty' <- tcCheckRetainedType mode (noLocA ty) liftedTypeKind
+       ; checkExpKind ty ty' liftedTypeKind exp_kind }
+  | otherwise
   = failWithTc TcRnRetainedQuantificationNotImplemented
 
 tcHsType mode HsForAllTy{} _
