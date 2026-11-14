@@ -731,6 +731,13 @@ getCfg platform weights graph =
             mkEdgeInfo = -- pprTrace "Info" (ppr branchInfo <+> ppr cond)
                          EdgeInfo (CmmSource branch branchInfo) . fromIntegral
             mkEdge target weight = ((bid,target), mkEdgeInfo weight)
+            -- BUG: this runs after fixStgRegisters, which turns a read of a
+            -- global register with no machine register into a load at its
+            -- offset from BaseReg. So on x86 and x86-64 a test of any such
+            -- register, CurrentTSO or CurrentNursery among them, is tagged
+            -- HeapStackCheck too, and so, by the clause for BaseReg, is any
+            -- test that reads BaseReg itself. This costs only speed, under
+            -- -fcmm-static-pred, not under -finfo-table-map.
             branchInfo =
               foldRegsUsed
                 (panic "GHC.CmmToAsm.CFG.getCfg: foldRegsUsed")
@@ -795,6 +802,11 @@ findBackEdges root cfg =
 optimizeCFG :: Bool -> Weights -> RawCmmDecl -> CFG -> CFG
 optimizeCFG _ _ (CmmData {}) cfg = cfg
 optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg =
+  -- staticPredCfg starts from the weights optHsPatterns leaves and normalises
+  -- them, so the info table penalty, favourFewerPreds' +1 and -1 and the bonus
+  -- on findBackEdges' back edges carry into the predicted probabilities, except
+  -- where the back edge rule of Note [Static Branch Prediction] replaces the
+  -- weights.
   (if doStaticPred then staticPredCfg (g_entry graph) else id) $
     optHsPatterns weights proc $ cfg
 
@@ -898,6 +910,10 @@ staticPredCfg entry cfg = cfg'
 
 -- | Determine loop membership of blocks based on SCC analysis
 --   This is faster but only gives yes/no answers.
+--   TODO: neither this nor loopLevels has a caller in GHC. This was added
+--   early in 2019 for the graph allocator's spill costs, which stopped calling
+--   it that year, when they began to weight by block frequencies instead;
+--   loopLevels, added with the loop analysis that year, has never had one.
 loopMembers :: HasDebugCallStack => CFG -> LabelMap Bool
 loopMembers cfg =
     foldl' (flip setLevel) mapEmpty sccs
@@ -942,6 +958,30 @@ instance Outputable LoopInfo where
     We do so by performing bfs from the tail node towards the head.
  -}
 
+{- Note [Back edges in loopInfo]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+loopInfo counts an edge as a back edge where its target is in its source's set
+of dominators, as mkDomMap computes them. mkDomMap leaves the root out of every
+set, and puts a block in its own set only where the block is a leaf of the
+dominator tree. Hence:
+
+* BUG #28083: an edge into the entry block is never a back edge, so a loop whose
+  head is the entry block is not found. This costs only speed, on x86 and x86-64
+  under -fcmm-static-pred, not under -finfo-table-map.
+* BUG #28093: a self loop is a back edge only where its block dominates no
+  other block. So a block that jumps to itself and to an exit it dominates,
+  as cmpxchg_code's retry loop in GHC.CmmToAsm.X86.CodeGen does where the
+  linear allocator puts no fixup block on its retry edge, is not a loop. This
+  costs only speed, on x86 and x86-64 under -fcmm-static-pred, not under
+  -finfo-table-map.
+
+findBackEdges, which optHsPatterns uses for the back edge bonus, classifies
+the edges by a depth-first search instead. It counts as back edges the edges
+into the entry block and the back edges of irreducible cycles, and no self
+loop. TODO: the two notions of a back edge disagree on these three kinds of
+edge, on a self loop only where its block dominates no other block.
+-}
+
 -- | Determine loop membership of blocks based on Dominator analysis.
 --   This is slower but gives loop levels instead of just loop membership.
 --   However it only detects natural loops. Irreducible control flow is not
@@ -969,7 +1009,7 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
     -- We can't recompute nodes from edges, there might be blocks not connected via edges.
     nodes = getCfgNodes cfg :: [BlockId]
 
-    -- identify back edges
+    -- identify back edges: see Note [Back edges in loopInfo]
     isBackEdge (from,to)
       | Just doms <- mapLookup from domMap
       , setMember to doms
@@ -1115,10 +1155,16 @@ but are usually never entered, and if at most once.
 Three heuristics are implemented: that we do not exit loops (lehPredicts), that
 an equality test (MO_Eq) with a literal and no likelihood annotation is false
 (ohPredicts), and that a branch with back edges and other edges takes a back
-edge.
+edge. WIP: the paper's other heuristics are stubs (phPredicts and the rest), so
+a two-way branch to which none of the three applies keeps the CFG's weights,
+normalised where neither edge is a back edge or a heap or stack check's.
 
 The back edge case is special as it supersedes any other heuristic if it
-applies.
+applies. BUG: it supersedes a likely annotation in the Cmm as well: a branch
+with both a back edge and another edge is predicted to take the back edge
+whatever its annotation says, unless an edge of it is tagged HeapStackCheck
+(a heap or stack check). This costs only speed, on x86 and x86-64 under
+-fcmm-static-pred, not under -finfo-table-map.
 
 Do NOT rely solely on nofib results for benchmarking this. I recommend at least
 comparing megaparsec and container benchmarks. Nofib does not seem to have
@@ -1249,6 +1295,16 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         pred_LEH = 0.75
         -- If and only if no successor is a loopheader,
         -- then we will likely not exit the current loop body.
+        -- TODO: where a heap or stack check's call to the garbage collector
+        -- returns into the procedure, getCfg gives the call an edge to the
+        -- block it returns to, from which control reaches the check again.
+        -- loopInfo counts that cycle as a loop, headed by its block that
+        -- dominates the others, unless that is the entry block. Where the call
+        -- returns to the checking block, or to a block that jumps back to it,
+        -- the head is the checking block, and lehPredicts returns Nothing for a
+        -- branch into it. Where the call returns to a block that chooses among
+        -- case alternatives, that block is the head, and lehPredicts counts a
+        -- branch towards an alternative without such a check as a loop exit.
         lehPredicts :: (TargetNodeInfo,TargetNodeInfo) -> Maybe Prob
         lehPredicts ((s1,_s1_info),(s2,_s2_info))
           | S.member s1 loopHeads || S.member s2 loopHeads
@@ -1265,6 +1321,29 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
                 s2Level = mapLookup s2 loopLevels
 
         -- Comparing to a constant is unlikely to be equal.
+        -- TODO: ohPredicts matches only MO_Eq, so whether a test is predicted
+        -- depends on how GHC.Cmm.ContFlowOpt leaves it spelt
+        -- (Note [Invert Cmm conditionals]). Predicting a pointer-tag test spelt
+        -- with MO_Ne, such as x & 7 != 0, as its MO_Eq spelling is predicted
+        -- (the evaluated side likely) was tried on a development branch and
+        -- cost nofib 0.36% more instructions at -O2.
+        -- BUG TODO: a constructor-tag test is predicted like any other
+        -- comparison, though which side is likely depends on the order of
+        -- the type's constructors. The prediction is wrong for the trees of
+        -- Data.Map and Data.Set, which declare Bin first, where the test is
+        -- left spelt as an equality, as in a client's copy of Data.Map's
+        -- lookup specialised at Int keys: the side that stays in the loop is
+        -- predicted unlikely. This costs only speed, on x86 and x86-64 under
+        -- -fcmm-static-pred, not under -finfo-table-map.
+        -- BUG: ohPredicts treats s1 as the true side only where it is ltrue,
+        -- the label the branch was made with, which an edge no longer ends
+        -- at once the linear allocator's fixup block (addNodesBetween),
+        -- the block that allocMoreStack moves the entry block's code to
+        -- (addPreentryBlock) or shortcutting (shortcutWeightMap) has redirected
+        -- it. Where the redirected true edge's new target has the smaller
+        -- label of the two, each side gets the other's prediction. This costs
+        -- only speed, on x86 and x86-64 under -fcmm-static-pred, not under
+        -- -finfo-table-map.
         ohPredicts (s1,_s2)
             | CmmSource { trans_cmmNode = src1 } <- getTransitionSource node (fst s1) cfg
             , CmmCondBranch cond ltrue _lfalse likely <- src1
@@ -1318,6 +1397,13 @@ cfgEdgeProbabilities cfg toVertex
 -- This is the fixpoint algorithm from
 --   "Static Branch Frequency and Program Profile Analysis" by Y Wu, JR Larus
 -- The adaption to Haskell is my own.
+--
+-- TODO: nothing checks the result, as sanityCheckCfg checks the CFG against the
+-- blocks and their jumps. A check could compare each block's frequency with the
+-- sum of the frequencies on its in-edges; the propagation below departs from
+-- that sum at some blocks, among them an irreducible block, a loop head whose
+-- cycle probability is capped, and the entry block, which it gives 1 whatever
+-- its in-edges.
 calcFreqs :: IM.IntMap (IM.IntMap Prob) -> [(Int,Int)] -> [(Int, [Int])] -> [Int]
           -> (Array Int Double, IM.IntMap (IM.IntMap Prob))
 calcFreqs graph backEdges loops revPostOrder = runST $ do
@@ -1391,8 +1477,27 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
                     let bp_backedge = isBackEdge bp block
                     return (not bp_visited && not bp_backedge)
 
+                -- An irreducible block keeps the frequency it has, 1 where
+                -- the last pass to set it was that of a loop it heads, and 0
+                -- where no pass has set it, as where it heads a loop whose
+                -- pass has not run yet; and passes it on to its out-edges
+                -- below. TODO: an irreducible block arises on a cycle that
+                -- can be entered at more than one of its blocks, and where
+                -- a block has a self loop that loopInfo does not count
+                -- (Note [Back edges in loopInfo]). Such a block's frequency,
+                -- and those of the blocks reached only through it, can thus
+                -- be 0 though a nonzero frequency flows in, or, where the
+                -- block heads a loop, 1 however little enters that loop, so
+                -- that more can leave the loop than enters it; and on x86 and
+                -- x86-64 under -fcmm-static-pred, not under -finfo-table-map,
+                -- the layout by default ranks their edges by numbers that do
+                -- not add up: at -O1 on x86-64, a loop calling fetchOrIntArray#
+                -- gives cmpxchg_code's retry block 0 though a nonzero frequency
+                -- flows in, and the loop's back edge after it 0. Summing the
+                -- inflow was tried on a development branch, in a replacement of
+                -- this function, and kept there.
                 if irreducible
-                then return () -- Rare we don't care
+                then return ()
                 else do
                     setFreq block 0
                     !cycleProb <- sum <$> (forM preds $ \pred -> do
@@ -1416,7 +1521,13 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
             setVisited block
             calcOutFreqs head block
 
-    -- Loops, by nesting, inner to outer
+    -- BUG: mkGlobalWeights passes the loops in the order of loopInfo's back
+    -- edges, which is edgeList's order, descending by label, not by nesting. A
+    -- loop can thus come before a loop nested in it, and its pass then reads in
+    -- edgeBackProbs the branch probabilities of the inner loop's back edges,
+    -- not the cycle probabilities the inner loop's pass would have set. This
+    -- costs only speed, on x86 and x86-64 under -fcmm-static-pred, not under
+    -- -finfo-table-map.
     forM_ loops $ \(head, body) -> do
         forM_ [0 .. nodeCount - 1] (\i -> unsafeWrite visitedNodes i True) -- Mark all nodes as visited.
         forM_ body (\i -> unsafeWrite visitedNodes i False) -- Mark all blocks reachable from head as not visited
