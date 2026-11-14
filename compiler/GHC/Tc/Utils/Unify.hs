@@ -3722,6 +3722,11 @@ body with the same flags and wrap its reduction with mkDepFunRedn. This keeps
 the ordinary occurs and coercion checks. A reflexive shortcut would miss
 occurrences such as a ~ (foreach n -> Vec a n). The binder scopes the complete
 body reduction. Do not decompose a wanted retained-function equality here.
+The same immutable check can traverse an invisible constraint arrow. Check
+its multiplicity, predicate and result with the same flags, and keep the
+complete FunTy reduction. This does not discharge a dictionary obligation
+or turn class evidence into equality evidence. Ordinary Given checks and
+every mutable check still reject these impredicative RHSs.
 The Given already belongs to a checked implication scope. No runtime Id is
 created, promoted or assigned. The scoped rewrite filter separately checks
 its use beneath a retained binder.
@@ -4446,13 +4451,13 @@ check_ty_eq_rhs flags ty
   = case ty of
       -- See Note [Rigid retained indices]
       TermVarTy v
-        | TEFTyVar { tefTyVar_allowNativeGivenRhs = True } <- flags
+        | native_given
         , isNativeIndexId v
         -> return $ okCheckRefl ty
         | otherwise
         -> return $ PuFail (cteProblem cteSkolemEscape)
       DepFunTy index body
-        | TEFTyVar { tefTyVar_allowNativeGivenRhs = True } <- flags
+        | native_given
         , isNativeIndexId index
         , typeKind body `eqType` liftedTypeKind
         -> do { body_res <- check_ty_eq_rhs flags body
@@ -4468,6 +4473,7 @@ check_ty_eq_rhs flags ty
 
       FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r}
        | isInvisibleFunArg af  -- e.g.  Num a => blah
+       , not native_given     -- See Note [Rigid retained indices]
        -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
        | otherwise
        -> do { w_res <- check_ty_eq_rhs flags w
@@ -4488,6 +4494,10 @@ check_ty_eq_rhs flags ty
 
       ForAllTy {}   -> return $ PuFail impredicativeProblem -- Not allowed (TyEq:F)
          -- No need to worry about RuntimeUnkTv
+  where
+    native_given = case flags of
+      TEFTyVar { tefTyVar_allowNativeGivenRhs = True } -> True
+      _ -> False
 
 -------------------
 checkCo :: Monad m => TyEqFlags m a -> Coercion -> m (PuResult a Coercion)
