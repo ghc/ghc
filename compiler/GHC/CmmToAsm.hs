@@ -528,6 +528,11 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
         -- tag instructions with register liveness information
         -- also drops dead code. We don't keep the cfg in sync on
         -- some backends, so don't use it there.
+        -- TODO #20428: ncgEnableDeadCodeElimination is off under
+        -- -finfo-table-map too, since 55a6377a5d. Where it is off, no pass from
+        -- here on gets a CFG, so the layout has neither static prediction nor
+        -- the chains of -fblock-layout-cfg: sequenceTop lays the blocks out
+        -- without weights.
         let livenessCfg = if ncgEnableDeadCodeElimination config
                                 then Just nativeCfgWeights
                                 else Nothing
@@ -644,6 +649,12 @@ cmmNativeGen logger ncgImpl us fileIds dbgMap cmm count
                 (\cfg -> addNodesBetween weights cfg cfgRegAllocUpdates) <$> livenessCfg
 
         -- Insert stack update blocks
+        -- BUG: X86's allocMoreStack adds a block after each entry block and
+        -- retargets every jump into the entry block to the added block, but
+        -- addImmediateSuccessor moves only the entry block's own edges. So the
+        -- CFG keeps an edge into the entry block from each block that jumps
+        -- there. This costs only speed; it is reached on x86-64, the only
+        -- target with a CFG here, where ncgAllocMoreStack adds blocks.
         let postRegCFG =
                 pure (foldl' (\m (from,to) -> addImmediateSuccessor weights from to m ))
                      <*> cfgWithFixupBlks
@@ -895,6 +906,12 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     -- find all the blocks that just consist of a jump that can be
     -- shorted.
     -- Don't completely eliminate loops here -- that can leave a dangling jump!
+    -- BUG: under -g a block that holds only its jump can also hold the location
+    -- and unwinding information that -g adds, and is then kept where without -g
+    -- it is shorted: the code jumps through it, and on x86-64 static prediction
+    -- and block layout get another CFG than without -g. This costs only speed
+    -- and code size, under -g and -fasm-shortcutting, on x86 and x86-64, not on
+    -- Darwin.
     shortcut_blocks :: [(BlockId, jumpDest)]
     (_, shortcut_blocks, others) =
         foldl' split (setEmpty :: LabelSet, [], []) blocks
