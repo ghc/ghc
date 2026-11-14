@@ -263,6 +263,13 @@ blockToFrame blk uws
                     , dwFdeUnwind     = uws
                     }
 
+-- BUG: a table that does not name Sp is given Sp's rule at the procedure's
+-- entry, and the table that X86's addSpUnwindings adds where the C stack
+-- pointer moves, as around a C call, names MachSp alone. Up to the next table
+-- that names Sp, DWARF then gives the canonical frame address by Sp's rule at
+-- entry, rbp+0 on x86-64, where before a call it can be another offset, such as
+-- rbp+16, and a debugger unwinding from there finds the wrong frame. This is
+-- reached under -g on ELF targets, on x86 and x86-64.
 addDefaultUnwindings :: UnwindTable -> [UnwindPoint] -> [UnwindPoint]
 addDefaultUnwindings tbl pts =
     [ UnwindPoint lbl (tbl' `mappend` tbl)

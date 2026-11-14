@@ -697,6 +697,14 @@ takeRegRegMoveInstr _  = Nothing
 -- Conditional branches on PowerPC are limited to +-32KB; if our Procs get too
 -- big, we have to work around this limitation.
 
+-- BUG: blockLen counts each instruction as one, where MFOV, LDFAR, STFAR and
+-- FETCHPC print as two (GHC.CmmToAsm.PPC.Ppr), as does a BCC that makeFar turns
+-- into a BCCFAR. So the estimate of a branch's distance can fall short by more
+-- than the margin nearLimit keeps below bc's reach of 8192 instructions, and a
+-- conditional branch beyond its reach is left as it is. LLVM's assembler (clang
+-- 18) then encodes it, without a message, with a wrapped displacement, which
+-- is wrong code, as it did at a beq with 9205 instructions between it and its
+-- target; GNU as 2.42 rejects the module.
 makeFarBranches
         :: Platform
         -> LabelMap RawCmmStatics

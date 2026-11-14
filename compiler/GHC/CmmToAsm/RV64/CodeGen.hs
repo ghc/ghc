@@ -668,6 +668,16 @@ getRegister' config plat expr =
             (getRegisterReg plat reg)
             nilOL
         )
+    -- BUG #28133: neither case truncates the sum to a sub-word register's
+    -- width, except at an offset of -2048. The first sends an offset from 1
+    -- to 2047 to MO_Add's case for a register plus a 12-bit literal, and one
+    -- from -2047 to -1 to MO_Sub's, neither of which truncates; -2048 goes
+    -- to MO_Sub's general case, which does. cmmMachOpFoldM in GHC.Cmm.Opt
+    -- folds a sub-word register plus or minus a literal into a CmmRegOff. The
+    -- bits above the width break the invariant of Note [Signed arithmetic on
+    -- RISCV64], which is wrong code where they are read. #28133 reports those
+    -- cases of MO_Add and MO_Sub, and MO_Or's for a 12-bit literal; the second
+    -- has no issue.
     CmmRegOff reg off | isNbitEncodeable 12 (fromIntegral off) -> do
       getRegister' config plat
         $ CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
@@ -2017,6 +2027,12 @@ genFarJump far_target =
 data BlockInRange = InRange | NotInRange BlockId
 
 -- See Note [RISCV64 far jumps]
+-- BUG: max_jump_dist is 2^11-1 instructions, where a BCOND, printed as a B-type
+-- branch, reaches 4 KiB each way, 1024 instructions back and 1023 forward where
+-- none is compressed. So a conditional branch whose target lies more than 4 KiB
+-- away, but fewer than 2^11-1 instructions by the estimate, is left beyond its
+-- reach, and only an assembler that lengthens such a branch, as LLVM's (clang
+-- 18) and GNU as 2.42 do, assembles the module as meant.
 makeFarBranches ::
   Platform ->
   LabelMap RawCmmStatics ->

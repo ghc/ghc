@@ -1270,6 +1270,11 @@ mkRegRegMoveInstr config fmt src dst =
     -- This ensures the upper part of the register is properly cleared
     -- and avoids partial register stalls.
     --
+    -- TODO: not for a float or a double. scalarMoveFormat copies those by
+    -- MOV FF64, printed movsd, which keeps the destination's upper half (see
+    -- MOV in regUsageOfInstr). The copy then depends on the destination's
+    -- previous value, where a full-register move would not.
+    --
     -- See also the 'ArithInt8' and 'ArithWord8' tests,
     -- which fail without this logic.
   where
@@ -1581,6 +1586,15 @@ shortcutStatic fn (CmmStaticLit (CmmLabelDiffOff lbl1 lbl2 off w))
   = CmmStaticLit (CmmLabelDiffOff (shortcutLabel fn lbl1) lbl2 off w)
         -- slightly dodgy, we're ignoring the second label, but this
         -- works with the way we use CmmLabelDiffOff for jump tables now.
+        -- BUG #28138: under -fPIC or -fPIE the entries of a jump table are
+        -- relative to the label of the block that jumps through it, in the
+        -- procedure's section (Note [Jump tables] in GHC.CmmToAsm.X86.CodeGen),
+        -- not to the table's. An entry retargeted to a label in another
+        -- section, an imported procedure's or, under -fsplit-sections, another
+        -- procedure's, is a difference the assembler cannot resolve, and it
+        -- rejects the module. This is reached under -fasm-shortcutting, on x86
+        -- and x86-64, not on Darwin, and under -g only for a jump-only block to
+        -- which -g adds nothing.
 shortcutStatic _ other_static
         = other_static
 

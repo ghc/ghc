@@ -482,6 +482,19 @@ import GHC.Platform.Reg
 #endif
 
 -- See also Note [Caller saves and callee-saves regs.]
+-- BUG: no clause names XmmReg, YmmReg or ZmmReg, though
+-- rts/include/stg/MachRegs/x86.h defines CALLER_SAVES_XMM1 and up for x86-64,
+-- and arm64.h CALLER_SAVES_XMM1 and XMM2; for i386, x86.h puts XMM1 to XMM4
+-- in xmm0 to xmm3 and defines none for them. So the Cmm passes treat a vector
+-- STG register as surviving an unsafe foreign call, which clobbers its machine
+-- register: where Cmm copies a vector STG register to a local before such a
+-- call, or a callish MachOp compiled to one such as MO_F64_Sin, and uses the
+-- local after it, as StgToCmm does with a function's vector argument, sinking,
+-- on at -O1 and -O2, can move the copy past the call. This is wrong code on
+-- AArch64 and i386, reached on AArch64 from Haskell that uses vector primops;
+-- on x86-64, each of XMM1 to XMM6 that x86.h makes caller-saves shares its
+-- machine register with an F and a D register that callerSaves names, and the
+-- copy stays before the call.
 callerSaves :: GlobalReg -> Bool
 #if defined(CALLER_SAVES_Base)
 callerSaves BaseReg           = True

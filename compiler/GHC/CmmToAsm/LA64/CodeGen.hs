@@ -546,6 +546,17 @@ getRegister' config plat expr =
                                 nilOL
                          )
 
+    -- BUG: neither case truncates the sum to a sub-word register's width, the
+    -- first going to MO_Add's case for a literal of 12 bits, which extends
+    -- its operand only at 8 and 16 bits and does not truncate, where intOp
+    -- truncates a sub-word MO_Add; and cmmMachOpFoldM in GHC.Cmm.Opt folds a
+    -- sub-word register plus or minus a literal into a CmmRegOff. In the first
+    -- case, the bits above the width break the invariant stated under "Signed
+    -- arithmetic on LoongArch64" above getRegister', but no wrong code is
+    -- known: each reader of a sub-word register here extends or masks it first,
+    -- or reads its low bits alone. The second case's ADD of two registers of
+    -- 8 or 16 bits is a compiler panic in GHC.CmmToAsm.LA64.Ppr, which prints
+    -- such an ADD at 32 and 64 bits alone.
     CmmRegOff reg off | isNbitEncodeable 12 (fromIntegral off) -> do
       getRegister' config plat
         $ CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
@@ -2219,6 +2230,16 @@ genCondFarJump cond op1 op2 far_target = do
                 $ BCOND cond op1 op2 (TBlock far_target)
                 ]
 
+-- BUG: replace_jump rewrites BCOND1 alone, never BEQZ or BNEZ, which
+-- genCondJump also emits and which reach 4 MiB each way; instr_size counts
+-- a MOV that prints as li.d as one instruction, where the assembler expands
+-- li.d to up to four; and replace_jump advances its position by two for each
+-- BCOND1 it rewrites, where instr_size counted one, which shortens the estimate
+-- of a forward branch's distance by one for each BCOND1 rewritten before its
+-- target. So a conditional branch beyond its reach can be left as it is. LLVM's
+-- assembler (clang 18) then rejects the module, as it did at a beqz, and at a
+-- bltu that the undercount of many li.d, or 40 BCOND1 rewritten before it, left
+-- as it was; GNU as 2.42 lengthens the branch instead.
 makeFarBranches ::
   Platform ->
   LabelMap RawCmmStatics ->

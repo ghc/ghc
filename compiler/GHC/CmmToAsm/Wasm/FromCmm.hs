@@ -969,6 +969,12 @@ lower_CmmReg lbl (CmmGlobal (GlobalRegUse greg reg_use_ty)) = do
                         NaturallyAligned
 
 -- | Lower a 'CmmRegOff'.
+--
+-- BUG: the sum is not truncated to a sub-word register's width, as
+-- lower_MO_Bin_Homo_Trunc truncates a sub-word MO_Add's, and cmmMachOpFoldM
+-- in GHC.Cmm.Opt folds a sub-word register plus or minus a literal into a
+-- CmmRegOff. Where an operation reads the bits above the width, as a widening
+-- MO_UU_Conv does, this is wrong code.
 lower_CmmRegOff :: CLabel -> CmmReg -> Int -> WasmCodeGenM w (SomeWasmExpr w)
 lower_CmmRegOff lbl reg 0 = lower_CmmReg lbl reg
 lower_CmmRegOff lbl reg o = do
