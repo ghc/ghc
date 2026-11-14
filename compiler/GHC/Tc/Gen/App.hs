@@ -801,9 +801,9 @@ allocates the remaining type variables. Keep the original head and checked
 type arguments. Pass immutable choices to IALL so that type applications and
 dictionaries retain their telescope order. Require NoQL, no consumed value
 arguments, no pending type arguments, and the existing inference guards.
-The generic route can use a nonempty declared argument prefix. The
-native-index-kind route requires exact saturation. Calls without type arguments
-keep the existing prepass.
+Both routes can use a nonempty declared argument prefix on eligible heads.
+The native-index-kind route still requires complete immutable choices.
+Calls without type arguments keep the existing prepass.
 
 Only tcApp enables this step. It retains the inferred argument cache even when
 matching fails. The public tcInstFun caller cannot consume a cache and leaves
@@ -1586,7 +1586,13 @@ Other arguments retain ordinary expected-type checking. If matching fails or
 leaves index binders undetermined, ordinary instantiation checks the same cached
 arguments. The ordinary unifier still rejects retained meta-variable fills.
 
-The native-index route requires exact saturation. For leading type arguments,
+On heads without concreteness requirements, infer independent ordinary
+parameters from eligible prefix domains too. Keep index-bearing domains on
+their existing inference path. Classify other domains with
+tcRetainedInferableArg. Parameters fixed by the expected result retain their
+expected-type checks. Concrete heads keep exact, index-only inference.
+Require every index-route choice before instantiation; do not allocate native
+meta-variables. For leading type arguments,
 see Note [Native inference after visible type applications].
 See Note [Generic retained argument inference] for extra arguments on the
 generic route. Preserve any leading context as described in
@@ -1618,9 +1624,10 @@ whose outer binders are already determined by that result.
 
 A generic result can itself be a function. For fst pair 42, infer pair from
 the one declared domain of fst, then check 42 against the chosen function
-result. Admit a nonempty declared argument prefix on the generic route only.
-Keep the native-index-kind route exactly saturated. Classify and cache only
-prefix arguments, and require an anchor in that prefix. Start matching from
+result. Admit a nonempty declared argument prefix on eligible heads in both
+routes. The index route requires complete immutable choices; see
+Note [Cached retained argument inference]. Classify and cache only prefix
+arguments. The generic route requires an anchor in that prefix. Start matching from
 the empty substitution: the final expected result is after the extra
 arguments, not the intermediate result used to choose fst's parameter.
 Keep the full original argument spine for tcInstFunWithExpected and
@@ -1960,7 +1967,7 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
         value_args = [arg | EValArg { ea_arg = arg } <- args]
         overapplied = arity < length value_args
   , arity == length value_args
-    || (overapplied && arity > 0 && null index_tvs)
+    || (overapplied && arity > 0 && hasNoConcreteTyVars fun)
   , isTauTy tau, not (isFunTy result)
   , not (hasNativeDependentExpr (Core.Type body))
   = do { expected_ty <- mapM (liftZonkM . zonkTcType) expected
@@ -1969,10 +1976,17 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
                            | otherwise = result_subst expected_ty index_route tvs result
              result_anchor = any (hasNativeDependentExpr . Core.Type)
                                [ty | tv <- tvs, Just ty <- [Subst.lookupTyVar initial_subst tv]]
-             needed_tvs | index_route = index_tvs
+             needed_tvs | index_route && not (hasNoConcreteTyVars fun) = index_tvs
                         | otherwise = filter (isNothing . Subst.lookupTyVar initial_subst) tvs
        ; eligible <- if index_route
-                     then return (Just (repeat True))
+                     then if hasNoConcreteTyVars fun
+                          then do { shapes <- mapM tcRetainedInferableArg
+                                                (take arity value_args)
+                                  ; return (Just (zipWith
+                                      (\domain (inferable, _) -> inferable ||
+                                        any (`elemVarSet` tyCoVarsOfType (scaledThing domain)) index_tvs)
+                                      domains shapes)) }
+                          else return (Just (repeat True))
                      else if hasNoConcreteTyVars fun
                              && isJust (tcRetainedOrdinaryResult arity tau)
                           then do { shapes <- mapM tcRetainedInferableArg
