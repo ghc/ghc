@@ -1970,7 +1970,7 @@ Validation on 2026-11-14:
   and the job peaked at 1,735 MiB under 8 GiB. The initial direct invocation
   omitted Hadrian's Make/tool environment. Its printer failure is preserved;
   v2 supplies that environment and runs the same five tests.
-- The 23 compiler input hashes and the previous-format reader's three hashes
+- The 22 compiler input hashes and the previous-format reader's three hashes
   remain unchanged. Both source snapshots match the example files. Fourmolu
   checks, compiler parsing, an ignored Cabal-gild copy and whitespace checks
   pass. The Default MR template requires regression coverage.
