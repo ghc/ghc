@@ -3,13 +3,13 @@
   "cache_directory": "_build/verification/dependent-haskell-papers-2026-11-14",
   "storage_note": "PDFs and extraction artifacts remain in the ignored cache. This manifest records references and reading coverage only.",
   "verification": {
-    "verified_utc": "2026-11-14T21:51:26Z",
+    "verified_utc": "2026-11-14T22:32:03Z",
     "pdf_reader": "pypdf 7.1.0",
-    "checks": "All eight cached PDFs match the recorded SHA256 and byte counts. PDF page counts were checked with pypdf.",
-    "work_count": 6,
-    "pdf_count": 8
+    "checks": "All nine cached PDFs match the recorded SHA256 and byte counts. PDF page counts were checked with pypdf.",
+    "work_count": 7,
+    "pdf_count": 9
   },
-  "reading_scope_note": "Reading scopes come from the six cached metadata records. No full-thesis reading, full-appendix audit or formal proof replay is claimed. These readings do not certify the compiler implementation.",
+  "reading_scope_note": "Reading scopes come from the seven cached metadata records. No full-thesis reading, full-appendix audit or formal proof replay is claimed. These readings do not certify the compiler implementation.",
   "works": [
     {
       "id": "haskell2012-singletons",
@@ -433,6 +433,89 @@
             ]
           },
           "printed_pages": "1:1–1:42"
+        }
+      ]
+    },
+    {
+      "id": "icfp2020-quick-look",
+      "title": "A Quick Look at Impredicativity",
+      "authors": [
+        "Alejandro Serrano",
+        "Jurriaan Hage",
+        "Simon Peyton Jones",
+        "Dimitrios Vytiniotis"
+      ],
+      "year": 2020,
+      "venue": "Proceedings of the ACM on Programming Languages 4 (ICFP), article 89",
+      "doi": "10.1145/3408971",
+      "bibliography_source_url": "https://simon.peytonjones.org/quick-look/",
+      "published_extent": "The institutional publication record gives article pages 1–29.",
+      "published_extent_source_url": "https://research-portal.uu.nl/en/publications/a-quick-look-at-impredicativity/",
+      "version_note": "The downloaded author-hosted PDF explicitly reports January 2026 corrections relative to the published ICFP 2020 version. This file has 33 PDF pages, and its own citation says 33 pages. The institutional record gives the published article as 29 pages. No byte identity or full page correspondence is asserted.",
+      "reading_metadata": "icfp2020-quicklook-metadata.json",
+      "versions": [
+        {
+          "id": "author-corrected-january-2026",
+          "description": "Author-hosted PDF with January 2026 corrections relative to the published ICFP 2020 paper.",
+          "pdf_filename": "icfp2020-quicklook.pdf",
+          "source_url": "https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf",
+          "sha256": "cd2702e52a609806597890bea8f89a7bfd2fe28e8f3d158a40bf3ba894336f25",
+          "bytes": 715853,
+          "pdf_pages": 33,
+          "accessed_utc": "2026-11-14T22:16:23Z",
+          "access_time_basis": "Access time recorded during the original PDF download. A later local copy did not fetch a new version.",
+          "reading_scope": {
+            "summary": "Selected checking, instantiation, application, qualified-type, and implementation sections read. This was not a full-paper or proof audit.",
+            "pdf_pages": [
+              1,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ],
+            "printed_page_ranges": [
+              "89:1",
+              "89:4–89:15",
+              "89:18–89:23"
+            ],
+            "sections": [
+              "Title, author list, version statement, citation, and first introduction page.",
+              "Section 3 overview and Sections 3.1–3.4.",
+              "Section 4, including Figures 2–4, bidirectional checking, application-head lookup, instantiation, and VTA.",
+              "Section 5 introduction and Sections 5.1–5.8, including Figure 5 and the function-arrow invariance discussion.",
+              "Final Section 6.3 transformation discussion and Section 7 introduction.",
+              "Sections 7.1–7.2, Figures 6–8, inference-variable invariant, and soundness statement.",
+              "Section 8 and Figures 9–10: qualified types, local assumptions, and GADTs.",
+              "Section 9 implementation, including the qualified-argument order issue."
+            ],
+            "visual_checks": [
+              "Figure 4 on PDF page 8.",
+              "Figure 7 on PDF page 19."
+            ],
+            "excluded": [
+              "The complete introduction and motivation sections.",
+              "Section 5.9 and Section 6 were not read in full. Only the final Section 6.3 transformation discussion on page 89:18 was read.",
+              "The complete applications and related-work sections, references, or appendices.",
+              "A replay or independent verification of the paper proofs.",
+              "Byte identity with the published ACM PDF or a comparison of all 2026 corrections.",
+              "A build, execution, or implementation test of the proposed GHC adaptation."
+            ]
+          },
+          "printed_pages": "89:1–89:33"
         }
       ]
     },

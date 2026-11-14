@@ -1,6 +1,6 @@
 # Dependent Haskell paper reading
 
-Read on 2026-11-14. The [manifest](manifest.json) records six works and eight
+Read on 2026-11-14. The [manifest](manifest.json) records seven works and nine
 downloaded PDF versions. It contains source URLs, checksums, page counts and
 the exact reading scope. PDF copies and extraction files are local in
 `_build/verification/dependent-haskell-papers-2026-11-14/`.
@@ -16,6 +16,7 @@ sections. No Coq development was rebuilt for this reading.
 | [Dependent Types in Haskell: Theory and Practice](https://richarde.dev/papers/2016/thesis/eisenberg-thesis.pdf) | Eisenberg, PhD thesis, 2016; supervised by Weirich | Binder properties, Pico and Bake |
 | [A Specification for Dependent Types in Haskell](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf) | Weirich, Voizard, de Amorim and Eisenberg, ICFP 2017 | D/DC, equality assumptions, erasure and nontermination |
 | [A Role for Dependent Types in Haskell](https://richarde.dev/papers/2019/dep-roles/dep-roles.pdf) | Weirich, Choudhury, Voizard and Eisenberg, ICFP 2019 | Nominal and representational dependent equality |
+| [A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf) | Serrano, Hage, Peyton Jones and Vytiniotis, ICFP 2020 | Instantiation, known variables and ordinary final checking |
 | [A Graded Dependent Type System with a Usage-Aware Semantics](https://richarde.dev/papers/2021/grad/grad.pdf) | Choudhury, Eades, Eisenberg and Weirich, POPL 2021 | Runtime usage, erasure and the limits of resource claims |
 
 ## Singletons, Haskell 2012
@@ -114,6 +115,38 @@ The paper does not prove our deep free-Id filter or cache policy. Its coercion
 quantifier is not an ordinary Haskell class dictionary. Source type classes are
 outside its calculus (section 3, page 7). It therefore does not directly justify
 admitting the next qualified-Pi source examples.
+
+## Quick Look, ICFP 2020
+
+Read selected sections on checking, application, instantiation, qualified types
+and implementation. The manifest lists the exact pages. The author PDF has
+33 pages and reports January 2026 corrections. The published 2020 citation gives
+29 pages. These versions are not assumed to be identical. The appendices were
+not read and the proofs were not replayed.
+
+The `h-var` rule retrieves the existing variable type (Figure 3, printed page
+89:7). With no leading quantifiers, `iresult` preserves that type for an empty
+argument list (Figures 4 and 8, pages 89:8 and 89:20). Final checking still emits
+result equality (Figure 7, page 89:19). An empty argument list alone is not
+sufficient: a leading `forall` still needs instantiation. The empty-list example
+uses the expected result to select that instantiation (sections 3.1 and 5.5,
+pages 89:5 and 89:14). Qualified types retain constraint entailment and local
+assumptions (section 8, pages 89:21–22). Automatic eta expansion changes lazy
+program semantics (section 5.8, page 89:15).
+
+With `ImpredicativeTypes`, our fork uses `NoQL` for an actual variable with no
+source arguments and no leading `forall` or context. The actual type or an
+available expected type must contain native syntax. The types must have no
+free QL instantiation variables. This route supports checking and inference
+from an existing variable type, including a proof case scrutinee. It preserves
+the ordinary `InferResult` path, final subsumption and native evidence scope.
+It does not eta-expand the variable. See Note
+`[Known native variables with ImpredicativeTypes]` in `GHC.Tc.Gen.App`.
+
+This is a restricted GHC adaptation. It adds no general Quick Look inference
+for native types and does not permit native types in mutable type metavariables.
+The paper's soundness theorem covers its own language (section 7.2, page 89:21).
+It does not certify our runtime indices, `DepFunTy` or `DepFunCo`.
 
 ## GraD, POPL 2021
 

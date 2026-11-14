@@ -7,9 +7,9 @@ Later changes to proposal status, package bounds, branches, or documentation nee
 verification. A link to a mutable branch identifies the inspected source, not a
 permanent compatibility guarantee.
 The Pi normalization sources below were checked on 2026-11-13.
-Six research works were fetched and read on 2026-11-14. See the
+Seven research works were fetched and read on 2026-11-14. See the
 [paper reading ledger](papers/README.md) for page-specific findings and the
-[version manifest](papers/manifest.json) for all eight PDF hashes and reading
+[version manifest](papers/manifest.json) for all nine PDF hashes and reading
 scopes. This includes selected thesis chapters, not the full thesis.
 
 See [the project overview](README.md) for the objective. See [the implementation
@@ -2544,9 +2544,12 @@ They do not equate Haskell class dictionaries with FC equality evidence.
 
 GHC's existing application pipeline needs a separate checked-variable path.
 A bare actual variable with no leading invisible quantifier or context needs
-no type instantiation. Select `NoQL` only in checking mode, with no arguments,
-known native syntax and no existing Quick Look instantiation variables in
-the zonked types. Use the native-aware deep free-variable traversal. The
+no type instantiation. Select `NoQL` with no arguments, known native syntax
+and no existing Quick Look instantiation variables in the zonked types.
+Read an available expected type without allocating an inference cell. A
+case scrutinee can return its existing type through `InferResult`; its level,
+promotion and runtime-representation checks remain active. Use the
+native-aware deep free-variable traversal. The
 Quick Look traversal itself rejects retained binders and indices. Preserve
 final subsumption and native evidence capture. This does not add general
 native Quick Look inference or establish a soundness theorem.
@@ -2555,3 +2558,21 @@ Eight Agda source records are pinned in
 `native-qualified-pi-prior-art-v1/provenance.json`. Six full-file Git blobs
 were checked locally; two records use tagged source ranges. Keep this
 provenance separate from the frozen M33 evidence.
+
+Serrano, Hage, Peyton Jones and Vytiniotis,
+[A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf),
+ICFP 2020, supplies the application algorithm. The downloaded author copy
+contains January 2026 corrections and 33 pages; the published citation has
+29 pages. `h-var` retrieves a known type (Figure 3, page 7). `iresult` can
+finish with empty arguments and substitution (Figure 4, page 8). Leading
+foralls still instantiate. Final result equality remains required (Figure 7,
+page 19). Section 5.8 warns that eta expansion changes lazy behavior (page 15).
+See [the exact reading scope](papers/README.md#quick-look-icfp-2020).
+
+The first end-to-end source probe also identifies a synonym boundary.
+`checkTyConApp` normally rejects a non-tau synonym unless `rewriterView`
+expands it. On the native Given path, expand synonyms with `coreView`, then
+perform the same recursive check as for the written RHS. Preserve occurrence
+checks inside predicates and results. All other paths keep the existing
+synonym policy. See Notes [Rigid retained indices] and
+[Forgetful synonyms in checkTyConApp] in `GHC.Tc.Utils.Unify`.
