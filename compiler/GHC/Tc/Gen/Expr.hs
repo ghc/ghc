@@ -450,7 +450,23 @@ tcExpr (ExplicitList _ exprs) res_ty
 
 tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
   | all tupArgPresent tup_args
-  = do { let arity  = length tup_args
+  = do { native_infer <- case res_ty of
+             Infer _ | Boxed <- boxity
+               -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+                     ; if enabled
+                       then snd <$> tcRetainedInferableArg (noLocA expr)
+                       else return False }
+             _ -> return False
+       ; if native_infer
+         then do { checkTupSize (length tup_args)
+                 ; let con = wrapGenSpan (HsVar noExtField
+                               (noLocA (dataConName (tupleDataCon Boxed (length tup_args)))))
+                       app = foldl' (\fun arg -> wrapGenSpan (HsApp noExtField fun arg))
+                                    con [arg | Present _ arg <- tup_args]
+                 -- See Note [Inference of native tuple fields].
+                 ; tcCollectApp (mkExpandedExpr expr (unLoc app)) res_ty }
+         else do
+       { let arity  = length tup_args
              tup_tc = tupleTyCon boxity arity
                -- NB: tupleTyCon doesn't flatten 1-tuples
                -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
@@ -462,7 +478,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; let arg_tys' = case boxity of Unboxed -> drop arity arg_tys
                                        Boxed   -> arg_tys
        ; tup_args1 <- tcCheckExplicitTuple tup_args arg_tys'
-       ; return $ mkHsWrapCo coi (ExplicitTuple x tup_args1 boxity) }
+       ; return $ mkHsWrapCo coi (ExplicitTuple x tup_args1 boxity) } }
 
   | otherwise
   = -- The tup_args are a mixture of Present and Missing (for tuple sections).
@@ -925,6 +941,29 @@ tcInferTupArgs boxity args
     case boxity of
       Unboxed -> newOpenFlexiFRRTyVarTy (FRRUnboxedTupleSection i)
       Boxed   -> newFlexiTyVarTy liftedTypeKind
+
+{- Note [Inference of native tuple fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If xs :: Vec Int n, inferring (42, xs) must retain that exact second field
+type. The ordinary tuple path first allocates component meta-variables.
+Those variables cannot contain a runtime Id such as n.
+
+Under ExperimentalDependentTypes, expand a complete boxed tuple to its
+ordinary data constructor when the result is an InferResult and a field
+has a native anchor. Use tcRetainedInferableArg to classify the fields
+without checking them or running splices. The application checker infers
+and caches native fields, chooses their types immutably, and checks the
+other fields normally. It retains scope, kind, usage and subsumption checks.
+
+Use the existing expansion wrapper and generated application spans. Keep
+the original tuple context and the user-written field spans in diagnostics.
+A known expected type still uses component checking, including higher-rank
+fields. Tuple sections and unboxed tuples keep their existing paths.
+
+The ordinary product does not bind a runtime index. Returning (n, xs) cannot
+hide a free callback-local n. Use an explicit package for that purpose.
+See docs/dependent-haskell/REFERENCES.md#boxed-tuple-inference-prior-art.
+-}
 
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary

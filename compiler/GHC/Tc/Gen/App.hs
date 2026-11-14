@@ -11,7 +11,8 @@
 
 module GHC.Tc.Gen.App
        ( tcApp
-       , tcExprPrag ) where
+       , tcExprPrag
+       , tcRetainedInferableArg ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr, tcInferRho )
 
@@ -1539,6 +1540,9 @@ expected-type check. A named application can contain these expressions as
 arguments. Its own application checker supplies their expected types.
 Calls without an anchor keep their ordinary checking behavior. Constructors
 and Ids with concreteness requirements also keep ordinary instantiation.
+Complete boxed tuples can also supply an anchor through their fields.
+In inference mode, they use the ordinary tuple-constructor application path.
+See Note [Inference of native tuple fields] in GHC.Tc.Gen.Expr.
 
 A complete expression signature supplies its own checking type. Infer signed
 arguments such as (42 :: Int) through the same cache. In nested inference,
@@ -1592,7 +1596,7 @@ retains the completed immutable mode and cannot allocate another type meta.
 The existing flat routes still apply their type arguments directly.
 -}
 
--- | Classify named or completely signed arguments without elaboration.
+-- | Classify named, completely signed or boxed tuple arguments without elaboration.
 tcRetainedInferableArg :: LHsExpr GhcRn -> TcM (Bool, Bool)
 tcRetainedInferableArg (L _ expr)
   = case expr of
@@ -1612,6 +1616,10 @@ tcRetainedInferableArg (L _ expr)
                 else do { (_, arg_anchor) <- tcRetainedInferableArg arg
                         ; return (True, fun_anchor || arg_anchor) } }
       HsAppType _ fun _ -> tcRetainedInferableArg fun
+      ExplicitTuple _ args Boxed
+        | all tupArgPresent args
+        -> do { shapes <- mapM tcRetainedInferableArg [arg | Present _ arg <- args]
+              ; return (True, any snd shapes) }
       ExprWithTySig _ arg sig@(HsWC { hswc_body = L _ (HsSig { sig_bndrs = bndrs
                                                             , sig_body = body }) })
         | isCompleteHsSig sig, null (hsOuterTyVarNames bndrs), simple_type body
