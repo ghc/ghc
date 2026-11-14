@@ -79,9 +79,9 @@ regSpill platform code slotsFree slotCount regs
                                            -- See Note [UniqFM and the register allocator]
                                 $ listToUFM
                                 $ zip (nonDetEltsUniqSet regs) slots :: UniqFM Reg Int
-                    -- This is non-deterministic but we do not
-                    -- currently support deterministic code-generation.
-                    -- See Note [Unique Determinism and code generation]
+                    -- The order of both lists decides which free slots
+                    -- are taken and which spilled vreg gets each
+                    -- (Note [Unique Determinism and code generation])
 
                 -- Grab the unique supply from the monad.
                 UDSM $ \us ->

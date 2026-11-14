@@ -890,8 +890,8 @@ apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
 -- -----------------------------------------------------------------------------
 -- Instruction selection
 
--- Native code instruction selection for a chunk of stix code.  For
--- this part of the computation, we switch from the UniqSM monad to
+-- Native code instruction selection for a chunk of Cmm.  For
+-- this part of the computation, we switch from the UniqDSM monad to
 -- the NatM monad.  The latter carries not only a Unique, but also an
 -- Int denoting the current C stack pointer offset in the generated
 -- code; this is needed for creating correct spill offsets on

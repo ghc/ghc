@@ -250,8 +250,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     :default: off but enabled by :ghc-flag:`-O`.
 
     Enables the sinking pass in the code generator.
-    This optimisation attempts to find identical Cmm blocks and
-    eliminate the duplicates attempts to move variable bindings closer
+    This optimisation attempts to move variable bindings closer
     to their usage sites. It also inlines simple expressions like
     literals or registers.
 
@@ -263,10 +262,15 @@ as such you shouldn't need to set any of them explicitly. A flag
 
     :default: off but enabled by :ghc-flag:`-O`.
 
-    This enables static control flow prediction on the final Cmm
-    code. If enabled GHC will apply certain heuristics to identify
-    loops and hot code paths. This information is then used by the
-    register allocation and code layout passes.
+    This enables static control flow prediction in the native code generator
+    for x86-64. If enabled GHC will apply certain heuristics to identify loops
+    and hot code paths, and use this information to lay out the code and to
+    order the jumps of some conditional branches. On x86-64 the graph colouring
+    allocators (:ghc-flag:`-fregs-graph`, :ghc-flag:`-fregs-iterative`) weight
+    the register uses and definitions they count by the same heuristics whatever
+    this flag says, unless :ghc-flag:`-finfo-table-map` is on, but they choose
+    what to spill by live range length alone, so this flag does not change their
+    allocation. It has no effect when :ghc-flag:`-finfo-table-map` is on.
 
 .. ghc-flag:: -fcmm-control-flow
     :shortdesc: Enable control flow optimisation in the Cmm backend. Implied by :ghc-flag:`-O`.

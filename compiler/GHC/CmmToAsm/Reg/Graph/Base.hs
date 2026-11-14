@@ -96,9 +96,8 @@ worst regsOfClass regAlias neighbors classN classC
  = let  regAliasS regs  = unionManyUniqSets
                         $ map regAlias
                         $ nonDetEltsUniqSet regs
-                        -- This is non-deterministic but we do not
-                        -- currently support deterministic code-generation.
-                        -- See Note [Unique Determinism and code generation]
+                        -- The union does not depend on the order
+                        -- (Note [Unique Determinism and code generation])
 
         -- all the regs in classes N, C
         regsN           = regsOfClass classN
