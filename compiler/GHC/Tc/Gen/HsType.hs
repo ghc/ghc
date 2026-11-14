@@ -741,8 +741,8 @@ Keep the original source span when entering this checker through tcHsType.
 
 Do not select this rule by the printed name of an equality constructor.
 Ordinary checked type applications share the same type formation. This does
-not permit a retained Pi as a kind. It does not change isTauTy, erased forall
-checking or the restrictions on mutable type-variable assignment. Checking
+not admit literal foreach syntax in a kind. It does not change isTauTy, erased
+forall checking or the restrictions on mutable type-variable assignment. Checking
 an existing Given is separate; see Note [Rigid retained indices] in
 GHC.Tc.Utils.Unify. Agda's Pi formation and equality transport motivate this
 rule. See docs/dependent-haskell/REFERENCES.md#retained-function-types-as-equality-operands.
