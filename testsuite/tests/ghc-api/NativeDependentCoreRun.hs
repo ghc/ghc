@@ -1684,6 +1684,36 @@ runModuleChecks libdir = do
         , "runtime outer-index Given: (3,2,[9,9,9],[True,True],True)"
         , "outer-index Given ignores bottom index: ok"
         , "outer-index Given ignores unused payload: []"
+        , "runtime Pi operand: (0,[],[],[])"
+        , "runtime Pi operand: (1,[7],[7],[7])"
+        , "runtime Pi operand: (2,[7,7],[7,7],[7,7])"
+        , "runtime Pi operand: (3,[7,7,7],[7,7,7],[7,7,7])"
+        , "direct Pi operand preserves bottom function: native-pi-operand-bottom-function"
+        , "eta Pi operand returns a function: ok"
+        , "eta Pi operand demands applied function: native-pi-operand-bottom-function"
+        , "unused Pi operand ignores bottom function: 42"
+        , "Pi operand proof precedes bottom function: native-pi-operand-bottom-proof"
+        , "unused Pi operand ignores bottom proof: 42"
+        , "Pi operand Refl preserves bottom function: native-pi-operand-bottom-function"
+        , "unused Pi operand ignores bottom index: 42"
+        , "unused Pi operand ignores cyclic index: 42"
+        , "Pi operand vector retains index demand: packed-bottom-length"
+        , "Pi operand partial index prefix: [7]"
+        , "Pi operand cyclic index prefix: [7,7]"
+        , "Pi operand shares original function: True"
+        , "Pi operand shares named result: True"
+        , "Pi operand shares original IORef payload: True"
+        , "runtime outer Pi operand: (0,1,[],[True],True)"
+        , "runtime outer Pi operand: (2,3,[9,9],[True,True,True],True)"
+        , "outer Pi operand ignores bottom index: ok"
+        , "outer Pi operand ignores unused payload: []"
+        , "Pi operand vector error precedes index: packed-bottom-payload"
+        , "runtime lifted Pi operand: (0,0,[],[])"
+        , "runtime lifted Pi operand: (1,2,[7,7],[True])"
+        , "runtime lifted Pi operand: (2,1,[7],[True,True])"
+        , "runtime lifted Pi operand: (3,3,[7,7,7],[True,True,True])"
+        , "lifted Pi operand shares outer function: True"
+        , "lifted Pi operand projection ignores bottom outer index: ok"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -3061,6 +3091,26 @@ runPackageSourceRejectChecks = do
         , ("PiGivenRepresentationalEvidenceIsNotNominal", 83865, "Couldn't match", ["TypeFamilies"], ["import Data.Coerce (Coercible)"], ["transportCoercible :: forall a b. Coercible a b => (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec b n)", "transportCoercible f = f"])
         , ("PiGivenOuterProofCannotIdentifyInnerIndex", 83865, "Couldn't match", ["TypeFamilies"], [], ["wrongInner :: forall a. foreach (k :: Nat) -> (a ~ Vec Int k) => (foreach (n :: Nat) -> (a, Vec Bool n)) -> (foreach (n :: Nat) -> (Vec Int n, Vec Bool n))", "wrongInner k f = f"])
         , ("PiGivenNativeFamilyOccursCycleCannotTransport", 83865, "Couldn't match", ["TypeFamilies"], [], ["type family Cycle a (n :: Nat)", "wrongCycle :: forall a. foreach (k :: Nat) -> (a ~ Maybe (Cycle a k)) => (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec Bool n)", "wrongCycle k f = f"])
+        , ("PiOperandMissingRetainedPiProof", 91028, "Cannot equate type variable", ["TypeFamilies", "FlexibleContexts"], [], ["withoutPiProof :: forall value. value -> (foreach (n :: Nat) -> Vec Int n)", "withoutPiProof f = f"])
+        , ("PiOperandUnrelatedProofCannotExposePi", 91028, "Cannot equate type variable", ["TypeFamilies", "FlexibleContexts", "AllowAmbiguousTypes"], [], ["fromWrongPi :: forall left right. left ~ (foreach (n :: Nat) -> Vec Int n) => right -> (foreach (n :: Nat) -> Vec Int n)", "fromWrongPi f = f"])
+        , ("PiOperandBranchProofCannotEscape", 91028, "Cannot equate type variable", ["TypeFamilies", "FlexibleContexts"], ["import Data.Type.Equality ((:~:)(Refl))"], ["fromScopedProof :: forall value. Bool -> (value :~: (foreach (n :: Nat) -> Vec Int n)) -> value -> (foreach (n :: Nat) -> Vec Int n)", "fromScopedProof flag proof f = case flag of { True -> case proof of { Refl -> f }; False -> f }"])
+        , ("PiOperandFamilyCycleCannotProveUnrelatedPi", 91028, "Cannot equate type variable", ["TypeFamilies", "FlexibleContexts"], [], ["type family Cycle value (index :: Nat)", "wrongCycle :: forall value. foreach (k :: Nat) -> value ~ (foreach (n :: Nat) -> Vec (Cycle value k) n) => value -> (foreach (n :: Nat) -> Vec Bool n)", "wrongCycle k f = f"])
+        , ("PiOperandDistinctOuterRuntimeIndices", 83865, "Couldn't match", ["TypeFamilies", "FlexibleContexts"], [], ["wrongOuterPi :: forall value. foreach (k :: Nat) -> foreach (m :: Nat) -> value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> (foreach (n :: Nat) -> (Vec Int m, Vec Bool n))", "wrongOuterPi k m f = f"])
+        , ("PiOperandRepresentationalEvidenceCannotSupplyNominalProof", 91028, "Cannot equate type variable", ["TypeFamilies", "FlexibleContexts", "AllowAmbiguousTypes"], ["import Data.Coerce (Coercible)"], ["wrongRolePi :: forall left right. (Coercible left right, left ~ (foreach (n :: Nat) -> Vec Int n)) => right -> (foreach (n :: Nat) -> Vec Int n)", "wrongRolePi f = f"])
+        , ("PiOperandLinearOuterIndexCaptureRejected", 83605, "already-bound unrestricted local value", ["TypeFamilies", "FlexibleContexts", "LinearTypes"], [], ["consumeNat :: Nat %1 -> Int", "consumeNat Z = 42", "consumeNat (S rest) = consumeNat rest", "bad :: Nat %1 -> Int", "bad k = let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in consumeNat k"])
+        , ("PiOperandUnsupportedPiDomainRejected", 83605, "supported closed first-order algebraic domain", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall value. value ~ (foreach (n :: Int) -> Int) => value -> Int -> Int", "bad f = f"])
+        , ("PiOperandPartialPiOperandRejected", 83605, "complete type signature", ["TypeFamilies", "FlexibleContexts", "PartialTypeSignatures"], [], ["bad :: forall value. value ~ (foreach (n :: Nat) -> Vec _ n) => value -> (foreach (n :: Nat) -> Vec Int n)", "bad f = f"])
+        , ("PiOperandQuotedPiOperandCaptureRejected", 83605, "Template Haskell", ["TypeFamilies", "FlexibleContexts", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| let { keep :: forall value. value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => value -> value; keep f = f } in (42 :: Int) |]"])
+        , ("PiOperandEqualityOperandKindMismatch", 83865, "Expected kind", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall (value :: Nat). value ~ (foreach (n :: Nat) -> Vec Int n) => Int", "bad = 42"])
+        , ("PiOperandErasedForallArgumentUnchanged", 91510, "Illegal polymorphic type", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], [], ["bad :: Maybe (forall a. a -> a) -> Int", "bad _ = 42"])
+        , ("PiOperandPiKindUnchanged", 43582, "not supported in this type position", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], ["import Data.Proxy (Proxy(..))"], ["bad :: forall (a :: foreach (n :: Nat) -> Vec Int n). Proxy a", "bad = Proxy"])
+        , ("PiOperandRecursivePiCannotProveUnrelated", 91028, "Cannot equate type variable", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall value. value ~ (foreach (n :: Nat) -> Vec value n) => value -> (foreach (n :: Nat) -> Vec Bool n)", "bad f = f"])
+        , ("PiOperandNamedHoleInsidePiArgument", 83605, "must be complete", ["TypeApplications", "NamedWildCards"], [], ["bad :: Maybe (foreach (n :: Nat) -> Vec Int n) -> Maybe (foreach (n :: Nat) -> Vec Int n)", "bad f = id @(Maybe (foreach (n :: Nat) -> Vec _a n)) f"])
+        , ("PiOperandAnonymousHoleBesidePiArgument", 83605, "must be complete", ["TypeApplications", "NamedWildCards"], [], ["bad :: Either Int (foreach (n :: Nat) -> Vec Int n) -> Either Int (foreach (n :: Nat) -> Vec Int n)", "bad f = id @(Either _ (foreach (n :: Nat) -> Vec Int n)) f"])
+        , ("PiOperandSplicedHoleBesidePiArgument", 83605, "must be complete", ["TypeApplications", "TemplateHaskell"], ["import Language.Haskell.TH (Type(WildCardT))"], ["bad :: Either Int (foreach (n :: Nat) -> Vec Int n) -> Either Int (foreach (n :: Nat) -> Vec Int n)", "bad f = id @(Either $(pure WildCardT) (foreach (n :: Nat) -> Vec Int n)) f"])
+        , ("PiOperandRecursivePiCannotRewriteBeneathBinder", 83865, "Couldn't match", ["TypeFamilies", "FlexibleContexts"], [], ["bad :: forall value. value ~ (foreach (n :: Nat) -> Vec value n) => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Vec Bool n), Vec Bool m))", "bad f = f"])
+        , ("PiOperandSynonymPiCannotSupplyMissingProof", 91028, "Cannot equate type variable", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], [], ["type Pi = foreach (n :: Nat) -> Vec Int n", "bad :: forall value. value -> Pi", "bad f = f"])
+        , ("PiOperandPiKindViaAlias", 91028, "Cannot instantiate unification variable", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], ["import Data.Proxy (Proxy(..))"], ["type Pi = foreach (n :: Nat) -> Vec Int n", "bad :: forall (a :: Pi). Proxy a", "bad = Proxy"])
         , ("PiVTAIndependentRuntimeIndexMismatch", 83865, "Couldn't match", ["TypeApplications"], [], localActions ++ ["bad :: Nat -> Nat -> Int", "bad k m = length (toListLocal (id @(Vec Int k) (localVector m)))"])
         , ("PiVTALexicalShadowRejectsOuter", 83865, "Couldn't match", ["TypeApplications"], [], localActions ++ ["bad :: Nat -> Nat -> Int", "bad k input = let { outer :: Vec Int k; outer = localVector k; apply :: Nat -> Int; apply k = length (toListLocal (id @(Vec Int k) outer)) } in apply input"])
         , ("PiVTASplicedWildcardCannotCaptureIndex", 83605, "must be complete", ["TypeApplications", "TemplateHaskell"], ["import Language.Haskell.TH (Type(WildCardT))"], localActions ++ ["bad :: Nat -> Int", "bad k = length (toListLocal (id @(Vec $(pure WildCardT) k) (localVector k)))"])
@@ -3124,6 +3174,50 @@ runPackageSourceRejectChecks = do
                                ]
                             ++ declarations
             sourceModuleRejects name code fragment moduleName source
+    -- Check Pi formation and immutable proof transport without adding output.
+    forM_
+        [ ("OrdinaryArrowGiven", ["TypeFamilies", "FlexibleContexts"], [], ["ordinaryArrow :: forall value. value ~ (Int -> Int) => value -> Int -> Int", "ordinaryArrow f = f"])
+        , ("IdenticalRetainedPi", ["TypeFamilies", "FlexibleContexts"], [], ["identicalPi :: (foreach (n :: Nat) -> Vec Int n) -> (foreach (n :: Nat) -> Vec Int n)", "identicalPi f = f"])
+        , ("GivenRetainedPiRhs", ["TypeFamilies", "FlexibleContexts"], [], ["fromGivenPi :: forall value. value ~ (foreach (n :: Nat) -> Vec Int n) => value -> (foreach (n :: Nat) -> Vec Int n)", "fromGivenPi f = f"])
+        , ("ReflRetainedPiRhs", ["TypeFamilies", "FlexibleContexts"], ["import Data.Type.Equality ((:~:)(Refl))"], ["fromReflPi :: forall value. (value :~: (foreach (n :: Nat) -> Vec Int n)) -> value -> (foreach (n :: Nat) -> Vec Int n)", "fromReflPi proof f = case proof of Refl -> f"])
+        , ("GivenOuterIndexRetainedPiRhs", ["TypeFamilies", "FlexibleContexts"], [], ["fromOuterGivenPi :: forall value. foreach (k :: Nat) -> value ~ (foreach (n :: Nat) -> Vec (Vec Int k) n) => value -> (foreach (n :: Nat) -> Vec (Vec Int k) n)", "fromOuterGivenPi k f = f"])
+        , ("SymmetricRetainedPiOperand", ["TypeFamilies", "FlexibleContexts"], [], ["fromSymmetricPi :: forall value. (foreach (n :: Nat) -> Vec Int n) ~ value => value -> (foreach (n :: Nat) -> Vec Int n)", "fromSymmetricPi f = f"])
+        , ("TransitiveRetainedPiOperand", ["TypeFamilies", "FlexibleContexts", "AllowAmbiguousTypes"], [], ["fromTransitivePi :: forall left right. (left ~ right, right ~ (foreach (n :: Nat) -> Vec Int n)) => left -> (foreach (n :: Nat) -> Vec Int n)", "fromTransitivePi f = f"])
+        , ("NestedFixedDomainPiOperand", ["TypeFamilies", "FlexibleContexts"], [], ["fromNestedPi :: forall value. value ~ (foreach (n :: Nat) -> foreach (m :: Nat) -> (Vec Int n, Vec Bool m)) => value -> (foreach (n :: Nat) -> foreach (m :: Nat) -> (Vec Int n, Vec Bool m))", "fromNestedPi f = f"])
+        , ("VacuousPiMatchesOrdinaryArrow", ["TypeFamilies", "FlexibleContexts"], [], ["fromVacuousPi :: forall value. value ~ (foreach (n :: Nat) -> Int) => value -> Nat -> Int", "fromVacuousPi f = f"])
+        , ("UnusedFamilyCycleAssumption", ["TypeFamilies", "FlexibleContexts"], [], ["type family Cycle value (index :: Nat)", "preserveCycle :: forall value. foreach (k :: Nat) -> value ~ (foreach (n :: Nat) -> Vec (Cycle value k) n) => value -> value", "preserveCycle k f = f"])
+        , ("GenericDatatypePi", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], [], ["ignore :: Maybe (foreach (n :: Nat) -> Vec Int n) -> Int", "ignore _ = 42"])
+        , ("ExplicitPiArgument", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], [], ["same :: (foreach (n :: Nat) -> Vec Int n) -> (foreach (n :: Nat) -> Vec Int n)", "same f = id @(foreach (n :: Nat) -> Vec Int n) f"])
+        , ("UnusedRecursivePiAssumption", ["TypeFamilies", "FlexibleContexts"], [], ["unused :: forall value. value ~ (foreach (n :: Nat) -> Vec value n) => value -> value", "unused f = f"])
+        , ("OrdinarySplicedHoleUnchanged", ["TypeApplications", "TemplateHaskell"], ["import Language.Haskell.TH (Type(WildCardT))"], ["good :: Int", "good = id @($(pure WildCardT)) (42 :: Int)"])
+        , ("OrdinaryNamedHoleUnchanged", ["TypeApplications", "NamedWildCards"], [], ["good :: Int", "good = id @_a (42 :: Int)"])
+        , ("RetainedTypeSynonymBoundary", [], [], ["type Pi = foreach (n :: Nat) -> Vec Int n"])
+        , ("PiGivenBeneathRetainedBinder", ["TypeFamilies", "FlexibleContexts"], [], ["liftGiven :: forall value. value ~ (foreach (n :: Nat) -> Vec Int n) => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Vec Int n), Vec Bool m))", "liftGiven f = f"])
+        , ("OuterPiGivenBeneathRetainedBinder", ["TypeFamilies", "FlexibleContexts"], [], ["liftOuter :: forall value. foreach (k :: Nat) -> value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n)) => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> (Vec Int k, Vec Bool n)), Vec Bool m))", "liftOuter k f = f"])
+        , ("SynonymPiGiven", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], [], ["type Pi = foreach (n :: Nat) -> Vec Int n", "fromAlias :: forall value. value ~ Pi => value -> Pi", "fromAlias f = f"])
+        , ("SynonymExplicitPiArgument", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], [], ["type Pi = foreach (n :: Nat) -> Vec Int n", "same :: Pi -> Pi", "same f = id @Pi f"])
+        , ("ExplicitPiKindViaAlias", ["TypeApplications", "PolyKinds", "StandaloneKindSignatures"], ["import Data.Kind (Type)"], ["type Pi = foreach (n :: Nat) -> Vec Int n", "type P :: forall k. k -> Type", "data P a = MkP", "bad :: forall (a :: Pi). P @Pi a", "bad = MkP @Pi @a"])
+        , ("FormerRetainedSynonymBoundary", [], [], ["type family Select (b :: Bool) where", "  Select True = Int", "  Select False = Bool", "type Bad = foreach (b :: Bool) -> Select b -> Select b"])
+        ]
+        $ \(name, extensions, imports, declarations) -> do
+            let moduleName = "NativeSourcePiOperand" ++ name
+                source =
+                    unlines $
+                        [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll #-}"
+                        , "{-# LANGUAGE GADTs, KindSignatures, RankNTypes, ScopedTypeVariables #-}"
+                        , "{-# LANGUAGE TypeApplications, TypeFamilies, TypeOperators #-}"
+                        ]
+                            ++ map (\extension -> "{-# LANGUAGE " ++ extension ++ " #-}") extensions
+                            ++ ["module " ++ moduleName ++ " where"]
+                            ++ imports
+                            ++ [ "data Nat = Z | S Nat"
+                               , "data Vec a (n :: Nat) where"
+                               , "  VNil :: Vec a Z"
+                               , "  VCons :: a -> Vec a n -> Vec a (S n)"
+                               ]
+                            ++ declarations
+                            ++ ["entry :: Int", "entry = 42"]
+            void $ sourceEntry moduleName source
     -- Keep the ordinary spliced wildcard on its existing inference path.
     void
         $ sourceEntry "NativeSourcePackageOrdinarySplicedWildcard"
@@ -3317,8 +3411,7 @@ runSourceRejectChecks = do
         , ("SPECIALISE expression pragma", 83605, "Optimisation pragmas", [], local ["{-# SPECIALISE keep True #-}"] selection identity "42")
         , ("unsigned retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["alias = keep"]) "42")
         , ("unsigned partial retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["index :: Bool", "index = False", "alias = keep index"]) "42")
-        , ("retained type in a type-constructor argument", 43582, "not supported in this type position", [], ["bad :: Maybe (foreach (b :: Bool) -> Select b -> Select b)", "bad = undefined"])
-        , ("retained type synonym", 43582, "not supported in this type position", [], ["type Bad = foreach (b :: Bool) -> Select b -> Select b"])
+        , ("implicit undefined instantiation of retained container", 91028, "Cannot instantiate unification variable", [], ["bad :: Maybe (foreach (b :: Bool) -> Select b -> Select b)", "bad = undefined"])
         , ("unregistered ordinary term name", 37479, "is a term-level binding", [], ["ordinary :: Bool", "ordinary = False", "type Bad = NativeSourceRejected.ordinary"])
         , ("constructor payload mismatch", 83865, "second argument", [], local [] selection identity "keep True False")
         ,
