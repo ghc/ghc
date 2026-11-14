@@ -1281,6 +1281,38 @@ must leave predecessor, head and tail fields lazy. A terminating finite input
 supports the functional interpretation. Partial and cyclic checks establish
 only their stated evaluation observations.
 
+## Runtime equality and aligned zip: next source probe
+
+Status: research for the next source target. No GHC implementation is verified.
+Compare two stored runtime lengths. On equality, return ordinary Haskell
+`Data.Type.Equality` evidence and use `Refl` to align two vector indices.
+Return `Maybe`, so the mismatch result carries no refutation proof.
+
+- Agda stdlib v2.3
+  [`Data.Nat.Properties`, lines 90–109](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Nat/Properties.agda#L90-L109),
+  derives propositional equality from natural-number comparison. Successor
+  injectivity and successor congruence support the recursive proof. File blob:
+  `3198ad7f4d783a46d30cc70751a198294d350892`. Its `_≟_` uses Boolean comparison
+  with proof generation. A structural Haskell comparison returning `Maybe`
+  would use a different algorithm and result representation.
+- [`Relation.Nullary.Decidable.Core`, lines 42–61](https://github.com/agda/agda-stdlib/blob/v2.3/src/Relation/Nullary/Decidable/Core.agda#L42-L61),
+  defines `Dec` with a Boolean decision and reflected evidence. The `no` case
+  carries negative evidence. A Haskell `Nothing` does not supply that evidence.
+  File blob: `47b9e55b55bbff72ab21c21e144b2fc3d8f9c823`.
+- [`Data.Vec.Base`, lines 128–143](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L128-L143),
+  defines `zipWith` and `zip` for two vectors with the same index. The proposed
+  runtime comparison would establish that shared index for independent Haskell
+  packages. File blob: `8c03fb8a83e6cec1fa7b8e1f64bb7e606c531cb8`.
+- [`Relation.Binary.PropositionalEquality.Core`, lines 54–55](https://github.com/agda/agda-stdlib/blob/v2.3/src/Relation/Binary/PropositionalEquality/Core.agda#L54-L55),
+  defines `cong` by matching `refl`. This supports the successor proof shape;
+  it does not justify an additional GHC equality axiom. File blob:
+  `2db2dd64e1a8bbb9bda6410930e3bd15366719d7`.
+
+Use nested source cases within the current retained telescope subset. Probe
+the existing equality-Given path before adding a rule. A mismatch must leave
+vector payloads lazy. A partial index or equality proof can diverge when the
+consumer demands it. Agda's totality checks do not apply to these Haskell terms.
+
 ## Later solver and proof-certificate work
 
 These references concern additional equality reasoning. None is required for the

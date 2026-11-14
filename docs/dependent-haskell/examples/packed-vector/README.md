@@ -2,7 +2,7 @@
 
 The bootstrap and self-hosted compilers compile and run this source example.
 The consumer imports the library interface with the producer source absent
-from its import path. All 81 observations below pass with Core Lint and STG
+from its import path. All 102 observations below pass with Core Lint and STG
 Lint enabled.
 
 `PackedVecLibrary.hs` stores a runtime `Nat` and a `Vec` indexed by that same
@@ -146,6 +146,50 @@ field still reject with GHC-83605. No Core form or interface format changes.
 General projections and constructor patterns in retained index fields remain
 separate work. This increment does not establish totality or proof erasure.
 
+## Uncons with a runtime predecessor
+
+The source worker inspects the stored length and returns a packed tail:
+
+```haskell
+unconsPacked :: PackedVec a -> Maybe (a, PackedVec a)
+unconsPacked (PackVec n xs) = case n of
+    Z -> Nothing
+    S k -> case xs of
+        VCons x rest -> Just (x, PackVec k rest)
+```
+
+The checked case rule transports captured `xs` into the `S k` branch at
+`Vec a (S k)`. The ordinary vector pattern then relates its tail to `k`.
+The tail package stores that actual runtime predecessor. Agda's
+[indexed uncons and case abstraction](../../REFERENCES.md#source-vector-uncons)
+provide the relation and scope precedent. No runtime value is reconstructed
+from an erased vector index.
+
+`toListPacked` repeatedly calls this worker and consumes the returned tail
+packages. Inputs read through an IORef produce `Nothing`, head 42 with tail
+length 1, and head 42 with tail length 2. Draining filtered packages preserves
+their finite element order.
+
+The zero branch ignores an undefined vector. The successor branch inspects
+the vector constructor. Observing the result, pair and tail package does not
+force predecessor, head or tail. Separate observations force each field and
+check its named error. A bounded prefix of a specific cyclic input returns
+three elements. This is an evaluation observation, not a general productivity
+or totality result.
+
+The complete source observer exposed a Core Tidy boundary. It contains
+`PackVec (S bottomLength) (VCons bottomElement bottomPayload)`. Tidy globalises
+the top-level `bottomLength` Id. Native index leaves must remain local.
+The compiler now inserts lazy local aliases before tidying native RHSs and
+substitutes expressions, types and coercions together. CorePrep's existing
+native guard keeps the aliases. The failing expression remains in the program.
+The index grammar, Core forms and interface format stay unchanged.
+
+Packaging the tail with the original, successor or an independent length
+rejects at the payload with located GHC-25897. Existing retained-field and
+scope restrictions remain in force. Some diagnostics still show generated
+captured bindings in their relevant-binding details.
+
 ## Separate-module runner
 
 Run this from the repository root with matching compiler libraries.
@@ -270,6 +314,27 @@ nested head bottom package: packed-bottom-package
 nested proof bottom package: bounded-bottom-package
 wildcard repack bottom package: bounded-bottom-package
 guard fallback bottom package: packed-bottom-package
+runtime uncons: Nothing
+runtime uncons: 42:(1,[42])
+runtime uncons: 42:(2,[42,42])
+runtime drain filtered: [1,2,3]
+runtime drain filtered: [2,3]
+runtime drain filtered: []
+uncons zero ignores payload: Nothing
+drain zero ignores payload: []
+uncons index before payload: packed-bottom-length
+uncons successor demands vector: packed-bottom-payload
+uncons partial result: ok
+uncons partial pair: ok
+uncons partial tail package: ok
+uncons demands head: packed-filter-bottom-element
+uncons demands predecessor: packed-bottom-length
+uncons demands tail payload: packed-bottom-payload
+uncons cyclic predecessor result: ok
+uncons cyclic predecessor tail package: ok
+uncons cyclic predecessor head: 42
+uncons cyclic bounded prefix: [42,42,42]
+uncons bottom package: packed-bottom-package
 ```
 
 These observations check this source subset. They do not establish a general

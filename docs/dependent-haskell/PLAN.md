@@ -31,8 +31,14 @@ M13 is verified at `7a98362197`. Its source run passes 81 observations in both
 stages. Ordinary package fields admit nested vector/proof patterns and wildcards.
 Separate per-equation cases preserve retained field identity and source clause
 order. The API and runtime controls pass with 20 package/bound rejection checks.
-All five focused registered regressions pass. The next source target repackages
-a vector tail with its actual runtime predecessor.
+All five focused registered regressions pass.
+
+M14 is verified at `ed5b0f56e4`. Both compiler stages pass 102 source observations
+after the Core Tidy alias fix. Source uncons packages a vector tail with its
+actual runtime predecessor. Repeated uncons preserves finite element order and
+produces a bounded prefix from the tested cyclic input. The Core API and runtime
+fixture pass with 22 package/bound rejections. All five registered regressions
+pass. The original Core Lint failure remains in the verification artifacts.
 
 ## Direction and boundaries
 
@@ -1085,8 +1091,8 @@ The implementation and validation are recorded in
 Next, probe `unconsPacked :: PackedVec a -> Maybe (a, PackedVec a)`. Match the
 stored length with `Z` and `S k`. In the successor branch, match the vector
 and package its tail at actual runtime `k`. Keep the predecessor, head and
-tail lazy until a consumer demands them. This source target is not verified
-yet. It must use the current checked case rule before a new rule is proposed.
+tail lazy until a consumer demands them. This source target is verified in
+M14 below. It uses the existing checked case rule.
 
 ### M14: source vector uncons at an actual runtime predecessor
 
@@ -1107,16 +1113,16 @@ The existing checked case rule transports captured `xs` into the successor
 branch. Ordinary GADT evidence then relates the vector tail to `k`.
 See [the pinned sources](REFERENCES.md#source-vector-uncons).
 
-- [ ] Add the source worker and a source consumer that repeatedly opens its
+- [x] Add the source worker and a source consumer that repeatedly opens its
   tail packages. Keep Core, interface formats and compiler rules unchanged
   unless a concrete source failure requires a change.
-- [ ] Check IORef inputs, empty and nonempty results, finite element order and
+- [x] Check IORef inputs, empty and nonempty results, finite element order and
   tail lengths. Observe the result, pair and tail package separately. Check
   predecessor, head and tail demand independently. The zero branch must not
   force its vector; a successor branch must inspect the vector constructor.
-- [ ] Reject a tail packaged with an incorrect or independent runtime index
+- [x] Reject a tail packaged with an incorrect or independent runtime index
   using a located diagnostic. Probe the diagnostic before pinning it.
-- [ ] Run both compiler stages through separate source interfaces with Core
+- [x] Run both compiler stages through separate source interfaces with Core
   and STG Lint. Update the existing runtime regression and run its registered
   normal way. Record exact commands, resource peaks and artifact hashes.
 
@@ -1132,6 +1138,14 @@ Preserve the failing source expression as a regression observation.
 This exercise does not infer a runtime predecessor from an erased type. It
 does not add general projections, retained index patterns or proof erasure.
 Finite results and bounded partial/cyclic observations do not prove totality.
+
+The next source probe compares two independent runtime lengths and returns
+`Maybe (n :~: m)`. Reuse ordinary `Data.Type.Equality` evidence. A matching
+`Refl` branch should permit a source consumer to zip the two vectors and
+package the result. This target is not verified. `Nothing` would carry no
+refutation proof. Preserve payload laziness on a length mismatch. Probe the
+current equality-Given path before proposing a compiler rule. See the
+[pinned comparison, congruence and zip sources](REFERENCES.md#runtime-equality-and-aligned-zip-next-source-probe).
 
 ## Further work
 

@@ -169,6 +169,15 @@ field remains lazy; it is not an erased coercion. See
 
 ## Scope and equality
 
+Core Tidy turns same-module top-level LocalIds into GlobalIds. Before that
+step, give each native RHS lazy local aliases for its free top-level index
+Ids. Substitute the whole RHS, including types and coercions, then wrap the
+aliases outside that substitution. Their RHSs retain the original top-level
+references. This keeps all native index leaves local after tidying. Ordinary
+RHSs keep their existing path. The existing CorePrep alias guard preserves
+these local names. Top binder types and the native unfolding/interface gates
+remain unchanged. See Note [Local indices across Core Tidy] in `GHC.Iface.Tidy`.
+
 Check `DepFunTy b result` under a context extended by the runtime binder `b`.
 Check every `TermVarTy` occurrence against its binding-site identifier and type.
 Free-variable collection includes the runtime index and its type dependencies.

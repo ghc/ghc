@@ -39,13 +39,14 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages, five registered regressions, the Core API and bootstrap runtime pass; the source example has 81 runtime observations and 20 package/bound rejection checks |
+| Last verified checkpoint | Both compiler stages, five registered regressions, the Core API and bootstrap runtime pass; the source example has 102 runtime observations and 22 package/bound rejection checks |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
 | Bounded source filter | Both compiler stages run the three-field source package; the filter constructs a checked LE proof while unused, partial and cyclic proof fields retain their tested laziness |
 | Source package patterns | Nested vector/proof patterns, wildcard proof fields and guarded clauses pass in both stages; separate cases preserve each row's runtime index Ids |
-| Next task | Repackage a source vector tail with its actual runtime predecessor |
+| Source vector tails | Source uncons and repeated draining use the actual runtime predecessor; partial fields stay lazy and the tested cyclic input produces a bounded prefix |
+| Next task | Probe runtime length equality returning ordinary `:~:` evidence, then zip independently created packages |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -1921,5 +1922,68 @@ the passing source execution and final negative checks.
 Retained index constructor patterns, lazy package patterns, pattern bindings,
 linear package elimination and general projections remain gated. Native
 optimization, proof erasure and totality remain separate work. The full GHC
-suite was not run. Next, probe a source `unconsPacked` that packages the vector
-tail with the actual runtime predecessor from the stored length.
+suite was not run. The source uncons target is verified below.
+
+## Source vector uncons checkpoint
+
+Implementation: `ed5b0f56e4`; source target and provenance: `5a297d202e`.
+The Core Tidy adaptation was specified at `296eb26a01` after the full source
+observer exposed the failure. The
+[source library](examples/packed-vector/README.md#uncons-with-a-runtime-predecessor)
+now defines `unconsPacked` and `toListPacked`. In the successor branch,
+`PackVec k rest` stores the actual predecessor obtained from `S k`.
+The checked case rule transports the captured vector. Ordinary GADT evidence
+relates its tail to `k`. No singleton or inferred runtime predecessor is added.
+
+The full observer's `S bottomLength` argument passed typechecking but failed
+Core Lint after Tidy globalised `bottomLength`. Before tidying a native RHS,
+the compiler now creates lazy local aliases for its free top-level indices.
+Existing Core substitution replaces term, type and coercion occurrences
+together. The alias RHSs retain the original top-level references. CorePrep's
+existing native alias guard preserves the local index. Ordinary RHSs, the
+index grammar and interface format keep their existing paths. See
+Note [Local indices across Core Tidy] in `GHC.Iface.Tidy` and the
+[pinned Agda sources](REFERENCES.md#source-vector-uncons).
+
+Validation on 2026-11-14:
+
+- Both compiler stages compile separate producer and interface-only consumer
+  modules with Core and STG Lint. All 102 observations pass: the previous 81
+  plus 21 uncons and draining observations. IORef lengths 0, 2 and 3 give
+  `Nothing`, a tail of length 1, and a tail of length 2. Filtered inputs drain
+  in their original element order. Result, pair, tail package, predecessor,
+  head and payload demand are observed separately. A bounded cyclic prefix
+  produces `[42,42,42]`.
+- The Core API and bootstrap runtime controls pass. The runtime fixture
+  checks 22 package/bound rejections. A separate harness pins three located
+  GHC-25897 errors for the original length, successor length and an independent
+  length used to package the tail. Some relevant-binding details still show
+  generated capture names; the primary errors identify source locations.
+- The bootstrap compiler target built in 28.72s and peaked at 2,027 MiB.
+  The self-hosted target and dependencies built in 16m39s and peaked at
+  4,698 MiB. Both jobs used serial 16 GiB caps with swap disabled.
+- The bootstrap source run peaked at 99 MiB under 4 GiB. Core API and runtime
+  checks peaked at 1,129 MiB under 4 GiB. The final self-hosted source and
+  pinned rejection checks peaked at 108 MiB under 4 GiB.
+- All five focused registered tests pass: 39 cases, 34 skips, no unexpected
+  results, and no framework failures or warnings. The driver took 26.071s
+  and the job peaked at 1,735 MiB under 8 GiB. The initial direct invocation
+  omitted Hadrian's Make/tool environment. Its printer failure is preserved;
+  v2 supplies that environment and runs the same five tests.
+- The 23 compiler input hashes and the previous-format reader's three hashes
+  remain unchanged. Both source snapshots match the example files. Fourmolu
+  checks, compiler parsing, an ignored Cabal-gild copy and whitespace checks
+  pass. The Default MR template requires regression coverage.
+
+Artifacts use `_build/verification/native-uncons-source-`. Successful logs
+are `bootstrap-build-v1.log`, `bootstrap-run-v2.log`, `selfhost-build-v1.log`,
+`selfhost-run-v1.log`, `api-v1.log`, `bootstrap-runtime-v1.log`,
+`negatives-v2.log` and `registered-v2.log`. `bootstrap-run-v1.log` preserves
+the original Tidy Core Lint failure. Input, source, documentation, harness
+and output manifests identify this checkpoint. The saved Agda vector source
+has Git blob `8c03fb8a83e6cec1fa7b8e1f64bb7e606c531cb8`.
+
+The source programs run at `-O0` with the existing native interface gates.
+Native optimization, general projections, retained index patterns, proof
+erasure and totality remain separate work. The full GHC suite was not run.
+Next, probe runtime equality evidence and use it to zip two source packages.
