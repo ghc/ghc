@@ -62,8 +62,9 @@ Algorithm:
        not live after N, inline the assignment and remove it
        from A.
 
-     * If an assignment in A is cheap (RHS is local register), then
-       inline the assignment and keep it in A in case it is used afterwards.
+     * If an assignment in A is cheap (RHS is a local register, a literal
+       or a global register that isTrivial accepts), then inline the
+       assignment and keep it in A in case it is used afterwards.
 
      * Otherwise don't inline.
 
@@ -89,8 +90,7 @@ Algorithm:
        join-point will always begin with an empty list of assignments.
 
 As a result of above algorithm, sinking deletes some dead assignments
-(transitively, even).  This isn't as good as removeDeadAssignments,
-but it's much cheaper.
+(transitively, even), though not every one.
 -}
 
 -- -----------------------------------------------------------------------------
@@ -241,7 +241,7 @@ isTrivial :: Platform -> CmmExpr -> Bool
 isTrivial _ (CmmReg (CmmLocal _)) = True
 isTrivial platform (CmmReg (CmmGlobal (GlobalRegUse r _))) = -- see Note [Inline GlobalRegs?]
   if isARM (platformArch platform)
-  then True -- CodeGen.Platform.ARM does not have globalRegMaybe
+  then True -- added while ARM's globalRegMaybe panicked; it no longer does
   else isJust (globalRegMaybe platform r)
   -- GlobalRegs that are loads from BaseReg are not trivial
 isTrivial _ (CmmLit _) = True
@@ -384,11 +384,9 @@ shouldSink platform (CmmAssign (CmmLocal r) e) | no_local_regs = Just (r, e, exp
 shouldSink _ _other = Nothing
 
 --
--- discard dead assignments.  This doesn't do as good a job as
--- removeDeadAssignments, because it would need multiple passes
--- to get all the dead code, but it catches the common case of
--- superfluous reloads from the stack that the stack allocator
--- leaves behind.
+-- discard dead assignments.  This does not get all the dead code, but it
+-- catches the common case of superfluous reloads from the stack that the stack
+-- allocator leaves behind.
 --
 -- Also we catch "r = r" here.  You might think it would fall
 -- out of inlining, but the inliner will see that r is live
@@ -634,7 +632,7 @@ regsUsedIn ls e = go ls e False
 -- we don't inline into CmmUnsafeForeignCall if the expression refers
 -- to global registers.  This is a HACK to avoid global registers
 -- clashing with C argument-passing registers, really the back-end
--- ought to be able to handle it properly, but currently neither PprC
+-- ought to be able to handle it properly, but currently neither GHC.CmmToC
 -- nor the NCG can do it.  See Note [Register parameter passing]
 -- See also GHC.StgToCmm.Foreign.load_args_into_temps.
 okToInline :: Platform -> CmmExpr -> CmmNode e x -> Bool
@@ -649,8 +647,8 @@ okToInline _ _ _ = True
 An assignment 'A' conflicts with a statement 'N' if any of the following
 conditions are satisfied:
 
-  (C1) 'A' assigns to a register mentioned in 'N'
-  (C2) 'A' mentions a register assigned by 'N'
+  (C1) 'N' assigns to a register 'A' mentions
+  (C2) 'N' reads the register 'A' assigns
   (C3) 'A' reads from memory written by 'N'
 
 In such a situation, it is not safe to commute 'A' past 'N'. For example,
@@ -665,7 +663,7 @@ Remarks:
 
   (C3) includes all foreign calls, as they may modify the heap/stack.
 
-  (C1) includes the following two situations:
+  (C1) includes the following three situations:
 
     (C1a) 'N' defines the LHS register in the assignment 'A', for example:
 

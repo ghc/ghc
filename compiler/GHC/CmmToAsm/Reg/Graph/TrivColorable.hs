@@ -187,7 +187,7 @@ trivColorable classN conflicts exclusions
 --      node N of classN has n neighbors of class C.
 --
 --      We currently only have RcInteger and RcFloatOrVector, which don't conflict at all.
---      This is a bit boring compared to what's in RegArchX86.
+--      This is a bit boring compared to what's in GHC.CmmToAsm.Reg.Graph.X86.
 --
 worst :: Int -> RegClass -> RegClass -> Int
 worst n classN classC

@@ -6,11 +6,6 @@
 --
 --      TODO:   Signed vs unsigned?
 --
---      TODO:   This module is currently shared by all architectures because
---              NCGMonad need to know about it to make a VReg. It would be better
---              to have architecture specific formats, and do the overloading
---              properly. eg SPARC doesn't care about FF80.
---
 module GHC.CmmToAsm.Format (
     Format(.., IntegerFormat),
     ScalarFormat(..),
@@ -61,7 +56,7 @@ These include:
 
  * 'GHC.Cmm.Type.Length': The width (measured in number of scalars) of a vector value.
 
- * 'Format.Format': The data format representation used by much of the backend.
+ * 'GHC.CmmToAsm.Format.Format': The data format representation used by much of the backend.
 
  * 'GHC.CmmToAsm.Format.ScalarFormat': The format of a 'GHC.CmmToAsm.Format.VecFormat'\'s scalar.
 

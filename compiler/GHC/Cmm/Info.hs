@@ -381,7 +381,7 @@ mkLivenessBits platform liveness
     lits = mkWordCLit platform (fromIntegral n_bits)
          : map (mkStgWordCLit platform) bitmap
       -- The first word is the size.  The structure must match
-      -- StgLargeBitmap in rts/include/rts/storage/InfoTable.h
+      -- StgLargeBitmap in rts/include/rts/storage/InfoTables.h
 
 -------------------------------------------------------------------------
 --

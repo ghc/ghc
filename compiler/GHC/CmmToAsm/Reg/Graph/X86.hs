@@ -3,8 +3,9 @@
 --
 --   This isn't used directly in GHC proper.
 --
---   See RegArchBase.hs for the reference.
---   See MachRegs.hs for the actual trivColorable function used in GHC.
+--   See GHC.CmmToAsm.Reg.Graph.Base for the reference.
+--   See GHC.CmmToAsm.Reg.Graph.TrivColorable for the actual trivColorable
+--   function used in GHC.
 --
 module GHC.CmmToAsm.Reg.Graph.X86 (
         classOfReg,

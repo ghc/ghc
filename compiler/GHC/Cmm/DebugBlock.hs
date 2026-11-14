@@ -383,7 +383,8 @@ The flow of unwinding information through the compiler is a bit convoluted:
 
  * The unwind nodes are carried through the sinking pass. Currently this is
    guaranteed not to invalidate unwind information since it won't touch stores
-   to Sp, but this will need revisiting if CmmSink gets smarter in the future.
+   to Sp, but this will need revisiting if GHC.Cmm.Sink gets smarter in the
+   future.
 
  * Eventually we make it to the native code generator backend which can then
    preserve the unwind nodes in its machine-specific instructions. In so doing

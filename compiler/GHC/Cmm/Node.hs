@@ -85,7 +85,7 @@ data CmmNode e x where
       -- See Note [Unsafe foreign calls clobber caller-save registers]
       --
       -- Invariant: the arguments and the ForeignTarget must not
-      -- mention any registers for which GHC.Platform.callerSaves
+      -- mention any registers for which GHC.Platform.Regs.callerSaves
       -- is True.  See Note [Register parameter passing].
 
   CmmBranch :: ULabel -> CmmNode O C
@@ -894,8 +894,8 @@ instance Eq CmmTickScope where
     -- This is still deterministic because
     -- the order is the same for equal lists
 
--- This is non-deterministic but we do not currently support deterministic
--- code-generation. See Note [Unique Determinism and code generation]
+-- This compares uniques, so the order is deterministic if the uniques are:
+-- see Note [Unique Determinism and code generation].
 -- See Note [No Ord for Unique]
 instance Ord CmmTickScope where
   compare GlobalScope    GlobalScope     = EQ

@@ -121,8 +121,8 @@ instance Eq LocalReg where
 instance Outputable LocalReg where
     ppr e = pprLocalReg e
 
--- This is non-deterministic but we do not currently support deterministic
--- code-generation. See Note [Unique Determinism and code generation]
+-- This compares uniques, so the order is deterministic if the uniques are:
+-- see Note [Unique Determinism and code generation].
 -- See Note [No Ord for Unique]
 instance Ord LocalReg where
   compare (LocalReg u1 _) (LocalReg u2 _) = nonDetCmpUnique u1 u2
@@ -251,7 +251,7 @@ data GlobalReg
   -- | Base Register for PIC (position-independent code) calculations.
   --
   -- Only used inside the native code generator. Its exact meaning differs
-  -- from platform to platform (see module PositionIndependentCode).
+  -- from platform to platform (see module GHC.CmmToAsm.PIC).
   | PicBaseReg
 
   deriving( Eq, Ord, Show )

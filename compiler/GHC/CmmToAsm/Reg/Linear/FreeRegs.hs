@@ -23,11 +23,16 @@ import GHC.Platform
 -- Here's an inefficient 'executable specification' of the FreeRegs data type:
 --
 --      type FreeRegs = [RegNo]
---      noFreeRegs = 0
+--      noFreeRegs = []
 --      releaseReg n f = if n `elem` f then f else (n : f)
 --      initFreeRegs = allocatableRegs
---      getFreeRegs cls f = filter ( (==cls) . regClass . RealReg ) f
---      allocateReg f r = filter (/= r) f
+--      getFreeRegs cls f = filter ( (==cls) . classOf ) (inOrder f)
+--      allocateReg r f = filter (/= r) f
+--
+--      where classOf gives a register's class (targetClassOfRealReg) and
+--      inOrder sorts the registers into the instance's own fixed order. The
+--      AArch64, RISC-V and LoongArch instances panic where releaseReg is given
+--      a free register or allocateReg an allocated one.
 
 import qualified GHC.CmmToAsm.Reg.Linear.PPC     as PPC
 import qualified GHC.CmmToAsm.Reg.Linear.X86     as X86

@@ -56,13 +56,16 @@ import GHC.Types.Unique.DSM (UniqDSM)
   * Compute a CFG based on the Cmm AST, see getCfgProc.
     This CFG will have edge weights representing a guess
     on how important they are.
-  * After we convert Cmm to Asm we run `optimizeCFG` which
-    adds a few more "educated guesses" to the equation.
+  * After register allocation and shortcutting, where the CFG is kept (x86-64,
+    not under -finfo-table-map), we run `optimizeCFG` which adds a few
+    more "educated guesses" to the equation.
   * Then we run loop analysis on the CFG (`loopInfo`) which tells us
     about loop headers, loop nesting levels and the sort.
   * Based on the CFG and loop information refine the edge weights
-    in the CFG and normalize them relative to the most often visited
+    in the CFG and normalize them relative to the entry
     node. (See `mkGlobalWeights`)
+    This step and the loop analysis run for the layout only under
+    -fcmm-static-pred, on at -O1 and -O2.
   * Feed this CFG into the block layout code (`sequenceTop`) in this
     module. Which will then produce a code layout based on the input weights.
 
@@ -113,8 +116,7 @@ import GHC.Types.Unique.DSM (UniqDSM)
   We do so by:
 
   *)  Ignore edges which represent instructions which can not be replaced
-      by fall through control flow. Primarily calls and edges to blocks which
-      are prefixed by a info table we have to jump across.
+      by fall through control flow: calls.
 
   *)  Then process remaining edges in order of frequency taken and:
 
@@ -143,9 +145,9 @@ import GHC.Types.Unique.DSM (UniqDSM)
   Creating singleton chains is required for situations where we have code of the
   form:
 
-    A: goto B:
+    A: call f, returning to B
     <infoTable>
-    B: goto C:
+    B: call g, returning to C
     <infoTable>
     C: ...
 
@@ -265,7 +267,9 @@ import GHC.Types.Unique.DSM (UniqDSM)
     We apply a small modifier to them to ensure edges for which we can
     eliminate the overhead completely are considered first. See also #18053.
 
-  * Edges constituted by a call are ignored.
+  * Edges constituted by a call are ignored while the chains are built and while
+    neighbouring chains are combined, and count a 64th of their weight when the
+    chains are merged at the end.
 
     Considering these hardly helped with performance and ignoring
     them helps quite a bit to improve compiler performance.
@@ -281,11 +285,12 @@ import GHC.Types.Unique.DSM (UniqDSM)
 neighbourOverlapp :: Int
 neighbourOverlapp = 2
 
--- | Maps blocks near the end of a chain to it's chain AND
--- the other blocks near the end.
--- [A,B,C,D,E] Gives entries like (B -> ([A,B], [A,B,C,D,E]))
--- where [A,B] are blocks in the end region of a chain.
--- This is cheaper then recomputing the ends multiple times.
+-- | Maps each block near one end of a chain to the blocks near that end and
+-- the chain: combineNeighbourhood keeps one map for the ends (getEnds, last
+-- block first) and one for the fronts (getFronts).
+-- [A,B,C,D,E] gives (B -> ([A,B], [A,B,C,D,E])) in the fronts' map
+-- and (D -> ([E,D], [A,B,C,D,E])) in the ends' map.
+-- This is cheaper than recomputing the ends multiple times.
 type FrontierMap = LabelMap ([BlockId],BlockChain)
 
 -- | A non empty ordered sequence of basic blocks.

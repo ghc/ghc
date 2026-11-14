@@ -344,8 +344,12 @@ stmtToInstrs bid stmt = do
 
       CmmBranch id          -> return $ genBranch id
 
-      --We try to arrange blocks such that the likely branch is the fallthrough
-      --in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
+      -- GHC.Cmm.ContFlowOpt inverts a condition, and its likelihood with it,
+      -- only where the condition can be inverted and its true target has one
+      -- predecessor, and there inverts a likely-false condition if its false
+      -- target has more than one predecessor (Note [Invert Cmm conditionals]),
+      -- so the condition may be likely true here. genCondBranch does not read
+      -- the likelihood.
       CmmCondBranch arg true false _ -> genCondBranch bid true false arg
       CmmSwitch arg ids -> genSwitch arg ids bid
       CmmCall { cml_target = arg
@@ -3496,8 +3500,11 @@ getAmode e = do
             let off = litToImm lit
             return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
-      -- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be
-      -- recognised by the next rule.
+      -- Turn (e << n) + lit into lit + (e << n), for a lit that the clause for
+      -- x + lit above does not take (on x86-64: a W64 integer that does not
+      -- fit in 32 bits; on Windows also any label, with or without an offset;
+      -- elsewhere also a label's offset that does not fit in 32 bits), so that
+      -- the clause for x + (y << shift) below takes it, or else that for x + y.
       CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _), b@(CmmLit _)]
          -> getAmode (CmmMachOp (MO_Add rep) [b,a])
 

@@ -8,17 +8,19 @@ usable by most UNIX debugging tools.
 .. ghc-flag:: -g
               -g⟨n⟩
     :shortdesc: Produce DWARF debug information in compiled object files.
-        ⟨n⟩ can be 0, 1, or 2, with higher numbers producing richer
+        ⟨n⟩ can be 0, 1, 2, or 3, with higher numbers producing richer
         output. If ⟨n⟩ is omitted, level 2 is assumed.
     :type: dynamic
     :category: debugging
 
     :since: 7.10, numeric levels since 8.0
-    :implies: :ghc-flag:`-fexpose-internal-symbols` when ⟨n⟩ >= 2.
+    :implies: :ghc-flag:`-fexpose-internal-symbols` when ⟨n⟩ >= 3.
 
-    Emit debug information in object code. Currently only DWARF debug
-    information is supported on x86-64 and i386. Currently debug levels 0
-    through 3 are accepted:
+    Emit debug information in object code. Currently only the native code
+    generator emits it, as DWARF, and only for ELF on x86-64, i386, 64-bit
+    PowerPC with the ELFv2 ABI, RISC-V and LoongArch; its unwinding records
+    follow the Haskell stack pointer through a function only on x86-64 and
+    i386. Currently debug levels 0 through 3 are accepted:
 
      * ``-g0``: no debug information produced
      * ``-g1``: produces stack unwinding records for top-level functions (sufficient for basic backtraces)
@@ -66,22 +68,10 @@ GHC that we want debug information,
     $ ghc -g -rtsopts fib.hs
 
 Here we used the ``-g`` option to inform GHC that it should add debugging
-information in the produced binary. There are three levels of debugging
+information in the produced binary. There are four levels of debugging
 output: ``-g0`` (no debugging information, the default), ``-g1`` (sufficient for
-basic backtraces), ``-g2`` (or just ``-g`` for short; emitting everything GHC knows).
-Note that this debugging information does not affect the optimizations performed
-by GHC.
-
-.. tip::
-   Under Mac OS X debug information is kept apart from the executable. After
-   compiling the executable you'll need to use the ``dsymutil`` utility to
-   extract the debugging information and place them in the debug archive,
-
-   .. code-block:: sh
-
-      $ dsymutil fib
-
-   This should produce a file named ``fib.dSYM``.
+basic backtraces), ``-g2`` (or just ``-g`` for short; more precise backtraces)
+and ``-g3`` (GHC-specific DWARF information as well).
 
 Now let's have a look at the flow of control. For this we can just start our
 program under ``gdb`` (or an equivalent debugger) as we would any other native
@@ -162,7 +152,7 @@ this point in the program,
     provided by GDB. While these locations will usually be in some sense
     "correct", they aren't always useful. This is why profiling tools targeting
     Haskell should supplement the standard source location information with
-    GHC-specific annotations (emitted with ``-g2``) when assigning costs.
+    GHC-specific annotations (emitted with ``-g3``) when assigning costs.
 
 Indeed, we can even set breakpoints,
 

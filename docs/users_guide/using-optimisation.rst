@@ -250,8 +250,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     :default: off but enabled by :ghc-flag:`-O`.
 
     Enables the sinking pass in the code generator.
-    This optimisation attempts to find identical Cmm blocks and
-    eliminate the duplicates attempts to move variable bindings closer
+    This optimisation attempts to move variable bindings closer
     to their usage sites. It also inlines simple expressions like
     literals or registers.
 
@@ -263,10 +262,15 @@ as such you shouldn't need to set any of them explicitly. A flag
 
     :default: off but enabled by :ghc-flag:`-O`.
 
-    This enables static control flow prediction on the final Cmm
-    code. If enabled GHC will apply certain heuristics to identify
-    loops and hot code paths. This information is then used by the
-    register allocation and code layout passes.
+    This enables static control flow prediction in the native code generator
+    for x86-64. If enabled GHC will apply certain heuristics to identify loops
+    and hot code paths, and use this information to lay out the code (not
+    under :ghc-flag:`-fblock-layout-weightless` without
+    :ghc-flag:`-fblock-layout-cfg`) and to order the jumps of some conditional
+    branches. The graph colouring allocators (:ghc-flag:`-fregs-graph`,
+    :ghc-flag:`-fregs-iterative`) choose what to spill by live range length
+    alone, so this flag does not change their allocation. It has no effect when
+    :ghc-flag:`-finfo-table-map` is on.
 
 .. ghc-flag:: -fcmm-control-flow
     :shortdesc: Enable control flow optimisation in the Cmm backend. Implied by :ghc-flag:`-O`.
@@ -306,10 +310,10 @@ as such you shouldn't need to set any of them explicitly. A flag
     :default: off but enabled by :ghc-flag:`-O`.
 
     The new algorithm considers all outgoing edges of a basic blocks for
-    code layout instead of only the last jump instruction.
-    It also builds a control flow graph for functions, tries to find
-    hot code paths and place them sequentially leading to better cache utilization
-    and performance.
+    code layout instead of at most one edge per block.
+    It tries to find hot code paths and place them sequentially leading to
+    better cache utilization and performance. It takes effect only on x86-64,
+    and not under :ghc-flag:`-finfo-table-map`.
 
     This is expected to improve performance on average, but actual performance
     difference can vary.
@@ -332,7 +336,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     advise against this.
 
 .. ghc-flag:: -fblock-layout-weightless
-    :shortdesc: Ignore cfg weights for code layout.
+    :shortdesc: Ignore cfg weights in the old code layout algorithm.
     :type: dynamic
     :reverse: -fno-block-layout-weightless
     :category:
@@ -344,8 +348,11 @@ as such you shouldn't need to set any of them explicitly. A flag
     block in the cfg.
 
     With this flag enabled we use the last jump instruction in blocks.
-    Without this flags the old algorithm also uses the heaviest outgoing
-    edge.
+    Without this flag, on x86-64 and without
+    :ghc-flag:`-finfo-table-map`, the old algorithm uses the heaviest outgoing
+    edge instead, or none where that edge's weight is not positive or the block
+    has more than two successors; elsewhere it uses the last jump whatever this
+    flag says.
 
     When this flag is enabled and :ghc-flag:`-fblock-layout-cfg` is disabled
     block layout behaves the same as in 8.6 and earlier.

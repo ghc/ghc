@@ -403,8 +403,8 @@ Here we could use C = {A} and therefore [Inline] C = A.
 {-
 Note [No static object resurrection]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The "static flag" mechanism (see Note [STATIC_LINK fields] in smStorage.h) that
-the GC uses to track liveness of static objects assumes that unreachable
+The "static flag" mechanism (see Note [STATIC_LINK fields] in rts/sm/Storage.h)
+that the GC uses to track liveness of static objects assumes that unreachable
 objects will never become reachable again (i.e. are never "resurrected").
 Breaking this assumption can result in extremely subtle GC soundness issues
 (e.g. #15544, #20959).

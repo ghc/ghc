@@ -1709,7 +1709,7 @@ genCCall'
 
     But there are substantial differences:
     * The number of registers used for parameter passing and the exact set of
-      nonvolatile registers differs (see MachRegs.hs).
+      nonvolatile registers differs (see GHC.CmmToAsm.PPC.Regs).
     * On AIX and 64-bit ELF, stack space is always reserved for parameters,
       even if they are passed in registers. The called routine may choose to
       save parameters from registers to the corresponding space on the stack.

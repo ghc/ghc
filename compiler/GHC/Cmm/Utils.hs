@@ -431,7 +431,7 @@ globalRegsOverlap platform g1 g2
 -- the expression.
 --
 -- We must check for overlapping registers and not just equal
--- registers here, otherwise CmmSink may incorrectly reorder
+-- registers here, otherwise GHC.Cmm.Sink may incorrectly reorder
 -- assignments that conflict due to overlap. See #10521 and Note
 -- [Overlapping global registers].
 regUsedIn :: Platform -> CmmReg -> CmmExpr -> Bool
