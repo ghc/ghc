@@ -153,3 +153,4 @@ test('T20298c', normal, compile, ['-O2 -dno-builtin-rules -ddump-simpl -dno-type
 
 test('T27368', normal, compile, ['-O'])
 test('T27979', [req_cmm, check_errmsg('stg_ap_0_fast')], compile, ['-O -ddump-cmm -dno-typeable-binds -dsuppress-uniques'])
+test('T28126', [unless(arch('aarch64'), skip), only_ways(['normal']), expect_broken(28126)], compile, ['-O'])
