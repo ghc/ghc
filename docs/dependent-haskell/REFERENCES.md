@@ -1930,3 +1930,42 @@ Preserve the existing
 native-meta and general Quick Look gates, immutable kind/scope/concreteness
 checks, once-only usage, local evidence and final subsumption. M24 must support
 the direct source bind, without a singleton or package conversion workaround.
+
+## Scoped native source inference
+
+M25 is unverified. Its two source failures are preserved by M24: a local
+unsigned native action reaches the inferred-type gate; a callback that returns
+its native payload requires an ordinary result meta to contain native syntax.
+Use inference cells and exact immutable choices before that allocation.
+
+Agda v2.8.0 [Term.hs, lines 1662–1672](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L1662-L1672)
+checks a let type and value in the lexical context before adding the binding.
+An inserted annotation uses `checkDontExpandLast`. The file blob is
+`02991c9fa0085315cc854d2833a9080af14a7740`.
+[Context.hs, lines 434–438](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Monad/Context.hs#L434-L438)
+stores the type and value with `makeOpen`. Its file blob is
+`98e50ce60319dcb47a542ac7c04b4b3e491a64e9`.
+This supplies lexical-scope prior art. GHC already infers a single
+nonrecursive FunBind RHS before allocating its Id. M25 admits that exact type
+only for a local NoGen value with one zero-argument equation and a monotype.
+Use the existing validity checker to validate free runtime indices against
+their actual lexical bindings. Keep generalization and other binding shapes
+at their existing gates. A Haskell let remains lazy and opaque as an index.
+
+Agda [Term.hs, lines 685–710](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L685-L710)
+checks the argument domain, adds it to the lambda context and checks the body
+under that context. GHC's `tcMatches` already accepts a known pattern type
+and a result inference cell. Reuse it for a one-argument ordinary callback
+after a native action fixes its input. Check the synthesized result after
+the callback context has closed. A free callback or inner local runtime Id
+cannot appear in an ordinary arrow result. Report the callback body span.
+An explicit retained arrow or package needs its own source checking path.
+
+Agda [MetaVars.hs, lines 282–321](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/MetaVars.hs#L282-L321)
+captures the current telescope when it creates a contextual meta. File blob:
+`13f52cb7f2a08ac55f62e326564043470e62f6f6`.
+GHC's adaptation does not assign native syntax to a meta. Preserve the existing
+inference-cell level, promotion, branch-joining and GADT escape checks.
+Determine the native payload before allocating an ordinary callback-result
+parameter. Final ordinary subsumption must still resolve an inferred monad
+head. Keep usage collection and typed-argument caching once per argument.

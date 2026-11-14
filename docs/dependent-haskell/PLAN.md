@@ -1705,15 +1705,18 @@ assignment or runtime-index escape.
 
 - [ ] Reuse `tcMonoBinds`' existing single nonrecursive FunBind path at
   `Tc.Gen.Bind:1330`. It calls `runInferRhoFRR` before it allocates the Id.
-  Investigate admission of a local NoGen binding with one zero-argument
-  equation and an exact native monotype. Validate each free runtime index
-  against its actual outer binding. Preserve FRR and multiplicity checks.
+  Admit a local NoGen binding with one zero-argument equation and an exact
+  native monotype. Use the existing inferred-signature validity context to
+  validate each free runtime index against its actual outer binding. Keep
+  ordinary head metas, FRR and multiplicity checks. No DepFunTy is inferred.
 - [ ] Keep the separate InferGen guard at `Tc.Gen.Bind:731`. Do not remove
   inferred-type guards globally. Recursive groups, pattern bindings, partial
   signatures and inferred native function telescopes need separate designs.
   Preserve infer-cell promotion and branch-joining checks.
 - [ ] With an action's input type fixed, use the existing match checker to
-  investigate synthesis of the continuation body through an infer cell.
+  synthesize the continuation body through an infer cell. Start with one
+  ordinary unrestricted lambda argument, a variable pattern and one
+  unguarded equation. This includes the generated do continuation.
   Determine its native result choice before creating an ordinary result meta.
   A synthesized ordinary monad head can remain unknown; extract the payload
   and retain final subsumption to resolve that head. Whole-type immutable
@@ -1728,9 +1731,12 @@ assignment or runtime-index escape.
   callback-index escape and GADT escape rejections. Verify both stages and
   the registered regressions.
 
-The source pointers above use `75c628aa8d`. Agda's pinned let checker and
-lexical context insertion supply prior art. Its transparent lets do not
-justify equating runtime aliases or bypassing Haskell scope checks.
+The source pointers above use `75c628aa8d`. See
+[scoped source inference provenance](REFERENCES.md#scoped-native-source-inference).
+Agda's pinned let checker and lexical context insertion supply prior art.
+Its transparent lets do not justify equating runtime aliases or bypassing
+Haskell scope checks. Agda's dependent lambda codomain is explicit; synthesis
+of an ordinary GHC callback must instead reject a free callback-local index.
 
 ## Further work
 
