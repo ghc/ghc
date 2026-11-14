@@ -1613,6 +1613,24 @@ runModuleChecks libdir = do
         , "leading VTA selections share captured vector: True"
         , "leading VTA vector shares original payload: True"
         , "full ordinary VTA control: 43"
+        , "runtime index VTA: (0,[42,42],[],[],True,1,[0,1,2])"
+        , "runtime index VTA: (1,[42,42],[7],[7],True,2,[0,1,2])"
+        , "runtime index VTA: (2,[42,42],[7,7],[7,7],True,3,[0,1,2])"
+        , "runtime index VTA: (3,[42,42],[7,7,7],[7,7,7],True,4,[0,1,2])"
+        , "index VTA construction has no effects: 0"
+        , "index VTA ignores bottom fields: 42"
+        , "index VTA action executes once: 1"
+        , "index VTA action executes again: 2"
+        , "index VTA retains vector error: packed-bottom-payload"
+        , "index VTA demands index through vector: packed-bottom-length"
+        , "index VTA spine ignores element: 1"
+        , "index VTA retains element error: packed-filter-bottom-element"
+        , "index VTA partial prefix: [7]"
+        , "index VTA cyclic prefix: [7,7]"
+        , "index VTA first vector before second: zip-left-vector"
+        , "index VTA second vector demand: zip-right-vector"
+        , "index VTA shares named vector: True"
+        , "index VTA shares original payload: True"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2956,6 +2974,20 @@ runPackageSourceRejectChecks = do
         , ("LeadingVTAGeneratedTypeArgWrongExtra", 18872, "selecting the field", ["TupleSections", "TypeApplications", "OverloadedRecordDot"], [], ["data Holder = Holder { field :: Int -> Int }", "bad :: Int", "bad = (Holder (+1)).field True"])
         , ("LeadingVTAQuickLookGate", 83605, "Quick Look inference", ["TupleSections", "TypeApplications", "ImpredicativeTypes"], [], ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: foreach (n :: Nat) -> Vec Int n -> (Vec Int n,Int)", "bad n xs = selectVTA @Bool True ((xs,),False) (42 :: Int)"])
         , ("LeadingVTAInferredPrefixAnnotation", 83865, "'x' :: Bool", ["TupleSections", "TypeApplications"], [], localActions ++ ["selectVTA :: forall tag value. tag -> (value,Bool) -> value", "selectVTA _ (value,_) = value", "bad :: Nat -> IO (PackedVec Int)", "bad n = pure (PackVec n (fst (selectVTA @Bool True ((localVector n,),('x' :: Bool)) (42 :: Int))))"])
+        , ("IndexVTAWrongElementTypeArgument", 83865, "Vec Bool", ["TypeApplications"], [], localActions ++ ["observe :: forall a (index :: Nat). Vec a index -> Int", "observe _ = 42", "bad :: Nat -> IO Int", "bad n = pure (observe @Bool (localVector n))"])
+        , ("IndexVTAWrongKind", 83865, "Expecting one more argument", ["TypeApplications"], [], localActions ++ ["observe :: forall a (index :: Nat). Vec a index -> Int", "observe _ = 42", "bad :: Nat -> IO Int", "bad n = pure (observe @Maybe (localVector n))"])
+        , ("IndexVTAConflictingIndices", 83865, "untouchable", ["TypeApplications"], [], localActions ++ ["observeSame :: forall a (index :: Nat). Vec a index -> Vec a index -> Int", "observeSame _ _ = 42", "bad :: Nat -> Nat -> IO Int", "bad n m = pure (observeSame @Int (localVector n) (localVector m))"])
+        , ("IndexVTAWrongResultIndex", 83865, "Vec Int m", ["TypeApplications"], [], localActions ++ ["keepIndex :: forall a (index :: Nat). Vec a index -> Vec a index", "keepIndex xs = xs", "bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m", "bad n m xs = keepIndex @Int xs"])
+        , ("IndexVTAMissingEqualityDictionary", 39999, "Eq NoEq", ["TypeApplications"], [], localActions ++ ["data NoEq = NoEq", "observeEq :: forall a (index :: Nat). Eq a => Vec a index -> Int", "observeEq _ = 42", "bad :: foreach (n :: Nat) -> Vec NoEq n -> Int", "bad n xs = observeEq @NoEq xs"])
+        , ("IndexVTACallbackLocalIndexEscape", 83605, "outside the application scope", ["TypeApplications"], [], localActions ++ ["keepIndex :: forall a (index :: Nat). Vec a index -> Vec a index", "keepIndex xs = xs", "bad :: Nat -> IO Int", "bad n = let compute = pure (localVector n) >>= \\xs -> let { k :: Nat; k = n } in pure (keepIndex @Int (localVector k)) in pure 42"])
+        , ("IndexVTALocalResultIndexEscape", 83605, "out of scope here", ["TypeApplications"], [], localActions ++ ["keepIndex :: forall a (index :: Nat). Vec a index -> Vec a index", "keepIndex xs = xs", "bad :: Nat -> IO Int", "bad n = let result = let { k :: Nat; k = n } in keepIndex @Int (localVector k) in pure 42"])
+        , ("IndexVTALinearCaptureTwice", 18872, "multiplicity", ["TypeApplications", "LinearTypes"], [], localActions ++ ["linearKeep :: forall a (index :: Nat). Vec a index %1 -> Vec a index", "linearKeep xs = xs", "bad :: foreach (n :: Nat) -> Vec Int n %1 -> (Vec Int n, Vec Int n)", "bad n xs = (linearKeep @Int xs, linearKeep @Int xs)"])
+        , ("IndexVTANativeIndexOverapplicationBoundary", 83865, "untouchable", ["TypeApplications"], [], localActions ++ ["selectIndexed :: forall a (index :: Nat) result. Vec a index -> result -> result", "selectIndexed _ value = value", "bad :: Nat -> IO Int", "bad n = pure (selectIndexed @Int (localVector n) ((+ 1) :: Int -> Int) 42)"])
+        , ("IndexVTAInterleavedTypeApplicationBoundary", 83865, "untouchable", ["TypeApplications"], [], localActions ++ ["interleavedIndex :: forall a. a -> forall (index :: Nat). Vec a index -> Int", "interleavedIndex _ _ = 42", "bad :: Nat -> IO Int", "bad n = pure (interleavedIndex @Int (0 :: Int) @_ (localVector n))"])
+        , ("IndexVTAQuickLookBoundary", 83605, "Quick Look inference", ["TypeApplications", "ImpredicativeTypes"], [], ["observe :: forall a (index :: Nat). Vec a index -> Int", "observe _ = 42", "bad :: foreach (n :: Nat) -> Vec Int n -> Int", "bad n xs = observe @Int xs"])
+        , ("IndexVTAWrongClosedIndexArgument", 83865, "third argument", ["TypeApplications"], [], localActions ++ ["observe :: forall a (index :: Nat). Vec a index -> Int", "observe _ = 42", "bad :: Nat -> IO Int", "bad n = pure (observe @Int @Z (localVector n))"])
+        , ("IndexVTACallbackInputIndexEscape", 83605, "outside the application scope", ["TypeApplications"], [], localActions ++ ["keepIndex :: forall a (index :: Nat). Vec a index -> Vec a index", "keepIndex xs = xs", "withAux :: forall a b c. IO a -> IO c -> (a -> IO b) -> IO b", "withAux action auxiliary callback = action >>= callback", "bad :: Nat -> IO Int", "bad n = let compute = withAux (pure (S Z)) (pure (localVector n)) (\\k -> pure (keepIndex @Int (localVector k))) in pure 42"])
+        , ("IndexVTAWrongRemainingOrdinaryArgument", 83865, "Char", ["TypeApplications"], [], localActions ++ ["inspectTagged :: forall a (index :: Nat) tag. (tag, Vec a index) -> tag -> Int", "inspectTagged _ _ = 42", "bad :: Nat -> IO Int", "bad n = pure (inspectTagged @Int (True, localVector n) 'x')"])
         , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureAliasIndex", 83605, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])

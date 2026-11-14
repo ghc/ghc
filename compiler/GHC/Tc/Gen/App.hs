@@ -1586,10 +1586,10 @@ Other arguments retain ordinary expected-type checking. If matching fails or
 leaves index binders undetermined, ordinary instantiation checks the same cached
 arguments. The ordinary unifier still rejects retained meta-variable fills.
 
-The native-index route requires exact saturation. See Note [Native inference
-after visible type applications] for leading type arguments, and
-Note [Generic retained argument inference] for extra arguments on the generic
-route. Preserve any leading context as described in
+The native-index route requires exact saturation. For leading type arguments,
+see Note [Native inference after visible type applications].
+See Note [Generic retained argument inference] for extra arguments on the
+generic route. Preserve any leading context as described in
 Note [Constrained immutable instantiation]. Inference uses a fresh infer cell
 at the current TcLevel. It can return an exact retained type without assigning a type meta-variable.
 -}

@@ -1664,6 +1664,128 @@ driveLeadingVTA input = do
             )
         )
 
+-- | Ignore a vector without inspecting its erased runtime index.
+observeIndexVTA :: forall a (index :: Nat). Vec a index -> Int
+observeIndexVTA _ = 42
+
+-- | Preserve a vector and its runtime index without evaluating either.
+retainIndexVTA :: forall a (index :: Nat). Vec a index -> Vec a index
+retainIndexVTA vector = vector
+
+-- | Infer two independent runtime indices after the element type.
+observeTwoIndexVTA :: forall a (left :: Nat) (right :: Nat). Vec a left -> Vec a right -> Int
+observeTwoIndexVTA left right = length (toList left) + length (toList right)
+
+-- | Check a dictionary before inferring the remaining runtime index.
+observeEqIndexVTA :: forall a. (Eq a) => forall (index :: Nat). Vec a index -> Bool
+observeEqIndexVTA vector = all (\value -> value == value) (toList vector)
+
+-- | Compare omitted and partial type applications at independent runtime indices.
+{-# NOINLINE driveIndexVTA #-}
+driveIndexVTA :: Nat -> IO String
+driveIndexVTA input = do
+    indexCell <- newIORef input
+    otherCell <- newIORef (S Z)
+    n <- readIORef indexCell
+    m <- readIORef otherCell
+    effects <- newIORef (0 :: Int)
+    let vector = replicateNative @Int n 7
+        other = replicateNative @Int m 9
+        action = modifyIORef' effects (+ 1) >> pure vector
+    before <- readIORef effects
+    first <- action
+    count1 <- readIORef effects
+    second <- action
+    count2 <- readIORef effects
+    pure (show (natToInt n, [observeIndexVTA first, observeIndexVTA @Int first], toList (retainIndexVTA first), toList (retainIndexVTA @Int second), observeEqIndexVTA @Int first, observeTwoIndexVTA @Int first other, [before, count1, count2]))
+
+-- | Check index inference after VTA without adding evaluation or copying fields.
+runIndexVTAChecks :: IO ()
+runIndexVTAChecks = do
+    assertEqual "ordinary complete index VTA" 42 (observeIndexVTA @Int @Z VNil)
+    assertEqual "ordinary complete retained VTA" ([] :: [Int]) (toList (retainIndexVTA @Int @Z VNil))
+    forM_
+        [ (Z, "(0,[42,42],[],[],True,1,[0,1,2])")
+        , (S Z, "(1,[42,42],[7],[7],True,2,[0,1,2])")
+        , (S (S Z), "(2,[42,42],[7,7],[7,7],True,3,[0,1,2])")
+        , (S (S (S Z)), "(3,[42,42],[7,7,7],[7,7,7],True,4,[0,1,2])")
+        ]
+        $ \(input, expected) -> do
+            actual <- driveIndexVTA input
+            assertEqual "runtime index VTA" expected actual
+            putStrLn ("runtime index VTA: " ++ actual)
+    ignoredIndex <- pure bottomLength
+    effects <- newIORef (0 :: Int)
+    let ignoredVector :: Vec Int ignoredIndex
+        ignoredVector = bottomPayload
+        action = modifyIORef' effects (+ 1) >> pure (observeIndexVTA @Int ignoredVector)
+    before <- readIORef effects
+    assertEqual "index VTA construction has no effects" 0 before
+    putStrLn "index VTA construction has no effects: 0"
+    assertEqual "index VTA ignores bottom fields" 42 (observeIndexVTA ignoredVector)
+    assertEqual "index VTA ignores bottom fields" 42 (observeIndexVTA @Int ignoredVector)
+    putStrLn "index VTA ignores bottom fields: 42"
+    assertEqual "index VTA action result" 42 =<< action
+    once <- readIORef effects
+    assertEqual "index VTA action executes once" 1 once
+    putStrLn "index VTA action executes once: 1"
+    assertEqual "index VTA repeated result" 42 =<< action
+    twice <- readIORef effects
+    assertEqual "index VTA action executes again" 2 twice
+    putStrLn "index VTA action executes again: 2"
+    expectMarker "index VTA retains vector error" "packed-bottom-payload" $
+        evaluate (retainIndexVTA @Int ignoredVector)
+    let delayedVector = replicateNative @Int ignoredIndex 7
+    expectMarker "index VTA demands index through vector" "packed-bottom-length" $
+        evaluate (length (toList (retainIndexVTA @Int delayedVector)))
+    finiteIndex <- pure (S Z)
+    let finiteVector = replicateNative @Int finiteIndex bottomElement
+    assertEqual "index VTA spine ignores element" 1 (length (toList (retainIndexVTA @Int finiteVector)))
+    putStrLn "index VTA spine ignores element: 1"
+    expectMarker "index VTA retains element error" "packed-filter-bottom-element" $
+        evaluate (sum (toList (retainIndexVTA @Int finiteVector)))
+    partialIndex <- pure (S bottomLength)
+    cyclicIndex <- pure cyclicLength
+    let partialVector = replicateNative @Int partialIndex 7
+        cyclicVector = replicateNative @Int cyclicIndex 7
+    assertEqual "index VTA partial prefix" [7] (take 1 (toList (retainIndexVTA @Int partialVector)))
+    putStrLn "index VTA partial prefix: [7]"
+    assertEqual "index VTA cyclic prefix" [7, 7] (take 2 (toList (retainIndexVTA @Int cyclicVector)))
+    putStrLn "index VTA cyclic prefix: [7,7]"
+    rightIndex <- pure bottomRightLength
+    let left :: Vec Int ignoredIndex
+        left = leftVector
+        right :: Vec Int rightIndex
+        right = rightVector
+    expectMarker "index VTA first vector before second" "zip-left-vector" $
+        evaluate (observeTwoIndexVTA @Int left right)
+    zeroIndex <- pure Z
+    let empty = replicateNative @Int zeroIndex 7
+    expectMarker "index VTA second vector demand" "zip-right-vector" $
+        evaluate (observeTwoIndexVTA @Int empty right)
+    sharingIndex <- pure (S (S Z))
+    payload <- newIORef (42 :: Int)
+    let vector = replicateNative @(IORef Int) sharingIndex payload
+    original <- evaluate vector
+    first <- evaluate (retainIndexVTA @(IORef Int) vector)
+    second <- evaluate (retainIndexVTA vector)
+    originalName <- makeStableName original
+    firstName <- makeStableName first
+    secondName <- makeStableName second
+    assertEqual "index VTA shares named vector" True (originalName == firstName && firstName == secondName)
+    putStrLn "index VTA shares named vector: True"
+    case toList first of
+        [leftPayload, rightPayload] -> do
+            originalPayload <- evaluate payload
+            firstPayload <- evaluate leftPayload
+            secondPayload <- evaluate rightPayload
+            originalPayloadName <- makeStableName originalPayload
+            firstPayloadName <- makeStableName firstPayload
+            secondPayloadName <- makeStableName secondPayload
+            assertEqual "index VTA shares original payload" True (originalPayloadName == firstPayloadName && firstPayloadName == secondPayloadName)
+            putStrLn "index VTA shares original payload: True"
+        _ -> fail "index VTA sharing vector has the wrong length"
+
 -- | Check leading type applications without changing demand or sharing.
 runLeadingVTAChecks :: IO ()
 runLeadingVTAChecks = do
@@ -2312,3 +2434,4 @@ main = do
     runTupleSectionChecks
     runGenericOverapplicationChecks
     runLeadingVTAChecks
+    runIndexVTAChecks
