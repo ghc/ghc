@@ -1531,9 +1531,20 @@ expand a Template Haskell splice. The classifier does not execute a splice.
 Once a call has an anchor, infer named argument spines whose formal domains
 mention undetermined outer binders. Ordinary variables and constructors can
 supply other bindings, as in const (rightZero n) Nothing. Any fresh variables
-from Nothing remain ordinary meta-variables. Seed the immutable substitution
-from the expected result first. Do not infer a domain whose outer binders
-are already determined by that result.
+from Nothing remain ordinary meta-variables. At exact saturation, seed the
+immutable substitution from the expected result first. Do not infer a domain
+whose outer binders are already determined by that result.
+
+A generic result can itself be a function. For fst pair 42, infer pair from
+the one declared domain of fst, then check 42 against the chosen function
+result. Admit a nonempty declared argument prefix on the generic route only.
+Keep the native-index-kind route exactly saturated. Classify and cache only
+prefix arguments, and require an anchor in that prefix. Start matching from
+the empty substitution: the final expected result is after the extra
+arguments, not the intermediate result used to choose fst's parameter.
+Keep the full original argument spine for tcInstFunWithExpected and
+finishAppWithCache. They check the extra arguments, evidence order, usage and
+final result. Do not infer or cache an extra argument here.
 
 A top-level lambda, literal, case, let, or do expression keeps its ordinary
 expected-type check. A named application can contain these expressions as
@@ -1849,6 +1860,7 @@ tcRetainedArgInst do_ql expected rn_head args fun sigma
 
 -- | Match cached index arguments when the experimental extension is enabled.
 -- See Note [Available expected types in native applications].
+-- See Note [Generic retained argument inference] for overapplication.
 tcRetainedArgInstEnabled :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
                          -> [HsExprArg 'TcpRn] -> HsExpr GhcTc -> TcSigmaType
                          -> TcM (HsExpr GhcTc, TcSigmaType, RetainedArgCache, RetainedInstPlan)
@@ -1861,13 +1873,18 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
   , not (null tvs)
   , null theta || hasNoConcreteTyVars fun
   , let (domains, result) = splitFunTys tau
-  , length domains == count isHsValArg args
+        arity = length domains
+        value_args = [arg | EValArg { ea_arg = arg } <- args]
+        overapplied = arity < length value_args
+  , arity == length value_args
+    || (overapplied && arity > 0 && null index_tvs)
   , isTauTy tau, not (isFunTy result)
   , not (hasNativeDependentExpr (Core.Type body))
   = do { expected_ty <- readExpType_maybe expected
        ; expected_ty <- mapM (liftZonkM . zonkTcType) expected_ty
        ; let index_route = not (null index_tvs)
-             initial_subst = result_subst expected_ty index_route tvs result
+             initial_subst | overapplied = Subst.emptySubst
+                           | otherwise = result_subst expected_ty index_route tvs result
              result_anchor = any (hasNativeDependentExpr . Core.Type)
                                [ty | tv <- tvs, Just ty <- [Subst.lookupTyVar initial_subst tv]]
              needed_tvs | index_route = index_tvs
@@ -1875,9 +1892,9 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
        ; eligible <- if index_route
                      then return (Just (repeat True))
                      else if hasNoConcreteTyVars fun
-                             && isJust (tcRetainedOrdinaryResult (count isHsValArg args) tau)
+                             && isJust (tcRetainedOrdinaryResult arity tau)
                           then do { shapes <- mapM tcRetainedInferableArg
-                                                [arg | EValArg { ea_arg = arg } <- args]
+                                                (take arity value_args)
                                   ; return (if result_anchor || any snd shapes
                                             then Just (map fst shapes)
                                             else Nothing) }
