@@ -1503,9 +1503,29 @@ identity, not aliases. Reject a forged fallback `Refl` and wrong-index payloads.
 
 ### M22: anonymous terminal fallback
 
-This target is unverified. Permit bare wildcard patterns in the final fallback,
-including `sameNat _ _ = Nothing`. Keep mixed constructor/variable rows,
+This target is unverified. Permit `VarPat` or `WildPat` in each selected
+index column of the one terminal fallback. This includes `_ _`, `left _`
+and `_ right`. Keep constructor/variable and constructor/wildcard rows,
 guards and interior contexts outside this probe. Preserve M21 evidence.
+
+Before TC, replace each selected wildcard with a `VarPat` carrying that
+column's existing shared whole-index Name. Do not allocate a fresh index Id
+or add a let alias. Named columns keep M21's resolved-name substitution.
+Anonymous columns introduce no source-visible name. Keep both typed index
+VarPats outermost and unwrapped. This lets the existing pattern checker and
+match-variable selector preserve the Ids used by later types and the result.
+
+The fallback uses no constructor proofs. Its transports remain reflexive.
+Check its RHS against the incoming unspecialized result type. Failed prefix
+rows supply no evidence to it. Preserve source argument lambda order and
+ordinary match failure and demand. Check quotations on every fallback row,
+even when both selected columns are anonymous and no name substitution is
+needed. Use `tcMatchWithSource` to retain the original Match for errors.
+Keep wildcard and RHS locations. Existing constructor, ordinary argument and
+unselected retained-pattern restrictions remain in force.
+
+Follow [the pinned anonymous-context and GHC wildcard rules](REFERENCES.md#anonymous-terminal-fallback-equations).
+No new Core, backend, interface or equality rule is proposed.
 
 - [ ] Inspect Agda's anonymous variable handling and GHC's wildcard tidying.
   Record the provenance before selecting generated index binders. A wildcard

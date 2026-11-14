@@ -1741,3 +1741,43 @@ Names to the shared whole-index Names. Keep its checked VarPats unwrapped and
 check its RHS without constructor proofs. A fresh alias would not establish
 native index identity. M20's separate constructor rows keep their actual
 fields and proofs. This change adds no backend or Core rule.
+
+
+## Anonymous terminal fallback equations
+
+Status: unverified M22 plan. Admit variables and wildcards in the two selected
+columns of the one terminal fallback. Keep constructor prefixes unchanged.
+
+Agda v2.8.0 [`LHS.hs`, lines 291–306](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L291-L306)
+treats `A.VarP` and `A.WildP` as solved patterns.
+[Lines 468–481](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L468-L481)
+retain an internal `VarP` and record the source wildcard as `PatOWild`.
+[Lines 555–573](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L555-L573)
+keep anonymous telescope slots and generate names outside source scope.
+File blob: `3779ffa6e418bca99e30c071e189106f82ecbe1b`.
+These rules support anonymous internal bindings. They do not select GHC Uniques
+or establish Haskell demand semantics.
+
+At GHC base `19ff36f2aede0ca2e554016ff22c71e73aa9803b`,
+[`Tc/Gen/Pat.hs`, lines 641–646](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/Tc/Gen/Pat.hs#L641-L646)
+checks a variable binder and extends the Id environment.
+[Lines 684–688](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/Tc/Gen/Pat.hs#L684-L688)
+check wildcard multiplicity without binding an Id. File blob:
+`81efc26e865fcb090315091724f34b3aa4f25a06`.
+[`HsToCore/Utils.hs`, lines 132–146](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/HsToCore/Utils.hs#L132-L146)
+selects the variable pattern's Id; its generic path allocates a fresh Id.
+File blob: `c3ae336c9b2a0f9f55a0fc879905480414be544a`.
+[`HsToCore/Match.hs`, lines 406–413](https://github.com/ghc/ghc/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/HsToCore/Match.hs#L406-L413)
+tidies a wildcard with an identity wrapper and a variable with `bindMatchId`.
+File blob: `f6c63c37c5cfae10d11a9dde22829ae25adf3106`.
+
+The planned GHC adaptation replaces each selected wildcard with the existing
+shared index `VarPat` before TC. It adds no source-visible name, fresh index Id
+or alias. Both typed index patterns remain outermost and unwrapped. The fallback
+has zero constructor proofs and reflexive transports. Check its incoming result
+type without evidence from failed rows. Preserve source lambdas and ordered
+failure continuations. Keep the original Match through `tcMatchWithSource` for
+errors. Reject quotations even when neither column has a source variable Name.
+Constructor/wildcard rows and other pattern extensions remain outside M22.
+No Core form or equality rule changes. Runtime and located-error verification
+remain pending.
