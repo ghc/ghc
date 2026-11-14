@@ -433,15 +433,17 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
        -- Step 1: Infer the type of `fun`, the head of the application
        ; let rn_head = (rn_fun, fun_lspan)
        ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
-       ; (tc_fun1, fun_sigma1) <- tcRetainedExpectedInst wanted_ql exp_res_ty rn_args
+       -- See Note [Checked native variables with ImpredicativeTypes].
+       ; head_ql <- tcRetainedCheckedHeadQL wanted_ql rn_args exp_res_ty tc_fun0 fun_sigma0
+       ; (tc_fun1, fun_sigma1) <- tcRetainedExpectedInst head_ql exp_res_ty rn_args
                                                      tc_fun0 fun_sigma0
        ; (tc_fun2, fun_sigma2, initial_cache, inst_plan) <-
-           tcRetainedArgInst wanted_ql exp_res_ty rn_head rn_args tc_fun1 fun_sigma1
+           tcRetainedArgInst head_ql exp_res_ty rn_head rn_args tc_fun1 fun_sigma1
        ; (dollar_inst, dollar_cache) <-
            tcRetainedDollarInst exp_res_ty rn_head rn_args tc_fun2 fun_sigma2
        ; let (tc_fun, fun_sigma) = fromMaybe (tc_fun2, fun_sigma2) dollar_inst
              arg_cache = initial_cache ++ dollar_cache
-             do_ql | null dollar_cache = wanted_ql
+             do_ql | null dollar_cache = head_ql
                    | otherwise = NoQL
              -- inst_final: top-instantiate the result type of the application,
              -- EXCEPT if we are trying to infer a sigma-type
@@ -485,6 +487,44 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
 
             ; finishAppWithCache (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan rn_fun tc_fun
                                        inst_args app_res_rho exp_res_ty } }
+
+-- | Check an existing monomorphic native variable without Quick Look.
+-- See Note [Checked native variables with ImpredicativeTypes].
+tcRetainedCheckedHeadQL :: QLFlag -> [HsExprArg 'TcpRn] -> ExpRhoType
+                       -> HsExpr GhcTc -> TcSigmaType -> TcM QLFlag
+tcRetainedCheckedHeadQL DoQL [] (Check expected) HsVar{} actual
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; if not enabled then return DoQL else
+    do { actual <- liftZonkM (zonkTcType actual)
+       ; expected <- liftZonkM (zonkTcType expected)
+       ; let tys = [actual, expected]
+             has_ql_var v = isTcTyVar v && isQLInstTyVar v
+       ; return $ if not (isSigmaTy actual || isForAllTy actual)
+                     && any (hasNativeDependentExpr . Core.Type) tys
+                     && not (any has_ql_var (tyCoVarsOfTypesList tys))
+                  then NoQL else DoQL } }
+tcRetainedCheckedHeadQL do_ql _ _ _ _ = return do_ql
+
+{- Note [Checked native variables with ImpredicativeTypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ImpredicativeTypes permits a qualified retained Pi in a checked type argument.
+It also enables Quick Look for every application, including a bare variable.
+For fromGiven f = f under a Given value ~ (foreach (n :: Nat) ->
+Eq Int => Vec Int n), the RHS has no argument or invisible binder to
+instantiate. The checking context supplies its expected type. This check
+needs conversion, not Quick Look instantiation.
+
+Use NoQL for a checked actual variable with no arguments and no leading
+forall or context. Require native syntax in the actual or expected type.
+Zonk both types and reject this route if either has a free QL instantiation
+variable. Use the native-aware deep free-variable traversal; foldQLInstVars
+does not support retained binders or indices. Keep the ordinary final result
+subsumption and native evidence capture. Do not eta-expand the variable.
+
+All other applications retain their Quick Look guards. In particular, this
+route does not instantiate a polymorphic head or monomorphise QL variables.
+See docs/dependent-haskell/REFERENCES.md#qualified-retained-function-types.
+-}
 
 -- | Bind native dictionary evidence at the application that needs it.
 tcRetainedAppEvidence :: TcM (HsExpr GhcTc) -> TcM (HsExpr GhcTc)
