@@ -1518,6 +1518,10 @@ tcHsType _ rn_ty@(HsTyLit _ lit) exp_kind
 --------- Wildcards
 
 tcHsType mode ty@(HsWildCardTy _) ek
+  | Just (_, HM_VTA) <- mode_holes mode
+  , not (isEmptyNameEnv (mode_indices mode))
+  = failWithTc $ TcRnRetainedQuantificationError RetainedPartialTypeArgument
+  | otherwise
   = do k <- expTypeToType ek
        tcAnonWildCardOcc NoExtraConstraint mode ty k
 

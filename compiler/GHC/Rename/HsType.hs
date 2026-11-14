@@ -215,6 +215,10 @@ aliases as complete local signatures. Keep the actual term Name and Unique.
 Existing erased type variables take precedence. Do not capture named wildcards,
 global terms, or Names inside quotations. Reject partial types when they capture
 an index. Ordinary visible type arguments keep their existing wildcard rules.
+Type splices can produce anonymous wildcards after this initial scan. The
+typechecker also rejects HsWildCardTy under HM_VTA when mode_indices is nonempty.
+HsWC's extension contains only named wildcards. See Note
+[Wildcards in visible type application] in GHC.Tc.Gen.HsType.
 
 The typechecker validates each captured Id and seeds only mode_indices. It keeps
 HM_VTA, kind checking, validity checking, and the normal type application order.
