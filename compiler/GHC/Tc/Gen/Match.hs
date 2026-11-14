@@ -691,7 +691,7 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
           | otherwise = pat : insert ds pats
         insert _ [] = panic "tcRetainedConMatches: missing source argument"
 
-    -- | Match shared retained positions to the row's resolved variable Names.
+    -- Match shared retained positions to the row's resolved variable Names.
     retained_names :: [RetainedConArg] -> [LPat GhcRn] -> TcM [(Name, Name)]
     retained_names [] [] = return []
     retained_names (RetainedConDict _ : args) pats = retained_names args pats
