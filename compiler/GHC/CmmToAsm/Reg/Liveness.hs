@@ -502,9 +502,9 @@ slurpReloadCoalesce live
                 = listToUFM_Directly
                 $ [ (k, r1)
                   | (k, r1) <- nonDetUFMToList map1
-                  -- This is non-deterministic but we do not
-                  -- currently support deterministic code-generation.
-                  -- See Note [Unique Determinism and code generation]
+                  -- Each entry is kept or dropped on its own and the list
+                  -- becomes a map again, so its order does not matter
+                  -- (Note [Unique Determinism and code generation])
                   , case lookupUFM_Directly map2 k of
                           Nothing -> False
                           Just r2 -> r1 == r2 ]

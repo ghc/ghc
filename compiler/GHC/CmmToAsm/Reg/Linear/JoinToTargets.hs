@@ -97,9 +97,9 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
         -- and free up those registers which are now free.
         let to_free =
                 [ r     | (reg, Loc loc _locFmt) <- nonDetUFMToList assig
-                        -- This is non-deterministic but we do not
-                        -- currently support deterministic code-generation.
-                        -- See Note [Unique Determinism and code generation]
+                        -- The registers are released into a bitmap of
+                        -- free registers, so the order does not matter
+                        -- (Note [Unique Determinism and code generation])
                         , not (elemUniqSet_Directly reg $ getRegs live_set)
                         , r          <- regsOfLoc loc ]
 
@@ -159,9 +159,9 @@ joinToTargets_again
         | equalIgnoringFormats
             (nonDetUFMToList dest_assig)
             (nonDetUFMToList src_assig)
-        -- This is non-deterministic but we do not
-        -- currently support deterministic code-generation.
-        -- See Note [Unique Determinism and code generation]
+        -- Both lists are in the order of the uniques, so
+        -- the comparison does not depend on that order
+        -- (Note [Unique Determinism and code generation])
         = joinToTargets' block_live new_blocks block_id instr dests
 
         -- assignments don't match, need fixup code
@@ -237,17 +237,15 @@ joinToTargets_again
 
 -- | Construct a graph of register\/spill movements.
 --
---      Cyclic components seem to occur only very rarely.
---
 --      We cut some corners by not handling memory-to-memory moves.
 --      This shouldn't happen because every temporary gets its own stack slot.
 --
 makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [Node Loc Unique]
 makeRegMovementGraph adjusted_assig dest_assig
  = [ node       | (vreg, src) <- nonDetUFMToList adjusted_assig
-                    -- This is non-deterministic but we do not
-                    -- currently support deterministic code-generation.
-                    -- See Note [Unique Determinism and code generation]
+                    -- The list's order, by unique, decides the order of the
+                    -- fixup moves and which move of a cycle goes through the
+                    -- stack (Note [Unique Determinism and code generation])
                     -- source reg might not be needed at the dest:
                 , Just loc <- [lookupUFM_Directly dest_assig vreg]
                 , node <- expandNode vreg src loc ]
@@ -323,8 +321,10 @@ handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
 --          (vreg1, InReg r1,    [InReg r2])
 --          (vreg2, InReg r2,    [InReg r1])
 --
---      To avoid needing temp register, we just spill all the source regs, then
---      reaload them into their destination regs.
+--      To avoid needing a temp register, we spill the first move's source
+--      reg into its vreg's slot, do the other moves (handling any cycle left
+--      among them the same way), and reload the slot into the first move's
+--      destination reg last.
 --
 --      Note that we can not have cycles that involve memory locations as
 --      sources as single destination because memory locations (stack slots)

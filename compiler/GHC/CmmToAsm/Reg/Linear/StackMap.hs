@@ -7,8 +7,9 @@
 
 --      The StackMap stack map keeps track of virtual register - stack slot
 --      associations and of which stack slots are still free. Once it has been
---      associated, a stack slot is never "freed" or removed from the StackMap again,
---      it remains associated until we are done with the current CmmProc.
+--      associated, a stack slot is never "freed": no other virtual register
+--      gets it before we are done with the current CmmProc, even after its
+--      register has outgrown it and moved to new slots.
 --
 module GHC.CmmToAsm.Reg.Linear.StackMap (
         StackSlot,

@@ -7,12 +7,12 @@
 
   Things outside this module which are related to this:
 
-  + module CLabel
+  + GHC.Cmm.CLabel
     - PIC base label (pretty printed as local label 1)
     - DynamicLinkerLabels - several kinds:
         CodeStub, SymbolPtr, GotSymbolPtr, GotSymbolOffset
     - labelDynamic predicate
-  + module Cmm
+  + GHC.Cmm.Reg and GHC.Cmm.Expr
     - The GlobalReg datatype has a PicBaseReg constructor
     - The CmmLit datatype has a CmmLabelDiffOff constructor
   + codeGen & RTS
@@ -22,15 +22,18 @@
       because Win32 doesn't support external references in data sections.
       TODO: make sure this still works, it might be bitrotted
   + NCG
-    - The cmmToCmm pass in AsmCodeGen calls cmmMakeDynamicReference for all
+    - cmmToCmm in GHC.Cmm.GenericOpt calls cmmMakeDynamicReference for all
       labels.
-    - nativeCodeGen calls pprImportedSymbol and pprGotDeclaration to output
-      all the necessary stuff for imported symbols.
+    - makeImportsDoc in GHC.CmmToAsm calls pprImportedSymbol and
+      pprGotDeclaration to output all the necessary stuff for imported
+      symbols.
     - The NCG monad keeps track of a list of imported symbols.
-    - MachCodeGen invokes initializePicBase to generate code to initialize
-      the PIC base register when needed.
-    - MachCodeGen calls cmmMakeDynamicReference whenever it uses a CLabel
-      that wasn't in the original Cmm code (e.g. floating point literals).
+    - The x86 and PowerPC instruction selectors invoke initializePicBase_x86
+      and initializePicBase_ppc to generate code to initialize the PIC base
+      register when needed.
+    - The instruction selectors call cmmMakeDynamicReference whenever they
+      use a CLabel that wasn't in the original Cmm code (e.g. floating point
+      literals).
 -}
 
 module GHC.CmmToAsm.PIC (

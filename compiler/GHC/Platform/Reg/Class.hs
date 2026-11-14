@@ -30,7 +30,9 @@ instance Outputable RegClass where
 data RegArch
   -- | Floating-point and vector registers are unified (e.g. X86, AArch64).
   = Unified
-  -- | Floating-point and vector registers are separate (e.g. RISC-V).
+  -- | Floating-point and vector registers are separate. No architecture uses
+  -- this yet: registerArch gives RISC-V NoVectors, as its vector registers are
+  -- not supported.
   | Separate
   -- | No vector registers.
   | NoVectors

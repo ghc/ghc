@@ -64,8 +64,8 @@ newtype RegM freeRegs a
         = RegM { unReg :: RA_State freeRegs -> RA_Result freeRegs a }
         deriving (Functor, Applicative, Monad) via (Strict.State (RA_State freeRegs))
 
--- | Smart constructor for 'RegM', as described in Note [The one-shot state
--- monad trick] in GHC.Utils.Monad.
+-- | Smart constructor for 'RegM', as described in
+-- Note [The one-shot state monad trick] in GHC.Utils.Monad.
 mkRegM :: (RA_State freeRegs -> RA_Result freeRegs a) -> RegM freeRegs a
 mkRegM f = RegM (oneShot f)
 

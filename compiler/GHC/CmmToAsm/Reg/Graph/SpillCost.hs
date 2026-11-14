@@ -122,9 +122,9 @@ slurpSpillCostInfo platform cfg cmm
          = do
                 -- Increment the lifetime counts for regs live on entry to this instr.
                 mapM_ incLifetime $ nonDetEltsUniqSet rsLiveEntry
-                    -- This is non-deterministic but we do not
-                    -- currently support deterministic code-generation.
-                    -- See Note [Unique Determinism and code generation]
+                    -- Each vreg's lifetime is counted on
+                    -- its own, so the order does not matter
+                    -- (Note [Unique Determinism and code generation])
 
                 -- Increment counts for what regs were read/written from.
                 let (RU read written)   = regUsageOfInstr platform instr
@@ -176,8 +176,6 @@ chooseSpill info graph
 --
 --   cost =     sum         loadCost * freq (u)  +    sum        storeCost * freq (d)
 --          u <- uses (v)                         d <- defs (v)
---
---   There are no loops in our code at the moment, so we can set the freq's to 1.
 --
 --  If we don't have live range splitting then Chaitins function performs badly
 --  if we have lots of nested live ranges and very few registers.

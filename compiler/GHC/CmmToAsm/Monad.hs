@@ -117,7 +117,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     -- ^ given the instruction sequence of a block, produce a list of
     -- the block's 'UnwindPoint's
     -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock"
-    -- and Note [Unwinding information in the NCG] in this module.
+    -- and Note [Unwinding information in the NCG] in "GHC.CmmToAsm".
     invertCondBranches        :: Maybe CFG -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
                               -> [NatBasicBlock instr]
     -- ^ Turn the sequence of @jcc l1; jmp l2@ into @jncc l2; \<block_l1>@

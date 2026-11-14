@@ -56,7 +56,7 @@ import GHC.Types.Unique.DSM (UniqDSM)
   * Compute a CFG based on the Cmm AST, see getCfgProc.
     This CFG will have edge weights representing a guess
     on how important they are.
-  * After we convert Cmm to Asm we run `optimizeCFG` which
+  * After register allocation and shortcutting we run `optimizeCFG` which
     adds a few more "educated guesses" to the equation.
   * Then we run loop analysis on the CFG (`loopInfo`) which tells us
     about loop headers, loop nesting levels and the sort.
@@ -265,7 +265,8 @@ import GHC.Types.Unique.DSM (UniqDSM)
     We apply a small modifier to them to ensure edges for which we can
     eliminate the overhead completely are considered first. See also #18053.
 
-  * Edges constituted by a call are ignored.
+  * Edges constituted by a call are ignored while the chains are built, and
+    count a 64th of their weight when the chains are merged at the end.
 
     Considering these hardly helped with performance and ignoring
     them helps quite a bit to improve compiler performance.

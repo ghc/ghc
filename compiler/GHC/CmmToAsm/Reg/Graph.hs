@@ -131,9 +131,8 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
            $$ text "regsFree    = " <> (hcat $ punctuate space $ map ppr
                                              $ nonDetEltsUniqSet $ unionManyUniqSets
                                              $ nonDetEltsUFM regsFree)
-              -- This is non-deterministic but we do not
-              -- currently support deterministic code-generation.
-              -- See Note [Unique Determinism and code generation]
+              -- The order decides only how the panic message lists the free
+              -- registers (Note [Unique Determinism and code generation])
            $$ text "slotsFree   = " <> ppr (sizeUniqSet slotsFree))
 
         -- Build the register conflict graph from the cmm code.
@@ -193,7 +192,7 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
 
          -- Coloring was successful because no registers needed to be spilled.
          then do
-                -- if -fasm-lint is turned on then validate the graph.
+                -- if -dasm-lint is turned on then validate the graph.
                 -- This checks for bugs in the graph allocator itself.
                 let graph_colored_lint  =
                         if ncgAsmLinting config
@@ -254,7 +253,7 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
          -- Coloring was unsuccessful. We need to spill some register to the
          -- stack, make a new graph, and try to color it again.
          else do
-                -- if -fasm-lint is turned on then validate the graph
+                -- if -dasm-lint is turned on then validate the graph
                 let graph_colored_lint  =
                         if ncgAsmLinting config
                                 then Color.validateGraph (text "")

@@ -263,10 +263,10 @@ as such you shouldn't need to set any of them explicitly. A flag
 
     :default: off but enabled by :ghc-flag:`-O`.
 
-    This enables static control flow prediction on the final Cmm
-    code. If enabled GHC will apply certain heuristics to identify
-    loops and hot code paths. This information is then used by the
-    register allocation and code layout passes.
+    This enables static control flow prediction in the native code generator
+    for x86-64. If enabled GHC will apply certain heuristics to identify loops
+    and hot code paths, and use this information to lay out the code. It has no
+    effect when :ghc-flag:`-finfo-table-map` is on.
 
 .. ghc-flag:: -fcmm-control-flow
     :shortdesc: Enable control flow optimisation in the Cmm backend. Implied by :ghc-flag:`-O`.

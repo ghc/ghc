@@ -560,22 +560,29 @@ addNodesBetween weights m updates =
   * Unconditional Control Transfer - They will always
     transfer control to their target. Unless there is a info table
     we can turn the jump into a fallthrough as well.
-    We use 20k as default, so it's easy to spot if values have been
-    modified but unlikely that we run into issues with overflow.
+    We use 1000 as default ('defaultWeights' in GHC.CmmToAsm.CFG.Weight).
   * If branches (likely) - We assume branches marked as likely
-    are taken more than 80% of the time.
+    are taken 75% of the time: the default weights give the likely side 900 and
+    the other side 300.
     By ranking them below unconditional jumps we make sure we
     prefer the unconditional if there is a conditional and
     unconditional edge towards a block.
-  * If branches (regular) - The false branch can potentially be turned
-    into a fallthrough so we prefer it slightly over the true branch.
-  * Unlikely branches - These can be assumed to be taken less than 20%
-    of the time. So we given them one of the lowest priorities.
+  * If branches (regular) - Both sides get the same weight, but on x86-64 the
+    instruction selector adds 3 to the weight of a floating-point comparison's
+    false edge (genCondBranch' in GHC.CmmToAsm.X86.CodeGen). If the weights are
+    still equal after optHsPatterns' other adjustments, favourFewerPreds adds
+    one to the side with fewer predecessors that could fall through into it, and
+    subtracts one from the other side.
+  * Unlikely branches - By the same weights we assume that these are taken 25%
+    of the time. So we give them one of the lowest priorities.
   * Switches - Switches at this level are implemented as jump tables
     so have a larger number of successors. So without more information
     we can only say that each individual successor is unlikely to be
     jumped to and we rank them accordingly.
-  * Calls - We currently ignore calls completely:
+  * Calls - A call's edge to its continuation gets callWeight. The
+    layout leaves these edges out when it builds chains (directEdges in
+    GHC.CmmToAsm.BlockLayout), and divides their weight by 64 when it merges the
+    chains at the end:
         * By the time we return from a call there is a good chance
           that the address we return to has already been evicted from
           cache eliminating a main advantage sequential placement brings.
@@ -659,7 +666,7 @@ getCfg platform weights graph =
 
     blocks = revPostorder graph :: [CmmBlock]
 
---Find back edges by BFS
+--Find back edges by a depth-first search (classifyEdges)
 findBackEdges :: HasDebugCallStack => BlockId -> CFG -> Edges
 findBackEdges root cfg =
     --pprTraceIt "Backedges:" $
@@ -991,9 +998,9 @@ check we do not apply any of the heuristics.
 The reason is simple: They look like loops in the control flow graph
 but are usually never entered, and if at most once.
 
-Currently implemented is a heuristic to predict that we do not exit
-loops (lehPredicts) and one to predict that backedges are more likely
-than any other edge.
+Three heuristics are implemented: that we do not exit loops (lehPredicts), that
+a comparison with a literal is unequal (ohPredicts), and that a back edge is
+more likely than any other edge.
 
 The back edge case is special as it supersedes any other heuristic if it
 applies.
@@ -1055,7 +1062,9 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         | length successors /= 2
         = cfg
 
-        -- Only backedges - no need to adjust
+        -- Only backedges - no need to adjust. This case also keeps the weights
+        -- of a back edge beside a heap or stack check's edge, which the mix
+        -- case above excludes.
         | length m > 0
         = cfg
 
@@ -1116,7 +1125,9 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
 
         -- Heuristics return nothing if they don't say anything about this branch
         -- or Just (prob_s1) where prob_s1 is the likelihood for s1 to be the
-        -- taken branch. s1 is the branch in the true case.
+        -- taken branch. s1 is the successor with the smaller label, as
+        -- getSuccessorEdges orders them, and need not be the true branch: a
+        -- heuristic that needs the true branch looks it up, as ohPredicts does.
 
         -- Loop exit heuristic.
         -- We are unlikely to leave a loop unless it's to enter another one.

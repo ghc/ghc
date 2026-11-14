@@ -835,10 +835,14 @@ mkCmmIfThenElse' e tbranch fbranch likely = do
   let
     (test, then_, else_, likely') = case likely of
       Just False | Just e' <- maybeInvertCmmExpr e
-        -- currently NCG doesn't know about likely
-        -- annotations. We manually switch then and
-        -- else branch so the likely false branch
-        -- becomes a fallthrough.
+        -- The NCG uses likely annotations on x86-64, where getCfg in
+        -- GHC.CmmToAsm.CFG weights the CFG's edges by them for the block
+        -- layout, and on PowerPC, which prints them as hints on its
+        -- branches. Where maybeInvertCmmExpr can invert it, a test annotated
+        -- likely false becomes a likely-true test of the inverse, with
+        -- the branches swapped. GHC.Cmm.ContFlowOpt swaps them back
+        -- where the true target, after shortcutting, has one predecessor
+        -- (Note [Invert Cmm conditionals]).
         -> (e', fbranch, tbranch, Just True)
       _ -> (e, tbranch, fbranch, likely)
 
