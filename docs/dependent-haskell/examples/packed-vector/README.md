@@ -1,9 +1,9 @@
 # Packed vector source example
 
-Both M28 compiler stages pass all 439 source observations with Core Lint
-and STG Lint. The API/runtime fixture passes 133 source rejection cases.
-All five registered regressions pass. M28 adds 22 observations and keeps the
-previous 417 lines in order. Both stages pass 99 standalone rejection cases
+Both M29 compiler stages pass all 461 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 146 source rejection cases.
+All five registered regressions pass. M29 adds 22 observations and keeps the
+previous 439 lines in order. Both stages pass 112 standalone rejection cases
 and four ordinary-Haskell controls.
 
 At M20, both stages and all five regressions passed 301 observations and
@@ -1095,7 +1095,47 @@ extra arguments/results, conflicting prefixes, scope escapes, missing
 dictionaries, linear duplication and the partial-VTA boundary. A separate
 TC trace counts one prefix elaboration on failed matching.
 
-The remaining source boundary is a leading partial type application, such as
-`selectVTA @Bool ...`. The same native call without VTA compiles. Complete
-ordinary VTA also compiles. See the
+At M28, the remaining source boundary was a leading partial type application, such as
+`selectVTA @Bool ...`. The same native call without VTA compiled. Complete
+ordinary VTA also compiled. M29 verifies this generic route below. See the
 [M29 plan](../../PLAN.md#m29-native-generic-inference-after-leading-vta).
+
+## Leading visible type applications
+
+M29 passes bootstrap and self-hosted validation.
+The source example passes 461 observations. The previous 439 outputs remain
+unchanged. The focused application checks pass ten positive controls and
+fourteen located rejections. The API fixture passes 146 rejection cases.
+
+```haskell
+selectVTA :: forall tag value. tag -> (value, Bool) -> value
+selectVTA _ (value, _) = value
+
+let vector = replicateNative @Int n 7
+    pair = ((vector,), False)
+    result = selectVTA @Bool True pair (42 :: Int)
+```
+
+The checker instantiates `tag` with `Bool` first. It infers the remaining
+generic `value` from the pair before checking the extra ordinary argument.
+It preserves the written type argument and the original evidence order.
+No native type is assigned to a meta-variable. Core and the interface
+representation are unchanged.
+
+[driveLeadingVTA and runLeadingVTAChecks](Main.hs) compare partial `@Bool`,
+omitted VTA, a named partial selection, two leading arguments `@Bool @Int`,
+and a context between forall groups. Runtime IORef lengths range from 0
+through 3. Counters require `[0,1,2,3,4,5]`. Further checks separate action
+construction from repeated execution. They check bottom index, payload,
+tag and function demand, partial/cyclic prefixes, and sharing of the named
+captured vector and original IORef payload. The unconstrained selector ignores
+its tag. The constrained selector evaluates `tag == tag`; a bottom tag must
+raise its original error. A full ordinary VTA call remains a separate control.
+
+See Note `[Native inference after visible type applications]` in
+[GHC.Tc.Gen.App](../../../../compiler/GHC/Tc/Gen/App.hs) and the
+[pinned application references](../../REFERENCES.md#native-inference-after-leading-visible-type-applications).
+The separate native-index-kind prepass is unchanged. A leading `@Int` with
+remaining Nat-kinded erased variables is outside the new M29 route. Both stages compile `observe vector` and `observe @Int @Z VNil`, but reject
+`observe @Int vector` with located GHC-83865. See the
+[M30 plan](../../PLAN.md#m30-native-index-kind-inference-after-leading-vta).

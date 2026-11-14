@@ -91,7 +91,10 @@ All five registered regressions pass. M27 verifies native tuple sections with
 M28 verifies native generic result overapplication with 439 source observations,
 99 located rejection cases, four ordinary controls and 133 API rejection cases.
 Both stages pass the failed-match cache trace. All five registered regressions
-pass. M29 targets native generic inference after leading visible type applications.
+pass. M29 verifies native generic inference after leading visible type applications
+with 461 observations, 112 located rejections, four ordinary controls and 146
+API rejections. Both stages pass the cache trace and all five registered tests.
+M30 targets native-index-kind inference after leading VTA.
 
 ## Direction and boundaries
 
@@ -1879,31 +1882,59 @@ the saturation distinction. No Core or interface form changed.
 
 ### M29: native generic inference after leading VTA
 
-This target is unverified. Both M28 stages accept a selector without VTA and
-reject its otherwise equivalent partial `@Bool` form with located GHC-83865.
-Complete ordinary VTA remains valid. The native prepass excludes written type
-arguments, so it cannot use the remaining generic binders after partial VTA.
+Verified in both stages. The original M28 baseline rejected partial `@Bool`
+with located GHC-83865. M29 accepts this generic route and preserves omitted
+and complete ordinary VTA. The original native-index-kind prepass is unchanged.
 
-- [ ] Use the existing ITYARG step to check leading written type arguments
+- [x] Use the existing ITYARG step to check leading written type arguments
   once. Before IALL creates metas for the remaining binders, attempt native
   argument-directed inference from the substituted signature. Keep NoQL,
   extension, known-head/concreteness, prefix-anchor, kind and scope guards.
   Start before any value argument and require no remaining written VTA.
-- [ ] Preserve the recorded checked type arguments and original head. Feed
+- [x] Preserve the recorded checked type arguments and original head. Feed
   immutable choices through IALL's existing plan and evidence order. Do not
   prepend remaining type applications ahead of the written `@Bool`.
-- [ ] Return inferred argument caches to `tcApp` and `finishAppWithCache`,
+- [x] Return inferred argument caches to `tcApp` and `finishAppWithCache`,
   including failed-match caches. Preserve the public `tcInstFun` interface
   where possible. Separate cache value positions from diagnostic source
-  positions: `tcValArgsWithCache` currently counts written type arguments,
-  while `RetainedArgCache` keys count only value arguments. Earlier VTA
-  guards kept this difference outside native cache use.
-- [ ] Compare omitted, partial and complete VTA from source. Check wrong tags
+  positions. `RetainedArgCache` keys count only value arguments. Generated
+  type arguments advance neither cache keys nor source diagnostic positions.
+- [x] Compare omitted, partial and complete VTA from source. Check wrong tags
   and kinds, extra arguments/results, conflicting prefix choices, contexts,
   scope and linear usage. Trace once-only elaboration on failure. Preserve
   generated/written argument positions and located diagnostics. Leave VTA
   interleaved after values outside this increment. Reuse the pinned spine
   precedent and give shared rules one owning Note.
+
+
+### M30: native-index-kind inference after leading VTA
+
+This target is unverified. Both M29 stages compile `observe vector` and
+`observe @Int @Z VNil`. They reject the following partial-VTA form with
+GHC-83865 at `localVector n`, in the second argument of `observe`:
+
+```haskell
+observe :: forall a (index :: Nat). Vec a index -> Int
+observe _ = 42
+bad n = pure (observe @Int (localVector n))
+```
+
+- [ ] Reuse the native-index-kind matcher after ITYARG substitutes leading
+  arguments. Keep its exact-saturation, kind, native-meta and lexical-scope
+  guards. Require NoQL, the extension, the original eligible head, no consumed
+  value arguments and no remaining type arguments. Generic overapplication
+  stays separate.
+- [ ] Return immutable choices for the remaining telescope through IALL.
+  Preserve written type arguments and dictionary order. Retain successful
+  and failed-match caches. Use the existing separate value/source counters
+  and preserve the public cache-discarding wrapper.
+- [ ] Compare omitted, partial and complete ordinary VTA from source. Cover
+  runtime Nat indices, nested contexts, multiple remaining parameters, scope,
+  kinds, mismatched indices and linear usage. Check that ignored native index
+  arguments stay lazy. Preserve original payload sharing and action counts.
+- [ ] Update the owning Note and pinned Agda/GHC provenance. Pin emitted
+  diagnostics and primary source tokens in both stages. Rebuild both stages,
+  run the focused registered regressions, and preserve the frozen M29 evidence.
 
 ## Further work
 

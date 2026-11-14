@@ -2089,10 +2089,79 @@ and finalizers cannot measure this failing TC path. Preserve the normal
 trace's tentative messages separately from emitted error diagnostics.
 Linear positive/negative controls check usage independently.
 
-The M29 baseline keeps the same selector and adds `@Bool`. Omitted VTA and
-complete ordinary VTA compile, while the partial native form rejects in both
-stages. GHC's ITYARG step already checks the written type argument. The next
-adaptation should reuse that substituted signature and IALL's binder/evidence
-order. Cache keys and diagnostic positions need separate counters before
-native caches can include written VTA. These are unverified implementation
-tasks, not a new type-theoretic rule.
+## Native inference after leading visible type applications
+
+M29's compiler implementation is `37963035139963313ab0c16bbe06fbf3870c4d9a`.
+Both stages pass 461 source observations and 24 focused application cases:
+ten positive and fourteen negative. They preserve 112 located rejections and
+four ordinary runtime controls. The API fixture passes 146 rejection cases;
+all five registered regressions pass.
+The original M29 baseline rejected partial native `@Bool` in both M28 stages,
+while omitted VTA and complete ordinary VTA compiled. Keep that baseline
+separate from the bootstrap implementation results.
+
+Agda v2.8.0 [`Rules/Application.hs`, lines 774–808](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+checks an argument against the current Pi domain, records the checked argument,
+and continues with the substituted codomain `absApp b u`.
+[Lines 449–465](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L449-L465)
+retain the final application-result check. File blob:
+`82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+[`Rules/Term.hs`, lines 685–710](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L685-L710)
+checks a lambda under the domain and codomain supplied by its current expected
+Pi. File blob: `02991c9fa0085315cc854d2833a9080af14a7740`.
+Both exact tagged files are already pinned in the frozen M28 prior-art archive.
+They support staged application checking and telescope substitution. They do
+not supply GHC's erased VTA syntax, immutable inference policy or usage rules.
+
+GHC's existing application pipeline is pinned at
+`dad8b99f6f8b50b514e2e1ef149aa66e90351456`.
+In `GHC.Tc.Gen.App`, lines 882–890 implement IALL's invisible-binder and
+class-dictionary instantiation. Lines 979–984 implement ITYARG through `tcVTA`
+and retain the checked type argument. File blob:
+`19670a6fe282f97fedc8ce80c8bfc8cff997e07f`.
+M29 keeps that pipeline. After leading type arguments, native inference uses
+the substituted signature before IALL allocates the remaining variables.
+It keeps the original head and checked arguments, then passes immutable
+choices through IALL in the original type-argument and evidence order.
+
+The owning Note is `[Native inference after visible type applications]` in
+`GHC.Tc.Gen.App`. Only `tcApp` enables the cache-consuming route. Require NoQL,
+no consumed value arguments, no remaining type applications and the existing
+generic inference guards. The native-index-kind prepass remains separate.
+Keep inferred caches on failed matching. Record an attempt so that later IALL
+steps cannot elaborate the same arguments again. Public `tcInstFun` callers
+that cannot consume the cache leave this route disabled. Preserve native-meta,
+kind, lexical scope, concreteness, exact-domain and final subsumption checks.
+
+Cache keys count value arguments. Diagnostic positions also count written
+type arguments. Generated type arguments advance neither source diagnostic
+positions nor value-cache keys. Emit each cached usage once at the actual
+argument multiplicity. A generated type argument is still an application-spine
+argument; it can enable the post-type-application cache route.
+
+Record-dot expansion supplies the concrete generated-argument precedent.
+At the same pinned GHC commit, `GHC.Rename.Expr` lines 419–425 expand
+`HsGetField` while retaining its original expression. Lines 2883–2904 contain
+`mkGetField` and `mkGet`. The latter builds `getField @field record` with
+`genAppType` and `wrapGenSpan`. File blob:
+`b086a0356ce48938a7ecc6d6ad2086b5b341c350`.
+This generated label must not shift the user's value-argument diagnostic.
+The separate M29 archive is `native-leading-vta-prior-art-v1`. Preserve the
+frozen M28 source and evidence. M29 adds no Core form or equality rule.
+
+
+## Native-index-kind inference after leading VTA: next boundary
+
+Both M29 stages compile an erased Nat-indexed `observe` without VTA and with
+complete ordinary `@Int @Z`. Partial `@Int` rejects with GHC-83865 at
+`localVector n`, with a second-argument context. The baseline sources,
+commands, emitted diagnostics and tokens are in
+`native-leading-vta-probes-{bootstrap,selfhost}-next-v1`. These are compile/Lint
+checks. They make no runtime claim about the rejected form.
+
+M30 will reuse the existing native-index-kind matcher after leading ITYARG,
+under exact saturation and the current kind, scope and native-meta guards.
+Agda's pinned current-Pi argument checking and substituted codomain remain
+the application precedent. GHC's existing native-index prepass and M29's
+immutable IALL choices supply the implementation precedent. This is a local
+next step, not a claim of general term computation in types.

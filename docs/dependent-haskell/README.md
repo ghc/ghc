@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 439 runtime observations and the runtime fixtures check 133 source rejection cases |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 461 runtime observations and the runtime fixtures check 146 source rejection cases |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -59,7 +59,8 @@ Last updated: 2026-11-14.
 | Native boxed tuples | Complete boxed tuples infer exact native field types through ordinary constructor applications; runtime syntax, constructor and helper comparisons pass |
 | Native tuple sections | Inferred and expected boxed sections preserve exact native fields, hole multiplicities, field laziness and captured vector sharing |
 | Generic result application | A native-anchored declared argument prefix determines a generic function result before ordinary checking consumes extra arguments |
-| Next task | M29: reuse prefix inference after leading visible type applications; a partial `@Bool` still blocks the native generic route |
+| Leading visible type applications | Remaining generic binders infer after leading VTA; checked type arguments, evidence order, usage and diagnostic positions are preserved |
+| Next task | M30: native-index-kind inference after leading VTA; `observe vector` compiles while `observe @Int vector` still rejects |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2863,7 +2864,65 @@ Earlier frozen evidence, the initial VTA probe and trace-parser failures remain.
 [Pinned Agda and upstream GHC sources](REFERENCES.md#generic-result-overapplication-prior-art)
 record the application-spine precedent and the limits of TH counter evidence.
 
-The next compile/Lint baseline omits or supplies a leading `@Bool`. The omitted
-form works; partial VTA still reports located GHC-83865 in both stages.
-Complete ordinary VTA works. [M29](PLAN.md#m29-native-generic-inference-after-leading-vta)
+At M28, the next compile/Lint baseline omitted or supplied a leading `@Bool`.
+The omitted form worked; partial VTA reported located GHC-83865 in both stages.
+Complete ordinary VTA worked. [M29](PLAN.md#m29-native-generic-inference-after-leading-vta)
 will attempt prefix inference after GHC checks the written type arguments.
+
+
+## M29: native inference after leading visible type applications
+
+A selector can now infer a remaining generic type after leading VTA:
+
+```haskell
+selectVTA :: forall tag value. tag -> (value, Bool) -> value
+selectVTA _ (value, _) = value
+-- vector has the exact type Vec Int n at an existing runtime index n.
+result = selectVTA @Bool True ((vector,), False) (42 :: Int)
+```
+
+ITYARG checks the written `@Bool`. Before IALL allocates the remaining
+variables, the native matcher uses the substituted signature and declared
+argument prefix. Immutable choices pass through IALL in telescope order.
+Checked type arguments and dictionaries keep their order. Only the NoQL
+`tcApp` route enables this inference, before any value argument and with no
+remaining type arguments. Public callers that cannot consume an argument
+cache leave it disabled. No Core form or interface format changes.
+
+The checker retains inferred argument caches even when matching fails.
+Value-cache keys count values. Diagnostic positions also count written VTA;
+generated record-dot type arguments do not shift them. The owning Note is
+`[Native inference after visible type applications]` in `GHC.Tc.Gen.App`.
+[Pinned Agda and GHC sources](REFERENCES.md#native-inference-after-leading-visible-type-applications)
+record the application, substitution and generated-argument precedents.
+
+Both compiler stages pass 461 source observations, preserving the earlier
+439 lines. The 22 additions compare omitted, partial, named and two-leading
+VTA calls at runtime IORef lengths 0 through 3. They check action effects,
+index/payload/tag/function demand, partial/cyclic indices and captured-vector
+and original-IORef sharing. Both stages pass 112 located rejection cases and
+four ordinary runtime controls. The new matrix has ten positive cases and
+fourteen negative cases. It covers contexts, linear usage, higher-rank extra
+arguments, kinds, scopes, dictionaries, generated type arguments and the
+Quick Look gate. Interleaved VTA remains outside this increment. Wrong tag
+and extra-value errors retain second/fourth argument contexts. Deep
+annotation errors retain their nested expression contexts. Failed matching
+elaborates the traced `prefixProbe` application once per stage.
+
+The API fixture passes 146 source rejection cases. All five registered
+regressions pass, with 34 skipped ways and no unexpected results or framework
+warnings. The full GHC suite was not run. Evidence uses
+`_build/verification/native-leading-vta-*`. Three archives each retain 32
+selected compiler paths. The first self-host build was stopped to correct
+one Note sentence about generated type arguments. The corrected bootstrap
+and self-host builds took 15.94s and 5m08s; their serial job peaked at
+7303 MiB under 16 GiB. Final both-stage source/API checks peaked at 1217 MiB
+under 4 GiB. Registered tests took 13.76s and peaked at 1877 MiB under 8 GiB.
+Swap was disabled. Frozen M28 and earlier evidence remains unchanged.
+
+The separate native-index-kind route still runs only in its existing prepass.
+Both stages compile `observe vector` and `observe @Int @Z VNil`, but reject
+`observe @Int vector` when the remaining erased variable has kind `Nat`.
+That compile/Lint baseline reports GHC-83865 at `localVector n`, with a
+second-argument context. [M30](PLAN.md#m30-native-index-kind-inference-after-leading-vta)
+will reuse this route after leading VTA under its exact-saturation guards.
