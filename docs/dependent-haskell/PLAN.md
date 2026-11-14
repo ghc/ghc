@@ -2129,6 +2129,14 @@ Use `NoQL` throughout that application, with the existing final subsumption
 and evidence checks. Applied and polymorphic heads retain their guards.
 This intermediate step does not complete the caller or runtime work below.
 
+The first checked-head build accepts direct Given transport. The
+beneath-binder case reaches GHC-83865 with `cteImpredicative`. The `Refl`
+case instead needs inference of its already-typed scrutinee. Extend the
+monomorphic variable route to return that existing type through `InferResult`.
+Read an available expected type without allocating a new cell. Preserve
+promotion, level, representation and branch checks. This does not infer a
+new native function type or instantiate a polymorphic head.
+
 - [ ] Pin the source-validity rule and GHC's ordinary dictionary elaboration.
   Compare the Agda hidden/instance distinction and the paper binder properties.
   Keep visibility, evidence kind and runtime retention separate. The D/DC/DR
