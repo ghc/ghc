@@ -1435,6 +1435,11 @@ This target is unverified. Rewrite the existing nested-case `sameNat` as four
 constructor equations for `Z/Z`, `Z/S`, `S/Z` and `S/S`. Its result remains
 `Maybe (n :~: m)`. The recursive success branch eliminates the predecessor
 proof before it returns `Just Refl`. Keep the case implementation as a reference.
+The second constructor column can follow ordinary value arguments. Other
+retained positions keep M19's bare-variable rule. Keep the one-column checker
+as the existing path. Compose the first nominal transport with a second
+transport over its result type. Locate duplicate pairs at their later row,
+missing pairs at the group, and unsupported patterns at that pattern.
 
 - [ ] Admit an initial complete matrix of two retained constructor columns.
   Require bare constructor subfields, unique constructor pairs and no overlap.
