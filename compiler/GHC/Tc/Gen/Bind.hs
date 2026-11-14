@@ -555,7 +555,7 @@ tcPolyNoGen top_lvl rec_tc prag_fn tc_sig_fn bind_list
       | NotTopLevel <- top_lvl
       , NonRecursive <- rec_tc
       , [L _ (FunBind { fun_matches = MG { mg_alts = L _
-            [L _ (Match { m_pats = [] })] } })] <- bind_list
+            [L _ (Match { m_pats = L _ [] })] } })] <- bind_list
       = True
       | otherwise = False
 

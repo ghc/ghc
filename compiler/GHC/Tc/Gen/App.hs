@@ -18,6 +18,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr, tcInferRho )
 import GHC.Hs
 
 import GHC.Tc.Gen.Head
+import GHC.Tc.Gen.Match ( tcMatches, tcBody )
 import GHC.Tc.Gen.Sig ( isCompleteHsSig )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
@@ -80,6 +81,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Data.Data ( Data, cast, gmapQ )
 import Data.Function
+import qualified Data.List.NonEmpty as NE
 import Data.Semigroup
 
 import GHC.Prelude
@@ -1878,16 +1880,22 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
        ; case eligible of
            Nothing -> return (fun, sigma, [], Nothing)
            Just inferable -> do
-             { cache <- infer_args needed_tvs inferable domains 1 args
-             ; actual_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) cache
-             ; let templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- cache ]
+             { initial_cache <- infer_args needed_tvs inferable domains 1 args
+             ; initial_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) initial_cache
+             ; let initial_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- initial_cache ]
                    match_args subst = foldM (\subst (formal, actual) ->
                                         tcMatchTyX_BM (bind_outer tvs) subst formal actual)
-                                      subst (zip templates actual_tys)
+                                      subst (zip initial_templates initial_tys)
                    -- See Note [Ordinary heads in native argument matching].
-                   matched = case match_args initial_subst of
+                   initial_match = case match_args initial_subst of
                                Nothing | not index_route -> match_args Subst.emptySubst
                                other -> other
+             ; (matched, cache) <- case initial_match of
+                   Just subst | not index_route ->
+                     tcRetainedCallbackArgs tvs domains args subst initial_cache
+                   _ -> return (initial_match, initial_cache)
+             ; actual_tys <- mapM (liftZonkM . zonkTcType . actual_type . snd) cache
+             ; let templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- cache ]
              ; choices <- case matched of
                             Just subst -> tcRetainedArgChoices index_route tvs subst
                             Nothing -> return Nothing
@@ -1941,6 +1949,122 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstEnabled _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+
+-- | Infer a callback result after earlier arguments determine its input type.
+-- Keep each checked callback and its usage in the ordinary argument cache.
+-- See Note [Scoped native callback results].
+tcRetainedCallbackArgs :: [TyVar] -> [Scaled Type] -> [HsExprArg 'TcpRn]
+                       -> Subst.Subst -> RetainedArgCache
+                       -> TcM (Maybe Subst.Subst, RetainedArgCache)
+tcRetainedCallbackArgs tvs domains args subst cache
+  = go subst cache (zip3 [1..] domains [arg | EValArg { ea_arg = arg } <- args])
+  where
+    go subst cache []
+      = do { subst <- foldM expose_choice subst tvs
+           ; return (Just subst, cache) }
+    go subst cache ((pos, domain, arg) : rest)
+      | isNothing (lookup pos cache)
+      , FunTy { ft_af = af, ft_mult = mult, ft_arg = input, ft_res = output }
+          <- coreFullView (Subst.substTy subst (scaledThing domain))
+      , isVisibleFunArg af, isManyTy mult
+      , not (mentions_templates input)
+      , mentions_templates output
+      , isTauTy input, typeKind input `eqType` liftedTypeKind
+      , Just (build, annotation, matches, body_span) <- callback arg
+      = setSrcSpanA (getLoc arg) $ do
+          { valid <- tcRetainedInstScope [input]
+          ; if not valid then return (Nothing, cache) else
+        do { (usage, (matches', result)) <- tcCollectingUsage $
+               runInferRho $ \result_ty ->
+                 tcMatches (LamAlt LamSingle) tcBody
+                   [mkCheckExpFunPatTy (Scaled ManyTy input)] result_ty matches
+           ; result <- liftZonkM (zonkTcType result)
+           -- tcMatches has restored the application environment here.
+           ; valid_result <- tcRetainedInstScope [result]
+           ; unless valid_result $ setSrcSpanA body_span $
+               failWithTc (TcRnRetainedQuantificationError (RetainedCallbackResult result))
+           ; unless (isTauTy result) $ setSrcSpanA body_span $
+               failWithTc (TcRnRetainedQuantificationError (RetainedInference result))
+           ; let actual = mkVisFunTyMany input result
+                 typed = build (HsLam annotation LamSingle matches')
+                 cache' = cache ++ [(pos, (typed, actual, usage))]
+                 candidate = case match_type subst output result of
+                   Just subst' -> Just subst'
+                   Nothing -> do
+                     (_, formal_payload) <- splitAppTy_maybe output
+                     (_, actual_payload) <- splitAppTy_maybe result
+                     match_type subst formal_payload actual_payload
+           ; case candidate of
+               Just subst'
+                 | let expected = Subst.substTy subst' (scaledThing domain)
+                 , not (mentions_templates expected)
+                 -> do { typed <- tcRetainedAppEvidence $
+                            do { wrap <- tcSubTypeSigma (exprCtOrigin (unLoc arg))
+                                           GenSigCtxt actual expected
+                               ; return (mkHsWrap wrap (unLoc typed)) }
+                       ; let entry = (pos, (fmap (const typed) arg, expected, usage))
+                       ; go subst' (cache ++ [entry]) rest }
+               _ -> return (Nothing, cache') } }
+      | otherwise = go subst cache rest
+
+    mentions_templates ty = any (`elemVarSet` tyCoVarsOfType ty) tvs
+
+    expose_choice subst tv
+      | Just ty <- Subst.lookupTyVar subst tv
+      = do { ty <- liftZonkM (zonkTcType ty)
+           ; let subst' = Subst.extendSubstInScopeSet subst (tyCoVarsOfType ty)
+           ; return (Subst.extendTvSubst subst' tv ty) }
+      | otherwise = return subst
+
+    match_type subst formal actual
+      = do { subst <- tcMatchTyX_BM bind_outer subst (typeKind formal) (typeKind actual)
+           ; tcMatchTyX_BM bind_outer subst formal actual }
+
+    bind_outer tv _ | tv `elem` tvs = BindMe
+                    | otherwise = DontBindMe
+
+    -- Keep parentheses and source locations on the cached lambda.
+    callback :: LHsExpr GhcRn
+             -> Maybe ( HsExpr GhcTc -> LHsExpr GhcTc, XLam GhcTc
+                      , MatchGroup GhcRn (LHsExpr GhcRn), SrcSpanAnnA )
+    callback (L loc (HsPar annotation arg))
+      = do { (build, lam_annotation, matches, body_span) <- callback arg
+           ; return (L loc . HsPar annotation . build, lam_annotation, matches, body_span) }
+    callback (L loc (HsLam annotation LamSingle matches))
+      | [L _ (Match { m_pats = L _ [L _ VarPat{}]
+                    , m_grhss = GRHSs { grhssGRHSs = grhss } })] <- unLoc (mg_alts matches)
+      , [L _ (GRHS _ [] body)] <- NE.toList grhss
+      = Just (L loc, annotation, matches, getLoc body)
+    callback _ = Nothing
+
+{- Note [Scoped native callback results]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A known action fixes the input of its ordinary continuation. For example,
+IO (Vec Int n) fixes xs in (>>=) action (\xs -> pure xs). Do not allocate the
+result beta before checking this callback. A mutable beta cannot hold its
+native result type.
+
+Check one bare variable pattern at the known Many input type. Infer the body
+through an InferResult and keep the typed lambda and its usage exactly once.
+The match checker retains its normal level, promotion and branch checks.
+After it returns, validate the result in the outer application environment.
+An input or inner local Id cannot escape into the ordinary function result.
+Do not infer a retained arrow or an existential package.
+
+Match the inferred result immutably. An ordinary monad head can still be a
+meta-variable: pure xs can infer f (Vec Int n). In that case, match the payload
+and keep ordinary callback subsumption to check the whole type, including f.
+It can assign f := IO without assigning a native type to a meta-variable.
+Cache the wrapped callback at its checked type. Final argument and result
+subsumption still run. Preserve IALL evidence order and all native scope,
+kind, concreteness and Quick Look guards.
+
+Agda expands a do bind to ordinary application and a lambda. Its local
+context stores the checked term and type. This implementation keeps GHC's
+runtime Ids opaque and keeps Haskell evaluation unchanged. See
+docs/dependent-haskell/REFERENCES.md#direct-do-bind-of-a-saved-native-action
+and #checked-local-payload-signatures in the same file.
+-}
 
 -- | Preserve matched native choices and freshen undetermined ordinary binders.
 -- See Note [Ordinary parameters in native applications].
