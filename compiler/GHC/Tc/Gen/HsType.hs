@@ -529,6 +529,7 @@ tcRetainedAmbientIndices invalid_reason hs_ty
                       _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
                   ; return (Just (name, index)) }
              _ -> invalid_index }
+    invalid_index :: TcM a
     invalid_index = failWithTc $ TcRnRetainedQuantificationError invalid_reason
 
     -- Keep only free runtime occurrences. Telescope binders have their own Ids.
