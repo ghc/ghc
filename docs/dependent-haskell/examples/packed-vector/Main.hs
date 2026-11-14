@@ -168,6 +168,51 @@ driveFilteredAppend left right = do
 lazySum :: foreach (n :: Nat) -> Sum n Z
 lazySum n = Sum n bottomEquality
 
+-- | Reverse a package constructed from a length read at runtime.
+{-# NOINLINE driveReverse #-}
+driveReverse :: Nat -> IO String
+driveReverse input = do
+    cell <- newIORef input
+    n <- readIORef cell
+    pure (renderPacked (reversePacked (makePacked n)))
+
+-- | Reverse distinct elements selected by a runtime predicate.
+{-# NOINLINE driveFilteredReverse #-}
+driveFilteredReverse :: Int -> IO String
+driveFilteredReverse input = do
+    cell <- newIORef input
+    cutoff <- readIORef cell
+    pure (renderPacked (reversePacked (filterPacked (> cutoff) samplePacked)))
+
+-- | Reverse onto an accumulator with an independently read length.
+{-# NOINLINE driveReverseAppend #-}
+driveReverseAppend :: Int -> Nat -> IO String
+driveReverseAppend cutoffInput lengthInput = do
+    cutoffCell <- newIORef cutoffInput
+    lengthCell <- newIORef lengthInput
+    cutoff <- readIORef cutoffCell
+    m <- readIORef lengthCell
+    pure
+        ( withPacked
+            (filterPacked (> cutoff) samplePacked)
+            ( \n xs ->
+                case sumNat n m of
+                    Sum p Refl -> renderPacked (PackVec p (reverseAppendNative @Int n m xs (replicateNative @Int m 7)))
+            )
+        )
+
+-- | Demand both arithmetic proofs at independently read runtime indices.
+{-# NOINLINE driveReverseProofs #-}
+driveReverseProofs :: Nat -> Nat -> IO String
+driveReverseProofs left right = do
+    leftCell <- newIORef left
+    rightCell <- newIORef right
+    n <- readIORef leftCell
+    m <- readIORef rightCell
+    case rightZero n of
+        Refl -> case addSucc n m of
+            Refl -> pure "Refl"
+
 -- | A named error for demand of the ordinary equality field.
 bottomEquality :: forall n m. n :~: m
 bottomEquality = error "append-bottom-proof"
@@ -825,3 +870,90 @@ main = do
     putStrLn "index mismatch skips guard argument: 0"
     expectMarker "index pattern before guard" "packed-bottom-length" $
         evaluate (guardedByIndex (lazyPacked bottomLength) True)
+    forM_
+        [ (Z, "(0,[])")
+        , (S (S Z), "(2,[42,42])")
+        , (S (S (S Z)), "(3,[42,42,42])")
+        ]
+        $ \(input, expected) -> do
+            actual <- driveReverse input
+            assertEqual "runtime reverse" expected actual
+            putStrLn ("runtime reverse: " ++ actual)
+    forM_
+        [ (0, "(3,[3,2,1])")
+        , (1, "(2,[3,2])")
+        , (3, "(0,[])")
+        ]
+        $ \(cutoff, expected) -> do
+            actual <- driveFilteredReverse cutoff
+            assertEqual "runtime filtered reverse" expected actual
+            putStrLn ("runtime filtered reverse: " ++ actual)
+    forM_
+        [ (0, S (S Z), "(5,[3,2,1,7,7])")
+        , (1, S Z, "(3,[3,2,7])")
+        , (3, S (S Z), "(2,[7,7])")
+        ]
+        $ \(cutoff, size, expected) -> do
+            actual <- driveReverseAppend cutoff size
+            assertEqual "runtime reverse append" expected actual
+            putStrLn ("runtime reverse append: " ++ actual)
+    proofs <- driveReverseProofs (S (S Z)) (S Z)
+    assertEqual "runtime reverse arithmetic proofs" "Refl" proofs
+    putStrLn ("runtime reverse arithmetic proofs: " ++ proofs)
+    assertWhnf "reverse constructor with bottom fields" (reversePacked (lazyPacked bottomLength))
+    assertWhnf "reverse constructor with cyclic fields" (reversePacked (cyclicPacked cyclicLength))
+    assertEqual "reverse keeps stored length" 2 (withPacked (reversePacked (lazyPacked (S (S Z)))) (\n xs -> natToInt n))
+    putStrLn "reverse keeps stored length: 2"
+    assertEqual "reverse keeps partial stored constructor" 42 (withPacked (reversePacked (lazyPacked (S bottomLength))) (\n xs -> case n of Z -> 0; S k -> 42 :: Int))
+    putStrLn "reverse keeps partial stored constructor: 42"
+    expectMarker "reverse stored length demands index" "packed-bottom-length" $
+        evaluate (withPacked (reversePacked (lazyPacked bottomLength)) (\n xs -> natToInt n))
+    expectMarker "reverse index before payload" "packed-bottom-length" $
+        evaluate (firstPacked (reversePacked (lazyPacked bottomLength)))
+    expectMarker "reverse partial index before payload" "packed-bottom-length" $
+        evaluate (firstPacked (reversePacked (lazyPacked (S bottomLength))))
+    expectMarker "reverse zero inspects payload" "packed-bottom-payload" $
+        evaluate (firstPacked (reversePacked (lazyPacked Z)))
+    expectMarker "reverse successor inspects payload" "packed-bottom-payload" $
+        evaluate (firstPacked (reversePacked (lazyPacked (S Z))))
+    expectMarker "reverse complete spine before head" "packed-bottom-payload" $
+        evaluate (firstPacked (reversePacked (PackVec (S (S Z)) (VCons 42 bottomPayload))))
+    assertWhnf "reverse lazy element result" (headPacked (reversePacked singletonBottom))
+    expectMarker "reverse demands element" "packed-filter-bottom-element" $
+        evaluate (firstPacked (reversePacked singletonBottom))
+    let reversedBottomHead = reversePacked (PackVec (S (S Z)) (VCons bottomElement (VCons 7 VNil)))
+    assertEqual "reverse preserves last element" 7 (firstPacked reversedBottomHead)
+    putStrLn "reverse preserves last element: 7"
+    expectMarker "reverse later element demand" "packed-filter-bottom-element" $
+        evaluate (withPacked reversedBottomHead (\n xs -> sum (toList xs)))
+    expectMarker "reverse bottom package" "packed-bottom-package" $
+        evaluate (reversePacked bottomPackage)
+    assertEqual "unused reverse package" 42 (const (42 :: Int) (reversePacked bottomPackage))
+    putStrLn "unused reverse package: 42"
+    assertWhnf "partial reverse ignores bottom index" (reverseNative @Int bottomLength)
+    assertWhnf "partial reverse ignores cyclic index" (reverseNative @Int cyclicLength)
+    assertWhnf "partial reverse append ignores indices" (reverseAppendNative @Int bottomLength bottomRightLength)
+    assertWhnf "partial reverse append ignores payload" (reverseAppendNative @Int bottomLength bottomRightLength bottomPayload)
+    expectMarker "empty reverse append inspects first vector" "zip-left-vector" $
+        evaluate (reverseAppendNative @Int Z bottomLength leftVector rightVector)
+    expectMarker "empty reverse append ignores right index" "zip-right-vector" $
+        evaluate (reverseAppendNative @Int Z bottomLength VNil rightVector)
+    case addSucc Z bottomLength of
+        Refl -> putStrLn "successor proof zero ignores right index: Refl"
+    expectMarker "successor proof demands first index" "packed-bottom-length" $
+        evaluate (addSucc bottomLength bottomRightLength)
+    expectMarker "successor proof demands remaining index" "packed-bottom-length" $
+        evaluate (addSucc (S bottomLength) bottomRightLength)
+    expectMarker "right zero proof demands index" "packed-bottom-length" $
+        evaluate (rightZero bottomLength)
+    assertEqual "ignored reverse proof stays lazy" 42 (const (42 :: Int) (rightZero cyclicLength))
+    putStrLn "ignored reverse proof stays lazy: 42"
+    expectMarker "reverse append payload before predecessor" "packed-bottom-payload" $
+        evaluate (reverseAppendNative @Int (S bottomLength) bottomRightLength bottomPayload bottomPayload)
+    expectMarker "reverse append proof before tail" "packed-bottom-length" $
+        evaluate (reverseAppendNative @Int (S bottomLength) Z (VCons 42 bottomPayload) VNil)
+    assertEqual
+        "reverse append ignores right fields"
+        42
+        (case reverseAppendNative @Int (S Z) bottomRightLength (VCons 42 VNil) bottomPayload of VCons x xs -> x)
+    putStrLn "reverse append ignores right fields: 42"

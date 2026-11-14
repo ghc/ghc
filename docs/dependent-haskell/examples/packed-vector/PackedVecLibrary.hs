@@ -31,6 +31,11 @@ module PackedVecLibrary
     , sumNat
     , appendNative
     , appendPacked
+    , addSucc
+    , rightZero
+    , reverseAppendNative
+    , reverseNative
+    , reversePacked
     , proofDepthBounded
     , repackWithoutProof
     , guardedRepack
@@ -109,6 +114,54 @@ A finite first length can leave the second length and vector fields lazy.
 The proof is an ordinary lifted field. Matching Refl forces it. Haskell
 permits bottom and cyclic inputs; this is not a totality or erasure claim.
 See docs/dependent-haskell/REFERENCES.md#computed-length-append-next-source-probe.
+-}
+
+-- | Transport addition across a successor in its second operand.
+addSucc :: foreach (n :: Nat) -> foreach (m :: Nat) -> Add n (S m) :~: S (Add n m)
+addSucc n m = case n of
+    Z -> Refl
+    S k -> case addSucc k m of
+        Refl -> Refl
+
+-- | Prove the right identity of addition by runtime Nat induction.
+rightZero :: foreach (n :: Nat) -> Add n Z :~: n
+rightZero Z = Refl
+rightZero (S k) = case rightZero k of
+    Refl -> Refl
+
+-- | Reverse the first vector onto the second vector.
+reverseAppendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)
+reverseAppendNative n m xs acc = case n of
+    Z -> case xs of
+        VNil -> acc
+    S k -> case xs of
+        VCons x rest -> case addSucc k m of
+            Refl -> reverseAppendNative @a k (S m) rest (VCons x acc)
+
+-- | Reverse a vector while preserving its retained length.
+reverseNative :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n
+reverseNative n xs = case rightZero n of
+    Refl -> reverseAppendNative @a n Z xs VNil
+
+-- | Keep the original stored index and delay the reversed vector.
+reversePacked :: PackedVec a -> PackedVec a
+reversePacked (PackVec n xs) = PackVec n (reverseNative n xs)
+
+{- Note [Length-preserving runtime vector reverse]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Agda's indexed fold and reverse provide the program precedent. This fixed-Add
+worker uses the standard successor-addition and right-zero proofs explicitly.
+Match each ordinary Refl proof before changing the vector index. The wrapper
+stores the original runtime n. The worker type relates lengths; it does not
+specify element order or establish termination.
+
+Bind both retained arguments before the case in addSucc. Constructor equations
+with a later retained binder require separate source identity handling.
+The package leaves both fields lazy. Demanding the reversed vector first
+demands the whole finite Nat spine through rightZero, then the vector spine.
+Each addSucc can inspect the remaining Nat spine again. This is not a linear
+runtime claim. Proofs are ordinary lifted values and matching Refl forces them.
+See REFERENCES.md#length-preserving-reverse-next-source-probe for pinned sources.
 -}
 
 -- | Build a vector from a runtime length.

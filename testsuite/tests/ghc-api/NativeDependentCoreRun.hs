@@ -1361,6 +1361,46 @@ runModuleChecks libdir = do
         , "index guard failure reaches catchall: 99"
         , "index mismatch skips guard argument: 0"
         , "index pattern before guard: packed-bottom-length"
+        , "runtime reverse: (0,[])"
+        , "runtime reverse: (2,[42,42])"
+        , "runtime reverse: (3,[42,42,42])"
+        , "runtime filtered reverse: (3,[3,2,1])"
+        , "runtime filtered reverse: (2,[3,2])"
+        , "runtime filtered reverse: (0,[])"
+        , "runtime reverse append: (5,[3,2,1,7,7])"
+        , "runtime reverse append: (3,[3,2,7])"
+        , "runtime reverse append: (2,[7,7])"
+        , "runtime reverse arithmetic proofs: Refl"
+        , "reverse constructor with bottom fields: ok"
+        , "reverse constructor with cyclic fields: ok"
+        , "reverse keeps stored length: 2"
+        , "reverse keeps partial stored constructor: 42"
+        , "reverse stored length demands index: packed-bottom-length"
+        , "reverse index before payload: packed-bottom-length"
+        , "reverse partial index before payload: packed-bottom-length"
+        , "reverse zero inspects payload: packed-bottom-payload"
+        , "reverse successor inspects payload: packed-bottom-payload"
+        , "reverse complete spine before head: packed-bottom-payload"
+        , "reverse lazy element result: ok"
+        , "reverse demands element: packed-filter-bottom-element"
+        , "reverse preserves last element: 7"
+        , "reverse later element demand: packed-filter-bottom-element"
+        , "reverse bottom package: packed-bottom-package"
+        , "unused reverse package: 42"
+        , "partial reverse ignores bottom index: ok"
+        , "partial reverse ignores cyclic index: ok"
+        , "partial reverse append ignores indices: ok"
+        , "partial reverse append ignores payload: ok"
+        , "empty reverse append inspects first vector: zip-left-vector"
+        , "empty reverse append ignores right index: zip-right-vector"
+        , "successor proof zero ignores right index: Refl"
+        , "successor proof demands first index: packed-bottom-length"
+        , "successor proof demands remaining index: packed-bottom-length"
+        , "right zero proof demands index: packed-bottom-length"
+        , "ignored reverse proof stays lazy: 42"
+        , "reverse append payload before predecessor: packed-bottom-payload"
+        , "reverse append proof before tail: packed-bottom-length"
+        , "reverse append ignores right fields: 42"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2618,6 +2658,13 @@ runPackageSourceRejectChecks = do
         , ("ZipUnmatchedProof", 83865, "zipVec xs ys", [], equalityImports, package ++ equality ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = case sameNat n m of", "  Nothing -> Nothing", "  Just proof -> Just (PackVec n (zipVec xs ys))"])
         , ("ZipNothingBranch", 83865, "zipVec xs ys", [], equalityImports, package ++ equality ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = case sameNat n m of", "  Just Refl -> Just (PackVec n (zipVec xs ys))", "  Nothing -> Just (PackVec n (zipVec xs ys))"])
         , ("LinearIndex", 83605, "local index variable", ["LinearTypes"], [], package ++ ["bad :: Nat %1 -> PackedVec Int", "bad n = PackVec n (error \"unused\")"])
+        , ("ReverseWrongLength", 83865, "reverseNative", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a (S n)", "bad n xs = reverseNative @a n xs"])
+        , ("ReverseMissingStep", 5617, "reverseAppendNative", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)", "bad n m xs acc = case n of", "  Z -> case xs of VNil -> acc", "  S k -> case xs of VCons x rest -> reverseAppendNative @a k (S m) rest (VCons x acc)"])
+        , ("ReverseMissingZero", 83865, "reverseAppendNative", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n", "bad n xs = reverseAppendNative @a n Z xs VNil"])
+        , ("AddSuccForged", 83865, "Refl", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Add n (S m) :~: S (Add n m)", "bad n m = Refl"])
+        , ("RightZeroForged", 83865, "Refl", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: foreach (n :: Nat) -> Add n Z :~: n", "bad n = Refl"])
+        , ("ReverseIndexEscape", 83865, "reverseNative", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n xs) = reverseNative @Int n xs"])
+        , ("ReverseWrongPredecessor", 25897, "rest", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)", "bad n m xs acc = case n of", "  Z -> case xs of VNil -> acc", "  S k -> case xs of VCons x rest -> reverseAppendNative @a (S k) m rest acc"])
         , ("SumForged", 83865, "Refl", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (p :: Nat) -> Sum n m", "bad n m p = Sum p Refl"])
         , ("SumWrongEvidence", 83865, "proof", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (p :: Nat) -> (p :~: n) -> Sum n m", "bad n m p proof = Sum p proof"])
         , ("AppendUnmatchedProof", 83865, "appendNative n m xs ys", ["TypeFamilies"], equalityImports, package ++ sums ++ ["bad :: PackedVec a -> PackedVec a -> PackedVec a", "bad (PackVec n xs) (PackVec m ys) = case sumNat n m of", "  Sum p proof -> PackVec p (appendNative n m xs ys)"])
@@ -2692,6 +2739,27 @@ runPackageSourceRejectChecks = do
         [ "zipVec :: Vec a n -> Vec b n -> Vec (a, b) n"
         , "zipVec VNil VNil = VNil"
         , "zipVec (VCons x xs) (VCons y ys) = VCons (x, y) (zipVec xs ys)"
+        ]
+    reversal =
+        [ "addSucc :: foreach (n :: Nat) -> foreach (m :: Nat) -> Add n (S m) :~: S (Add n m)"
+        , "addSucc n m = case n of"
+        , "    Z -> Refl"
+        , "    S k -> case addSucc k m of"
+        , "        Refl -> Refl"
+        , "rightZero :: foreach (n :: Nat) -> Add n Z :~: n"
+        , "rightZero Z = Refl"
+        , "rightZero (S k) = case rightZero k of"
+        , "    Refl -> Refl"
+        , "reverseAppendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)"
+        , "reverseAppendNative n m xs acc = case n of"
+        , "    Z -> case xs of"
+        , "        VNil -> acc"
+        , "    S k -> case xs of"
+        , "        VCons x rest -> case addSucc k m of"
+        , "            Refl -> reverseAppendNative @a k (S m) rest (VCons x acc)"
+        , "reverseNative :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n"
+        , "reverseNative n xs = case rightZero n of"
+        , "    Refl -> reverseAppendNative @a n Z xs VNil"
         ]
     keepBound = "PackBounded (S len) (VCons x ys) (LES proof)"
     dropBound = "PackBounded len ys (weakenRight proof)"
