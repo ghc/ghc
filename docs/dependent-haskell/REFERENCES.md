@@ -2243,3 +2243,65 @@ existing application pipeline for extras. The pinned Agda application spine
 and M28 empty-substitution rule for overapplication remain the precedents.
 Do not infer missing native indices from extra-only anchors or assign native
 syntax to mutable metas.
+
+
+## Joint native-index prefix inference and result overapplication
+
+M31's initial compiler implementation is `0265297eb3`. It exposed a regression
+in the existing source program. Commit `1728237cc8` changes inference to two
+phases. With that correction, bootstrap passes all 503 source observations
+and 28 focused compile/Lint cases: fourteen positive and fourteen negative.
+These include a genuine retained-function payload and its runtime application.
+Both stages now pass 503 source observations, 139 located rejections and four
+ordinary controls. Both failed-match cache traces elaborate `prefixProbe` once.
+The API fixture passes 173 rejections. All five registered regressions pass.
+The full GHC suite was not run.
+
+The GHC baseline is `GHC.Tc.Gen.App` at
+`b7286565696f21de8c87743b2171c2e58e3fb87c`, Git blob
+`3550f031fc573d658fe1d9379ad8986f9aa92912`.
+Its index route inferred domains containing `index_tvs`, then required complete
+immutable choices. An independent payload parameter could remain unknown.
+Its exact-saturation guard also excluded extra arguments on that route.
+M31 reuses the same matcher, argument cache, IALL and final application checks.
+It does not add a Core representation, equality rule or interface format.
+
+Agda v2.8.0 [`Rules/Application.hs`, lines 774–808](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+checks the argument at the current Pi domain. It records that argument and
+continues with the substituted codomain `absApp b u`.
+[Lines 619–643](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L619-L643)
+insert implicit arguments before checking the next supplied argument.
+The pinned file blob is `82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+These are telescope-substitution and application-spine precedents. Agda uses
+contextual metas. It does not implement the index-first policy below or
+justify changes to GHC's native-meta, usage or strictness restrictions.
+
+The owning Note `[Cached retained argument inference]` records the two phases.
+First infer and match index-bearing domains. Then infer eligible independent
+domains only for parameters that remain unknown. Use
+`tcRetainedInferableArg` for those domains and skip already cached positions.
+Independent domains whose parameters are fixed by the expected result or
+the index arguments retain their ordinary expected-type checks.
+
+For `filterBounded (const False) xs`, the vector determines the predicate's
+element type. Inferring the predicate first can leave an ordinary meta as a
+rigid actual type in the immutable match. The later vector cannot repair that
+candidate. The two-phase policy first obtains the element type from `xs`,
+then checks the predicate against its known domain. This is a bounded GHC
+adaptation. It is not Agda's unification algorithm.
+
+The owning Note `[Generic retained argument inference]` records extra arguments.
+Match only the nonempty declared argument prefix. At exact saturation, keep
+the existing expected-result seed. With extra arguments, start from an empty
+substitution: the final result follows those arguments, so it cannot seed the
+intermediate selection. Keep the original application spine. IALL and final
+checking consume the extra arguments, dictionaries and written type arguments
+in order. Do not infer missing native indices from extra-only arguments.
+
+New independent-domain and extra-argument inference requires a head without
+concreteness requirements. Concrete heads keep exact, index-only inference.
+The index route still requires complete immutable choices. Preserve NoQL,
+kind, exact cached-domain, lexical runtime-Id scope and native-meta guards.
+Preserve once-only argument usage, failed-match caches and final subsumption.
+Both leading-VTA and omitted-VTA calls use the existing application pipeline.
+The separate source archive is `native-joint-prefix-prior-art-v1`.

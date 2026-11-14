@@ -1,9 +1,9 @@
 # Packed vector source example
 
-Both M30 compiler stages pass all 479 source observations with Core Lint
-and STG Lint. The API/runtime fixture passes 160 source rejection cases.
-All five registered regressions pass. M30 adds 18 observations and keeps the
-previous 461 lines in order. Both stages pass 126 standalone rejection cases
+Both M31 compiler stages pass all 503 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 173 source rejection cases.
+All five registered regressions pass. M31 adds 24 observations and keeps the
+previous 479 lines in order. Both stages pass 139 standalone rejection cases
 and four ordinary-Haskell controls.
 
 At M20, both stages and all five regressions passed 301 observations and
@@ -1187,3 +1187,57 @@ M30 passes all five registered regressions. Its two-stage strict composition
 baseline accepts a named native-function selection from a combined tuple,
 but rejects direct application and separate ordinary/native payloads.
 See the [M31 plan](../../PLAN.md#m31-joint-native-index-argument-inference-and-result-overapplication).
+
+## Joint index and payload inference
+
+M31 passes bootstrap and self-hosted validation with 503 source observations. The previous
+479 outputs remain unchanged. The 28 new compile controls pass fourteen
+positive cases and fourteen located rejections. The API fixture passes
+173 rejection cases. Both stages pass 139 located rejections, four ordinary
+runtime controls and two failed-match cache traces. All five registered
+regressions pass. The full GHC suite was not run.
+
+```haskell
+selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value
+selectIndex _ value = value
+
+let witness = replicateNative @Int n 0
+    payloadVector = replicateNative @Int m 7
+    ordinary = selectIndex @Int witness ((+ 1) :: Int -> Int) 42
+    direct = selectIndex @Int witness (payloadVector,) (42 :: Int)
+    retained = selectIndex @Int witness (replicateNative @Int) m 7
+```
+
+The checker infers the witness index and the independent payload type from
+the declared argument prefix. The payload can contain another runtime index.
+The selected result can then receive ordinary extra arguments. A retained
+function result keeps its retained application checks. Naming the selection
+first is no longer required. Omitted and leading visible type applications
+use the same matching rules.
+
+Inference has two phases. First infer and match index-bearing arguments.
+Then infer eligible independent arguments whose parameters remain unknown.
+Already cached arguments are not checked again. Arguments with a domain
+fixed by the index arguments retain ordinary expected-type checking.
+For `filterBounded (const False) xs`, infer the element type from `xs`
+before checking the predicate. Inferring the predicate first left an ordinary
+meta rigid in the immutable match and rejected the existing source program.
+
+[driveJointIndexPrefix and runJointIndexPrefixChecks](Main.hs) compare named
+and direct selections, separate and combined payloads, contexts, and ordinary
+and retained function results. Runtime IORef inputs keep witness and payload
+indices independent. The checks retain effects, original demand errors,
+partial/cyclic prefixes and sharing of named vectors and original payloads.
+They do not require newly evaluated expressions to share.
+
+The route keeps NoQL and complete immutable index choices. It cannot infer
+a missing native index from an extra-only argument. New independent-argument
+and extra-argument inference requires a head without concreteness requirements.
+Concrete heads retain exact index-only inference. Scope, kind, cached usage,
+native-meta and final subsumption checks remain. No Core or interface form
+changes.
+
+See Notes `[Cached retained argument inference]` and
+`[Generic retained argument inference]` in
+[GHC.Tc.Gen.App](../../../../compiler/GHC/Tc/Gen/App.hs), and the
+[joint-prefix references](../../REFERENCES.md#joint-native-index-prefix-inference-and-result-overapplication).

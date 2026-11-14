@@ -96,8 +96,11 @@ with 461 observations, 112 located rejections, four ordinary controls and 146
 API rejections. Both stages pass the cache trace and all five registered tests.
 M30 verifies native-index-kind inference after leading VTA with 479 source
 observations, 126 located rejections, four ordinary controls and 160 API
-rejections. Both stages and all five registered regressions pass. M31 targets
-joint native-index/payload inference and result overapplication.
+rejections. Both stages and all five registered regressions pass. M31 verifies
+joint native-index/payload inference and result overapplication with 503 source
+observations, 139 located rejections, four ordinary controls and 173 API
+rejections. Both stages and all five registered regressions pass. M32 targets
+safe outer equality evidence under fixed-domain retained Pi types.
 
 ## Direction and boundaries
 
@@ -1942,45 +1945,72 @@ bad n = pure (observe @Int (localVector n))
 
 ### M31: joint native-index argument inference and result overapplication
 
-This target is unverified. Both M30 stages pass a named exact-saturated
-selection from `(Vec a index, value)`, where `value` is a native function.
-Directly applying that selection rejects. A helper with separate vector and
-payload arguments also rejects, including an ordinary function payload:
+M30 passed a named exact-saturated selection from `(Vec a index, value)`,
+where `value` is a native function. Direct application rejected. A helper
+with separate vector and payload arguments also rejected, including an
+ordinary function payload. M31 accepts these forms:
 
 ```haskell
 selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value
 selectIndex _ value = value
-bad n = pure (let selected = selectIndex @Int (localVector n)
-                              ((+1) :: Int -> Int)
-              in selected 42)
+good n = pure (selectIndex @Int (localVector n) ((+1) :: Int -> Int) 42)
 ```
 
-The index route infers domains that mention `index_tvs`. Its choice check
-requires every quantified parameter, so an independent `value` remains
-undetermined. Exact saturation also blocks direct result overapplication.
-The strict two-stage baseline has two accepted and four rejected forms.
+Infer index-bearing arguments first. Their immutable match determines the
+expected domains of ordinary arguments such as predicates. Then infer eligible
+independent domains for parameters that remain unknown. Match the nonempty
+declared prefix before checking extra arguments. The former strict baseline
+had two accepted and four rejected forms; all six now compile in both stages.
+Both stages pass 503 source observations, 139 located rejections, four ordinary
+controls and both failed-match cache traces. The API fixture passes 173
+rejections. All five registered regressions pass. The full GHC suite was not run.
 
-- [ ] Match native-index and ordinary payload choices jointly from the
+- [x] Match native-index and ordinary payload choices jointly from the
   nonempty declared argument prefix. Infer independent parameters needed by
   that prefix, while preserving known expected domains. Require complete
   immutable native-index choices. Preserve kind, head/concreteness, exact
   cached-domain and lexical scope checks; keep native mutable fills forbidden.
-- [ ] Allow ordinary extra arguments after that prefix. Start overapplication
+- [x] Allow ordinary extra arguments after that prefix. Start overapplication
   matching with an empty substitution, since the final expected result comes
   after those arguments. Reuse IALL, final subsumption and dictionary order.
   Keep both leading-VTA and existing no-VTA routes consistent.
-- [ ] Compare named/direct calls and ordinary/native function payloads from
+- [x] Compare named/direct calls and ordinary/native function payloads from
   source. Cover runtime indices, contexts, sharing, effects and demand. Pin
   conflicting choices, undetermined indices, extra-only anchors, scopes,
   kinds, dictionaries and linear use. Trace once-only elaboration on failure.
-- [ ] Update the owning Notes and pinned Agda/GHC provenance. Rebuild both
+- [x] Update the owning Notes and pinned Agda/GHC provenance. Rebuild both
   stages, run the focused regressions, and preserve the frozen M30 evidence.
 
-After this composition step, probe ambient ordinary equality evidence under
-a fixed-domain retained Pi. Restrict evidence to outer variables that cannot
-depend on the new runtime binder. Keep plugins, cache writes, fresh dependent
-Wanteds and mutable native fills gated. Audit optimizer substitution,
-occurrence scope and proof-case reconstruction before enabling transformations.
+### M32: outer equality evidence under a retained Pi
+
+The six-case baseline agrees in both stages. Ordinary function transport under
+`a ~ b`, identical retained functions, pointwise retained transport, and global
+family-axiom normalization compile with Core and STG Lint. Whole retained
+function transport under `a ~ b` rejects with GHC-83865 at the returned `f`:
+
+```haskell
+transportElement :: forall a b. a ~ b
+                 => (foreach (n :: Nat) -> Vec a n)
+                 -> (foreach (n :: Nat) -> Vec b n)
+transportElement f = f
+```
+
+The pointwise definition `transportElement f n = f n` compiles. Removing the
+equality proof rejects. This isolates an evidence boundary under the Pi.
+It is separate from argument-prefix inference and source signature support.
+
+- [ ] Pin Agda's conversion/context rules and the GHC inert-rewrite paths.
+  Audit the existing `DepFunCo` proof and its free runtime Ids.
+- [ ] Admit only outer ordinary equality evidence that cannot contain the new
+  runtime binder. Preserve the fixed closed domain, role and location context.
+  Keep plugins, family-cache access, fresh dependent Wanteds and mutable native
+  fills gated. Update Note `[Rewriting retained dependent functions]`.
+- [ ] Compare direct and pointwise transport through a separate interface.
+  Check proof scope, absent proofs, nested binders, demand and sharing. Pin
+  located failures, rebuild both stages and run the registered regressions.
+
+Optimizer support remains separate. Audit substitution, occurrence scope and
+proof-case reconstruction before enabling transformations.
 
 ## Further work
 

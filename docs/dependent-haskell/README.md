@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 479 runtime observations and the runtime fixtures check 160 source rejection cases |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 503 runtime observations and the runtime fixtures check 173 source rejection cases |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -60,8 +60,9 @@ Last updated: 2026-11-14.
 | Native tuple sections | Inferred and expected boxed sections preserve exact native fields, hole multiplicities, field laziness and captured vector sharing |
 | Generic result application | A native-anchored declared argument prefix determines a generic function result before ordinary checking consumes extra arguments |
 | Leading visible type applications | Remaining generic binders infer after leading VTA; checked type arguments, evidence order, usage and diagnostic positions are preserved |
-| Native-index VTA | Remaining Nat-kinded parameters infer after leading VTA under exact saturation; index demand, contexts and argument positions pass |
-| Next task | M31: infer native indices and independent payload parameters together, then apply selected function results directly |
+| Native-index VTA | Remaining Nat-kinded parameters infer after leading VTA; index demand, contexts and argument positions pass |
+| Joint prefix inference | Index-bearing arguments determine expected domains before independent payload inference; selected ordinary and retained functions accept further arguments directly |
+| Next task | M32: use safe outer equality evidence beneath a fixed-domain retained Pi |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2993,3 +2994,65 @@ complete choices. Both stages agree on two accepted and four rejected forms.
 will infer the index and payload together from the declared prefix. A later
 capability is safe ambient equality beneath a fixed-domain retained Pi;
 optimizer support requires its own substitution and scope audit.
+
+## M31: joint index and payload inference
+
+The declared argument prefix can now determine both a native index and an
+independent payload type. The selected payload can receive further arguments:
+
+```haskell
+selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value
+selectIndex _ value = value
+-- witness :: Vec Int n at an existing runtime Nat n.
+ordinary = selectIndex @Int witness ((+1) :: Int -> Int) 42
+retained = selectIndex @Int witness (replicateNative @Int) m 7
+```
+
+The retained result in the second call uses the independent runtime index `m`.
+The first inference phase matches index-bearing arguments. The second phase
+infers eligible independent domains whose parameters remain unknown. This
+order preserves expected-type checking for `filterBounded (const False) xs`:
+the vector determines the predicate's element type. The first implementation
+inferred that predicate too early and rejected the existing source program.
+Commit `1728237cc8` corrects the order.
+
+Only the nonempty declared prefix supplies inference choices. Extra arguments
+use the existing application checks. Overapplication starts with an empty
+substitution because the final expected result follows those extra arguments.
+New independent-domain and extra-argument inference requires a head without
+concreteness requirements. Concrete heads retain exact index-only inference.
+Complete immutable index choices, NoQL, kind, exact cached-domain, lexical
+scope, usage and final subsumption checks remain. Native mutable fills remain
+forbidden. No Core form or interface version changes.
+The [pinned references](REFERENCES.md#joint-native-index-prefix-inference-and-result-overapplication)
+distinguish Agda's application/substitution precedents from this GHC inference
+policy. The owning Note is `[Cached retained argument inference]`.
+
+Both stages pass 503 source observations. The previous 479 outputs remain
+unchanged. The 24 additions compare named and direct selections, omitted and
+leading VTA, ordinary and retained function payloads, independent IORef indices,
+contexts, effects, demand and sharing. Both stages pass 139 located rejection
+cases and four ordinary runtime controls. The new matrix has fourteen positive
+and fourteen negative cases. One former M30 overapplication rejection now
+compiles. All six forms in the previous composition baseline compile.
+Failed matches in each inference phase elaborate `prefixProbe` once per stage.
+The API fixture passes 173 rejection cases. All five registered regressions
+pass, with 34 skipped ways and no unexpected results or framework warnings.
+The full GHC suite was not run.
+
+Evidence uses `_build/verification/native-joint-prefix-*`. Canonical archives
+v2, v3 and v4 retain 32 selected compiler paths each. The v4 bytes match v3;
+the final bootstrap and self-host builds took 21.12s and 6m39s. The self-host
+build peaked at 4386 MiB under 16 GiB. Source/API checks peaked at 1336 MiB
+under 4 GiB. Registered tests took 14.19s and peaked at 1822 MiB under 8 GiB.
+Swap was disabled. The partial v1 archive, the initial predicate regression,
+and a failed wrapper path remain as evidence. The initial formatter command
+changed the Cabal template in place; the original template was restored before
+the canonical archives. Frozen M30 and earlier evidence remains unchanged.
+
+The next six-case baseline isolates outer equality beneath a retained Pi.
+Ordinary function transport, identical retained functions, pointwise transport
+under `a ~ b`, and family-axiom normalization compile in both stages. Returning
+the whole retained function under `a ~ b` rejects with GHC-83865 at `f`.
+The corresponding no-proof control also rejects. See the
+[M32 plan](PLAN.md#m32-outer-equality-evidence-under-a-retained-pi).
