@@ -2115,6 +2115,20 @@ recursive qualified-Pi assumption reject with GHC-91510 at the signature's
 locate the first boundary in source validity. They do not establish an
 immutable Given-rewrite failure.
 
+The follow-up seven-case probe enables `ImpredicativeTypes`. Both stages then
+accept the ordinary qualified arrow and ordinary qualified Given. The five
+native cases pass signature validity but reject with GHC-83605 at their
+bodies: Quick Look does not support the retained type. Preserve this result
+before changing Given checking.
+
+First add a checked-variable route that needs no Quick Look instantiation.
+Require an actual variable head, zero arguments, a checking context, no leading
+invisible forall or context, and no free Quick Look instantiation variables
+in either zonked type. Require native syntax in the actual or expected type.
+Use `NoQL` throughout that application, with the existing final subsumption
+and evidence checks. Applied and polymorphic heads retain their guards.
+This intermediate step does not complete the caller or runtime work below.
+
 - [ ] Pin the source-validity rule and GHC's ordinary dictionary elaboration.
   Compare the Agda hidden/instance distinction and the paper binder properties.
   Keep visibility, evidence kind and runtime retention separate. The D/DC/DR

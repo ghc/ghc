@@ -2523,3 +2523,35 @@ separate questions. They do not identify ordinary Haskell class dictionaries
 with erased equality evidence. See the
 [roles paper reading](papers/README.md#roles-icfp-2019) and
 [next source task](PLAN.md#m34-qualified-retained-function-types).
+
+## Qualified retained function types
+
+The M34 seven-case probe enables `ImpredicativeTypes` on the frozen M33
+compiler. Both stages admit the signatures. Two ordinary controls compile.
+Five native bodies reject with GHC-83605 at the Quick Look guard. The
+`native-qualified-pi-*` evidence preserves source, commands, diagnostics and
+both beneath-binder traces. The initial scope peaks at 179 MiB under 4 GiB.
+
+Agda v2.8.0
+[Pi checking](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L106-L130)
+checks the body inside its telescope. Its
+[domain checker](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L335-L365)
+preserves instance metadata while checking later domains. Its
+[argument insertion](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Implicit.hs#L81-L101)
+distinguishes unification metas from instance metas and substitutes each
+argument into the remaining type. These rules guide binder order and scope.
+They do not equate Haskell class dictionaries with FC equality evidence.
+
+GHC's existing application pipeline needs a separate checked-variable path.
+A bare actual variable with no leading invisible quantifier or context needs
+no type instantiation. Select `NoQL` only in checking mode, with no arguments,
+known native syntax and no existing Quick Look instantiation variables in
+the zonked types. Use the native-aware deep free-variable traversal. The
+Quick Look traversal itself rejects retained binders and indices. Preserve
+final subsumption and native evidence capture. This does not add general
+native Quick Look inference or establish a soundness theorem.
+
+Eight Agda source records are pinned in
+`native-qualified-pi-prior-art-v1/provenance.json`. Six full-file Git blobs
+were checked locally; two records use tagged source ranges. Keep this
+provenance separate from the frozen M33 evidence.
