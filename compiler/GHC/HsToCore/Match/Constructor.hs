@@ -120,7 +120,7 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
 
   -- See Note [Retained constructor equation scope].
   | any (any has_native_proof) groups
-  = do { results <- mapM match_retained_row (foldr1 (<>) groups)
+  = do { results <- mapM match_retained_row (concatMap NE.toList groups)
        ; return (foldr1 combineMatchResults results) }
 
   | otherwise
