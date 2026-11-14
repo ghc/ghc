@@ -182,9 +182,9 @@ runIndexMatrixChecks = do
         assertEqual (label ++ " reference") wanted reference
         assertEqual label wanted actual
         putStrLn (label ++ ": " ++ actual)
-    _ <- evaluate (sameNatByCase bottomLength)
+    _ <- evaluate (sameNatByCase bottomLength `seq` ())
     assertWhnf "matrix partial ignores bottom index" (sameNat bottomLength)
-    _ <- evaluate (sameNatByCase cyclicLength)
+    _ <- evaluate (sameNatByCase cyclicLength `seq` ())
     assertWhnf "matrix partial ignores cyclic index" (sameNat cyclicLength)
     check_marker
         "matrix first index before second"
