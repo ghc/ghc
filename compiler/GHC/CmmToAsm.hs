@@ -8,44 +8,191 @@
 -- | Note [Native code generator]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- The native-code generator has machine-independent and
--- machine-dependent modules.
+-- The native code generator (NCG) turns a module's raw Cmm into assembly
+-- text. Raw Cmm is Cmm whose info tables are already laid out (cmmToRawCmm in
+-- GHC.Cmm.Info).
 --
--- This module ("GHC.CmmToAsm") is the top-level machine-independent
--- module.  Before entering machine-dependent land, we do some
--- machine-independent optimisations (defined below) on the
--- 'CmmStmts's. (Which ideally would be folded into CmmOpt ...)
+-- nativeCodeGen, below, dispatches on the target's architecture. x86, x86-64,
+-- PowerPC, AArch64, RISC-V and LoongArch each supply an NcgImpl and go through
+-- cmmNativeGen. wasm32 goes to GHC.CmmToAsm.Wasm, a generator of its own with
+-- its own monad, which maps Cmm locals to wasm locals and so uses none of the
+-- CFG, block layout or register allocators described below. For any other
+-- architecture nativeCodeGen panics.
 --
--- We convert to the machine-specific 'Instr' datatype with
--- 'cmmCodeGen', assuming an infinite supply of registers.  We then use
--- a (mostly) machine-independent register allocator to rejoin
--- reality.  Obviously, 'regAlloc' has machine-specific helper
--- functions (see the used register allocator for details).
+-- By default (platformDefaultBackend in GHC.Driver.Backend), an unregisterised
+-- build uses the C back end (GHC.CmmToC), a JavaScript target uses the
+-- JavaScript back end (GHC.StgToJS), which starts from STG, and any other
+-- architecture uses the LLVM back end (GHC.CmmToLlvm). The bytecode generator
+-- (GHC.StgToByteCode) also starts from STG.
 --
--- Finally, we order the basic blocks of the function so as to minimise
--- the number of jumps between blocks, by utilising fallthrough wherever
--- possible.
+-- The Cmm pipeline (cmmPipeline in GHC.Cmm.Pipeline) hands over Cmm in which:
 --
--- The machine-dependent bits are generally contained under
---  GHC/CmmToAsm/<Arch>/* and generally breaks down as follows:
+--   * stack layout (GHC.Cmm.LayoutStack) has made Sp explicit, saved each local
+--     that is live across a call and reloaded it into the same local in the
+--     call's continuation, and turned safe foreign calls into unsafe ones;
+--   * switches are comparisons and dense jump tables
+--     (GHC.Cmm.Switch.Implement);
+--   * where tables are next to code, proc points are not split, so the
+--     continuations of a procedure are those of its blocks that carry info
+--     tables;
+--   * unreachable blocks are gone (Note [unreachable blocks]);
+--   * GHC.Cmm.ContFlowOpt has inverted some conditional branches
+--     (Note [Invert Cmm conditionals]);
+--   * at -O, sinking (GHC.Cmm.Sink) has moved assignments to their uses.
 --
---   * "Regs": Everything about the target platform's machine
---     registers (and immediate operands, and addresses, which tend to
---     intermingle/interact with registers).
+-- The testsuite compiles with -dcmm-lint (Note [Norms of the NCG]).
 --
---   * "Instr":  Includes the 'Instr' datatype plus a miscellany of other things
---     (e.g., 'targetDoubleSize', 'smStablePtrTable', ...)
+-- The NCG takes these from StgToCmm and the RTS:
 --
---   * "CodeGen":  is where 'Cmm' stuff turns into
---     machine instructions.
+--   * The machine registers of STG's registers come from a header under
+--     rts/include/stg/MachRegs/, from which compiler/CodeGen.Platform.h defines
+--     activeStgRegs and globalRegMaybe. The allocators never hand out those of
+--     BaseReg, Sp, SpLim, Hp and HpLim.
+--   * An unsafe foreign call clobbers the STG registers that callerSaves
+--     names (Note [Unsafe foreign calls clobber caller-save registers]
+--     in GHC.Cmm.Node). The NCG's call instructions clobber the target's
+--     callClobberedRegs.
+--   * A heap or stack check (do_checks in GHC.StgToCmm.Heap) branches, marked
+--     unlikely, to a block that calls the garbage collector. Where that call
+--     returns into the procedure, as in a case alternative, control reaches the
+--     check again from the block it returns to, which closes a cycle in the CFG
+--     (the TODO at lehPredicts in GHC.CmmToAsm.CFG). The check at a function's
+--     or thunk's entry jumps to the garbage collector instead.
 --
---   * "Ppr": 'pprInstr' turns an 'Instr' into text (well, really
---     a 'SDoc').
+-- The machine-independent parts of the NCG are this module, the CFG
+-- (GHC.CmmToAsm.CFG), block layout (GHC.CmmToAsm.BlockLayout), liveness
+-- (GHC.CmmToAsm.Reg.Liveness) and the two register allocators. They access
+-- a target through the NcgImpl record (GHC.CmmToAsm.Monad), the Instruction
+-- class (GHC.CmmToAsm.Instr) and, in the linear allocator, the FR class
+-- of free register sets (GHC.CmmToAsm.Reg.Linear.FreeRegs, which holds
+-- its instances; a module for each target under Reg/Linear/ defines its
+-- set). Some functions dispatch on the architecture instead, such as those of
+-- GHC.CmmToAsm.Reg.Target.
 --
--- The register allocators lives under GHC.CmmToAsm.Reg.*, there is both a Linear and a Graph
--- based register allocator. Both of which have their own notes describing them. They
--- are mostly platform independent but there are some platform specific files
--- encoding architecture details under Reg/<Allocator>/<Arch.hs>
+-- GHC.CmmToAsm.<Arch> defines a target's NcgImpl and its Instruction
+-- instance. Under GHC/CmmToAsm/<Arch>/, Regs describes the machine registers
+-- and addressing modes, Instr the instructions, CodeGen the instruction
+-- selector (cmmTopCodeGen) and Ppr the printer.
+--
+-- Only some targets have:
+--
+--   * a CFG kept up to date through instruction selection and
+--     register allocation: x86-64 alone (backendMaintainsCfg in
+--     GHC.CmmToAsm.BlockLayout), and not there under -finfo-table-map (the TODO
+--     #20428 at livenessCfg in cmmNativeGen). Static branch prediction, the
+--     chain layout of -fblock-layout-cfg, the graph allocator's spill costs and
+--     invertCondBranches need it.
+--   * the machine registers of STG's argument registers (R1 and up, F, D, XMM)
+--     handed out between their uses: x86-64 and PowerPC. i386 maps only R1,
+--     to esi, and reserves it; AArch64, RISC-V and LoongArch reserve them all
+--     (freeReg in compiler/CodeGen.Platform.h).
+--   * vector code: the x86 targets, as far as the -msse and -mavx flags
+--     allow, and AArch64, for 128-bit vectors (checkVecCompatibility in
+--     GHC.StgToCmm.Prim).
+--   * 64-bit values held in two virtual registers: the 32-bit targets, i386 and
+--     32-bit PowerPC (RegCode64 in GHC.CmmToAsm.Monad).
+--
+-- cmmNativeGen runs the following passes on each procedure, in this order. The
+-- -ddump flags at the end of a step show its output. Where the CFG is not kept
+-- (the first item of the list above), steps 7 and 10 do nothing and step 12
+-- leaves the branches as they are.
+--
+--   1. fixStgRegisters (GHC.StgToCmm.CgUtils) replaces each read or write of an
+--      STG register that has no machine register on the target by a load or a
+--      store at its offset from BaseReg. Afterwards the only STG registers left
+--      are those that activeStgRegs pins to machine registers.
+--   2. cmmToCmm (GHC.Cmm.GenericOpt) folds constants, but only where neither
+--      -fcmm-sink nor -fcore-constant-folding is on, so by default only at
+--      -O0. It also makes the indirections that position-independent code and
+--      dynamic linking need (GHC.CmmToAsm.PIC), collecting the imported labels,
+--      and turns a branch on a constant into a jump. -ddump-opt-cmm.
+--   3. getCfgProc (GHC.CmmToAsm.CFG) builds the CFG, with the edge weights that
+--      -fblock-layout-weights sets.
+--   4. genMachCode runs the target's instruction selector, cmmTopCodeGen,
+--      in the NatM monad (GHC.CmmToAsm.Monad), with an unbounded supply
+--      of virtual registers. Each Cmm local becomes one virtual register
+--      for the whole procedure, keyed by the local's unique. Where the
+--      x86 selector splits a Cmm block, it returns the new block and
+--      adds it to the CFG (Note [Keeping track of the current block] in
+--      GHC.CmmToAsm.X86.CodeGen). Liveness (GHC.CmmToAsm.Reg.Liveness) takes a
+--      block's successors from its jumps, by jumpDestsOfInstr, so every block
+--      a selector makes must end in jumps that name all its successors. The
+--      C stack delta that the selector tracks must end at 0, or genMachCode
+--      panics. -ddump-asm-native.
+--   5. cmmTopLiveness (GHC.CmmToAsm.Reg.Liveness) drops unreachable blocks,
+--      orders the blocks by strongly connected components, and annotates each
+--      instruction with the registers that are born and that die there. Given a
+--      CFG, it keeps only the blocks the CFG has. -ddump-asm-liveness.
+--   6. Register allocation puts each virtual register in a machine register or
+--      a spill slot at each instruction. It uses the graph colouring allocator
+--      (GHC.CmmToAsm.Reg.Graph) under -fregs-graph or -fregs-iterative, and
+--      the linear allocator (GHC.CmmToAsm.Reg.Linear) otherwise. Where the
+--      allocator uses more spill slots than maxSpillSlots, ncgAllocMoreStack
+--      reserves stack for the extra slots, or, after the graph allocator,
+--      for all of them (the BUG at needStack in GHC.CmmToAsm.Reg.Graph).
+--      -ddump-asm-regalloc, -ddump-asm-regalloc-stages, -ddump-asm-stats.
+--   7. The blocks that register allocation added go into the CFG: the linear
+--      allocator's fixup blocks and those of ncgAllocMoreStack (the BUG at
+--      postRegCFG in cmmNativeGen).
+--   8. generateJumpTables puts each jump table after its procedure, as data.
+--   9. Under -fasm-shortcutting (on at -O2, and never on
+--      Darwin: Note [No asm-shortcutting on Darwin]), shortcutBranches
+--      removes each block that is a single jump and retargets the jumps to it
+--      (Note [supporting shortcutting] in GHC.CmmToAsm.Monad). Such a block
+--      is not the procedure's first and has no info table, and its jump is
+--      one that the target's canShortcut accepts and that goes neither to the
+--      block itself nor to a block already being removed. shortcutWeightMap
+--      (GHC.CmmToAsm.CFG) redirects or deletes the CFG's edges to match (the
+--      BUG in Note [Updating the CFG during shortcutting]).
+--  10. optimizeCFG adjusts the edge weights and, under -fcmm-static-pred (on at
+--      -O1 and -O2), predicts the branches (Note [Static Branch Prediction] and
+--      Note [Where a branch's likely side is known], both in GHC.CmmToAsm.CFG).
+--      -ddump-cfg-weights shows the CFG after step 4 and after this step, and
+--      between them the blocks that step 7 added. Then, under -dasm-lint or in
+--      a DEBUG compiler, sanityCheckCfg checks that the CFG has the same blocks
+--      as the code.
+--  11. sequenceTop (GHC.CmmToAsm.BlockLayout) orders the blocks: by chains
+--      of heavily weighted edges under -fblock-layout-cfg (on at -O1 and
+--      -O2) where the CFG is kept, and otherwise by the older sequenceBlocks
+--      (Note [CFG based code layout]). It drops each jump to the block
+--      placed next, unless that block has an info table. Last, it calls
+--      ncgMakeFarBranches. On PowerPC, AArch64, RISC-V and LoongArch, this
+--      rewrites the branches that may be out of range; on x86 and x86-64 it
+--      does nothing.
+--  12. On x86-64, when the CFG is kept, invertCondBranches turns a conditional
+--      jump to the block placed next, followed by a jump to another block, into
+--      the inverted conditional jump to the other block.
+--  13. Under -g, computeUnwinding collects the unwinding points
+--      (Note [Unwinding information in the NCG]). The procedure is then printed
+--      (Note [pprNatCmmDeclS and pprNatCmmDeclH] in GHC.CmmToAsm.Monad). At the
+--      end of the module, finishNativeGen adds the declarations of the imported
+--      symbols, where needImportedSymbols (GHC.CmmToAsm.PIC) holds, and the
+--      DWARF sections, under -g on ELF targets other than AArch64. -ddump-asm.
+--
+-- The NCG draws the uniques of its virtual registers and block labels from a
+-- supply tagged 'n' that counts from 0 in each Haskell module (initDUniqSupply
+-- in GHC.Driver.Main.Compile); for a .cmm file, the NCG continues the supply
+-- that the file's Cmm pipeline used. These uniques sit beside the Cmm's own:
+-- see Note [Unique order in the linear allocator] in GHC.CmmToAsm.Reg.Linear,
+-- and BUG #28125 at getHiVirtualRegFromLo in GHC.Platform.Reg.
+--
+-- After the NCG, the assembler encodes the printed instructions and resolves
+-- the labels within a module. The linker resolves the references across
+-- modules, with the indirections that GHC.CmmToAsm.PIC makes where code is
+-- position-independent or dynamically linked.
+--
+-- For work on the NCG: -ddump-cmm shows the Cmm that the Cmm pipeline hands
+-- over, and -ddump-cmm-verbose shows it after each of the pipeline's passes.
+-- -dasm-lint, which -dlint implies, turns on sanityCheckCfg's check (step
+-- 10) and the graph allocator's. The testsuite directories codeGen (whose
+-- should_gen_asm tests check the generated assembly), cmm, regalloc, simd and
+-- numeric exercise the NCG, and the optasm way (-O -fasm) runs tests with
+-- optimisation. A claim about the speed of the generated code is usually
+-- measured with nofib (the nofib submodule), and a claim about the compiler's
+-- own cost with the testsuite's perf/compiler tests.
+--
+-- Comments in the native code generator label what is a bug, what is half done
+-- and what is likely to change: see Note [Labels in NCG comments].
 --
 -- -}
 --
