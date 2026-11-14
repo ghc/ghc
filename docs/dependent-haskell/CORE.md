@@ -277,9 +277,11 @@ The ordinary `ForAllTy` binder-kind paths remain unchanged.
 
 Canonicalizing an existing Given does not assign a type metavariable.
 `checkTypeEqNoUnification` accepts valid opaque runtime indices in a native RHS
-only for a Given with a type-variable LHS. It disables family cycle breaking
-there because cycle-breaker restoration writes a metavariable. Keep ordinary
-occurs checks and reject retained-function RHSs in this check. All Wanted,
+only for a Given with a type-variable LHS. A checked retained Pi RHS recurses
+through its body with the same flags. `mkDepFunRedn` scopes the complete body
+reduction. Preserve ordinary occurs and coercion checks. A recursive
+`a ~ (foreach n -> Vec a n)` remains irreducible. Disable family cycle
+breaking because cycle-breaker restoration writes a metavariable. All Wanted,
 unification and concreteness checks retain their native-syntax restrictions.
 See Note [Rigid retained indices] in `GHC.Tc.Utils.Unify`.
 
@@ -299,6 +301,35 @@ See Notes [Normalising retained runtime indices] and
 [Rewriting retained dependent functions], and
 [the scoped Agda normalization sources](REFERENCES.md#agda-provenance).
 Agda's conversion and eta rules do not add a Haskell function eta law.
+
+Checked retained Pi expressions can appear in ordinary type arguments and
+equality operands. Renaming and typechecking share their existing retained
+telescope workers. Preserve the caller's mode and index environment. Require
+complete types, supported closed domains, `Many` binders and lifted bodies.
+No equality constructor name receives a special case. Check the whole visible
+type argument for named, anonymous and generated holes. A hole beside the Pi
+is also incomplete. Inspect expanded type-splice types without revisiting
+expressions or finalizers.
+
+Type synonyms follow this checked formation. Native scanners inspect their
+RHSs. Ordinary meta assignment stays blocked through an alias. Literal
+`foreach` kind syntax remains gated. A complete closed alias can be a kind
+with an explicit specified kind argument. Ordinary inferred kind-meta filling
+with that alias still rejects. This does not add universe levels.
+See Notes [Retained Pi type formation] in `GHC.Rename.HsType` and
+[Retained Pi type arguments] in `GHC.Tc.Gen.HsType`.
+
+Direct equality transport can match an irreducible Given. Transport beneath
+another retained binder needs the eligible inert rewrite described above.
+This distinction separates checked type formation from Given canonicalization.
+Neither path adds structural Pi unification or function eta equality.
+See [the pinned Agda and GHC sources](REFERENCES.md#retained-function-types-as-equality-operands).
+
+The D/DC specification keeps coercion abstraction during erasure. GHC's
+existing zero-width coercion tokens preserve this arity. Native alternative
+lowering removes only the extra virtual proof binder. It retains the strict
+case, real fields and ordinary coercion slots. This implementation audit is
+not an erasure proof. See [the paper comparison](papers/README.md#d-and-dc-icfp-2017).
 
 Complete visible type arguments can refer to an already-bound runtime index,
 as in `f @(Vec Int k)`. The renamer reuses lexical aliases from local signatures.
@@ -564,9 +595,10 @@ case inspects it. The result type uses that same Id. The empty case needs no
 constructor proof. An empty source case keeps its original context because
 there is no branch to refine. A demanded application to bottom still diverges.
 
-This rule checks a supplied type. It does not infer a native function type or
-enable new retained type positions. Retained quantification in nested type
-positions and general checking-dependent argument inference remain separate work.
+This lambda rule checks a supplied type. It does not infer a native function
+type or enable new retained type positions. M33 adds checked Pi expressions
+in type arguments as a separate rule. General checking-dependent argument
+inference remains separate work.
 Agda's expected-Pi lambda rule and extended-lambda function checker supply the
 checking precedent.
 See [the pinned sources](REFERENCES.md#checked-retained-lambdas).

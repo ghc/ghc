@@ -1,10 +1,10 @@
 # Packed vector source example
 
-Both M31 compiler stages pass all 503 source observations with Core Lint
-and STG Lint. The API/runtime fixture passes 173 source rejection cases.
-All five registered regressions pass. M31 adds 24 observations and keeps the
-previous 479 lines in order. Both stages pass 139 standalone rejection cases
-and four ordinary-Haskell controls.
+Both M33 compiler stages pass all 562 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 210 package and 291 total
+source rejections. All five registered regressions pass. M33 adds 30
+observations and keeps the previous 532 lines in order. Both stages pass
+177 located standalone rejections and four ordinary-Haskell controls.
 
 At M20, both stages and all five regressions passed 301 observations and
 63 package/bound rejections. The complete four-clause worker remains in Main
@@ -1337,9 +1337,10 @@ index.
 
 ## M33: retained function types as equality operands
 
-The bootstrap source executable and API fixture pass all 562 observations.
+Both source compilers and the API fixture pass all 562 observations.
 The 30 additions follow the existing 532 observations without changes.
-The self-hosted source checks and registered regressions remain pending.
+All five registered regressions pass. Each stage also passes 21 new compile
+controls and 21 new located negative cases, alongside 156 retained rejections.
 
 [exposePi](PackedVecLibrary.hs) puts the whole retained function type on the
 RHS of a Given equality:

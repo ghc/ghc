@@ -99,8 +99,12 @@ observations, 126 located rejections, four ordinary controls and 160 API
 rejections. Both stages and all five registered regressions pass. M31 verifies
 joint native-index/payload inference and result overapplication with 503 source
 observations, 139 located rejections, four ordinary controls and 173 API
-rejections. Both stages and all five registered regressions pass. M32 targets
-safe outer equality evidence under fixed-domain retained Pi types.
+rejections. Both stages and all five registered regressions pass. M32 verifies
+outer equality evidence under fixed-domain retained Pi types, with 532 source
+observations and 156 located rejections. M33 verifies checked Pi equality
+operands and immutable rewriting beneath retained binders, with 562 source
+observations and 177 located rejections. The API fixture checks 210 package
+and 291 total rejections. Both stages and all five registered regressions pass.
 
 ## Direction and boundaries
 
@@ -2089,16 +2093,43 @@ with `error`. Keep these restrictions instead of widening inference.
 - [x] Trace direct matching and the later beneath-binder failure separately.
   Check existing native Pi Givens without assignment. A recursive Pi Given
   remains an occurs-check failure and cannot justify a rewrite.
-- [x] Pass 562 bootstrap source observations through separate interfaces with
+- [x] Pass 562 source observations in both stages through separate interfaces with
   Core and STG Lint. Preserve M32's 532 outputs as an exact prefix. Check
   finite IORef inputs, proof demand, ignored indices, partial spines and
-  function/vector sharing. Prepare 42 source cases: 21 positive and 21 negative.
-- [ ] Rebuild the self-hosted stage. Run both strict source matrices, retained
-  regressions, API checks and all five registered tests. Preserve M32 evidence.
+  function/vector sharing. Pass 42 strict source cases in each stage:
+  21 positive and 21 negative.
+- [x] Rebuild the self-hosted stage. Pass both strict source matrices, 156
+  retained located rejections, API checks and all five registered tests.
+  Preserve M32 evidence. The full GHC suite was not run.
 
 See [the pinned prior art](REFERENCES.md#retained-function-types-as-equality-operands).
 This task adds no runtime index evaluation, function eta equality,
 structural retained unification or optimizer transformations.
+
+### M34: qualified retained function types
+
+The measured six-case baseline agrees in both stages. An ordinary qualified
+arrow compiles. Direct and beneath-binder Givens, a `Refl` witness and a
+recursive qualified-Pi assumption reject with GHC-91510 at the signature's
+`forall`. The missing-proof body rejects with GHC-91028 at `f`. These results
+locate the first boundary in source validity. They do not establish an
+immutable Given-rewrite failure.
+
+- [ ] Pin the source-validity rule and GHC's ordinary dictionary elaboration.
+  Compare the Agda hidden/instance distinction and the paper binder properties.
+  Keep visibility, evidence kind and runtime retention separate. The D/DC/DR
+  coercion quantifier is not a general Haskell class context.
+- [ ] Specify the checked qualified-Pi subset before changing admission.
+  Preserve ordinary erased-forall restrictions, complete arguments, dictionary
+  scope, roles, occurs checks and the native-meta guard. Trace formation first;
+  change immutable Given recursion only if a later probe demonstrates a need.
+- [ ] Run direct and pointwise source controls through separate interfaces.
+  Check dictionary demand, proof demand, bottom-function WHNF, ignored indices
+  and sharing. Pin invalid scope and no-proof diagnostics in both stages.
+  Rebuild and run the existing focused regressions before recording completion.
+
+See [the paper reading](papers/README.md) and
+[the measured baseline](REFERENCES.md#retained-function-types-as-equality-operands).
 
 ## Further work
 

@@ -12,6 +12,7 @@ Last updated: 2026-11-14.
 
 - [Implementation plan](PLAN.md): Core extension, port tasks, and acceptance checks.
 - [References](REFERENCES.md): annotated sources, reading order, and status dates.
+- [Paper reading ledger](papers/README.md): conference-paper findings, thesis sections and version hashes.
 - [Packed vector source example](examples/packed-vector/README.md): producer, consumer, runtime observations, and a separate-module runner.
 - [Historical port](PORT.md): pinned commits, module mapping, and missing rules.
 - [Restricted Core](CORE.md): representation, typing, substitution, and gates.
@@ -39,7 +40,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 532 runtime observations and the runtime fixture checks 190 package rejections |
+| Last verified checkpoint | M33 passes both compiler stages and all five registered regressions; 562 source observations, 177 located rejections and 210 package / 291 total API rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -64,7 +65,8 @@ Last updated: 2026-11-14.
 | Joint prefix inference | Index-bearing arguments determine expected domains before independent payload inference; selected ordinary and retained functions accept further arguments directly |
 | Outer Given evidence | Existing scoped equalities normalize retained function bodies; direct transport preserves bottom-function WHNF and runtime identity |
 | Written runtime index types | Complete visible type arguments capture lexical indices; shadowing, generated wildcards and staging checks pass |
-| Next task | M33: admit checked retained Pi types as equality operands; the current source-position gate rejects with GHC-43582 |
+| Native Pi equality operands | Complete checked Pi type arguments and immutable Given rewriting beneath another retained binder pass; native meta assignments remain blocked |
+| Next task | M34: qualified retained function types; the measured equality examples reject with GHC-91510 before solver rewriting |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -3136,3 +3138,72 @@ The next six-case baseline accepts two controls. Three retained equality
 operands reject at the source type-position gate with GHC-43582. A return
 without proof rejects with GHC-91028. See the
 [M33 plan](PLAN.md#m33-retained-function-types-as-equality-operands).
+
+## M33: retained function types as equality operands
+
+Checked source type arguments now admit retained Pi types. This includes
+whole-Pi operands of `~` and `:~:`. The implementation reuses the retained
+telescope checkers. It preserves index scope, closed domains, `Many` usage,
+lifted bodies and complete visible arguments. It does not special-case
+equality names. Type synonyms use the same checked formation. Native meta
+assignment remains blocked, including through aliases.
+
+```haskell
+exposePi :: forall value.
+            value ~ (foreach (n :: Nat) -> Vec Int n)
+         => value -> (foreach (n :: Nat) -> Vec Int n)
+exposePi f = f
+```
+
+The direct example can match an irreducible Given. Rewriting below another
+retained binder needs the additional immutable Given check. It recursively
+checks the Pi RHS and scopes the body reduction with `mkDepFunRedn`.
+Occurs checks and the M32 scope filter remain active. Wanted decomposition,
+native family cycle breaking, structural Pi unification and native meta
+assignment remain gated.
+
+The source example adds 30 observations. IORef-fed inputs compare direct,
+pointwise and explicit-proof calls. The checks cover bottom-function WHNF,
+proof-before-function demand, ignored bottom/cyclic indices, productive
+prefixes and function/vector sharing. `liftExposedPi` rewrites a whole Pi
+equality beneath another retained binder without eta expansion.
+
+| Validation | Final result |
+| --- | --- |
+| Source execution | 562 observations in each compiler stage; previous 532 outputs are an exact prefix |
+| New strict source matrix | 42 cases per stage: 21 compile controls and 21 located rejections |
+| Retained checks | 156 located rejections, 104 compile controls, four ordinary runtime controls and two failed-match cache traces per stage |
+| API/runtime fixture | 210 package / 291 total source rejections, 22 quiet compile controls and the 562-observation embedded oracle |
+| Registered regressions | Five expected passes, 34 skipped cases, no unexpected results or framework failures/warnings |
+| Next source baseline | One ordinary qualified-arrow pass and five located failures in each stage |
+
+Source formation is in `6963da76a7` and `826f47d880`. The immutable Given
+check is in `050d928510`. Runtime examples are in `4acfc34dc8`; the existing
+API fixture is updated in `33a0755a1f`. The final compiler archive contains
+37 selected files at `c8fa644189` in `native-pi-operand-inputs-v5`.
+All five input archives match their recorded Git blobs.
+
+The final bootstrap build took 26.85 seconds; the final self-hosted build
+took about 1m13s. Their combined job peaked at 2840 MiB under 16 GiB.
+The earlier functional self-host build took 7m39s and peaked at 4292 MiB.
+The final CLI scope peaked at 357 MiB under 4 GiB. The API fixture peaked
+at 1023 MiB under 4 GiB. Registered tests took 14.18 seconds and peaked at
+1902 MiB under 8 GiB. Swap was disabled. The full GHC suite was not run.
+Nonmutating Fourmolu parsing and cabal-gild validation pass.
+
+The `native-pi-operand-*.SHA256SUMS` manifests bind source, documentation,
+harness and output evidence. They preserve failed attempts as well as final
+results. M32 and earlier evidence remains frozen. See
+[the source example](examples/packed-vector/README.md#m33-retained-function-types-as-equality-operands),
+[the Core rules](CORE.md#family-axiom-normalization-under-retained-binders)
+and [the provenance](REFERENCES.md#retained-function-types-as-equality-operands).
+
+The next baseline rejects four qualified-Pi equality signatures with
+GHC-91510 at `forall`. The missing-proof body rejects with GHC-91028.
+The trace reaches source validity before Given rewriting. M34 must address
+that boundary first. See [the next plan](PLAN.md#m34-qualified-retained-function-types).
+
+The [paper ledger](papers/README.md) now records five conference papers and
+selected thesis chapters, with eight distinct PDF versions. Their typing,
+role and erasure results guide the implementation. They do not establish
+preservation, termination or a runtime correspondence theorem for this fork.

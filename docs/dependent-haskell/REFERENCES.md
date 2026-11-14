@@ -7,6 +7,10 @@ Later changes to proposal status, package bounds, branches, or documentation nee
 verification. A link to a mutable branch identifies the inspected source, not a
 permanent compatibility guarantee.
 The Pi normalization sources below were checked on 2026-11-13.
+Six research works were fetched and read on 2026-11-14. See the
+[paper reading ledger](papers/README.md) for page-specific findings and the
+[version manifest](papers/manifest.json) for all eight PDF hashes and reading
+scopes. This includes selected thesis chapters, not the full thesis.
 
 See [the project overview](README.md) for the objective. See [the implementation
 plan](PLAN.md) for scope, decisions, and acceptance criteria. The first experiment
@@ -1053,7 +1057,8 @@ preserve that non-strict behavior without requiring singleton reification.
 
 ### D and DC: equality, erasure, and nontermination
 
-- [The D/DC specification paper](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf),
+- Weirich, Voizard, de Amorim and Eisenberg,
+  [A Specification for Dependent Types in Haskell](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf),
   ICFP 2017, supplies an implicit dependent calculus D and an explicitly annotated
   calculus DC. D shares term/type syntax and supports relevant and irrelevant
   dependent quantification. DC has explicit coercions and decidable checking.
@@ -1067,8 +1072,11 @@ preserve that non-strict behavior without requiring singleton reification.
   [`icfp17` tag](https://github.com/sweirich/corespec/tree/icfp17) for the original
   paper. The default branch later adds eta-equivalence. The mechanization covers
   the research calculus and its stated assumptions, not the GHC implementation.
-  Progress requires an appropriate consistent equality context; preservation can
-  remain useful in contradictory contexts produced during optimization.
+  D progress excludes coercion assumptions. DC progress permits only irrelevant
+  term assumptions. Preservation does not require consistent assumptions
+  (author PDF pages 12–13 and 20). These theorem premises do not authorize an
+  arbitrary GHC Given context. Section 6.3 also preserves coercion abstraction
+  during erasure (page 22). See [the reading and lowering comparison](papers/README.md#d-and-dc-icfp-2017).
 
 ### Roles and graded usage
 
@@ -2492,7 +2500,7 @@ scope the full body reduction. The trace then records `PuOK` and an inert
 `CIrredCan{cteInsolubleOccurs}`. It cannot justify transport. Native family
 cycle breaking, Wanted decomposition and mutable native fills stay blocked.
 
-The bootstrap source executable passes 562 observations, with the previous
+Both compiler stages pass 562 observations, with the previous
 532 as an exact prefix. The API fixture passes 210 package and 291 total
 source rejections, plus 22 quiet positive cases. Bare `Refl` and an `error`
 result at a native equality type hit ordinary meta guards. Their callers now
@@ -2501,6 +2509,17 @@ write complete type applications. The transitive-Given control uses
 native meta fill. The unrelated-proof and representational controls also
 use that extension, then fail at the intended body expression.
 
-Self-hosted and registered validation remain pending. These source results
-and bounded Haskell demand observations do not prove preservation, totality
-or correspondence with Agda.
+Both stages pass 21 new located rejections, 21 new compile controls and the
+156 retained located rejections. The API fixture and all five registered
+regressions pass. These source results and bounded Haskell demand observations
+do not prove preservation, totality or correspondence with Agda.
+
+The next six-case baseline reaches an earlier source-validity restriction.
+Four qualified-Pi equality examples reject with GHC-91510 at the signature's
+`forall`. The no-proof body rejects with GHC-91028; the ordinary qualified-arrow
+control compiles. The traces do not establish a Given-rewrite failure.
+Agda's hidden/instance distinction and the D/DC/DR coercion quantifiers guide
+separate questions. They do not identify ordinary Haskell class dictionaries
+with erased equality evidence. See the
+[roles paper reading](papers/README.md#roles-icfp-2019) and
+[next source task](PLAN.md#m34-qualified-retained-function-types).
