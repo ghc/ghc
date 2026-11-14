@@ -1239,6 +1239,14 @@ variables. Keep the original expected type for final `checkResultTy`.
 Do not infer the first operand, expand a splice or choose a result that
 depends on an undetermined template binder.
 
+The next retest clears the new proof/dollar errors but exposes two earlier
+bound-proof callback regressions. `withBounded` needs its expected result
+before checking the higher-rank retained callback. Before inferring a dollar
+RHS, inspect its named head's declared domains. Keep higher-rank callback
+domains on the existing expected-checking path. Make this decision before
+elaborating the RHS. This preserves the current restriction against general
+higher-rank argument inference and keeps the old proof-demand observations.
+
 ## Further work
 
 After M8, review broader retained kinds, nested and higher-order dependence,
