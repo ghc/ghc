@@ -17,6 +17,7 @@ import GHC.Core.Utils (stripTicksTopE)
 import GHC.Data.FastString (unpackFS, lengthFS, mkFastStringShortText)
 import GHC.Driver.DynFlags
 import GHC.Hs
+import GHC.Hs.Syn.Type (hsPatType)
 import GHC.Tc.Utils.TcMType (shortCutLit)
 import GHC.Types.Id
 import GHC.Core.ConLike
@@ -336,9 +337,7 @@ desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
 desugarConPatOut x con univ_tys ex_tvs dicts con_args
   | RealDataCon dc <- con, not (null (dataConRepArgBinders dc))
   = case con_args of
-      PrefixCon _ ps
-        | Just fields <- traverse bare_field ps
-        -> go_field_pats (map idType fields) (zip [0..] ps)
+      PrefixCon _ ps -> go_field_pats (map (hsPatType . unLoc) ps) (zip [0..] ps)
       _ -> failWithDs DsRetainedPackagePatterns
   | otherwise = case con_args of
     PrefixCon _ ps                   -> go_field_pats arg_tys (zip [0..] ps)
@@ -346,11 +345,8 @@ desugarConPatOut x con univ_tys ex_tvs dicts con_args
     RecCon    _ (HsRecFields _ fs _) -> go_field_pats arg_tys (rec_field_ps fs)
   where
     -- See Note [Checking retained package patterns] in GHC.Tc.Gen.Pat.
-    -- selectMatchVar chooses these same Ids below. Their types already contain
-    -- the preceding retained source field Ids. Keep ordinary PMC enabled.
-    bare_field :: LPat GhcTc -> Maybe Id
-    bare_field (L _ (VarPat _ (L _ var))) = Just (localiseId var)
-    bare_field _ = Nothing
+    -- Checked outer field types contain the preceding retained source Ids.
+    -- Nested patterns can carry GADT evidence. Keep ordinary PMC enabled.
 
     -- The actual argument types (instantiated)
     arg_tys     = map scaledThing $ conLikeInstOrigArgTys con (univ_tys ++ mkTyVarTys ex_tvs)

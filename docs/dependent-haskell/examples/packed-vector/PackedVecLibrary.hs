@@ -18,6 +18,10 @@ module PackedVecLibrary
     , withPacked
     , repack
     , ignorePacked
+    , headPacked
+    , proofDepthBounded
+    , repackWithoutProof
+    , guardedRepack
     , filterVec
     , filterPacked
     , filterBounded
@@ -64,6 +68,44 @@ repack (PackVec n xs) = PackVec n xs
 -- | Inspect the package constructor without evaluating either stored field.
 ignorePacked :: PackedVec a -> Int
 ignorePacked (PackVec n xs) = 42
+
+-- | Match the vector without evaluating its stored runtime length.
+headPacked :: PackedVec a -> Maybe a
+headPacked (PackVec n VNil) = Nothing
+headPacked (PackVec m (VCons x xs)) = Just x
+
+-- | Match and count a stored proof without evaluating the vector or length.
+proofDepthBounded :: BoundedVec a limit -> Int
+proofDepthBounded (PackBounded n xs LEZ) = 0
+proofDepthBounded (PackBounded m ys (LES proof)) = 1 + depth proof
+  where
+    depth :: LE n m -> Int
+    depth LEZ = 0
+    depth (LES rest) = 1 + depth rest
+
+-- | Copy the length and vector without evaluating the proof field.
+repackWithoutProof :: BoundedVec a limit -> PackedVec a
+repackWithoutProof (PackBounded n xs _) = PackVec n xs
+
+-- | Reconstruct the package from the first row whose guard succeeds.
+guardedRepack :: Bool -> PackedVec a -> PackedVec a
+guardedRepack takeFirst (PackVec n xs)
+    | takeFirst = PackVec n xs
+guardedRepack takeFirst (PackVec m ys) = PackVec m ys
+
+{- Note [Source package pattern clauses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Each clause binds its own runtime index Id. The vector and proof patterns use
+that same Id in their types. Match compilation keeps a separate constructor
+case for each clause. Each case uses that clause's actual runtime fields.
+Ordinary aliases do not establish equality between distinct runtime indices.
+
+Nested constructor patterns evaluate only the selected payload or proof.
+Bare and wildcard fields remain lazy. Guards and later clauses retain their
+source order. Agda supplies constructor telescope and case-tree prior art;
+it does not supply Haskell's evaluation rules. See
+REFERENCES.md#source-package-patterns.
+-}
 
 -- | Filter a vector and store its computed length with the result.
 filterVec :: forall a n. (a -> Bool) -> Vec a n -> PackedVec a

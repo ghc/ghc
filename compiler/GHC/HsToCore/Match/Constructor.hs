@@ -110,6 +110,13 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
   = assertPpr (null other_groups) (ppr con1) $
     matchNewtypeCon var vars ty group1
 
+  -- See Note [Retained package equation scope].
+  | RealDataCon dc <- con1
+  , not (null (dataConRepArgBinders dc))
+  = do { unless (null other_groups) (failWithDs DsRetainedPackagePatterns)
+       ; results <- mapM match_package_row group1
+       ; return (foldr1 combineMatchResults results) }
+
   | otherwise
   = do let mult = matchIdMult var
            -- Each variable in the argument list correspond to one column in the
@@ -121,6 +128,12 @@ matchConFamily (var :| vars) ty groups@(group1 :| other_groups)
        return (mkDataConCase var ty alts)
   where
     ConPat { pat_con = L _ con1 } = firstPat (NE.head group1)
+
+    -- | Compile one equation with its own runtime index binders.
+    match_package_row :: EquationInfoNE -> DsM (MatchResult CoreExpr)
+    match_package_row eqn
+      = do { alt <- matchOneConLike vars ty (matchIdMult var) (eqn :| [])
+           ; return (mkDataConCase var ty (toRealAlt alt :| [])) }
 
     toRealAlt alt = case alt_pat alt of
         RealDataCon dcon -> alt{ alt_pat = dcon }
@@ -208,6 +221,27 @@ See Note [Retained constructor matches] in GHC.Tc.Gen.Match and the Agda
 constructor-context provenance in docs/dependent-haskell/REFERENCES.md.
 -}
 
+{- Note [Retained package equation scope]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Each package equation binds its own runtime index Id. Later field types and
+the typed RHS refer to that Id. Sharing the first equation's fields with a
+later equation through ordinary let aliases does not substitute those types.
+
+Compile each equation with its own constructor case on the original shared
+scrutinee. Combine the MatchResults in source order. A failed field pattern
+or guard tries the next case. An earlier infallible match discards later rows.
+Each case keeps its actual retained source field Ids. selectMatchVar chooses
+ordinary fields from their checked outer pattern types. Their nested patterns
+use the usual match compiler. No typed-AST or runtime-index alias is required.
+
+Re-casing the shared scrutinee does not repeat its evaluation. The fields stay
+lazy until their patterns or RHS demand them. This can generate more cases
+than field sharing. Ordinary constructor families retain their current path.
+Agda supplies the constructor-telescope and clause-discrimination precedent.
+Separate cases preserve Haskell's field demand and source clause order.
+See docs/dependent-haskell/REFERENCES.md#source-package-patterns.
+-}
+
 matchOneConLike :: [MatchId]
                 -> Type
                 -> Mult
@@ -219,8 +253,8 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
               putSrcSpanDsA (getLoc (eqn_pat eqn1)) $
                 do { unless (null eqns && isManyTy mult) package_error
                    ; case args1 of
-                       PrefixCon _ pats
-                         | Just fields <- traverse bare_field pats -> return (Just fields)
+                       PrefixCon _ pats ->
+                         Just <$> mapM (selectMatchVar mult . unLoc) pats
                        _ -> package_error }
             _ -> return Nothing
         ; let inst_tys = assert (all tcIsTcTyVar ex_tvs) $
@@ -293,12 +327,6 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
-    -- See Note [Checking retained package patterns] in GHC.Tc.Gen.Pat.
-    -- The field types already use these source Ids. An ordinary alias would
-    -- not establish equality between two different runtime index Ids.
-    bare_field :: LPat GhcTc -> Maybe Id
-    bare_field (L _ (VarPat _ (L _ var))) = Just (localiseId var)
-    bare_field _ = Nothing
     package_error :: DsM a
     package_error = failWithDs DsRetainedPackagePatterns
 

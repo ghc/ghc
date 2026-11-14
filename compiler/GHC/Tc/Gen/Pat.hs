@@ -1309,7 +1309,7 @@ tcRetainedDataConPat (L con_span _) con pat_ty_scaled penv arg_pats thing_inside
            PrefixCon ann pats -> return (ann, pats)
            _ -> bad_pattern
        ; check_con_pat_arity con_like (length pats)
-       ; mapM_ check_variable pats
+       ; mapM_ check_variable [pat | (Just _, pat) <- zip binders pats]
        ; tcSubMult (pe_orig penv) ManyTy pat_mult
        ; (wrap, ctxt_res_tys) <- matchExpectedConTy penv (dataConTyCon con) pat_ty_scaled
        ; unless (isIdHsWrapper wrap) bad_pattern
@@ -1359,11 +1359,12 @@ Name for the retained Id. tcPatBndr uses that same Name, type, and multiplicity
 when it checks the field. Extend the substitution and its in-scope set before
 checking later fields and the RHS. Do not put this Id among the erased skolems.
 
-The first source subset has one constructor, prefix patterns, and bare variable
-fields in a strict constructor match. The fields themselves stay lazy. Reject
-lazy and let patterns. Match compilation rejects multiple equations for the
-same package constructor before it shares alternative fields. It must use
-these actual source field Ids, not fresh fields followed by ordinary aliases.
+Retained fields require bare variable patterns. Check ordinary fields with
+tcConArg. Nested GADT evidence then scopes over the later fields and the RHS.
+Keep one constructor and prefix patterns in a strict constructor match. The
+fields themselves stay lazy. Reject lazy package and let patterns. Match
+compilation keeps each equation's actual source field Ids in a separate case.
+See Note [Retained package equation scope] in GHC.HsToCore.Match.Constructor.
 
 An ordinary case starts with a fresh multiplicity metavariable. Require Many
 with tcSubMult, as checkManyPattern does for other nonlinear patterns. A

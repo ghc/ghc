@@ -27,7 +27,7 @@ instance Diagnostic DsMessage where
       -> diagnosticMessage (f opts) m
     DsRetainedPackagePatterns
       -> mkSimpleDecorated $
-           text "A retained package constructor currently requires one equation with bare variable fields."
+           text "Retained package matches require prefix patterns with bare variable retained fields and unrestricted multiplicity."
     DsEmptyEnumeration
       -> mkSimpleDecorated $ text "Enumeration is empty"
     DsIdentitiesFound conv_fn type_of_conv

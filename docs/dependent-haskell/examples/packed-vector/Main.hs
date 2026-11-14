@@ -79,6 +79,42 @@ driveBoundedFilter input = do
     cutoff <- readIORef cell
     pure (withPacked samplePacked (\n xs -> renderBounded (filterBounded (> cutoff) xs)))
 
+-- | Select nested vector and proof alternatives with one runtime cutoff.
+{-# NOINLINE drivePatterns #-}
+drivePatterns :: Int -> IO String
+drivePatterns input = do
+    cell <- newIORef input
+    cutoff <- readIORef cell
+    let filtered = filterPacked (> cutoff) samplePacked
+        bounded = withPacked samplePacked (\n xs -> proofDepthBounded (filterBounded (> cutoff) xs))
+    pure (show (headPacked filtered, bounded))
+
+-- | Exercise both guarded rows after reading the guard at runtime.
+{-# NOINLINE driveGuardedRepack #-}
+driveGuardedRepack :: Bool -> IO String
+driveGuardedRepack input = do
+    cell <- newIORef input
+    takeFirst <- readIORef cell
+    pure (renderPacked (guardedRepack takeFirst (makePacked (S (S Z)))))
+
+-- | Let an earlier guarded row ignore an undefined payload.
+earlyCatchall :: Bool -> PackedVec Int -> Int
+earlyCatchall takeFirst (PackVec n xs)
+    | takeFirst = 42
+earlyCatchall takeFirst (PackVec m (VCons x xs)) = x
+earlyCatchall takeFirst (PackVec k VNil) = 0
+
+-- | Demand the payload before considering the guarded catchall row.
+payloadFirst :: Bool -> PackedVec Int -> Int
+payloadFirst takeFirst (PackVec n (VCons x xs)) = x
+payloadFirst takeFirst (PackVec m ys)
+    | takeFirst = 42
+payloadFirst takeFirst (PackVec k VNil) = 0
+
+-- | Store three independently undefined fields at one runtime index.
+undefinedBoundedFields :: Nat -> BoundedVec Int (S Z)
+undefinedBoundedFields n = PackBounded n bottomPayload bottomProof
+
 {-# NOINLINE bottomProof #-}
 
 -- | A named error in a bound proof.
@@ -297,3 +333,48 @@ main = do
         evaluate (withPacked (makePacked (S bottomLength)) (\n xs -> forgetBounded (filterBounded (const False) xs)))
     assertEqual "unused bounded filter" 42 (const (42 :: Int) (withPacked bottomPackage (\n xs -> forgetBounded (filterBounded bottomPredicate xs))))
     putStrLn "unused bounded filter: 42"
+    forM_
+        [ (0, "(Just 1,3)")
+        , (1, "(Just 2,2)")
+        , (3, "(Nothing,0)")
+        ]
+        $ \(cutoff, expected) -> do
+            actual <- drivePatterns cutoff
+            assertEqual "runtime nested patterns" expected actual
+            putStrLn ("runtime nested patterns: " ++ actual)
+    assertEqual "nested empty head" Nothing (headPacked (makePacked Z))
+    putStrLn "nested empty head: Nothing"
+    assertEqual "nested partial tail head" (Just 42) (headPacked (makePacked (S bottomLength)))
+    putStrLn "nested partial tail head: Just 42"
+    assertWhnf "nested bottom element constructor" (headPacked singletonBottom)
+    expectMarker "nested demands element" "packed-filter-bottom-element" $
+        evaluate (maybe 0 id (headPacked singletonBottom))
+    expectMarker "nested payload before index" "packed-bottom-payload" $
+        evaluate (headPacked (lazyPacked bottomLength))
+    expectMarker "nested proof before fields" "bounded-bottom-proof" $
+        evaluate (proofDepthBounded (undefinedBoundedFields bottomLength))
+    expectMarker "nested partial proof" "bounded-bottom-proof" $
+        evaluate (proofDepthBounded partialProofBounded)
+    assertWhnf "wildcard proof repack" (repackWithoutProof (undefinedBoundedFields bottomLength))
+    assertEqual "wildcard proof ignores bottom" (Just 42) (headPacked (repackWithoutProof lazyProofBounded))
+    putStrLn "wildcard proof ignores bottom: Just 42"
+    assertEqual "wildcard proof ignores cyclic" (Just 42) (headPacked (repackWithoutProof cyclicBounded))
+    putStrLn "wildcard proof ignores cyclic: Just 42"
+    assertEqual "early catchall ignores payload" 42 (earlyCatchall True (lazyPacked bottomLength))
+    putStrLn "early catchall ignores payload: 42"
+    expectMarker "reversed catchall demands payload" "packed-bottom-payload" $
+        evaluate (payloadFirst True (lazyPacked bottomLength))
+    forM_ [False, True] $ \takeFirst -> do
+        actual <- driveGuardedRepack takeFirst
+        assertEqual "runtime guarded repack" "(2,[42,42])" actual
+        putStrLn ("runtime guarded repack: " ++ actual)
+    assertWhnf "guard fallback bottom fields" (guardedRepack False (lazyPacked bottomLength))
+    assertWhnf "guard fallback cyclic fields" (guardedRepack False (cyclicPacked cyclicLength))
+    expectMarker "nested head bottom package" "packed-bottom-package" $
+        evaluate (headPacked bottomPackage)
+    expectMarker "nested proof bottom package" "bounded-bottom-package" $
+        evaluate (proofDepthBounded (error "bounded-bottom-package" :: BoundedVec Int (S Z)))
+    expectMarker "wildcard repack bottom package" "bounded-bottom-package" $
+        evaluate (repackWithoutProof (error "bounded-bottom-package" :: BoundedVec Int (S Z)))
+    expectMarker "guard fallback bottom package" "packed-bottom-package" $
+        evaluate (guardedRepack False bottomPackage)

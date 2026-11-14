@@ -1163,6 +1163,29 @@ runModuleChecks libdir = do
         , "bounded predicate before tail: packed-filter-bottom-predicate"
         , "bounded scans partial tail: packed-bottom-length"
         , "unused bounded filter: 42"
+        , "runtime nested patterns: (Just 1,3)"
+        , "runtime nested patterns: (Just 2,2)"
+        , "runtime nested patterns: (Nothing,0)"
+        , "nested empty head: Nothing"
+        , "nested partial tail head: Just 42"
+        , "nested bottom element constructor: ok"
+        , "nested demands element: packed-filter-bottom-element"
+        , "nested payload before index: packed-bottom-payload"
+        , "nested proof before fields: bounded-bottom-proof"
+        , "nested partial proof: bounded-bottom-proof"
+        , "wildcard proof repack: ok"
+        , "wildcard proof ignores bottom: Just 42"
+        , "wildcard proof ignores cyclic: Just 42"
+        , "early catchall ignores payload: 42"
+        , "reversed catchall demands payload: packed-bottom-payload"
+        , "runtime guarded repack: (2,[42,42])"
+        , "runtime guarded repack: (2,[42,42])"
+        , "guard fallback bottom fields: ok"
+        , "guard fallback cyclic fields: ok"
+        , "nested head bottom package: packed-bottom-package"
+        , "nested proof bottom package: bounded-bottom-package"
+        , "wildcard repack bottom package: bounded-bottom-package"
+        , "guard fallback bottom package: packed-bottom-package"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2400,11 +2423,13 @@ runPackageSourceRejectChecks = do
         , ("Equality", 83605, "contexts", [], [], declaration "forall a. (a ~ Int) => foreach (n :: Nat) -> Vec a n -> PackedVec a")
         , ("RefinedUniversal", 83605, "equality specifications", [], [], declaration "foreach (n :: Nat) -> Vec Int n -> PackedVec Int")
         , ("Promotion", 83605, "Promotion of constructors with retained fields", [], [], package ++ ["type Bad = 'PackVec"])
-        , ("ConstructorField", 83605, "bare variable fields", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec Z xs) = 0"])
+        , ("ConstructorField", 83605, "bare variable retained fields", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec Z xs) = 0"])
+        , ("RetainedWildcard", 83605, "bare variable retained fields", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec _ xs) = 0"])
         , ("LazyPattern", 83605, "Lazy patterns and pattern bindings", [], [], package ++ ["bad :: PackedVec a -> Int", "bad ~(PackVec n xs) = 0"])
         , ("LetPattern", 83605, "Lazy patterns and pattern bindings", [], [], package ++ ["bad :: PackedVec a -> Int", "bad p = let PackVec n xs = p in 0"])
         , ("IndexMismatch", 83865, "Couldn't match", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> PackedVec Int", "bad n m xs = PackVec @Int m xs"])
         , ("IndexEscape", 83865, "Couldn't match", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n xs) = xs"])
+        , ("NestedIndexEscape", 5617, "VCons x xs", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n (VCons x xs)) = VCons x xs"])
         , ("LinearClause", 18872, "arising from a pattern", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
         , ("LinearCase", 18872, "arising from multiplicity", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad p = case p of PackVec n xs -> PackVec n xs"])
         , ("RigidMultiplicity", 25897, "is a rigid type variable", ["LinearTypes"], ["import GHC.Types (Multiplicity)"], package ++ ["bad :: forall (p :: Multiplicity) a. PackedVec a %p -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
@@ -2412,7 +2437,6 @@ runPackageSourceRejectChecks = do
         , ("BoundedVectorLength", 5617, "VCons x ys", [], [], bounded "PackBounded len (VCons x ys) (weakenRight proof)" dropBound)
         , ("BoundedProofLength", 5617, "weakenRight proof", [], [], bounded "PackBounded (S len) (VCons x ys) (weakenRight proof)" dropBound)
         , ("BoundedUpperBound", 25897, "PackBounded len ys proof", [], [], bounded keepBound "PackBounded len ys proof")
-        , ("SharedEquations", 94726, "one equation with bare variable fields", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec n xs) = 0", "bad (PackVec m ys) = 1"])
         ]
         $ \(name, code, fragment, extensions, imports, declarations) -> do
             let moduleName = "NativeSourcePackage" ++ name
