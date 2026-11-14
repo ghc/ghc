@@ -5,11 +5,28 @@
 --      architectures. Therefore, we avoid having to generate memory-to-memory moves
 --      by simply giving every virtual register its own stack slot.
 
+--      BUG #27638: since #26668 a virtual register whose format has outgrown
+--      its slot gets new slots (getStackSlotFor), and a jump can then need a
+--      move between two slots of one register, on which makeMove panics: see
+--      handleComponent in GHC.CmmToAsm.Reg.Linear.JoinToTargets.
+
 --      The StackMap stack map keeps track of virtual register - stack slot
 --      associations and of which stack slots are still free. Once it has been
 --      associated, a stack slot is never "freed": no other virtual register
 --      gets it before we are done with the current CmmProc, even after its
 --      register has outgrown it and moved to new slots.
+
+--      So a slot belongs to one virtual register for the whole procedure:
+--      getStackSlotFor takes a new slot only at the next free one, which
+--      only grows, and a register that outgrows its slot gets another there,
+--      the first staying its own though the map then records only the new
+--      one. The fixups at a jump rely on this in treating a slot as its
+--      register's own (makeRegMovementGraph, handleComponent and makeMove in
+--      GHC.CmmToAsm.Reg.Linear.JoinToTargets), and a change that frees slots,
+--      as step (j) of the outline at the top of GHC.CmmToAsm.Reg.Linear would,
+--      must keep them correct. It costs stack: the slots of a procedure add up
+--      over every register spilled in it, at its size, and ncgAllocMoreStack
+--      reserves those beyond maxSpillSlots.
 --
 module GHC.CmmToAsm.Reg.Linear.StackMap (
         StackSlot,
