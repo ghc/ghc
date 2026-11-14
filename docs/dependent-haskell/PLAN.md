@@ -1088,6 +1088,42 @@ and package its tail at actual runtime `k`. Keep the predecessor, head and
 tail lazy until a consumer demands them. This source target is not verified
 yet. It must use the current checked case rule before a new rule is proposed.
 
+### M14: source vector uncons at an actual runtime predecessor
+
+The initial source probe compiles with Core and STG Lint in the existing
+self-hosted compiler. No compiler change is required by that probe.
+
+```haskell
+unconsPacked :: forall a. PackedVec a -> Maybe (a, PackedVec a)
+unconsPacked (PackVec n xs) = case n of
+  Z -> Nothing
+  S k -> case xs of
+    VCons x rest -> Just (x, PackVec k rest)
+```
+
+Follow Agda's indexed vector `uncons` relation. Use the actual runtime `k`
+from `S k`, rather than reconstructing it from the erased vector index.
+The existing checked case rule transports captured `xs` into the successor
+branch. Ordinary GADT evidence then relates the vector tail to `k`.
+See [the pinned sources](REFERENCES.md#source-vector-uncons).
+
+- [ ] Add the source worker and a source consumer that repeatedly opens its
+  tail packages. Keep Core, interface formats and compiler rules unchanged
+  unless a concrete source failure requires a change.
+- [ ] Check IORef inputs, empty and nonempty results, finite element order and
+  tail lengths. Observe the result, pair and tail package separately. Check
+  predecessor, head and tail demand independently. The zero branch must not
+  force its vector; a successor branch must inspect the vector constructor.
+- [ ] Reject a tail packaged with an incorrect or independent runtime index
+  using a located diagnostic. Probe the diagnostic before pinning it.
+- [ ] Run both compiler stages through separate source interfaces with Core
+  and STG Lint. Update the existing runtime regression and run its registered
+  normal way. Record exact commands, resource peaks and artifact hashes.
+
+This exercise does not infer a runtime predecessor from an erased type. It
+does not add general projections, retained index patterns or proof erasure.
+Finite results and bounded partial/cyclic observations do not prove totality.
+
 ## Further work
 
 After M8, review broader retained kinds, nested and higher-order dependence,

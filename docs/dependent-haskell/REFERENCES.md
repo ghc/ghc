@@ -1234,6 +1234,43 @@ field remains an ordinary lazy field. General retained-index patterns and
 projections remain separate work. See Note [Retained package equation scope]
 in `GHC.HsToCore.Match.Constructor`.
 
+## Source vector uncons
+
+Decision: inspect the stored runtime length before repackaging a vector tail.
+In the `S k` branch, use that actual `k` as the tail package's retained field.
+The checked case rule transports the captured vector to `Vec a (S k)`.
+The nested ordinary GADT match relates its tail index to `k`. Do not reconstruct
+a runtime value from an erased GADT index. No new Core rule is proposed.
+
+Agda stdlib v2.3
+[`Data.Vec.Base.uncons`, lines 285–286](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L285-L286)
+returns `A × Vec A n` from `Vec A (suc n)`. The
+[constructors, lines 36–38](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L36-L38),
+and [head/tail, lines 53–57](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda#L53-L57)
+give the same payload relation. File blob:
+`8c03fb8a83e6cec1fa7b8e1f64bb7e606c531cb8`.
+Agda's index is implicit. This Haskell adaptation must obtain its predecessor
+from the actual stored `Nat`. Agda's `length` implementation is not a runtime
+index-reconstruction rule for GHC.
+
+The stdlib's
+[`case_returning_of_`, lines 110–116](https://github.com/agda/agda-stdlib/blob/v2.3/src/Function/Base.agda#L110-L116)
+makes the motive explicit. File blob:
+`1f8f3f0b18ee0f90f1475226cba59b31c35696e9`.
+The Agda v2.8.0
+[with-abstraction manual, lines 728–741](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/with-abstraction.lagda.rst#L728-L741)
+explains why a dependent case alone need not refine an existing argument.
+Lines 910–936 describe context generalization and checking the auxiliary type.
+File blob: `ff0888af84f3101351c501534de087c180dc7afd`.
+These sources motivate the captured-context transport. They do not supply
+Haskell's evaluation rules or prove preservation for this fork.
+
+The Haskell zero branch must ignore its vector. The successor branch must
+inspect the vector constructor. Returning the result, pair and tail package
+must leave predecessor, head and tail fields lazy. A terminating finite input
+supports the functional interpretation. Partial and cyclic checks establish
+only their stated evaluation observations.
+
 ## Later solver and proof-certificate work
 
 These references concern additional equality reasoning. None is required for the
