@@ -194,6 +194,9 @@
 -- Comments in the native code generator label what is a bug, what is half done
 -- and what is likely to change: see Note [Labels in NCG comments].
 --
+-- For an order in which to read the NCG's Notes, the terms its comments use and
+-- how to find the pass at fault, see compiler/GHC/CmmToAsm/README.md.
+--
 -- -}
 --
 module GHC.CmmToAsm
