@@ -37,7 +37,7 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Zonk.TcType
 
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys, dataConTyCon, dataConWorkId )
+import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys, dataConRepArgBinders, dataConTyCon, dataConWorkId )
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Utils ( applyTypeToArgs )
@@ -1345,11 +1345,31 @@ tcRetainedWorkerResultMatch NoQL (Just expected) args fun sigma
       | otherwise = DontBindMe
 
     kind_agrees subst tv ty = eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty)
+    worker_result n ty
+      | XExpr (ConLikeTc (RealDataCon dc)) <- fun
+      , let fields = dataConRepArgBinders dc
+      , not (null fields)
+      , n == length fields
+      = constructor_result fields ty
     worker_result 0 ty = Just ty
     worker_result n ty
       | Just (_, res) <- splitVisibleFunTy_maybe ty
       = worker_result (n-1) res
       | otherwise = Nothing
+
+    constructor_result [] ty = Just ty
+    constructor_result (Just _ : fields) (DepFunTy _ body)
+      = constructor_result fields body
+    constructor_result (Just index : fields) ty
+      | FunTy flag mult domain body <- coreFullView ty
+      , isVisibleFunArg flag
+      , isManyTy mult
+      , eqType domain (varType index)
+      = constructor_result fields body
+    constructor_result (Nothing : fields) ty
+      | Just (_, body) <- splitVisibleFunTy_maybe ty
+      = constructor_result fields body
+    constructor_result _ _ = Nothing
 tcRetainedWorkerResultMatch _ _ _ _ _ = return Nothing
 
 -- | Admit known runtime function values without erased polymorphism.
@@ -1379,6 +1399,21 @@ a known head without concreteness variables, NoQL, and no pending explicit type
 arguments. Consume only the written ordinary value arguments. An unapplied
 ordinary arrow can remain part of the expected function value. Do not consume
 or guess a retained runtime argument here.
+
+A fully applied real constructor is a separate case. Its validated retained
+field metadata guarantees that field indices do not escape into its result.
+Traverse its current signature in metadata order: a retained field consumes
+DepFunTy; an ordinary field consumes a visible arrow. This can expose Sum n m
+in Sum :: forall n m. foreach p -> (p :~: Add n m) -> Sum n m. Choose only
+the erased n and m from the expected result. Field checking still resolves
+the supplied runtime p and checks its equality proof. Do not infer p here.
+Use the current body because earlier explicit type applications may already
+have substituted declaration variables. Require every field to be supplied.
+Partial constructors and ordinary retained functions keep the existing path.
+mkDepFunTy represents an unused retained binder as an ordinary Many arrow.
+For a retained metadata entry, also accept that arrow with the same closed
+index domain. This consumes the field without choosing its runtime value.
+See docs/dependent-haskell/REFERENCES.md#computed-length-append-next-source-probe.
 
 tcMatchRetainedTyX_BM compares fixed-domain retained bodies under paired runtime
 binders. Its existing escape check prevents an outer erased parameter from

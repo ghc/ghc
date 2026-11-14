@@ -551,7 +551,7 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
             logger = hsc_logger hsc_env
 
         -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
-        native <- checkNativeDependentModule hsc_env core_binds []
+        native <- checkNativeDependentModule hsc_env core_binds [] (cg_tycons cgguts)
         let dflags | native = gopt_set (gopt_set (hsc_dflags hsc_env) Opt_DoCoreLinting)
                                        Opt_DoStgLinting
                    | otherwise = hsc_dflags hsc_env

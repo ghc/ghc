@@ -1457,7 +1457,7 @@ hscSimplify' plugins ds_result = do
                     $ hscUpdateFlags (\dflags -> foldr addPluginModuleName dflags plugins)
                       hsc_env
     liftIO $ do
-      native <- checkNativeDependentModule hsc_env_with_plugins (mg_binds ds_result) (mg_rules ds_result)
+      native <- checkNativeDependentModule hsc_env_with_plugins (mg_binds ds_result) (mg_rules ds_result) (mg_tcs ds_result)
       if native
         then do
           let lint_env = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env_with_plugins
@@ -1483,6 +1483,11 @@ Require -O0 and omit interface pragmas and serialized Core. Native interface
 signatures use scoped local Ids. Native unfoldings remain gated. Reject plugins,
 profiling, and non-object module backends before unsupported transformations.
 Repeat the option check at the machine-code entry for direct API callers.
+Include retained constructor worker types from the module's type constructors
+in each option check. A declaration-only module can have no native explicit
+binding. addImplicitBinds generates its constructor worker later. Classify
+that module before simplification and tidying, then use the checked native
+CorePrep path for its generated worker. Keep the late-plugin output guard.
 This adds no singleton or index evaluation. It carries the existing dependent
 application and constructor rules through the module driver; see the Agda
 provenance in docs/dependent-haskell/REFERENCES.md#agda-provenance.
@@ -1517,7 +1522,7 @@ myCoreToStg logger dflags ic_inscope for_bytecode this_mod ml prepd_binds = do
 
 hscTidy :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 hscTidy hsc_env guts = do
-  native <- checkNativeDependentModule hsc_env (mg_binds guts) (mg_rules guts)
+  native <- checkNativeDependentModule hsc_env (mg_binds guts) (mg_rules guts) (mg_tcs guts)
   let logger   = hsc_logger hsc_env
   let this_mod = mg_module guts
   let lint_env | native = hscUpdateFlags (`gopt_set` Opt_DoCoreLinting) hsc_env

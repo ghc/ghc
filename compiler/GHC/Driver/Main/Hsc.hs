@@ -66,7 +66,12 @@ import GHC.Iface.Tidy
 import GHC.HsToCore.Breakpoints.Types (ModBreaks)
 
 import GHC.Core
-import GHC.Core.Dependent ( hasNativeDependentProgram, rejectNativeDependentProgram )
+import GHC.Core.Dependent
+    ( hasNativeDependentProgram, rejectNativeDependentProgram
+    , hasNativeDependentExpr, rejectNativeDependentExpr )
+import GHC.Core.DataCon ( dataConRepArgBinders, dataConWorkId )
+import GHC.Core.TyCon ( TyCon, tyConDataCons_maybe )
+import GHC.Types.Id ( idType )
 
 import GHC.Parser.Errors.Types
 
@@ -158,11 +163,19 @@ initHscEnv mb_top_dir = do
 
 -- | Check the supported options for a module containing native dependent Core.
 -- Return whether the module needs the checked native pipeline.
-checkNativeDependentModule :: HscEnv -> CoreProgram -> [CoreRule] -> IO Bool
-checkNativeDependentModule hsc_env binds rules = do
-  let native = hasNativeDependentProgram binds rules
+checkNativeDependentModule :: HscEnv -> CoreProgram -> [CoreRule] -> [TyCon] -> IO Bool
+checkNativeDependentModule hsc_env binds rules tycons = do
+  let implicit_cons = [ Type (idType (dataConWorkId dc))
+                      | tc <- tycons
+                      , Just dcs <- [tyConDataCons_maybe tc]
+                      , dc <- dcs
+                      , not (null (dataConRepArgBinders dc)) ]
+      native = hasNativeDependentProgram binds rules
+               || any hasNativeDependentExpr implicit_cons
       dflags = hsc_dflags hsc_env
-      reject phase = rejectNativeDependentProgram phase binds rules
+      reject phase = do
+        rejectNativeDependentProgram phase binds rules
+        mapM_ (rejectNativeDependentExpr phase) implicit_cons
   when native $ do
     -- See Note [Compiling native dependent modules] in GHC.Driver.Main.Passes.
     unless (backendWritesFiles (backend dflags) && not (backendUseJSLinker (backend dflags))) $
