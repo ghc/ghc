@@ -2905,7 +2905,11 @@ sourceRejects label code fragment extensions declarations = do
 
 -- | Require a located diagnostic from a complete source module.
 sourceModuleRejects :: String -> Int -> String -> String -> String -> GHC.Ghc ()
-sourceModuleRejects label code fragment moduleName source = do
+sourceModuleRejects label code fragment = sourceModuleRejectsWith label [(code, fragment)]
+
+-- | Require specified located diagnostics from one source compilation.
+sourceModuleRejectsWith :: String -> [(Int, String)] -> String -> String -> GHC.Ghc ()
+sourceModuleRejectsWith label diagnostics moduleName source = do
     targets <- GHC.getTargets
     result <- GHC.handleSourceError (pure . Left) $ do
         parsed <- parseSourceTarget moduleName source
@@ -2913,7 +2917,7 @@ sourceModuleRejects label code fragment moduleName source = do
         void (GHC.desugarModule checked)
         pure (Right ())
     GHC.setTargets targets
-    checkSourceRejection label code fragment result
+    forM_ diagnostics $ \(code, fragment) -> checkSourceRejection label code fragment result
 
 -- | Inspect source errors without accepting an unlocated error or a panic.
 checkSourceRejection :: String -> Int -> String -> Either SourceError () -> GHC.Ghc ()
@@ -2940,6 +2944,20 @@ checkSourceRejection label code fragment result =
                     ++ show (map (diagnosticCode . errMsgDiagnostic) messages)
                     ++ "; got:\n"
                     ++ showSDoc flags (vcat (map (pprDiagnostic . errMsgDiagnostic) messages))
+
+{- Note [Qualified retained Pi source checks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ImpredicativeTypes admits these complete qualified Pi equality operands.
+Conversion must retain each constraint arrow and its predicate. A known
+monomorphic variable can use its checked type without Quick Look inference.
+The negative head and local-alias cases record current inference restrictions.
+They do not specify that these source forms must always reject.
+
+The local alias has separate inference and Quick Look diagnostics. Check both
+located envelopes from one compilation. The standalone matrix pins their exact
+source positions. See Note [Known native variables with ImpredicativeTypes]
+in GHC.Tc.Gen.App and Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+-}
 
 -- | Check source package restrictions before or during desugaring.
 runPackageSourceRejectChecks :: GHC.Ghc ()
@@ -3133,6 +3151,16 @@ runPackageSourceRejectChecks = do
         , ("LocalSignatureTypedQuotation", 83605, "Template Haskell", ["TemplateHaskellQuotes"], ["import Language.Haskell.TH.Syntax (Code, Q)"], localSignatures ++ ["bad :: Nat -> Code Q (PackedVec Int)", "bad n = [|| let { xs :: Vec Int n; xs = localVector n } in PackVec n xs ||]"])
         , ("LocalSignatureUntypedQuotation", 83605, "Template Haskell", ["TemplateHaskellQuotes"], ["import Language.Haskell.TH.Syntax (Exp, Q)"], localSignatures ++ ["bad :: Nat -> Q Exp", "bad n = [| let { xs :: Vec Int n; xs = localVector n } in PackVec n xs |]"])
         , ("MatrixFallbackPayloadMismatch", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad first second xs ys = PackVec second xs"])
+        , ("QualifiedPiMissingProof", 91028, "Cannot equate type variable", qualifiedPiExtensions, [], ["withoutQualifiedProof :: forall value. value -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "withoutQualifiedProof f = f"])
+        , ("QualifiedPiRecursiveAssumption", 91028, "Cannot equate type variable", qualifiedPiExtensions, [], ["type family Cycle value (index :: Nat)", "wrongQualifiedCycle :: forall value. foreach (k :: Nat) -> value ~ (foreach (n :: Nat) -> Eq Int => Vec (Cycle value k) n) => value -> (foreach (n :: Nat) -> Eq Int => Vec Bool n)", "wrongQualifiedCycle k f = f"])
+        , ("QualifiedPiKnownNativeLocalAlias", 83605, "requires an explicit signature", qualifiedPiExtensions, [], ["localKnown :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "localKnown f = let saved = f in saved"])
+        , ("QualifiedPiUnrelatedGiven", 91028, "Cannot equate type variable", qualifiedPiExtensions, [], ["unrelated :: forall value other. other ~ (foreach (n :: Nat) -> Eq Int => Vec Int n) => value -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "unrelated f = f"])
+        , ("QualifiedPiRepresentationalGiven", 91028, "Cannot equate type variable", qualifiedPiExtensions, ["import Data.Coerce (Coercible)"], ["representation :: forall value. Coercible value (foreach (n :: Nat) -> Eq Int => Vec Int n) => value -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "representation f = f"])
+        , ("QualifiedPiPredicateOccurrence", 83865, "Couldn't match expected type", qualifiedPiExtensions, [], ["predicateCycle :: forall value. value ~ (foreach (n :: Nat) -> Eq value => Vec Int n) => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Eq value => Vec Bool n), Vec Bool m))", "predicateCycle f = f"])
+        , ("QualifiedPiPredicateMismatch", 83865, "Couldn't match type", qualifiedPiExtensions, [], ["wrongDictionary :: forall value. value ~ (foreach (n :: Nat) -> Eq Int => Vec Int n) => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Eq Bool => Vec Int n), Vec Bool m))", "wrongDictionary f = f"])
+        , ("QualifiedPiPolymorphicHeadUnsupported", 83605, "Quick Look inference", qualifiedPiExtensions, [], ["polyHead :: (foreach (n :: Nat) -> Eq Int => Vec Int n)", "polyHead = undefined"])
+        , ("QualifiedPiAppliedHeadUnsupported", 83605, "Quick Look inference", qualifiedPiExtensions, [], ["sameQ :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "sameQ f = f", "applied :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "applied f = sameQ f"])
+        , ("QualifiedPiLeadingDictionaryUnsupported", 83605, "Quick Look inference", qualifiedPiExtensions, [], ["leading :: (Eq Int => (foreach (n :: Nat) -> Eq Int => Vec Int n)) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "leading f = f"])
         , ("MatrixFallbackUntypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad (S left) (S right) = Nothing", "bad first second = let ignored = [| 42 :: Int |] in Nothing"])
         , ("MatrixFallbackTypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad (S left) (S right) = Nothing", "bad first second = let ignored = [|| 42 :: Int ||] in Nothing"])
         , ("LaterUntypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = let ignored = [| 42 :: Int |] in ys", "bad (S k) later xs ys = ys"])
@@ -3173,7 +3201,10 @@ runPackageSourceRejectChecks = do
                                , "  VCons :: a -> Vec a n -> Vec a (S n)"
                                ]
                             ++ declarations
-            sourceModuleRejects name code fragment moduleName source
+            let diagnostics =
+                    (code, fragment)
+                        : [(83605, "Quick Look inference") | name == "QualifiedPiKnownNativeLocalAlias"]
+            sourceModuleRejectsWith name diagnostics moduleName source
     -- Check Pi formation and immutable proof transport without adding output.
     forM_
         [ ("OrdinaryArrowGiven", ["TypeFamilies", "FlexibleContexts"], [], ["ordinaryArrow :: forall value. value ~ (Int -> Int) => value -> Int -> Int", "ordinaryArrow f = f"])
@@ -3198,6 +3229,17 @@ runPackageSourceRejectChecks = do
         , ("SynonymExplicitPiArgument", ["TypeFamilies", "FlexibleContexts", "TypeApplications"], [], ["type Pi = foreach (n :: Nat) -> Vec Int n", "same :: Pi -> Pi", "same f = id @Pi f"])
         , ("ExplicitPiKindViaAlias", ["TypeApplications", "PolyKinds", "StandaloneKindSignatures"], ["import Data.Kind (Type)"], ["type Pi = foreach (n :: Nat) -> Vec Int n", "type P :: forall k. k -> Type", "data P a = MkP", "bad :: forall (a :: Pi). P @Pi a", "bad = MkP @Pi @a"])
         , ("FormerRetainedSynonymBoundary", [], [], ["type family Select (b :: Bool) where", "  Select True = Int", "  Select False = Bool", "type Bad = foreach (b :: Bool) -> Select b -> Select b"])
+        , ("OrdinaryQualifiedArrowControl", ["TypeFamilies", "FlexibleContexts", "ConstraintKinds", "AllowAmbiguousTypes"], [], ["ordinaryQualified :: (Nat -> Eq Int => Int) -> Nat -> Eq Int => Int", "ordinaryQualified f = f"])
+        , ("DirectQualifiedPiGiven", qualifiedPiExtensions, [], ["fromQualifiedPi :: forall value. value ~ (foreach (n :: Nat) -> Eq Int => Vec Int n) => value -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "fromQualifiedPi f = f"])
+        , ("QualifiedPiGivenBeneathRetainedBinder", qualifiedPiExtensions, [], ["liftQualifiedPi :: forall value. value ~ (foreach (n :: Nat) -> Eq Int => Vec Int n) => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Eq Int => Vec Int n), Vec Bool m))", "liftQualifiedPi f = f"])
+        , ("ReflQualifiedPiWitness", qualifiedPiExtensions, equalityImports, ["fromQualifiedRefl :: forall value. (value :~: (foreach (n :: Nat) -> Eq Int => Vec Int n)) -> value -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "fromQualifiedRefl proof f = case proof of Refl -> f"])
+        , ("OrdinaryQualifiedGivenControl", qualifiedPiExtensions, [], ["ordinaryGiven :: forall value. value ~ (Nat -> Eq Int => Int) => value -> (Nat -> Eq Int => Int)", "ordinaryGiven f = f"])
+        , ("QualifiedIdentity", qualifiedPiExtensions, [], ["qualifiedIdentity :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "qualifiedIdentity f = f"])
+        , ("KnownNativeCase", qualifiedPiExtensions, [], ["caseKnown :: (foreach (n :: Nat) -> Eq Int => Vec Int n) -> (foreach (n :: Nat) -> Eq Int => Vec Int n)", "caseKnown f = case f of saved -> saved"])
+        , ("KnownNativeProofCopy", qualifiedPiExtensions, equalityImports, ["copyProof :: forall value. (value :~: (foreach (n :: Nat) -> Eq Int => Vec Int n)) -> (value :~: (foreach (n :: Nat) -> Eq Int => Vec Int n))", "copyProof proof = proof"])
+        , ("CapturedQualifiedGiven", qualifiedPiExtensions, [], ["capturedGiven :: forall value. foreach (k :: Nat) -> value ~ (foreach (n :: Nat) -> Eq (Vec Int k) => Vec Int n) => value -> (foreach (n :: Nat) -> Eq (Vec Int k) => Vec Int n)", "capturedGiven k f = f"])
+        , ("CapturedQualifiedGivenBeneathBinder", qualifiedPiExtensions, [], ["capturedLift :: forall value. foreach (k :: Nat) -> value ~ (foreach (n :: Nat) -> Eq (Vec Int k) => Vec Int n) => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Eq (Vec Int k) => Vec Int n), Vec Bool m))", "capturedLift k f = f"])
+        , ("OrdinaryImpredicativeList", qualifiedPiExtensions, [], ["ids :: [forall a. a -> a]", "ids = [id, id]"])
         ]
         $ \(name, extensions, imports, declarations) -> do
             let moduleName = "NativeSourcePiOperand" ++ name
@@ -3237,6 +3279,7 @@ runPackageSourceRejectChecks = do
                ]
     liftIO $ putStrLn "package source rejection checks: ok"
   where
+    qualifiedPiExtensions = ["TypeFamilies", "FlexibleContexts", "ConstraintKinds", "AllowAmbiguousTypes", "ImpredicativeTypes"]
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
     package = declaration "foreach (n :: Nat) -> Vec a n -> PackedVec a"
     localSignatures =
