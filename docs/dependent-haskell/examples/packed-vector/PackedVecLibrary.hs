@@ -23,6 +23,11 @@ module PackedVecLibrary (
     transportElementEta,
     transportElementWith,
     transportOuterIndex,
+    exposePi,
+    exposePiEta,
+    exposePiWith,
+    exposePiOuter,
+    liftExposedPi,
     withPacked,
     repack,
     ignorePacked,
@@ -187,6 +192,27 @@ transportElementWith proof f = case proof of
 -- | Transport with an equality that contains an outer runtime index.
 transportOuterIndex :: forall a. foreach (k :: Nat) -> (a ~ Vec Int k) => (foreach (n :: Nat) -> (a, Vec Bool n)) -> (foreach (n :: Nat) -> (Vec Int k, Vec Bool n))
 transportOuterIndex k f = f
+
+-- | Return a retained function through an equality with its whole type.
+exposePi :: forall value. (value ~ (foreach (n :: Nat) -> Vec Int n)) => value -> (foreach (n :: Nat) -> Vec Int n)
+exposePi f = f
+
+-- | Apply the transported function as an explicit eta control.
+exposePiEta :: forall value. (value ~ (foreach (n :: Nat) -> Vec Int n)) => value -> (foreach (n :: Nat) -> Vec Int n)
+exposePiEta f n = exposePi @value f n
+
+-- | Demand a whole-type equality proof before returning the function.
+exposePiWith :: forall value. (value :~: (foreach (n :: Nat) -> Vec Int n)) -> value -> (foreach (n :: Nat) -> Vec Int n)
+exposePiWith proof f = case proof of
+    Refl -> f
+
+-- | Return a retained function whose type contains an outer runtime index.
+exposePiOuter :: forall value. foreach (k :: Nat) -> (value ~ (foreach (n :: Nat) -> (Vec Int k, Vec Bool n))) => value -> (foreach (n :: Nat) -> (Vec Int k, Vec Bool n))
+exposePiOuter k f = f
+
+-- | Use a whole-type equality beneath another retained function binder.
+liftExposedPi :: forall value. (value ~ (foreach (n :: Nat) -> Vec Int n)) => (foreach (m :: Nat) -> (value, Vec Bool m)) -> (foreach (m :: Nat) -> ((foreach (n :: Nat) -> Vec Int n), Vec Bool m))
+liftExposedPi f = f
 
 -- | Pass both stored fields to a consumer with one scoped runtime index.
 withPacked :: forall a r. PackedVec a -> (foreach (n :: Nat) -> Vec a n -> r) -> r

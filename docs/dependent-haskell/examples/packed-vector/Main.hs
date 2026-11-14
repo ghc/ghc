@@ -2180,6 +2180,159 @@ runPiGivenChecks = do
     assertEqual "outer-index Given ignores unused payload" [] (toList (snd (transportOuterIndex @(Vec Int ignoredOuter) ignoredOuter ignoreOuter Z)))
     putStrLn "outer-index Given ignores unused payload: []"
 
+-- | Check whole-type equality transport without adding eta equality.
+runPiOperandChecks :: IO ()
+runPiOperandChecks = do
+    let worker :: foreach (n :: Nat) -> Vec Int n
+        worker n = replicateNative @Int n 7
+        direct :: foreach (n :: Nat) -> Vec Int n
+        direct = exposePi @(foreach (n :: Nat) -> Vec Int n) worker
+        eta :: foreach (n :: Nat) -> Vec Int n
+        eta = exposePiEta @(foreach (n :: Nat) -> Vec Int n) worker
+        proved :: foreach (n :: Nat) -> Vec Int n
+        proved = exposePiWith @(foreach (n :: Nat) -> Vec Int n) (Refl @(foreach (n :: Nat) -> Vec Int n)) worker
+    forM_
+        [ (Z, "(0,[],[],[])")
+        , (S Z, "(1,[7],[7],[7])")
+        , (S (S Z), "(2,[7,7],[7,7],[7,7])")
+        , (S (S (S Z)), "(3,[7,7,7],[7,7,7],[7,7,7])")
+        ]
+        $ \(input, expected) -> do
+            cell <- newIORef input
+            n <- readIORef cell
+            let actual = show (natToInt n, toList (direct n), toList (eta n), toList (proved n))
+            assertEqual "runtime Pi operand" expected actual
+            putStrLn ("runtime Pi operand: " ++ actual)
+    let bottomWorker :: foreach (n :: Nat) -> Vec Int n
+        bottomWorker = error "native-pi-operand-bottom-function"
+        bottomEquality :: (foreach (n :: Nat) -> Vec Int n) :~: (foreach (n :: Nat) -> Vec Int n)
+        bottomEquality = error @_ @((foreach (n :: Nat) -> Vec Int n) :~: (foreach (n :: Nat) -> Vec Int n)) "native-pi-operand-bottom-proof"
+    expectMarker "direct Pi operand preserves bottom function" "native-pi-operand-bottom-function" $
+        checkWhnf (exposePi @(foreach (n :: Nat) -> Vec Int n) bottomWorker)
+    assertWhnf "eta Pi operand returns a function" (exposePiEta @(foreach (n :: Nat) -> Vec Int n) bottomWorker)
+    expectMarker "eta Pi operand demands applied function" "native-pi-operand-bottom-function" $
+        checkWhnf (exposePiEta @(foreach (n :: Nat) -> Vec Int n) bottomWorker Z)
+    assertEqual "unused Pi operand ignores bottom function" 42 (const (42 :: Int) (exposePi @(foreach (n :: Nat) -> Vec Int n) bottomWorker))
+    putStrLn "unused Pi operand ignores bottom function: 42"
+    expectMarker "Pi operand proof precedes bottom function" "native-pi-operand-bottom-proof" $
+        checkWhnf (exposePiWith @(foreach (n :: Nat) -> Vec Int n) bottomEquality bottomWorker)
+    assertEqual "unused Pi operand ignores bottom proof" 42 (const (42 :: Int) (exposePiWith @(foreach (n :: Nat) -> Vec Int n) bottomEquality worker))
+    putStrLn "unused Pi operand ignores bottom proof: 42"
+    expectMarker "Pi operand Refl preserves bottom function" "native-pi-operand-bottom-function" $
+        checkWhnf (exposePiWith @(foreach (n :: Nat) -> Vec Int n) (Refl @(foreach (n :: Nat) -> Vec Int n)) bottomWorker)
+    assertEqual "unused Pi operand ignores bottom index" 42 (const (42 :: Int) (direct bottomLength))
+    putStrLn "unused Pi operand ignores bottom index: 42"
+    assertEqual "unused Pi operand ignores cyclic index" 42 (const (42 :: Int) (direct cyclicLength))
+    putStrLn "unused Pi operand ignores cyclic index: 42"
+    expectMarker "Pi operand vector retains index demand" "packed-bottom-length" $
+        checkWhnf (direct bottomLength)
+    partialIndex <- pure (S bottomLength)
+    assertEqual "Pi operand partial index prefix" [7] (take 1 (toList (direct partialIndex)))
+    putStrLn "Pi operand partial index prefix: [7]"
+    cyclicIndex <- pure cyclicLength
+    assertEqual "Pi operand cyclic index prefix" [7, 7] (take 2 (toList (direct cyclicIndex)))
+    putStrLn "Pi operand cyclic index prefix: [7,7]"
+    checkWhnf worker
+    checkWhnf direct
+    originalFunctionName <- makeStableName worker
+    exposedFunctionName <- makeStableName direct
+    assertEqual "Pi operand shares original function" True (originalFunctionName == exposedFunctionName)
+    putStrLn "Pi operand shares original function: True"
+    sharingIndex <- pure (S (S Z))
+    let saved = direct sharingIndex
+    first <- evaluate saved
+    second <- evaluate saved
+    firstName <- makeStableName first
+    secondName <- makeStableName second
+    assertEqual "Pi operand shares named result" True (firstName == secondName)
+    putStrLn "Pi operand shares named result: True"
+    payloadCell <- newIORef saved
+    originalPayload <- readIORef payloadCell
+    checkWhnf originalPayload
+    originalPayloadName <- makeStableName originalPayload
+    assertEqual "Pi operand shares original IORef payload" True (firstName == originalPayloadName)
+    putStrLn "Pi operand shares original IORef payload: True"
+    forM_
+        [ (Z, S Z, "(0,1,[],[True],True)")
+        , (S (S Z), S (S (S Z)), "(2,3,[9,9],[True,True,True],True)")
+        ]
+        $ \(outerInput, innerInput, expected) -> do
+            outerCell <- newIORef outerInput
+            innerCell <- newIORef innerInput
+            k <- readIORef outerCell
+            n <- readIORef innerCell
+            let payload = replicateNative @Int k 9
+                original :: foreach (index :: Nat) -> (Vec Int k, Vec Bool index)
+                original index = (payload, replicateNative @Bool index True)
+                moved :: foreach (index :: Nat) -> (Vec Int k, Vec Bool index)
+                moved = exposePiOuter @(foreach (index :: Nat) -> (Vec Int k, Vec Bool index)) k original
+                result :: (Vec Int k, Vec Bool n)
+                result = moved n
+                firstField :: Vec Int k
+                firstField = fst result
+                secondField :: Vec Bool n
+                secondField = snd result
+            checkWhnf payload
+            checkWhnf firstField
+            originalName <- makeStableName payload
+            movedName <- makeStableName firstField
+            let actual = show (natToInt k, natToInt n, toList firstField, toList secondField, originalName == movedName)
+            assertEqual "runtime outer Pi operand" expected actual
+            putStrLn ("runtime outer Pi operand: " ++ actual)
+    ignoredOuter <- pure bottomLength
+    let ignoreOuter :: foreach (index :: Nat) -> (Vec Int ignoredOuter, Vec Bool index)
+        ignoreOuter index = (bottomPayload, replicateNative @Bool index True)
+        ignoredMoved :: foreach (index :: Nat) -> (Vec Int ignoredOuter, Vec Bool index)
+        ignoredMoved = exposePiOuter @(foreach (index :: Nat) -> (Vec Int ignoredOuter, Vec Bool index)) ignoredOuter ignoreOuter
+        ignoredResult :: (Vec Int ignoredOuter, Vec Bool Z)
+        ignoredResult = ignoredMoved Z
+        ignoredSecond :: Vec Bool Z
+        ignoredSecond = snd ignoredResult
+    assertWhnf "outer Pi operand ignores bottom index" ignoredMoved
+    assertEqual "outer Pi operand ignores unused payload" [] (toList ignoredSecond)
+    putStrLn "outer Pi operand ignores unused payload: []"
+    let lazyWorker :: foreach (n :: Nat) -> Vec Int n
+        lazyWorker n = bottomPayload
+    expectMarker "Pi operand vector error precedes index" "packed-bottom-payload" $
+        checkWhnf (exposePi @(foreach (n :: Nat) -> Vec Int n) lazyWorker bottomLength)
+    let originalOuter :: foreach (m :: Nat) -> ((foreach (n :: Nat) -> Vec Int n), Vec Bool m)
+        originalOuter m = (worker, replicateNative @Bool m True)
+        lifted :: foreach (m :: Nat) -> ((foreach (n :: Nat) -> Vec Int n), Vec Bool m)
+        lifted = liftExposedPi @(foreach (n :: Nat) -> Vec Int n) originalOuter
+    forM_
+        [ (Z, Z, "(0,0,[],[])")
+        , (S Z, S (S Z), "(1,2,[7,7],[True])")
+        , (S (S Z), S Z, "(2,1,[7],[True,True])")
+        , (S (S (S Z)), S (S (S Z)), "(3,3,[7,7,7],[True,True,True])")
+        ]
+        $ \(outerInput, innerInput, expected) -> do
+            outerCell <- newIORef outerInput
+            innerCell <- newIORef innerInput
+            m <- readIORef outerCell
+            n <- readIORef innerCell
+            let result :: ((foreach (index :: Nat) -> Vec Int index), Vec Bool m)
+                result = lifted m
+                inner :: foreach (index :: Nat) -> Vec Int index
+                inner = fst result
+                flags :: Vec Bool m
+                flags = snd result
+                actual = show (natToInt m, natToInt n, toList (inner n), toList flags)
+            assertEqual "runtime lifted Pi operand" expected actual
+            putStrLn ("runtime lifted Pi operand: " ++ actual)
+    checkWhnf originalOuter
+    checkWhnf lifted
+    originalOuterName <- makeStableName originalOuter
+    liftedName <- makeStableName lifted
+    assertEqual "lifted Pi operand shares outer function" True (originalOuterName == liftedName)
+    putStrLn "lifted Pi operand shares outer function: True"
+    ignoredIndex <- pure bottomLength
+    let ignoredPair :: ((foreach (index :: Nat) -> Vec Int index), Vec Bool ignoredIndex)
+        ignoredPair = lifted ignoredIndex
+        ignoredFunction :: foreach (index :: Nat) -> Vec Int index
+        ignoredFunction = fst ignoredPair
+    checkWhnf ignoredFunction
+    putStrLn "lifted Pi operand projection ignores bottom outer index: ok"
+
 -- | Run finite observations and bounded strictness checks.
 main :: IO ()
 main = do
@@ -2734,3 +2887,4 @@ main = do
     runIndexVTAChecks
     runJointIndexPrefixChecks
     runPiGivenChecks
+    runPiOperandChecks

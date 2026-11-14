@@ -1334,3 +1334,63 @@ error. The ordinary type-splice wildcard control still compiles. The
 standalone splice probes use the target external interpreter. A same-name
 shadowing control accepts the inner index and rejects a vector at the outer
 index.
+
+## M33: retained function types as equality operands
+
+The bootstrap source executable and API fixture pass all 562 observations.
+The 30 additions follow the existing 532 observations without changes.
+The self-hosted source checks and registered regressions remain pending.
+
+[exposePi](PackedVecLibrary.hs) puts the whole retained function type on the
+RHS of a Given equality:
+
+```haskell
+exposePi :: forall value.
+            value ~ (foreach (n :: Nat) -> Vec Int n)
+         => value -> (foreach (n :: Nat) -> Vec Int n)
+exposePi f = f
+```
+
+Its caller writes the retained type as an ordinary visible type argument:
+
+```haskell
+let direct :: foreach (n :: Nat) -> Vec Int n
+    direct = exposePi @(foreach (n :: Nat) -> Vec Int n) worker
+```
+
+[exposePiEta](PackedVecLibrary.hs) is the pointwise control.
+[exposePiWith](PackedVecLibrary.hs) accepts an explicit `:~:` proof and
+matches `Refl` in a case expression. [exposePiOuter](PackedVecLibrary.hs)
+uses an equality whose retained RHS captures an outer runtime `k`:
+`foreach (n :: Nat) -> (Vec Int k, Vec Bool n)`. Its caller supplies a
+complete written type argument. The result pair and each native field have
+complete local signatures.
+
+[runPiOperandChecks](Main.hs) compares direct, eta and explicit-proof calls
+at IORef-fed lengths 0 to 3. The demand checks require direct transport to
+preserve a bottom function at WHNF. The eta control must return a lambda
+and demand the bottom function after application. Matching a bottom proof
+must raise its marker before a bottom function. Ignoring the whole call
+must leave the proof or function unevaluated.
+
+The direct Given and `Refl` helpers can use an exact match with existing
+evidence. [liftExposedPi](PackedVecLibrary.hs) exercises the additional
+solver path. Its Given identifies `value` with a retained function type.
+Its argument returns `(value, Vec Bool m)` beneath another retained binder
+`m`. The result replaces `value` with the retained function type without
+eta expansion. Six final observations compare IORef-fed inner and outer
+indices, check outer-function identity, and project the inner function at a
+bottom outer index without demanding that index.
+
+The checks also cover ignored bottom and cyclic indices, productive vector
+prefixes and the original payload error before an unused index. StableName
+checks compare the original named function, a reused named vector result,
+that same vector stored in an IORef, and an outer captured vector. They do
+not require separate applications to share newly allocated results.
+
+This increment uses existing nominal equality evidence. It does not add
+function eta equality or mutable assignments of native types. Missing,
+unrelated and escaping evidence must remain rejected. Fixed supported
+runtime domains, unrestricted retained binders, scope checks and ordinary
+role checks still apply. See the
+[M33 provenance and limits](../../REFERENCES.md#retained-function-types-as-equality-operands).
