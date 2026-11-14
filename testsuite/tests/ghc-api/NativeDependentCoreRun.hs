@@ -3062,6 +3062,8 @@ runPackageSourceRejectChecks = do
         , ("PiGivenOuterProofCannotIdentifyInnerIndex", 83865, "Couldn't match", ["TypeFamilies"], [], ["wrongInner :: forall a. foreach (k :: Nat) -> (a ~ Vec Int k) => (foreach (n :: Nat) -> (a, Vec Bool n)) -> (foreach (n :: Nat) -> (Vec Int n, Vec Bool n))", "wrongInner k f = f"])
         , ("PiGivenNativeFamilyOccursCycleCannotTransport", 83865, "Couldn't match", ["TypeFamilies"], [], ["type family Cycle a (n :: Nat)", "wrongCycle :: forall a. foreach (k :: Nat) -> (a ~ Maybe (Cycle a k)) => (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec Bool n)", "wrongCycle k f = f"])
         , ("PiVTAIndependentRuntimeIndexMismatch", 83865, "Couldn't match", ["TypeApplications"], [], localActions ++ ["bad :: Nat -> Nat -> Int", "bad k m = length (toListLocal (id @(Vec Int k) (localVector m)))"])
+        , ("PiVTALexicalShadowRejectsOuter", 83865, "Couldn't match", ["TypeApplications"], [], localActions ++ ["bad :: Nat -> Nat -> Int", "bad k input = let { outer :: Vec Int k; outer = localVector k; apply :: Nat -> Int; apply k = length (toListLocal (id @(Vec Int k) outer)) } in apply input"])
+        , ("PiVTASplicedWildcardCannotCaptureIndex", 83605, "must be complete", ["TypeApplications", "TemplateHaskell"], ["import Language.Haskell.TH (Type(WildCardT))"], localActions ++ ["bad :: Nat -> Int", "bad k = length (toListLocal (id @(Vec $(pure WildCardT) k) (localVector k)))"])
         , ("PiVTAUnsupportedRuntimeIndexDomain", 83605, "visible type argument", ["TypeApplications"], [], localActions ++ ["bad :: Int -> Int", "bad k = length (toListLocal (id @(Vec Int k) VNil))"])
         , ("PiVTAGlobalTermIsNotCaptured", 76037, "globalIndex", ["TypeApplications"], [], localActions ++ ["globalIndex :: Nat", "globalIndex = Z", "bad :: Int", "bad = length (toListLocal (id @(Vec Int globalIndex) VNil))"])
         , ("PiVTAUnavailableTermIsNotCaptured", 76037, "unavailableIndex", ["TypeApplications"], [], localActions ++ ["bad :: Int", "bad = length (toListLocal (id @(Vec Int unavailableIndex) VNil))"])
@@ -3122,6 +3124,23 @@ runPackageSourceRejectChecks = do
                                ]
                             ++ declarations
             sourceModuleRejects name code fragment moduleName source
+    -- Keep the ordinary spliced wildcard on its existing inference path.
+    void
+        $ sourceEntry "NativeSourcePackageOrdinarySplicedWildcard"
+        $ unlines
+        $ [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures #-}"
+          , "{-# LANGUAGE RankNTypes, ScopedTypeVariables, TypeApplications, TemplateHaskell #-}"
+          , "module NativeSourcePackageOrdinarySplicedWildcard where"
+          , "import Language.Haskell.TH (Type(WildCardT))"
+          , "data Nat = Z | S Nat"
+          , "data Vec a (n :: Nat) where"
+          , "  VNil :: Vec a Z"
+          , "  VCons :: a -> Vec a n -> Vec a (S n)"
+          ]
+            ++ localActions
+            ++ [ "entry :: Int"
+               , "entry = length (toListLocal (id @(Vec $(pure WildCardT) Z) VNil))"
+               ]
     liftIO $ putStrLn "package source rejection checks: ok"
   where
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
