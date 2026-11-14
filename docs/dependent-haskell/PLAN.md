@@ -40,6 +40,14 @@ produces a bounded prefix from the tested cyclic input. The Core API and runtime
 fixture pass with 22 package/bound rejections. All five registered regressions
 pass. The original Core Lint failure remains in the verification artifacts.
 
+M15's source workers are verified at `f3350988c3`, with application checking
+at `78460ce4f4`. Both compiler stages pass all 136 source observations. The
+bootstrap runtime fixture and registered runtime test pass 27 package/bound
+rejections. Four standalone equality-scope errors have pinned codes and source
+locations in both stages. All five focused registered regressions pass.
+The new source uses ordinary `:~:` evidence to
+align independently computed runtime lengths before zipping their vectors.
+
 ## Direction and boundaries
 
 The implementation extends Core. It does not require singleton elaboration or
@@ -1149,9 +1157,11 @@ current equality-Given path before proposing a compiler rule. See the
 
 ### M15: source runtime equality and aligned vector zip
 
-The initial source probe passes Core and STG Lint in the current self-hosted
-compiler. Keep the existing Core and interface rules. Use ordinary `:~:` and
-match `Refl` to introduce scoped equality evidence.
+Source workers: `f3350988c3`. Application checking: `78460ce4f4`.
+Both compiler stages pass 136 source observations with Core and STG Lint.
+The bootstrap and registered runtime fixtures pass 27 package/bound
+rejections. Four standalone equality-scope errors have pinned codes and source
+locations in both stages. All five focused registered regressions pass.
 
 ```haskell
 sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
@@ -1159,93 +1169,102 @@ zipVec :: Vec a n -> Vec b n -> Vec (a, b) n
 zipPacked :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))
 ```
 
-Define `sameNat` with one variable equation and nested cases. Compare the
-successor fields recursively. A `Just Refl` branch proves successor equality
-by ordinary congruence. `zipPacked` must match that proof before passing the
-two captured vectors to `zipVec`. Follow the pinned Agda equality and vector
-relations. The Haskell result carries positive evidence only. `Nothing` is
-not Agda's negative `Dec` evidence.
+`sameNat` uses one variable equation with nested cases. Its recursive
+`Just Refl` branch proves successor equality by ordinary congruence.
+`zipPacked` matches that proof before passing two captured vectors to
+`zipVec`. The solver keeps runtime indices opaque. Core and interface rules
+are unchanged. Follow the [pinned Agda equality and vector relations](REFERENCES.md#runtime-equality-and-aligned-zip-next-source-probe).
+The Haskell result carries positive evidence only. `Nothing` carries no
+refutation proof. Equal-length success compares both finite Nat spines before
+returning `Just`. Vector fields, tuple components and tails remain lazy until
+the consumer demands them.
 
-- [ ] Add the three source workers, exports, Haddock comments and a GHC Note
-  that records proof scope, Haskell field demand and the Agda provenance.
-- [ ] Read both lengths independently through IORefs. Check equal and unequal
+- [x] Add source workers, exports, Haddock comments and a GHC Note with proof
+  scope, Haskell demand and Agda provenance.
+- [x] Read both lengths independently through IORefs. Check equal and unequal
   finite inputs, empty vectors and element order after runtime filtering.
-- [ ] Observe length comparison, result and package WHNF, vector tags, pair
-  components and tails separately. A mismatch must ignore both vector
-  payloads. Partial predecessors must remain lazy until comparison needs them.
-  Preserve package-pattern order. Do not force an equal cyclic comparison.
-- [ ] Probe and pin located errors for independent `Refl`, zip without
-  equality, an unmatched proof value, and equality used outside its branch.
-- [ ] Compile separate producer and interface-only consumer modules with
-  both compiler stages and Core/STG Lint. Update the existing runtime fixture.
-  Run the focused registered normal-way checks. Record artifact hashes and
-  capped resource peaks. Reuse the M14 compiler builds unless a demonstrated
-  compiler defect requires a change.
+- [x] Observe comparison, result and package WHNF, vector tags, pair components
+  and tails separately. Mismatches ignore both vectors. Partial predecessors
+  remain lazy until comparison needs them. Preserve package-pattern order.
+  Do not force an equal cyclic comparison.
+- [x] Pin located errors for independent `Refl`, zip without equality,
+  unmatched proof values, branch-local equality escape and a linear index.
+- [x] Complete both compiler stages through separate source interfaces with
+  Core/STG Lint. Run the updated runtime fixture and focused registered normal
+  way. Record commands, resource peaks and artifact hashes. Preserve the
+  previous-format reader and failed probes.
 
-This target does not add runtime-index evaluation to the solver, a refutation
-proof, proof erasure, native optimization or a totality claim. Keep the
-original Tidy failure and previous-format reader artifacts unchanged.
+The full consumer required three bounded application-checking changes:
 
-The full source observer exposes two checking boundaries that the worker
-probe did not cover. IO reads used inside local lets fail the native index
-grammar check. The resolver checks raw Id metadata; assigned type or
-multiplicity variables can hide a supported unrestricted domain. Normalize
-only that metadata with the within-typechecker zonker. Preserve Name, Unique
-and lexical identity. Do not default an unresolved variable or use the final
-zonker's recursive Id environment.
+1. Normalize Id type and multiplicity metadata with the within-TC `zonkId`.
+   Validate immutable index choices against the authoritative local or
+   same-module binding. Preserve Name, Unique, local identity, equal closed
+   domain and Many multiplicity. Reject imported GlobalIds, unresolved or
+   rigid domains, linear indices and missing bindings. Do not use the final
+   zonker's recursive Id environment.
+2. Reuse algebraic result-candidate matching for known ordinary Ids. Select a
+   complete index substitution while an ordinary payload type is unresolved.
+   Preserve the actual instantiated type. Final subsumption solves ordinary
+   payload equalities and checks every index equality. Expected matching can
+   retain an ordinary tau arrow after the written arguments. Argument
+   inference still requires saturation.
+3. Specialize a fully applied wired-in `($)` only when a complete result is
+   known and its named right operand has a native anchor. A result independent
+   of the named first operand's invisible binders can supply the result for a
+   discarded `do` statement. Read that signature without elaborating operands
+   or expanding splices. Infer and cache the right operand once. Match kinds
+   before types to determine both representation binders. Require complete
+   choices, kind agreement, exact result/domain types, valid runtime scope
+   and concrete original `idConcreteTvs` choices. Apply the choices to the
+   original operator and use NoQL through instantiation, result checking and
+   cache resumption. Final checking retains the original expected type.
 
-The immutable instantiation scope check also searches only the local type
-environment. Same-module top-level LocalIds can instead be in the global
-type environment. Check the authoritative binding in both environments and
-compare normalized metadata. Keep imported GlobalIds, stale identities,
-linear indices and unsupported domains rejected. Preserve the original
-source observer. Retest generic `evaluate` and polymorphic vector fields
-before extending any expected-type inference rule. No native type may enter
-a mutable type variable.
+Decide dollar eligibility before right-operand inference. Higher-rank
+callback domains retain their existing expected-checking path. In particular,
+`withBounded` needs an expected result before checking its retained callback.
+If an attempted immutable match fails after inference, keep the cached
+operand and use ordinary NoQL checking. Do not elaborate that operand again.
+Emit its saved usage once under the final argument multiplicity. Other Quick
+Look applications keep their current path.
 
-The metadata retest removes the IO-let grammar failures. Client probes show
-that direct `observe (evaluate (sameNat n Z))` works, while the equivalent
-`observe $ evaluate (sameNat n Z)` fails after Quick Look caches ordinary
-instantiation variables. Preserve the original dollar applications.
+The original source observer is unchanged. These routes do not put native
+syntax in mutable type or Quick Look variables. They add no equality axiom,
+refutation proof, proof erasure, native optimization or totality claim.
 
-Extend the existing immutable algebraic result candidate selection to known
-ordinary Id heads. Choose the complete index substitution even if an ordinary
-payload type is unresolved. Keep the actual instantiated result. Final
-subsumption must solve ordinary payload equalities and verify every index
-equality. Expected-result matching may retain an ordinary tau arrow after
-the written arguments. Argument inference still requires saturation.
+### M16: source append with a computed result length
 
-For a fully applied wired-in `($)` with no explicit type applications, a
-complete expected result and a named native-anchored right operand, infer
-and cache that operand once. Match the result and operand types against the
-original dollar signature. Require every invisible choice, kind agreement,
-authoritative runtime scope and concrete choices for its fixed runtime
-representation variables. Apply the immutable choices to the original Id.
-Use NoQL for that fully instantiated application, result checking and cache
-resumption. Check the first operand against the now-known arrow type. Emit
-the right operand's saved usage once under its final multiplicity. Other
-Quick Look calls keep their current path. No native type enters a mutable
-type variable or a Quick Look instantiation variable.
+This target is unverified. Return a runtime sum with ordinary equality
+evidence, then use that evidence to package an appended vector. Follow
+the [pinned addition, vector append and congruence definitions](REFERENCES.md#computed-length-append-next-source-probe).
 
-The full retest clears the IO-let and polymorphic vector-field errors. Its
-five dollar/proof observations remain in discarded `do` statements. Such a
-statement has expected type `IO alpha` before its result is discarded.
-If this expected result is incomplete, read the named first operand's
-declared ordinary signature without elaborating it. A result independent of
-its outer invisible binders can supply the complete dollar result. For
-`expectMarker label marker`, the result after those two arguments and the
-dollar operand is `IO ()`. Require a known tau result without mutable
-variables. Keep the original expected type for final `checkResultTy`.
-Do not infer the first operand, expand a splice or choose a result that
-depends on an undetermined template binder.
+```haskell
+data Sum (n :: Nat) (m :: Nat) where
+  Sum :: foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m
 
-The next retest clears the new proof/dollar errors but exposes two earlier
-bound-proof callback regressions. `withBounded` needs its expected result
-before checking the higher-rank retained callback. Before inferring a dollar
-RHS, inspect its named head's declared domains. Keep higher-rank callback
-domains on the existing expected-checking path. Make this decision before
-elaborating the RHS. This preserves the current restriction against general
-higher-rank argument inference and keeps the old proof-demand observations.
+sumNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Sum n m
+appendPacked :: PackedVec a -> PackedVec a -> PackedVec a
+```
+
+- [ ] Probe the declaration and `Sum m Refl :: Sum Z m` separately.
+  Construction must instantiate the erased `m` with the captured runtime
+  index before allocating mutable instantiation variables. The current
+  result matcher may stop at the constructor's retained argument. Establish
+  that boundary before extending it. Prefer a constructor-only result match
+  with existing kind, scope and final subsumption checks.
+- [ ] Define `Add` and source append by recursion on the first length.
+  Define `sumNat` with the same recursion. In the successor case, match
+  recursive `Refl` before constructing `Sum (S p) Refl`. Reuse family
+  reduction and ordinary equality congruence.
+- [ ] Open both packages, match `Sum p Refl`, and repackage the appended
+  vector at `p`. Reject forged sums, missing equality elimination, swapped
+  indices without a lemma, and an escaping result index.
+- [ ] Check independent runtime inputs and finite element order. Observe
+  package, equality, length and vector demand separately. This proposed
+  `sumNat` forces the entire first Nat spine before returning a constructor.
+  Do not claim productivity for a cyclic first length. Check that a finite
+  first length can leave the second length and vector fields lazy.
+- [ ] Validate both compiler stages, existing controls and resource limits.
+  Record provenance, located errors and reproducible artifacts.
 
 ## Further work
 

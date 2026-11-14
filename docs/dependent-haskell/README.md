@@ -39,14 +39,15 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages, five registered regressions, the Core API and bootstrap runtime pass; the source example has 102 runtime observations and 22 package/bound rejection checks |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 136 runtime observations and the runtime fixtures check 27 package/bound rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
 | Bounded source filter | Both compiler stages run the three-field source package; the filter constructs a checked LE proof while unused, partial and cyclic proof fields retain their tested laziness |
 | Source package patterns | Nested vector/proof patterns, wildcard proof fields and guarded clauses pass in both stages; separate cases preserve each row's runtime index Ids |
 | Source vector tails | Source uncons and repeated draining use the actual runtime predecessor; partial fields stay lazy and the tested cyclic input produces a bounded prefix |
-| Next task | Probe runtime length equality returning ordinary `:~:` evidence, then zip independently created packages |
+| Source equality and zip | Both compiler stages pass 136 observations; ordinary `Refl` aligns independently computed lengths; four equality-scope errors have pinned codes and source locations |
+| Next task | Probe source append with a runtime sum and an equality witness for its computed result length |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -1987,3 +1988,58 @@ The source programs run at `-O0` with the existing native interface gates.
 Native optimization, general projections, retained index patterns, proof
 erasure and totality remain separate work. The full GHC suite was not run.
 Next, probe runtime equality evidence and use it to zip two source packages.
+
+## Source runtime equality and aligned zip checkpoint
+
+Source and fixture commit `f3350988c3`, with frontend commit `78460ce4f4`,
+passes all 136 source observations in both compiler stages. The consumer
+imports only the producer interface, then links its object file. Core and
+STG Lint run in both stages. The bootstrap runtime fixture and registered
+runtime test pass all 27 package/bound rejection checks. Four standalone
+equality-scope errors have pinned GHC-83865 codes and primary source tokens
+in both stages. All five focused registered regressions pass: 39 cases,
+34 skipped, five expected passes, no framework warnings or failures.
+
+`sameNat` compares two independently supplied runtime lengths. Its successful
+result contains ordinary `:~:` evidence. `zipPacked` matches `Refl` before
+zipping their vectors. The source observations cover independent IORef
+inputs, runtime-filtered vectors, mismatch laziness, package order, partial
+lengths, vector tags, pair components and tails. Equal-length success
+compares both finite Nat spines. `Nothing` carries no negative proof.
+See the [source guide](examples/packed-vector/README.md#runtime-equality-and-aligned-zip).
+
+The consumer required three bounded frontend changes. Index resolution
+normalizes assigned Id metadata and validates current bindings. Result
+matching can select a complete index while an ordinary payload type remains
+unresolved. Fully applied wired-in `($)` can use a complete expected or
+independently declared result and one cached right operand. It preserves the
+original operator, concrete representation checks and final subsumption.
+Higher-rank callbacks keep their expected-checking path. These changes add
+no Core rule or interface format. The fork version remains
+`10.1.20261113.2`.
+
+The final bootstrap compiler build took 46.36 seconds and peaked at
+1,852 MiB under 16 GiB. The self-hosted compiler target and dependencies
+took 9m08s and peaked at 5,274 MiB under 16 GiB. Bootstrap source execution
+peaked at 106 MiB under 4 GiB. Bootstrap runtime and standalone rejection
+checks peaked at 999 MiB under 4 GiB. Self-hosted source and standalone
+rejection checks peaked at 117 MiB under 4 GiB. The registered normal-way
+run took 12.620 seconds and peaked at 1,647 MiB under 8 GiB. All final
+commands passed with zero recorded swap.
+
+Artifacts use `_build/verification/native-equality-zip-`. Final compiler
+inputs are in `build-input-v5.SHA256SUMS`. Successful source logs are
+`bootstrap-run-v5.log` and `selfhost-run-v2.log`. The updated runtime log is
+`bootstrap-runtime-v2.log`; standalone diagnostics are `negatives-v3/` and
+`negatives-v4/`. The registered command and environment are in
+`registered-argv.json` and `registered-env-v1.json`. Source, documentation,
+harness and output manifests identify the checkpoint. Earlier compiler,
+source and harness failures remain saved. The previous-format reader,
+executable and interface fixture retain their original three hashes.
+
+An exploratory imported-global probe still reaches an unlocated late-pipeline
+gate. It is not included in the located rejection counts. Native optimization,
+general index expressions, totality and proof erasure remain separate work.
+The full GHC suite was not run. Next, probe source append with a computed
+runtime length and ordinary equality evidence. The
+[M16 plan](PLAN.md#m16-source-append-with-a-computed-result-length) is unverified.

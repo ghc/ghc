@@ -432,9 +432,9 @@ with the datatype parameter prefix. It then checks the remaining arguments and
 compares the actual result with the target. The file blob is
 `82ba94ac864d19b947d4c92b9af252b0fe81347a`.
 Our bounded path instead selects immutable candidates per result argument,
-then runs full ordinary subsumption. It applies only to DataCon heads with a
-plain result and no Quick Look path. Existing kind and scope guards remain.
-Constructors with concreteness requirements keep ordinary instantiation.
+then runs full ordinary subsumption. It accepts DataCon heads and, since M15,
+known ordinary Ids with a plain result and no Quick Look path. Existing kind
+and scope guards remain. Heads with concreteness requirements keep ordinary instantiation.
 Candidate selection does not establish index equality. These are different
 algorithms. Our path does not special-case `Refl` or add a general index solver.
 
@@ -1283,7 +1283,9 @@ only their stated evaluation observations.
 
 ## Runtime equality and aligned zip: next source probe
 
-Status: research for the next source target. No GHC implementation is verified.
+Status: both compiler stages pass all 136 source observations with Core and
+STG Lint. The bootstrap and registered runtime fixtures pass 27 package/bound
+rejections. All five focused registered regressions pass.
 Compare two stored runtime lengths. On equality, return ordinary Haskell
 `Data.Type.Equality` evidence and use `Refl` to align two vector indices.
 Return `Maybe`, so the mismatch result carries no refutation proof.
@@ -1312,6 +1314,66 @@ Use nested source cases within the current retained telescope subset. Probe
 the existing equality-Given path before adding a rule. A mismatch must leave
 vector payloads lazy. A partial index or equality proof can diverge when the
 consumer demands it. Agda's totality checks do not apply to these Haskell terms.
+
+The full consumer exposes GHC-specific application boundaries. The native
+resolver must read assigned Id type and multiplicity metadata with the
+existing within-TC `zonkId`. Immutable instantiation must check current lexical
+and same-module bindings. These operations preserve binding identity and do
+not assign native types to mutable variables.
+
+An ordinary polymorphic result can have a known index and an unresolved
+ordinary payload type. Reuse the existing result-candidate matcher to choose
+the index. Keep the actual instantiated type and let final subsumption check
+all equalities. Expected checking can also supply an ordinary function arrow
+after the written arguments. This follows expected-type instantiation; the
+candidate itself supplies no equality proof.
+
+GHC already gives wired-in dollar applications special Quick Look handling
+in `GHC.Tc.Gen.App`. Its source signature in
+`libraries/ghc-internal/src/GHC/Internal/Base.hs` quantifies over both runtime
+representations. The bounded native route keeps that signature and Id. It
+requires a complete expected or independently declared result, immutable
+argument choices and concrete runtime representation choices. It infers the right operand once and retains
+the final argument and result checks. General Quick Look still cannot assign
+native syntax to an instantiation variable. These are GHC elaboration choices;
+Agda's comparison or proof erasure does not justify changing them.
+
+A discarded `do` statement can have expected type `IO alpha`. GHC's ordinary
+`(>>)` does not determine that result type before checking the statement.
+The bounded dollar route can read a named first operand's declared result
+when that result is independent of its outer invisible binders. It does not
+elaborate that operand or expand a splice. The original expected type still
+passes through final checking. The inspected dollar-definition file has Git
+blob `703a03ad64c5fe1a6f17c94c583bfd699abceb11`.
+
+Decide eligibility before right-operand inference. Higher-rank callback
+domains need their existing expected-checking path. If immutable matching
+fails after inference, retain the elaborated operand and its usage in one
+NoQL fallback. Do not elaborate that operand again.
+
+## Computed-length append: next source probe
+
+Status: unverified. Compute a runtime result `p` with evidence
+`p :~: Add n m`. Match that evidence before packaging an appended vector.
+The proposed `Sum` package follows the existing retained-field design.
+
+- [Agda v2.8.0 builtin Nat, lines 18–20](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Nat.agda#L18-L20),
+  defines addition by recursion on its first operand. File blob:
+  `2b4801f18bb487e2d999304729bf38ac14ca8400`.
+- [Agda stdlib v2.3 vector append](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Base.agda),
+  gives the result length as the sum of the input lengths. File blob:
+  `8c03fb8a83e6cec1fa7b8e1f64bb7e606c531cb8`.
+- [Equality congruence, lines 54–55](https://github.com/agda/agda-stdlib/blob/v2.3/src/Relation/Binary/PropositionalEquality/Core.agda#L54-L55),
+  transports equality through a function by matching `refl`. Successor
+  congruence supplies the recursive sum proof. File blob:
+  `2db2dd64e1a8bbb9bda6410930e3bd15366719d7`.
+
+These definitions support the proof shape. They do not establish that the
+proposed Haskell constructors elaborate. Probe the base constructor first.
+The proposed recursive witness forces the entire first Nat spine before
+returning `Sum`. For a finite first length, its result can store the second
+length without forcing it. Validate these demands separately from vector
+demand. Agda's totality and erasure checks do not apply to this Haskell code.
 
 ## Later solver and proof-certificate work
 

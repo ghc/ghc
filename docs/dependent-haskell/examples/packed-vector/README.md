@@ -1,9 +1,11 @@
 # Packed vector source example
 
-The bootstrap and self-hosted compilers compile and run this source example.
-The consumer imports the library interface with the producer source absent
-from its import path. All 102 observations below pass with Core Lint and STG
-Lint enabled.
+Both compiler stages compile and run all 136 observations below with Core
+Lint and STG Lint enabled. The consumer imports the library interface with
+the producer source absent from its import path. The bootstrap and registered
+runtime fixtures pass all 27 package and bound rejections. Four standalone
+equality-scope rejections have pinned, located GHC-83865 diagnostics in both
+stages. All five focused registered regressions pass.
 
 `PackedVecLibrary.hs` stores a runtime `Nat` and a `Vec` indexed by that same
 field. `PackVec` has two ordinary runtime fields. It has no singleton argument.
@@ -190,6 +192,95 @@ rejects at the payload with located GHC-25897. Existing retained-field and
 scope restrictions remain in force. Some diagnostics still show generated
 captured bindings in their relevant-binding details.
 
+## Runtime equality and aligned zip
+
+`sameNat` compares two independent runtime lengths. Its successful result
+contains the ordinary `Data.Type.Equality.:~:` proof. `zipPacked` opens two
+packages and matches `Refl` before it calls the ordinary equal-length `zipVec`.
+The source workers are:
+
+```haskell
+sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
+sameNat n m = case n of
+    Z -> case m of
+        Z -> Just Refl
+        S q -> Nothing
+    S p -> case m of
+        Z -> Nothing
+        S q -> case sameNat p q of
+            Nothing -> Nothing
+            Just Refl -> Just Refl
+
+-- | Pair elements of ordinary vectors with one shared length index.
+zipVec :: Vec a n -> Vec b n -> Vec (a, b) n
+zipVec VNil VNil = VNil
+zipVec (VCons x xs) (VCons y ys) = VCons (x, y) (zipVec xs ys)
+
+-- | Compare stored lengths before aligning the vector payloads.
+zipPacked :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))
+zipPacked (PackVec n xs) (PackVec m ys) = case sameNat n m of
+    Nothing -> Nothing
+    Just Refl -> Just (PackVec n (zipVec xs ys))
+```
+
+The `Just` constructor alone does not establish equality in the branch.
+Matching its `Refl` field introduces the local equality that aligns the two
+vector types. That equality cannot escape its branch. The negative source
+checks reject transport without `Refl`, transport in the `Nothing` branch,
+and transport between unrelated stored indices. `Nothing` contains no
+refutation proof. This result is not Agda's `Dec` datatype.
+
+Equal-length success completes the comparison of both finite `Nat` spines
+before it returns `Just`. The comparison inspects the left length first.
+`Z` versus `S bottom` and `S bottom` versus `Z` return `Nothing` without
+forcing the predecessor. Comparing a bottom length still fails, including
+comparison of that length with itself. Equal cyclic lengths can diverge.
+These workers do not establish totality or adopt Agda's proof erasure.
+See the [pinned equality and vector sources](../../REFERENCES.md#runtime-equality-and-aligned-zip-next-source-probe).
+
+The consumer reads each length independently through an IORef. It builds
+vectors of 42 and 7, then prints these results:
+
+| Runtime lengths | Output |
+| --- | --- |
+| `(0,0)` | `runtime equality zip: same Just (0,[])` |
+| `(0,2)` | `runtime equality zip: different Nothing` |
+| `(2,0)` | `runtime equality zip: different Nothing` |
+| `(2,2)` | `runtime equality zip: same Just (2,[(42,7),(42,7)])` |
+| `(2,3)` | `runtime equality zip: different Nothing` |
+| `(3,2)` | `runtime equality zip: different Nothing` |
+| `(3,3)` | `runtime equality zip: same Just (3,[(42,7),(42,7),(42,7)])` |
+
+The filtered inputs are `[1,2,3]` and `[10,20,30]`. Each uses its own
+runtime cutoff and keeps elements greater than that cutoff:
+
+| Runtime cutoffs | Output |
+| --- | --- |
+| `(0,0)` | `runtime filtered zip: Just (3,[(1,10),(2,20),(3,30)])` |
+| `(1,10)` | `runtime filtered zip: Just (2,[(2,20),(3,30)])` |
+| `(1,0)` | `runtime filtered zip: Nothing` |
+| `(3,30)` | `runtime filtered zip: Just (0,[])` |
+
+A length mismatch ignores both vector payloads. After equal-length success,
+result WHNF, package WHNF and the stored length can also ignore both vectors.
+Observing the vector demands its left constructor before its right constructor.
+A defined pair still leaves its two head values lazy. A returned tail package
+leaves both vector tails lazy until the consumer observes them. Separate error
+markers check each demand. These claims concern vector payloads, pair fields
+and tails. They do not make the preceding length comparison lazy.
+
+The complete consumer also checks indices read from IORefs inside local lets.
+The checker normalizes assigned type and multiplicity metadata before it
+validates an index Id. It checks that Id against its current lexical or
+same-module binding and preserves its Name and Unique. Ordinary expected-result
+matching selects immutable type arguments and retains the actual result type
+for final subsumption. The bounded `($)` path infers its native-anchored RHS
+once. It obtains a complete result from the expected type or a named first
+operand's fixed declared result. It retains the original operator, checks its
+representation choices and scope, and uses the ordinary argument and result
+checks. The source expressions stay unchanged. General native meta-variable
+assignment and general Quick Look over native types remain unsupported.
+
 ## Separate-module runner
 
 Run this from the repository root with matching compiler libraries.
@@ -335,6 +426,40 @@ uncons cyclic predecessor tail package: ok
 uncons cyclic predecessor head: 42
 uncons cyclic bounded prefix: [42,42,42]
 uncons bottom package: packed-bottom-package
+runtime equality zip: same Just (0,[])
+runtime equality zip: different Nothing
+runtime equality zip: different Nothing
+runtime equality zip: same Just (2,[(42,7),(42,7)])
+runtime equality zip: different Nothing
+runtime equality zip: different Nothing
+runtime equality zip: same Just (3,[(42,7),(42,7),(42,7)])
+runtime filtered zip: Just (3,[(1,10),(2,20),(3,30)])
+runtime filtered zip: Just (2,[(2,20),(3,30)])
+runtime filtered zip: Nothing
+runtime filtered zip: Just (0,[])
+equality zero successor ignores predecessor: Nothing
+equality successor zero ignores predecessor: Nothing
+equality cyclic successor zero: Nothing
+equality demands left length: packed-bottom-length
+equality demands right length: equality-right-length
+equality same index still demands length: packed-bottom-length
+equality demands left predecessor: packed-bottom-length
+equality demands right predecessor: equality-right-length
+zip mismatch ignores vectors: Nothing
+zip reversed mismatch ignores vectors: Nothing
+zip demands left package first: packed-bottom-package
+zip demands right package: zip-right-package
+zip equal result ignores vectors: ok
+zip equal package ignores vectors: ok
+zip length ignores vectors: 1
+zip vector demands left tag: zip-left-vector
+zip vector demands right tag: zip-right-vector
+zip tuple ignores components: ok
+zip demands left head: packed-filter-bottom-element
+zip demands right head: zip-right-head
+zip tail package ignores tails: ok
+zip demands left tail: zip-left-vector
+zip demands right tail: zip-right-vector
 ```
 
 These observations check this source subset. They do not establish a general

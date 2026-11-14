@@ -280,24 +280,24 @@ be equal only under a local Given. The exact immutable result matcher cannot
 select the shared type argument in that case. Ordinary instantiation would
 allocate a meta-variable that the retained-index fill check must reject.
 
-The constructor fallback matches corresponding result arguments separately.
+The result fallback matches corresponding result arguments separately.
 It selects the first candidate for each outer invisible binder. Every binder
 must have a candidate. The complete substitution must satisfy the substituted
 binder kinds and the existing local runtime-index scope check. No template
 binder can remain free in the candidates. The fallback requires NoQL, an actual
-data constructor, a saturated ordinary algebraic result of the same datatype,
-and no pending type arguments, native template, or constraints. Constructors
-with concreteness requirements keep ordinary instantiation.
+data constructor or known ordinary Id, a saturated ordinary algebraic result
+of the same datatype, and no pending type arguments, native template, or
+constraints. Heads with concreteness requirements keep ordinary instantiation.
 
 The fallback emits ordinary type applications and preserves the actual
-substituted constructor type. `finishAppWithCache` still runs `checkResultTy`
+substituted function type. `finishAppWithCache` still runs `checkResultTy`
 against the original expected type. Ordinary subsumption must prove every
 remaining equality. Candidate selection supplies no evidence. Both a false
 `n :~: S n` proof and an unproved right-unit `Refl` must fail at the expression.
-See Note [Retained constructor instantiation candidates] in `GHC.Tc.Gen.App`.
+See Note [Retained instantiation candidates] in `GHC.Tc.Gen.App`.
 
-The constructor change does not assign retained syntax to ordinary argument
-meta-variables. Generic consumers use the separate immutable route below.
+The fallback does not assign retained syntax to ordinary argument
+meta-variables. Argument-directed consumers use the separate immutable route below.
 
 The proof is a lifted value. Matching `Refl` forces it and introduces an ordinary
 GADT CoVar only within its alternative. Merely receiving a proof, or checking it
@@ -1071,6 +1071,28 @@ match their types. The cache retains checked expressions and usage records.
 Payload arguments still use expected-type checking. These routes require
 `NoQL`; argument-directed matching also requires the experimental flag.
 The mutable unifier's index escape checks remain unchanged.
+
+Normalize an index Id's assigned type and multiplicity metadata before these
+checks. Preserve its Name and Unique. Validate immutable choices against the
+current lexical or same-module binding. Imported GlobalIds, linear indices,
+unresolved domains and stale bindings remain invalid. A known ordinary Id can
+also supply an algebraic result candidate when its index is determined but
+an ordinary payload type is unresolved. Keep the actual instantiated type.
+Final subsumption solves ordinary payload equalities and verifies all index
+equalities. This does not establish equality between independent runtime Ids.
+
+A fully applied wired-in `($)` can use this immutable path with a complete
+known result and a named native-anchored right operand. A fixed result can
+come from the expected type or the first operand's declared ordinary result.
+The checker reads that signature without elaborating the first operand.
+It matches kinds before types, checks every type choice and original concrete
+representation requirement, then instantiates the original operator. It uses
+NoQL through final checking and emits the cached right operand's usage once.
+Higher-rank callback domains retain expected checking. A failed candidate
+keeps its already elaborated operand on one NoQL fallback path. General
+native Quick Look and mutable native type assignments remain gated. See
+Notes [Native index bindings during typechecking] and
+[Immutable native dollar applications] in `GHC.Tc.Gen.App`.
 
 Ambiguity checking opens each retained binder with one shared opaque runtime Id.
 It compares ordinary arrows under those Ids and retains the outer erased
