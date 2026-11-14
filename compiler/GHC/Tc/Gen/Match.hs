@@ -574,7 +574,7 @@ retainedMatrixColumn plan (MG { mg_alts = L _ rows })
     constructor_pattern (L _ ConPat{}) = True
     constructor_pattern _ = False
 
--- | Check a two-index matrix with an optional final variable equation.
+-- | Check a two-index matrix with an optional variable or wildcard fallback.
 -- See Note [Retained constructor matrices].
 tcRetainedMatrixMatches :: Id -> (Int, Id) -> [ExpPatType] -> [ExpPatType]
                        -> [RetainedConArg] -> ExpRhoType
@@ -623,7 +623,7 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
       { m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
       = setSrcSpanA match_loc $
         do { (first, second) <- row_patterns match
-           ; if bare_variable first && bare_variable second
+           ; if fallback_pattern first && fallback_pattern second
              then do { unless (position == length matches) $
                          setSrcSpanA (getLoc first) $
                            failWithTc (TcRnRetainedQuantificationError RetainedMatrixFallback)
@@ -633,9 +633,10 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                      ; return (Just (one, two)) } }
     constructors _ (L match_loc _) = setSrcSpanA match_loc coverage_error
 
-    bare_variable :: LPat GhcRn -> Bool
-    bare_variable (L _ VarPat{}) = True
-    bare_variable _ = False
+    fallback_pattern :: LPat GhcRn -> Bool
+    fallback_pattern (L _ VarPat{}) = True
+    fallback_pattern (L _ WildPat{}) = True
+    fallback_pattern _ = False
 
     resolve index pat = setSrcSpanA (getLoc pat) $
       do { con <- tcRetainedCon (varType index) pat
@@ -666,8 +667,9 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                              ; case unLoc first of
                                  VarPat _ (L _ name) ->
                                    return ((name, idName first_index) : later_names)
+                                 WildPat{} -> return later_names
                                  _ -> pattern_error }
-           ; unless (null names) $
+           ; when (isNothing row || not (null names)) $
                case retainedMatchQuotation match of
                  Nothing -> return ()
                  Just span -> setSrcSpan span $
@@ -696,10 +698,14 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                                      RetainedConValue -> pSnd (coercionKind co)
                                      _ -> ty))) plan arg_tys arg_cos
                  first_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType first_index))
-                 renamed = renameRetainedMatch names match
+                 renamed@(Match { m_pats = L renamed_loc renamed_pats })
+                   = renameRetainedMatch names match
+                 prepared = case row of
+                   Just _ -> renamed
+                   Nothing -> renamed { m_pats = L renamed_loc (bind_wildcards 0 renamed_pats) }
            ; L checked_loc checked <- tcMatchWithSource tcBody
                  (invis_pat_tys ++ first_arg : refined_args)
-                 (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc renamed)
+                 (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc prepared)
            ; let Match { m_pats = L pats_loc checked_pats, m_grhss = grhss } = checked
                  wrap_index _ Nothing pat = pat
                  wrap_index index (Just cv) (L pat_loc pat)
@@ -718,6 +724,20 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                    = L rhs_loc (GRHS x guards (mkLHsWrapCo (mkSymCo result_co) rhs))
            ; return (L checked_loc (checked { m_pats = L pats_loc checked_pats'
                        , m_grhss = grhss { grhssGRHSs = fmap cast_rhs (grhssGRHSs grhss) } })) }
+
+    -- Bind each selected anonymous index to its existing shared Id.
+    bind_wildcards :: Int -> [LPat GhcRn] -> [LPat GhcRn]
+    bind_wildcards _ [] = []
+    bind_wildcards column (pat@(L pat_loc inner) : pats)
+      | not (isVisArgLPat pat) = pat : bind_wildcards column pats
+      | otherwise
+      = let shared | column == 0 = first_index
+                   | otherwise = second_index
+            pat' | WildPat{} <- inner
+                 , column == 0 || column == second_column+1
+                 = L pat_loc (VarPat noExtField (L (l2l pat_loc) (idName shared)))
+                 | otherwise = pat
+        in pat' : bind_wildcards (column+1) pats
 
     check_later _ [] [] = return []
     check_later column (argument : args) (pat@(L pat_loc inner) : pats)
@@ -752,7 +772,7 @@ cannot mention that binder; its second transport is reflexive. Retained domains
 must have reflexive transport. Reject contexts in this initial matrix telescope.
 Combined dictionary bindings would need the scope of both constructor proofs.
 
-Check unique complete constructor pairs, or use a final variable equation as
+Check unique complete constructor pairs, or use a final fallback equation as
 described in Note [Retained variable fallback]. Reject mixed constructor/variable
 rows and keep bare subfields. Ordinary grouping of
 repeated constructors would alias distinct native fields and proofs. Desugar
@@ -764,7 +784,8 @@ tree precedents in docs/dependent-haskell/REFERENCES.md#two-index-constructor-eq
 
 {- Note [Retained variable fallback]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Allow one final equation with bare variables in both selected index columns.
+Allow one final equation with bare variables or wildcards in both selected
+index columns.
 Constructor rows retain their two actual-field proofs. The variable row has
 zero constructor proofs. Start its transports with nominal reflexivity; do not
 pass reflexivity to tcRetainedCoercion, which requires a constructor endpoint.
@@ -773,7 +794,12 @@ no equality, field Id or Given to that RHS.
 
 Rename both source variable Names to the shared whole-index Names before TC.
 Also rename any other retained variable columns, as in M19. Rebuild NameSets
-and reject quotations before renaming. Keep the checked index VarPats unwrapped.
+and reject quotations before renaming. Replace each selected WildPat with a
+VarPat carrying that column's existing shared Name and source span. A raw
+WildPat would not bind the Id needed by later payload and result types. Do not
+allocate a fresh Id or expose a source name for an anonymous column. Keep the
+original source Match for diagnostics. Check quotations even if both columns
+are anonymous. Keep the checked index VarPats unwrapped.
 A lazy let alias is not native index equality. Repackaging a fallback payload
 with its original index must work without an alias proof.
 
@@ -788,6 +814,9 @@ Agda's variable terminal problems and ordered catchall compilation supply the
 precedents. See docs/dependent-haskell/REFERENCES.md#ordered-variable-fallback-equations
 for pinned source ranges and GHC failure-continuation provenance. These sources
 do not establish Haskell demand; the source probes must check it separately.
+Agda's anonymous context names and GHC's variable environment and wildcard
+tidying rules supply the anonymous binder precedents. See
+docs/dependent-haskell/REFERENCES.md#anonymous-terminal-fallback-equations.
 -}
 
 -- | Resolve a constructor and its actual closed runtime field identities.

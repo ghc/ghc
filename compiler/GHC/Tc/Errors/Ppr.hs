@@ -3571,14 +3571,14 @@ pprRetainedQuantificationError reason = case reason of
     text "A retained constructor match requires one unguarded clause for each constructor of its domain."
   RetainedMatrixCoverage ->
     vcat [text "A retained constructor matrix requires one unguarded clause for each pair of constructors of its two index domains."
-         ,text "A final equation with bare variables in both index columns can cover the remaining pairs."]
+         ,text "A final equation with bare variables or wildcards in both index columns can cover the remaining pairs."]
   RetainedMatrixDuplicate ->
     text "This retained constructor pair is matched by an earlier equation."
   RetainedMatrixFallback ->
-    text "A retained constructor matrix permits only one final equation with bare variable patterns in both selected index columns."
+    text "A retained constructor matrix permits only one final equation with bare variables or wildcards in both selected index columns."
   RetainedMatrixPattern ->
     vcat [text "A retained constructor matrix requires constructor patterns in both selected index columns, with bare variable fields."
-         ,text "One final equation can use bare variables in both columns."]
+         ,text "One final equation can use bare variables or wildcards in both columns."]
   RetainedMatrixContext ->
     text "Constraints within a retained constructor matrix are not supported yet."
   RetainedCasePatterns ->
