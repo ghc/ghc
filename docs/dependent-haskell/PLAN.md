@@ -2003,6 +2003,12 @@ It is separate from argument-prefix inference and source signature support.
   Audit the existing `DepFunCo` proof and its free runtime Ids.
 - [ ] Admit only outer ordinary equality evidence that cannot contain the new
   runtime binder. Preserve the fixed closed domain, role and location context.
+  Track all active retained runtime Ids in the rewrite environment. Require a
+  Given candidate's predicate, canonical RHS and evidence coercion to have no
+  deep free occurrence of these Ids. Check variable kinds and reject coercion
+  holes in this metadata. An outer runtime index can remain in the evidence.
+  Preserve `eqCanRewriteFR` and ordinary dependency recording. Keep the ordinary
+  empty-scope path free of these additional scans.
   Keep plugins, family-cache access, fresh dependent Wanteds and mutable native
   fills gated. Update Note `[Rewriting retained dependent functions]`.
 - [ ] Compare direct and pointwise transport through a separate interface.

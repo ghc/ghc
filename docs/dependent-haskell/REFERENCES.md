@@ -2305,3 +2305,47 @@ kind, exact cached-domain, lexical runtime-Id scope and native-meta guards.
 Preserve once-only argument usage, failed-match caches and final subsumption.
 Both leading-VTA and omitted-VTA calls use the existing application pipeline.
 The separate source archive is `native-joint-prefix-prior-art-v1`.
+
+## Outer Given evidence beneath a retained Pi
+
+M32 targets existing equality evidence under a fixed-domain retained Pi.
+The M31 six-case baseline accepts pointwise transport under `a ~ b` but rejects
+returning the whole dependent function. This is an evidence restriction in
+normalization. It does not require function eta equality or a new Core form.
+
+Agda v2.8.0 [Pi comparison](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L746-L754)
+uses [domain comparison and context extension](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L849)
+before comparing codomains. The `Conversion.hs` blob is
+`69423e2c11b6f35bc5eee2d502cf2830efbc005a`.
+[`defaultAddCtx`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Monad/Context.hs#L198-L202)
+extends the context with `raiseS 1`.
+[`updateContext`](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Monad/Context.hs#L258-L265)
+updates checkpoint substitutions. The `Context.hs` blob is
+`98e50ce60319dcb47a542ac7c04b4b3e491a64e9`.
+These rules preserve outer assumptions under a new binder. They motivate the
+scope discipline. They do not prove GHC's flavour, role or coercion invariants.
+
+Agda's [propositional equality rewrite](https://github.com/agda/agda/blob/v2.8.0/doc/user-manual/language/with-abstraction.lagda.rst#L594-L606)
+uses with-abstraction and a `refl` match. The manual blob is
+`ff0888af84f3101351c501534de087c180dc7afd`.
+[`Builtin.Equality`](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Equality.agda#L5-L9)
+has blob `22d08dc45b843ed4a3bb9410d38a7508383699c2`.
+This is explicit proof elimination. GHC instead reuses an existing FC Given
+through its inert rewrite machinery. Agda's extensional term comparison does
+not establish Haskell eta or `seq` laws.
+
+The GHC baseline is commit `8e58f91009a2e789571513c3207922d43333b5b6`.
+`rewrite_tyvar2` in `GHC.Tc.Solver.Rewrite` blocks all inert rewrites beneath
+a retained binder. The M32 design replaces only this exclusion with a Given
+filter. Track every active retained runtime Id. Require deep free variables
+of the predicate, canonical RHS and coercion to exclude those Ids. Check kinds,
+CoVar metadata and coercion holes. Preserve `eqCanRewriteFR`, role conversion
+and `recordRewriter`. Evidence may contain an outer runtime index.
+
+`GHC.Core.TyCo.FVs` includes runtime Ids and deep variable types.
+`DepFunCo` binds the runtime Id throughout the body proof.
+`mkDepFunRedn` reconstructs both endpoints with `mkDepFunTy`.
+These are the existing GHC proof and substitution mechanisms. Keep plugins,
+inert-family rewrites, family-cache access, Wanted rewrites and coercion zapping
+disabled beneath retained binders. Keep `rewrite_co` as zonking only.
+The source archive is `native-pi-given-prior-art-v1`.
