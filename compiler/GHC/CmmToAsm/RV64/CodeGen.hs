@@ -668,6 +668,14 @@ getRegister' config plat expr =
             (getRegisterReg plat reg)
             nilOL
         )
+    -- BUG: neither case truncates the sum to a sub-word register's width,
+    -- except at an offset of -2048. The first sends an offset from 1 to 2047 to
+    -- MO_Add's case for a register plus a 12-bit literal, and one from -2047
+    -- to -1 to MO_Sub's, neither of which truncates (#28133); -2048 goes to
+    -- MO_Sub's general case, which does. cmmMachOpFoldM in GHC.Cmm.Opt folds
+    -- a sub-word register plus a literal into a CmmRegOff. The bits above the
+    -- width break the invariant of Note [Signed arithmetic on RISCV64], which
+    -- is wrong code where they are read.
     CmmRegOff reg off | isNbitEncodeable 12 (fromIntegral off) -> do
       getRegister' config plat
         $ CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]

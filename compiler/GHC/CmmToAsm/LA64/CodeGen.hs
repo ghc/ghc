@@ -546,6 +546,13 @@ getRegister' config plat expr =
                                 nilOL
                          )
 
+    -- BUG: neither case truncates the sum to a sub-word register's width, the
+    -- first going to MO_Add's case for a literal of 12 bits, which extends its
+    -- operand and does not truncate, where intOp truncates a sub-word MO_Add;
+    -- and cmmMachOpFoldM in GHC.Cmm.Opt folds a sub-word register plus
+    -- a literal into a CmmRegOff. The bits above the width break the invariant
+    -- stated under "Signed arithmetic on LoongArch64" above getRegister', which
+    -- is wrong code where they are read.
     CmmRegOff reg off | isNbitEncodeable 12 (fromIntegral off) -> do
       getRegister' config plat
         $ CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
