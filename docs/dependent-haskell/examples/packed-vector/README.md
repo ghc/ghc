@@ -273,7 +273,7 @@ sameNat Z Z = Just Refl
 sameNat (S left) (S right) = case sameNat left right of
     Nothing -> Nothing
     Just Refl -> Just Refl
-sameNat left right = Nothing
+sameNat _ _ = Nothing
 
 -- | Pair elements of ordinary vectors with one shared length index.
 zipVec :: Vec a n -> Vec b n -> Vec (a, b) n
@@ -905,7 +905,27 @@ fallback. Four finite pairs and seven demand checks establish that an absent
 first constructor can leave the second index untouched. They also check
 partial function WHNF and package laziness at partial mismatch indices.
 
-Only one final row with bare variables in both selected index columns is
-supported here. Constructor pairs before it remain unique. A row with one
-constructor and one variable still rejects. Anonymous `_` patterns remain
-the next source task. No equality follows from a let alias or a failed row.
+M21 admitted one final row with bare variables in both selected index columns.
+Constructor pairs before it remain unique. A row with one constructor and one
+variable still rejects. M22 extends the fallback below. No equality follows
+from a let alias or a failed row.
+
+
+## Anonymous final equation
+
+M22 uses `sameNat _ _ = Nothing`. A selected fallback column can contain a
+bare variable or wildcard. Anonymous columns get internal VarPats with the
+existing whole-index Ids before TC. They add no source-visible name and no
+constructor equality. The original source equation remains available for errors.
+
+Both compiler stages pass 331 source observations; the original 316 remain
+unchanged. `sameNatByVariables`, `sameNatByMatrix` and `sameNatByCase` retain
+the named fallback, four-clause and nested-case references. `fallbackFirst`
+and `fallbackSecond` check named-index package identity beside an anonymous
+index. `zeroOnlyAnonymous` checks a both-wildcard fallback against `zeroOnly`.
+Four runtime pairs and eleven demand observations check finite results, partial
+function WHNF, lazy payload fields and selective index demand.
+
+Unsigned local vector bindings still reject inferred retained types. The probe
+passes inline payload expressions to the workers. Complete local payload
+signatures that mention an ambient runtime index remain the next source task.

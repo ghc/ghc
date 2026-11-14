@@ -70,7 +70,12 @@ M19's compiler is `fdf23acaea`, with comment cleanup at `a367bd0a7a`.
 Both compiler stages pass 269 source observations, and the runtime fixtures
 pass 55 package/bound rejections. All five registered regressions pass.
 Constructor equations accept later retained variables and preserve contexts.
-Next, M20 probes four constructor equations for `sameNat` over both indices.
+M20 verifies four constructor equations for `sameNat`; M21 verifies a final
+named fallback. M22 verifies anonymous fallback columns with 331 source
+observations, 76 API package/bound rejections and 42 standalone located errors
+in both stages. All five registered regressions pass. The original 316 source
+outputs remain unchanged. M23 next addresses complete local payload signatures
+that refer to an already-bound runtime index.
 
 ## Direction and boundaries
 
@@ -1503,7 +1508,8 @@ identity, not aliases. Reject a forged fallback `Refl` and wrong-index payloads.
 
 ### M22: anonymous terminal fallback
 
-This target is unverified. Permit `VarPat` or `WildPat` in each selected
+Verified with frontend `7b7586bfe0` and source/fixture `2435b1a7df`. Both
+compiler stages and all five registered regressions pass. Permit `VarPat` or `WildPat` in each selected
 index column of the one terminal fallback. This includes `_ _`, `left _`
 and `_ right`. Keep constructor/variable and constructor/wildcard rows,
 guards and interior contexts outside this probe. Preserve M21 evidence.
@@ -1527,15 +1533,46 @@ unselected retained-pattern restrictions remain in force.
 Follow [the pinned anonymous-context and GHC wildcard rules](REFERENCES.md#anonymous-terminal-fallback-equations).
 No new Core, backend, interface or equality rule is proposed.
 
-- [ ] Inspect Agda's anonymous variable handling and GHC's wildcard tidying.
+- [x] Inspect Agda's anonymous variable handling and GHC's wildcard tidying.
   Record the provenance before selecting generated index binders. A wildcard
   must preserve the shared whole-index identity without introducing equality.
-- [ ] Check final variable/wildcard combinations against the original result
+- [x] Check final variable/wildcard combinations against the original result
   type. Keep diagnostics at the source wildcard or RHS. Reject a forged
   fallback `Refl` and preserve payload scope.
-- [ ] Compare the wildcard worker with named fallback, four-clause and case
+- [x] Compare the wildcard worker with named fallback, four-clause and case
   references. Preserve partial WHNF, missing-constructor demand and the order
   of failures. Run both compiler stages and the five registered regressions.
+
+### M23: checked local payload signatures
+
+This target is unverified. Support a complete local value signature that
+mentions an already-bound eligible runtime index. Use ordinary local signature
+syntax under `ExperimentalDependentTypes`:
+
+```haskell
+n <- readIORef cell
+let xs :: Vec Int n
+    xs = replicateNative @Int n 7
+```
+
+Agda checks the declared type in the current context, then checks the value
+against it. Follow [the pinned checked-let rules](REFERENCES.md#checked-local-payload-signatures).
+GHC must use the actual local index Id. Do not unfold the index's RHS or derive
+index equality from a let alias. Unsigned inference remains a separate task.
+
+- [ ] Resolve an otherwise-unbound local signature index against an eligible,
+  already-bound local term Name. Preserve erased type-variable precedence,
+  lexical shadowing and normal behavior outside the experimental flag. Do not
+  infer a fresh erased forall for a captured runtime index.
+- [ ] Check the actual local Id's scope, supported domain and unrestricted
+  multiplicity before constructing its TermVarTy. Reject globals, forward
+  references and same-group unavailable binders at their source locations.
+  Keep the existing inferred-type and native-meta restrictions. Add a GHC Note
+  that states these scope rules and the distinction from definitional equality.
+- [ ] Use the signed local payload twice after reading its index from IORef.
+  Check wrong-index payloads, shadowed Names, bottom and cyclic indices,
+  payload sharing and signature errors. Preserve source demand, both compiler
+  stages and the existing registered regressions. No Core change is planned.
 
 ## Further work
 

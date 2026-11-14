@@ -1745,8 +1745,9 @@ fields and proofs. This change adds no backend or Core rule.
 
 ## Anonymous terminal fallback equations
 
-Status: unverified M22 plan. Admit variables and wildcards in the two selected
-columns of the one terminal fallback. Keep constructor prefixes unchanged.
+Status: verified M22, frontend `7b7586bfe0`, source/fixture `2435b1a7df`.
+Both compiler stages pass variables and wildcards in the two selected columns
+of the one terminal fallback. Constructor prefixes remain unchanged.
 
 Agda v2.8.0 [`LHS.hs`, lines 291–306](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L291-L306)
 treats `A.VarP` and `A.WildP` as solved patterns.
@@ -1771,7 +1772,7 @@ File blob: `c3ae336c9b2a0f9f55a0fc879905480414be544a`.
 tidies a wildcard with an identity wrapper and a variable with `bindMatchId`.
 File blob: `f6c63c37c5cfae10d11a9dde22829ae25adf3106`.
 
-The planned GHC adaptation replaces each selected wildcard with the existing
+The GHC adaptation replaces each selected wildcard with the existing
 shared index `VarPat` before TC. It adds no source-visible name, fresh index Id
 or alias. Both typed index patterns remain outermost and unwrapped. The fallback
 has zero constructor proofs and reflexive transports. Check its incoming result
@@ -1779,5 +1780,31 @@ type without evidence from failed rows. Preserve source lambdas and ordered
 failure continuations. Keep the original Match through `tcMatchWithSource` for
 errors. Reject quotations even when neither column has a source variable Name.
 Constructor/wildcard rows and other pattern extensions remain outside M22.
-No Core form or equality rule changes. Runtime and located-error verification
-remain pending.
+No Core form or equality rule changes. Both stages pass 331 source
+observations and 42 standalone located errors. The API/runtime fixture passes
+76 package/bound rejections. All five registered regressions pass.
+
+
+## Checked local payload signatures
+
+Status: unverified M23 plan. A complete local signature should refer to an
+eligible runtime index that is already in lexical scope. Unsigned local values
+remain outside this target.
+
+Agda v2.8.0 [`Rules/Term.hs`, lines 1662–1672](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L1662-L1672)
+checks a let binding's declared type in the current context. It checks the RHS
+against that type before extending the context with the checked value.
+File blob: `02991c9fa0085315cc854d2833a9080af14a7740`.
+[`Monad/Context.hs`, lines 434–438](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Monad/Context.hs#L434-L438)
+stores the value and type with `makeOpen` in the lexical let environment.
+File blob: `98e50ce60319dcb47a542ac7c04b4b3e491a64e9`.
+The full tagged sources and their blob checks are retained with M22 evidence.
+
+The proposed GHC adaptation uses the actual local runtime Id in TermVarTy.
+Agda's context discipline supplies the scope precedent. Its transparent lets
+and totality rules do not justify unfolding Haskell values or equating aliases.
+The implementation must preserve Haskell laziness and ordinary type-variable
+shadowing. It needs a source-name capture rule and a checked local index
+environment. Existing foreach-local signature environments start empty outside
+their own telescope, so an ambient `xs :: Vec Int n` is currently unsupported.
+No inference, Core, backend or interface extension is proposed for M23.
