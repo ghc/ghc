@@ -18,6 +18,7 @@ module GHC.Tc.Gen.Match
    , tcCaseMatches
    , tcRetainedCase
    , tcLambdaMatches
+   , tcMatches
    , tcGRHSNE
    , tcGRHSsPat
    , TcStmtChecker

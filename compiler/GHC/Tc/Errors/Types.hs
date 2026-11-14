@@ -5317,6 +5317,7 @@ data RetainedQuantificationError
   | RetainedConstraintType Type
   | RetainedPragma
   | RetainedInference Type
+  | RetainedCallbackResult Type
   | RetainedInvalidBinder Id
   | RetainedIndexOutOfScope Id
   | RetainedPartialSignature

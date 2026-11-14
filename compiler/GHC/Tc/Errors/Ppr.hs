@@ -3555,6 +3555,9 @@ pprRetainedQuantificationError reason = case reason of
   RetainedInference ty ->
     vcat [ text "This inferred retained type requires an explicit signature:"
          , ppr ty ]
+  RetainedCallbackResult ty ->
+    vcat [ text "The inferred callback result contains a runtime index outside the application scope:"
+         , ppr ty ]
   RetainedInvalidBinder var ->
     text "A retained index must be a local, unrestricted value of a supported algebraic domain:" <+> ppr var
   RetainedIndexOutOfScope var ->
