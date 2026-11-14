@@ -6,7 +6,7 @@ from Eisenberg's historical `nokinds-pi` work, ported and completed on current
 GHC. Keep the validated `singletons` encoding as a comparison implementation.
 The current source subset includes runtime Peano naturals and length-indexed vectors.
 
-Last updated: 2026-11-14.
+Last updated: 2026-11-15.
 
 ## Project documents
 
@@ -14,6 +14,7 @@ Last updated: 2026-11-14.
 - [References](REFERENCES.md): annotated sources, reading order, and status dates.
 - [Paper reading ledger](papers/README.md): conference-paper findings, thesis sections and version hashes.
 - [Packed vector source example](examples/packed-vector/README.md): producer, consumer, runtime observations, and a separate-module runner.
+- [Qualified retained functions](examples/qualified-pi/README.md): dictionary demand, lazy transport and function identity through separate interfaces.
 - [Historical port](PORT.md): pinned commits, module mapping, and missing rules.
 - [Restricted Core](CORE.md): representation, typing, substitution, and gates.
 - This file: current status, validation results, and instructions to resume work.
@@ -40,7 +41,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M33 passes both compiler stages and all five registered regressions; 562 source observations, 177 located rejections and 210 package / 291 total API rejections |
+| Last verified checkpoint | M34 source/runtime checkpoint passes both stages and focused regressions; 562 previous plus 22 new runtime observations; qualified-Pi witness callers remain open |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -66,7 +67,8 @@ Last updated: 2026-11-14.
 | Outer Given evidence | Existing scoped equalities normalize retained function bodies; direct transport preserves bottom-function WHNF and runtime identity |
 | Written runtime index types | Complete visible type arguments capture lexical indices; shadowing, generated wildcards and staging checks pass |
 | Native Pi equality operands | Complete checked Pi type arguments and immutable Given rewriting beneath another retained binder pass; native meta assignments remain blocked |
-| Next task | M34: qualified retained function types; the measured equality examples reject with GHC-91510 before solver rewriting |
+| Qualified retained functions | Known monomorphic variables, immutable Given transport and synonym expansion pass; ordinary dictionaries preserve the tested demand and sharing behavior |
+| Next task | M35: exact expected matching through algebraic containers, then the remaining M34 proof-demand and tuple runtime checks |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -3207,3 +3209,83 @@ The [paper ledger](papers/README.md) now records five conference papers and
 selected thesis chapters, with eight distinct PDF versions. Their typing,
 role and erasure results guide the implementation. They do not establish
 preservation, termination or a runtime correspondence theorem for this fork.
+
+## M34: qualified retained function transport
+
+This is a verified source/runtime checkpoint. M34 remains open for witness
+construction and proof-demand checks. Both compiler stages build with the
+selected 37 compiler inputs from `9cbab37151`. Later commits add source
+controls and documentation without changing those compiler inputs.
+
+A producer can export `QPi = foreach (n :: Nat) -> Eq Int => Vec Int n` and
+transport a value through an incoming `value ~ QPi` assumption. The producer
+uses `ImpredicativeTypes` for this equality operand. A separate consumer with
+`NoImpredicativeTypes` specializes the helper from its complete expected arrow.
+Run the [source example](examples/qualified-pi/README.md) to inspect this path.
+
+A known monomorphic variable needs no type instantiation. The application
+checker uses `NoQL` for that restricted case. It preserves final subsumption
+and returns an existing type through the ordinary inference result when
+needed. Deep free-variable checks exclude existing Quick Look instantiation
+variables. Applied, polymorphic and leading-context heads retain their guards.
+This does not add general native Quick Look or infer new native function types.
+
+The immutable native Given check now traverses ordinary dictionary arrows.
+It also expands native synonyms before the non-tau constructor guard. The
+expanded predicate and result retain the existing occurs, role, scope and
+multiplicity checks. The mutable native-meta guard remains active. There is
+no new Core constructor, interface schema or function eta expansion.
+
+| Check | Result |
+| --- | --- |
+| Compiler stages | Bootstrap and self-hosted builds pass |
+| Previous packed-vector executable | 562 observations per stage, unchanged |
+| Qualified retained executable | 22 observations per stage through separate interfaces |
+| Focused source cases | 26 per stage: 13 accepted, 13 rejected or currently unsupported |
+| Located diagnostic envelopes | 14 in those rejection cases; the inferred alias has two |
+| Previous Pi operand matrix | 42 per stage: 21 accepted and 21 rejected |
+| Previous standalone rejections | All 177 per stage retained, including those 21 |
+| Other retained controls | 104 compile positives, four ordinary runtime controls and two cache traces per stage |
+| API source inventory | 221 package and 302 total rejection programs; 35 quiet positives |
+| API golden | 37 lines, unchanged |
+| Focused registered regressions | Five passes across 39 cases, with 34 skips |
+| Changed registered fixture | Retested after strengthening: one pass across 11 cases, with 10 skips |
+| Full GHC suite | Not run |
+
+API inventory counts come from the fixture structure and successful runs.
+They are not printed runtime counters. The final bootstrap API run and the
+self-hosted registered fixture pass the strengthened occurrence controls.
+All focused runs have zero unexpected or framework failures and warnings.
+
+The runtime example covers finite independent indices, ignored and demanded
+bottom, cyclic prefixes, partial application, payload sharing and two function
+`StableName` comparisons at `-O0`. Six observations use `withDict` and a
+single-method `Demand` class. They distinguish vector shape from method demand.
+They do not inject a bottom global `Eq Int` dictionary.
+
+The two isolated predicate-occurrence controls keep the vector element type
+unchanged. Both reject at the final `f`. The synonym trace records
+`cteInsolubleOccurs` and keeps an `IrredCt`; the successful beneath-binder trace
+keeps an `EqCt`. This checks the recursive predicate boundary separately from
+an unrelated element-type mismatch.
+
+`withQ` checks an incoming equality witness. Separate `Refl` and bottom-proof
+callers at `QPi :~: QPi` still reject with GHC-91028. Proof demand and proof order
+remain unverified for that caller path. The original tuple-under-Pi source
+shape compiles, but the runtime example uses an ordinary vector argument there.
+The [M35 plan](PLAN.md#m35-exact-matching-through-algebraic-containers) keeps
+these acceptance checks open and specifies the next exact-matching extension.
+
+The [paper ledger](papers/README.md) now records seven works and nine downloaded
+PDF versions, including the corrected author copy of the Quick Look paper.
+It records authors, publication versions, hashes and selected reading ranges.
+The [provenance section](REFERENCES.md#qualified-retained-function-types)
+separates the Agda context rules, the paper algorithm and this GHC adaptation.
+No paper theorem is claimed for this implementation.
+
+Evidence is isolated under `_build/verification/native-qualified-pi-*`.
+Earlier failed probes and superseded input archives remain available.
+The M33 manifests and committed source/documentation versions are preserved.
+The compiler build used the serial 16 GiB cap and peaked at 4892 MiB.
+The final API and affected regression used the serial 4 GiB cap and peaked
+at 1123 MiB. Both scopes disabled swap and exited successfully.

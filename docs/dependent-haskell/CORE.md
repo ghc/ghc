@@ -1277,3 +1277,60 @@ check its constraints in the current index scope. Later binders enter only the
 body. Ordinary qualified bodies without retained syntax use the existing kind
 checker. See [the exact provenance](REFERENCES.md#later-retained-arguments-in-constructor-equations).
 No new Core rule or interface schema is required.
+
+## Qualified retained function types
+
+M34 permits a qualified body such as
+`foreach (n :: Nat) -> Eq Int => Vec Int n` in the checked native type positions.
+In an equality operand, `ImpredicativeTypes` admits this type but normally
+enables Quick Look even for a bare variable. A known variable can need
+conversion without type instantiation.
+
+Select `NoQL` only for an actual `HsVar` with no arguments and no leading
+`forall` or context. Require native syntax in its actual type or an available
+expected type. Zonk these types and use the native-aware `tyCoVarsOfTypesList`
+traversal to exclude free QL instantiation variables. Do not use the unsupported
+QL traversal for this guard. In `Check` mode, retain final subsumption and
+native evidence capture. In inference mode, return the variable's existing
+type through `InferResult`. Read an available expected type without allocating
+an inference cell. Preserve promotion, level, runtime-representation and branch
+checks. Do not eta-expand the variable. Other applications keep their QL guards.
+See Note
+[Known native variables with ImpredicativeTypes] in `GHC.Tc.Gen.App`.
+
+The immutable native Given RHS check can recurse through an invisible
+dictionary arrow. Check its multiplicity, predicate and result with the same
+flags. Preserve the complete `FunTy` reduction. This checks an existing Given
+with a type-variable LHS; it neither solves a dictionary obligation nor assigns
+a type metavariable. On this path, expand synonyms with `coreView` before the
+`isTauTyCon` rejection. Recheck the expanded RHS so occurrences in predicates
+and results remain visible. Other checks retain their ordinary synonym policy.
+
+Keep the existing role, occurs, multiplicity and predicate checks. Preserve the
+scoped Given rewrite filter beneath retained binders. Disable native family
+cycle breaking because restoring a cycle breaker writes a metavariable.
+Ordinary erased `forall` handling stays unchanged; the native Given RHS check
+still rejects `ForAllTy`. Wanted and mutable native-meta checks keep their
+restrictions. `Coercible` does not establish nominal equality. See Note
+[Rigid retained indices] in `GHC.Tc.Utils.Unify`.
+
+Dictionaries use the existing ordinary evidence arrows. This increment adds
+no Core constructor or interface schema. Agda's telescope and instance-argument
+rules guide context order and scope. They do not identify Haskell dictionaries
+with FC equality evidence. Quick Look's `h-var` and `iresult` supply the
+no-instantiation precedent (Figures 3–4, printed pages 89:7–89:8). Its algorithm
+retains final result equality (Figure 7, page 89:19) and dictionary entailment
+(section 8, pages 89:21–89:22). Section 5.8 records the semantic effect of eta
+expansion (page 89:15). These are design precedents, not a soundness theorem for
+our native types. See [the exact provenance](REFERENCES.md#qualified-retained-function-types).
+
+Both compiler stages check 26 focused source cases: 13 are accepted and 13 are
+rejected or unsupported. The 22 runtime observations and the previous
+562-observation program pass. `sameFunction` reports two `True` results
+at `-O0`; this records the tested named closures. The API fixture and all five
+focused registered regressions pass. The full GHC suite was not run.
+
+`ReflClient` and `BottomProofClient` still reject with GHC-91028 when constructing
+`QPi :~: QPi`. This checkpoint does not check proof demand or proof-before-result
+order for those values. Checked construction and demand of boxed qualified-Pi
+equality proofs remain the next boundary.

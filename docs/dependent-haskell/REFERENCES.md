@@ -2576,3 +2576,20 @@ perform the same recursive check as for the written RHS. Preserve occurrence
 checks inside predicates and results. All other paths keep the existing
 synonym policy. See Notes [Rigid retained indices] and
 [Forgetful synonyms in checkTyConApp] in `GHC.Tc.Utils.Unify`.
+
+The current M34 checkpoint passes 26 source cases in both compiler stages:
+13 compile and 13 reject or record unsupported inference forms. Synonym
+controls distinguish an unused parameter from a real occurrence in a
+predicate. Both stages pass the 562 previous source observations and 22
+new runtime observations. The six dictionary observations use ordinary
+`GHC.Exts.withDict` with a single-method class. The two function-identity
+observations pass at `-O0` after forcing the compared values. These are
+program observations, not a general sharing theorem.
+
+The source helper with an incoming `:~:` proof compiles. Its separate `Refl`
+and bottom-proof callers still reject with GHC-91028. Do not claim proof
+demand for those callers. The next task extends exact expected matching
+through ordinary algebraic containers; general native Quick Look and
+native mutable-meta assignment remain separate work. See the
+[source example](examples/qualified-pi/README.md) and
+[M35 plan](PLAN.md#m35-exact-matching-through-algebraic-containers).

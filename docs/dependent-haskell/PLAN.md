@@ -2108,6 +2108,10 @@ structural retained unification or optimizer transformations.
 
 ### M34: qualified retained function types
 
+This task remains open at a verified source/runtime checkpoint. Declaration
+checking and transport pass. Construction and demand of a qualified-Pi
+equality witness require M35 below.
+
 The measured six-case baseline agrees in both stages. An ordinary qualified
 arrow compiles. Direct and beneath-binder Givens, a `Refl` witness and a
 recursive qualified-Pi assumption reject with GHC-91510 at the signature's
@@ -2137,21 +2141,54 @@ Read an available expected type without allocating a new cell. Preserve
 promotion, level, representation and branch checks. This does not infer a
 new native function type or instantiate a polymorphic head.
 
-- [ ] Pin the source-validity rule and GHC's ordinary dictionary elaboration.
+- [x] Pin the source-validity rule and GHC's ordinary dictionary elaboration.
   Compare the Agda hidden/instance distinction and the paper binder properties.
   Keep visibility, evidence kind and runtime retention separate. The D/DC/DR
   coercion quantifier is not a general Haskell class context.
-- [ ] Specify the checked qualified-Pi subset before changing admission.
+- [x] Specify the checked qualified-Pi subset before changing admission.
   Preserve ordinary erased-forall restrictions, complete arguments, dictionary
   scope, roles, occurs checks and the native-meta guard. Trace formation first;
   change immutable Given recursion only if a later probe demonstrates a need.
-- [ ] Run direct and pointwise source controls through separate interfaces.
-  Check dictionary demand, proof demand, bottom-function WHNF, ignored indices
-  and sharing. Pin invalid scope and no-proof diagnostics in both stages.
-  Rebuild and run the existing focused regressions before recording completion.
+- [x] Run direct and beneath-binder transport through separate interfaces.
+  Both stages pass 26 source cases: 13 accepted and 13 rejected or currently
+  unsupported. Check dictionary demand, bottom-function WHNF, ignored indices,
+  payload sharing and function identity with 22 runtime observations. Preserve
+  the 562 existing source observations. The API fixture and all five focused
+  registered regressions pass. The full GHC suite was not run.
+- [ ] Complete the source witness callers and check proof demand. Run the
+  original tuple-under-Pi shape at runtime. Keep these checks open while the
+  `Refl` and bottom-proof clients reject with GHC-91028.
 
 See [the paper reading](papers/README.md) and
 [the measured baseline](REFERENCES.md#retained-function-types-as-equality-operands).
+
+### M35: exact matching through algebraic containers
+
+The imported `withQ` helper typechecks. Its callers cannot yet instantiate
+`QPi :~: QPi` through the complete expected type. The result eligibility
+predicate in `GHC.Tc.Gen.App` does not traverse a non-tau algebraic container.
+This blocks the existing exact immutable matching route before proof demand
+can be tested. The function-identity client already works; it is not evidence
+for this proposed extension.
+
+- [ ] Preserve the measured `Refl` and bottom-proof failures. Pin the Agda
+  argument-checking comparison and the existing GHC matching rules.
+- [ ] Extend only `isRetainedValueType` eligibility for exactly saturated
+  algebraic containers of lifted result kind. Keep the ordinary `isTauTy`
+  fast path. Recurse through each argument with the unchanged incoming
+  `under_pi` flag. A Pi in one argument must not admit a qualified sibling.
+  Exclude new class, family, unsaturated and nonlifted cases. This does not
+  change `isTauTy`, Quick Look, source formation, candidate matching, coercion
+  roles, scope checks or the mutable native-meta guard.
+- [ ] Cover both existing callers: expected result matching and worker
+  specialization. Use an imported tuple consumer and complete nested-container
+  expected arrows. Keep erased forall, wrong-index, predicate, scope and
+  nominal/representational rejection controls. If newtype containers enter
+  the supported subset, check bottom preservation.
+- [ ] Run `Refl`, ignored bottom proof and demanded bottom proof through
+  separate interfaces. Add the original tuple-under-Pi runtime case. Update
+  the existing API fixture and run both compiler stages and the focused
+  regressions before closing M34.
 
 ## Further work
 
