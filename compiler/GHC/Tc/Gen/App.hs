@@ -1490,14 +1490,16 @@ For example, observeVec :: forall n. Vec Int n -> IO String needs the index
 from its argument. Under ExperimentalDependentTypes and NoQL, infer arguments
 whose formal types mention outer invisible index binders. Match their actual
 types against the formal types with an immutable substitution. A retained
-expected result can supply additional bindings. Apply the substitution only
-when every binder is determined and its kind and local runtime scope agree.
+expected result can supply additional bindings. Native index binders must be
+determined. An anchored generic consumer can use fresh ordinary parameters as
+described in Note [Ordinary parameters in native applications]. Each final
+choice must have the correct kind and local runtime scope.
 
 Save the typed arguments and their usage environments. tcValArgsWithCache
 checks each saved type by subsumption and emits its usage under the final
 argument multiplicity. It does not typecheck the source expression again.
 Other arguments retain ordinary expected-type checking. If matching fails or
-leaves binders undetermined, ordinary instantiation checks the same cached
+leaves index binders undetermined, ordinary instantiation checks the same cached
 arguments. The ordinary unifier still rejects retained meta-variable fills.
 
 Only saturated ordinary monomorphic arrows without explicit type arguments
@@ -1877,10 +1879,12 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
                    matched = foldM (\subst (formal, actual) ->
                                tcMatchTyX_BM (bind_outer tvs) subst formal actual)
                              initial_subst (zip templates actual_tys)
-             ; case matched of
-                 Just subst
-                   | Just inst_tys <- traverse (Subst.lookupTyVar subst) tvs
-                   , index_route || any (hasNativeDependentExpr . Core.Type) inst_tys
+             ; choices <- case matched of
+                            Just subst -> tcRetainedArgChoices index_route tvs subst
+                            Nothing -> return Nothing
+             ; case choices of
+                 Just (subst, inst_tys)
+                   | index_route || any (hasNativeDependentExpr . Core.Type) inst_tys
                    , not nested || any (hasNativeDependentExpr . Core.Type) inst_tys
                    , and (zipWith (kind_agrees subst) tvs inst_tys)
                    , and (zipWith (\formal actual -> eqType (Subst.substTy subst formal) actual)
@@ -1928,6 +1932,43 @@ tcRetainedArgInstEnabled NoQL expected rn_head args fun sigma
     infer_args tvs inferable domains pos (_ : args)
       = infer_args tvs inferable domains pos args
 tcRetainedArgInstEnabled _ _ _ _ fun sigma = return (fun, sigma, [], Nothing)
+
+-- | Preserve matched native choices and freshen undetermined ordinary binders.
+-- See Note [Ordinary parameters in native applications].
+tcRetainedArgChoices :: Bool -> [TyVar] -> Subst.Subst
+                    -> TcM (Maybe (Subst.Subst, [Type]))
+tcRetainedArgChoices index_route tvs subst
+  | Just choices <- traverse (Subst.lookupTyVar subst) tvs
+  = return (Just (subst, choices))
+  | not index_route
+  , any (hasNativeDependentExpr . Core.Type)
+        [ty | tv <- tvs, Just ty <- [Subst.lookupTyVar subst tv]]
+  = do { (subst, choices) <- mapAccumLM choose subst tvs
+       ; return (Just (subst, choices)) }
+  | otherwise = return Nothing
+  where
+    choose subst tv
+      | Just ty <- Subst.lookupTyVar subst tv = return (subst, ty)
+      | otherwise = do { (subst, tv) <- newMetaTyVarX subst tv
+                       ; return (subst, mkTyVarTy tv) }
+
+{- Note [Ordinary parameters in native applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A known action IO (Vec Int n) determines m and a for (>>=), but its generated
+continuation may still need to infer an ordinary result b. An exact argument
+match can therefore leave b undetermined. Preserve the matched native input
+and use newMetaTyVarX for missing ordinary binders. It creates ordinary TauTvs
+at the current level in telescope order, with kinds substituted by the choices
+already made. Check the continuation against Vec Int n -> IO beta. Its body
+can then determine beta := [Int] without assigning a native type to a meta.
+
+Complete only a successful partial match containing a native choice. Keep
+index binders on the existing complete immutable route. A failed match still
+fails. Preserve kind, exact cached-domain, runtime scope and concreteness
+checks, the ordinary evidence order and once-only cached usage. Native result
+inference still cannot fill beta with Vec Int n. Final subsumption remains
+authoritative. See Note [Immutable instantiation of nested contexts].
+-}
 
 {- Note [Available expected types in native applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
