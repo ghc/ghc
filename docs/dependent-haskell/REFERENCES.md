@@ -1933,10 +1933,13 @@ the direct source bind, without a singleton or package conversion workaround.
 
 ## Scoped native source inference
 
-M25 is unverified. Its two source failures are preserved by M24: a local
-unsigned native action reaches the inferred-type gate; a callback that returns
-its native payload requires an ordinary result meta to contain native syntax.
-Use inference cells and exact immutable choices before that allocation.
+M25 is verified in both compiler stages with 377 source observations,
+69 standalone rejection cases, four ordinary controls and 103 API/runtime
+package/bound rejections. All five registered regressions pass. M24 preserved
+two source failures: a local unsigned native action reached the inferred-type
+gate; a callback that returned its native payload required an ordinary result
+meta to contain native syntax. M25 uses inference cells and exact immutable
+choices before that allocation.
 
 Agda v2.8.0 [Term.hs, lines 1662–1672](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Term.hs#L1662-L1672)
 checks a let type and value in the lexical context before adding the binding.
@@ -1985,3 +1988,31 @@ deep free-variable list for lexical runtime-index validation before its
 structural walk. `TyCo.FVs` follows kind/coercion metadata and excludes bound
 retained indices. Exclude CoVars explicitly. This establishes the required
 scope check across metadata; no source-level exploit is claimed.
+
+## Boxed tuple inference prior art
+
+M26 is unverified. The M25 baseline compiles `(,) (42 :: Int) xs` and an
+ordinary polymorphic `pair` helper, but rejects tuple syntax with GHC-83865.
+At `6cca33589e`, `Tc.Gen.Expr` lines 451–465 first converts the expected type
+to a Type and matches the tuple TyCon, creating component metas. Its boxed
+`tcInferTupArgs` branch at lines 915–920 also checks fields against fresh
+metas. Those whole-field metas cannot contain a native vector type. The
+ordinary constructor application route already preserves exact native choices.
+
+Agda stdlib v2.3 [Data.Product.Base, lines 68–74](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Product/Base.agda#L68-L74)
+defines the ordinary product using a constant Sigma family. File blob:
+`02f7e5269732fea8275074a03e1c94b3397fc60b`.
+Agda v2.8.0 [Builtin.Sigma, lines 7–11](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Sigma.agda#L7-L11)
+defines its two stored fields and constructor. File blob:
+`d68aead018bb834aec9a547a7907576005c28dcf`.
+[Rules.Application, lines 774–808](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+supplies the existing argument-checking and codomain-substitution precedent;
+its file blob is `82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+Exact source files, Git blob checks and retrieval metadata are recorded with
+the M25 prior-art artifacts.
+
+A GHC tuple with component `Vec Int outerN` still refers to that outer index.
+The tuple does not bind a new index in its second field type. A callback-local
+Nat cannot escape by returning an ordinary tuple. Use the explicit dependent
+package for that relation. Preserve Haskell lazy fields and usage separately;
+Agda's product and constructor rules do not establish those properties.

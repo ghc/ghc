@@ -80,8 +80,10 @@ observations, 53 standalone located errors and four ordinary controls. The
 API/runtime fixture passes 87 package/bound rejections. All five registered
 regressions pass. M24 verifies ordinary native action binds with 360 source
 observations, 60 located errors, four ordinary controls and 94 API rejections.
-All five registered regressions pass. M25 next investigates scoped native
-source inference.
+All five registered regressions pass. M25 verifies scoped native source
+inference with 377 observations, 69 located rejection cases, four ordinary
+controls and 103 API rejections in both-stage validation. All five registered
+regressions pass. M26 targets boxed tuple syntax inference.
 
 ## Direction and boundaries
 
@@ -1697,13 +1699,14 @@ failure behavior need separate source tests. No Core change is proposed.
 
 ### M25: scoped native source inference
 
-This target is unverified. M24 preserves two separate failures:
-`ActionMissingSignature` rejects an unsigned local native action with
-GHC-83605; `ActionNativeResultInference` rejects `pure xs` in an inferred local
-computation with GHC-83865. Recover both source forms without native meta
-assignment or runtime-index escape.
+This target is verified in both compiler stages. M24 preserved two separate
+failures: `ActionMissingSignature` rejected an unsigned local native action
+with GHC-83605; `ActionNativeResultInference` rejected `pure xs` in an inferred
+local computation with GHC-83865. Both source forms now compile without native
+meta assignment or runtime-index escape. The source example passes 377
+observations; see [M25 evidence](README.md#m25-scoped-native-source-inference).
 
-- [ ] Reuse `tcMonoBinds`' existing single nonrecursive FunBind path at
+- [x] Reuse `tcMonoBinds`' existing single nonrecursive FunBind path at
   `Tc.Gen.Bind:1330`. It calls `runInferRhoFRR` before it allocates the Id.
   Admit a local NoGen binding with one zero-argument equation and an exact
   native monotype. Use the existing inferred-signature validity context to
@@ -1712,11 +1715,11 @@ assignment or runtime-index escape.
   Validate deep free runtime Ids too. The structural validity walk skips
   variable kinds and coercions; use its existing deep free-variable list and
   lexical index check. Exclude bound indices and erased CoVars.
-- [ ] Keep the separate InferGen guard at `Tc.Gen.Bind:731`. Do not remove
+- [x] Keep the separate InferGen guard at `Tc.Gen.Bind:731`. Do not remove
   inferred-type guards globally. Recursive groups, pattern bindings, partial
   signatures and inferred native function telescopes need separate designs.
   Preserve infer-cell promotion and branch-joining checks.
-- [ ] With an action's input type fixed, use the existing match checker to
+- [x] With an action's input type fixed, use the existing match checker to
   synthesize the continuation body through an infer cell. Start with one
   ordinary unrestricted lambda argument, a variable pattern and one
   unguarded equation. This includes the generated do continuation.
@@ -1724,17 +1727,17 @@ assignment or runtime-index escape.
   A synthesized ordinary monad head can remain unknown; extract the payload
   and retain final subsumption to resolve that head. Whole-type immutable
   matching against a fixed IO head is not sufficient by itself.
-- [ ] Preserve unsigned effectful actions such as `effect >> pure vector`.
+- [x] Preserve unsigned effectful actions such as `effect >> pure vector`.
   Matching the first action fixes IO; the second can still infer a head meta.
   In the generic route only, unify ordinary head types that contain neither
   native syntax nor outer templates, then repeat exact whole-argument
   matching. Keep native choices immutable and keep the native-index route.
-- [ ] Reject a synthesized result that mentions the continuation's own input
+- [x] Reject a synthesized result that mentions the continuation's own input
   Id or an inner local Id. Returning `IO (Vec Int outerN)` is in scope;
   returning `IO (Vec Int n)` from an ordinary inner Nat binder would escape.
   Validate against the outer call-site environment and report the actual
   source occurrence. Do not infer a dependent arrow or package implicitly.
-- [ ] Turn both preserved failures into positive source/runtime cases. Keep
+- [x] Turn both preserved failures into positive source/runtime cases. Keep
   sharing, action counts and bottom behavior. Add independent-index,
   callback-index escape and GADT escape rejections. Verify both stages and
   the registered regressions.
@@ -1745,6 +1748,38 @@ Agda's pinned let checker and lexical context insertion supply prior art.
 Its transparent lets do not justify equating runtime aliases or bypassing
 Haskell scope checks. Agda's dependent lambda codomain is explicit; synthesis
 of an ordinary GHC callback must instead reject a free callback-local index.
+
+### M26: boxed tuple source inference
+
+This target is unverified. The M25 tuple baseline checks three versions of a
+callback that returns `(42 :: Int, xs)` at an outer runtime index. Tuple syntax
+rejects with GHC-83865. `(,) (42 :: Int) xs` and an ordinary polymorphic `pair`
+helper compile with Core/STG lint. These are compile controls, not runtime
+validation. Preserve the failing syntax as the implementation target.
+
+- [ ] Inspect `Tc.Gen.Expr`'s complete `ExplicitTuple` path at the M25
+  checkpoint. It calls `expTypeToType` and allocates component metas before
+  checking fields. The boxed `tcInferTupArgs` path also allocates metas.
+  Reuse the existing ordinary tuple-constructor application machinery for an
+  anchored boxed tuple that needs inference. Keep the original tuple syntax
+  and source spans in diagnostics, using the existing expansion wrapper.
+- [ ] Extend the read-only native-argument classifier to recognize complete
+  boxed tuple syntax with a native anchor. Do not execute splices or elaborate
+  components during classification. Preserve checking when an expected tuple
+  shape is available. Keep tuple sections, unboxed fields and representations
+  on their existing paths until their inference rules are established.
+- [ ] Preserve exact field types, outer runtime Id scope, ordinary field
+  multiplicities and once-only usage. A tuple does not bind an existential
+  runtime index. Returning a callback-local index with its vector still needs
+  an explicit package. Do not infer a Sigma type for an ordinary tuple.
+- [ ] Run the syntax, constructor and helper forms at finite IORef inputs.
+  Check effect counts, bottom fields, partial/cyclic values and sharing. Reject
+  independent indices and callback/inner-index escape with located errors.
+  Verify both compiler stages and the existing registered regressions.
+
+Use [Agda's constant product family](REFERENCES.md#boxed-tuple-inference-prior-art)
+as the product precedent. Existing GHC constructor checking supplies the
+implementation path. No Core or interface representation change is proposed.
 
 ## Further work
 

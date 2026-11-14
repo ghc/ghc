@@ -1,9 +1,9 @@
 # Packed vector source example
 
-Both M24 compiler stages pass all 360 source observations with Core Lint
-and STG Lint. The API/runtime fixture passes 94 package/bound rejections.
-All five registered regressions pass. M24 adds 17 observations and keeps the
-previous 343 lines in order. Both stages pass 60 standalone located errors
+Both M25 compiler stages pass all 377 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 103 package/bound rejections.
+All five registered regressions pass. M25 adds 17 observations and keeps the
+previous 360 lines in order. Both stages pass 69 standalone rejection cases
 and four ordinary-Haskell controls.
 
 At M20, both stages and all five regressions passed 301 observations and
@@ -985,6 +985,40 @@ passes 360 observations; the original 343 remain unchanged.
 The API fixture passes 94 package/bound rejections. Each compiler stage passes
 60 standalone located errors and four ordinary controls. The seven new errors
 check independent indices, wrong monads, conflicting cached inputs, native
-result inference, unsigned native actions and linear capture. Native results
-with an unknown expected type and unsigned native local bindings remain
+result inference, unsigned native actions and linear capture. At M24, native
+results with an unknown expected type and unsigned native local bindings were
 [M25 inference targets](../../PLAN.md#m25-scoped-native-source-inference).
+
+## Inferred local vectors and native callback results
+
+M25 admits a local monomorphic value that captures an existing runtime index:
+
+```haskell
+n <- readIORef indexCell
+let vector = replicateNative @Int n 7
+    action = modifyIORef' effects (+ 1) >> pure vector
+    compute = action >>= \xs -> pure xs
+xs <- compute
+pure (toList xs)
+```
+
+`driveSourceInference` runs the do and explicit-bind forms at runtime lengths
+0 through 3. Its counters compare construction and three executions with
+`[0,1,2,3]`. Thirteen further observations check ignored bottom fields,
+original demanded errors, repeated effects, partial/cyclic prefixes and
+StableName sharing of the vector and original IORef payload. Both compiler
+stages pass these 17 additions and the previous 360 outputs.
+
+Each inferred type must remain in lexical scope. A callback result can mention
+an outer index. It cannot mention its own input index or an inner local index
+after that scope closes. An unused local binding cannot hide an escaping
+index. Explicit packages can bind their stored index. No implicit package,
+dependent arrow or runtime type check is inserted. Generalized and recursive
+native bindings, pattern bindings and partial signatures retain their gates.
+
+The API fixture passes 103 rejection cases. Standalone checks pin codes and
+source tokens for 69 cases in each stage. Callback escapes report GHC-83605
+at the body. The existing GADT, multiplicity and wrong-index diagnostics remain.
+`pure ((42 :: Int), xs)` is a preserved tuple-syntax inference failure.
+Equivalent constructor and polymorphic helper applications compile.
+[M26](../../PLAN.md#m26-boxed-tuple-source-inference) is unverified.

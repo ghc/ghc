@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 360 runtime observations and the runtime fixtures check 94 package/bound rejections |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 377 runtime observations and the runtime fixtures check 103 package/bound rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -55,7 +55,8 @@ Last updated: 2026-11-14.
 | Terminal variable equations | Both compiler stages pass three-clause sameNat, original-index repackaging and non-strict fallback of an unmatched second column |
 | Local payload signatures | Complete local signatures capture eligible already-bound runtime indices; both stages pass sharing, scope, demand and ordinary-Haskell controls |
 | Native IO binds | Saved and inline actions preserve native inputs through do and explicit bind; ordinary local computation results infer, with effects, demand and sharing controls |
-| Next task | M25: scoped native local inference and separately native continuation result synthesis; unverified |
+| Scoped source inference | Local monomorphic vectors/actions and native callback results infer at existing outer runtime indices; deep metadata scope and callback escape checks apply |
+| Next task | M26: boxed tuple syntax with native components; constructor/helper controls compile, tuple syntax still rejects |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2634,5 +2635,72 @@ registered run took 12.57s and peaked at 1844 MiB under 8 GiB: five passes and
 34 skipped ways. No unexpected results occurred. Swap was disabled for all
 jobs. Existing GHC/Cabal warnings remain; the full GHC suite was not run.
 Source, docs, harness and outputs are frozen separately. M23 and earlier
-evidence remain unchanged. The native-result and unsigned-binding gates are
-[M25 source-inference targets](PLAN.md#m25-scoped-native-source-inference).
+evidence remain unchanged. At M24, native-result inference and unsigned native
+bindings remained gated. [M25](#m25-scoped-native-source-inference) admits the
+scoped source forms below.
+
+## M25: scoped native source inference
+
+Both compiler stages and all five registered regressions pass. Local values
+and callback results can infer native types at an existing runtime index:
+
+```haskell
+n <- readIORef cell
+let vector = replicateNative @Int n 7
+    action = modifyIORef' effects (+ 1) >> pure vector
+    compute = do
+      xs <- action
+      pure xs
+xs <- compute
+pure (PackVec n xs)
+```
+
+The existing single nonrecursive FunBind path infers its RHS before allocating
+the Id. M25 admits the resulting monotype for a local NoGen value with one
+zero-argument equation. The validity checker checks free runtime indices
+against their actual lexical bindings. It also checks its existing deep
+free-variable list, since the structural walk skips variable kinds and
+coercions. Bound indices and erased CoVars are excluded from that list's
+runtime checks. No native type is assigned to a meta-variable.
+
+After an action fixes a callback input, the existing match checker infers the
+body through an InferResult. Its result is checked after the callback context
+closes. A callback-local or inner local runtime Id cannot escape in an
+ordinary arrow result. Explicit retained arrows and packages keep their own
+checking paths. Generic argument matching can unify ordinary head metas for
+`effect >> pure vector`, then repeats exact whole-argument matching. Both heads
+must contain no native syntax or outer templates. Final subsumption remains.
+
+Notes `[Scoped inferred native values]`, `[Scoped native callback results]`,
+`[Ordinary action heads in native inference]` and
+`[Validity of retained binders]` record the rules.
+[Pinned Agda let, lambda and contextual-meta sources](REFERENCES.md#scoped-native-source-inference)
+supply scope and checking precedents. GHC retains its own laziness, usage,
+FRR, promotion, generalization, kind, concreteness and evidence checks.
+The callback admission starts with one ordinary Many argument, a variable
+pattern and one unguarded equation. Recursive groups, pattern bindings,
+partial signatures and inferred retained function telescopes remain gated.
+
+Both source clients pass 377 observations, keeping the previous 360 unchanged.
+The 17 additions cover four IORef inputs, repeated action effects, bottom
+indices and payloads, original errors, partial/cyclic prefixes, shared vectors
+and the original shared IORef payload. Both stages pass 69 located rejection
+cases and four ordinary controls. Two M24 rejection forms are now positive;
+the other 58 remain. Eleven new cases cover scope, independent indices,
+generalization, GADT escape and linear capture. The API/runtime fixture passes
+103 package/bound rejection cases. The five registered tests pass with 34
+skipped ways, no unexpected results and no framework warnings.
+
+Evidence uses `_build/verification/native-source-inference-*`. Three compiler
+input archives each contain 31 selected paths. The final self-hosted build
+took 11m28s and peaked at 5761 MiB under 16 GiB. Final both-stage source/API
+checks peaked at 1099 MiB under 4 GiB. The registered run took 14.07s and
+peaked at 1734 MiB under 8 GiB. Swap was disabled. Full GHC tests were not run.
+Earlier evidence and the original reader remain preserved. Initial source
+failures, the rejected Hadrian target and a corrected probe-generator error
+are retained. The deep metadata check is justified by the structural audit;
+no source-level exploit is claimed. Core and the interface version are unchanged.
+
+The next failure is `pure ((42 :: Int), xs)` inside the inferred callback.
+Equivalent `(,)` and ordinary polymorphic helper applications compile.
+[M26](PLAN.md#m26-boxed-tuple-source-inference) targets tuple syntax inference.
