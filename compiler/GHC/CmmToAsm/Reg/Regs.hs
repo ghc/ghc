@@ -33,8 +33,15 @@ import Data.Coerce ( coerce )
 -- register liveness analysis.  See Note [Register formats in liveness analysis]
 -- in GHC.CmmToAsm.Reg.Liveness.
 newtype Regs = Regs { getRegs :: UniqSet RegWithFormat }
+  -- TODO #27619: Eq is UniqSet's, which compares the registers and not their
+  -- formats.
   deriving newtype (Eq, Outputable)
 
+-- BUG #27619: this can keep the narrower of two formats. Format's derived
+-- Ord compares a VecFormat's number of elements before their format, so
+-- VecFormat 16 FmtInt8 (128 bits) ranks above VecFormat 4 FmtDouble (256
+-- bits). Were one register read at both formats, a spill or reload at the
+-- narrower would be wrong code; whether any register is read so is not known.
 maxRegWithFormat :: RegWithFormat -> RegWithFormat -> RegWithFormat
 maxRegWithFormat r1@(RegWithFormat _ fmt1) r2@(RegWithFormat _ fmt2)
   = if fmt1 >= fmt2

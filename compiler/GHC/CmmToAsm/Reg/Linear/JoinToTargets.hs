@@ -115,6 +115,40 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
                         adjusted_assig dest_assig
 
 
+{- Note [The first jump into a block fixes its entry assignment]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Of the jumps into a block, the first that the allocator processes records the
+block's entry assignment (joinToTargets_first): where each vreg live into the
+block is, InReg, InMem or InBoth, and which registers are free. Every jump into
+the block that is processed later is made to conform to that assignment by fixup
+code (joinToTargets_again), whatever its own assignment and however often its
+edge runs. Hence:
+
+* TODO: where a loop head's entry assignment comes from a preheader that has
+  spilled a loop-carried vreg, it records the vreg InMem. The body then reloads
+  the vreg at its first read, and every back edge stores it again once the body
+  has written it.
+
+* TODO #27800: a return continuation is an entry block, and the allocator,
+  going in SCC order, processes it before the loops it jumps into. So where the
+  procedure's entry and such a continuation enter one loop at two different
+  blocks, the two record incompatible assignments, and the loop's own edges get
+  fixup code that runs on every iteration. Taking the entry first and then,
+  after each SCC, an SCC holding a block whose entry assignment is recorded was
+  tried on a development branch and showed no gain.
+
+* TODO: where a failed heap or stack check returns from the garbage collector
+  to a block of its own (GHC.StgToCmm.Heap), that block is an entry block that
+  jumps back into the checking block. The order in which the allocator takes the
+  blocks, from sccBlocks in GHC.CmmToAsm.Reg.Liveness, depends on no frequency,
+  so the return block can come first and record the assignment that the hot
+  path's jump into the checking block must then conform to.
+
+The assignment a jump arrives with is chosen without regard to the entry
+assignment already recorded for its target: see the TODOs in joinToTargets_first
+(#27981) and in findPrefRealReg in GHC.CmmToAsm.Reg.Linear (#27980).
+-}
+
 -- this is the first time we jumped to this block.
 joinToTargets_first :: (FR freeRegs, Instruction instr)
                     => BlockMap Regs
@@ -132,10 +166,15 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
         to_free
 
  = do   -- free up the regs that are not live on entry to this block.
+        -- TODO #27981: to_free holds only registers that hold vregs. So a real
+        -- register still allocated at the jump, such as R1 on x86-64 where
+        -- it is read after a conditional branch, stays allocated in the free
+        -- registers recorded for the block, even when it is not live into it.
         freeregs        <- getFreeRegsR
         let freeregs' = foldl' (flip frReleaseReg) freeregs to_free
 
-        -- remember the current assignment on entry to this block.
+        -- remember the current assignment on entry to this block: see
+        -- Note [The first jump into a block fixes its entry assignment]
         setBlockAssigR (updateBlockAssignment dest (freeregs', src_assig) block_assig)
 
         joinToTargets' block_live new_blocks block_id instr dests
@@ -203,6 +242,10 @@ joinToTargets_again
                 -- make a new basic block containing the fixup code.
                 --      A the end of the current block we will jump to the fixup one,
                 --      then that will jump to our original destination.
+                --      The fixup code gets a block of its own even where the
+                --      jump is unconditional; putting the moves before such
+                --      a jump instead was tried on a development branch and
+                --      showed no gain.
                 fixup_block_id <- mkBlockId <$> getUniqueR
                 let block = BasicBlock fixup_block_id
                                 $ fixUpInstrs ++ mkJumpInstr dest
@@ -239,13 +282,16 @@ joinToTargets_again
 --
 --      We cut some corners by not handling memory-to-memory moves.
 --      This shouldn't happen because every temporary gets its own stack slot.
+--      BUG #27638: since #26668 a temporary can have more than one stack slot,
+--      and a move between two of them panics in makeMove: see handleComponent.
 --
 makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [Node Loc Unique]
 makeRegMovementGraph adjusted_assig dest_assig
  = [ node       | (vreg, src) <- nonDetUFMToList adjusted_assig
                     -- The list's order, by unique, decides the order of the
                     -- fixup moves and which move of a cycle goes through the
-                    -- stack (Note [Unique Determinism and code generation])
+                    -- stack: see Note [Unique order in the linear allocator] in
+                    -- GHC.CmmToAsm.Reg.Linear
                     -- source reg might not be needed at the dest:
                 , Just loc <- [lookupUFM_Directly dest_assig vreg]
                 , node <- expandNode vreg src loc ]
@@ -287,6 +333,9 @@ expandNode vreg src@(Loc srcLoc srcFmt) dst@(Loc dstLoc dstFmt) =
     (InBoth srcReg _, InReg dstReg)
         | srcReg == dstReg
         -> []
+    -- TODO: where dst is InBoth with the source's slot, as when a vreg is
+    -- InBoth at both ends of the jump, this stores the value into a slot that
+    -- already holds it.
     (InBoth srcReg _, _)
         -> expandNode vreg (Loc (InReg srcReg) srcFmt) dst
     _
@@ -326,10 +375,17 @@ handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
 --      among them the same way), and reload the slot into the first move's
 --      destination reg last.
 --
---      Note that we can not have cycles that involve memory locations as
---      sources as single destination because memory locations (stack slots)
---      are allocated exclusively for a virtual register and therefore can not
---      require a fixup.
+--      There can be no cycle through a memory location, as a stack slot is
+--      allocated for one virtual register only. But since #26668 a vreg can
+--      have more than one slot: getStackSlotFor gives it a new one where its
+--      format has outgrown the old.
+--
+--      BUG #27638: a jump can then need a move from one of a vreg's slots to
+--      another, which makeMove does not handle: it panics. And where the first
+--      move goes to an InBoth destination, the pattern below leaves out the
+--      destination's slot, which is then written only if it is the slot spillR
+--      picks; otherwise the slot keeps a stale value, which is wrong code where
+--      it is reloaded. No program reaching either is known.
 --
 handleComponent delta instr
         (CyclicSCC ((DigraphNode vreg (Loc (InReg sreg) scls) ((Loc (InReg dreg) dcls: _))) : rest))
@@ -387,5 +443,7 @@ makeMove delta vreg (Loc src _srcFmt) (Loc dst dstFmt)
               -- we don't handle memory to memory moves.
               -- they shouldn't happen because we don't share
               -- stack slots between vregs.
+              -- BUG #27638: they can happen, between two slots of one vreg, and
+              -- the compiler then panics here: see handleComponent.
               pprPanic "makeMove: we don't handle mem->mem moves"
                  (ppr vreg <+> parens (ppr src) <+> parens (ppr dst))

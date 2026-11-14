@@ -89,6 +89,7 @@ The algorithm is roughly:
 
         (j) For each spilled reg known to be now dead, re-add its stack slot
             to the free list.
+            WIP: not done; a StackMap never frees a slot.
 
 -}
 
@@ -290,6 +291,10 @@ linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
 
    A block whose assignment never gets set is dropped: process stops after
    a round in which it allocates no block.
+
+   The first predecessor to be allocated sets the assignment for good:
+   see Note [The first jump into a block fixes its entry assignment] in
+   GHC.CmmToAsm.Reg.Linear.JoinToTargets.
 -}
 
 process :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
@@ -435,6 +440,11 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
     -- then we can eliminate the instruction.
     -- (we can't eliminate it if the source register is on the stack, because
     --  we do not want to use one spill slot for different virtual registers)
+    -- TODO: eliminating the move gives dst the register of src, even where
+    -- dst is live into a block whose recorded entry assignment holds it in
+    -- another register; the jump to that block then needs a fixup move. See
+    -- Note [The first jump into a block fixes its entry assignment] in
+    -- GHC.CmmToAsm.Reg.Linear.JoinToTargets.
     case takeRegRegMoveInstr platform instr of
         Just (src,dst)  | Just fmt <- lookupReg src (liveDieRead live),
                           isVirtualReg dst,
@@ -668,6 +678,60 @@ releaseRegs regs = do
 --        - clobbered regs are not allocatable.
 --
 
+{- Note [Unique order in the linear allocator]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A fold over the assignment visits its vregs in the order of their uniques, which
+compares their tags first and then their numbers.
+
+A vreg named in the Cmm keeps the unique of its local register, and the local
+register of an Id keeps the Id's unique (idToReg in GHC.StgToCmm.Env), so its
+tag is that of the pass that made the Id. -fobject-determinism renames every
+local register of StgToCmm's output, in the order it visits them, with uniques
+tagged 'Q', which sort before the instruction selector's 'n'. Among the tags
+that vregs carry are, in their order (that renaming replaces 'B', 'g', 'r', 't'
+and StgToCmm's own 'c'):
+
+* 'B', Ids that CorePrep's eta-expansion makes, such as the arguments of a
+  constructor worker's entry code at -O0;
+* 'H', on i386, the high half of a 64-bit vreg (getHiVirtualRegFromLo in
+  GHC.Platform.Reg);
+* 'T', the temporaries of -fcmm-thread-sanitizer;
+* 'c', StgToCmm's own temporaries, and a .cmm file's own registers;
+* 'g', Ids made from the supply of the STG pipeline's passes (runStgM in
+  GHC.Stg.Pipeline), such as the arguments that unarisation makes for an unboxed
+  sum;
+* 'n', the instruction selector's temporaries, and in a Haskell module the Cmm
+  pipeline's, as for a safe foreign call;
+* 'r', Ids whose uniques come from the name cache, which Tidy draws on for
+  top-level Ids: the register that holds a top-level closure in its own code is
+  one;
+* 't', Ids made from the supplies of CorePrep, CoreToStg and GHC.Stg.EnforceEpt,
+  among them CorePrep's clones of local Ids;
+* 'u', the Cmm pipeline's temporaries in a .cmm file.
+
+With -fobject-determinism, the order in a Haskell module is deterministic
+except for the sanitizer's temporaries. A .cmm file's own registers
+keep the 'c' uniques its parser draws, which nothing renames
+(Note [Unique Determinism and code generation] in GHC.Types.Unique).
+
+TODO: nothing in the allocator chose this order, but three places depend on it,
+the first two taking it as a ranking:
+
+* allocRegsAndSpill_spill chooses among the vregs in a register of the class
+  needed, other than those being allocated for the instruction (keep). It evicts
+  the first in the order of those in both a register and their slot or, if there
+  are none, of those in a register only, whatever its next use (the ToDo of step
+  (a) in the outline at the top of this module).
+* saveClobberedTemps finds new registers for the values an instruction clobbers
+  in the order, so once the free registers that would suit them run out, the
+  later values are spilled.
+* makeRegMovementGraph lists a jump's moves in the order, which decides the
+  order of joinToTargets' fixup moves and which move of a cycle goes through the
+  stack.
+
+No other fold over the assignment depends on the order.
+-}
+
 saveClobberedTemps
         :: forall instr freeRegs.
            (Instruction instr, FR freeRegs)
@@ -700,7 +764,7 @@ saveClobberedTemps clobbered dying
                 -- saveClobberedTemps folds maybe_spill over the vregs in the
                 -- order of their uniques, so the order decides which clobbered
                 -- values move to free registers and which are spilled once
-                -- those run out (Note [Unique Determinism and code generation])
+                -- those run out (Note [Unique order in the linear allocator])
                 Loc (InReg reg) fmt
                     | any (realRegsAlias reg) clobbered
                     , temp `notElem` map getUnique dying
@@ -722,6 +786,13 @@ saveClobberedTemps clobbered dying
               -- (1) we have a free reg of the right class that isn't
               -- clobbered by this instruction; use it to save the
               -- clobbered value.
+              -- TODO #26631: my_reg is the first such register, chosen without
+              -- regard to what the instructions before the value's next read
+              -- do to it. Where they write it too, as the moves of a C call's
+              -- arguments into their registers do, the value is moved from
+              -- register to register, and the call then spills it all the
+              -- same. Handing out the floating-point registers in descending
+              -- order was tried on a development branch and showed no gain.
               (my_reg : _) -> do
                   setFreeRegsR (frAllocateReg my_reg freeRegs)
 
@@ -764,6 +835,9 @@ clobberRegs clobbered
                  NoVectors -> NoVectors.allRegClasses
             allFreeRegs = foldMap (\ rc -> frGetFreeRegs rc freeregs) allRegClasses
 
+        -- Only the free ones: on AArch64, RISC-V and LoongArch, frAllocateReg
+        -- panics on a register that is already allocated (on x86-64, i386 and
+        -- PowerPC it does not).
         let extra_clobbered = [ r | r <- clobbered, r `elem` allFreeRegs ]
 
         setFreeRegsR $! foldl' (flip frAllocateReg) freeregs extra_clobbered
@@ -878,6 +952,20 @@ allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt
 -- end and start of the loop, avoiding redundant reg-reg moves.
 -- Note: I tried returning a list of past assignments, but that
 -- turned out to barely matter.
+--
+-- TODO #27980, closed as a duplicate of #27800: the preference is the
+-- variable's register in that first entry assignment, whichever block it is
+-- for, not its register in the entry assignment recorded for a block the
+-- current one jumps to. So the return continuation of a call in a loop reloads
+-- a loop variable into its preferred register even where the loop head holds
+-- it in another, and the back edge then gets fixup code that runs on every
+-- iteration.
+--
+-- TODO: the preference is keyed by virtual register, and a Cmm local is one
+-- virtual register over its whole procedure, however many live ranges it
+-- has. So the register taken for one live range becomes the preference of
+-- another. Stack layout makes such ranges: it reloads a local that is live
+-- across a call into the same local in the call's continuation.
 findPrefRealReg :: VirtualReg -> RegM freeRegs (Maybe RealReg)
 findPrefRealReg vreg = do
   bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
@@ -938,7 +1026,7 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
                       -- picks the vreg evicted below: of those whose register
                       -- is of the class needed (compat), the first in both a
                       -- register and a slot, else the first in a register only
-                      -- (Note [Unique Determinism and code generation])
+                      -- (Note [Unique order in the linear allocator])
                 let candidates = nonDetUFMToList candidates'
 
                 -- the vregs we could kick out that are already in a slot

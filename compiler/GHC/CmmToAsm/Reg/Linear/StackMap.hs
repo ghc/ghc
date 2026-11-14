@@ -5,6 +5,11 @@
 --      architectures. Therefore, we avoid having to generate memory-to-memory moves
 --      by simply giving every virtual register its own stack slot.
 
+--      BUG #27638: since #26668 a virtual register whose format has outgrown
+--      its slot gets new slots (getStackSlotFor), and a jump can then need a
+--      move between two slots of one register, on which makeMove panics: see
+--      handleComponent in GHC.CmmToAsm.Reg.Linear.JoinToTargets.
+
 --      The StackMap stack map keeps track of virtual register - stack slot
 --      associations and of which stack slots are still free. Once it has been
 --      associated, a stack slot is never "freed": no other virtual register

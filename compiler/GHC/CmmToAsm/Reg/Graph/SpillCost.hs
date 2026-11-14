@@ -91,6 +91,11 @@ slurpSpillCostInfo platform cfg cmm
                 $ flattenSCCs sccs
             where
                 LiveInfo _ entries _ _ = info
+                -- WIP: no spill choice depends on these frequencies. They scale
+                -- only the counts of uses and definitions, while chooseSpill
+                -- uses spillCost_length, a function of the lifetimes alone;
+                -- spillCost_chaitin, which would read the counts, is commented
+                -- out.
                 freqMap = (fst . mkGlobalWeights (head entries)) <$> cfg
 
         -- Lookup the regs that are live on entry to this block in

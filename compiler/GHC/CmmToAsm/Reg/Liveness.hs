@@ -193,6 +193,8 @@ data Liveness
         = Liveness
         { liveBorn      :: Regs      -- ^ registers born in this instruction (written to for first time).
         , liveDieRead   :: Regs      -- ^ registers that died because they were read for the last time.
+                                     --   At a branch, also those live into its
+                                     --   targets and not past the branch.
         , liveDieWrite  :: Regs }    -- ^ registers that died because they were clobbered by something.
 
 
@@ -855,7 +857,11 @@ reverseBlocksInTops top
 -- | Computing liveness
 --
 --  On entry, the SCCs must be in "reverse" order: later blocks may transfer
---  control to earlier ones only, else `panic`.
+--  control to earlier ones only, else `panic`. No block may fall
+--  through: every block must end in jumps that name all its successors
+--  ('jumpDestsOfInstr'). The walk over a block adds the registers live into
+--  each target at the jump to it, so a register live into a block that the
+--  block fell into would count as dead at its end.
 --
 --  The SCCs returned are in the *opposite* order, which is exactly what we
 --  want for the next pass.
@@ -872,6 +878,9 @@ computeLiveness
 computeLiveness platform sccs
  = case checkIsReverseDependent sccs of
         Nothing         -> livenessSCCs platform mapEmpty [] sccs
+        -- A jump to a block missing from the CFG also ends here, the order not
+        -- being at fault: where sccBlocks is given a CFG, it keeps only the
+        -- CFG's blocks.
         Just bad        -> let sccs' = fmap (fmap (fmap (fmap (pprInstr platform)))) sccs
                            in pprPanic "RegAlloc.Liveness.computeLiveness"
                                 (vcat   [ text "SCCs aren't in reverse dependent order"
@@ -921,6 +930,22 @@ livenessSCCs platform blockmap done
 
                 -- probably the least efficient way to compare two
                 -- BlockMaps for equality.
+                --
+                -- TODO #27437: each round compares the whole map.
+                --
+                -- BUG #27619: Regs' Eq compares the registers and not their
+                -- formats, so the iteration stops once the live sets stop
+                -- growing, whether or not the formats recorded for the cycle's
+                -- blocks have converged. A spill or reload at a format left
+                -- too narrow is wrong code, though no program giving a wrong
+                -- result is known. A test that compared the formats too would
+                -- stop at a result that does not depend on the order in which
+                -- the blocks are walked: each step is monotone in the live sets
+                -- and, by Format's derived Ord, in the formats, the kill in
+                -- minusCoveredRegs included. That Ord ranks some narrower
+                -- vector formats above wider ones, so the result could still
+                -- keep a format too narrow (the BUG at maxRegWithFormat in
+                -- GHC.CmmToAsm.Reg.Regs).
             equalBlockMaps :: BlockMap Regs -> BlockMap Regs -> Bool
             equalBlockMaps a b
                 = a' == b'
