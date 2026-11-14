@@ -796,12 +796,14 @@ tcInstFunWithExpected = tcInstFunWithExpectedCache Nothing
 {- Note [Native inference after visible type applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ITYARG checks each written type argument once. After leading type arguments,
-use the substituted signature to infer native generic arguments before IALL
+use the substituted signature to infer native arguments before IALL
 allocates the remaining type variables. Keep the original head and checked
 type arguments. Pass immutable choices to IALL so that type applications and
 dictionaries retain their telescope order. Require NoQL, no consumed value
-arguments, no pending type arguments, and the existing generic inference guards.
-Native-index-kind instantiation keeps its existing prepass.
+arguments, no pending type arguments, and the existing inference guards.
+The generic route can use a nonempty declared argument prefix. The
+native-index-kind route requires exact saturation. Calls without type arguments
+keep the existing prepass.
 
 Only tcApp enables this step. It retains the inferred argument cache even when
 matching fails. The public tcInstFun caller cannot consume a cache and leaves
@@ -1948,7 +1950,6 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
   , let (tvs, theta, tau) = tcRetainedInstTelescope sigma
         nested = length tvs /= length outer_tvs
   , let index_tvs = filter (isNativeIndexType . tyVarKind) tvs
-  , isNothing after_vta || null index_tvs
   , not (null tvs)
   , null theta || hasNoConcreteTyVars fun
   , let (domains, result) = splitFunTys tau
