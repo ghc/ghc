@@ -71,6 +71,19 @@ regAlloc config regsFree slotsFree slotsCount code cfg
                         triv
                         regsFree slotsFree slotsCount [] code cfg
 
+        -- BUG: once regSpill (GHC.CmmToAsm.Reg.Graph.Spill) has grown the pool
+        -- of slots, the preallocated slots are reserved a second time, and with
+        -- them slots that no spill uses. The pool starts with maxSpillSlots+1
+        -- slots, and regSpill grows it 512 slots at a time when a round of
+        -- spilling needs more than are free. slotsCount', returned here as
+        -- the stack needed, is the pool's highest slot number, which counts
+        -- the preallocated slots and every slot of the pool, used or not,
+        -- whereas the linear allocator's regAlloc returns only the slots
+        -- from maxSpillSlots on (the BUG at its extra_stack); the driver
+        -- passes either to ncgAllocMoreStack. This costs C stack space and,
+        -- where a target's mkStackAllocInstr returns more instructions for
+        -- a larger amount, code at entry and exit, under -fregs-graph or
+        -- -fregs-iterative.
         let needStack
                 | slotsCount == slotsCount'
                 = Nothing
@@ -253,6 +266,13 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
          -- Coloring was unsuccessful. We need to spill some register to the
          -- stack, make a new graph, and try to color it again.
          else do
+                -- BUG: nothing evaluates this graph. It goes only into
+                -- the lazy raGraph field of a RegAllocStatsSpill, and
+                -- only a RegAllocStatsStart's raGraph is ever accessed
+                -- (GHC.CmmToAsm.Reg.Graph.Stats and GHC.CmmToAsm). So
+                -- -dasm-lint validates no graph of a round that spills, only
+                -- that of the round that colours every node. This only misleads
+                -- a reader, under -fregs-graph or -fregs-iterative.
                 let graph_colored_lint  =
                         if ncgAsmLinting config
                                 then Color.validateGraph (text "")

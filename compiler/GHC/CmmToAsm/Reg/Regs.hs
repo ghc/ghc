@@ -33,8 +33,18 @@ import Data.Coerce ( coerce )
 -- register liveness analysis.  See Note [Register formats in liveness analysis]
 -- in GHC.CmmToAsm.Reg.Liveness.
 newtype Regs = Regs { getRegs :: UniqSet RegWithFormat }
+  -- TODO #27619: Eq is UniqSet's, which compares the registers and not their
+  -- formats; the issue proposes an Eq that compares the formats too. What
+  -- comparing the registers alone leads to is the BUG at livenessSCCs in
+  -- GHC.CmmToAsm.Reg.Liveness.
   deriving newtype (Eq, Outputable)
 
+-- BUG #27619: this can keep the narrower of two formats. Format's derived Ord
+-- compares a VecFormat's number of elements before their format, so VecFormat
+-- 16 FmtInt8 (128 bits) ranks above VecFormat 4 FmtDouble (256 bits). Were
+-- one register read at both formats, a write at the narrower would kill it in
+-- minusCoveredRegs, which is wrong code; whether any register is read so is not
+-- known.
 maxRegWithFormat :: RegWithFormat -> RegWithFormat -> RegWithFormat
 maxRegWithFormat r1@(RegWithFormat _ fmt1) r2@(RegWithFormat _ fmt2)
   = if fmt1 >= fmt2
@@ -59,7 +69,7 @@ addRegMaxFmt = coerce $ strictAddOneToUniqSet_C maxRegWithFormat
 -- | Remove 2nd argument registers from the 1st argument: one at a scalar
 -- format in the first whatever its format in the second, and one at a vector
 -- format only if its format in the second is at least as large by Format's
--- derived Ord.
+-- derived Ord (see the BUG at maxRegWithFormat).
 minusCoveredRegs :: Regs -> Regs -> Regs
 minusCoveredRegs = coerce $ minusUniqSet_C f
   where
@@ -93,7 +103,7 @@ intersectRegsMaxFmt = coerce $ strictIntersectUniqSets_C maxRegWithFormat
 
 -- | Computes the registers of the first argument that are not in the second,
 -- and, at the second's format, those whose format ranks lower in the second than
--- in the first by Format's derived Ord.
+-- in the first by Format's derived Ord (see the BUG at maxRegWithFormat).
 shrinkingRegs :: Regs -> Regs -> Regs
 shrinkingRegs = coerce $ minusUniqSet_C f
   where
