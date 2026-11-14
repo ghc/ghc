@@ -1102,6 +1102,120 @@ runActionBindChecks = do
             putStrLn "action repeated payload sharing: True"
         _ -> fail "action sharing vector has the wrong length"
 
+-- | Infer local values and native callback results at one runtime index.
+{-# NOINLINE driveSourceInference #-}
+driveSourceInference :: Nat -> IO String
+driveSourceInference input = do
+    indexCell <- newIORef input
+    n <- readIORef indexCell
+    effects <- newIORef (0 :: Int)
+    let vector = replicateNative @Int n 7
+        action = modifyIORef' effects (+ 1) >> pure vector
+        computeDo = do
+            xs <- action
+            pure xs
+        computeBind = action >>= \xs -> pure xs
+    before <- readIORef effects
+    first <- computeDo
+    count1 <- readIORef effects
+    second <- computeBind
+    count2 <- readIORef effects
+    third <- computeDo
+    count3 <- readIORef effects
+    pure (show (natToInt n, [toList first, toList second, toList third], [before, count1, count2, count3]))
+
+-- | Check demand and sharing through inferred local native computations.
+runSourceInferenceChecks :: IO ()
+runSourceInferenceChecks = do
+    forM_
+        [ (Z, "(0,[[],[],[]],[0,1,2,3])")
+        , (S Z, "(1,[[7],[7],[7]],[0,1,2,3])")
+        , (S (S Z), "(2,[[7,7],[7,7],[7,7]],[0,1,2,3])")
+        , (S (S (S Z)), "(3,[[7,7,7],[7,7,7],[7,7,7]],[0,1,2,3])")
+        ]
+        $ \(input, expected) -> do
+            actual <- driveSourceInference input
+            assertEqual "runtime source inference" expected actual
+            putStrLn ("runtime source inference: " ++ actual)
+    ignoredIndex <- pure bottomLength
+    effects <- newIORef (0 :: Int)
+    let ignoredVector = replicateNative @Int ignoredIndex bottomElement
+        ignoredAction = modifyIORef' effects (+ 1) >> pure ignoredVector
+        ignoredCompute = ignoredAction >>= \xs -> pure xs
+    before <- readIORef effects
+    assertEqual "inferred construction has no effects" 0 before
+    putStrLn "inferred construction has no effects: 0"
+    ignored <- ignoredCompute >> pure (42 :: Int)
+    assertEqual "inferred result ignores bottom fields" 42 ignored
+    putStrLn "inferred result ignores bottom fields: 42"
+    once <- readIORef effects
+    assertEqual "inferred action executes once" 1 once
+    putStrLn "inferred action executes once: 1"
+    _ <- ignoredCompute
+    twice <- readIORef effects
+    assertEqual "inferred computation executes again" 2 twice
+    putStrLn "inferred computation executes again: 2"
+    expectMarker "inferred vector retains index demand" "packed-bottom-length" $
+        evaluate (sum (toList ignoredVector))
+    finiteIndex <- pure (S Z)
+    payloadEffects <- newIORef (0 :: Int)
+    let payload :: Vec Int finiteIndex
+        payload = bottomPayload
+        payloadAction = modifyIORef' payloadEffects (+ 1) >> pure payload
+        payloadCompute = do
+            xs <- payloadAction
+            pure xs
+    ignoredPayload <- payloadCompute >> pure (42 :: Int)
+    assertEqual "inferred result ignores bottom payload" 42 ignoredPayload
+    putStrLn "inferred result ignores bottom payload: 42"
+    expectMarker "inferred result retains payload error" "packed-bottom-payload" $ do
+        xs <- payloadCompute
+        evaluate (sum (toList xs))
+    payloadCount <- readIORef payloadEffects
+    assertEqual "inferred payload demand follows effects" 2 payloadCount
+    putStrLn "inferred payload demand follows effects: 2"
+    let bottomAction :: IO (Vec Int finiteIndex)
+        bottomAction = error "native-inferred-action-bottom"
+        bottomCompute = bottomAction >>= \xs -> pure xs
+    expectMarker "inferred bottom action executes" "native-inferred-action-bottom" $ do
+        _ <- bottomCompute
+        pure ()
+    partialIndex <- pure (S bottomLength)
+    let partialVector = replicateNative @Int partialIndex 7
+        partialCompute = pure partialVector >>= \xs -> pure xs
+    partial <- partialCompute
+    assertEqual "inferred partial index prefix" [7] (take 1 (toList partial))
+    putStrLn "inferred partial index prefix: [7]"
+    cyclicIndex <- pure cyclicLength
+    let cyclicVector = replicateNative @Int cyclicIndex 7
+        cyclicCompute = pure cyclicVector >>= \xs -> pure xs
+    cyclic <- cyclicCompute
+    assertEqual "inferred cyclic index prefix" [7, 7] (take 2 (toList cyclic))
+    putStrLn "inferred cyclic index prefix: [7,7]"
+    sharingIndex <- pure (S (S Z))
+    sharedPayload <- newIORef (7 :: Int)
+    let sharingVector = replicateNative @(IORef Int) sharingIndex sharedPayload
+        sharingCompute = pure sharingVector >>= \xs -> pure xs
+    left <- sharingCompute
+    right <- sharingCompute
+    leftValue <- evaluate left
+    rightValue <- evaluate right
+    leftName <- makeStableName leftValue
+    rightName <- makeStableName rightValue
+    assertEqual "inferred computation shares vector" True (leftName == rightName)
+    putStrLn "inferred computation shares vector: True"
+    case toList left of
+        [first, second] -> do
+            original <- evaluate sharedPayload
+            firstValue <- evaluate first
+            secondValue <- evaluate second
+            originalName <- makeStableName original
+            firstName <- makeStableName firstValue
+            secondName <- makeStableName secondValue
+            assertEqual "inferred vector shares original payload" True (originalName == firstName && firstName == secondName)
+            putStrLn "inferred vector shares original payload: True"
+        _ -> fail "inferred sharing vector has the wrong length"
+
 -- | Run finite observations and bounded strictness checks.
 main :: IO ()
 main = do
@@ -1648,3 +1762,4 @@ main = do
     runWildcardMatrixChecks
     runLocalSignatureChecks
     runActionBindChecks
+    runSourceInferenceChecks

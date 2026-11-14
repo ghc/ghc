@@ -1512,6 +1512,23 @@ runModuleChecks libdir = do
         , "inline action ignores bottom index: 42"
         , "explicit bind ignores bottom payload: 42"
         , "action repeated payload sharing: True"
+        , "runtime source inference: (0,[[],[],[]],[0,1,2,3])"
+        , "runtime source inference: (1,[[7],[7],[7]],[0,1,2,3])"
+        , "runtime source inference: (2,[[7,7],[7,7],[7,7]],[0,1,2,3])"
+        , "runtime source inference: (3,[[7,7,7],[7,7,7],[7,7,7]],[0,1,2,3])"
+        , "inferred construction has no effects: 0"
+        , "inferred result ignores bottom fields: 42"
+        , "inferred action executes once: 1"
+        , "inferred computation executes again: 2"
+        , "inferred vector retains index demand: packed-bottom-length"
+        , "inferred result ignores bottom payload: 42"
+        , "inferred result retains payload error: packed-bottom-payload"
+        , "inferred payload demand follows effects: 2"
+        , "inferred bottom action executes: native-inferred-action-bottom"
+        , "inferred partial index prefix: [7]"
+        , "inferred cyclic index prefix: [7,7]"
+        , "inferred computation shares vector: True"
+        , "inferred vector shares original payload: True"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2800,9 +2817,18 @@ runPackageSourceRejectChecks = do
         , ("ActionWrongIOMonad", 83865, "IO", [], [], localActions ++ ["bad :: Nat -> Maybe [Int]", "bad n = let { action :: IO (Vec Int n); action = pure (localVector n) } in action >>= \\xs -> Just (toListLocal xs)"])
         , ("ActionWrongMaybeMonad", 83865, "Maybe", [], [], localActions ++ ["bad :: Nat -> IO [Int]", "bad n = let { action :: Maybe (Vec Int n); action = Just (localVector n) } in do { xs <- action; pure (toListLocal xs) }"])
         , ("ActionConflictingArguments", 83865, "second", [], [], localActions ++ ["consume :: forall a. IO a -> IO a -> IO [Int]", "consume first second = pure []", "bad :: Nat -> Nat -> IO [Int]", "bad n m = let { first :: IO (Vec Int n); first = pure (localVector n); second :: IO (Vec Int m); second = pure (localVector m) } in consume first second"])
-        , ("ActionNativeResultInference", 83865, "untouchable", [], [], localActions ++ ["bad :: Nat -> IO (PackedVec Int)", "bad n = let { action :: IO (Vec Int n); action = pure (localVector n); compute = do { xs <- action; pure xs } } in compute >>= \\xs -> pure (PackVec n xs)"])
-        , ("ActionMissingSignature", 83605, "explicit signature", [], [], localActions ++ ["bad :: Nat -> IO [Int]", "bad n = let action = pure (localVector n) in do { xs <- action; pure (toListLocal xs) }"])
         , ("ActionLinearCapture", 18872, "multiplicity", ["LinearTypes"], [], localActions ++ ["bad :: () %1 -> Nat -> IO [Int]", "bad token n = let { action :: IO (Vec Int n); action = pure (localVector n) } in action >>= \\xs -> pure (case token of () -> toListLocal xs)"])
+        , ("SourceInferenceCallbackLocalIndexEscape", 83605, "outside the application scope", [], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let { action :: IO (Vec Int n); action = pure (localVector n); compute = action >>= \\xs -> let { k :: Nat; k = n } in pure (localVector k) } in pure 42"])
+        , ("SourceInferenceCallbackInputIndexEscape", 83605, "outside the application scope", [], [], localActions ++ ["withAux :: forall a b c. IO a -> IO c -> (a -> IO b) -> IO b", "withAux action auxiliary callback = action >>= callback", "bad :: Nat -> IO Int", "bad n = let compute = withAux (pure (S Z)) (pure (localVector n)) (\\k -> pure (localVector k)) in pure 42"])
+        , ("SourceInferenceIndependentIndex", 83865, "xs", [], [], localActions ++ ["bad :: Nat -> Nat -> IO (PackedVec Int)", "bad n m = let { action = pure (localVector n); compute = action >>= \\xs -> pure xs } in compute >>= \\xs -> pure (PackVec m xs)"])
+        , ("SourceInferenceNativeFunctionAlias", 83605, "explicit signature", [], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let alias = localVector in pure 42"])
+        , ("SourceInferenceGadtEscape", 46956, "escape its scope", [], [], localActions ++ ["data Hidden where Hidden :: forall a. a -> Hidden", "bad :: Nat -> Hidden -> IO Int", "bad n hidden = let { action :: IO (Vec Int n); action = pure (localVector n); compute = action >>= \\xs -> case hidden of Hidden value -> pure value } in pure 42"])
+        , ("SourceInferenceLocalRhsEscape", 83605, "out of scope here", [], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let xs = (let { m :: Nat; m = n } in localVector m) in pure 42"])
+        , ("SourceInferenceRecursiveNativeValue", 83865, "untouchable", [], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let xs = const (localVector n) xs in pure 42"])
+        , ("SourceInferencePatternNativeValue", 83605, "explicit signature", [], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let (xs) = localVector n in pure 42"])
+        , ("SourceInferenceGeneralizedNativeValue", 83605, "explicit signature", ["NoMonoLocalBinds"], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let xs = localVector n in pure 42"])
+        , ("SourceInferencePartialNativeValue", 83865, "untouchable", ["PartialTypeSignatures"], [], localActions ++ ["bad :: Nat -> IO Int", "bad n = let { xs :: _; xs = localVector n } in pure 42"])
+        , ("SourceInferenceCallbackLinearCapture", 18872, "multiplicity", ["LinearTypes"], [], localActions ++ ["bad :: Nat -> Int %1 -> IO [Int]", "bad n value = let { action = pure (localVector n); compute = action >>= \\xs -> const (pure xs) value } in compute >>= \\ys -> pure (toListLocal ys)"])
         , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureAliasIndex", 83605, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])
