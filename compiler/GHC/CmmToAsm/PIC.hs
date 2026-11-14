@@ -7,12 +7,12 @@
 
   Things outside this module which are related to this:
 
-  + module CLabel
+  + GHC.Cmm.CLabel
     - PIC base label (pretty printed as local label 1)
     - DynamicLinkerLabels - several kinds:
         CodeStub, SymbolPtr, GotSymbolPtr, GotSymbolOffset
     - labelDynamic predicate
-  + module Cmm
+  + GHC.Cmm.Reg and GHC.Cmm.Expr
     - The GlobalReg datatype has a PicBaseReg constructor
     - The CmmLit datatype has a CmmLabelDiffOff constructor
   + codeGen & RTS
@@ -22,15 +22,18 @@
       because Win32 doesn't support external references in data sections.
       TODO: make sure this still works, it might be bitrotted
   + NCG
-    - The cmmToCmm pass in AsmCodeGen calls cmmMakeDynamicReference for all
+    - cmmToCmm in GHC.Cmm.GenericOpt calls cmmMakeDynamicReference for all
       labels.
-    - nativeCodeGen calls pprImportedSymbol and pprGotDeclaration to output
-      all the necessary stuff for imported symbols.
+    - makeImportsDoc in GHC.CmmToAsm calls pprImportedSymbol and
+      pprGotDeclaration to output all the necessary stuff for imported
+      symbols.
     - The NCG monad keeps track of a list of imported symbols.
-    - MachCodeGen invokes initializePicBase to generate code to initialize
-      the PIC base register when needed.
-    - MachCodeGen calls cmmMakeDynamicReference whenever it uses a CLabel
-      that wasn't in the original Cmm code (e.g. floating point literals).
+    - The x86 and PowerPC instruction selectors invoke initializePicBase_x86
+      and initializePicBase_ppc to generate code to initialize the PIC base
+      register when needed.
+    - The instruction selectors call cmmMakeDynamicReference whenever they
+      use a CLabel that wasn't in the original Cmm code (e.g. floating point
+      literals).
 -}
 
 module GHC.CmmToAsm.PIC (
@@ -79,9 +82,9 @@ import GHC.Data.FastString
 -- code. It does The Right Thing(tm) to convert the CmmLabel into a
 -- position-independent, dynamic-linking-aware reference to the thing
 -- in question.
--- Note that this also has to be called from MachCodeGen in order to
--- access static data like floating point literals (labels that were
--- created after the cmmToCmm pass).
+-- Note that this also has to be called from the instruction selectors in order
+-- to access static data like floating point literals (labels that were created
+-- after the cmmToCmm pass).
 -- The function must run in a monad that can keep track of imported symbols
 -- A function for recording an imported symbol must be passed in:
 -- - addImportCmmOpt for the CmmOptM monad
@@ -692,9 +695,9 @@ pprImportedSymbol config importedLbl = case (arch,os) of
 --------------------------------------------------------------------------------
 -- Generate code to calculate the address that should be put in the
 -- PIC base register.
--- This is called by MachCodeGen for every CmmProc that accessed the
--- PIC base register. It adds the appropriate instructions to the
--- top of the CmmProc.
+-- This is called by cmmTopCodeGen in the x86 and PowerPC instruction selectors
+-- for every CmmProc that accessed the PIC base register, except on AIX. It adds
+-- the appropriate instructions to the top of the CmmProc.
 
 -- It is assumed that the first NatCmmDecl in the input list is a Proc
 -- and the rest are CmmDatas.

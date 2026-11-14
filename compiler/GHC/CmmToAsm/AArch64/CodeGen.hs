@@ -328,8 +328,12 @@ stmtToInstrs stmt = do
 
       CmmBranch id          -> genBranch id
 
-      --We try to arrange blocks such that the likely branch is the fallthrough
-      --in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
+      -- GHC.Cmm.ContFlowOpt inverts a condition, and its likelihood with it,
+      -- only where the condition can be inverted and its true target has one
+      -- predecessor, and there inverts a likely-false condition if its false
+      -- target has more than one predecessor (Note [Invert Cmm conditionals]),
+      -- so the condition may be likely true here. genCondBranch does not read
+      -- the likelihood.
       CmmCondBranch arg true false _prediction ->
           genCondBranch true false arg
 

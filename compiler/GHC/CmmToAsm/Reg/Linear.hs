@@ -201,7 +201,7 @@ regAlloc _ (CmmProc _ _ _ _)
 
 -- | Do register allocation on some basic blocks.
 --   But be careful to allocate a block in an SCC only if it has
---   an entry in the block map or it is the first block.
+--   an entry in the block map or it is an entry block of the procedure.
 --
 linearRegAlloc
         :: forall instr. (Instruction instr)
@@ -286,11 +286,10 @@ linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
    before allocating one of its predecessors, which could lead to
    inconsistent allocations. Make it so a block is only allocated
    if a predecessor has set the "incoming" assignments for the block, or
-   if it's the procedure's entry block.
+   if it is one of the procedure's entry blocks.
 
-   BL 2009/02: Careful. If the assignment for a block doesn't get set for
-   some reason then this function will loop. We should probably do some
-   more sanity checking to guard against this eventuality.
+   A block whose assignment never gets set is dropped: process stops after
+   a round in which it allocates no block.
 -}
 
 process :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
@@ -698,9 +697,10 @@ saveClobberedTemps clobbered dying
                  -> RegM freeRegs (RegMap Loc,[instr])
      maybe_spill !temp !(assig,instrs) !loc =
         case loc of
-                -- This is non-deterministic but we do not
-                -- currently support deterministic code-generation.
-                -- See Note [Unique Determinism and code generation]
+                -- saveClobberedTemps folds maybe_spill over the vregs in the
+                -- order of their uniques, so the order decides which clobbered
+                -- values move to free registers and which are spilled once
+                -- those run out (Note [Unique Determinism and code generation])
                 Loc (InReg reg) fmt
                     | any (realRegsAlias reg) clobbered
                     , temp `notElem` map getUnique dying
@@ -772,9 +772,8 @@ clobberRegs clobbered
 
         assig           <- getAssigR
         setAssigR $! clobber assig (nonDetUFMToList assig)
-          -- This is non-deterministic but we do not
-          -- currently support deterministic code-generation.
-          -- See Note [Unique Determinism and code generation]
+          -- Each vreg is updated on its own, so the list's order does
+          -- not matter (Note [Unique Determinism and code generation])
 
    where
         -- if the temp was InReg and clobbered, then we will have
@@ -868,8 +867,13 @@ allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt
                         | otherwise -> doSpill WriteNew
 
 -- | Given a virtual reg find a preferred real register.
--- The preferred register is simply the first one the variable
--- was assigned to (if any). This way when we allocate for a loop
+-- A block's entry assignment is recorded at the first jump into it, and the
+-- preferred register is the variable's register in the first entry assignment,
+-- in allocation order, that maps it to a register ('updateBlockAssignment'
+-- keeps the first). That need not be the first register the variable was
+-- assigned to, and a variable that no entry assignment maps to a register has
+-- none.
+-- This way when we allocate for a loop
 -- variables are likely to end up in the same registers at the
 -- end and start of the loop, avoiding redundant reg-reg moves.
 -- Note: I tried returning a list of past assignments, but that
@@ -929,9 +933,12 @@ allocRegsAndSpill_spill reading keep spills alloc r@(VirtualRegWithFormat vr vrF
                       flip delListFromUFM (fmap virtualRegWithFormat_reg keep) $
                       filterUFM (inRegOrBoth . locWithFormat_loc) $
                       assig
-                      -- This is non-deterministic but we do not
-                      -- currently support deterministic code-generation.
-                      -- See Note [Unique Determinism and code generation]
+                      -- candidates lists the vregs in a register, except those
+                      -- in keep, in the order of their uniques, and that order
+                      -- picks the vreg evicted below: of those whose register
+                      -- is of the class needed (compat), the first in both a
+                      -- register and a slot, else the first in a register only
+                      -- (Note [Unique Determinism and code generation])
                 let candidates = nonDetUFMToList candidates'
 
                 -- the vregs we could kick out that are already in a slot

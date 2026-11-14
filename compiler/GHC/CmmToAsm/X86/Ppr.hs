@@ -105,8 +105,8 @@ pprNatCmmDecl config proc@(CmmProc top_info entry_lbl _ (ListGraph blocks)) =
       -- info table and not the entry code!
     , pprProcAlignment config
 
-      -- Special label when ncgExposeInternalSymbols is enabled. See Note
-      -- [Internal proc labels] in GHC.Cmm.Label
+      -- Special label when ncgExposeInternalSymbols is enabled. See
+      -- Note [Internal proc labels] in GHC.Cmm.CLabel
     , pprExposedInternalProcLabel config entry_lbl
 
       -- Subsections-via-symbols label. See Note [Subsections Via Symbols]

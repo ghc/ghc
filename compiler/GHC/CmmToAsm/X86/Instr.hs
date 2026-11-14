@@ -444,8 +444,12 @@ regUsageOfInstr platform instr
       , OpReg {} <- src
       , OpReg {} <- dst
       -> usageRM dst_fmt src dst
-      -- other MOV instructions zero any remaining upper part of the destination
-      -- (largely to avoid partial register stalls)
+      -- The usage of the other MOV instructions has a register destination
+      -- written, not read. Some of them zero any remaining upper part of the
+      -- destination (largely to avoid partial register stalls), such as a
+      -- 32-bit MOV into a general register and a load at FF32 or FF64; others
+      -- keep it, such as a MOV between registers at FF32 or FF64 (movss, movsd)
+      -- and an 8-bit or 16-bit MOV into a general register.
       | otherwise
       -> usageRW dst_fmt src dst
     MOVD fmt1 fmt2 src dst    ->
