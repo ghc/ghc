@@ -5,6 +5,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NoPostfixOperators #-}
 
 -- | Check source packages, filtering, and evaluation demand.
@@ -14,6 +15,7 @@ import Control.Exception (ErrorCall, displayException, evaluate, try)
 import Control.Monad (forM_, unless)
 import Data.IORef (newIORef, readIORef)
 import Data.List (isInfixOf)
+import Data.Type.Equality ((:~:) (Refl))
 import PackedVecLibrary
 
 -- | Construct a package from an ordinary runtime input.
@@ -110,6 +112,58 @@ driveDrainFilter input = do
     cell <- newIORef input
     cutoff <- readIORef cell
     pure (show (toListPacked (filterPacked (> cutoff) samplePacked)))
+
+-- | Render a successful alignment's stored length and paired elements.
+renderZip :: Maybe (PackedVec (Int, Int)) -> String
+renderZip Nothing = "Nothing"
+renderZip (Just package) = "Just " ++ withPacked package (\n xs -> show (natToInt n, toList xs))
+
+-- | Read two independent lengths before comparing and pairing their vectors.
+{-# NOINLINE driveEqualityZip #-}
+driveEqualityZip :: Nat -> Nat -> IO String
+driveEqualityZip left right = do
+    leftCell <- newIORef left
+    rightCell <- newIORef right
+    n <- readIORef leftCell
+    m <- readIORef rightCell
+    let equality = case sameNat n m of
+            Nothing -> "different"
+            Just Refl -> "same"
+        leftPackage = PackVec n (replicateNative @Int n 42)
+        rightPackage = PackVec m (replicateNative @Int m 7)
+    pure (equality ++ " " ++ renderZip (zipPacked leftPackage rightPackage))
+
+-- | Compare two independently filtered lengths and preserve element order.
+{-# NOINLINE driveFilteredZip #-}
+driveFilteredZip :: Int -> Int -> IO String
+driveFilteredZip left right = do
+    leftCell <- newIORef left
+    rightCell <- newIORef right
+    leftCutoff <- readIORef leftCell
+    rightCutoff <- readIORef rightCell
+    pure (renderZip (zipPacked (filterPacked (> leftCutoff) samplePacked) (filterPacked (> rightCutoff) rightSamplePacked)))
+
+-- | A second ordered vector with different element values.
+rightSamplePacked :: PackedVec Int
+rightSamplePacked = PackVec (S (S (S Z))) (VCons 10 (VCons 20 (VCons 30 VNil)))
+
+-- | Select one pair without evaluating either of its components.
+firstPair :: PackedVec (Int, Int) -> (Int, Int)
+firstPair package = case headPacked package of
+    Nothing -> error "expected a nonempty aligned vector"
+    Just pair -> pair
+
+-- | Keep two vector errors distinct during alignment.
+leftVector :: forall (n :: Nat). Vec Int n
+leftVector = error "zip-left-vector"
+
+-- | Keep the right vector error distinct from the left vector error.
+rightVector :: forall (n :: Nat). Vec Int n
+rightVector = error "zip-right-vector"
+
+-- | A distinct error for the right runtime length.
+bottomRightLength :: Nat
+bottomRightLength = error "equality-right-length"
 
 -- | Exercise both guarded rows after reading the guard at runtime.
 {-# NOINLINE driveGuardedRepack #-}
@@ -447,3 +501,92 @@ main = do
             putStrLn "uncons cyclic bounded prefix: [42,42,42]"
     expectMarker "uncons bottom package" "packed-bottom-package" $
         evaluate (unconsPacked bottomPackage)
+    forM_
+        [ (Z, Z, "same Just (0,[])")
+        , (Z, S (S Z), "different Nothing")
+        , (S (S Z), Z, "different Nothing")
+        , (S (S Z), S (S Z), "same Just (2,[(42,7),(42,7)])")
+        , (S (S Z), S (S (S Z)), "different Nothing")
+        , (S (S (S Z)), S (S Z), "different Nothing")
+        , (S (S (S Z)), S (S (S Z)), "same Just (3,[(42,7),(42,7),(42,7)])")
+        ]
+        $ \(left, right, expected) -> do
+            actual <- driveEqualityZip left right
+            assertEqual "runtime equality zip" expected actual
+            putStrLn ("runtime equality zip: " ++ actual)
+    forM_
+        [ (0, 0, "Just (3,[(1,10),(2,20),(3,30)])")
+        , (1, 10, "Just (2,[(2,20),(3,30)])")
+        , (1, 0, "Nothing")
+        , (3, 30, "Just (0,[])")
+        ]
+        $ \(left, right, expected) -> do
+            actual <- driveFilteredZip left right
+            assertEqual "runtime filtered zip" expected actual
+            putStrLn ("runtime filtered zip: " ++ actual)
+    case sameNat Z (S bottomRightLength) of
+        Nothing -> putStrLn "equality zero successor ignores predecessor: Nothing"
+        Just _ -> fail "equality zero successor: expected Nothing"
+    case sameNat (S bottomLength) Z of
+        Nothing -> putStrLn "equality successor zero ignores predecessor: Nothing"
+        Just _ -> fail "equality successor zero: expected Nothing"
+    case sameNat cyclicLength Z of
+        Nothing -> putStrLn "equality cyclic successor zero: Nothing"
+        Just _ -> fail "equality cyclic successor zero: expected Nothing"
+    expectMarker "equality demands left length" "packed-bottom-length" $
+        evaluate (sameNat bottomLength Z)
+    expectMarker "equality demands right length" "equality-right-length" $
+        evaluate (sameNat Z bottomRightLength)
+    expectMarker "equality same index still demands length" "packed-bottom-length" $
+        evaluate (sameNat bottomLength bottomLength)
+    expectMarker "equality demands left predecessor" "packed-bottom-length" $
+        evaluate (sameNat (S bottomLength) (S Z))
+    expectMarker "equality demands right predecessor" "equality-right-length" $
+        evaluate (sameNat (S Z) (S bottomRightLength))
+    case zipPacked (PackVec Z leftVector) (PackVec (S Z) rightVector) of
+        Nothing -> putStrLn "zip mismatch ignores vectors: Nothing"
+        Just _ -> fail "zip mismatch ignores vectors: expected Nothing"
+    case zipPacked (PackVec (S Z) leftVector) (PackVec Z rightVector) of
+        Nothing -> putStrLn "zip reversed mismatch ignores vectors: Nothing"
+        Just _ -> fail "zip reversed mismatch ignores vectors: expected Nothing"
+    expectMarker "zip demands left package first" "packed-bottom-package" $
+        evaluate (zipPacked bottomPackage (error "zip-right-package" :: PackedVec Int))
+    expectMarker "zip demands right package" "zip-right-package" $
+        evaluate (zipPacked (PackVec bottomLength leftVector) (error "zip-right-package" :: PackedVec Int))
+    let undefinedVectors = zipPacked (PackVec (S Z) leftVector) (PackVec (S Z) rightVector)
+    assertWhnf "zip equal result ignores vectors" undefinedVectors
+    case undefinedVectors of
+        Nothing -> fail "zip equal result: expected Just"
+        Just package -> do
+            assertWhnf "zip equal package ignores vectors" package
+            assertEqual "zip length ignores vectors" 1 (withPacked package (\n xs -> natToInt n))
+            putStrLn "zip length ignores vectors: 1"
+            expectMarker "zip vector demands left tag" "zip-left-vector" $
+                evaluate (firstPair package)
+    case zipPacked (PackVec (S Z) (VCons 42 VNil)) (PackVec (S Z) rightVector) of
+        Nothing -> fail "zip right tag: expected Just"
+        Just package ->
+            expectMarker "zip vector demands right tag" "zip-right-vector" $
+                evaluate (firstPair package)
+    let partialLeft = PackVec (S (S Z)) (VCons bottomElement leftVector)
+        partialRight = PackVec (S (S Z)) (VCons (error "zip-right-head") rightVector)
+    case zipPacked partialLeft partialRight of
+        Nothing -> fail "zip partial fields: expected Just"
+        Just package -> do
+            let pair = firstPair package
+            assertWhnf "zip tuple ignores components" pair
+            expectMarker "zip demands left head" "packed-filter-bottom-element" (evaluate (fst pair))
+            expectMarker "zip demands right head" "zip-right-head" (evaluate (snd pair))
+            case unconsPacked package of
+                Nothing -> fail "zip partial tail: expected Just"
+                Just (_, rest) -> do
+                    assertWhnf "zip tail package ignores tails" rest
+                    expectMarker "zip demands left tail" "zip-left-vector" $
+                        evaluate (firstPair rest)
+    case zipPacked (PackVec (S (S Z)) (VCons 42 (VCons 43 VNil))) partialRight of
+        Nothing -> fail "zip right tail: expected Just"
+        Just package -> case unconsPacked package of
+            Nothing -> fail "zip right tail: expected a nonempty vector"
+            Just (_, rest) ->
+                expectMarker "zip demands right tail" "zip-right-vector" $
+                    evaluate (firstPair rest)

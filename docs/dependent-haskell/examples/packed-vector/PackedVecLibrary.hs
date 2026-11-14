@@ -6,6 +6,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | Store and consume a runtime length with an indexed vector.
 module PackedVecLibrary
@@ -21,6 +22,9 @@ module PackedVecLibrary
     , headPacked
     , unconsPacked
     , toListPacked
+    , sameNat
+    , zipVec
+    , zipPacked
     , proofDepthBounded
     , repackWithoutProof
     , guardedRepack
@@ -32,6 +36,8 @@ module PackedVecLibrary
     , toList
     , natToInt
     ) where
+
+import Data.Type.Equality ((:~:) (Refl))
 
 -- | A runtime length. Each successor contains an ordinary lazy field.
 data Nat = Z | S Nat
@@ -88,6 +94,49 @@ toListPacked :: PackedVec a -> [a]
 toListPacked package = case unconsPacked package of
     Nothing -> []
     Just (x, rest) -> x : toListPacked rest
+
+-- | Compare runtime lengths and return equality evidence on success.
+sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)
+sameNat n m = case n of
+    Z -> case m of
+        Z -> Just Refl
+        S q -> Nothing
+    S p -> case m of
+        Z -> Nothing
+        S q -> case sameNat p q of
+            Nothing -> Nothing
+            Just Refl -> Just Refl
+
+-- | Pair elements of ordinary vectors with one shared length index.
+zipVec :: Vec a n -> Vec b n -> Vec (a, b) n
+zipVec VNil VNil = VNil
+zipVec (VCons x xs) (VCons y ys) = VCons (x, y) (zipVec xs ys)
+
+-- | Compare stored lengths before aligning the vector payloads.
+zipPacked :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))
+zipPacked (PackVec n xs) (PackVec m ys) = case sameNat n m of
+    Nothing -> Nothing
+    Just Refl -> Just (PackVec n (zipVec xs ys))
+
+{- Note [Runtime length equality and vector alignment]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+sameNat compares the actual Nat values. Its successful result stores an
+ordinary :~: proof. zipPacked matches Refl before using the two vector fields
+at one length index. The proof variable alone supplies no local coercion.
+Nothing carries no refutation. No singleton or new equality datatype is used.
+
+The comparison inspects length constructors before any vector payload.
+Equal-length success completes comparison of both finite Nat spines before
+returning Just. This differs from Agda Dec's separate does and proof fields.
+Matching Refl evaluates the proof. The successful package still stores a lazy
+zipVec application. Its laziness concerns vectors, pair components, and tails,
+not the compared indices. Finite consistent inputs have the stated alignment.
+Partial and cyclic lengths need separate demand checks and can make comparison
+diverge.
+See REFERENCES.md#runtime-equality-and-aligned-zip-next-source-probe for the
+pinned Agda equality and vector operations. Their proof erasure and totality
+rules do not establish Haskell's evaluation behavior.
+-}
 
 {- Note [Uncons with a runtime predecessor]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

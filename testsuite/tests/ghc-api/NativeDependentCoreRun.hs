@@ -1207,6 +1207,40 @@ runModuleChecks libdir = do
         , "uncons cyclic predecessor head: 42"
         , "uncons cyclic bounded prefix: [42,42,42]"
         , "uncons bottom package: packed-bottom-package"
+        , "runtime equality zip: same Just (0,[])"
+        , "runtime equality zip: different Nothing"
+        , "runtime equality zip: different Nothing"
+        , "runtime equality zip: same Just (2,[(42,7),(42,7)])"
+        , "runtime equality zip: different Nothing"
+        , "runtime equality zip: different Nothing"
+        , "runtime equality zip: same Just (3,[(42,7),(42,7),(42,7)])"
+        , "runtime filtered zip: Just (3,[(1,10),(2,20),(3,30)])"
+        , "runtime filtered zip: Just (2,[(2,20),(3,30)])"
+        , "runtime filtered zip: Nothing"
+        , "runtime filtered zip: Just (0,[])"
+        , "equality zero successor ignores predecessor: Nothing"
+        , "equality successor zero ignores predecessor: Nothing"
+        , "equality cyclic successor zero: Nothing"
+        , "equality demands left length: packed-bottom-length"
+        , "equality demands right length: equality-right-length"
+        , "equality same index still demands length: packed-bottom-length"
+        , "equality demands left predecessor: packed-bottom-length"
+        , "equality demands right predecessor: equality-right-length"
+        , "zip mismatch ignores vectors: Nothing"
+        , "zip reversed mismatch ignores vectors: Nothing"
+        , "zip demands left package first: packed-bottom-package"
+        , "zip demands right package: zip-right-package"
+        , "zip equal result ignores vectors: ok"
+        , "zip equal package ignores vectors: ok"
+        , "zip length ignores vectors: 1"
+        , "zip vector demands left tag: zip-left-vector"
+        , "zip vector demands right tag: zip-right-vector"
+        , "zip tuple ignores components: ok"
+        , "zip demands left head: packed-filter-bottom-element"
+        , "zip demands right head: zip-right-head"
+        , "zip tail package ignores tails: ok"
+        , "zip demands left tail: zip-left-vector"
+        , "zip demands right tail: zip-right-vector"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2453,6 +2487,11 @@ runPackageSourceRejectChecks = do
         , ("NestedIndexEscape", 5617, "VCons x xs", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n (VCons x xs)) = VCons x xs"])
         , ("UnconsOriginalLength", 25897, "rest", [], [], package ++ ["bad :: forall a. PackedVec a -> Maybe (a, PackedVec a)", "bad (PackVec n xs) = case n of", "  Z -> Nothing", "  S k -> case xs of", "    VCons x rest -> Just (x, PackVec n rest)"])
         , ("UnconsIndependentLength", 25897, "rest", [], [], package ++ ["bad :: forall a. foreach (m :: Nat) -> PackedVec a -> Maybe (a, PackedVec a)", "bad m (PackVec n xs) = case n of", "  Z -> Nothing", "  S k -> case xs of", "    VCons x rest -> Just (x, PackVec m rest)"])
+        , ("IndependentRefl", 83865, "Just Refl", [], equalityImports, package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad n m = Just Refl"])
+        , ("ZipWithoutEquality", 83865, "zipVec xs ys", [], [], package ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = Just (PackVec n (zipVec xs ys))"])
+        , ("ZipUnmatchedProof", 83865, "zipVec xs ys", [], equalityImports, package ++ equality ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = case sameNat n m of", "  Nothing -> Nothing", "  Just proof -> Just (PackVec n (zipVec xs ys))"])
+        , ("ZipNothingBranch", 83865, "zipVec xs ys", [], equalityImports, package ++ equality ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = case sameNat n m of", "  Just Refl -> Just (PackVec n (zipVec xs ys))", "  Nothing -> Just (PackVec n (zipVec xs ys))"])
+        , ("LinearIndex", 83605, "local index variable", ["LinearTypes"], [], package ++ ["bad :: Nat %1 -> PackedVec Int", "bad n = PackVec n (error \"unused\")"])
         , ("LinearClause", 18872, "arising from a pattern", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
         , ("LinearCase", 18872, "arising from multiplicity", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad p = case p of PackVec n xs -> PackVec n xs"])
         , ("RigidMultiplicity", 25897, "is a rigid type variable", ["LinearTypes"], ["import GHC.Types (Multiplicity)"], package ++ ["bad :: forall (p :: Multiplicity) a. PackedVec a %p -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
@@ -2483,6 +2522,24 @@ runPackageSourceRejectChecks = do
   where
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
     package = declaration "foreach (n :: Nat) -> Vec a n -> PackedVec a"
+    equalityImports = ["import Data.Type.Equality ((:~:)(Refl))"]
+    equality =
+        [ "sameNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)"
+        , "sameNat n m = case n of"
+        , "  Z -> case m of"
+        , "    Z -> Just Refl"
+        , "    S q -> Nothing"
+        , "  S p -> case m of"
+        , "    Z -> Nothing"
+        , "    S q -> case sameNat p q of"
+        , "      Nothing -> Nothing"
+        , "      Just Refl -> Just Refl"
+        ]
+    zipper =
+        [ "zipVec :: Vec a n -> Vec b n -> Vec (a, b) n"
+        , "zipVec VNil VNil = VNil"
+        , "zipVec (VCons x xs) (VCons y ys) = VCons (x, y) (zipVec xs ys)"
+        ]
     keepBound = "PackBounded (S len) (VCons x ys) (LES proof)"
     dropBound = "PackBounded len ys (weakenRight proof)"
     bounded retained rejected =
