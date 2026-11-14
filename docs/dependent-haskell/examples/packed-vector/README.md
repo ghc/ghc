@@ -1,9 +1,9 @@
 # Packed vector source example
 
-Both M29 compiler stages pass all 461 source observations with Core Lint
-and STG Lint. The API/runtime fixture passes 146 source rejection cases.
-All five registered regressions pass. M29 adds 22 observations and keeps the
-previous 439 lines in order. Both stages pass 112 standalone rejection cases
+Both M30 compiler stages pass all 479 source observations with Core Lint
+and STG Lint. The API/runtime fixture passes 160 source rejection cases.
+All five registered regressions pass. M30 adds 18 observations and keeps the
+previous 461 lines in order. Both stages pass 126 standalone rejection cases
 and four ordinary-Haskell controls.
 
 At M20, both stages and all five regressions passed 301 observations and
@@ -1135,7 +1135,55 @@ raise its original error. A full ordinary VTA call remains a separate control.
 See Note `[Native inference after visible type applications]` in
 [GHC.Tc.Gen.App](../../../../compiler/GHC/Tc/Gen/App.hs) and the
 [pinned application references](../../REFERENCES.md#native-inference-after-leading-visible-type-applications).
-The separate native-index-kind prepass is unchanged. A leading `@Int` with
-remaining Nat-kinded erased variables is outside the new M29 route. Both stages compile `observe vector` and `observe @Int @Z VNil`, but reject
-`observe @Int vector` with located GHC-83865. See the
+At M29, the separate native-index-kind prepass remained unchanged. A leading
+`@Int` with remaining Nat-kinded erased variables was outside that route.
+Both stages compiled `observe vector` and `observe @Int @Z VNil`, but rejected
+`observe @Int vector` with located GHC-83865. M30 implements this case below.
+See the
 [M30 plan](../../PLAN.md#m30-native-index-kind-inference-after-leading-vta).
+
+## Native index inference after leading VTA
+
+M30 passes bootstrap and self-hosted validation.
+The source example passes 479 observations. The previous 461 outputs remain
+unchanged. Focused checks pass ten positive controls and fourteen located
+rejections. The corrected API fixture passes 160 rejection cases.
+
+```haskell
+observeIndexVTA :: forall a (index :: Nat). Vec a index -> Int
+observeIndexVTA _ = 42
+
+use :: foreach (n :: Nat) -> Vec Int n -> Int
+use n xs = observeIndexVTA @Int xs
+```
+
+The checker first instantiates `a` with `Int`. The existing NoQL matcher then
+infers the remaining `index :: Nat` from the actual vector type. It passes
+that immutable choice through IALL in the original telescope order. This
+route requires exact saturation. It retains native-meta, kind, scope, usage
+and final subsumption checks. The erased index adds no runtime argument and
+does not evaluate `n`. Core and the interface representation are unchanged.
+
+[driveIndexVTA and runIndexVTAChecks](Main.hs) compare omitted, partial and
+complete ordinary VTA. They use `observeIndexVTA`, `retainIndexVTA`,
+`observeTwoIndexVTA` and `observeEqIndexVTA` at IORef lengths 0 through 3.
+The counters require `[0,1,2]`. Ignoring a bottom index and vector returns
+42. Demanding the vector, its generating index or its element preserves the
+original error. Partial/cyclic prefixes remain usable. Further checks
+preserve first/second vector demand and sharing of the named vector and
+original IORef payload.
+
+The early Quick Look rejection now counts the written type argument:
+`xs` is the second argument of `observeIndexVTA @Int xs`. The API diagnostic
+assertion was corrected for promoted-constructor tick notation. This changes
+the expected diagnostic text, not the type rule.
+
+See Note `[Native inference after visible type applications]` in
+[GHC.Tc.Gen.App](../../../../compiler/GHC/Tc/Gen/App.hs) and the
+[pinned index-inference references](../../REFERENCES.md#native-index-kind-inference-after-leading-vta).
+
+
+M30 passes all five registered regressions. Its two-stage strict composition
+baseline accepts a named native-function selection from a combined tuple,
+but rejects direct application and separate ordinary/native payloads.
+See the [M31 plan](../../PLAN.md#m31-joint-native-index-argument-inference-and-result-overapplication).

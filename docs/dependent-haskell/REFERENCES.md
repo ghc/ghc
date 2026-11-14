@@ -2150,7 +2150,7 @@ The separate M29 archive is `native-leading-vta-prior-art-v1`. Preserve the
 frozen M28 source and evidence. M29 adds no Core form or equality rule.
 
 
-## Native-index-kind inference after leading VTA: next boundary
+## Native-index-kind inference after leading VTA
 
 Both M29 stages compile an erased Nat-indexed `observe` without VTA and with
 complete ordinary `@Int @Z`. Partial `@Int` rejects with GHC-83865 at
@@ -2159,9 +2159,87 @@ commands, emitted diagnostics and tokens are in
 `native-leading-vta-probes-{bootstrap,selfhost}-next-v1`. These are compile/Lint
 checks. They make no runtime claim about the rejected form.
 
-M30 will reuse the existing native-index-kind matcher after leading ITYARG,
-under exact saturation and the current kind, scope and native-meta guards.
-Agda's pinned current-Pi argument checking and substituted codomain remain
-the application precedent. GHC's existing native-index prepass and M29's
-immutable IALL choices supply the implementation precedent. This is a local
-next step, not a claim of general term computation in types.
+M30's compiler implementation is `459add4e28`, with diagnostic correction
+`651ddfe0f7`. Both stages pass 479 source observations, 126 located rejection
+cases and four ordinary controls. The new matrix has 24 cases. The API fixture
+passes 160 rejection checks. All five registered regressions pass. M30 reuses
+the existing native-index-kind matcher after leading ITYARG. For example,
+the source target is:
+
+```haskell
+observe :: forall a (index :: Nat). Vec a index -> Int
+observe _ = 42
+
+use :: foreach (n :: Nat) -> Vec Int n -> Int
+use n xs = observe @Int xs
+```
+
+ITYARG checks `@Int` and substitutes `a`. The remaining erased parameter
+`index :: Nat` can then match the runtime index `n` in the actual type of `xs`.
+That match supplies an immutable type-argument choice. It does not evaluate
+`n`, pass a singleton, or put native syntax into an ordinary type meta.
+
+Agda v2.8.0 [`Rules/Application.hs`, lines 774–808](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+checks the current Pi argument and continues with the substituted codomain
+`absApp b u`. [Lines 619–643](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L619-L643)
+insert implicit arguments before checking the next supplied argument.
+The exact tagged file in the M29 archive has Git blob
+`82ba94ac864d19b947d4c92b9af252b0fe81347a`.
+These rules support staged telescope substitution. Agda's contextual metas
+and Pi forcing do not justify relaxing GHC's native-meta or scope restrictions.
+
+The GHC implementation precedent is `GHC.Tc.Gen.App` at
+`51b8c1b41d010ecd1ba59f99efba7c542029b2db`, Git blob
+`f34aa668c0d8a28d25878104c0f2028ea22cd3a0`. IALL starts at line 957;
+ITYARG starts at line 1054. The removed guard was at line 1951.
+Its native-index-kind prepass already performs immutable matching. Its M29
+post-VTA route already returns choices through IALL in the original binder
+and dictionary order. M30 removes the exclusion
+`isNothing after_vta || null index_tvs`. The owning Note
+`[Native inference after visible type applications]` now states both policies.
+Native-index-kind inference requires exact saturation. Only the separate
+generic route can use a nonempty declared argument prefix for overapplication.
+
+Keep NoQL, the extension guard, the eligible original head, no consumed value
+arguments and no remaining type applications. Keep all required immutable
+choices, substituted-kind checks, exact argument types and lexical runtime-Id
+scope checks. Preserve native-meta and concreteness guards. Retain successful
+and failed-match caches, separate value/source counters, once-only usage and
+final subsumption. Public callers that cannot consume the cache remain gated.
+Calls without type arguments keep the existing prepass.
+
+The diagnostic correction passes `pos + count written_type_arg acc` to
+`quickLookArg`. Its integer argument supplies `addArgCtxt` in `quickLookArg1`.
+It does not select matches, cache entries or instantiation choices. At the
+pinned M29 source above, `tcValArgsWithCache` lines 638–649 already separate
+value positions from source positions. Lines 3399–3401 use the Quick Look
+position for argument context. The correction applies that existing source
+convention before final argument checking too. For `observe @Int xs`, the
+GHC-83605 context now identifies the second argument rather than the first.
+The error location remains `xs`. Generated `ETypeArg` entries do not count.
+
+M30's separate archive is `native-index-vta-prior-art-v1`. Preserve the frozen
+M29 evidence. This change adds no Core representation or equality rule.
+
+
+## Joint native-index and payload inference: next boundary
+
+M30's strict compile/Lint baseline is
+`native-index-vta-probes-{bootstrap,selfhost}-next-strict-v1`. Both stages
+accept a named exact-saturated native-function selection from a combined
+vector/payload tuple and a complete ordinary VTA control. Direct native
+selection, its omitted-VTA counterpart, a separate native payload and a
+separate ordinary function payload reject with located GHC-83865. The first
+discovery expected that ordinary payload control to pass; the strict v2
+dataset records the observed rejection. No runtime behavior is claimed for
+rejected forms.
+
+At M30, `tcRetainedArgInstEnabled` selects `index_tvs` as the domains to infer
+for the index route. `tcRetainedArgChoices` requires complete immutable
+choices on that route. An independently quantified payload can therefore
+remain undetermined even when its actual argument is ordinary. M31 will
+match these parameters together from the declared prefix, then use GHC's
+existing application pipeline for extras. The pinned Agda application spine
+and M28 empty-substitution rule for overapplication remain the precedents.
+Do not infer missing native indices from extra-only anchors or assign native
+syntax to mutable metas.

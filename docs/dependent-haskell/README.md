@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 461 runtime observations and the runtime fixtures check 146 source rejection cases |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 479 runtime observations and the runtime fixtures check 160 source rejection cases |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -60,7 +60,8 @@ Last updated: 2026-11-14.
 | Native tuple sections | Inferred and expected boxed sections preserve exact native fields, hole multiplicities, field laziness and captured vector sharing |
 | Generic result application | A native-anchored declared argument prefix determines a generic function result before ordinary checking consumes extra arguments |
 | Leading visible type applications | Remaining generic binders infer after leading VTA; checked type arguments, evidence order, usage and diagnostic positions are preserved |
-| Next task | M30: native-index-kind inference after leading VTA; `observe vector` compiles while `observe @Int vector` still rejects |
+| Native-index VTA | Remaining Nat-kinded parameters infer after leading VTA under exact saturation; index demand, contexts and argument positions pass |
+| Next task | M31: infer native indices and independent payload parameters together, then apply selected function results directly |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2926,3 +2927,69 @@ Both stages compile `observe vector` and `observe @Int @Z VNil`, but reject
 That compile/Lint baseline reports GHC-83865 at `localVector n`, with a
 second-argument context. [M30](PLAN.md#m30-native-index-kind-inference-after-leading-vta)
 will reuse this route after leading VTA under its exact-saturation guards.
+
+
+## M30: native-index inference after leading visible type applications
+
+The exact-saturated native-index route now runs after leading VTA:
+
+```haskell
+observe :: forall a (index :: Nat). Vec a index -> Int
+observe _ = 42
+-- vector has type Vec Int n at the existing runtime Nat n.
+result = observe @Int vector
+```
+
+ITYARG first checks `@Int`. The existing immutable matcher infers the
+remaining Nat index from the vector type. IALL consumes the choices in the
+original telescope and dictionary order. NoQL, extension, head/concreteness,
+kind, exact-domain and lexical scope guards remain. Index-kind inference
+requires exact saturation; generic result overapplication keeps its separate
+route. Successful and failed matches retain their argument caches.
+
+The owning Note `[Native inference after visible type applications]` records
+both routes. The cached-inference Note refers to it. The Quick Look argument
+context now adds the written-type-argument offset, as final argument checking
+already does. `observe @Int xs` reports its retained-type rejection at `xs`,
+with a second-argument context. Generated type arguments do not add an offset.
+This diagnostic adjustment does not change matching or instantiation.
+[Pinned Agda and GHC sources](REFERENCES.md#native-index-kind-inference-after-leading-vta)
+record the existing application and inference rules. Core representation and
+the interface version are unchanged.
+
+Both compiler stages pass 479 source observations; the previous 461 outputs
+remain unchanged. The 18 additions compare omitted, partial and complete
+ordinary VTA, including two independent runtime indices and nested contexts.
+They check action counts, ignored bottom index/vector values, original vector,
+index and element errors, bounded partial/cyclic prefixes, left/right demand,
+and sharing of named vectors and original IORefs. Inferring an erased index
+does not force its runtime value.
+
+Both stages pass 126 located rejection cases and four ordinary runtime
+controls. The new matrix has ten positive and fourteen negative cases. It
+covers remaining ordinary binders, an incoming index dictionary without an
+instance, linear use, contexts, mismatches, kinds, escapes, interleaved VTA and
+Quick Look. The failed-match trace elaborates `prefixProbe` once per stage.
+The API fixture passes 160 source rejection cases. All five registered
+regressions pass, with 34 skipped ways and no unexpected results or framework
+warnings. The full GHC suite was not run.
+
+Evidence uses `_build/verification/native-index-vta-*`. Three archives each
+retain 32 selected compiler paths. The final bootstrap and self-host builds
+took 16.97s and 6m52s; their serial job peaked at 4583 MiB under 16 GiB.
+Final source/API checks peaked at 1229 MiB under 4 GiB. Registered tests took
+13.24s and peaked at 1812 MiB under 8 GiB. Swap was disabled. The failed API
+assertion remains: the API printer uses promoted `'Z` while the CLI prints
+`Z`. The corrected API assertion checks the stable third-argument context;
+the CLI still checks the closed-index fragment and exact source tokens.
+Frozen M29 and earlier evidence remains unchanged.
+
+The next strict compile/Lint baseline passes a named selection of a native
+function from a combined vector/payload tuple. Its direct application rejects.
+A separate payload also rejects, including an ordinary `Int -> Int` payload:
+the index route only infers domains that mention an index binder, then requires
+complete choices. Both stages agree on two accepted and four rejected forms.
+[M31](PLAN.md#m31-joint-native-index-argument-inference-and-result-overapplication)
+will infer the index and payload together from the declared prefix. A later
+capability is safe ambient equality beneath a fixed-domain retained Pi;
+optimizer support requires its own substitution and scope audit.

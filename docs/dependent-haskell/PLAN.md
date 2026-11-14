@@ -94,7 +94,10 @@ Both stages pass the failed-match cache trace. All five registered regressions
 pass. M29 verifies native generic inference after leading visible type applications
 with 461 observations, 112 located rejections, four ordinary controls and 146
 API rejections. Both stages pass the cache trace and all five registered tests.
-M30 targets native-index-kind inference after leading VTA.
+M30 verifies native-index-kind inference after leading VTA with 479 source
+observations, 126 located rejections, four ordinary controls and 160 API
+rejections. Both stages and all five registered regressions pass. M31 targets
+joint native-index/payload inference and result overapplication.
 
 ## Direction and boundaries
 
@@ -1909,9 +1912,9 @@ and complete ordinary VTA. The original native-index-kind prepass is unchanged.
 
 ### M30: native-index-kind inference after leading VTA
 
-This target is unverified. Both M29 stages compile `observe vector` and
-`observe @Int @Z VNil`. They reject the following partial-VTA form with
-GHC-83865 at `localVector n`, in the second argument of `observe`:
+Verified in both stages. The M29 baseline compiled `observe vector` and
+`observe @Int @Z VNil`, but rejected the following partial-VTA form with
+GHC-83865. M30 accepts it without evaluating its inferred runtime index:
 
 ```haskell
 observe :: forall a (index :: Nat). Vec a index -> Int
@@ -1919,22 +1922,65 @@ observe _ = 42
 bad n = pure (observe @Int (localVector n))
 ```
 
-- [ ] Reuse the native-index-kind matcher after ITYARG substitutes leading
+- [x] Reuse the native-index-kind matcher after ITYARG substitutes leading
   arguments. Keep its exact-saturation, kind, native-meta and lexical-scope
   guards. Require NoQL, the extension, the original eligible head, no consumed
   value arguments and no remaining type arguments. Generic overapplication
   stays separate.
-- [ ] Return immutable choices for the remaining telescope through IALL.
+- [x] Return immutable choices for the remaining telescope through IALL.
   Preserve written type arguments and dictionary order. Retain successful
   and failed-match caches. Use the existing separate value/source counters
   and preserve the public cache-discarding wrapper.
-- [ ] Compare omitted, partial and complete ordinary VTA from source. Cover
+- [x] Compare omitted, partial and complete ordinary VTA from source. Cover
   runtime Nat indices, nested contexts, multiple remaining parameters, scope,
   kinds, mismatched indices and linear usage. Check that ignored native index
   arguments stay lazy. Preserve original payload sharing and action counts.
-- [ ] Update the owning Note and pinned Agda/GHC provenance. Pin emitted
+- [x] Update the owning Note and pinned Agda/GHC provenance. Pin emitted
   diagnostics and primary source tokens in both stages. Rebuild both stages,
   run the focused registered regressions, and preserve the frozen M29 evidence.
+
+
+### M31: joint native-index argument inference and result overapplication
+
+This target is unverified. Both M30 stages pass a named exact-saturated
+selection from `(Vec a index, value)`, where `value` is a native function.
+Directly applying that selection rejects. A helper with separate vector and
+payload arguments also rejects, including an ordinary function payload:
+
+```haskell
+selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value
+selectIndex _ value = value
+bad n = pure (let selected = selectIndex @Int (localVector n)
+                              ((+1) :: Int -> Int)
+              in selected 42)
+```
+
+The index route infers domains that mention `index_tvs`. Its choice check
+requires every quantified parameter, so an independent `value` remains
+undetermined. Exact saturation also blocks direct result overapplication.
+The strict two-stage baseline has two accepted and four rejected forms.
+
+- [ ] Match native-index and ordinary payload choices jointly from the
+  nonempty declared argument prefix. Infer independent parameters needed by
+  that prefix, while preserving known expected domains. Require complete
+  immutable native-index choices. Preserve kind, head/concreteness, exact
+  cached-domain and lexical scope checks; keep native mutable fills forbidden.
+- [ ] Allow ordinary extra arguments after that prefix. Start overapplication
+  matching with an empty substitution, since the final expected result comes
+  after those arguments. Reuse IALL, final subsumption and dictionary order.
+  Keep both leading-VTA and existing no-VTA routes consistent.
+- [ ] Compare named/direct calls and ordinary/native function payloads from
+  source. Cover runtime indices, contexts, sharing, effects and demand. Pin
+  conflicting choices, undetermined indices, extra-only anchors, scopes,
+  kinds, dictionaries and linear use. Trace once-only elaboration on failure.
+- [ ] Update the owning Notes and pinned Agda/GHC provenance. Rebuild both
+  stages, run the focused regressions, and preserve the frozen M30 evidence.
+
+After this composition step, probe ambient ordinary equality evidence under
+a fixed-domain retained Pi. Restrict evidence to outer variables that cannot
+depend on the new runtime binder. Keep plugins, cache writes, fresh dependent
+Wanteds and mutable native fills gated. Audit optimizer substitution,
+occurrence scope and proof-case reconstruction before enabling transformations.
 
 ## Further work
 
