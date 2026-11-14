@@ -1237,6 +1237,16 @@ This target is unverified. Return a runtime sum with ordinary equality
 evidence, then use that evidence to package an appended vector. Follow
 the [pinned addition, vector append and congruence definitions](REFERENCES.md#computed-length-append-next-source-probe).
 
+The first probes confirm two boundaries. A declaration-only module reaches
+the late implicit-binding gate. Include local retained constructor worker
+types in native module classification before simplification, tidying and
+code generation. Keep the existing native option restrictions. Construction
+of `Sum m Refl` also fails with GHC-83865 at the expression. Extend result
+projection only for a fully applied real constructor with validated retained
+field metadata. Traverse its current signature in metadata order. Do not
+project through retained arguments of arbitrary functions. Match only outer
+erased parameters and keep the actual instantiated telescope and field checks.
+
 ```haskell
 data Sum (n :: Nat) (m :: Nat) where
   Sum :: foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m
