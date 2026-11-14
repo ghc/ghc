@@ -176,7 +176,7 @@ rnWithRetainedAliases bound_names partial_error free_vars syntax action
                   Comp -> return ()
                   _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
               ; (wildcards, _) <- partition_nwcs free_vars
-              ; case anonymous_wildcard syntax `mplus`
+              ; case retainedWildcardSpan syntax `mplus`
                      (getLocA <$> listToMaybe wildcards) of
                   Nothing -> return ()
                   Just loc -> setSrcSpan loc $
@@ -197,15 +197,38 @@ rnWithRetainedAliases bound_names partial_error free_vars syntax action
            ; return (Just (occ, name)) }
       | otherwise = return Nothing
 
-    anonymous_wildcard :: Data a => a -> Maybe SrcSpan
-    anonymous_wildcard thing
-      | Just (L loc HsWildCardTy{}) <- (cast thing :: Maybe (LHsType GhcPs))
-      = Just (locA loc)
-      | Just (L _ HsSpliceTy{}) <- (cast thing :: Maybe (LHsType GhcPs))
-      = Nothing
-      | Just (L _ XHsType{}) <- (cast thing :: Maybe (LHsType GhcPs))
-      = Nothing
-      | otherwise = msum (gmapQ anonymous_wildcard thing)
+-- | Find a parsed anonymous wildcard without entering splice payloads.
+retainedWildcardSpan :: Data a => a -> Maybe SrcSpan
+retainedWildcardSpan thing
+  | Just (L loc HsWildCardTy{}) <- (cast thing :: Maybe (LHsType GhcPs))
+  = Just (locA loc)
+  | Just (L _ HsSpliceTy{}) <- (cast thing :: Maybe (LHsType GhcPs))
+  = Nothing
+  | Just (L _ XHsType{}) <- (cast thing :: Maybe (LHsType GhcPs))
+  = Nothing
+  | otherwise = msum (gmapQ retainedWildcardSpan thing)
+
+-- | Find a source Pi at any depth without entering splice payloads.
+hasParsedRetainedPi :: Data a => a -> Bool
+hasParsedRetainedPi thing
+  | Just (L _ HsForEachTy{}) <- (cast thing :: Maybe (LHsType GhcPs)) = True
+  | Just (L _ HsSpliceTy{}) <- (cast thing :: Maybe (LHsType GhcPs)) = False
+  | Just (L _ XHsType{}) <- (cast thing :: Maybe (LHsType GhcPs)) = False
+  | otherwise = or (gmapQ hasParsedRetainedPi thing)
+
+-- | Find a wildcard in a renamed type, including an expanded type splice.
+-- Inspect only the expanded type, not its module finalizers.
+renamedRetainedWildcardSpan :: Data a => a -> Maybe SrcSpan
+renamedRetainedWildcardSpan thing
+  | Just (L loc HsWildCardTy{}) <- (cast thing :: Maybe (LHsType GhcRn))
+  = Just (locA loc)
+  | Just (L _ (HsSpliceTy (HsUntypedSpliceTop _ ty) _))
+      <- (cast thing :: Maybe (LHsType GhcRn))
+  = renamedRetainedWildcardSpan ty
+  | Just (L _ HsSpliceTy{}) <- (cast thing :: Maybe (LHsType GhcRn)) = Nothing
+  | Just (L _ XHsType{}) <- (cast thing :: Maybe (LHsType GhcRn)) = Nothing
+  | Just _ <- (cast thing :: Maybe Name) = Nothing
+  | otherwise = msum (gmapQ renamedRetainedWildcardSpan thing)
 
 {- Note [Runtime indices in visible type arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -259,9 +282,16 @@ rnHsSigWcType :: HsDocContext
               -> RnM (LHsSigWcType GhcRn, FreeNames)
 rnHsSigWcType doc (HsWC { hswc_body =
     sig_ty@(L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
-  = do { free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
+  = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
        ; (nwc_rdrs', imp_tv_nms) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
+       ; when (experimental && hasParsedRetainedPi body_ty) $
+           case retainedWildcardSpan body_ty `mplus`
+                (getLocA <$> listToMaybe nwc_rdrs) of
+             Nothing -> pure ()
+             Just loc -> setSrcSpan loc $
+               failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature
        ; bindHsOuterTyVarBndrs doc Nothing imp_tv_nms outer_bndrs $ \outer_bndrs' ->
     do { (wcs, body_ty', fvs) <-
            if | hsHasForEachTy (unLoc body_ty)
@@ -301,30 +331,44 @@ rnRetainedSigType doc (L loc (HsFunTy x mult arg res))
                plusFNs [arg_fvs, res_fvs, mult_fvs]) }
 rnRetainedSigType doc (L loc (HsForEachTy x bndrs body))
   = setSrcSpanA loc $
-    do { level <- getThLevel
+    do { ((bndrs', body'), fvs) <-
+           rnRetainedTelescope (mkTyKiEnv doc TypeLevel RnTypeBody)
+                               (rnRetainedSigType doc) bndrs body
+       ; pure (L loc (HsForEachTy x bndrs' body'), fvs) }
+rnRetainedSigType doc ty = rnLHsType doc ty
+
+-- | Rename a retained telescope in the caller's type context.
+-- Scope each fresh runtime Name over subsequent binders and the body only.
+-- See Note [Retained Pi type formation] below.
+rnRetainedTelescope :: RnTyKiEnv
+                    -> (LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames))
+                    -> [LHsTyVarBndr () GhcPs] -> LHsType GhcPs
+                    -> RnM (([LHsTyVarBndr () GhcRn], LHsType GhcRn), FreeNames)
+rnRetainedTelescope env rn_body bndrs body
+  = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; unless (experimental && not (isRnKindLevel env)) $
+           failWithTc TcRnRetainedQuantificationNotImplemented
+       ; level <- getThLevel
        ; case level of
            Comp -> pure ()
            _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
        ; when (null bndrs) $
            failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
        ; checkDupRdrNames (mapMaybe hsLTyVarLocName bndrs)
-       ; ((bndrs', body'), fvs) <- bind_bndrs bndrs
-       ; pure (L loc (HsForEachTy x bndrs' body'), fvs) }
+       ; bind_bndrs bndrs }
   where
-    bind_bndrs :: [LHsTyVarBndr () GhcPs]
-               -> RnM (([LHsTyVarBndr () GhcRn], LHsType GhcRn), FreeNames)
     bind_bndrs []
-      = do { (body', fvs) <- rnRetainedSigType doc body
+      = do { (body', fvs) <- rn_body body
            ; pure (([], body'), fvs) }
     bind_bndrs (L lb bndr : rest)
       = setSrcSpanA lb $
         case bndr of
           HsTvb xb () (HsBndrVar _ (L lv (Unqual occ))) (HsBndrKind _ domain) ->
-            do { (domain', domain_fvs) <- rnLHsType doc domain
+            do { (domain', domain_fvs) <- rnLHsTyKi env domain
                ; name <- newLocalBndrRn (L lv (mkRdrUnqual (setOccNameSpace varName occ)))
                ; ((rest', body'), body_fvs) <- bindLocalNamesFV [name] $
-                   do { env <- getLocalRdrEnv
-                      ; setLocalRdrEnv (extendLocalRdrEnvWithAlias env occ name) $
+                   do { rdr_env <- getLocalRdrEnv
+                      ; setLocalRdrEnv (extendLocalRdrEnvWithAlias rdr_env occ name) $
                           bind_bndrs rest }
                ; let bndr' = L lb (HsTvb xb () (HsBndrVar noExtField (L lv name))
                                               (HsBndrKind noExtField domain'))
@@ -332,7 +376,25 @@ rnRetainedSigType doc (L loc (HsForEachTy x bndrs body))
           HsTvb _ _ HsBndrWildCard{} _ ->
             failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsName
           _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderNeedsType
-rnRetainedSigType doc ty = rnLHsType doc ty
+
+{- Note [Retained Pi type formation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Rename a supported Pi in a TypeLevel position with the same telescope worker
+as a retained signature. Preserve the caller's context and named wildcard set.
+Each binder has a fresh term Name and a type-lookup alias of that same Name.
+Its domain precedes its scope. Its scope contains later domains and the body.
+Keep KindLevel and quotation restrictions. The typechecker checks the closed
+domain, multiplicity, kind, and later equality evidence independently.
+
+A visible type argument containing a source Pi must be complete. Reject both
+anonymous and named wildcards before renaming that argument. This also covers
+wildcards outside the Pi within the same argument. Inspect the renamed argument
+again to catch holes in already-expanded splices, including sibling arguments.
+Do not expand a splice twice or inspect its module finalizers. Ordinary arguments
+such as @_ keep their existing rules. Generated holes within a Pi also remain
+subject to the typechecker's native-index completeness guard.
+See Note [Retained Pi type arguments] in GHC.Tc.Gen.HsType.
+-}
 
 rnHsPatSigType :: HsPatSigTypeScoping
                -> HsDocContext
@@ -396,13 +458,29 @@ rnWcBodyType = rnWcBodyTyKi TypeLevel
 rnWcBodyTyKi :: TypeOrKind -> HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeNames)
 rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
-  = do { nwcs <- mapM newLocalBndrRn nwc_rdrs
+  = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; let pi_argument = experimental && TypeLevel == level &&
+                 case ctxt of
+                   HsTypeCtx -> hasParsedRetainedPi hs_ty
+                   _ -> False
+       ; when pi_argument $
+           case retainedWildcardSpan hs_ty `mplus`
+                (getLocA <$> listToMaybe nwc_rdrs) of
+             Nothing -> pure ()
+             Just loc -> setSrcSpan loc $
+               failWithTc $ TcRnRetainedQuantificationError RetainedPartialTypeArgument
+       ; nwcs <- mapM newLocalBndrRn nwc_rdrs
        ; let env = RTKE { rtke_level = level
                         , rtke_what  = RnTypeBody
                         , rtke_nwcs  = mkNameSet nwcs
                         , rtke_ctxt  = ctxt }
        ; (hs_ty', fvs) <- bindLocalNamesFV nwcs $
                           rn_lty env hs_ty
+       ; when pi_argument $
+           case renamedRetainedWildcardSpan hs_ty' of
+             Nothing -> pure ()
+             Just loc -> setSrcSpan loc $
+               failWithTc $ TcRnRetainedQuantificationError RetainedPartialTypeArgument
        ; return (nwcs, hs_ty', fvs) }
   where
     rn_lty env (L loc hs_ty)
@@ -412,8 +490,8 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
 
     rn_ty :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
     -- A lot of faff just to allow the extra-constraints wildcard to appear
-    rn_ty _ HsForEachTy{}
-      = failWithTc TcRnRetainedQuantificationNotImplemented
+    rn_ty env ty@HsForEachTy{}
+      = rnHsTyKi env ty
 
     rn_ty env (HsForAllTy { hst_tele = tele, hst_body = hs_body })
       = bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
@@ -772,8 +850,10 @@ rnLHsTyKi env (L loc ty)
 
 rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
 
-rnHsTyKi _ HsForEachTy{}
-  = failWithTc TcRnRetainedQuantificationNotImplemented
+rnHsTyKi env (HsForEachTy x bndrs body)
+  = do { ((bndrs', body'), fvs) <-
+           rnRetainedTelescope env (rnLHsTyKi env) bndrs body
+       ; pure (HsForEachTy x bndrs' body', fvs) }
 
 rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
   = do { checkPolyKinds env (HsType ty)
