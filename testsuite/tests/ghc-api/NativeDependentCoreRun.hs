@@ -1468,6 +1468,21 @@ runModuleChecks libdir = do
         , "fallback zero successor packages stay lazy: ok"
         , "fallback successor zero packages stay lazy: ok"
         , "fallback package partial ignores fields: ok"
+        , "runtime wildcard fallback (0,0): (0,[])|(0,[])|same"
+        , "runtime wildcard fallback (0,1): (0,[])|(1,[9])|different"
+        , "runtime wildcard fallback (1,0): (1,[7])|(0,[])|different"
+        , "runtime wildcard fallback (1,1): (1,[7])|(1,[9])|different"
+        , "wildcard skips second index: different"
+        , "wildcard cyclic first skips second: different"
+        , "wildcard zero demands second index: equality-right-length"
+        , "wildcard first index before second: packed-bottom-length"
+        , "wildcard partial ignores first index: ok"
+        , "wildcard left package stays lazy: ok"
+        , "wildcard right package stays lazy: ok"
+        , "wildcard left partial ignores fields: ok"
+        , "wildcard right partial ignores fields: ok"
+        , "wildcard left retains payload demand: packed-bottom-payload"
+        , "wildcard right retains payload demand: packed-bottom-payload"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2742,10 +2757,16 @@ runPackageSourceRejectChecks = do
         , ("MatrixFalseSuccessorZero", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad Z (S right) = Nothing", "bad (S left) Z = Just Refl", "bad (S left) (S right) = Nothing"])
         , ("MatrixMissingRecursiveEvidence", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad Z (S right) = Nothing", "bad (S left) Z = Nothing", "bad (S left) (S right) = Just Refl"])
         , ("MatrixContext", 83605, "Constraints within a retained constructor matrix", ["FlexibleContexts"], equalityImports, ["bad :: foreach (n :: Nat) -> Show Int => foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad Z (S right) = Nothing", "bad (S left) Z = Nothing", "bad (S left) (S right) = Nothing"])
-        , ("MatrixFallbackNonterminal", 83605, "only one final equation with bare variable patterns", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad first second = Nothing", "bad (S left) (S right) = Nothing"])
-        , ("MatrixFallbackRepeated", 83605, "only one final equation with bare variable patterns", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad first second = Nothing", "bad another final = Nothing"])
-        , ("MatrixFallbackWildcards", 83605, "constructor patterns in both selected index columns", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad _ _ = Nothing"])
+        , ("MatrixFallbackNonterminal", 83605, "only one final equation", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad first second = Nothing", "bad (S left) (S right) = Nothing"])
+        , ("MatrixFallbackRepeated", 83605, "only one final equation", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad first second = Nothing", "bad another final = Nothing"])
+        , ("MatrixFallbackMixedWildcard", 83605, "constructor patterns in both selected index columns", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad _ Z = Nothing", "bad _ _ = Nothing"])
+        , ("MatrixFallbackWildcardsFalseRefl", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad _ _ = Just Refl"])
+        , ("MatrixFallbackLeftVariableFalseRefl", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad first _ = Just Refl"])
+        , ("MatrixFallbackRightVariableFalseRefl", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad _ second = Just Refl"])
         , ("MatrixFallbackFalseRefl", 83865, "Just Refl", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Just Refl", "bad first second = Just Refl"])
+        , ("MatrixFallbackWildcardsPayloadMismatch", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad _ _ xs ys = PackVec Z xs"])
+        , ("MatrixFallbackLeftVariablePayloadMismatch", 83865, "ys", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad first _ xs ys = PackVec first ys"])
+        , ("MatrixFallbackRightVariablePayloadMismatch", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad _ second xs ys = PackVec second xs"])
         , ("MatrixFallbackPayloadMismatch", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> PackedVec Int", "bad Z Z xs ys = PackVec Z xs", "bad (S left) (S right) xs ys = PackVec (S left) xs", "bad first second xs ys = PackVec second xs"])
         , ("MatrixFallbackUntypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad (S left) (S right) = Nothing", "bad first second = let ignored = [| 42 :: Int |] in Nothing"])
         , ("MatrixFallbackTypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad (S left) (S right) = Nothing", "bad first second = let ignored = [|| 42 :: Int ||] in Nothing"])
@@ -2819,7 +2840,7 @@ runPackageSourceRejectChecks = do
         , "sameNat (S left) (S right) = case sameNat left right of"
         , "  Nothing -> Nothing"
         , "  Just Refl -> Just Refl"
-        , "sameNat left right = Nothing"
+        , "sameNat _ _ = Nothing"
         ]
     zipper =
         [ "zipVec :: Vec a n -> Vec b n -> Vec (a, b) n"

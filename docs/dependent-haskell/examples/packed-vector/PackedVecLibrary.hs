@@ -201,7 +201,7 @@ sameNat Z Z = Just Refl
 sameNat (S left) (S right) = case sameNat left right of
     Nothing -> Nothing
     Just Refl -> Just Refl
-sameNat left right = Nothing
+sameNat _ _ = Nothing
 
 -- | Pair elements of ordinary vectors with one shared length index.
 zipVec :: Vec a n -> Vec b n -> Vec (a, b) n
