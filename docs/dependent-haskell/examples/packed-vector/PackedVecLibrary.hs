@@ -12,12 +12,17 @@ module PackedVecLibrary
     ( Nat (..)
     , Vec (..)
     , PackedVec (..)
+    , LE (..)
+    , BoundedVec (..)
     , replicateNative
     , withPacked
     , repack
     , ignorePacked
     , filterVec
     , filterPacked
+    , filterBounded
+    , withBounded
+    , weakenRight
     , toList
     , natToInt
     ) where
@@ -33,6 +38,15 @@ data Vec a (n :: Nat) where
 -- | Store one runtime length and a vector indexed by that same field.
 data PackedVec a where
     PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a
+
+-- | Evidence that the first length is at most the second length.
+data LE (n :: Nat) (m :: Nat) where
+    LEZ :: LE Z m
+    LES :: LE n m -> LE (S n) (S m)
+
+-- | Store a vector and evidence that its length is within the input bound.
+data BoundedVec a (limit :: Nat) where
+    PackBounded :: foreach (len :: Nat) -> Vec a len -> LE len limit -> BoundedVec a limit
 
 -- | Build a vector from a runtime length.
 replicateNative :: forall a. foreach (n :: Nat) -> a -> Vec a n
@@ -64,6 +78,38 @@ filterVec predicate (VCons x xs) =
 filterPacked :: forall a. (a -> Bool) -> PackedVec a -> PackedVec a
 filterPacked predicate (PackVec n xs) = filterVec predicate xs
 
+-- | Pass the vector and its bound proof to a consumer at one runtime length.
+withBounded :: forall a limit r. BoundedVec a limit -> (foreach (len :: Nat) -> Vec a len -> LE len limit -> r) -> r
+withBounded (PackBounded len xs proof) consume = consume len xs proof
+
+-- | Increase the upper bound by one without changing the lower bound.
+weakenRight :: LE n m -> LE n (S m)
+weakenRight LEZ = LEZ
+weakenRight (LES proof) = LES (weakenRight proof)
+
+-- | Filter a vector and construct evidence that its length does not increase.
+filterBounded :: forall a limit. (a -> Bool) -> Vec a limit -> BoundedVec a limit
+filterBounded predicate VNil = PackBounded Z VNil LEZ
+filterBounded predicate (VCons x xs) =
+    if predicate x
+        then case filterBounded predicate xs of
+            PackBounded len ys proof -> PackBounded (S len) (VCons x ys) (LES proof)
+        else case filterBounded predicate xs of
+            PackBounded len ys proof -> PackBounded len ys (weakenRight proof)
+
+{- Note [Filtering with a length bound]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Agda's Vec≤ stores a length, a vector at that length, and a bound proof.
+PackBounded uses the same field relation. LEZ checks the empty case. LES
+increases both proof indices when an element is retained. Right weakening
+increases only the upper bound when an element is rejected.
+
+Agda marks its bound field irrelevant. The Haskell proof is an ordinary
+lazy field. Package and vector observations need not evaluate it. A bound
+interpretation requires terminating indices and a terminating proof.
+See REFERENCES.md#source-vector-filter for the pinned sources.
+-}
+
 {- Note [Filtering a packed vector]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Agda's Data.Vec.filter returns Vec≤ with a hidden output length, a vector
@@ -73,8 +119,9 @@ returns the recursive package. See REFERENCES.md#source-vector-filter.
 
 This implementation inspects each predicate before the recursive result.
 It scans the finite input spine before returning its package. Retained
-elements and stored index fields remain lazy. A bound proof and productive
-filtering of infinite inputs require further work.
+elements and stored index fields remain lazy. PackVec does not store a bound
+proof. See Note [Filtering with a length bound]. Productive filtering of
+infinite inputs requires further work.
 -}
 
 -- | Observe a finite vector without reading its stored length.

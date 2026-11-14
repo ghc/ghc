@@ -1166,6 +1166,40 @@ They then demand each section application. These checks use ordinary section
 syntax with `PostfixOperators` disabled. See
 [Note [Restricted dependent simplification]](../../compiler/GHC/Core/SimpleOpt.hs).
 
+### Source filter bound proof
+
+The M12 source probe follows Agda standard library v2.3. Its
+[`_≤_` constructors](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Nat/Base.agda#L56-L58)
+correspond to `LEZ` and `LES`. The Haskell `weakenRight` function follows
+[`m≤n⇒m≤1+n`](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Nat/Properties.agda#L297-L299)
+by structural recursion on the proof. These sources were checked on 2026-11-14.
+
+The retained branch constructs `S len`, `VCons x ys` and `LES proof` together.
+The rejected branch keeps `len` and `ys`, then weakens only the upper bound.
+Agda's filter instead uses
+[`≤-cast`](https://github.com/agda/agda-stdlib/blob/v2.3/src/Data/Vec/Bounded/Base.agda#L113-L114)
+with `n≤1+n`. Direct structural weakening gives the same bound transformation
+without a general transitivity helper in the Haskell example.
+
+Agda marks the stored bound proof irrelevant. The Haskell `LE` field is an
+ordinary lazy runtime field. Separate observations must check vector demand,
+proof WHNF and recursive proof demand. A terminating proof over terminating
+indices gives the bound interpretation. A bottom or cyclic proof does not
+establish that interpretation. General proof erasure remains separate work.
+
+The source observer also uses ordinary `evaluate proof >> pure ()`. GHC's
+dictionary selector has the type
+`forall m. Monad m => forall a b. m a -> m b -> m b`.
+See [Note [Dictionary selectors]](../../compiler/GHC/Types/Id/Make.hs).
+Its later `a` can denote `LE len limit` at a scoped runtime `len`. Native
+instantiation must match across the invisible prefix while preserving the
+original order of type and evidence applications. It must not flatten the
+constraint into a different Core application order. The existing IALL and
+`instCall` pipeline supplies that order. See
+[Note [Immutable instantiation of nested contexts]](../../compiler/GHC/Tc/Gen/App.hs).
+This is a GHC frontend requirement. It adds no new Core proof rule or mutable
+type-meta assignment for the runtime index.
+
 ## Later solver and proof-certificate work
 
 These references concern additional equality reasoning. None is required for the

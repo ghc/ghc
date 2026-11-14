@@ -32,6 +32,19 @@ cyclicPacked n = PackVec n cyclicPayload
 renderPacked :: PackedVec Int -> String
 renderPacked package = withPacked package (\n xs -> show (natToInt n, toList xs))
 
+-- | Observe a finite length, vector and proof independently.
+renderBounded :: BoundedVec Int limit -> String
+renderBounded package = withBounded package (\n xs proof -> show (natToInt n, toList xs, proofDepth proof))
+
+-- | Remove the bound proof without evaluating it.
+forgetBounded :: BoundedVec a limit -> PackedVec a
+forgetBounded (PackBounded n xs proof) = PackVec n xs
+
+-- | Count successor steps in a finite bound proof.
+proofDepth :: LE n m -> Int
+proofDepth LEZ = 0
+proofDepth (LES proof) = 1 + proofDepth proof
+
 -- | Read one payload constructor without evaluating the predecessor length.
 firstPacked :: PackedVec Int -> Int
 firstPacked package =
@@ -57,6 +70,36 @@ driveFilter input = do
     cell <- newIORef input
     cutoff <- readIORef cell
     pure (renderPacked (filterPacked (> cutoff) samplePacked))
+
+-- | Filter at a runtime cutoff and observe the constructed bound proof.
+{-# NOINLINE driveBoundedFilter #-}
+driveBoundedFilter :: Int -> IO String
+driveBoundedFilter input = do
+    cell <- newIORef input
+    cutoff <- readIORef cell
+    pure (withPacked samplePacked (\n xs -> renderBounded (filterBounded (> cutoff) xs)))
+
+{-# NOINLINE bottomProof #-}
+
+-- | A named error in a bound proof.
+bottomProof :: forall n m. LE n m
+bottomProof = error "bounded-bottom-proof"
+
+-- | Preserve a cyclic proof without evaluating it.
+cyclicProof :: forall n m. LE n m
+cyclicProof = cyclicProof
+
+-- | Keep a valid vector independent of its undefined proof.
+lazyProofBounded :: BoundedVec Int (S Z)
+lazyProofBounded = PackBounded (S Z) (VCons 42 VNil) bottomProof
+
+-- | Keep the proof constructor defined while its recursive proof is bottom.
+partialProofBounded :: BoundedVec Int (S (S Z))
+partialProofBounded = PackBounded (S (S Z)) (VCons 1 (VCons 2 VNil)) (LES bottomProof)
+
+-- | Delay the proof transformation used by the rejected filter branch.
+weakenedProofBounded :: BoundedVec Int (S (S Z))
+weakenedProofBounded = PackBounded (S Z) (VCons 42 VNil) (weakenRight bottomProof)
 
 -- | A finite input with three distinct elements.
 samplePacked :: PackedVec Int
@@ -207,3 +250,50 @@ main = do
         evaluate ((bottomElement +) 0)
     expectMarker "applied right section demands operand" "packed-filter-bottom-element" $
         evaluate ((+ bottomElement) 0)
+    forM_
+        [ (0, "(3,[1,2,3],3)")
+        , (1, "(2,[2,3],2)")
+        , (3, "(0,[],0)")
+        ]
+        $ \(cutoff, expected) -> do
+            actual <- driveBoundedFilter cutoff
+            assertEqual "runtime bounded filter" expected actual
+            putStrLn ("runtime bounded filter: " ++ actual)
+    let boundedEmpty = filterBounded bottomPredicate VNil
+        boundedRejected = filterBounded (const False) (VCons bottomElement VNil)
+        boundedRetained = filterBounded (const True) (VCons bottomElement VNil)
+        cyclicBounded = PackBounded (S Z) (VCons 42 VNil) cyclicProof :: BoundedVec Int (S Z)
+    assertEqual "bounded empty ignores predicate" "(0,[],0)" (renderBounded boundedEmpty)
+    putStrLn "bounded empty ignores predicate: (0,[],0)"
+    assertEqual "bounded rejects bottom element" "(0,[],0)" (renderBounded boundedRejected)
+    putStrLn "bounded rejects bottom element: (0,[],0)"
+    assertWhnf "bounded retains bottom element" boundedRetained
+    assertEqual "bounded retained proof depth" 1 (withBounded boundedRetained (\n xs proof -> proofDepth proof))
+    putStrLn "bounded retained proof depth: 1"
+    assertEqual "bounded retained length" 1 (withBounded boundedRetained (\n xs proof -> natToInt n))
+    putStrLn "bounded retained length: 1"
+    expectMarker "bounded demands retained element" "packed-filter-bottom-element" $
+        evaluate (firstPacked (forgetBounded boundedRetained))
+    assertWhnf "bounded constructor with bottom proof" lazyProofBounded
+    assertEqual "bounded length ignores proof" 1 (withBounded lazyProofBounded (\n xs proof -> natToInt n))
+    putStrLn "bounded length ignores proof: 1"
+    assertEqual "bounded vector ignores proof" "(1,[42])" (renderPacked (forgetBounded lazyProofBounded))
+    putStrLn "bounded vector ignores proof: (1,[42])"
+    expectMarker "bounded demands proof" "bounded-bottom-proof" $
+        withBounded lazyProofBounded (\n xs proof -> evaluate proof >> pure ())
+    withBounded partialProofBounded (\n xs proof -> assertWhnf "bounded partial proof constructor" proof)
+    expectMarker "bounded demands recursive proof" "bounded-bottom-proof" $
+        evaluate (withBounded partialProofBounded (\n xs proof -> proofDepth proof))
+    assertWhnf "bounded constructor with weakened proof" weakenedProofBounded
+    assertEqual "bounded vector ignores weakened proof" 42 (firstPacked (forgetBounded weakenedProofBounded))
+    putStrLn "bounded vector ignores weakened proof: 42"
+    expectMarker "bounded demands weakened proof" "bounded-bottom-proof" $
+        withBounded weakenedProofBounded (\n xs proof -> evaluate proof >> pure ())
+    assertEqual "bounded vector ignores cyclic proof" 42 (firstPacked (forgetBounded cyclicBounded))
+    putStrLn "bounded vector ignores cyclic proof: 42"
+    expectMarker "bounded predicate before tail" "packed-filter-bottom-predicate" $
+        evaluate (withPacked (makePacked (S bottomLength)) (\n xs -> forgetBounded (filterBounded bottomPredicate xs)))
+    expectMarker "bounded scans partial tail" "packed-bottom-length" $
+        evaluate (withPacked (makePacked (S bottomLength)) (\n xs -> forgetBounded (filterBounded (const False) xs)))
+    assertEqual "unused bounded filter" 42 (const (42 :: Int) (withPacked bottomPackage (\n xs -> forgetBounded (filterBounded bottomPredicate xs))))
+    putStrLn "unused bounded filter: 42"

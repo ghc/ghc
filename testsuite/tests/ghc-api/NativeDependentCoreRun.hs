@@ -1141,6 +1141,28 @@ runModuleChecks libdir = do
         , "applied right section demands operator: packed-section-bottom-operator"
         , "applied left section demands operand: packed-filter-bottom-element"
         , "applied right section demands operand: packed-filter-bottom-element"
+        , "runtime bounded filter: (3,[1,2,3],3)"
+        , "runtime bounded filter: (2,[2,3],2)"
+        , "runtime bounded filter: (0,[],0)"
+        , "bounded empty ignores predicate: (0,[],0)"
+        , "bounded rejects bottom element: (0,[],0)"
+        , "bounded retains bottom element: ok"
+        , "bounded retained proof depth: 1"
+        , "bounded retained length: 1"
+        , "bounded demands retained element: packed-filter-bottom-element"
+        , "bounded constructor with bottom proof: ok"
+        , "bounded length ignores proof: 1"
+        , "bounded vector ignores proof: (1,[42])"
+        , "bounded demands proof: bounded-bottom-proof"
+        , "bounded partial proof constructor: ok"
+        , "bounded demands recursive proof: bounded-bottom-proof"
+        , "bounded constructor with weakened proof: ok"
+        , "bounded vector ignores weakened proof: 42"
+        , "bounded demands weakened proof: bounded-bottom-proof"
+        , "bounded vector ignores cyclic proof: 42"
+        , "bounded predicate before tail: packed-filter-bottom-predicate"
+        , "bounded scans partial tail: packed-bottom-length"
+        , "unused bounded filter: 42"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2387,6 +2409,9 @@ runPackageSourceRejectChecks = do
         , ("LinearCase", 18872, "arising from multiplicity", ["LinearTypes"], [], package ++ ["bad :: PackedVec a %1 -> PackedVec a", "bad p = case p of PackVec n xs -> PackVec n xs"])
         , ("RigidMultiplicity", 25897, "is a rigid type variable", ["LinearTypes"], ["import GHC.Types (Multiplicity)"], package ++ ["bad :: forall (p :: Multiplicity) a. PackedVec a %p -> PackedVec a", "bad (PackVec n xs) = PackVec n xs"])
         , ("FilterWrongLength", 5617, "PackVec m (VCons x ys)", [], [], package ++ ["filterVec :: forall a n. (a -> Bool) -> Vec a n -> PackedVec a", "filterVec predicate VNil = PackVec Z VNil", "filterVec predicate (VCons x xs) =", "  if predicate x", "    then case filterVec predicate xs of", "      PackVec m ys -> PackVec m (VCons x ys)", "    else filterVec predicate xs"])
+        , ("BoundedVectorLength", 5617, "VCons x ys", [], [], bounded "PackBounded len (VCons x ys) (weakenRight proof)" dropBound)
+        , ("BoundedProofLength", 5617, "weakenRight proof", [], [], bounded "PackBounded (S len) (VCons x ys) (weakenRight proof)" dropBound)
+        , ("BoundedUpperBound", 25897, "PackBounded len ys proof", [], [], bounded keepBound "PackBounded len ys proof")
         , ("SharedEquations", 94726, "one equation with bare variable fields", [], [], package ++ ["bad :: PackedVec a -> Int", "bad (PackVec n xs) = 0", "bad (PackVec m ys) = 1"])
         ]
         $ \(name, code, fragment, extensions, imports, declarations) -> do
@@ -2411,6 +2436,26 @@ runPackageSourceRejectChecks = do
   where
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
     package = declaration "foreach (n :: Nat) -> Vec a n -> PackedVec a"
+    keepBound = "PackBounded (S len) (VCons x ys) (LES proof)"
+    dropBound = "PackBounded len ys (weakenRight proof)"
+    bounded retained rejected =
+        [ "data LE (n :: Nat) (m :: Nat) where"
+        , "  LEZ :: LE Z m"
+        , "  LES :: LE n m -> LE (S n) (S m)"
+        , "data BoundedVec a (limit :: Nat) where"
+        , "  PackBounded :: foreach (len :: Nat) -> Vec a len -> LE len limit -> BoundedVec a limit"
+        , "weakenRight :: LE n m -> LE n (S m)"
+        , "weakenRight LEZ = LEZ"
+        , "weakenRight (LES proof) = LES (weakenRight proof)"
+        , "filterBounded :: forall a limit. (a -> Bool) -> Vec a limit -> BoundedVec a limit"
+        , "filterBounded predicate VNil = PackBounded Z VNil LEZ"
+        , "filterBounded predicate (VCons x xs) ="
+        , "  if predicate x"
+        , "    then case filterBounded predicate xs of"
+        , "      PackBounded len ys proof -> " ++ retained
+        , "    else case filterBounded predicate xs of"
+        , "      PackBounded len ys proof -> " ++ rejected
+        ]
 
 -- | Reject index mismatches and malformed retained Nat constructor equations.
 runNatSourceRejectChecks :: GHC.Ghc ()
