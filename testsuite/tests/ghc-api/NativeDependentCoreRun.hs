@@ -1631,6 +1631,30 @@ runModuleChecks libdir = do
         , "index VTA second vector demand: zip-right-vector"
         , "index VTA shares named vector: True"
         , "index VTA shares original payload: True"
+        , "runtime joint index inference: (0,[],[(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9])],[43,43,43,43],[0,1,2])"
+        , "runtime joint index inference: (1,[7],[(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9])],[43,43,43,43],[0,1,2])"
+        , "runtime joint index inference: (2,[7,7],[(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9])],[43,43,43,43],[0,1,2])"
+        , "runtime joint index inference: (3,[7,7,7],[(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9])],[43,43,43,43],[0,1,2])"
+        , "joint selection construction has no effects: 0"
+        , "joint selection action executes once: 1"
+        , "joint selection action executes again: 2"
+        , "joint selected function ignores prefix index: ok"
+        , "joint selected later field ignores prefix index: 42"
+        , "joint payload keeps its independent index: [9]"
+        , "joint selection preserves payload error: packed-bottom-payload"
+        , "joint selection preserves payload index error: packed-bottom-length"
+        , "unused joint selection ignores bottom function: 42"
+        , "joint application demands selected function: native-joint-bottom-function"
+        , "joint projection demands containing pair: native-joint-bottom-pair"
+        , "joint context preserves tag demand: native-joint-bottom-tag"
+        , "joint selection partial payload prefix: [9]"
+        , "joint selection partial payload tail: packed-bottom-length"
+        , "joint selection cyclic payload prefix: [9,9]"
+        , "joint selection spine ignores element: 1"
+        , "joint selection preserves element error: packed-filter-bottom-element"
+        , "joint selections share named vector: True"
+        , "joint selections share original payload: True"
+        , "joint selection applies retained function: [7,7]"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2982,12 +3006,25 @@ runPackageSourceRejectChecks = do
         , ("IndexVTACallbackLocalIndexEscape", 83605, "outside the application scope", ["TypeApplications"], [], localActions ++ ["keepIndex :: forall a (index :: Nat). Vec a index -> Vec a index", "keepIndex xs = xs", "bad :: Nat -> IO Int", "bad n = let compute = pure (localVector n) >>= \\xs -> let { k :: Nat; k = n } in pure (keepIndex @Int (localVector k)) in pure 42"])
         , ("IndexVTALocalResultIndexEscape", 83605, "out of scope here", ["TypeApplications"], [], localActions ++ ["keepIndex :: forall a (index :: Nat). Vec a index -> Vec a index", "keepIndex xs = xs", "bad :: Nat -> IO Int", "bad n = let result = let { k :: Nat; k = n } in keepIndex @Int (localVector k) in pure 42"])
         , ("IndexVTALinearCaptureTwice", 18872, "multiplicity", ["TypeApplications", "LinearTypes"], [], localActions ++ ["linearKeep :: forall a (index :: Nat). Vec a index %1 -> Vec a index", "linearKeep xs = xs", "bad :: foreach (n :: Nat) -> Vec Int n %1 -> (Vec Int n, Vec Int n)", "bad n xs = (linearKeep @Int xs, linearKeep @Int xs)"])
-        , ("IndexVTANativeIndexOverapplicationBoundary", 83865, "untouchable", ["TypeApplications"], [], localActions ++ ["selectIndexed :: forall a (index :: Nat) result. Vec a index -> result -> result", "selectIndexed _ value = value", "bad :: Nat -> IO Int", "bad n = pure (selectIndexed @Int (localVector n) ((+ 1) :: Int -> Int) 42)"])
         , ("IndexVTAInterleavedTypeApplicationBoundary", 83865, "untouchable", ["TypeApplications"], [], localActions ++ ["interleavedIndex :: forall a. a -> forall (index :: Nat). Vec a index -> Int", "interleavedIndex _ _ = 42", "bad :: Nat -> IO Int", "bad n = pure (interleavedIndex @Int (0 :: Int) @_ (localVector n))"])
         , ("IndexVTAQuickLookBoundary", 83605, "Quick Look inference", ["TypeApplications", "ImpredicativeTypes"], [], ["observe :: forall a (index :: Nat). Vec a index -> Int", "observe _ = 42", "bad :: foreach (n :: Nat) -> Vec Int n -> Int", "bad n xs = observe @Int xs"])
         , ("IndexVTAWrongClosedIndexArgument", 83865, "third argument", ["TypeApplications"], [], localActions ++ ["observe :: forall a (index :: Nat). Vec a index -> Int", "observe _ = 42", "bad :: Nat -> IO Int", "bad n = pure (observe @Int @Z (localVector n))"])
         , ("IndexVTACallbackInputIndexEscape", 83605, "outside the application scope", ["TypeApplications"], [], localActions ++ ["keepIndex :: forall a (index :: Nat). Vec a index -> Vec a index", "keepIndex xs = xs", "withAux :: forall a b c. IO a -> IO c -> (a -> IO b) -> IO b", "withAux action auxiliary callback = action >>= callback", "bad :: Nat -> IO Int", "bad n = let compute = withAux (pure (S Z)) (pure (localVector n)) (\\k -> pure (keepIndex @Int (localVector k))) in pure 42"])
         , ("IndexVTAWrongRemainingOrdinaryArgument", 83865, "Char", ["TypeApplications"], [], localActions ++ ["inspectTagged :: forall a (index :: Nat) tag. (tag, Vec a index) -> tag -> Int", "inspectTagged _ _ = 42", "bad :: Nat -> IO Int", "bad n = pure (inspectTagged @Int (True, localVector n) 'x')"])
+        , ("JointPrefixConflictingNativeIndexChoices", 83865, "untouchable", ["TypeApplications", "TupleSections"], [], localActions ++ ["selectSameIndex :: forall a (index :: Nat) value. Vec a index -> Vec a index -> value -> value", "selectSameIndex _ _ value = value", "bad :: Nat -> Nat -> IO Int", "bad n m = pure (selectSameIndex @Int (localVector n) (localVector m) ((+ 1) :: Int -> Int) 42)"])
+        , ("JointPrefixIndependentPayloadResultMismatch", 83865, "Vec Int n", ["TypeApplications", "TupleSections"], [], localActions ++ ["selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value", "selectIndex _ value = value", "bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int n", "bad n m xs ys = selectIndex @Int xs ys"])
+        , ("JointPrefixUndeterminedNativeIndex", 83865, "untouchable", ["TypeApplications", "TupleSections"], [], localActions ++ ["selectUnknownIndex :: forall a (index :: Nat) (unknown :: Nat) value. Vec a index -> value -> value", "selectUnknownIndex _ value = value", "bad :: Nat -> IO Int", "bad n = pure (selectUnknownIndex @Int (localVector n) ((+ 1) :: Int -> Int) 42)"])
+        , ("JointPrefixNativeAnchorOnlyInExtraArgument", 83865, "untouchable", ["TypeApplications", "TupleSections"], [], localActions ++ ["selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value", "selectIndex _ value = value", "zeroVector :: Vec Int Z", "zeroVector = VNil", "bad :: Nat -> IO (PackedVec Int)", "bad n = pure (PackVec n (selectIndex @Int zeroVector id (localVector n)))"])
+        , ("JointPrefixWrongExtraArgument", 83865, "fourth argument", ["TypeApplications", "TupleSections"], [], localActions ++ ["selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value", "selectIndex _ value = value", "bad :: Nat -> IO Int", "bad n = pure (selectIndex @Int (localVector n) ((+ 1) :: Int -> Int) True)"])
+        , ("JointPrefixWrongFinalResult", 83865, "Bool", ["TypeApplications", "TupleSections"], [], localActions ++ ["selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value", "selectIndex _ value = value", "bad :: Nat -> IO Bool", "bad n = pure (selectIndex @Int (localVector n) ((+ 1) :: Int -> Int) 42)"])
+        , ("JointPrefixWrongElementTypeArgument", 83865, "Vec Bool", ["TypeApplications", "TupleSections"], [], localActions ++ ["selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value", "selectIndex _ value = value", "bad :: Nat -> IO Int", "bad n = pure (selectIndex @Bool (localVector n) ((+ 1) :: Int -> Int) 42)"])
+        , ("JointPrefixWrongTypeArgumentKind", 83865, "Expecting one more argument", ["TypeApplications", "TupleSections"], [], localActions ++ ["selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value", "selectIndex _ value = value", "bad :: Nat -> IO Int", "bad n = pure (selectIndex @Maybe (localVector n) ((+ 1) :: Int -> Int) 42)"])
+        , ("JointPrefixMissingEqualityDictionary", 39999, "Eq NoEq", ["TypeApplications", "TupleSections"], [], localActions ++ ["data NoEq = NoEq", "selectEqIndex :: forall a. Eq a => forall (index :: Nat) value. Vec a index -> value -> value", "selectEqIndex _ value = value", "bad :: foreach (n :: Nat) -> Vec NoEq n -> Int", "bad n xs = selectEqIndex @NoEq xs ((+ 1) :: Int -> Int) 42"])
+        , ("JointPrefixLinearPayloadReuse", 18872, "multiplicity", ["TypeApplications", "TupleSections", "LinearTypes"], [], localActions ++ ["selectLinearIndex :: forall a (index :: Nat) value. Vec a index -> value %1 -> value", "selectLinearIndex _ value = value", "bad :: foreach (n :: Nat) -> Vec Int n -> Vec Int n %1 -> ((Vec Int n, Int), (Vec Int n, Int))", "bad n witness xs = (selectLinearIndex @Int witness (xs,) (42 :: Int), selectLinearIndex @Int witness (xs,) (43 :: Int))"])
+        , ("JointPrefixLocalResultIndexEscape", 83605, "out of scope here", ["TypeApplications", "TupleSections"], [], localActions ++ ["selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value", "selectIndex _ value = value", "bad :: Nat -> IO Int", "bad n = let result = let { k :: Nat; k = n } in selectIndex @Int (localVector n) (localVector k,) (42 :: Int) in pure 42"])
+        , ("JointPrefixCallbackResultIndexEscape", 83605, "outside the application scope", ["TypeApplications", "TupleSections"], [], localActions ++ ["selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value", "selectIndex _ value = value", "bad :: Nat -> IO Int", "bad n = let compute = pure (localVector n) >>= \\xs -> let { k :: Nat; k = n } in pure (selectIndex @Int xs (localVector k,) (42 :: Int)) in pure 42"])
+        , ("JointPrefixInterleavedTypeApplicationBoundary", 83865, "untouchable", ["TypeApplications", "TupleSections"], [], localActions ++ ["interleavedIndex :: forall a. a -> forall (index :: Nat) value. Vec a index -> value -> value", "interleavedIndex _ _ value = value", "bad :: Nat -> IO Int", "bad n = pure (interleavedIndex @Int (0 :: Int) @_ @_ (localVector n) ((+ 1) :: Int -> Int) 42)"])
+        , ("JointPrefixQuickLookBoundary", 83605, "Quick Look inference", ["TypeApplications", "TupleSections", "ImpredicativeTypes"], [], ["selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value", "selectIndex _ value = value", "bad :: foreach (n :: Nat) -> Vec Int n -> (Vec Int n, Int)", "bad n xs = selectIndex @Int xs (xs,) (42 :: Int)"])
         , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureAliasIndex", 83605, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])

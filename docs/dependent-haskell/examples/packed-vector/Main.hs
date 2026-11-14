@@ -1786,6 +1786,173 @@ runIndexVTAChecks = do
             putStrLn "index VTA shares original payload: True"
         _ -> fail "index VTA sharing vector has the wrong length"
 
+-- | Select an independent payload after a vector determines its erased index.
+selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value
+selectIndex _ value = value
+
+-- | Project the payload from the same declared argument as the vector.
+projectIndex :: forall a (index :: Nat) value. (Vec a index, value) -> value
+projectIndex (_, value) = value
+
+-- | Preserve a dictionary before the remaining vector and payload telescope.
+selectIndexContext :: forall tag. (Eq tag) => forall a (index :: Nat) value. tag -> Vec a index -> value -> value
+selectIndexContext tag _ value = if tag == tag then value else value
+
+-- | Compare named and direct selections with independently read runtime indices.
+{-# NOINLINE driveJointIndexPrefix #-}
+driveJointIndexPrefix :: Nat -> IO String
+driveJointIndexPrefix input = do
+    indexCell <- newIORef input
+    payloadCell <- newIORef (S Z)
+    n <- readIORef indexCell
+    m <- readIORef payloadCell
+    effects <- newIORef (0 :: Int)
+    let vector = replicateNative @Int n 7
+        payloadVector = replicateNative @Int m 9
+        payload = (payloadVector,)
+        ordinary = (+ 1) :: Int -> Int
+        pair = (vector, payload)
+        action = modifyIORef' effects (+ 1) >> pure pair
+        direct = action >>= \stored -> pure (selectIndex @Int (fst stored) (snd stored) (42 :: Int))
+        named =
+            action >>= \stored ->
+                let selected = projectIndex stored
+                 in pure (selected (42 :: Int))
+        selected = selectIndex vector payload
+    before <- readIORef effects
+    first <- direct
+    once <- readIORef effects
+    second <- named
+    twice <- readIORef effects
+    let third = selected (42 :: Int)
+        fourth = projectIndex @Int pair (42 :: Int)
+        fifth = selectIndexContext @Bool @Int True vector payload (42 :: Int)
+        sixth = selectIndexContext True vector payload (42 :: Int)
+        seventh = selectIndex vector payload (42 :: Int)
+        eighth = projectIndex pair (42 :: Int)
+    pure
+        ( show
+            ( natToInt n
+            , toList vector
+            ,
+                [ (snd first, toList (fst first))
+                , (snd second, toList (fst second))
+                , (snd third, toList (fst third))
+                , (snd fourth, toList (fst fourth))
+                , (snd fifth, toList (fst fifth))
+                , (snd sixth, toList (fst sixth))
+                , (snd seventh, toList (fst seventh))
+                , (snd eighth, toList (fst eighth))
+                ]
+            ,
+                [ selectIndex @Int vector ordinary 42
+                , selectIndex vector ordinary 42
+                , projectIndex @Int (vector, ordinary) 42
+                , projectIndex (vector, ordinary) 42
+                ]
+            , [before, once, twice]
+            )
+        )
+
+-- | Check joint prefix inference without changing demand, effects or sharing.
+runJointIndexPrefixChecks :: IO ()
+runJointIndexPrefixChecks = do
+    forM_
+        [ (Z, "(0,[],[(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9])],[43,43,43,43],[0,1,2])")
+        , (S Z, "(1,[7],[(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9])],[43,43,43,43],[0,1,2])")
+        , (S (S Z), "(2,[7,7],[(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9])],[43,43,43,43],[0,1,2])")
+        , (S (S (S Z)), "(3,[7,7,7],[(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9]),(42,[9])],[43,43,43,43],[0,1,2])")
+        ]
+        $ \(input, expected) -> do
+            actual <- driveJointIndexPrefix input
+            assertEqual "runtime joint index inference" expected actual
+            putStrLn ("runtime joint index inference: " ++ actual)
+    ignoredIndex <- pure bottomLength
+    payloadIndex <- pure (S Z)
+    effects <- newIORef (0 :: Int)
+    let ignoredVector :: Vec Int ignoredIndex
+        ignoredVector = bottomPayload
+        payloadVector = replicateNative @Int payloadIndex 9
+        payload = (payloadVector,)
+        action = modifyIORef' effects (+ 1) >> pure (selectIndex @Int ignoredVector payload (42 :: Int))
+    before <- readIORef effects
+    assertEqual "joint selection construction has no effects" 0 before
+    putStrLn "joint selection construction has no effects: 0"
+    first <- action
+    once <- readIORef effects
+    assertEqual "joint selection action executes once" 1 once
+    putStrLn "joint selection action executes once: 1"
+    _ <- action
+    twice <- readIORef effects
+    assertEqual "joint selection action executes again" 2 twice
+    putStrLn "joint selection action executes again: 2"
+    assertWhnf "joint selected function ignores prefix index" (selectIndex @Int ignoredVector payload)
+    assertEqual "joint selected later field ignores prefix index" 42 (snd first)
+    putStrLn "joint selected later field ignores prefix index: 42"
+    assertEqual "joint payload keeps its independent index" [9] (toList (fst first))
+    putStrLn "joint payload keeps its independent index: [9]"
+    let missingPayload :: Vec Int payloadIndex
+        missingPayload = bottomPayload
+    expectMarker "joint selection preserves payload error" "packed-bottom-payload" $
+        evaluate (sum (toList (fst (selectIndex @Int ignoredVector (missingPayload,) (42 :: Int)))))
+    let delayedPayload = replicateNative @Int ignoredIndex 9
+    expectMarker "joint selection preserves payload index error" "packed-bottom-length" $
+        evaluate (sum (toList (fst (selectIndex @Int payloadVector (delayedPayload,) (42 :: Int)))))
+    let bottomFunction :: Int -> (Vec Int payloadIndex, Int)
+        bottomFunction = error "native-joint-bottom-function"
+        bottomPair :: (Vec Int ignoredIndex, Int -> (Vec Int payloadIndex, Int))
+        bottomPair = error "native-joint-bottom-pair"
+    assertEqual "unused joint selection ignores bottom function" 42 (const (42 :: Int) (selectIndex @Int ignoredVector bottomFunction))
+    putStrLn "unused joint selection ignores bottom function: 42"
+    expectMarker "joint application demands selected function" "native-joint-bottom-function" $
+        evaluate (selectIndex @Int ignoredVector bottomFunction (42 :: Int))
+    expectMarker "joint projection demands containing pair" "native-joint-bottom-pair" $
+        evaluate (projectIndex @Int bottomPair (42 :: Int))
+    expectMarker "joint context preserves tag demand" "native-joint-bottom-tag" $
+        evaluate (selectIndexContext @Bool @Int (error "native-joint-bottom-tag") ignoredVector payload (42 :: Int))
+    partialIndex <- pure (S bottomLength)
+    cyclicIndex <- pure cyclicLength
+    let partialVector = replicateNative @Int partialIndex 9
+        cyclicVector = replicateNative @Int cyclicIndex 9
+        partialResult = selectIndex @Int ignoredVector (partialVector,) (42 :: Int)
+    assertEqual "joint selection partial payload prefix" [9] (take 1 (toList (fst partialResult)))
+    putStrLn "joint selection partial payload prefix: [9]"
+    expectMarker "joint selection partial payload tail" "packed-bottom-length" $
+        evaluate (length (toList (fst partialResult)))
+    assertEqual "joint selection cyclic payload prefix" [9, 9] (take 2 (toList (fst (projectIndex @Int (ignoredVector, (cyclicVector,)) (42 :: Int)))))
+    putStrLn "joint selection cyclic payload prefix: [9,9]"
+    let bottomHead = replicateNative @Int payloadIndex bottomElement
+        headResult = selectIndex ignoredVector (bottomHead,) (42 :: Int)
+    assertEqual "joint selection spine ignores element" 1 (length (toList (fst headResult)))
+    putStrLn "joint selection spine ignores element: 1"
+    expectMarker "joint selection preserves element error" "packed-filter-bottom-element" $
+        evaluate (sum (toList (fst headResult)))
+    sharingIndex <- pure (S (S Z))
+    originalPayload <- newIORef (7 :: Int)
+    let sharingVector = replicateNative @(IORef Int) sharingIndex originalPayload
+        sharingFunction = (sharingVector,)
+    original <- evaluate sharingVector
+    left <- evaluate (fst (selectIndex @Int payloadVector sharingFunction (42 :: Int)))
+    right <- evaluate (fst (projectIndex @Int (payloadVector, sharingFunction) (43 :: Int)))
+    originalName <- makeStableName original
+    leftName <- makeStableName left
+    rightName <- makeStableName right
+    assertEqual "joint selections share named vector" True (originalName == leftName && leftName == rightName)
+    putStrLn "joint selections share named vector: True"
+    case toList left of
+        [firstPayload, secondPayload] -> do
+            originalValue <- evaluate originalPayload
+            firstValue <- evaluate firstPayload
+            secondValue <- evaluate secondPayload
+            originalPayloadName <- makeStableName originalValue
+            firstPayloadName <- makeStableName firstValue
+            secondPayloadName <- makeStableName secondValue
+            assertEqual "joint selections share original payload" True (originalPayloadName == firstPayloadName && firstPayloadName == secondPayloadName)
+            putStrLn "joint selections share original payload: True"
+        _ -> fail "joint selection sharing vector has the wrong length"
+    assertEqual "joint selection applies retained function" [7, 7] (toList (selectIndex @Int (replicateNative @Int sharingIndex 0) (replicateNative @Int) sharingIndex 7))
+    putStrLn "joint selection applies retained function: [7,7]"
+
 -- | Check leading type applications without changing demand or sharing.
 runLeadingVTAChecks :: IO ()
 runLeadingVTAChecks = do
@@ -2435,3 +2602,4 @@ main = do
     runGenericOverapplicationChecks
     runLeadingVTAChecks
     runIndexVTAChecks
+    runJointIndexPrefixChecks
