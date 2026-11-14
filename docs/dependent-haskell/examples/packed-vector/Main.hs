@@ -2050,6 +2050,136 @@ runLeadingVTAChecks = do
     assertEqual "full ordinary VTA control" 43 (selectVTA @Bool @(Int -> Int) True ((+ 1), False) 42)
     putStrLn "full ordinary VTA control: 43"
 
+-- | Check outer equality transport without adding eta expansion or demand.
+runPiGivenChecks :: IO ()
+runPiGivenChecks = do
+    let worker :: foreach (n :: Nat) -> Vec Int n
+        worker n = replicateNative @Int n 7
+        direct :: foreach (n :: Nat) -> Vec Int n
+        direct = transportElement @Int @Int worker
+        eta :: foreach (n :: Nat) -> Vec Int n
+        eta = transportElementEta @Int @Int worker
+        proved :: foreach (n :: Nat) -> Vec Int n
+        proved = transportElementWith @Int @Int Refl worker
+    forM_
+        [ (Z, "(0,[],[],[])")
+        , (S Z, "(1,[7],[7],[7])")
+        , (S (S Z), "(2,[7,7],[7,7],[7,7])")
+        , (S (S (S Z)), "(3,[7,7,7],[7,7,7],[7,7,7])")
+        ]
+        $ \(input, expected) -> do
+            cell <- newIORef input
+            n <- readIORef cell
+            let actual = show (natToInt n, toList (direct n), toList (eta n), toList (proved n))
+            assertEqual "runtime Pi Given" expected actual
+            putStrLn ("runtime Pi Given: " ++ actual)
+    let bottomWorker :: foreach (n :: Nat) -> Vec Int n
+        bottomWorker = error "native-pi-bottom-function"
+    expectMarker "direct Pi Given preserves bottom function" "native-pi-bottom-function" $
+        checkWhnf (transportElement @Int @Int bottomWorker)
+    assertWhnf "eta Pi Given returns a function" (transportElementEta @Int @Int bottomWorker)
+    expectMarker "eta Pi Given demands applied function" "native-pi-bottom-function" $
+        evaluate (transportElementEta @Int @Int bottomWorker Z)
+    assertEqual "unused Pi Given ignores bottom function" 42 (const (42 :: Int) (transportElement @Int @Int bottomWorker))
+    putStrLn "unused Pi Given ignores bottom function: 42"
+    assertEqual "unused Pi Given ignores bottom index" 42 (const (42 :: Int) (direct bottomLength))
+    putStrLn "unused Pi Given ignores bottom index: 42"
+    assertEqual "unused Pi Given ignores cyclic index" 42 (const (42 :: Int) (direct cyclicLength))
+    putStrLn "unused Pi Given ignores cyclic index: 42"
+    expectMarker "Pi Given vector retains index demand" "packed-bottom-length" $
+        evaluate (direct bottomLength)
+    finiteIndex <- pure (S Z)
+    let elementWorker :: foreach (n :: Nat) -> Vec Int n
+        elementWorker n = replicateNative @Int n bottomElement
+        lazyWorker :: foreach (n :: Nat) -> Vec Int n
+        lazyWorker n = bottomPayload
+    assertEqual "Pi Given vector spine ignores element" 1 (length (toList (transportElement @Int @Int elementWorker finiteIndex)))
+    putStrLn "Pi Given vector spine ignores element: 1"
+    expectMarker "Pi Given retains element error" "packed-filter-bottom-element" $
+        evaluate (sum (toList (transportElement @Int @Int elementWorker finiteIndex)))
+    assertEqual "unused Pi Given ignores bottom vector" 42 (const (42 :: Int) (transportElement @Int @Int lazyWorker bottomLength))
+    putStrLn "unused Pi Given ignores bottom vector: 42"
+    expectMarker "Pi Given vector error precedes index" "packed-bottom-payload" $
+        evaluate (transportElement @Int @Int lazyWorker bottomLength)
+    partialIndex <- pure (S bottomLength)
+    assertEqual "Pi Given partial index prefix" [7] (take 1 (toList (direct partialIndex)))
+    putStrLn "Pi Given partial index prefix: [7]"
+    cyclicIndex <- pure cyclicLength
+    assertEqual "Pi Given cyclic index prefix" [7, 7] (take 2 (toList (direct cyclicIndex)))
+    putStrLn "Pi Given cyclic index prefix: [7,7]"
+    checkWhnf worker
+    checkWhnf direct
+    originalFunctionName <- makeStableName worker
+    transportedFunctionName <- makeStableName direct
+    assertEqual "Pi Given shares original function" True (originalFunctionName == transportedFunctionName)
+    putStrLn "Pi Given shares original function: True"
+    sharingIndex <- pure (S (S Z))
+    payload <- newIORef (7 :: Int)
+    let sharingWorker :: foreach (n :: Nat) -> Vec (IORef Int) n
+        sharingWorker n = replicateNative @(IORef Int) n payload
+        saved = transportElement @(IORef Int) @(IORef Int) sharingWorker sharingIndex
+    first <- evaluate saved
+    second <- evaluate saved
+    firstName <- makeStableName first
+    secondName <- makeStableName second
+    assertEqual "Pi Given shares named result" True (firstName == secondName)
+    putStrLn "Pi Given shares named result: True"
+    case toList first of
+        [leftPayload, rightPayload] -> do
+            original <- evaluate payload
+            left <- evaluate leftPayload
+            right <- evaluate rightPayload
+            originalName <- makeStableName original
+            leftName <- makeStableName left
+            rightName <- makeStableName right
+            assertEqual "Pi Given shares original payload" True (originalName == leftName && leftName == rightName)
+            putStrLn "Pi Given shares original payload: True"
+        _ -> fail "Pi Given sharing vector has the wrong length"
+    let bottomEquality :: Int :~: Int
+        bottomEquality = error "native-pi-bottom-proof"
+    expectMarker "Pi Given transport demands proof" "native-pi-bottom-proof" $
+        checkWhnf (transportElementWith @Int @Int bottomEquality worker)
+    expectMarker "Pi Given proof precedes bottom function" "native-pi-bottom-proof" $
+        checkWhnf (transportElementWith @Int @Int bottomEquality bottomWorker)
+    assertEqual "unused Pi Given ignores bottom proof" 42 (const (42 :: Int) (transportElementWith @Int @Int bottomEquality worker))
+    putStrLn "unused Pi Given ignores bottom proof: 42"
+    expectMarker "Pi Given Refl preserves bottom function" "native-pi-bottom-function" $
+        checkWhnf (transportElementWith @Int @Int Refl bottomWorker)
+    forM_
+        [ (Z, S Z, "(0,1,[],[True],True)")
+        , (S (S Z), S Z, "(2,1,[9,9],[True],True)")
+        , (S (S (S Z)), S (S Z), "(3,2,[9,9,9],[True,True],True)")
+        ]
+        $ \(outerInput, innerInput, expected) -> do
+            outerCell <- newIORef outerInput
+            innerCell <- newIORef innerInput
+            k <- readIORef outerCell
+            n <- readIORef innerCell
+            let payload = replicateNative @Int k 9
+                original :: foreach (index :: Nat) -> (Vec Int k, Vec Bool index)
+                original index = (payload, replicateNative @Bool index True)
+                moved :: foreach (index :: Nat) -> (Vec Int k, Vec Bool index)
+                moved = transportOuterIndex @(Vec Int k) k original
+                result :: (Vec Int k, Vec Bool n)
+                result = moved n
+                first :: Vec Int k
+                first = fst result
+                second :: Vec Bool n
+                second = snd result
+            checkWhnf payload
+            checkWhnf first
+            originalName <- makeStableName payload
+            movedName <- makeStableName first
+            let actual = show (natToInt k, natToInt n, toList first, toList second, originalName == movedName)
+            assertEqual "runtime outer-index Given" expected actual
+            putStrLn ("runtime outer-index Given: " ++ actual)
+    ignoredOuter <- pure bottomLength
+    let ignoreOuter :: foreach (index :: Nat) -> (Vec Int ignoredOuter, Vec Bool index)
+        ignoreOuter index = (bottomPayload, replicateNative @Bool index True)
+    assertWhnf "outer-index Given ignores bottom index" (transportOuterIndex @(Vec Int ignoredOuter) ignoredOuter ignoreOuter)
+    assertEqual "outer-index Given ignores unused payload" [] (toList (snd (transportOuterIndex @(Vec Int ignoredOuter) ignoredOuter ignoreOuter Z)))
+    putStrLn "outer-index Given ignores unused payload: []"
+
 -- | Run finite observations and bounded strictness checks.
 main :: IO ()
 main = do
@@ -2603,3 +2733,4 @@ main = do
     runLeadingVTAChecks
     runIndexVTAChecks
     runJointIndexPrefixChecks
+    runPiGivenChecks

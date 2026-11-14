@@ -1655,6 +1655,35 @@ runModuleChecks libdir = do
         , "joint selections share named vector: True"
         , "joint selections share original payload: True"
         , "joint selection applies retained function: [7,7]"
+        , "runtime Pi Given: (0,[],[],[])"
+        , "runtime Pi Given: (1,[7],[7],[7])"
+        , "runtime Pi Given: (2,[7,7],[7,7],[7,7])"
+        , "runtime Pi Given: (3,[7,7,7],[7,7,7],[7,7,7])"
+        , "direct Pi Given preserves bottom function: native-pi-bottom-function"
+        , "eta Pi Given returns a function: ok"
+        , "eta Pi Given demands applied function: native-pi-bottom-function"
+        , "unused Pi Given ignores bottom function: 42"
+        , "unused Pi Given ignores bottom index: 42"
+        , "unused Pi Given ignores cyclic index: 42"
+        , "Pi Given vector retains index demand: packed-bottom-length"
+        , "Pi Given vector spine ignores element: 1"
+        , "Pi Given retains element error: packed-filter-bottom-element"
+        , "unused Pi Given ignores bottom vector: 42"
+        , "Pi Given vector error precedes index: packed-bottom-payload"
+        , "Pi Given partial index prefix: [7]"
+        , "Pi Given cyclic index prefix: [7,7]"
+        , "Pi Given shares original function: True"
+        , "Pi Given shares named result: True"
+        , "Pi Given shares original payload: True"
+        , "Pi Given transport demands proof: native-pi-bottom-proof"
+        , "Pi Given proof precedes bottom function: native-pi-bottom-proof"
+        , "unused Pi Given ignores bottom proof: 42"
+        , "Pi Given Refl preserves bottom function: native-pi-bottom-function"
+        , "runtime outer-index Given: (0,1,[],[True],True)"
+        , "runtime outer-index Given: (2,1,[9,9],[True],True)"
+        , "runtime outer-index Given: (3,2,[9,9,9],[True,True],True)"
+        , "outer-index Given ignores bottom index: ok"
+        , "outer-index Given ignores unused payload: []"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2892,8 +2921,8 @@ runPackageSourceRejectChecks = do
         , ("Equality", 83605, "contexts", [], [], declaration "forall a. (a ~ Int) => foreach (n :: Nat) -> Vec a n -> PackedVec a")
         , ("RefinedUniversal", 83605, "equality specifications", [], [], declaration "foreach (n :: Nat) -> Vec Int n -> PackedVec Int")
         , ("Promotion", 83605, "Promotion of constructors with retained fields", [], [], package ++ ["type Bad = 'PackVec"])
-        , ("PatternWrongPredecessor", 25897, "rest", [], [], package ++ ["bad :: PackedVec Int -> PackedVec Int", "bad (PackVec (S k) (VCons x rest)) = PackVec (S k) rest"])
-        , ("PatternIndependent", 25897, "rest", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> PackedVec Int", "bad m (PackVec (S k) (VCons x rest)) = PackVec m rest"])
+        , ("PatternWrongPredecessor", 5617, "rest", [], [], package ++ ["bad :: PackedVec Int -> PackedVec Int", "bad (PackVec (S k) (VCons x rest)) = PackVec (S k) rest"])
+        , ("PatternIndependent", 5617, "rest", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> PackedVec Int", "bad m (PackVec (S k) (VCons x rest)) = PackVec m rest"])
         , ("PatternGuardScope", 83865, "xs", [], [], package ++ ["bad :: PackedVec Int -> PackedVec Int", "bad (PackVec (S k) (VCons x rest)) | False = PackVec k rest", "bad (PackVec n xs) = PackVec (S n) xs"])
         , ("PatternFieldEscape", 25897, "rest", [], [], package ++ ["bad :: PackedVec Int -> Vec Int n", "bad (PackVec (S k) (VCons x rest)) = rest"])
         , ("PatternNestedField", 83605, "bare variable patterns", [], [], package ++ ["bad :: PackedVec Int -> Int", "bad (PackVec (S (S k)) xs) = 0"])
@@ -2905,8 +2934,8 @@ runPackageSourceRejectChecks = do
         , ("IndexMismatch", 83865, "Couldn't match", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> PackedVec Int", "bad n m xs = PackVec @Int m xs"])
         , ("IndexEscape", 83865, "Couldn't match", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n xs) = xs"])
         , ("NestedIndexEscape", 5617, "VCons x xs", [], [], package ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n (VCons x xs)) = VCons x xs"])
-        , ("UnconsOriginalLength", 25897, "rest", [], [], package ++ ["bad :: forall a. PackedVec a -> Maybe (a, PackedVec a)", "bad (PackVec n xs) = case n of", "  Z -> Nothing", "  S k -> case xs of", "    VCons x rest -> Just (x, PackVec n rest)"])
-        , ("UnconsIndependentLength", 25897, "rest", [], [], package ++ ["bad :: forall a. foreach (m :: Nat) -> PackedVec a -> Maybe (a, PackedVec a)", "bad m (PackVec n xs) = case n of", "  Z -> Nothing", "  S k -> case xs of", "    VCons x rest -> Just (x, PackVec m rest)"])
+        , ("UnconsOriginalLength", 5617, "rest", [], [], package ++ ["bad :: forall a. PackedVec a -> Maybe (a, PackedVec a)", "bad (PackVec n xs) = case n of", "  Z -> Nothing", "  S k -> case xs of", "    VCons x rest -> Just (x, PackVec n rest)"])
+        , ("UnconsIndependentLength", 5617, "rest", [], [], package ++ ["bad :: forall a. foreach (m :: Nat) -> PackedVec a -> Maybe (a, PackedVec a)", "bad m (PackVec n xs) = case n of", "  Z -> Nothing", "  S k -> case xs of", "    VCons x rest -> Just (x, PackVec m rest)"])
         , ("IndependentRefl", 83865, "Just Refl", [], equalityImports, package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad n m = Just Refl"])
         , ("ZipWithoutEquality", 83865, "zipVec xs ys", [], [], package ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = Just (PackVec n (zipVec xs ys))"])
         , ("ZipUnmatchedProof", 83865, "zipVec xs ys", [], equalityImports, package ++ equality ++ zipper ++ ["bad :: PackedVec a -> PackedVec b -> Maybe (PackedVec (a, b))", "bad (PackVec n xs) (PackVec m ys) = case sameNat n m of", "  Nothing -> Nothing", "  Just proof -> Just (PackVec n (zipVec xs ys))"])
@@ -2918,7 +2947,7 @@ runPackageSourceRejectChecks = do
         , ("AddSuccForged", 83865, "Refl", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Add n (S m) :~: S (Add n m)", "bad n m = Refl"])
         , ("RightZeroForged", 83865, "Refl", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: foreach (n :: Nat) -> Add n Z :~: n", "bad n = Refl"])
         , ("ReverseIndexEscape", 83865, "reverseNative", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n xs) = reverseNative @Int n xs"])
-        , ("ReverseWrongPredecessor", 25897, "rest", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)", "bad n m xs acc = case n of", "  Z -> case xs of VNil -> acc", "  S k -> case xs of VCons x rest -> reverseAppendNative @a (S k) m rest acc"])
+        , ("ReverseWrongPredecessor", 5617, "rest", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)", "bad n m xs acc = case n of", "  Z -> case xs of VNil -> acc", "  S k -> case xs of VCons x rest -> reverseAppendNative @a (S k) m rest acc"])
         , ("LaterWildcard", 83605, "bare variable pattern", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z _ xs ys = ys", "bad (S k) later xs ys = ys"])
         , ("LaterConstructor", 83605, "constructor patterns in both selected index columns", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z Z xs ys = ys", "bad (S k) later xs ys = ys"])
         , ("MatrixIncomplete", 83605, "each pair of constructors", [], equalityImports, ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Maybe (n :~: m)", "bad Z Z = Nothing", "bad Z (S right) = Nothing", "bad (S left) Z = Nothing"])
@@ -3025,6 +3054,21 @@ runPackageSourceRejectChecks = do
         , ("JointPrefixCallbackResultIndexEscape", 83605, "outside the application scope", ["TypeApplications", "TupleSections"], [], localActions ++ ["selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value", "selectIndex _ value = value", "bad :: Nat -> IO Int", "bad n = let compute = pure (localVector n) >>= \\xs -> let { k :: Nat; k = n } in pure (selectIndex @Int xs (localVector k,) (42 :: Int)) in pure 42"])
         , ("JointPrefixInterleavedTypeApplicationBoundary", 83865, "untouchable", ["TypeApplications", "TupleSections"], [], localActions ++ ["interleavedIndex :: forall a. a -> forall (index :: Nat) value. Vec a index -> value -> value", "interleavedIndex _ _ value = value", "bad :: Nat -> IO Int", "bad n = pure (interleavedIndex @Int (0 :: Int) @_ @_ (localVector n) ((+ 1) :: Int -> Int) 42)"])
         , ("JointPrefixQuickLookBoundary", 83605, "Quick Look inference", ["TypeApplications", "TupleSections", "ImpredicativeTypes"], [], ["selectIndex :: forall a (index :: Nat) value. Vec a index -> value -> value", "selectIndex _ value = value", "bad :: foreach (n :: Nat) -> Vec Int n -> (Vec Int n, Int)", "bad n xs = selectIndex @Int xs (xs,) (42 :: Int)"])
+        , ("PiGivenNoGivenRetainedPi", 83865, "Couldn't match", ["TypeFamilies"], [], ["transportWithoutProof :: forall a b. (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec b n)", "transportWithoutProof f = f"])
+        , ("PiGivenUnrelatedGivenCannotTransport", 83865, "Couldn't match", ["TypeFamilies"], [], ["transportWrongProof :: forall a b c. a ~ b => (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec c n)", "transportWrongProof f = f"])
+        , ("PiGivenGadtGivenBeforePi", 83605, "requires one unguarded clause", ["TypeFamilies"], ["import Data.Type.Equality ((:~:)(Refl))"], ["transportRefl :: forall a b. (a :~: b) -> (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec b n)", "transportRefl Refl f = f"])
+        , ("PiGivenBranchGivenCannotEscape", 83865, "Couldn't match", ["TypeFamilies"], ["import Data.Type.Equality ((:~:)(Refl))"], ["transportMaybe :: forall a b. Maybe (a :~: b) -> (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec b n)", "transportMaybe proof f = case proof of { Just Refl -> f; Nothing -> f }"])
+        , ("PiGivenRepresentationalEvidenceIsNotNominal", 83865, "Couldn't match", ["TypeFamilies"], ["import Data.Coerce (Coercible)"], ["transportCoercible :: forall a b. Coercible a b => (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec b n)", "transportCoercible f = f"])
+        , ("PiGivenOuterProofCannotIdentifyInnerIndex", 83865, "Couldn't match", ["TypeFamilies"], [], ["wrongInner :: forall a. foreach (k :: Nat) -> (a ~ Vec Int k) => (foreach (n :: Nat) -> (a, Vec Bool n)) -> (foreach (n :: Nat) -> (Vec Int n, Vec Bool n))", "wrongInner k f = f"])
+        , ("PiGivenNativeFamilyOccursCycleCannotTransport", 83865, "Couldn't match", ["TypeFamilies"], [], ["type family Cycle a (n :: Nat)", "wrongCycle :: forall a. foreach (k :: Nat) -> (a ~ Maybe (Cycle a k)) => (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec Bool n)", "wrongCycle k f = f"])
+        , ("PiVTAIndependentRuntimeIndexMismatch", 83865, "Couldn't match", ["TypeApplications"], [], localActions ++ ["bad :: Nat -> Nat -> Int", "bad k m = length (toListLocal (id @(Vec Int k) (localVector m)))"])
+        , ("PiVTAUnsupportedRuntimeIndexDomain", 83605, "visible type argument", ["TypeApplications"], [], localActions ++ ["bad :: Int -> Int", "bad k = length (toListLocal (id @(Vec Int k) VNil))"])
+        , ("PiVTAGlobalTermIsNotCaptured", 76037, "globalIndex", ["TypeApplications"], [], localActions ++ ["globalIndex :: Nat", "globalIndex = Z", "bad :: Int", "bad = length (toListLocal (id @(Vec Int globalIndex) VNil))"])
+        , ("PiVTAUnavailableTermIsNotCaptured", 76037, "unavailableIndex", ["TypeApplications"], [], localActions ++ ["bad :: Int", "bad = length (toListLocal (id @(Vec Int unavailableIndex) VNil))"])
+        , ("PiVTAPartialNativeTypeArgument", 83605, "must be complete", ["TypeApplications"], [], localActions ++ ["bad :: Nat -> Int", "bad k = length (toListLocal (id @(Vec _ k) (localVector k)))"])
+        , ("PiVTANamedWildcardIsNotCaptured", 83865, "Couldn't match", ["TypeApplications", "NamedWildCards"], [], localActions ++ ["bad :: Nat -> Int", "bad _k = length (toListLocal (id @(Vec Int _k) (localVector _k)))"])
+        , ("PiVTAQuotationRuntimeCapture", 83605, "Template Haskell", ["TypeApplications", "TemplateHaskell"], ["import Language.Haskell.TH (Q, Exp)"], ["bad :: Nat -> Q Exp", "bad k = [| id @(Vec Int k) undefined |]"])
+        , ("PiVTALinearRuntimeIndexRejected", 83605, "visible type argument", ["TypeApplications", "LinearTypes"], [], localActions ++ ["bad :: Nat %1 -> Int", "bad k = length (toListLocal (id @(Vec Int k) (localVector k)))"])
         , ("LocalSignatureWrongIndex", 83865, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> Nat -> PackedVec Int", "bad n m = let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureAliasIndex", 83605, "localVector m", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad n = let m = n in let { xs :: Vec Int n; xs = localVector m } in PackVec n xs"])
         , ("LocalSignatureSameGroup", 83605, "already-bound unrestricted local value", [], [], localSignatures ++ ["bad :: Nat -> PackedVec Int", "bad outer = let { n :: Nat; n = outer; xs :: Vec Int n; xs = localVector n } in PackVec n xs"])

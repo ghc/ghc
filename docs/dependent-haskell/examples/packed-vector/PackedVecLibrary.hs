@@ -19,6 +19,10 @@ module PackedVecLibrary (
     Add,
     Sum (..),
     replicateNative,
+    transportElement,
+    transportElementEta,
+    transportElementWith,
+    transportOuterIndex,
     withPacked,
     repack,
     ignorePacked,
@@ -166,6 +170,23 @@ See REFERENCES.md#length-preserving-reverse-next-source-probe for pinned sources
 replicateNative :: forall a. foreach (n :: Nat) -> a -> Vec a n
 replicateNative Z x = VNil
 replicateNative (S k) x = VCons x (replicateNative @a k x)
+
+-- | Transport a retained function with an outer element equality.
+transportElement :: forall a b. (a ~ b) => (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec b n)
+transportElement f = f
+
+-- | Transport each application as an explicit eta control.
+transportElementEta :: forall a b. (a ~ b) => (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec b n)
+transportElementEta f n = f n
+
+-- | Demand an equality proof before returning the transported function.
+transportElementWith :: forall a b. (a :~: b) -> (foreach (n :: Nat) -> Vec a n) -> (foreach (n :: Nat) -> Vec b n)
+transportElementWith proof f = case proof of
+    Refl -> f
+
+-- | Transport with an equality that contains an outer runtime index.
+transportOuterIndex :: forall a. foreach (k :: Nat) -> (a ~ Vec Int k) => (foreach (n :: Nat) -> (a, Vec Bool n)) -> (foreach (n :: Nat) -> (Vec Int k, Vec Bool n))
+transportOuterIndex k f = f
 
 -- | Pass both stored fields to a consumer with one scoped runtime index.
 withPacked :: forall a r. PackedVec a -> (foreach (n :: Nat) -> Vec a n -> r) -> r
