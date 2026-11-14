@@ -18,6 +18,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr, tcInferRho )
 import GHC.Hs
 
 import GHC.Tc.Gen.Head
+import GHC.Tc.Gen.Sig ( isCompleteHsSig )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
 import GHC.Tc.Utils.Monad
@@ -77,6 +78,7 @@ import GHC.Utils.Panic
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Data.Data ( Data, cast, gmapQ )
 import Data.Function
 import Data.Semigroup
 
@@ -1532,6 +1534,18 @@ arguments. Its own application checker supplies their expected types.
 Calls without an anchor keep their ordinary checking behavior. Constructors
 and Ids with concreteness requirements also keep ordinary instantiation.
 
+A complete expression signature supplies its own checking type. Infer signed
+arguments such as (42 :: Int) through the same cache. In nested inference,
+const (42 :: Int) (rightZero n) has no expected result to determine const's
+first parameter. Skipping the signed argument leaves the substitution partial
+and forces ordinary instantiation of the native proof type. Reuse
+isCompleteHsSig and inspect the renamed type syntax without elaboration.
+Exclude written quantifiers, contexts and type splices, including those in
+kinds and multiplicities. Stop at Names and embedded Core types. Type synonyms
+can hide polymorphism; normal signature checking and final subsumption still
+check their actual types. This syntactic gate does not prove monomorphism.
+See Note [Application chains and heads] and tcExprSig in GHC.Tc.Gen.Head.
+
 Use the existing argument cache and subsumption checks. Keep cached entries
 even if matching fails. Emit each saved usage once at the final argument
 multiplicity. Require every outer binder to have a candidate of the correct
@@ -1572,7 +1586,7 @@ retains the completed immutable mode and cannot allocate another type meta.
 The existing flat routes still apply their type arguments directly.
 -}
 
--- | Classify a named argument spine and find known native Ids without elaboration.
+-- | Classify named or completely signed arguments without elaboration.
 tcRetainedInferableArg :: LHsExpr GhcRn -> TcM (Bool, Bool)
 tcRetainedInferableArg (L _ expr)
   = case expr of
@@ -1592,10 +1606,32 @@ tcRetainedInferableArg (L _ expr)
                 else do { (_, arg_anchor) <- tcRetainedInferableArg arg
                         ; return (True, fun_anchor || arg_anchor) } }
       HsAppType _ fun _ -> tcRetainedInferableArg fun
+      ExprWithTySig _ arg sig@(HsWC { hswc_body = L _ (HsSig { sig_bndrs = bndrs
+                                                            , sig_body = body }) })
+        | isCompleteHsSig sig, null (hsOuterTyVarNames bndrs), simple_type body
+        -> do { (_, anchor) <- tcRetainedInferableArg arg
+              ; return (True, anchor) }
       HsPar _ arg -> tcRetainedInferableArg arg
       HsPragE _ _ arg -> tcRetainedInferableArg arg
       XExpr (ExpandedThingRn (HSE { hse_exp = arg })) -> tcRetainedInferableArg arg
       _ -> return (False, False)
+  where
+    -- | Exclude checking-only syntax without traversing compiler type graphs.
+    simple_type :: Data a => a -> Bool
+    simple_type thing
+      | Just ty <- (cast thing :: Maybe (HsType GhcRn))
+      , not (simple_shape ty) = False
+      | Just ty <- (cast thing :: Maybe Type) = isTauTy ty
+      | Just _ <- (cast thing :: Maybe Name) = True
+      | otherwise = and (gmapQ simple_type thing)
+
+    -- | Keep explicit quantifiers, contexts and type splices on the usual path.
+    simple_shape :: HsType GhcRn -> Bool
+    simple_shape HsForAllTy{} = False
+    simple_shape HsForEachTy{} = False
+    simple_shape HsQualTy{} = False
+    simple_shape HsSpliceTy{} = False
+    simple_shape _ = True
 
 -- | Specialize the wired-in dollar operator from a checked result and one
 -- cached native-anchored RHS. Keep its original type and evidence application.
