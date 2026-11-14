@@ -170,6 +170,12 @@ rnRetainedSigType :: HsDocContext -> LHsType GhcPs
 rnRetainedSigType doc (L loc (HsParTy _ body))
   = do { (body', fvs) <- rnRetainedSigType doc body
        ; pure (L loc (HsParTy noAnn body'), fvs) }
+rnRetainedSigType doc (L loc (HsQualTy _ ctxt body))
+  = setSrcSpanA loc $
+    do { let env = mkTyKiEnv doc TypeLevel RnTypeBody
+       ; (ctxt', ctxt_fvs) <- rnTyKiContext env ctxt
+       ; (body', body_fvs) <- rnRetainedSigType doc body
+       ; pure (L loc (HsQualTy noExtField ctxt' body'), ctxt_fvs `plusFN` body_fvs) }
 rnRetainedSigType doc (L loc (HsFunTy x mult arg res))
   = setSrcSpanA loc $
     do { (arg', arg_fvs) <- rnRetainedSigType doc arg

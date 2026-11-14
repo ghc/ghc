@@ -674,11 +674,12 @@ ignoreParens :: LHsType (GhcPass p) -> LHsType (GhcPass p)
 ignoreParens (L _ (HsParTy _ ty)) = ignoreParens ty
 ignoreParens ty                   = ty
 
--- | Find retained binders through parentheses and ordinary function arrows.
+-- | Find retained binders through parentheses, contexts and function arrows.
 -- See Note [Higher-order retained signatures] in GHC.Tc.Gen.HsType.
 hsHasForEachTy :: HsType (GhcPass p) -> Bool
 hsHasForEachTy HsForEachTy{} = True
 hsHasForEachTy (HsParTy _ ty) = hsHasForEachTy (unLoc ty)
+hsHasForEachTy (HsQualTy _ _ ty) = hsHasForEachTy (unLoc ty)
 hsHasForEachTy (HsFunTy _ _ arg res)
   = hsHasForEachTy (unLoc arg) || hsHasForEachTy (unLoc res)
 hsHasForEachTy _ = False

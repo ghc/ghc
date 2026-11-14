@@ -64,7 +64,7 @@ import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind )
-import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind )
+import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo )
 import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
@@ -174,9 +174,9 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
       _ | DepFunTy binder _ <- coreFullView ty ->
           do { index <- newSysLocalId (fsLit "retained") ManyTy (varType binder)
              ; let body_ty = applyTypeToArgs ty [Var index]
-             ; (pat_tys, dictionaries, rhs_ty) <-
+             ; (pat_tys, argument_plan, rhs_ty) <-
                  tcRetainedConArgs herald ctxt (arity - 1) body_ty
-             ; tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty matches }
+             ; tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty matches }
         | otherwise -> failWithTc $
             TcRnRetainedQuantificationError RetainedConstructorCoverage
   where
@@ -258,7 +258,8 @@ tcRetainedCase index matches@(MG { mg_alts = L loc alternatives }) (Check result
                     dictionary_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . varType) dictionaries
                     capture_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . generalize . varType) captures
                     arg_tys = dictionary_tys ++ capture_tys
-                    argument_plan = map Just dictionaries ++ map (const Nothing) captures
+                    argument_plan = map RetainedConDict dictionaries
+                                    ++ map (const RetainedConValue) captures
               ; checked <- tcRetainedConMatches fresh_index [] arg_tys argument_plan
                              (mkCheckExpType (generalize result_ty)) matches'
               ; mapM_ (tcEmitBindingUsage . singleUsageUE) captures
@@ -341,6 +342,35 @@ rewriteRetainedCase index con fields captures = go
       | Just names <- (cast thing :: Maybe NameSet)
       = fromMaybe thing (cast (mkNameSet (concatMap replace_name (nameSetElemsStable names))))
       | otherwise = gmapT go thing
+
+-- | Rename resolved row Names and free-name sets after checking quotations.
+renameRetainedMatch :: Data a => [(Name, Name)] -> a -> a
+renameRetainedMatch names = go
+  where
+    rename name = fromMaybe name (lookup name names)
+    go :: Data b => b -> b
+    go thing
+      | Just name <- (cast thing :: Maybe Name)
+      = fromMaybe thing (cast (rename name))
+      | Just free <- (cast thing :: Maybe NameSet)
+      = fromMaybe thing (cast (mkNameSet (map rename (nameSetElemsStable free))))
+      | Just _ <- (cast thing :: Maybe Type) = thing
+      | otherwise = gmapT go thing
+
+-- | Find a quotation's source span without traversing compiler type graphs.
+retainedMatchQuotation :: Data a => a -> Maybe SrcSpan
+retainedMatchQuotation thing
+  | Just (L loc expr) <- (cast thing :: Maybe (LHsExpr GhcRn))
+  , is_quote expr = Just (locA loc)
+  | Just _ <- (cast thing :: Maybe Name) = Nothing
+  | Just _ <- (cast thing :: Maybe NameSet) = Nothing
+  | Just _ <- (cast thing :: Maybe Type) = Nothing
+  | otherwise = msum (gmapQ retainedMatchQuotation thing)
+  where
+    is_quote :: HsExpr GhcRn -> Bool
+    is_quote HsTypedBracket{} = True
+    is_quote HsUntypedBracket{} = True
+    is_quote _ = False
 
 {- Note [Source retained case refinement]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -448,29 +478,42 @@ splitRetainedContext prefix group@(MG { mg_alts = L loc [L match_loc match]
     split_prefix n [] = pprPanic "splitRetainedContext: missing prefix" (ppr n)
 splitRetainedContext _ _ = panic "splitRetainedContext: multiple equations"
 
--- | Collect dictionaries at their telescope positions without counting them as values.
+-- | Distinguish transported payloads from shared evidence and runtime indices.
+data RetainedConArg
+  = RetainedConValue
+  | RetainedConDict EvVar
+  | RetainedConIndex Id
+
+-- | Collect shared binders in telescope order without counting evidence as values.
 tcRetainedConArgs :: ExpectedFunTyCtxt -> UserTypeCtxt -> Int -> Type
-                  -> TcM ([ExpPatType], [Maybe EvVar], ExpRhoType)
+                  -> TcM ([ExpPatType], [RetainedConArg], ExpRhoType)
 tcRetainedConArgs herald ctxt = go [] []
   where
-    go acc dictionaries n ty
+    go acc argument_plan n ty
       | (theta, tau) <- tcSplitPhiTy ty, not (null theta)
       = do { givens <- newEvVars theta
            ; let pat_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . varType) givens
-           ; go (reverse pat_tys ++ acc) (reverse (map Just givens) ++ dictionaries) n tau }
+           ; go (reverse pat_tys ++ acc)
+                (reverse (map RetainedConDict givens) ++ argument_plan) n tau }
       | n == 0
-      = return (reverse acc, reverse dictionaries, mkCheckExpType ty)
+      = return (reverse acc, reverse argument_plan, mkCheckExpType ty)
+      | DepFunTy binder _ <- coreFullView ty
+      = do { name <- newSysName (nameOccName (idName binder))
+           ; let index = mkLocalId name ManyTy (varType binder)
+                 pat_ty = mkCheckExpFunPatTy (Scaled ManyTy (varType binder))
+           ; go (pat_ty : acc) (RetainedConIndex index : argument_plan) (n-1)
+                (applyTypeToArgs ty [Var index]) }
       | FunTy{} <- coreFullView ty
       = do { (co, arg_ty, rhs_ty) <- matchActualFunTy herald Nothing (n, ty) ty
            ; unless (isIdHsWrapper (mkWpCastN co)) $
                failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
-           ; go (mkCheckExpFunPatTy arg_ty : acc) (Nothing : dictionaries) (n-1) rhs_ty }
+           ; go (mkCheckExpFunPatTy arg_ty : acc) (RetainedConValue : argument_plan) (n-1) rhs_ty }
       | otherwise
       = do { (wrap, result) <- matchExpectedFunTys herald ctxt 1 (mkCheckExpType ty) $
                \pat_tys rhs_ty ->
                  do { rhs_ty <- readExpType rhs_ty
                     ; go (reverse pat_tys ++ acc)
-                         (map (const Nothing) pat_tys ++ dictionaries) (n-1) rhs_ty }
+                         (map (const RetainedConValue) pat_tys ++ argument_plan) (n-1) rhs_ty }
            ; unless (isIdHsWrapper wrap) $
                failWithTc (TcRnRetainedQuantificationError RetainedResultWrapper)
            ; return result }
@@ -513,10 +556,10 @@ docs/dependent-haskell/REFERENCES.md#agda-provenance.
 
 -- | Resolve a constructor and its actual closed runtime field identities.
 
-tcRetainedConMatches :: Id -> [ExpPatType] -> [ExpPatType] -> [Maybe EvVar] -> ExpRhoType
+tcRetainedConMatches :: Id -> [ExpPatType] -> [ExpPatType] -> [RetainedConArg] -> ExpRhoType
                     -> MatchGroup GhcRn (LHsExpr GhcRn)
                     -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
-tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty
+tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                     (MG { mg_alts = L loc matches, mg_ext = (origin, _) })
   = setSrcSpanA loc $
     do { constructors <- mapM constructor matches
@@ -538,9 +581,12 @@ tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty
                          , mg_ext = MatchGroupTc (Scaled ManyTy (varType index) : arg_tys) result_ty origin }) }
   where
     empty_matches arg_tys result_ty
-      = do { arguments <- zipWithM (\dictionary (Scaled mult ty) ->
-                               maybe (newSysLocalId (fsLit "retained_arg") mult ty) return dictionary)
-                             dictionaries arg_tys
+      = do { arguments <- zipWithM (\argument (Scaled mult ty) ->
+                               case argument of
+                                 RetainedConValue -> newSysLocalId (fsLit "retained_arg") mult ty
+                                 RetainedConDict dict -> return dict
+                                 RetainedConIndex shared -> return shared)
+                             argument_plan arg_tys
            ; let index_ty = Scaled ManyTy (varType index)
                  empty_case = MG { mg_alts = L loc []
                                  , mg_ext = MatchGroupTc [index_ty] result_ty origin }
@@ -572,22 +618,34 @@ tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty
 
     check_match (con, fields) arg_tys result_ty (L match_loc match@(Match { m_pats = L _ pats }))
       = setSrcSpanA match_loc $
-        do { unless (all bare_variable (drop 1 (filter isVisArgLPat pats))) argument_error
+        do { names <- retained_names argument_plan (drop 1 (filter isVisArgLPat pats))
+           ; unless (null names) $
+               case retainedMatchQuotation match of
+                 Nothing -> return ()
+                 Just span -> setSrcSpan span $
+                   failWithTc (TcRnRetainedQuantificationError RetainedConstructorQuotation)
+           ; mapM_ (\pat -> unless (bare_variable pat) $
+                        setSrcSpanA (getLoc pat) argument_error)
+               (drop 1 (filter isVisArgLPat pats))
            ; let constructor_index = mkTyConApp (promoteDataCon con) (map TermVarTy fields)
            ; cv <- newEvVar (mkNomEqPred (TermVarTy index) constructor_index)
            ; arg_cos <- mapM (tcRetainedCoercion index (mkCoVarCo cv) . scaledThing) arg_tys
            ; result_co <- tcRetainedCoercion index (mkCoVarCo cv) result_ty
-           ; let dictionary_cos = [(dict, co) | (Just dict, co) <- zip dictionaries arg_cos]
+           ; sequence_ [unless (isReflCo co) $
+                          failWithTc (TcRnRetainedQuantificationError (RetainedPatternType ty))
+                       | (RetainedConIndex _, co, Scaled _ ty) <- zip3 argument_plan arg_cos arg_tys]
+           ; let dictionary_cos = [(dict, co) | (RetainedConDict dict, co) <- zip argument_plan arg_cos]
            ; refined_givens <- newEvVars (map (pSnd . coercionKind . snd) dictionary_cos)
            ; let refined_args = zipWith3 (\dictionary (Scaled mult ty) co ->
                                    mkCheckExpFunPatTy (Scaled mult (case dictionary of
-                                     Just _ -> ty
-                                     Nothing -> pSnd (coercionKind co))))
-                                 dictionaries arg_tys arg_cos
+                                     RetainedConValue -> pSnd (coercionKind co)
+                                     _ -> ty)))
+                                 argument_plan arg_tys arg_cos
                  index_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType index))
-                 match' = match { m_pats = fmap (insert_dictionaries dictionaries) (m_pats match) }
-                 check = tcMatch tcBody (invis_pat_tys ++ index_arg : refined_args)
-                           (mkCheckExpType (pSnd (coercionKind result_co))) (L match_loc match')
+                 renamed = renameRetainedMatch names match
+                 match' = renamed { m_pats = fmap (insert_dictionaries argument_plan) (m_pats renamed) }
+                 check = tcMatchWithSource tcBody (invis_pat_tys ++ index_arg : refined_args)
+                           (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc match')
            ; (ev_binds, L checked_loc checked) <- if null refined_givens
                then do { checked <- check; return (emptyTcEvBinds, checked) }
                else checkConstraints (PatSkol (RealDataCon con) (m_ctxt match)) [] refined_givens check
@@ -608,9 +666,9 @@ tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty
                                     (L first_loc (add_proof cv branch_binds first)))
                      : zipWith4 (\dictionary co (Scaled _ ty) (L pat_loc pat) ->
                                    case dictionary of
-                                     Just _ -> L pat_loc pat
-                                     Nothing -> L pat_loc (XPat (CoPat (mkWpCastN co) pat ty)))
-                                dictionaries arg_cos arg_tys rest
+                                     RetainedConValue -> L pat_loc (XPat (CoPat (mkWpCastN co) pat ty))
+                                     _ -> L pat_loc pat)
+                                argument_plan arg_cos arg_tys rest
                    [] -> panic "tcRetainedConMatches: no constructor pattern"
                  cast_rhs (L rhs_loc (GRHS x guards rhs)) =
                    L rhs_loc (GRHS x guards (mkLHsWrapCo (mkSymCo result_co) rhs))
@@ -626,12 +684,26 @@ tcRetainedConMatches index invis_pat_tys pat_tys dictionaries rhs_ty
         before_index [] = panic "tcRetainedConMatches: missing source index"
 
         insert [] pats = pats
-        insert (Just dict : rest) pats
+        insert (RetainedConDict dict : rest) pats
           = noLocA (VarPat noExtField (noLocA (idName dict))) : insert rest pats
-        insert ds@(Nothing : rest) (pat : pats)
+        insert ds@(_ : rest) (pat : pats)
           | isVisArgLPat pat = pat : insert rest pats
           | otherwise = pat : insert ds pats
         insert _ [] = panic "tcRetainedConMatches: missing source argument"
+
+    -- | Match shared retained positions to the row's resolved variable Names.
+    retained_names :: [RetainedConArg] -> [LPat GhcRn] -> TcM [(Name, Name)]
+    retained_names [] [] = return []
+    retained_names (RetainedConDict _ : args) pats = retained_names args pats
+    retained_names (RetainedConIndex shared : args) (L pat_loc pat : pats)
+      = setSrcSpanA pat_loc $
+        do { name <- case pat of
+               VarPat _ (L _ name) -> return name
+               _ -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
+           ; names <- retained_names args pats
+           ; return ((name, idName shared) : names) }
+    retained_names (RetainedConValue : args) (_ : pats) = retained_names args pats
+    retained_names _ _ = argument_error
 
     bare_variable (L _ VarPat{}) = True
     bare_variable _ = False
@@ -683,6 +755,23 @@ lambda and all its index occurrences therefore have the same Unique, without
 adding a field to MatchGroupTc. Keep exactly one unguarded equation for each
 constructor of the index domain. This gives the native proof case complete coverage.
 Later arguments currently require bare variable patterns and Many multiplicity.
+
+A later retained binder also needs one shared runtime Id across all equations.
+Consume each DepFunTy in telescope order and instantiate its codomain with that
+Id before reading later argument types. RetainedConArg distinguishes these
+indices from evidence and ordinary payloads. Rename each row's resolved later
+index Names to the shared Names before checking it. Update stored free-name sets
+and preserve WithUserRdr spelling and source spans. Stop at embedded Core Types.
+Check the rewritten row, but use the original source row for error contexts.
+Reject quotations at their expression spans before the rewrite.
+
+Keep each shared index VarPat outermost, as for dictionaries. Even a reflexive
+CoPat would make selectMatchVar choose a fresh Id and break runtime identity.
+Its closed domain must have reflexive constructor transport. Only dictionary
+positions get specialised Givens; ordinary payloads keep their existing CoPats.
+All source value and dictionary lambdas still precede constructor discrimination.
+Agda lifts its constructor substitution over the later telescope and RHS target.
+See docs/dependent-haskell/REFERENCES.md#later-retained-arguments-in-constructor-equations.
 
 An empty domain needs no constructor proof. Bind the chosen index with a
 variable pattern and inspect it with an actual empty case. Keep the original
@@ -873,11 +962,22 @@ tcMatch :: (AnnoBody body)
         -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
 
 tcMatch tc_body pat_tys rhs_ty match
+  = tcMatchWithSource tc_body pat_tys rhs_ty (unLoc match) match
+
+-- | Check a rewritten equation with its original source in the error context.
+tcMatchWithSource :: (AnnoBody body)
+                  => TcMatchAltChecker body
+                  -> [ExpPatType]
+                  -> ExpRhoType
+                  -> Match GhcRn (LocatedA (body GhcRn))
+                  -> LMatch GhcRn (LocatedA (body GhcRn))
+                  -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
+tcMatchWithSource tc_body pat_tys rhs_ty source_match match
   = do { (L loc r) <- wrapLocMA (tc_match pat_tys rhs_ty) match
        ; return (L loc r) }
   where
     tc_match pat_tys rhs_ty
-             match@(Match { m_ctxt = ctxt, m_pats = L l pats, m_grhss = grhss })
+             (Match { m_ctxt = ctxt, m_pats = L l pats, m_grhss = grhss })
       = add_match_ctxt $
         do { (pats', (grhss')) <- tcMatchPats ctxt pats pat_tys $
                                   tcGRHSs ctxt tc_body grhss rhs_ty
@@ -897,7 +997,7 @@ tcMatch tc_body pat_tys rhs_ty match
             LamAlt LamSingle -> thing_inside
             StmtCtxt (HsDoStmt{}) -> thing_inside -- this is an expanded do stmt
             RecUpd -> thing_inside -- record update is Expanded out so ignore it
-            _          -> addErrCtxt (MatchInCtxt match) thing_inside
+            _          -> addErrCtxt (MatchInCtxt source_match) thing_inside
 
 -------------
 tcGRHSs :: AnnoBody body

@@ -3573,6 +3573,8 @@ pprRetainedQuantificationError reason = case reason of
     text "Dependent case refinement requires one unguarded match for each constructor, with bare variable fields."
   RetainedCaseQuotation ->
     text "Dependent case refinement does not support Template Haskell quotations."
+  RetainedConstructorQuotation ->
+    text "Constructor equations with later retained arguments do not support Template Haskell quotations yet."
   RetainedConstructorArguments ->
     text "Retained constructor fields and later arguments currently require bare variable patterns and unrestricted multiplicities."
   RetainedPatternType ty ->

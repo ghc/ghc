@@ -512,6 +512,12 @@ tcCheckRetainedSigType = go typeLevelMode
   where
     go :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
     go mode (L _ (HsParTy _ body)) kind = go mode body kind
+    go mode (L loc ty@(HsQualTy _ ctxt body)) kind
+      | hsHasForEachTy (unLoc body)
+      = setSrcSpanA loc $
+        do { theta <- tc_hs_context mode ctxt
+           ; body_ty <- go mode body liftedTypeKind
+           ; checkExpKind ty (tcMkPhiTy theta body_ty) liftedTypeKind (Check kind) }
     go mode (L loc (HsFunTy _ mult arg res)) kind
       = setSrcSpanA loc $
         tc_fun_type_x (go mode) mode mult arg res (Check kind)
@@ -618,6 +624,16 @@ Note [Restricted retained dependent types] in GHC.Core.TyCo.Rep.
 
 {- Note [Higher-order retained signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A qualified signature can have further retained binders in its body. Keep the
+retained signature walker through HsQualTy. Rename and check its constraints
+with the ordinary context routines in the current index environment. Then
+check the body with the retained walker and build the usual evidence arrows.
+Later binders scope over the body, not the preceding constraints. The syntax
+selector hsHasForEachTy must also traverse qualified bodies. This permits a
+leading class context and a context between retained arguments. Ordinary
+qualified bodies without retained syntax keep the ordinary kind checker.
+See docs/dependent-haskell/REFERENCES.md#later-retained-arguments-in-constructor-equations.
+
 A complete value signature can put a retained function in an ordinary arrow
 argument or result. Rename and check both children in their original context.
 Each nested retained telescope extends only its own body's index environment.
