@@ -39,7 +39,7 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 136 runtime observations and the runtime fixtures check 27 package/bound rejections |
+| Last verified checkpoint | Both compiler stages and all five registered regressions pass; the source example has 180 runtime observations and the runtime fixtures check 34 package/bound rejections |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -47,7 +47,8 @@ Last updated: 2026-11-14.
 | Source package patterns | Nested vector/proof patterns, wildcard proof fields and guarded clauses pass in both stages; separate cases preserve each row's runtime index Ids |
 | Source vector tails | Source uncons and repeated draining use the actual runtime predecessor; partial fields stay lazy and the tested cyclic input produces a bounded prefix |
 | Source equality and zip | Both compiler stages pass 136 observations; ordinary `Refl` aligns independently computed lengths; four equality-scope errors have pinned codes and source locations |
-| Next task | Probe source append with a runtime sum and an equality witness for its computed result length |
+| Source append | Both stages pass 180 observations; a runtime sum and ordinary equality witness determine the result length; declaration-only imports, partial VTA and unused retained fields pass |
+| Next task | Probe retained constructor patterns in source package fields |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -2037,9 +2038,72 @@ harness and output manifests identify the checkpoint. Earlier compiler,
 source and harness failures remain saved. The previous-format reader,
 executable and interface fixture retain their original three hashes.
 
-An exploratory imported-global probe still reaches an unlocated late-pipeline
-gate. It is not included in the located rejection counts. Native optimization,
+An exploratory imported-global probe reached an unlocated late-pipeline
+gate. It was excluded from the located rejection counts. M16 resolves the
+declaration classification and checks the actual index restriction below. Native optimization,
 general index expressions, totality and proof erasure remain separate work.
 The full GHC suite was not run. Next, probe source append with a computed
 runtime length and ordinary equality evidence. The
-[M16 plan](PLAN.md#m16-source-append-with-a-computed-result-length) is unverified.
+[M16 checkpoint](#source-append-with-a-runtime-sum-checkpoint) records that extension.
+
+## Source append with a runtime sum checkpoint
+
+Source and fixture `fba00f8f0c`, with compiler changes `491c5fb0c9`, pass all
+180 source observations in both compiler stages. `sumNat` returns a runtime
+length `p` and ordinary evidence `p :~: Add n m`. `appendPacked` matches
+`Refl` before repackaging the appended vector at that length. Independent
+IORef inputs and runtime filters preserve the left elements before the right
+elements. The [source guide](examples/packed-vector/README.md#append-with-a-computed-result-length)
+shows the implementation and demand observations.
+
+The runtime fixture checks 34 package/bound rejections in bootstrap and
+registered runs. Seven standalone sum/append errors pin GHC-05617 or GHC-83865
+and the primary source token in both stages. A separate declaration-only
+producer and interface-only consumer pass three observations: inferred
+constructor parameters, partial VTA, and an unused retained field. The
+self-hosted declaration checks also preserve the optimization, unfolding,
+Core-serialization and profiling gates. Those option failures are separate
+from the located source-error counts.
+
+Constructor result matching now follows validated field metadata through a
+fully applied real constructor's current signature. It chooses only outer
+erased parameters. It keeps the actual instantiated telescope and normal
+proof checking. An unused retained binder can have a canonical ordinary Many
+arrow. Matching checks that arrow's closed domain. Module classification
+also includes local retained worker types before implicit bindings are
+generated. This gives declaration-only modules the existing checked native
+pipeline. These changes add no Core rule or interface schema.
+
+The final incremental bootstrap compiler build took 22.96 seconds and peaked
+at 1,627 MiB under 16 GiB. The self-hosted compiler target and dependencies
+took 9m10s and peaked at 4,510 MiB under 16 GiB. Final bootstrap source,
+runtime and standalone diagnostic checks peaked at 1,022 MiB under 4 GiB.
+Self-hosted source, diagnostics and capability checks peaked at 120 MiB
+under 4 GiB. All five registered tests passed: 39 cases, 34 skipped, no
+framework warnings or failures. The driver took 12.064 seconds and peaked
+at 1,659 MiB under 8 GiB. Final commands recorded zero swap.
+
+The earlier imported-global probe has a vacuous Boolean binder. GHC
+canonicalizes that binder to an ordinary arrow, so its imported `otherwise`
+argument is valid. It now compiles. A separate genuinely dependent stored
+Boolean still rejects `otherwise` with GHC-83605 at that token. These two
+scope controls passed at 49 MiB under 4 GiB.
+
+Artifacts use `_build/verification/native-append-sum-`. Final compiler inputs
+are in `build-input-v3.SHA256SUMS`. Passing source logs are
+`bootstrap-run-v2.log` and `selfhost-run-v1.log`; the runtime log is
+`bootstrap-runtime-v1.log`. Diagnostic directories `negatives-v2/` and
+`negatives-v3/` retain sources, commands, messages and primary tokens.
+`gates-v1/` records declaration capability checks. Registered command and
+environment files are retained. Source, documentation, harness and output
+manifests identify the checkpoint. The original declaration/application
+failures and a failed bootstrap build remain saved. M15's 31 harness and
+337 output hashes still match. The protected previous-format reader retains
+its original three hashes.
+
+The sum witness scans the entire first length before it returns a constructor.
+A finite first length can leave the right length and vector payloads lazy.
+The proof is an ordinary lifted field. Totality, proof erasure, native
+optimization and general index expressions remain separate work. The full
+GHC suite was not run. Next, probe constructor patterns on retained package
+fields in [M17](PLAN.md#m17-constructor-patterns-on-retained-package-fields).

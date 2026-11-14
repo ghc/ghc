@@ -48,6 +48,13 @@ locations in both stages. All five focused registered regressions pass.
 The new source uses ordinary `:~:` evidence to
 align independently computed runtime lengths before zipping their vectors.
 
+M16 source workers are committed at `fba00f8f0c`, with compiler changes at
+`491c5fb0c9`. Both compiler stages pass 180 source observations. The bootstrap
+and registered runtime fixtures pass 34 package/bound rejections. Seven
+standalone errors have pinned codes and primary source tokens in both stages.
+A declaration-only producer passes separate imports, partial type applications
+and an unused retained field. All five focused registered regressions pass.
+
 ## Direction and boundaries
 
 The implementation extends Core. It does not require singleton elaboration or
@@ -1233,19 +1240,24 @@ refutation proof, proof erasure, native optimization or totality claim.
 
 ### M16: source append with a computed result length
 
-This target is unverified. Return a runtime sum with ordinary equality
-evidence, then use that evidence to package an appended vector. Follow
+Both compiler stages pass 180 source observations at `fba00f8f0c`, with
+compiler changes at `491c5fb0c9`. The runtime fixtures pass 34 package/bound
+rejections. Seven standalone errors have pinned codes and source tokens in
+both stages. All five focused registered regressions pass. Return a runtime
+sum with ordinary equality evidence, then use that evidence to package an
+appended vector. Follow
 the [pinned addition, vector append and congruence definitions](REFERENCES.md#computed-length-append-next-source-probe).
 
-The first probes confirm two boundaries. A declaration-only module reaches
-the late implicit-binding gate. Include local retained constructor worker
-types in native module classification before simplification, tidying and
-code generation. Keep the existing native option restrictions. Construction
-of `Sum m Refl` also fails with GHC-83865 at the expression. Extend result
-projection only for a fully applied real constructor with validated retained
-field metadata. Traverse its current signature in metadata order. Do not
-project through retained arguments of arbitrary functions. Match only outer
-erased parameters and keep the actual instantiated telescope and field checks.
+Native module classification includes local retained constructor worker
+types before simplification, tidying and code generation. This covers a
+declaration-only producer before implicit workers are generated. Existing
+native option restrictions remain. Constructor result projection applies
+only to a fully applied real constructor with validated retained metadata.
+It traverses the current signature in metadata order. A vacuous retained
+binder can use its canonical ordinary Many arrow with the same closed
+domain. Only outer erased parameters receive immutable choices. The actual
+instantiated telescope and normal field checks remain. Arbitrary functions
+and partial constructors keep their previous path.
 
 ```haskell
 data Sum (n :: Nat) (m :: Nat) where
@@ -1255,26 +1267,48 @@ sumNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Sum n m
 appendPacked :: PackedVec a -> PackedVec a -> PackedVec a
 ```
 
-- [ ] Probe the declaration and `Sum m Refl :: Sum Z m` separately.
+- [x] Probe the declaration and `Sum m Refl :: Sum Z m` separately.
   Construction must instantiate the erased `m` with the captured runtime
-  index before allocating mutable instantiation variables. The current
-  result matcher may stop at the constructor's retained argument. Establish
-  that boundary before extending it. Prefer a constructor-only result match
-  with existing kind, scope and final subsumption checks.
-- [ ] Define `Add` and source append by recursion on the first length.
+  index before allocating mutable instantiation variables. Preserve the
+  original failed probes. Use the constructor-only result match with
+  existing kind, scope and final subsumption checks. Check partial VTA
+  against the current signature and an unused retained field.
+- [x] Define `Add` and source append by recursion on the first length.
   Define `sumNat` with the same recursion. In the successor case, match
   recursive `Refl` before constructing `Sum (S p) Refl`. Reuse family
   reduction and ordinary equality congruence.
-- [ ] Open both packages, match `Sum p Refl`, and repackage the appended
+- [x] Open both packages, match `Sum p Refl`, and repackage the appended
   vector at `p`. Reject forged sums, missing equality elimination, swapped
   indices without a lemma, and an escaping result index.
-- [ ] Check independent runtime inputs and finite element order. Observe
-  package, equality, length and vector demand separately. This proposed
+- [x] Check independent runtime inputs and finite element order. Observe
+  package, equality, length and vector demand separately. This
   `sumNat` forces the entire first Nat spine before returning a constructor.
   Do not claim productivity for a cyclic first length. Check that a finite
   first length can leave the second length and vector fields lazy.
-- [ ] Validate both compiler stages, existing controls and resource limits.
+- [x] Validate both compiler stages, existing controls and resource limits.
   Record provenance, located errors and reproducible artifacts.
+
+### M17: constructor patterns on retained package fields
+
+This target is unverified. Start with `PackVec Z _` and
+`PackVec (S k) (VCons x xs)` equations for source uncons. The zero row must
+keep ignoring the vector field. Probe `PackVec Z VNil` separately because
+that explicit vector pattern must demand its constructor. Reuse the existing
+checked native constructor equality. Keep each equation's runtime Ids and
+source-order failure continuation.
+
+- [ ] Probe a constructor head with bare variable subfields. Preserve a fresh
+  Id for the whole stored index, then scope its nominal constructor equality
+  over subsequent field patterns and the RHS. Use the actual predecessor.
+- [ ] Reuse native coercion checking. Preserve original outer field types
+  through checked pattern coercions. Follow the pinned Agda later-telescope
+  substitution in [source package patterns](REFERENCES.md#source-package-patterns).
+- [ ] Preserve matching order across other arguments, guards and views.
+  Moving fields into RHS cases can change that order. Keep ordinary row
+  failure instead of requiring complete source-case alternatives.
+- [ ] Check bottom indices, lazy elements, first-row failure, repeated
+  equations and scope errors. Keep diagnostics on the original patterns.
+  Preserve the existing rejection of lazy package patterns.
 
 ## Further work
 

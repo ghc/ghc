@@ -1353,9 +1353,14 @@ NoQL fallback. Do not elaborate that operand again.
 
 ## Computed-length append: next source probe
 
-Status: unverified. Compute a runtime result `p` with evidence
-`p :~: Add n m`. Match that evidence before packaging an appended vector.
-The proposed `Sum` package follows the existing retained-field design.
+Status: both compiler stages pass 180 source observations. The runtime
+fixtures pass 34 package/bound rejections. Seven standalone errors have
+pinned codes and source tokens in both stages. Declaration-only producer,
+partial VTA and unused-field controls pass through a separate interface.
+All five focused registered regressions pass. Compute a runtime result `p`
+with evidence `p :~: Add n m`.
+Match that evidence before packaging an appended vector. `Sum` follows
+the existing retained-field design.
 
 - [Agda v2.8.0 builtin Nat, lines 18–20](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Nat.agda#L18-L20),
   defines addition by recursion on its first operand. File blob:
@@ -1368,12 +1373,29 @@ The proposed `Sum` package follows the existing retained-field design.
   congruence supplies the recursive sum proof. File blob:
   `2db2dd64e1a8bbb9bda6410930e3bd15366719d7`.
 
-These definitions support the proof shape. They do not establish that the
-proposed Haskell constructors elaborate. Probe the base constructor first.
-The proposed recursive witness forces the entire first Nat spine before
+These definitions support the proof shape. The Haskell source checks its
+constructor and proof through the current compiler. The recursive witness
+forces the entire first Nat spine before
 returning `Sum`. For a finite first length, its result can store the second
 length without forcing it. Validate these demands separately from vector
 demand. Agda's totality and erasure checks do not apply to this Haskell code.
+
+Agda's
+[`checkConstructorApplication`, lines 1030–1071](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L1030-L1071),
+uses a fully applied expected datatype to select constructor parameters,
+checks the remaining arguments, then compares the actual result. File blob:
+`82ba94ac864d19b947d4c92b9af252b0fe81347a`. The bounded GHC route follows that
+order with immutable erased arguments. It projects only a fully applied
+real constructor with validated retained fields. It traverses the current
+signature, including earlier VTA substitutions and canonical unused Many
+arrows. It keeps the actual telescope and normal field/proof checks.
+It does not generalize result projection through retained function arguments.
+
+A declaration-only GHC module needs the native option check before its
+implicit constructor worker is generated. Module classification now includes
+local retained worker types before simplification, tidying and code generation.
+This carries the existing constructor rules through GHC's driver. It adds no
+equality rule, interface schema or runtime field.
 
 ## Later solver and proof-certificate work
 

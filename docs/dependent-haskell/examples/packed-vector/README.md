@@ -1,11 +1,12 @@
 # Packed vector source example
 
-Both compiler stages compile and run all 136 observations below with Core
-Lint and STG Lint enabled. The consumer imports the library interface with
-the producer source absent from its import path. The bootstrap and registered
-runtime fixtures pass all 27 package and bound rejections. Four standalone
-equality-scope rejections have pinned, located GHC-83865 diagnostics in both
-stages. All five focused registered regressions pass.
+Both compiler stages pass all 180 observations below with Core Lint and
+STG Lint enabled. The consumer imports the library interface with the
+producer source absent from its import path. The bootstrap and registered
+runtime fixtures pass all 34 package/bound rejections. Seven standalone
+sum/append errors have pinned codes and source tokens in both stages.
+A declaration-only producer also passes separate imports, partial VTA and
+an unused retained field. All five focused registered regressions pass.
 
 `PackedVecLibrary.hs` stores a runtime `Nat` and a `Vec` indexed by that same
 field. `PackVec` has two ordinary runtime fields. It has no singleton argument.
@@ -281,6 +282,89 @@ representation choices and scope, and uses the ordinary argument and result
 checks. The source expressions stay unchanged. General native meta-variable
 assignment and general Quick Look over native types remain unsupported.
 
+## Append with a computed result length
+
+`Add` computes an erased sum index. `sumNat` computes an ordinary runtime
+length `p` and stores an equality proof in `Sum n m`. `appendNative` returns
+a vector at `Add n m`. `appendPacked` matches `Refl` to transport that vector
+to `p`, then stores the actual runtime length with it:
+
+```haskell
+type family Add (n :: Nat) (m :: Nat) :: Nat where
+    Add Z m = m
+    Add (S n) m = S (Add n m)
+
+-- | Store a runtime sum and evidence that it matches the erased addition.
+data Sum (n :: Nat) (m :: Nat) where
+    Sum :: foreach (p :: Nat) -> (p :~: Add n m) -> Sum n m
+
+-- | Compute a runtime sum and its equality witness.
+sumNat :: foreach (n :: Nat) -> foreach (m :: Nat) -> Sum n m
+sumNat n m = case n of
+    Z -> Sum m Refl
+    S k -> case sumNat k m of
+        Sum p Refl -> Sum (S p) Refl
+
+-- | Append two vectors with an erased sum index.
+appendVec :: Vec a n -> Vec a m -> Vec a (Add n m)
+appendVec VNil ys = ys
+appendVec (VCons x xs) ys = VCons x (appendVec xs ys)
+
+-- | Append vectors indexed by two retained runtime lengths.
+appendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)
+appendNative n m xs ys = appendVec xs ys
+
+-- | Compute the sum length before packaging the appended vector.
+appendPacked :: PackedVec a -> PackedVec a -> PackedVec a
+appendPacked (PackVec n xs) (PackVec m ys) = case sumNat n m of
+    Sum p Refl -> PackVec p (appendNative n m xs ys)
+```
+
+The proof is an ordinary lifted field. Matching `Sum p proof` alone does not
+establish equality; matching `Refl` supplies the branch-local equality.
+The recursive proof uses the `Add` equations and successor congruence.
+The solver does not evaluate runtime indices. See the
+[pinned addition, vector append and congruence sources](../../REFERENCES.md#computed-length-append-next-source-probe).
+
+The consumer reads each length independently through an IORef. Its left
+vector contains 42 and its right vector contains 7:
+
+| Runtime lengths | Appended length and elements |
+| --- | --- |
+| `(0,0)` | `(0,[])` |
+| `(0,2)` | `(2,[7,7])` |
+| `(2,0)` | `(2,[42,42])` |
+| `(2,2)` | `(4,[42,42,7,7])` |
+| `(2,3)` | `(5,[42,42,7,7,7])` |
+| `(3,2)` | `(5,[42,42,42,7,7])` |
+| `(3,3)` | `(6,[42,42,42,7,7,7])` |
+
+Filtering `[1,2,3]` and `[10,20,30]` with independent runtime cutoffs also
+preserves the left input before the right input:
+
+| Runtime cutoffs | Appended length and elements |
+| --- | --- |
+| `(0,0)` | `(6,[1,2,3,10,20,30])` |
+| `(1,10)` | `(4,[2,3,20,30])` |
+| `(1,0)` | `(5,[2,3,10,20,30])` |
+| `(3,30)` | `(0,[])` |
+
+A fully applied `sumNat` inspects the entire first Nat spine before returning
+`Sum`. A partial application stays in function WHNF without forcing that
+length. A finite first length can leave the right length lazy. Matching the
+computed proof still ignores a bottom right length; observing the complete
+result length can force it. An explicitly constructed `Sum` can also contain
+a bottom length or proof, which separate observations demand independently.
+
+`appendPacked` inspects both package constructors before computing the sum.
+Its result package and stored length can ignore both vectors. Vector demand
+checks distinguish the left constructor, its first element and tail, and the
+right vector reached after the finite left spine. A finite left input can
+precede a tested cyclic right input and produce a bounded prefix. A cyclic
+first length can diverge during `sumNat`. These are separate demand checks,
+not totality or general productivity claims. The proof remains an ordinary
+lazy Haskell value; this example does not establish proof erasure.
+
 ## Separate-module runner
 
 Run this from the repository root with matching compiler libraries.
@@ -460,6 +544,50 @@ zip demands right head: zip-right-head
 zip tail package ignores tails: ok
 zip demands left tail: zip-left-vector
 zip demands right tail: zip-right-vector
+runtime append: (0,[])
+runtime append: (2,[7,7])
+runtime append: (2,[42,42])
+runtime append: (4,[42,42,7,7])
+runtime append: (5,[42,42,7,7,7])
+runtime append: (5,[42,42,42,7,7])
+runtime append: (6,[42,42,42,7,7,7])
+runtime filtered append: (6,[1,2,3,10,20,30])
+runtime filtered append: (4,[2,3,20,30])
+runtime filtered append: (5,[2,3,10,20,30])
+runtime filtered append: (0,[])
+partial sum keeps bottom left: ok
+partial sum keeps cyclic left: ok
+sum zero ignores right bottom: ok
+sum successors ignore right bottom: ok
+sum ignores cyclic right: ok
+sum demands left length: packed-bottom-length
+sum demands left predecessor: packed-bottom-length
+sum proof ignores right bottom: ok
+sum length head ignores right bottom: S
+sum length demands right bottom: equality-right-length
+sum constructor ignores bottom fields: ok
+sum stored length demand: packed-bottom-length
+sum stored proof demand: append-bottom-proof
+sum length ignores proof: 0
+unused append: 42
+append demands left package first: packed-bottom-package
+append demands right package before lengths: append-right-package
+append demands left length before vectors: packed-bottom-length
+append scans first length: packed-bottom-length
+append zero ignores right length and vector: ok
+append zero demands right vector: zip-right-vector
+append zero length demands right length: equality-right-length
+append package ignores vectors: ok
+append length ignores vectors: 2
+append vector demands left tag: zip-left-vector
+append first head ignores right vector: 42
+append tail demands right vector: zip-right-vector
+append package ignores left element: ok
+append demands left element: packed-filter-bottom-element
+append first head ignores left tail: 42
+append demands left tail: zip-left-vector
+append finite left ignores cyclic right: 42
+append cyclic right bounded prefix: [42,42,42]
 ```
 
 These observations check this source subset. They do not establish a general

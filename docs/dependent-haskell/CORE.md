@@ -558,6 +558,16 @@ argument checking and final subsumption. Do not evaluate indices, inspect
 unfoldings, or eta-expand the worker. General unification and the default matcher
 keep their existing retained-function gates.
 
+A fully applied real constructor can project its result through validated
+retained field metadata. Traverse the current instantiated signature in
+field order. A retained entry consumes its native Pi, or its canonical
+ordinary Many arrow when that binder is unused. An ordinary entry consumes
+a visible arrow. Match only the outer erased parameters against the complete
+expected result. Keep the actual telescope for argument and proof checking.
+Partial VTA must use the current signature's substituted variables. This
+route neither chooses a stored runtime index nor supplies equality evidence.
+See Note [Expected retained worker instantiation] in `GHC.Tc.Gen.App`.
+
 A constructor branch can transport a captured closure type through a retained
 binder with an unchanged domain. Abstract the outer index only in the body.
 Preserve the inner index scope. Existing FC lifting builds the fixed-domain
