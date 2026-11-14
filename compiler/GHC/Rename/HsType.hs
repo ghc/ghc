@@ -14,7 +14,8 @@ module GHC.Rename.HsType (
         rnModifierContext, rnModifiersContext, rnModifiersContextAndWarn,
         rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType, rnHsModifiedFunArrWith,
-        HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
+        HsPatSigTypeScoping(..), rnHsSigWcType, rnLocalHsSigWcType,
+        rnHsPatSigType, rnHsPatSigKind,
         newTyVarNameRn,
         rnHsConDeclRecFields,
         lookupField, mkHsOpTyRn,
@@ -91,6 +92,7 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List (nubBy, partition)
+import Data.Data (Data, cast, gmapQ)
 import Control.Monad
 
 {-
@@ -138,6 +140,79 @@ data HsPatSigTypeScoping
     -- variable binders, then @b@ would be rejected for being out of scope.
     -- See also @Note [Pattern signature binders and scoping]@ in
     -- "GHC.Hs.Type".
+
+-- | Rename a local signature with aliases for already-scoped term Names.
+-- The caller checks ExperimentalDependentTypes and LocalBindCtxt.
+-- See Note [Local retained signature aliases].
+rnLocalHsSigWcType :: NameSet -> HsDocContext -> LHsSigWcType GhcPs
+                  -> RnM (LHsSigWcType GhcRn, FreeNames)
+rnLocalHsSigWcType bound_names doc ty@(HsWC { hswc_body = sig_ty })
+  = do { env <- getLocalRdrEnv
+       ; free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
+       ; named_wildcards <- xoptM LangExt.NamedWildCards
+       ; aliases <- fmap catMaybes $ mapM (candidate env named_wildcards) free_vars
+       ; unless (null aliases) $
+           do { level <- getThLevel
+              ; case level of
+                  Comp -> return ()
+                  _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
+              ; (wildcards, _) <- partition_nwcs free_vars
+              ; case anonymous_wildcard sig_ty `mplus`
+                     (getLocA <$> listToMaybe wildcards) of
+                  Nothing -> return ()
+                  Just loc -> setSrcSpan loc $
+                    failWithTc $ TcRnRetainedQuantificationError RetainedPartialSignature }
+       ; let env' = foldl' (\env (occ, name) -> extendLocalRdrEnvWithAlias env occ name)
+                          env aliases
+       ; setLocalRdrEnv env' $ rnHsSigWcType doc ty }
+  where
+    candidate env named_wildcards (L loc rdr)
+      | Unqual occ <- rdr
+      , not (named_wildcards && startsWithUnderscore occ)
+      , Nothing <- lookupLocalRdrEnv env rdr
+      , Just term_rdr <- demoteRdrNameTv rdr
+      , Just name <- lookupLocalRdrEnv env term_rdr
+      = do { when (name `elemNameSet` bound_names) $
+               setSrcSpanA loc $
+                 failWithTc $ TcRnRetainedQuantificationError RetainedLocalSignatureIndex
+           ; return (Just (occ, name)) }
+      | otherwise = return Nothing
+
+    anonymous_wildcard :: Data a => a -> Maybe SrcSpan
+    anonymous_wildcard thing
+      | Just (L loc HsWildCardTy{}) <- (cast thing :: Maybe (LHsType GhcPs))
+      = Just (locA loc)
+      | Just (L _ HsSpliceTy{}) <- (cast thing :: Maybe (LHsType GhcPs))
+      = Nothing
+      | Just (L _ XHsType{}) <- (cast thing :: Maybe (LHsType GhcPs))
+      = Nothing
+      | otherwise = msum (gmapQ anonymous_wildcard thing)
+
+{- Note [Local retained signature aliases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A complete local signature can refer to an already-bound runtime index.
+Install type-variable occurrence aliases only while renaming that signature.
+Each alias keeps the term Name and Unique. Ordinary type lookup then prevents
+implicit quantification over the index. Preserve existing type-variable lookup,
+explicit forall shadowing, and RequiredTypeArguments capture.
+
+The local reader environment already contains every binder in the current
+binding group. Reject those Names instead of capturing a forward reference or
+an outer Name hidden by one of them. Do not look in the global reader environment.
+The typechecker checks the actual local Id's domain, multiplicity and scope.
+
+Do not alias named wildcards. If a signature needs a new alias, reject its
+partial type at a wildcard before installing aliases. Keep capture outside
+quotations, including untyped quotations that will not check the body yet.
+Keep all other signatures
+on the ordinary path. Type splices and compiler Core types have no parsed
+signature wildcard to inspect here.
+
+Agda checks a declared let type and its RHS in the existing local context.
+See docs/dependent-haskell/REFERENCES.md for the pinned let-checking sources.
+This precedent does not make Haskell runtime bindings definitionally transparent.
+The index remains the actual opaque Id. No RHS is unfolded or evaluated.
+-}
 
 rnHsSigWcType :: HsDocContext
               -> LHsSigWcType GhcPs

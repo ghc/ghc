@@ -3600,6 +3600,8 @@ pprRetainedQuantificationError reason = case reason of
     text "This result requires a wrapper that is not supported for retained functions yet."
   RetainedIndexExpression ->
     text "A retained argument must be a local index variable or a supported constructor tree."
+  RetainedLocalSignatureIndex ->
+    text "A retained local signature index must refer to an already-bound unrestricted local value of a supported index domain."
   RetainedPackageDeclaration ->
     vcat [ text "A retained constructor requires a lazy ordinary data declaration with a lifted result kind."
          , text "Records, contexts, existential binders, equality specifications, and StrictData are not supported."

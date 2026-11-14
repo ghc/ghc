@@ -144,6 +144,7 @@ import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.List ( mapAccumL )
 import Control.Monad
+import Data.Data (Data, cast, gmapQ)
 import Data.Tuple( swap )
 
 {-
@@ -508,8 +509,41 @@ tc_lhs_sig_type allow_retained skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = 
 -- | Check retained telescopes in function positions of a complete signature.
 -- See Note [Higher-order retained signatures].
 tcCheckRetainedSigType :: LHsType GhcRn -> TcKind -> TcM TcType
-tcCheckRetainedSigType = go typeLevelMode
+tcCheckRetainedSigType hs_ty kind
+  = do { experimental <- xoptM LangExt.ExperimentalDependentTypes
+       ; indices <- if experimental
+                    then catMaybes <$> mapM check_index (ambient_names hs_ty)
+                    else return []
+       ; go (typeLevelMode { mode_indices = mkNameEnv indices }) hs_ty kind }
   where
+    check_index (span, name) = setSrcSpan span $
+      do { thing <- tcLookupLcl_maybe name
+         ; case thing of
+             Just ATyVar{} -> return Nothing
+             Just (ATcId { tct_id = index }) ->
+               do { index <- liftZonkM (zonkId index)
+                  ; unless (not (isExternalName name) && isNativeIndexId index) invalid_index
+                  ; level <- getThLevel
+                  ; case level of
+                      Comp -> return ()
+                      _ -> failWithTc $ TcRnRetainedQuantificationError RetainedStaging
+                  ; return (Just (name, index)) }
+             _ -> invalid_index }
+    invalid_index = failWithTc $ TcRnRetainedQuantificationError RetainedLocalSignatureIndex
+
+    -- Keep only free runtime occurrences. Telescope binders have their own Ids.
+    ambient_names :: Data a => a -> [(SrcSpan, Name)]
+    ambient_names thing
+      | Just (L loc (HsTyVar _ _ (L _ (WithUserRdr _ name))))
+          <- (cast thing :: Maybe (LHsType GhcRn))
+      , isVarName name = [(locA loc, name)]
+      | Just (L _ (HsForEachTy _ bndrs _)) <- (cast thing :: Maybe (LHsType GhcRn))
+      = let bound = mapMaybe hsLTyVarName bndrs
+        in filter (\(_, name) -> name `notElem` bound) (concat (gmapQ ambient_names thing))
+      | Just _ <- (cast thing :: Maybe Name) = []
+      | Just _ <- (cast thing :: Maybe Type) = []
+      | otherwise = concat (gmapQ ambient_names thing)
+
     go :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
     go mode (L _ (HsParTy _ body)) kind = go mode body kind
     go mode (L loc ty@(HsQualTy _ ctxt body)) kind
@@ -545,6 +579,31 @@ tcCheckRetainedSigType = go typeLevelMode
                    ; return (mkDepFunTy index body_ty) }
               _ -> failWithTc $ TcRnRetainedQuantificationError RetainedBinderCount
     go mode body kind = tc_check_lhs_type mode body kind
+
+{- Note [Local runtime indices in signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A complete local value signature can mention an already-bound runtime index,
+for example xs :: Vec Int n under a do-bound n. The binding renamer adds a
+signature-local type lookup alias for the actual term Name. Preserve that Name
+and find its existing ATcId in the local type environment. Zonk its type and
+multiplicity without changing its Unique. Require a local unrestricted Id of
+a supported closed index domain. Do not look through a global environment or
+create a replacement Id when the local lookup fails.
+
+Seed mode_indices with only the runtime Names referenced by this signature.
+Registering all ambient index Ids would activate retained forall and context
+restrictions for unrelated ordinary signatures. Exclude the signature's own
+foreach binders; check_bndrs introduces those Ids in telescope order. Leave
+ATyVar occurrences on their ordinary path. Renaming retains erased-variable
+precedence, rejects unavailable current-group terms and gates partial capture.
+
+Check the RHS with the ordinary complete-signature rules. The captured Id is
+opaque. A let alias supplies no equality between different runtime indices.
+Agda checks a local declaration in its current context before extending that
+context with its value. Its transparent lets do not establish Haskell equality
+or demand. Keep ambient capture outside quotations, as for foreach signatures.
+See docs/dependent-haskell/REFERENCES.md#checked-local-payload-signatures.
+-}
 
 -- | Check the field suffix of a retained GADT constructor signature.
 -- The Boolean selects final domain validation. Kind inference checks only

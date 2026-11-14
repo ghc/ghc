@@ -5338,6 +5338,7 @@ data RetainedQuantificationError
   | RetainedContextPattern
   | RetainedResultWrapper
   | RetainedIndexExpression
+  | RetainedLocalSignatureIndex
   | RetainedPackageDeclaration
   | RetainedPackagePromotion
   | RetainedPackagePattern
