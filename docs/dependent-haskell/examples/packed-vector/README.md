@@ -2,7 +2,7 @@
 
 The bootstrap and self-hosted compilers compile and run this source example.
 The consumer imports the library interface with the producer source absent
-from its import path. All 36 observations below pass with Core Lint and STG
+from its import path. All 58 observations below pass with Core Lint and STG
 Lint enabled.
 
 `PackedVecLibrary.hs` stores a runtime `Nat` and a `Vec` indexed by that same
@@ -58,13 +58,57 @@ element still raises its original error. A partial input spine remains partial.
 
 This follows Agda's `Vec≤` filter structure for its length and vector fields.
 See the [pinned references](../../REFERENCES.md#source-vector-filter). The bound
-proof and productive filtering of infinite inputs remain separate work.
+proof is implemented in the following source increment. Productive filtering
+of infinite inputs remains separate work.
 
 The same source file checks left and right operator sections. It disables
 `PostfixOperators` so a left section keeps its implicit lambda. Both section
 forms remain in WHNF with an undefined operator or operand. Applying each
 section demands the corresponding error. These checks cover the required
 expansion of GHC's temporary section helpers before code generation.
+
+## Filter with a checked length bound
+
+`BoundedVec a limit` stores three runtime fields: a length, a vector at that
+length, and a proof that the length is at most `limit`.
+
+```haskell
+data LE (n :: Nat) (m :: Nat) where
+    LEZ :: LE Z m
+    LES :: LE n m -> LE (S n) (S m)
+
+data BoundedVec a (limit :: Nat) where
+    PackBounded :: foreach (len :: Nat) ->
+                   Vec a len -> LE len limit -> BoundedVec a limit
+```
+
+`filterBounded` constructs all three fields from source. Empty input uses
+`LEZ`. A retained element increments the length, extends the vector, and uses
+`LES proof`. A rejected element keeps the length and vector, then calls
+`weakenRight proof` to increase only the proof's upper bound. The three negative
+checks separately change the vector length, the proof's lower index, and its
+upper index. Each fails at a source location with GHC-05617 or GHC-25897.
+
+The consumer opens the input's `PackedVec` before it calls `filterBounded`.
+The input bound therefore refers to the same scoped runtime index as its
+vector. The result observer prints the output length, element list and number
+of `LES` steps. For runtime cutoffs 0, 1 and 3, these are `(3,[1,2,3],3)`,
+`(2,[2,3],2)` and `(0,[],0)`.
+
+The proof is an ordinary lazy field. Package WHNF, stored length and vector
+observations can ignore a bottom or cyclic proof. A defined `LES` constructor
+can contain a bottom recursive proof. The source checks distinguish proof
+WHNF from recursive proof demand. They also check the delayed right-weakening
+call used by the rejected branch. A terminating proof over terminating indices
+gives the bound interpretation. This does not establish Haskell totality or
+prove that the predicate selected the correct elements. Agda's corresponding
+bound field is irrelevant; general proof erasure remains separate work here.
+See [the exact constructors and weakening lemma](../../REFERENCES.md#source-filter-bound-proof).
+
+The proof observer uses ordinary `evaluate proof >> pure ()`. Supporting the
+scoped proof type requires the native checker to retain GHC's nested forall
+and dictionary order for `(>>)`. It reuses IALL and `instCall`; no new Core
+form or interface format is required.
 
 ## Separate-module runner
 
@@ -145,6 +189,28 @@ applied left section demands operator: packed-section-bottom-operator
 applied right section demands operator: packed-section-bottom-operator
 applied left section demands operand: packed-filter-bottom-element
 applied right section demands operand: packed-filter-bottom-element
+runtime bounded filter: (3,[1,2,3],3)
+runtime bounded filter: (2,[2,3],2)
+runtime bounded filter: (0,[],0)
+bounded empty ignores predicate: (0,[],0)
+bounded rejects bottom element: (0,[],0)
+bounded retains bottom element: ok
+bounded retained proof depth: 1
+bounded retained length: 1
+bounded demands retained element: packed-filter-bottom-element
+bounded constructor with bottom proof: ok
+bounded length ignores proof: 1
+bounded vector ignores proof: (1,[42])
+bounded demands proof: bounded-bottom-proof
+bounded partial proof constructor: ok
+bounded demands recursive proof: bounded-bottom-proof
+bounded constructor with weakened proof: ok
+bounded vector ignores weakened proof: 42
+bounded demands weakened proof: bounded-bottom-proof
+bounded vector ignores cyclic proof: 42
+bounded predicate before tail: packed-filter-bottom-predicate
+bounded scans partial tail: packed-bottom-length
+unused bounded filter: 42
 ```
 
 These observations check this source subset. They do not establish a general

@@ -156,6 +156,13 @@ scans the finite input spine before returning its package. Element demand
 depends on the predicate and the consumer. See
 [the source example](examples/packed-vector/README.md#filter-with-a-computed-result-length).
 
+`BoundedVec a limit` adds an ordinary proof field `LE len limit` after its
+`Vec a len` field. Both field types use the same actual retained `len` Id.
+The upper bound remains an erased parent parameter. The constructor keeps
+three runtime fields. `LE` uses ordinary GADT checking and evidence. The proof
+field remains lazy; it is not an erased coercion. See
+[the bounded source filter](examples/packed-vector/README.md#filter-with-a-checked-length-bound).
+
 ## Scope and equality
 
 Check `DepFunTy b result` under a context extended by the runtime binder `b`.
@@ -325,6 +332,18 @@ instantiation must contain native syntax. Emit ordinary type applications.
 Final result and argument subsumption still run. Emit each saved usage once at
 the argument's final multiplicity. Native meta-variable assignment stays gated.
 See Note [Generic retained argument inference] in `GHC.Tc.Gen.App`.
+
+Dictionary selectors can place another invisible forall after a context.
+For example, `(>>)` has `forall m. Monad m => forall a b. m a -> m b -> m b`.
+For matching, collect only the invisible prefix before the first visible arrow.
+Keep the existing native anchor, saturation, complete substitution, kind, scope,
+concreteness and exact-domain checks. Preserve the original sigma and emit the
+selected types through IALL one group at a time. `instCall` emits each group's
+evidence in its original position. Keep the choices in binder order because
+outer substitution can freshen inner binders. All choices must be consumed.
+Constraint generation remains inside `tcRetainedAppEvidence`. Flat routes and
+the usage cache remain unchanged. See
+Note [Immutable instantiation of nested contexts] in `GHC.Tc.Gen.App`.
 
 Inference does not force the argument. `force (rightZero n)` forces the proof;
 `force (Just (rightZero n))` forces only `Just`. Ignoring the proof stays lazy.

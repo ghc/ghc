@@ -22,9 +22,11 @@ with `Z` and `S` from runtime predicate results.
 All 36 package, filter and section observations pass. Sixteen located rejection
 checks, the five focused registered regressions, Core API and bootstrap runtime
 also pass. See [the recorded evidence](README.md#source-vector-filter-checkpoint).
-The next source exercise is M12's length-bound proof. Reuse the current Core
-forms before broader package patterns or projections. Preserve the existing
-signature, proof, laziness and ordinary Haskell controls.
+M12's length-bound proof is verified at `7eae40be91`, with the nested-context
+instantiation fix at `4ad47fdeca`. Both stages pass all 58 source observations;
+the runtime fixtures also check 19 package/bound rejections. Broader package
+patterns are next. Preserve the existing signature, proof, laziness and ordinary
+Haskell controls.
 
 ## Direction and boundaries
 
@@ -962,10 +964,11 @@ the output-length bound proof and broader package patterns remain later work.
 
 ### M12: source filter with a checked length bound
 
-Proposed next source exercise. Complete the bound component of Agda's `Vec≤`
-result before broader package patterns. Keep this source-level if the current
-constructor and proof machinery supports it. The source probe must establish
-that support before it becomes a verified claim.
+The source example implements the bound component of Agda's `Vec≤` result.
+It uses the current constructor and proof forms. Both compiler stages pass
+all 58 source observations. The runtime fixtures check 19 package/bound
+rejections. The focused registered regressions and Core API also pass. See
+[the checkpoint](README.md#source-filter-bound-proof-checkpoint).
 
 ```haskell
 data LE (n :: Nat) (m :: Nat) where
@@ -980,17 +983,17 @@ filterBounded :: forall a limit.
                  (a -> Bool) -> Vec a limit -> BoundedVec a limit
 ```
 
-- [ ] Probe these declarations from source. Check all three runtime fields and
+- [x] Probe these declarations from source. Check all three runtime fields and
   their ordered scope through a separate interface. Reuse ordinary GADTs for
   `LE`; add no primitive dependent-pair form.
-- [ ] Construct `LEZ` for empty input and `LES proof` for a retained element.
+- [x] Construct `LEZ` for empty input and `LES proof` for a retained element.
   For a rejected element, use structural right weakening
   `LE n m -> LE n (S m)`. General transitivity and an external solver are not
   required for this proof.
-- [ ] Observe the vector, computed length and finite proof separately. Reject
+- [x] Observe the vector, computed length and finite proof separately. Reject
   an incorrectly reconstructed bound with a located diagnostic. Check that
   package WHNF and vector observation can leave the proof unevaluated.
-- [ ] Validate source execution and the existing compatibility controls. Record
+- [x] Validate source execution and the existing compatibility controls. Record
   any newly exposed source gate before changing compiler rules.
 
 Agda's bound field is irrelevant. The proposed Haskell `LE` field is an ordinary

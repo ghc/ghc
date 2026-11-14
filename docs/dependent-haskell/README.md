@@ -39,11 +39,12 @@ Last updated: 2026-11-14.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | Both compiler stages, five registered regressions, the Core API and bootstrap runtime pass; the source filter has 36 runtime observations and 16 located rejection checks |
+| Last verified checkpoint | Both compiler stages, five registered regressions, the Core API and bootstrap runtime pass; the bounded source filter has 58 runtime observations and 19 package/bound rejection checks |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
-| Next task | Add a checked length-bound proof to the source filter; then broaden package patterns |
+| Bounded source filter | Both compiler stages run the three-field source package; the filter constructs a checked LE proof while unused, partial and cyclic proof fields retain their tested laziness |
+| Next task | Broaden source package patterns, with a concrete source target before changing the match compiler |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -1791,7 +1792,66 @@ their own output manifests. The first failed expectation remains in
 
 This filter scans a finite input spine before it returns a package. It leaves
 retained elements lazy when the predicate permits it. It does not prove the
-output-length bound or predicate correctness. M12 proposes a source `LE` proof
-for the bound. That source probe is not implemented yet. Broader package
+output-length bound or predicate correctness. The following M12 checkpoint adds
+a source `LE` proof for the bound. Broader package
 patterns, general projections, native optimization and proof erasure remain
 separate work. The full GHC suite was not run.
+
+## Source filter bound proof checkpoint
+
+Implementation: `7eae40be91`; prerequisite frontend fix: `4ad47fdeca`.
+The [source example](examples/packed-vector/README.md#filter-with-a-checked-length-bound)
+now returns a runtime length, a vector at that length and an `LE` proof that
+the output length is at most the input bound. It uses ordinary GADTs and the
+existing retained constructor fields. No new Core form or interface format is
+required. The retained branch constructs `S len`, `VCons x ys` and `LES proof`.
+The rejected branch weakens only the proof's upper bound. The constructors and
+weakening function follow the [pinned Agda definitions](REFERENCES.md#source-filter-bound-proof).
+
+The source observer exposed a frontend gap in `evaluate proof >> pure ()`.
+Dictionary selectors put their method foralls after the class constraint.
+Native instantiation now matches across that invisible prefix and retains an
+immutable plan in binder order. Existing IALL and `instCall` emit each group's
+type and evidence applications in the original order. The usage cache, runtime
+scope checks and final subsumption checks remain in place. Native types do not
+enter mutable type metas. See
+Note [Immutable instantiation of nested contexts] in `GHC.Tc.Gen.App`.
+
+Validation on 2026-11-14:
+
+- Both compiler stages compile and run the producer and interface-only consumer
+  with Core and STG Lint. All 58 observations pass: the previous 36 plus 22 bound
+  and proof-demand checks. Cutoffs 0, 1 and 3 produce vector lengths and proof
+  depths 3, 2 and 0. No GHC API producer adds these source declarations.
+- Nineteen package/bound rejection checks pass in the runtime fixtures. The
+  three new source mutations separately break the vector length, proof lower
+  index and proof upper index. They reject with located GHC-05617, GHC-05617
+  and GHC-25897 diagnostics. The standalone harness pins the same results.
+- The bootstrap compiler build took 51.86s and peaked at 2,040 MiB. The
+  self-hosted compiler target and its dependencies built in 13m33s and peaked
+  at 6,276 MiB. Both jobs used 16 GiB caps with swap disabled.
+- The bootstrap runtime passes at 1,053 MiB under 4 GiB. The self-hosted source,
+  Core API and pinned negative checks pass together at 1,118 MiB under 4 GiB.
+- All five focused registered tests pass: 39 cases, 34 skips, no unexpected
+  results, and no framework failures or warnings. The driver took 11.864s;
+  the complete job took 1m56s and peaked at 2,923 MiB under 8 GiB.
+- CorePrep/STG show three runtime constructor fields. Proof observations remain
+  separate from package and vector demand. The immutable previous-format reader
+  remains unchanged. Fourmolu parsing/checks, an ignored Cabal-gild copy and
+  whitespace checks pass. The repository MR template requires regression coverage.
+
+Artifacts use `_build/verification/native-filter-bound-`. Successful logs are
+`bootstrap-build-v1.log`, `bootstrap-run-v1.log`, `bootstrap-runtime-v1.log`,
+`selfhost-build-v1.log`, `selfhost-run-v2.log`, `api-v1.log`, `negatives-v2.log`
+and `registered-v1.log`. The initial `selfhost-run-v1.log` records the scoped
+IO error before the frontend fix. Input, source, documentation, harness and
+output manifests identify this checkpoint. The Agda snapshots are in
+`prior-art/` under the same prefix.
+
+The proof is an ordinary lazy runtime field. Package WHNF and vector observation
+can ignore an undefined proof. A defined proof constructor can contain an
+undefined recursive proof. A bound interpretation requires terminating indices
+and a terminating proof. This does not establish totality, predicate selection
+correctness or general proof erasure. Native optimization, broader package
+patterns and general projections remain separate work. The full GHC suite was
+not run.
