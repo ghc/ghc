@@ -1001,7 +1001,7 @@ and retain its exact type. Check its lifted kind as well as its fixed runtime
 representation. Other present fields and missing-field metas keep ordinary
 inference. Missing fields supply no native anchor.
 
-A known visible-arrow telescope with a native boxed tuple result supplies
+A native expected visible-arrow function with a boxed tuple result supplies
 component types and hole multiplicities. Check present fields at those types.
 Store a missing field's tuple component type and the corresponding arrow
 multiplicity. Reconstruct the whole section function, then use the existing

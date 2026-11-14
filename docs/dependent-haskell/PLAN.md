@@ -1803,7 +1803,7 @@ Keep `ExplicitTuple` and its existing desugaring. Present expressions remain
 inside the missing-field lambdas, in source order. Do not add a sharing let.
 Infer an anchored native present field once with its exact type and require
 a lifted kind. Keep ordinary missing-field metas for inference. For a known
-expected visible-arrow telescope with a native boxed tuple result, check
+native expected visible-arrow function with a boxed tuple result, check
 fields against the tuple components and use the expected hole multiplicities.
 Store each hole's tuple component type, then check the reconstructed whole
 section function against the original expected type. This retains required
