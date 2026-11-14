@@ -1270,6 +1270,11 @@ mkRegRegMoveInstr config fmt src dst =
     -- This ensures the upper part of the register is properly cleared
     -- and avoids partial register stalls.
     --
+    -- TODO: not for a float or a double. scalarMoveFormat copies those by
+    -- MOV FF64, printed movsd, which keeps the destination's upper half (see
+    -- MOV in regUsageOfInstr). The copy then depends on the destination's
+    -- previous value, where a full-register move would not.
+    --
     -- See also the 'ArithInt8' and 'ArithWord8' tests,
     -- which fail without this logic.
   where

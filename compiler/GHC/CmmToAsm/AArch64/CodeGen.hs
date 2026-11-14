@@ -904,6 +904,10 @@ getRegister' config plat expr
               format = cmmTypeFormat rep
           return (Any format (\dst -> imm_code `snocOL` (annExpr expr $ LDR format (OpReg (formatToWidth format) dst) op)))
 
+        -- BUG #28126: compiling a label at an offset from -2048 to -1 stops
+        -- with check_off's error. isNbitEncodeable 12 admits offsets from -2048
+        -- to 2047, but the printer adds the offset as an immediate, which
+        -- check_off in GHC.CmmToAsm.AArch64.Ppr accepts only from 0 to 4095.
         CmmLabelOff _lbl off | isNbitEncodeable 12 (fromIntegral off) -> do
           (op, imm_code) <- litToImm' lit
           let rep = cmmLitType plat lit

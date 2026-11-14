@@ -162,6 +162,9 @@ pprSizeDecl platform lbl
    then line (text "\t.size" <+> pprAsmLabel platform lbl <> text ", .-" <> pprAsmLabel platform lbl)
    else empty
 
+-- TODO #27668: after the procedure's start, which pprNatCmmDecl aligns, a block
+-- is aligned only if it has an info table, by pprAlignForSection before the
+-- table. Any other block, a loop head included, gets no alignment directive.
 pprBasicBlock :: IsDoc doc => NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> doc
 pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $

@@ -3483,6 +3483,8 @@ getAmode e = do
 
       -- This is all just ridiculous, since it carefully undoes
       -- what mangleIndexTree has just done.
+      -- BUG #28105: for i = -2^31 the displacement -i does not fit in 32 bits,
+      -- and the x86-64 assembler rejects the module.
       CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)]
          | is32BitLit platform lit
          -- assert (rep == II32)???
@@ -3505,6 +3507,8 @@ getAmode e = do
          -> getAmode (CmmMachOp (MO_Add rep) [b,a])
 
       -- Matches: (x + offset) + (y << shift)
+      -- BUG #28105: offset is not checked to fit in 32 bits; where it does not,
+      -- the x86-64 assembler rejects the module.
       CmmMachOp (MO_Add _) [CmmRegOff x offset, CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)]]
          | shift == 0 || shift == 1 || shift == 2 || shift == 3
          -> x86_complex_amode (CmmReg x) y shift (fromIntegral offset)
@@ -3513,6 +3517,9 @@ getAmode e = do
          | shift == 0 || shift == 1 || shift == 2 || shift == 3
          -> x86_complex_amode x y shift 0
 
+      -- BUG #28105: && binds tighter than ||, so the guard checks offset only
+      -- at shift 3; where offset does not fit in 32 bits, the x86-64 assembler
+      -- rejects the module.
       CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Add _) [CmmMachOp (MO_Shl _)
                                                     [y, CmmLit (CmmInt shift _)], CmmLit (CmmInt offset _)]]
          | shift == 0 || shift == 1 || shift == 2 || shift == 3
@@ -3942,6 +3949,18 @@ condIntCode' platform cond (CmmMachOp (MO_And _) [x,o2]) (CmmLit (CmmInt 0 ty))
       return (CondCode False cond code)
 
 -- anything vs zero
+-- TODO #27738: this emits the TEST even on a path where the instruction
+-- that computed x has already set ZF and SF from it, as the dec ending
+-- the body of a loop that counts down does on the back edge into the
+-- loop's test. The loop's entry reaches that test too: after a dec
+-- of its own in the issue's program, and with none in the worker of
+-- loop 0 acc = acc; loop n acc = loop (n - 1) (acc + n) at -O. condIntCode'
+-- sees only the comparison, here of a register with 0, and none of these paths;
+-- where one of them sets no flags, dropping the TEST from the others takes the
+-- test duplicated into them. And a dec writes OF and leaves CF, both of which
+-- TEST clears, so only a condition that reads ZF and SF alone, such as the jne
+-- of that worker and not the jg of the issue's program, could use the dec's
+-- flags.
 condIntCode' _ cond x (CmmLit (CmmInt 0 ty)) = do
     (x_reg, x_code) <- getSomeReg x
     let
@@ -4349,6 +4368,19 @@ genPrim bid (MO_Ctz width) [dst] [src]
   = genCtz bid width dst src
 
 -- Then we deal with cases which not introducing new blocks in the stream.
+-- BUG #27694: MO_UF_Conv does introduce new blocks, in genWordToFloat,
+-- and the last is not returned. The statements after it in the same
+-- Cmm block are then given the block it split as their current block
+-- (Note [Keeping track of the current block]), and one of them that splits its
+-- current block in turn, as a second conversion does, moves the wrong block's
+-- edges: the CFG then lacks the edges of the jumps ending the Cmm block. Where
+-- the linear allocator puts a fixup block on one of these jumps, the compiler
+-- panics in addNodesBetween (#27915), on x86-64. Where shortcutting cuts the
+-- second conversion's last block, a lone jump, and with it the CFG's only edges
+-- into the first conversion's blocks, the compiler panics in classifyEdges,
+-- called by findBackEdges, on x86-64 under -fasm-shortcutting. -dasm-lint does
+-- not catch the missing edges first: sanityCheckCfg compares the CFG's blocks
+-- with the code's, not its edges.
 genPrim bid prim dst args
   = (,Nothing) <$> genSimplePrim bid prim dst args
 
@@ -6235,6 +6267,11 @@ invertCondBranches (Just cfg) keep bs =
       , CmmSource {trans_cmmNode = cmmCondBranch} <- transitionSource edgeInfo1
 
       --Int comparisons are invertable
+      -- TODO: so are floating-point ones. maybeInvertCond pairs each
+      -- condition with its complement on the flags (see the flags at
+      -- Cond's constructors), so the inverted jump goes where the old pair
+      -- went, whatever comparison set the flags; that includes each shape
+      -- genCondBranch' emits for a floating-point comparison.
       , CmmCondBranch (CmmMachOp op _args) _ _ _ <- cmmCondBranch
       , Just _ <- maybeIntComparison op
       , Just invCond <- maybeInvertCond cond1
@@ -6687,6 +6724,11 @@ genByteSwap width dst src = do
         --
         -- NB: if dst_hi == rhi, we must make sure to preserve the contents
         -- of rhi before writing to dst_hi (#25601).
+        --
+        -- BUG #28125: dst_hi == rhi with dst_lo /= rlo happens only where
+        -- a Cmm local and an NCG temporary share a number, and such
+        -- sharing gives wrong code on i386 (see getHiVirtualRegFromLo in
+        -- GHC.Platform.Reg). The branch below for that case swaps correctly.
         let shuffle = if dst_hi == rhi && dst_lo == rlo then
                         toOL [ MOV II32 (OpReg rhi) (OpReg tmp),
                                MOV II32 (OpReg rlo) (OpReg dst_hi),

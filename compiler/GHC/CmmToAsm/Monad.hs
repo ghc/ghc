@@ -311,6 +311,10 @@ data RegCode64 code = RegCode64
   !Reg -- ^ Lower part
 
 -- | Return a virtual 64-bit register
+--
+-- BUG #28125: the high half can be the high half of a 64-bit Cmm local too
+-- (localReg64), and writing one then overwrites the other, which is wrong code
+-- on i386: see getHiVirtualRegFromLo in GHC.Platform.Reg.
 getNewReg64 :: NatM Reg64
 getNewReg64 = do
   let rep = II32
@@ -324,6 +328,10 @@ getNewReg64 = do
 -- | Convert a 64-bit LocalReg into two virtual 32-bit regs.
 --
 -- Used to handle 64-bit "registers" on 32-bit architectures
+--
+-- BUG #28125: the high half can be the high half of a 64-bit NCG temporary too
+-- (getNewReg64), and writing one then overwrites the other, which is wrong code
+-- on i386: see getHiVirtualRegFromLo in GHC.Platform.Reg.
 localReg64 :: HasDebugCallStack => LocalReg -> Reg64
 localReg64 (LocalReg vu ty)
   | isWord64 ty = let lo = RegVirtual (VirtualRegI vu)

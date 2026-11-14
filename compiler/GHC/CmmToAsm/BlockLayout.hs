@@ -930,7 +930,8 @@ lookupDeleteUFM m k = do -- Maybe monad
 
 backendMaintainsCfg :: Platform -> Bool
 backendMaintainsCfg platform = case platformArch platform of
-    -- ArchX86 -- Should work but not tested so disabled currently.
+    -- WIP: ArchX86 is left out. It is untested, and its iselExpr64 splits
+    -- blocks for 64-bit shifts by NEWBLOCK without adding them to the CFG.
     ArchX86_64 -> True
     _otherwise -> False
 
