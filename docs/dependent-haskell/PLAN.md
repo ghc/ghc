@@ -1636,11 +1636,12 @@ xs <- action
 pure (toList xs)
 ```
 
-The signed action checks, but the saved M23 `cli-v3` client failed at its bind.
-That client also reported an `_n` error. First isolate the bind in a minimal
-source module. Do not treat every error in the combined client as one cause.
-The full target keeps the known action's actual native payload index through
-ordinary do expansion and the continuation binder.
+The signed action checks. Nine isolated baseline probes at `0e979288f8` fail
+with GHC-83865. They cover saved and direct actions, do and explicit bind,
+checked and inferred ordinary results, ignored payloads, and a native-result
+inference boundary. The full target keeps the known action's actual native
+payload index through ordinary do expansion and the continuation binder.
+Evidence uses `_build/verification/native-action-bind-*`.
 
 At fork commit `da16ec16e6`, `GHC.Tc.Gen.Expr` at line 582 expands ordinary
 `HsDo` through `expandDoStmts`.
@@ -1648,13 +1649,24 @@ At fork commit `da16ec16e6`, `GHC.Tc.Gen.Expr` at line 582 expands ordinary
 to the action and a generated continuation. Inspect the application checker,
 not the legacy syntax-operator path. In `tcRetainedArgInstEnabled`, line 1872
 zonks cached actual types. Lines 1903–1908 seed `result_subst` from the raw
-expected type. Expected-type zonking is a hypothesis, not a proven sole cause.
-Trace the expected and actual types, assigned metadata and runtime Ids first.
+expected type. In the isolated `SavedChecked` trace, result and monad metas
+are assigned `[Int]` and `IO` at lines 1274 and 1303 before the action bind at
+line 2304. The action's exact native type is cached, but matching falls back
+to fresh mutable input parameters. Read existing expected assignments before
+immutable matching. This does not require evaluating the index.
 
-- [ ] Isolate direct action binding and preserve its current source failure.
+- [x] Isolate direct action binding and preserve its current source failure.
   Inspect the expanded `(>>=) action (\xs -> rest)` and immutable candidates.
-- [ ] Establish the mismatch cause before changing matching. Read assigned
-  metadata without native meta assignment. Preserve kind, scope, exact-domain,
+- [ ] Read an available expected type with `readExpType_maybe`, then zonk it
+  before seeding immutable matching. Leave an empty infer cell untouched.
+  Check this increment against the saved baseline probes before extending it.
+- [ ] For a successful partial match anchored by a known native input, retain
+  its fixed choices and instantiate undetermined ordinary result parameters
+  with standard fresh TauTvs in telescope order. Preserve substituted kinds.
+  A failed match is not a partial match. Native index parameters still require
+  immutable choices, and native results cannot fill ordinary metas. Check a
+  local do expression whose ordinary result has no complete expected type.
+- [ ] Preserve kind, scope, exact-domain,
   concreteness, NoQL, once-only usage and local evidence safeguards. Keep final
   argument checking and result subsumption authoritative.
 - [ ] Keep the ordinary bind operator, generated continuation and dictionary

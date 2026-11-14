@@ -1871,10 +1871,17 @@ sequencing, bottom demand, eta laws or GHC's immutable matching algorithm.
 At fork commit `da16ec16e6`, `Tc.Gen.Expr` at line 582 and `Tc.Gen.Do` at line 101 expand the
 ordinary bind into an operator application and continuation. In `Tc.Gen.App`,
 `tcRetainedArgInstEnabled` zonks cached actual types at line 1872, but
-`result_subst` uses the raw expected type at lines 1903–1908. Expected-type
-zonking is an investigation hypothesis. The combined client does not prove
-that this difference is the sole cause. Trace candidate scope, assigned
-metadata and exact runtime Ids before selecting a fix. Preserve the existing
+`result_subst` uses the raw expected type at lines 1903–1908. Nine isolated
+source probes at fork commit `0e979288f8` fail with GHC-83865. The
+`native-action-bind-baseline-v1/SavedChecked/Main.dump-tc-trace` assigns the
+result and monad metas before the native action bind. The cached action keeps
+its exact runtime index, but immutable matching reads the raw expected metas.
+Normalize existing assignments through `readExpType_maybe` and the within-TC
+zonker. An empty infer cell must remain empty. A genuinely unknown ordinary
+continuation result also needs a fresh ordinary parameter while the native
+input stays fixed. GHC's `newMetaTyVarX` supplies existing telescope-order
+freshening with substituted kinds. No native type may enter those metas.
+Preserve the existing
 native-meta and general Quick Look gates, immutable kind/scope/concreteness
 checks, once-only usage, local evidence and final subsumption. M24 must support
 the direct source bind, without a singleton or package conversion workaround.
