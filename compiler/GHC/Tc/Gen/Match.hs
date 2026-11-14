@@ -64,7 +64,7 @@ import GHC.Core.TyCo.Rep ( Type(DepFunTy, FunTy, TermVarTy) )
 import qualified GHC.Core.TyCo.Subst as Subst
 import GHC.Core.Type ( coreFullView, isManyTy, splitTyConApp_maybe
                      , anyFreeVarsOfType, typeKind )
-import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo, mkTransCo )
+import GHC.Core.Coercion ( mkCoVarCo, mkCoCast, mkSymCo, mkSubCo, coercionKind, isReflCo, mkTransCo, mkNomReflCo )
 import GHC.Core.DataCon ( DataCon, dataConName, promoteDataCon )
 import GHC.Core.ConLike ( ConLike(RealDataCon) )
 import GHC.Core.Predicate ( mkNomEqPred )
@@ -92,7 +92,7 @@ import GHC.Types.Basic( VisArity, Origin(Generated), GenReason(OtherExpansion), 
 import GHC.Data.Bag ( listToBag, unionBags )
 import GHC.Data.FastString ( fsLit )
 import GHC.Data.Pair ( pSnd )
-import GHC.Data.Maybe ( catMaybes, fromMaybe )
+import GHC.Data.Maybe ( catMaybes, fromMaybe, isNothing )
 
 import qualified GHC.Data.List.NonEmpty as NE
 import Data.Data ( Data, cast, gmapQ, gmapT )
@@ -574,7 +574,7 @@ retainedMatrixColumn plan (MG { mg_alts = L _ rows })
     constructor_pattern (L _ ConPat{}) = True
     constructor_pattern _ = False
 
--- | Check a complete two-index constructor matrix with successive row proofs.
+-- | Check a two-index matrix with an optional final variable equation.
 -- See Note [Retained constructor matrices].
 tcRetainedMatrixMatches :: Id -> (Int, Id) -> [ExpPatType] -> [ExpPatType]
                        -> [RetainedConArg] -> ExpRhoType
@@ -586,12 +586,13 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
   = setSrcSpanA loc $
     do { when (any dictionary plan) $
            failWithTc (TcRnRetainedQuantificationError RetainedMatrixContext)
-       ; rows <- mapM constructors matches
+       ; rows <- zipWithM constructors [1..] matches
        ; _ <- foldM unique_pair [] (zip rows matches)
-       ; let pairs = [(fst first, fst second) | (first, second) <- rows]
+       ; let pairs = [(fst first, fst second) | (first, second) <- catMaybes rows]
              expected = [(first, second) | first <- domain_cons first_index
                                          , second <- domain_cons second_index]
-       ; unless (pairs `equalLength` expected && all (`elem` pairs) expected) coverage_error
+       ; unless (any isNothing rows ||
+                 (pairs `equalLength` expected && all (`elem` pairs) expected)) coverage_error
        ; arg_tys <- mapM argument_type pat_tys
        ; result_ty <- readExpType rhs_ty
        ; (usages, checked) <- mapAndUnzipM
@@ -618,20 +619,30 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
             _ -> pattern_error
           _ -> pattern_error
 
-    constructors (L match_loc match@(Match
+    constructors position (L match_loc match@(Match
       { m_grhss = GRHSs { grhssGRHSs = L _ (GRHS _ [] _) :| [] } }))
       = setSrcSpanA match_loc $
         do { (first, second) <- row_patterns match
-           ; one <- resolve first_index first
-           ; two <- resolve second_index second
-           ; return (one, two) }
-    constructors (L match_loc _) = setSrcSpanA match_loc coverage_error
+           ; if bare_variable first && bare_variable second
+             then do { unless (position == length matches) $
+                         setSrcSpanA (getLoc first) $
+                           failWithTc (TcRnRetainedQuantificationError RetainedMatrixFallback)
+                     ; return Nothing }
+             else do { one <- resolve first_index first
+                     ; two <- resolve second_index second
+                     ; return (Just (one, two)) } }
+    constructors _ (L match_loc _) = setSrcSpanA match_loc coverage_error
+
+    bare_variable :: LPat GhcRn -> Bool
+    bare_variable (L _ VarPat{}) = True
+    bare_variable _ = False
 
     resolve index pat = setSrcSpanA (getLoc pat) $
       do { con <- tcRetainedCon (varType index) pat
          ; maybe pattern_error return con }
 
-    unique_pair seen ((first, second), L match_loc match)
+    unique_pair seen (Nothing, _) = return seen
+    unique_pair seen (Just (first, second), L match_loc match)
       = setSrcSpanA match_loc $
         do { let pair = (fst first, fst second)
            ; when (pair `elem` seen) $
@@ -646,23 +657,35 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
            ; return scaled }
     argument_type _ = argument_error
 
-    check_row ((first_con, first_fields), (second_con, second_fields))
-              arg_tys result_ty (L match_loc match@(Match { m_pats = L _ pats }))
+    check_row row arg_tys result_ty (L match_loc match@(Match { m_pats = L _ pats }))
       = setSrcSpanA match_loc $
-        do { names <- check_later 0 plan (drop 1 (filter isVisArgLPat pats))
+        do { later_names <- check_later 0 plan (drop 1 (filter isVisArgLPat pats))
+           ; names <- case row of
+               Just _ -> return later_names
+               Nothing -> do { (first, _) <- row_patterns match
+                             ; case unLoc first of
+                                 VarPat _ (L _ name) ->
+                                   return ((name, idName first_index) : later_names)
+                                 _ -> pattern_error }
            ; unless (null names) $
                case retainedMatchQuotation match of
                  Nothing -> return ()
                  Just span -> setSrcSpan span $
                    failWithTc (TcRnRetainedQuantificationError RetainedConstructorQuotation)
-           ; first_cv <- newEvVar (mkNomEqPred (TermVarTy first_index)
-                           (mkTyConApp (promoteDataCon first_con) (map TermVarTy first_fields)))
-           ; second_cv <- newEvVar (mkNomEqPred (TermVarTy second_index)
-                            (mkTyConApp (promoteDataCon second_con) (map TermVarTy second_fields)))
-           ; let transport ty = do
-                   one <- tcRetainedCoercion first_index (mkCoVarCo first_cv) ty
-                   two <- tcRetainedCoercion second_index (mkCoVarCo second_cv) (pSnd (coercionKind one))
-                   return (mkTransCo one two)
+           ; cvs <- case row of
+               Nothing -> return Nothing
+               Just ((first_con, first_fields), (second_con, second_fields)) ->
+                 do { first_cv <- newEvVar (mkNomEqPred (TermVarTy first_index)
+                                   (mkTyConApp (promoteDataCon first_con) (map TermVarTy first_fields)))
+                    ; second_cv <- newEvVar (mkNomEqPred (TermVarTy second_index)
+                                    (mkTyConApp (promoteDataCon second_con) (map TermVarTy second_fields)))
+                    ; return (Just (first_cv, second_cv)) }
+           ; let transport ty = case cvs of
+                   Nothing -> return (mkNomReflCo ty)
+                   Just (first_cv, second_cv) -> do
+                     one <- tcRetainedCoercion first_index (mkCoVarCo first_cv) ty
+                     two <- tcRetainedCoercion second_index (mkCoVarCo second_cv) (pSnd (coercionKind one))
+                     return (mkTransCo one two)
            ; arg_cos <- mapM (transport . scaledThing) arg_tys
            ; result_co <- transport result_ty
            ; sequence_ [unless (isReflCo co) $
@@ -678,15 +701,16 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
                  (invis_pat_tys ++ first_arg : refined_args)
                  (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc renamed)
            ; let Match { m_pats = L pats_loc checked_pats, m_grhss = grhss } = checked
-                 wrap_index index cv (L pat_loc pat)
+                 wrap_index _ Nothing pat = pat
+                 wrap_index index (Just cv) (L pat_loc pat)
                    = L pat_loc (AsPat noExtField (noLocA index)
                        (L pat_loc (addRetainedConProof cv emptyTcEvBinds pat)))
                  wrap_later column argument co (Scaled _ ty) pat@(L pat_loc inner)
-                   | column == second_column = wrap_index second_index second_cv pat
+                   | column == second_column = wrap_index second_index (snd <$> cvs) pat
                    | RetainedConValue <- argument = L pat_loc (XPat (CoPat (mkWpCastN co) inner ty))
                    | otherwise = pat
                  checked_pats' = case checked_pats of
-                   first : rest -> wrap_index first_index first_cv first :
+                   first : rest -> wrap_index first_index (fst <$> cvs) first :
                      zipWith4 (\(column, argument) co ty pat -> wrap_later column argument co ty pat)
                        (zip [0..] plan) arg_cos arg_tys rest
                    [] -> panic "tcRetainedMatrixMatches: missing first pattern"
@@ -697,14 +721,14 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
 
     check_later _ [] [] = return []
     check_later column (argument : args) (pat@(L pat_loc inner) : pats)
-      | column == second_column = check_later (column+1) args pats
       | RetainedConIndex shared <- argument
       = setSrcSpanA pat_loc $
-        do { name <- case inner of
-               VarPat _ (L _ name) -> return name
-               _ -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
-           ; names <- check_later (column+1) args pats
-           ; return ((name, idName shared) : names) }
+        case inner of
+          VarPat _ (L _ name) ->
+            do { names <- check_later (column+1) args pats
+               ; return ((name, idName shared) : names) }
+          _ | column == second_column -> check_later (column+1) args pats
+            | otherwise -> failWithTc (TcRnRetainedQuantificationError RetainedVariablePattern)
       | otherwise
       = do { case unLoc pat of
                VarPat{} -> return ()
@@ -714,7 +738,7 @@ tcRetainedMatrixMatches first_index (second_column, second_index) invis_pat_tys
 
 {- Note [Retained constructor matrices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A complete two-index matrix needs one proof for each matched index in each row.
+A constructor row in a two-index matrix needs one proof for each matched index.
 Keep both shared whole-argument Ids. Resolve their constructor patterns with the
 actual source field Ids. Lift the first nominal constructor equality through a
 payload or result type, then lift the second equality through that result.
@@ -725,16 +749,45 @@ Attach each proof to its own ConPat, inside an outer AsPat for its whole Id.
 Keep the original MatchGroupTc types and all source argument lambdas. Ordinary
 payload CoPats preserve their outer types. A payload before the second index
 cannot mention that binder; its second transport is reflexive. Retained domains
-must have reflexive transport. Contexts in this initial matrix telescope reject:
-combined dictionary bindings would need the scope of both constructor proofs.
+must have reflexive transport. Reject contexts in this initial matrix telescope.
+Combined dictionary bindings would need the scope of both constructor proofs.
 
-Check unique complete constructor pairs, not the first column alone. Reject
-mixed variable/constructor rows and keep bare subfields. Ordinary grouping of
+Check unique complete constructor pairs, or use a final variable equation as
+described in Note [Retained variable fallback]. Reject mixed constructor/variable
+rows and keep bare subfields. Ordinary grouping of
 repeated constructors would alias distinct native fields and proofs. Desugar
 proof-bearing rows separately as described in GHC.HsToCore.Match.Constructor,
 Note [Retained constructor equation scope]. This preserves row failure and
 left-before-right demand. Agda supplies the constructor substitution and split
 tree precedents in docs/dependent-haskell/REFERENCES.md#two-index-constructor-equations.
+-}
+
+{- Note [Retained variable fallback]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Allow one final equation with bare variables in both selected index columns.
+Constructor rows retain their two actual-field proofs. The variable row has
+zero constructor proofs. Start its transports with nominal reflexivity; do not
+pass reflexivity to tcRetainedCoercion, which requires a constructor endpoint.
+Check the fallback RHS at the original result type. Earlier failed rows supply
+no equality, field Id or Given to that RHS.
+
+Rename both source variable Names to the shared whole-index Names before TC.
+Also rename any other retained variable columns, as in M19. Rebuild NameSets
+and reject quotations before renaming. Keep the checked index VarPats unwrapped.
+A lazy let alias is not native index equality. Repackaging a fallback payload
+with its original index must work without an alias proof.
+
+GHC.HsToCore.Match already keeps the final PgAny block after the PgCon block.
+Its matchVariables drops a column without forcing it. combineMatchResults and
+shareFailureHandler put fallback execution outside failed constructor proofs.
+Keep M20's separate constructor rows. No backend change is needed. In particular,
+a missing first constructor can reach fallback without demanding the second
+index. Keep all source argument lambdas before this discrimination.
+
+Agda's variable terminal problems and ordered catchall compilation supply the
+precedents. See docs/dependent-haskell/REFERENCES.md#ordered-variable-fallback-equations
+for pinned source ranges and GHC failure-continuation provenance. These sources
+do not establish Haskell demand; the source probes must check it separately.
 -}
 
 -- | Resolve a constructor and its actual closed runtime field identities.

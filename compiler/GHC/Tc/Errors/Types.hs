@@ -5326,6 +5326,7 @@ data RetainedQuantificationError
   | RetainedConstructorCoverage
   | RetainedMatrixCoverage
   | RetainedMatrixDuplicate
+  | RetainedMatrixFallback
   | RetainedMatrixPattern
   | RetainedMatrixContext
   | RetainedCasePatterns
