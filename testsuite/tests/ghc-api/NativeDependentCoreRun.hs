@@ -1401,6 +1401,26 @@ runModuleChecks libdir = do
         , "reverse append payload before predecessor: packed-bottom-payload"
         , "reverse append proof before tail: packed-bottom-length"
         , "reverse append ignores right fields: 42"
+        , "runtime later indices: (2,[7,7])|(3,[9,9,9])|42"
+        , "runtime later indices: (3,[7,7,7])|(0,[])|42"
+        , "runtime later evidence: ([],[9,9])"
+        , "runtime later evidence: ([7,7],[9,9,9])"
+        , "later partial ignores first index: ok"
+        , "later partial ignores cyclic first index: ok"
+        , "later partial ignores all supplied fields: ok"
+        , "later tuple ignores later fields: ok"
+        , "later left package ignores partial index: ok"
+        , "later right package ignores cyclic first index: ok"
+        , "later first index before payloads: packed-bottom-length"
+        , "later left stored index demand: packed-bottom-length"
+        , "later right stored index demand: equality-right-length"
+        , "later left payload demand: zip-left-vector"
+        , "later right payload demand: zip-right-vector"
+        , "later ordinary shadowing: 42"
+        , "later evidence partial ignores indices: ok"
+        , "later evidence first index before payloads: packed-bottom-length"
+        , "runtime leading context: ([],[7])"
+        , "runtime leading context: ([42,42],[7])"
         ]
     putStrLn "packed vector module checks: ok"
     putStrLn "module execution checks: ok"
@@ -2665,6 +2685,13 @@ runPackageSourceRejectChecks = do
         , ("RightZeroForged", 83865, "Refl", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: foreach (n :: Nat) -> Add n Z :~: n", "bad n = Refl"])
         , ("ReverseIndexEscape", 83865, "reverseNative", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: foreach (m :: Nat) -> PackedVec Int -> Vec Int m", "bad m (PackVec n xs) = reverseNative @Int n xs"])
         , ("ReverseWrongPredecessor", 25897, "rest", ["TypeFamilies"], equalityImports, package ++ sums ++ reversal ++ ["bad :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)", "bad n m xs acc = case n of", "  Z -> case xs of VNil -> acc", "  S k -> case xs of VCons x rest -> reverseAppendNative @a (S k) m rest acc"])
+        , ("LaterWildcard", 83605, "bare variable pattern", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z _ xs ys = ys", "bad (S k) later xs ys = ys"])
+        , ("LaterConstructor", 83605, "bare variable pattern", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z Z xs ys = ys", "bad (S k) later xs ys = ys"])
+        , ("LaterUntypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = let ignored = [| 42 :: Int |] in ys", "bad (S k) later xs ys = ys"])
+        , ("LaterTypedQuote", 83605, "Constructor equations with later retained arguments", ["TemplateHaskellQuotes"], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = let ignored = [|| 42 :: Int ||] in ys", "bad (S k) later xs ys = ys"])
+        , ("LaterWrongResult", 83865, "xs", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right xs ys = xs", "bad (S k) later xs ys = ys"])
+        , ("LaterIndependentIndex", 83865, "ys", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (j :: Nat) -> Vec Int n -> Vec Int m -> Vec Int j -> Vec Int j", "bad Z first second xs ys zs = zs", "bad (S k) later final xs ys zs = ys"])
+        , ("LaterOrdinaryPattern", 83605, "unrestricted multiplicities", [], [], package ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> Vec Int m", "bad Z right VNil ys = ys", "bad (S k) later xs ys = ys"])
         , ("SumForged", 83865, "Refl", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (p :: Nat) -> Sum n m", "bad n m p = Sum p Refl"])
         , ("SumWrongEvidence", 83865, "proof", ["TypeFamilies"], equalityImports, sums ++ ["bad :: foreach (n :: Nat) -> foreach (m :: Nat) -> foreach (p :: Nat) -> (p :~: n) -> Sum n m", "bad n m p proof = Sum p proof"])
         , ("AppendUnmatchedProof", 83865, "appendNative n m xs ys", ["TypeFamilies"], equalityImports, package ++ sums ++ ["bad :: PackedVec a -> PackedVec a -> PackedVec a", "bad (PackVec n xs) (PackVec m ys) = case sumNat n m of", "  Sum p proof -> PackVec p (appendNative n m xs ys)"])
@@ -2742,21 +2769,19 @@ runPackageSourceRejectChecks = do
         ]
     reversal =
         [ "addSucc :: foreach (n :: Nat) -> foreach (m :: Nat) -> Add n (S m) :~: S (Add n m)"
-        , "addSucc n m = case n of"
-        , "    Z -> Refl"
-        , "    S k -> case addSucc k m of"
-        , "        Refl -> Refl"
+        , "addSucc Z right = Refl"
+        , "addSucc (S k) later = case addSucc k later of"
+        , "    Refl -> Refl"
         , "rightZero :: foreach (n :: Nat) -> Add n Z :~: n"
         , "rightZero Z = Refl"
         , "rightZero (S k) = case rightZero k of"
         , "    Refl -> Refl"
         , "reverseAppendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)"
-        , "reverseAppendNative n m xs acc = case n of"
-        , "    Z -> case xs of"
-        , "        VNil -> acc"
-        , "    S k -> case xs of"
-        , "        VCons x rest -> case addSucc k m of"
-        , "            Refl -> reverseAppendNative @a k (S m) rest (VCons x acc)"
+        , "reverseAppendNative Z right xs acc = case xs of"
+        , "    VNil -> acc"
+        , "reverseAppendNative (S k) later xs acc = case xs of"
+        , "    VCons x rest -> case addSucc k later of"
+        , "        Refl -> reverseAppendNative @a k (S later) rest (VCons x acc)"
         , "reverseNative :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n"
         , "reverseNative n xs = case rightZero n of"
         , "    Refl -> reverseAppendNative @a n Z xs VNil"

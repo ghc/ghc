@@ -417,6 +417,119 @@ cyclicPayload = cyclicPayload
 bottomPackage :: PackedVec Int
 bottomPackage = error "packed-bottom-package"
 
+-- | Keep two later runtime indices in separate lazy packages.
+forwardLater :: foreach (n :: Nat) -> Vec Int n -> foreach (m :: Nat) -> foreach (k :: Nat) -> Vec Int m -> Vec Int k -> (PackedVec Int, PackedVec Int, Int)
+forwardLater Z firstPayload m k middlePayload lastPayload =
+    let right () = PackVec k lastPayload
+        shadow :: Int -> Int
+        shadow m = m + 1
+     in (left (), right (), shadow 41)
+  where
+    left () = PackVec m middlePayload
+forwardLater (S predecessor) firstPayload middle final middlePayload lastPayload =
+    let left () = PackVec middle middlePayload
+        shadow :: Int -> Int
+        shadow middle = middle + 1
+     in (left (), right (), shadow 41)
+  where
+    right () = PackVec final lastPayload
+
+-- | Use the equality context between two retained argument positions.
+keepWithLaterEvidence :: foreach (n :: Nat) -> foreach (m :: Nat) -> (n ~ m) => foreach (k :: Nat) -> Vec Int m -> Vec Int k -> (Vec Int n, Vec Int k)
+keepWithLaterEvidence Z m k xs ys = (xs, ys)
+keepWithLaterEvidence (S predecessor) middle final xs ys = (xs, ys)
+
+-- | Keep a leading class context before a retained argument telescope.
+leadingContext :: forall a. (Show a) => foreach (n :: Nat) -> Vec a n -> foreach (m :: Nat) -> Vec a m -> String
+leadingContext Z xs right ys = show (toList xs, toList ys)
+leadingContext (S predecessor) xs later ys = show (toList xs, toList ys)
+
+-- | Read independent indices before checking both forwarded packages.
+{-# NOINLINE driveLaterIndices #-}
+driveLaterIndices :: Nat -> Nat -> Nat -> IO String
+driveLaterIndices first middle final = do
+    firstCell <- newIORef first
+    middleCell <- newIORef middle
+    finalCell <- newIORef final
+    n <- readIORef firstCell
+    m <- readIORef middleCell
+    k <- readIORef finalCell
+    case forwardLater n (replicateNative @Int n 42) m k (replicateNative @Int m 7) (replicateNative @Int k 9) of
+        (left, right, marker) -> pure (renderPacked left ++ "|" ++ renderPacked right ++ "|" ++ show marker)
+
+-- | Supply equality evidence for independently read equal indices.
+{-# NOINLINE driveLaterEvidence #-}
+driveLaterEvidence :: Nat -> Nat -> Nat -> IO String
+driveLaterEvidence first middle final = do
+    firstCell <- newIORef first
+    middleCell <- newIORef middle
+    finalCell <- newIORef final
+    n <- readIORef firstCell
+    m <- readIORef middleCell
+    k <- readIORef finalCell
+    case sameNat n m of
+        Nothing -> fail "later evidence inputs differ"
+        Just Refl -> case keepWithLaterEvidence n m k (replicateNative @Int m 7) (replicateNative @Int k 9) of
+            (left, right) -> pure (show (toList left, toList right))
+
+-- | Check shared later indices, dictionary order and evaluation demand.
+runLaterIndexChecks :: IO ()
+runLaterIndexChecks = do
+    forM_
+        [ (Z, S (S Z), S (S (S Z)), "(2,[7,7])|(3,[9,9,9])|42")
+        , (S Z, S (S (S Z)), Z, "(3,[7,7,7])|(0,[])|42")
+        ]
+        $ \(n, m, k, expected) -> do
+            actual <- driveLaterIndices n m k
+            assertEqual "runtime later indices" expected actual
+            putStrLn ("runtime later indices: " ++ actual)
+    forM_
+        [ (Z, Z, S (S Z), "([],[9,9])")
+        , (S (S Z), S (S Z), S (S (S Z)), "([7,7],[9,9,9])")
+        ]
+        $ \(n, m, k, expected) -> do
+            actual <- driveLaterEvidence n m k
+            assertEqual "runtime later evidence" expected actual
+            putStrLn ("runtime later evidence: " ++ actual)
+    assertWhnf "later partial ignores first index" (forwardLater bottomLength)
+    assertWhnf "later partial ignores cyclic first index" (forwardLater cyclicLength)
+    assertWhnf "later partial ignores all supplied fields" (forwardLater bottomLength leftVector bottomRightLength cyclicLength)
+    assertWhnf "later tuple ignores later fields" (forwardLater Z leftVector bottomLength bottomRightLength leftVector rightVector)
+    assertWhnf
+        "later left package ignores partial index"
+        (case forwardLater (S bottomLength) leftVector bottomLength bottomRightLength leftVector rightVector of (left, right, marker) -> left)
+    assertWhnf
+        "later right package ignores cyclic first index"
+        (case forwardLater cyclicLength leftVector bottomLength bottomRightLength leftVector rightVector of (left, right, marker) -> right)
+    expectMarker "later first index before payloads" "packed-bottom-length" $
+        evaluate (forwardLater bottomLength leftVector bottomRightLength cyclicLength leftVector rightVector)
+    expectMarker "later left stored index demand" "packed-bottom-length" $
+        evaluate (case forwardLater Z leftVector bottomLength bottomRightLength leftVector rightVector of (left, right, marker) -> withPacked left (\n xs -> natToInt n))
+    expectMarker "later right stored index demand" "equality-right-length" $
+        evaluate (case forwardLater (S Z) leftVector bottomLength bottomRightLength leftVector rightVector of (left, right, marker) -> withPacked right (\n xs -> natToInt n))
+    expectMarker "later left payload demand" "zip-left-vector" $
+        evaluate (case forwardLater Z leftVector (S (S Z)) bottomRightLength leftVector rightVector of (left, right, marker) -> firstPacked left)
+    expectMarker "later right payload demand" "zip-right-vector" $
+        evaluate (case forwardLater (S Z) leftVector bottomLength (S (S Z)) leftVector rightVector of (left, right, marker) -> firstPacked right)
+    assertEqual
+        "later ordinary shadowing"
+        42
+        (case forwardLater Z leftVector bottomLength bottomRightLength leftVector rightVector of (left, right, marker) -> marker)
+    putStrLn "later ordinary shadowing: 42"
+    assertWhnf "later evidence partial ignores indices" (keepWithLaterEvidence bottomLength bottomLength)
+    expectMarker "later evidence first index before payloads" "packed-bottom-length" $
+        evaluate (keepWithLaterEvidence bottomLength bottomLength bottomRightLength leftVector rightVector)
+
+    forM_
+        [(Z, "([],[7])"), (S (S Z), "([42,42],[7])")]
+        $ \(input, expected) -> do
+            cell <- newIORef input
+            n <- readIORef cell
+            let m = S Z
+                actual = leadingContext @Int n (replicateNative @Int n 42) m (replicateNative @Int m 7)
+            assertEqual "runtime leading context" expected actual
+            putStrLn ("runtime leading context: " ++ actual)
+
 -- | Run finite observations and bounded strictness checks.
 main :: IO ()
 main = do
@@ -957,3 +1070,4 @@ main = do
         42
         (case reverseAppendNative @Int (S Z) bottomRightLength (VCons 42 VNil) bottomPayload of VCons x xs -> x)
     putStrLn "reverse append ignores right fields: 42"
+    runLaterIndexChecks

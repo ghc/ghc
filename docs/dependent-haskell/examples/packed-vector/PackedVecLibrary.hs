@@ -118,10 +118,9 @@ See docs/dependent-haskell/REFERENCES.md#computed-length-append-next-source-prob
 
 -- | Transport addition across a successor in its second operand.
 addSucc :: foreach (n :: Nat) -> foreach (m :: Nat) -> Add n (S m) :~: S (Add n m)
-addSucc n m = case n of
-    Z -> Refl
-    S k -> case addSucc k m of
-        Refl -> Refl
+addSucc Z right = Refl
+addSucc (S k) later = case addSucc k later of
+    Refl -> Refl
 
 -- | Prove the right identity of addition by runtime Nat induction.
 rightZero :: foreach (n :: Nat) -> Add n Z :~: n
@@ -131,12 +130,11 @@ rightZero (S k) = case rightZero k of
 
 -- | Reverse the first vector onto the second vector.
 reverseAppendNative :: forall a. foreach (n :: Nat) -> foreach (m :: Nat) -> Vec a n -> Vec a m -> Vec a (Add n m)
-reverseAppendNative n m xs acc = case n of
-    Z -> case xs of
-        VNil -> acc
-    S k -> case xs of
-        VCons x rest -> case addSucc k m of
-            Refl -> reverseAppendNative @a k (S m) rest (VCons x acc)
+reverseAppendNative Z right xs acc = case xs of
+    VNil -> acc
+reverseAppendNative (S k) later xs acc = case xs of
+    VCons x rest -> case addSucc k later of
+        Refl -> reverseAppendNative @a k (S later) rest (VCons x acc)
 
 -- | Reverse a vector while preserving its retained length.
 reverseNative :: forall a. foreach (n :: Nat) -> Vec a n -> Vec a n
@@ -155,8 +153,8 @@ Match each ordinary Refl proof before changing the vector index. The wrapper
 stores the original runtime n. The worker type relates lengths; it does not
 specify element order or establish termination.
 
-Bind both retained arguments before the case in addSucc. Constructor equations
-with a later retained binder require separate source identity handling.
+Constructor equations share each later retained runtime Id across their rows.
+All source argument lambdas precede constructor inspection, as in the case form.
 The package leaves both fields lazy. Demanding the reversed vector first
 demands the whole finite Nat spine through rightZero, then the vector spine.
 Each addSucc can inspect the remaining Nat spine again. This is not a linear
