@@ -131,6 +131,42 @@ import Control.Monad
 import System.IO
 import System.Directory ( getCurrentDirectory )
 
+{- Note [Labels in NCG comments]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A comment or Note in the native code generator shows the kind of each statement
+it makes by a label at the head of the statement, or by having none:
+
+* BUG #nnn, or BUG where no issue is filed: the code behaves wrongly, as the
+  statement describes. The statement says in short what the wrong behaviour
+  leads to (wrong code, a panic or another failed compilation, assembly the
+  assembler rejects, only slower or larger code, or only more C stack space)
+  and, where the code shows it, under which flags and on which targets it is
+  reached.
+* WIP: the work is half done.
+* TODO #nnn, or TODO where no issue is filed: the code is likely to change,
+  whether it is correct or buggy, for instance for performance. A bug marked
+  TODO alone is understood, accepted for now and worked around: the label marks
+  it as accepted for now, not as due to be fixed.
+* BUG TODO, or BUG TODO #nnn: both, where both are to be stressed.
+* No label: the code is meant to stay as the statement describes it. A statement
+  of a trade-off that is kept says in a sentence why it is kept.
+
+The TODO, ToDo, FIXME and XXX of comments older than this Note predate these
+meanings. Leaving an older comment without a label was not a check of it, so
+such a comment does not say that the code is meant to stay.
+
+A change that fixes or alters what a labelled statement describes removes or
+rewrites the statement in the same change. A statement gains the number of its
+issue when the issue is filed. This command lists the lines that carry a label:
+
+  git grep -nwE 'BUG|WIP|TODO' -- 'compiler/GHC/CmmToAsm*' \
+    compiler/GHC/Driver/Config/CmmToAsm.hs compiler/GHC/Platform/Reg.hs
+
+It also lists the older TODOs and the sentences that only mention a label. With
+'BUG|WIP' as the pattern, it lists only the BUG and WIP statements and such
+mentions, as no older comment in these files uses either word.
+-}
+
 --------------------
 nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle
               -> CgStream RawCmmGroup a
