@@ -14,7 +14,7 @@ import GHC.Core
 import GHC.Core.Coercion (coercionLKind, coercionRKind, coercionRole, emptyLiftingContext, eqCoercion, extendLiftingContext, isReflCo, liftCoSubst, mkAxInstCo, mkCoVarCo, mkDepFunCo, mkFunCoNoFTF, mkKindCo, mkNomReflCo, mkPiCo, mkReflCo, mkSubCo, mkSymCo, mkTermAppCo, mkTransCo, mkTyConAppCo)
 import GHC.Core.Coercion.Axiom (Branched, ClosedTyFam (..), CoAxiom, CoAxiomRule (..), Role (..))
 import GHC.Core.ConLike (ConLike (RealDataCon))
-import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict, SrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConName, dataConOrigArgTys, dataConRepArgBinders, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
+import GHC.Core.DataCon (DataCon, DataConRep (NoDataConRep), HsImplBang (HsLazy), HsSrcBang (HsSrcBang), SrcStrictness (NoSrcStrict, SrcStrict), SrcUnpackedness (NoSrcUnpack), StrictnessMark (NotMarkedStrict), dataConInstArgTys, dataConInstOrigArgTys, dataConInstSig, dataConName, dataConOrigArgTys, dataConRepArgBinders, dataConRepArity, dataConWorkId, dataConWrapperType, mkDataCon, mkDataConWithRetainedArgs, promoteDataCon)
 import GHC.Core.Dependent
 import GHC.Core.FVs (exprFreeVars)
 import GHC.Core.FamInstEnv (emptyFamInstEnvs, mkBranchedCoAxiom, mkCoAxBranch, normaliseType)
@@ -53,7 +53,7 @@ import GHC.Iface.Binary (CompressionIFace (..), TraceBinIFace (..), getWithUserD
 import GHC.Iface.Decl (tyThingToIfaceDecl)
 import GHC.Iface.Env (extendIfaceIdEnv)
 import GHC.Iface.Syntax (IfGuidance (IfWhen), IfaceAlt (..), IfaceBang (IfNoBang, IfStrict), IfaceConAlt (..), IfaceConDecl (..), IfaceConDecls (IfDataTyCon), IfaceDecl (IfaceData, IfaceId, ifCons, ifKind, ifName, ifParent, ifResKind), IfaceExpr (..), IfaceIdDetails (IfDFunId, IfVanillaId), IfaceInfoItem (HsUnfold), IfaceRule (IfaceRule), IfaceSrcBang (IfSrcBang), IfaceTyConParent (IfDataInstance), IfaceUnfolding (IfCoreUnfold, IfDFunUnfold))
-import GHC.Iface.Type (IfaceAppArgs (IA_Nil), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, ifaceBndrName, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
+import GHC.Iface.Type (IfaceAppArgs (IA_Nil), IfaceBndr (IfaceIdBndr, IfaceTvBndr), IfaceCoercion (IfaceCoVarCo), IfaceTyCon (IfaceTyCon), IfaceTyConSort (IfaceNormalTyCon), IfaceType (..), getIfaceType, putIfaceType, ifaceBndrName, mkIfLclName, mkIfaceForAllTvBndr, mkIfaceTyConInfo)
 import GHC.IfaceToCore (tcIfaceDecl, tcIfaceExpr, tcIfaceRules)
 import qualified GHC.Parser as Parser
 import qualified GHC.Parser.Lexer as Lexer
@@ -63,6 +63,7 @@ import GHC.Types.Basic (OccInfo (..), PromotionFlag (IsPromoted, NotPromoted), T
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails (VanillaId), RuleInfo (..))
 import GHC.Types.Id.Make (mkDataConWorkId)
+import GHC.Types.RepType (countConRepArgs, countFunRepArgs)
 import GHC.Types.InlinePragma (ActivationX (AlwaysActive), neverInlinePragma)
 import GHC.Types.Literal (Literal (LitChar))
 import GHC.Types.Name (getOccName, mkExternalName, mkSystemName, nameModule)
@@ -463,7 +464,24 @@ runRetainedFieldChecks dflags = do
     rejectsMetadata "retained metadata must use the declared field domain" [Just (setIdType template boolTy), Nothing] originalArgs packageTy
     rejectsMetadata "retained metadata must use unrestricted binders" [Just (setIdMult template OneTy), Nothing] originalArgs packageTy
     let functionField = local 6299 "function_field" (mkFunctionType ManyTy natTy natTy)
-    rejectsMetadata "function-valued retained binders do not widen constructor fields" [Just functionField] [Scaled ManyTy (idType functionField)] packageTy
+        functionConstructor = build [Just functionField] [Scaled ManyTy (idType functionField)] packageTy
+        functionWorkerType = idType (dataConWorkId functionConstructor)
+        innerLinearFunction = setIdType functionField (mkFunctionType OneTy natTy natTy)
+    check "vacuous function field preserves its retained metadata" $
+        case dataConRepArgBinders functionConstructor of
+            [Just field] -> field == functionField && isNativeIndexFunctionId field
+            _ -> False
+    check "vacuous function field worker uses an ordinary arrow" $ case functionWorkerType of
+        FunTy{} -> True
+        _ -> False
+    checkType dflags "vacuous function field worker retains its exact domain"
+        (mkFunctionType ManyTy (idType functionField) packageTy) functionWorkerType
+    check "vacuous function field occupies one runtime slot" $
+        dataConRepArity functionConstructor == 1
+            && countFunRepArgs 1 functionWorkerType == 1
+            && countConRepArgs functionConstructor == 1
+    rejectsMetadata "retained function field rejects an inner linear arrow"
+        [Just innerLinearFunction] [Scaled ManyTy (idType innerLinearFunction)] packageTy
     rejectsMetadata "retained metadata cannot reference an unbound runtime Id" [Nothing, Nothing] originalArgs packageTy
     rejectsMetadata "retained field cannot escape into constructor result" [Just template, Nothing] originalArgs (payloadTy (TermVarTy template))
     let recursivePackage base constructors =
@@ -1376,6 +1394,48 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
         ordinary <- restorePackage env =<< roundtrip NormalCompression (tyThingToIfaceDecl (ATyCon boolTyCon))
         forcePackage ordinary
         check "ordinary constructor interface has no retained metadata" (all (null . dataConRepArgBinders) (tyConDataCons ordinary))
+        -- Check call types under the actual lexical Id environment.
+        let callF = local 9100 "wire_call" (mkFunctionType ManyTy boolTy boolTy)
+            callN = local 9101 "wire_arg" boolTy
+            callM = local 9102 "wire_arg_other" boolTy
+            callCv = proof 9103 (TermVarTy callN) (TermVarTy callM)
+            callAt v = TermAppTy callF (TermVarTy v)
+            openCalls = toIfaceType (indexed (callAt callN))
+            callName = mkIfLclName (fsLit "wire_call")
+            closedCalls = mkDepFunTy callF (mkDepFunTy callN (indexed (callAt callN)))
+            freeCall = toIfaceTypeX (unitVarSet callF) (callAt callN)
+            nestedFreeCall = toIfaceTypeX (unitVarSet callF) (indexed (callAt callN))
+            reservedCo = toIfaceCoercion (mkTermAppCo callF (mkCoVarCo callCv))
+        forM_ [NormalCompression, MaximumCompression] $ \compression -> do
+            wire <- roundtrip compression openCalls
+            restored <- restore [callF, callN] wire
+            checkType dflags "open call codec preserves its type" (indexed (callAt callN)) restored
+            case restored of
+                FunTy _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _ ->
+                    check "repeated call nodes reuse actual scoped head and index" (left == callF && right == callF && ln == callN && rn == callN)
+                _ -> fail "FAIL: open call codec lost repeated endpoints"
+            other <- restore [callF, callM] =<< roundtrip compression (toIfaceType (indexed (callAt callM)))
+            check "call codec does not identify distinct argument Ids" (not (eqType restored other))
+            decoded <- roundtrip compression (IfaceTermAppTy callName (toIfaceType (TermVarTy callN)))
+            rejectsIface "wire call cannot invent a missing head" "Iface id out of scope" [callN] decoded
+            let linearHead = mkSysLocal (fsLit "wire_call") (unique 9100) OneTy (idType callF)
+                scalarHead = local 9100 "wire_call" boolTy
+            rejectsIface "wire call rejects a linear head" "Invalid retained call head" [linearHead, callN] decoded
+            rejectsIface "wire call rejects stale scalar head metadata" "Invalid retained call head" [scalarHead, callN] decoded
+            wrongDomain <- roundtrip compression (IfaceTermAppTy callName (toIfaceType intTy))
+            rejectsIface "wire call rejects wrong argument domain" "Invalid retained call argument" [callF] wrongDomain
+            reservedPi <- roundtrip compression (toIfaceType (tidyTopType closedCalls))
+            rejectsIface "generic function Pi import stays reserved" "Invalid retained binder" [] reservedPi
+            rejectsWith "call coercion serialization stays reserved" "Opaque runtime call congruence interfaces are not implemented" (roundtrip compression reservedCo)
+            forM_ [("direct", freeCall), ("nested", nestedFreeCall)] $ \(label, diagnostic) ->
+                rejectsWith (label ++ " diagnostic call head cannot enter binary") "Can't serialise IfaceFreeTermAppTy" (roundtrip compression diagnostic)
+        rejectsIfaceExpr "raw call coercion import stays reserved" "Opaque runtime call congruence interfaces are not implemented" [callF, callN, callM, callCv] (IfaceCo reservedCo)
+        rejectsIface "free diagnostic head cannot be imported" "diagnostic-only retained call head" [callF, callN] freeCall
+        rejectsIface "nested free diagnostic head cannot be imported" "diagnostic-only retained call head" [callF, callN] nestedFreeCall
+        rejectsWith "raw free-head writer bypass stays rejected" "Can't serialise IfaceFreeTermAppTy" $ do
+            writer <- Binary.openBinMem 1024
+            putIfaceType writer freeCall
+
         let payload = local 309 "payload" intTy
             caseBinder = local 310 "case_b" boolTy
             index = TermVarTy b
