@@ -62,7 +62,7 @@ import GHC.Types.Basic (OccInfo (..), PromotionFlag (IsPromoted, NotPromoted), T
 import GHC.Types.Id
 import GHC.Types.Id.Info (IdDetails (VanillaId), RuleInfo (..))
 import GHC.Types.Id.Make (mkDataConWorkId)
-import GHC.Types.InlinePragma (ActivationX (AlwaysActive))
+import GHC.Types.InlinePragma (ActivationX (AlwaysActive), neverInlinePragma)
 import GHC.Types.Literal (Literal (LitChar))
 import GHC.Types.Name (getOccName, mkExternalName, mkSystemName, nameModule)
 import GHC.Types.Name.Occurrence (mkDataConWorkerOcc, mkDataOcc, mkTcOcc, mkTyVarOcc, mkVarOcc, occNameFS)
@@ -92,6 +92,7 @@ main = do
             dflags <- runGhc (Just libdir) getSessionDynFlags
             runSyntaxChecks dflags
             runChecks dflags
+            runAliasChecks dflags
             runMatchingChecks dflags
             runTypeMapChecks
             runCaseChecks dflags
@@ -1613,8 +1614,9 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         setIdUnfolding
                             (local 3108 "opaque_interface_producer" (mkFunctionType ManyTy boolTy boolTy))
                             (unfolding (error "forced an interface producer unfolding"))
-                opaqueProofCase <- roundtrip NormalCompression $
-                    wrap (IfaceApp (toIfaceExpr (Var ifaceOpaqueProducer)) scrut) [falseAlt, IfaceAlt trueCon [proofName] rhs]
+                opaqueProofCase <-
+                    roundtrip NormalCompression $
+                        wrap (IfaceApp (toIfaceExpr (Var ifaceOpaqueProducer)) scrut) [falseAlt, IfaceAlt trueCon [proofName] rhs]
                 rejectsIfaceExpr
                     "unsupported opaque interface proof scrutinee"
                     "Unsupported scrutinee for native Boolean interface evidence"
@@ -2062,6 +2064,133 @@ unfolding body =
         , uf_cache = UnfoldingCache False False False False
         , uf_guidance = UnfNever
         }
+
+-- | Check native variable substitution before any backend preparation.
+runAliasChecks :: DynFlags -> IO ()
+runAliasChecks dflags = do
+    let (nat, zero, successor) = peanoNat
+        natTy = mkTyConTy nat
+        actual = local 4200 "alias_actual" natTy
+        alias = local 4201 "alias" natTy
+        inner = local 4202 "inner_alias" natTy
+        parameter = mkTyVar (mkSystemName (unique 4203) (mkTyVarOcc "index")) natTy
+        consume = local 4204 "consume_index" (mkForAllTy (Bndr parameter Specified) (mkVisFunTyMany natTy (mkVisFunTyMany natTy intTy)))
+        consumeType = local 4205 "consume_index_type" (mkForAllTy (Bndr parameter Specified) intTy)
+        seed = local 4206 "opaque_seed" natTy
+        producer = local 4207 "opaque_producer" (mkVisFunTyMany natTy natTy)
+        zeroExpr = Var (dataConWorkId zero)
+        successorExpr = App (Var (dataConWorkId successor)) (Var actual)
+        repeated index left right = mkApps (Var consume) [Type index, Var left, Var right]
+        typeOnly index = App (Var consumeType) (Type index)
+        binding binder rhs = Let (NonRec binder rhs) (Var binder)
+        absent label eliminated expression =
+            check label (not (eliminated `elemVarSet` exprFreeVars expression))
+
+    -- Keep this first. The M40 compiler retains this valid literal alias.
+    literal <- simplifyAccepts dflags "native literal variable alias" [actual] (binding alias (Var actual))
+    check "native literal variable alias disappears" $ case literal of
+        Var result -> result == actual
+        _ -> False
+
+    let chained =
+            Let (NonRec alias (Var actual))
+                $ Let (NonRec inner (Var alias))
+                $ repeated (TermVarTy inner) inner inner
+    repeatedResult <- simplifyAccepts dflags "native alias updates runtime and erased arguments" [actual, consume] chained
+    check "native aliases preserve the repeated actual Id" $ case repeatedResult of
+        App (App (App (Var worker) (Type (TermVarTy index))) (Var first)) (Var second) ->
+            worker == consume && index == actual && first == actual && second == actual
+        _ -> False
+    absent "first alias is absent from deep free variables" alias repeatedResult
+    absent "second alias is absent from deep free variables" inner repeatedResult
+    check "actual index remains in deep free variables" (actual `elemVarSet` exprFreeVars repeatedResult)
+
+    let opaque =
+            Let (NonRec actual (App (Var producer) (Var seed)))
+                $ Let (NonRec alias (Var actual))
+                $ typeOnly (TermVarTy alias)
+    opaqueResult <- simplifyAccepts dflags "type-only alias retains its opaque outer binding" [producer, seed, consumeType] opaque
+    case opaqueResult of
+        Let (NonRec retained (App (Var rhsProducer) (Var rhsSeed))) body@(App (Var worker) (Type (TermVarTy index))) -> do
+            check "opaque producer and seed remain shared" (retained == index && rhsProducer == producer && rhsSeed == seed && worker == consumeType)
+            check "erased argument keeps the outer index live" (retained `elemVarSet` exprFreeVars body)
+            absent "type-only alias has no stale deep dependency" alias body
+            absent "outer opaque index remains bound" retained opaqueResult
+        _ -> fail "FAIL: type-only alias lost its outer opaque binding"
+
+    let capture =
+            Let (NonRec alias (Var actual)) $
+                Lam actual (repeated (TermVarTy alias) alias actual)
+    captured <- simplifyAccepts dflags "native alias avoids reused-Unique lambda capture" [actual, consume] capture
+    check "descendant lambda cannot capture the stored alias range" $ case captured of
+        Lam fresh (App (App (App (Var worker) (Type (TermVarTy index))) (Var outer)) (Var bound)) ->
+            fresh /= actual && worker == consume && index == actual && outer == actual && bound == fresh
+        _ -> False
+
+    let at index = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, index, index]) intTy
+        typeParameter = mkTyVar (mkSystemName (unique 4208) (mkTyVarOcc "result")) liftedTypeKind
+        consumePi = local 4209 "consume_pi" (mkForAllTy (Bndr typeParameter Specified) intTy)
+        dependentCapture =
+            Let (NonRec alias (Var actual))
+                $ App (Var consumePi)
+                $ Type (mkDepFunTy actual (mkVisFunTyMany (at (TermVarTy alias)) (at (TermVarTy actual))))
+    capturedType <- simplifyAccepts dflags "native alias avoids reused-Unique type capture" [actual, consumePi] dependentCapture
+    case capturedType of
+        App (Var worker) (Type (DepFunTy fresh (FunTy _ _ argument result))) -> do
+            check "retained type binder is fresh" (worker == consumePi && fresh /= actual)
+            checkType dflags "type argument retains the outer actual index" (at (TermVarTy actual)) argument
+            checkType dflags "type result uses its fresh retained binder" (at (TermVarTy fresh)) result
+            absent "type capture leaves no stale alias" alias capturedType
+            check "outer index survives beneath retained type" (actual `elemVarSet` exprFreeVars capturedType)
+        _ -> fail "FAIL: native alias did not preserve the retained type telescope"
+
+    let opaqueTarget = setIdUnfolding actual (unfolding (error "forced an alias target unfolding"))
+    opaqueTargetResult <- simplifyAccepts dflags "alias target unfolding remains opaque" [opaqueTarget] (binding alias (Var opaqueTarget))
+    check "alias uses the actual Id without its unfolding" $ case opaqueTargetResult of
+        Var result -> result == opaqueTarget
+        _ -> False
+
+    let substitutedConstructor = App (Lam actual (binding alias (Var actual))) zeroExpr
+    constructorResult <- simplifyAccepts dflags "constructor substitution retains the alias fallback" [] substitutedConstructor
+    check "current constructor substitution is not a variable alias" $ case constructorResult of
+        Let (NonRec retained (Var constructor)) (Var result) -> retained == result && constructor == dataConWorkId zero
+        _ -> False
+
+    let stableAlias = setIdUnfolding alias ((unfolding (Var actual)){uf_src = StableUserSrc})
+        inactiveAlias = setInlinePragma alias neverInlinePragma
+        loopAlias = setIdOccInfo alias (IAmALoopBreaker False NoTailCallInfo)
+        global = mkVanillaGlobal (mkExternalName (unique 4210) (nameModule eqTyConName) (mkVarOcc "global_alias_target") noSrcSpan) natTy
+        fallbackCases =
+            [ ("opaque producer RHS", [actual, producer], alias, App (Var producer) (Var actual))
+            , ("constructor RHS", [actual], alias, successorExpr)
+            , ("cast RHS", [actual], alias, Cast (Var actual) (mkReflCo Representational natTy))
+            , ("beta RHS", [actual], alias, App (Lam inner (Var inner)) (Var actual))
+            , ("let RHS", [actual], alias, binding inner (Var actual))
+            , ("stable alias metadata", [actual], stableAlias, Var actual)
+            , ("inactive alias metadata", [actual], inactiveAlias, Var actual)
+            , ("loop-breaker alias metadata", [actual], loopAlias, Var actual)
+            , ("global target", [], alias, Var global)
+            ]
+    forM_ fallbackCases $ \(label, scope, binder, rhs) -> do
+        result <- simplifyAccepts dflags ("native alias fallback: " ++ label) scope (binding binder rhs)
+        check ("native alias fallback retains its binding: " ++ label) $ case result of
+            Let (NonRec retained _) (Var occurrence) -> retained == occurrence
+            _ -> False
+    recursive <- simplifyAccepts dflags "native alias preserves recursive group" [actual] (Let (Rec [(alias, Var actual)]) (Var alias))
+    check "recursive alias remains in its group" $ case recursive of
+        Let (Rec [(retained, Var target)]) (Var occurrence) -> retained == occurrence && target == actual
+        _ -> False
+
+    let linearAlias = setIdMult alias OneTy
+        wrongDomain = setIdType alias boolTy
+        stale = local 4211 "stale_alias_index" natTy
+        exported = setIdExported alias
+    lintRejects dflags "linear alias index is invalid before simplification" [actual, consumeType] $
+        Let (NonRec linearAlias (Var actual)) (typeOnly (TermVarTy linearAlias))
+    lintRejects dflags "wrong alias domain is invalid before simplification" [actual] (binding wrongDomain (Var actual))
+    lintRejects dflags "stale alias index is invalid before simplification" [actual, consumeType] $
+        Let (NonRec alias (Var actual)) (typeOnly (TermVarTy stale))
+    lintRejects dflags "exported local alias is invalid before simplification" [actual] (binding exported (Var actual))
 
 -- | Check the first native Core increment without executing native code.
 runChecks :: DynFlags -> IO ()
