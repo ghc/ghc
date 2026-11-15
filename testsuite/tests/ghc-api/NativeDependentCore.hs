@@ -1760,7 +1760,7 @@ runOpaqueCallChecks dflags = do
     checkType dflags "head substitution changes the actual head" (TermAppTy g (TermVarTy n)) (Subst.substTy replaceF call)
     checkType dflags "head substitution composition changes its range" (TermAppTy h (TermVarTy n)) (Subst.substTy composed call)
     checkType dflags "stored head substitution range is used once" (TermAppTy g (TermVarTy n)) (Subst.substTy simultaneous call)
-    check "head substitution range records its free function" (g `elemVarSet` Subst.getTCvSubstRangeTyCoFVs replaceF)
+    check "head substitution range records its free function" (g `elemVarSet` Subst.getSubstRangeTyCoFVs replaceF)
     check "coercion substitution preserves the actual chosen head" (eqCoercion (mkTermAppCo g (mkCoVarCo cv)) (Subst.substCo (indexSubst [g, n, m, cv] f (Var g)) co))
     let body = mkFunctionType ManyTy (indexed (TermAppTy f (TermVarTy n))) (indexed (TermAppTy f (TermVarTy m)))
         captured = Subst.substTy (indexSubst [f, n] m (Var n)) (mkDepFunTy n body)
