@@ -2186,6 +2186,14 @@ constructor prefix through the existing ordinary pattern route. Keep the
 unconsumed Pi result, arity, usage scaling and newtype laziness. This does not
 add support for multiple ordinary constructor rows.
 
+The bootstrap pattern build compiles both producers. The runtime client and
+the newtype matrix client then panic at the newtype worker's LFInfo. The
+restricted simplifier leaves its compulsory unfolding disabled. A newtype
+constructor has no runtime binding. Permit its existing cast template through
+the compulsory-unfolding route. Keep the activation guard and the native
+substitution and beta rules. Do not enable general inlining. Check named and
+lambda patterns for lazy newtypes and strict data constructors at runtime.
+
 - [ ] Preserve the measured `Refl` and bottom-proof failures. Pin the Agda
   argument-checking comparison and the existing GHC matching rules.
 - [ ] Extend only `isRetainedValueType` eligibility for exactly saturated

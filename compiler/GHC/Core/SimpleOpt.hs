@@ -318,6 +318,11 @@ lambda, so the section does not force its operator or operand at WHNF.
 See Note [Left and right sections] in GHC.Rename.Expr and
 Note [Wired-in Ids for rebindable syntax] in GHC.Builtin.WiredIn.Ids.
 
+Newtype constructor wrappers are also exceptions. They have no runtime
+definitions. Their compulsory unfoldings produce casts. Expand these templates
+with the same substitution and beta rules. Do not force the wrapped value.
+See Note [Newtype workers] in GHC.Types.Id.Make.
+
 A virtual Boolean proof is not a constructor field. Reduce its case only when
 the scrutinee is an exact constructor and the substituted primitive nominal
 equality has that constructor at both endpoints. Replace the proof with nominal
@@ -546,6 +551,7 @@ simple_app env (Var v) as
   | not (soe_native env)
     || v `hasKey` leftSectionKey
     || v `hasKey` rightSectionKey
+    || maybe False isNewDataCon (isDataConWrapId_maybe v)
   , let unf = idUnfolding v
   , isCompulsoryUnfolding unf
   , isAlwaysActive (idInlineActivation v)
