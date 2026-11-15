@@ -2593,3 +2593,42 @@ through ordinary algebraic containers; general native Quick Look and
 native mutable-meta assignment remain separate work. See the
 [source example](examples/qualified-pi/README.md) and
 [M35 plan](PLAN.md#m35-exact-matching-through-algebraic-containers).
+
+## Exact matching through algebraic containers
+
+The M35 baseline preserves two witness-caller failures in each compiler stage.
+The source signature is a complete `QPi -> QPi` arrow. Both `withQ Refl`
+and `withQ (error ...)` report GHC-91028 at the helper and witness argument.
+A known qualified copy compiles. These are source observations from the
+unchanged M34 compiler, before the container eligibility change.
+
+Agda v2.8.0 checks an available
+[expected target](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L690-L767)
+before the current argument only after rigidity, arity and dependency checks.
+It strengthens an independent target and compares the types. Its
+[argument checker](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+uses the current domain's hiding and modality, then substitutes into the
+remaining telescope. Its
+[conversion checker](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L849)
+compares Pi bodies in an extended context. These rules motivate expected-type
+information with explicit scope checks. They do not certify GHC's algorithm.
+
+The GHC adaptation extends only `isRetainedValueType` eligibility. An exactly
+saturated algebraic container of kind `Type` can hold a supported retained
+function. The check keeps the incoming `under_pi` flag for every argument.
+A Pi in one argument does not put a sibling inside that Pi. A real enclosing
+Pi remains in scope for every argument. Keep the ordinary tau fast path and
+the existing erased-forall, class, family and nonlifted restrictions.
+Saturation and exact `Type` kind are GHC restrictions, not Agda guarantees.
+
+The immutable matcher already compares equal constructor heads and their
+arguments. It retains complete substitutions, kind agreement, runtime scope,
+Pi-local escape checks and final subsumption. No change to `isTauTy`, mutable
+native metas, roles, Core, interfaces or eta rules follows from eligibility.
+See Note [Known retained function instantiation] in `GHC.Tc.Gen.App` and
+Note [Matching retained function types] in `GHC.Core.Unify`.
+
+Four full-file Agda blobs are verified in
+`native-pi-container-prior-art-v1/provenance.json`. The GHC excerpts record
+the working-tree bytes read during implementation. They do not assign dirty
+bytes to the earlier baseline commit. Runtime results remain pending here.

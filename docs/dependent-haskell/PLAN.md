@@ -2177,6 +2177,15 @@ The bottom-proof caller reports GHC-91028 at both `withQ` and `error`.
 Keep these commands, sources and locations under `native-pi-container-*`.
 The M34 prefix is frozen.
 
+The classifier build accepts both original witness callers in both stages.
+The runtime and shared matrix producer then stop with GHC-83605 at a leading
+ordinary newtype pattern. `tcRetainedMatches` selects constructor coverage by
+syntax before checking whether the first expected argument is retained.
+Restrict that selection to an actual first `DepFunTy`. Check a single ordinary
+constructor prefix through the existing ordinary pattern route. Keep the
+unconsumed Pi result, arity, usage scaling and newtype laziness. This does not
+add support for multiple ordinary constructor rows.
+
 - [ ] Preserve the measured `Refl` and bottom-proof failures. Pin the Agda
   argument-checking comparison and the existing GHC matching rules.
 - [ ] Extend only `isRetainedValueType` eligibility for exactly saturated

@@ -166,7 +166,7 @@ tcRetainedMatches :: ExpectedFunTyCtxt -> UserTypeCtxt -> HsMatchContextRn
 tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
   = case unLoc (mg_alts matches) of
       [L _ (Match { m_pats = L _ pats })]
-        | not (first_constructor pats) ->
+        | not (first_retained_constructor pats) ->
           tcRetainedVarMatches herald ctxt ty (filter isVisArgLPat pats) $ \pat_tys rhs_ty boundary ->
             tcMatches mctxt tcBody (invis_pat_tys ++ pat_tys) rhs_ty
               (case boundary of
@@ -181,9 +181,12 @@ tcRetainedMatches herald ctxt mctxt arity invis_pat_tys ty matches
         | otherwise -> failWithTc $
             TcRnRetainedQuantificationError RetainedConstructorCoverage
   where
-    first_constructor pats = case filter isVisArgLPat pats of
-      pat : _ -> constructor_pat pat
-      _ -> False
+    first_retained_constructor pats
+      | DepFunTy{} <- coreFullView ty
+      = case filter isVisArgLPat pats of
+          pat : _ -> constructor_pat pat
+          _ -> False
+      | otherwise = False
     constructor_pat (L _ (ParPat _ pat)) = constructor_pat pat
     constructor_pat (L _ ConPat{}) = True
     constructor_pat _ = False
@@ -211,6 +214,15 @@ An empty lambda-case on an empty index domain still binds its runtime index.
 Use a generated variable clause whose body is an actual empty case on that Id.
 An empty match group alone would make matchWrapper allocate a different Id.
 See Note [Retained constructor matches].
+
+Select the retained constructor rule only when the first expected argument is
+a DepFunTy. A single ordinary constructor pattern can precede a retained result.
+For example, unwrap (Box f) = f can have type Box QPi -> QPi. Consume its
+ordinary arrow with tcRetainedVarMatches and check Box with the ordinary pattern
+checker. When the source patterns end, keep the remaining Pi as the RHS type.
+Do not add a runtime index pattern or eta-expand that result. The ordinary
+pattern checker and desugarer retain newtype pattern laziness. Multiple rows
+with ordinary leading constructor patterns remain separate work.
 -}
 
 -- | Find a retained binder after any canonical ordinary arrows.
