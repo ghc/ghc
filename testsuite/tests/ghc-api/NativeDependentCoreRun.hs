@@ -24,13 +24,15 @@ import GHC.Core.TyCo.Rep (Type (..), scaledThing)
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Utils (dataConRepInstPat, exprType)
+import GHC.CoreToStg.Prep (CorePrepConfig (..), corePrepExpr)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Driver.Backend (backendWritesFiles)
 import GHC.Driver.Config.Core.Lint (initLintConfig)
+import GHC.Driver.Config.CoreToStg.Prep (initCorePrepConfig)
 import GHC.Driver.DynFlags (DynFlags (..), ExecutableLinkMode (Dynamic), GhcLink (LinkExecutable, NoLink), GhcMode (OneShot), gopt_set, targetProfile)
-import GHC.Driver.Env (HscEnv, hscInterp, hsc_NC)
+import GHC.Driver.Env (HscEnv, hscInterp, hsc_NC, hsc_logger)
 import GHC.Driver.Flags (GeneralFlag (Opt_ExternalInterpreter))
 import GHC.Driver.Main (hscCompileCoreExpr, hscSimplify)
 import GHC.Driver.Phases (Phase (StopLn), StopPhase (NoStop))
@@ -4117,6 +4119,60 @@ runNatChecks environment flags bindings tycons = do
     expectBottom "replication tail forces partial predecessor" (drive "observeVec" "partialNat")
     expect "replication of cyclic Nat has a finite prefix" "[42,42,42,42]" (drive "observeVecPrefix" "cyclicNat")
     expectBottom "replication inspects its Nat constructor" (drive "observeVecHead" "bottomNat")
+    let betaIndex = local 3100 "beta_index" (mkTyConTy nat)
+        betaIdentity = App (Lam betaIndex (Var betaIndex)) (Var input)
+        betaSuccessor = App (Lam betaIndex (App (Var (dataConWorkId successor)) (Var betaIndex))) (Var input)
+        betaConstant = App (Lam betaIndex (Var (dataConWorkId zero))) (Var input)
+        betaIndexType = TermVarTy input
+        betaSuccType = mkTyConApp (promoteDataCon successor) [betaIndexType]
+        betaZeroType = mkTyConTy (promoteDataCon zero)
+        betaKernel observer argument resultIndex element =
+            Let (Rec [(worker, rhs)])
+                $ Lam input
+                $ mkApps
+                    (Var (helper bindings observer))
+                    [Type resultIndex, mkApps (Var worker) [argument, element]]
+        betaDrive observer argument resultIndex seed =
+            mkApps
+                (Var (helper bindings "driveNat"))
+                [betaKernel observer argument resultIndex payload, Var (helper bindings seed)]
+    forM_ [(betaIdentity, betaIndexType), (betaSuccessor, betaSuccType), (betaConstant, betaZeroType)] $ \(argument, resultIndex) -> do
+        let applied = mkApps (Var worker) [argument, payload]
+            expected = mkTyConApp vec [intTy, resultIndex]
+        unless (eqType (exprType applied) expected) $
+            fail "FAIL: beta replication recovered the wrong dependent result type"
+    expect
+        "beta identity at zero/two/three"
+        (unlines ["[]:0", "[42,42]:2", "[42,42,42]:3"])
+        (App (Var (helper bindings "driveNats")) (betaKernel "observeVec" betaIdentity betaIndexType payload))
+    expect
+        "beta successor at zero/two/three"
+        (unlines ["[42]:1", "[42,42,42]:3", "[42,42,42,42]:4"])
+        (App (Var (helper bindings "driveNats")) (betaKernel "observeVec" betaSuccessor betaSuccType payload))
+    expect "beta constant ignores bottom index and payload" "[]:0" $
+        mkApps
+            (Var (helper bindings "driveNat"))
+            [betaKernel "observeVec" betaConstant betaZeroType (Var (helper bindings "bottomElement")), Var (helper bindings "bottomNat")]
+    expectBottom "beta identity demands original bottom index" (betaDrive "observeVecHead" betaIdentity betaIndexType "bottomNat")
+    expect "beta successor head ignores bottom predecessor" "42" (betaDrive "observeVecHead" betaSuccessor betaSuccType "bottomNat")
+    expectBottom "beta successor tail demands original predecessor" (betaDrive "observeVec" betaSuccessor betaSuccType "bottomNat")
+    expect "beta identity retains a finite cyclic prefix" "[42,42,42,42]" (betaDrive "observeVecPrefix" betaIdentity betaIndexType "cyclicNat")
+    cpConfig <- initCorePrepConfig environment
+    let nativeCpConfig = cpConfig{cp_allowNativeDependent = True, cp_arityOpts = Nothing, cp_specEval = False, cp_specEvalDFun = False}
+    forM_
+        [ ("identity", betaKernel "observeVec" betaIdentity betaIndexType payload)
+        , ("successor", betaKernel "observeVecHead" betaSuccessor betaSuccType payload)
+        , ("constant", betaKernel "observeVec" betaConstant betaZeroType (Var (helper bindings "bottomElement")))
+        ]
+        $ \(label, rawKernel) -> do
+            prepared <- corePrepExpr (hsc_logger environment) nativeCpConfig rawKernel
+            unless (eqType (exprType rawKernel) (exprType prepared)) $
+                fail ("FAIL: direct beta CorePrep changed the " ++ label ++ " kernel type")
+            lintNative flags ("direct beta CorePrep " ++ label) prepared
+            let seed = if label == "identity" then Var (dataConWorkId zero) else Var (helper bindings "bottomNat")
+                expected = if label == "successor" then "42" else "[]:0"
+            expect ("direct beta CorePrep " ++ label) expected $
+                mkApps (Var (helper bindings "driveNat")) [prepared, seed]
     let emptyKernel =
             Let (Rec [(worker, rhs)]) $
                 Lam
@@ -4293,6 +4349,21 @@ runNatChecks environment flags bindings tycons = do
         Left exception | "native-bottom-function" `isInfixOf` displayException exception -> pure ()
         Left exception -> fail ("FAIL: constructed bottom function raised another exception: " ++ displayException exception)
         Right value -> fail ("FAIL: constructor transport hid a bottom function: " ++ show value)
+    let bottomBetaPartial = App (Var bottomFunction) betaSuccessor
+        bottomBetaKernel =
+            Lam input
+                $ Let (NonRec bottomFunction bottomFunctionRhs)
+                $ mkApps (Var (helper bindings "force")) [Type (exprType bottomBetaPartial), bottomBetaPartial]
+    betaBottomOutcome <-
+        try
+            ( execute environment flags "beta argument preserves bottom function WHNF" $
+                mkApps (Var (helper bindings "driveNat")) [bottomBetaKernel, Var (helper bindings "bottomNat")]
+            ) ::
+            IO (Either SomeException String)
+    case betaBottomOutcome of
+        Left exception | "native-bottom-function" `isInfixOf` displayException exception -> pure ()
+        Left exception -> fail ("FAIL: beta argument changed bottom function demand: " ++ displayException exception)
+        Right value -> fail ("FAIL: beta argument hid a bottom function: " ++ show value)
     let natTy = mkTyConTy nat
         keepN = local 211 "unused_nat" natTy
         indexedNat index = mkFunctionType ManyTy (mkTyConApp eqTyCon [natTy, index, index]) intTy
@@ -4307,6 +4378,15 @@ runNatChecks environment flags bindings tycons = do
         keepKernel = Lam input (Let (NonRec keepId keepExpr) (App (Var (helper bindings "observeInt")) kept))
     expect "unused retained Nat does not force its input" "42" $
         mkApps (Var (helper bindings "driveNat")) [keepKernel, Var (helper bindings "bottomNat")]
+    let betaKept = mkApps (Var keepId) [betaIdentity, value, reflexive]
+        betaKeepKernel = Lam input (Let (NonRec keepId keepExpr) (App (Var (helper bindings "observeInt")) betaKept))
+    lintNative flags "raw beta keep kernel" betaKeepKernel
+    preparedKeep <- corePrepExpr (hsc_logger environment) nativeCpConfig betaKeepKernel
+    unless (eqType (exprType betaKeepKernel) (exprType preparedKeep)) $
+        fail "FAIL: direct beta keep CorePrep changed its kernel type"
+    lintNative flags "direct beta keep CorePrep" preparedKeep
+    expect "direct beta keep CorePrep does not force its input" "42" $
+        mkApps (Var (helper bindings "driveNat")) [preparedKeep, Var (helper bindings "bottomNat")]
   where
     namedTyCon label = case find ((== label) . occNameString . nameOccName . tyConName) tycons of
         Just tycon -> pure tycon

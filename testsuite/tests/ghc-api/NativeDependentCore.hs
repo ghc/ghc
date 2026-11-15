@@ -33,7 +33,7 @@ import GHC.Core.TyCon (AlgTyConFlav (VanillaAlgTyCon), FamTyConFlav (..), Inject
 import GHC.Core.Type
 import GHC.Core.Unfold.Make (mkCoreUnfolding)
 import GHC.Core.Unify (BindFlag (..), MaybeApartReason (..), UnifyResultM (..), alwaysBindFam, alwaysBindTv, tcMatchRetainedTyX_BM, tcMatchTy, tcMatchTyX_BM, tcMatchTys, tcUnifyTysFG)
-import GHC.Core.Utils (applyTypeToArgs, dataConRepFSInstPat, dataConRepInstPat, exprType)
+import GHC.Core.Utils (applyTypeToArgs, cheapEqExpr, dataConRepFSInstPat, dataConRepInstPat, exprType)
 import GHC.CoreToIface (toIfaceAlt, toIfaceCoercion, toIfaceExpr, toIfaceType, toIfaceTypeX)
 import GHC.Data.Bag (bagToList)
 import GHC.Data.FastString (fsLit)
@@ -670,6 +670,77 @@ runNatChecks dflags = do
         $ \expression -> check "index conversion rejects malformed constructor applications" $ case exprToNativeIndex expression of
             Nothing -> True
             Just _ -> False
+    let beta = local 3100 "beta_index" natTy
+        innerBeta = local 3101 "beta_index" natTy
+        boolBeta = local 3102 "beta_bool" boolTy
+        boolInput = local 3103 "beta_bool_input" boolTy
+        betaOpaque =
+            setIdUnfolding
+                (local 3105 "opaque_beta_index" natTy)
+                (unfolding (error "forced a beta index unfolding"))
+        opaqueProducer =
+            setIdUnfolding
+                (local 3104 "opaque_beta_producer" (mkFunctionType ManyTy natTy natTy))
+                (unfolding (error "forced a beta producer unfolding"))
+        betaIdentity argument = App (Lam beta (Var beta)) argument
+        betaSuccessor argument = App (Lam beta (succExpr (Var beta))) argument
+        betaConstant argument = App (Lam beta zeroExpr) argument
+        betaCases =
+            [ ("identity variable", betaIdentity (Var m), Var m, TermVarTy m)
+            , ("identity constructor", betaIdentity zeroExpr, zeroExpr, zeroTy)
+            , ("successor variable", betaSuccessor (Var m), succExpr (Var m), succTy (TermVarTy m))
+            , ("constant ignores opaque index", betaConstant (Var betaOpaque), zeroExpr, zeroTy)
+            , ("nested atomic argument", betaSuccessor (App (Lam innerBeta (Var innerBeta)) (Var m)), succExpr (Var m), succTy (TermVarTy m))
+            , ("nested body", App (Lam beta (succExpr (App (Lam innerBeta (Var innerBeta)) (Var beta)))) (Var m), succExpr (Var m), succTy (TermVarTy m))
+            ]
+    forM_ betaCases $ \(label, expression, expectedValue, expectedIndex) -> do
+        case normaliseNativeIndexExpr expression of
+            Just (normalised, actualIndex) -> do
+                check ("checked beta runtime form: " ++ label) (cheapEqExpr expectedValue normalised)
+                checkType dflags ("checked beta index: " ++ label) expectedIndex actualIndex
+                checkType dflags ("checked beta domain: " ++ label) natTy (typeKind actualIndex)
+                lintAccepts dflags ("normalised beta value: " ++ label) [m, betaOpaque] normalised
+            Nothing -> fail ("FAIL: checked beta was not an index: " ++ label)
+        lintAccepts dflags ("retained beta application: " ++ label) [m, betaOpaque] (App keepNat expression)
+        checkType dflags ("retained beta exact result: " ++ label) (keepNatResult expectedIndex) (exprType (App keepNat expression))
+    case normaliseNativeIndexExpr (betaIdentity (Var m)) of
+        Just (Var actual, TermVarTy actualIndex) ->
+            check "beta preserves the original shared runtime Id" (actual == m && actualIndex == m)
+        _ -> fail "FAIL: beta identity changed runtime variable sharing"
+    forM_
+        [ (App (Lam boolBeta (Var boolBeta)) (Var boolInput), Var boolInput, TermVarTy boolInput)
+        , (App (Lam boolBeta (Var (dataConWorkId trueDataCon))) (Var boolInput), Var (dataConWorkId trueDataCon), mkTyConTy (promoteDataCon trueDataCon))
+        ]
+        $ \(expression, expectedValue, expectedIndex) -> case normaliseNativeIndexExpr expression of
+            Just (normalised, actualIndex) -> do
+                check "Bool beta retains its runtime form" (cheapEqExpr expectedValue normalised)
+                checkType dflags "Bool beta retains its exact index" expectedIndex actualIndex
+                checkType dflags "Bool beta index kind" boolTy (typeKind actualIndex)
+                lintAccepts dflags "Bool beta ordinary typing" [boolInput] expression
+            Nothing -> fail "FAIL: checked Bool beta was rejected"
+    forM_
+        [ ("linear binder", App (Lam (setIdMult beta OneTy) (Var beta)) (Var m))
+        , ("linear argument", betaConstant (Var (setIdMult m OneTy)))
+        , ("wrong argument domain", betaIdentity (Var (dataConWorkId trueDataCon)))
+        , ("ignored wrong argument domain", betaConstant (Var (dataConWorkId trueDataCon)))
+        , ("wrong body domain", App (Lam beta (Var (dataConWorkId trueDataCon))) (Var m))
+        , ("wrong Bool argument domain", App (Lam boolBeta (Var boolBeta)) zeroExpr)
+        , ("malformed constructor body", App (Lam beta (succExpr (Var (dataConWorkId trueDataCon)))) (Var m))
+        , ("non-atomic successor argument", betaIdentity (succExpr (Var m)))
+        , ("opaque producer argument", betaIdentity (App (Var opaqueProducer) (Var m)))
+        , ("opaque producer body", App (Lam beta (App (Var opaqueProducer) (Var beta))) (Var m))
+        , ("representational cast argument", betaIdentity (Cast (Var m) (mkReflCo Representational natTy)))
+        , ("let argument", betaIdentity (Let (NonRec innerBeta (Var m)) (Var innerBeta)))
+        ]
+        $ \(label, expression) -> check ("checked beta rejects " ++ label) $ case normaliseNativeIndexExpr expression of
+            Nothing -> True
+            Just _ -> False
+    lintRejects dflags "beta cannot admit an out-of-scope runtime argument" [] (App keepNat (betaIdentity (Var m)))
+    lintRejects dflags "beta cannot erase an ignored out-of-scope argument" [] (App keepNat (betaConstant (Var m)))
+    lintRejects dflags "beta does not push a representational cast" [m] $
+        App keepNat (betaIdentity (Cast (Var m) (mkReflCo Representational natTy)))
+    lintRejects dflags "beta does not unfold an opaque producer" [m, opaqueProducer] $
+        App keepNat (betaIdentity (App (Var opaqueProducer) (Var m)))
     let replace = indexSubst [m] n (succExpr (Var m))
         range = Subst.getSubstRangeTyCoFVs replace
         nested = succTy (succTy index)
