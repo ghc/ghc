@@ -2194,6 +2194,12 @@ the compulsory-unfolding route. Keep the activation guard and the native
 substitution and beta rules. Do not enable general inlining. Check named and
 lambda patterns for lazy newtypes and strict data constructors at runtime.
 
+The first API run reaches an old expected rejection for `undefined` at a
+complete `Maybe (foreach ...)` result. This now compiles through the intended
+immutable expected-result match. Keep the same source as a positive control.
+Do not restore that old rejection by excluding containers. Recount the source
+inventory after this reclassification and the new container cases.
+
 - [ ] Preserve the measured `Refl` and bottom-proof failures. Pin the Agda
   argument-checking comparison and the existing GHC matching rules.
 - [ ] Extend only `isRetainedValueType` eligibility for exactly saturated

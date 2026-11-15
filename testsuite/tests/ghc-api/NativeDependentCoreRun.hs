@@ -3556,6 +3556,20 @@ runNatSourceRejectChecks = do
 -- | Check unsupported source forms without desugaring or starting plugins twice.
 runSourceRejectChecks :: GHC.Ghc ()
 runSourceRejectChecks = do
+    -- A complete container result determines the immutable instantiation.
+    -- See Note [Known retained function instantiation] in GHC.Tc.Gen.App.
+    void $ sourceEntry "NativeSourceContainerUndefined" $
+        unlines
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, GADTs, KindSignatures, RankNTypes, TypeFamilies, TypeOperators, NoImpredicativeTypes #-}"
+            , "module NativeSourceContainerUndefined where"
+            , "type family Select (b :: Bool) where"
+            , "  Select True = Int"
+            , "  Select False = Bool"
+            , "bad :: Maybe (foreach (b :: Bool) -> Select b -> Select b)"
+            , "bad = undefined"
+            , "entry :: Int"
+            , "entry = 42"
+            ]
     mapM_
         check
         [ ("unsupported algebraic domain", 83605, "supported closed first-order algebraic domain", [], local [] "foreach (b :: Int) -> Int -> Int" identity "42")
@@ -3576,7 +3590,6 @@ runSourceRejectChecks = do
         , ("SPECIALISE expression pragma", 83605, "Optimisation pragmas", [], local ["{-# SPECIALISE keep True #-}"] selection identity "42")
         , ("unsigned retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["alias = keep"]) "42")
         , ("unsigned partial retained alias", 83605, "requires an explicit signature", [], local [] selection (identity ++ ["index :: Bool", "index = False", "alias = keep index"]) "42")
-        , ("implicit undefined instantiation of retained container", 91028, "Cannot instantiate unification variable", [], ["bad :: Maybe (foreach (b :: Bool) -> Select b -> Select b)", "bad = undefined"])
         , ("unregistered ordinary term name", 37479, "is a term-level binding", [], ["ordinary :: Bool", "ordinary = False", "type Bad = NativeSourceRejected.ordinary"])
         , ("constructor payload mismatch", 83865, "second argument", [], local [] selection identity "keep True False")
         ,
