@@ -306,9 +306,11 @@ See [the exact primary links](../REFERENCES.md#signed-source-call-beta-prior-art
 The canonical seven-work, nine-PDF ledger is unchanged. No new paper was read.
 Agda was not executed. No preservation theorem is claimed.
 
-## M46 head-only binder research
+## M46 head-only binder reading
 
-M46 remains unimplemented. The review reuses Agda v2.8.0 Term 542–587 and
+M46 implements a bounded local-signature subset. Focused compiler/runtime
+validation passes; it does not establish a theorem from these paper readings.
+The review reuses Agda v2.8.0 Term 542–587 and
 Application 774–808, and verifies Conversion 746–761/827–850 at blob
 `69423e2c11b6f35bc5eee2d502cf2830efbc005a`. It checks expected-domain scope
 and comparison beneath Pi binders. It also rereads selected cached D/DC
@@ -316,8 +318,37 @@ Figure 8 pages 16–17 and the existing matchability comparison. No new whole
 paper reading, downloaded version or proof replay is added. The canonical
 seven-work/nine-PDF manifest stays unchanged.
 
-The proposed GHC binder keeps function occurrences in dedicated call-head
+In types and coercions, the GHC binder occurs only in dedicated call-head
 slots. Agda's general Pi rules and D/DC's binder congruence do not establish
 GHC substitution, dictionary/FC scope, Haskell laziness or a codec. The new
 research record is `native-source-call-beta-next-function-pi-v1/`.
 See [the detailed comparison](../REFERENCES.md#head-only-function-valued-retained-binders-prior-art).
+
+The implementation retains fixed-domain evidence and variable-only head
+substitution. Actuals are already-bound unrestricted local function variables
+of the exact checked type; they need no separate written local signature.
+The retained worker still needs its complete local signature. Scalar indices,
+constructor fields and call codecs keep their
+separate gates. An ordinary nonreflexive multiplicity-family control found a
+Phantom FunCo child-role mismatch. The upstream 19ff36f source and the measured
+failure are recorded in native-function-binders-phantom-review-v1/; this is not
+an additional conference-paper result.
+
+The next-refinement study reuses pinned Agda With 101–173, Application 774–808,
+LHS 1503–1532 and Conversion 746–761/827–850. It rereads D/DC Figure 8 and
+Figure 10 An-Push on author-PDF page 19. These readings distinguish an exact
+instantiated call from the worker's bound schema. Direct application inside
+a call-refining case remains unimplemented. The later two-stage probe2 reports
+two GHC-83865 payload mismatches per stage at lines 33/37, with no runtime
+result. The earlier static-study provenance is native-function-binders-next-refinement-v1/. No new work or PDF is added to the
+canonical seven-work/nine-PDF manifest. No full-paper reading or proof replay
+is claimed. See the [source comparison](../REFERENCES.md#head-only-function-valued-retained-binders-prior-art).
+
+
+The later scope review is native-function-binders-next-refinement-scope-v1/.
+It reuses those primary readings and inspects GHC's free-Id masking and
+ordinary evidence-argument paths. Its M47 plan keeps the motive/alias Ids
+distinct, carries an explicit equality and limits application transport to a
+whole tau residual after actual substitution under NoQL. It is unimplemented.
+Neither Agda's contextual checking nor D/DC's cast rule proves the proposed
+GHC scope, usage, token arity or Haskell demand behavior. The ledger is unchanged.

@@ -3007,9 +3007,13 @@ with unresolved multiplicities or general unannotated inference is claimed.
 See Note [Signed source call beta] and
 [the primary readings](REFERENCES.md#signed-source-call-beta-prior-art).
 
-### M46: head-only function-valued retained binders (unimplemented)
+<a id="m46-head-only-function-valued-retained-binders-unimplemented"></a>
+<a id="m46-head-only-function-valued-retained-binders"></a>
 
-Begin with complete local signatures and one variable equation:
+### M46: head-only function-valued retained binders (compiler validation complete)
+
+The implementation starts with complete local signatures and one equation
+with bare variables in retained columns:
 
 ```haskell
 keepCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat)
@@ -3021,41 +3025,142 @@ idCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat)
 idCall f n xs = xs
 ```
 
-- [ ] Specify a distinct retained-binder policy: a scalar Id or an existing
+- [x] Specify a distinct retained-binder policy: a scalar Id or an existing
   eligible local Many function head with closed ordinary Many A -> B and
   independently closed scalar A/B. Keep TermVarTy and scalar predicates unchanged.
-- [ ] Admit the actual runtime function Name in a complete local telescope.
+- [x] Admit the actual runtime function Name in a complete local telescope.
   Keep its type/coercion occurrences in TermAppTy/TermAppCo head slots.
   Preserve outer aliases,
   shadowing, ranks, staging and source errors. Start with bare variable patterns.
-- [ ] Select variable-only actual function operands at their exact domain.
+- [x] Select variable-only actual function operands at their exact domain.
   Check usage once. Reuse head-only substitution and binder masking; reject
   unsupported lambda/global/applied ranges, or keep a signed lazy local alias.
-- [ ] Update blocked Core lambda/type/application binder checks. Verify the
+  The actual variable needs the exact checked type, not its own written signature.
+- [x] Update blocked Core lambda/type/application binder checks. Verify the
   existing deep FVs, binder masking and capture avoidance. Preserve same-head
   identity. Do not represent a bare function as TermVarTy or matchable AppTy.
-- [ ] Extend fixed-domain DepFunCo, Lint, lifting, normalization and permitted
+- [x] Extend fixed-domain DepFunCo, Lint, lifting, normalization and permitted
   Given checks. Permit only unchanged/reflexive head transport. Body congruence
   can use TermAppCo under that same head. Add no function equality, inverse
   call projection, native meta fill or heterogeneous domain rule.
-- [ ] Let CorePrep substitute an eligible local Var head directly. Do not use
+- [x] Let CorePrep substitute an eligible local Var head directly. Do not use
   scalar markers or strict DEFAULT naming for a function argument. Preserve
   existing lazy head aliases, metadata protection and top-level Tidy behavior.
-- [ ] Run keep/id payloads through source, Core/STG Lint and execution. Check
+- [x] Run keep/id payloads through source, Core/STG Lint and execution. Check
   ignored bottom function/index/payload, actual call demand, distinct heads,
   alpha/capture cases and proof-only FVs. Pin invalid domains, scope and producer
   errors. Keep pure Pi matching opt-in and its escape checks intact.
-- [ ] Keep exported call-bearing signatures and all new wire forms gated.
+- [x] Keep exported call-bearing signatures and all new wire forms gated.
   Do not extend the scalar interface reader as an accidental codec bypass.
 
 Dependencies: binder policy and exact variable application precede source
 checking. Coercion/type recovery and Prep scope precede execution. For an initial
 case consumer, define a complete local caller :: Vec Int (f n) -> Vec Int (f n)
 and caller = idCall f n outside the case. Existing M43 transport can capture
-that instantiated caller. Direct idCall f n xs inside a refining case remains
-unproven: its schema contains different bound heads/indices before application.
-Probe that composition separately; do not widen M43 Givens to promise it.
-No implementation, new evaluator, optimizer or theorem is claimed.
-C1 and C2 remain open. Preparation and exact source hashes are in
+that instantiated caller. Direct probes2/3 reject payloads in both branches in
+both stages: GHC-83865 at lines 33/37 compares Vec Int Z or Vec Int (S k)
+with Vec Int (f n). These probes have no runtime result. The worker schema contains
+different bound heads/indices before application. Keep this as the next-step
+baseline; do not widen M43 Givens to promise successful direct composition.
+Implementation and focused compiler/runtime validation are complete. Canonical
+audit and publication have separate records. No new evaluator, general
+optimizer or combined preservation theorem is claimed.
+C1 and C2 remain open. Historical preparation and exact source hashes are in
 `native-source-call-beta-next-function-pi-v1/`. See
 [the primary comparison](REFERENCES.md#head-only-function-valued-retained-binders-prior-art).
+
+Selected snapshot6 uses compiler/source
+8fd22b97c74571c7d5508607f4f16e6611a84435. It contains 83 compiler inputs and
+102 source paths. Snapshot5 passed bootstrap/API2, public14 plus ten negative
+clients and constructor11 in both stages, and legacy8. The reviewed negative
+split was nine GHC-83605 and one GHC-83865. API2 took 5.72s/17.14s with
+unchanged 1/37 goldens. CoreRun adds ten quiet source positives and four errors.
+The old M45 baseline2 rejects the same public bytes with seven GHC-83605.
+
+Snapshot5 final1 passed its first eight phases, including raw/public106 and
+packed562 in both stages. Registered tests passed four and mismatched one
+existing scalar stderr expectation. Snapshot6 restores that scalar wording;
+new function wording applies only when isPiTy holds. No golden changed. Two
+quiet scalar assertion fragments were restored. Preserve all earlier import,
+role, assertion and diagnostic failures with their own inputs.
+
+- [x] Complete selected bootstrap6, API3 and self-host2. Bootstrap takes 2m48s;
+  API3 Unit/CoreRun take 5.698s/17.910s. Self-hosting takes 11m03s with peak
+  4966MiB under 16GiB and swap0.
+- [x] Record CLI bootstrap4/self-host2. Each passes public14 and rejects ten
+  clients with ten error envelopes: nine GHC-83605 and one GHC-83865.
+- [x] Run constructor supplements3: all eleven pass in each stage.
+- [x] Review direct probes3: two GHC-83865 errors per stage at lines 33/37;
+  review-v3 confirms four errors total, no panic and no runtime result.
+- [x] Complete legacy2: all eight phases pass.
+- [x] Complete final2: nine phases pass, with two API3 reuses and seven launches.
+  Both stages pass raw/public106 and packed562. Registered tests have five
+  expected passes, 39 cases and 34 skips, with no unexpected/framework failures
+  or warnings. The registered run takes 23.631763s. Final2 peaks at 1213MiB
+  under 4GiB with swap0.
+
+Source41, known41, prior64, Tc metadata and the full GHC suite were not rerun.
+Freeze and independent audit follow the documentation commit. Record their
+outcomes in `dependent-haskell-M46-final-audit-v1.json`; record publication in
+`dependent-haskell-M46-publication-v1.json`. Do not infer their counters or
+hashes from the passing compiler checks.
+
+Keep the ordinary Phantom regression. A nonreflexive ordinary multiplicity
+family exposes the same FunCo child-role defect as the dependent control.
+Note [Function reduction multiplicity roles] owns the targeted correction.
+Normalize multiplicity at Nominal; weaken only the evidence stored in a
+Phantom FunCo. Do not weaken Core Lint or drop the failing role case.
+
+### M47: direct application inside call refinement (unimplemented)
+
+Use the measured two-stage probes2/3 as the baseline. Both branches reject
+payloads with GHC-83865 at lines 33/37. Keep the working pre-instantiated
+caller control. Instantiating idCall f n first exposes the exact free call;
+the original schema has its own bound head and index. Do not compare that
+schema after discarding its binders.
+
+- [ ] After existing whole-call generalization, add q_motive :: i ~# f n.
+  Keep its RHS f n intact; do not generalize it to i. Put this first evidence
+  argument immediately after the motive index, before old generalized Givens
+  and captures. Supply the outer alias proof q :: r ~# f n at the application.
+  The motive Id i and strict alias Id r remain distinct.
+- [ ] Prepend q_motive's RetainedConDict entry. Reuse existing dictionary/cv
+  transport in a K row to derive q_branch :: K ~# f n from q_motive and
+  cv :: i ~# K. Its symmetry gives f n ~# K. Do not compose the outer q with cv
+  as if r and i were the same Id.
+- [ ] Install an exact key/proof descriptor only around the row RHS checker,
+  after patterns enter scope and inside the existing implication. Keep
+  cpt_dicts/cpt_binds scope. Restore it for other rows and clear it at staging,
+  static-form and arrow boundaries. It is not a solver inert rule.
+- [ ] In App, consume the actual retained prefix before testing the complete
+  residual type. Require NoQL and isTauTy on the WHOLE residual. Decline a
+  remaining DepFunTy, erased ForAllTy or context arrow, including nested ones.
+  Keep occurrence masking for bound/reused Ids; never expose a bound call by
+  peeling its binder. Require exact eligible in-scope head/operand choices.
+- [ ] Lift the descriptor's nominal proof through the supported residual
+  ordinary arrow/value. Attach mkWpCastN to the checked prefix, then continue
+  ordinary argument checking and final subsumption. Preserve dictionary order,
+  cached usage and once-only source checking. Do not solve a native meta or
+  use a constructor to guess an erased index choice. isTauTy is only a shape
+  gate; it does not prove that ordinary metas are solved.
+- [ ] Preserve ordinary CoVar/evidence-argument arity. Only cv occupies the
+  existing virtual constructor-proof slot. q_motive is an ordinary helper
+  evidence parameter; do not delete it as another virtual proof. Protect
+  generated patterns under Strict without changing source argument demand.
+- [ ] Add direct branch, shadowed/reused-Unique, recursive partial-worker and
+  unrelated residual-Pi controls. Check bottom function/index/payload order,
+  partial WHNF, evidence scope and usage with Core/STG Lint. A residual Pi
+  that captures a free call still fails the initial whole-residual tau gate.
+
+No implementation is claimed. This plan adds no inverse call decomposition,
+function equality, native mutable-meta assignment, general solver rule, eta
+law, Core node, codec or evaluator. Match owns the explicit evidence and row
+scope; App owns post-prefix transport. A lexical context helper must follow
+the existing native-Given scope resets. Existing Unify occurrence/lifting
+checks, DS and Zonk remain authoritative.
+
+Pinned Agda context/substitution and D/DC readings are recorded in
+native-function-binders-next-refinement-v1/. The later scope review is
+native-function-binders-next-refinement-scope-v1/. These are static design
+records, distinct from the measured source-rejection probes. They do not
+establish a combined FC, usage or Haskell runtime theorem.

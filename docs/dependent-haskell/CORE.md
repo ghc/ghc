@@ -16,8 +16,9 @@ DepFunTy b result -- A retained dependent function.
 TermAppTy f arg   -- A scoped opaque runtime call index.
 ```
 
-`b` is a local non-coercion `Id`. Its type is a supported closed algebraic domain.
-Its multiplicity is `Many`.
+`b` is a local non-coercion `Id` with multiplicity `Many`. In TermVarTy its
+type is a supported closed algebraic domain. DepFunTy can also bind an eligible
+opaque function head. See [function-valued retained binders](#function-valued-retained-binders).
 It keeps its identity as a runtime variable. It is not a `TyVar` or a `CoVar`.
 The term binder and every reference to its index use the same `Unique`.
 
@@ -1787,6 +1788,84 @@ registered tests. Freeze and independent audit must pass before publication.
 
 See Note [Signed source call beta] in GHC.Tc.Gen.Expr and
 [the pinned readings](REFERENCES.md#signed-source-call-beta-prior-art).
-Function-domain retained binders remain unimplemented M46 work. It requires a
-separate binder policy, exact local head substitution and fixed-head proof scope;
-TermVarTy must remain scalar-only. Call-bearing interfaces stay gated.
+M45 left function-domain retained binders for the M46 rule below. TermVarTy
+remains scalar-only. Call-bearing interfaces stay gated.
+
+### Function-valued retained binders
+
+isNativeRetainedBinder accepts a scalar index Id or an existing eligible opaque
+head Id. isNativeRetainedBinderType checks the domain without a fabricated Id.
+A function head has a closed ordinary visible Many arrow A -> B. Both A and B
+are independently supported scalar domains. The Id is local, unrestricted and
+not a join point. Scalar predicates, TermVarTy and constructor-field metadata
+keep their old domain policy.
+
+DepFunTy f body scopes f over calls in body. The body has kind Type. Within types and coercions, f occurs only in TermAppTy/TermAppCo head slots.
+It is not a scalar index or a matchable type function. A vacuous retained binder still becomes an ordinary
+arrow. Lambda type recovery uses this extended binder policy.
+
+At a function-valued retained binder, application accepts only an eligible
+local Var g at the exact domain of f. Its result is body[f := g], using the existing Id substitution. Lint checks
+both the occurrence metadata and the actual scoped binding. Substitution masks
+bound heads and freshens capturing binders. Free-variable, equality, type-map
+and tidying traversal retain their existing runtime-binder scopes. Immutable
+matching stays opt-in; outer templates cannot capture the bound function head.
+No call-argument decomposition is added.
+
+DepFunCo binds the same function head in its body proof and endpoints. Its
+domain remains fixed and reflexive. Existing lifting and normalization can
+abstract the body proof under that scope. They do not cast the function domain,
+compare different runtime functions, or infer equality from equal call results.
+CorePrep substitutes a supported Var directly. It does not form TermVarTy g or
+add a strict scalar DEFAULT alias. A signed local lazy function alias can remain
+shared. Unsupported non-variable substitutions keep the existing gate.
+
+The source permission applies only to complete local value signatures. One
+equation uses bare variables in retained columns. Source actuals must be
+already-bound unrestricted local function variables of the exact checked type.
+An actual variable does not need its own written local signature. Bare function
+indices, global or applied actuals, unsupported domains, staging and native
+mutable-meta assignments keep their gates. No export or expression codec is
+added. The public client instantiates caller = idCall f n outside a case.
+Direct in-branch probes2/3 reject two payloads with GHC-83865 in each stage
+at lines 33/37. These probes have no runtime result; checked composition remains M47 work.
+
+Note [Function-valued retained binders] in GHC.Core.Type owns the policy.
+Note [Function reduction multiplicity roles] in GHC.Core.Reduction owns an
+ordinary role correction found by the new tests. Multiplicity normalization
+still supplies a nominal reduction. A Phantom FunCo requires Phantom stored
+multiplicity evidence; mkFunRedn weakens only that proof with funRole. Its
+normalized type and nominal/representational behavior do not change.
+
+Snapshot5 API2 passes the function-binder and ordinary multiplicity-family
+controls at N/R/P. Source14, ten negative clients, constructor11 and legacy8
+also pass their separate checks. Final1 passes its first eight phases; one
+registered test mismatches the existing scalar error text. Snapshot6 restores
+that wording without changing a golden; function wording applies only to
+isPiTy. Selected API3 and both-stage builds pass. CLI bootstrap4/self-host2
+pass public14 and reject ten clients each (nine GHC-83605, one GHC-83865;
+ten error envelopes per stage). Constructor supplements3 pass all eleven in
+each stage. Direct probes3 have two source errors per stage and no runtime.
+Legacy2 passes eight phases. Final2 passes nine phases, including both-stage
+raw/public106 and packed562, with registered five passes/39 cases/34 skips and
+no unexpected/framework failures or warnings. These compiler/runtime checks
+are complete. Canonical audit/publication records are separate; component
+checks do not establish combined preservation.
+
+The M47 plan is unimplemented. Its motive takes q_motive :: i ~# f n directly
+after i, before old evidence/captures. Create it after whole-call
+generalization; preserve f n on the RHS. Existing row cv :: i ~# K and checked
+dictionary transport derive q_branch :: K ~# f n. A lexical descriptor carries
+sym q_branch only inside the row RHS implication. The outer alias r is not i;
+its proof cannot compose directly with cv.
+
+Candidate application transport runs after actual retained substitution and
+requires NoQL plus isTauTy on the entire residual. A remaining Pi, forall or
+context anywhere in that residual declines the route. Existing free-call
+masking still excludes bound/shadowed dependencies. Lift only the exact
+nominal proof through the supported residual ordinary arrow/value; keep final
+subsumption, evidence order and once-only usage. Do not infer missing choices
+or fill native metas. Keep q_motive's ordinary evidence-token ABI; only cv uses
+the current virtual constructor-proof erasure. No solver, eta or inverse-call
+rule follows. See [the plan](PLAN.md#m47-direct-application-inside-call-refinement-unimplemented)
+and [the primary comparison](REFERENCES.md#head-only-function-valued-retained-binders-prior-art).

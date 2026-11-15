@@ -42,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M45 passes both stages with signed immediate beta arguments in source calls; 562 packed-vector plus 106 qualified/container/worker runtime observations remain |
+| Compiler validation | M46 snapshot6 passes both-stage builds, public14 and constructor11 controls; old packed562 and raw/public106 regressions remain separate passing sets |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -77,7 +77,8 @@ Last updated: 2026-11-15.
 | Native variable aliases | Literal local Many aliases substitute the same eligible Id in terms, types and coercions; opaque producer bindings stay lazy and shared; excluded metadata and non-variable targets keep their bindings |
 | Opaque call indices | Source cases on `f n`, `f Z` and `f (S n)` refine the exact whole call; nested constructor fields, captures and demand controls pass both stages |
 | Signed call beta | Complete plain scalar endofunction signatures expose immediate checked lambda beta; actual assigned Many, binder identity and original call execution are preserved; Strict keeps its ordinary fallback |
-| Next task | Specify a head-only function-valued retained binder with complete local signatures and variable-only function arguments; keep scalar indices and call-interface gates distinct |
+| Function-valued retained binders | Snapshot6 passes both-stage source14, negative10 and constructor11 controls, plus legacy8 and final9; canonical audit/publication records are separate |
+| Next task | Implement the bounded M47 branch-proof transport after actual retained substitution; keep the direct in-case rejection baseline and pre-instantiated control |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -3951,7 +3952,97 @@ source41/known41/prior64 matrix or Tc metadata probe is claimed as rerun.
 See the [Core contract](CORE.md#signed-beta-arguments-in-source-calls),
 [plan](PLAN.md#m45-signed-beta-arguments-in-source-calls) and
 [pinned checking precedent](REFERENCES.md#signed-source-call-beta-prior-art).
-C1 and C2 remain open. [M46](PLAN.md#m46-head-only-function-valued-retained-binders-unimplemented)
-is an unimplemented local-signature step. It must preserve head-only scope,
-variable substitution and lazy function arguments; call-bearing exports stay
-gated until a separate interface increment.
+C1 and C2 remain open. M45 left function-domain retained binders for
+[M46](PLAN.md#m46-head-only-function-valued-retained-binders) below.
+Call-bearing exports stay gated until a separate interface increment.
+
+## M46: head-only function-valued retained binders
+
+The [function-binder client](examples/qualified-pi/FunctionBinderClient.hs)
+uses complete local signatures such as:
+
+```haskell
+idCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat)
+       -> Vec Int (f n) -> Vec Int (f n)
+idCall f n xs = xs
+```
+
+The retained worker requires a complete local value signature and one equation
+with bare variables in retained columns. Each actual function operand is an
+already-bound unrestricted local function variable of the exact checked type.
+The operand does not need its own written local signature. Its enclosing
+signature or existing assigned type can supply that type. A signed local alias
+can hold a lambda, an ordinary function or a lazy producer. Passing a lambda,
+global name or applied producer directly gets no new rule. The function has a
+closed ordinary Many arrow A -> B. A and B are independently closed scalar
+types. The Bool -> Nat client checks different input and result domains.
+
+In types and coercions, function occurrences use TermAppTy/TermAppCo head slots.
+Scalar TermVarTy, index reification and constructor-field eligibility do not
+change. Exact local Var substitution masks bound heads and avoids capture.
+CorePrep substitutes directly without a strict scalar alias case. DepFunCo
+keeps its domain fixed; body congruence adds no function equality or inverse
+call equality. Call-bearing exports and wire forms remain gated.
+
+The working client defines caller = idCall f n before case f n. Existing
+whole-call refinement can transport that instantiated caller. The separate
+direct in-branch probes2/3 reject in both stages: two GHC-83865 payload mismatches
+at lines 33/37 compare Vec Int Z or Vec Int (S k) with Vec Int (f n). These probes
+have no runtime result. Checked direct composition remains an M47 task.
+
+Selected snapshot6 has compiler/source
+`8fd22b97c74571c7d5508607f4f16e6611a84435`, with 83 compiler inputs and 102
+source paths. Reduction.hs is the additional archived compiler path. Snapshot6
+restores the original unsupported scalar-domain wording. It uses the new
+function wording only when isPiTy holds. No golden changed; two quiet scalar
+assertion fragments were restored.
+
+| Evidence | Measured result |
+| --- | --- |
+| Old M45 baseline2 | Same public source bytes reject with seven GHC-83605 diagnostics |
+| Snapshot5 bootstrap5/API2 | Build passes in 35.32s; Unit/CoreRun pass in 5.72s/17.14s with unchanged 1/37 goldens |
+| Snapshot5 source clients, both stages | Public14 passes; ten negative clients reject, with nine GHC-83605 and one GHC-83865 |
+| Snapshot5 constructor supplement, both stages | All eleven controls pass |
+| Snapshot5 legacy8 | Passes |
+| Snapshot5 final1 | First eight phases pass, including raw/public106 and packed562 in both stages; registered tests give four passes and one scalar diagnostic-text mismatch |
+| Selected bootstrap6 | Passes in 2m48s |
+| Selected API3 | Unit/CoreRun pass in 5.698s/17.910s; goldens remain 1/37 |
+| Selected self-host2 | Passes in 11m03s, peak 4966MiB under 16GiB, swap0 |
+| Selected CLI bootstrap4/self-host2 | Each passes public14 and rejects ten clients; ten error envelopes each, nine GHC-83605 and one GHC-83865 |
+| Constructor supplements3 | All eleven controls pass in each stage |
+| Direct probes3 | Each stage rejects two payloads at lines 33/37; review-v3 confirms four GHC-83865 errors total, no panic or runtime |
+| Selected legacy2 | All eight phases pass |
+| Selected final2 | All nine phases pass: two API3 reuses and seven launches; both stages pass raw/public106 and packed562 |
+| Selected registered run | Five expected passes, 39 cases and 34 skips; zero unexpected/framework failures or warnings; 23.631763s |
+| Final2 resource bound | Peak 1213MiB under 4GiB, swap0 |
+| Independent audit/publication | Outcomes are recorded separately in the canonical M46 audit/publication files |
+
+CoreRun adds ten quiet positive observations and four expected errors. Public14
+checks IORef-fed finite inputs, ignored bottom functions/indices/payloads,
+original demanded exceptions, lazy producer aliases, partial/cyclic prefixes
+and a mixed-domain head. The unit controls cover alpha/FVs, head-only
+substitution, fixed-domain coercions, scoped matching and ordinary
+multiplicity-family normalization at Nominal, Representational and Phantom.
+These are bounded observations, not a full laziness or preservation theorem.
+
+The Phantom control found an ordinary FunCo role defect. The fix weakens only
+its stored multiplicity proof to funRole's required role. Preserve bootstrap1/2
+import failures, the later passing attempts, API1's role failure and stale
+assertions, and the historical CLI1 catalog. Keep snapshot5's registered
+wording mismatch. Snapshot6 passes all selected compiler/runtime validation,
+including legacy2 and final2. Evidence uses native-function-binders-*; the M45
+prefix stays frozen. Source41, known41, prior64, Tc metadata and the full GHC
+suite were not rerun. The later canonical audit is recorded in
+`dependent-haskell-M46-final-audit-v1.json`; publication has its separate
+`dependent-haskell-M46-publication-v1.json` record. This section reports compiler
+validation, not predicted outcomes or counters for those records.
+The unimplemented M47 plan makes the branch equality explicit. It passes
+q_motive :: i ~# f n just after the motive index, before existing evidence and
+captures. Existing constructor evidence derives the row's f n ~# K proof.
+A descriptor exposes that proof only inside the row RHS. App may lift it through
+a whole ordinary tau residual type only after actual retained substitution,
+with NoQL and existing scope/usage checks. It must decline remaining native or
+erased binders and contexts. This is a plan, not a new solver or evaluator rule.
+See the [Core contract](CORE.md#function-valued-retained-binders),
+[plan](PLAN.md#m46-head-only-function-valued-retained-binders) and
+[primary comparison](REFERENCES.md#head-only-function-valued-retained-binders-prior-art).

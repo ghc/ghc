@@ -207,8 +207,8 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   Both stages pass the focused source, runtime and negative controls.
   M44 admits checked constructor-tree arguments in these source cases. It
   preserves exact whole-call identity and reuses the existing Core bridge.
-  Both stages pass source, demand and located negative controls. Function-domain
-  retained binders, general computation and a preservation theorem remain open.
+  Both stages pass source, demand and located negative controls. General
+  computation and a preservation theorem remain open.
   M45 implements an explicitly signed immediate-lambda step. It requires
   actual assigned Many metadata and excludes Strict from that new path.
 - [ ] **C2: Complete native Core transformations.** Depends on C1. Add the
@@ -231,9 +231,15 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   no Core or backend transformation. Ordinary optimization remains gated.
   M45 adds assigned-Many signed source beta using the existing scalar bridge.
   It preserves the checked runtime expression and ordinary Strict fallback.
-  M46 is unimplemented: begin with complete local keepCall/idCall signatures,
-  a distinct retained-binder policy and variable-only function arguments.
-  Keep heads scoped, scalar TermVarTy unchanged, and exported call codecs gated.
+  M46 implements complete local keepCall/idCall signatures with a separate
+  binder policy and exact local variable function operands. Scalar TermVarTy,
+  constructor fields and exported call codecs keep their gates. Bootstrap
+  snapshot6 builds, source/API catalogs, constructor supplements, legacy8 and
+  final9 pass. Canonical audit/publication records are separate. Direct
+  in-case probes2/3 reject
+  payloads with GHC-83865 in both stages. M47 proposes row-local explicit
+  evidence and post-substitution whole-residual tau transport under NoQL.
+  That plan is unimplemented; C1/C2 dependency states do not change.
   C1 and C2 remain open.
 - [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
   release. Broaden the documented static subset and supported domains. Implement

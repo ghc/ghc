@@ -3131,11 +3131,16 @@ paper ledger is unchanged.
 
 ## Head-only function-valued retained binders: prior art
 
-M46 is unimplemented. Its proposed binder has type/coercion occurrences only
-in TermAppTy/TermAppCo head slots. It would accept eligible variable operands
-under a fixed closed function domain. Scalar TermVarTy, inverse call decomposition, function equality,
-heterogeneous transport and call-interface codecs remain outside the proposal.
-See [the concrete plan](PLAN.md#m46-head-only-function-valued-retained-binders-unimplemented).
+M46 implements a bounded local-signature subset. Focused compiler/runtime
+validation passes; canonical audit/publication records remain separate.
+Its type/coercion occurrences use only TermAppTy/TermAppCo head slots. It accepts
+already-bound unrestricted local function operands of the exact checked
+closed ordinary Many A -> B type. An operand does not need its own written
+local signature. The complete local signature requirement governs retained
+binder formation. Scalar TermVarTy and constructor fields keep their policies.
+Inverse call decomposition, function equality, heterogeneous transport and
+call-interface codecs remain outside this increment. See
+[the concrete plan](PLAN.md#m46-head-only-function-valued-retained-binders).
 
 Agda v2.8.0 [Conversion 746–761](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L746-L761)
 and [827–850](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Conversion.hs#L827-L850),
@@ -3152,3 +3157,45 @@ not injectivity of runtime calls. The existing matchability comparison above
 retains that distinction. This review rereads selected cached extracts only.
 The canonical paper ledger stays seven works/nine PDFs. No Agda eta law,
 Haskell function extensionality or combined preservation proof is adopted.
+
+The implementation uses Note [Function-valued retained binders] in Core.Type
+and Note [Function reduction multiplicity roles] in Core.Reduction. A new
+Phantom control found an ordinary FunCo construction defect. The upstream
+[FunTy normalizer at base 19ff36f, lines 1553–1558](https://gitlab.haskell.org/ghc/ghc/-/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/Core/FamInstEnv.hs#L1553-1558)
+normalizes multiplicity at Nominal. The upstream
+[Lint rule, lines 2432–2447](https://gitlab.haskell.org/ghc/ghc/-/blob/19ff36f2aede0ca2e554016ff22c71e73aa9803b/compiler/GHC/Core/Lint.hs#L2432-2447)
+requires a Phantom multiplicity child inside Phantom FunCo. A nonreflexive
+ordinary multiplicity-family reduction reproduces the mismatch without a
+retained binder. The fix keeps nominal normalization and weakens only the
+stored proof. Exact bytes, excerpts and the observed failure are in
+native-function-binders-phantom-review-v1/. This is source evidence and a
+bounded correction, not a new paper result.
+
+The unimplemented direct-case composition study reuses pinned
+[With 101–173](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/With.hs#L101-L173),
+[Application 774–808](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+and [LHS 1503–1532](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/LHS.hs#L1503-L1532).
+They check an argument before codomain substitution and transport the remaining
+context by constructor substitution. D/DC Figure 8 supplies forward congruence;
+Figure 10, author-PDF page 19, supplies An-Push. These are comparisons for
+explicit scoped evidence after instantiation. They do not supply an automatic
+whole-call rewrite in GHC or justify evidence escape. Selected excerpts, blobs,
+hashes and reading limits are in native-function-binders-next-refinement-v1/.
+The pre-instantiated caller is not evidence that direct source application
+succeeds. The later probe2 gives two GHC-83865 payload mismatches in each stage
+at lines 33/37 and has no runtime result. This measured baseline is separate
+from the earlier static study. No new PDF, full-paper reading, Agda execution or combined
+FC/usage/runtime theorem is claimed. The canonical ledger remains seven
+works and nine PDFs.
+
+
+The later scope review, native-function-binders-next-refinement-scope-v1/,
+checks the existing free-call mask and proposed evidence order. Bound/reused
+runtime Ids do not count as free call dependencies. A distinct motive Id needs
+its own explicit i ~# f n parameter; the outer alias proof does not identify
+i with r. Existing checked dictionary/cv transport can derive the row proof.
+The proposed row-RHS descriptor and NoQL/whole-residual isTauTy gate remain
+unimplemented. isTauTy rejects binders and contexts, not all ordinary metas.
+These are GHC scope/usage requirements. The pinned Agda and D/DC readings do
+not establish them for this implementation. No new paper or proof replay is
+added to the seven-work/nine-PDF ledger.
