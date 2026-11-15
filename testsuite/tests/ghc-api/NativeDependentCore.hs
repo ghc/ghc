@@ -1382,6 +1382,8 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             close expression = Lam b (Lam payload expression)
             variableCase =
                 close $ Case (Var b) caseBinder (indexed index) (dictionaryAlts payload falseProof trueProof)
+            betaCase =
+                close $ Case (App (identity 3107 boolTy) (Var b)) caseBinder (indexed index) (dictionaryAlts payload falseProof trueProof)
             literalCase =
                 close $
                     Case
@@ -1409,6 +1411,7 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                         ]
             expressionCases =
                 [ ("variable proof case", variableCase, 2)
+                , ("identity beta proof case", betaCase, 2)
                 , ("literal proof case", literalCase, 2)
                 , ("ordinary Boolean case", ordinaryCase, 0)
                 , ("DEFAULT and proof case", defaultCase, 1)
@@ -1601,10 +1604,22 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
                     "extra interface proof names"
                     "Native Boolean interface alternative must bind exactly one proof name"
                     (wrap scrut [falseAlt, IfaceAlt trueCon [proofName, proofName] rhs])
-                reject
-                    "unsupported interface proof scrutinee"
+                forM_ [NormalCompression, SafeExtraCompression, MaximumCompression] $ \compression -> do
+                    decoded <- roundtrip compression (wrap (IfaceApp (IfaceLam retained scrut) scrut) [falseAlt, IfaceAlt trueCon [proofName] rhs])
+                    restored <- restoreExpr [] decoded
+                    lintAccepts dflags "interface proof accepts a checked identity beta scrutinee" [] restored
+                    checkType dflags "interface identity beta proof exact type" (exprType variableCase) (exprType restored)
+                let ifaceOpaqueProducer =
+                        setIdUnfolding
+                            (local 3108 "opaque_interface_producer" (mkFunctionType ManyTy boolTy boolTy))
+                            (unfolding (error "forced an interface producer unfolding"))
+                opaqueProofCase <- roundtrip NormalCompression $
+                    wrap (IfaceApp (toIfaceExpr (Var ifaceOpaqueProducer)) scrut) [falseAlt, IfaceAlt trueCon [proofName] rhs]
+                rejectsIfaceExpr
+                    "unsupported opaque interface proof scrutinee"
                     "Unsupported scrutinee for native Boolean interface evidence"
-                    (wrap (IfaceApp (IfaceLam retained scrut) scrut) [falseAlt, IfaceAlt trueCon [proofName] rhs])
+                    [ifaceOpaqueProducer]
+                    opaqueProofCase
                 reject
                     "incomplete interface proof case"
                     "Native Boolean interface proof alternatives must be exhaustive"
