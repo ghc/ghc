@@ -4359,9 +4359,10 @@ See [the contract](CORE.md#multi-constructor-retained-package-patterns),
 
 ## M51: function-valued retained package fields
 
-Compiler and source validation is complete. Evidence sealing and publication
-are the remaining checkpoint steps. The maintained [Showcase.hs](Showcase.hs)
-now includes the `functionFields` group.
+The checkpoint is independently audited and published at
+[b92d3f1595](https://github.com/tritlo/ghc/commit/b92d3f1595fa9a2341f683dfd4f0c7ed66b906a6).
+This later status update changes documentation only. The maintained
+[Showcase.hs](Showcase.hs) includes the `functionFields` group.
 
 [FunctionPackageLibrary.hs](examples/qualified-pi/FunctionPackageLibrary.hs)
 stores the function and input used by a later field type:
@@ -4415,3 +4416,15 @@ The work does not establish totality or close R22, C1 or C2. See the
 [contract](CORE.md#function-valued-retained-package-fields),
 [plan](PLAN.md#m51-function-valued-retained-package-fields), and
 [prior art](REFERENCES.md#function-valued-retained-package-fields-prior-art).
+
+
+The canonical local record is
+`_build/verification/dependent-haskell-M51-final-audit-v1.json`, SHA256
+`4cc77414d28e947f26301bc59168d9306671f04144a09c9fadc1535d033a7fa2`.
+It pins72 manifests. The frozen cohort has110 source paths, nine documents,
+45 harness files and1509 outputs. Independent auditor-v3 passes55914 checks
+and146121 overlapping manifest-entry checks. These are not distinct artifact
+or observation totals. The original auditor-v2 report remains failed because
+its historical baseline schema omitted the successful third reader step. An
+external repair record, exact diff and manifest preserve that history without
+changing the frozen checkpoint or compiler/source inputs.

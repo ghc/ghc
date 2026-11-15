@@ -3350,7 +3350,7 @@ not replace focused regression evidence.
 
 ### M51: function-valued retained package fields
 
-Status: compiler and source validation complete; evidence sealing and publication pending.
+Status: completed, independently audited and published.
 The target stores the actual function used by the later payload type:
 
 ```haskell
@@ -3401,7 +3401,7 @@ scalar indices or infer input/function equality from equal call results.
   registered checks. Preserve historical failures and exact selected inputs.
   Add a labeled function-field example to Showcase.hs when this slice passes.
 - [x] Update the contract, references and current status with actual results.
-- [ ] Freeze, independently audit and publish the completed checkpoint.
+- [x] Freeze, independently audit and publish the completed checkpoint.
 
 The preparation lives under `native-function-package-*`. M50 and its
 `native-multicon-package-*` namespace remain frozen. Prior art is recorded
@@ -3429,6 +3429,23 @@ Preserve baseline1's dependency-lookup failure, the failed formatter attempts,
 the sandbox bus launch failure and Showcase1's invalid library-query option.
 The corrected showcase runner passes bootstrap2 and selfhost1. No compiler
 source change follows the successful builds. Existing goldens stay unchanged.
+
+The audited and published checkpoint is `b92d3f1595`. The canonical local
+record is `dependent-haskell-M51-final-audit-v1.json`, SHA256
+`4cc77414d28e947f26301bc59168d9306671f04144a09c9fadc1535d033a7fa2`.
+It pins72 manifests. Auditor-v3 passes55914 checks and146121 overlapping
+manifest-entry checks. The frozen cohort keeps110 source paths, nine
+documents,45 harness files and1509 outputs. This status change follows the
+verified push and changes documentation only.
+
+The first freeze attempt failed before writing manifests because its quiet
+oracle parser captured strings after the list. Freeze-v3 bounds and decodes
+the exact24 strings. The first independent audit failed because baseline2
+contains a third successful old-reader step. External auditor-v3 verifies that
+step and passes the full audit. An external repair manifest pins the original
+failed report, frozen auditor-v2, actual auditor-v3, exact diff and repaired
+result. The frozen namespace stays unchanged. No failed attempt is relabeled
+as a pass.
 
 ### Next candidate: exported function-valued retained signatures
 
