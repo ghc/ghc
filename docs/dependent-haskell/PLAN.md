@@ -2322,6 +2322,11 @@ Keep ground constraints as obligations for IALL and `instCall`. Types may
 mention valid rigid outer variables and runtime indices. Preserve ordinary
 payload inference and the native mutable-meta guard.
 
+Use the existing immutable algebraic candidate fallback for a supported native
+proof type. Repeated `Refl` endpoints can differ before nominal entailment uses
+a local Given. Preserve the actual substituted result. A representational
+Given or a false equality must still fail the final check.
+
 Resume with the original head and checked prefix accumulator. This keeps
 constructor and concreteness information, evidence order and written-VTA
 diagnostic positions. Failed mode selection continues with the same prefix

@@ -45,6 +45,7 @@ import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys
 import qualified GHC.Core as Core
 import GHC.Core.Dependent ( hasNativeDependentExpr )
 import GHC.Core.Utils ( applyTypeToArgs )
+import GHC.Core.FVs ( exprFreeVarsList )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
@@ -435,37 +436,45 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
        ; (tc_fun0, fun_sigma0) <- tcInferAppHead rn_head
        -- See Note [Known native variables with ImpredicativeTypes].
        ; head_ql <- tcRetainedKnownHeadQL wanted_ql rn_args exp_res_ty tc_fun0 fun_sigma0
-       ; (tc_fun1, fun_sigma1) <- tcRetainedExpectedInst head_ql exp_res_ty rn_args
-                                                     tc_fun0 fun_sigma0
-       ; (tc_fun2, fun_sigma2, initial_cache, inst_plan) <-
-           tcRetainedArgInst head_ql exp_res_ty rn_head rn_args tc_fun1 fun_sigma1
-       ; (dollar_inst, dollar_cache) <-
-           tcRetainedDollarInst exp_res_ty rn_head rn_args tc_fun2 fun_sigma2
-       ; let (tc_fun, fun_sigma) = fromMaybe (tc_fun2, fun_sigma2) dollar_inst
-             arg_cache = initial_cache ++ dollar_cache
-             do_ql | null dollar_cache = head_ql
-                   | otherwise = NoQL
-             -- inst_final: top-instantiate the result type of the application,
-             -- EXCEPT if we are trying to infer a sigma-type
-             expected_rho = case exp_res_ty of
-                              Check rho -> Just rho
-                              Infer {}  -> Nothing
-             inst_final = case exp_res_ty of
-                             Check {} -> True
-                             Infer (IR {ir_inst=iif}) ->
-                                case iif of
-                                  IIF_ShallowRho -> True
-                                  IIF_DeepRho    -> True
-                                  IIF_Sigma      -> False
-
-       ; traceTc "tcApp:inferAppHead" $
-         vcat [ text "tc_fun:" <+> ppr tc_fun
-              , text "fun_sigma:" <+> ppr fun_sigma
-              , text "do_ql:" <+> ppr do_ql]
-
        ; tcRetainedAppEvidence $
-         do { -- Step 2: Instantiate the function type (taking a quick look at args)
-              -- See Note [Quick Look for particular Ids]
+         do { (prefix, prepared_ql, prepared_sigma, remaining_args) <-
+                tcRetainedGroundApp head_ql exp_res_ty rn_head tc_fun0 fun_sigma0 rn_args
+            ; (tc_fun1, fun_sigma1) <-
+                if null prefix
+                then tcRetainedExpectedInst prepared_ql exp_res_ty remaining_args
+                                            tc_fun0 prepared_sigma
+                else return (tc_fun0, prepared_sigma)
+            ; (tc_fun2, fun_sigma2, initial_cache, inst_plan) <-
+                if null prefix
+                then tcRetainedArgInst prepared_ql exp_res_ty rn_head remaining_args
+                                      tc_fun1 fun_sigma1
+                else return (tc_fun1, fun_sigma1, [], Nothing)
+            ; (dollar_inst, dollar_cache) <-
+                if null prefix
+                then tcRetainedDollarInst exp_res_ty rn_head remaining_args tc_fun2 fun_sigma2
+                else return (Nothing, [])
+            ; let (tc_fun, fun_sigma) = fromMaybe (tc_fun2, fun_sigma2) dollar_inst
+                  arg_cache = initial_cache ++ dollar_cache
+                  do_ql | null dollar_cache = prepared_ql
+                        | otherwise = NoQL
+                  expected_rho = case exp_res_ty of
+                                   Check rho -> Just rho
+                                   Infer {}  -> Nothing
+                  -- Top-instantiate the result unless inferring a sigma type.
+                  inst_final = case exp_res_ty of
+                                 Check {} -> True
+                                 Infer (IR {ir_inst=iif}) ->
+                                   case iif of
+                                     IIF_ShallowRho -> True
+                                     IIF_DeepRho    -> True
+                                     IIF_Sigma      -> False
+            ; traceTc "tcApp:inferAppHead" $
+                vcat [ text "tc_fun:" <+> ppr tc_fun
+                     , text "fun_sigma:" <+> ppr fun_sigma
+                     , text "do_ql:" <+> ppr do_ql ]
+            ; -- Step 2: Instantiate the function type, then take a quick look
+              -- at value arguments. Preserve the checked leading prefix.
+              -- See Note [Quick Look for particular Ids].
               vta_cache <- case do_ql of
                 NoQL | not (null [() | ETypeArg{} <- rn_args])
                   -> do { enabled <- xoptM LangExt.ExperimentalDependentTypes
@@ -473,20 +482,149 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
                           else return Nothing }
                 _ -> return Nothing
             ; (inst_args, app_res_rho) <-
-                tcInstFunWithExpectedCache vta_cache expected_rho inst_plan do_ql inst_final
-                                           rn_head tc_fun fun_sigma rn_args
+                tcInstFunWithPrefix False prefix vta_cache expected_rho inst_plan
+                  do_ql inst_final rn_head tc_fun fun_sigma remaining_args
             ; extra_cache <- case vta_cache of
                 Nothing -> return []
                 Just ref -> fromMaybe [] <$> readTcRef ref
-
-            ; -- Step 3: Take a quick look at the result type
-              -- See Note [QuickLook: arguments before result]
+            ; -- Step 3: Take a quick look at the result type.
+              -- See Note [QuickLook: arguments before result].
               case (do_ql, exp_res_ty) of
-                 (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
-                 _                     -> return ()
+                (DoQL, Check exp_rho) -> quickLookResultType app_res_rho exp_rho
+                _                    -> return ()
+            ; finishAppWithCache (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan
+                rn_fun tc_fun inst_args app_res_rho exp_res_ty } }
 
-            ; finishAppWithCache (arg_cache ++ extra_cache) do_ql rn_expr fun_lspan rn_fun tc_fun
-                                       inst_args app_res_rho exp_res_ty } }
+-- | Prepare a checked native application without inspecting value arguments.
+-- See Note [Ground retained applications].
+tcRetainedGroundApp :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
+                    -> HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn]
+                    -> TcM ([HsExprArg 'TcpInst], QLFlag, TcSigmaType,
+                            [HsExprArg 'TcpRn])
+tcRetainedGroundApp DoQL exp_ty rn_head fun sigma args
+  | known_head fun
+  = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
+       ; if not enabled then unchanged else
+    do { let (leading, rest) = span prefix_arg args
+       ; (prefix, residual, remaining) <-
+           if any type_arg leading
+           then do { (checked, ty) <- tcInstFunWithPrefix True [] Nothing Nothing
+                                       Nothing DoQL False rn_head fun sigma leading
+                   ; return (checked, ty, rest) }
+           else return ([], sigma, args)
+       ; expected <- readExpType_maybe exp_ty
+       ; expected <- mapM (liftZonkM . zonkTcType) expected
+       ; residual <- liftZonkM (zonkTcType residual)
+       ; let keep_ql = return (prefix, DoQL, residual, remaining)
+       ; prefix_metadata <- retainedPrefixTypes prefix
+       ; case prefix_metadata of
+           Nothing -> keep_ql
+           Just prefix_tys ->
+            do { prefix_tys <- liftZonkM (zonkTcTypes prefix_tys)
+               ; let tys = residual : prefix_tys ++ maybeToList expected
+               ; valid_scope <- tcRetainedInstScope tys
+               ; if not (valid_scope && all no_ql_vars tys
+                         && any (hasNativeDependentExpr . Core.Type) tys
+                         && maybe True isRetainedValueType expected)
+                 then keep_ql else
+            do { let (tvs, _, tau) = tcRetainedInstTelescope residual
+               ; if null tvs && isRetainedValueType tau
+                 then return (prefix, NoQL, residual, remaining)
+                 else do
+                   { matched <- tcRetainedResultInst NoQL expected remaining fun residual
+                   ; case matched of
+                       Just (choices, body)
+                         | let (remaining_tvs, _, body_tau) = tcRetainedInstTelescope body
+                         , null remaining_tvs, isRetainedValueType body_tau
+                         -> do { choices <- liftZonkM (zonkTcTypes choices)
+                               ; body <- liftZonkM (zonkTcType body)
+                               ; valid_choices <- tcRetainedInstScope (body : choices)
+                               ; if valid_choices && all no_ql_vars (body : choices)
+                                 then return (prefix ++ [EWrap (EHsWrap (mkWpTyApps choices))],
+                                              NoQL, body, remaining)
+                                 else keep_ql }
+                       _ -> keep_ql } } } } }
+  where
+    unchanged = return ([], DoQL, sigma, args)
+    known_head HsVar{} = True
+    known_head (XExpr (ConLikeTc (RealDataCon _))) = True
+    known_head _ = False
+    prefix_arg ETypeArg{} = True
+    prefix_arg EPrag{} = True
+    prefix_arg EWrap{} = True
+    prefix_arg _ = False
+    type_arg ETypeArg{} = True
+    type_arg _ = False
+    no_ql_vars = not . any is_ql . tyCoVarsOfTypeList
+    is_ql v = isTcTyVar v && isQLInstTyVar v
+tcRetainedGroundApp ql _ _ _ sigma args = return ([], ql, sigma, args)
+
+-- | Collect the types that can retain Quick Look choices in a checked prefix.
+-- Unrecognised evidence and wrappers keep the original Quick Look path.
+retainedPrefixTypes :: [HsExprArg 'TcpInst] -> TcM (Maybe [TcType])
+retainedPrefixTypes args
+  = fmap (fmap concat . sequence) (mapM arg_types args)
+  where
+    value_type ty
+      = do { ty <- liftZonkM (zonkTcType ty)
+           ; return $ if hasNativeDependentExpr (Core.Type ty)
+                         && not (isRetainedValueType ty)
+                      then Nothing else Just [ty] }
+    arg_types (ETypeArg { ea_ty_arg = ty }) = value_type ty
+    arg_types (EWrap (EHsWrap wrap)) = wrap_types wrap
+    arg_types (EWrap (EPar _)) = return (Just [])
+    arg_types (EWrap (EExpand _ _)) = return (Just [])
+    arg_types EPrag{} = return (Just [])
+    arg_types _ = return Nothing
+    wrap_types WpHole = return (Just [])
+    wrap_types (WpCompose first second)
+      = do { first_tys <- wrap_types first
+           ; second_tys <- wrap_types second
+           ; return ((++) <$> first_tys <*> second_tys) }
+    wrap_types (WpTyApp ty) = value_type ty
+    wrap_types (WpEvApp (EvExpr expr))
+      = return (Just (concatMap var_types (exprFreeVarsList expr)))
+    wrap_types _ = return Nothing
+    var_types v | isTyVar v = [mkTyVarTy v, varType v]
+                | otherwise = [varType v]
+
+{- Note [Ground retained applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ImpredicativeTypes enables Quick Look even when a checked application does
+not need impredicative inference. A known worker can have all its native
+parameters fixed by explicit type arguments. A proof constructor can instead
+have all its parameters fixed by a complete native expected result.
+
+Check only the leading type, pragma and wrapper prefix with the ordinary
+IALL and ITYARG rules. Keep their original Quick Look allocations. Stop before
+IRESULT and before any value argument. Resume with the original head and the
+checked prefix in telescope order. Do not check a type argument twice. Keep
+this preparation inside the application's evidence scope.
+
+Select ordinary checking only when no erased choices remain, the native
+value types are supported, and deep zonking finds no free Quick Look variables
+in the residual type, expected type or saved prefix metadata. Ground theta
+remains an obligation for IALL and instCall. Outer rigid variables and runtime
+indices are permitted. Ordinary metavariables keep their existing rules.
+
+Alternatively, use the existing immutable expected-result selection, including
+its algebraic candidate fallback. Keep the actual substituted signature. Append
+its type applications after the explicit prefix. This lets a nested Refl use
+its own complete expected proof type. It does not assume that the proof holds;
+argument checking, nominal entailment and final subsumption still run.
+
+A failed selection keeps the checked prefix and resumes Quick Look. It never
+infers a value argument or creates an argument cache. Public tcInstFun callers
+retain their native Quick Look guards. See Note [Retained types and Quick Look]
+and Note [Retained application evidence]. The IALL/ITYARG rules follow
+Serrano et al., A quick look at impredicativity, ICFP 2020; see
+Note [Quick Look overview]. This checked route does not extend those rules
+with mutable native instantiation. Agda v2.8.0 retains a checked prefix in
+Rules/Application.hs:619-641 and substitutes arguments in telescope order at
+774-808. Its contextual metas do not justify native GHC meta assignment.
+See docs/dependent-haskell/REFERENCES.md#applications-with-fixed-native-type-choices
+for the pinned source links and the limits of this adaptation.
+-}
 
 -- | Use an existing monomorphic native variable without Quick Look.
 -- See Note [Known native variables with ImpredicativeTypes].
@@ -875,8 +1013,19 @@ tcInstFunWithExpectedCache :: Maybe (TcRef (Maybe RetainedArgCache))
                           -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
                           -> TcSigmaType -> [HsExprArg 'TcpRn]
                           -> TcM ([HsExprArg 'TcpInst], TcSigmaType)
-tcInstFunWithExpectedCache vta_cache expected_rho inst_plan do_ql inst_final
-                          rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
+tcInstFunWithExpectedCache = tcInstFunWithPrefix False []
+
+-- | Resume instantiation after a checked prefix, or check that prefix only.
+-- Prefix-only calls cannot enter value inference or IRESULT.
+-- See Note [Ground retained applications].
+tcInstFunWithPrefix :: Bool -> [HsExprArg 'TcpInst]
+                    -> Maybe (TcRef (Maybe RetainedArgCache))
+                    -> Maybe TcRhoType -> RetainedInstPlan -> QLFlag -> Bool
+                    -> (HsExpr GhcRn, SrcSpan) -> HsExpr GhcTc
+                    -> TcSigmaType -> [HsExprArg 'TcpRn]
+                    -> TcM ([HsExprArg 'TcpInst], TcSigmaType)
+tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql inst_final
+                    rn_head@(_, fun_lspan) tc_fun fun_sigma rn_args
   = do { lvl <- getTcLevel
        ; traceTc "tcInstFun" (vcat [ text "tc_fun" <+> ppr tc_fun
                                    , text "rn_fun" <+> ppr rn_head
@@ -886,9 +1035,10 @@ tcInstFunWithExpectedCache vta_cache expected_rho inst_plan do_ql inst_final
                                    , text "lvl:" <+> ppr lvl ])
        ; case do_ql of
            NoQL -> return ()
-           DoQL -> setSrcSpan fun_lspan $ rejectNativeQuickLook fun_sigma
+           DoQL | not prefix_only -> setSrcSpan fun_lspan $ rejectNativeQuickLook fun_sigma
+                | otherwise -> return ()
        ; fun_origin <- mk_origin rn_head
-       ; res@(_, fun_ty) <- go inst_plan fun_origin 1 [] fun_sigma rn_args
+       ; res@(_, fun_ty) <- go inst_plan fun_origin 1 (reverse prefix) fun_sigma rn_args
        ; traceTc "tcInstFun:ret" (ppr fun_ty)
        ; return res
        }
@@ -952,6 +1102,9 @@ tcInstFunWithExpectedCache vta_cache expected_rho inst_plan do_ql inst_final
             -> [HsExprArg 'TcpInst]     -- Accumulator, reversed
             -> TcSigmaType -> [HsExprArg 'TcpRn]
             -> TcM ([HsExprArg 'TcpInst], TcSigmaType)
+
+    -- A prefix is not a whole application. Do not run final IALL or IRESULT.
+    go _ _ _ acc fun_ty [] | prefix_only = return (reverse acc, fun_ty)
 
     -- go: If fun_ty=kappa, look it up in Theta
     go plan fun_orig pos acc fun_ty args
@@ -1303,6 +1456,12 @@ and emits the required equality evidence. For example, a non-reflexive Refl
 still fails without a suitable Given. Never replace the actual result with
 the expected result, or use a reflexive coercion for this check.
 
+The expected algebraic result can contain a supported retained function type.
+For example, Refl can be checked at value :~: QPi under value ~ QPi. Choose
+its repeated endpoint immutably. Keep the actual reflexive result and let
+final nominal entailment use the Given. Representational evidence is not
+sufficient. See Note [Ground retained applications].
+
 Keep this fallback under NoQL. Require a known head without concreteness
 requirements, a saturated ordinary algebraic result, no pending type arguments,
 and no constraints or native template. Pattern synonyms do not use this
@@ -1345,7 +1504,7 @@ tcRetainedResultCandidate NoQL (Just expected) args fun sigma
   , (tvs, body) <- tcSplitForAllInvisTyVars sigma
   , not (null tvs)
   , Just result <- tcRetainedOrdinaryResult (count isHsValArg args) body
-  , isTauTy expected, isTauTy body
+  , isRetainedValueType expected, isTauTy body
   , not (hasNativeDependentExpr (Core.Type body))
   , Just (tc, templates) <- splitTyConApp_maybe result
   , isAlgTyCon tc
