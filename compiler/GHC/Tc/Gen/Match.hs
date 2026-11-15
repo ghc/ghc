@@ -400,8 +400,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                     capture_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . generalize) capture_cos
                     argument_plan = map RetainedConDict dictionaries
                                     ++ map (const RetainedConValue) captures
-              ; checked <- tcRetainedConMatchesWithCall (Just (call_ty, motive_proof))
-                             index [] (dictionary_tys ++ capture_tys)
+              ; checked <- tcRetainedConMatches index [] (dictionary_tys ++ capture_tys)
                              argument_plan (mkCheckExpType (generalize result_co)) matches'
               ; strict <- xoptM LangExt.Strict
               ; mapM_ (tcEmitBindingUsage . singleUsageUE) captures
@@ -549,25 +548,21 @@ instrumentation: an inserted tick can obscure the checked runtime call.
 The dispatcher checks the original scrutinee and its usage once. It also
 keeps the original case for diagnostics with ExpandedThingTc.
 
-Pass a separate ordinary evidence parameter q_motive :: i ~# f n to the motive.
-Create it after whole-call generalization, before the old dictionaries. Apply
-the motive to r, then q, then the transported old evidence and captures. This
-keeps the outer alias r distinct from the motive's index i.
+Pass an ordinary evidence parameter q_motive :: i ~# f n after the motive
+index. Create it after whole-call generalization. Apply the motive to the
+outer alias r, then q :: r ~# f n, then the old evidence and captures.
+The outer alias r and motive index i remain distinct.
 
-The constructor proof cv :: i ~# K refines q_motive's predicate through the
-existing dictionary transport. It produces q_branch :: K ~# f n for solving.
-The application descriptor instead uses sym q_motive ; cv :: f n ~# K.
-Both source proofs are already bound in the row. A direct cast does not emit
-a Wanted that marks q_branch as needed. The solver can therefore prune that
-intermediate Given binding. Keep the direct proof independent of its liveness.
-Record the descriptor only while checking that row body.
-Keep q_motive in the ordinary evidence-parameter ABI. Only cv occupies the
-virtual constructor-proof slot. Its branch evidence binds remain under cv.
-Applications may use this descriptor only after substituting the actual
-retained operands into a residual monomorphic ordinary type. They must not
-cast an uninstantiated retained telescope, even if a formal binder reuses an
-outer Id's Unique. See Note [Lexical retained call refinements] in
-GHC.Tc.Utils.Monad. No new family equation or function injectivity is assumed.
+The existing constructor transport uses cv :: i ~# K to give the row
+q_branch :: K ~# f n. checkConstraints scopes this Given over the complete
+row, including its where bindings. Ordinary argument and result checking can
+emit a Wanted f n ~# K. The solver matches the exact or symmetric irreducible
+Given. It does not decompose the opaque call or equate its inputs or heads.
+Coercion-hole filling records the used evidence, so the solver retains the
+required q_branch binding. See Note [Delete dead Given evidence bindings]
+in GHC.Tc.Solver.Solve. No separate application cast or lexical proof list
+is needed for this path. Keep q_motive in the ordinary evidence-token ABI;
+only cv occupies the virtual constructor-proof slot.
 
 Agda with-abstraction supplies prior art for whole-term generalization and
 checking a helper in its dependent context. It supplies no Haskell demand
@@ -1108,19 +1103,9 @@ tcRetainedConMatches :: Id -> [ExpPatType] -> [ExpPatType] -> [RetainedConArg] -
                     -> MatchGroup GhcRn (LHsExpr GhcRn)
                     -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
 tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty group
-  = tcRetainedConMatchesWithCall Nothing index invis_pat_tys pat_tys argument_plan rhs_ty group
-
--- | Check constructor rows with an optional exact-call evidence parameter.
--- The call motive supplies only dictionary and value arguments after its index.
-tcRetainedConMatchesWithCall :: Maybe (Type, EvVar)
-                            -> Id -> [ExpPatType] -> [ExpPatType] -> [RetainedConArg]
-                            -> ExpRhoType -> MatchGroup GhcRn (LHsExpr GhcRn)
-                            -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
-tcRetainedConMatchesWithCall call_refinement index invis_pat_tys pat_tys argument_plan rhs_ty group
-  | Nothing <- call_refinement
-  , Just second <- retainedMatrixColumn argument_plan group
+  | Just second <- retainedMatrixColumn argument_plan group
   = tcRetainedMatrixMatches index second invis_pat_tys pat_tys argument_plan rhs_ty group
-tcRetainedConMatchesWithCall call_refinement index invis_pat_tys pat_tys argument_plan rhs_ty
+tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                     (MG { mg_alts = L loc matches, mg_ext = (origin, _) })
   = setSrcSpanA loc $
     do { constructors <- mapM constructor matches
@@ -1205,13 +1190,7 @@ tcRetainedConMatchesWithCall call_refinement index invis_pat_tys pat_tys argumen
                  index_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType index))
                  renamed = renameRetainedMatch names match
                  match' = renamed { m_pats = fmap (insert_dictionaries argument_plan) (m_pats renamed) }
-                 check_body = case call_refinement of
-                   Nothing -> tcBody
-                   Just (call_ty, motive_proof) -> \body body_ty ->
-                     withRetainedCallRefinement call_ty
-                       (mkTransCo (mkSymCo (mkCoVarCo motive_proof)) (mkCoVarCo cv)) $
-                         tcBody body body_ty
-                 check = tcMatchWithSource check_body (invis_pat_tys ++ index_arg : refined_args)
+                 check = tcMatchWithSource tcBody (invis_pat_tys ++ index_arg : refined_args)
                            (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc match')
            ; (ev_binds, L checked_loc checked) <- if null refined_givens
                then do { checked <- check; return (emptyTcEvBinds, checked) }

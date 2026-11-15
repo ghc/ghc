@@ -19,7 +19,6 @@ module GHC.Tc.Utils.Monad(
   getTopEnv, updTopEnv, updTopEnvIO, getGblEnv, updGblEnv,
   setGblEnv, getLclEnv, updLclEnv, updLclCtxt, setLclEnv, restoreLclEnv,
   tcExtendNativeGivens,
-  getRetainedCallRefinements, withRetainedCallRefinement,
   updTopFlags,
   getEnvs, setEnvs, updEnvs, restoreEnvs,
   xoptM, doptM, goptM, woptM,
@@ -203,7 +202,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Type( mkStrLitTy )
-import GHC.Core.TyCo.Rep( CoercionHole(..), CoercionN )
+import GHC.Core.TyCo.Rep( CoercionHole(..) )
 import GHC.Core.TyCo.FVs( coVarsOfCo )
 import GHC.Core.TyCon ( TyCon )
 
@@ -487,7 +486,6 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
                 tcl_native_givens = [],
-                tcl_retained_call_refinements = [],
                 tcl_tclvl      = topTcLevel
                 },
                 tcl_usage      = usage_var,
@@ -598,38 +596,6 @@ tcExtendNativeGivens givens thing_inside
       [] -> thing_inside
       native_givens -> updLclCtxt (\ctxt -> ctxt
         { tcl_native_givens = native_givens ++ tcl_native_givens ctxt }) thing_inside
-
--- | Read the enclosing whole-call proofs, with the innermost proof first.
-getRetainedCallRefinements :: TcM [(Type, CoercionN)]
-getRetainedCallRefinements
-  = tcl_retained_call_refinements . tcl_lcl_ctxt <$> getLclEnv
-
--- | Check a row body with a nominal proof from its exact call to its constructor.
--- See Note [Lexical retained call refinements].
-withRetainedCallRefinement :: Type -> CoercionN -> TcM a -> TcM a
-withRetainedCallRefinement call_ty co
-  = updLclCtxt (\ctxt -> ctxt
-      { tcl_retained_call_refinements = (call_ty, co)
-          : tcl_retained_call_refinements ctxt })
-
-{- Note [Lexical retained call refinements]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A checked opaque-call case can supply an exact whole-call proof to applications
-in one row body. Store the original call and its nominal proof to that row's
-constructor. The proof is an ordinary scoped CoVar expression. This list is
-not a solver inert set and does not rewrite a worker's uninstantiated type.
-See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
-
-Install the descriptor after checking the row patterns, inside the implication
-for its refined Givens. Keep the innermost descriptor first. Applications must
-wait until the relevant retained operands have been substituted. They must not
-transport beneath a remaining retained binder or erased quantifier. The scoped
-occurrence check also masks a call's free Ids under binders of the same Unique.
-
-Initialize the list empty. Follow the lexical native-Given scope boundaries.
-Static forms clear the list. Arrow escape and nested typed splices restore
-the enclosing list. A row proof must not escape through these source scopes.
--}
 
 {- Note [Lexical native Givens]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1043,8 +1009,7 @@ newArrowScope :: TcM a -> TcM a
 newArrowScope
   = updLclEnv $ \env ->
       modifyLclCtxt (\ctx -> ctx { tcl_arrow_ctxt = ArrowCtxt (getLclEnvRdrEnv env)
-                                                  (tcl_lie env) (tcl_native_givens ctx)
-                                                  (tcl_retained_call_refinements ctx) }) env
+                                                  (tcl_lie env) (tcl_native_givens ctx) }) env
 
 -- Return to the stored environment (from the enclosing proc)
 escapeArrowScope :: TcM a -> TcM a
@@ -1052,11 +1017,10 @@ escapeArrowScope
   = updLclEnv $ \ env ->
     case getLclEnvArrowCtxt env of
       NoArrowCtxt       -> env
-      ArrowCtxt rdr_env lie givens refinements -> env
+      ArrowCtxt rdr_env lie givens -> env
         { tcl_lcl_ctxt = (tcl_lcl_ctxt env) { tcl_arrow_ctxt = NoArrowCtxt
                                           , tcl_rdr = rdr_env
-                                          , tcl_native_givens = givens
-                                          , tcl_retained_call_refinements = refinements }
+                                          , tcl_native_givens = givens }
         , tcl_lie = lie }
 
 {-

@@ -2343,11 +2343,11 @@ runFunctionBinderSourceChecks = do
 These quiet checks keep the M46 source corpus separate. Exact branch-local
 annotations activate the existing opaque-call case path. Instantiate the
 retained worker inside that branch instead of capturing a signed caller first.
-The application cast must use the row proof after both actual indices enter
-its residual type. A partial recursive worker and an unrelated remaining Pi
-must retain their binders. This path does not check row where bindings under
-the new application descriptor. See Note [Source opaque call refinement] in
-GHC.Tc.Gen.Match. Keep ordinary payload checking and the existing Lint paths.
+Ordinary argument and result checking emit equality Wanteds after actual
+retained substitution. The existing row Given can solve an exact whole-call
+equality. A partial recursive worker and an unrelated remaining Pi must retain
+their binders. See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
+Keep ordinary payload checking and the existing Lint paths.
 -}
 
 -- | Add direct branch-local applications without changing inherited sources.

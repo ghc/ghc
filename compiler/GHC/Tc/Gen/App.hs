@@ -1355,9 +1355,7 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
                           else tcRetainedArg (varType binder) arg
            ; arg' <- skipQuickLook ctxt arg (Scaled ManyTy (varType binder))
            ; let body_ty = applyTypeToArgs fun_ty [core_arg]
-           ; (call_wrap, refined_body) <- tcRetainedCallAppCoercion do_ql body_ty
-           ; go plan fun_orig (pos + 1)
-                (addArgWrap call_wrap (arg' : acc)) refined_body rest_args }
+           ; go plan fun_orig (pos + 1) (arg' : acc) body_ty rest_args }
 
     -- Rule ITVDQ from the GHC Proposal #281
     go1 plan fun_orig pos acc fun_ty ((EValArg { ea_arg = arg }) : rest_args)
@@ -1457,64 +1455,6 @@ tcInstFunWithPrefix prefix_only prefix vta_cache expected_rho inst_plan do_ql in
            DoStmtOrigin -> ExpectedFunTySyntaxOp DoStmtOrigin tc_fun
            _ -> ExpectedFunTyArg (HsExprTcThing tc_fun) arg
 
-
--- | Refine the complete ordinary type of an already-built retained prefix.
--- See Note [Application of a refined opaque call].
-tcRetainedCallAppCoercion :: QLFlag -> TcType -> TcM (HsWrapper, TcType)
-tcRetainedCallAppCoercion NoQL original_ty
-  = do { refinements <- getRetainedCallRefinements
-       ; case refinements of
-           [] -> return (WpHole, original_ty)
-           _  -> do { ty <- liftZonkM (zonkTcType original_ty)
-                    ; if not (isTauTy ty)
-                         || anyFreeVarsOfType
-                              (\v -> isTyVar v && isMetaTyVar v
-                                  && isNativeIndexType (tyVarKind v)) ty
-                      then return (WpHole, original_ty)
-                      else do { (co, refined_ty) <-
-                                  foldM refine (mkNomReflCo ty, ty) refinements
-                              ; return (mkWpCastN co, refined_ty) } } }
-  where
-    refine (prefix_co, ty) (call_ty, branch_co)
-      | retainedCallOccurs call_ty ty
-      = do { co <- tcRetainedCallCoercion call_ty branch_co ty
-           ; return (mkTransCo prefix_co co, coercionRKind co) }
-      | otherwise
-      = return (prefix_co, ty)
-tcRetainedCallAppCoercion DoQL original_ty = return (WpHole, original_ty)
-
-{- Note [Application of a refined opaque call]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A checked source case can provide a lexical proof f n ~# K. After actual
-retained arguments have been substituted, a worker prefix can have type
-Vec Int (f n) -> Vec Int (f n). Lift the exact free call through this whole
-type, then cast the already-built prefix before checking its ordinary payload.
-Use the same step when no ordinary arguments remain. The result checker still
-checks the actual refined result against the original expected type.
-
-Read the lexical descriptors first. An empty list leaves the original type
-unchanged without zonking it. Require NoQL and isTauTy on the whole residual
-type. A remaining retained binder, erased forall, or context postpones this
-step. In particular, a
-recursive partial worker can reuse the current index Unique in its remaining
-binder. It must retain that binder instead of receiving a branch cast.
-isTauTy alone does not establish completion of erased native choices.
-After zonking, decline this transport if a free meta TyVar still has a native
-index kind. Return the original type and use the existing checking path.
-Independent Type-kinded payload metas remain ordinary. This is a conservative
-GHC application invariant, not a requirement attributed to Agda.
-
-retainedCallOccurs masks bound dependencies and compares the whole call key.
-See Note [Source opaque call refinement] in GHC.Tc.Gen.Match.
-
-Descriptors are lexical evidence, ordered from the innermost case outwards.
-Compose their checked nominal lifts in that order. Do not compare source
-spellings, decompose an opaque head, or assign native syntax to a metavariable.
-The accumulator remains reversed: addArgWrap attaches the cast after the
-retained argument already in the accumulator. Value arguments and cached
-arguments continue through their existing checking paths exactly once.
-This step does not infer a value argument or change Quick Look mode.
--}
 
 -- | Resolve one already-bound local function at its exact retained domain.
 -- Read existing assignments without instantiating or checking the value again.
