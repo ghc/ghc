@@ -234,9 +234,10 @@ the shared-context comparison precedent. See
 These sources do not prove preservation for the current GHC extension.
 
 Transport a function value with a cast. Do not replace that cast with a lambda:
-eta expansion can hide a bottom function in Haskell. General Pi matching,
-ambient-evidence normalization under retained binders, changed domains or multiplicities,
-dependent erased binder kinds, and the ordinary optimizer remain unsupported.
+eta expansion can hide a bottom function in Haskell. Changed domains or
+multiplicities, dependent erased binder kinds, and the ordinary optimizer
+remain unsupported. Eligible ambient Givens can normalize retained bodies;
+the later Given-normalization sections specify that restricted path.
 `ForAllCo` still binds only erased type and coercion variables. No new selector
 or erased `InstCo` rule is added. Diagnostic interface conversion can print the
 coercion; serialization in native unfolding bodies remains gated.
@@ -807,7 +808,9 @@ Its type must be the homogeneous nominal primitive equality from the scrutinee's
 index to that exact promoted constructor. Check its type before adding it to
 scope. Check its right-hand side with the proof in scope. Keep the proof outside
 all other alternatives and the result annotation. Ordinary Boolean alternatives
-with no binders keep their existing rule. `DEFAULT` cannot bind a proof.
+with no binders keep their existing rule. `DEFAULT` supplies no constructor
+refinement. It can carry the separate checked index-alias proof described in
+the constructor-naming section.
 
 Require exhaustive alternatives whenever an algebraic alternative binds a proof.
 All constructors of its domain or a binder-free `DEFAULT` must cover the input.
@@ -1017,21 +1020,25 @@ It adds `simpleOptNativeExpr` as a separate entry. It does not enable the full
 simplifier or the ordinary program optimization pipeline.
 
 The native mode reuses the SimpleOpt traversal with restricted rewrites. It
-skips occurrence analysis, general inlining, compulsory unfolding, binding
+skips occurrence analysis, general inlining, general compulsory unfolding, binding
 dropping, eta reduction, and cast pushing through lambdas. It also disables
 generic known-constructor case elimination.
 It creates no rules, Core unfoldings, or join points. Unfolding construction
 would invoke ordinary occurrence analysis again. Existing join points remain.
 
-Dependent beta reduction can substitute an accepted local Boolean variable or
-an exact Boolean constructor. An unsupported producer keeps its application
-redex. A virtual-proof case can reduce only when its scrutinee is an exact
+Dependent beta reduction can substitute an accepted local index variable or
+an accepted constructor expression in the current index grammar. An unsupported
+producer keeps its application redex. A virtual Boolean-proof case can reduce
+only when its scrutinee is an exact
 syntactic Boolean constructor. The substituted proof must be nominal primitive
 equality whose endpoints are that same promoted constructor. Replace that proof
 with checked reflexivity before substituting into the selected branch.
 
 Keep variable cases and lazy source lets. Do not inspect unfoldings to decide an
-opaque index. These rules implement dependent substitution and checked case
+opaque index. The current mode permits the existing compulsory templates for
+wired tuple sections and native newtype wrappers. These exceptions expose
+required wrappers; they do not authorize arbitrary unfolding. These rules
+implement dependent substitution and checked case
 refinement from [the design references](REFERENCES.md#agda-provenance). They do
 not add arbitrary expression indices, general Pi matching, or general proof
 erasure. Run Core Lint before and after this entry. Retest the shared runtime
@@ -1416,3 +1423,30 @@ arrow stays outside this collected telescope. No native metavariable assignment
 or Core/interface change is added. See Note [Declared native argument choices]
 in `GHC.Tc.Gen.App` and
 [the primary-source record](REFERENCES.md#native-choices-from-declared-arguments).
+
+## Core research correspondence and remaining obligations
+
+The C1 audit compares this implementation with three distinct results. D/DC's
+An-PiCong supplies a precedent for `DepFunCo` with an unchanged domain.
+System DR supplies role-indexed equality obligations; dependent arguments require
+nominal equality. GraD separates type dependency from runtime usage. None supplies
+a ready-made theorem for the combined GHC implementation. The current rules
+specialize these ideas to eligible closed domains, Many indices, explicit FC
+coercions, and the existing checked backend.
+
+A larger index language must preserve substitution, scope, result kind, role,
+constructor consistency, and runtime erasure. An actual strict branch justifies
+constructor evidence. A DEFAULT alias justifies identity with its scrutinee.
+These rules need their own correspondence argument. General changed-domain
+congruence, residual term expressions in types, optimizer substitution closure,
+and normal unfolding support remain open. An open evaluator must not assume a
+complete terminating equality procedure for arbitrary Haskell.
+
+The next bounded experiment uses a primitive beta step. Its spec is in PLAN.md.
+It will return a normalized runtime expression together with the same checked
+index. CorePrep must consume that pair before argument naming. Accepting a new
+expression shape in type recovery alone would leave naming inconsistent.
+The initial argument restriction is an already atomic variable or nullary
+constructor. This preserves named argument sharing while the bridge is checked.
+The source argument grammar remains separately gated until it has its own
+checked elaboration path.

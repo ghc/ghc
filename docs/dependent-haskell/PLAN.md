@@ -2442,3 +2442,43 @@ retained quantifiers, first-class sums, evaluation, promotion, and language
 cleanup. Source-inference improvements support that program but do not replace
 its Core and type-computation work. SMT reasoning and proof-certificate checking
 remain separate tasks.
+
+### M39: checked beta exposure in the native Core index bridge
+
+M38 is frozen and published at `a80eac9875be9f9757554390b5f3108c9d5c3b87`.
+Use a new `native-index-beta-*` evidence prefix. Never write an M38 artifact.
+This increment advances ROADMAP C1/C2 with one checked Core reduction. It does
+not implement a general evaluator or source lambda-index elaboration.
+
+Preserve the existing variable/constructor conversion. Add a shared checked
+conversion that returns both a normalized runtime expression and its index.
+For an immediate `App (Lam b body) arg`, require an eligible local Many binder,
+one unchanged supported closed domain, and matching argument/body domains.
+Require the argument to normalize to a local variable or nullary constructor.
+The body and result must stay in the supported finite index grammar. Do not
+unfold an Id, consume a cast as equality, evaluate a producer, introduce a
+residual expression type, or add eta conversion. Caller Core Lint must still
+check the original expression and all actual scopes and metadata.
+
+Normalize before CorePrep names the argument. A result variable must stay that
+actual variable; do not force it with an alias case. A result constructor must
+use the existing checked constructor naming and transport. Keep type recovery,
+substitution, `mapNativeIndex`, and naming on the same checked bridge. Preserve
+ordinary code paths and reject unsupported expressions through existing gates.
+
+Initial examples, with scoped Nat variables, are identity applied to `n`,
+successor applied to `n`, and constant zero applied to a bottom-valued variable.
+The unused bottom must stay lazy. A demanded bottom must retain its marker.
+The initial atomic-argument restriction avoids duplicating a constructed
+argument when a lambda uses it more than once.
+
+- [ ] Preserve the M38 Core/source baselines and add quiet checks to the existing
+  Core API fixtures. Add no new tracked tests or golden output.
+- [ ] Implement the shared checked bridge and CorePrep normalization. Add one
+  owning GHC Note with paper and implementation obligations.
+- [ ] Check type recovery, capture avoidance, nominal roles, wrong domains,
+  invalid multiplicity/scope, opaque producers, runtime demand, and sharing.
+- [ ] Build both stages and run the focused existing regressions serially under
+  the resource caps. Preserve the 94 and 562 source output prefixes.
+- [ ] Record the Core-only boundary and plan source admission after the kernel
+  and naming checks pass. Keep general promotion and open evaluation unchecked.

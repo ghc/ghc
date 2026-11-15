@@ -2860,3 +2860,27 @@ to this implementation without a correspondence argument.
 The linked open-evaluator issue #27413 and homogeneous-equality wiki returned
 bot challenges. Their bodies were not read. The checklist attributes only the
 available roadmap descriptions to those tasks.
+
+## Core contract audit and bounded beta exposure
+
+The C1 audit is cached in `native-core-contract-research-v1`, with three exact
+paper versions, 12 source snapshots, reading scope, and hashes. It maps the
+current closed-domain forms, scoped coercions, virtual case evidence, and erasure
+to the relevant obligations. It does not replay a proof for this implementation.
+
+The 2017 D/DC author PDF gives An-Beta and An-AppAbs in Figure 8 on PDF page 16.
+The endpoints must type check and the reduction must be an actual primitive
+step. An-Push on page 19 handles casted application with explicit evidence.
+The 2019 role paper requires nominal equality for dependent arguments and does
+not supply its annotated implementable counterpart. The extended 2021 GraD
+paper separates type use from runtime usage and still requires an explicit
+checker. These results motivate a checked beta bridge, not arbitrary producer
+unfolding, equality between opaque names, or an eta rule.
+
+The proposed first bridge accepts an immediate lambda over an eligible Many
+index domain. Its argument is an existing atomic index. Its body normalizes
+inside the existing variable/constructor grammar. Runtime argument normalization,
+type recovery, index substitution, and CorePrep naming must agree. Keep the
+source elaboration step separate until it can preserve the same typing, scope,
+usage, and failure behavior. See [the Core contract](CORE.md#core-research-correspondence-and-remaining-obligations)
+and the M39 spec in PLAN.md.
