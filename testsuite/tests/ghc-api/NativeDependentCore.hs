@@ -1548,8 +1548,57 @@ runIfaceChecks libdir = runGhc (Just libdir) $ do
             rejectsIface "wire call rejects stale scalar head metadata" "Invalid retained call head" [scalarHead, callN] decoded
             wrongDomain <- roundtrip compression (IfaceTermAppTy callName (toIfaceType intTy))
             rejectsIface "wire call rejects wrong argument domain" "Invalid retained call argument" [callF] wrongDomain
-            reservedPi <- roundtrip compression (toIfaceType (tidyTopType closedCalls))
-            rejectsIface "generic function Pi import stays reserved" "Invalid retained binder" [] reservedPi
+            functionPiWire <- roundtrip compression (toIfaceType (tidyTopType closedCalls))
+            firstFunctionPi <- restore [] functionPiWire
+            secondFunctionPi <- restore [] =<< roundtrip compression (toIfaceType (tidyTopType closedCalls))
+            checkType dflags "function Pi codec preserves alpha equality" closedCalls firstFunctionPi
+            checkType dflags "separate function Pi imports are alpha equivalent" firstFunctionPi secondFunctionPi
+            check "function Pi codec preserves both runtime argument slots" (countFunRepArgs 2 firstFunctionPi == 2)
+            case (firstFunctionPi, secondFunctionPi) of
+                (DepFunTy firstHead (DepFunTy firstIndex firstBody), DepFunTy secondHead (DepFunTy secondIndex secondBody)) -> do
+                    check "function Pi imports freshen both actual binders" (firstHead /= secondHead && firstIndex /= secondIndex)
+                    forM_ [(firstHead, firstIndex, firstBody), (secondHead, secondIndex, secondBody)] $ \(headId, indexId, body) ->
+                        case body of
+                            FunTy _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _ ->
+                                check "function Pi endpoints share actual imported head and index" (left == headId && right == headId && ln == indexId && rn == indexId)
+                            _ -> fail "FAIL: function Pi codec lost repeated call endpoints"
+                _ -> fail "FAIL: function Pi codec lost its runtime telescope"
+            let shadowHead = local 9110 "wire_call" (idType callF)
+                shadowCalls = mkDepFunTy callF (mkDepFunTy shadowHead (mkDepFunTy callN $
+                    mkFunctionType ManyTy (mkTyConApp eqTyCon [boolTy, TermAppTy callF (TermVarTy callN), TermAppTy shadowHead (TermVarTy callN)]) intTy))
+            shadowRestored <- restore [] =<< roundtrip compression (toIfaceType (tidyTopType shadowCalls))
+            checkType dflags "same-spelling function Pi binders avoid capture" shadowCalls shadowRestored
+            case shadowRestored of
+                DepFunTy outer (DepFunTy inner (DepFunTy argument (FunTy _ _ (TyConApp _ [_, TermAppTy left (TermVarTy ln), TermAppTy right (TermVarTy rn)]) _))) ->
+                    check "shadowed call heads retain distinct actual identities" (outer /= inner && left == outer && right == inner && ln == argument && rn == argument)
+                _ -> fail "FAIL: shadowed function Pi codec changed shape"
+            case functionPiWire of
+                IfaceDepFunTy (mult, name, domain) body -> do
+                    let badDomain replacement = IfaceDepFunTy (mult, name, replacement) body
+                    rejectsIface "function Pi rejects outer multiplicity One" "Invalid retained binder" [] $
+                        IfaceDepFunTy (toIfaceType OneTy, name, domain) body
+                    rejectsIface "function Pi rejects an inner linear arrow" "Invalid retained binder" [] $
+                        badDomain (toIfaceType (mkFunctionType OneTy boolTy boolTy))
+                    rejectsIface "function Pi rejects an unsupported result domain" "Invalid retained binder" [] $
+                        badDomain (toIfaceType (mkFunctionType ManyTy boolTy intTy))
+                    let missingType = mkTyVar (mkSystemName (unique 9111) (mkTyVarOcc "missing_domain")) liftedTypeKind
+                    rejectsIface "function Pi cannot import a free domain variable" "Iface type variable out of scope" [] $
+                        badDomain (toIfaceType (mkFunctionType ManyTy (mkTyVarTy missingType) boolTy))
+                    let boundDomainName = mkIfLclName (fsLit "bound_domain")
+                        nonclosedDomain = case domain of
+                            IfaceFunTy flag arrowMult _ result -> IfaceFunTy flag arrowMult (IfaceTyVar boundDomainName) result
+                            _ -> error "FAIL: function Pi domain is not an ordinary arrow"
+                        boundDomainPi = IfaceForAllTy
+                            (mkIfaceForAllTvBndr Specified (boundDomainName, toIfaceType liftedTypeKind))
+                            (badDomain nonclosedDomain)
+                    rejectsIface "function Pi rejects an in-scope nonclosed domain" "Invalid retained binder" [] boundDomainPi
+                    rejectsIface "function binder is not a scalar TermVarTy" "Invalid retained index" [] $
+                        IfaceDepFunTy (mult, name, domain) (IfaceTermVar name)
+                    rejectsIface "call argument cannot refer to a later scalar binder" "Iface id out of scope" [] $
+                        IfaceDepFunTy (mult, name, domain) (IfaceTermAppTy name (toIfaceType (TermVarTy callN)))
+                    rejectsIface "a sibling function binder is not in scope" "Iface id out of scope" [] $
+                        IfaceDepFunTy (mult, name, domain) (IfaceTermAppTy (mkIfLclName (fsLit "sibling_head")) (toIfaceType boolTy))
+                _ -> fail "FAIL: function Pi wire fixture changed shape"
             rejectsWith "call coercion serialization stays reserved" "Opaque runtime call congruence interfaces are not implemented" (roundtrip compression reservedCo)
             forM_ [("direct", freeCall), ("nested", nestedFreeCall)] $ \(label, diagnostic) ->
                 rejectsWith (label ++ " diagnostic call head cannot enter binary") "Can't serialise IfaceFreeTermAppTy" (roundtrip compression diagnostic)

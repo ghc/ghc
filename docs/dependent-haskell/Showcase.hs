@@ -25,6 +25,7 @@ import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
 import Data.Type.Equality ((:~:) (Refl))
 import qualified FunctionPackageLibrary as FunctionPackages
+import qualified FunctionSignatureLibrary as FunctionSignatures
 import qualified GroundApplicationClient as Ground
 import qualified IndexBetaClient as IndexBeta
 import qualified KnownArgumentClient as Known
@@ -279,10 +280,17 @@ functionFields = do
         successor size = S size
         package = FunctionPackages.buildPack @Int successor n 42
     case FunctionPackages.repackFunction package of
-        FunctionPackages.FunctionPack storedFunction storedInput values ->
+        FunctionPackages.FunctionPack storedFunction storedInput values -> do
             observe "stored function, input and dependent payload" (natToInt (storedFunction storedInput), toList values)
+            observe "imported function signature preserves payload" (toList (FunctionSignatures.idCall @Int storedFunction storedInput values))
     observe "generic payload in a function package" (FunctionPackages.inspectFunction (FunctionPackages.buildPack @Char successor n 'q'))
     observe "function package fields stay lazy" (FunctionPackages.ignoreFunction (FunctionPackages.lazyPack @Int (error "showcase-stored-function") (error "showcase-stored-input")))
+    observe "imported function keeps ignored fields lazy" (ignoreImported (FunctionPackages.lazyPack @Int (error "showcase-imported-function") (error "showcase-imported-input")))
+  where
+    -- | Apply the imported worker without demanding its result.
+    ignoreImported :: FunctionPackages.FunctionPack Int -> Int
+    ignoreImported (FunctionPackages.FunctionPack f n xs) =
+        const 42 (FunctionSignatures.idCall @Int f n xs)
 
 -- | Open either constructor without sharing their retained field binders.
 alternatives :: IO ()
