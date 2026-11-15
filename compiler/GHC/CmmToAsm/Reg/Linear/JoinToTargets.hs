@@ -248,16 +248,14 @@ joinToTargets_again
                                     text "dest:" <> ppr dest
                                     ) (return ())
                                 -}
-                                -- BUG: instr' jumps to the fixup block
-                                -- wherever instr jumped to dest, but dests
-                                -- still holds dest's later occurrences, a jump
-                                -- table's other entries for it. Each makes the
-                                -- same moves again, into a block nothing jumps
-                                -- to, which gets an edge in the CFG and is laid
-                                -- out and emitted. This costs only code size.
                                 recordFixupBlock block_id fixup_block_id dest
+                                -- instr' jumps to the fixup block wherever
+                                -- instr jumped to dest, so dest's later
+                                -- occurrences in dests, a jump table's other
+                                -- entries for it, make no block
                                 joinToTargets' (block : new_blocks)
-                                               block_id instr' dests
+                                               block_id instr'
+                                               (filter (/= dest) dests)
 
 
 -- | Construct a graph of register\/spill movements.

@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Put common type definitions here to break recursive module dependencies.
@@ -54,8 +53,6 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
 import GHC.CmmToAsm.Reg.Utils
 import GHC.CmmToAsm.Format
-
-data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
 
 -- | Used to store the register assignment on entry to a basic block.
 --      We use this to handle join points, where multiple branch instructions

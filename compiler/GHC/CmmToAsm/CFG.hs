@@ -255,21 +255,15 @@ mkWeightInfo = EdgeInfo AsmCodeGen
 --   If there is no such edge returns the original map.
 adjustEdgeWeight :: CFG -> (EdgeWeight -> EdgeWeight)
                  -> BlockId -> BlockId -> CFG
-adjustEdgeWeight cfg f from to
-  | Just info <- getEdgeInfo from to cfg
-  , !weight <- edgeWeight info
-  , !newWeight <- f weight
-  = addEdge from to (info { edgeWeight = newWeight}) cfg
-  | otherwise = cfg
+adjustEdgeWeight cfg f from to =
+  mapAdjust (mapAdjust (\info -> info { edgeWeight = f (edgeWeight info) }) to)
+            from cfg
 
 -- | Set the weight between the blocks to the given weight.
 --   If there is no such edge returns the original map.
 setEdgeWeight :: CFG -> EdgeWeight
               -> BlockId -> BlockId -> CFG
-setEdgeWeight cfg !weight from to
-  | Just info <- getEdgeInfo from to cfg
-  = addEdge from to (info { edgeWeight = weight}) cfg
-  | otherwise = cfg
+setEdgeWeight cfg !weight from to = adjustEdgeWeight cfg (const weight) from to
 
 
 getCfgNodes :: CFG -> [BlockId]
@@ -577,12 +571,8 @@ updateEdgeWeight f (from, to) cfg
 
 -- from to oldWeight => newWeight
 mapWeights :: (BlockId -> BlockId -> EdgeWeight -> EdgeWeight) -> CFG -> CFG
-mapWeights f cfg =
-  foldl' (\cfg (CfgEdge from to info) ->
-            let oldWeight = edgeWeight info
-                newWeight = f from to oldWeight
-            in addEdge from to (info {edgeWeight = newWeight}) cfg)
-          cfg (infoEdgeList cfg)
+mapWeights f = mapMapWithKey $ \from -> mapMapWithKey $ \to info ->
+  info { edgeWeight = f from to (edgeWeight info) }
 
 
 -- | Insert a block in the control flow between two other blocks.
@@ -653,7 +643,7 @@ addNodesBetween weights m updates =
     unconditional edge towards a block.
   * If branches (regular) - Both sides get the same weight, but on x86-64 the
     instruction selector adds 3 to the weight of a floating-point comparison's
-    false edge (genCondBranch' in GHC.CmmToAsm.X86.CodeGen). If the weights are
+    false edge (genCondBranch in GHC.CmmToAsm.X86.CodeGen). If the weights are
     still equal after optHsPatterns' other adjustments, favourFewerPreds adds
     one to the side with fewer predecessors that could fall through into it, and
     subtracts one from the other side.
@@ -879,17 +869,19 @@ optHsPatterns backs weights info cfg =
     favourFewerPreds :: CFG -> CFG
     favourFewerPreds cfg =
         let
-            revCfg =
-              reverseEdges $ filterEdges
-                              (\_from -> fallthroughTarget)  cfg
+            -- how many edges that could fall through enter each block
+            predCounts :: LabelMap Int
+            predCounts = mapFoldl (\ !m -> mapFoldlWithKey count m) mapEmpty cfg
+            count !m to e
+              | fallthroughTarget to e = mapInsertWith (+) to 1 m
+              | otherwise              = m
 
-            predCount n = length $ getSuccessorEdges revCfg n
+            predCount n = mapFindWithDefault 0 n predCounts
             nodes = getCfgNodes cfg
 
             modifiers :: Int -> Int -> (EdgeWeight, EdgeWeight)
             modifiers preds1 preds2
               | preds1 <  preds2 = ( 1,-1)
-              | preds1 == preds2 = ( 0, 0)
               | otherwise        = (-1, 1)
 
             update :: CFG -> BlockId -> CFG
@@ -899,7 +891,10 @@ optHsPatterns backs weights info cfg =
               , !w2 <- edgeWeight e2
               --Only change the weights if there isn't already a ordering.
               , w1 == w2
-              , (mod1,mod2) <- modifiers (predCount s1) (predCount s2)
+              , preds1 <- predCount s1
+              , preds2 <- predCount s2
+              , preds1 /= preds2
+              , (mod1,mod2) <- modifiers preds1 preds2
               = (\cfg' ->
                   (adjustEdgeWeight cfg' (+mod2) node s2))
                     (adjustEdgeWeight cfg  (+mod1) node s1)

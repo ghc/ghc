@@ -340,11 +340,11 @@ neighbourOverlapp :: Int
 neighbourOverlapp = 2
 
 -- | Maps blocks near the end of a chain to it's chain AND
--- the other blocks near the end.
--- [A,B,C,D,E] Gives entries like (B -> ([A,B], [A,B,C,D,E]))
--- where [A,B] are blocks in the end region of a chain.
+-- the blocks near either end, as getFronts and getEnds give them.
+-- [A,B,C,D,E] Gives entries like (B -> ([A,B], [E,D], [A,B,C,D,E]))
+-- where [A,B] are blocks in the front region of a chain.
 -- This is cheaper then recomputing the ends multiple times.
-type FrontierMap = LabelMap ([BlockId],BlockChain)
+type FrontierMap = LabelMap ([BlockId],[BlockId],BlockChain)
 
 -- | A non empty ordered sequence of basic blocks.
 --   It is suitable for serialization in this order.
@@ -487,15 +487,12 @@ combineNeighbourhood edges chains
         --Build maps from chain ends to chains
         endFrontier, startFrontier :: FrontierMap
         endFrontier =
-            mapFromList $ concatMap (\chain ->
-                                let ends = getEnds chain :: [BlockId]
-                                    entry = (ends,chain)
-                                in map (\x -> (x,entry)) ends ) chains
+            mapFromList $ concatMap (\entry@(_,ends,_) ->
+                                map (\x -> (x,entry)) ends ) entries
         startFrontier =
-            mapFromList $ concatMap (\chain ->
-                                let front = getFronts chain
-                                    entry = (front,chain)
-                                in map (\x -> (x,entry)) front) chains
+            mapFromList $ concatMap (\entry@(front,_,_) ->
+                                map (\x -> (x,entry)) front) entries
+        entries = map (\chain -> (getFronts chain, getEnds chain, chain)) chains
         applyEdges :: [CfgEdge] -> FrontierMap -> FrontierMap -> EdgeSet
                    -> ([BlockChain], EdgeSet)
         applyEdges [] chainEnds _chainFronts combined =
@@ -505,27 +502,28 @@ combineNeighbourhood edges chains
             -- instructions and allocated 0.094% and 0.093% more compiling
             -- !16269's CmmDiamondChain at -O1 and -O2, and nothing more at
             -- -O0, where the chain layout does not run, on GHC 10.1.20261108
-            ([ c | (k, (ends, c)) <- mapToList chainEnds, all (k <=) ends ]
+            ([ c | (k, (_, ends, c)) <- mapToList chainEnds, all (k <=) ends ]
             , combined)
         applyEdges ((CfgEdge from to _w):edges) chainEnds chainFronts combined
-            | Just (c1_e,c1) <- mapLookup from chainEnds
-            , Just (c2_f,c2) <- mapLookup to chainFronts
+            | Just (c1_f,c1_e,c1) <- mapLookup from chainEnds
+            , Just (c2_f,c2_e,c2) <- mapLookup to chainFronts
             , c1 /= c2 -- Avoid trying to concat a chain with itself.
             = let newChain = chainConcat c1 c2
-                  newChainFrontier = getFronts newChain
-                  newChainEnds = getEnds newChain
+                  -- from its parts': getFronts and getEnds of newChain walked
+                  -- down c1's left and c2's right spine, which each fusion
+                  -- onto c1's end or c2's front deepens
+                  newChainFrontier = take neighbourOverlapp (c1_f ++ c2_f)
+                  newChainEnds = take neighbourOverlapp (c2_e ++ c1_e)
+                  entry = (newChainFrontier,newChainEnds,newChain) --let bound to ensure sharing
                   newFronts :: FrontierMap
                   newFronts =
                     let withoutOld =
-                            foldl' (\m b -> mapDelete b m :: FrontierMap) chainFronts (c2_f ++ getFronts c1)
-                        entry =
-                            (newChainFrontier,newChain) --let bound to ensure sharing
+                            foldl' (\m b -> mapDelete b m :: FrontierMap) chainFronts (c2_f ++ c1_f)
                     in foldl' (\m x -> mapInsert x entry m)
                               withoutOld newChainFrontier
 
                   newEnds =
-                    let withoutOld = foldl' (\m b -> mapDelete b m) chainEnds (c1_e ++ getEnds c2)
-                        entry = (newChainEnds,newChain) --let bound to ensure sharing
+                    let withoutOld = foldl' (\m b -> mapDelete b m) chainEnds (c1_e ++ c2_e)
                     in foldl' (\m x -> mapInsert x entry m)
                               withoutOld newChainEnds
               in
@@ -538,7 +536,7 @@ combineNeighbourhood edges chains
                 --   text "newChain" <+> ppr newChain $$
                 --   text "newChainFrontier" <+> ppr newChainFrontier $$
                 --   text "newChainEnds" <+> ppr newChainEnds $$
-                --   text "drop" <+> ppr ((c2_f ++ getFronts c1) ++ (c1_e ++ getEnds c2)) $$
+                --   text "drop" <+> ppr ((c2_f ++ c1_f) ++ (c1_e ++ c2_e)) $$
 
                 --   text "after" $$
                 --   text "fronts" <+> ppr newFronts $$
@@ -705,8 +703,8 @@ buildChains info cfg edges blocks
             toChain <- readSTRef toRef
             let newChain = chainConcat fromChain toChain
             ref <- newSTRef newChain
-            let start = Partial.head $ takeL 1 newChain
-            let end = Partial.head $ takeR 1 newChain
+            let start = headOL (chainBlocks newChain)
+            let end = lastOL (chainBlocks newChain)
             -- chains <- sequence $ mapMap readSTRef chainStarts
             -- pprTraceM "pre-fuse chains:" $ ppr chains
             buildNext
@@ -942,8 +940,12 @@ sequenceChain  info weights  hasBacks blocks@((BasicBlock entry _):_) =
             -- builds if something slips through.
             assert (null unplaced) $
             --pprTraceIt "placedBlocks" $
-            -- ++ [] is still kinda expensive
-            if null unplaced then blockList else blockList ++ unplaced
+            -- a blockList as long as blockMap holds every block unless it names
+            -- one twice or one not in blockMap, and such a list fails later, in
+            -- the assembler or in getBlock, with the unplaced blocks appended
+            -- or without
+            if lengthIs blockList (mapSize blockMap) then blockList
+              else blockList ++ unplaced
         getBlock bid = expectJust $ mapLookup bid blockMap
     in
         --Assert we placed all blocks given as input

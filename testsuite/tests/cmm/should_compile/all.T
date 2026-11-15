@@ -40,6 +40,13 @@ test('T27800', [cmm_src, only_ways(['optasm']), unless(arch('x86_64'), skip),
      compile, ['-no-hs-main -ddump-asm'])
 test('T8327', [cmm_src, only_ways(['optasm']), grep_errmsg(r'(1234567)', [1])],
      compile, ['-no-hs-main -ddump-cmm'])
+# A jump table naming one target in several entries, where the target needs a
+# fixup block: the linear allocator made a block for each entry, all but the
+# first unreachable (linearAlloc in -ddump-cfg-weights must list at most one;
+# x86-64)
+test('JumpTableFixup', [cmm_src, only_ways(['optasm']), unless(arch('x86_64'), skip),
+                        grep_errmsg(r'^linearAlloc: \[\([^()]*\)(, \([^()]*\))', [1])],
+     compile, ['-no-hs-main -ddump-cfg-weights'])
 test('CmmRegOffW16', [cmm_src, only_ways(['optasm']), unless(arch('x86_64'), skip)], compile, ['-no-hs-main'])
 # A test whose true edge -fasm-shortcutting moves to a block with a smaller
 # label than its false target: static prediction took that edge for the false

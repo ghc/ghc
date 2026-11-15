@@ -1,0 +1,30 @@
+#include "Cmm.h"
+
+// A jump table names join in three entries, and join is jumped to first from
+// the likely branch, with x in another register than before the table, so the
+// table's way to join needs a fixup block.  The linear register allocator made
+// one for each of the three entries: the first entry's block took all three,
+// and the other two were copies that nothing jumps to, each laid out, emitted
+// and given an edge from the table's block in the CFG.  The test checks the
+// fixup blocks the allocator records (linearAlloc in -ddump-cfg-weights), of
+// which there must be at most one.
+jtfix (W_ a, W_ b)
+{
+    W_ x, r;
+    if (a > 1000) (likely: True) {
+        x = b + 7;
+        goto join;
+    }
+    x = b + 9;
+    (r) = ccall jtfix_callee(a);
+    switch [0 .. 7] (r) {
+        case 0, 1, 5: { goto join; }
+        case 2: { return (x + 1); }
+        case 3: { return (x + 2); }
+        case 4: { return (x + 3); }
+        case 6: { return (x + 4); }
+        case 7: { return (x + 5); }
+    }
+join:
+    return (x * 3 + a);
+}

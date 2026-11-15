@@ -1173,7 +1173,7 @@ generateJumpTables ncgImpl xs = concatMap f xs
 -- offer terribly great benefits.
 
 shortcutBranches
-        :: forall statics instr jumpDest. (Outputable jumpDest)
+        :: forall statics instr jumpDest. (Outputable jumpDest, Instruction instr)
         => NCGConfig
         -> NcgImpl statics instr jumpDest
         -> [NatCmmDecl statics instr]
@@ -1184,7 +1184,8 @@ shortcutBranches config ncgImpl tops weights
   | ncgEnableShortcutting config
     -- See Note [No asm-shortcutting on Darwin]
   , not $ osMachOTarget $ platformOS $ ncgPlatform config
-  = ( map (apply_mapping ncgImpl mapping) tops'
+  = ( if mapNull mapping then tops'
+                         else map (apply_mapping ncgImpl mapping) tops'
     , shortcutWeightMap mappingBid <$!> weights )
   | otherwise
   = (tops, weights)
@@ -1193,8 +1194,8 @@ shortcutBranches config ncgImpl tops weights
     mapping = mapUnions mappings :: LabelMap jumpDest
     mappingBid = fmap (getJumpDestBlockId ncgImpl) mapping
 
-build_mapping :: forall instr t d statics jumpDest.
-                 NcgImpl statics instr jumpDest
+build_mapping :: forall instr t d statics jumpDest. Instruction instr
+              => NcgImpl statics instr jumpDest
               -> GenCmmDecl d (LabelMap t) (ListGraph instr)
               -> (GenCmmDecl d (LabelMap t) (ListGraph instr)
                  ,LabelMap jumpDest)
@@ -1209,26 +1210,37 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     -- find all the blocks that just consist of a jump that can be
     -- shorted.
     -- Don't completely eliminate loops here -- that can leave a dangling jump!
-    -- BUG: under -g a block that holds only its jump also holds the location
-    -- and unwinding information that -g adds, so it is kept where without -g it
-    -- is shorted: the code jumps through it, and on x86-64 static prediction
-    -- and block layout get another CFG than without -g. This costs only speed
-    -- and code size, under -g and -fasm-shortcutting, on x86 and x86-64, not on
-    -- Darwin.
+    -- BUG: jumpOnly looks past meta instructions only where ncgDwarfUnwindings
+    -- holds, on ELF targets. Elsewhere, Windows among them, a block that holds
+    -- only its jump and the unwinding information that -g adds is kept under -g
+    -- where without -g it is shorted: the code jumps through it, and on x86-64
+    -- static prediction and block layout get another CFG than without -g. This
+    -- costs only speed and code size, under -g and -fasm-shortcutting, on x86
+    -- and x86-64, not on Darwin.
     shortcut_blocks :: [(BlockId, jumpDest)]
     (_, shortcut_blocks, others) =
         foldl' split (setEmpty :: LabelSet, [], []) blocks
-    split (s, shortcut_blocks, others) b@(BasicBlock id [insn])
-        | Just jd <- canShortcut ncgImpl insn
-        , Just dest <- getJumpDestBlockId ncgImpl jd
+    split (s, shortcut_blocks, others) b@(BasicBlock id insns)
+        | Just insn <- jumpOnly insns
+        , Just jd <- canShortcut ncgImpl insn
         , not (has_info id)
-        , (setMember dest s) || dest == id -- loop checks
-        = (s, shortcut_blocks, b : others)
-    split (s, shortcut_blocks, others) (BasicBlock id [insn])
-        | Just dest <- canShortcut ncgImpl insn
-        , not (has_info id)
-        = (setInsert id s, (id,dest) : shortcut_blocks, others)
+        = case getJumpDestBlockId ncgImpl jd of
+            Just dest
+              | (setMember dest s) || dest == id -- loop checks
+              -> (s, shortcut_blocks, b : others)
+            _ -> (setInsert id s, (id,jd) : shortcut_blocks, others)
     split (s, shortcut_blocks, others) other = (s, shortcut_blocks, other : others)
+
+    -- the last instruction of a block whose others are meta instructions, which
+    -- emit no code, as the location and the unwinding information that -g adds:
+    -- so that a block is shorted with -g where it is without. They are looked
+    -- for only where ncgDwarfUnwindings holds, under -g on ELF targets: without
+    -- -g the test would only cost compile time, and on other targets the BUG
+    -- above stands.
+    jumpOnly [i]                             = Just i
+    jumpOnly (i : is) | dwarf, isMetaInstr i = jumpOnly is
+    jumpOnly _                               = Nothing
+    dwarf = ncgDwarfUnwindings (ncgConfig ncgImpl)
 
     -- do not eliminate blocks that have an info table
     has_info l = mapMember l info

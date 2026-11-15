@@ -1399,7 +1399,7 @@ raInsn new_instrs id !pos (LiveInstr (Instr instr) (Just live)) rest
               RegReal rr -> setAssigR (addToUFM assig dst (Loc (InReg rr) fmt))
                 -- if src is a fixed reg, then we just map dest to this
                 -- reg in the assignment.  src must be an allocatable reg,
-                -- otherwise it wouldn't be in r_dying.
+                -- otherwise it wouldn't be in liveDieRead.
               _virt -> case lookupUFM assig src of
                 -- TODO: a virtual src gives dst its location, whatever dst's
                 -- preferences: firstFreeInOrder makes up for that only where
@@ -1410,12 +1410,6 @@ raInsn new_instrs id !pos (LiveInstr (Instr instr) (Just live)) rest
                            setAssigR (addToUFM (delFromUFM assig src) dst loc)
 
            -- we have eliminated this instruction
-          {-
-          freeregs <- getFreeRegsR
-          assig <- getAssigR
-          pprTrace "raInsn" (text "ELIMINATED: " <> docToSDoc (pprInstr instr)
-                        $$ ppr r_dying <+> ppr w_dying $$ text (show freeregs) $$ ppr assig) $ do
-          -}
            return (new_instrs, [])
 
         _ -> genRaInsn new_instrs id pos instr rest live

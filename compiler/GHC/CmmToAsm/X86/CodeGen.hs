@@ -4236,15 +4236,7 @@ genCondBranch
     -> CmmExpr      -- the condition on which to branch
     -> NatM InstrBlock -- Instructions
 
-genCondBranch bid id false expr = do
-  is32Bit <- is32BitPlatform
-  genCondBranch' is32Bit bid id false expr
-
--- | We return the instructions generated.
-genCondBranch' :: Bool -> BlockId -> BlockId -> BlockId -> CmmExpr
-               -> NatM InstrBlock
-
-genCondBranch' _ bid id false bool = do
+genCondBranch bid id false bool = do
   CondCode is_float cond cond_code <- getCondCode bool
   if not is_float
     then
