@@ -42,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M48 snapshot2 passes both-stage builds, selected API/CLI/public17, legacy8 and final9; registered results are 39 cases, 34 skips and five expected passes |
+| Compiler validation | M49 snapshot1 passes both-stage builds, API1, the selected source matrix, public21, legacy8, constructor11 and final9; registered results are 39 cases, 34 skips and five expected passes |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -78,7 +78,8 @@ Last updated: 2026-11-15.
 | Opaque call indices | Source cases on `f n`, `f Z` and `f (S n)` refine the exact whole call; nested constructor fields, captures and demand controls pass both stages |
 | Signed call beta | Complete plain scalar endofunction signatures expose immediate checked lambda beta; actual assigned Many, binder identity and original call execution are preserved; Strict keeps its ordinary fallback |
 | Function-valued retained binders | Snapshot6 passes both-stage source14, negative10 and constructor11 controls, plus legacy8 and final9; canonical audit/publication records are separate |
-| Next task | Complete M48 artifact audit/publication; C1/C2 and the broader roadmap remain open |
+| Constructed worker activation | Known local retained workers accept scalar constructor trees during metadata discovery; ordinary application and row evidence checks remain unchanged |
+| Next task | Multi-constructor retained package patterns after M49 audit/publication; C1/C2 and the broader roadmap remain open |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -4139,11 +4140,77 @@ from the tested incomplete case. The duplicate control stays in its separate
 CLI to avoid an expected warning in the quiet fixture. The two independent negative clients add no fixture assertions.
 Raw scope36 remains inherited M47 evidence; it was not rerun for M48.
 
-All selected compiler/runtime validation passes. Artifact audit and publication
-remain separate and pending. These focused checks do not cover the full GHC
-suite. No broader inference, evaluation or dependent-Haskell completion is
-claimed.
+All selected M48 compiler/runtime validation, freeze and independent audit pass.
+Publication is complete at `3e6f9aa35fba64e9276433e490351d426bac0973`.
+The canonical audit SHA256 is
+`953f58351b6ed84eaaccf0a93e957fe7fc7e291ac7bfafef0161cb3516d16aa8`.
+It records 65 manifests and 35457 integrity checks. These focused checks do not
+cover the full GHC suite or complete dependent Haskell.
 C1 and C2 remain open. See the
 [contract](CORE.md#known-worker-case-activation),
 [plan](PLAN.md#m48-known-worker-case-activation) and
 [prior-art comparison](REFERENCES.md#known-worker-case-activation-prior-art).
+
+
+## M49: constructed-worker case activation
+
+M49 extends the M48 metadata query to scalar constructor trees. A local worker
+can expose the exact call `f (S n)` or `f (S (S n))` without a branch payload
+annotation. This local complete-signature group uses the existing bridge:
+
+```haskell
+observeConstructedCall :: foreach (f :: Nat -> Nat) -> foreach (n :: Nat) -> [Int]
+observeConstructedCall f n = case f (S n) of
+    Z -> toList (idCall f (S n) VNil)
+    S k -> toList (idCall f (S n) (VCons 42 (replicateNative @Int k 42)))
+```
+
+The query accepts resolved `HsVar`, `HsApp` and `HsPar` constructor trees.
+It requires a real monomorphic constructor at the expected scalar domain.
+It checks each child against its declared field domain and validates the
+reconstructed metadata with `exprToNativeIndex`. `applyTypeToArgs` opens the
+known leading `DepFunTy` binders. Function operands remain eligible bare local
+Vars. Complete rows, quotation boundaries and whole-tau residual checks keep
+their M48 behavior. The actual source application is still checked once.
+
+The change affects Match only. App, Core, evidence, solver, codecs and backend
+rules do not change. M47's ordinary motive equality and row Given supply the
+same branch evidence. A constant function can ignore a bottom predecessor;
+constructor-tree discovery neither executes the call nor makes it injective.
+
+Snapshot1 selects compiler `a90757e6d9adfd4e7500672a715bf939c65371bb`
+and source `4ef6ba241ed13dc195b60d1b5fcbfa0bcbd5681c`. It records 83 compiler
+inputs and 102 source paths.
+
+| Evidence | Measured result |
+| --- | --- |
+| Bootstrap1 | Passes in 25.35s |
+| Self-host1 | Passes in 5m48s, peak 5816MiB under 16GiB, swap0 |
+| Selected API1 | Unit/CoreRun pass in 5.679607153s/17.552677284s; exact 1/37 goldens and eight new quiet values |
+| API1 post-build comparison | Both 304-entry input maps remain unchanged; each contains zero Stage1 paths |
+| Constructed source CLI | Both stages emit 1/3/4/0 |
+| Nested and demand CLI | Both stages emit 2/4/5/0 and 0/0 respectively |
+| Ordinary source CLI | Both stages preserve 42/7/42 |
+| Wrong constructed/bare keys | Both modules reject with located GHC-05617 in both stages; compile-only, no runtime |
+| Public example | Both stages emit all 21 expected lines: the unchanged old17 prefix and independent 1/3/4/0 appendix |
+| Legacy8 and constructor11 | Legacy8 passes; all eleven positive constructor controls pass in each stage |
+| Final9 and registered run | Two own API1 reuses and seven launches pass; both-stage raw/public106 and packed562 pass; registered results are 39 cases, 34 skips and five expected passes, with zero unexpected/framework failures or warnings |
+
+The wrong-constructed payload is at line25 column83. It requires `Z ~ f (S m)`
+under the unrelated Given `Z ~ f (S n)`. The wrong-bare payload is at line25
+column79 and requires `Z ~ f n` under `Z ~ f (S n)`. Relevant bindings can still
+print a generated `co :: call_motive ~ f (S n)`. The measured source locations
+and contexts are retained; M49 does not implement the proposed display fix.
+
+The eight quiet values and standalone CLI programs have separate scopes.
+The inherited 243 package/322 total rejection programs and 95 quiet source
+controls keep their existing denominator. M48 duplicate and quotation checks,
+and the transitive M47 utility36 evidence, are inherited rather than rerun.
+No source41, known41, prior64, TC-metadata or full-suite rerun is claimed.
+
+Freeze and independent audit must pass before publication. The next substantial
+source candidate is multi-constructor retained package patterns. Both pattern
+checking and constructor-family desugaring need a coordinated change. R22,
+C1 and C2 remain open. See [the contract](CORE.md#constructed-worker-case-activation),
+[plan](PLAN.md#m49-constructed-worker-case-activation) and
+[prior art](REFERENCES.md#constructed-worker-case-activation-prior-art).

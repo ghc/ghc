@@ -3262,3 +3262,30 @@ do not constitute a full GHC suite run.
 This step adds no paper, PDF, full-file reading, Agda execution or preservation
 claim. The canonical ledger remains seven works and nine PDFs. Earlier selected
 source identities and reading limits remain in the existing Agda records.
+
+
+## Constructed-worker case activation: prior art
+
+M49 reuses the pinned Agda v2.8.0
+[Application 774–808](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+and [With 101–173](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/With.hs#L101-L173)
+readings. Application checks an argument and substitutes the codomain. With
+constructs the helper's generalized context. Their file blobs remain
+`82ba94ac864d19b947d4c92b9af252b0fe81347a` and
+`fb84d352f3c6b2e786a0c095c74c5bee15e533cf` respectively. The existing
+[remembered-equality comparison](#remembering-an-abstracted-call-prior-art)
+explains why later worker instantiation can use the original call relation.
+
+GHC's new query only reconstructs metadata from a known local worker and
+resolved monomorphic constructor trees. Expected domains, the existing scalar
+converter and exact call identity constrain this discovery. Normal checking
+still handles values and usage; ordinary motive/row Given evidence handles
+transport. Agda's contextual inference does not specify this bounded trigger,
+Haskell demand, evidence liveness or FC lowering.
+
+Both builds, selected API1, both-stage source/public21 and final9 checks pass.
+Artifact checks are tracked in
+[the current checkpoint](README.md#m49-constructed-worker-case-activation).
+GHC-05617 points at each wrong payload, but relevant bindings can still show a
+generated `call_motive` name. No new paper, PDF, full-file reading, Agda execution
+or theorem claim is added. The ledger remains seven works and nine PDFs.

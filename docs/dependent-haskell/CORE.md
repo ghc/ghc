@@ -1935,3 +1935,35 @@ failures or warnings. Artifact audit and publication remain separate. These
 focused checks do not cover the full GHC suite. C1 and C2 stay open.
 See [the plan](PLAN.md#m48-known-worker-case-activation) and
 [the prior art](REFERENCES.md#known-worker-case-activation-prior-art).
+
+
+## Constructed-worker case activation
+
+M49 extends the metadata-only M48 trigger with scalar constructor trees.
+`named_application` reads the known local worker's leading `DepFunTy` binders.
+For a scalar binder, `scalar_argument` reconstructs only resolved `HsVar`,
+`HsApp` and `HsPar` forms. A constructor must be a real monomorphic DataCon
+without erased binders, equality specifications or constraints. Its result
+must match the expected scalar domain. Each field is checked recursively
+against the declared field domain. `exprToNativeIndex` validates the tree
+before `applyTypeToArgs` substitutes it into the existing worker type.
+
+Function operands retain the eligible bare-local-Var policy. The query does
+not infer types, allocate choices, collect usage or run source expressions.
+Complete constructor rows, whole-tau residuals, quotation boundaries and exact
+free-call matching keep their existing roles. `f n`, `f (S n)` and `f (S m)`
+remain distinct keys. No inverse-call or injectivity rule is added.
+
+Actual source arguments are checked once by the existing path. M47's ordinary
+motive equality and row Given still supply evidence. App, Core, solver, codecs
+and backend rules do not change. Constant-head and nested-index controls check
+that metadata discovery does not force a predecessor.
+
+The selected source matrix and public21 pass both stages. Eight new quiet
+values retain the old 1/37 goldens. Wrong-key payloads reject with GHC-05617 at
+source locations; relevant bindings can still expose a generated `call_motive`
+name. Final9 passes. Artifact status is recorded in the
+[current checkpoint](README.md#m49-constructed-worker-case-activation).
+Note [Source opaque call refinement] in GHC.Tc.Gen.Match owns the trigger.
+C1 and C2 remain open. See [the plan](PLAN.md#m49-constructed-worker-case-activation)
+and [prior art](REFERENCES.md#constructed-worker-case-activation-prior-art).

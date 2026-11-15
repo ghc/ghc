@@ -3210,8 +3210,10 @@ Wanted/Given solver.
   Inherited raw/public106 and packed562 pass in both stages. The registered
   run has 39 cases, 34 skips and five expected passes, with zero unexpected/
   framework failures or warnings.
-- [ ] Complete the separate artifact audit and publication. Infer no counters
-  or hashes from the compiler/runtime passes.
+- [x] Complete the separate M48 freeze, independent audit and publication at
+  `3e6f9aa35fba64e9276433e490351d426bac0973`. The canonical audit SHA256 is
+  `953f58351b6ed84eaaccf0a93e957fe7fc7e291ac7bfafef0161cb3516d16aa8`.
+  It records 65 manifests and 35457 integrity checks.
 
 Snapshot2 selects compiler `439fbf6396` and source `8480d83c98`, with 83
 compiler inputs and 102 source paths. The compiler change is confined to Match.
@@ -3225,3 +3227,73 @@ Complete signatures remain required. No App/Core form, evidence rule, solver
 rule, backend transformation or evaluator is added. C1/C2 and the broader
 roadmap remain open. See [the contract](CORE.md#known-worker-case-activation)
 and [the prior art](REFERENCES.md#known-worker-case-activation-prior-art).
+
+
+### M49: constructed-worker case activation
+
+Extend only Match's known-worker metadata trigger. Keep actual application
+checking and ordinary motive/row Given evidence unchanged.
+
+- [x] Reconstruct resolved `HsVar`/`HsApp`/`HsPar` scalar constructor trees.
+  Require real monomorphic constructors with no erased binders, equalities or
+  contexts. Check the expected result domain and each field domain. Validate
+  the resulting metadata with `exprToNativeIndex`.
+- [x] Use the known leading `DepFunTy` telescope and `applyTypeToArgs`.
+  Keep function actuals as eligible bare local Vars. Preserve the complete-row,
+  whole-tau and quotation gates, and the existing activation triggers.
+- [x] Add no source value recheck, usage accounting, meta assignment or splice
+  execution to discovery. Keep App/Core/evidence/solver/backend/codecs unchanged.
+- [x] Preserve the M48 baseline: the constructed client rejects normally with
+  GHC-83605/GHC-83865 and has no runtime result. Its ordinary client runs
+  42/7/42. Keep every attempt and source fingerprint.
+- [x] Pass bootstrap1 in 25.35s and self-host1 in 5m48s. Self-host peak is
+  5816MiB under 16GiB, swap0. Snapshot1 records compiler `a90757e6d9` and source
+  `4ef6ba241e`, with 83 compiler inputs and 102 source paths.
+- [x] Pass API1 Unit/CoreRun in 5.679607153s/17.552677284s. Preserve exact
+  1/37 goldens. Add eight quiet values: 1/3/4/0 for one constructor layer and
+  2/4/5/0 for two layers. Post-build input maps are unchanged, with 304 entries
+  each and zero Stage1 paths.
+- [x] Pass both-stage constructed4, nested4, demand2 and ordinary3 source
+  programs. Their outputs are 1/3/4/0, 2/4/5/0, 0/0 and 42/7/42 respectively.
+- [x] Reject the two independent wrong-key clients with located GHC-05617 in
+  both stages. Keep them compile-only. Check distinct constructed keys and a
+  bare key against the original `f (S n)` branch relation. Record the known
+  generated `call_motive` name in relevant bindings as a rendering limitation.
+- [x] Pass public21 in both stages. Preserve its exact old17 byte prefix and
+  independently authored appendix 1/3/4/0. The constant-head case ignores
+  bottom `n` beneath `S n`.
+- [x] Pass selected legacy8 and constructor11 in both stages.
+- [x] Pass final9 with two own API1 reuses and seven launches. Both-stage
+  raw/public106 and packed562 pass. The registered run has 39 cases, 34 skips
+  and five expected passes, with zero unexpected/framework failures or warnings.
+- [ ] Freeze the exact evidence, pass the independent audit and publish the
+  canonical record. Infer no hashes or results from prepared helpers.
+
+Keep the eight new values separate from the inherited 243/322/95 source corpus
+and the overlapping CLI programs. Inherit M48 duplicate/quotation controls and
+transitive M47 utility36 evidence. Do not claim a new utility36, source41,
+known41, prior64, TC-metadata or full GHC suite run. C1 and C2 remain open.
+See [the contract](CORE.md#constructed-worker-case-activation) and
+[prior art](REFERENCES.md#constructed-worker-case-activation-prior-art).
+
+### Next source candidate: multi-constructor retained packages
+
+This candidate is unimplemented. Specify a package with two ordinary parent
+constructors before changing either gate. The existing retained-field storage
+is an ADT facility; R22's first-class existential task stays open.
+
+- [ ] Review `tcRetainedDataConPat` in `GHC.Tc.Gen.Pat`. It currently requires
+  exactly one constructor in the parent type. Define field/evidence scope for
+  each constructor and each row before removing that restriction.
+- [ ] Review `matchConFamily` in `GHC.HsToCore.Match.Constructor`. Its retained
+  path currently rejects other constructor groups. Preserve row failure,
+  clause order and actual field Ids across every constructor group.
+- [ ] Check PMC coverage, incomplete matches, per-branch index/proof escape,
+  declaration metadata and imports from actual interfaces. Test both constructor
+  orders and an ordinary constructor beside a retained-field constructor.
+- [ ] Check outer-bottom demand, selected and unselected payloads, lazy fields,
+  guards and fallback rows through actual machine code. Keep linear, lazy and
+  let-pattern restrictions unless a separate checked change admits them.
+
+This needs coordinated pattern checking and desugaring. A typechecker-only
+change cannot establish the source contract. Keep full R22, C1 and C2 open.

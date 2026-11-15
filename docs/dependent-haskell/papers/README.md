@@ -389,3 +389,18 @@ Self-hosting, selected both-stage source controls and public17 pass.
 Legacy, constructor, final9 and registered checks pass. Artifact audit and
 publication remain separate. These focused checks do not establish a theorem
 or a full GHC suite result. See [the source comparison](../REFERENCES.md#known-worker-case-activation-prior-art).
+
+
+## M49 constructed-worker activation
+
+M49 reuses the same selected Agda Application 774–808, With 101–173 and
+remembered-equality readings. No new paper, PDF or full-reading claim is added.
+The canonical manifest remains seven works and nine PDFs.
+
+GHC reads known worker metadata and reconstructs scalar constructor trees at
+expected domains. Ordinary checking and motive/row Given evidence retain their
+roles. This adds no App/Core/solver or backend rule. Both builds, selected API1,
+the source matrix, public21 and final9 pass. Artifact checks are recorded in
+[the current checkpoint](../README.md#m49-constructed-worker-case-activation).
+These focused results do not establish a theorem or full GHC suite result.
+See [the source comparison](../REFERENCES.md#constructed-worker-case-activation-prior-art).

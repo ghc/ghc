@@ -254,7 +254,15 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   phases pass. Both stages preserve raw/public106 and packed562; registered
   results are 39 cases, 34 skips and five expected passes, with no unexpected/
   framework failures or warnings. Artifact audit and publication remain separate. This changes no Core, evidence,
-  solver or backend rule. C1 and C2 remain open.
+  solver or backend rule. M48 is published at `3e6f9aa35f`, with canonical
+  audit `953f58351b6ed84eaaccf0a93e957fe7fc7e291ac7bfafef0161cb3516d16aa8`.
+  M49 extends the metadata query to resolved scalar constructor trees, using
+  expected field domains and the existing scalar converter. Function operands
+  stay bare local Vars. The selected source matrix and public21 pass both stages;
+  legacy8, constructor11 and final9 pass. Both-stage raw/public106 and packed562
+  pass. The registered run has 39 cases, 34 skips and five expected passes,
+  with zero unexpected/framework failures or warnings. Artifact checks remain
+  separate. No Core/App/solver/backend rule changes. C1 and C2 remain open.
 - [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
   release. Broaden the documented static subset and supported domains. Implement
   invisible retained binders and their explicit `@` overrides. Reuse inherited
@@ -266,6 +274,11 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   but specify first-class formation, introduction, elimination, scope, and
   erasure separately. Existing `PackVec` is the execution baseline. Keep erased
   `exists` and retained `some` distinct. Advances `R04` and `R02`.
+  The next bounded source candidate is multi-constructor retained package
+  patterns. Both Pat's one-parent-constructor gate and constructor-family
+  desugaring need a coordinated change. Check branch scope, row failure, PMC,
+  interface imports and demand before admission. This candidate is unimplemented
+  and does not close R22, C1 or C2.
 - [ ] **E1: Specify and implement closed evaluation.** Depends on a typed
   representation from C1 and an explicit compile-time evaluation boundary.
   Select the smallest closed pure expression subset. Specify constraint,
