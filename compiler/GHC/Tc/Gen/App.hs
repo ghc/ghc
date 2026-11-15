@@ -1498,7 +1498,7 @@ tcRetainedArg domain arg
     resolve_app env expected (L loc (HsLam _ LamSingle matches)) arg
       | [L _ Match { m_pats = L _ [L _ (VarPat _ lname)]
                    , m_grhss = GRHSs { grhssGRHSs = grhss
-                                     , grhssLocalBinds = EmptyLocalBinds _ } }]
+                                     , grhssLocalBinds = L _ (EmptyLocalBinds _) } }]
           <- unLoc (mg_alts matches)
       , [L _ (GRHS _ [] body)] <- NE.toList grhss
       = setSrcSpanA loc $
