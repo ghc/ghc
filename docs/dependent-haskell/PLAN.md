@@ -2239,7 +2239,7 @@ subtotals omitted that control.
 
 ### M36: native worker arguments after full application
 
-`withQ (error ...) f` still rejects at `f` with GHC-91028. After both arguments
+Before M36, `withQ (error ...) f` rejects at `f` with GHC-91028. After both arguments
 are consumed, the result `QPi` does not determine the erased `value` parameter.
 The partial form has expected type `QPi -> QPi` and determines that parameter.
 Keep this difference as the measured baseline.
@@ -2260,20 +2260,55 @@ template escape. Skip callback inference and fresh ordinary parameters in
 this mode. Keep every inferred cache entry if matching fails. Use the existing
 ordered plan for index parameters, nested contexts and leading VTA.
 
-- [ ] Pin the scoped argument-checking comparison in Agda and the existing
+- [x] Pin the scoped argument-checking comparison in Agda and the existing
   GHC argument-cache rules. Do not transfer Agda's general Pi-meta policy.
-- [ ] Add a cache-producing `NoQL` route for a native worker. Select erased
+- [x] Add a cache-producing `NoQL` route for a native worker. Select erased
   parameters only from independently inferable named arguments whose formal
   domains contain no native syntax. Check the native-template proof argument
   after substitution. Infer each selected argument once.
-- [ ] Preserve complete choices, kinds, runtime scope, exact cached domains,
+- [x] Preserve complete choices, kinds, runtime scope, exact cached domains,
   original instantiation, final subsumption and failure-cache ownership. Keep
   native mutable-meta assignment and general native Quick Look disabled.
   Do not infer inside `tcRetainedWorkerResultMatch`: it cannot return caches
   and also runs after visible type application.
-- [ ] Check full and partial caller behavior, proof demand and order, forged
+- [x] Check full and partial caller behavior, proof demand and order, forged
   witnesses, conflicting arguments, scope escape, visible type application
   and once-only cache use. Run both compiler stages and focused regressions.
+
+Both compiler stages build and pass the 52-client source matrix: 27 compile
+and 25 reject or remain unsupported at 35 located diagnostic envelopes.
+A separate closed-proof control reports GHC-83605. Named proofs come through
+an ordinary `ProofBox` pattern. Consecutive forall/context groups before the
+first visible arrow pass, including joint Nat and Type choices. A forall
+after a visible arrow remains outside the collected telescope. The failure
+trace records one elaboration of the cached `prefixProbe` argument.
+
+Both stages pass 57 runtime observations and the prior 562 observations.
+The previous container matrix has one changed admission: the full bottom-proof
+call now compiles. Its other 25 rows keep their codes and locations. All 26
+earlier qualified-Pi cases are unchanged. The existing API fixture passes with
+232 package and 312 total rejection programs and 61 quiet positives. Its
+37-line golden is unchanged. All five focused registered tests pass across
+39 cases with 34 skips and no framework warnings. The full GHC suite and the
+full earlier standalone rejection corpus were not run.
+
+### M37: applications with ImpredicativeTypes
+
+All four new application controls with `ImpredicativeTypes` report GHC-83605.
+This includes explicit `withQ @QPi`, an incoming named proof, and an already
+monomorphic `withKnownQ` head. Their source formation succeeds, but the applied
+Quick Look route is blocked. Preserve these measured sources before changing
+that route. A qualified Pi type argument without `ImpredicativeTypes` reports
+the separate source-formation error GHC-91510.
+
+- [ ] Pin the Quick Look and Agda precedents for applications whose native
+  types are already fixed. Identify when ordinary instantiation can still
+  create a QL variable.
+- [ ] Choose a narrow route that keeps immutable choices, original evidence,
+  final checking and failure-cache ownership. Keep general native Quick Look
+  and mutable native-meta assignment blocked.
+- [ ] Run the four preserved controls with both compiler stages. Check proof
+  demand, function identity and the existing polymorphic-head guards.
 
 ## Further work
 

@@ -36,14 +36,14 @@ executable.
 It copies interfaces between compilation directories and enables Core and
 STG Lint. It runs at `-O0`.
 
-The executable checks 48 observations. Four finite lengths come through
+The executable checks 57 observations. Finite lengths come through
 independent `readIORef` calls. Other checks cover ignored and demanded bottom,
 cyclic indices, partial application, payload sharing and six function
 `StableName` comparisons. Six dictionary checks use the single-method
 `Demand` class with `GHC.Exts.withDict`. They distinguish vector shape from
 method demand. They do not inject a bottom global `Eq Int` dictionary.
 
-Both compiler stages pass all 48 observations. The identity results apply to
+Both compiler stages pass all 57 observations. The identity results apply to
 these programs and build settings.
 The full optimizer and GHC test suite remain outside this validation.
 
@@ -69,10 +69,24 @@ complete `fixedQ` type for the pattern checks. This avoids an applied native
 Quick Look inference path. No case or eta expansion replaces the newtype
 patterns.
 
-Fully applied `withQ (error ...) f` remains unsupported when the result alone
-cannot determine the erased `value` parameter. The compiler reports GHC-91028
-at `f`. The partial helper above has enough expected information. General
-native Quick Look and mutable native-meta assignment remain separate work.
+Full applications now select the erased parameter from the known argument:
+
+```haskell
+viaFull :: QPi -> QPi
+viaFull f = withQ Refl f
+```
+
+The result alone does not determine `value`. The compiler infers `f` once,
+selects `value := QPi`, then checks the proof. The added runtime checks call
+`withQ Refl original n` and `exposeQ original n` directly at four IORef-fed
+lengths. Ignoring the result leaves both a bottom proof and function unforced.
+Demanding the result checks the proof before the function. The ignored-proof
+worker also preserves the tested function identity.
+
+This argument route uses `NoQL`. Qualified Pi type arguments still need
+`ImpredicativeTypes`, whose applied native Quick Look path reports GHC-83605.
+General native Quick Look and mutable native-meta assignment remain separate
+work.
 
 See the [typing rules](../../CORE.md#qualified-retained-function-types),
 [source provenance](../../REFERENCES.md#qualified-retained-function-types)

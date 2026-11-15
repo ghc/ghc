@@ -41,7 +41,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Last verified checkpoint | M35 passes both stages and focused regressions; 562 packed-vector plus 48 qualified/container runtime observations; M34 witness and tuple checks complete |
+| Last verified checkpoint | M36 passes both stages and focused regressions; 562 packed-vector plus 57 qualified/container/worker runtime observations |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -68,7 +68,8 @@ Last updated: 2026-11-15.
 | Written runtime index types | Complete visible type arguments capture lexical indices; shadowing, generated wildcards and staging checks pass |
 | Native Pi equality operands | Complete checked Pi type arguments and immutable Given rewriting beneath another retained binder pass; native meta assignments remain blocked |
 | Qualified retained functions | Known monomorphic variables, immutable Given transport and synonym expansion pass; ordinary dictionaries preserve the tested demand and sharing behavior |
-| Next task | M36: infer fully applied witness helpers from independently known native arguments, with one checked argument cache |
+| Native worker arguments | Full witness and equality-Given calls select complete erased parameters from known arguments through one checked cache |
+| Next task | M37: check fixed native applications with ImpredicativeTypes; four source controls currently report GHC-83605 |
 
 The current direction is native dependent Core. The historical branch is
 unfinished. It supplies binder and application design work, but dependent type
@@ -3351,9 +3352,9 @@ standalone splice control, which earlier reported subtotals omitted.
 The API provider compiles as object
 code without linking. Native bytecode module compilation remains unsupported.
 
-Fully applied `withQ (error ...) f` still rejects at `f` with GHC-91028 when
+At M35, fully applied `withQ (error ...) f` rejects at `f` with GHC-91028 when
 its result does not determine the erased parameter. The complete expected
-`QPi -> QPi` arrow makes the partial helper work. M36 will select the missing
+`QPi -> QPi` arrow makes the partial helper work. M36 below selects the missing
 parameter from an independently known native argument and cache that check.
 The [plan](PLAN.md#m36-native-worker-arguments-after-full-application) keeps the
 native-meta and Quick Look guards explicit.
@@ -3370,3 +3371,79 @@ build peaked at 4363 MiB under 16 GiB. The final checks peaked at 2020 MiB under
 4 GiB. Both scopes disabled swap. All focused registered checks have zero
 unexpected failures, framework failures and framework warnings. The earlier
 177 standalone rejection corpus was not rerun in full for M35.
+
+## M36: native worker arguments
+
+Full witness and equality-Given calls now compile from source with
+`NoImpredicativeTypes`:
+
+```haskell
+via :: QPi -> QPi
+via f = withQ Refl f
+
+viaBottom :: QPi -> QPi
+viaBottom f = withQ (error "bottom proof") f
+```
+
+The final `QPi` result does not determine the erased `value` parameter.
+The compiler infers the independently known `f :: QPi` once and selects
+`value := QPi`. It then checks the proof against the complete witness type.
+Direct `withQ Refl f n` and `exposeQ f n` also check the extra runtime argument.
+The separate-module [public example](examples/qualified-pi/README.md) exercises
+these calls at four lengths read through IORefs.
+
+The new mode uses the existing `NoQL` argument cache. It infers only original
+native-free tau domains on a known head without concreteness requirements.
+The original body or context must contain native syntax. Match kinds before
+types with one restricted immutable substitution. Require every invisible
+choice, its substituted kind, exact cached domains and current runtime scope.
+Keep cached expressions and usage on failure. The trace confirms one
+elaboration of `prefixProbe` when conflicting arguments force fallback.
+The ordered plan preserves evidence groups before the first visible arrow
+and after leading VTA. Final subsumption still runs. This adds no Core or
+interface constructor and does not assign native types to mutable metas.
+
+| Check | Result in each compiler stage |
+| --- | --- |
+| Full and partial source calls | Both forms compile; five full applications in the initial baseline reported GHC-91028 |
+| Worker source matrix | 52 clients: 27 compile, 25 reject or remain unsupported; 35 located diagnostic envelopes |
+| Closed-proof control | Separate `qRefl = Refl` with ImpredicativeTypes reports GHC-83605 |
+| Qualified/container/worker executable | 57 observations; all 48 earlier output lines preserved |
+| Previous packed-vector executable | All 562 output lines unchanged |
+| Previous container source matrix | 18 compile and eight reject; only the full bottom-proof call changes admission |
+| Previous qualified-Pi source matrix | All 26 outcomes, codes and locations unchanged |
+| API source inventory | 232 package and 312 total rejection programs; 61 quiet positives |
+| API execution | Bootstrap and self-hosted registered execution preserve the 37-line golden |
+| Focused registered tests | Five expected passes across 39 cases, 34 skips, zero unexpected failures or framework warnings |
+
+The added runtime observations distinguish ignored proof and function bottoms,
+proof-before-function demand, `Refl` exposing a bottom function, ignored-proof
+function identity and lazy partial application. These results apply to the
+checked programs at `-O0`. They do not establish optimizer-wide equivalence.
+
+The source matrix includes a named proof obtained from a `ProofBox`, scoped
+runtime indices, repeated arguments, expected-result choices, nested contexts
+and leading VTA. A direct `ProofQ` parameter or qualified `@QPi` without
+`ImpredicativeTypes` reports the separate formation error GHC-91510. An erased
+forall after a visible arrow remains outside the collected telescope. Four
+applications with `ImpredicativeTypes`, including explicit VTA and a known
+monomorphic worker, form successfully but report GHC-83605 in Quick Look.
+The [M37 plan](PLAN.md#m37-applications-with-impredicativetypes) starts from
+those measured controls. General native Quick Look and mutable native-meta
+assignment remain gated.
+
+The [provenance](REFERENCES.md#native-worker-argument-inference) pins four full
+Agda source files and the previous GHC checker. Agda normally checks arguments
+in telescope order and retains blocked checks with their context. Its source
+also records an abandoned postponement experiment. The GHC change uses the
+existing cache; it does not transfer Agda's mutable-meta or eta policies.
+The paper ledger remains seven works and nine verified PDF versions.
+
+Evidence uses `native-worker-arguments-*`. The selected compiler source is
+`c2f86121b675ab36c491043b4bd623e05e1a99b7`, with 37 archived inputs. Both
+compiler stages build. The self-hosted build takes 7m07s and peaks at 4326 MiB
+under 16 GiB. Fourteen serial validation phases and two reused matrix checks
+pass. The validation scope peaks at 2209 MiB under 4 GiB. Both scopes disable
+swap. Failed and superseded source attempts remain available. The M35 prefix
+and older evidence remain frozen. The full GHC suite and the full earlier
+177-program standalone rejection corpus were not run for this checkpoint.

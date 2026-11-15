@@ -1324,13 +1324,48 @@ retains final result equality (Figure 7, page 89:19) and dictionary entailment
 expansion (page 89:15). These are design precedents, not a soundness theorem for
 our native types. See [the exact provenance](REFERENCES.md#qualified-retained-function-types).
 
-Both compiler stages check 26 focused source cases: 13 are accepted and 13 are
-rejected or unsupported. The 22 runtime observations and the previous
-562-observation program pass. `sameFunction` reports two `True` results
-at `-O0`; this records the tested named closures. The API fixture and all five
-focused registered regressions pass. The full GHC suite was not run.
+Complete expected types also select ordinary parameters through saturated
+lifted algebraic containers. A boxed equality witness can therefore contain a
+qualified retained function type. Each container argument keeps the incoming
+Pi scope. A Pi in one field does not admit a qualified sibling. Erased foralls,
+newly non-tau class and family arguments, unsaturated heads and nonlifted
+containers keep their gates. See Note [Known retained function instantiation]
+in `GHC.Tc.Gen.App`.
 
-`ReflClient` and `BottomProofClient` still reject with GHC-91028 when constructing
-`QPi :~: QPi`. This checkpoint does not check proof demand or proof-before-result
-order for those values. Checked construction and demand of boxed qualified-Pi
-equality proofs remain the next boundary.
+## Native worker arguments
+
+A full worker application can need information from a later argument:
+
+```haskell
+withQ :: forall value. (value :~: QPi) -> value -> QPi
+withQ proof f = case proof of Refl -> f
+
+via :: QPi -> QPi
+via f = withQ Refl f
+```
+
+The final result does not determine `value`. Under `NoQL`, infer the known
+`f` once and match its type against the original native-free domain `value`.
+Select `value := QPi`, then check `Refl` against the complete witness type.
+Apply this mode only to a known head without concreteness requirements. Its
+original body or context must contain native syntax. Require an independently
+known native argument or an immutable expected-result choice.
+
+Match kinds before types with the same restricted immutable substitution.
+Require every invisible parameter, exact cached domains, substituted kinds
+and current runtime scope. Reject template escape. Do not infer callback
+results or create fresh missing parameters in this mode. An overapplied call
+uses only its declared ordinary prefix. It cannot seed choices from the final
+result after the extra runtime arguments.
+
+Keep inferred expressions and usage on failure. The ordinary fallback must
+consume the same cache. The existing ordered plan handles consecutive forall
+and context groups before the first visible arrow and after leading VTA.
+Keep original evidence applications, argument subsumption and final result
+checking. No mutable meta receives native syntax. Runtime argument order and
+function eta rules stay unchanged. See Note [Native worker argument inference]
+in `GHC.Tc.Gen.App` and [its provenance](REFERENCES.md#native-worker-argument-inference).
+
+Qualified Pi type arguments still require `ImpredicativeTypes`. Its applied
+Quick Look path is separate from this `NoQL` route. An erased forall after a
+visible argument also remains outside the collected telescope.

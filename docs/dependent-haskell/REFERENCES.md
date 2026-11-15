@@ -2659,7 +2659,7 @@ Both compiler stages now pass 48 runtime observations and 26 source cases:
 17 compile and nine reject at 11 located diagnostic envelopes. The runtime
 checks cover `Refl`, ignored and demanded bottom proofs, tuple-under-Pi results,
 function identity, and named and lambda patterns over data and newtypes.
-The fully applied `withQ (error ...) f` case remains an inference boundary.
+At M35, the fully applied `withQ (error ...) f` case remains an inference boundary.
 Its result does not determine the erased parameter. The partial helper has a
 complete expected arrow and compiles. This does not admit native mutable metas.
 A leading GADT `Refl` pattern now transports a retained function through its
@@ -2702,4 +2702,24 @@ Four full Agda source files and the frozen M35 GHC checker are verified in
 `native-worker-arguments-prior-art-v1/provenance.json`. The reading records
 source ranges, SHA256 and calculated Git blobs. Agda's context-abstracted
 mutable metas and eta policies do not transfer to this implementation.
-The compiler change and its source/runtime checks remain pending.
+Both compiler stages pass the 52-client source matrix: 27 compile and 25
+reject or remain unsupported at 35 located diagnostic envelopes. A separate
+closed-proof control reports GHC-83605. The failure trace records one
+elaboration of the cached argument. Consecutive forall/context groups before
+the first visible arrow and leading VTA pass. Foralls after visible arrows
+remain outside the collected telescope.
+
+Both stages pass 57 runtime observations, including direct full applications
+at four IORef-fed lengths. The ignored bottom proof and function stay lazy.
+Demanding the result checks the proof before the function. The ignored-proof
+worker preserves the tested function identity. The prior 562 observations,
+the existing API fixture and all five focused registered tests pass. The full
+GHC suite was not run.
+
+Four `ImpredicativeTypes` application controls report GHC-83605. They include
+explicit `@QPi`, an incoming proof and a monomorphic native head. Their types
+form successfully, but applied Quick Look remains blocked. A direct `ProofQ`
+parameter or qualified `@QPi` without `ImpredicativeTypes` instead reports
+GHC-91510 during source formation. An ordinary `ProofBox` pattern can supply
+the named incoming proof on the supported `NoQL` route. Keep these boundaries
+separate. See the [next plan](PLAN.md#m37-applications-with-impredicativetypes).
