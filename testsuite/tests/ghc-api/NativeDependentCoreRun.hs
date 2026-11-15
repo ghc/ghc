@@ -1100,6 +1100,7 @@ retainedNatConsumerSource =
 -- | Run Boolean and Nat consumers against separately compiled disk artifacts.
 runModuleChecks :: FilePath -> IO ()
 runModuleChecks libdir = do
+    runMultiPackageSourceChecks libdir
     forM_
         [
             ( "bool"
@@ -2242,7 +2243,6 @@ runNatSourceChecks = do
     runCallApplicationSourceChecks
     runCallActivationSourceChecks
     runConstructedCallActivationSourceChecks
-    runMultiPackageSourceChecks
 
 -- | Add head-only retained function workers as a separate source corpus.
 retainedFunctionBinderSource :: String -> String -> String
@@ -5378,7 +5378,10 @@ runConstructedCallActivationSourceChecks = do
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Check two constructor declaration orders with source-written telescopes.
 Each selected row passes its own retained field Id to PackVec. These quiet
-checks do not change the registered stdout oracle or the inherited groups.
+checks use the existing object-module runner. Constructor workers must be
+linked from their compiled module. Extracting entry Core alone cannot supply
+the generated DataCon workers. Keep the registered stdout oracle and all
+inherited groups unchanged.
 -}
 
 -- | Add source package declarations and local conversion workers.
@@ -5386,19 +5389,8 @@ retainedMultiPackageSource :: String -> String -> String
 retainedMultiPackageSource moduleName observation =
     unlines $ concatMap insert (lines (retainedNatSource moduleName observation))
   where
-    insert line@"entry :: IO String" = packageDeclarations ++ [line]
     insert line@"      run :: Nat -> IO String" = map ("      " ++) workers ++ [line]
     insert line = [line]
-    packageDeclarations =
-        [ "data PackedVec a where"
-        , "  PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a"
-        , "data Availability a where"
-        , "  Unavailable :: Availability a"
-        , "  Available :: foreach (n :: Nat) -> Vec a n -> Availability a"
-        , "data ReverseAvailability a where"
-        , "  PresentFirst :: foreach (n :: Nat) -> Vec a n -> ReverseAvailability a"
-        , "  AbsentLast :: ReverseAvailability a"
-        ]
     workers =
         [ "makeMulti :: Nat -> Availability Int"
         , "makeMulti n = Available n (replicateNative @Int n 42)"
@@ -5415,10 +5407,26 @@ retainedMultiPackageSource moduleName observation =
         , "observeMulti (Just (PackVec n xs)) = pure (show (vecList xs))"
         ]
 
+-- | Compile source constructors with the ordinary runtime helpers.
+multiPackageHelperSource :: String
+multiPackageHelperSource =
+    unlines (["{-# LANGUAGE ExperimentalDependentTypes #-}"] ++ lines helperSource ++ packageDeclarations)
+  where
+    packageDeclarations =
+        [ "data PackedVec a where"
+        , "  PackVec :: foreach (n :: Nat) -> Vec a n -> PackedVec a"
+        , "data Availability a where"
+        , "  Unavailable :: Availability a"
+        , "  Available :: foreach (n :: Nat) -> Vec a n -> Availability a"
+        , "data ReverseAvailability a where"
+        , "  PresentFirst :: foreach (n :: Nat) -> Vec a n -> ReverseAvailability a"
+        , "  AbsentLast :: ReverseAvailability a"
+        ]
+
 -- | Check six IORef-fed finite packages and both absent alternatives quietly.
-runMultiPackageSourceChecks :: GHC.Ghc ()
-runMultiPackageSourceChecks = do
-    let moduleName = "NativeSourceMultiPackage"
+runMultiPackageSourceChecks :: FilePath -> IO ()
+runMultiPackageSourceChecks libdir = do
+    let moduleName = "Main"
         observation =
             unlines
                 [ "do forward <- driveNats (\\n -> observeMulti (multiToPacked (makeMulti n)))"
@@ -5428,9 +5436,5 @@ runMultiPackageSourceChecks = do
                 , "        pure (forward ++ reverse ++ unlines [absent, reverseAbsent])"
                 ]
         expected = ["[]", "[42,42]", "[42,42,42]", "[]", "[42,42]", "[42,42,42]", "absent", "absent"]
-    expression <- sourceEntry moduleName (retainedMultiPackageSource moduleName observation)
-    environment <- GHC.getSession
-    flags <- GHC.getSessionDynFlags
-    actual <- liftIO $ execute environment flags "multi-constructor package source" expression
-    unless (lines actual == expected) $
-        fail ("FAIL: multi-constructor package source: " ++ show actual)
+    let consumer = retainedMultiPackageSource moduleName observation ++ "\nmain :: IO ()\nmain = entry >>= putStr\n"
+    runModuleCase libdir "multi-constructor-quiet" "NativeRuntimeHelpers" multiPackageHelperSource consumer expected
