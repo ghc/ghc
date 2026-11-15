@@ -244,8 +244,17 @@ own small spec and validation boundary in PLAN.md before compiler edits.
   controls pass. Final9 passes its two API4 reuses and seven launches, including
   both-stage raw/public106 and packed562. The registered run gives five passes,
   39 cases and 34 skips, with no unexpected/framework failures or warnings. No custom App cast, solver rule,
-  evaluator or codec is added. Annotation-free activation is a separate task.
-  C1 and C2 remain open.
+  evaluator or codec is added. M48 adds a metadata-only activation policy for
+  known lexical workers when earlier triggers are absent. Bootstrap fresh and
+  freshwhere clients run without payload annotations. Snapshot2 API1 passes
+  ten new quiet values with exact 1/37 goldens. Ordinary, quote and duplicate
+  controls retain their measured behavior; independent wrong-head/index clients
+  reject with located errors. Self-hosting, selected both-stage source controls
+  and public17 pass. Legacy8, both-stage constructor11 and all nine final
+  phases pass. Both stages preserve raw/public106 and packed562; registered
+  results are 39 cases, 34 skips and five expected passes, with no unexpected/
+  framework failures or warnings. Artifact audit and publication remain separate. This changes no Core, evidence,
+  solver or backend rule. C1 and C2 remain open.
 - [ ] **Q1: Complete retained products.** Depends on C1; C2 gates general
   release. Broaden the documented static subset and supported domains. Implement
   invisible retained binders and their explicit `@` overrides. Reuse inherited

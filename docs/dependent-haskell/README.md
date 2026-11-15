@@ -42,7 +42,7 @@ Last updated: 2026-11-15.
 | Case evidence | Incoming dictionaries and primitive equality evidence pass through case captures; arrow evidence scope and partial-case strictness pass |
 | Checked lambdas | Expected retained telescopes check anonymous and nested lambdas, constructor lambda forms, and empty-domain elimination |
 | Higher-order closures | Complete signatures accept retained function arguments and results; named and checked closures pass the bootstrap runtime |
-| Compiler validation | M47 snapshot5 passes both-stage builds, selected CLI/API controls, legacy8 and final9; the registered run gives five expected passes, 39 cases and 34 skips |
+| Compiler validation | M48 snapshot2 passes both-stage builds, selected API/CLI/public17, legacy8 and final9; registered results are 39 cases, 34 skips and five expected passes |
 | Worker instantiation | Complete expected types infer erased worker parameters; scoped matching, contexts, nested aliases, and bottom-function behavior pass API/runtime and separate CLI checks |
 | Stored dependent pairs | Both compiler stages build and run the two-module packed-vector example from source; all 15 runtime observations pass with Core and STG Lint |
 | Source filter | Both compiler stages pass 36 package, filter and section observations through a separate interface; incorrect result lengths and linear or rigid package patterns reject with located diagnostics |
@@ -78,7 +78,7 @@ Last updated: 2026-11-15.
 | Opaque call indices | Source cases on `f n`, `f Z` and `f (S n)` refine the exact whole call; nested constructor fields, captures and demand controls pass both stages |
 | Signed call beta | Complete plain scalar endofunction signatures expose immediate checked lambda beta; actual assigned Many, binder identity and original call execution are preserved; Strict keeps its ordinary fallback |
 | Function-valued retained binders | Snapshot6 passes both-stage source14, negative10 and constructor11 controls, plus legacy8 and final9; canonical audit/publication records are separate |
-| Next task | Complete artifact audit/publication; scope annotation-free case activation separately while C1/C2 remain open |
+| Next task | Complete M48 artifact audit/publication; C1/C2 and the broader roadmap remain open |
 
 The current direction is native dependent Core. The unfinished historical branch
 supplies binder and application design work. This fork adds checked Boolean and
@@ -4045,7 +4045,8 @@ See the [Core contract](CORE.md#function-valued-retained-binders),
 M47 remembers the relation between a checked call `f n` and its fresh motive
 index. Focused compiler/runtime validation is complete. A source branch can then check `idCall f n payload`
 directly. Existing result, capture, Given or annotation information still
-activates whole-call refinement. Annotation-free activation needs separate work.
+activates whole-call refinement. M47 leaves annotation-free activation to the
+M48 step below.
 
 The motive takes `q_motive :: i ~# f n` as its first ordinary evidence argument
 after `i`. Existing constructor transport derives `q_branch :: K ~# f n`.
@@ -4090,3 +4091,59 @@ and exported call codecs stay gated. C1 and C2 remain open.
 See the [contract](CORE.md#remembered-equality-for-direct-call-application),
 [plan](PLAN.md#m47-remembered-equality-for-direct-call-application) and
 [Agda comparison](REFERENCES.md#remembering-an-abstracted-call-prior-art).
+
+## M48: known-worker case activation
+
+M48 lets selected source cases activate retained refinement without a payload
+annotation. Focused compiler/runtime validation is complete. Existing result, capture, Given and annotation
+triggers keep priority. Only when all are absent does Match inspect an already
+checked lexical worker and its leading retained arguments.
+
+The discovery requires complete, unique, unguarded constructor rows with bare
+field variables and no quotations. It reads the worker's leading `DepFunTy`
+telescope. Each supplied retained argument must be an eligible bare local Var
+at the exact domain. `applyTypeToArgs` substitutes those actual Ids. The whole
+residual must be tau and contain the exact free call being matched.
+These are trigger-discovery rules, not a general App restriction.
+
+Discovery does not infer a type, allocate a meta, collect usage or execute a
+splice. Unsupported metadata silently leaves the ordinary case path in place.
+Normal checking still checks the actual application. M47's ordinary motive
+Given supplies the branch relation, including `where` bindings. Complete native
+worker signatures remain required. No App, Core, evidence, solver or backend
+rule changes.
+
+Snapshot2 selects compiler `439fbf6396` and source `8480d83c98`, with 83
+compiler inputs and 102 source paths. The public source removes payload
+annotations. Fresh/freshwhere baselines reject with GHC-83865/GHC-83605
+and have no runtime result.
+
+| Evidence | Measured result |
+| --- | --- |
+| Bootstrap1 | Passes in 25.56s |
+| Self-host1 | Passes in 6m14s, peak 5412MiB under 16GiB, swap0 |
+| Selected API1 | Unit/CoreRun pass in 5.616214630s/16.836089039s, with exact 1/37 goldens |
+| API1 post-build comparison | Own input maps are unchanged; no repeat needed |
+| Fresh and freshwhere CLI | Each emits 0/2/3 in both stages without payload annotations |
+| Ordinary/duplicate/quote CLI | Both stages keep 42/7/42, 42 plus GHC-53633, and 42/7 respectively |
+| Wrong-head/index clients | Each rejects with a located GHC-83865 in both stages; compile-only, no runtime |
+| Simplified public example | All seventeen unchanged expected outputs pass in both stages |
+| Legacy and constructor controls | Legacy8 passes; all eleven positive constructor controls pass in each stage |
+| Selected final9 | All nine phases pass: two own API1 reuses and seven launched phases |
+| Inherited final controls | Raw/public106 and packed562 pass in both stages |
+| Registered run | 39 cases, 34 skips and five expected passes; zero unexpected/framework failures or warnings |
+
+The ten new quiet values cover direct and where calls at inputs 0/2/3.
+They also check 42 from an ignored undefined payload, 42/7 from guards and 42
+from the tested incomplete case. The duplicate control stays in its separate
+CLI to avoid an expected warning in the quiet fixture. The two independent negative clients add no fixture assertions.
+Raw scope36 remains inherited M47 evidence; it was not rerun for M48.
+
+All selected compiler/runtime validation passes. Artifact audit and publication
+remain separate and pending. These focused checks do not cover the full GHC
+suite. No broader inference, evaluation or dependent-Haskell completion is
+claimed.
+C1 and C2 remain open. See the
+[contract](CORE.md#known-worker-case-activation),
+[plan](PLAN.md#m48-known-worker-case-activation) and
+[prior-art comparison](REFERENCES.md#known-worker-case-activation-prior-art).

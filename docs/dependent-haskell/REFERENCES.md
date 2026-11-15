@@ -3237,3 +3237,28 @@ audit and publication remain separate; these are focused checks, not a full
 GHC suite run. No Agda execution, proof replay,
 new PDF or combined preservation result is added. The ledger stays seven
 works and nine PDFs.
+
+## Known-worker case activation: prior art
+
+M48 reuses the pinned Agda v2.8.0
+[Application 774–808](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+and [With 101–173](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/With.hs#L101-L173)
+readings. They check an argument in context and generalize a helper's dependent
+context. The [remembered-equality comparison](#remembering-an-abstracted-call-prior-art)
+also remains relevant. These readings do not prescribe GHC's activation policy.
+
+The M48 adaptation reads a checked lexical worker type before deciding whether
+to use the existing case bridge. It substitutes known local actual Ids without
+elaborating them or guessing a type. Complete rows, leading retained binders,
+whole-tau residuals and silent fallback are bounded GHC discovery choices.
+They are not new general application or solver rules. Ordinary checking and
+the existing motive Given still supply evidence and usage checks.
+
+Bootstrap fresh/freshwhere and selected API1 controls pass. The ten quiet
+values retain exact 1/37 goldens. Self-hosting, selected both-stage source
+controls and public17 pass. Legacy, constructor, final9 and registered checks
+also pass. Artifact audit and publication remain separate; these focused checks
+do not constitute a full GHC suite run.
+This step adds no paper, PDF, full-file reading, Agda execution or preservation
+claim. The canonical ledger remains seven works and nine PDFs. Earlier selected
+source identities and reading limits remain in the existing Agda records.

@@ -1876,9 +1876,8 @@ application, native-meta, scope, usage and staging checks retain their rules.
 
 Keep `q_motive` in the ordinary evidence-token ABI. Only `cv` occupies the
 existing virtual constructor-proof slot. The strict alias and its demand rules
-remain unchanged. Existing result, capture, Given or annotation information
-must activate the retained case. Annotation-free activation remains outside
-this increment.
+remain unchanged. M47 requires result, capture, Given or annotation information
+to activate the retained case. M48 below adds a metadata-only trigger.
 
 Given-only bootstrap, self-host2 and selected API4 pass. The quiet fixture
 checks eleven values, three runtime exception markers and three located
@@ -1895,3 +1894,44 @@ M47 adds no Core/interface schema, codec, general optimizer or evaluator.
 C1 and C2 remain open. Note [Source opaque call refinement] in GHC.Tc.Gen.Match
 owns this evidence order. See [the plan](PLAN.md#m47-remembered-equality-for-direct-call-application)
 and [the Agda comparison](REFERENCES.md#remembering-an-abstracted-call-prior-art).
+
+## Known-worker case activation
+
+M48 adds trigger discovery in Match. Existing result, capture, Given and
+annotation triggers run first and keep their behavior. The new metadata rules
+apply only when those triggers are absent. They are not a new general App gate.
+
+First require complete, unique, unguarded constructor alternatives with bare
+field variables. The metadata path does not activate through quotations.
+Look up an already checked lexical worker. Read only its leading retained
+`DepFunTy` telescope. Every consumed source actual must be an eligible bare
+local Var of the exact binder domain. Parentheses do not change its identity.
+Substitute actual Ids with `applyTypeToArgs`. Require `isTauTy` for the whole
+residual and an exact free occurrence of the checked call. Bound/shadowed
+identities keep their existing meaning.
+
+Do not infer argument types, instantiate erased choices, assign metas, collect
+usage or expand splices during discovery. Do not enter splice/quote subtrees
+or opaque expression extensions. Unknown workers and unsupported forms decline
+silently to the ordinary case path. Existing activation still keeps its own
+diagnostics. Actual application checking and usage accounting remain ordinary.
+
+Once triggered, reuse the M47 motive equality and constructor Given across the
+complete row, including `where`. No new proof, App cast, solver rule, Core node
+or backend step follows. Complete worker signatures are still required.
+Note [Source opaque call refinement] in GHC.Tc.Gen.Match owns the policy.
+
+Bootstrap1, fresh/freshwhere attempt2 and selected API1 pass. Ten new quiet
+values pass with exact 1/37 goldens. Quote and ordinary controls keep their
+outputs. The duplicate control stays in a separate warning-producing CLI.
+Two independent wrong-head/index clients reject with located GHC-83865.
+Self-hosting, selected both-stage source controls and public17 pass. API1's
+input maps are unchanged after the build. Inherited M47 raw scope36 was not
+rerun; Core, Type and Utils are unchanged. Legacy8 and both-stage positive
+constructor11 pass. Final9 passes two own API1 reuses and seven launched phases,
+including both-stage raw/public106 and packed562. The registered run has
+39 cases, 34 skips and five expected passes, with zero unexpected/framework
+failures or warnings. Artifact audit and publication remain separate. These
+focused checks do not cover the full GHC suite. C1 and C2 stay open.
+See [the plan](PLAN.md#m48-known-worker-case-activation) and
+[the prior art](REFERENCES.md#known-worker-case-activation-prior-art).

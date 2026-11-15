@@ -372,3 +372,20 @@ Artifact audit and publication remain separate. No new full-paper reading,
 Agda execution, proof replay or combined preservation theorem is claimed.
 The Agda source provenance is
 `native-call-application-refinement-remember-equality-prior-art-v1/`.
+
+## M48 known-worker activation
+
+M48 reuses the existing Agda Application 774–808, With 101–173 and remembered
+`in eq` readings. It adds no paper, PDF or full-reading claim. The canonical
+seven-work/nine-PDF manifest is unchanged.
+
+The GHC step inspects checked worker metadata to choose an existing case path.
+It does not perform Agda-style inference or execute source arguments. Its
+leading-retained/whole-tau shape rules constrain this discovery only. Normal
+application checking and M47's ordinary Given retain their existing roles.
+Bootstrap fresh/freshwhere, quote and selected API1 controls pass. Public
+annotations are removed and ten quiet values pass with unchanged goldens.
+Self-hosting, selected both-stage source controls and public17 pass.
+Legacy, constructor, final9 and registered checks pass. Artifact audit and
+publication remain separate. These focused checks do not establish a theorem
+or a full GHC suite result. See [the source comparison](../REFERENCES.md#known-worker-case-activation-prior-art).

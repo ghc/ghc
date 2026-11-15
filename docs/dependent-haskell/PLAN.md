@@ -3159,8 +3159,8 @@ unpublished custom-App attempts and API3's expected-code failure separately.
 The latter needs only a fixture correction, not broader source acceptance.
 These are focused checks; the full GHC suite was not run.
 
-Existing result, capture, Given or annotation information must still activate
-the retained case. Annotation-free activation is a separate future task.
+At M47, existing result, capture, Given or annotation information must activate
+the retained case. M48 below adds a separate metadata-only trigger.
 `where` support already follows from the complete row's Given scope.
 
 This step adds no Core/interface form, inverse call decomposition, function
@@ -3168,3 +3168,60 @@ equality, native mutable-meta assignment, eta law, general solver rule or
 evaluator. Existing checking, scope, usage and staging remain authoritative.
 C1 and C2 stay open. See [the contract](CORE.md#remembered-equality-for-direct-call-application)
 and [the primary comparison](REFERENCES.md#remembering-an-abstracted-call-prior-art).
+
+### M48: known-worker case activation
+
+M48 compiler/runtime validation is complete. Match adds one activation policy.
+It reuses the existing retained case checker, motive equality and ordinary
+Wanted/Given solver.
+
+- [x] Keep the existing result, capture, Given and annotation triggers first.
+  Consult metadata only when none applies.
+- [x] Silently require complete, unique, unguarded constructor rows with bare
+  field variables. Do not inspect quoted terms to find a new trigger.
+- [x] Read a known checked lexical worker's leading retained telescope. Open
+  only `DepFunTy` binders with eligible bare local actual Vars at exact domains.
+  Use `applyTypeToArgs`, then require a whole-tau residual containing the exact
+  free call. Do not guess erased choices or look up an unknown worker globally.
+- [x] Keep discovery read-only with respect to inference, metas and usage.
+  Do not elaborate source arguments or execute/expand splices. Decline unknown
+  or unsupported metadata and preserve the ordinary case fallback.
+- [x] Pass bootstrap1 in 25.56s. Fresh and freshwhere bootstrap attempts2 each
+  compile/run 0/2/3 without payload annotations. Their baselines reject with
+  GHC-83865/GHC-83605 and have no runtime result.
+- [x] Preserve ordinary outputs 42/7/42 and duplicate-row output 42 plus warning
+  GHC-53633.
+- [x] Pass quote CLI1 with 42/7. Independent wrong-head and wrong-index CLI
+  clients each reject with a located GHC-83865 and no runtime result.
+- [x] Remove public payload annotations. Add ten quiet values: direct and where
+  calls at inputs 0/2/3, an ignored undefined payload returning 42, guard outputs
+  42/7 and the tested incomplete case returning 42. Keep the warning-producing
+  duplicate control in its separate CLI only.
+- [x] Pass selected API1 Unit/CoreRun in 5.616214630s/16.836089039s. Exact
+  goldens remain 1/37. Add no new negative fixture assertions for the two
+  independent CLI rejections.
+- [x] Pass self-host1 in 6m14s, peak 5412MiB under 16GiB, swap0. Verify API1's
+  own input maps are unchanged after the build; do not repeat the same checks.
+- [x] Pass selected both-stage fresh3/freshwhere3 and ordinary/duplicate/quote
+  controls. Each wrong-head/index client rejects with located GHC-83865 and
+  no runtime. Public17 passes both stages with all expected outputs unchanged.
+- [x] Pass legacy8 and all eleven positive constructor controls in each stage.
+- [x] Pass all nine final phases: two own API1 reuses and seven launches.
+  Inherited raw/public106 and packed562 pass in both stages. The registered
+  run has 39 cases, 34 skips and five expected passes, with zero unexpected/
+  framework failures or warnings.
+- [ ] Complete the separate artifact audit and publication. Infer no counters
+  or hashes from the compiler/runtime passes.
+
+Snapshot2 selects compiler `439fbf6396` and source `8480d83c98`, with 83
+compiler inputs and 102 source paths. The compiler change is confined to Match.
+These shape rules select a trigger; they impose no new global application restriction. Earlier
+triggers preserve their existing diagnostics and behavior. Normal checking
+still performs source checking and usage accounting once. Raw scope36 remains
+M47 evidence and was not rerun; Core, Type and Utils do not change. These are
+focused checks, not a full GHC suite run.
+
+Complete signatures remain required. No App/Core form, evidence rule, solver
+rule, backend transformation or evaluator is added. C1/C2 and the broader
+roadmap remain open. See [the contract](CORE.md#known-worker-case-activation)
+and [the prior art](REFERENCES.md#known-worker-case-activation-prior-art).
