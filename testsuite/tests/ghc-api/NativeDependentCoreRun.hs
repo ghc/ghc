@@ -862,6 +862,32 @@ retainedCaseSource moduleName observation =
                ]
     insert line = [line]
 
+-- | Add computed-call cases without changing the inherited source declarations.
+retainedCallSource :: String -> String -> String
+retainedCallSource moduleName observation =
+    unlines $ concatMap insert (lines (retainedNatSource moduleName observation))
+  where
+    insert line@"      run :: Nat -> IO String" = map ("      " ++) declarations ++ [line]
+    insert line = [line]
+    declarations =
+        [ "toList :: forall size. Vec Int size -> [Int]"
+        , "toList = vecList"
+        , "callObserve :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> IO String"
+        , "callObserve f n original = case f n of { Z -> let { ys :: Vec Int (f n); ys = VNil } in observeVec ys; S k -> let { ys :: Vec Int (f n); ys = VCons 42 (replicateNative @Int k 42) } in observeVec ys }"
+        , "callHead :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> IO String"
+        , "callHead f n original = case f n of { Z -> let { ys :: Vec Int (f n); ys = VNil } in pure (show (length (toList ys))); S k -> let { ys :: Vec Int (f n); ys = VCons 42 (replicateNative @Int k 42) } in pure (show (head (toList ys))) }"
+        , "callPrefix :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> IO String"
+        , "callPrefix f n original = case f n of { Z -> let { ys :: Vec Int (f n); ys = VNil } in pure (show (take 4 (toList ys))); S k -> let { ys :: Vec Int (f n); ys = VCons 42 (replicateNative @Int k 42) } in pure (show (take 4 (toList ys))) }"
+        , "callCached :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int"
+        , "callCached f n original = let { consume :: Vec Int (f n) -> Int; consume cached = case f n of { Z -> length (toList cached); S predecessor -> length (toList cached) } } in case f n of { Z -> let { ys :: Vec Int (f n); ys = VNil } in consume ys; S actual -> let { ys :: Vec Int (f n); ys = VCons 42 (replicateNative @Int actual 42) } in consume ys }"
+        , "callFunction :: (Nat -> Nat) -> foreach (n :: Nat) -> Vec Int n -> Int -> Int"
+        , "callFunction f n original = case f n of { Z -> let { ys :: Vec Int (f n); ys = VNil } in \\answer -> length (toList ys) + answer; S k -> let { ys :: Vec Int (f n); ys = VCons 42 (replicateNative @Int k 42) } in \\answer -> length (toList ys) + answer }"
+        , "ordinaryCallWildcard :: (Nat -> Nat) -> Nat -> Int"
+        , "ordinaryCallWildcard f n = case f n of { _ -> 42 }"
+        , "ordinaryCallVariable :: (Nat -> Nat) -> Nat -> Int"
+        , "ordinaryCallVariable f n = case f n of { ignored -> 42 }"
+        ]
+
 -- | Share the case worker between source, executable, and interface checks.
 retainedCaseDeclarations :: [String]
 retainedCaseDeclarations =
@@ -2188,6 +2214,64 @@ runNatSourceChecks = do
     runNatClassSourceChecks
     runNatContextSourceChecks
     runCaseSourceChecks
+    runOpaqueCallSourceChecks
+
+-- | Check source call refinement, captured consumers and strict case demand.
+runOpaqueCallSourceChecks :: GHC.Ghc ()
+runOpaqueCallSourceChecks = do
+    let moduleName = "NativeSourceOpaqueCalls"
+        observation =
+            unlines
+                [ "do identityValues <- driveNats (\\n -> callObserve opaqueNat n bottomVec)"
+                , "        constantValues <- driveNats (\\n -> callObserve constantZeroNat n bottomVec)"
+                , "        captured <- driveNats (\\n -> observeInt (callCached opaqueNat n bottomVec))"
+                , "        functions <- driveNats (\\n -> case callFunction opaqueNat n bottomVec of !_ -> pure \"forced\")"
+                , "        ignoredIndex <- driveNat (\\n -> callObserve constantZeroNat n bottomVec) bottomNat"
+                , "        lazyHead <- driveNat (\\n -> callHead opaqueNat n bottomVec) partialNat"
+                , "        cyclicPrefix <- driveNat (\\n -> callPrefix opaqueNat n bottomVec) cyclicNat"
+                , "        wildcard <- observeInt (ordinaryCallWildcard bottomFunction bottomNat)"
+                , "        variable <- observeInt (ordinaryCallVariable bottomFunction bottomNat)"
+                , "        pure (identityValues ++ constantValues ++ captured ++ functions ++ unlines [ignoredIndex,lazyHead,cyclicPrefix,wildcard,variable])"
+                ]
+        expected =
+            [ "[]:0"
+            , "[42,42]:2"
+            , "[42,42,42]:3"
+            , "[]:0"
+            , "[]:0"
+            , "[]:0"
+            , "0"
+            , "2"
+            , "3"
+            , "forced"
+            , "forced"
+            , "forced"
+            , "[]:0"
+            , "42"
+            , "[42,42,42,42]"
+            , "42"
+            , "42"
+            ]
+    expression <- sourceEntry moduleName (retainedCallSource moduleName observation)
+    environment <- GHC.getSession
+    flags <- GHC.getSessionDynFlags
+    actual <- liftIO $ execute environment flags "source opaque calls" expression
+    unless (lines actual == expected) $
+        fail ("FAIL: source opaque call refinement, capture or demand: " ++ show actual)
+    forM_
+        [ ("NativeSourceOpaqueHeadBottom", "driveNat (\\n -> callHead bottomFunction n bottomVec) bottomNat", "native-bottom-function")
+        , ("NativeSourceOpaqueArgumentBottom", "driveNat (\\n -> callHead opaqueNat n bottomVec) bottomNat", "native-bottom-nat")
+        , ("NativeSourceOpaqueFunctionResultBottom", "driveNat (\\n -> case callFunction bottomFunction n bottomVec of !_ -> pure \"forced\") bottomNat", "native-bottom-function")
+        ]
+        $ \(name, body, fragment) -> do
+            bottomExpression <- sourceEntry name (retainedCallSource name body)
+            bottomEnvironment <- GHC.getSession
+            outcome <- liftIO $ try (execute bottomEnvironment flags name bottomExpression)
+            case outcome of
+                Left exception
+                    | fragment `isInfixOf` displayException (exception :: SomeException) -> pure ()
+                    | otherwise -> fail ("FAIL: " ++ name ++ "; wrong exception: " ++ displayException exception)
+                Right result -> fail ("FAIL: " ++ name ++ "; expected bottom, got " ++ show result)
 
 -- | Observe refined source cases and reject malformed dependent alternatives.
 runCaseSourceChecks :: GHC.Ghc ()
