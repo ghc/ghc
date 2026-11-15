@@ -160,6 +160,7 @@ main = do
     runContainerChecks
     runOrdinaryPatternChecks
     runGadtPatternChecks
+    runFullWorkerChecks
 
 -- | Specialize the injected-context function from its complete expected arrow.
 specializeDemand :: DPi -> DPi
@@ -394,3 +395,49 @@ runGadtPatternChecks = do
     putStrLn "GADT partial bottom proof: ok"
     expectMarker "GADT demanded returned function" "native-container-gadt-bottom-proof" $
         checkWhnf (transportPlainBottom plainFunction)
+
+-- | Compare fully applied witness and Given workers at an IORef-fed length.
+checkFullWorkerFinite :: Int -> Nat -> IO ()
+checkFullWorkerFinite count index = do
+    cell <- newIORef index
+    n <- readIORef cell
+    let witnessed = toList (withQ Refl original n)
+        exposed = toList (exposeQ original n)
+        control = toList (original n)
+        expected = replicate count 7
+        label = "worker full finite " ++ show count
+    assertEqual label expected witnessed
+    assertEqual label expected exposed
+    assertEqual label expected control
+    putStrLn (label ++ ": " ++ show witnessed ++ " | " ++ show exposed ++ " | " ++ show control)
+
+-- | Check full worker inference without changing proof or function demand.
+runFullWorkerChecks :: IO ()
+runFullWorkerChecks = do
+    forM_
+        [ (0, Z)
+        , (1, S Z)
+        , (2, S (S Z))
+        , (3, S (S (S Z)))
+        ]
+        $ \(count, n) -> checkFullWorkerFinite count n
+    assertEqual
+        "worker full ignored bottom proof and function"
+        42
+        (ignoreQ (withQ (error "native-worker-bottom-proof") bottomFunction))
+    putStrLn "worker full ignored bottom proof and function: 42"
+    expectMarker "worker full proof before function" "native-worker-bottom-proof" $
+        checkWhnf (withQ (error "native-worker-bottom-proof") bottomFunction)
+    expectMarker "worker full Refl bottom function" "native-q-bottom-function" $
+        checkWhnf (withQ Refl bottomFunction)
+    let kept :: QPi
+        kept = ignoreProofQ (error "native-worker-bottom-proof") original
+        partial :: QPi -> QPi
+        partial = withQ (error "native-worker-bottom-proof")
+    checkWhnf original
+    checkWhnf kept
+    same <- sameFunction original kept
+    assertEqual "worker full ignored proof function identity" True same
+    putStrLn "worker full ignored proof function identity: True"
+    checkWhnf partial
+    putStrLn "worker partial bottom proof: ok"

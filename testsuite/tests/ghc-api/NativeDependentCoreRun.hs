@@ -3340,6 +3340,20 @@ runPackageSourceRejectChecks = do
             , "type QPi = foreach (n :: Nat) -> Eq Int => Vec Int n"
             , "withQ :: forall value. (value :~: QPi) -> value -> QPi"
             , "withQ proof f = case proof of Refl -> f"
+            , "type ProofQ = QPi :~: QPi"
+            , "data ProofBox = ProofBox ProofQ"
+            , "exposeQ :: forall value. value ~ QPi => value -> QPi"
+            , "exposeQ f = f"
+            , "contextConsumer :: forall value. value ~ QPi => value -> Int"
+            , "contextConsumer _ = 42"
+            , "taggedContextConsumer :: forall tag value. value ~ QPi => tag -> value -> Int"
+            , "taggedContextConsumer _ _ = 42"
+            , "nestedContextConsumer :: forall tag. Eq tag => forall value. value ~ QPi => tag -> value -> Int"
+            , "nestedContextConsumer _ _ = 42"
+            , "bothQ :: forall value. (value :~: QPi) -> value -> value -> QPi"
+            , "bothQ proof first _ = case proof of Refl -> first"
+            , "requiresShowQ :: forall value. Show value => (value :~: QPi) -> value -> QPi"
+            , "requiresShowQ proof f = case proof of Refl -> f"
             , "type NativePi = foreach (n :: Nat) -> Vec Int n"
             , "type QualifiedPair = (QPi, QPi)"
             , "headTuple :: forall a. (a, a) -> a"
@@ -3376,7 +3390,18 @@ runPackageSourceRejectChecks = do
     containerClients =
         [ ("ReflClient", Nothing, [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["viaWitness :: QPi -> QPi", "viaWitness = withQ Refl"])
         , ("OriginalBottomWitnessPartial", Nothing, [], ["import NativePiContainerProvider"], ["viaWitness :: QPi -> QPi", "viaWitness = withQ (error \"native-q-bottom-proof\")"])
-        , ("OriginalBottomWitnessApplied", Just (91028, "polytypes: QPi"), [], ["import NativePiContainerProvider"], ["viaWitness :: QPi -> QPi", "viaWitness f = withQ (error \"native-q-bottom-proof\") f"])
+        , ("OriginalBottomWitnessApplied", Nothing, [], ["import NativePiContainerProvider"], ["viaWitness :: QPi -> QPi", "viaWitness f = withQ (error \"native-q-bottom-proof\") f"])
+        , ("WorkerFullRefl", Nothing, [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["viaWitness :: QPi -> QPi", "viaWitness f = withQ Refl f"])
+        , ("WorkerEqualityGivenFullCall", Nothing, [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> QPi", "via f = exposeQ f"])
+        , ("WorkerFullCallThenNativeIndex", Nothing, [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: foreach (n :: Nat) -> QPi -> Vec Int n", "via n f = withQ Refl f n"])
+        , ("WorkerIncomingNamedProof", Nothing, [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: ProofBox -> QPi -> QPi", "via (ProofBox proof) f = withQ proof f"])
+        , ("WorkerContextOnlyChoice", Nothing, [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> Int", "via f = contextConsumer f"])
+        , ("WorkerNestedThetaBeforeValues", Nothing, [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: forall tag. Eq tag => tag -> QPi -> Int", "via tag f = nestedContextConsumer tag f"])
+        , ("WorkerLeadingVTAChoice", Nothing, [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["via :: QPi -> Int", "via f = taggedContextConsumer @Int 42 f"])
+        , ("WorkerForgedBoolWitness", Just (83865, "Couldn't match type"), [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: QPi", "bad = withQ (Refl :: Bool :~: Bool) True"])
+        , ("WorkerConflictingArguments", Just (91028, "Cannot instantiate unification variable"), [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: QPi -> (foreach (n :: Nat) -> Eq Int => Vec Bool n) -> QPi", "bad f g = bothQ Refl f g"])
+        , ("WorkerMissingClass", Just (39999, "No instance for"), [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: QPi -> QPi", "bad f = requiresShowQ Refl f"])
+        , ("WorkerErasedPolymorphicArgument", Just (91028, "Cannot instantiate unification variable"), [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["bad :: (forall a. a) -> QPi", "bad f = withQ Refl f"])
         , ("OrdinaryGenericBottomWitness", Nothing, [], ["import NativePiContainerProvider"], ["viaWitness :: QPi -> QPi", "viaWitness = withQ bottomValue"])
         , ("ImportedHeadTupleQualifiedPair", Nothing, [], ["import NativePiContainerProvider"], ["tupleClient :: QPi -> QPi -> QPi", "tupleClient f g = acceptPair (headTuple ((f, g), (g, f)))"])
         , ("ImportedHeadTupleNestedContainer", Nothing, [], ["import NativePiContainerProvider"], ["nestedClient :: QPi -> QPi -> QPi", "nestedClient f g = acceptNested (headTuple (Just ((f, g), 42), Nothing)) f"])
