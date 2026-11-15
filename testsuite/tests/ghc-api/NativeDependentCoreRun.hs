@@ -2959,6 +2959,14 @@ The local alias has separate inference and Quick Look diagnostics. Check both
 located envelopes from one compilation. The standalone matrix pins their exact
 source positions. See Note [Known native variables with ImpredicativeTypes]
 in GHC.Tc.Gen.App and Note [Rigid retained indices] in GHC.Tc.Utils.Unify.
+
+Container clients load one ImpredicativeTypes provider. It imports the actual
+PackedVecLibrary types. Each client disables ImpredicativeTypes and checks its
+complete source without a local Nat or Vec declaration. Ordinary tau controls
+keep their existing inference path. Rejections record current guard and
+inference boundaries; they do not establish permanent source invalidity.
+The standalone matrix owns exact source positions and full pipeline checks.
+See Note [Known retained function instantiation] in GHC.Tc.Gen.App.
 -}
 
 -- | Check source package restrictions before or during desugaring.
@@ -3282,8 +3290,117 @@ runPackageSourceRejectChecks = do
             ++ [ "entry :: Int"
                , "entry = length (toListLocal (id @(Vec $(pure WildCardT) Z) VNil))"
                ]
+    -- Discard earlier inference-only targets before loading the provider graph.
+    flags <- GHC.getSessionDynFlags
+    logger <- GHC.getLogger
+    (containerFlags, leftovers, _) <-
+        GHC.parseDynamicFlags logger flags $
+            map noLoc ["-O0", "-fomit-interface-pragmas", "-fno-write-if-simplified-core", "-dcore-lint", "-dstg-lint", "-v0"]
+    unless (null leftovers) (fail "FAIL: native container flags were not parsed")
+    void $
+        GHC.setSessionDynFlags $
+            gopt_set
+                containerFlags{backend = GHC.bytecodeBackend, ghcLink = GHC.LinkInMemory}
+                Opt_ExternalInterpreter
+    now <- liftIO getCurrentTime
+    let target =
+            GHC.Target
+                { GHC.targetId = GHC.TargetFile "NativePiContainerProvider.hs" Nothing
+                , GHC.targetUnitId = GHC.homeUnitId_ containerFlags
+                , GHC.targetAllowObjCode = False
+                , GHC.targetContents = Just (stringToStringBuffer containerProvider, now)
+                }
+    GHC.setTargets [target]
+    loaded <- GHC.load GHC.LoadAllTargets
+    unless (GHC.succeeded loaded) (fail "FAIL: native container provider did not load")
+    forM_ containerClients $ \(label, diagnostic, extensions, imports, declarations) -> do
+        let moduleName = "NativeSourceContainer" ++ label
+            source =
+                unlines $
+                    map (\extension -> "{-# LANGUAGE " ++ extension ++ " #-}") (containerExtensions ++ extensions)
+                        ++ [ "module " ++ moduleName ++ " where"
+                           , "import PackedVecLibrary"
+                           ]
+                        ++ imports
+                        ++ declarations
+                        ++ ["entry :: Int", "entry = 42"]
+        case diagnostic of
+            Nothing -> void $ sourceEntry moduleName source
+            Just (code, fragment) -> sourceModuleRejects label code fragment moduleName source
+    void (GHC.setSessionDynFlags flags)
     liftIO $ putStrLn "package source rejection checks: ok"
   where
+    containerExtensions = ["DataKinds", "ExperimentalDependentTypes", "ExplicitForAll", "GADTs", "KindSignatures", "RankNTypes", "ScopedTypeVariables", "TypeFamilies", "TypeOperators", "FlexibleContexts", "ConstraintKinds", "AllowAmbiguousTypes", "TypeApplications", "NoImpredicativeTypes"]
+    containerProvider =
+        unlines
+            [ "{-# LANGUAGE DataKinds, ExperimentalDependentTypes, ExplicitForAll, GADTs, KindSignatures, RankNTypes, ScopedTypeVariables, TypeFamilies, TypeOperators, FlexibleContexts, ConstraintKinds, AllowAmbiguousTypes, TypeApplications, ImpredicativeTypes, PolyKinds, UnboxedTuples, MagicHash #-}"
+            , "module NativePiContainerProvider where"
+            , "import PackedVecLibrary"
+            , "import Data.Type.Equality ((:~:)(Refl))"
+            , "import Data.Proxy (Proxy(..))"
+            , "import GHC.Exts (Int#)"
+            , "type QPi = foreach (n :: Nat) -> Eq Int => Vec Int n"
+            , "withQ :: forall value. (value :~: QPi) -> value -> QPi"
+            , "withQ proof f = case proof of Refl -> f"
+            , "type NativePi = foreach (n :: Nat) -> Vec Int n"
+            , "type QualifiedPair = (QPi, QPi)"
+            , "headTuple :: forall a. (a, a) -> a"
+            , "headTuple (first, _) = first"
+            , "acceptPair :: QualifiedPair -> QPi"
+            , "acceptPair (first, _) = first"
+            , "acceptNested :: Maybe (QualifiedPair, Int) -> QPi -> QPi"
+            , "acceptNested _ f = f"
+            , "acceptIndexedPair :: foreach (k :: Nat) -> (Vec Int k, QPi) -> QPi"
+            , "acceptIndexedPair k pair = case pair of (_, f) -> f"
+            , "type QualifiedSibling = (QPi, Eq Int => Int)"
+            , "acceptSibling :: QualifiedSibling -> Int"
+            , "acceptSibling _ = 42"
+            , "type ErasedSibling = (NativePi, forall a. a -> a)"
+            , "acceptErasedSibling :: ErasedSibling -> Int"
+            , "acceptErasedSibling _ = 42"
+            , "bottomValue :: forall a. a"
+            , "bottomValue = error \"native-pi-container-bottom-witness\""
+            , "proxyValue :: forall k (a :: k). Proxy a"
+            , "proxyValue = Proxy"
+            , "acceptClassProxy :: Proxy (Eq NativePi) -> Int"
+            , "acceptClassProxy _ = 42"
+            , "type family Stuck a"
+            , "acceptStuck :: Stuck NativePi -> Int"
+            , "acceptStuck _ = 42"
+            , "acceptUnsaturatedProxy :: Proxy (Either NativePi) -> Int"
+            , "acceptUnsaturatedProxy _ = 42"
+            , "acceptUnliftedProxy :: Proxy (# NativePi, Int# #) -> Int"
+            , "acceptUnliftedProxy _ = 42"
+            , "newtype ContainerShell a = ContainerShell a"
+            , "openShell :: ContainerShell QPi -> QPi"
+            , "openShell (ContainerShell f) = f"
+            ]
+    containerClients =
+        [ ("ReflClient", Nothing, [], ["import NativePiContainerProvider", "import Data.Type.Equality ((:~:)(Refl))"], ["viaWitness :: QPi -> QPi", "viaWitness = withQ Refl"])
+        , ("OriginalBottomWitnessPartial", Nothing, [], ["import NativePiContainerProvider"], ["viaWitness :: QPi -> QPi", "viaWitness = withQ (error \"native-q-bottom-proof\")"])
+        , ("OriginalBottomWitnessApplied", Just (91028, "polytypes: QPi"), [], ["import NativePiContainerProvider"], ["viaWitness :: QPi -> QPi", "viaWitness f = withQ (error \"native-q-bottom-proof\") f"])
+        , ("OrdinaryGenericBottomWitness", Nothing, [], ["import NativePiContainerProvider"], ["viaWitness :: QPi -> QPi", "viaWitness = withQ bottomValue"])
+        , ("ImportedHeadTupleQualifiedPair", Nothing, [], ["import NativePiContainerProvider"], ["tupleClient :: QPi -> QPi -> QPi", "tupleClient f g = acceptPair (headTuple ((f, g), (g, f)))"])
+        , ("ImportedHeadTupleNestedContainer", Nothing, [], ["import NativePiContainerProvider"], ["nestedClient :: QPi -> QPi -> QPi", "nestedClient f g = acceptNested (headTuple (Just ((f, g), 42), Nothing)) f"])
+        , ("CapturedIndexInsideContainer", Nothing, [], ["import NativePiContainerProvider"], ["capturePair :: foreach (k :: Nat) -> Vec Int k -> QPi -> QPi", "capturePair k xs f = acceptIndexedPair k (headTuple ((xs, f), (xs, f)))"])
+        , ("IndependentIndexInsideContainer", Just (83865, "Actual: Vec Int m"), [], ["import NativePiContainerProvider"], ["wrongPair :: foreach (n :: Nat) -> foreach (m :: Nat) -> Vec Int n -> Vec Int m -> QPi -> QPi", "wrongPair n m xs ys f = acceptIndexedPair n (headTuple ((ys, f), (ys, f)))"])
+        , ("WorkerNestedContainerResult", Nothing, [], ["import NativePiContainerProvider"], ["worker :: forall a. foreach (n :: Nat) -> Vec a n -> Maybe (foreach (m :: Nat) -> Vec a m -> Vec a m)", "worker n xs = Nothing", "specialized :: foreach (n :: Nat) -> Vec Int n -> Maybe (foreach (m :: Nat) -> Vec Int m -> Vec Int m)", "specialized = worker"])
+        , ("WorkerContainerAfterOrdinaryPrefix", Nothing, [], ["import NativePiContainerProvider"], ["worker :: forall a. foreach (n :: Nat) -> Vec a n -> Maybe (foreach (m :: Nat) -> Vec a m -> Vec a m)", "worker n xs = Nothing", "taggedWorker :: forall a. Int -> foreach (n :: Nat) -> Vec a n -> Maybe (foreach (m :: Nat) -> Vec a m -> Vec a m)", "taggedWorker _ = worker @a", "specialized :: foreach (n :: Nat) -> Vec Int n -> Maybe (foreach (m :: Nat) -> Vec Int m -> Vec Int m)", "specialized = taggedWorker 42"])
+        , ("IndependentQualifiedSibling", Just (83865, "Eq Int => Int"), [], ["import NativePiContainerProvider"], ["sibling :: QPi -> (Eq Int => Int) -> Int", "sibling f g = acceptSibling (headTuple ((f, g), (f, g)))"])
+        , ("ErasedForallSibling", Just (91028, "polytypes: ErasedSibling"), [], ["import NativePiContainerProvider"], ["erasedSibling :: NativePi -> (forall a. a -> a) -> Int", "erasedSibling f g = acceptErasedSibling (headTuple ((f, g), (f, g)))"])
+        , ("ClassArgumentGuard", Just (91028, "polytypes: Eq NativePi"), [], ["import NativePiContainerProvider"], ["classGuard :: Int", "classGuard = acceptClassProxy proxyValue"])
+        , ("StuckFamilyGuard", Just (83865, "untouchable"), [], ["import NativePiContainerProvider"], ["familyGuard :: Int", "familyGuard = acceptStuck bottomValue"])
+        , ("UnsaturatedArgumentGuard", Just (91028, "polytypes: Either NativePi"), [], ["import NativePiContainerProvider"], ["unsaturatedGuard :: Int", "unsaturatedGuard = acceptUnsaturatedProxy proxyValue"])
+        , ("NonliftedArgumentGuard", Just (91028, "(# NativePi"), [], ["import NativePiContainerProvider"], ["nonliftedGuard :: Int", "nonliftedGuard = acceptUnliftedProxy proxyValue"])
+        , ("OrdinaryTauTupleControl", Nothing, [], ["import NativePiContainerProvider"], ["ordinaryHead :: forall a. (a,a) -> a", "ordinaryHead (first,_) = first", "ordinaryPair :: (Int, Bool)", "ordinaryPair = ordinaryHead ((42, True), (43, False))"])
+        , ("OrdinaryTauClassProxyControl", Nothing, ["PolyKinds"], ["import NativePiContainerProvider", "import Data.Proxy (Proxy)"], ["ordinaryClass :: Proxy (Eq Int)", "ordinaryClass = proxyValue"])
+        , ("OrdinaryTauFamilyControl", Nothing, [], ["import NativePiContainerProvider"], ["type family OrdinaryFamily a", "ordinary :: OrdinaryFamily Int -> OrdinaryFamily Int", "ordinary x = id x"])
+        , ("OrdinaryTauUnsaturatedControl", Nothing, ["PolyKinds"], ["import NativePiContainerProvider", "import Data.Proxy (Proxy)"], ["ordinaryHigher :: Proxy (Either Int)", "ordinaryHigher = proxyValue"])
+        , ("OrdinaryTauUnliftedProxyControl", Nothing, ["PolyKinds", "UnboxedTuples", "MagicHash"], ["import NativePiContainerProvider", "import Data.Proxy (Proxy)", "import GHC.Exts (Int#)"], ["ordinaryUnlifted :: Proxy (# Int, Int# #)", "ordinaryUnlifted = proxyValue"])
+        , ("NominalContainerGiven", Nothing, [], ["import NativePiContainerProvider hiding (NativePi)"], ["type NativePi = foreach (n :: Nat) -> Vec Int n", "nominal :: forall value. value ~ (NativePi, NativePi) => value -> (NativePi, NativePi)", "nominal x = x"])
+        , ("RepresentationalEvidenceIsNotNominal", Just (91028, "Cannot equate type variable"), [], ["import NativePiContainerProvider hiding (NativePi)", "import Data.Coerce (Coercible)"], ["type NativePi = foreach (n :: Nat) -> Vec Int n", "representation :: forall value. Coercible value (NativePi, NativePi) => value -> (NativePi, NativePi)", "representation x = x"])
+        , ("NewtypeContainer", Nothing, [], ["import NativePiContainerProvider"], ["shellClient :: QPi -> QPi", "shellClient f = openShell (headTuple (ContainerShell f, ContainerShell f))"])
+        ]
     qualifiedPiExtensions = ["TypeFamilies", "FlexibleContexts", "ConstraintKinds", "AllowAmbiguousTypes", "ImpredicativeTypes"]
     declaration signature = ["data PackedVec a where", "  PackVec :: " ++ signature]
     package = declaration "foreach (n :: Nat) -> Vec a n -> PackedVec a"
