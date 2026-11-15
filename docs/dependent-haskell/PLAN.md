@@ -2953,7 +2953,9 @@ C1 and C2 remain open.
 Admit a bounded immediate lambda argument such as
 `case f (((\x -> S x) :: Nat -> Nat) n) of ...` through the existing Core beta
 bridge. Begin with an explicit complete monomorphic scalar endofunction
-signature. Do not implement general unannotated lambda inference.
+signature. Require one written plain `A -> A` arrow with the same bare,
+optionally parenthesized type constructor Name on each side. Exclude signature
+aliases. Do not implement general unannotated lambda inference.
 
 - [ ] Require the actual checked ExprWithTySig node retained by
   `Tc.Gen.Head.tcExprWithSig` at lines 510–517. Do not infer signature provenance
