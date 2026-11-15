@@ -2778,3 +2778,36 @@ identities. In the filled-kind control, ordinary VTA kind checking assigns
 `Type` to the inferred kind before mode selection permits `NoQL`.
 These observations support the bounded implementation. They do not extend
 the paper's theorem to native FC or permit native mutable-meta assignment.
+
+## Native choices from declared arguments
+
+For `withQ Refl f`, the declared monomorphic type `f :: QPi` can select the
+outer erased argument before the checker elaborates `Refl`. The corrected
+[Quick Look author copy](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf)
+uses later declared argument information before checking an earlier empty list
+on PDF page 5. The `h-var` rules read the context on pages 7 and 19. Argument
+advice precedes full checking on pages 11–15 and 19–22. Section 5.7's
+precomputed guardedness is implemented; its guarded-first iteration is an
+alternative. These rules do not cover native FC.
+
+Agda v2.8.0's
+[variable head rule](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L299-L325)
+uses the current context and still checks modalities. Its
+[domain checking](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L774-L808)
+substitutes checked arguments into the telescope. Its
+[blocked checking](https://github.com/agda/agda/blob/v2.8.0/src/full/Agda/TypeChecking/Rules/Application.hs#L924-L987)
+retains the checked prefix. The rejected postponement comment at lines
+779–791 is not an implemented later-first algorithm.
+
+The GHC adaptation reads declared types without `tcInferId`, which emits
+occurrence usage. A global lookup can load an interface. Complete immutable
+choices enter the existing IALL plan before value checking. Original
+forall/context groups retain their order. Normal argument checking records
+scaled usage once and checks proof entailment. This is type advice, not
+proof evidence or permission to assign native types to mutable variables.
+`Note [Declared native argument choices]` in `GHC.Tc.Gen.App` owns the rule.
+
+`native-known-arguments-prior-art-v1/provenance.json` records the corrected
+PDF version, pinned Agda blobs, full GHC source snapshots and read ranges.
+The reading did not replay a paper proof or inspect the full Agda solver.
+The implementation and source validation are recorded separately.

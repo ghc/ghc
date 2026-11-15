@@ -437,20 +437,21 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
        -- See Note [Known native variables with ImpredicativeTypes].
        ; head_ql <- tcRetainedKnownHeadQL wanted_ql rn_args exp_res_ty tc_fun0 fun_sigma0
        ; tcRetainedAppEvidence $
-         do { (prefix, prepared_ql, prepared_sigma, remaining_args) <-
+         do { (prefix, prepared_ql, prepared_sigma, remaining_args, prepared_plan) <-
                 tcRetainedGroundApp head_ql exp_res_ty rn_head tc_fun0 fun_sigma0 rn_args
+            ; let infer_args = null prefix && isNothing prepared_plan
             ; (tc_fun1, fun_sigma1) <-
-                if null prefix
+                if infer_args
                 then tcRetainedExpectedInst prepared_ql exp_res_ty remaining_args
                                             tc_fun0 prepared_sigma
                 else return (tc_fun0, prepared_sigma)
             ; (tc_fun2, fun_sigma2, initial_cache, inst_plan) <-
-                if null prefix
+                if infer_args
                 then tcRetainedArgInst prepared_ql exp_res_ty rn_head remaining_args
                                       tc_fun1 fun_sigma1
-                else return (tc_fun1, fun_sigma1, [], Nothing)
+                else return (tc_fun1, fun_sigma1, [], prepared_plan)
             ; (dollar_inst, dollar_cache) <-
-                if null prefix
+                if infer_args
                 then tcRetainedDollarInst exp_res_ty rn_head remaining_args tc_fun2 fun_sigma2
                 else return (Nothing, [])
             ; let (tc_fun, fun_sigma) = fromMaybe (tc_fun2, fun_sigma2) dollar_inst
@@ -500,7 +501,7 @@ tcApp rn_expr rn_fun rn_args exp_res_ty
 tcRetainedGroundApp :: QLFlag -> ExpRhoType -> (HsExpr GhcRn, SrcSpan)
                     -> HsExpr GhcTc -> TcSigmaType -> [HsExprArg 'TcpRn]
                     -> TcM ([HsExprArg 'TcpInst], QLFlag, TcSigmaType,
-                            [HsExprArg 'TcpRn])
+                            [HsExprArg 'TcpRn], RetainedInstPlan)
 tcRetainedGroundApp DoQL exp_ty rn_head fun sigma args
   | known_head fun
   = do { enabled <- xoptM LangExt.ExperimentalDependentTypes
@@ -515,7 +516,12 @@ tcRetainedGroundApp DoQL exp_ty rn_head fun sigma args
        ; expected <- readExpType_maybe exp_ty
        ; expected <- mapM (liftZonkM . zonkTcType) expected
        ; residual <- liftZonkM (zonkTcType residual)
-       ; let keep_ql = return (prefix, DoQL, residual, remaining)
+       ; let keep_ql = return (prefix, DoQL, residual, remaining, Nothing)
+             declared_plan =
+               do { plan <- tcRetainedKnownArgPlan expected fun residual remaining
+                  ; case plan of
+                      Just _ -> return (prefix, NoQL, residual, remaining, plan)
+                      Nothing -> keep_ql }
        ; prefix_metadata <- retainedPrefixTypes prefix
        ; case prefix_metadata of
            Nothing -> keep_ql
@@ -524,12 +530,13 @@ tcRetainedGroundApp DoQL exp_ty rn_head fun sigma args
                ; let tys = residual : prefix_tys ++ maybeToList expected
                ; valid_scope <- tcRetainedInstScope tys
                ; if not (valid_scope && all no_ql_vars tys
-                         && any (hasNativeDependentExpr . Core.Type) tys
                          && maybe True isRetainedValueType expected)
                  then keep_ql else
+                 if not (any (hasNativeDependentExpr . Core.Type) tys)
+                 then declared_plan else
             do { let (tvs, _, tau) = tcRetainedInstTelescope residual
                ; if null tvs && isRetainedValueType tau
-                 then return (prefix, NoQL, residual, remaining)
+                 then return (prefix, NoQL, residual, remaining, Nothing)
                  else do
                    { matched <- tcRetainedResultInst NoQL expected remaining fun residual
                    ; case matched of
@@ -541,11 +548,11 @@ tcRetainedGroundApp DoQL exp_ty rn_head fun sigma args
                                ; valid_choices <- tcRetainedInstScope (body : choices)
                                ; if valid_choices && all no_ql_vars (body : choices)
                                  then return (prefix ++ [EWrap (EHsWrap (mkWpTyApps choices))],
-                                              NoQL, body, remaining)
+                                              NoQL, body, remaining, Nothing)
                                  else keep_ql }
-                       _ -> keep_ql } } } } }
+                       _ -> declared_plan } } } } }
   where
-    unchanged = return ([], DoQL, sigma, args)
+    unchanged = return ([], DoQL, sigma, args, Nothing)
     known_head HsVar{} = True
     known_head (XExpr (ConLikeTc (RealDataCon _))) = True
     known_head _ = False
@@ -557,7 +564,7 @@ tcRetainedGroundApp DoQL exp_ty rn_head fun sigma args
     type_arg _ = False
     no_ql_vars = not . any is_ql . tyCoVarsOfTypeList
     is_ql v = isTcTyVar v && isQLInstTyVar v
-tcRetainedGroundApp ql _ _ _ sigma args = return ([], ql, sigma, args)
+tcRetainedGroundApp ql _ _ _ sigma args = return ([], ql, sigma, args, Nothing)
 
 -- | Collect the types that can retain Quick Look choices in a checked prefix.
 -- Unrecognised evidence and wrappers keep the original Quick Look path.
@@ -588,6 +595,114 @@ retainedPrefixTypes args
     var_types v | isTyVar v = [mkTyVarTy v, varType v]
                 | otherwise = [varType v]
 
+-- | Select erased arguments from declared monomorphic values without usage.
+-- See Note [Declared native argument choices].
+tcRetainedKnownArgPlan :: Maybe TcRhoType -> HsExpr GhcTc -> TcSigmaType
+                      -> [HsExprArg 'TcpRn] -> TcM RetainedInstPlan
+tcRetainedKnownArgPlan expected fun sigma args
+  | hasNoConcreteTyVars fun
+  , not (any is_type_arg args)
+  , (tvs, _, tau) <- tcRetainedInstTelescope sigma
+  , not (null tvs), isRetainedValueType tau
+  , let (domains, result) = splitFunTys tau
+        values = [arg | EValArg { ea_arg = arg } <- args]
+  , not (null domains), not (null values)
+  = do { pairs <- fmap catMaybes $ mapM (declared_arg tvs) (zip domains values)
+       ; let actuals = map snd pairs
+             seed | length domains == length values
+                  , Just rho <- expected
+                  = fromMaybe Subst.emptySubst $
+                      matchRetainedAppType tvs Subst.emptySubst result rho
+                  | otherwise = Subst.emptySubst
+             match subst = foldM (\s (formal, actual) ->
+                                    matchRetainedAppType tvs s formal actual)
+                                 subst pairs
+             matched = case match seed of
+                         Nothing -> match Subst.emptySubst
+                         other -> other
+       ; case matched of
+           Just subst
+             | not (null pairs)
+             , any (hasNativeDependentExpr . Core.Type)
+                   (sigma : actuals ++ maybeToList expected)
+             , Just choices <- traverse (Subst.lookupTyVar subst) tvs
+             , not (any (`elemVarSet` tyCoVarsOfTypes choices) tvs)
+             , and (zipWith (\tv ty ->
+                      eqType (Subst.substTy subst (tyVarKind tv)) (typeKind ty))
+                    tvs choices)
+             , all (\(formal, actual) -> eqType (Subst.substTy subst formal) actual) pairs
+             , all no_ql_vars (actuals ++ choices)
+             -> do { valid <- tcRetainedInstScope (actuals ++ choices)
+                   ; return (if valid then Just choices else Nothing) }
+           _ -> return Nothing }
+  where
+    is_type_arg ETypeArg{} = True
+    is_type_arg _ = False
+    no_ql_vars = not . any (\v -> isTcTyVar v && isQLInstTyVar v) . tyCoVarsOfTypeList
+
+    declared_arg tvs (domain, arg)
+      | let formal = scaledThing domain
+      , any (`elemVarSet` tyCoVarsOfType formal) tvs
+      = do { actual <- declared_type arg
+           ; return ((formal,) <$> actual) }
+      | otherwise = return Nothing
+
+    declared_type (L _ (HsPar _ arg)) = declared_type arg
+    declared_type (L loc (HsVar _ lname))
+      | not (isDataOcc (nameOccName (unLocWithUserRdr lname)))
+      = setSrcSpan (locA loc) $
+        do { mb_id <- tcLookupIdMaybe (unLocWithUserRdr lname)
+           ; case mb_id of
+               Just var -> do
+                 { ty <- liftZonkM (zonkTcType (varType var))
+                 ; let (tvs, theta, _) = tcRetainedInstTelescope ty
+                 ; return (if null tvs && null theta && isRetainedValueType ty
+                              && no_ql_vars ty
+                           then Just ty else Nothing) }
+               Nothing -> return Nothing }
+    declared_type _ = return Nothing
+tcRetainedKnownArgPlan _ _ _ _ = return Nothing
+
+-- | Match kinds and types with the same outer erased binder substitution.
+-- See Note [Declared native argument choices] and
+-- Note [Native worker argument inference].
+matchRetainedAppType :: [TyVar] -> Subst.Subst -> Type -> Type -> Maybe Subst.Subst
+matchRetainedAppType tvs subst formal actual
+  = do { subst <- tcMatchRetainedTyX_BM bind_outer subst (typeKind formal) (typeKind actual)
+       ; tcMatchRetainedTyX_BM bind_outer subst formal actual }
+  where
+    bind_outer tv _ | tv `elem` tvs = BindMe
+                   | otherwise = DontBindMe
+
+{- Note [Declared native argument choices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In withQ Refl f, the declared monomorphic type of f can determine value := QPi.
+Reading this declaration does not check the occurrence or consume its usage.
+Do not call tcInferId: it emits usage. Global lookup may load an interface.
+Keep applications, constructors, signatures and polymorphic values on their
+existing paths. Look through parentheses without expanding source syntax.
+
+Match known types against the declared ordinary argument prefix. Match kinds
+before types and bind only the outer erased variables. Require every choice,
+correct substituted kinds, exact matched domains and valid runtime scope.
+Reject free Quick Look variables, including those in kinds and coercions.
+Use an expected seed only at ordinary saturation. Retry a failed seeded match
+independently from the empty substitution. Conflicts retain the guarded path.
+
+Return the choices as an IALL plan. Keep the original signature and checked
+VTA prefix. IALL consumes each forall/context group in its original order.
+Do not infer arguments or create a cache before installing this plan. Refl
+then checks at its actual expected proof type. All arguments retain ordinary
+subsumption and scaled usage; all constraints and final result checks remain.
+A linear value may supply a type. Only runtime indices inside that type must
+meet the unrestricted native-index scope rule. No native meta is assigned.
+
+Quick Look's h-var reads a declared type and its argument advice precedes full
+checking. Agda checks each domain under the substituted telescope and retains
+the checked prefix. This route uses complete immutable choices, not their
+mutable instantiation rules. See docs/dependent-haskell/REFERENCES.md.
+-}
+
 {- Note [Ground retained applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ImpredicativeTypes enables Quick Look even when a checked application does
@@ -616,7 +731,9 @@ argument checking, nominal entailment and final subsumption still run.
 A failed selection keeps the checked prefix and resumes Quick Look. It never
 infers a value argument or creates an argument cache. Public tcInstFun callers
 retain their native Quick Look guards. See Note [Retained types and Quick Look]
-and Note [Retained application evidence]. The IALL/ITYARG rules follow
+and Note [Retained application evidence]. Declared arguments can supply a
+complete IALL plan; see Note [Declared native argument choices].
+The IALL/ITYARG rules follow
 Serrano et al., A quick look at impredicativity, ICFP 2020; see
 Note [Quick Look overview]. This checked route does not extend those rules
 with mutable native instantiation. Agda v2.8.0 retains a checked prefix in
@@ -2275,7 +2392,7 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
              ; let initial_templates = [ scaledThing (domains !! (pos-1)) | (pos, _) <- initial_cache ]
                    match_args subst pairs = foldM (\subst (formal, actual) ->
                                         if native_worker
-                                        then match_worker_type tvs subst formal actual
+                                        then matchRetainedAppType tvs subst formal actual
                                         else tcMatchTyX_BM (bind_outer tvs) subst formal actual)
                                       subst pairs
                    -- See Note [Ordinary heads in native argument matching].
@@ -2342,7 +2459,7 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
       | Just expected_ty <- expected
       , native_worker
       , isRetainedValueType expected_ty
-      , Just subst <- match_worker_type tvs Subst.emptySubst result expected_ty
+      , Just subst <- matchRetainedAppType tvs Subst.emptySubst result expected_ty
       = subst
       | Just expected_ty <- expected
       , not native_worker
@@ -2351,12 +2468,6 @@ tcRetainedArgInstEnabled after_vta NoQL expected rn_head args fun sigma
       , Just subst <- tcMatchTyX_BM (bind_outer tvs) Subst.emptySubst result expected_ty
       = subst
       | otherwise = Subst.emptySubst
-
-    -- | Match kinds before worker types with the same restricted substitution.
-    match_worker_type :: [TyVar] -> Subst.Subst -> Type -> Type -> Maybe Subst.Subst
-    match_worker_type tvs subst formal actual
-      = do { subst <- tcMatchRetainedTyX_BM (bind_outer tvs) subst (typeKind formal) (typeKind actual)
-           ; tcMatchRetainedTyX_BM (bind_outer tvs) subst formal actual }
 
     actual_type (_, ty, _) = ty
 
