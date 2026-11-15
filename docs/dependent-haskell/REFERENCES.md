@@ -3322,3 +3322,47 @@ whole-paper reading is claimed.
 The operational source evidence and remaining gates are in
 [the M50 contract](CORE.md#multi-constructor-retained-package-patterns) and
 [checkpoint](README.md#m50-multi-constructor-retained-package-patterns).
+
+
+## Function-valued retained package fields prior art
+
+M51 extends the existing field telescope to a stored function. Its later
+payload type can refer to `f n` under the actual stored `f` and `n`.
+The constructor uses an ordinary erased payload parameter. This uses the
+existing opaque call rule; it adds no evaluator or call-injectivity rule.
+
+Agda v2.8.0's [datatype constructors](https://agda.readthedocs.io/en/v2.8.0/language/data-types.html#general-form)
+use dependent function telescopes. Its [record declarations](https://agda.readthedocs.io/en/v2.8.0/language/record-types.html#declaring-record-types)
+allow later field types to depend on earlier fields. The builtin
+[Sigma source](https://github.com/agda/agda/blob/v2.8.0/src/data/lib/prim/Agda/Builtin/Sigma.agda#L7-L11)
+places the second field under the actual first field. A function can occupy
+that first field. These are the formation and scope precedents. They do not
+provide GHC's lazy-field semantics, Many restriction, FC roles or file codec.
+
+The pinned v2.8.0 Git blobs are datatype manual
+`7713c0755a94f784971a637059caaed4c616f04e`, record manual
+`6abb10deffa8796ec2de469f37a096dc23ba13d5` and builtin Sigma
+`d68aead018bb834aec9a547a7907576005c28dcf`.
+The selected reading is datatype lines59–76 and95–108, record lines162–178,
+and the full17-line Sigma module. Cached bytes and reading provenance are in
+`_build/verification/native-function-package-next-research-v1/provenance.json`.
+The rendered datatype and record manuals were checked again on2026-11-15.
+The Sigma web fetch failed; its exact cached primary source was read instead.
+No Agda execution, full-manual reading or termination/positivity transfer is claimed.
+
+Eisenberg's [2016 thesis](https://richarde.dev/papers/2016/thesis/eisenberg-thesis.pdf),
+printed54–55/PDF69–70, separates dependency from relevance. Here both stored
+index fields are relevant: later types depend on them, and runtime code can
+use their values. An erased existential variable is a different mechanism.
+The selected thesis text was revisited; no full-thesis reading is claimed.
+
+[System D/DC, ICFP2017 author version](https://richarde.dev/papers/2017/dep-haskell-spec/dep-haskell-spec.pdf),
+PDF7–9 and14–16, supplies relevant telescopes and typed substitution as broader
+prior art. Section9, printed31:27/PDF27, explicitly leaves primitive datatypes
+and pattern matching to future work. It does not verify this DataCon/importer
+extension. The seven-work/nine-PDF ledger is unchanged; no proof replay occurs.
+
+For the wire boundary, follow GHC's existing separate free-variable diagnostic
+forms. A diagnostic free function head must remain distinct from a scoped
+local interface name. The new type tag requires a distinct fork version and
+actual old/new reader checks. See [the M51 plan](PLAN.md#m51-function-valued-retained-package-fields).

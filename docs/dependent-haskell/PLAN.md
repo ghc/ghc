@@ -3346,3 +3346,64 @@ measured controls; existing PMC remains enabled.
 Add a small labeled example in the same change that completes a source feature.
 Keep the program finite. This showcase does not close R22, C1 or C2 and does
 not replace focused regression evidence.
+
+
+### M51: function-valued retained package fields
+
+Status: specified; implementation and final validation are pending.
+The target stores the actual function used by the later payload type:
+
+```haskell
+data FunctionPack a where
+    FunctionPack :: foreach (f :: Nat -> Nat)
+                  -> foreach (n :: Nat)
+                  -> Vec a (f n) -> FunctionPack a
+```
+
+The erased parameter `a` remains ordinary. The stored `f` and `n` remain lazy
+runtime fields. A later field refers to their actual constructor-local Ids.
+Reuse `DepFunTy`, `TermAppTy` and the existing sequential field metadata.
+Reuse the M46 closed, visible Many function policy. Do not make functions
+scalar indices or infer input/function equality from equal call results.
+
+- [x] Preserve the M50 baseline compiler and matching reader metadata. The
+  generic producer is rejected with located GHC-83605 at its function binder.
+  Baseline attempt1 failed dependency-interface lookup before this check;
+  attempt2 copies the actual dependency interface and reaches the source gate.
+  The saved old reader reads the actual old PackedVecLibrary interface.
+- [ ] Use `isNativeRetainedBinderType` in source field checking and deferred
+  named-field import. Use `isNativeRetainedBinder` in DataCon validation and
+  source pattern fields. Preserve all existing declaration, scope, Many,
+  wrapper, ordinary-field and scalar constructor-pattern checks. A stored
+  function pattern must remain a bare variable.
+- [ ] Encode `IfaceTermAppTy` with fresh type tag12, a local head name and an
+  argument type. Decode through the lexical Id environment. Check the exact
+  closed function domains and argument kind before constructing `TermAppTy`.
+  Keep the whole-field check for references to earlier fields only.
+- [ ] Preserve diagnostic free call heads in a separate non-serializable
+  `IfaceFreeTermAppTy`, following `IfaceFreeTermVar`. Cover printing and all
+  type traversals. A free head must not become a serialized local spelling.
+- [ ] Set tracked `VERSION_DATE` to20261115.1 and reconfigure the fork as
+  10.1.20261115.1, header1001202611151. Rebuild matching compiler/libraries.
+  Check old-reader/new-file and new-reader/old-file rejection, including
+  IgnoreHiWay. Keep unknown tags explicit failures. Keep generic exported
+  function-valued Pi, coercion encoding and native unfoldings gated.
+- [ ] Extend the existing API fixtures without new test files or golden lines.
+  Check binary round trips, lexical freshening, free/forward/sibling heads,
+  wrong kinds/domains/multiplicities, noninjectivity and deferred malformed
+  datatype knots. Check field order and runtime arity with Core/STG Lint.
+- [ ] Pass separate producer/consumer source imports in both compilers with
+  the 24-line independently specified finite oracle. Cover IORef0/2/3,
+  identity/successor/constant heads, a Char payload, repacking, row scope,
+  package WHNF, ignored fields and distinct demanded errors. A producer
+  failure must not count as a negative client rejection.
+- [ ] Run the existing relevant API, source, constructor, native pipeline and
+  registered checks. Preserve historical failures and exact selected inputs.
+  Add a labeled function-field example to Showcase.hs when this slice passes.
+- [ ] Update the contract, references and current status with actual results.
+  Freeze, independently audit and publish the completed checkpoint.
+
+The preparation lives under `native-function-package-*`. M50 and its
+`native-multicon-package-*` namespace remain frozen. Prior art is recorded
+[with the references](REFERENCES.md#function-valued-retained-package-fields-prior-art).
+This slice does not close R22, C1 or C2 and does not establish totality.
