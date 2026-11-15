@@ -384,7 +384,9 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                         (call_ty : result_ty : map varType (givens ++ captures)))
                     subst = Subst.mkIdSubst in_scope (unitVarEnv alias (Var index))
                     generalize = Subst.substTy subst . pSnd . coercionKind
-              ; dictionaries <- newEvVars (map generalize given_cos)
+              ; motive_proof <- newEvVar (mkNomEqPred (TermVarTy index) call_ty)
+              ; old_dictionaries <- newEvVars (map generalize given_cos)
+              ; let dictionaries = motive_proof : old_dictionaries
               ; names <- mapM (newSysName . nameOccName . idName) captures
               ; let capture_names = zip (map idName captures) names
                     add_arguments (L match_loc match@(Match { m_pats = L pats_loc pats }), (con, fields))
@@ -398,7 +400,8 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                     capture_tys = map (mkCheckExpFunPatTy . Scaled ManyTy . generalize) capture_cos
                     argument_plan = map RetainedConDict dictionaries
                                     ++ map (const RetainedConValue) captures
-              ; checked <- tcRetainedConMatches index [] (dictionary_tys ++ capture_tys)
+              ; checked <- tcRetainedConMatchesWithCall (Just (call_ty, motive_proof))
+                             index [] (dictionary_tys ++ capture_tys)
                              argument_plan (mkCheckExpType (generalize result_co)) matches'
               ; strict <- xoptM LangExt.Strict
               ; mapM_ (tcEmitBindingUsage . singleUsageUE) captures
@@ -419,7 +422,7 @@ tcRetainedCallCase call_ty@(TermAppTy fun arg_ty) scrut
                       if isCoVar given
                       then evCoercion (mkCoCast (mkCoVarCo given) (mkSubCo co))
                       else evCast (Var given) (mkSubCo co)) givens given_cos
-                    with_evidence = mkHsWrap (mkWpEvApps evidence)
+                    with_evidence = mkHsWrap (mkWpEvApps (evCoercion (mkCoVarCo proof) : evidence))
                                       (HsApp noExtField (noLocA motive) alias_arg)
                     arguments = zipWith (\var co -> mkLHsWrapCo co
                                   (noLocA (HsVar noExtField (noLocA var)))) captures capture_cos
@@ -545,6 +548,22 @@ Do not introduce this strict alias on that ordinary path. Reject active
 instrumentation: an inserted tick can obscure the checked runtime call.
 The dispatcher checks the original scrutinee and its usage once. It also
 keeps the original case for diagnostics with ExpandedThingTc.
+
+Pass a separate ordinary evidence parameter q_motive :: i ~# f n to the motive.
+Create it after whole-call generalization, before the old dictionaries. Apply
+the motive to r, then q, then the transported old evidence and captures. This
+keeps the outer alias r distinct from the motive's index i.
+
+The constructor proof cv :: i ~# K refines q_motive's predicate through the
+existing dictionary transport. It produces q_branch :: K ~# f n. Only while
+checking that row body, record the exact call with sym q_branch :: f n ~# K.
+Keep q_motive in the ordinary evidence-parameter ABI. Only cv occupies the
+virtual constructor-proof slot. Its branch evidence binds remain under cv.
+Applications may use this descriptor only after substituting the actual
+retained operands into a residual monomorphic ordinary type. They must not
+cast an uninstantiated retained telescope, even if a formal binder reuses an
+outer Id's Unique. See Note [Lexical retained call refinements] in
+GHC.Tc.Utils.Monad. No new family equation or function injectivity is assumed.
 
 Agda with-abstraction supplies prior art for whole-term generalization and
 checking a helper in its dependent context. It supplies no Haskell demand
@@ -1085,9 +1104,19 @@ tcRetainedConMatches :: Id -> [ExpPatType] -> [ExpPatType] -> [RetainedConArg] -
                     -> MatchGroup GhcRn (LHsExpr GhcRn)
                     -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
 tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty group
-  | Just second <- retainedMatrixColumn argument_plan group
+  = tcRetainedConMatchesWithCall Nothing index invis_pat_tys pat_tys argument_plan rhs_ty group
+
+-- | Check constructor rows with an optional exact-call evidence parameter.
+-- The call motive supplies only dictionary and value arguments after its index.
+tcRetainedConMatchesWithCall :: Maybe (Type, EvVar)
+                            -> Id -> [ExpPatType] -> [ExpPatType] -> [RetainedConArg]
+                            -> ExpRhoType -> MatchGroup GhcRn (LHsExpr GhcRn)
+                            -> TcM (MatchGroup GhcTc (LHsExpr GhcTc))
+tcRetainedConMatchesWithCall call_refinement index invis_pat_tys pat_tys argument_plan rhs_ty group
+  | Nothing <- call_refinement
+  , Just second <- retainedMatrixColumn argument_plan group
   = tcRetainedMatrixMatches index second invis_pat_tys pat_tys argument_plan rhs_ty group
-tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
+tcRetainedConMatchesWithCall call_refinement index invis_pat_tys pat_tys argument_plan rhs_ty
                     (MG { mg_alts = L loc matches, mg_ext = (origin, _) })
   = setSrcSpanA loc $
     do { constructors <- mapM constructor matches
@@ -1172,7 +1201,16 @@ tcRetainedConMatches index invis_pat_tys pat_tys argument_plan rhs_ty
                  index_arg = mkCheckExpFunPatTy (Scaled ManyTy (varType index))
                  renamed = renameRetainedMatch names match
                  match' = renamed { m_pats = fmap (insert_dictionaries argument_plan) (m_pats renamed) }
-                 check = tcMatchWithSource tcBody (invis_pat_tys ++ index_arg : refined_args)
+                 check_body = case call_refinement of
+                   Nothing -> tcBody
+                   Just (call_ty, motive_proof) ->
+                     case lookup motive_proof (zip (map fst dictionary_cos) refined_givens) of
+                       Just branch_proof -> \body body_ty ->
+                         withRetainedCallRefinement call_ty (mkSymCo (mkCoVarCo branch_proof)) $
+                           tcBody body body_ty
+                       Nothing -> pprPanic "tcRetainedConMatchesWithCall: missing call proof"
+                                    (ppr motive_proof)
+                 check = tcMatchWithSource check_body (invis_pat_tys ++ index_arg : refined_args)
                            (mkCheckExpType (pSnd (coercionKind result_co))) match (L match_loc match')
            ; (ev_binds, L checked_loc checked) <- if null refined_givens
                then do { checked <- check; return (emptyTcEvBinds, checked) }

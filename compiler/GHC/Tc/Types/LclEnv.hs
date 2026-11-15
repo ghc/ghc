@@ -39,6 +39,7 @@ import GHC.Tc.Utils.TcType ( TcLevel )
 import GHC.Tc.Errors.Types ( TcRnMessage )
 
 import GHC.Core.UsageEnv ( UsageEnv )
+import GHC.Core.TyCo.Rep ( Type, CoercionN )
 
 import GHC.Types.Name.Reader ( LocalRdrEnv )
 import GHC.Types.Name.Env ( NameEnv )
@@ -100,6 +101,10 @@ data TcLclCtxt
         tcl_native_givens :: [EvVar],       -- Lexical native evidence parameters,
                                             -- including equality CoVars.
                                             -- See Note [Lexical native Givens]
+                                            -- in GHC.Tc.Utils.Monad.
+        tcl_retained_call_refinements :: [(Type, CoercionN)],
+                                            -- Lexical whole-call proofs.
+                                            -- See Note [Lexical retained call refinements]
                                             -- in GHC.Tc.Utils.Monad.
         tcl_bndrs       :: TcBinderStack,   -- Used for reporting relevant bindings,
                                             -- and for tidying type
@@ -261,4 +266,4 @@ cannot capture dictionaries introduced inside the proc.
 
 data ArrowCtxt   -- Note [Escaping the arrow scope]
   = NoArrowCtxt
-  | ArrowCtxt LocalRdrEnv (TcRef WantedConstraints) [EvVar]
+  | ArrowCtxt LocalRdrEnv (TcRef WantedConstraints) [EvVar] [(Type, CoercionN)]
