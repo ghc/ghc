@@ -24,6 +24,7 @@ import Control.Monad (unless)
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf)
 import Data.Type.Equality ((:~:) (Refl))
+import qualified FunctionPackageLibrary as FunctionPackages
 import qualified GroundApplicationClient as Ground
 import qualified IndexBetaClient as IndexBeta
 import qualified KnownArgumentClient as Known
@@ -269,6 +270,20 @@ functions = do
         Z -> toList (idCall f (S n) VNil)
         S k -> toList (idCall f (S n) (VCons 42 (replicateNative @Int k 42)))
 
+-- | Store the actual function and input used by a later payload type.
+functionFields :: IO ()
+functionFields = do
+    cell <- newIORef (S (S (S Z)))
+    n <- readIORef cell
+    let successor :: Nat -> Nat
+        successor size = S size
+        package = FunctionPackages.buildPack @Int successor n 42
+    case FunctionPackages.repackFunction package of
+        FunctionPackages.FunctionPack storedFunction storedInput values ->
+            observe "stored function, input and dependent payload" (natToInt (storedFunction storedInput), toList values)
+    observe "generic payload in a function package" (FunctionPackages.inspectFunction (FunctionPackages.buildPack @Char successor n 'q'))
+    observe "function package fields stay lazy" (FunctionPackages.ignoreFunction (FunctionPackages.lazyPack @Int (error "showcase-stored-function") (error "showcase-stored-input")))
+
 -- | Open either constructor without sharing their retained field binders.
 alternatives :: IO ()
 alternatives = do
@@ -361,5 +376,6 @@ main = do
     finiteDomains
     vectors
     functions
+    functionFields
     laterArguments
     alternatives
