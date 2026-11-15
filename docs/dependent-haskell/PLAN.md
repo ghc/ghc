@@ -2609,3 +2609,43 @@ The unsigned captured-alias rejection is a measured pre-existing multiplicity
 boundary; a signed alias works. The existing CoreRun diagnostic fragment now
 matches the expanded grammar. Its 37-line golden remains unchanged.
 The full GHC suite and older standalone matrices were not rerun.
+
+### M41: checked native variable aliases
+
+Remove one redundant local alias in the restricted native simplifier:
+`let alias = actual in body` becomes `body[actual/alias]`. Keep an outer
+`let actual = opaqueProducer x` lazy and shared. This is one C2 transformation.
+It does not admit general inlining or an ordinary optimizer mode.
+
+Match only a nonrecursive, non-top-level binding whose input RHS is literally
+`Var actual`. Require both input Ids to be eligible local Many indices. Resolve
+the target with the current `lookupIdSubst` only. Require a variable result of
+the same substituted closed domain. A constructor substitution falls back to
+the existing path. Do not unfold, beta-normalize or simplify an RHS to discover
+an alias. Exclude joins, exported aliases, stable unfoldings, rules, inactive
+inline activation and loop-breaker aliases. Do not inspect the target's unfolding.
+
+Use `extendIdSubstWithClone` to store the same actual Id and maintain the
+in-scope set. This helper allocates no Id. Remove a stale alias entry from the
+inlining environment. Existing traversal substitutes terms, binder types,
+Type nodes, coercions and native indices together. Surviving binders retain
+the existing capture-avoidance rules. Keep recursive and top-level groups.
+The rule runs only under `soe_native`.
+
+Add quiet checks to the existing API fixtures. Lint input and output. Check
+exact result types, deep free variables, repeated actual-Id identity, a
+type-only alias dependency and a descendant binder that reuses a Unique.
+Keep let-bound indices inside their scopes; the whole test result must not
+expose a local alias. Test valid fallback cases separately from malformed Core.
+Inspect direct simplifier output before execution. Check function WHNF,
+ignored bottom returning 42, demanded bottom and a finite cyclic prefix.
+Run both-stage public and packed-vector examples and the focused regressions.
+Keep all existing goldens. Add no tracked test. Preserve M40 evidence unchanged
+and use `native-variable-alias-*` for new evidence. Source alias defaulting,
+function indices and the broader C1/C2 obligations remain open.
+
+- [ ] Preserve a measured pre-change alias-retention baseline.
+- [ ] Add the native-only substitution and owning Note.
+- [ ] Check scope, metadata, exact types and fallback cases directly.
+- [ ] Check runtime demand and both-stage source execution.
+- [ ] Build both stages, freeze the focused evidence and record the boundary.
